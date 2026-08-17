@@ -1,7 +1,8 @@
 import "@testing-library/jest-dom/vitest";
-import "vitest-axe/extend-expect";
-import { afterEach } from "vitest";
+import { afterEach, expect } from "vitest";
 import { cleanup } from "@testing-library/react";
+import * as axeMatchers from "vitest-axe/matchers";
+import type { AxeMatchers } from "vitest-axe/matchers";
 
 // vitest.config.mts sets `globals: false`, so @testing-library/react's automatic
 // afterEach(cleanup) (which relies on global test hooks) never registers. Register
@@ -9,3 +10,19 @@ import { cleanup } from "@testing-library/react";
 afterEach(() => {
   cleanup();
 });
+
+// vitest-axe@0.1.0's own "vitest-axe/extend-expect" entry point ships an empty
+// dist/extend-expect.js (a broken build published to npm — verified against the
+// registry tarball, not an install artifact of this machine) and its .d.ts targets
+// vitest's pre-1.0 `declare global { namespace Vi { ... } }` typing pattern, which
+// current vitest (module-augmentation-based `declare module "vitest"`) no longer
+// picks up. Register the matcher at runtime and re-declare its type ourselves,
+// mirroring the pattern @testing-library/jest-dom/vitest uses.
+expect.extend(axeMatchers);
+
+declare module "vitest" {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-empty-object-type, @typescript-eslint/no-unused-vars -- declaration-merging interface must match vitest's own `Assertion<T = any>` signature exactly
+  interface Assertion<T = any> extends AxeMatchers {}
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type -- declaration-merging interface, adds no new members by design
+  interface AsymmetricMatchersContaining extends AxeMatchers {}
+}
