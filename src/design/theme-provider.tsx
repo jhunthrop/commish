@@ -26,7 +26,16 @@ function apply(t: ThemePreference): void {
 }
 
 export function ThemeProvider({ children }: { readonly children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemePreference>(readStored);
+  // Initialize to "system" unconditionally so the server-rendered markup and the
+  // client's first render match. Reading localStorage happens in an effect below,
+  // after mount, to avoid a hydration mismatch (the initializer form of useState
+  // runs during render, including hydration, where `window` already exists client
+  // side but not server side).
+  const [theme, setThemeState] = useState<ThemePreference>("system");
+
+  useEffect(() => {
+    setThemeState(readStored());
+  }, []);
 
   useEffect(() => {
     apply(theme);
