@@ -41,3 +41,18 @@ export const clientDraftActionSchema = z.discriminatedUnion("type", [
 ]);
 
 export type ClientDraftAction = z.infer<typeof clientDraftActionSchema>;
+
+/**
+ * Turns a validated client submission into a persisted action by stamping the two fields a
+ * client is never allowed to choose: which team is acting, and when.
+ */
+export function toDraftAction(input: ClientDraftAction, teamId: string, timestamp: string): DraftAction {
+  switch (input.type) {
+    case "MAKE_PICK":
+      return { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp, teamId, playerId: input.playerId };
+    case "NOMINATE":
+      return { v: DRAFT_ACTION_VERSION, type: "NOMINATE", timestamp, teamId, playerId: input.playerId, openingBid: input.openingBid };
+    case "BID":
+      return { v: DRAFT_ACTION_VERSION, type: "BID", timestamp, teamId, amount: input.amount };
+  }
+}

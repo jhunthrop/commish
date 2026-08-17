@@ -14,4 +14,4 @@ export {
   remainingBudget, minBidFor, maxBidFor, currentTier, currentClockSeconds, currentDeadline, nextTightening,
   draftStateView, type DraftStateView,
 } from "./selectors";
-export { draftActionSchema, clientDraftActionSchema, type ClientDraftAction } from "./action-schema";
+export { draftActionSchema, clientDraftActionSchema, toDraftAction, type ClientDraftAction } from "./action-schema";

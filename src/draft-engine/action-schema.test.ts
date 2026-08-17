@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clientDraftActionSchema, draftActionSchema } from "./action-schema";
+import { clientDraftActionSchema, draftActionSchema, toDraftAction } from "./action-schema";
 
 describe("draftActionSchema (persisted jsonb boundary)", () => {
   it("accepts a v1 MAKE_PICK row", () => {
@@ -53,5 +53,38 @@ describe("clientDraftActionSchema (HTTP body boundary)", () => {
 
   it("refuses START_DRAFT from the actions endpoint", () => {
     expect(clientDraftActionSchema.safeParse({ type: "START_DRAFT" }).success).toBe(false);
+  });
+});
+
+describe("toDraftAction (stamps the server-resolved teamId and timestamp)", () => {
+  it("stamps a MAKE_PICK", () => {
+    expect(toDraftAction({ type: "MAKE_PICK", playerId: "p1" }, "team_1", "2026-09-01T00:00:00.000Z")).toEqual({
+      v: 1,
+      type: "MAKE_PICK",
+      timestamp: "2026-09-01T00:00:00.000Z",
+      teamId: "team_1",
+      playerId: "p1",
+    });
+  });
+
+  it("stamps a NOMINATE", () => {
+    expect(toDraftAction({ type: "NOMINATE", playerId: "p1", openingBid: 5 }, "team_1", "2026-09-01T00:00:00.000Z")).toEqual({
+      v: 1,
+      type: "NOMINATE",
+      timestamp: "2026-09-01T00:00:00.000Z",
+      teamId: "team_1",
+      playerId: "p1",
+      openingBid: 5,
+    });
+  });
+
+  it("stamps a BID", () => {
+    expect(toDraftAction({ type: "BID", amount: 10 }, "team_1", "2026-09-01T00:00:00.000Z")).toEqual({
+      v: 1,
+      type: "BID",
+      timestamp: "2026-09-01T00:00:00.000Z",
+      teamId: "team_1",
+      amount: 10,
+    });
   });
 });
