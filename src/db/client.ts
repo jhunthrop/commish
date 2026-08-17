@@ -12,6 +12,9 @@ function requireDatabaseUrl(): string {
 
 export type Db = ReturnType<typeof createDb>;
 
+/** The transaction handle Drizzle hands a `db.transaction` callback. */
+export type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
+
 export function createDb(connectionString: string = requireDatabaseUrl()) {
   const client = postgres(connectionString, { max: 10 });
   return drizzle(client, { schema });

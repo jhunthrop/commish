@@ -31,15 +31,18 @@ function newStore(publishFn: PublishFn = publish) {
 }
 
 /**
- * A `Db` whose `insert(draftActions)` always rejects with a connection-style error rather
- * than a Postgres unique violation — the store's non-race failure path, distinct from the
- * (draft_id, sequence) backstop exercised elsewhere.
+ * A `Db` whose `transaction(...)` always rejects with a connection-style error rather than a
+ * Postgres unique violation — the store's non-race failure path, distinct from the
+ * (draft_id, sequence) backstop exercised elsewhere. `applyAction` does its append inside
+ * `db.transaction`, so this is the seam that actually fails when the connection drops —
+ * intercepting `insert` alone would miss it, because the transaction callback receives its
+ * own `tx` handle, never `db.insert` itself.
  */
 function storeWithBrokenInsert() {
   const brokenDb = new Proxy(db, {
     get(target, prop, receiver) {
-      if (prop === "insert") {
-        return () => ({ values: () => Promise.reject(new Error("connection reset by peer")) });
+      if (prop === "transaction") {
+        return () => Promise.reject(new Error("connection reset by peer"));
       }
       return Reflect.get(target, prop, receiver);
     },
@@ -100,9 +103,12 @@ describe("draft store — persistence", () => {
     const { draftId, teamIds } = await fixture();
     const store = newStore();
     await store.applyAction(draftId, start(teamIds));
+    const publishedBeforeRejection = published.length;
     const result = await store.applyAction(draftId, pick(teamIds[1]!, "qb1"));
     expect(result).toEqual({ ok: false, reason: "It's not your turn to pick." });
     expect(await actionRows(draftId)).toHaveLength(1);
+    // The rejected action contributes no new publish — only START_DRAFT (above) did.
+    expect(published).toHaveLength(publishedBeforeRejection);
   });
 
   it("publishes draft events after the write, on the league stream", async () => {
@@ -136,9 +142,18 @@ describe("draft store — persistence", () => {
 
     expect(await actionRows(draftId)).toHaveLength(1);
     expect(published).toHaveLength(0);
-    // The failed write must not poison the cache: the next read still replays the true log.
+    // The failed write must not poison the cache: if it had, a later read would keep
+    // returning the pre-failure state even after the log changed underneath it. Insert a
+    // row out-of-band (bypassing the store entirely) and confirm the next read reflects it —
+    // proof the cache was actually cleared, not merely "still equal to what it was before".
+    await db.insert(draftActions).values({
+      draftId,
+      sequence: 2,
+      action: pick(teamIds[0]!, "qb1"),
+      timestamp: new Date(T),
+    });
     const state = await broken.getDraftState(draftId);
-    expect(state?.sequence).toBe(1);
+    expect(state?.sequence).toBe(2);
   });
 });
 
@@ -190,5 +205,8 @@ describe("draft store — concurrency", () => {
     const loser = results.find((r) => !r.ok);
     expect(loser).toEqual({ ok: false, reason: "Someone else acted first. Try again." });
     expect(await actionRows(draftId)).toHaveLength(2);
+    // One event for START_DRAFT plus one for the winning pick — the loser's rejected
+    // write never reaches `broadcast`, so it contributes nothing.
+    expect(published).toHaveLength(2);
   });
 });
