@@ -3,7 +3,10 @@ import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
 import { AUCTION_CONFIG } from "./config";
 
 const version = z.literal(DRAFT_ACTION_VERSION);
-const timestamp = z.string().min(1);
+// A strict ISO 8601 datetime (not just any non-empty string) so a malformed stamp can't
+// `Date.parse` to `NaN` and silently bypass the R-B4 "clock hasn't run out yet" guard, which
+// compares `Date.parse(action.timestamp)` against the deadline.
+const timestamp = z.iso.datetime();
 const teamId = z.string().min(1);
 const playerId = z.string().min(1);
 const dollars = z.number().int().positive();

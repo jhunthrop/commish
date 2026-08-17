@@ -36,12 +36,25 @@ async function insertPlayers(count: number): Promise<void> {
   );
 }
 
-/** One SSE-equivalent client: reads the league stream until the draft is announced complete. */
-async function watchUntilComplete(leagueId: string, signal: AbortSignal): Promise<readonly RealtimeEvent[]> {
+/** Flips true the moment a watcher has received its first stream entry — see `watchUntilComplete`. */
+interface Watcher {
+  ready: boolean;
+}
+
+/**
+ * One SSE-equivalent client: reads the league stream until the draft is announced complete.
+ * `watcher.ready` flips true on the first entry received (real or probe) — a marker that this
+ * connection's blocking XREAD has actually registered with Redis, used by
+ * `waitUntilSubscribersReady` below in place of a fixed sleep. Probe entries (see there) are
+ * never real draft events and are filtered out before being recorded.
+ */
+async function watchUntilComplete(leagueId: string, signal: AbortSignal, watcher: Watcher): Promise<readonly RealtimeEvent[]> {
   const seen: RealtimeEvent[] = [];
   const redis = new Redis(REDIS_URL);
   try {
     for await (const event of subscribe({ redis, leagueId, afterId: "$", signal })) {
+      watcher.ready = true;
+      if ((event.payload as { probe?: boolean } | null)?.probe === true) continue;
       seen.push(event);
       if (event.type === "draft.status" && (event.payload as { phase?: string }).phase === "complete") break;
     }
@@ -49,6 +62,27 @@ async function watchUntilComplete(leagueId: string, signal: AbortSignal): Promis
     redis.disconnect();
   }
   return seen;
+}
+
+/**
+ * Deterministic replacement for a fixed `setTimeout` warm-up: republishes a probe event onto
+ * the league stream until every given watcher has observed at least one stream entry (proving
+ * its `subscribe()` XREAD has registered with Redis), so the caller can be sure no *real*
+ * event published next will be missed by a subscriber that hadn't started listening yet.
+ * Bounded by `timeoutMs` so a genuinely stuck subscriber fails the test with a clear message
+ * instead of hanging the suite.
+ */
+async function waitUntilSubscribersReady(leagueId: string, watchers: readonly Watcher[], timeoutMs = 5_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (watchers.some((w) => !w.ready)) {
+    if (Date.now() > deadline) {
+      throw new Error(
+        `Timed out after ${timeoutMs}ms waiting for ${watchers.length} SSE subscriber(s) on league "${leagueId}" to register.`,
+      );
+    }
+    await publisher.publish({ leagueId, type: "draft.status", payload: { probe: true } });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
 }
 
 function picksFromEvents(events: readonly RealtimeEvent[]) {
@@ -78,11 +112,9 @@ describe("two SSE clients watching a live snake draft", () => {
 
     const draft = store();
     const ac = new AbortController();
-    const clients = [
-      watchUntilComplete(fixture.leagueId, ac.signal),
-      watchUntilComplete(fixture.leagueId, ac.signal),
-    ];
-    await new Promise((resolve) => setTimeout(resolve, 150)); // let both XREADs register
+    const watchers: Watcher[] = [{ ready: false }, { ready: false }];
+    const clients = watchers.map((watcher) => watchUntilComplete(fixture.leagueId, ac.signal, watcher));
+    await waitUntilSubscribersReady(fixture.leagueId, watchers);
 
     const started = await draft.startDraft(fixture.draftId);
     if (!started.ok) throw new Error(started.reason);
@@ -131,11 +163,9 @@ describe("two SSE clients watching a live auction draft", () => {
 
     const draft = store();
     const ac = new AbortController();
-    const clients = [
-      watchUntilComplete(fixture.leagueId, ac.signal),
-      watchUntilComplete(fixture.leagueId, ac.signal),
-    ];
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    const watchers: Watcher[] = [{ ready: false }, { ready: false }];
+    const clients = watchers.map((watcher) => watchUntilComplete(fixture.leagueId, ac.signal, watcher));
+    await waitUntilSubscribersReady(fixture.leagueId, watchers);
 
     const started = await draft.startDraft(fixture.draftId);
     if (!started.ok) throw new Error(started.reason);

@@ -1,4 +1,4 @@
-import type { TimerExpireAction } from "@/domain/draft";
+import { DRAFT_ACTION_VERSION, type TimerExpireAction } from "@/domain/draft";
 import { currentDeadline } from "./selectors";
 import type { DraftState } from "./state";
 
@@ -12,5 +12,5 @@ import type { DraftState } from "./state";
  * otherwise exercise.
  */
 export function expireAt(state: DraftState): TimerExpireAction {
-  return { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state)! };
+  return { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: currentDeadline(state)! };
 }

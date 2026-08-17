@@ -4,10 +4,15 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 /**
  * Directories with a 100% coverage gate (mirrored in `coverage.thresholds` below).
- * `coverage.include` makes an orphan file — one nothing imports, like a barrel — show up
- * as 0% and fail its threshold instead of being invisible to the run. Because `include`
- * forces every matching file into the measurement, verify the gate with an UNFILTERED
- * `npm run test:coverage` (a path-filtered run would report the other directory at 0%).
+ * `coverage.include` protects LOGIC files that nothing imports: without it, a real file no
+ * test ever pulls in wouldn't be instrumented at all, and a 100% threshold checked only
+ * against instrumented files can't fail on work that's silently missing coverage. It does
+ * NOT protect a pure re-export barrel — a barrel has no statements/branches of its own, so
+ * it measures 0/0 and a 0/0 percentage passes any threshold trivially. The real protection
+ * for a barrel is a smoke test that imports it and asserts its exports exist. Because
+ * `include` forces every matching file into the measurement, verify the gate with an
+ * UNFILTERED `npm run test:coverage` (a path-filtered run would report the other directory
+ * at 0%).
  */
 const COVERAGE_GATED_DIRS = ["src/scoring", "src/draft-engine"] as const;
 const coverageInclude = COVERAGE_GATED_DIRS.map((dir) => `${dir}/**`);

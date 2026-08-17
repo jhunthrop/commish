@@ -25,16 +25,44 @@ interface TickerDeps {
   readonly store: DraftStore;
   readonly clock: Clock;
   readonly intervalMs?: number;
+  /**
+   * Called for every `applied: false` outcome, rate-limited per draft id (see
+   * `DRAFT_SERVICE_CONFIG.tickWarnIntervalMs`) so a stuck draft is visible in logs without
+   * spamming them. Defaults to `console.warn`.
+   */
+  readonly onOutcome?: (outcome: TickOutcome) => void;
 }
+
+const defaultOnOutcome = (outcome: TickOutcome): void => {
+  console.warn("[draft] tick not applied", outcome);
+};
 
 /**
  * The only producer of TIMER_EXPIRE actions. Built around an injected `Clock` and an explicit
  * `tick()` so tests drive expiry deterministically instead of sleeping; `start()` is just a
  * setInterval around the same function for the running server.
  */
-export function createDraftTicker({ db, store, clock, intervalMs = DRAFT_SERVICE_CONFIG.tickIntervalMs }: TickerDeps): DraftTicker {
+export function createDraftTicker({
+  db,
+  store,
+  clock,
+  intervalMs = DRAFT_SERVICE_CONFIG.tickIntervalMs,
+  onOutcome = defaultOnOutcome,
+}: TickerDeps): DraftTicker {
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
+  // Last time (ms since epoch, per the injected clock) a given draft's failure was logged —
+  // the first failure always logs; a rejection or thrown error may recur every tick, and
+  // without this a stuck draft would log once per tick forever.
+  const lastWarnedAtMs = new Map<string, number>();
+
+  function reportIfDue(outcome: TickOutcome, nowMs: number): void {
+    if (outcome.applied) return;
+    const lastWarnedAt = lastWarnedAtMs.get(outcome.draftId);
+    if (lastWarnedAt !== undefined && nowMs - lastWarnedAt < DRAFT_SERVICE_CONFIG.tickWarnIntervalMs) return;
+    lastWarnedAtMs.set(outcome.draftId, nowMs);
+    onOutcome(outcome);
+  }
 
   async function tickOne(draftId: string, now: string): Promise<TickOutcome | null> {
     const state = await store.getDraftState(draftId);
@@ -54,16 +82,22 @@ export function createDraftTicker({ db, store, clock, intervalMs = DRAFT_SERVICE
       .limit(DRAFT_SERVICE_CONFIG.maxDraftsPerTick);
 
     const now = clock.now();
+    const nowMs = Date.parse(now);
     const outcomes: TickOutcome[] = [];
     for (const row of rows) {
       try {
         const outcome = await tickOne(row.id, now);
-        if (outcome !== null) outcomes.push(outcome);
+        if (outcome !== null) {
+          outcomes.push(outcome);
+          reportIfDue(outcome, nowMs);
+        }
       } catch (error: unknown) {
         // One draft's DB error (a dropped connection, a transient failure) must not stop
         // the scan — every other in-progress draft still needs its clock checked this tick.
         console.error("[draft] ticker failed for draft", row.id, error);
-        outcomes.push({ draftId: row.id, applied: false, reason: "Something went wrong checking this draft's clock." });
+        const outcome: TickOutcome = { draftId: row.id, applied: false, reason: "Something went wrong checking this draft's clock." };
+        outcomes.push(outcome);
+        reportIfDue(outcome, nowMs);
       }
     }
     return outcomes;

@@ -140,6 +140,34 @@ Two guards stop a double append:
 
 A bug in the mutex therefore costs a retry, never a duplicated pick.
 
+### Multi-instance considerations (Phase 2)
+
+Three things change once more than one process runs this service, none of which are handled
+yet — noted here so Phase 2 doesn't have to rediscover them:
+
+- **`lock_timeout`.** Today the per-draft mutex above is usually what keeps two writers from
+  even reaching the database at the same moment. Once a Postgres advisory lock replaces it (see
+  above), a second writer's `INSERT` can block for the full duration of the first writer's
+  transaction — including `commitDraftState`'s multi-table commit on the completing action.
+  Phase 2 should set a `lock_timeout` on that acquisition so a stuck or slow instance fails fast
+  with a retryable error instead of hanging every other writer for that draft.
+- **The per-process cache under multiple instances.** `cache` in `store.ts` is scoped to one
+  process. A WRITER on a stale instance self-heals: its `INSERT` loses the unique-index race,
+  `isSequenceConflict` fires, the stale cache entry is dropped, and the caller sees "Someone
+  else acted first. Try again." A READER on a stale instance has no such signal —
+  `getDraftState` happily serves a frozen board forever, since nothing tells it another
+  instance moved the draft forward. Recommended fix: have every instance subscribe to the
+  league streams of drafts it has cached and call `invalidate(draftId)` on any `draft.*` event,
+  rather than trusting the cache until the next write it personally makes.
+- **N instances means N tickers.** Every instance that calls `getDraftTicker()` runs its own
+  `setInterval` scan of `drafts` with `status = 'in_progress'`. This is harmless
+  correctness-wise — R-B4 plus the `(draft_id, sequence)` unique index mean at most one
+  instance's `TIMER_EXPIRE` ever lands — but it's `N`× the redundant scanning and `N`× the
+  rejected-write noise (the ticker's `onOutcome` rate-limits its own logging per draft, but
+  doesn't reduce the underlying write attempts). Phase 2 should elect a single ticker via a
+  Postgres advisory lock (one instance holds it for the ticker role and actually ticks; the
+  rest skip their interval) rather than accept the redundancy indefinitely.
+
 ## The auto-commit-on-completion seam
 
 `commitDraftState` (`commit.ts`) is the single seam between "a draft happened" and "a season
@@ -148,11 +176,13 @@ exists": in one transaction it writes `draft_picks`, upserts `roster_slots`, and
 transaction that inserts the completing action row, the moment a draft's `phase` transitions
 to `complete` — so a draft can never be "done" in the log without also being committed.
 
-`commitDraftResults(draftId)` (the store method the API and tooling call directly) is
-idempotent: it checks `drafts.status` first, and if the draft is already `complete` it returns
-`{ ok: true, alreadyCommitted: true, ... }` without writing anything again. This is what makes
-it safe to call after a crash recovery (log completed, process died before its own commit ran)
-or defensively from an admin tool — it can never double-insert picks or roster slots.
+`commitDraftResults(draftId)` is a defensive/admin seam, not the normal path — `applyAction`
+already commits automatically the instant a draft completes (previous paragraph). It exists,
+and is idempotent (checks `drafts.status` first; if already `complete` it returns
+`{ ok: true, alreadyCommitted: true, ... }` without writing anything again), for the cases
+where that automatic commit didn't happen: crash recovery (log completed, process died before
+its own transaction ran) or a one-off admin/tooling call. It can never double-insert picks or
+roster slots.
 
 ## Event payloads (`draft.*`, on the league stream)
 
@@ -177,9 +207,10 @@ arrival order without reordering.
 
 | Route | Who | Notes |
 |---|---|---|
-| `GET /api/drafts/[draftId]` | any signed-in user | `draftStateView` + the caller's own `teamId`. A commissioner with no team of their own (`teamId === null && isCommissioner`) is still allowed to view. |
+| `GET /api/drafts/[draftId]` | a manager with a team in the league, or the commissioner | `draftStateView` + the caller's own `teamId`. A commissioner with no team of their own (`teamId === null && isCommissioner`) is still allowed to view. |
 | `POST /api/drafts/[draftId]/actions` | a manager with a team in the league | Body: `{ type: "MAKE_PICK" \| "NOMINATE" \| "BID", … }`. **No `teamId`** — the server resolves it from the session. A rejected action is a 409 with the reducer's reason. |
 | `POST /api/drafts/[draftId]/start` | commissioner only | Fixes the order and the ranked pool. |
+| `GET /api/leagues/[leagueId]/events` | a manager with a team in the league, or the commissioner | The real-time fan-out: Redis Streams over SSE. Gated the same way as the draft board — a signed-in stranger with no team in the league gets 403, not another league's events. |
 
-Real-time fan-out is the existing `GET /api/leagues/[leagueId]/events` SSE stream. There is no
-second transport and no per-draft stream.
+There is no second transport and no per-draft stream — `draft.*` events ride the league stream
+above.

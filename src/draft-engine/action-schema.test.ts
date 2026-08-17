@@ -31,6 +31,11 @@ describe("draftActionSchema (persisted jsonb boundary)", () => {
     const row = { v: 1, type: "BID", timestamp: "2026-09-01T00:00:00.000Z", teamId: "t1", amount: 0 };
     expect(draftActionSchema.safeParse(row).success).toBe(false);
   });
+
+  it("rejects a non-ISO timestamp — a string that would Date.parse to NaN must never bypass the R-B4 deadline guard", () => {
+    const row = { v: 1, type: "MAKE_PICK", timestamp: "not-a-real-timestamp", teamId: "t1", playerId: "p1" };
+    expect(draftActionSchema.safeParse(row).success).toBe(false);
+  });
 });
 
 describe("clientDraftActionSchema (HTTP body boundary)", () => {

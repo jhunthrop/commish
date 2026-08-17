@@ -127,6 +127,59 @@ describe("draft ticker", () => {
   });
 });
 
+describe("draft ticker — onOutcome logging (I5)", () => {
+  it("logs the first applied:false outcome for a draft, then rate-limits further logs until tickWarnIntervalMs has passed", async () => {
+    const { fixture, store: realStore } = await liveDraft();
+    // Past the initial deadline, so tickOne always attempts an expiry.
+    now = "2026-09-01T09:00:00.000Z";
+    // Warm the real store's cache with the actual (past-deadline) draft state, then hand the
+    // ticker a store whose applyAction always rejects — deterministic repeated failures,
+    // without depending on the exact shape of a real race.
+    await realStore.getDraftState(fixture.draftId);
+    const applyAction = vi.fn(async () => ({ ok: false as const, reason: "boom" }));
+    const store = { ...realStore, applyAction };
+    const onOutcome = vi.fn();
+    const ticker = createDraftTicker({ db, store, clock, onOutcome });
+
+    const first = await ticker.tick();
+    expect(first).toEqual([{ draftId: fixture.draftId, applied: false, reason: "boom" }]);
+    expect(onOutcome).toHaveBeenCalledTimes(1);
+    expect(onOutcome).toHaveBeenCalledWith({ draftId: fixture.draftId, applied: false, reason: "boom" });
+
+    // Same instant, still failing — must NOT log again yet.
+    await ticker.tick();
+    expect(onOutcome).toHaveBeenCalledTimes(1);
+
+    // Just under the interval — still rate-limited.
+    now = "2026-09-01T09:00:59.999Z";
+    await ticker.tick();
+    expect(onOutcome).toHaveBeenCalledTimes(1);
+
+    // At/after the interval — logs again.
+    now = "2026-09-01T09:01:00.000Z";
+    await ticker.tick();
+    expect(onOutcome).toHaveBeenCalledTimes(2);
+  });
+
+  it("defaults onOutcome to a rate-limited console.warn", async () => {
+    const { fixture, store: realStore } = await liveDraft();
+    now = "2026-09-01T09:00:00.000Z";
+    await realStore.getDraftState(fixture.draftId);
+    const store = { ...realStore, applyAction: async () => ({ ok: false as const, reason: "boom" }) };
+    const ticker = createDraftTicker({ db, store, clock });
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      await ticker.tick();
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[draft] tick not applied",
+        { draftId: fixture.draftId, applied: false, reason: "boom" },
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+});
+
 describe("draft ticker — R-B4 store-level regression (check-then-act race)", () => {
   it("rejects a stale TIMER_EXPIRE submitted after a concurrent pick already advanced the turn", async () => {
     const { store, fixture } = await liveDraft();

@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { pgTable, text } from "drizzle-orm/pg-core";
 import { players, rosterSlots } from "@/db/schema";
 import { excludedSetFor } from "./upsert";
 
@@ -28,5 +29,16 @@ describe("excludedSetFor", () => {
     // column to itself. Every value here must instead be an `excluded.*` SQL reference.
     const set = excludedSetFor(rosterSlots, ["teamId", "slot", "slotIndex"]);
     expect(rawTextOf(set.playerId)).not.toBe("player_id");
+  });
+
+  it("throws a clear error instead of interpolating an unsafe column identifier into raw SQL", () => {
+    // `excludedSetFor` builds its `excluded.<name>` fragment with `sql.raw`, which is not
+    // parameterized — a column name that doesn't look like a plain SQL identifier must never
+    // reach it unchecked.
+    const unsafeTable = pgTable("upsert_test_unsafe", {
+      id: text("id").primaryKey(),
+      bad: text("bad; DROP TABLE users; --"),
+    });
+    expect(() => excludedSetFor(unsafeTable, ["id"])).toThrow(/unsafe|identifier/i);
   });
 });
