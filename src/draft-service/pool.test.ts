@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { players, playerStatLines } from "@/db/schema";
+import { players, playerStatLines, scoringSettings } from "@/db/schema";
+import { STANDARD_SCORING } from "@/domain/scoring";
+import { computeFantasyPoints } from "@/scoring";
 import { buildDraftPool } from "./pool";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -55,5 +57,45 @@ describe("buildDraftPool", () => {
     await db.insert(playerStatLines).values([{ ...zeroLine, playerId: "vet", week: 1, receivingYards: 50 }]);
 
     expect((await buildDraftPool(db, leagueId)).map((p) => p.playerId)).toEqual(["vet", "a_rookie", "b_rookie"]);
+  });
+
+  it("ranks by the league's own scoring settings, not the PPR fallback", async () => {
+    const { leagueId } = await seedDraftFixture(db, {
+      draftId: "draft_r", leagueId: "league_r", format: "snake", teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    // This league scores standard, not PPR — pointsPerReception: 0 — which is the whole point:
+    // a test that passes identically under PPR would never catch buildDraftPool ignoring the
+    // league's own settings row.
+    await db.insert(scoringSettings).values({ leagueId, ...STANDARD_SCORING });
+    await db.insert(players).values([
+      { id: "grinder", name: "Grinder Back", position: "RB", nflTeam: "KC" },
+      { id: "possession", name: "Possession Receiver", position: "WR", nflTeam: "SF" },
+    ]);
+    await db.insert(playerStatLines).values([
+      { ...zeroLine, playerId: "grinder", week: 1, rushingYards: 50 },
+      { ...zeroLine, playerId: "possession", week: 1, receivingYards: 10, receptions: 20 },
+    ]);
+
+    // Under this league's standard settings: grinder = 50 * 0.1 = 5pts; possession =
+    // 10 * 0.1 = 1pt (20 receptions score nothing since pointsPerReception is 0). Under the
+    // PPR fallback the ranking would flip: possession = 10 * 0.1 + 20 * 1 = 21pts, well above
+    // grinder's 5 — so this ranking is only correct if the league's own row was read.
+    const grinderPoints = computeFantasyPoints(
+      { playerId: "grinder", week: 1, ...zeroLine, rushingYards: 50 },
+      "RB",
+      STANDARD_SCORING,
+    );
+    const possessionPoints = computeFantasyPoints(
+      { playerId: "possession", week: 1, ...zeroLine, receivingYards: 10, receptions: 20 },
+      "WR",
+      STANDARD_SCORING,
+    );
+    expect(grinderPoints).toBe(5);
+    expect(possessionPoints).toBe(1);
+    expect(grinderPoints).toBeGreaterThan(possessionPoints);
+
+    const pool = await buildDraftPool(db, leagueId);
+    expect(pool.map((p) => p.playerId)).toEqual(["grinder", "possession"]);
   });
 });

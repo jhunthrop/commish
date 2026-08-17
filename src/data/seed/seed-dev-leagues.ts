@@ -20,14 +20,36 @@ interface LeaguePlan {
 /**
  * A dev league you can point a browser at. Placeholder owners only — real identity is
  * WorkOS's, so these rows are clearly namespaced and this function refuses to run in
- * production. Idempotent: re-running updates rather than duplicating.
+ * production.
+ *
+ * `claimUserId` is an explicit parameter, not read from `process.env` in here — the entry
+ * point (`src/data/seed/index.ts`) reads `DEV_SEED.claimUserIdEnvVar` and passes the result
+ * in. That keeps this function a pure function of its arguments (easy to call from a test
+ * without an ambient env var silently changing behavior — a developer who happens to have
+ * `DEV_SEED_CLAIM_USER_ID` exported locally would otherwise get a surprise FK failure the
+ * moment a test tried to use an id that isn't in the test database's `users` table).
+ *
+ * Idempotent in the row-count sense verified by the "running it twice" test below: re-running
+ * updates existing rows rather than duplicating them. It is NOT idempotent in the "produces
+ * byte-identical output" sense — `kickoffAt` is recomputed from `clock.now()` each call, so a
+ * real second run (a later wall-clock time) legitimately reschedules the draft. It is also NOT
+ * one transaction: a failure partway through (e.g. after the snake league's rows but before
+ * the auction league's) leaves a partially-seeded database, and the fix is to re-run this
+ * function, not to hand-roll a rollback — every write here is an upsert, so replaying is safe.
+ * Finally, re-seeding a dev league whose draft already ran does NOT reset `drafts.status` back
+ * to `scheduled` — only `kickoffAt` is touched — because resetting status without also
+ * clearing that draft's `draft_actions` log would desync the two: the log would still say
+ * "complete" while the row claimed "scheduled".
  */
-export async function seedDevLeagues(db: Db, clock: Clock): Promise<{ leagues: number; teams: number; drafts: number }> {
+export async function seedDevLeagues(
+  db: Db,
+  clock: Clock,
+  claimUserId?: string,
+): Promise<{ leagues: number; teams: number; drafts: number }> {
   if (process.env.NODE_ENV === "production") {
     throw new Error("seedDevLeagues creates placeholder users and must never run in production.");
   }
 
-  const claimUserId = process.env[DEV_SEED.claimUserIdEnvVar];
   const kickoffAt = new Date(Date.parse(clock.now()) + DEV_SEED.kickoffHoursFromNow * MS_PER_HOUR);
 
   const devUserIds = Array.from({ length: DEV_SEED.teamCount }, (_, i) => `${DEV_SEED.userIdPrefix}${String(i + 1).padStart(2, "0")}`);

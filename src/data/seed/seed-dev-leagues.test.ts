@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, leagues, teams } from "@/db/schema";
+import { drafts, leagues, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { DEV_SEED } from "./config";
 import { seedDevLeagues } from "./seed-dev-leagues";
@@ -42,5 +42,42 @@ describe("seedDevLeagues", () => {
     expect(await db.select().from(leagues)).toHaveLength(2);
     expect(await db.select().from(teams)).toHaveLength(DEV_SEED.teamCount * 2);
     expect(await db.select().from(drafts)).toHaveLength(2);
+  });
+
+  it("hands the claimed user team 1 and the commissioner's chair in both leagues, when given one", async () => {
+    // The claim id is a real (WorkOS) user id — its `users` row already exists from the
+    // AuthKit callback by the time anyone would run the seed while signed in.
+    await db.insert(users).values({ id: "workos_real_user", email: "real@test.local", displayName: "Real User" });
+
+    const result = await seedDevLeagues(db, clock, "workos_real_user");
+    expect(result).toEqual({ leagues: 2, teams: DEV_SEED.teamCount * 2, drafts: 2 });
+
+    for (const plan of [DEV_SEED.snake, DEV_SEED.auction]) {
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, plan.leagueId));
+      expect(league?.commissionerUserId).toBe("workos_real_user");
+      const [team1] = await db
+        .select()
+        .from(teams)
+        .where(and(eq(teams.leagueId, plan.leagueId), eq(teams.id, `${plan.leagueId}_team_01`)));
+      expect(team1?.userId).toBe("workos_real_user");
+    }
+  });
+
+  it("is called with no ambient environment coupling — the claim id is undefined unless a caller passes one", async () => {
+    // Regression guard: seedDevLeagues must never read `process.env` itself. A developer who
+    // happens to have DEV_SEED_CLAIM_USER_ID exported locally (from running `npm run seed`
+    // against their real dev database) must not have it silently affect this test — there is
+    // no row for that id in the test database, so if this function read it directly the FK
+    // constraint on `teams.user_id` would fail here instead of this asserting normal placeholder
+    // ownership.
+    process.env.DEV_SEED_CLAIM_USER_ID = "not_a_real_row_in_this_test_db";
+    try {
+      const result = await seedDevLeagues(db, clock);
+      expect(result).toEqual({ leagues: 2, teams: DEV_SEED.teamCount * 2, drafts: 2 });
+      const [snake] = await db.select().from(leagues).where(eq(leagues.id, DEV_SEED.snake.leagueId));
+      expect(snake?.commissionerUserId).toBe(`${DEV_SEED.userIdPrefix}01`);
+    } finally {
+      delete process.env.DEV_SEED_CLAIM_USER_ID;
+    }
   });
 });

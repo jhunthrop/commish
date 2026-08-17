@@ -4,7 +4,7 @@ import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { draftActions } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
-import { createDraftStore, type PublishFn } from "./store";
+import { createDraftStore, isSequenceConflict, type PublishFn } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
 const db = createTestDb();
@@ -208,5 +208,33 @@ describe("draft store — concurrency", () => {
     // One event for START_DRAFT plus one for the winning pick — the loser's rejected
     // write never reaches `broadcast`, so it contributes nothing.
     expect(published).toHaveLength(2);
+  });
+});
+
+describe("isSequenceConflict", () => {
+  /** Shapes a fake error the way `postgres-js` actually does — `code`/`constraint_name` one level under `.cause`. */
+  const driverError = (code: string, constraintName: string) => ({ cause: { code, constraint_name: constraintName } });
+
+  it("is true for the exact race applyAction retries on", () => {
+    expect(isSequenceConflict(driverError("23505", "draft_actions_draft_sequence_idx"))).toBe(true);
+  });
+
+  it("is false for a different unique-index violation with the same SQLSTATE — must not be mislabeled as a retryable race", () => {
+    expect(isSequenceConflict(driverError("23505", "draft_picks_draft_player_idx"))).toBe(false);
+  });
+
+  it("is false for a non-unique-violation error, even on the right table", () => {
+    expect(isSequenceConflict(driverError("23503", "draft_actions_draft_sequence_idx"))).toBe(false);
+  });
+
+  it("is false for errors with no driver shape at all", () => {
+    expect(isSequenceConflict(new Error("connection reset by peer"))).toBe(false);
+    expect(isSequenceConflict(null)).toBe(false);
+    expect(isSequenceConflict(undefined)).toBe(false);
+    expect(isSequenceConflict("not an object")).toBe(false);
+  });
+
+  it("finds the fields whether they sit on the error directly or one .cause down", () => {
+    expect(isSequenceConflict({ code: "23505", constraint_name: "draft_actions_draft_sequence_idx" })).toBe(true);
   });
 });

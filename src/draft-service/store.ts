@@ -60,17 +60,34 @@ export interface DraftStore {
 /** Postgres unique-violation SQLSTATE. */
 const UNIQUE_VIOLATION_SQLSTATE = "23505";
 
-/** The driver's `code`, unwrapping the `DrizzleQueryError` that carries it as `.cause`. */
-function sqlState(error: unknown): unknown {
+/** The unique index `applyAction`'s append actually races on — see `schema.ts`. */
+const SEQUENCE_UNIQUE_INDEX = "draft_actions_draft_sequence_idx";
+
+/**
+ * Reads one field off the driver's raw error, unwrapping the `DrizzleQueryError` that carries
+ * it as `.cause` (confirmed empirically: `postgres-js` puts `code` and `constraint_name` on
+ * the same object, one level under `.cause`, not on the `DrizzleQueryError` itself).
+ */
+function driverErrorField(error: unknown, key: string): unknown {
   if (typeof error !== "object" || error === null) return undefined;
-  if ("code" in error) return (error as { code?: unknown }).code;
-  if ("cause" in error) return sqlState((error as { cause?: unknown }).cause);
+  if (key in error) return (error as Record<string, unknown>)[key];
+  if ("cause" in error) return driverErrorField((error as { cause?: unknown }).cause, key);
   return undefined;
 }
 
-/** Postgres unique-violation SQLSTATE, as surfaced by the `postgres` driver (possibly wrapped by drizzle-orm). */
-function isUniqueViolation(error: unknown): boolean {
-  return sqlState(error) === UNIQUE_VIOLATION_SQLSTATE;
+/**
+ * True only for the specific race `applyAction` retries on: two writers both inserting the
+ * same `(draft_id, sequence)`. Keying on the constraint name — not just the SQLSTATE — matters
+ * because 23505 is the generic "unique violation" code; a `draft_picks` primary-key clash
+ * from `commitDraftState` running inside the same transaction is also a 23505, and mislabeling
+ * that as "Someone else acted first. Try again." would hide a real commit bug behind a retry
+ * message instead of surfacing it as the unexpected error it is.
+ */
+export function isSequenceConflict(error: unknown): boolean {
+  return (
+    driverErrorField(error, "code") === UNIQUE_VIOLATION_SQLSTATE &&
+    driverErrorField(error, "constraint_name") === SEQUENCE_UNIQUE_INDEX
+  );
 }
 
 /**
@@ -152,7 +169,7 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
         } catch (error: unknown) {
           // Our view of the log is provably stale — drop it so the next read replays.
           cache.delete(draftId);
-          if (isUniqueViolation(error)) return { ok: false, reason: "Someone else acted first. Try again." };
+          if (isSequenceConflict(error)) return { ok: false, reason: "Someone else acted first. Try again." };
           throw error;
         }
 

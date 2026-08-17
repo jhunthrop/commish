@@ -1,5 +1,6 @@
 import postgres from "postgres";
 import { drizzle } from "drizzle-orm/postgres-js";
+import { DB_POOL_CONFIG } from "./config";
 import * as schema from "./schema";
 
 function requireDatabaseUrl(): string {
@@ -15,8 +16,18 @@ export type Db = ReturnType<typeof createDb>;
 /** The transaction handle Drizzle hands a `db.transaction` callback. */
 export type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
-export function createDb(connectionString: string = requireDatabaseUrl()) {
-  const client = postgres(connectionString, { max: 10 });
+export interface DbOptions {
+  /** Pool size. Defaults to `DB_POOL_CONFIG.defaultMaxConnections`. */
+  readonly max?: number;
+  /** Seconds an idle connection may sit before the pool closes it. Unset = no timeout. */
+  readonly idleTimeoutSeconds?: number;
+}
+
+export function createDb(connectionString: string = requireDatabaseUrl(), options: DbOptions = {}) {
+  const client = postgres(connectionString, {
+    max: options.max ?? DB_POOL_CONFIG.defaultMaxConnections,
+    idle_timeout: options.idleTimeoutSeconds,
+  });
   return drizzle(client, { schema });
 }
 

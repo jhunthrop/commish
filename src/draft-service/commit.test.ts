@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftPicks, drafts, players, rosterSlots } from "@/db/schema";
+import { draftActions, draftPicks, drafts, players, rosterSlots } from "@/db/schema";
+import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
+import { DRAFT_CLOCK_SCHEDULE, initialDraftState, reduceDraft, type DraftConfig } from "@/draft-engine";
 import { createDraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -47,6 +49,54 @@ async function runOnTheClock(draftId: string): Promise<void> {
   throw new Error("draft did not finish");
 }
 
+const SPRINT_POOL: readonly DraftPoolEntry[] = POOL_ROWS.map((p) => ({ playerId: p.id, position: p.position }));
+
+/**
+ * Drives a full snake draft to completion with the PURE reducer (no store, no I/O) and
+ * inserts the resulting action log directly into `draft_actions` — bypassing `applyAction`
+ * entirely, so its automatic commit-on-completion never runs. `drafts.status` is left exactly
+ * as `seedDraftFixture` set it ("scheduled"). This is what "a draft finished but the process
+ * crashed before the commit transaction ran" looks like on disk, and it's the only way to
+ * reach `commitDraftResults`'s real (`alreadyCommitted: false`) branch, since every path
+ * through the store commits automatically the moment a draft completes.
+ */
+async function seedCompletedActionLog(draftId: string, leagueId: string, teamIds: readonly string[]): Promise<void> {
+  const config: DraftConfig = {
+    draftId,
+    leagueId,
+    format: "snake",
+    kickoffAt: "2026-09-10T17:00:00.000Z",
+    auctionBudget: null,
+    slotConfig: SPRINT_ROSTER_SLOTS,
+    clockSchedule: DRAFT_CLOCK_SCHEDULE,
+  };
+  const actions: DraftAction[] = [
+    { v: 1, type: "START_DRAFT", timestamp: clock.now(), draftOrder: teamIds, pool: SPRINT_POOL },
+  ];
+  let state = initialDraftState(config);
+  for (const action of actions) {
+    const result = reduceDraft(state, action);
+    if (!result.ok) throw new Error(result.reason);
+    state = result.state;
+  }
+  while (state.phase !== "complete") {
+    const expire: DraftAction = { v: 1, type: "TIMER_EXPIRE", timestamp: clock.now() };
+    const result = reduceDraft(state, expire);
+    if (!result.ok) throw new Error(result.reason);
+    actions.push(expire);
+    state = result.state;
+  }
+
+  await db.insert(draftActions).values(
+    actions.map((action, index) => ({
+      draftId,
+      sequence: index + 1,
+      action,
+      timestamp: new Date(action.timestamp),
+    })),
+  );
+}
+
 beforeEach(async () => {
   await truncateAll(db);
   store = createDraftStore({ db, publish, clock });
@@ -77,6 +127,20 @@ describe("startDraft", () => {
 
   it("refuses to start a draft that doesn't exist", async () => {
     expect(await store.startDraft("nope")).toEqual({ ok: false, reason: "That draft doesn't exist." });
+  });
+
+  it("refuses to start a draft with an empty pool", async () => {
+    // fixture() inserts POOL_ROWS into `players`; skip that step so the pool is empty.
+    const { draftId } = await seedDraftFixture(db, {
+      draftId: "draft_empty",
+      leagueId: "league_empty",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+    });
+    expect(await store.startDraft(draftId)).toEqual({ ok: false, reason: "There are no players to draft yet." });
   });
 });
 
@@ -134,5 +198,38 @@ describe("commitDraftResults — auction", () => {
     }
     const [row] = await db.select().from(drafts).where(eq(drafts.id, draftId));
     expect(row?.status).toBe("complete");
+  });
+});
+
+describe("commitDraftResults — the real commit branch", () => {
+  it("refuses to commit a draft that doesn't exist", async () => {
+    expect(await store.commitDraftResults("nope")).toEqual({ ok: false, reason: "That draft doesn't exist." });
+  });
+
+  it("commits for real (not the auto-commit shortcut) when a completed log exists but drafts.status was never flipped", async () => {
+    const { draftId, leagueId, teamIds } = await fixture("snake");
+    await seedCompletedActionLog(draftId, leagueId, teamIds);
+
+    // Precondition: the log says the draft finished, but nothing has touched `drafts.status` —
+    // it's still whatever seedDraftFixture set it to, proving auto-commit never ran here.
+    const [before] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+    expect(before?.status).toBe("scheduled");
+    expect(await db.select().from(draftPicks).where(eq(draftPicks.draftId, draftId))).toHaveLength(0);
+
+    const result = await store.commitDraftResults(draftId);
+    expect(result).toEqual({ ok: true, picks: 6, teams: 2, alreadyCommitted: false });
+
+    const picks = await db.select().from(draftPicks).where(eq(draftPicks.draftId, draftId));
+    expect(picks).toHaveLength(6);
+    for (const teamId of teamIds) {
+      expect(await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, teamId))).toHaveLength(3);
+    }
+    const [after] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+    expect(after?.status).toBe("complete");
+
+    // Calling it again now finds drafts.status already "complete" and takes the short-circuit.
+    const again = await store.commitDraftResults(draftId);
+    expect(again).toEqual({ ok: true, picks: 6, teams: 2, alreadyCommitted: true });
+    expect(await db.select().from(draftPicks).where(eq(draftPicks.draftId, draftId))).toHaveLength(6);
   });
 });
