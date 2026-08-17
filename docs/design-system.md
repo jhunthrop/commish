@@ -33,3 +33,5 @@ Plain language, active voice, specific. Errors say what happened and what to do 
 
 ## Checklist for every UI step (from `docs/conventions.md`)
 Design review against this doc · light + dark verified · loading/empty/error/success states exist · `axe` clean + keyboard walkthrough · copy review · works at 360px.
+
+Component tests run in happy-dom without a stylesheet, so the "both themes + axe" checks in `*.test.tsx` verify structural a11y (roles, labels, ARIA attributes) in each theme, not actual rendered color; real color contrast is verified numerically by `src/design/tokens.test.ts`, and browser-based visual contrast checks land with the e2e plan.

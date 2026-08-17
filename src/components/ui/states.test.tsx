@@ -13,6 +13,23 @@ describe("Skeleton", () => {
     const el = screen.getByText("Loading…").parentElement!;
     expect(el).toHaveAttribute("aria-busy", "true");
   });
+
+  it("clamps every line's width to the minimum, even with many lines", () => {
+    const { container } = render(<Skeleton lines={12} />);
+    const bars = container.querySelectorAll('[aria-hidden="true"]');
+    expect(bars).toHaveLength(12);
+    for (const bar of bars) {
+      const width = parseFloat((bar as HTMLElement).style.width);
+      expect(width).toBeGreaterThanOrEqual(40);
+    }
+  });
+
+  it("renders only the sr-only text for a negative line count, never throws", () => {
+    render(<Skeleton lines={-1} />);
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    const el = screen.getByText("Loading…").parentElement!;
+    expect(el.querySelectorAll('[aria-hidden="true"]')).toHaveLength(0);
+  });
 });
 
 describe("EmptyState", () => {
@@ -25,6 +42,11 @@ describe("EmptyState", () => {
         expect(await axe(container)).toHaveNoViolations();
       },
     );
+  });
+
+  it("renders its default icon (inbox) when no icon is given", () => {
+    const { container } = render(<EmptyState title="No leagues yet" action={<Button>Create a league</Button>} />);
+    expect(container.querySelector("svg.lucide-inbox")).toBeInTheDocument();
   });
 });
 

@@ -8,23 +8,23 @@ function round2(n: number): number {
 }
 
 /** Pure. Every stat category is weighted by the league's configurable settings — no magic numbers here. */
-export function computeFantasyPoints(s: StatLine, position: Position, r: ScoringRules): number {
-  const receptionPoints = s.receptions * (r.pointsPerReception + (position === "TE" ? r.teReceptionBonus : 0));
+export function computeFantasyPoints(statLine: StatLine, position: Position, rules: ScoringRules): number {
+  const receptionPoints = statLine.receptions * (rules.pointsPerReception + (position === "TE" ? rules.teReceptionBonus : 0));
   const total =
-    s.passingYards * r.pointsPerPassingYard +
-    s.passingTouchdowns * r.pointsPerPassingTouchdown +
-    s.interceptions * r.pointsPerInterception +
-    s.rushingYards * r.pointsPerRushingYard +
-    s.rushingTouchdowns * r.pointsPerRushingTouchdown +
-    s.receivingYards * r.pointsPerReceivingYard +
-    s.receivingTouchdowns * r.pointsPerReceivingTouchdown +
+    statLine.passingYards * rules.pointsPerPassingYard +
+    statLine.passingTouchdowns * rules.pointsPerPassingTouchdown +
+    statLine.interceptions * rules.pointsPerInterception +
+    statLine.rushingYards * rules.pointsPerRushingYard +
+    statLine.rushingTouchdowns * rules.pointsPerRushingTouchdown +
+    statLine.receivingYards * rules.pointsPerReceivingYard +
+    statLine.receivingTouchdowns * rules.pointsPerReceivingTouchdown +
     receptionPoints +
-    s.fumblesLost * r.pointsPerFumbleLost +
-    s.fieldGoalsMade * r.pointsPerFieldGoal +
-    s.extraPointsMade * r.pointsPerExtraPoint +
-    s.sacks * r.pointsPerSack +
-    s.defensiveInterceptions * r.pointsPerDefensiveInterception +
-    s.defensiveTouchdowns * r.pointsPerDefensiveTouchdown;
+    statLine.fumblesLost * rules.pointsPerFumbleLost +
+    statLine.fieldGoalsMade * rules.pointsPerFieldGoal +
+    statLine.extraPointsMade * rules.pointsPerExtraPoint +
+    statLine.sacks * rules.pointsPerSack +
+    statLine.defensiveInterceptions * rules.pointsPerDefensiveInterception +
+    statLine.defensiveTouchdowns * rules.pointsPerDefensiveTouchdown;
   return round2(total);
 }
 
@@ -44,14 +44,20 @@ export interface LineupScore {
   readonly byPlayer: ReadonlyMap<string, number>;
 }
 
-/** A starter with no stat line (bye week / did not play) scores 0 — never throws. */
+/**
+ * A starter with no stat line (bye week / did not play) scores 0 — never throws.
+ *
+ * `starters` is assumed to contain no duplicate `playerId` (upstream validation enforces
+ * this). If it did, `total` would count that player's points once per occurrence while
+ * `byPlayer` — keyed by playerId — would keep only the last write.
+ */
 export function scoreLineup({ starters, statLinesByPlayerId, settings }: ScoreLineupInput): LineupScore {
   const byPlayer = new Map<string, number>();
   let total = 0;
-  for (const st of starters) {
-    const line = statLinesByPlayerId.get(st.playerId);
-    const pts = line === undefined ? 0 : computeFantasyPoints(line, st.position, settings);
-    byPlayer.set(st.playerId, pts);
+  for (const starter of starters) {
+    const line = statLinesByPlayerId.get(starter.playerId);
+    const pts = line === undefined ? 0 : computeFantasyPoints(line, starter.position, settings);
+    byPlayer.set(starter.playerId, pts);
     total += pts;
   }
   return { total: round2(total), byPlayer };

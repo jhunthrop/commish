@@ -75,6 +75,9 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - Coverage threshold: 100% for `src/scoring/**` (configured in `vitest.config.mts`).
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 
+### Migrations
+`ADD COLUMN … NOT NULL` without a `DEFAULT` is acceptable only while the table is empty (pre-first-deploy, as in `drizzle/0001`); once deployed, add with a DEFAULT or backfill in a separate migration.
+
 ### Commits
 Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`). Commit after every completed step; commit bodies explain *why* and record any deviation from the plan.
 

@@ -55,7 +55,7 @@ Copied from the spec/conventions — every task's requirements implicitly includ
 | `scripts/gen-mock-dataset.ts` | CLI wrapper. `npm run stats:generate`. |
 | `src/db/schema.ts` (modify) | Add `players`, `player_stat_lines` tables. |
 | `src/data/seed/index.ts`, `seed-players.ts` | The one seed entry point; loads the mock provider's data into Postgres. |
-| `src/scoring/compute.ts` | `computeFantasyPoints(statLine, position, settings)`, `scoreRoster(...)`. |
+| `src/scoring/compute.ts` | `computeFantasyPoints(statLine, position, settings)`, `scoreLineup(...)`. |
 | `src/scoring/presets.ts` | Re-exports presets from domain for the scoring module's public surface. |
 
 Existing files this plan touches: `src/app/globals.css`, `src/app/layout.tsx`, `package.json` (scripts + deps), `src/db/schema.ts`, `src/db/test-db.ts`, `src/domain/player.ts`, `src/domain/scoring.ts`, `.env.example` (no change needed — `ANTHROPIC_API_KEY` already listed).

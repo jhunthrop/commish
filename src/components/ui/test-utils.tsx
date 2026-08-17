@@ -7,12 +7,18 @@ export function inBothThemes(
   assert: (r: RenderResult, theme: "light" | "dark") => void | Promise<void>,
 ) {
   return (async () => {
-    for (const theme of ["light", "dark"] as const) {
-      document.documentElement.setAttribute("data-theme", theme);
-      const r = render(ui);
-      await assert(r, theme);
-      r.unmount();
+    try {
+      for (const theme of ["light", "dark"] as const) {
+        document.documentElement.setAttribute("data-theme", theme);
+        const r = render(ui);
+        try {
+          await assert(r, theme);
+        } finally {
+          r.unmount();
+        }
+      }
+    } finally {
+      document.documentElement.removeAttribute("data-theme");
     }
-    document.documentElement.removeAttribute("data-theme");
   })();
 }
