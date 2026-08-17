@@ -8,3 +8,6 @@ export { ErrorState, type ErrorStateProps } from "./error-state";
 export { Icon, type IconName, type IconProps } from "./icon";
 export { Select, type SelectProps, type SelectOption } from "./select";
 export { Avatar, initialsFor, type AvatarProps, type AvatarSize } from "./avatar";
+export { Modal, type ModalProps } from "./modal";
+export { ToastProvider, useToast, type ToastInput, type ToastTone, type ToastAction, type ToastApi } from "./toast";
+export { UI_CONFIG } from "./config";
