@@ -17,6 +17,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { draftActions, leagues, players, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { GET as getDraft } from "@/app/api/drafts/[draftId]/route";
+import { GET as getPlayers } from "@/app/api/drafts/[draftId]/players/route";
 import { POST as postAction } from "@/app/api/drafts/[draftId]/actions/route";
 import { POST as postStart } from "@/app/api/drafts/[draftId]/start/route";
 import { getDraftStore } from "@/draft-service";
@@ -120,6 +121,44 @@ describe("GET /api/drafts/[draftId]", () => {
     expect(body.data.teamId).toBeNull();
     expect(body.data.isCommissioner).toBe(true);
     expect(body.data.draft.draftId).toBe(DRAFT_ID);
+  });
+
+  it("includes every team card in the draft state body", async () => {
+    const f = await fixture();
+    signedInAs(f.userIds[0]!);
+    const body = await (await getDraft(new Request(`http://test/api/drafts/${DRAFT_ID}`), { params })).json();
+    expect(body.data.teams).toHaveLength(f.teamIds.length);
+    expect(body.data.teams[0]).toMatchObject({ id: expect.any(String), name: expect.any(String), ownerDisplayName: expect.any(String) });
+    expect(body.data.draft.slotConfig).toEqual(SPRINT_ROSTER_SLOTS);
+  });
+});
+
+describe("GET /api/drafts/[draftId]/players", () => {
+  it("returns ranked player metadata to a league member", async () => {
+    const f = await fixture();
+    signedInAs(f.userIds[0]!);
+    const response = await getPlayers(new Request(`http://test/api/drafts/${DRAFT_ID}/players`), { params });
+    const body = await response.json();
+    expect(response.status).toBe(200);
+    expect(body.ok).toBe(true);
+    expect(body.data.players).toHaveLength(6);
+    expect(body.data.players[0]).toMatchObject({ id: expect.any(String), name: expect.any(String), position: expect.any(String), nflTeam: expect.any(String) });
+  });
+
+  it("refuses a signed-in stranger with no team in this league", async () => {
+    await fixture();
+    await db.insert(users).values({ id: "stranger", email: "stranger@test.local", displayName: "Stranger" });
+    signedInAs("stranger");
+    const response = await getPlayers(new Request(`http://test/api/drafts/${DRAFT_ID}/players`), { params });
+    expect(response.status).toBe(403);
+  });
+
+  it("answers 401 JSON — never a redirect — when nobody is signed in", async () => {
+    await fixture();
+    signedInAs(null);
+    const response = await getPlayers(new Request(`http://test/api/drafts/${DRAFT_ID}/players`), { params });
+    expect(response.status).toBe(401);
+    expect((await response.json()).ok).toBe(false);
   });
 });
 

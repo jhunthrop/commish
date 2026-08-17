@@ -1,6 +1,9 @@
+import { getDb } from "@/db/client";
 import { fail, ok } from "@/lib/api/respond";
 import { draftStateView } from "@/draft-engine";
 import { getDraftStore } from "@/draft-service";
+import { listTeamCards } from "@/draft-service/teams";
+import type { DraftSnapshotBody } from "@/draft-room/contract";
 import { withDraftActor, type RouteContext } from "./_shared";
 
 export const runtime = "nodejs";
@@ -22,6 +25,12 @@ export async function GET(request: Request, context: RouteContext) {
     const state = await getDraftStore().getDraftState(actor.draftId);
     if (state === null) return fail("That draft doesn't exist.", 404);
 
-    return ok({ draft: draftStateView(state), teamId: actor.teamId, isCommissioner: actor.isCommissioner });
+    const body: DraftSnapshotBody = {
+      draft: draftStateView(state),
+      teamId: actor.teamId,
+      isCommissioner: actor.isCommissioner,
+      teams: await listTeamCards(getDb(), actor.leagueId),
+    };
+    return ok(body);
   });
 }

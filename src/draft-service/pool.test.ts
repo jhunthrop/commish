@@ -3,7 +3,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { players, playerStatLines, scoringSettings } from "@/db/schema";
 import { STANDARD_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints } from "@/scoring";
-import { buildDraftPool } from "./pool";
+import { buildDraftPool, rankedPlayers } from "./pool";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
 const db = createTestDb();
@@ -97,5 +97,27 @@ describe("buildDraftPool", () => {
 
     const pool = await buildDraftPool(db, leagueId);
     expect(pool.map((p) => p.playerId)).toEqual(["grinder", "possession"]);
+  });
+});
+
+describe("rankedPlayers", () => {
+  // Self-contained: no league row is needed, because a league with no scoringSettings row
+  // falls back to PPR_SCORING, which this suite already relies on.
+  it("ranks whole player rows, best first, and buildDraftPool is exactly its projection", async () => {
+    await db.insert(players).values([
+      { id: "p_low", name: "Low Output", position: "RB", nflTeam: "SF" },
+      { id: "p_high", name: "High Output", position: "RB", nflTeam: "KC" },
+    ]);
+    await db.insert(playerStatLines).values([
+      { ...zeroLine, playerId: "p_low", week: 1, rushingYards: 10 },
+      { ...zeroLine, playerId: "p_high", week: 1, rushingYards: 200, rushingTouchdowns: 2 },
+    ]);
+
+    const ranked = await rankedPlayers(db, "league_without_settings");
+    expect(ranked.map((player) => player.id)).toEqual(["p_high", "p_low"]);
+    expect(ranked[0]).toMatchObject({ name: "High Output", position: "RB", nflTeam: "KC" });
+
+    const pool = await buildDraftPool(db, "league_without_settings");
+    expect(pool.map((entry) => entry.playerId)).toEqual(ranked.map((player) => player.id));
   });
 });

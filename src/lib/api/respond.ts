@@ -13,6 +13,11 @@ export function fail(error: string, status: number): NextResponse {
   return NextResponse.json({ ok: false, error }, { status });
 }
 
+/** The shape a browser parses back out of `ok()` / `fail()`. One envelope, both directions. */
+export type ApiEnvelope<T> =
+  | { readonly ok: true; readonly data: T }
+  | { readonly ok: false; readonly error: string };
+
 export type Parsed<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly response: NextResponse };
 
 /** Parses and validates a JSON request body at the boundary; a bad body is a 400 with the first issue's message. */

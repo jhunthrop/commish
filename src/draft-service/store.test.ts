@@ -118,7 +118,10 @@ describe("draft store — persistence", () => {
     await store.applyAction(draftId, pick(teamIds[0]!, "qb1"));
     expect(published.map((e) => e.type)).toEqual(["draft.status", "draft.pick"]);
     expect(published.every((e) => e.leagueId === leagueId)).toBe(true);
-    expect(published[1]?.payload).toMatchObject({ draftId, playerId: "qb1", teamId: teamIds[0], sequence: 2 });
+    expect(published[1]?.payload).toMatchObject({
+      draftId, playerId: "qb1", teamId: teamIds[0], slotIndex: 0,
+      clock: expect.objectContaining({ sequence: 2 }),
+    });
   });
 
   it("accepts the action even when publishing blows up — Postgres is authoritative", async () => {
