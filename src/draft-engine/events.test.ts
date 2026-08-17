@@ -5,6 +5,7 @@ import { initialDraftState, type DraftConfig, type DraftState } from "./state";
 import { DRAFT_CLOCK_SCHEDULE } from "./config";
 import { reduceDraft } from "./reduce";
 import { draftEventsFor } from "./events";
+import { expireAt } from "./test-support";
 
 const SLOTS: readonly RosterSlotConfig[] = [
   { slot: "QB", count: 1, eligiblePositions: ["QB"] },
@@ -52,7 +53,7 @@ describe("draftEventsFor", () => {
 
   it("emits the expiry before the autopick it caused, so clients render them in order", () => {
     const opened = step(initialDraftState(CONFIG), START).state;
-    const { events } = step(opened, { v: 1, type: "TIMER_EXPIRE", timestamp: T });
+    const { events } = step(opened, expireAt(opened));
     expect(events.map((e) => e.type)).toEqual(["draft.timer_expire", "draft.pick"]);
   });
 
@@ -60,7 +61,7 @@ describe("draftEventsFor", () => {
     let state = step(initialDraftState(CONFIG), START).state;
     let events: readonly { type: string }[] = [];
     for (let i = 0; i < 4; i++) {
-      const next = step(state, { v: 1, type: "TIMER_EXPIRE", timestamp: T });
+      const next = step(state, expireAt(state));
       state = next.state;
       events = next.events;
     }
@@ -83,7 +84,7 @@ describe("draftEventsFor", () => {
   it("emits the expiry then the nomination when the clock auto-nominates", () => {
     const auctionConfig: DraftConfig = { ...CONFIG, format: "auction", auctionBudget: 10 };
     const opened = step(initialDraftState(auctionConfig), START).state;
-    const { events } = step(opened, { v: 1, type: "TIMER_EXPIRE", timestamp: T });
+    const { events } = step(opened, expireAt(opened));
     expect(events.map((e) => e.type)).toEqual(["draft.timer_expire", "draft.nominate"]);
     expect(events[1]?.payload).toMatchObject({ auto: true, openingBid: 1 });
   });

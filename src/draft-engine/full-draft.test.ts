@@ -7,6 +7,7 @@ import { DRAFT_CLOCK_SCHEDULE } from "./config";
 import { reduceDraft } from "./reduce";
 import { snakeTeamForPick } from "./order";
 import { isComplete, remainingBudget } from "./selectors";
+import { expireAt } from "./test-support";
 
 const TEAMS = Array.from({ length: 12 }, (_, i) => `t${String(i + 1).padStart(2, "0")}`);
 
@@ -51,7 +52,7 @@ describe("a full 12-team, 15-round snake draft", () => {
 
   const final = (() => {
     let state = apply(initialDraftState(config), START);
-    while (!isComplete(state)) state = apply(state, { v: 1, type: "TIMER_EXPIRE", timestamp: T });
+    while (!isComplete(state)) state = apply(state, expireAt(state));
     return state;
   })();
 
@@ -103,7 +104,7 @@ describe("a full 12-team auction draft", () => {
     let state = apply(initialDraftState(config), START);
     let guard = 0;
     while (!isComplete(state)) {
-      state = apply(state, { v: 1, type: "TIMER_EXPIRE", timestamp: T });
+      state = apply(state, expireAt(state));
       guard += 1;
       expect(guard).toBeLessThan(1000); // fails loudly instead of hanging if the auction can't finish
       // No team's spending ever outruns its budget, at any point in the run.
@@ -128,7 +129,7 @@ describe("a full 12-team auction draft", () => {
       ok: false,
       reason: "You can only bid up to $186 — you need $1 for each of your remaining roster spots.",
     });
-    state = apply(state, { v: 1, type: "TIMER_EXPIRE", timestamp: T });
+    state = apply(state, expireAt(state));
     expect(remainingBudget(state, TEAMS[0]!)).toBe(14);
     expect(state.picks[0]).toMatchObject({ teamId: TEAMS[0], playerId: "qb1", price: 186 });
   });

@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { players } from "@/db/schema";
+import { DRAFT_ACTION_VERSION } from "@/domain/draft";
+import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "./store";
 import { createDraftTicker } from "./ticker";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
@@ -91,5 +93,31 @@ describe("draft ticker", () => {
       setIntervalSpy.mockRestore();
       clearIntervalSpy.mockRestore();
     }
+  });
+});
+
+describe("draft ticker — R-B4 store-level regression (check-then-act race)", () => {
+  it("rejects a stale TIMER_EXPIRE submitted after a concurrent pick already advanced the turn", async () => {
+    const { store, fixture } = await liveDraft();
+    now = "2026-09-01T09:00:00.000Z"; // past the initial 8h deadline
+
+    // What the ticker would have read on its way to computing a deadline to expire.
+    const before = await store.getDraftState(fixture.draftId);
+    const staleDeadline = currentDeadline(before!)!;
+    const onClockTeamId = before!.draftOrder[0]!;
+
+    // A legitimate pick — a real HTTP request, in production — lands in the gap between
+    // the ticker's read and the applyAction call it hasn't made yet.
+    const picked = await store.applyAction(fixture.draftId, {
+      v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp: now, teamId: onClockTeamId, playerId: "qb1",
+    });
+    expect(picked.ok).toBe(true);
+
+    // The ticker's now-stale TIMER_EXPIRE — computed against the superseded deadline —
+    // must not be allowed to autopick for whoever's turn it now is.
+    const stale = await store.applyAction(fixture.draftId, {
+      v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: staleDeadline,
+    });
+    expect(stale).toEqual({ ok: false, reason: "The clock hasn't run out yet." });
   });
 });

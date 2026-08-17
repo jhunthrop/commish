@@ -1,6 +1,7 @@
 import type { DraftAction, StartDraftAction } from "@/domain/draft";
 import { auctionOf, totalRosterSlots, type DraftReduceResult, type DraftState } from "./state";
 import { AUCTION_CONFIG } from "./config";
+import { currentDeadline } from "./selectors";
 import { reduceMakePick, reduceSnakeExpiry } from "./snake";
 import { reduceAuctionExpiry, reduceBid, reduceNominate } from "./auction";
 
@@ -77,6 +78,17 @@ function dispatch(state: DraftState, action: DraftAction): DraftReduceResult {
         : reduceBid(state, auction, action);
     }
     case "TIMER_EXPIRE": {
+      // Checked once, here, so every expiry producer (the ticker today, anything else
+      // later) inherits it: a clock can only be expired once it has actually run out.
+      // This closes a check-then-act race — the ticker reads state and computes a
+      // deadline in one step, then submits TIMER_EXPIRE in a later, separate step; a
+      // legitimate action can land in between and start a fresh clock for someone else,
+      // and the ticker's now-stale timestamp must not be allowed to expire THAT clock.
+      // No clock running (`currentDeadline` null) means nothing to guard — allow through.
+      const deadline = currentDeadline(state);
+      if (deadline !== null && Date.parse(action.timestamp) < Date.parse(deadline)) {
+        return { ok: false, reason: "The clock hasn't run out yet." };
+      }
       const auction = auctionOf(state);
       return auction === null
         ? reduceSnakeExpiry(state, action.timestamp)

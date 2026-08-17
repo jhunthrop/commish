@@ -5,6 +5,7 @@ import { initialDraftState, type DraftConfig, type DraftState } from "./state";
 import { DRAFT_CLOCK_SCHEDULE } from "./config";
 import { reduceDraft } from "./reduce";
 import { maxBidFor, minBidFor, remainingBudget, teamOnClock } from "./selectors";
+import { expireAt } from "./test-support";
 
 const SPRINT_SLOTS: readonly RosterSlotConfig[] = [
   { slot: "QB", count: 1, eligiblePositions: ["QB"] },
@@ -99,7 +100,7 @@ describe("NOMINATE", () => {
 
   it("rejects a nomination for an already-drafted player", () => {
     let state = apply(started(), nominate("t1", "qb1", 1));
-    state = apply(state, { v: 1, type: "TIMER_EXPIRE", timestamp: T }); // t1 wins qb1 uncontested; t2 is up next
+    state = apply(state, expireAt(state)); // t1 wins qb1 uncontested; t2 is up next
     expect(reduceDraft(state, nominate("t2", "qb1", 1))).toEqual({ ok: false, reason: "That player has already been drafted." });
   });
 
@@ -201,7 +202,7 @@ describe("nomination rotation across three teams", () => {
     // wasn't t2's own nomination turn.
     state = apply(state, nominate("t1", "p1", 1));
     state = apply(state, bid("t2", 2));
-    state = apply(state, { v: 1, type: "TIMER_EXPIRE", timestamp: T });
+    state = apply(state, expireAt(state));
     expect(state.rosters.t2).toHaveLength(1);
     // Rotation resumes after the nominator (t1): t2 is full and gets skipped, landing on
     // t3 — which is not adjacent to t1 in the original draft order.

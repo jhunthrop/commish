@@ -3,7 +3,7 @@ import { asc, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { draftActions, draftPicks, drafts, players, rosterSlots } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
-import { DRAFT_CLOCK_SCHEDULE, initialDraftState, reduceDraft, type DraftConfig } from "@/draft-engine";
+import { DRAFT_CLOCK_SCHEDULE, currentDeadline, initialDraftState, reduceDraft, type DraftConfig } from "@/draft-engine";
 import { createDraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -43,7 +43,12 @@ async function runOnTheClock(draftId: string): Promise<void> {
   for (let i = 0; i < 100; i++) {
     const state = await store.getDraftState(draftId);
     if (state === null || state.phase === "complete") return;
-    const result = await store.applyAction(draftId, { v: 1, type: "TIMER_EXPIRE", timestamp: clock.now() });
+    // The reducer now rejects an expiry before the deadline it actually set — advance to
+    // that deadline (rather than the fixed test clock, which would only clear the first
+    // turn) instead of reasoning about tier math here.
+    const result = await store.applyAction(draftId, {
+      v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state) ?? clock.now(),
+    });
     if (!result.ok) throw new Error(result.reason);
   }
   throw new Error("draft did not finish");
@@ -80,7 +85,7 @@ async function seedCompletedActionLog(draftId: string, leagueId: string, teamIds
     state = result.state;
   }
   while (state.phase !== "complete") {
-    const expire: DraftAction = { v: 1, type: "TIMER_EXPIRE", timestamp: clock.now() };
+    const expire: DraftAction = { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state) ?? clock.now() };
     const result = reduceDraft(state, expire);
     if (!result.ok) throw new Error(result.reason);
     actions.push(expire);
