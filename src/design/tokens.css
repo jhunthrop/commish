@@ -11,6 +11,7 @@
   --commish-color-negative: #B0342A;
   --commish-color-negative-text: #FFFFFF;
   --commish-color-warning: #8A5A00;
+  --commish-color-scrim: #0F1412;
   --commish-space-1: 4px;
   --commish-space-2: 8px;
   --commish-space-3: 12px;
@@ -57,6 +58,7 @@
   --commish-color-negative: #F07C70;
   --commish-color-negative-text: #2A0F0C;
   --commish-color-warning: #E5B054;
+  --commish-color-scrim: #000000;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -72,5 +74,6 @@
     --commish-color-negative: #F07C70;
     --commish-color-negative-text: #2A0F0C;
     --commish-color-warning: #E5B054;
+    --commish-color-scrim: #000000;
   }
 }

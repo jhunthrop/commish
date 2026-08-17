@@ -13,6 +13,9 @@ const MIN_DISTINGUISHABLE_HUE_DEG = 30;
 const DISTINGUISHABLE_ROLES: readonly ColorRole[] = ["accent", "positive", "negative", "warning"];
 
 // Every text/foreground role that sits directly on a surface must clear AA text contrast.
+// `scrim` is deliberately absent from every list below: it is a translucent modal backdrop
+// overlay, never text or a UI foreground, so text-contrast and distinguishability checks do
+// not apply to it.
 const TEXT_ON_SURFACE: readonly ColorRole[] = ["textPrimary", "textMuted", "accent", "positive", "negative", "warning"];
 
 describe("TOKENS.color", () => {

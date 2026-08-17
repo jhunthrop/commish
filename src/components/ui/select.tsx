@@ -1,4 +1,5 @@
-import { forwardRef, useId, type SelectHTMLAttributes } from "react";
+import { forwardRef, type SelectHTMLAttributes } from "react";
+import { FieldShell, useFieldIds } from "./field-shell";
 
 export interface SelectOption {
   readonly value: string;
@@ -23,16 +24,9 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
   { label, options, error, hint, id: givenId, className = "", ...rest },
   ref,
 ) {
-  const autoId = useId();
-  const id = givenId ?? autoId;
-  const hintId = hint ? `${id}-hint` : undefined;
-  const errorId = error ? `${id}-error` : undefined;
-  const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
+  const { id, hintId, errorId, describedBy } = useFieldIds(givenId, hint, error);
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-text-primary">
-        {label}
-      </label>
+    <FieldShell id={id} label={label} hint={hint} hintId={hintId} error={error} errorId={errorId}>
       <select
         ref={ref}
         id={id}
@@ -53,16 +47,6 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
           </option>
         ))}
       </select>
-      {hint ? (
-        <p id={hintId} className="text-sm text-text-muted">
-          {hint}
-        </p>
-      ) : null}
-      {error ? (
-        <p id={errorId} role="alert" className="text-sm text-negative">
-          {error}
-        </p>
-      ) : null}
-    </div>
+    </FieldShell>
   );
 });

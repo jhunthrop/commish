@@ -23,4 +23,11 @@ describe("Input", () => {
     render(<Input label="Team name" hint="You can change this later." />);
     expect(screen.getByText("You can change this later.")).toBeInTheDocument();
   });
+  it("has disabled styling parity with Select (dimmed, not-allowed cursor)", () => {
+    render(<Input label="Team name" disabled />);
+    const input = screen.getByLabelText("Team name");
+    expect(input).toBeDisabled();
+    expect(input.className).toMatch(/disabled:opacity-60/);
+    expect(input.className).toMatch(/disabled:cursor-not-allowed/);
+  });
 });

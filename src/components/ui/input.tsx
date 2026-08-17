@@ -1,4 +1,5 @@
-import { forwardRef, useId, type InputHTMLAttributes } from "react";
+import { forwardRef, type InputHTMLAttributes } from "react";
+import { FieldShell, useFieldIds } from "./field-shell";
 
 export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, "id"> {
   readonly label: string;
@@ -11,16 +12,9 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
   { label, error, hint, id: givenId, className = "", ...rest },
   ref,
 ) {
-  const autoId = useId();
-  const id = givenId ?? autoId;
-  const hintId = hint ? `${id}-hint` : undefined;
-  const errorId = error ? `${id}-error` : undefined;
-  const describedBy = [hintId, errorId].filter(Boolean).join(" ") || undefined;
+  const { id, hintId, errorId, describedBy } = useFieldIds(givenId, hint, error);
   return (
-    <div className="flex flex-col gap-1">
-      <label htmlFor={id} className="text-sm font-medium text-text-primary">
-        {label}
-      </label>
+    <FieldShell id={id} label={label} hint={hint} hintId={hintId} error={error} errorId={errorId}>
       <input
         ref={ref}
         id={id}
@@ -29,21 +23,12 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         className={
           "h-10 rounded-md border bg-surface-elevated px-3 text-md text-text-primary " +
           "placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
+          "disabled:opacity-60 disabled:cursor-not-allowed " +
           (error ? "border-negative " : "border-border ") +
           className
         }
         {...rest}
       />
-      {hint ? (
-        <p id={hintId} className="text-sm text-text-muted">
-          {hint}
-        </p>
-      ) : null}
-      {error ? (
-        <p id={errorId} role="alert" className="text-sm text-negative">
-          {error}
-        </p>
-      ) : null}
-    </div>
+    </FieldShell>
   );
 });

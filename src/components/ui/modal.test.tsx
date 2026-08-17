@@ -78,4 +78,16 @@ describe("Modal", () => {
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "a" });
     expect(onClose).not.toHaveBeenCalled();
   });
+
+  it("keeps focus on the dialog panel when Tab is pressed with no focusable descendants", () => {
+    render(
+      <Modal open title="Notice" onClose={() => {}} footer={<></>}>
+        Just a message, nothing to focus in here.
+      </Modal>,
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveFocus();
+    fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(document.activeElement).toBe(dialog);
+  });
 });

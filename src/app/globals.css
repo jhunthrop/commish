@@ -16,6 +16,7 @@
   --color-negative: var(--commish-color-negative);
   --color-negative-text: var(--commish-color-negative-text);
   --color-warning: var(--commish-color-warning);
+  --color-scrim: var(--commish-color-scrim);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
   --radius-sm: var(--commish-radius-sm);

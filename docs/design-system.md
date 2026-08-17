@@ -16,8 +16,12 @@ Single source of truth: `src/design/tokens.ts` → generated `src/design/tokens.
 - Accent: `bg-accent text-accent-text` (buttons/links), `text-accent`
 - Semantic: `text-positive` / `text-negative` / `text-warning` (semantic color is *not* the accent)
 - Semantic-on-fill: when a semantic color is used as a fill (e.g. `bg-negative`), pair it with its `-text` role (e.g. `text-negative-text`) for the label color, never a raw white/black.
+- Overlay: `bg-scrim` (used at `bg-scrim/50` for the modal backdrop) — the token for "darken what's behind this," never a raw `bg-black`. Not a text/foreground role, so it is excluded from the token contrast tests.
 - Radii: `rounded-sm|md|lg|pill`; spacing via Tailwind's default 4px scale (matches `TOKENS.space`)
 - **No raw hex, no raw px in feature code.**
+
+## Stacking
+No z-index scale yet — two sanctioned layers exist by convention: the toast region is `z-40`, and `Modal` is `z-50` (always above toasts). Any new overlay must pick a value against these two, not invent an unrelated one.
 
 ## Theming
 `<ThemeProvider>` (in `layout.tsx`) manages `system | light | dark`, persisted, stamping `data-theme` on `<html>`. Default is system.

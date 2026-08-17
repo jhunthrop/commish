@@ -47,7 +47,13 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
       const panel = panelRef.current;
       if (panel === null) return;
       const items = Array.from(panel.querySelectorAll<HTMLElement>(FOCUSABLE));
-      if (items.length === 0) return;
+      if (items.length === 0) {
+        // No focusable descendant to cycle to — without this, the browser's default Tab
+        // behavior would carry focus out of the dialog and onto the page behind it.
+        event.preventDefault();
+        panel.focus();
+        return;
+      }
       const first = items[0]!;
       const last = items[items.length - 1]!;
       const active = document.activeElement;
@@ -65,7 +71,7 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-4 sm:items-center">
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim/50 p-4 sm:items-center">
       <div
         ref={panelRef}
         role="dialog"

@@ -11,7 +11,8 @@ export type ColorRole =
   | "positive"
   | "negative"
   | "negativeText"
-  | "warning";
+  | "warning"
+  | "scrim";
 
 type Palette = Readonly<Record<ColorRole, string>>;
 
@@ -29,6 +30,8 @@ const light: Palette = {
   negative: "#B0342A",
   negativeText: "#FFFFFF",
   warning: "#8A5A00",
+  /** Modal backdrop overlay. Not text — excluded from the contrast-on-surface checks below. */
+  scrim: "#0F1412",
 };
 
 const dark: Palette = {
@@ -44,6 +47,7 @@ const dark: Palette = {
   negative: "#F07C70",
   negativeText: "#2A0F0C",
   warning: "#E5B054",
+  scrim: "#000000",
 };
 
 export const TOKENS = {
