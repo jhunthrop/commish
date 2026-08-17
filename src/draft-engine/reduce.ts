@@ -1,5 +1,6 @@
 import type { DraftAction, StartDraftAction } from "@/domain/draft";
 import { auctionOf, totalRosterSlots, type DraftReduceResult, type DraftState } from "./state";
+import { AUCTION_CONFIG } from "./config";
 import { reduceMakePick, reduceSnakeExpiry } from "./snake";
 import { reduceAuctionExpiry, reduceBid, reduceNominate } from "./auction";
 
@@ -19,8 +20,8 @@ function reduceStart(state: DraftState, action: StartDraftAction): DraftReduceRe
   if (isAuction && (budget === null || budget <= 0)) {
     return { ok: false, reason: "An auction draft needs a budget before it can start." };
   }
-  if (isAuction && (budget as number) < totalRosterSlots(state.config.slotConfig)) {
-    return { ok: false, reason: "An auction budget must be at least $1 for every roster spot." };
+  if (isAuction && (budget as number) < totalRosterSlots(state.config.slotConfig) * AUCTION_CONFIG.minBid) {
+    return { ok: false, reason: `An auction budget must be at least $${AUCTION_CONFIG.minBid} for every roster spot.` };
   }
   const rosters = Object.fromEntries(action.draftOrder.map((teamId) => [teamId, []]));
   const budgets = isAuction ? Object.fromEntries(action.draftOrder.map((teamId) => [teamId, budget as number])) : {};

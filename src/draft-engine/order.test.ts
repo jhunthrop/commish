@@ -41,4 +41,11 @@ describe("snakeTeamForPick", () => {
   it("throws for a pick number outside the draft", () => {
     expect(() => snakeTeamForPick(ORDER, 0)).toThrow(/pick number/i);
   });
+
+  it("throws when called directly with an empty draft order", () => {
+    // snakeTeamForPick is part of the public engine barrel and only validates
+    // pickNumber itself — an empty draftOrder is a caller error it still must
+    // reject rather than silently returning undefined.
+    expect(() => snakeTeamForPick([], 1)).toThrow(/invalid/i);
+  });
 });

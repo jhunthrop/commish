@@ -1,6 +1,7 @@
 import { DRAFT_CLOCK_SCHEDULE, type ClockTier } from "./config";
 
-const MS_PER_HOUR = 60 * 60 * 1000;
+export const MS_PER_SECOND = 1000;
+const MS_PER_HOUR = 60 * 60 * MS_PER_SECOND;
 
 export interface Tightening {
   /** The instant the next, shorter tier takes effect. */
@@ -43,9 +44,9 @@ export function clockTierFor(
   kickoffIso: string,
   schedule: readonly ClockTier[] = DRAFT_CLOCK_SCHEDULE,
 ): ClockTier {
-  const tier = schedule[tierIndexFor(atIso, kickoffIso, schedule)];
-  if (tier === undefined) throw new Error("The draft clock schedule must have at least one tier.");
-  return tier;
+  // `tierIndexFor` throws for an empty schedule and otherwise returns an index within
+  // bounds, so this lookup can never miss.
+  return schedule[tierIndexFor(atIso, kickoffIso, schedule)]!;
 }
 
 /**

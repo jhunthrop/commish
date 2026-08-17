@@ -71,6 +71,11 @@ describe("START_DRAFT", () => {
     expect(reduceDraft(started(), START)).toEqual({ ok: false, reason: "This draft has already started." });
   });
 
+  it("rejects a draft order with fewer than two teams", () => {
+    const result = reduceDraft(initialDraftState(CONFIG), { ...START, draftOrder: ["t1"] });
+    expect(result).toEqual({ ok: false, reason: "A draft needs at least two teams." });
+  });
+
   it("rejects a draft order with a duplicate team", () => {
     const result = reduceDraft(initialDraftState(CONFIG), { ...START, draftOrder: ["t1", "t1"] });
     expect(result).toEqual({ ok: false, reason: "Every team may appear in the draft order only once." });

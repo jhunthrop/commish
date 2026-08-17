@@ -91,8 +91,10 @@ export function reduceAuctionExpiry(state: DraftState, auction: AuctionState, ti
   const lot = auction.lot;
 
   if (lot === null) {
-    const nominator = auction.nominatingTeamId;
-    if (nominator === null) return { ok: false, reason: "This draft has already finished." };
+    // `nominatingTeamId` is only ever null together with `phase: "complete"`, and
+    // `reduceDraft` rejects every action once the draft is complete before dispatch
+    // reaches here — so a live call always has a real nominator.
+    const nominator = auction.nominatingTeamId!;
     const best = bestAvailableFor(state, nominator);
     if (best === null) return { ok: false, reason: "No eligible player is available to auto-pick." };
     return { ok: true, state: openLot(state, nominator, best.playerId, AUCTION_CONFIG.minBid, timestamp, true) };

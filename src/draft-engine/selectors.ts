@@ -5,7 +5,7 @@ import { auctionOf, rosterFor, totalRosterSlots, type AuctionState, type Complet
 import { snakeTeamForPick } from "./order";
 import { assignSlot } from "./slotting";
 import { AUCTION_CONFIG, type ClockTier } from "./config";
-import { clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
+import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
 
 export function draftedPlayerIds(state: DraftState): ReadonlySet<string> {
   return new Set(state.picks.map((p) => p.playerId));
@@ -91,8 +91,11 @@ export function currentClockSeconds(state: DraftState): number | null {
 
 export function currentDeadline(state: DraftState): string | null {
   const seconds = currentClockSeconds(state);
+  // `seconds !== null` already implies `turnStartedAt !== null` (both derive from
+  // `currentTier`, which requires it) — this check exists only so TS can narrow
+  // `turnStartedAt` from `string | null` to `string` below.
   if (seconds === null || state.turnStartedAt === null) return null;
-  return new Date(Date.parse(state.turnStartedAt) + seconds * 1000).toISOString();
+  return new Date(Date.parse(state.turnStartedAt) + seconds * MS_PER_SECOND).toISOString();
 }
 
 /** When the clock next tightens and to what — null before/after the draft, or on the final tier. */

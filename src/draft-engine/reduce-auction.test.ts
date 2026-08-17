@@ -100,6 +100,11 @@ describe("NOMINATE", () => {
     });
   });
 
+  it("accepts an opening bid exactly at the nominator's maximum", () => {
+    const state = apply(started(), nominate("t1", "qb1", 8));
+    expect(state.auction?.lot).toMatchObject({ highBid: 8, highBidTeamId: "t1" });
+  });
+
   it("rejects a pick in an auction draft", () => {
     expect(reduceDraft(started(), { v: 1, type: "MAKE_PICK", timestamp: T, teamId: "t1", playerId: "qb1" })).toEqual({
       ok: false,
@@ -138,10 +143,48 @@ describe("BID", () => {
     });
   });
 
+  it("accepts a bid exactly at the bidder's maximum", () => {
+    const state = apply(withLot(), bid("t2", 8));
+    expect(state.auction?.lot).toMatchObject({ highBid: 8, highBidTeamId: "t2" });
+  });
+
   it("rejects a bid in a snake draft", () => {
     const snake: DraftConfig = { ...CONFIG, format: "snake", auctionBudget: null };
     const state = apply(initialDraftState(snake), START);
     expect(reduceDraft(state, bid("t2", 5))).toEqual({ ok: false, reason: "This is a snake draft — there's nothing to bid on." });
+  });
+});
+
+describe("nomination rotation across three teams", () => {
+  // One universal slot each, so a single won lot fills a roster completely and makes
+  // that team ineligible to nominate or bid again.
+  const THREE_TEAM_SLOTS: readonly RosterSlotConfig[] = [
+    { slot: "BENCH", count: 1, eligiblePositions: ["QB", "RB", "WR", "TE", "K", "DEF"] },
+  ];
+  const THREE_TEAM_POOL: readonly DraftPoolEntry[] = [
+    { playerId: "p1", position: "QB" },
+    { playerId: "p2", position: "RB" },
+    { playerId: "p3", position: "WR" },
+  ];
+  const threeTeamConfig: DraftConfig = {
+    draftId: "draft_3", leagueId: "league_1", format: "auction", kickoffAt: "2026-09-10T17:00:00.000Z",
+    auctionBudget: 5, slotConfig: THREE_TEAM_SLOTS, clockSchedule: DRAFT_CLOCK_SCHEDULE,
+  };
+  const threeTeamStart: StartDraftAction = {
+    v: 1, type: "START_DRAFT", timestamp: T, draftOrder: ["t1", "t2", "t3"], pool: THREE_TEAM_POOL,
+  };
+
+  it("skips a team whose roster is already full to reach a non-adjacent open one", () => {
+    let state = apply(initialDraftState(threeTeamConfig), threeTeamStart);
+    // t1 nominates p1, but t2 outbids and wins it — t2's one slot fills even though it
+    // wasn't t2's own nomination turn.
+    state = apply(state, nominate("t1", "p1", 1));
+    state = apply(state, bid("t2", 2));
+    state = apply(state, { v: 1, type: "TIMER_EXPIRE", timestamp: T });
+    expect(state.rosters.t2).toHaveLength(1);
+    // Rotation resumes after the nominator (t1): t2 is full and gets skipped, landing on
+    // t3 — which is not adjacent to t1 in the original draft order.
+    expect(state.auction).toEqual({ nominatingTeamId: "t3", lot: null });
   });
 });
 
