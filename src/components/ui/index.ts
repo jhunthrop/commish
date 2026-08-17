@@ -6,3 +6,5 @@ export { Skeleton, type SkeletonProps } from "./skeleton";
 export { EmptyState, type EmptyStateProps } from "./empty-state";
 export { ErrorState, type ErrorStateProps } from "./error-state";
 export { Icon, type IconName, type IconProps } from "./icon";
+export { Select, type SelectProps, type SelectOption } from "./select";
+export { Avatar, initialsFor, type AvatarProps, type AvatarSize } from "./avatar";
