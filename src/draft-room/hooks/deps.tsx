@@ -1,0 +1,34 @@
+"use client";
+
+import { createContext, useContext, type ReactNode } from "react";
+
+/** The slice of `EventSource` the room uses. Narrow on purpose, so a test double is trivial. */
+export interface EventSourceLike {
+  addEventListener(type: string, listener: (event: MessageEvent) => void): void;
+  close(): void;
+}
+
+export interface DraftRoomDeps {
+  readonly fetchJson: (url: string, init?: RequestInit) => Promise<Response>;
+  readonly openEventSource: (url: string) => EventSourceLike;
+}
+
+/**
+ * Real browser dependencies. `new EventSource(...)` is constructed lazily inside the factory
+ * so importing this module is safe in happy-dom, which has no `EventSource`.
+ */
+const BROWSER_DEPS: DraftRoomDeps = {
+  fetchJson: (url, init) => fetch(url, init),
+  openEventSource: (url) => new EventSource(url),
+};
+
+const DepsContext = createContext<DraftRoomDeps>(BROWSER_DEPS);
+
+/** Injects test doubles. Production never renders this — the default context value is real. */
+export function DraftRoomDepsProvider({ deps, children }: { readonly deps: DraftRoomDeps; readonly children: ReactNode }) {
+  return <DepsContext.Provider value={deps}>{children}</DepsContext.Provider>;
+}
+
+export function useDraftRoomDeps(): DraftRoomDeps {
+  return useContext(DepsContext);
+}
