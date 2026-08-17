@@ -1,0 +1,3 @@
+ALTER TABLE "draft_actions" ADD COLUMN "sequence" integer NOT NULL;--> statement-breakpoint
+ALTER TABLE "leagues" ADD COLUMN "roster_slots" jsonb DEFAULT '[{"slot":"QB","count":1,"eligiblePositions":["QB"]},{"slot":"RB","count":2,"eligiblePositions":["RB"]},{"slot":"WR","count":2,"eligiblePositions":["WR"]},{"slot":"TE","count":1,"eligiblePositions":["TE"]},{"slot":"FLEX","count":1,"eligiblePositions":["RB","WR","TE"]},{"slot":"K","count":1,"eligiblePositions":["K"]},{"slot":"DEF","count":1,"eligiblePositions":["DEF"]},{"slot":"BENCH","count":6,"eligiblePositions":["QB","RB","WR","TE","K","DEF"]}]'::jsonb NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "draft_actions_draft_sequence_idx" ON "draft_actions" USING btree ("draft_id","sequence");

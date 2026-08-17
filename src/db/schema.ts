@@ -12,6 +12,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
 export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
@@ -47,6 +48,8 @@ export const leagues = pgTable("leagues", {
   commissionerUserId: text("commissioner_user_id")
     .notNull()
     .references(() => users.id),
+  /** The league's roster shape. The draft reads this to know its rounds and slot rules. */
+  rosterSlots: jsonb("roster_slots").$type<readonly RosterSlotConfig[]>().notNull().default([...STANDARD_ROSTER_SLOTS]),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -128,10 +131,19 @@ export const draftActions = pgTable(
     draftId: text("draft_id")
       .notNull()
       .references(() => drafts.id, { onDelete: "cascade" }),
+    /**
+     * 1-based position in this draft's action log. The unique index below is the database's
+     * own backstop against two writers appending at the same position — a bug in the
+     * in-process lock can then cost a rejected action, never a double-drafted player.
+     */
+    sequence: integer("sequence").notNull(),
     action: jsonb("action").notNull(),
     timestamp: timestamp("timestamp", { withTimezone: true }).notNull(),
   },
-  (t) => [index("draft_actions_draft_id_id_idx").on(t.draftId, t.id)],
+  (t) => [
+    index("draft_actions_draft_id_id_idx").on(t.draftId, t.id),
+    uniqueIndex("draft_actions_draft_sequence_idx").on(t.draftId, t.sequence),
+  ],
 );
 
 export const draftPicks = pgTable(
