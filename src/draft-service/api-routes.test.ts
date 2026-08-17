@@ -14,7 +14,7 @@ vi.mock("@/lib/auth/current-user", () => ({
 
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions, players } from "@/db/schema";
+import { draftActions, leagues, players, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { GET as getDraft } from "@/app/api/drafts/[draftId]/route";
 import { POST as postAction } from "@/app/api/drafts/[draftId]/actions/route";
@@ -102,6 +102,24 @@ describe("GET /api/drafts/[draftId]", () => {
     const response = await getDraft(new Request(`http://test/api/drafts/${DRAFT_ID}`), { params });
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ ok: false, error: "You don't have a team in this league." });
+  });
+
+  // The `teamId === null && isCommissioner` branch: a commissioner who runs the league but
+  // fields no team of their own must still be able to view the draft room.
+  it("lets a commissioner with no team of their own view the draft", async () => {
+    const f = await fixture();
+    const commissionerId = "league_api_commish_no_team";
+    await db.insert(users).values({ id: commissionerId, email: `${commissionerId}@test.local`, displayName: commissionerId });
+    await db.update(leagues).set({ commissionerUserId: commissionerId }).where(eq(leagues.id, f.leagueId));
+    signedInAs(commissionerId);
+
+    const response = await getDraft(new Request(`http://test/api/drafts/${DRAFT_ID}`), { params });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.teamId).toBeNull();
+    expect(body.data.isCommissioner).toBe(true);
+    expect(body.data.draft.draftId).toBe(DRAFT_ID);
   });
 });
 

@@ -25,6 +25,8 @@ The founder's standing direction (2026-08-17): *"I don't want an MVP. Let's work
 src/
   app/                    Next.js routes. API routes under app/api/**.
   domain/                 Pure domain types + pure functions. NO I/O, NO Date.now(). readonly everywhere.
+  draft-engine/           Pure draft reducer (snake + auction), clock schedule, selectors. 100% coverage.
+  draft-service/          Durable replay-based draft store, commit seam, clock ticker, draft authz.
   db/                     schema.ts (Drizzle, pg-core), client.ts (createDb/getDb), test-db.ts
   lib/
     auth/                 current-user.ts (server identity seam over WorkOS), user-sync.ts (profile upsert)
@@ -60,7 +62,15 @@ Anything time-dependent takes a `Clock` (`src/domain/timing.ts`) and calls `cloc
 - **Delivery is Redis Streams over SSE.** Stream key `league:<id>:events`. Read with plain `XREAD BLOCK` from a per-connection cursor. **Never `XREADGROUP`** — consumer groups partition entries across consumers; a draft room needs every viewer to see every pick.
 - **Resume** is via the standard `Last-Event-ID` header (the SSE `id:` is the stream entry id). Full-state refetch is the fallback only when a gap outlasts stream retention.
 - **Event types** are enumerated once in `src/lib/realtime/events.ts` (`draft.*`, `chat.*`, `score.update`). Add there, nowhere else.
+- **Draft events** (`draft.pick`, `draft.nominate`, `draft.bid`, `draft.timer_expire`, `draft.status`) ride the **league** stream — there is no per-draft stream. Their payload contracts live in `docs/draft-engine.md`.
 - No Socket.io, no managed realtime vendor, no second transport — ever.
+
+### Draft state — the action log is the source of truth
+An in-progress draft's state is *derived*, by replaying `draft_actions` through the pure
+reducer in `src/draft-engine/`. Any in-memory materialization is a cache and must be safe to
+drop at any moment. Every accepted action is persisted before it is cached or published, and
+`teamId` is always resolved from the authenticated session, never from a request body.
+See `docs/draft-engine.md`.
 
 ### API responses
 Every JSON route returns the envelope from `src/lib/api/respond.ts`: `{ ok: true, data }` or `{ ok: false, error }` with a meaningful HTTP status. Bodies are parsed with `parseJson(request, ZodSchema)`; a bad body is a 400 naming the field. Error strings are user-facing plain language — never raw DB/exception text.
