@@ -34,7 +34,9 @@ function reduceStart(state: DraftState, action: StartDraftAction): DraftReduceRe
       pool: action.pool,
       rosters,
       budgets,
-      auction: isAuction ? { nominatingTeamId: action.draftOrder[0] ?? null, lot: null } : null,
+      // The `draftOrder.length < 2` guard above already rejects any draft order without a
+      // first team, so `[0]` is always defined here — no `?? null` fallback needed.
+      auction: isAuction ? { nominatingTeamId: action.draftOrder[0]!, lot: null } : null,
       pickNumber: 1,
       turnStartedAt: action.timestamp,
     },

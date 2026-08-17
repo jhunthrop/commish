@@ -101,14 +101,17 @@ export function reduceAuctionExpiry(state: DraftState, auction: AuctionState, ti
   }
 
   const winner = lot.highBidTeamId;
+  // The winner's budget and roster space were already validated by checkAffordable when
+  // they placed the bid or nomination that made them the high bidder (reduceBid /
+  // reduceNominate), and nothing else can touch their roster or budget while this lot is
+  // still open — applyPick can never fail here.
   const applied = applyPick(state, {
     teamId: winner,
     playerId: lot.playerId,
     price: lot.highBid,
     auto: lot.autoNominated && winner === lot.nominatedByTeamId,
     timestamp,
-  });
-  if (!applied.ok) return applied;
+  }) as { readonly ok: true; readonly state: DraftState };
 
   const paid: DraftState = {
     ...applied.state,

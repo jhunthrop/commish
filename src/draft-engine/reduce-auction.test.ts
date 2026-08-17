@@ -93,6 +93,27 @@ describe("NOMINATE", () => {
     expect(reduceDraft(started(), nominate("t1", "ghost", 1))).toEqual({ ok: false, reason: "That player isn't in this draft's player pool." });
   });
 
+  it("rejects an opening bid below the minimum", () => {
+    expect(reduceDraft(started(), nominate("t1", "qb1", 0))).toEqual({ ok: false, reason: "The opening bid must be at least $1." });
+  });
+
+  it("rejects a nomination for an already-drafted player", () => {
+    let state = apply(started(), nominate("t1", "qb1", 1));
+    state = apply(state, { v: 1, type: "TIMER_EXPIRE", timestamp: T }); // t1 wins qb1 uncontested; t2 is up next
+    expect(reduceDraft(state, nominate("t2", "qb1", 1))).toEqual({ ok: false, reason: "That player has already been drafted." });
+  });
+
+  it("rejects a nomination for a position no slot in this league accepts", () => {
+    // No slot here — not even BENCH — takes a WR, so wr1 has nowhere to go regardless of budget.
+    const noWrSlots: readonly RosterSlotConfig[] = [
+      { slot: "QB", count: 1, eligiblePositions: ["QB"] },
+      { slot: "RB", count: 1, eligiblePositions: ["RB"] },
+    ];
+    const config: DraftConfig = { ...CONFIG, slotConfig: noWrSlots };
+    const state = apply(initialDraftState(config), START);
+    expect(reduceDraft(state, nominate("t1", "wr1", 1))).toEqual({ ok: false, reason: "No roster slot in this league accepts a WR." });
+  });
+
   it("rejects an opening bid above the nominator's maximum", () => {
     expect(reduceDraft(started(), nominate("t1", "qb1", 9))).toEqual({
       ok: false,
@@ -199,6 +220,17 @@ describe("auction selectors", () => {
   it("reports no budget and no bidding room for a team it has never seen", () => {
     expect(remainingBudget(started(), "nobody")).toBe(0);
     expect(maxBidFor(started(), "nobody")).toBe(0);
+  });
+
+  it("returns 0 for a team whose roster is already completely full", () => {
+    const state = started();
+    const fullRoster = [
+      { slot: "QB" as const, slotIndex: 0, playerId: "qb1" },
+      { slot: "RB" as const, slotIndex: 0, playerId: "rb1" },
+      { slot: "BENCH" as const, slotIndex: 0, playerId: "wr1" },
+    ];
+    const fullState = { ...state, rosters: { ...state.rosters, t1: fullRoster } };
+    expect(maxBidFor(fullState, "t1")).toBe(0);
   });
 
   it("puts nobody on the clock while a lot is live — during bidding the clock belongs to everyone", () => {

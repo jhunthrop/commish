@@ -118,4 +118,17 @@ describe("TIMER_EXPIRE (auction)", () => {
     expect(state.auction?.nominatingTeamId).toBeNull();
     expect(state.auction?.lot).toBeNull();
   });
+
+  it("rejects an auto-nomination when the stalled team has no eligible player left at all", () => {
+    // Only a QB slot exists — no BENCH — so once the pool's lone QB is gone, the
+    // remaining WR fits nowhere and the next team's stall can't even auto-nominate.
+    const qbOnlyConfig: DraftConfig = {
+      ...auctionConfig, slotConfig: [{ slot: "QB", count: 1, eligiblePositions: ["QB"] }],
+    };
+    const qbOnlyPool: readonly DraftPoolEntry[] = [{ playerId: "qb1", position: "QB" }, { playerId: "wr1", position: "WR" }];
+    let state = apply(initialDraftState(qbOnlyConfig), { ...START, pool: qbOnlyPool });
+    state = apply(state, EXPIRE); // t1 auto-nominates qb1
+    state = apply(state, EXPIRE); // t1 wins qb1 uncontested; t2 is up next
+    expect(reduceDraft(state, EXPIRE)).toEqual({ ok: false, reason: "No eligible player is available to auto-pick." });
+  });
 });

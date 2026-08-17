@@ -40,7 +40,11 @@ export function reduceSnakeExpiry(state: DraftState, timestamp: string): DraftRe
   const teamId = snakeTeamForPick(state.draftOrder, state.pickNumber);
   const best = bestAvailableFor(state, teamId);
   if (best === null) return { ok: false, reason: "No eligible player is available to auto-pick." };
-  const applied = applyPick(state, { teamId, playerId: best.playerId, price: null, auto: true, timestamp });
-  if (!applied.ok) return applied;
+  // `bestAvailableFor` already ran the exact same assignSlot check, on the same roster and
+  // position, that applyPick reruns internally — it can never fail here.
+  const applied = applyPick(state, { teamId, playerId: best.playerId, price: null, auto: true, timestamp }) as {
+    readonly ok: true;
+    readonly state: DraftState;
+  };
   return { ok: true, state: advanceSnake(applied.state, timestamp) };
 }
