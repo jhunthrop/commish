@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { DRAFT_ACTION_VERSION, type DraftAction, type DraftPoolEntry, type StartDraftAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
-import { DRAFT_CLOCK_SCHEDULE } from "./config";
+import { AUCTION_CONFIG, DRAFT_CLOCK_SCHEDULE } from "./config";
 import { reduceDraft } from "./reduce";
 import { draftEventsFor } from "./events";
 import { expireAt } from "./test-support";
@@ -84,6 +84,30 @@ describe("draftEventsFor", () => {
     expect(events.map((e) => e.type)).toEqual(["draft.timer_expire", "draft.pick"]);
   });
 
+  it("carries an exact-shape draft.timer_expire payload: the EXPIRED pick's own number, plus the post-autopick clock", () => {
+    const opened = step(initialDraftState(CONFIG), START).state;
+    const { events } = step(opened, expireAt(opened));
+    const timerExpireEvent = events.find((e) => e.type === "draft.timer_expire");
+    expect(timerExpireEvent).toEqual({
+      type: "draft.timer_expire",
+      payload: {
+        draftId: "d1",
+        // The pick the clock ran out on — the pre-transition pickNumber, not the post-autopick one.
+        pickNumber: 1,
+        clock: {
+          phase: "in_progress",
+          sequence: 2,
+          // The autopick already advanced to the NEXT pick by the time this event is built.
+          pickNumber: 2,
+          onClockTeamId: "t2",
+          deadlineAt: "2026-09-01T16:00:00.000Z",
+          clockSeconds: 8 * 60 * 60,
+          nextTightening: { at: "2026-09-03T17:00:00.000Z", pickSeconds: 4 * 60 * 60 },
+        },
+      },
+    });
+  });
+
   it("emits draft.status when the last pick completes the draft", () => {
     let state = step(initialDraftState(CONFIG), START).state;
     let events: readonly { type: string }[] = [];
@@ -95,16 +119,30 @@ describe("draftEventsFor", () => {
     expect(events.map((e) => e.type)).toEqual(["draft.timer_expire", "draft.pick", "draft.status"]);
   });
 
-  it("emits draft.nominate and draft.bid for auction lots", () => {
+  it("emits draft.nominate and draft.bid for auction lots, each carrying the next legal minimum bid", () => {
     const auctionConfig: DraftConfig = { ...CONFIG, format: "auction", auctionBudget: 10 };
     const opened = step(initialDraftState(auctionConfig), START).state;
+    // Both actions below share timestamp T, so the clock — turn-started-at, tier, deadline and
+    // the next-tightening schedule — is identical after each: live bidding pins the window to
+    // the 15s auction bid window (the shorter of that and the 8h tier this far from kickoff).
+    const liveClock = {
+      phase: "in_progress",
+      onClockTeamId: null, // an open lot belongs to everyone, not one team
+      pickNumber: 1,
+      deadlineAt: "2026-09-01T00:00:15.000Z",
+      clockSeconds: 15,
+      nextTightening: { at: "2026-09-03T17:00:00.000Z", pickSeconds: 4 * 60 * 60 },
+    };
+
     const nominated = step(opened, { v: 1, type: "NOMINATE", timestamp: T, teamId: "t1", playerId: "qb1", openingBid: 2 });
     expect(nominated.events).toEqual([
       {
         type: "draft.nominate",
         payload: {
           draftId: "d1", teamId: "t1", playerId: "qb1", openingBid: 2, auto: false,
-          clock: expect.objectContaining({ sequence: 2 }),
+          // AUCTION_CONFIG.bidIncrement is 1, so the opening $2 bid makes $3 the next legal bid.
+          minBid: 3,
+          clock: { ...liveClock, sequence: 2 },
         },
       },
     ]);
@@ -114,7 +152,9 @@ describe("draftEventsFor", () => {
         type: "draft.bid",
         payload: {
           draftId: "d1", teamId: "t2", playerId: "qb1", amount: 3,
-          clock: expect.objectContaining({ sequence: 3 }),
+          // The $3 raise makes $4 the next legal bid.
+          minBid: 4,
+          clock: { ...liveClock, sequence: 3 },
         },
       },
     ]);
@@ -187,6 +227,9 @@ describe("draftEventsFor — auction money on the pick event", () => {
       // t1 spent $12 of $50; its only roster spot is now full, so its ceiling is $0.
       budgets: { t1: 38, t2: 50 },
       maxBids: { t1: 0, t2: 50 },
+      // The lot just closed and no new one has opened yet, so the floor resets to the
+      // config's opening minimum — the complete opening state for whoever nominates next.
+      minBid: AUCTION_CONFIG.minBid,
     });
     expect((pickEvent.payload as { readonly clock: { readonly sequence: number } }).clock.sequence).toBe(awarded.sequence);
   });
@@ -200,5 +243,6 @@ describe("draftEventsFor — auction money on the pick event", () => {
     expect(pickEvent.payload).toMatchObject({ slot: "QB", slotIndex: 0, price: null });
     expect(pickEvent.payload).not.toHaveProperty("budgets");
     expect(pickEvent.payload).not.toHaveProperty("maxBids");
+    expect(pickEvent.payload).not.toHaveProperty("minBid");
   });
 });

@@ -4,7 +4,7 @@ import { draftStateView } from "@/draft-engine";
 import { getDraftStore } from "@/draft-service";
 import { listTeamCards } from "@/draft-service/teams";
 import type { DraftSnapshotBody } from "@/draft-room/contract";
-import { withDraftActor, type RouteContext } from "./_shared";
+import { withLeagueMember, type RouteContext } from "./_shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,11 +17,7 @@ export const dynamic = "force-dynamic";
  * board.
  */
 export async function GET(request: Request, context: RouteContext) {
-  return withDraftActor(request, context, async (actor) => {
-    if (actor.teamId === null && !actor.isCommissioner) {
-      return fail("You don't have a team in this league.", 403);
-    }
-
+  return withLeagueMember(request, context, async (actor) => {
     const state = await getDraftStore().getDraftState(actor.draftId);
     if (state === null) return fail("That draft doesn't exist.", 404);
 

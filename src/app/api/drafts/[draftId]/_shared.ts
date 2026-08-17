@@ -2,6 +2,7 @@ import type { NextResponse } from "next/server";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { fail } from "@/lib/api/respond";
+import { requireLeagueMember } from "@/lib/leagues/membership";
 import { resolveDraftActor, type DraftActor } from "@/draft-service";
 
 export interface RouteContext {
@@ -36,4 +37,19 @@ export async function withDraftActor(request: Request, { params }: RouteContext,
     console.error("[draft] route handler failed", { draftId, path: new URL(request.url).pathname }, error);
     return fail("Something went wrong on our side. Please try again.", 500);
   }
+}
+
+/**
+ * `withDraftActor` plus the one membership gate every `/api/drafts/[draftId]/**` GET shares:
+ * a signed-in caller with no team in this league and no commissioner role is a stranger and
+ * gets 403 before the handler ever runs. `requireLeagueMember` is the single place that rule
+ * and its message live — reused verbatim by the league's own SSE route — so no route restates
+ * the predicate.
+ */
+export async function withLeagueMember(request: Request, context: RouteContext, handler: DraftActorHandler): Promise<NextResponse> {
+  return withDraftActor(request, context, async (actor, req) => {
+    const denied = requireLeagueMember(actor);
+    if (denied !== null) return denied;
+    return handler(actor, req);
+  });
 }

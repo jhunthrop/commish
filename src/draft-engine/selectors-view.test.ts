@@ -70,6 +70,15 @@ describe("draftClockView", () => {
     expect(clock.deadlineAt).toBe("2026-09-01T08:00:00.000Z");
     expect(clock.nextTightening).toEqual({ at: "2026-09-23T17:00:00.000Z", pickSeconds: 4 * 60 * 60 });
   });
+
+  it("has no team on the clock while an auction lot is open — the turn belongs to everyone, not one team", () => {
+    const nominated = apply(started("auction"), {
+      v: 1, type: "NOMINATE", timestamp: "2026-09-01T00:01:00.000Z", teamId: "t1", playerId: "qb1", openingBid: 5,
+    });
+    const clock = draftClockView(nominated);
+    expect(clock.phase).toBe("in_progress");
+    expect(clock.onClockTeamId).toBeNull();
+  });
 });
 
 describe("maxBidsFor", () => {

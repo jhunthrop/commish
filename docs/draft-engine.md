@@ -196,10 +196,18 @@ sequence number a client uses for gap detection is `payload.clock.sequence`.
 | Event | Extra payload | Emitted when |
 |---|---|---|
 | `draft.status` | `phase` | `next.phase !== prev.phase`. |
-| `draft.pick` | every `CompletedPick` field (`pickNumber`, `round`, `teamId`, `playerId`, `slot`, `slotIndex`, `price`, `timestamp`, `auto`); **auction only:** `budgets` and `maxBids` after the award | Once per new entry in `next.picks`. |
-| `draft.nominate` | `teamId`, `playerId`, `openingBid`, `auto` | A new lot opens. |
-| `draft.bid` | `teamId`, `playerId`, `amount` | The open lot's high bid changes without a new player. |
+| `draft.pick` | every `CompletedPick` field (`pickNumber`, `round`, `teamId`, `playerId`, `slot`, `slotIndex`, `price`, `timestamp`, `auto`); **auction only:** `budgets`, `maxBids` and `minBid` after the award | Once per new entry in `next.picks`. |
+| `draft.nominate` | `teamId`, `playerId`, `openingBid`, `auto`, `minBid` (the floor for the NEXT bid on this lot) | A new lot opens. |
+| `draft.bid` | `teamId`, `playerId`, `amount`, `minBid` (the floor for the NEXT bid on this lot) | The open lot's high bid changes without a new player. |
 | `draft.timer_expire` | `pickNumber` (the pick the clock ran out on) | Every accepted `TIMER_EXPIRE`, always pushed first. |
+
+Two fields are easy to misread because a `pickNumber` appears twice with different meanings
+on the same payload. On `draft.pick`, the **top-level** `pickNumber` is that pick's own
+number (it came off `CompletedPick`), while `clock.pickNumber` is the number of the pick now
+coming up NEXT — the pick just made has already been applied by the time the event is built.
+On `draft.timer_expire`, the top-level `pickNumber` is the pick the clock ran out on (the
+*pre*-transition number), while `clock.pickNumber` again reflects whatever the resulting
+autopick or auto-nomination advanced to.
 
 Ordering is deliberate and enforced by `draftEventsFor`'s own push order: `draft.timer_expire`
 always precedes the `draft.pick` or `draft.nominate` it caused, and both precede a trailing
@@ -211,7 +219,7 @@ arrival order without reordering.
 | Route | Who | Notes |
 |---|---|---|
 | `GET /api/drafts/[draftId]` | a manager with a team in the league, or the commissioner | `draftStateView` + the caller's own `teamId` + `isCommissioner` + `teams` (every `TeamCard` in the league). A commissioner with no team of their own (`teamId === null && isCommissioner`) is still allowed to view. |
-| `GET /api/drafts/[draftId]/players` | a league member | Ranked player metadata (id/name/position/nflTeam) for the pool. Separate from the state route because it never changes mid-draft and the state route is refetched on every resync. |
+| `GET /api/drafts/[draftId]/players` | a manager with a team in the league, or the commissioner | Ranked player metadata (id/name/position/nflTeam) for the pool. Separate from the state route because it never changes mid-draft and the state route is refetched on every resync. |
 | `POST /api/drafts/[draftId]/actions` | a manager with a team in the league | Body: `{ type: "MAKE_PICK" \| "NOMINATE" \| "BID", … }`. **No `teamId`** — the server resolves it from the session. A rejected action is a 409 with the reducer's reason. |
 | `POST /api/drafts/[draftId]/start` | commissioner only | Fixes the order and the ranked pool. |
 | `GET /api/leagues/[leagueId]/events` | a manager with a team in the league, or the commissioner | The real-time fan-out: Redis Streams over SSE. Gated the same way as the draft board — a signed-in stranger with no team in the league gets 403, not another league's events. |

@@ -1,7 +1,7 @@
 import type { DraftAction } from "@/domain/draft";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import { auctionOf, type DraftState } from "./state";
-import { draftClockView, maxBidsFor } from "./selectors";
+import { draftClockView, maxBidsFor, minBidFor } from "./selectors";
 
 /**
  * The draft slice of the one event taxonomy. Types are not re-declared here — they are
@@ -34,9 +34,10 @@ export function draftEventsFor(prev: DraftState, next: DraftState, action: Draft
   }
 
   const afterAuction = auctionOf(next);
-  // A lot being awarded is the only thing that moves money, so budgets and ceilings ride the
-  // pick event — the client assigns them rather than doing budget arithmetic of its own.
-  const money = afterAuction === null ? {} : { budgets: next.budgets, maxBids: maxBidsFor(next) };
+  // A lot being awarded is the only thing that moves money, so budgets, ceilings and the next
+  // lot's opening floor all ride the pick event — the client assigns them rather than doing
+  // budget or bid-floor arithmetic of its own.
+  const money = afterAuction === null ? {} : { budgets: next.budgets, maxBids: maxBidsFor(next), minBid: minBidFor(next) };
 
   for (const pick of next.picks.slice(prev.picks.length)) {
     events.push({ type: "draft.pick", payload: { ...base, ...pick, ...money } });
@@ -46,15 +47,21 @@ export function draftEventsFor(prev: DraftState, next: DraftState, action: Draft
   const before = beforeAuction === null ? null : beforeAuction.lot;
   const after = afterAuction === null ? null : afterAuction.lot;
   if (after !== null) {
+    // A nomination or a bid always moves the floor for the NEXT bid on this same lot — carried
+    // here so a client folding the event never re-derives `highBid + bidIncrement` itself.
+    const nextMinBid = minBidFor(next);
     events.push(
       before === null || before.playerId !== after.playerId
         ? {
             type: "draft.nominate",
-            payload: { ...base, teamId: after.nominatedByTeamId, playerId: after.playerId, openingBid: after.highBid, auto: after.autoNominated },
+            payload: {
+              ...base, teamId: after.nominatedByTeamId, playerId: after.playerId,
+              openingBid: after.highBid, auto: after.autoNominated, minBid: nextMinBid,
+            },
           }
         : {
             type: "draft.bid",
-            payload: { ...base, teamId: after.highBidTeamId, playerId: after.playerId, amount: after.highBid },
+            payload: { ...base, teamId: after.highBidTeamId, playerId: after.playerId, amount: after.highBid, minBid: nextMinBid },
           },
     );
   }

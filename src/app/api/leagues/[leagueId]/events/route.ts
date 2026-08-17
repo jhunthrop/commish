@@ -1,6 +1,6 @@
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { resolveLeagueMembership } from "@/lib/leagues/membership";
+import { requireLeagueMember, resolveLeagueMembership } from "@/lib/leagues/membership";
 import { createLeagueEventStream } from "@/lib/realtime/sse";
 import { fail } from "@/lib/api/respond";
 
@@ -24,9 +24,8 @@ export async function GET(request: Request, { params }: RouteContext) {
 
   const membership = await resolveLeagueMembership(getDb(), leagueId, user.id);
   if (!membership.ok) return fail(membership.error, membership.status);
-  if (membership.membership.teamId === null && !membership.membership.isCommissioner) {
-    return fail("You don't have a team in this league.", 403);
-  }
+  const denied = requireLeagueMember(membership.membership);
+  if (denied !== null) return denied;
 
   return createLeagueEventStream(request, leagueId);
 }

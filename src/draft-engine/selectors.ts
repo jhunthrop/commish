@@ -164,9 +164,17 @@ export interface DraftStateView extends DraftClockView {
   readonly budgets: Readonly<Record<string, number>>;
   readonly auction: AuctionState | null;
   readonly availablePlayerIds: readonly string[];
-  /** Lowest legal next bid; null for a snake draft. */
+  /**
+   * Lowest legal next bid; null for a snake draft, and for an auction draft that hasn't
+   * started yet (`auctionOf` is null until `START_DRAFT`, since `state.auction` itself is
+   * null before then).
+   */
   readonly minBid: number | null;
-  /** teamId → highest legal bid right now. Empty for a snake draft. */
+  /**
+   * teamId → highest legal bid right now. Empty for a snake draft, and for an auction draft
+   * that hasn't started yet (`auctionOf` is null until `START_DRAFT`, since `state.auction`
+   * itself is null before then).
+   */
   readonly maxBids: Readonly<Record<string, number>>;
 }
 
