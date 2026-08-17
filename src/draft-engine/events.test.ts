@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { DraftAction, DraftPoolEntry, StartDraftAction } from "@/domain/draft";
+import { DRAFT_ACTION_VERSION, type DraftAction, type DraftPoolEntry, type StartDraftAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
 import { DRAFT_CLOCK_SCHEDULE } from "./config";
@@ -34,7 +34,24 @@ function step(state: DraftState, action: DraftAction) {
 describe("draftEventsFor", () => {
   it("announces the draft opening as a status event", () => {
     const { events } = step(initialDraftState(CONFIG), START);
-    expect(events).toEqual([{ type: "draft.status", payload: { draftId: "d1", sequence: 1, phase: "in_progress" } }]);
+    expect(events).toEqual([
+      {
+        type: "draft.status",
+        payload: {
+          draftId: "d1",
+          phase: "in_progress",
+          clock: {
+            phase: "in_progress",
+            sequence: 1,
+            pickNumber: 1,
+            onClockTeamId: "t1",
+            deadlineAt: expect.any(String),
+            clockSeconds: expect.any(Number),
+            nextTightening: expect.anything(),
+          },
+        },
+      },
+    ]);
   });
 
   it("emits one draft.pick carrying the whole pick", () => {
@@ -44,8 +61,18 @@ describe("draftEventsFor", () => {
       {
         type: "draft.pick",
         payload: {
-          draftId: "d1", sequence: 2, pickNumber: 1, round: 1, teamId: "t1", playerId: "qb1",
-          slot: "QB", price: null, timestamp: T, auto: false,
+          draftId: "d1",
+          pickNumber: 1, round: 1, teamId: "t1", playerId: "qb1",
+          slot: "QB", slotIndex: 0, price: null, timestamp: T, auto: false,
+          clock: {
+            phase: "in_progress",
+            sequence: 2,
+            pickNumber: 2,
+            onClockTeamId: "t2",
+            deadlineAt: expect.any(String),
+            clockSeconds: expect.any(Number),
+            nextTightening: expect.anything(),
+          },
         },
       },
     ]);
@@ -73,11 +100,23 @@ describe("draftEventsFor", () => {
     const opened = step(initialDraftState(auctionConfig), START).state;
     const nominated = step(opened, { v: 1, type: "NOMINATE", timestamp: T, teamId: "t1", playerId: "qb1", openingBid: 2 });
     expect(nominated.events).toEqual([
-      { type: "draft.nominate", payload: { draftId: "d1", sequence: 2, teamId: "t1", playerId: "qb1", openingBid: 2, auto: false } },
+      {
+        type: "draft.nominate",
+        payload: {
+          draftId: "d1", teamId: "t1", playerId: "qb1", openingBid: 2, auto: false,
+          clock: expect.objectContaining({ sequence: 2 }),
+        },
+      },
     ]);
     const raised = step(nominated.state, { v: 1, type: "BID", timestamp: T, teamId: "t2", amount: 3 });
     expect(raised.events).toEqual([
-      { type: "draft.bid", payload: { draftId: "d1", sequence: 3, teamId: "t2", playerId: "qb1", amount: 3 } },
+      {
+        type: "draft.bid",
+        payload: {
+          draftId: "d1", teamId: "t2", playerId: "qb1", amount: 3,
+          clock: expect.objectContaining({ sequence: 3 }),
+        },
+      },
     ]);
   });
 
@@ -87,5 +126,79 @@ describe("draftEventsFor", () => {
     const { events } = step(opened, expireAt(opened));
     expect(events.map((e) => e.type)).toEqual(["draft.timer_expire", "draft.nominate"]);
     expect(events[1]?.payload).toMatchObject({ auto: true, openingBid: 1 });
+  });
+});
+
+const ONE_QB: readonly RosterSlotConfig[] = [{ slot: "QB", count: 1, eligiblePositions: ["QB"] }];
+const MONEY_POOL = [
+  { playerId: "qb1", position: "QB" as const },
+  { playerId: "qb2", position: "QB" as const },
+];
+
+function moneyStep(state: DraftState, action: DraftAction): DraftState {
+  const result = reduceDraft(state, action);
+  if (!result.ok) throw new Error(`unexpected rejection: ${result.reason}`);
+  return result.state;
+}
+
+function moneyConfigFor(format: "snake" | "auction"): DraftConfig {
+  return {
+    draftId: "d1",
+    leagueId: "l1",
+    format,
+    kickoffAt: "2026-09-30T17:00:00.000Z",
+    auctionBudget: format === "auction" ? 50 : null,
+    slotConfig: ONE_QB,
+    clockSchedule: DRAFT_CLOCK_SCHEDULE,
+  };
+}
+
+function moneyStartedDraft(format: "snake" | "auction"): DraftState {
+  return moneyStep(initialDraftState(moneyConfigFor(format)), {
+    v: DRAFT_ACTION_VERSION,
+    type: "START_DRAFT",
+    timestamp: "2026-09-01T00:00:00.000Z",
+    draftOrder: ["t1", "t2"],
+    pool: MONEY_POOL,
+  });
+}
+
+describe("draftEventsFor — auction money on the pick event", () => {
+  it("carries the post-award budgets and every team's reserve-adjusted ceiling", () => {
+    const nominated = moneyStep(moneyStartedDraft("auction"), {
+      v: DRAFT_ACTION_VERSION,
+      type: "NOMINATE",
+      timestamp: "2026-09-01T00:00:10.000Z",
+      teamId: "t1",
+      playerId: "qb1",
+      openingBid: 12,
+    });
+    const expiry = expireAt(nominated);
+    const awarded = moneyStep(nominated, expiry);
+
+    const pickEvent = draftEventsFor(nominated, awarded, expiry).find((event) => event.type === "draft.pick")!;
+    expect(pickEvent.payload).toMatchObject({
+      draftId: "d1",
+      teamId: "t1",
+      playerId: "qb1",
+      slot: "QB",
+      slotIndex: 0,
+      price: 12,
+      // t1 spent $12 of $50; its only roster spot is now full, so its ceiling is $0.
+      budgets: { t1: 38, t2: 50 },
+      maxBids: { t1: 0, t2: 50 },
+    });
+    expect((pickEvent.payload as { readonly clock: { readonly sequence: number } }).clock.sequence).toBe(awarded.sequence);
+  });
+
+  it("omits budgets and ceilings entirely for a snake pick", () => {
+    const started = moneyStartedDraft("snake");
+    const pick: DraftAction = { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp: "2026-09-01T00:05:00.000Z", teamId: "t1", playerId: "qb1" };
+    const after = moneyStep(started, pick);
+
+    const pickEvent = draftEventsFor(started, after, pick).find((event) => event.type === "draft.pick")!;
+    expect(pickEvent.payload).toMatchObject({ slot: "QB", slotIndex: 0, price: null });
+    expect(pickEvent.payload).not.toHaveProperty("budgets");
+    expect(pickEvent.payload).not.toHaveProperty("maxBids");
   });
 });

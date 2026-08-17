@@ -13,6 +13,8 @@ describe("the draft-engine public barrel", () => {
     expect(engine.replayDraft).toBeTypeOf("function");
     expect(engine.draftEventsFor).toBeTypeOf("function");
     expect(engine.draftStateView).toBeTypeOf("function");
+    expect(engine.draftClockView).toBeTypeOf("function");
+    expect(engine.maxBidsFor).toBeTypeOf("function");
     expect(engine.clockTierFor).toBeTypeOf("function");
     expect(engine.DRAFT_CLOCK_SCHEDULE).toBeDefined();
     expect(engine.AUCTION_CONFIG).toBeDefined();

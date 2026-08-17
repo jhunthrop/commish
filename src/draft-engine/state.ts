@@ -24,6 +24,11 @@ export interface CompletedPick {
   readonly teamId: string;
   readonly playerId: string;
   readonly slot: RosterSlotType;
+  /**
+   * Which copy of that slot (RB0, RB1, …). Recorded rather than derived so a client folding
+   * a `draft.pick` event into its view never has to re-run slot-assignment rules.
+   */
+  readonly slotIndex: number;
   /** Winning bid for an auction pick; null for a snake pick. */
   readonly price: number | null;
   readonly timestamp: string;

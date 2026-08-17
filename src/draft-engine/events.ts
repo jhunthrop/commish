@@ -1,6 +1,7 @@
 import type { DraftAction } from "@/domain/draft";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import { auctionOf, type DraftState } from "./state";
+import { draftClockView, maxBidsFor } from "./selectors";
 
 /**
  * The draft slice of the one event taxonomy. Types are not re-declared here — they are
@@ -23,19 +24,25 @@ export interface DraftEventEnvelope {
  * effects, so a client can render them in arrival order without reordering.
  */
 export function draftEventsFor(prev: DraftState, next: DraftState, action: DraftAction): readonly DraftEventEnvelope[] {
-  const base = { draftId: next.config.draftId, sequence: next.sequence };
+  // Every payload embeds the post-transition clock view, so a client that applies an event
+  // learns the new deadline, tier and turn without re-deriving any of them.
+  const base = { draftId: next.config.draftId, clock: draftClockView(next) };
   const events: DraftEventEnvelope[] = [];
 
   if (action.type === "TIMER_EXPIRE") {
     events.push({ type: "draft.timer_expire", payload: { ...base, pickNumber: prev.pickNumber } });
   }
 
+  const afterAuction = auctionOf(next);
+  // A lot being awarded is the only thing that moves money, so budgets and ceilings ride the
+  // pick event — the client assigns them rather than doing budget arithmetic of its own.
+  const money = afterAuction === null ? {} : { budgets: next.budgets, maxBids: maxBidsFor(next) };
+
   for (const pick of next.picks.slice(prev.picks.length)) {
-    events.push({ type: "draft.pick", payload: { ...base, ...pick } });
+    events.push({ type: "draft.pick", payload: { ...base, ...pick, ...money } });
   }
 
   const beforeAuction = auctionOf(prev);
-  const afterAuction = auctionOf(next);
   const before = beforeAuction === null ? null : beforeAuction.lot;
   const after = afterAuction === null ? null : afterAuction.lot;
   if (after !== null) {

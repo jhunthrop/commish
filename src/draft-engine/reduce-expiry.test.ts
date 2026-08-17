@@ -97,7 +97,7 @@ describe("TIMER_EXPIRE (snake)", () => {
     const expire = expireAt(started);
     const state = apply(started, expire);
     expect(state.picks).toEqual([
-      { pickNumber: 1, round: 1, teamId: "t1", playerId: "qb1", slot: "QB", price: null, timestamp: expire.timestamp, auto: true },
+      { pickNumber: 1, round: 1, teamId: "t1", playerId: "qb1", slot: "QB", slotIndex: 0, price: null, timestamp: expire.timestamp, auto: true },
     ]);
     expect(teamOnClock(state)).toBe("t2");
   });
@@ -148,7 +148,7 @@ describe("TIMER_EXPIRE (auction)", () => {
     const expire = expireAt(state);
     state = apply(state, expire);
     expect(state.picks).toEqual([
-      { pickNumber: 1, round: 1, teamId: "t2", playerId: "qb1", slot: "QB", price: 4, timestamp: expire.timestamp, auto: false },
+      { pickNumber: 1, round: 1, teamId: "t2", playerId: "qb1", slot: "QB", slotIndex: 0, price: 4, timestamp: expire.timestamp, auto: false },
     ]);
     expect(remainingBudget(state, "t2")).toBe(6);
     expect(remainingBudget(state, "t1")).toBe(10);

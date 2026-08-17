@@ -109,7 +109,7 @@ describe("MAKE_PICK (snake)", () => {
     const state = pick(started(), "t1", "qb1");
     expect(state.sequence).toBe(2);
     expect(state.picks).toEqual([
-      { pickNumber: 1, round: 1, teamId: "t1", playerId: "qb1", slot: "QB", price: null, timestamp: "2026-09-01T00:10:00.000Z", auto: false },
+      { pickNumber: 1, round: 1, teamId: "t1", playerId: "qb1", slot: "QB", slotIndex: 0, price: null, timestamp: "2026-09-01T00:10:00.000Z", auto: false },
     ]);
     expect(state.rosters.t1).toEqual([{ slot: "QB", slotIndex: 0, playerId: "qb1" }]);
     expect(state.pickNumber).toBe(2);

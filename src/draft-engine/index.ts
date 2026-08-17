@@ -11,7 +11,7 @@ export { draftEventsFor, type DraftEventEnvelope, type DraftEventType } from "./
 export { clockTierFor, tierIndexFor, nextTighteningAfter, hoursUntil, type Tightening } from "./clock-schedule";
 export {
   draftedPlayerIds, availablePool, openSlotCount, isComplete, teamOnClock, bestAvailableFor,
-  remainingBudget, minBidFor, maxBidFor, currentTier, currentClockSeconds, currentDeadline, nextTightening,
-  draftStateView, type DraftStateView,
+  remainingBudget, minBidFor, maxBidFor, maxBidsFor, currentTier, currentClockSeconds, currentDeadline, nextTightening,
+  draftClockView, draftStateView, type DraftClockView, type DraftStateView,
 } from "./selectors";
 export { draftActionSchema, clientDraftActionSchema, toDraftAction, type ClientDraftAction } from "./action-schema";

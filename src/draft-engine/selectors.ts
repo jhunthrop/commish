@@ -1,6 +1,6 @@
 import type { DraftPoolEntry, DraftStatus } from "@/domain/draft";
 import type { DraftFormat } from "@/domain/league";
-import type { RosterSlot } from "@/domain/roster";
+import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
 import { auctionOf, rosterFor, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
 import { assignSlot } from "./slotting";
@@ -113,43 +113,77 @@ export function nextTightening(state: DraftState): Tightening | null {
   return nextTighteningAfter(state.turnStartedAt, state.config.kickoffAt, state.config.clockSchedule);
 }
 
-/** The one serialization of a draft: what `GET /api/drafts/:id` returns and Plan C renders. */
-export interface DraftStateView {
-  readonly draftId: string;
-  readonly leagueId: string;
-  readonly format: DraftFormat;
+/** The clock-and-turn slice every draft event and the full view both carry. */
+export interface DraftClockView {
   readonly phase: DraftStatus;
   readonly sequence: number;
-  readonly draftOrder: readonly string[];
-  readonly picks: readonly CompletedPick[];
-  readonly rosters: Readonly<Record<string, readonly RosterSlot[]>>;
-  readonly budgets: Readonly<Record<string, number>>;
-  readonly auction: AuctionState | null;
   readonly pickNumber: number;
   readonly onClockTeamId: string | null;
   readonly deadlineAt: string | null;
   readonly clockSeconds: number | null;
   readonly nextTightening: Tightening | null;
-  readonly availablePlayerIds: readonly string[];
 }
 
-export function draftStateView(state: DraftState): DraftStateView {
+/**
+ * Everything about "whose turn, until when, and what changes next", in one object. Both
+ * `draftStateView` and every `draft.*` event payload embed exactly this, so a client that has
+ * applied an event knows the new deadline and tier without re-deriving either.
+ */
+export function draftClockView(state: DraftState): DraftClockView {
   return {
-    draftId: state.config.draftId,
-    leagueId: state.config.leagueId,
-    format: state.config.format,
     phase: state.phase,
     sequence: state.sequence,
-    draftOrder: state.draftOrder,
-    picks: state.picks,
-    rosters: state.rosters,
-    budgets: state.budgets,
-    auction: state.auction,
     pickNumber: state.pickNumber,
     onClockTeamId: teamOnClock(state),
     deadlineAt: currentDeadline(state),
     clockSeconds: currentClockSeconds(state),
     nextTightening: nextTightening(state),
+  };
+}
+
+/**
+ * Every team's current ceiling. Computed here, once, because the budget-reserve rule
+ * (invariant 4 in `docs/draft-engine.md`) must exist in exactly one place — a client that
+ * re-derived it would drift the moment the config changed.
+ */
+export function maxBidsFor(state: DraftState): Readonly<Record<string, number>> {
+  if (auctionOf(state) === null) return {};
+  return Object.fromEntries(state.draftOrder.map((teamId) => [teamId, maxBidFor(state, teamId)]));
+}
+
+/** The one serialization of a draft: what `GET /api/drafts/:id` returns and Plan C renders. */
+export interface DraftStateView extends DraftClockView {
+  readonly draftId: string;
+  readonly leagueId: string;
+  readonly format: DraftFormat;
+  /** The league's roster shape — what lets the UI draw the empty slots, not just the filled ones. */
+  readonly slotConfig: readonly RosterSlotConfig[];
+  readonly draftOrder: readonly string[];
+  readonly picks: readonly CompletedPick[];
+  readonly rosters: Readonly<Record<string, readonly RosterSlot[]>>;
+  readonly budgets: Readonly<Record<string, number>>;
+  readonly auction: AuctionState | null;
+  readonly availablePlayerIds: readonly string[];
+  /** Lowest legal next bid; null for a snake draft. */
+  readonly minBid: number | null;
+  /** teamId → highest legal bid right now. Empty for a snake draft. */
+  readonly maxBids: Readonly<Record<string, number>>;
+}
+
+export function draftStateView(state: DraftState): DraftStateView {
+  return {
+    ...draftClockView(state),
+    draftId: state.config.draftId,
+    leagueId: state.config.leagueId,
+    format: state.config.format,
+    slotConfig: state.config.slotConfig,
+    draftOrder: state.draftOrder,
+    picks: state.picks,
+    rosters: state.rosters,
+    budgets: state.budgets,
+    auction: state.auction,
     availablePlayerIds: availablePool(state).map((p) => p.playerId),
+    minBid: auctionOf(state) === null ? null : minBidFor(state),
+    maxBids: maxBidsFor(state),
   };
 }

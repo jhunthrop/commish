@@ -53,6 +53,7 @@ export function applyPick(state: DraftState, input: ApplyPickInput): ApplyPickRe
     teamId: input.teamId,
     playerId: input.playerId,
     slot: assignment.slot,
+    slotIndex: assignment.slotIndex,
     price: input.price,
     timestamp: input.timestamp,
     auto: input.auto,
