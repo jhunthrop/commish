@@ -16,6 +16,7 @@ import {
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
 export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
 export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress", "complete"]);
+export const playerPositionEnum = pgEnum("player_position", ["QB", "RB", "WR", "TE", "K", "DEF"]);
 
 // Identity (credentials, sessions, MFA, OAuth) is owned by WorkOS AuthKit. This table is
 // the app's own profile row for a WorkOS user — `id` IS the WorkOS user id — holding the
@@ -181,4 +182,38 @@ export const matchups = pgTable(
     awayScore: real("away_score"),
   },
   (t) => [primaryKey({ columns: [t.leagueId, t.weekNumber, t.homeTeamId] })],
+);
+
+export const players = pgTable(
+  "players",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    position: playerPositionEnum("position").notNull(),
+    nflTeam: text("nfl_team").notNull(),
+  },
+  (t) => [index("players_position_idx").on(t.position)],
+);
+
+export const playerStatLines = pgTable(
+  "player_stat_lines",
+  {
+    playerId: text("player_id").notNull().references(() => players.id, { onDelete: "cascade" }),
+    week: integer("week").notNull(),
+    passingYards: integer("passing_yards").notNull().default(0),
+    passingTouchdowns: integer("passing_touchdowns").notNull().default(0),
+    interceptions: integer("interceptions").notNull().default(0),
+    rushingYards: integer("rushing_yards").notNull().default(0),
+    rushingTouchdowns: integer("rushing_touchdowns").notNull().default(0),
+    receivingYards: integer("receiving_yards").notNull().default(0),
+    receivingTouchdowns: integer("receiving_touchdowns").notNull().default(0),
+    receptions: integer("receptions").notNull().default(0),
+    fumblesLost: integer("fumbles_lost").notNull().default(0),
+    fieldGoalsMade: integer("field_goals_made").notNull().default(0),
+    extraPointsMade: integer("extra_points_made").notNull().default(0),
+    sacks: integer("sacks").notNull().default(0),
+    defensiveInterceptions: integer("defensive_interceptions").notNull().default(0),
+    defensiveTouchdowns: integer("defensive_touchdowns").notNull().default(0),
+  },
+  (t) => [primaryKey({ columns: [t.playerId, t.week] }), index("player_stat_lines_week_idx").on(t.week)],
 );
