@@ -18,3 +18,19 @@ export interface Roster {
   readonly teamId: string;
   readonly slots: readonly RosterSlot[];
 }
+
+/**
+ * The canonical 15-slot roster. One definition, used by the `leagues.roster_slots`
+ * column default, the dev seed, and every test — a league may override it per-league,
+ * but nothing re-declares this shape.
+ */
+export const STANDARD_ROSTER_SLOTS: readonly RosterSlotConfig[] = [
+  { slot: "QB", count: 1, eligiblePositions: ["QB"] },
+  { slot: "RB", count: 2, eligiblePositions: ["RB"] },
+  { slot: "WR", count: 2, eligiblePositions: ["WR"] },
+  { slot: "TE", count: 1, eligiblePositions: ["TE"] },
+  { slot: "FLEX", count: 1, eligiblePositions: ["RB", "WR", "TE"] },
+  { slot: "K", count: 1, eligiblePositions: ["K"] },
+  { slot: "DEF", count: 1, eligiblePositions: ["DEF"] },
+  { slot: "BENCH", count: 6, eligiblePositions: ["QB", "RB", "WR", "TE", "K", "DEF"] },
+];
