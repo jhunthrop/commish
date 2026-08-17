@@ -1,5 +1,6 @@
 import { getDb } from "@/db/client";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
+import { seedDevLeagues } from "./seed-dev-leagues";
 import { seedPlayers } from "./seed-players";
 
 /**
@@ -8,8 +9,10 @@ import { seedPlayers } from "./seed-players";
  */
 async function main(): Promise<void> {
   const db = getDb();
-  const result = await seedPlayers(db, createMockStatsProvider());
-  console.log(`seeded ${result.players} players and ${result.statLines} stat lines`);
+  const playerCounts = await seedPlayers(db, createMockStatsProvider());
+  console.log(`seeded ${playerCounts.players} players and ${playerCounts.statLines} stat lines`);
+  const dev = await seedDevLeagues(db, { now: () => new Date().toISOString() });
+  console.log(`seeded ${dev.leagues} dev leagues, ${dev.teams} teams and ${dev.drafts} scheduled drafts`);
 }
 
 main().then(() => process.exit(0)).catch((err: unknown) => {
