@@ -10,4 +10,5 @@ export { Select, type SelectProps, type SelectOption } from "./select";
 export { Avatar, initialsFor, type AvatarProps, type AvatarSize } from "./avatar";
 export { Modal, type ModalProps } from "./modal";
 export { ToastProvider, useToast, type ToastInput, type ToastTone, type ToastAction, type ToastApi } from "./toast";
+export { Table, type TableProps, type TableColumn } from "./table";
 export { UI_CONFIG } from "./config";

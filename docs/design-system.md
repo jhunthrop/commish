@@ -27,10 +27,16 @@ No z-index scale yet — two sanctioned layers exist by convention: the toast re
 `<ThemeProvider>` (in `layout.tsx`) manages `system | light | dark`, persisted, stamping `data-theme` on `<html>`. Default is system.
 
 ## Primitives (`src/components/ui`)
-`Button` (variants primary/secondary/destructive/ghost; `loading` = aria-busy + disabled + spinner, label stays), `Input` (label required; error → `aria-invalid` + `aria-describedby`), `Card`, `Badge`, `Skeleton` (aria-busy, announces "Loading…"), `EmptyState` / `ErrorState` (action required), `Icon` (curated `IconName` union; feature code never imports lucide directly).
+`Button` (variants primary/secondary/destructive/ghost; `loading` = aria-busy + disabled + spinner, label stays), `Input` (label required; error → `aria-invalid` + `aria-describedby`), `Select` (label required; native `<select>`; same error/hint contract as `Input`), `Card`, `Badge`, `Table` (semantic `<table>`; `caption` required — visually hidden unless `captionVisible`; `empty` node required; scrolls horizontally inside its own wrapper at 360px), `Avatar` (deterministic initials fallback from the display name; decorative unless given a `label`), `Modal` (renders nothing when closed; `role="dialog"` + `aria-modal`; focus moves in on open, cycles on Tab, returns to the opener on close; Esc closes), `ToastProvider`/`useToast` (one polite live region; `tone: "error"` toasts are also `role="alert"`; auto-dismiss after `UI_CONFIG.toast.dismissMs`, or `reducedMotionDismissMs` when the user prefers reduced motion; optional action button), `Skeleton` (aria-busy, announces "Loading…"), `EmptyState` / `ErrorState` (action required), `Icon` (curated `IconName` union; feature code never imports lucide directly).
+
+Tunables for primitives live in `src/components/ui/config.ts` (`UI_CONFIG`) — never inline in a component.
 
 ## Motion
-`TOKENS.motion` — fast 120ms / base 200ms / slow 320ms. Use motion for state changes and moments that matter (a pick landing, a win). Never decorative loops. Reduced-motion is globally respected in `globals.css`.
+`TOKENS.motion` — fast 120ms / base 200ms / slow 320ms, easings `standard` and `emphasized`. Use motion for state changes and moments that matter (a pick landing, a win). Never decorative loops.
+
+Reduced motion is honored twice over:
+1. **Globally**, in `globals.css`: a `prefers-reduced-motion: reduce` block collapses every animation and transition to 0.01ms. This is the safety net — it applies to code that has never heard of the preference.
+2. **Deliberately**, via `usePrefersReducedMotion()` (`src/design/use-reduced-motion.ts`) whenever "less motion" should mean *different behavior*, not merely a faster animation: the pick-landing celebration renders a static highlight instead of an animated one, and toasts dwell twice as long. Any component whose reduced-motion behavior is a real branch must have a test that asserts both branches.
 
 ## Copy
 Plain language, active voice, specific. Errors say what happened and what to do next. No raw exception/DB text ever reaches a user.
