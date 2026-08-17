@@ -106,8 +106,11 @@ describe("a full 12-team auction draft", () => {
       state = apply(state, { v: 1, type: "TIMER_EXPIRE", timestamp: T });
       guard += 1;
       expect(guard).toBeLessThan(1000); // fails loudly instead of hanging if the auction can't finish
+      // No team's spending ever outruns its budget, at any point in the run.
+      for (const teamId of TEAMS) expect(remainingBudget(state, teamId)).toBeGreaterThanOrEqual(0);
     }
     expect(state.picks).toHaveLength(180);
+    expect(new Set(state.picks.map((p) => p.playerId)).size).toBe(state.picks.length);
     for (const teamId of TEAMS) {
       expect(state.rosters[teamId]).toHaveLength(15);
       // Every unchallenged auto-nomination goes for the $1 minimum.

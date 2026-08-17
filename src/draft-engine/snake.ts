@@ -1,7 +1,7 @@
 import type { MakePickAction } from "@/domain/draft";
 import { totalRosterSlots, type DraftReduceResult, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
-import { applyPick } from "./apply-pick";
+import { applyPick, expectApplied } from "./apply-pick";
 import { bestAvailableFor } from "./selectors";
 
 /** Moves to the next pick, or ends the draft once every roster spot is filled. */
@@ -40,11 +40,7 @@ export function reduceSnakeExpiry(state: DraftState, timestamp: string): DraftRe
   const teamId = snakeTeamForPick(state.draftOrder, state.pickNumber);
   const best = bestAvailableFor(state, teamId);
   if (best === null) return { ok: false, reason: "No eligible player is available to auto-pick." };
-  // `bestAvailableFor` already ran the exact same assignSlot check, on the same roster and
-  // position, that applyPick reruns internally — it can never fail here.
-  const applied = applyPick(state, { teamId, playerId: best.playerId, price: null, auto: true, timestamp }) as {
-    readonly ok: true;
-    readonly state: DraftState;
-  };
-  return { ok: true, state: advanceSnake(applied.state, timestamp) };
+  const applied = applyPick(state, { teamId, playerId: best.playerId, price: null, auto: true, timestamp });
+  const nextState = expectApplied(applied, "autopick chosen by bestAvailableFor must be applicable");
+  return { ok: true, state: advanceSnake(nextState, timestamp) };
 }

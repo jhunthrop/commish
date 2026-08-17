@@ -17,6 +17,18 @@ export type ApplyPickResult =
   | { readonly ok: false; readonly reason: string };
 
 /**
+ * Unwraps an `ApplyPickResult` the caller has already proven can only be `ok`, by an
+ * argument specific to that call site (stated in `invariant`) — not a defensive re-check.
+ * If the invariant is ever violated (a future regression in `assignSlot`, `bestAvailableFor`,
+ * or `checkAffordable` desyncing from this), this throws loudly instead of silently lying to
+ * the type system with an unsound cast.
+ */
+export function expectApplied(result: ApplyPickResult, invariant: string): DraftState {
+  if (!result.ok) throw new Error(`Draft engine invariant violated (${invariant}): ${result.reason}`);
+  return result.state;
+}
+
+/**
  * The one place a player becomes a pick: validates the player is real and undrafted, asks
  * `assignSlot` (which delegates to domain roster rules) where they land, and records both the
  * pick and the roster slot. It does NOT advance the turn — snake and auction advance differently.

@@ -46,6 +46,6 @@ describe("snakeTeamForPick", () => {
     // snakeTeamForPick is part of the public engine barrel and only validates
     // pickNumber itself — an empty draftOrder is a caller error it still must
     // reject rather than silently returning undefined.
-    expect(() => snakeTeamForPick([], 1)).toThrow(/invalid/i);
+    expect(() => snakeTeamForPick([], 1)).toThrow(/draftOrder has no team/);
   });
 });

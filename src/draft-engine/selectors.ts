@@ -89,13 +89,22 @@ export function currentClockSeconds(state: DraftState): number | null {
   return tier.pickSeconds;
 }
 
-export function currentDeadline(state: DraftState): string | null {
+/**
+ * Bundles the two values `currentDeadline` needs from one combined check, so it narrows
+ * `turnStartedAt` exactly once instead of re-checking it after `currentClockSeconds` has
+ * already implied it's non-null.
+ */
+function currentTurnClock(state: DraftState): { readonly seconds: number; readonly startedAt: string } | null {
+  const startedAt = state.turnStartedAt;
   const seconds = currentClockSeconds(state);
-  // `seconds !== null` already implies `turnStartedAt !== null` (both derive from
-  // `currentTier`, which requires it) — this check exists only so TS can narrow
-  // `turnStartedAt` from `string | null` to `string` below.
-  if (seconds === null || state.turnStartedAt === null) return null;
-  return new Date(Date.parse(state.turnStartedAt) + seconds * MS_PER_SECOND).toISOString();
+  if (startedAt === null || seconds === null) return null;
+  return { seconds, startedAt };
+}
+
+export function currentDeadline(state: DraftState): string | null {
+  const turn = currentTurnClock(state);
+  if (turn === null) return null;
+  return new Date(Date.parse(turn.startedAt) + turn.seconds * MS_PER_SECOND).toISOString();
 }
 
 /** When the clock next tightens and to what — null before/after the draft, or on the final tier. */

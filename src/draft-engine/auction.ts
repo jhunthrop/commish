@@ -2,7 +2,7 @@ import type { BidAction, NominateAction } from "@/domain/draft";
 import { rosterFor, type AuctionState, type DraftReduceResult, type DraftState } from "./state";
 import { AUCTION_CONFIG } from "./config";
 import { assignSlot } from "./slotting";
-import { applyPick } from "./apply-pick";
+import { applyPick, expectApplied } from "./apply-pick";
 import { bestAvailableFor, maxBidFor, openSlotCount, remainingBudget } from "./selectors";
 
 /**
@@ -101,22 +101,22 @@ export function reduceAuctionExpiry(state: DraftState, auction: AuctionState, ti
   }
 
   const winner = lot.highBidTeamId;
-  // The winner's budget and roster space were already validated by checkAffordable when
-  // they placed the bid or nomination that made them the high bidder (reduceBid /
-  // reduceNominate), and nothing else can touch their roster or budget while this lot is
-  // still open — applyPick can never fail here.
   const applied = applyPick(state, {
     teamId: winner,
     playerId: lot.playerId,
     price: lot.highBid,
     auto: lot.autoNominated && winner === lot.nominatedByTeamId,
     timestamp,
-  }) as { readonly ok: true; readonly state: DraftState };
+  });
+  const wonState = expectApplied(
+    applied,
+    "auction award: high bidder was validated at bid time and no roster changed while the lot was open",
+  );
 
   const paid: DraftState = {
-    ...applied.state,
-    budgets: { ...applied.state.budgets, [winner]: remainingBudget(applied.state, winner) - lot.highBid },
-    pickNumber: applied.state.pickNumber + 1,
+    ...wonState,
+    budgets: { ...wonState.budgets, [winner]: remainingBudget(wonState, winner) - lot.highBid },
+    pickNumber: wonState.pickNumber + 1,
   };
   const nominator = nextNominator(paid, lot.nominatedByTeamId);
   return {

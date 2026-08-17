@@ -16,6 +16,8 @@ export function snakeTeamForPick(draftOrder: readonly string[], pickNumber: numb
   const indexInRound = (pickNumber - 1) % teamCount;
   const orderIndex = round % 2 === 1 ? indexInRound : teamCount - 1 - indexInRound;
   const team = draftOrder[orderIndex];
-  if (team === undefined) throw new Error(`Invalid pick number: ${pickNumber}.`);
+  if (team === undefined) {
+    throw new Error(`draftOrder has no team at index ${orderIndex} for pick ${pickNumber}.`);
+  }
   return team;
 }
