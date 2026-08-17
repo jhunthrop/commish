@@ -1,53 +1,48 @@
-import { cookies } from "next/headers";
+import { withAuth } from "@workos-inc/authkit-nextjs";
+import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
-import { createAuthService, type AuthService, type AuthUser } from "./auth";
-import { AUTH_CONFIG } from "./config";
+import { users } from "@/db/schema";
+import type { User } from "@/domain/user";
+import { syncUserFromWorkOS } from "./user-sync";
 
 const systemClock = { now: () => new Date().toISOString() };
 
-let service: AuthService | undefined;
-
-/** The one process-wide AuthService bound to the real DB and the real clock. */
-export function getAuthService(): AuthService {
-  if (service === undefined) {
-    service = createAuthService({ db: getDb(), clock: systemClock });
-  }
-  return service;
+export interface CurrentUser extends User {
+  readonly email: string;
 }
 
 /**
- * The single server-side identity seam. Every server component, route handler,
- * and server action that needs "who is this" calls this — never the cookie directly.
+ * The single server-side identity seam. Every server component, route handler, and
+ * server action that needs "who is this" calls this — never WorkOS directly.
+ *
+ * WorkOS AuthKit owns authentication (credentials, sessions, MFA, OAuth). This joins
+ * the WorkOS session to our local profile row, creating it if the callback hasn't yet
+ * (e.g. a session established before a deploy that added this table).
  */
-export async function getCurrentUser(): Promise<AuthUser | null> {
-  const store = await cookies();
-  const sessionId = store.get(AUTH_CONFIG.sessionCookieName)?.value;
-  if (sessionId === undefined) {
-    return null;
-  }
-  return getAuthService().getUserBySession(sessionId);
+export async function getCurrentUser(): Promise<CurrentUser | null> {
+  const { user: wu } = await withAuth();
+  if (!wu) return null;
+
+  const db = getDb();
+  const [row] = await db.select().from(users).where(eq(users.id, wu.id));
+  const profile = row !== undefined ? row : null;
+
+  const local =
+    profile !== null
+      ? {
+          id: profile.id,
+          displayName: profile.displayName,
+          experienceTier: profile.experienceTier,
+          avatarUrl: profile.avatarUrl,
+          createdAt: profile.createdAt.toISOString(),
+        }
+      : await syncUserFromWorkOS({ db, clock: systemClock }, wu);
+
+  return { ...local, email: wu.email };
 }
 
-export async function requireCurrentUser(): Promise<AuthUser> {
+export async function requireCurrentUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
-  if (user === null) {
-    throw new Error("Not authenticated.");
-  }
+  if (user === null) throw new Error("Not authenticated.");
   return user;
-}
-
-export async function setSessionCookie(sessionId: string): Promise<void> {
-  const store = await cookies();
-  store.set(AUTH_CONFIG.sessionCookieName, sessionId, {
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    path: "/",
-    maxAge: AUTH_CONFIG.sessionLifetimeDays * 24 * 60 * 60,
-  });
-}
-
-export async function clearSessionCookie(): Promise<void> {
-  const store = await cookies();
-  store.delete(AUTH_CONFIG.sessionCookieName);
 }

@@ -72,13 +72,6 @@ CREATE TABLE "scoring_settings" (
 	"te_reception_bonus" real DEFAULT 0 NOT NULL
 );
 --> statement-breakpoint
-CREATE TABLE "sessions" (
-	"id" text PRIMARY KEY NOT NULL,
-	"user_id" text NOT NULL,
-	"expires_at" timestamp with time zone NOT NULL,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
-);
---> statement-breakpoint
 CREATE TABLE "teams" (
 	"id" text PRIMARY KEY NOT NULL,
 	"league_id" text NOT NULL,
@@ -89,11 +82,11 @@ CREATE TABLE "teams" (
 CREATE TABLE "users" (
 	"id" text PRIMARY KEY NOT NULL,
 	"email" text NOT NULL,
-	"password_hash" text NOT NULL,
 	"display_name" text NOT NULL,
 	"experience_tier" "experience_tier" DEFAULT 'beginner' NOT NULL,
 	"avatar_url" text,
-	"created_at" timestamp with time zone DEFAULT now() NOT NULL
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"last_seen_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "weeks" (
@@ -112,14 +105,12 @@ ALTER TABLE "matchups" ADD CONSTRAINT "matchups_home_team_id_teams_id_fk" FOREIG
 ALTER TABLE "matchups" ADD CONSTRAINT "matchups_away_team_id_teams_id_fk" FOREIGN KEY ("away_team_id") REFERENCES "public"."teams"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "roster_slots" ADD CONSTRAINT "roster_slots_team_id_teams_id_fk" FOREIGN KEY ("team_id") REFERENCES "public"."teams"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "scoring_settings" ADD CONSTRAINT "scoring_settings_league_id_leagues_id_fk" FOREIGN KEY ("league_id") REFERENCES "public"."leagues"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "sessions" ADD CONSTRAINT "sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teams" ADD CONSTRAINT "teams_league_id_leagues_id_fk" FOREIGN KEY ("league_id") REFERENCES "public"."leagues"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "teams" ADD CONSTRAINT "teams_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE no action ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "weeks" ADD CONSTRAINT "weeks_league_id_leagues_id_fk" FOREIGN KEY ("league_id") REFERENCES "public"."leagues"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "draft_actions_draft_id_id_idx" ON "draft_actions" USING btree ("draft_id","id");--> statement-breakpoint
 CREATE UNIQUE INDEX "draft_picks_draft_player_idx" ON "draft_picks" USING btree ("draft_id","player_id");--> statement-breakpoint
 CREATE INDEX "drafts_league_id_idx" ON "drafts" USING btree ("league_id");--> statement-breakpoint
-CREATE INDEX "sessions_user_id_idx" ON "sessions" USING btree ("user_id");--> statement-breakpoint
 CREATE INDEX "teams_league_id_idx" ON "teams" USING btree ("league_id");--> statement-breakpoint
 CREATE INDEX "teams_user_id_idx" ON "teams" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "teams_league_user_idx" ON "teams" USING btree ("league_id","user_id");--> statement-breakpoint

@@ -19,7 +19,6 @@ describe("schema round-trip against Postgres", () => {
     await db.insert(users).values({
       id: "user_1",
       email: "jh@example.com",
-      passwordHash: "not-a-real-hash",
       displayName: "JH",
     });
 
@@ -59,7 +58,6 @@ describe("schema round-trip against Postgres", () => {
     await db.insert(users).values({
       id: "user_1",
       email: "jh@example.com",
-      passwordHash: "x",
       displayName: "JH",
     });
     await db.insert(leagues).values({
@@ -78,9 +76,9 @@ describe("schema round-trip against Postgres", () => {
   });
 
   it("rejects duplicate emails", async () => {
-    await db.insert(users).values({ id: "u1", email: "dup@example.com", passwordHash: "x", displayName: "A" });
+    await db.insert(users).values({ id: "u1", email: "dup@example.com", displayName: "A" });
     await expect(
-      db.insert(users).values({ id: "u2", email: "dup@example.com", passwordHash: "x", displayName: "B" }),
+      db.insert(users).values({ id: "u2", email: "dup@example.com", displayName: "B" }),
     ).rejects.toThrow();
   });
 });

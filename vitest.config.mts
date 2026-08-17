@@ -6,6 +6,9 @@ export default defineConfig({
   plugins: [tsconfigPaths(), react()],
   test: {
     environment: "happy-dom",
+    // Integration tests share one real Postgres/Redis and truncate between tests, so
+    // test FILES must not interleave. Tests within a file already run sequentially.
+    fileParallelism: false,
     setupFiles: ["./vitest.setup.mts"],
     globals: false,
     coverage: {
