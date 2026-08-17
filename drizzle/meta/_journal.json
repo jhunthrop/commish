@@ -29,6 +29,13 @@
       "when": 1786995210158,
       "tag": "0003_mean_supreme_intelligence",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787000866136,
+      "tag": "0004_overconfident_wither",
+      "breakpoints": true
     }
   ]
 }

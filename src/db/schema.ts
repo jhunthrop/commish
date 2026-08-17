@@ -118,7 +118,12 @@ export const drafts = pgTable(
     kickoffAt: timestamp("kickoff_at", { withTimezone: true }).notNull(),
     auctionBudget: integer("auction_budget"),
   },
-  (t) => [index("drafts_league_id_idx").on(t.leagueId)],
+  (t) => [
+    index("drafts_league_id_idx").on(t.leagueId),
+    // The ticker scans every in_progress draft on a fixed interval — this is what makes
+    // that scan an index lookup instead of a sequential scan as the table grows.
+    index("drafts_status_idx").on(t.status),
+  ],
 );
 
 // Durable, replay-based draft action log — the source of truth for in-progress

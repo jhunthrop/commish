@@ -36,22 +36,35 @@ export function createDraftTicker({ db, store, clock, intervalMs = DRAFT_SERVICE
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
 
+  async function tickOne(draftId: string, now: string): Promise<TickOutcome | null> {
+    const state = await store.getDraftState(draftId);
+    if (state === null) return null;
+    const deadline = currentDeadline(state);
+    if (deadline === null || Date.parse(now) < Date.parse(deadline)) return null;
+    const result = await store.applyAction(draftId, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: now });
+    return result.ok ? { draftId, applied: true } : { draftId, applied: false, reason: result.reason };
+  }
+
   async function tick(): Promise<readonly TickOutcome[]> {
     const rows = await db
       .select({ id: drafts.id })
       .from(drafts)
       .where(eq(drafts.status, "in_progress"))
+      .orderBy(drafts.id)
       .limit(DRAFT_SERVICE_CONFIG.maxDraftsPerTick);
 
     const now = clock.now();
     const outcomes: TickOutcome[] = [];
     for (const row of rows) {
-      const state = await store.getDraftState(row.id);
-      if (state === null) continue;
-      const deadline = currentDeadline(state);
-      if (deadline === null || Date.parse(now) < Date.parse(deadline)) continue;
-      const result = await store.applyAction(row.id, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: now });
-      outcomes.push(result.ok ? { draftId: row.id, applied: true } : { draftId: row.id, applied: false, reason: result.reason });
+      try {
+        const outcome = await tickOne(row.id, now);
+        if (outcome !== null) outcomes.push(outcome);
+      } catch (error: unknown) {
+        // One draft's DB error (a dropped connection, a transient failure) must not stop
+        // the scan — every other in-progress draft still needs its clock checked this tick.
+        console.error("[draft] ticker failed for draft", row.id, error);
+        outcomes.push({ draftId: row.id, applied: false, reason: "Something went wrong checking this draft's clock." });
+      }
     }
     return outcomes;
   }

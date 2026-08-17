@@ -93,6 +93,16 @@ describe("GET /api/drafts/[draftId]", () => {
     expect(body.data.draft.onClockTeamId).not.toBeNull();
     expect(body.data.draft.deadlineAt).not.toBeNull();
   });
+
+  // Ruling R-B5: reading a draft is restricted to that league's own members (plus its
+  // commissioner) — a signed-in stranger from another league must not see this board.
+  it("answers 403 for a signed-in user with no team in this league", async () => {
+    await fixture();
+    signedInAs("stranger");
+    const response = await getDraft(new Request(`http://test/api/drafts/${DRAFT_ID}`), { params });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ ok: false, error: "You don't have a team in this league." });
+  });
 });
 
 describe("POST /api/drafts/[draftId]/actions", () => {
@@ -127,13 +137,17 @@ describe("POST /api/drafts/[draftId]/actions", () => {
     expect(body.data.draft.picks[0]).toMatchObject({ teamId: onClockTeamId, playerId: "qb1" });
   });
 
-  it("answers 409 with the reducer's plain-language reason when the action isn't legal", async () => {
+  it("answers 409 with the reducer's plain-language reason when the action isn't legal, even if the body claims to be the on-clock team", async () => {
     const f = await fixture();
     const state = await getDraftStore().startDraft(DRAFT_ID);
     if (!state.ok) throw new Error(state.reason);
+    const onClockTeamId = state.state.draftOrder[0]!;
     const offClockTeamId = state.state.draftOrder[1]!;
     signedInAs(f.userIds[f.teamIds.indexOf(offClockTeamId)]!);
-    const response = await postAction(postJson({ type: "MAKE_PICK", playerId: "qb1" }), { params });
+    // The body lies and claims to be the on-clock team. If the server ever honoured a body
+    // teamId, this would wrongly succeed as that team's pick instead of being rejected as
+    // the off-clock caller's own illegal pick.
+    const response = await postAction(postJson({ type: "MAKE_PICK", playerId: "qb1", teamId: onClockTeamId }), { params });
     expect(response.status).toBe(409);
     expect(await response.json()).toEqual({ ok: false, error: "It's not your turn to pick." });
   });

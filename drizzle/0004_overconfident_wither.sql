@@ -1,0 +1,1 @@
+CREATE INDEX "drafts_status_idx" ON "drafts" USING btree ("status");

@@ -15,6 +15,7 @@ export function getDraftStore(): DraftStore {
       db: getDb(),
       publish: (input) => getPublisher().publish(input),
       clock: systemClock,
+      onPublishError: (error, event) => console.error("[draft] publish failed", event, error),
     });
   }
   return store;

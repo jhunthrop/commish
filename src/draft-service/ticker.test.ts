@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { players } from "@/db/schema";
+import { draftActions, players } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "./store";
@@ -60,6 +60,37 @@ describe("draft ticker", () => {
     const { ticker } = await liveDraft();
     await truncateAll(db);
     expect(await ticker.tick()).toEqual([]);
+  });
+
+  it("only scans drafts with status='in_progress', leaving a merely scheduled draft in the same table untouched", async () => {
+    const { ticker, fixture } = await liveDraft();
+    // Present in `drafts`, but never started — must never appear in the ticker's SQL scan,
+    // not merely be a no-op once loaded.
+    await seedDraftFixture(db, {
+      draftId: "draft_tick_scheduled", leagueId: "league_tick_scheduled", format: "snake", teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    now = "2026-09-01T09:00:00.000Z"; // past the in-progress draft's deadline
+    expect(await ticker.tick()).toEqual([{ draftId: fixture.draftId, applied: true }]);
+  });
+
+  it("reports applied:false with the store's own rejection reason when applyAction is rejected", async () => {
+    const { ticker, store, fixture } = await liveDraft();
+    now = "2026-09-01T09:00:00.000Z"; // past the deadline
+    const state = await store.getDraftState(fixture.draftId); // warms the ticker's shared store cache
+    // Sabotage the log: insert a row at the sequence number the ticker's own applyAction
+    // call will try to use next, so the store's optimistic-concurrency check rejects it —
+    // exercising the real "reducer rejected" branch, not a thrown exception.
+    await db.insert(draftActions).values({
+      draftId: fixture.draftId,
+      sequence: state!.sequence + 1,
+      action: { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: now },
+      timestamp: new Date(now),
+    });
+
+    expect(await ticker.tick()).toEqual([
+      { draftId: fixture.draftId, applied: false, reason: "Someone else acted first. Try again." },
+    ]);
   });
 
   // P3 (controller ruling): the brief's version of this test ended in `expect(true).toBe(true)`,
