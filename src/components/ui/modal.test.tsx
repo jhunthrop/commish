@@ -79,7 +79,7 @@ describe("Modal", () => {
     expect(onClose).not.toHaveBeenCalled();
   });
 
-  it("keeps focus on the dialog panel when Tab is pressed with no focusable descendants", () => {
+  it("prevents default and re-focuses the panel on Tab with no focusable descendants", () => {
     render(
       <Modal open title="Notice" onClose={() => {}} footer={<></>}>
         Just a message, nothing to focus in here.
@@ -87,7 +87,31 @@ describe("Modal", () => {
     );
     const dialog = screen.getByRole("dialog");
     expect(dialog).toHaveFocus();
-    fireEvent.keyDown(dialog, { key: "Tab" });
-    expect(document.activeElement).toBe(dialog);
+
+    // The mount effect already focused the panel once; spy from here so the assertion
+    // below only counts a focus() call made by the Tab handler itself.
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+    // testing-library's fireEvent returns the DOM dispatchEvent result: false means
+    // preventDefault() was called on a cancelable event.
+    const notPrevented = fireEvent.keyDown(dialog, { key: "Tab" });
+    expect(notPrevented).toBe(false);
+    expect(focusSpy).toHaveBeenCalled();
+    focusSpy.mockRestore();
+  });
+
+  it("prevents default and re-focuses the panel on Shift+Tab with no focusable descendants", () => {
+    render(
+      <Modal open title="Notice" onClose={() => {}} footer={<></>}>
+        Just a message, nothing to focus in here.
+      </Modal>,
+    );
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveFocus();
+
+    const focusSpy = vi.spyOn(HTMLElement.prototype, "focus");
+    const notPrevented = fireEvent.keyDown(dialog, { key: "Tab", shiftKey: true });
+    expect(notPrevented).toBe(false);
+    expect(focusSpy).toHaveBeenCalled();
+    focusSpy.mockRestore();
   });
 });

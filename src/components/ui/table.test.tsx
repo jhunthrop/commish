@@ -48,8 +48,8 @@ describe("Table", () => {
     expect(screen.getByText("Auction results")).not.toHaveClass("sr-only");
   });
 
-  it("renders only the empty node — no header row — when there are no rows", () => {
-    render(
+  it("renders only the empty node — no header row — and is axe-clean in both themes when there are no rows", async () => {
+    await inBothThemes(
       <Table
         caption="Auction results"
         columns={columns}
@@ -57,10 +57,13 @@ describe("Table", () => {
         rowKey={(r: Pick) => r.id}
         empty={<EmptyState title="No picks yet" description="Picks land here as they happen." action={<Button>Refresh</Button>} />}
       />,
+      async ({ container }) => {
+        expect(screen.queryByRole("table")).toBeNull();
+        expect(screen.getByRole("heading", { name: "No picks yet" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
     );
-    expect(screen.queryByRole("table")).toBeNull();
-    expect(screen.getByRole("heading", { name: "No picks yet" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Refresh" })).toBeInTheDocument();
   });
 
   it("applies per-row styling and marks numeric and narrow-hidden columns", () => {
