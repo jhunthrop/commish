@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
+import { playerStatLines } from "@/db/schema";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import { PLAYER_COUNT, SEASON_WEEKS } from "@/stats/mock/generate-dataset";
+import type { StatsProvider } from "@/stats/provider";
 import { seedPlayers } from "./seed-players";
 
 const db = createTestDb();
@@ -28,6 +30,36 @@ describe("seedPlayers", () => {
     await seedPlayers(db, provider);
     await seedPlayers(db, provider);
     expect(await countOf("players")).toBe(PLAYER_COUNT);
+    expect(await countOf("player_stat_lines")).toBe(PLAYER_COUNT * SEASON_WEEKS);
+  }, 30_000);
+
+  it("re-seeding with a revised stat line upserts it instead of leaving the stale row", async () => {
+    await seedPlayers(db, provider);
+
+    const week1Lines = await provider.getWeeklyStatLines(1);
+    const target = week1Lines[0]!;
+    const revisedPassingYards = target.passingYards + 100;
+
+    // Delegates to the mock provider and maps only the one targeted line — immutable,
+    // never mutates a line returned by the underlying provider.
+    const revisedProvider: StatsProvider = {
+      listPlayers: () => provider.listPlayers(),
+      getWeeklyStatLines: async (week) => {
+        const lines = await provider.getWeeklyStatLines(week);
+        if (week !== 1) return lines;
+        return lines.map((line) =>
+          line.playerId === target.playerId ? { ...line, passingYards: revisedPassingYards } : line,
+        );
+      },
+    };
+
+    await seedPlayers(db, revisedProvider);
+
+    const [row] = await db
+      .select({ passingYards: playerStatLines.passingYards })
+      .from(playerStatLines)
+      .where(and(eq(playerStatLines.playerId, target.playerId), eq(playerStatLines.week, 1)));
+    expect(row?.passingYards).toBe(revisedPassingYards);
     expect(await countOf("player_stat_lines")).toBe(PLAYER_COUNT * SEASON_WEEKS);
   }, 30_000);
 });
