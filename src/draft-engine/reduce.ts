@@ -1,6 +1,7 @@
 import type { DraftAction, StartDraftAction } from "@/domain/draft";
-import type { DraftReduceResult, DraftState } from "./state";
-import { reduceMakePick } from "./snake";
+import { auctionOf, totalRosterSlots, type DraftReduceResult, type DraftState } from "./state";
+import { reduceMakePick, reduceSnakeExpiry } from "./snake";
+import { reduceAuctionExpiry, reduceBid, reduceNominate } from "./auction";
 
 export type { DraftReduceResult } from "./state";
 
@@ -17,6 +18,9 @@ function reduceStart(state: DraftState, action: StartDraftAction): DraftReduceRe
   const budget = state.config.auctionBudget;
   if (isAuction && (budget === null || budget <= 0)) {
     return { ok: false, reason: "An auction draft needs a budget before it can start." };
+  }
+  if (isAuction && (budget as number) < totalRosterSlots(state.config.slotConfig)) {
+    return { ok: false, reason: "An auction budget must be at least $1 for every roster spot." };
   }
   const rosters = Object.fromEntries(action.draftOrder.map((teamId) => [teamId, []]));
   const budgets = isAuction ? Object.fromEntries(action.draftOrder.map((teamId) => [teamId, budget as number])) : {};
@@ -57,14 +61,23 @@ function dispatch(state: DraftState, action: DraftAction): DraftReduceResult {
       return reduceStart(state, action);
     case "MAKE_PICK":
       return reduceMakePick(state, action);
-    case "NOMINATE":
-      // Auction nomination/bidding lands in Task 3; a snake draft rejects it outright here
-      // because the brief's snake test suite exercises this rejection.
-      if (state.config.format === "snake") {
-        return { ok: false, reason: "This is a snake draft — make a pick instead of nominating." };
-      }
-      return { ok: false, reason: "That action isn't supported yet." };
-    default:
-      return { ok: false, reason: "That action isn't supported yet." };
+    case "NOMINATE": {
+      const auction = auctionOf(state);
+      return auction === null
+        ? { ok: false, reason: "This is a snake draft — make a pick instead of nominating." }
+        : reduceNominate(state, auction, action);
+    }
+    case "BID": {
+      const auction = auctionOf(state);
+      return auction === null
+        ? { ok: false, reason: "This is a snake draft — there's nothing to bid on." }
+        : reduceBid(state, auction, action);
+    }
+    case "TIMER_EXPIRE": {
+      const auction = auctionOf(state);
+      return auction === null
+        ? reduceSnakeExpiry(state, action.timestamp)
+        : reduceAuctionExpiry(state, auction, action.timestamp);
+    }
   }
 }
