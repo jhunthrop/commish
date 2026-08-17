@@ -1,8 +1,11 @@
-import type { DraftPoolEntry } from "@/domain/draft";
-import { auctionOf, rosterFor, totalRosterSlots, type DraftState } from "./state";
+import type { DraftPoolEntry, DraftStatus } from "@/domain/draft";
+import type { DraftFormat } from "@/domain/league";
+import type { RosterSlot } from "@/domain/roster";
+import { auctionOf, rosterFor, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
 import { assignSlot } from "./slotting";
-import { AUCTION_CONFIG } from "./config";
+import { AUCTION_CONFIG, type ClockTier } from "./config";
+import { clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
 
 export function draftedPlayerIds(state: DraftState): ReadonlySet<string> {
   return new Set(state.picks.map((p) => p.playerId));
@@ -69,4 +72,72 @@ export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEn
     if (assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig }).ok) return entry;
   }
   return null;
+}
+
+/** The tier in force for the turn that's currently running, or null when no turn is running. */
+export function currentTier(state: DraftState): ClockTier | null {
+  if (state.phase !== "in_progress" || state.turnStartedAt === null) return null;
+  return clockTierFor(state.turnStartedAt, state.config.kickoffAt, state.config.clockSchedule);
+}
+
+/** Seconds allowed for the current turn: the tier's pick clock, or the shorter live bid window. */
+export function currentClockSeconds(state: DraftState): number | null {
+  const tier = currentTier(state);
+  if (tier === null) return null;
+  const auction = auctionOf(state);
+  if (auction !== null && auction.lot !== null) return Math.min(tier.pickSeconds, AUCTION_CONFIG.bidWindowSeconds);
+  return tier.pickSeconds;
+}
+
+export function currentDeadline(state: DraftState): string | null {
+  const seconds = currentClockSeconds(state);
+  if (seconds === null || state.turnStartedAt === null) return null;
+  return new Date(Date.parse(state.turnStartedAt) + seconds * 1000).toISOString();
+}
+
+/** When the clock next tightens and to what — null before/after the draft, or on the final tier. */
+export function nextTightening(state: DraftState): Tightening | null {
+  if (state.phase !== "in_progress" || state.turnStartedAt === null) return null;
+  return nextTighteningAfter(state.turnStartedAt, state.config.kickoffAt, state.config.clockSchedule);
+}
+
+/** The one serialization of a draft: what `GET /api/drafts/:id` returns and Plan C renders. */
+export interface DraftStateView {
+  readonly draftId: string;
+  readonly leagueId: string;
+  readonly format: DraftFormat;
+  readonly phase: DraftStatus;
+  readonly sequence: number;
+  readonly draftOrder: readonly string[];
+  readonly picks: readonly CompletedPick[];
+  readonly rosters: Readonly<Record<string, readonly RosterSlot[]>>;
+  readonly budgets: Readonly<Record<string, number>>;
+  readonly auction: AuctionState | null;
+  readonly pickNumber: number;
+  readonly onClockTeamId: string | null;
+  readonly deadlineAt: string | null;
+  readonly clockSeconds: number | null;
+  readonly nextTightening: Tightening | null;
+  readonly availablePlayerIds: readonly string[];
+}
+
+export function draftStateView(state: DraftState): DraftStateView {
+  return {
+    draftId: state.config.draftId,
+    leagueId: state.config.leagueId,
+    format: state.config.format,
+    phase: state.phase,
+    sequence: state.sequence,
+    draftOrder: state.draftOrder,
+    picks: state.picks,
+    rosters: state.rosters,
+    budgets: state.budgets,
+    auction: state.auction,
+    pickNumber: state.pickNumber,
+    onClockTeamId: teamOnClock(state),
+    deadlineAt: currentDeadline(state),
+    clockSeconds: currentClockSeconds(state),
+    nextTightening: nextTightening(state),
+    availablePlayerIds: availablePool(state).map((p) => p.playerId),
+  };
 }
