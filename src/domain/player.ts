@@ -19,4 +19,9 @@ export interface StatLine {
   readonly receivingTouchdowns: number;
   readonly receptions: number;
   readonly fumblesLost: number;
+  readonly fieldGoalsMade: number;
+  readonly extraPointsMade: number;
+  readonly sacks: number;
+  readonly defensiveInterceptions: number;
+  readonly defensiveTouchdowns: number;
 }

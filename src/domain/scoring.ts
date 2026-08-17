@@ -11,6 +11,11 @@ export interface ScoringSettings {
   readonly pointsPerFumbleLost: number;
   /** Extra points per reception, added on top of pointsPerReception, for TE receptions only. */
   readonly teReceptionBonus: number;
+  readonly pointsPerFieldGoal: number;
+  readonly pointsPerExtraPoint: number;
+  readonly pointsPerSack: number;
+  readonly pointsPerDefensiveInterception: number;
+  readonly pointsPerDefensiveTouchdown: number;
 }
 
 export const STANDARD_SCORING: Omit<ScoringSettings, "leagueId"> = {
@@ -24,6 +29,11 @@ export const STANDARD_SCORING: Omit<ScoringSettings, "leagueId"> = {
   pointsPerReception: 0,
   pointsPerFumbleLost: -2,
   teReceptionBonus: 0,
+  pointsPerFieldGoal: 3,
+  pointsPerExtraPoint: 1,
+  pointsPerSack: 1,
+  pointsPerDefensiveInterception: 2,
+  pointsPerDefensiveTouchdown: 6,
 };
 
 export const PPR_SCORING: Omit<ScoringSettings, "leagueId"> = {

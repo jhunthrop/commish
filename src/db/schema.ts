@@ -82,6 +82,11 @@ export const scoringSettings = pgTable("scoring_settings", {
   pointsPerReception: real("points_per_reception").notNull(),
   pointsPerFumbleLost: real("points_per_fumble_lost").notNull(),
   teReceptionBonus: real("te_reception_bonus").notNull().default(0),
+  pointsPerFieldGoal: real("points_per_field_goal").notNull(),
+  pointsPerExtraPoint: real("points_per_extra_point").notNull(),
+  pointsPerSack: real("points_per_sack").notNull(),
+  pointsPerDefensiveInterception: real("points_per_defensive_interception").notNull(),
+  pointsPerDefensiveTouchdown: real("points_per_defensive_touchdown").notNull(),
 });
 
 export const rosterSlots = pgTable(
