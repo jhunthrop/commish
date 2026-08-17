@@ -51,6 +51,7 @@ interface Deps {
 
 export function createLlmClient({ env = process.env, sdk }: Deps = {}): LlmClient {
   const enabled = isLLMEnabled(env);
+  // The SDK's messages.create takes a mutable MessageParam[]; AnthropicLike declares it readonly (test-injectable narrow slice). Structurally incompatible, so cast at this single construction site.
   const client: AnthropicLike | null = enabled ? (sdk ?? (new Anthropic({ apiKey: env.ANTHROPIC_API_KEY }) as unknown as AnthropicLike)) : null;
 
   return {
