@@ -1,4 +1,9 @@
-# Blueprint: Commish — MVP Prototype
+# Blueprint: Commish — Phase 1: Production Foundation
+
+> **Revision note (v6) — "no MVP" directive:** mid-execution of Step 1, the founder directed: *"I don't want an MVP. Let's work towards the end solution."* This phase is hereby reframed from "prototype with deliberately disposable layers" to **production foundation**: the phases still sequence *scope* (real money, tax, native apps still come later, and the external business blockers — data license, banking partner, counsel — are unchanged), but nothing in this phase may be built in a form that a later phase plans to throw away. Concrete changes:
+> - **Postgres + Redis via Docker Compose from Step 1** — not SQLite. This supersedes every "SQLite in Phase 1, migrate in Phase 2" statement below (not individually rewritten yet — this note wins where they conflict), and obsoletes Phase 2's migration step. Forcing factor beyond the directive: `better-sqlite3`'s native binding segfaults on this dev machine (exit 139) and `node-gyp` silently no-op rebuilds; Postgres's pure-JS wire-protocol driver avoids native compilation entirely.
+> - **Real auth architecture in Step 1**, not the seeded cookie dev-login stub — Phase 2's auth step then extends (hardening, rate limiting) rather than replaces.
+> - A full de-MVP reconciliation pass over this file and Phase 2 is the next planning task; until then, read every "prototype-only" qualifier below through this note.
 
 **Objective:** Build a software-only prototype of the core "Beating Apex" product experience — the unified draft engine, scoring, league management, social layer, AI draft moderator, and AI advisory layer — with no real money movement, no regulated infrastructure, and no native mobile apps. Prove the UX differentiation thesis from `docs/research/2026-08-16-beating-apex-strategy.md` before any regulated build-out.
 

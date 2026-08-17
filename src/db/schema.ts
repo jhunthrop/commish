@@ -1,0 +1,188 @@
+import {
+  pgTable,
+  pgEnum,
+  text,
+  integer,
+  real,
+  boolean,
+  timestamp,
+  jsonb,
+  bigserial,
+  primaryKey,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/pg-core";
+
+export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
+export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
+export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress", "complete"]);
+
+export const users = pgTable(
+  "users",
+  {
+    id: text("id").primaryKey(),
+    email: text("email").notNull(),
+    passwordHash: text("password_hash").notNull(),
+    displayName: text("display_name").notNull(),
+    experienceTier: experienceTierEnum("experience_tier").notNull().default("beginner"),
+    avatarUrl: text("avatar_url"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("users_email_idx").on(t.email)],
+);
+
+export const sessions = pgTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("sessions_user_id_idx").on(t.userId)],
+);
+
+export const leagues = pgTable("leagues", {
+  id: text("id").primaryKey(),
+  name: text("name").notNull(),
+  format: draftFormatEnum("format").notNull(),
+  teamCount: integer("team_count").notNull(),
+  stakeTier: integer("stake_tier").notNull().default(0),
+  isPublicMatchmade: boolean("is_public_matchmade").notNull().default(false),
+  inviteCode: text("invite_code").notNull().unique(),
+  commissionerUserId: text("commissioner_user_id")
+    .notNull()
+    .references(() => users.id),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const teams = pgTable(
+  "teams",
+  {
+    id: text("id").primaryKey(),
+    leagueId: text("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    name: text("name").notNull(),
+  },
+  (t) => [
+    index("teams_league_id_idx").on(t.leagueId),
+    index("teams_user_id_idx").on(t.userId),
+    uniqueIndex("teams_league_user_idx").on(t.leagueId, t.userId),
+  ],
+);
+
+export const scoringSettings = pgTable("scoring_settings", {
+  leagueId: text("league_id")
+    .primaryKey()
+    .references(() => leagues.id, { onDelete: "cascade" }),
+  pointsPerPassingYard: real("points_per_passing_yard").notNull(),
+  pointsPerPassingTouchdown: real("points_per_passing_touchdown").notNull(),
+  pointsPerInterception: real("points_per_interception").notNull(),
+  pointsPerRushingYard: real("points_per_rushing_yard").notNull(),
+  pointsPerRushingTouchdown: real("points_per_rushing_touchdown").notNull(),
+  pointsPerReceivingYard: real("points_per_receiving_yard").notNull(),
+  pointsPerReceivingTouchdown: real("points_per_receiving_touchdown").notNull(),
+  pointsPerReception: real("points_per_reception").notNull(),
+  pointsPerFumbleLost: real("points_per_fumble_lost").notNull(),
+  teReceptionBonus: real("te_reception_bonus").notNull().default(0),
+});
+
+export const rosterSlots = pgTable(
+  "roster_slots",
+  {
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    slot: text("slot").notNull(),
+    slotIndex: integer("slot_index").notNull(),
+    playerId: text("player_id"),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.slot, t.slotIndex] })],
+);
+
+export const drafts = pgTable(
+  "drafts",
+  {
+    id: text("id").primaryKey(),
+    leagueId: text("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    format: draftFormatEnum("format").notNull(),
+    status: draftStatusEnum("status").notNull().default("scheduled"),
+    kickoffAt: timestamp("kickoff_at", { withTimezone: true }).notNull(),
+    auctionBudget: integer("auction_budget"),
+  },
+  (t) => [index("drafts_league_id_idx").on(t.leagueId)],
+);
+
+// Durable, replay-based draft action log — the source of truth for in-progress
+// draft state. Materialized state is a cache derived by replaying this table
+// through the DraftEngine reducer, never the other way around.
+export const draftActions = pgTable(
+  "draft_actions",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    draftId: text("draft_id")
+      .notNull()
+      .references(() => drafts.id, { onDelete: "cascade" }),
+    action: jsonb("action").notNull(),
+    timestamp: timestamp("timestamp", { withTimezone: true }).notNull(),
+  },
+  (t) => [index("draft_actions_draft_id_id_idx").on(t.draftId, t.id)],
+);
+
+export const draftPicks = pgTable(
+  "draft_picks",
+  {
+    draftId: text("draft_id")
+      .notNull()
+      .references(() => drafts.id, { onDelete: "cascade" }),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id),
+    playerId: text("player_id").notNull(),
+    round: integer("round").notNull(),
+    pickNumber: integer("pick_number").notNull(),
+    price: integer("price"),
+  },
+  (t) => [
+    primaryKey({ columns: [t.draftId, t.pickNumber] }),
+    uniqueIndex("draft_picks_draft_player_idx").on(t.draftId, t.playerId),
+  ],
+);
+
+export const weeks = pgTable(
+  "weeks",
+  {
+    leagueId: text("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    weekNumber: integer("week_number").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.leagueId, t.weekNumber] })],
+);
+
+export const matchups = pgTable(
+  "matchups",
+  {
+    leagueId: text("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    weekNumber: integer("week_number").notNull(),
+    homeTeamId: text("home_team_id")
+      .notNull()
+      .references(() => teams.id),
+    awayTeamId: text("away_team_id")
+      .notNull()
+      .references(() => teams.id),
+    homeScore: real("home_score"),
+    awayScore: real("away_score"),
+  },
+  (t) => [primaryKey({ columns: [t.leagueId, t.weekNumber, t.homeTeamId] })],
+);
