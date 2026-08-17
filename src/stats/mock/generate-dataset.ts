@@ -65,7 +65,8 @@ function statLineFor(rand: () => number, player: Player, week: number): StatLine
     case "WR": return { ...zero, receptions: int(rand, 1, 10), receivingYards: int(rand, 10, 140), receivingTouchdowns: count(rand, 0.28, 2), rushingYards: int(rand, 0, 12), fumblesLost: count(rand, 0.03, 1) };
     case "TE": return { ...zero, receptions: int(rand, 0, 8), receivingYards: int(rand, 0, 95), receivingTouchdowns: count(rand, 0.22, 2), fumblesLost: count(rand, 0.03, 1) };
     case "K":  return { ...zero, fieldGoalsMade: int(rand, 0, 4), extraPointsMade: int(rand, 0, 5) };
-    case "DEF": return { ...zero, sacks: int(rand, 0, 5), defensiveInterceptions: count(rand, 0.35, 3), defensiveTouchdowns: count(rand, 0.1, 1) };
+    // A defense that plays always registers something; floor sacks so no DEF line is all-zero.
+    case "DEF": return { ...zero, sacks: Math.max(1, int(rand, 0, 5)), defensiveInterceptions: count(rand, 0.35, 3), defensiveTouchdowns: count(rand, 0.1, 1) };
   }
 }
 

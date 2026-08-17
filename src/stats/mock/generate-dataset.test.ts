@@ -33,6 +33,14 @@ describe("generateDataset", () => {
     }
   });
 
+  it("never gives a DEF an all-zero defensive line (a defense that plays always registers something)", () => {
+    const byId = new Map(ds.players.map((p) => [p.id, p]));
+    for (const s of ds.statLines) {
+      if (byId.get(s.playerId)!.position !== "DEF") continue;
+      expect(s.sacks + s.defensiveInterceptions + s.defensiveTouchdowns).toBeGreaterThan(0);
+    }
+  });
+
   it("matches the committed dataset.json byte-for-byte (run `npm run stats:generate` after changing the generator)", () => {
     const committed = readFileSync(resolve(process.cwd(), "src/stats/mock/dataset.json"), "utf8");
     expect(committed).toBe(JSON.stringify(ds, null, 2) + "\n");
