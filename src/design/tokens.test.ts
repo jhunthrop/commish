@@ -28,6 +28,9 @@ describe("TOKENS.color", () => {
       it("accentText on accent (button label) ≥ 4.5:1", () => {
         expect(contrastRatio(c.accentText, c.accent)).toBeGreaterThanOrEqual(AA_TEXT);
       });
+      it("negativeText on negative (destructive button label) ≥ 4.5:1", () => {
+        expect(contrastRatio(c.negativeText, c.negative)).toBeGreaterThanOrEqual(AA_TEXT);
+      });
       it("border against surface ≥ 3:1 (non-text UI)", () => {
         expect(contrastRatio(c.border, c.surface)).toBeGreaterThanOrEqual(AA_LARGE_AND_UI);
       });

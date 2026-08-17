@@ -9,6 +9,7 @@
   --color-accent-text: #FFFFFF;
   --color-positive: #136B49;
   --color-negative: #B0342A;
+  --color-negative-text: #FFFFFF;
   --color-warning: #8A5A00;
   --space-1: 4px;
   --space-2: 8px;
@@ -54,6 +55,7 @@
   --color-accent-text: #0B1A12;
   --color-positive: #5CC995;
   --color-negative: #F07C70;
+  --color-negative-text: #2A0F0C;
   --color-warning: #E5B054;
 }
 
@@ -68,6 +70,7 @@
     --color-accent-text: #0B1A12;
     --color-positive: #5CC995;
     --color-negative: #F07C70;
+    --color-negative-text: #2A0F0C;
     --color-warning: #E5B054;
   }
 }

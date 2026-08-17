@@ -10,6 +10,7 @@ export type ColorRole =
   | "accentText"
   | "positive"
   | "negative"
+  | "negativeText"
   | "warning";
 
 type Palette = Readonly<Record<ColorRole, string>>;
@@ -24,6 +25,7 @@ const light: Palette = {
   accentText: "#FFFFFF",
   positive: "#136B49",
   negative: "#B0342A",
+  negativeText: "#FFFFFF",
   warning: "#8A5A00",
 };
 
@@ -37,6 +39,7 @@ const dark: Palette = {
   accentText: "#0B1A12",
   positive: "#5CC995",
   negative: "#F07C70",
+  negativeText: "#2A0F0C",
   warning: "#E5B054",
 };
 
