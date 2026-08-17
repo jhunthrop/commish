@@ -14,7 +14,7 @@ import tsconfigPaths from "vite-tsconfig-paths";
  * UNFILTERED `npm run test:coverage` (a path-filtered run would report the other directory
  * at 0%).
  */
-const COVERAGE_GATED_DIRS = ["src/scoring", "src/draft-engine"] as const;
+const COVERAGE_GATED_DIRS = ["src/scoring", "src/draft-engine", "src/draft-room/state"] as const;
 const coverageInclude = COVERAGE_GATED_DIRS.map((dir) => `${dir}/**`);
 
 export default defineConfig({
@@ -40,6 +40,12 @@ export default defineConfig({
           statements: 100,
         },
         "src/draft-engine/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        "src/draft-room/state/**": {
           branches: 100,
           functions: 100,
           lines: 100,
