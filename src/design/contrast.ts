@@ -24,3 +24,26 @@ export function contrastRatio(a: string, b: string): number {
   const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
   return (hi + 0.05) / (lo + 0.05);
 }
+
+/** Standard RGB→HSL hue, degrees, 0 (inclusive) .. 360 (exclusive). Gray (zero saturation) is 0. */
+export function hueDegrees(hex: string): number {
+  const [r, g, b] = parseHex(hex).map((c) => c / 255);
+  const max = Math.max(r, g, b);
+  const min = Math.min(r, g, b);
+  const delta = max - min;
+  if (delta === 0) return 0;
+
+  let hue: number;
+  if (max === r) hue = ((g - b) / delta) % 6;
+  else if (max === g) hue = (b - r) / delta + 2;
+  else hue = (r - g) / delta + 4;
+
+  hue *= 60;
+  return hue < 0 ? hue + 360 : hue;
+}
+
+/** Shortest arc between two hues (degrees), 0 .. 180. */
+export function hueDistance(a: number, b: number): number {
+  const diff = Math.abs(a - b) % 360;
+  return diff > 180 ? 360 - diff : diff;
+}

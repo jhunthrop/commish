@@ -10,7 +10,7 @@
 - **Mobile-first.** Minimum viewport 360px.
 
 ## Tokens
-Single source of truth: `src/design/tokens.ts` → generated `src/design/tokens.css` (`npm run tokens:build`; a test fails if they drift). Use tokens via Tailwind aliases:
+Single source of truth: `src/design/tokens.ts` → generated `src/design/tokens.css` (`npm run tokens:build`; a test fails if they drift). The generated file declares namespaced source variables (`--commish-color-surface`, `--commish-space-4`, `--commish-radius-md`, …) on `:root`; `src/app/globals.css`'s `@theme inline` block aliases each Tailwind theme variable (`--color-surface`, `--radius-md`, `--text-md`, …) to its `--commish-*` counterpart. This two-layer scheme (generated `--commish-*` source vars → `@theme inline` Tailwind aliases → utility classes) exists because aliasing a theme variable to itself (`--color-surface: var(--color-surface);`) is a CSS custom-property cycle — it only resolved before because the unlayered token import happened to outrank `@layer theme` in the cascade, which is not a property to depend on. Use tokens via Tailwind aliases:
 - Surfaces: `bg-surface`, `bg-surface-elevated`, `border-border`
 - Text: `text-text-primary`, `text-text-muted`
 - Accent: `bg-accent text-accent-text` (buttons/links), `text-accent`

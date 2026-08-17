@@ -23,7 +23,9 @@ const light: Palette = {
   textMuted: "#586159",
   accent: "#0B6B47",
   accentText: "#FFFFFF",
-  positive: "#136B49",
+  // Hue ≈105° (leaf/grass green) — deliberately distinct from accent's ≈158° teal-green
+  // so "good outcome" (positive) never reads as the same color as the brand/interactive accent.
+  positive: "#2A6E14",
   negative: "#B0342A",
   negativeText: "#FFFFFF",
   warning: "#8A5A00",
@@ -37,7 +39,8 @@ const dark: Palette = {
   textMuted: "#A3AEA7",
   accent: "#4FC08D",
   accentText: "#0B1A12",
-  positive: "#5CC995",
+  // Hue ≈94° (leaf/grass green) — deliberately distinct from accent's ≈153° teal-green.
+  positive: "#8FD35A",
   negative: "#F07C70",
   negativeText: "#2A0F0C",
   warning: "#E5B054",

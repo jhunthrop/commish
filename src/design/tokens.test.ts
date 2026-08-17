@@ -1,10 +1,16 @@
 import { describe, it, expect } from "vitest";
 import { TOKENS, type ThemeName, type ColorRole } from "./tokens";
-import { contrastRatio } from "./contrast";
+import { contrastRatio, hueDegrees, hueDistance } from "./contrast";
 
 const THEMES: readonly ThemeName[] = ["light", "dark"];
 const AA_TEXT = 4.5;
 const AA_LARGE_AND_UI = 3;
+
+// Two colors used for distinct semantic/interactive meanings must not be visually
+// interchangeable, even when both individually clear AA text contrast on a surface.
+const MIN_DISTINGUISHABLE_CONTRAST = 1.5;
+const MIN_DISTINGUISHABLE_HUE_DEG = 30;
+const DISTINGUISHABLE_ROLES: readonly ColorRole[] = ["accent", "positive", "negative", "warning"];
 
 // Every text/foreground role that sits directly on a surface must clear AA text contrast.
 const TEXT_ON_SURFACE: readonly ColorRole[] = ["textPrimary", "textMuted", "accent", "positive", "negative", "warning"];
@@ -34,6 +40,18 @@ describe("TOKENS.color", () => {
       it("border against surface ≥ 3:1 (non-text UI)", () => {
         expect(contrastRatio(c.border, c.surface)).toBeGreaterThanOrEqual(AA_LARGE_AND_UI);
       });
+
+      for (let i = 0; i < DISTINGUISHABLE_ROLES.length; i++) {
+        for (let j = i + 1; j < DISTINGUISHABLE_ROLES.length; j++) {
+          const roleA = DISTINGUISHABLE_ROLES[i]!;
+          const roleB = DISTINGUISHABLE_ROLES[j]!;
+          it(`${roleA} and ${roleB} are distinguishable (contrast ≥ ${MIN_DISTINGUISHABLE_CONTRAST} or hue distance ≥ ${MIN_DISTINGUISHABLE_HUE_DEG}°)`, () => {
+            const contrast = contrastRatio(c[roleA], c[roleB]);
+            const hueDelta = hueDistance(hueDegrees(c[roleA]), hueDegrees(c[roleB]));
+            expect(contrast >= MIN_DISTINGUISHABLE_CONTRAST || hueDelta >= MIN_DISTINGUISHABLE_HUE_DEG).toBe(true);
+          });
+        }
+      }
     });
   }
 });

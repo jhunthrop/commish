@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { contrastRatio, relativeLuminance } from "./contrast";
+import { contrastRatio, relativeLuminance, hueDegrees, hueDistance } from "./contrast";
 
 describe("relativeLuminance", () => {
   it("is 0 for black and 1 for white", () => {
@@ -21,5 +21,29 @@ describe("contrastRatio", () => {
   });
   it("throws a clear error for a non-hex input", () => {
     expect(() => contrastRatio("red", "#fff")).toThrow(/hex color/);
+  });
+});
+
+describe("hueDegrees", () => {
+  it("computes standard RGB→HSL hue for primaries", () => {
+    expect(hueDegrees("#FF0000")).toBeCloseTo(0, 5);
+    expect(hueDegrees("#00FF00")).toBeCloseTo(120, 5);
+    expect(hueDegrees("#0000FF")).toBeCloseTo(240, 5);
+  });
+  it("is 0 for a gray (no saturation)", () => {
+    expect(hueDegrees("#808080")).toBeCloseTo(0, 5);
+  });
+});
+
+describe("hueDistance", () => {
+  it("is the shortest arc between two hues, wrapping at 0/360", () => {
+    expect(hueDistance(350, 10)).toBeCloseTo(20, 5);
+    expect(hueDistance(10, 350)).toBeCloseTo(20, 5);
+  });
+  it("is 0 for identical hues", () => {
+    expect(hueDistance(120, 120)).toBe(0);
+  });
+  it("is at most 180", () => {
+    expect(hueDistance(0, 180)).toBeCloseTo(180, 5);
   });
 });
