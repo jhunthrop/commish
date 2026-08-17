@@ -13,7 +13,7 @@ The founder's standing direction (2026-08-17): *"I don't want an MVP. Let's work
 | App | Next.js 15 (App Router), React 19, TypeScript strict | `"type": "module"` in `package.json` |
 | Database | **Postgres 17** via Drizzle ORM (`drizzle-orm/postgres-js`, `postgres` driver) | Pure-JS wire protocol, no native compilation. SQLite was dropped (better-sqlite3 segfaults on this dev machine; and no-MVP directive). |
 | Real-time | **Redis 7 Streams → Server-Sent Events** | The one and only real-time mechanism. See below. |
-| Auth | argon2id (`@node-rs/argon2`), DB-backed sessions, HttpOnly cookie | Prebuilt N-API binary — no node-gyp. |
+| Auth | **WorkOS AuthKit** (`@workos-inc/authkit-nextjs`) — hosted sign-in/up, sessions, MFA, OAuth | We do not roll our own auth. Local `users` row keyed by the WorkOS user id holds app-owned fields. |
 | Validation | Zod v4 (`z.email()`, not the deprecated `z.string().email()`) | At every boundary. Zod schemas will also drive OpenAPI generation for native clients (Phase 7). |
 | Tests | Vitest + happy-dom + @testing-library/react + vitest-axe | jsdom was dropped (broken ESM/CJS transitive deps across two major versions). |
 | Local infra | `docker-compose.yml`: postgres (5432), postgres-test (5433, tmpfs), redis (6379, AOF everysec) | `npm run infra:up` |
@@ -27,7 +27,7 @@ src/
   domain/                 Pure domain types + pure functions. NO I/O, NO Date.now(). readonly everywhere.
   db/                     schema.ts (Drizzle, pg-core), client.ts (createDb/getDb), test-db.ts
   lib/
-    auth/                 auth.ts (service), current-user.ts (server identity seam), config.ts
+    auth/                 current-user.ts (server identity seam over WorkOS), user-sync.ts (profile upsert)
     realtime/             publish.ts, subscribe.ts, sse.ts, redis.ts, publisher.ts, events.ts, config.ts
     api/                  respond.ts — the JSON envelope + parseJson boundary validation
     llm/                  shared Anthropic client (to be built)
@@ -47,8 +47,13 @@ Domain types are `readonly`; use `readonly T[]` / `Readonly<Record<…>>`. Updat
 ### Timing — no ambient clock in domain/reducer code
 Anything time-dependent takes a `Clock` (`src/domain/timing.ts`) and calls `clock.now()`. Actions carry an explicit ISO `timestamp`. Tests inject a fixed clock. `Date.now()` / `new Date()` are only allowed at the outermost edge (route handlers, `current-user.ts`, `publisher.ts`).
 
-### Identity — one seam
-Server code reads "who is this" **only** via `getCurrentUser()` / `requireCurrentUser()` from `src/lib/auth/current-user.ts`. Never read the cookie directly. Session cookie: `commish_session`, HttpOnly, SameSite=lax, Secure in production, 30 days (all in `AUTH_CONFIG`).
+### Identity — one seam, WorkOS underneath
+- **WorkOS AuthKit owns authentication** (credentials, sessions, MFA, OAuth, password reset). We never store passwords or mint sessions.
+- Server code reads "who is this" **only** via `getCurrentUser()` / `requireCurrentUser()` from `src/lib/auth/current-user.ts`. Nothing else imports `@workos-inc/authkit-nextjs` for identity — the seam is what lets us swap or extend the provider later.
+- `users.id` **is** the WorkOS user id. `/callback` upserts the local row on every sign-in (`user-sync.ts`); app-owned fields (`displayName`, `experienceTier`, `avatarUrl`) are never clobbered by a sync.
+- `src/middleware.ts` (composable `authkit()`/`handleAuthkitProxy`): pages under `/app` redirect to hosted sign-in; **API and SSE routes never redirect** — they return a JSON 401 themselves.
+- Routes: `/sign-in`, `/sign-up` (hosted), `/sign-out` (POST), `/callback`, `GET /api/auth/me`.
+- Env: `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD` (≥32 chars), `NEXT_PUBLIC_WORKOS_REDIRECT_URI`. Dashboard: Redirect URI `…/callback`, sign-in endpoint `…/sign-in`.
 
 ### Real-time — one mechanism
 - **Writes are plain HTTP.** Validate → persist to Postgres → then `getPublisher().publish(...)`. Postgres is authoritative; publishing is best-effort and must never fail the write.
@@ -66,7 +71,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 ### Tests
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
-- Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`.
+- Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
 - Coverage threshold: 100% for `src/scoring/**` (configured in `vitest.config.mts`).
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 
@@ -74,7 +79,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`). Commit after every completed step; commit bodies explain *why* and record any deviation from the plan.
 
 ### Environment
-`.env.example` is committed; `.env.local` is gitignored. Required: `DATABASE_URL`, `REDIS_URL`; test-only: `TEST_DATABASE_URL`; optional: `ANTHROPIC_API_KEY`. Fail fast with a clear message when a required var is missing (see `db/client.ts`, `realtime/redis.ts`).
+`.env.example` is committed; `.env.local` is gitignored. Required: `DATABASE_URL`, `REDIS_URL`, `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD`, `NEXT_PUBLIC_WORKOS_REDIRECT_URI`; test-only: `TEST_DATABASE_URL`; optional: `ANTHROPIC_API_KEY`. Fail fast with a clear message when a required var is missing (see `db/client.ts`, `realtime/redis.ts`).
 
 ## Verification commands (every step)
 
