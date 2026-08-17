@@ -16,6 +16,9 @@ function reduceStart(state: DraftState, action: StartDraftAction): DraftReduceRe
   if (new Set(action.pool.map((p) => p.playerId)).size !== action.pool.length) {
     return { ok: false, reason: "Every player may appear in the draft pool only once." };
   }
+  if (action.pool.length < action.draftOrder.length * totalRosterSlots(state.config.slotConfig)) {
+    return { ok: false, reason: "There aren't enough players to fill every roster." };
+  }
   const isAuction = state.config.format === "auction";
   const budget = state.config.auctionBudget;
   if (isAuction && (budget === null || budget <= 0)) {

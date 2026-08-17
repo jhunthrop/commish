@@ -147,6 +147,24 @@ describe("startDraft", () => {
     });
     expect(await store.startDraft(draftId)).toEqual({ ok: false, reason: "There are no players to draft yet." });
   });
+
+  it("refuses to start a draft whose pool can't fill every roster", async () => {
+    // SPRINT_ROSTER_SLOTS is 3 slots/team * 2 teams = 6 players needed; insert only 5.
+    const { draftId } = await seedDraftFixture(db, {
+      draftId: "draft_short_pool",
+      leagueId: "league_short_pool",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+    });
+    await db.insert(players).values(POOL_ROWS.slice(0, 5));
+    expect(await store.startDraft(draftId)).toEqual({
+      ok: false,
+      reason: "There aren't enough players to fill every roster.",
+    });
+  });
 });
 
 describe("commitDraftResults — snake", () => {

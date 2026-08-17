@@ -1,6 +1,7 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues, teams } from "@/db/schema";
+import { drafts } from "@/db/schema";
+import { resolveLeagueMembership } from "@/lib/leagues/membership";
 
 export interface DraftActor {
   readonly draftId: string;
@@ -18,27 +19,28 @@ export type ActorResult =
  * The one place a route learns who the caller is *in this draft*. Routes never read a team id
  * from a request body — this resolves it from the authenticated user id, so a client cannot
  * act as another manager by asking nicely.
+ *
+ * The team/commissioner lookup itself lives in `resolveLeagueMembership` (shared with the
+ * league's SSE route) — this only adds the draft → league resolution on top of it.
  */
 export async function resolveDraftActor(db: Db, draftId: string, userId: string): Promise<ActorResult> {
-  const [draft] = await db
-    .select({ leagueId: drafts.leagueId, commissionerUserId: leagues.commissionerUserId })
-    .from(drafts)
-    .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
-    .where(eq(drafts.id, draftId));
+  const [draft] = await db.select({ leagueId: drafts.leagueId }).from(drafts).where(eq(drafts.id, draftId));
   if (draft === undefined) return { ok: false, status: 404, error: "That draft doesn't exist." };
 
-  const [team] = await db
-    .select({ id: teams.id })
-    .from(teams)
-    .where(and(eq(teams.leagueId, draft.leagueId), eq(teams.userId, userId)));
+  const membership = await resolveLeagueMembership(db, draft.leagueId, userId);
+  // A draft's `leagueId` is a NOT NULL foreign key, so its league existing is guaranteed —
+  // this branch is unreachable in practice, but resolveLeagueMembership's type still allows
+  // it, and surfacing the draft's own 404 here (rather than the league's) keeps the error
+  // scoped to what the caller actually asked about.
+  if (!membership.ok) return { ok: false, status: 404, error: "That draft doesn't exist." };
 
   return {
     ok: true,
     actor: {
       draftId,
       leagueId: draft.leagueId,
-      teamId: team?.id ?? null,
-      isCommissioner: draft.commissionerUserId === userId,
+      teamId: membership.membership.teamId,
+      isCommissioner: membership.membership.isCommissioner,
     },
   };
 }

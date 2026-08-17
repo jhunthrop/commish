@@ -91,6 +91,17 @@ describe("START_DRAFT", () => {
     const result = reduceDraft(initialDraftState(auctionConfig), START);
     expect(result).toEqual({ ok: false, reason: "An auction draft needs a budget before it can start." });
   });
+
+  it("rejects a pool one player short of filling every roster", () => {
+    // SPRINT_SLOTS has 3 slots/team, draftOrder has 2 teams — 6 players are needed; give 5.
+    const result = reduceDraft(initialDraftState(CONFIG), { ...START, pool: POOL.slice(0, 5) });
+    expect(result).toEqual({ ok: false, reason: "There aren't enough players to fill every roster." });
+  });
+
+  it("accepts a pool with exactly enough players to fill every roster", () => {
+    const result = reduceDraft(initialDraftState(CONFIG), { ...START, pool: POOL.slice(0, 6) });
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe("MAKE_PICK (snake)", () => {

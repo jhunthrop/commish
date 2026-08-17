@@ -125,8 +125,16 @@ describe("TIMER_EXPIRE (snake)", () => {
   });
 
   it("rejects an expiry when no eligible player is available to auto-pick", () => {
-    // SPRINT_SLOTS here has no BENCH, so a kicker fits nowhere in this league at all.
-    const state = apply(initialDraftState(snakeConfig), { ...START, pool: [{ playerId: "k1", position: "K" }] });
+    // SPRINT_SLOTS here has no BENCH, so a kicker fits nowhere in this league at all. Four
+    // kickers (not one) so the pool still clears the "enough players to fill every roster"
+    // count check at START_DRAFT — this test is about eligibility, not pool size.
+    const kickers: readonly DraftPoolEntry[] = [
+      { playerId: "k1", position: "K" },
+      { playerId: "k2", position: "K" },
+      { playerId: "k3", position: "K" },
+      { playerId: "k4", position: "K" },
+    ];
+    const state = apply(initialDraftState(snakeConfig), { ...START, pool: kickers });
     expect(reduceDraft(state, expireAt(state))).toEqual({ ok: false, reason: "No eligible player is available to auto-pick." });
   });
 });
