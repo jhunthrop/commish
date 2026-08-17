@@ -1,7 +1,6 @@
-import { getTableColumns, sql, type SQL } from "drizzle-orm";
-import type { PgTable } from "drizzle-orm/pg-core";
 import type { Db } from "@/db/client";
 import { players, playerStatLines } from "@/db/schema";
+import { excludedSetFor } from "@/db/upsert";
 import type { StatsProvider } from "@/stats/provider";
 
 const BATCH = 500;
@@ -10,20 +9,6 @@ function chunks<T>(arr: readonly T[], size: number): readonly (readonly T[])[] {
   const out: T[][] = [];
   for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
   return out;
-}
-
-/**
- * Builds an `onConflictDoUpdate` `set` clause that assigns every non-key column to its
- * `excluded.<column>` value, so callers never hand-list columns (and can't forget one when
- * the schema grows). `keys` are the JS property names of the conflict target columns.
- */
-function excludedSetFor<T extends PgTable>(table: T, keys: readonly string[]): Record<string, SQL> {
-  const columns = getTableColumns(table);
-  return Object.fromEntries(
-    Object.entries(columns)
-      .filter(([key]) => !keys.includes(key))
-      .map(([key, column]) => [key, sql.raw(`excluded.${column.name}`)]),
-  );
 }
 
 /**
