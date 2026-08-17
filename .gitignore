@@ -44,3 +44,6 @@ next-env.d.ts
 *.db
 *.sqlite
 *.sqlite3
+
+# superpowers SDD scratch (ledgers, briefs, review packages)
+.superpowers/
