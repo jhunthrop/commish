@@ -24,7 +24,7 @@ describe("listTeamCards", () => {
     ]);
     await db.insert(leagues).values({
       id: leagueId, name: leagueId, format: "snake", teamCount: 2,
-      inviteCode: `${leagueId}_invite`, commissionerUserId: "user_a", rosterSlots: [...STANDARD_ROSTER_SLOTS],
+      commissionerUserId: "user_a", rosterSlots: [...STANDARD_ROSTER_SLOTS],
     });
     // Inserted in reverse id order — proves the result is actually ORDER BY id, not just
     // insertion order echoed back.

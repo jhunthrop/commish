@@ -15,6 +15,6 @@ export const DEV_SEED = {
    * start and act in a seeded draft.
    */
   claimUserIdEnvVar: "DEV_SEED_CLAIM_USER_ID",
-  snake: { leagueId: "dev_league_snake", draftId: "dev_draft_snake", inviteCode: "DEVSNAKE", name: "Dev Snake League" },
-  auction: { leagueId: "dev_league_auction", draftId: "dev_draft_auction", inviteCode: "DEVAUCTION", name: "Dev Auction League", budget: 200 },
+  snake: { leagueId: "dev_league_snake", draftId: "dev_draft_snake", name: "Dev Snake League" },
+  auction: { leagueId: "dev_league_auction", draftId: "dev_draft_auction", name: "Dev Auction League", budget: 200 },
 } as const;

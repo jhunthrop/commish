@@ -38,7 +38,6 @@ export async function seedDraftFixture(db: Db, input: SeedDraftInput): Promise<D
     name: input.leagueId,
     format: input.format,
     teamCount: input.teamCount,
-    inviteCode: `${input.leagueId}_invite`,
     commissionerUserId: userIds[0]!,
     rosterSlots: [...input.slotConfig],
   });

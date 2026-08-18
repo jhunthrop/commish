@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
-import { users, leagues, teams, scoringSettings } from "./schema";
+import { users, leagues, teams, scoringSettings, leagueInvites, lineupSlots } from "./schema";
 import { PPR_SCORING } from "@/domain/scoring";
 
 const db = createTestDb();
@@ -27,7 +27,6 @@ describe("schema round-trip against Postgres", () => {
       name: "Sunday Money",
       format: "snake",
       teamCount: 12,
-      inviteCode: "SUNDAY1",
       commissionerUserId: "user_1",
     });
 
@@ -65,7 +64,6 @@ describe("schema round-trip against Postgres", () => {
       name: "L",
       format: "auction",
       teamCount: 10,
-      inviteCode: "CODE1",
       commissionerUserId: "user_1",
     });
     await db.insert(teams).values({ id: "team_1", leagueId: "league_1", userId: "user_1", name: "A" });
@@ -80,5 +78,68 @@ describe("schema round-trip against Postgres", () => {
     await expect(
       db.insert(users).values({ id: "u2", email: "dup@example.com", displayName: "B" }),
     ).rejects.toThrow();
+  });
+});
+
+const LEAGUE_ID = "league_invite_lineup";
+const USER_ID = "user_invite_lineup";
+const TEAM_ID = "team_invite_lineup";
+
+/** Inserts a user, the league they commission, and their team — the fixture `league_invites` and `lineup_slots` hang off. */
+async function seedLeague(): Promise<void> {
+  await db.insert(users).values({ id: USER_ID, email: "invite-lineup@example.com", displayName: "Invite Lineup" });
+  await db.insert(leagues).values({
+    id: LEAGUE_ID,
+    name: "Invite Lineup League",
+    format: "snake",
+    teamCount: 12,
+    commissionerUserId: USER_ID,
+  });
+  await db.insert(teams).values({ id: TEAM_ID, leagueId: LEAGUE_ID, userId: USER_ID, name: "Fixture Team" });
+}
+
+describe("league_invites and lineup_slots", () => {
+  it("stores an invite and enforces one row per code", async () => {
+    await seedLeague();
+    await db.insert(leagueInvites).values({
+      code: "SUNDAY12",
+      leagueId: LEAGUE_ID,
+      createdByUserId: USER_ID,
+      expiresAt: new Date("2026-09-30T00:00:00.000Z"),
+      maxUses: 12,
+    });
+    const [row] = await db.select().from(leagueInvites).where(eq(leagueInvites.code, "SUNDAY12"));
+    expect(row).toMatchObject({ leagueId: LEAGUE_ID, maxUses: 12, uses: 0 });
+    await expect(
+      db.insert(leagueInvites).values({
+        code: "SUNDAY12", leagueId: LEAGUE_ID, createdByUserId: USER_ID,
+        expiresAt: new Date("2026-09-30T00:00:00.000Z"), maxUses: 1,
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("stores one lineup row per team, week and slot", async () => {
+    await seedLeague();
+    await db.insert(lineupSlots).values([
+      { teamId: TEAM_ID, weekNumber: 1, slot: "QB", slotIndex: 0, playerId: "qb1" },
+      { teamId: TEAM_ID, weekNumber: 2, slot: "QB", slotIndex: 0, playerId: "qb2" },
+    ]);
+    const rows = await db.select().from(lineupSlots).where(eq(lineupSlots.teamId, TEAM_ID));
+    expect(rows).toHaveLength(2);
+    await expect(
+      db.insert(lineupSlots).values({ teamId: TEAM_ID, weekNumber: 1, slot: "QB", slotIndex: 0, playerId: "qb3" }),
+    ).rejects.toThrow();
+  });
+
+  it("drops both when the league goes away", async () => {
+    await seedLeague();
+    await db.insert(leagueInvites).values({
+      code: "GONE1234", leagueId: LEAGUE_ID, createdByUserId: USER_ID,
+      expiresAt: new Date("2026-09-30T00:00:00.000Z"), maxUses: 1,
+    });
+    await db.insert(lineupSlots).values({ teamId: TEAM_ID, weekNumber: 1, slot: "QB", slotIndex: 0, playerId: "qb1" });
+    await db.delete(leagues).where(eq(leagues.id, LEAGUE_ID));
+    expect(await db.select().from(leagueInvites)).toEqual([]);
+    expect(await db.select().from(lineupSlots)).toEqual([]);
   });
 });

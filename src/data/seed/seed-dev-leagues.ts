@@ -11,7 +11,6 @@ const MS_PER_HOUR = 60 * 60 * 1000;
 interface LeaguePlan {
   readonly leagueId: string;
   readonly draftId: string;
-  readonly inviteCode: string;
   readonly name: string;
   readonly format: "snake" | "auction";
   readonly auctionBudget: number | null;
@@ -73,7 +72,6 @@ export async function seedDevLeagues(
         name: plan.name,
         format: plan.format,
         teamCount: DEV_SEED.teamCount,
-        inviteCode: plan.inviteCode,
         commissionerUserId: ownerIds[0]!,
         rosterSlots: [...STANDARD_ROSTER_SLOTS],
       })
