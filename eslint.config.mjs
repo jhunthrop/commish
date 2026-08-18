@@ -16,8 +16,23 @@ const compat = new FlatCompat({
  * transport internals all live behind the API routes and the SSE route, not in the browser
  * bundle. `import type` stays allowed — sharing a TYPE (e.g. `DraftStateView`) costs nothing
  * at runtime and is how the client and server sides of the wire stay in sync.
+ *
+ * Both the bare barrel specifier (`@/db`, `@/lib/realtime`) and a `/*` glob for deep imports
+ * (`@/db/client`, `@/lib/realtime/sse`, …) are listed for all four modules — `@/draft-service`
+ * is imported both ways elsewhere in the codebase (e.g. `@/draft-service` itself and
+ * `@/draft-service/pool`), so a rule that only caught one form would be trivially bypassed by
+ * reaching one level deeper.
  */
-const SERVER_ONLY_MODULE_GROUPS = ["@/draft-engine", "@/draft-service", "@/db/*", "@/lib/realtime/*"];
+const SERVER_ONLY_MODULE_GROUPS = [
+  "@/draft-engine",
+  "@/draft-engine/*",
+  "@/draft-service",
+  "@/draft-service/*",
+  "@/db",
+  "@/db/*",
+  "@/lib/realtime",
+  "@/lib/realtime/*",
+];
 
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
@@ -33,7 +48,14 @@ const eslintConfig = [
     ],
   },
   {
-    files: ["src/draft-room/**/*.{ts,tsx}", "src/app/**/*.tsx"],
+    // Scoped to src/draft-room/** ONLY, not src/app/**/*.tsx: files under src/app are Next.js
+    // Server Components (page.tsx, layout.tsx, route.ts) that are allowed — and in this
+    // codebase's existing route handlers, expected — to import @/draft-engine/@/draft-service
+    // directly (see docs/conventions.md, "Draft room client boundary"). A page can't be told
+    // apart from a client component by its filename alone, so the only glob that can't
+    // misfire is the one directory that is BROWSER code by construction: everything under
+    // src/draft-room/**.
+    files: ["src/draft-room/**/*.{ts,tsx}"],
     plugins: { "@typescript-eslint": tseslint },
     rules: {
       "@typescript-eslint/no-restricted-imports": [

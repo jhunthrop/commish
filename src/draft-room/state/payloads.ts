@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { DraftClockView } from "@/draft-engine";
 
 /**
  * The SSE boundary. Everything arriving on the stream is untrusted text until it has been
@@ -14,6 +15,18 @@ const clockSchema = z.object({
   clockSeconds: z.number().nullable(),
   nextTightening: z.object({ at: z.string(), pickSeconds: z.number() }).nullable(),
 });
+
+/**
+ * A zero-cost bidirectional check that `clockSchema` still matches `DraftClockView` field for
+ * field. If the engine ever adds, removes or retypes a clock field without a matching change
+ * here, one of these two `extends` checks resolves to `never` and the assignment below stops
+ * typechecking — a compile error instead of a silent drift between the wire schema and the
+ * view the rest of the room trusts. `void`-read so it also can't trip an unused-var lint rule.
+ */
+type ClockSchemaShape = z.infer<typeof clockSchema>;
+type ClockShapesMatch = ClockSchemaShape extends DraftClockView ? (DraftClockView extends ClockSchemaShape ? true : never) : never;
+const _clockSchemaMatchesDraftClockView: ClockShapesMatch = true;
+void _clockSchemaMatchesDraftClockView;
 
 const common = { draftId: z.string().min(1), clock: clockSchema };
 const dollarsByTeam = z.record(z.string(), z.number());

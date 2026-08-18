@@ -72,6 +72,25 @@ drop at any moment. Every accepted action is persisted before it is cached or pu
 `teamId` is always resolved from the authenticated session, never from a request body.
 See `docs/draft-engine.md`.
 
+### Draft room client boundary
+Everything under `src/draft-room/**` is BROWSER code — the pure state reducer/formatters, the
+hooks, and (from Task 6 on) the client components that render the room. It talks to the draft
+engine and service ONLY over the wire (`GET`/`POST /api/drafts/[draftId]*`,
+`GET /api/leagues/[leagueId]/events`) — never by importing `@/draft-engine`, `@/draft-service`,
+`@/db*` or `@/lib/realtime*` as VALUES. An ESLint `@typescript-eslint/no-restricted-imports`
+rule (`eslint.config.mjs`, scoped to `src/draft-room/**/*.{ts,tsx}` only) enforces this;
+`import type` stays allowed, since sharing a TYPE (e.g. `DraftStateView`) costs nothing at
+runtime and is how the client and server sides of the wire stay in sync.
+
+The rule is deliberately **not** applied to `src/app/**`: pages and layouts there are Next.js
+Server Components (`page.tsx`, `layout.tsx`) and route handlers (`route.ts`), which are
+allowed — and already do, in this codebase's existing draft routes — import service-layer
+code (`@/draft-engine`, `@/draft-service`) directly; that is the idiomatic Next.js pattern,
+not a boundary violation. A page can't be told apart from a client component by its filename
+alone, so a glob covering `src/app/**` would either miss real client code elsewhere or
+wrongly flag a legitimate server import. Any client interactivity a page needs is a
+`"use client"` component imported FROM `src/draft-room/**`, not inlined into the page file.
+
 ### API responses
 Every JSON route returns the envelope from `src/lib/api/respond.ts`: `{ ok: true, data }` or `{ ok: false, error }` with a meaningful HTTP status. Bodies are parsed with `parseJson(request, ZodSchema)`; a bad body is a 400 naming the field. Error strings are user-facing plain language — never raw DB/exception text.
 

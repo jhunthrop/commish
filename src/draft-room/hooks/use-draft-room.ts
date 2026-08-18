@@ -71,41 +71,95 @@ export function useDraftRoom(draftId: string): DraftRoom {
   // Event handlers are long-lived closures; refs give them today's view without re-subscribing.
   const viewRef = useRef<DraftStateView | null>(null);
   const teamRef = useRef<string | null>(null);
+  // Single-flight + staleness guards for `refresh()`. `refreshPromiseRef` lets N gapped
+  // frames arriving back-to-back share ONE in-flight fetch pair instead of firing N; a
+  // resync fires it fire-and-forget (`void refresh()`), so nothing else awaits the promise
+  // this returns. `generationRef` is bumped only when `draftId` changes — it is what stops a
+  // request issued for the OLD draft, however late it resolves, from ever writing into the
+  // NEW draft's state (see the draftId-change effect below).
+  const refreshPromiseRef = useRef<Promise<void> | null>(null);
+  const generationRef = useRef(0);
 
-  const refresh = useCallback(async (): Promise<void> => {
-    try {
-      const [snapshotResponse, playersResponse] = await Promise.all([
-        deps.fetchJson(`/api/drafts/${draftId}`),
-        deps.fetchJson(`/api/drafts/${draftId}/players`),
-      ]);
-      const snapshot = (await snapshotResponse.json()) as ApiEnvelope<DraftSnapshotBody>;
-      if (!snapshot.ok) {
-        setState((prev) => ({ ...prev, status: "error", error: snapshot.error }));
-        return;
+  const refresh = useCallback((): Promise<void> => {
+    // Synchronous on purpose, with no `await` above this line: two `refresh()` calls made
+    // back-to-back in the same tick (the common case — a burst of gapped SSE frames each
+    // asking for a resync) are guaranteed to see the same `refreshPromiseRef.current`, so
+    // only the first actually issues a fetch.
+    const inFlight = refreshPromiseRef.current;
+    if (inFlight !== null) return inFlight;
+
+    const generation = generationRef.current;
+    // A mutable box, not a direct reference to `run` below: the closure below is invoked
+    // synchronously (so it exists before `const run = …` finishes), and TypeScript's
+    // definite-assignment analysis can't see that its `finally` only actually RUNS long after
+    // `run` (and this box) are assigned — referencing `run` itself inside its own initializer
+    // is a compile error even though it is safe at runtime. The box sidesteps that: it is
+    // "assigned" (to `null`) from the start, and set to the real promise one line below.
+    const runToken: { current: Promise<void> | null } = { current: null };
+    const run = (async () => {
+      try {
+        const [snapshotResponse, playersResponse] = await Promise.all([
+          deps.fetchJson(`/api/drafts/${draftId}`),
+          deps.fetchJson(`/api/drafts/${draftId}/players`),
+        ]);
+        const snapshot = (await snapshotResponse.json()) as ApiEnvelope<DraftSnapshotBody>;
+        // A newer generation has already taken over (a draftId change while we were
+        // fetching) — this response is stale and must never be applied, even though it's
+        // the one resolving right now.
+        if (generation !== generationRef.current) return;
+        if (!snapshot.ok) {
+          setState((prev) => ({ ...prev, status: "error", error: snapshot.error }));
+          return;
+        }
+        const players = (await playersResponse.json()) as ApiEnvelope<DraftPlayersBody>;
+        if (generation !== generationRef.current) return;
+        if (!players.ok) {
+          setState((prev) => ({ ...prev, status: "error", error: players.error }));
+          return;
+        }
+        viewRef.current = snapshot.data.draft;
+        teamRef.current = snapshot.data.teamId;
+        setLeagueId(snapshot.data.draft.leagueId);
+        setState((prev) => ({
+          ...prev,
+          status: "ready",
+          error: null,
+          view: snapshot.data.draft,
+          players: players.data.players,
+          teams: snapshot.data.teams,
+          myTeamId: snapshot.data.teamId,
+          isCommissioner: snapshot.data.isCommissioner,
+          pendingPlayerId: null,
+        }));
+      } catch {
+        if (generation === generationRef.current) {
+          setState((prev) => ({ ...prev, status: "error", error: NETWORK_ERROR }));
+        }
+      } finally {
+        // Only release the slot if it's still ours — a stale run settling late must not
+        // erase a newer refresh's in-flight tracking and cause a spurious duplicate fetch.
+        if (refreshPromiseRef.current === runToken.current) refreshPromiseRef.current = null;
       }
-      const players = (await playersResponse.json()) as ApiEnvelope<DraftPlayersBody>;
-      if (!players.ok) {
-        setState((prev) => ({ ...prev, status: "error", error: players.error }));
-        return;
-      }
-      viewRef.current = snapshot.data.draft;
-      teamRef.current = snapshot.data.teamId;
-      setLeagueId(snapshot.data.draft.leagueId);
-      setState((prev) => ({
-        ...prev,
-        status: "ready",
-        error: null,
-        view: snapshot.data.draft,
-        players: players.data.players,
-        teams: snapshot.data.teams,
-        myTeamId: snapshot.data.teamId,
-        isCommissioner: snapshot.data.isCommissioner,
-        pendingPlayerId: null,
-      }));
-    } catch {
-      setState((prev) => ({ ...prev, status: "error", error: NETWORK_ERROR }));
-    }
+    })();
+
+    runToken.current = run;
+    refreshPromiseRef.current = run;
+    return run;
   }, [deps, draftId]);
+
+  // A `draftId` change is a hard reset, not a revalidation: bump the generation so a fetch
+  // still in flight for the OLD draft can never write into the new one's state (the
+  // in-flight promise itself is abandoned here too, so the new draft's own refresh below
+  // isn't blocked waiting on it), and drop the old view/team/league immediately rather than
+  // showing the previous draft while the new one loads.
+  useEffect(() => {
+    generationRef.current += 1;
+    refreshPromiseRef.current = null;
+    viewRef.current = null;
+    teamRef.current = null;
+    setLeagueId(null);
+    setState(INITIAL);
+  }, [draftId]);
 
   useEffect(() => {
     void refresh();
@@ -165,6 +219,19 @@ export function useDraftRoom(draftId: string): DraftRoom {
       setState((prev) => ({ ...prev, view: patch.view, pendingPlayerId: patch.pendingPlayerId, submitting: true }));
 
       const rollback = (): void => {
+        const current = viewRef.current;
+        // SSE can carry the view past `before` while our POST is still in flight — an
+        // auction bid war rejecting a stale bid with a 409 is the routine case. Restoring
+        // `before` in that situation would rewind past events we've already confirmed
+        // (another team's pick vanishes, along with the money/lot state it produced), so
+        // once the view has moved on we ask the server for the truth instead of guessing
+        // backwards. Only a submit that landed with NOTHING else having happened in the
+        // meantime gets the cheap, synchronous plain restore.
+        if (current !== null && current.sequence !== before.sequence) {
+          setState((prev) => ({ ...prev, pendingPlayerId: null, submitting: false }));
+          void refresh();
+          return;
+        }
         viewRef.current = before;
         setState((prev) => ({ ...prev, view: before, pendingPlayerId: null, submitting: false }));
       };
@@ -191,7 +258,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
         return { ok: false, reason: NETWORK_ERROR };
       }
     },
-    [deps, draftId],
+    [deps, draftId, refresh],
   );
 
   return { ...state, submit, refresh };
