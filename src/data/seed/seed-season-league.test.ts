@@ -95,4 +95,21 @@ describe("seedSeasonLeague", () => {
     const [league] = await db.select().from(leagues).where(eq(leagues.id, DEV_SEED.season.leagueId));
     expect(league!.commissionerUserId).toBe("workos_user_123");
   });
+
+  it("does not un-claim a founder's team or commissioner's chair on a re-seed without a claim id", async () => {
+    await db.insert(users).values({ id: "workos_user_123", email: "workos_user_123@test.local", displayName: "Claim User" });
+    await seedSeasonLeague(db, clock, "workos_user_123");
+
+    // Re-seed WITHOUT a claim id — the scenario the bug required (e.g. a run where
+    // DEV_SEED_CLAIM_USER_ID isn't exported). The previously claimed team and chair must hold.
+    await seedSeasonLeague(db, clock);
+
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, DEV_SEED.season.leagueId));
+    expect(league!.commissionerUserId).toBe("workos_user_123");
+    const [team1] = await db.select().from(teams).where(eq(teams.id, `${DEV_SEED.season.leagueId}_team_01`));
+    expect(team1!.userId).toBe("workos_user_123");
+    // The rest of the roster is still refreshed to the (still-placeholder) dev owners.
+    const [team2] = await db.select().from(teams).where(eq(teams.id, `${DEV_SEED.season.leagueId}_team_02`));
+    expect(team2!.userId).toBe(`${DEV_SEED.userIdPrefix}02`);
+  });
 });

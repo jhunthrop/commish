@@ -149,6 +149,20 @@ describe("startDraft", () => {
     expect(await store.startDraft(draftId)).toEqual({ ok: false, reason: "There are no players to draft yet." });
   });
 
+  it("refuses to start a draft marked complete with an empty action log — the seeded-season-league booby trap", async () => {
+    // Mirrors src/data/seed/seed-season-league.ts: rosters dealt directly, `drafts.status`
+    // written straight to "complete", and NO draft_actions ever written. Replaying an empty
+    // log yields phase "scheduled", so without this guard the reducer's own "already
+    // started"/"already finished" checks never fire and startDraft would happily re-run over
+    // rosters that already exist.
+    const { draftId } = await fixture("snake");
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.id, draftId));
+
+    const result = await store.startDraft(draftId);
+    expect(result).toEqual({ ok: false, reason: "This draft has already finished." });
+    expect(await db.select().from(draftActions).where(eq(draftActions.draftId, draftId))).toHaveLength(0);
+  });
+
   it("refuses to start a draft whose pool can't fill every roster", async () => {
     // SPRINT_ROSTER_SLOTS is 3 slots/team * 2 teams = 6 players needed; insert only 5.
     const { draftId } = await seedDraftFixture(db, {

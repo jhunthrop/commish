@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues, rosterSlots, scoringSettings, teams, users } from "@/db/schema";
+import { drafts, leagues, rosterSlots, scoringSettings, teams } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotType } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
@@ -11,6 +11,7 @@ import { scoreWeek } from "@/league-service";
 import { writeSchedule } from "@/league-service/schedule";
 import { excludedSetFor } from "@/db/upsert";
 import { DEV_SEED } from "./config";
+import { ensureDevUsers, preserveRealCommissioner, preserveRealTeamOwner } from "./dev-users";
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -39,13 +40,7 @@ export async function seedSeasonLeague(
   }
 
   const { leagueId, draftId, name } = DEV_SEED.season;
-  const devUserIds = Array.from({ length: DEV_SEED.teamCount }, (_, i) => `${DEV_SEED.userIdPrefix}${String(i + 1).padStart(2, "0")}`);
-  await db
-    .insert(users)
-    .values(devUserIds.map((id) => ({ id, email: `${id}@${DEV_SEED.emailDomain}`, displayName: `Dev Manager ${id.slice(-2)}` })))
-    .onConflictDoNothing({ target: users.id });
-
-  const ownerIds = devUserIds.map((id, index) => (index === 0 && claimUserId !== undefined ? claimUserId : id));
+  const ownerIds = await ensureDevUsers(db, claimUserId);
   const teamIds = ownerIds.map((_, i) => `${leagueId}_team_${String(i + 1).padStart(2, "0")}`);
 
   await db
@@ -58,14 +53,14 @@ export async function seedSeasonLeague(
       commissionerUserId: ownerIds[0]!,
       rosterSlots: [...STANDARD_ROSTER_SLOTS],
     })
-    .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: sql`excluded.commissioner_user_id` } });
+    .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: preserveRealCommissioner() } });
 
   await db.insert(scoringSettings).values({ leagueId, ...PPR_SCORING }).onConflictDoNothing({ target: scoringSettings.leagueId });
 
   await db
     .insert(teams)
     .values(teamIds.map((id, i) => ({ id, leagueId, userId: ownerIds[i]!, name: DEV_SEED.teamNames[i] ?? `Team ${i + 1}` })))
-    .onConflictDoUpdate({ target: teams.id, set: { userId: sql`excluded.user_id` } });
+    .onConflictDoUpdate({ target: teams.id, set: { userId: preserveRealTeamOwner() } });
 
   // The draft already happened. Its kickoff sits in the past so nothing about this league
   // looks like it is waiting to start.

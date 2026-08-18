@@ -174,6 +174,19 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
       // here too would deadlock, since the mutex is not reentrant.
       const config = await loadDraftConfig(db, draftId);
       if (config === null) return { ok: false, reason: "That draft doesn't exist." };
+
+      // Guards against a draft the reducer's own "already started"/"already finished" checks
+      // cannot see: one whose `drafts.status` was written straight to "complete" (e.g. the
+      // season-league seed, which deals rosters directly) without ever writing a single
+      // action. Replaying that empty log yields phase "scheduled" — indistinguishable, to the
+      // reducer, from a draft that has never run — so without this check START_DRAFT would be
+      // admitted and would draft a second time over rosters that already exist.
+      const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
+      if (row?.status === "complete") {
+        const existingActions = await db.select({ id: draftActions.draftId }).from(draftActions).where(eq(draftActions.draftId, draftId)).limit(1);
+        if (existingActions.length === 0) return { ok: false, reason: "This draft has already finished." };
+      }
+
       const teamRows = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, config.leagueId));
       const pool = await buildDraftPool(db, config.leagueId);
       if (pool.length === 0) return { ok: false, reason: "There are no players to draft yet." };

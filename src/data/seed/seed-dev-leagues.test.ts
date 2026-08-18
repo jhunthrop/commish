@@ -64,6 +64,31 @@ describe("seedDevLeagues", () => {
     }
   });
 
+  it("does not un-claim a founder's team or commissioner's chair on a re-seed without a claim id", async () => {
+    await db.insert(users).values({ id: "workos_real_user", email: "real@test.local", displayName: "Real User" });
+    await seedDevLeagues(db, clock, "workos_real_user");
+
+    // Re-seed WITHOUT a claim id — e.g. a run where DEV_SEED_CLAIM_USER_ID isn't exported.
+    // The previously claimed team and commissioner's chair must hold in both leagues.
+    await seedDevLeagues(db, clock);
+
+    for (const plan of [DEV_SEED.snake, DEV_SEED.auction]) {
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, plan.leagueId));
+      expect(league?.commissionerUserId).toBe("workos_real_user");
+      const [team1] = await db
+        .select()
+        .from(teams)
+        .where(and(eq(teams.leagueId, plan.leagueId), eq(teams.id, `${plan.leagueId}_team_01`)));
+      expect(team1?.userId).toBe("workos_real_user");
+      // The rest of the roster is still refreshed to the (still-placeholder) dev owners.
+      const [team2] = await db
+        .select()
+        .from(teams)
+        .where(and(eq(teams.leagueId, plan.leagueId), eq(teams.id, `${plan.leagueId}_team_02`)));
+      expect(team2?.userId).toBe(`${DEV_SEED.userIdPrefix}02`);
+    }
+  });
+
   it("is called with no ambient environment coupling — the claim id is undefined unless a caller passes one", async () => {
     // Regression guard: seedDevLeagues must never read `process.env` itself. A developer who
     // happens to have DEV_SEED_CLAIM_USER_ID exported locally (from running `npm run seed`
