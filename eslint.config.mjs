@@ -99,7 +99,7 @@ const eslintConfig = [
           patterns: SERVER_ONLY_MODULE_GROUPS.map((group) => ({
             regex: aliasOrRelative(group),
             allowTypeImports: true,
-            message: "Client draft-room/league-room code must go through the HTTP/SSE boundary (API routes), not import server-only modules as values. `import type` is fine.",
+            message: "Client room code (draft-room/league-room/chat-room) must go through the HTTP/SSE boundary (API routes), not import server-only modules as values. `import type` is fine.",
           })),
         },
       ],

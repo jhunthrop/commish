@@ -12,7 +12,11 @@ export const CHAT_CONFIG = {
   pageSize: 50,
   /** The complete reaction set. */
   reactions: ["🔥", "😂", "😭", "👏", "🤝"],
-  /** Longest message list a client holds in memory; older ones are dropped as new ones land. */
+  /**
+   * Cap applied when LIVE frames land (`mergeMessages` drops the oldest past this). Pages a
+   * user explicitly loads via backward pagination prepend without trimming — scrolling into
+   * history may hold more than this, by design.
+   */
   maxHeldMessages: 500,
 } as const;
 
