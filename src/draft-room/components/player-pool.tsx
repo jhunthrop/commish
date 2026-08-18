@@ -150,16 +150,17 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
                   <span className="shrink-0 text-text-muted">—</span>
                 ) : row.drafted ? (
                   <Badge tone="neutral">Drafted</Badge>
-                ) : (
+                ) : canAct ? (
+                  // Picking mode: the act button exists only while it is genuinely your turn.
+                  // While waiting, the star is the action — a disabled "Draft" would be a lie-in-waiting.
                   <Button
                     size="sm"
-                    disabled={!canAct}
                     loading={submitting && pendingPlayerId === row.player.id}
                     onClick={() => onAct(row.player.id)}
                   >
                     {actionLabel}
                   </Button>
-                )}
+                ) : null}
               </li>
             );
           })}

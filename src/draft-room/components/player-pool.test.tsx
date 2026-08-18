@@ -98,10 +98,12 @@ describe("PlayerPool", () => {
     expect(within(rowFor("Jalen Croft")).getByText("QB").className).toContain("bg-pos-qb");
   });
 
-  it("disables acting when it is not your turn, and reports the player when it is", () => {
+  it("shows no act button while waiting — the star is the action — and reports the player on your turn", () => {
     const onAct = vi.fn();
     const { rerender } = render(<PlayerPool {...props} canAct={false} onAct={onAct} />);
-    expect(screen.getAllByRole("button", { name: "Draft" })[0]).toBeDisabled();
+    // Waiting mode: queue stars only. A disabled "Draft" would be a lie-in-waiting.
+    expect(screen.queryByRole("button", { name: "Draft" })).toBeNull();
+    expect(screen.getAllByRole("button", { name: /queue/i }).length).toBeGreaterThan(0);
 
     rerender(<PlayerPool {...props} canAct onAct={onAct} />);
     fireEvent.click(screen.getAllByRole("button", { name: "Draft" })[0]!);

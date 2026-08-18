@@ -155,7 +155,9 @@ function StickerCell({
     );
   }
 
-  return <div aria-hidden="true" className={`h-full min-h-12 rounded-sm border border-dashed ${cell.future ? "border-border/35" : "border-border"}`} />;
+  // Far-future rounds compress to slivers: the present deserves the space, and the shape of
+  // the season is still visible without shouting.
+  return <div aria-hidden="true" className={`h-full rounded-sm border border-dashed ${cell.future ? "min-h-4 border-border/35" : "min-h-12 border-border"}`} />;
 }
 
 /**
@@ -201,8 +203,12 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
 
   return (
     <section aria-label="Draft board" className="flex h-full min-h-0 flex-col gap-3">
-      {/* Wide: the board itself, scrolling inside its own container so the page never does. */}
-      <div ref={gridRef} data-testid="draft-board-grid" className="hidden min-h-0 w-full flex-1 overflow-auto sm:block">
+      {/* Wide: the board itself, scrolling inside its own container so the page never does.
+          The edge fades make a scrolled board read as intentional depth, not clipped stickers. */}
+      <div className="relative hidden min-h-0 w-full flex-1 sm:block">
+        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 z-20 w-6 bg-gradient-to-r from-surface to-transparent" />
+        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 z-20 w-6 bg-gradient-to-l from-surface to-transparent" />
+        <div ref={gridRef} data-testid="draft-board-grid" className="h-full w-full overflow-auto">
         <table className="w-full border-separate border-spacing-1 text-left">
           <caption className="sr-only">The draft board: one row per round, one column per team.</caption>
           <thead>
@@ -250,6 +256,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Narrow: the same board as a round-by-round list, newest round first. */}
