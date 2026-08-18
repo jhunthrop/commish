@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { lineupSlots, matchups, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
+import type { ScoringPresetName } from "@/domain/scoring";
+import { HALF_PPR_SCORING, PPR_SCORING } from "@/domain/scoring";
+import { computeFantasyPoints } from "@/scoring";
 import { createLeague } from "./creation";
 import { writeSchedule } from "./schedule";
 import { leagueStandings, scoreWeek } from "./results";
@@ -11,8 +14,12 @@ const clock = { now: () => "2026-08-17T12:00:00.000Z" };
 let nextId = 0;
 const newId = () => `id_${++nextId}`;
 
+// A WR slot rides along unused by the existing scoreWeek assertions below (an empty starting
+// slot just scores nothing — `scoreTeam` doesn't validate legality, it only sums whatever
+// starters exist) so the non-PPR regression test can field a receiver without a second fixture.
 const SLOTS = [
   { slot: "QB" as const, count: 1, eligiblePositions: ["QB" as const] },
+  { slot: "WR" as const, count: 1, eligiblePositions: ["WR" as const] },
   { slot: "BENCH" as const, count: 1, eligiblePositions: ["QB" as const] },
 ];
 
@@ -25,14 +32,19 @@ afterAll(async () => {
   await truncateAll(db);
 });
 
-/** Two teams, one QB slot each, one bench each, and a week-1 stat line per quarterback. */
-async function twoTeamLeague() {
+/**
+ * Two teams, one QB slot each, one bench each, and a week-1 stat line per quarterback.
+ * `scoringPreset` defaults to `"ppr"` for the existing scoreWeek assertions below; the
+ * non-PPR regression test passes its own preset so `scoreWeek` is proven to read the
+ * league's own `scoring_settings` row rather than a hardcoded fallback.
+ */
+async function twoTeamLeague(scoringPreset: ScoringPresetName = "ppr") {
   await db.insert(users).values([
     { id: "u1", email: "u1@test.local", displayName: "Manager 1" },
     { id: "u2", email: "u2@test.local", displayName: "Manager 2" },
   ]);
   const created = await createLeague({ db, clock, newId }, {
-    name: "Duel", format: "snake", teamCount: 2, scoringPreset: "ppr", auctionBudget: null,
+    name: "Duel", format: "snake", teamCount: 2, scoringPreset, auctionBudget: null,
     rosterSlots: SLOTS, commissionerUserId: "u1", teamName: "Team One",
   });
   if (!created.ok) throw new Error(created.reason);
@@ -109,6 +121,30 @@ describe("scoreWeek", () => {
     expect(await scoreWeek(db, "nope", 1)).toEqual({
       ok: false, status: 404, reason: "That league doesn't exist.",
     });
+  });
+
+  it("scores by the league's own (non-PPR) preset, not the fallback PPR rules", async () => {
+    const league = await twoTeamLeague("half_ppr");
+    await db.insert(players).values({ id: "wr1", name: "WR One", position: "WR", nflTeam: "MIA" });
+    await db.insert(rosterSlots).values({ teamId: league.teamId, slot: "WR", slotIndex: 0, playerId: "wr1" });
+    await db.insert(playerStatLines).values({ playerId: "wr1", week: 1, receivingYards: 50, receptions: 5 });
+
+    await scoreWeek(db, league.leagueId, 1);
+    const [row] = await db.select().from(matchups).where(and(eq(matchups.leagueId, league.leagueId), eq(matchups.weekNumber, 1)));
+    const ourScore = row!.homeTeamId === league.teamId ? row!.homeScore : row!.awayScore;
+
+    const [qb1Line] = await db.select().from(playerStatLines).where(eq(playerStatLines.playerId, "qb1"));
+    const [wr1Line] = await db.select().from(playerStatLines).where(eq(playerStatLines.playerId, "wr1"));
+    const halfPprExpected =
+      computeFantasyPoints(qb1Line!, "QB", HALF_PPR_SCORING) + computeFantasyPoints(wr1Line!, "WR", HALF_PPR_SCORING);
+    const pprExpected =
+      computeFantasyPoints(qb1Line!, "QB", PPR_SCORING) + computeFantasyPoints(wr1Line!, "WR", PPR_SCORING);
+
+    // 5 receptions is worth 2.5 points under half-PPR and 5 under full PPR — the two rule
+    // sets must disagree, or this test would prove nothing about which one `scoreWeek` used.
+    expect(halfPprExpected).not.toBe(pprExpected);
+    expect(ourScore).toBe(halfPprExpected);
+    expect(ourScore).not.toBe(pprExpected);
   });
 });
 

@@ -49,4 +49,22 @@ export const acceptInviteSchema = z.object({
   teamName: name.optional(),
 });
 
+/**
+ * A caller only ever names the STARTING slots they want; the bench is derived server-side
+ * (`setLineup`'s doc comment explains why), so a client that sends BENCH entries too is
+ * accepted and those entries are simply recomputed rather than trusted.
+ */
+export const setLineupSchema = z.object({
+  weekNumber: z.number().int().positive().max(LEAGUE_CONFIG.maxWeeks),
+  slots: z
+    .array(
+      z.object({
+        slot: z.enum(["QB", "RB", "WR", "TE", "FLEX", "K", "DEF", "BENCH"]),
+        slotIndex: z.number().int().nonnegative(),
+        playerId: z.string().min(1).nullable(),
+      }),
+    )
+    .min(1),
+});
+
 export type CreateLeagueRequest = z.infer<typeof createLeagueSchema>;

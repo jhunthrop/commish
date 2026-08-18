@@ -111,3 +111,19 @@ export interface MatchupWeekBody {
   readonly myTeamId: string | null;
   readonly matchups: readonly MatchupDetail[];
 }
+
+export interface LineupSlotView {
+  readonly slot: RosterSlotType;
+  readonly slotIndex: number;
+  readonly playerId: string | null;
+  readonly playerName: string | null;
+  readonly position: Position | null;
+}
+
+export interface LineupBody {
+  readonly weekNumber: number;
+  /** True once the week has been scored. The editor renders read-only rather than disabled-and-silent. */
+  readonly locked: boolean;
+  readonly starters: readonly LineupSlotView[];
+  readonly bench: readonly LineupSlotView[];
+}

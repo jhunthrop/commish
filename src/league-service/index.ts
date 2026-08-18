@@ -8,6 +8,11 @@ export { listLeaguesForUser, leagueHome, matchupWeek } from "./read";
 // `@/league-service/schedule` DIRECTLY, so the draft's commit seam never pulls in this barrel
 // (and with it `read.ts`'s import of `@/draft-service/teams`).
 export { writeSchedule, type WriteScheduleInput, type WrittenScheduleCounts } from "./schedule";
-export { getLineup, type GetLineupInput } from "./lineups";
+export {
+  getLineup, isWeekLocked, setLineup, lineupView,
+  type GetLineupInput, type LineupSlotInput, type SetLineupInput, type SetLineupResult,
+} from "./lineups";
 export { scoreWeek, leagueStandings, type ScoreWeekResult } from "./results";
-export { createLeagueSchema, createInviteSchema, acceptInviteSchema, type CreateLeagueRequest } from "./schemas";
+export {
+  createLeagueSchema, createInviteSchema, acceptInviteSchema, setLineupSchema, type CreateLeagueRequest,
+} from "./schemas";
