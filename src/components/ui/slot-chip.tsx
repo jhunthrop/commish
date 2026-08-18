@@ -1,4 +1,5 @@
 import type { RosterSlotType } from "@/domain/roster";
+import { EYEBROW } from "./config";
 
 export interface SlotChipProps {
   readonly slot: RosterSlotType;
@@ -13,7 +14,7 @@ export interface SlotChipProps {
 export function SlotChip({ slot, className = "" }: SlotChipProps) {
   return (
     <span
-      className={`rounded-sm border border-border px-2 font-display text-xs font-semibold uppercase tracking-wide text-text-muted ${className}`}
+      className={`rounded-sm border border-border px-2 text-text-muted ${EYEBROW} ${className}`}
     >
       {slot}
     </span>

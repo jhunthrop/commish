@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { LeagueHomeBody, LineupBody } from "../contract";
-import { Card } from "@/components/ui";
+import { Card, PageTitle } from "@/components/ui";
 import { formatPoints, formatWeek } from "../lib/format";
 import { InvitePanel } from "./invite-panel";
 import { LineupEditor } from "./lineup-editor";
@@ -22,7 +22,7 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
       <header className="flex flex-col gap-1">
-        <h1 className="font-display text-display-md font-bold leading-display text-text-primary">{home.name}</h1>
+        <PageTitle>{home.name}</PageTitle>
         <p className="text-sm text-text-muted">
           {`${home.teams.length} of ${home.teamCount} managers · ${home.format === "auction" ? "Auction" : "Snake"} draft`}
         </p>

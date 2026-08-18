@@ -3,7 +3,7 @@
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
-import { Avatar, positionStickerClass } from "@/components/ui";
+import { Avatar, EYEBROW, positionStickerClass } from "@/components/ui";
 import { useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { rosterSpots } from "../state/format";
@@ -154,7 +154,7 @@ function StickerCell({
     return (
       <div data-onclock-cell="true" className="relative flex h-full items-center justify-center rounded-sm border border-dashed border-border px-2 py-2">
         <span aria-hidden="true" className={`pointer-events-none absolute inset-0 rounded-sm ring-2 ring-accent ${spotlight ? "animate-spotlight" : ""}`} />
-        <span className="font-display text-xs font-semibold uppercase tracking-wide text-accent">On the clock</span>
+        <span className={`${EYEBROW} text-accent`}>On the clock</span>
       </div>
     );
   }
@@ -220,7 +220,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
           <caption className="sr-only">The draft board: one row per round, one column per team.</caption>
           <thead>
             <tr>
-              <th scope="col" className="sticky left-0 z-10 bg-surface px-2 py-1 font-display text-xs font-semibold uppercase tracking-wide text-text-muted">
+              <th scope="col" className={`sticky left-0 z-10 bg-surface px-2 py-1 text-text-muted ${EYEBROW}`}>
                 Rd
               </th>
               {columnIds.map((teamId, index) => (

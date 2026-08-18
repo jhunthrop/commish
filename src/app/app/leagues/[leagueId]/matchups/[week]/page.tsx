@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
+import { PageTitle } from "@/components/ui";
 import { leagueHome, matchupWeek } from "@/league-service";
 import { MatchupPanel } from "@/league-room/components/matchup-panel";
 import { WeekNav } from "@/league-room/components/week-nav";
@@ -31,7 +32,7 @@ export default async function MatchupWeekPage({ params }: PageProps) {
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
-      <h1 className="font-display text-display-md font-bold leading-display text-text-primary">{`${home.name} — Week ${weekNumber}`}</h1>
+      <PageTitle>{`${home.name} — Week ${weekNumber}`}</PageTitle>
       <WeekNav leagueId={leagueId} weekNumber={weekNumber} totalWeeks={body.totalWeeks} />
       {body.matchups.length === 0 ? (
         <p className="text-text-muted">There are no matchups in this week yet.</p>

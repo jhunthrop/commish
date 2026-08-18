@@ -3,7 +3,7 @@
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Badge } from "@/components/ui";
+import { Badge, EYEBROW } from "@/components/ui";
 import { formatClockLength, formatTightening } from "../state/format";
 import { playerName, teamName, teamsById } from "../lib/lookups";
 import type { ConnectionStatus } from "../hooks/use-draft-room";
@@ -126,7 +126,7 @@ function modeOf(view: DraftStateView, turn: TurnSummary): RoomMode {
 function StaticState({ headline, detail }: { readonly headline: string; readonly detail: string }) {
   return (
     <div className="flex flex-col">
-      <span className="font-display text-xs font-semibold uppercase tracking-wide text-text-muted">{headline}</span>
+      <span className={`${EYEBROW} text-text-muted`}>{headline}</span>
       <span className="text-sm text-text-muted">{detail}</span>
     </div>
   );
@@ -177,7 +177,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
         ) : (
           <>
             <div className="flex min-w-0 flex-col">
-              <span className={`font-display text-xs font-semibold uppercase tracking-wide ${turn.mine ? "text-negative" : "text-text-muted"}`}>
+              <span className={`${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
                 {turn.label}
               </span>
               <span className="truncate font-display text-display-sm font-bold leading-display text-text-primary">{turn.subject}</span>

@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { RosterSlotType } from "@/domain/roster";
 import type { DraftStateView } from "@/draft-engine";
-import { Button, PositionBadge, SlotChip } from "@/components/ui";
+import { Button, EYEBROW, PositionBadge, SlotChip } from "@/components/ui";
 import { formatYourTurn } from "../state/format";
 import { playerName, queueButtonLabel } from "../lib/lookups";
 import { moveInQueue, removeFromQueue } from "../state/queue";
@@ -65,7 +65,7 @@ function RosterFill({ view, myTeamId }: { readonly view: DraftStateView; readonl
   const filled = view.rosters[myTeamId] ?? [];
   return (
     <div className="hidden shrink-0 flex-col gap-1 lg:flex">
-      <h2 className="font-display text-xs font-semibold uppercase tracking-wide text-text-muted">Your roster</h2>
+      <h2 className={`${EYEBROW} text-text-muted`}>Your roster</h2>
       <ul aria-label="Your roster" className="flex flex-wrap items-center gap-x-3 gap-y-1">
         {view.slotConfig.map((config) => (
           <SlotFill key={config.slot} slot={config.slot} filled={filled.filter((slot) => slot.slot === config.slot).length} total={config.count} />
@@ -100,7 +100,7 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
 
   return (
     <div className="flex min-w-0 flex-1 flex-col gap-1">
-      <h2 className="font-display text-xs font-semibold uppercase tracking-wide text-text-muted">Your queue</h2>
+      <h2 className={`${EYEBROW} text-text-muted`}>Your queue</h2>
       <ol aria-label="Your queue" className="flex items-center gap-2 overflow-x-auto pb-1">
         {queue.map((playerId, index) => {
           const name = playerName(playersById, playerId);

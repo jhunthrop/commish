@@ -1,5 +1,6 @@
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
+import { PageTitle } from "@/components/ui";
 import { listLeaguesForUser } from "@/league-service";
 import { LeagueList } from "@/league-room/components/league-list";
 import { CreateLeaguePanel } from "@/league-room/components/create-league-panel";
@@ -17,7 +18,7 @@ export default async function LeaguesPage() {
 
   return (
     <main className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-4">
-      <h1 className="font-display text-display-md font-bold leading-display text-text-primary">Your leagues</h1>
+      <PageTitle>Your leagues</PageTitle>
       <LeagueList leagues={leagues} />
       <section id="create-league" className="flex flex-col gap-2">
         <h2 className="text-lg font-medium text-text-primary">Start a league</h2>

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageTitle } from "@/components/ui";
 
 /**
  * The signed-out landing page. One idea, one action: say what this is, then send the visitor
@@ -7,7 +8,7 @@ import Link from "next/link";
 export default function Home() {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-2xl flex-col items-center justify-center gap-6 p-8 text-center">
-      <h1 className="font-display text-display-xl font-bold leading-display text-text-primary">Commish</h1>
+      <PageTitle size="xl">Commish</PageTitle>
       <p className="max-w-prose text-lg text-text-muted">Season-long fantasy football, done right.</p>
       <Link
         href="/sign-in"
