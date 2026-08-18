@@ -44,6 +44,8 @@ export function PickCelebration({ lastPick, playersById, teams }: PickCelebratio
       role="status"
       data-testid="pick-celebration"
       data-own={isMine ? "true" : "false"}
+      data-pick-number={pickNumber}
+      key={pickNumber}
       className={`rounded-lg border p-3 text-center ${isMine ? "border-accent bg-accent/10" : "border-border bg-surface-elevated"} ${motion}`}
     >
       <p className="text-lg font-semibold text-text-primary">

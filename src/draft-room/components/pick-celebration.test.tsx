@@ -71,4 +71,38 @@ describe("PickCelebration", () => {
     act(() => void vi.advanceTimersByTime(DRAFT_ROOM_CONFIG.celebrationMs));
     expect(screen.queryByTestId("pick-celebration")).toBeNull();
   });
+
+  it("preserves the DOM node when rerendered with the same pickNumber — no re-animation", () => {
+    stubMatchMedia(false);
+    const pick1 = { ...pick, pickNumber: 5 };
+    const { rerender, container } = render(
+      <PickCelebration lastPick={{ pick: pick1, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />,
+    );
+    const firstNode = container.firstElementChild;
+    expect(firstNode).toBeInTheDocument();
+    expect(firstNode).toHaveAttribute("data-pick-number", "5");
+
+    rerender(<PickCelebration lastPick={{ pick: pick1, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
+
+    const secondNode = container.firstElementChild;
+    expect(secondNode).toBe(firstNode); // Same DOM node
+    expect(secondNode).toHaveAttribute("data-pick-number", "5");
+  });
+
+  it("updates the panel and animation class when rerendered with a new pickNumber", () => {
+    stubMatchMedia(false);
+    const pick1 = { ...pick, pickNumber: 5 };
+    const pick2 = { ...pick, pickNumber: 6 };
+    const { rerender, container } = render(
+      <PickCelebration lastPick={{ pick: pick1, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />,
+    );
+    const firstNode = container.firstElementChild;
+    expect(firstNode).toHaveAttribute("data-pick-number", "5");
+
+    rerender(<PickCelebration lastPick={{ pick: pick2, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
+
+    const secondNode = container.firstElementChild;
+    expect(secondNode).not.toBe(firstNode); // Different pick = new DOM node
+    expect(secondNode).toHaveAttribute("data-pick-number", "6");
+  });
 });
