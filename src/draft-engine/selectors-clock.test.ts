@@ -87,7 +87,7 @@ describe("draftStateView", () => {
       onClockTeamId: "t1",
       deadlineAt: "2026-09-10T14:40:00.000Z",
       clockSeconds: 600,
-      nextTightening: { at: "2026-09-10T15:00:00.000Z", pickSeconds: 60 },
+      nextTightening: { at: "2026-09-10T15:00:00.000Z", pickSeconds: 90 },
       picks: [],
       budgets: {},
       auction: null,

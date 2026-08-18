@@ -76,7 +76,7 @@ clock — every timed decision consumes a timestamp the caller supplied.
    inputs carried in the action log, never an ambient lookup, so the same log always autopicks
    the same player on replay.
 6. The pick clock auto-tightens against kickoff: `DRAFT_CLOCK_SCHEDULE` = 8h → 4h → 1h → 10m →
-   60s. A tier applies while the draft is more than `untilHoursBeforeKickoff` hours out; the
+   1:30. A tier applies while the draft is more than `untilHoursBeforeKickoff` hours out; the
    last tier is the floor. Live auction bidding uses the shorter of the tier and
    `AUCTION_CONFIG.bidWindowSeconds` (`currentClockSeconds`).
 

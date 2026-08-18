@@ -11,13 +11,17 @@ export interface ClockTier {
   readonly pickSeconds: number;
 }
 
-/** 8h → 4h → 1h → 10m → 60s, per the strategy doc's named schedule. */
+/**
+ * 8h → 4h → 1h → 10m → 1:30, per the strategy doc's auto-tightening schedule. The floor is
+ * the live draft-night pace: 90 seconds is enough to act on a plan (the queue) and short
+ * enough to keep twelve people leaning in — a founder call (2026-08-18) over the original 60s.
+ */
 export const DRAFT_CLOCK_SCHEDULE: readonly ClockTier[] = [
   { untilHoursBeforeKickoff: 168, pickSeconds: 8 * 60 * 60 },
   { untilHoursBeforeKickoff: 48, pickSeconds: 4 * 60 * 60 },
   { untilHoursBeforeKickoff: 12, pickSeconds: 60 * 60 },
   { untilHoursBeforeKickoff: 2, pickSeconds: 10 * 60 },
-  { untilHoursBeforeKickoff: 0, pickSeconds: 60 },
+  { untilHoursBeforeKickoff: 0, pickSeconds: 90 },
 ];
 
 export const DRAFT_QUEUE_CONFIG = {

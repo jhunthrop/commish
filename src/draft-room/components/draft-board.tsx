@@ -3,7 +3,7 @@
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
-import { positionStickerClass } from "@/components/ui";
+import { Avatar, positionStickerClass } from "@/components/ui";
 import { useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { rosterSpots } from "../state/format";
@@ -134,14 +134,18 @@ function StickerCell({
     const player = playersById.get(cell.pick.playerId) ?? null;
     const fill = player === null ? "border border-border bg-surface-elevated text-text-primary" : positionStickerClass(player.position);
     return (
-      <div className={`flex h-full flex-col justify-center gap-1 rounded-sm px-2 py-2 shadow-sticker ${fill} ${slap ? "animate-sticker-slap" : ""}`}>
-        <span className={`truncate font-display font-semibold leading-display ${CELL_TEXT[variant]}`}>
-          {player?.name ?? cell.pick.playerId}
-        </span>
-        <span className="truncate text-xs font-medium">
-          {player?.position ?? cell.pick.slot} · {player?.nflTeam ?? cell.pick.slot}
-          {cell.pick.price === null ? "" : ` · $${cell.pick.price}`}
-        </span>
+      <div className={`flex h-full items-center gap-2 rounded-sm px-2 py-2 shadow-sticker ${fill} ${slap ? "animate-sticker-slap" : ""}`}>
+        {/* Initials until the licensed stats feed brings real headshots (Phase 2). */}
+        <Avatar name={player?.name ?? cell.pick.playerId} size="sm" className="shrink-0 bg-scrim/20" />
+        <div className="flex min-w-0 flex-col justify-center gap-0.5">
+          <span className={`truncate font-display font-semibold leading-display ${CELL_TEXT[variant]}`}>
+            {player?.name ?? cell.pick.playerId}
+          </span>
+          <span className="truncate text-xs font-medium">
+            {player?.position ?? cell.pick.slot} · {player?.nflTeam ?? cell.pick.slot}
+            {cell.pick.price === null ? "" : ` · $${cell.pick.price}`}
+          </span>
+        </div>
       </div>
     );
   }
@@ -219,7 +223,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
               <th scope="col" className="sticky left-0 z-10 bg-surface px-2 py-1 font-display text-xs font-semibold uppercase tracking-wide text-text-muted">
                 Rd
               </th>
-              {columnIds.map((teamId) => (
+              {columnIds.map((teamId, index) => (
                 <th
                   key={teamId}
                   scope="col"
@@ -228,6 +232,9 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
                     (teamId === myTeamId ? "ring-2 ring-accent text-accent" : "text-text-primary")
                   }
                 >
+                  {/* The columns ARE the draft order; the slot number says so out loud. */}
+                  <span aria-hidden="true" className="mr-1.5 font-mono text-xs tabular-nums text-text-muted">{index + 1}</span>
+                  <span className="sr-only">{`Draft slot ${index + 1}: `}</span>
                   {teamName(byId, teamId)}
                   {teamId === myTeamId ? <span className="ml-2 font-display text-xs uppercase tracking-wide text-accent">You</span> : null}
                 </th>

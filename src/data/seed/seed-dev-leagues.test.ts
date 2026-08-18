@@ -30,7 +30,8 @@ describe("seedDevLeagues", () => {
 
     const [draft] = await db.select().from(drafts).where(eq(drafts.id, DEV_SEED.snake.draftId));
     expect(draft?.status).toBe("scheduled");
-    expect(draft?.kickoffAt.toISOString()).toBe("2026-09-02T02:00:00.000Z"); // clock.now() + 26h
+    // clock.now() + DEV_SEED.kickoffHoursFromNow (0h — the floor tier, live draft-night pace)
+    expect(draft?.kickoffAt.toISOString()).toBe("2026-09-01T00:00:00.000Z");
 
     const [auctionDraft] = await db.select().from(drafts).where(eq(drafts.id, DEV_SEED.auction.draftId));
     expect(auctionDraft?.auctionBudget).toBe(DEV_SEED.auction.budget);

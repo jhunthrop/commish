@@ -38,7 +38,6 @@ const START: StartDraftAction = {
   pool: POOL,
 };
 
-const EXPIRE = (timestamp: string) => ({ v: 1, type: "TIMER_EXPIRE", timestamp }) as const;
 
 function setQueue(teamId: string, playerIds: readonly string[], timestamp = "2026-09-01T00:00:10.000Z"): SetQueueAction {
   return { v: 1, type: "SET_QUEUE", timestamp, teamId, playerIds };
@@ -145,8 +144,10 @@ describe("queue-first autopick", () => {
     let state = expectOk(reduceDraft(started(), setQueue("t1", ["rb1", "qb2"])));
     // t1 autopicks rb1 (its queue head), t2 autopicks qb1 (the pool head). t1's RB slot is
     // now full, so the queue's remaining entry qb2 is the only legal one left in it.
-    state = expectOk(reduceDraft(state, EXPIRE("2026-09-20T00:00:00.000Z")));
-    state = expectOk(reduceDraft(state, EXPIRE("2026-09-20T00:01:00.000Z")));
+    // `expireAt(state)` per the pattern above — fixed stamps one minute apart broke the
+    // moment the floor tier grew past 60s.
+    state = expectOk(reduceDraft(state, expireAt(state)));
+    state = expectOk(reduceDraft(state, expireAt(state)));
     expect(state.picks.map((p) => p.playerId)).toEqual(["rb1", "qb1"]);
     expect(bestAvailableFor(state, "t1")).toEqual({ playerId: "qb2", position: "QB" });
   });

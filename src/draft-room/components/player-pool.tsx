@@ -49,17 +49,18 @@ function PositionFilters({ value, onChange }: { readonly value: string; readonly
         All
       </Button>
       {POSITIONS.map((position) => (
-        <Button
+        // A bare toggle, not a padded Button: seven chips must sit on one rail row, and the
+        // sticker badge already is the visual — button chrome around it was pure width.
+        <button
           key={position}
-          size="sm"
-          variant="ghost"
+          type="button"
           aria-pressed={value === position}
           aria-label={`Show ${position} only`}
-          className={value === position ? "ring-2 ring-accent" : ""}
+          className={`rounded-sm p-0.5 focus-visible:outline-2 focus-visible:outline-accent ${value === position ? "ring-2 ring-accent" : "opacity-80 hover:opacity-100"}`}
           onClick={() => onChange(value === position ? ALL : position)}
         >
           <PositionBadge position={position} size="sm" />
-        </Button>
+        </button>
       ))}
     </div>
   );

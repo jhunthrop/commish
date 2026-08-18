@@ -89,7 +89,7 @@ export async function seedDevLeagues(
           id: `${plan.leagueId}_team_${String(i + 1).padStart(2, "0")}`,
           leagueId: plan.leagueId,
           userId,
-          name: `Team ${i + 1}`,
+          name: DEV_SEED.teamNames[i] ?? `Team ${i + 1}`,
         })),
       )
       .onConflictDoUpdate({ target: teams.id, set: { userId: sql`excluded.user_id` } });
