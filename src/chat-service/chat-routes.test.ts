@@ -60,6 +60,19 @@ describe("GET /api/leagues/[leagueId]/chat", () => {
     const response = await GET(new Request(`${url}?before=drop-table`), leagueContext);
     expect(response.status).toBe(400);
   });
+
+  it("passes a valid cursor through to the service, returning the older page", async () => {
+    const first = (await (await POST(post({ body: "first" }), leagueContext)).json()) as ApiEnvelope<PostChatBody>;
+    if (!first.ok) throw new Error("post failed");
+    const second = (await (await POST(post({ body: "second" }), leagueContext)).json()) as ApiEnvelope<PostChatBody>;
+    if (!second.ok) throw new Error("post failed");
+
+    const response = await GET(new Request(`${url}?before=${second.data.message.id}`), leagueContext);
+    const body = (await response.json()) as ApiEnvelope<ChatPageBody>;
+    expect(body.ok).toBe(true);
+    if (!body.ok) return;
+    expect(body.data.messages.map((message) => message.body)).toEqual(["first"]);
+  });
 });
 
 describe("POST /api/leagues/[leagueId]/chat", () => {
@@ -81,9 +94,13 @@ describe("POST /api/leagues/[leagueId]/chat", () => {
     expect(body.error).toContain("Type a message first.");
   });
 
-  it("rejects a message past the length cap", async () => {
+  it("rejects a message past the length cap, naming the offending field", async () => {
     const response = await POST(post({ body: "x".repeat(5_000) }), leagueContext);
     expect(response.status).toBe(400);
+    const body = (await response.json()) as ApiEnvelope<never>;
+    expect(body.ok).toBe(false);
+    if (body.ok) return;
+    expect(body.error).toContain("body");
   });
 });
 
@@ -101,12 +118,16 @@ describe("POST /api/leagues/[leagueId]/chat/[messageId]/reactions", () => {
     expect(removed).toEqual({ ok: true, data: { messageId, reactions: [] } });
   });
 
-  it("rejects an emoji outside the league's set", async () => {
+  it("rejects an emoji outside the league's set, naming the offending field", async () => {
     const posted = (await (await POST(post({ body: "clutch" }), leagueContext)).json()) as ApiEnvelope<PostChatBody>;
     if (!posted.ok) throw new Error("post failed");
     const context = { params: Promise.resolve({ leagueId: "l1", messageId: posted.data.message.id }) };
     const response = await REACT(post({ emoji: "💀" }), context);
     expect(response.status).toBe(400);
+    const body = (await response.json()) as ApiEnvelope<never>;
+    expect(body.ok).toBe(false);
+    if (body.ok) return;
+    expect(body.error).toContain("emoji");
   });
 
   it("404s a message id that isn't in this league", async () => {
