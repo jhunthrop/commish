@@ -3,6 +3,7 @@ import type { LeagueHomeBody, LineupBody } from "../contract";
 import { Card, PageTitle } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import { formatPoints, formatWeek } from "../lib/format";
+import { AdvisorPanel } from "./advisor-panel";
 import { InvitePanel } from "./invite-panel";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
@@ -71,6 +72,8 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
       <LeagueChat leagueId={home.leagueId} />
 
       {lineup === null ? null : <LineupEditor leagueId={home.leagueId} lineup={lineup} />}
+
+      {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
 
       {home.isCommissioner ? <InvitePanel leagueId={home.leagueId} /> : null}
     </main>

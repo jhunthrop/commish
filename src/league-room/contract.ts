@@ -127,3 +127,22 @@ export interface LineupBody {
   readonly starters: readonly LineupSlotView[];
   readonly bench: readonly LineupSlotView[];
 }
+
+/** What the start/sit advisor answers with. Advice, never an action. */
+export interface AdviceBody {
+  readonly headline: string;
+  readonly reasoning: string;
+  /**
+   * True when this came from the app's own deterministic math because the assistant was
+   * unavailable. A designed state, not an error — the answer is still complete.
+   */
+  readonly degraded: boolean;
+}
+
+/** What the trade analyzer answers with: the deterministic verdict, plus prose about it. */
+export interface TradeAssessmentBody extends AdviceBody {
+  readonly verdict: "even" | "favors_proposer" | "favors_receiver" | "lopsided";
+  readonly flags: readonly string[];
+  readonly givingValue: number;
+  readonly receivingValue: number;
+}

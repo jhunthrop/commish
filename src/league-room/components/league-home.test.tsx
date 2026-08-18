@@ -109,4 +109,14 @@ describe("LeagueHome", () => {
     );
     await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
   });
+
+  it("offers the advisor to a manager with a team", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByRole("region", { name: "Lineup advisor" })).toBeInTheDocument();
+  });
 });
