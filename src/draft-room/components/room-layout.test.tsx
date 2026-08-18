@@ -50,4 +50,14 @@ describe("RoomLayout", () => {
     expect(bandFor("Stage").className).toContain("order-1");
     expect(bandFor("Stage").className).toContain("lg:order-2");
   });
+
+  it("renders the aside band when one is given", () => {
+    render(<RoomLayout rail={<p>rail</p>} pool={<p>pool</p>} stage={<p>stage</p>} dock={<p>dock</p>} aside={<p>aside</p>} />);
+    expect(screen.getByText("aside")).toBeInTheDocument();
+  });
+
+  it("renders no aside band at all when none is given — the TV board has none", () => {
+    render(<RoomLayout rail={<p>rail</p>} pool={<p>pool</p>} stage={<p>stage</p>} dock={<p>dock</p>} />);
+    expect(screen.queryByTestId("room-aside")).not.toBeInTheDocument();
+  });
 });

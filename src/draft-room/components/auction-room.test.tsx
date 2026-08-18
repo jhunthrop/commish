@@ -3,6 +3,8 @@ import { screen, waitFor, act, fireEvent, within } from "@testing-library/react"
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
 import { inBothThemes } from "@/components/ui/test-utils";
+import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
+import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { AUCTION_VIEW, fixtureDeps, renderInRoom, type FixtureDeps } from "../test-fixtures";
 import { DraftRoomDepsProvider, type DraftRoomDeps } from "../hooks/deps";
 import { DraftRoom } from "./draft-room";
@@ -21,9 +23,11 @@ const clockOf = (view: typeof AUCTION_VIEW, sequence: number) => ({
 function mountAuction(view = AUCTION_VIEW) {
   const fixture = fixtureDeps(view);
   const rendered = renderInRoom(
-    <ToastProvider>
-      <DraftRoom draftId="d1" />
-    </ToastProvider>,
+    <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+      <ToastProvider>
+        <DraftRoom draftId="d1" />
+      </ToastProvider>
+    </ChatRoomDepsProvider>,
     fixture.deps,
   );
   return { fixture, rendered };
@@ -56,9 +60,11 @@ function mountAuctionWithQueue(over: Partial<Pick<FixtureDeps, "queue" | "queueR
   Object.assign(fixture, over);
   const capture = withQueueBodyCapture(fixture.deps);
   renderInRoom(
-    <ToastProvider>
-      <DraftRoom draftId="d1" />
-    </ToastProvider>,
+    <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+      <ToastProvider>
+        <DraftRoom draftId="d1" />
+      </ToastProvider>
+    </ChatRoomDepsProvider>,
     capture.deps,
   );
   return { fixture, bodies: capture.bodies };
@@ -72,9 +78,11 @@ describe("AuctionRoom", () => {
     const fixture = fixtureDeps(AUCTION_VIEW);
     await inBothThemes(
       <DraftRoomDepsProvider deps={fixture.deps}>
-        <ToastProvider>
-          <DraftRoom draftId="d1" />
-        </ToastProvider>
+        <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+          <ToastProvider>
+            <DraftRoom draftId="d1" />
+          </ToastProvider>
+        </ChatRoomDepsProvider>
       </DraftRoomDepsProvider>,
       async ({ container }) => {
         await waitFor(() => expect(screen.getByRole("table", { name: /budgets/i })).toBeInTheDocument());

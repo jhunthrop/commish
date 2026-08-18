@@ -29,6 +29,8 @@ export interface RoomShellProps extends QueueHandlers {
   readonly poolFooter?: ReactNode;
   /** The auction's live-lot console (`BidControls`), or null. Snake never has one. */
   readonly bidConsole?: ReactNode;
+  /** The social band down the right edge (league chat), or nothing. Built by `DraftRoom`. */
+  readonly aside?: ReactNode;
 }
 
 /**
@@ -48,6 +50,7 @@ export function RoomShell({
   onQueueChange,
   poolFooter,
   bidConsole,
+  aside,
 }: RoomShellProps) {
   const pool = (
     <PlayerPool
@@ -65,6 +68,7 @@ export function RoomShell({
 
   return (
     <RoomLayout
+      aside={aside}
       rail={
         <RoomRail
           leagueName={room.leagueName}

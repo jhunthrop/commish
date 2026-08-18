@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import type { ClientDraftAction } from "@/draft-engine";
 import { Button, ErrorState, Skeleton, useToast } from "@/components/ui";
+import { LeagueChat } from "@/chat-room/components/league-chat";
 import { useDraftRoom } from "../hooks/use-draft-room";
 import { playersById as buildPlayersById } from "../lib/lookups";
 import { SnakeRoom } from "./snake-room";
@@ -44,9 +45,14 @@ export function DraftRoom({ draftId }: { readonly draftId: string }) {
     );
   }
 
+  // Built here, not inside RoomShell: DraftRoom is the one component that knows the league id
+  // and the only one whose test renders a fully-loaded room, so the chat's dependencies enter
+  // the tree in exactly one place — the same reason `bidConsole` and `poolFooter` are props.
+  const chat = <LeagueChat leagueId={room.view.leagueId} />;
+
   return room.view.format === "auction" ? (
-    <AuctionRoom room={room} playersById={playersById} onAct={act} />
+    <AuctionRoom room={room} playersById={playersById} onAct={act} aside={chat} />
   ) : (
-    <SnakeRoom room={room} playersById={playersById} onAct={act} />
+    <SnakeRoom room={room} playersById={playersById} onAct={act} aside={chat} />
   );
 }

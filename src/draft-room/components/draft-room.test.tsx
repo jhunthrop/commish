@@ -3,15 +3,19 @@ import { screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
 import { inBothThemes } from "@/components/ui/test-utils";
+import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
+import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { fixtureDeps, renderInRoom } from "../test-fixtures";
 import { DraftRoomDepsProvider } from "../hooks/deps";
 import { DraftRoom } from "./draft-room";
 
 function mount(fixture = fixtureDeps()) {
   const rendered = renderInRoom(
-    <ToastProvider>
-      <DraftRoom draftId="d1" />
-    </ToastProvider>,
+    <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+      <ToastProvider>
+        <DraftRoom draftId="d1" />
+      </ToastProvider>
+    </ChatRoomDepsProvider>,
     fixture.deps,
   );
   return { fixture, rendered };
@@ -22,9 +26,11 @@ describe("DraftRoom", () => {
     const fixture = fixtureDeps();
     await inBothThemes(
       <DraftRoomDepsProvider deps={fixture.deps}>
-        <ToastProvider>
-          <DraftRoom draftId="d1" />
-        </ToastProvider>
+        <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+          <ToastProvider>
+            <DraftRoom draftId="d1" />
+          </ToastProvider>
+        </ChatRoomDepsProvider>
       </DraftRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByText("Loading…")).toBeInTheDocument();
@@ -37,10 +43,22 @@ describe("DraftRoom", () => {
     );
   });
 
+  it("gives the room a chat band", async () => {
+    mount();
+    await waitFor(() => expect(screen.getByTestId("room-aside")).toBeInTheDocument());
+  });
+
   it("offers a retry when the draft cannot be loaded", async () => {
     const fixture = fixtureDeps();
     fixture.deps = { ...fixture.deps, fetchJson: async () => ({ json: async () => ({ ok: false, error: "That draft doesn't exist." }) }) as unknown as Response };
-    renderInRoom(<ToastProvider><DraftRoom draftId="d1" /></ToastProvider>, fixture.deps);
+    renderInRoom(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <ToastProvider>
+          <DraftRoom draftId="d1" />
+        </ToastProvider>
+      </ChatRoomDepsProvider>,
+      fixture.deps,
+    );
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("That draft doesn't exist."));
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });

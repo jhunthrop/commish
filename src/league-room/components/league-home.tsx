@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { LeagueHomeBody, LineupBody } from "../contract";
 import { Card, PageTitle } from "@/components/ui";
+import { LeagueChat } from "@/chat-room/components/league-chat";
 import { formatPoints, formatWeek } from "../lib/format";
 import { InvitePanel } from "./invite-panel";
 import { LineupEditor } from "./lineup-editor";
@@ -66,6 +67,8 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
       </section>
 
       <StandingsTable rows={home.standings} myTeamId={home.myTeamId} />
+
+      <LeagueChat leagueId={home.leagueId} />
 
       {lineup === null ? null : <LineupEditor leagueId={home.leagueId} lineup={lineup} />}
 
