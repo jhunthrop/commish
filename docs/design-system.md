@@ -145,6 +145,11 @@ Three rules any future room follows:
    justified when the two are genuinely different objects (`DraftBoard`'s grid and its
    per-round list are, and the inactive one is `display: none` so nothing is announced twice).
 
+`RoomLayout`'s regions are rail, pool, stage, dock and an optional **aside** — the social band
+down the right edge (league chat). It follows rule 1 (fixed width, scrolls inside itself) and
+rule 3 (linearizes last on a phone, never shrinks), and it is optional because the TV board is
+the same frame with nobody to talk to.
+
 Widths come from the spacing scale (`lg:w-88` = 352px for the pool rail), never an arbitrary
 value — `w-88` is Tailwind v4's on-demand spacing utility, not a bracket escape hatch.
 

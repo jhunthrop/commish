@@ -57,6 +57,18 @@ src/
                           components (components/), the fetchJson deps seam (hooks/), and
                           id→display-name formatting (lib/format.ts). Imports from
                           league/league-service are TYPE-ONLY — no league rule runs in React.
+  chat/                   Pure chat fold + wire contract + CHAT_CONFIG. NO I/O. 100% coverage.
+  chat-service/           Chat read/write service over Postgres: postMessage, paginated
+                          listMessages, toggleReaction, each publishing on the league stream.
+  chat-room/              The browser half of chat: the useLeagueChat hook, the deps seam and
+                          every chat component. Mounted by BOTH the league room and the draft
+                          room. Value-imports @/chat directly (pure, browser-safe); reaches
+                          @/chat-service only over the wire — same ESLint client boundary as
+                          draft-room/league-room. See docs/chat.md.
+  ai-advisor/             The advisory layer: read-only league context assembly, the pure
+                          trade-fairness core (also the platform's collusion detector), and the
+                          start/sit + trade advisors over src/lib/llm. Writes NOTHING — a legal
+                          constraint, enforced by advisory-only.test.ts. See docs/advisor.md.
   scoring/                Pure fantasy-scoring engine: computeFantasyPoints/scoreLineup, every
                           preset (PPR/standard/K-DEF/TE-premium). NO I/O. 100% coverage.
   stats/                  The fixed 2026 mock stat dataset this phase scores against
@@ -64,7 +76,8 @@ src/
   db/                     schema.ts (Drizzle, pg-core: users, leagues, teams, league_invites,
                           scoring_settings, roster_slots, lineup_slots, drafts, draft_actions,
                           draft_nudges, draft_picks, weeks, matchups, players,
-                          player_stat_lines), client.ts (createDb/getDb), test-db.ts
+                          player_stat_lines, chat_messages, chat_reactions), client.ts
+                          (createDb/getDb), test-db.ts
   lib/
     auth/                 current-user.ts (server identity seam over WorkOS), user-sync.ts (profile upsert)
     leagues/              membership.ts — resolveLeagueMembership/requireLeagueMember, the one
@@ -109,7 +122,7 @@ Anything time-dependent takes a `Clock` (`src/domain/timing.ts`) and calls `cloc
 - **Writes are plain HTTP.** Validate → persist to Postgres → then `getPublisher().publish(...)`. Postgres is authoritative; publishing is best-effort and must never fail the write.
 - **Delivery is Redis Streams over SSE.** Stream key `league:<id>:events`. Read with plain `XREAD BLOCK` from a per-connection cursor. **Never `XREADGROUP`** — consumer groups partition entries across consumers; a draft room needs every viewer to see every pick.
 - **Resume** is via the standard `Last-Event-ID` header (the SSE `id:` is the stream entry id). Full-state refetch is the fallback only when a gap outlasts stream retention.
-- **Event types** are enumerated once in `src/lib/realtime/events.ts` (`draft.*`, `chat.*`, `score.update`). Add there, nowhere else.
+- **Event types** are enumerated once in `src/lib/realtime/events.ts` (`draft.*`, `chat.*`, `score.update`). Add there, nowhere else. `chat.message`/`chat.reaction` are published by `src/chat-service/chat.ts` and consumed by `useLeagueChat` (`docs/chat.md`); `score.update` remains reserved for a later phase with a live feed and is never published in Phase 1.
 - **Draft events** (`draft.pick`, `draft.nominate`, `draft.bid`, `draft.timer_expire`, `draft.status`, `draft.queue`, `draft.nudge`) ride the **league** stream — there is no per-draft stream. Their payload contracts live in `docs/draft-engine.md`. `draft.nudge` is the one exception to "derived from the action log": it is published directly by the nudge scheduler on the ticker's own schedule, not by `draftEventsFor`. See `docs/draft-moderator.md`.
 - **On the browser side there is exactly one consumer:** `useDraftRoom` (`src/draft-room/hooks/`),
   built on a native `EventSource`. The browser's own reconnect and `Last-Event-ID` are the whole
@@ -128,19 +141,26 @@ See `docs/draft-engine.md`. `draft_nudges` (keyed on `(draftId, sequence)`) sits
 part of replay — see `docs/draft-moderator.md`.
 
 ### Client boundary
-Everything under `src/draft-room/**` and `src/league-room/**` is BROWSER code — the pure
-state reducer/formatters, the hooks, and the client components that render the draft room and
-the league room respectively. Each talks to its service layer ONLY over the wire
-(`GET`/`POST /api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`,
+Everything under `src/draft-room/**`, `src/league-room/**` and `src/chat-room/**` is BROWSER
+code — the pure state reducer/formatters, the hooks, and the client components that render the
+draft room, the league room and the chat surface respectively. Each talks to its service layer
+ONLY over the wire (`GET`/`POST /api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`,
 `GET /api/leagues/[leagueId]/events`) — never by importing `@/draft-engine`, `@/draft-service`,
 `@/league`, `@/league-service`, `@/db`, `@/lib/realtime`, `@/lib/auth`, `@/lib/leagues`,
 `@/lib/llm`, `@/lib/api/respond` or `@/data/seed` as VALUES. An ESLint
 `@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`,
-scoped to `src/draft-room/**/*.{ts,tsx}` and `src/league-room/**/*.{ts,tsx}` only) enforces
-this — matched against a relative-path spelling of the same module too (`../../draft-engine`),
-not just the `@/` alias. `import type` stays allowed, since sharing a TYPE (e.g.
-`DraftStateView`, `LeagueSummary`, `ApiEnvelope`) costs nothing at runtime and is how the
-client and server sides of the wire stay in sync.
+scoped to `src/draft-room/**/*.{ts,tsx}`, `src/league-room/**/*.{ts,tsx}` and
+`src/chat-room/**/*.{ts,tsx}` only) enforces this — matched against a relative-path spelling of
+the same module too (`../../draft-engine`), not just the `@/` alias. `import type` stays
+allowed, since sharing a TYPE (e.g. `DraftStateView`, `LeagueSummary`, `ChatMessageView`,
+`ApiEnvelope`) costs nothing at runtime and is how the client and server sides of the wire stay
+in sync.
+
+`src/chat/**` is deliberately **not** in that blocked list: unlike `draft-engine`/`league`, it is
+pure, I/O-free, browser-safe fold code (`mergeMessages`, `applyReaction`, `CHAT_CONFIG`), so
+`src/chat-room/**` value-imports it directly — the same way ordinary domain utilities would be
+shared. `@/chat-service` is not imported by `src/chat-room/**` at all (type or value); chat's
+service layer is reached only over the wire, the same as every other service module above.
 
 The rule is deliberately **not** applied to `src/app/**`: pages and layouts there are Next.js
 Server Components (`page.tsx`, `layout.tsx`) and route handlers (`route.ts`), which are
@@ -150,7 +170,7 @@ directly; that is the idiomatic Next.js pattern, not a boundary violation. A pag
 told apart from a client component by its filename alone, so a glob covering `src/app/**`
 would either miss real client code elsewhere or wrongly flag a legitimate server import. Any
 client interactivity a page needs is a `"use client"` component imported FROM
-`src/draft-room/**` or `src/league-room/**`, not inlined into the page file.
+`src/draft-room/**`, `src/league-room/**` or `src/chat-room/**`, not inlined into the page file.
 See `docs/draft-room.md` for the draft room's full fetch → SSE → apply → gap → refetch contract.
 
 ### API responses
@@ -163,7 +183,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**` and `src/league/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%). Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**` and `src/chat/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%). Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 
 ### Migrations
