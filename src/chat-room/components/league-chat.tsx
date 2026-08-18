@@ -16,7 +16,7 @@ export function LeagueChat({ leagueId }: { readonly leagueId: string }) {
 
   if (chat.status === "loading") {
     return (
-      <Card aria-label="League chat">
+      <Card as="section" aria-label="League chat">
         <Skeleton lines={4} />
       </Card>
     );

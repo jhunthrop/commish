@@ -44,7 +44,7 @@ export function MessageList({ messages, meUserId, hasMore, loadingEarlier, onLoa
           Load earlier messages
         </Button>
       ) : null}
-      <div role="log" aria-live="polite" aria-label="League chat">
+      <div role="log" aria-live="polite" aria-label="Messages">
         <ul className="flex flex-col gap-3">
           {messages.map((message) => (
             <li key={message.id} className="flex gap-2">
