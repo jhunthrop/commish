@@ -34,7 +34,9 @@ src/
   app/draft/[draftId]/board/      The read-only large-format TV draftboard.
   domain/                 Pure domain types + pure functions. NO I/O, NO Date.now(). readonly everywhere.
   draft-engine/           Pure draft reducer (snake + auction), clock schedule, selectors. 100% coverage.
-  draft-service/          Durable replay-based draft store, commit seam, clock ticker, draft authz.
+  draft-service/          Durable replay-based draft store, commit seam, clock ticker, draft authz,
+                          queue.ts (SET_QUEUE service seam), nudge.ts/nudge-copy.ts (AI draft
+                          moderator — see docs/draft-moderator.md).
   draft-room/             The browser half of the draft: pure view reducer (state/, 100% coverage),
                           the useDraftRoom hook (hooks/), every room component (components/), and
                           id→display-name lookups (lib/). Imports from draft-engine are TYPE-ONLY —
@@ -49,7 +51,8 @@ src/
   design/                 tokens (to be built — see design-system.md)
   components/ui/          shared primitives (to be built — see design-system.md)
 drizzle/                  generated SQL migrations (committed)
-docs/                     conventions.md (this), design-system.md, research/
+docs/                     conventions.md (this), design-system.md, draft-engine.md, draft-room.md,
+                          draft-moderator.md, research/
 plans/                    the phase blueprints
 ```
 
@@ -74,7 +77,7 @@ Anything time-dependent takes a `Clock` (`src/domain/timing.ts`) and calls `cloc
 - **Delivery is Redis Streams over SSE.** Stream key `league:<id>:events`. Read with plain `XREAD BLOCK` from a per-connection cursor. **Never `XREADGROUP`** — consumer groups partition entries across consumers; a draft room needs every viewer to see every pick.
 - **Resume** is via the standard `Last-Event-ID` header (the SSE `id:` is the stream entry id). Full-state refetch is the fallback only when a gap outlasts stream retention.
 - **Event types** are enumerated once in `src/lib/realtime/events.ts` (`draft.*`, `chat.*`, `score.update`). Add there, nowhere else.
-- **Draft events** (`draft.pick`, `draft.nominate`, `draft.bid`, `draft.timer_expire`, `draft.status`) ride the **league** stream — there is no per-draft stream. Their payload contracts live in `docs/draft-engine.md`.
+- **Draft events** (`draft.pick`, `draft.nominate`, `draft.bid`, `draft.timer_expire`, `draft.status`, `draft.queue`, `draft.nudge`) ride the **league** stream — there is no per-draft stream. Their payload contracts live in `docs/draft-engine.md`. `draft.nudge` is the one exception to "derived from the action log": it is published directly by the nudge scheduler on the ticker's own schedule, not by `draftEventsFor`. See `docs/draft-moderator.md`.
 - **On the browser side there is exactly one consumer:** `useDraftRoom` (`src/draft-room/hooks/`),
   built on a native `EventSource`. The browser's own reconnect and `Last-Event-ID` are the whole
   reconnect mechanism — **no retry loop, no backoff timer, no polling.** A full refetch of
@@ -87,7 +90,9 @@ An in-progress draft's state is *derived*, by replaying `draft_actions` through 
 reducer in `src/draft-engine/`. Any in-memory materialization is a cache and must be safe to
 drop at any moment. Every accepted action is persisted before it is cached or published, and
 `teamId` is always resolved from the authenticated session, never from a request body.
-See `docs/draft-engine.md`.
+See `docs/draft-engine.md`. `draft_nudges` (keyed on `(draftId, sequence)`) sits beside
+`draft_actions` for a different job: it is the AI moderator's durable once-per-turn claim, not
+part of replay — see `docs/draft-moderator.md`.
 
 ### Draft room client boundary
 Everything under `src/draft-room/**` is BROWSER code — the pure state reducer/formatters, the

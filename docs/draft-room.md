@@ -69,10 +69,22 @@ it agrees with the engine's `totalRosterSlots` so the two cannot diverge.
 
    The stream carries **named SSE events**, not one generic `message` frame: `useDraftRoom`
    registers one listener per draft event type (`draft.pick`, `draft.nominate`, `draft.bid`,
-   `draft.timer_expire`, `draft.status`) via `source.addEventListener(type, handler)`, plus
-   separate `open` and `error` listeners for connection state. `chat.*` and `score.update`
-   frames ride the same stream under their own event names and are never listened for here —
-   the draft room is not their consumer.
+   `draft.timer_expire`, `draft.status`, `draft.queue`, `draft.nudge`) via
+   `source.addEventListener(type, handler)`, plus separate `open` and `error` listeners for
+   connection state. `chat.*` and `score.update` frames ride the same stream under their own
+   event names and are never listened for here — the draft room is not their consumer.
+
+   **`draft.queue` and `draft.nudge` are the two frames that never move the picture.**
+   `draft.queue` carries only `teamId` — the queue's own contents are never on the wire, since
+   a queue is a private draft plan — and folds exactly like `draft.status`: the clock (and
+   therefore `sequence`) advances, nothing else about `view` changes. This is what keeps a
+   rival's queue edit from ever forcing a resync. The room's OWN `queue` — loaded with the
+   snapshot, held separately from `view`, written by `setQueue` (below) — is never touched by
+   any `draft.queue` frame, including an echo of the caller's own edit; the local, optimistic
+   value stays authoritative until the POST's own response replaces it. `draft.nudge` carries
+   `teamId` and `message` and moves nothing at all — `applyDraftEvent` surfaces it as a
+   `NudgeNotice` alongside the (unchanged) view, and `useDraftRoom` keeps it only when
+   `payload.teamId` matches the caller's own team. See `docs/draft-moderator.md`.
 3. **Apply** → `applyDraftEvent(view, data)` (`src/draft-room/state/apply-event.ts`) validates
    the frame with Zod (`state/payloads.ts`), then compares `payload.clock.sequence` with
    `view.sequence`:
@@ -118,6 +130,16 @@ it agrees with the engine's `totalRosterSlots` so the two cannot diverge.
    money, its lot — so the rollback instead triggers a full `refresh()` and asks the server for
    the truth. Only a submission that landed with nothing else having happened gets the cheap,
    synchronous plain restore.
+6. **`setQueue`** (`useDraftRoom`) follows the same optimistic-then-settle shape as `submit`,
+   through `POST /api/drafts/[draftId]/queue` — but **a queue edit is not a draft action**: it
+   never touches `pendingPlayerId`, `submitting`, `optimisticView`, or `view` at all. Only
+   `queue` moves, optimistically, then settles on the server's own answer or rolls back with
+   the reducer's 409 reason on rejection (`"A queue can hold at most 50 players."` and similar
+   — the client enforces no length cap of its own; see `docs/draft-moderator.md`). `SnakeRoom`
+   and `AuctionRoom` each call the shared `useQueueHandlers` hook
+   (`src/draft-room/hooks/use-queue-handlers.ts`) rather than threading a queue callback down
+   from `DraftRoom` — it wraps `room.setQueue` and turns a rejection into the same `tone:
+   "error"` toast every other rejected action gets, so that wiring isn't declared twice.
 
 ### What "optimistic" deliberately does not do
 
@@ -150,12 +172,14 @@ ticker's job, and `TIMER_EXPIRE` has no HTTP path a client could use. `Countdown
 | Component | Renders |
 |---|---|
 | `DraftRoom` | The client entry point for `/app/drafts/[draftId]`. Owns the loading/error/ready split and is the one place a rejected `submit()` becomes a toast. Picks `SnakeRoom` or `AuctionRoom` by `view.format`. |
-| `SnakeRoom` | Clock, pick-celebration, `PlayerPool` (action: "Draft"), `RosterBoard`, `PickHistory`. |
-| `AuctionRoom` | Clock, pick-celebration, `AuctionLotPanel`, `BidControls`, `PlayerPool` (action: "Nominate"), `BudgetTable`, `RosterBoard`, `PickHistory`, `NominateModal`. |
+| `SnakeRoom` | Clock, `NudgeBanner`, pick-celebration, `PlayerPool` (action: "Draft"), `RosterBoard`, `QueuePanel`, `PickHistory`. Reads `room.queue`/`room.nudge` and calls `room.setQueue` directly via `useQueueHandlers` — no queue props threaded from `DraftRoom`. |
+| `AuctionRoom` | Clock, `NudgeBanner`, pick-celebration, `AuctionLotPanel`, `BidControls`, `PlayerPool` (action: "Nominate"), `BudgetTable`, `RosterBoard`, `QueuePanel`, `PickHistory`, `NominateModal`. Same `useQueueHandlers` wiring as `SnakeRoom`. |
+| `QueuePanel` | The manager's own ranked autopick queue, rendered as an `<ol>` (position is the meaning). Named, keyboard-reachable move-up/move-down/remove buttons per row — no drag-only reordering. Shows `EmptyState` when the queue is empty; a queued player who's since been drafted gets a `Badge`. |
+| `NudgeBanner` | The moderator's prompt, verbatim, `role="status"`/`aria-live="polite"`. Renders only while `nudge.sequence === view.sequence`, so it clears itself the instant the turn moves on — no timer, nothing to leak. One surface, not two: a banner, never a toast as well. |
 | `TvBoard` | The read-only `/draft/[draftId]/board` shell: clock, pick-celebration, an "on the clock" spotlight, and `PickHistory` in `variant="tv"`. Shares `useDraftRoom` with the real room — no second data path. Renders no control except the error state's retry. |
 | `ClockBanner` | Whose turn it is, the countdown, the clock-length sentence, and `formatTightening`'s "picks shorten to …" line. Branches on `view.phase` (`scheduled` / `complete` / `in_progress`). |
 | `Countdown` / `useCountdown` | The one shared countdown implementation (see "Wall clock" above). `Countdown` itself is `aria-hidden`. |
-| `PlayerPool` | Server-ranked player list with name search and a position `Select`; caps rendered rows at `DRAFT_ROOM_CONFIG.poolPageSize`. Never re-ranks. |
+| `PlayerPool` | Server-ranked player list with name search and a position `Select`; caps rendered rows at `DRAFT_ROOM_CONFIG.poolPageSize`. Never re-ranks. A "Queue"/"Remove … from your queue" button per available row, driven by `queuedPlayerIds`/`onQueue`. |
 | `RosterBoard` | Expands each team's declared roster shape (`view.slotConfig`) into one cell per spot, filled or not, from `view.rosters`. |
 | `PickHistory` | A `Table` of `view.picks`, newest first. `variant="room"` (default) shows slot and auto-pick badge; `variant="tv"` drops those and widens for a TV audience. |
 | `AuctionLotPanel` | The lot everyone is watching: nominated player, standing high bid and bidder, and the bid-window countdown (from `view.deadlineAt`, via `useCountdown`). |

@@ -10,8 +10,9 @@ vi.mock("@/lib/auth/current-user", () => ({
   requireCurrentUser: vi.fn(),
 }));
 
+import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { players } from "@/db/schema";
+import { leagues, players, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { GET as getQueue, POST as postQueue } from "@/app/api/drafts/[draftId]/queue/route";
 import { GET as getDraft } from "@/app/api/drafts/[draftId]/route";
@@ -121,5 +122,22 @@ describe("GET /api/drafts/[draftId]/queue and the snapshot's queue", () => {
     await postQueue(post({ playerIds: ["rb1", "qb1"] }), { params });
     const snapshot = await (await getDraft(new Request(`http://test/api/drafts/${DRAFT_ID}`), { params })).json();
     expect(snapshot.data.queue).toEqual(["rb1", "qb1"]);
+  });
+
+  // Task 2 carry: a commissioner with no team of their own has no queue of their own either —
+  // `GET /queue` and the snapshot's `queue` field both answer `[]` rather than a 403 or a 500,
+  // the same `teamId === null` branch the state route already covers for `isCommissioner`.
+  it("answers an empty queue — never a 403 — for a commissioner with no team of their own", async () => {
+    const f = await fixture();
+    const commissionerId = "queue_api_commish_no_team";
+    await db.insert(users).values({ id: commissionerId, email: `${commissionerId}@test.local`, displayName: commissionerId });
+    await db.update(leagues).set({ commissionerUserId: commissionerId }).where(eq(leagues.id, f.leagueId));
+    signedInAs(commissionerId);
+
+    expect(await (await getQueue(new Request(url), { params })).json()).toEqual({ ok: true, data: { queue: [] } });
+    const snapshot = await (await getDraft(new Request(`http://test/api/drafts/${DRAFT_ID}`), { params })).json();
+    expect(snapshot.data.teamId).toBeNull();
+    expect(snapshot.data.isCommissioner).toBe(true);
+    expect(snapshot.data.queue).toEqual([]);
   });
 });

@@ -5,13 +5,15 @@ import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { ClientDraftAction, CompletedPick, DraftStateView } from "@/draft-engine";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import type { DraftPlayersBody, DraftSnapshotBody } from "@/draft-room/contract";
+import type { DraftPlayersBody, DraftQueueBody, DraftSnapshotBody } from "@/draft-room/contract";
 import { applyDraftEvent } from "@/draft-room/state/apply-event";
 import { optimisticView } from "@/draft-room/state/optimistic";
 import { useDraftRoomDeps } from "./deps";
 
-/** The five event types this room consumes. Chat and scoring ride the same stream and are ignored. */
-const DRAFT_EVENT_TYPES = ["draft.pick", "draft.nominate", "draft.bid", "draft.timer_expire", "draft.status"] as const;
+/** All seven event types this room consumes. Chat and scoring ride the same stream and are ignored. */
+const DRAFT_EVENT_TYPES = [
+  "draft.pick", "draft.nominate", "draft.bid", "draft.timer_expire", "draft.status", "draft.queue", "draft.nudge",
+] as const;
 
 const NETWORK_ERROR = "We couldn't reach the draft. Check your connection and try again.";
 
@@ -21,6 +23,12 @@ export type SubmitOutcome = { readonly ok: true } | { readonly ok: false; readon
 export interface LandedPick {
   readonly pick: CompletedPick;
   readonly isMine: boolean;
+}
+
+export interface RoomNudge {
+  readonly message: string;
+  /** The turn it was about — the banner hides itself once the view's sequence passes it. */
+  readonly sequence: number;
 }
 
 interface RoomState {
@@ -35,11 +43,15 @@ interface RoomState {
   readonly pendingPlayerId: string | null;
   readonly submitting: boolean;
   readonly lastPick: LandedPick | null;
+  /** The caller's own autopick queue. Never anybody else's. */
+  readonly queue: readonly string[];
+  readonly nudge: RoomNudge | null;
 }
 
 export interface DraftRoom extends RoomState {
   readonly submit: (action: ClientDraftAction) => Promise<SubmitOutcome>;
   readonly refresh: () => Promise<void>;
+  readonly setQueue: (playerIds: readonly string[]) => Promise<SubmitOutcome>;
 }
 
 const INITIAL: RoomState = {
@@ -54,6 +66,8 @@ const INITIAL: RoomState = {
   pendingPlayerId: null,
   submitting: false,
   lastPick: null,
+  queue: [],
+  nudge: null,
 };
 
 /**
@@ -71,6 +85,9 @@ export function useDraftRoom(draftId: string): DraftRoom {
   // Event handlers are long-lived closures; refs give them today's view without re-subscribing.
   const viewRef = useRef<DraftStateView | null>(null);
   const teamRef = useRef<string | null>(null);
+  // Mirrors `state.queue` the same way `viewRef` mirrors `state.view` — long-lived closures
+  // (the SSE handler, `setQueue`'s own rollback) need today's queue without re-subscribing.
+  const queueRef = useRef<readonly string[]>([]);
   // Single-flight + staleness guards for `refresh()`. `refreshPromiseRef` lets N gapped
   // frames arriving back-to-back share ONE in-flight fetch pair instead of firing N; a
   // resync fires it fire-and-forget (`void refresh()`), so nothing else awaits the promise
@@ -130,6 +147,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
 
         viewRef.current = snapshot.data.draft;
         teamRef.current = snapshot.data.teamId;
+        queueRef.current = snapshot.data.queue;
         setLeagueId(snapshot.data.draft.leagueId);
         setState((prev) => ({
           ...prev,
@@ -141,6 +159,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
           myTeamId: snapshot.data.teamId,
           isCommissioner: snapshot.data.isCommissioner,
           pendingPlayerId: null,
+          queue: snapshot.data.queue,
         }));
       } catch {
         if (generation === generationRef.current) {
@@ -167,6 +186,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
     refreshPromiseRef.current = null;
     viewRef.current = null;
     teamRef.current = null;
+    queueRef.current = [];
     playersLoadedForRef.current = null;
     setLeagueId(null);
     setState(INITIAL);
@@ -194,6 +214,12 @@ export function useDraftRoom(draftId: string): DraftRoom {
         ...prev,
         view: result.view,
         lastPick: landed === null ? prev.lastPick : { pick: landed, isMine: landed.teamId === teamRef.current },
+        // A nudge names exactly one team. Everybody on the league stream receives the frame;
+        // only that team's manager is shown it.
+        nudge:
+          result.nudge !== null && result.nudge.teamId === teamRef.current
+            ? { message: result.nudge.message, sequence: result.nudge.sequence }
+            : prev.nudge,
       }));
     };
 
@@ -271,5 +297,39 @@ export function useDraftRoom(draftId: string): DraftRoom {
     [deps, draftId, refresh],
   );
 
-  return { ...state, submit, refresh };
+  // A queue edit is not a draft action: it never touches `pendingPlayerId`, `submitting`,
+  // `optimisticView` or the view at all — only `queue` moves, optimistically, then settles on
+  // the server's own answer (or rolls back on rejection).
+  const setQueue = useCallback(
+    async (playerIds: readonly string[]): Promise<SubmitOutcome> => {
+      const before = queueRef.current;
+      queueRef.current = playerIds;
+      setState((prev) => ({ ...prev, queue: playerIds }));
+      const restore = (): void => {
+        queueRef.current = before;
+        setState((prev) => ({ ...prev, queue: before }));
+      };
+      try {
+        const response = await deps.fetchJson(`/api/drafts/${draftId}/queue`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ playerIds }),
+        });
+        const body = (await response.json()) as ApiEnvelope<DraftQueueBody>;
+        if (!body.ok) {
+          restore();
+          return { ok: false, reason: body.error };
+        }
+        queueRef.current = body.data.queue;
+        setState((prev) => ({ ...prev, queue: body.data.queue }));
+        return { ok: true };
+      } catch {
+        restore();
+        return { ok: false, reason: NETWORK_ERROR };
+      }
+    },
+    [deps, draftId],
+  );
+
+  return { ...state, submit, refresh, setQueue };
 }

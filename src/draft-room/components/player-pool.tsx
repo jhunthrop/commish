@@ -21,6 +21,8 @@ export interface PlayerPoolProps {
   readonly actionLabel: string;
   readonly submitting: boolean;
   readonly onAct: (playerId: string) => void;
+  readonly queuedPlayerIds: ReadonlySet<string>;
+  readonly onQueue: (playerId: string) => void;
 }
 
 interface PoolRow {
@@ -29,7 +31,7 @@ interface PoolRow {
   readonly drafted: boolean;
 }
 
-export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel, submitting, onAct }: PlayerPoolProps) {
+export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel, submitting, onAct, queuedPlayerIds, onQueue }: PlayerPoolProps) {
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState(ALL);
 
@@ -50,6 +52,16 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
     { key: "position", header: "Pos", cell: (row) => row.player.position },
     { key: "team", header: "NFL", cell: (row) => row.player.nflTeam, hideOnNarrow: true },
     { key: "rank", header: "Rank", cell: (row) => row.rank, numeric: true, hideOnNarrow: true },
+    {
+      key: "queue",
+      header: "Queue",
+      cell: (row) =>
+        row.drafted ? null : (
+          <Button size="sm" variant="ghost" disabled={submitting} onClick={() => onQueue(row.player.id)}>
+            {queuedPlayerIds.has(row.player.id) ? `Remove ${row.player.name} from your queue` : `Queue ${row.player.name}`}
+          </Button>
+        ),
+    },
     {
       key: "action",
       header: "Action",

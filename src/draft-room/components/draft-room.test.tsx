@@ -57,6 +57,19 @@ describe("DraftRoom", () => {
     expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
   });
 
+  it("queues a player and shows the reducer's reason in a toast when the queue change is rejected", async () => {
+    const fixture = fixtureDeps();
+    fixture.queueResponse = { ok: false, error: "A queue can hold at most 50 players." };
+    mount(fixture);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Queue Jalen Croft" }));
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent("A queue can hold at most 50 players.");
+    // Rolled back: the pool still offers to queue the player, not to remove them.
+    expect(screen.getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument();
+  });
+
   it("tells the user when the connection drops", async () => {
     const { fixture } = mount();
     await waitFor(() => expect(fixture.sources).toHaveLength(1));

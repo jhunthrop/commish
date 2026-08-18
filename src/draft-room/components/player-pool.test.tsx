@@ -13,6 +13,8 @@ const props = {
   actionLabel: "Draft",
   submitting: false,
   onAct: () => {},
+  queuedPlayerIds: new Set<string>(),
+  onQueue: () => {},
 };
 
 describe("PlayerPool", () => {
@@ -83,5 +85,13 @@ describe("PlayerPool", () => {
     const view = { ...SNAKE_VIEW, availablePlayerIds: manyPlayers.map((player) => player.id) };
     render(<PlayerPool {...props} players={manyPlayers} view={view} />);
     expect(screen.getByText("Showing the top 60 of 75 — narrow your search to see more.")).toBeInTheDocument();
+  });
+
+  it("queues and un-queues a player from the pool", () => {
+    const onQueue = vi.fn();
+    render(<PlayerPool {...props} queuedPlayerIds={new Set(["rb1"])} onQueue={onQueue} />);
+    fireEvent.click(screen.getByRole("button", { name: "Queue Jalen Croft" }));
+    expect(onQueue).toHaveBeenCalledWith("qb1");
+    expect(screen.getByRole("button", { name: "Remove Marcus Reed from your queue" })).toBeInTheDocument();
   });
 });

@@ -68,6 +68,10 @@ const bidPayloadSchema = z.object({
 });
 const statusPayloadSchema = z.object({ ...common, phase: z.enum(["scheduled", "in_progress", "complete"]) });
 const expirePayloadSchema = z.object({ ...common, pickNumber: z.number().int().nonnegative() });
+const queuePayloadSchema = z.object({ ...common, teamId: z.string().min(1) });
+
+/** The moderator's prompt. The queue itself is never on the wire — only this sentence. */
+const nudgePayloadSchema = z.object({ ...common, teamId: z.string().min(1), message: z.string().min(1) });
 
 /**
  * A `draft.*` frame off the league stream. Non-draft event types (`chat.*`, `score.update`)
@@ -79,9 +83,12 @@ export const draftEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("draft.bid"), payload: bidPayloadSchema }),
   z.object({ type: z.literal("draft.status"), payload: statusPayloadSchema }),
   z.object({ type: z.literal("draft.timer_expire"), payload: expirePayloadSchema }),
+  z.object({ type: z.literal("draft.queue"), payload: queuePayloadSchema }),
+  z.object({ type: z.literal("draft.nudge"), payload: nudgePayloadSchema }),
 ]);
 
 export type DraftEventFrame = z.infer<typeof draftEventSchema>;
 export type DraftPickPayload = z.infer<typeof pickPayloadSchema>;
 export type DraftNominatePayload = z.infer<typeof nominatePayloadSchema>;
 export type DraftBidPayload = z.infer<typeof bidPayloadSchema>;
+export type DraftNudgePayload = z.infer<typeof nudgePayloadSchema>;

@@ -4,14 +4,17 @@ import { useState } from "react";
 import type { Player } from "@/domain/player";
 import type { ClientDraftAction } from "@/draft-engine";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
+import { useQueueHandlers } from "../hooks/use-queue-handlers";
 import { playerName } from "../lib/lookups";
 import { ClockBanner } from "./clock-banner";
+import { NudgeBanner } from "./nudge-banner";
 import { PickCelebration } from "./pick-celebration";
 import { AuctionLotPanel } from "./auction-lot";
 import { BidControls } from "./bid-controls";
 import { NominateModal } from "./nominate-modal";
 import { BudgetTable } from "./budget-table";
 import { PlayerPool } from "./player-pool";
+import { QueuePanel } from "./queue-panel";
 import { RosterBoard } from "./roster-board";
 import { PickHistory } from "./pick-history";
 
@@ -26,10 +29,12 @@ export function AuctionRoom({ room, playersById, onAct }: AuctionRoomProps) {
   const [nominating, setNominating] = useState<string | null>(null);
   // Affordance only. `onClockTeamId` is the engine's nominator, and it is null while a lot is live.
   const canNominate = view.phase === "in_progress" && room.myTeamId !== null && view.onClockTeamId === room.myTeamId;
+  const { queuedPlayerIds, onQueueChange, onQueueToggle } = useQueueHandlers(room);
 
   return (
     <div className="flex flex-col gap-4">
       <ClockBanner view={view} teams={room.teams} myTeamId={room.myTeamId} playersById={playersById} />
+      <NudgeBanner nudge={room.nudge} sequence={view.sequence} />
       <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
       <AuctionLotPanel view={view} teams={room.teams} playersById={playersById} />
       <div className="grid gap-4 lg:grid-cols-2">
@@ -43,11 +48,20 @@ export function AuctionRoom({ room, playersById, onAct }: AuctionRoomProps) {
             actionLabel="Nominate"
             submitting={room.submitting}
             onAct={setNominating}
+            queuedPlayerIds={queuedPlayerIds}
+            onQueue={onQueueToggle}
           />
         </div>
         <div className="flex flex-col gap-4">
           <BudgetTable view={view} teams={room.teams} myTeamId={room.myTeamId} />
           <RosterBoard view={view} teams={room.teams} playersById={playersById} myTeamId={room.myTeamId} />
+          <QueuePanel
+            queue={room.queue}
+            playersById={playersById}
+            availablePlayerIds={view.availablePlayerIds}
+            busy={room.submitting}
+            onChange={onQueueChange}
+          />
           <PickHistory view={view} teams={room.teams} playersById={playersById} />
         </div>
       </div>

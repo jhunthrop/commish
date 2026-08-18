@@ -3,8 +3,15 @@ import { draftEventSchema, type DraftEventFrame, type DraftPickPayload } from ".
 
 export type ApplyOutcome = "ignored" | "resync";
 
+export interface NudgeNotice {
+  readonly teamId: string;
+  readonly message: string;
+  /** The turn this nudge was about. The banner hides itself once the view moves past it. */
+  readonly sequence: number;
+}
+
 export type ApplyEventResult =
-  | { readonly ok: true; readonly view: DraftStateView }
+  | { readonly ok: true; readonly view: DraftStateView; readonly nudge: NudgeNotice | null }
   | { readonly ok: false; readonly outcome: ApplyOutcome };
 
 const IGNORED: ApplyEventResult = { ok: false, outcome: "ignored" };
@@ -62,6 +69,8 @@ function applyFrame(view: DraftStateView, frame: DraftEventFrame): DraftStateVie
   switch (frame.type) {
     case "draft.timer_expire":
     case "draft.status":
+    case "draft.queue":
+    case "draft.nudge":
       return view;
     case "draft.pick":
       return applyPick(view, frame.payload);
@@ -116,5 +125,10 @@ export function applyDraftEvent(view: DraftStateView, data: string): ApplyEventR
   if (sequence > view.sequence + 1) return RESYNC;
 
   const next = applyFrame({ ...view, ...frame.payload.clock }, frame);
-  return next === null ? RESYNC : { ok: true, view: next };
+  if (next === null) return RESYNC;
+  const nudge: NudgeNotice | null =
+    frame.type === "draft.nudge"
+      ? { teamId: frame.payload.teamId, message: frame.payload.message, sequence: frame.payload.clock.sequence }
+      : null;
+  return { ok: true, view: next, nudge };
 }

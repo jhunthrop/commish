@@ -23,6 +23,12 @@ an explicit upgrade path in `draftActionSchema` — it never reinterprets an old
 - `MAKE_PICK` — `{ teamId, playerId }` (snake).
 - `NOMINATE` — `{ teamId, playerId, openingBid }` (auction; a nomination is a bid).
 - `BID` — `{ teamId, amount }` (auction).
+- `SET_QUEUE` — `{ teamId, playerIds }`, replacing a team's ranked autopick queue wholesale.
+  In the log rather than a side table, on purpose: `state.queues[teamId]` (`queueFor`) is
+  derived by replay exactly like `rosters` or `budgets`, so a queue edit is exactly as
+  replay-safe and durable as a pick. See `docs/draft-moderator.md`. Capped at
+  `DRAFT_QUEUE_CONFIG.maxLength` client-side; `PERSISTED_QUEUE_MAX` is the separate, frozen
+  ceiling for the jsonb row itself and must never decrease.
 - `TIMER_EXPIRE` — no payload. **Server-only**: produced by the ticker, never accepted over HTTP
   (the actions route's Zod schema has no `TIMER_EXPIRE` member a client can submit).
 
@@ -62,8 +68,13 @@ clock — every timed decision consumes a timestamp the caller supplied.
    open spot can always afford the minimum bid — that is why auto-nomination can't deadlock. A
    draft can't start unless the budget covers at least `minBid` per roster spot
    (`reduceStart` in `reduce.ts`).
-5. Autopick and auto-nomination (`bestAvailableFor`) take the highest-ranked player the team
-   can legally roster, ranked by `state.pool`'s order — an input, never an ambient lookup.
+5. **Autopick and auto-nomination are queue-first.** `bestAvailableFor` (`selectors.ts`) is the
+   one policy both `reduceSnakeExpiry` and `reduceAuctionExpiry` call: it takes the first entry
+   in the team's own ranked queue (`queueFor`) that is still available and still legally
+   rosterable; only once the queue is empty or exhausted does it fall back to the
+   highest-ranked player by `state.pool`'s order. Both the queue and the pool are explicit
+   inputs carried in the action log, never an ambient lookup, so the same log always autopicks
+   the same player on replay.
 6. The pick clock auto-tightens against kickoff: `DRAFT_CLOCK_SCHEDULE` = 8h → 4h → 1h → 10m →
    60s. A tier applies while the draft is more than `untilHoursBeforeKickoff` hours out; the
    last tier is the floor. Live auction bidding uses the shorter of the tier and
@@ -200,6 +211,8 @@ sequence number a client uses for gap detection is `payload.clock.sequence`.
 | `draft.nominate` | `teamId`, `playerId`, `openingBid`, `auto`, `minBid` (the floor for the NEXT bid on this lot) | A new lot opens. |
 | `draft.bid` | `teamId`, `playerId`, `amount`, `minBid` (the floor for the NEXT bid on this lot) | The open lot's high bid changes without a new player. |
 | `draft.timer_expire` | `pickNumber` (the pick the clock ran out on) | Every accepted `TIMER_EXPIRE`, always pushed first. |
+| `draft.queue` | `teamId` only — **the ordered list itself is never broadcast**, since a queue is a private draft plan. | Every accepted `SET_QUEUE`. Clock-only on the client: sequence advances, nothing else about the view changes. |
+| `draft.nudge` | `teamId`, `message` (the moderator's one sentence) | **Not emitted by `draftEventsFor`** — published directly by the nudge scheduler (`createNudgeScheduler`, `src/draft-service/nudge.ts`) on the ticker's own schedule, independent of any action. See `docs/draft-moderator.md`. |
 
 Two fields are easy to misread because a `pickNumber` appears twice with different meanings
 on the same payload. On `draft.pick`, the **top-level** `pickNumber` is that pick's own
@@ -214,6 +227,12 @@ always precedes the `draft.pick` or `draft.nominate` it caused, and both precede
 `draft.status` when the same action also completes the draft — so a client can render events in
 arrival order without reordering.
 
+`draftEventsFor`'s auction block (`draft.nominate`/`draft.bid`) is gated on the lot having
+**actually moved** — a new player, or a higher `highBid`/`highBidTeamId` — not merely on a lot
+being open. `SET_QUEUE` arriving while a lot is live changes nothing about that lot, so this
+gate is what stops a queue edit during a live auction from re-broadcasting the standing bid as
+if somebody had just raised it.
+
 ## API
 
 | Route | Who | Notes |
@@ -222,6 +241,8 @@ arrival order without reordering.
 | `GET /api/drafts/[draftId]/players` | a manager with a team in the league, or the commissioner | Ranked player metadata (id/name/position/nflTeam) for the pool. Separate from the state route because it never changes mid-draft and the state route is refetched on every resync. |
 | `POST /api/drafts/[draftId]/actions` | a manager with a team in the league | Body: `{ type: "MAKE_PICK" \| "NOMINATE" \| "BID", … }`. **No `teamId`** — the server resolves it from the session. A rejected action is a 409 with the reducer's reason. |
 | `POST /api/drafts/[draftId]/start` | commissioner only | Fixes the order and the ranked pool. |
+| `GET /api/drafts/[draftId]/queue` | a manager with a team in the league, or the commissioner | The caller's OWN autopick queue, never anybody else's. A commissioner with no team of their own gets `[]`, not a 403. |
+| `POST /api/drafts/[draftId]/queue` | a manager with a team in the league | Body: `{ playerIds: string[] }`. **No `teamId`** — the acting team is resolved from the session, same as `/actions`. A rejected change (a duplicate id, or over `DRAFT_QUEUE_CONFIG.maxLength`) is a 409 with the reducer's reason. |
 | `GET /api/leagues/[leagueId]/events` | a manager with a team in the league, or the commissioner | The real-time fan-out: Redis Streams over SSE. Gated the same way as the draft board — a signed-in stranger with no team in the league gets 403, not another league's events. |
 
 There is no second transport and no per-draft stream — `draft.*` events ride the league stream

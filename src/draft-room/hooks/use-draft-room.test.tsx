@@ -78,6 +78,10 @@ interface Harness {
   readonly fetches: string[];
   snapshot: DraftStateView;
   postResponse: unknown;
+  /** What the snapshot reports as the caller's own queue. */
+  queue: readonly string[];
+  /** What `POST /queue` answers with. */
+  queueResponse: unknown;
 }
 
 function harness(): Harness {
@@ -86,12 +90,15 @@ function harness(): Harness {
     fetches: [],
     snapshot: VIEW,
     postResponse: null,
+    queue: [],
+    queueResponse: { ok: true, data: { queue: [] } },
     deps: {
       fetchJson: async (url, init) => {
         state.fetches.push(`${init?.method ?? "GET"} ${url}`);
         if (url.endsWith("/players")) return jsonOf({ ok: true, data: { players: PLAYERS } });
+        if (url.endsWith("/queue")) return jsonOf(init?.method === "POST" ? state.queueResponse : { ok: true, data: { queue: state.queue } });
         if (init?.method === "POST") return jsonOf(state.postResponse);
-        return jsonOf({ ok: true, data: { draft: state.snapshot, teamId: "t1", isCommissioner: false, teams: TEAMS } });
+        return jsonOf({ ok: true, data: { draft: state.snapshot, teamId: "t1", isCommissioner: false, teams: TEAMS, queue: state.queue } });
       },
       openEventSource: (url) => {
         const source = new FakeEventSource(url);
@@ -402,5 +409,63 @@ describe("useDraftRoom", () => {
     const { unmount } = await mounted(h);
     unmount();
     expect(h.sources[0]?.closed).toBe(true);
+  });
+
+  it("loads the caller's own queue with the snapshot", async () => {
+    const h = harness();
+    h.queue = ["rb1"];
+    const { result } = await mounted(h);
+    expect(result.current.queue).toEqual(["rb1"]);
+  });
+
+  it("submits a queue change optimistically and keeps the server's answer", async () => {
+    const h = harness();
+    h.queueResponse = { ok: true, data: { queue: ["rb1", "qb1"] } };
+    const { result } = await mounted(h);
+    await act(async () => {
+      expect(await result.current.setQueue(["rb1", "qb1"])).toEqual({ ok: true });
+    });
+    expect(h.fetches).toContain("POST /api/drafts/d1/queue");
+    expect(result.current.queue).toEqual(["rb1", "qb1"]);
+  });
+
+  it("rolls a rejected queue change back and reports the reason", async () => {
+    const h = harness();
+    h.queue = ["rb1"];
+    h.queueResponse = { ok: false, error: "A queue can hold at most 50 players." };
+    const { result } = await mounted(h);
+    await act(async () => {
+      expect(await result.current.setQueue(["rb1", "qb1"])).toEqual({
+        ok: false,
+        reason: "A queue can hold at most 50 players.",
+      });
+    });
+    expect(result.current.queue).toEqual(["rb1"]);
+  });
+
+  it("does not let even my own draft.queue echo clobber the locally-held queue", async () => {
+    const h = harness();
+    h.queueResponse = { ok: true, data: { queue: ["rb1"] } };
+    const { result } = await mounted(h);
+    await act(async () => {
+      await result.current.setQueue(["rb1"]);
+    });
+    expect(result.current.queue).toEqual(["rb1"]);
+
+    const before = h.fetches.length;
+    act(() => h.sources[0]!.emit("draft.queue", { draftId: "d1", clock: { ...VIEW, sequence: VIEW.sequence + 1 }, teamId: "t1" }));
+    await waitFor(() => expect(result.current.view?.sequence).toBe(VIEW.sequence + 1));
+    // The queue is untouched by the echo — no resync was needed, so no refetch happened either.
+    expect(result.current.queue).toEqual(["rb1"]);
+    expect(h.fetches).toHaveLength(before);
+  });
+
+  it("keeps a nudge addressed to me and drops one addressed to somebody else", async () => {
+    const h = harness();
+    const { result } = await mounted(h);
+    act(() => h.sources[0]!.emit("draft.nudge", { draftId: "d1", clock: { ...VIEW }, teamId: "t2", message: "Not for you." }));
+    expect(result.current.nudge).toBeNull();
+    act(() => h.sources[0]!.emit("draft.nudge", { draftId: "d1", clock: { ...VIEW }, teamId: "t1", message: "You're up." }));
+    expect(result.current.nudge).toEqual({ message: "You're up.", sequence: VIEW.sequence });
   });
 });

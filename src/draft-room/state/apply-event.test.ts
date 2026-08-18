@@ -40,6 +40,17 @@ const auctionView: DraftStateView = {
 
 const frame = (type: string, payload: unknown) => JSON.stringify({ id: "1-0", type, leagueId: "l1", timestamp: "2026-09-01T00:00:00.000Z", payload });
 
+/** The seven `DraftClockView` fields a view already carries, unchanged — the "sibling" clock. */
+const clockOf = (view: DraftStateView): DraftClockView => ({
+  phase: view.phase,
+  sequence: view.sequence,
+  pickNumber: view.pickNumber,
+  onClockTeamId: view.onClockTeamId,
+  deadlineAt: view.deadlineAt,
+  clockSeconds: view.clockSeconds,
+  nextTightening: view.nextTightening,
+});
+
 const pickPayload = {
   draftId: "d1",
   clock: clock(),
@@ -169,5 +180,52 @@ describe("applyDraftEvent — clock-only events", () => {
     const view = (applyDraftEvent(snakeView, frame("draft.status", payload)) as { view: DraftStateView }).view;
     expect(view.phase).toBe("complete");
     expect(view.deadlineAt).toBeNull();
+  });
+});
+
+describe("applyDraftEvent — draft.queue and draft.nudge", () => {
+  it("folds a draft.queue frame: the clock advances and nothing else changes", () => {
+    const queuePayload = { draftId: "d1", clock: { ...clockOf(snakeView), sequence: snakeView.sequence + 1 }, teamId: "t2" };
+    const result = applyDraftEvent(snakeView, frame("draft.queue", queuePayload));
+    expect(result).toEqual({
+      ok: true,
+      view: { ...snakeView, sequence: snakeView.sequence + 1 },
+      nudge: null,
+    });
+  });
+
+  // The CRITICAL closure check (Task 2 review requirement): a rival's queue edit must fold
+  // cleanly — clock/sequence advance, nothing else changes — so it never forces a resync, and
+  // the NEXT real event right behind it applies normally instead of tripping the gap detector.
+  it("a rival's draft.queue frame folds cleanly, and the next real event right behind it applies without a resync", () => {
+    const queuePayload = { draftId: "d1", clock: { ...clockOf(snakeView), sequence: snakeView.sequence + 1 }, teamId: "t2" };
+    const afterQueue = applyDraftEvent(snakeView, frame("draft.queue", queuePayload));
+    expect(afterQueue).toEqual({ ok: true, view: { ...snakeView, sequence: snakeView.sequence + 1 }, nudge: null });
+    const queuedView = (afterQueue as { view: DraftStateView }).view;
+
+    const nextPick = { ...pickPayload, clock: clock({ sequence: snakeView.sequence + 2 }) };
+    const afterPick = applyDraftEvent(queuedView, frame("draft.pick", nextPick));
+    expect(afterPick.ok).toBe(true);
+    expect((afterPick as { view: DraftStateView }).view.picks).toHaveLength(1);
+  });
+
+  it("surfaces a draft.nudge as a notice without moving the view", () => {
+    const nudgePayload = { draftId: "d1", clock: clockOf(snakeView), teamId: "t1", message: "You're on the clock." };
+    expect(applyDraftEvent(snakeView, frame("draft.nudge", nudgePayload))).toEqual({
+      ok: true,
+      view: snakeView,
+      nudge: { teamId: "t1", message: "You're on the clock.", sequence: snakeView.sequence },
+    });
+  });
+
+  it("ignores a nudge frame missing its message", () => {
+    const malformed = { draftId: "d1", clock: clockOf(snakeView), teamId: "t1" };
+    expect(applyDraftEvent(snakeView, frame("draft.nudge", malformed))).toEqual({ ok: false, outcome: "ignored" });
+  });
+
+  it("does not surface a nudge on a non-nudge frame", () => {
+    const result = applyDraftEvent(snakeView, frame("draft.pick", pickPayload));
+    expect(result.ok).toBe(true);
+    expect((result as { nudge: unknown }).nudge).toBeNull();
   });
 });
