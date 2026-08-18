@@ -57,6 +57,13 @@
       "when": 1787059122363,
       "tag": "0007_nudge_claim_per_pick",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1787089064436,
+      "tag": "0008_salty_synch",
+      "breakpoints": true
     }
   ]
 }
