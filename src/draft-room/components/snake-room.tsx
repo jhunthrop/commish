@@ -4,6 +4,7 @@ import type { Player } from "@/domain/player";
 import type { ClientDraftAction } from "@/draft-engine";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { ClockBanner } from "./clock-banner";
+import { PickCelebration } from "./pick-celebration";
 import { PlayerPool } from "./player-pool";
 import { RosterBoard } from "./roster-board";
 import { PickHistory } from "./pick-history";
@@ -22,6 +23,7 @@ export function SnakeRoom({ room, playersById, onAct }: SnakeRoomProps) {
   return (
     <div className="flex flex-col gap-4">
       <ClockBanner view={view} teams={room.teams} myTeamId={room.myTeamId} />
+      <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
       <div className="grid gap-4 lg:grid-cols-2">
         <PlayerPool
           players={room.players}

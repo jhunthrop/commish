@@ -43,6 +43,29 @@ body {
   line-height: var(--commish-line-height-base);
 }
 
+/* The pick-landing moment. Durations and easings come from the generated token variables,
+   never from a literal — see docs/design-system.md. The reduced-motion block below is the
+   safety net; PickCelebration also drops these classes outright when the user asks for
+   less motion, so nothing merely runs faster. */
+@keyframes commish-pick-landed {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes commish-pick-mine {
+  0% { opacity: 0; transform: scale(0.96); }
+  60% { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.animate-pick-landed {
+  animation: commish-pick-landed var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
+}
+
+.animate-pick-mine {
+  animation: commish-pick-mine var(--commish-motion-duration-slow) var(--commish-motion-easing-emphasized) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation-duration: 0.01ms !important;

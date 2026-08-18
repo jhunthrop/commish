@@ -6,6 +6,7 @@ import type { ClientDraftAction } from "@/draft-engine";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { playerName } from "../lib/lookups";
 import { ClockBanner } from "./clock-banner";
+import { PickCelebration } from "./pick-celebration";
 import { AuctionLotPanel } from "./auction-lot";
 import { BidControls } from "./bid-controls";
 import { NominateModal } from "./nominate-modal";
@@ -29,6 +30,7 @@ export function AuctionRoom({ room, playersById, onAct }: AuctionRoomProps) {
   return (
     <div className="flex flex-col gap-4">
       <ClockBanner view={view} teams={room.teams} myTeamId={room.myTeamId} />
+      <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
       <AuctionLotPanel view={view} teams={room.teams} playersById={playersById} />
       <div className="grid gap-4 lg:grid-cols-2">
         <div className="flex flex-col gap-4">
