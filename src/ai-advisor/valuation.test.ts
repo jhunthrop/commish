@@ -36,6 +36,16 @@ describe("tradeBalance", () => {
     expect(balance.flags).toContain("uneven_player_count");
   });
 
+  // Task 7 review follow-up: both threshold boundaries pinned so a <= vs < regression is caught.
+  it("lands exactly ON each threshold on the lenient side: at evenDelta still even, at lopsidedDelta not yet lopsided", () => {
+    const atEven = tradeBalance([player("a", 10)], [player("b", 10 + ADVISOR_CONFIG.evenDelta)]);
+    expect(atEven.verdict).toBe("even");
+
+    const atLopsided = tradeBalance([player("a", 10)], [player("b", 10 + ADVISOR_CONFIG.lopsidedDelta)]);
+    expect(atLopsided.verdict).toBe("favors_proposer");
+    expect(atLopsided.flags).not.toContain("value_gap_over_threshold");
+  });
+
   it("sums and rounds both sides the way the rest of the product rounds points", () => {
     const balance = tradeBalance([player("a", 10.005), player("b", 1)], [player("c", 2.5)]);
     expect(balance.givingValue).toBe(11.01);
@@ -54,6 +64,12 @@ describe("baselineStartSit", () => {
     expect(baseline.start.map((p) => p.playerId)).toEqual(["b"]);
     expect(baseline.sit.map((p) => p.playerId)).toEqual(["c", "a"]);
     expect(baseline.changed).toBe(true);
+  });
+
+  it("breaks average-point ties by playerId — the same inputs always rank the same way", () => {
+    const baseline = baselineStartSit([candidate("z", 9, false), candidate("m", 9, true), candidate("a", 9, false)]);
+    expect(baseline.start.map((p) => p.playerId)).toEqual(["a"]);
+    expect(baseline.sit.map((p) => p.playerId)).toEqual(["m", "z"]);
   });
 
   it("says nothing needs to change when the best players are already starting", () => {

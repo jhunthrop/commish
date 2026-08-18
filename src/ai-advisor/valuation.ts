@@ -58,9 +58,9 @@ export function tradeBalance(giving: readonly ValuedPlayer[], receiving: readonl
   if (giving.length !== receiving.length) flags.push("uneven_player_count");
   if (gap > ADVISOR_CONFIG.lopsidedDelta) flags.push("value_gap_over_threshold");
 
-  const verdict: TradeVerdict = flags.includes("empty_side")
-    ? "lopsided"
-    : gap > ADVISOR_CONFIG.lopsidedDelta
+  // The verdict reuses the flag rather than re-testing the threshold — one rule, one spelling.
+  const verdict: TradeVerdict =
+    flags.includes("empty_side") || flags.includes("value_gap_over_threshold")
       ? "lopsided"
       : gap <= ADVISOR_CONFIG.evenDelta
         ? "even"
@@ -91,7 +91,10 @@ export interface StartSitBaseline {
  * league-specific before a single token is spent.
  */
 export function baselineStartSit(candidates: readonly StartSitCandidate[]): StartSitBaseline {
-  const ranked = [...candidates].sort((a, b) => b.averagePoints - a.averagePoints);
+  // playerId tiebreak: determinism by explicit key, not by trusting sort stability.
+  const ranked = [...candidates].sort(
+    (a, b) => b.averagePoints - a.averagePoints || a.playerId.localeCompare(b.playerId),
+  );
   const startingCount = candidates.filter((candidate) => candidate.starting).length;
   const start = ranked.slice(0, startingCount);
   const sit = ranked.slice(startingCount);
