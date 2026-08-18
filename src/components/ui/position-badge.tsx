@@ -1,6 +1,6 @@
 import type { Position } from "@/domain/player";
 
-export type PositionBadgeSize = "sm" | "md" | "lg";
+export type PositionBadgeSize = "sm" | "md";
 
 export interface PositionBadgeProps {
   readonly position: Position;
@@ -29,7 +29,6 @@ const FILL: Readonly<Record<Position, string>> = {
 const SIZE: Readonly<Record<PositionBadgeSize, string>> = {
   sm: "h-5 px-2 text-xs",
   md: "h-6 px-2 text-sm",
-  lg: "h-8 px-3 text-display-sm",
 };
 
 /**

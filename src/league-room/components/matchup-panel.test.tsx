@@ -29,4 +29,13 @@ describe("MatchupPanel", () => {
       expect(await axe(container)).toHaveNoViolations();
     });
   });
+
+  it("renders a starter's position as a PositionBadge sticker, not a bare string", () => {
+    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" />);
+    const position = MATCHUP.home.starters[0]!.position;
+    if (position === null) throw new Error("fixture starter has no position");
+    const candidates = screen.getAllByText(position, { selector: "span" });
+    const sticker = candidates.find((el) => el.className.includes("bg-pos-"));
+    expect(sticker?.className).toContain(`bg-pos-${position.toLowerCase()}`);
+  });
 });

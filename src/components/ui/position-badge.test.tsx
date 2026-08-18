@@ -39,11 +39,6 @@ describe("PositionBadge", () => {
     expect(container.querySelectorAll("span")).toHaveLength(ALL.length);
   });
 
-  it("sizes up for the board without changing what it says", () => {
-    render(<PositionBadge position="WR" size="lg" />);
-    expect(screen.getByText("WR").className).toMatch(/text-display-sm/);
-  });
-
   it("uses the display face, never the body face", () => {
     render(<PositionBadge position="TE" />);
     expect(screen.getByText("TE").className).toContain("font-display");

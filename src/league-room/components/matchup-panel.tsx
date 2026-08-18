@@ -1,11 +1,16 @@
 import type { MatchupDetail, MatchupSide } from "../contract";
-import { Badge, Card, Table, type TableColumn } from "@/components/ui";
+import { Badge, Card, PositionBadge, SlotChip, Table, type TableColumn } from "@/components/ui";
 import { formatPoints, formatWeek } from "../lib/format";
 
 const COLUMNS: readonly TableColumn<MatchupSide["starters"][number]>[] = [
-  { key: "slot", header: "Slot", cell: (row) => row.slot },
+  { key: "slot", header: "Slot", cell: (row) => <SlotChip slot={row.slot} /> },
   { key: "player", header: "Player", cell: (row) => row.playerName ?? "Empty" },
-  { key: "position", header: "Pos", cell: (row) => row.position ?? "—", hideOnNarrow: true },
+  {
+    key: "position",
+    header: "Pos",
+    cell: (row) => (row.position === null ? "—" : <PositionBadge position={row.position} size="sm" />),
+    hideOnNarrow: true,
+  },
   { key: "points", header: "Points", cell: (row) => formatPoints(row.points), numeric: true },
 ];
 

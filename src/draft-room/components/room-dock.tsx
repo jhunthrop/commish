@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { RosterSlotType } from "@/domain/roster";
 import type { DraftStateView } from "@/draft-engine";
-import { Button, PositionBadge } from "@/components/ui";
+import { Button, PositionBadge, SlotChip } from "@/components/ui";
 import { formatYourTurn } from "../state/format";
 import { playerName, queueButtonLabel } from "../lib/lookups";
 import { moveInQueue, removeFromQueue } from "../state/queue";
@@ -48,7 +48,7 @@ function SlotFill({ slot, filled, total }: { readonly slot: RosterSlotType; read
   return (
     <li className="flex items-center gap-1">
       {position === undefined ? (
-        <span className="rounded-sm border border-border px-2 font-display text-xs font-semibold uppercase tracking-wide text-text-muted">{slot}</span>
+        <SlotChip slot={slot} />
       ) : (
         <PositionBadge position={position} size="sm" />
       )}

@@ -153,8 +153,6 @@ const darkPositions: PositionPalette = {
 export const TOKENS = {
   color: { light, dark },
   position: { light: lightPositions, dark: darkPositions },
-  /** 4px-based spacing scale, px. */
-  space: { 1: 4, 2: 8, 3: 12, 4: 16, 5: 20, 6: 24, 8: 32, 10: 40, 12: 48, 16: 64 },
   radius: { sm: 4, md: 8, lg: 12, pill: 999 },
   font: {
     /** Body scale, px. */
@@ -165,7 +163,6 @@ export const TOKENS = {
      * never a substitute for a body size at the same px (see docs/design-system.md).
      */
     display: { sm: 20, md: 28, lg: 40, xl: 64 },
-    weight: { regular: 400, medium: 500, semibold: 600, bold: 700 },
     lineHeight: { display: 1.05, tight: 1.2, base: 1.5 },
   },
   /**

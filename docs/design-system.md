@@ -30,35 +30,41 @@ This two-layer scheme (generated `--commish-*` source vars → `@theme inline` T
 
 ### One pigment, two jobs
 
-The palette is **six pigments**, and four of them carry a semantic role as well as a position:
+The palette is **six pigments**, and four of them carry a semantic role as well as a position.
+Values live in exactly one place, `src/design/tokens.ts` (`lightPigments`/`darkPigments`) — this
+doc names the roles, not the hexes, so a palette tune never leaves it stale:
 
-| pigment | position | semantic role | light | dark |
-|---|---|---|---|---|
-| whistle | QB | `negative` | `#C8102E` | `#FF6B5E` |
-| leaf | RB | `positive` | `#0B7A3E` | `#5EC77E` |
-| marker | WR | `accent` | `#1D4ED8` | `#7AA5FF` |
-| clay | TE | `warning` | `#B45309` | `#E5B054` |
-| grape | K | — | `#6D28D9` | `#B48CFF` |
-| slate | DEF | — | `#2F3742` | `#3E4650` |
+| pigment | position | semantic role |
+|---|---|---|
+| whistle | QB | `negative` |
+| leaf | RB | `positive` |
+| marker | WR | `accent` |
+| clay | TE | `warning` |
+| grape | K | — |
+| slate | DEF | — |
 
 The doubling is deliberate: a real draft kit has one pack of markers, and reusing them is what makes the board and the chrome look like one object. It is safe only because **the two uses never share a context** — a position color appears exclusively inside a `PositionBadge` or a draft-board sticker, and a semantic color never appears inside either. Breaking that rule (a red "Drafted" chip next to a red QB sticker) is what would make the doubling a bug instead of a system.
 
 ### Color roles
 
-| role | light | dark | used for |
-|---|---|---|---|
-| `surface` | `#F6F5F1` | `#17181A` | the page — poster stock / board wall |
-| `surfaceElevated` | `#FFFFFF` | `#202225` | cards, tables, panels |
-| `border` | `#8E8A7E` | `#66676C` | the pencil hairline (≥3:1 vs `surface`) |
-| `textPrimary` | `#16181D` | `#F2EFE9` | ink / chalk |
-| `textMuted` | `#5A5E66` | `#A8A69F` | secondary text |
-| `accent` | `#1D4ED8` | `#7AA5FF` | interactive: links, primary buttons, focus rings |
-| `accentText` | `#FFFFFF` | `#14161A` | the label ON an accent fill |
-| `positive` | `#0B7A3E` | `#5EC77E` | good outcome (never the brand color) |
-| `negative` | `#C8102E` | `#FF6B5E` | failure, destructive |
-| `negativeText` | `#FFFFFF` | `#14161A` | the label ON a negative fill |
-| `warning` | `#B45309` | `#E5B054` | caution — e.g. the clock tightening |
-| `scrim` | `#16181D` | `#000000` | modal backdrop (used at `bg-scrim/50`) |
+Values live in `src/design/tokens.ts` (`light`/`dark` palettes) — read them there, not here;
+this table is the meaning of each role, which is the part a doc can keep true across a
+palette tune.
+
+| role | used for |
+|---|---|
+| `surface` | the page — poster stock / board wall |
+| `surfaceElevated` | cards, tables, panels |
+| `border` | the pencil hairline (≥3:1 vs `surface`) |
+| `textPrimary` | ink / chalk |
+| `textMuted` | secondary text |
+| `accent` | interactive: links, primary buttons, focus rings |
+| `accentText` | the label ON an accent fill |
+| `positive` | good outcome (never the brand color) |
+| `negative` | failure, destructive |
+| `negativeText` | the label ON a negative fill |
+| `warning` | caution — e.g. the clock tightening |
+| `scrim` | modal backdrop (used at `bg-scrim/50`) |
 
 Tailwind aliases: `bg-surface`, `bg-surface-elevated`, `border-border`, `text-text-primary`, `text-text-muted`, `bg-accent text-accent-text`, `text-accent`, `text-positive` / `text-negative` / `text-warning`, `bg-scrim`.
 
@@ -76,9 +82,13 @@ Tailwind aliases: `bg-surface`, `bg-surface-elevated`, `border-border`, `text-te
 
 `<role>` is `qb | rb | wr | te | k | def`.
 
-In light, every sticker is a dark marker with a white label, and `text` equals `sticker`. In dark, five stickers are bright with a near-black label — but **DEF stays dark** (chalk label, and a brightened steel `#A8B0BC` for its `text` variant), because DEF's meaning is "no color of its own" and a bright slate would be indistinguishable from the WR blue beside it.
+In light, every sticker is a dark marker with a white label, and `text` equals `sticker`. In dark, five stickers are bright with a near-black label — but **DEF stays dark** (chalk label, and a brightened steel for its `text` variant — see `darkPositions.def` in `src/design/tokens.ts`), because DEF's meaning is "no color of its own" and a bright slate would be indistinguishable from the WR blue beside it.
 
 **`PositionBadge` is the only way to render a position.** Nothing else may reach for `bg-pos-*`, except `DraftBoard`'s own sticker cells (which are `PositionBadge`-colored fills at cell scale). A bare `"QB"` string in a table cell is a bug.
+
+**Carve-out: a native `<select>` option label.** An `<option>` cannot contain an element, so `lineup-editor.tsx`'s slot picker renders a position as plain text inside the option label. This is the one legitimate exception to the rule above — it is a markup constraint, not a lapse — and it does not license a bare position anywhere text CAN hold an element.
+
+**Roster-slot letters** (`FLEX`, `BENCH` — slot types that are not themselves a position, so they cannot wear a `PositionBadge` sticker) use `SlotChip`, the bordered-chip counterpart to `PositionBadge`. Same rule: a bare slot letter in a table cell or list is the slot-letter version of the bug above.
 
 ### Type
 
@@ -106,7 +116,11 @@ Shadows are theme-independent on purpose: a shadow is cast light, and on the dar
 
 ### Other scales
 - Radii: `rounded-sm|md|lg|pill`. Stickers are `rounded-sm` — a sticker is a rectangle, not a pill.
-- Spacing via Tailwind's default 4px scale (matches `TOKENS.space`).
+- Spacing and font weight are Tailwind's own default scales, used as-is — deliberately NOT
+  reflected in `TOKENS`. A scale that duplicated Tailwind's defaults inside `TOKENS` generated
+  CSS variables nothing consumed (`@theme inline` had no alias for them), so it looked like a
+  source of truth without being one. If either scale ever needs to diverge from Tailwind's
+  default, it belongs in `TOKENS` AND in `@theme inline`'s alias block at the same time.
 
 ## Layout: pages vs. rooms
 
@@ -135,13 +149,13 @@ Widths come from the spacing scale (`lg:w-88` = 352px for the pool rail), never 
 value — `w-88` is Tailwind v4's on-demand spacing utility, not a bracket escape hatch.
 
 ## Stacking
-No z-index scale yet — three sanctioned layers exist by convention: a sticky board header/gutter is `z-10` (inside its own scroll container), the toast region is `z-40`, and `Modal` is `z-50` (always above toasts). Any new overlay must pick a value against these, not invent an unrelated one.
+No z-index scale yet — four sanctioned layers exist by convention: a sticky board header/gutter is `z-10` (inside its own scroll container), `DraftBoard`'s edge fades are `z-20` (must paint over the sticky `z-10` gutter beneath them), the toast region is `z-40`, and `Modal` is `z-50` (always above toasts). Any new overlay must pick a value against these, not invent an unrelated one.
 
 ## Theming
 `<ThemeProvider>` (in `layout.tsx`) manages `system | light | dark`, persisted, stamping `data-theme` on `<html>`. Default is system.
 
 ## Primitives (`src/components/ui`)
-`Button` (variants primary/secondary/destructive/ghost; `loading` = aria-busy + disabled + spinner, label stays), `Input` (label required; error → `aria-invalid` + `aria-describedby`), `Select` (label required; native `<select>`; same error/hint contract as `Input`), `Card` (border + `shadow-card`), `Badge` (semantic tones), **`PositionBadge`** (`position` + `size: sm|md|lg` — the sticker chip; the ONLY renderer of a position), `Table` (semantic `<table>`; `caption` required — visually hidden unless `captionVisible`; `empty` node required; optional `rowAttributes` spreads plain attributes onto the `<tr>` itself, never a second wrapper element; scrolls horizontally inside its own wrapper at 360px), `Celebration` (`role="status"`; `emphasis: "self" | "peer"` picks the animation class and the accent treatment; renders with no animation class at all under reduced motion — the one primitive both `PickCelebration` and `MatchupCelebration` are built on), `Avatar` (deterministic initials fallback from the display name; decorative unless given a `label`), `Modal` (renders nothing when closed; `role="dialog"` + `aria-modal`; focus moves in on open, cycles on Tab, returns to the opener on close; Esc closes), `ToastProvider`/`useToast` (one polite live region; `tone: "error"` toasts are also `role="alert"`; auto-dismiss after `UI_CONFIG.toast.dismissMs`, or `reducedMotionDismissMs` when the user prefers reduced motion; optional action button), `Skeleton` (aria-busy, announces "Loading…"), `EmptyState` / `ErrorState` (action required), `Icon` (curated `IconName` union; feature code never imports lucide directly).
+`Button` (variants primary/secondary/destructive/ghost; `loading` = aria-busy + disabled + spinner, label stays), `Input` (label required; error → `aria-invalid` + `aria-describedby`), `Select` (label required; native `<select>`; same error/hint contract as `Input`), `Card` (border + `shadow-card`), `Badge` (semantic tones), **`PositionBadge`** (`position` + `size: sm|md` — the sticker chip; the ONLY renderer of a position), **`SlotChip`** (`slot` — the bordered chip for a roster-slot letter that isn't itself a position, e.g. `FLEX`/`BENCH`), `Table` (semantic `<table>`; `caption` required — visually hidden unless `captionVisible`; `empty` node required; optional `rowAttributes` spreads plain attributes onto the `<tr>` itself, never a second wrapper element; scrolls horizontally inside its own wrapper at 360px), `Celebration` (`role="status"`; `emphasis: "self" | "peer"` picks the animation class and the accent treatment; renders with no animation class at all under reduced motion — the one primitive both `PickCelebration` and `MatchupCelebration` are built on), `Avatar` (deterministic initials fallback from the display name; decorative unless given a `label`), `Modal` (renders nothing when closed; `role="dialog"` + `aria-modal`; focus moves in on open, cycles on Tab, returns to the opener on close; Esc closes), `ToastProvider`/`useToast` (one polite live region; `tone: "error"` toasts are also `role="alert"`; auto-dismiss after `UI_CONFIG.toast.dismissMs`, or `reducedMotionDismissMs` when the user prefers reduced motion; optional action button), `Skeleton` (aria-busy, announces "Loading…"), `EmptyState` / `ErrorState` (action required), `Icon` (curated `IconName` union; feature code never imports lucide directly).
 
 Tunables for primitives live in `src/components/ui/config.ts` (`UI_CONFIG`) — never inline in a component.
 

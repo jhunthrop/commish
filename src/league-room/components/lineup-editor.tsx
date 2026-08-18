@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
-import { Button, Select } from "@/components/ui";
+import { Button, Select, SlotChip } from "@/components/ui";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatWeek } from "../lib/format";
 
@@ -35,8 +35,8 @@ export function LineupEditor({ leagueId, lineup }: { readonly leagueId: string; 
         <p className="text-sm text-text-muted">{`${formatWeek(lineup.weekNumber)} is final, so its lineup can't change.`}</p>
         <ul className="flex flex-col gap-1">
           {lineup.starters.map((slot) => (
-            <li key={slotKey(slot)} className="flex gap-2 text-text-primary">
-              <span className="w-16 text-text-muted">{slot.slot}</span>
+            <li key={slotKey(slot)} className="flex items-center gap-2 text-text-primary">
+              <SlotChip slot={slot.slot} />
               <span>{slot.playerName ?? "Empty"}</span>
             </li>
           ))}

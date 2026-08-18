@@ -8,13 +8,23 @@ describe("renderTokensCss", () => {
   const css = renderTokensCss();
 
   it("emits every light color role on :root as --commish-color-<kebab>", () => {
-    expect(css).toMatch(/:root\s*\{[^}]*--commish-color-text-primary:\s*#16181D/i);
-    expect(css).toMatch(/:root\s*\{[^}]*--commish-color-surface-elevated:\s*#FFFFFF/i);
+    // Values come from TOKENS itself — hardcoding hexes here made every deliberate palette
+    // tune a false drift failure (see the position-sticker test below, which learned this
+    // lesson first).
+    const light = TOKENS.color.light;
+    expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-color-text-primary:\s*${light.textPrimary}`, "i"));
+    expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-color-surface-elevated:\s*${light.surfaceElevated}`, "i"));
   });
 
   it("emits dark values under [data-theme=\"dark\"] and under prefers-color-scheme guarded by :not([data-theme=\"light\"])", () => {
-    expect(css).toMatch(/:root\[data-theme="dark"\]\s*\{[^}]*--commish-color-surface:\s*#17181A/i);
-    expect(css).toMatch(/@media \(prefers-color-scheme: dark\)\s*\{\s*:root:not\(\[data-theme="light"\]\)\s*\{[^}]*--commish-color-surface:\s*#17181A/i);
+    const dark = TOKENS.color.dark;
+    expect(css).toMatch(new RegExp(String.raw`:root\[data-theme="dark"\]\s*\{[^}]*--commish-color-surface:\s*${dark.surface}`, "i"));
+    expect(css).toMatch(
+      new RegExp(
+        String.raw`@media \(prefers-color-scheme: dark\)\s*\{\s*:root:not\(\[data-theme="light"\]\)\s*\{[^}]*--commish-color-surface:\s*${dark.surface}`,
+        "i",
+      ),
+    );
   });
 
   it("emits all three position-sticker variables per role, in both themes", () => {
@@ -29,8 +39,7 @@ describe("renderTokensCss", () => {
     expect(css).toMatch(new RegExp(String.raw`:root\[data-theme="dark"\]\s*\{[^}]*--commish-pos-def-text:\s*${darkDef.text}`, "i"));
   });
 
-  it("emits spacing, radius, font-size, display-size, shadow and motion vars, namespaced with the token var prefix", () => {
-    expect(css).toContain("--commish-space-4: 16px;");
+  it("emits radius, font-size, display-size, shadow and motion vars, namespaced with the token var prefix", () => {
     expect(css).toContain("--commish-radius-md: 8px;");
     expect(css).toContain("--commish-font-size-md: 16px;");
     expect(css).toContain("--commish-display-size-xl: 64px;");

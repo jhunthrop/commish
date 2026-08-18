@@ -3,6 +3,7 @@ export { Input, type InputProps } from "./input";
 export { Card, type CardProps } from "./card";
 export { Badge, type BadgeProps, type BadgeTone } from "./badge";
 export { PositionBadge, positionStickerClass, type PositionBadgeProps, type PositionBadgeSize } from "./position-badge";
+export { SlotChip, type SlotChipProps } from "./slot-chip";
 export { Skeleton, type SkeletonProps } from "./skeleton";
 export { EmptyState, type EmptyStateProps } from "./empty-state";
 export { ErrorState, type ErrorStateProps } from "./error-state";

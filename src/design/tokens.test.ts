@@ -105,11 +105,6 @@ describe("TOKENS.position", () => {
 });
 
 describe("TOKENS scales", () => {
-  it("spacing is a strictly increasing 4px-based scale", () => {
-    const vals = Object.values(TOKENS.space);
-    for (let i = 1; i < vals.length; i++) expect(vals[i]).toBeGreaterThan(vals[i - 1]!);
-    for (const v of vals) expect(v % 4).toBe(0);
-  });
   it("type scale is strictly increasing", () => {
     const vals = Object.values(TOKENS.font.size);
     for (let i = 1; i < vals.length; i++) expect(vals[i]).toBeGreaterThan(vals[i - 1]!);
