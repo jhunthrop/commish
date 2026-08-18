@@ -78,15 +78,19 @@ export function queueFor(state: DraftState, teamId: string): readonly string[] {
  */
 export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEntry | null {
   const roster = rosterFor(state, teamId);
-  const drafted = draftedPlayerIds(state);
+  // Computed once: `availablePool` already derives the drafted set internally, so a queued
+  // entry's availability is checked against the pool it produces rather than a second,
+  // separately-computed drafted-ids set.
+  const available = availablePool(state);
+  const availableIds = new Set(available.map((entry) => entry.playerId));
   const canRoster = (entry: DraftPoolEntry): boolean =>
-    !drafted.has(entry.playerId) &&
+    availableIds.has(entry.playerId) &&
     assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig }).ok;
 
   for (const entry of queuedEntriesFor(state, teamId)) {
     if (canRoster(entry)) return entry;
   }
-  for (const entry of availablePool(state)) {
+  for (const entry of available) {
     if (canRoster(entry)) return entry;
   }
   return null;

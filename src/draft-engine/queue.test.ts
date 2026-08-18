@@ -151,6 +151,14 @@ describe("queue-first autopick", () => {
     expect(bestAvailableFor(state, "t1")).toEqual({ playerId: "qb2", position: "QB" });
   });
 
+  it("skips a queued, undrafted player the roster can't take — distinct from skipping an already-drafted one", () => {
+    // qb2 stays in the pool (nobody drafts it) but t1's own QB slot is already full, so it's
+    // the `assignSlot`-false branch that must reject it, not the "already drafted" branch.
+    let state = expectOk(reduceDraft(started(), { v: 1, type: "MAKE_PICK", timestamp: "2026-09-01T00:00:05.000Z", teamId: "t1", playerId: "qb1" }));
+    state = expectOk(reduceDraft(state, setQueue("t1", ["qb2", "rb2"])));
+    expect(bestAvailableFor(state, "t1")).toEqual({ playerId: "rb2", position: "RB" });
+  });
+
   it("ignores queued ids that aren't in the pool at all", () => {
     // A queue set before START_DRAFT can name a player the snapshotted pool never included.
     const queued = expectOk(reduceDraft(initialDraftState(CONFIG), setQueue("t1", ["ghost", "rb2"])));

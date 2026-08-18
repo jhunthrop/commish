@@ -13,8 +13,14 @@ export interface DraftSnapshotBody {
   readonly teamId: string | null;
   readonly isCommissioner: boolean;
   readonly teams: readonly TeamCard[];
+  /** The caller's OWN autopick queue. Never anybody else's — a queue is a private draft plan. */
+  readonly queue: readonly string[];
 }
 
 export interface DraftPlayersBody {
   readonly players: readonly Player[];
+}
+
+export interface DraftQueueBody {
+  readonly queue: readonly string[];
 }

@@ -3,8 +3,9 @@ import { DRAFT_ACTION_VERSION, type DraftAction, type DraftPoolEntry, type Start
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
 import { AUCTION_CONFIG, DRAFT_CLOCK_SCHEDULE } from "./config";
-import { reduceDraft } from "./reduce";
+import { reduceDraft, type DraftReduceResult } from "./reduce";
 import { draftEventsFor } from "./events";
+import { draftClockView } from "./selectors";
 import { expireAt } from "./test-support";
 
 const SLOTS: readonly RosterSlotConfig[] = [
@@ -29,6 +30,26 @@ function step(state: DraftState, action: DraftAction) {
   const result = reduceDraft(state, action);
   if (!result.ok) throw new Error(result.reason);
   return { state: result.state, events: draftEventsFor(state, result.state, action) };
+}
+
+// A separate config (its own draftId) for the SET_QUEUE cases below, so their fixtures don't
+// entangle with the snake-draft suite above.
+const QUEUE_CONFIG: DraftConfig = { ...CONFIG, draftId: "draft_1" };
+
+function expectOk(result: DraftReduceResult): DraftState {
+  if (!result.ok) throw new Error(`expected ok, got: ${result.reason}`);
+  return result.state;
+}
+
+function started(): DraftState {
+  return expectOk(reduceDraft(initialDraftState(QUEUE_CONFIG), START));
+}
+
+/** An in-progress auction draft with one open lot (nominated, not yet closed). */
+function auctionWithOpenLot(): DraftState {
+  const auctionConfig: DraftConfig = { ...QUEUE_CONFIG, format: "auction", auctionBudget: 10 };
+  const opened = expectOk(reduceDraft(initialDraftState(auctionConfig), START));
+  return expectOk(reduceDraft(opened, { v: 1, type: "NOMINATE", timestamp: T, teamId: "t1", playerId: "qb1", openingBid: 2 }));
 }
 
 describe("draftEventsFor", () => {
@@ -166,6 +187,23 @@ describe("draftEventsFor", () => {
     const { events } = step(opened, expireAt(opened));
     expect(events.map((e) => e.type)).toEqual(["draft.timer_expire", "draft.nominate"]);
     expect(events[1]?.payload).toMatchObject({ auto: true, openingBid: 1 });
+  });
+
+  it("emits draft.queue, carrying the team but never the queue itself", () => {
+    const next = expectOk(reduceDraft(started(), { v: 1, type: "SET_QUEUE", timestamp: "2026-09-01T00:00:10.000Z", teamId: "t1", playerIds: ["rb2", "qb2"] }));
+    const events = draftEventsFor(started(), next, { v: 1, type: "SET_QUEUE", timestamp: "2026-09-01T00:00:10.000Z", teamId: "t1", playerIds: ["rb2", "qb2"] });
+    expect(events).toHaveLength(1);
+    expect(events[0]!.type).toBe("draft.queue");
+    expect(events[0]!.payload).toEqual({ draftId: "draft_1", clock: draftClockView(next), teamId: "t1" });
+    expect(JSON.stringify(events[0]!.payload)).not.toContain("rb2");
+  });
+
+  it("does not emit a phantom draft.bid when an open auction lot did not move", () => {
+    // A SET_QUEUE landing while somebody else's lot is live must not re-broadcast the bid.
+    const withLot = auctionWithOpenLot();
+    const action = { v: 1, type: "SET_QUEUE", timestamp: "2026-09-01T00:00:20.000Z", teamId: "t2", playerIds: [] } as const;
+    const next = expectOk(reduceDraft(withLot, action));
+    expect(draftEventsFor(withLot, next, action).map((e) => e.type)).toEqual(["draft.queue"]);
   });
 });
 

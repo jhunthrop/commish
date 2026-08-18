@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { DRAFT_QUEUE_CONFIG, PERSISTED_QUEUE_MAX } from "./config";
 import { clientDraftActionSchema, clientQueueSchema, draftActionSchema, toDraftAction, toSetQueueAction } from "./action-schema";
 
 describe("draftActionSchema (persisted jsonb boundary)", () => {
@@ -81,8 +82,26 @@ describe("clientQueueSchema (HTTP body boundary for POST /api/drafts/:draftId/qu
   });
 
   it("rejects a list longer than the configured maximum", () => {
-    const tooMany = Array.from({ length: 51 }, (_, i) => `p${i}`);
+    const tooMany = Array.from({ length: DRAFT_QUEUE_CONFIG.maxLength + 1 }, (_, i) => `p${i}`);
     expect(clientQueueSchema.safeParse({ playerIds: tooMany }).success).toBe(false);
+  });
+});
+
+describe("the frozen persisted-queue ceiling", () => {
+  it("never sits below the client-tunable maxLength — lowering the tunable must never break replay of older rows", () => {
+    expect(DRAFT_QUEUE_CONFIG.maxLength).toBeLessThanOrEqual(PERSISTED_QUEUE_MAX);
+  });
+
+  it("accepts a persisted SET_QUEUE row up to the frozen ceiling, even beyond today's client-submission maximum", () => {
+    const playerIds = Array.from({ length: PERSISTED_QUEUE_MAX }, (_, i) => `p${i}`);
+    const row = { v: 1, type: "SET_QUEUE", timestamp: "2026-09-01T00:00:00.000Z", teamId: "t1", playerIds };
+    expect(draftActionSchema.safeParse(row).success).toBe(true);
+  });
+
+  it("rejects a persisted SET_QUEUE row longer than the frozen ceiling", () => {
+    const playerIds = Array.from({ length: PERSISTED_QUEUE_MAX + 1 }, (_, i) => `p${i}`);
+    const row = { v: 1, type: "SET_QUEUE", timestamp: "2026-09-01T00:00:00.000Z", teamId: "t1", playerIds };
+    expect(draftActionSchema.safeParse(row).success).toBe(false);
   });
 });
 

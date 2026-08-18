@@ -28,6 +28,21 @@ export const DRAFT_QUEUE_CONFIG = {
   maxLength: 50,
 } as const;
 
+/**
+ * Ceiling for the PERSISTED `SET_QUEUE` action row (`draftActionSchema`, the jsonb boundary),
+ * kept deliberately separate from `DRAFT_QUEUE_CONFIG.maxLength` (the client-submission
+ * tunable). Every `draft_actions` row ever written was validated against this number at
+ * write time; if it were tied to the tunable and someone later lowered `maxLength`, those
+ * older rows would stop parsing on replay and the draft would become unloadable. Never
+ * decrease this value — only ever raise it, and only as a deliberate, documented migration.
+ *
+ * `DRAFT_QUEUE_CONFIG.maxLength <= PERSISTED_QUEUE_MAX` is asserted by a test
+ * (`action-schema.test.ts`) rather than a module-load throw here: a throw's failing branch
+ * can never be exercised by a passing test suite, which would cost this file the 100%
+ * branch-coverage gate `src/draft-engine` is held to.
+ */
+export const PERSISTED_QUEUE_MAX = 100;
+
 export const AUCTION_CONFIG = {
   /** Lowest legal opening bid, in whole dollars. */
   minBid: 1,

@@ -1,6 +1,6 @@
 import { getDb } from "@/db/client";
 import { fail, ok } from "@/lib/api/respond";
-import { draftStateView } from "@/draft-engine";
+import { draftStateView, queueFor } from "@/draft-engine";
 import { getDraftStore } from "@/draft-service";
 import { listTeamCards } from "@/draft-service/teams";
 import type { DraftSnapshotBody } from "@/draft-room/contract";
@@ -26,6 +26,8 @@ export async function GET(request: Request, context: RouteContext) {
       teamId: actor.teamId,
       isCommissioner: actor.isCommissioner,
       teams: await listTeamCards(getDb(), actor.leagueId),
+      // Own queue only. `queueFor` returns [] for a commissioner with no team.
+      queue: actor.teamId === null ? [] : queueFor(state, actor.teamId),
     };
     return ok(body);
   });

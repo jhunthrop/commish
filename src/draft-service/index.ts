@@ -31,3 +31,4 @@ export function getDraftTicker(): DraftTicker {
 export { resolveDraftActor, type DraftActor, type ActorResult } from "./authz";
 export type { ApplyResult, CommitResult, DraftStore } from "./store";
 export type { DraftTicker, TickOutcome } from "./ticker";
+export { setTeamQueue, getTeamQueue, type QueueDeps, type QueueResult, type SetQueueInput } from "./queue";

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DRAFT_ACTION_VERSION, type DraftAction, type SetQueueAction } from "@/domain/draft";
-import { AUCTION_CONFIG, DRAFT_QUEUE_CONFIG } from "./config";
+import { AUCTION_CONFIG, DRAFT_QUEUE_CONFIG, PERSISTED_QUEUE_MAX } from "./config";
 
 const version = z.literal(DRAFT_ACTION_VERSION);
 // A strict ISO 8601 datetime (not just any non-empty string) so a malformed stamp can't
@@ -27,7 +27,10 @@ export const draftActionSchema: z.ZodType<DraftAction> = z.discriminatedUnion("t
   z.object({ v: version, type: z.literal("NOMINATE"), timestamp, teamId, playerId, openingBid: dollars }),
   z.object({ v: version, type: z.literal("BID"), timestamp, teamId, amount: dollars }),
   z.object({ v: version, type: z.literal("TIMER_EXPIRE"), timestamp }),
-  z.object({ v: version, type: z.literal("SET_QUEUE"), timestamp, teamId, playerIds: z.array(playerId).max(DRAFT_QUEUE_CONFIG.maxLength) }),
+  // Capped at the frozen PERSISTED_QUEUE_MAX, not the tunable DRAFT_QUEUE_CONFIG.maxLength —
+  // see PERSISTED_QUEUE_MAX's doc comment: lowering the tunable must never break replay of
+  // rows already written under a higher one.
+  z.object({ v: version, type: z.literal("SET_QUEUE"), timestamp, teamId, playerIds: z.array(playerId).max(PERSISTED_QUEUE_MAX) }),
 ]);
 
 /**
