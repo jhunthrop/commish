@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TOKENS, type ThemeName, type ColorRole, type PositionColorRole } from "./tokens";
-import { contrastRatio, hueDegrees, hueDistance } from "./contrast";
+import { contrastRatio, hueDegrees, hueDistance } from "./test-support";
 
 const THEMES: readonly ThemeName[] = ["light", "dark"];
 const AA_TEXT = 4.5;

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { contrastRatio, relativeLuminance, hueDegrees, hueDistance } from "./contrast";
+import { contrastRatio, relativeLuminance, hueDegrees, hueDistance } from "./test-support";
 
 describe("relativeLuminance", () => {
   it("is 0 for black and 1 for white", () => {

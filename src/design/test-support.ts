@@ -1,3 +1,10 @@
+/**
+ * WCAG contrast/hue math for the design-token GATE — used only by test-support.test.ts and
+ * tokens.test.ts to assert the palette meets its contrast and distinguishability rules.
+ * Test-only despite living in `src/design`: no production code computes a contrast ratio at
+ * runtime, so this follows the repo's `test-support.ts` naming convention rather than reading
+ * as a production module (was `contrast.ts`).
+ */
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 function parseHex(hex: string): readonly [number, number, number] {
