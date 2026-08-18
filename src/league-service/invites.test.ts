@@ -210,6 +210,29 @@ describe("acceptInvite", () => {
   });
 
   /**
+   * The invite row's own lock. The league lock does NOT cover this: a second accept on the same
+   * code runs its `select` (seeing `uses: 0`) before it blocks on the league row, so without
+   * `for update` on the invite it resumes with a stale count and spends a use it does not have.
+   */
+  it("never lets a single-use invite be redeemed twice, even when two accepts race on the SAME code", async () => {
+    const created = await league(6); // plenty of seats — the cap under test is maxUses, not teamCount
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1", maxUses: 1 });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const outcomes = await Promise.all([
+      acceptInvite(writeDeps(), { code: invite.code, userId: "u2" }),
+      acceptInvite(writeDeps(), { code: invite.code, userId: "u3" }),
+    ]);
+    expect(outcomes.filter((r) => r.ok)).toHaveLength(1);
+    expect(outcomes.find((r) => !r.ok)).toEqual({
+      ok: false, status: 410, reason: "That invite link has already been used up. Ask your commissioner for a new one.",
+    });
+    expect(await db.select().from(teams).where(eq(teams.leagueId, created.leagueId))).toHaveLength(2);
+    const [row] = await db.select().from(leagueInvites).where(eq(leagueInvites.code, invite.code));
+    expect(row?.uses).toBe(1);
+  });
+
+  /**
    * The reason the lock is taken on the LEAGUE row rather than the invite row. Two different
    * codes for the same league share no invite row to serialize on, so locking the invite
    * would let both readers see the same last free seat and both insert.

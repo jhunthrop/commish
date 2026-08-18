@@ -65,12 +65,18 @@ export async function createInvite(
 /**
  * Joins the caller to the invite's league.
  *
- * The transaction locks the **league** row, not the invite row, before counting teams: two
- * people redeeming two DIFFERENT codes for the same league would otherwise both read
- * "11 of 12" and both insert. Locking the league serializes every accept for that league
- * whatever code it arrived on, and `teams_league_user_idx` remains the backstop for the
- * narrower "same person twice" race — a violation of THAT index means they are already a
- * member, which is a success, not an error.
+ * Two locks, taken in a fixed order (invite, then league) so no two accepts can deadlock.
+ *
+ * The **league** lock is what bounds `teamCount`: two people redeeming two DIFFERENT codes for
+ * the same league share no invite row, so they would otherwise both read "11 of 12" and both
+ * insert. Locking the league serializes every accept for that league whatever code it arrived
+ * on. The **invite** lock is what bounds `maxUses`: without it, a second accept on the SAME
+ * code reads the pre-increment `uses` before it blocks on the league lock, then resumes with a
+ * stale count in memory and passes the cap check anyway — so a `maxUses: 1` invite minted for
+ * one specific person could be redeemed by k concurrent people.
+ *
+ * `teams_league_user_idx` remains the backstop for the narrower "same person twice" race — a
+ * violation of THAT index means they are already a member, which is a success, not an error.
  */
 export async function acceptInvite(
   { db, clock, newId }: LeagueWriteDeps,
@@ -78,7 +84,9 @@ export async function acceptInvite(
 ): Promise<AcceptInviteResult> {
   try {
     return await db.transaction(async (tx) => {
-      const [invite] = await tx.select().from(leagueInvites).where(eq(leagueInvites.code, input.code));
+      // `for update`: the cap check at the bottom reads `invite.uses`, so this row must be
+      // held until the matching increment commits.
+      const [invite] = await tx.select().from(leagueInvites).where(eq(leagueInvites.code, input.code)).for("update");
       if (invite === undefined) return { ok: false as const, status: 404, reason: INVALID };
 
       // Serializes every accept for this league, whatever code it came from.
