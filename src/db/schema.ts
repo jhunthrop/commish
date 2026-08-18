@@ -197,12 +197,16 @@ export const draftActions = pgTable(
 );
 
 /**
- * One row per nudge the moderator has already sent, keyed by the draft and the action
- * sequence the nudge was for. This is what makes "we already nudged this turn" DURABLE:
- * a process restart, or a second app instance, both lose an in-memory set — they cannot
- * lose a committed row. Every accepted action bumps `sequence` and a new turn always
- * follows an accepted action, so one turn is exactly one sequence, and therefore at most
- * one nudge.
+ * One row per nudge the moderator has already sent, keyed by the draft and the PICK the nudge
+ * was for. This is what makes "we already nudged this turn" DURABLE: a process restart, or a
+ * second app instance, both lose an in-memory set — they cannot lose a committed row.
+ *
+ * Keyed on `pick_number`, not on the action `sequence`: `sequence` counts accepted actions, and
+ * a SET_QUEUE by any manager deliberately does NOT start a new turn while still bumping it. So
+ * a sequence-keyed claim released mid-turn, letting the moderator speak again for the same turn
+ * — duplicate nudges to the team on the clock, and one manager able to drive another's nudges
+ * (and the model spend) by editing their own queue. `pick_number` advances exactly once per
+ * turn in both formats, so one turn is exactly one row.
  */
 export const draftNudges = pgTable(
   "draft_nudges",
@@ -210,10 +214,10 @@ export const draftNudges = pgTable(
     draftId: text("draft_id")
       .notNull()
       .references(() => drafts.id, { onDelete: "cascade" }),
-    sequence: integer("sequence").notNull(),
+    pickNumber: integer("pick_number").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
-  (t) => [primaryKey({ columns: [t.draftId, t.sequence] })],
+  (t) => [primaryKey({ columns: [t.draftId, t.pickNumber] })],
 );
 
 export const draftPicks = pgTable(

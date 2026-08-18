@@ -89,12 +89,33 @@ describe("nudge scheduler", () => {
     expect(published).toHaveLength(1);
   });
 
+  it("does not re-arm when somebody edits a queue mid-turn", async () => {
+    // A SET_QUEUE by ANY manager bumps `sequence` while deliberately leaving `turnStartedAt`
+    // and `pickNumber` alone — editing a queue must never touch anybody's clock. A claim keyed
+    // on `sequence` therefore released mid-turn: duplicate nudges to the team on the clock, and
+    // a way for one manager to drive another's nudges (and the model spend) at will.
+    const draft = await liveDraft();
+    const { scheduler, published } = schedulerWith();
+    expect(await scheduler.nudge(draft.state, AFTER_THRESHOLD)).toBe("published");
+
+    const edited = await draft.store.applyAction(draft.draftId, {
+      v: 1, type: "SET_QUEUE", timestamp: START, teamId: draft.state.draftOrder[1]!, playerIds: ["wr1"],
+    });
+    expect(edited.ok).toBe(true);
+    const after = (edited as { state: DraftState }).state;
+    expect(after.sequence).toBe(draft.state.sequence + 1);
+    expect(after.pickNumber).toBe(draft.state.pickNumber);
+
+    expect(await scheduler.nudge(after, AFTER_THRESHOLD)).toBe("already-nudged");
+    expect(published).toHaveLength(1);
+  });
+
   it("nudges exactly once when two independent scheduler instances race on the same turn", async () => {
     const draft = await liveDraft();
     const a = schedulerWith();
     const b = schedulerWith();
     // Two processes hit the same threshold in the same tick. The in-process code cannot
-    // coordinate them; the (draft_id, sequence) primary key's ON CONFLICT DO NOTHING is
+    // coordinate them; the (draft_id, pick_number) primary key's ON CONFLICT DO NOTHING is
     // what must let exactly one claim through — mirroring the store's double-append race.
     const results = await Promise.all([
       a.scheduler.nudge(draft.state, AFTER_THRESHOLD),

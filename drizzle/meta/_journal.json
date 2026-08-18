@@ -50,6 +50,13 @@
       "when": 1787059122362,
       "tag": "0006_clean_infant_terrible",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787059122363,
+      "tag": "0007_nudge_claim_per_pick",
+      "breakpoints": true
     }
   ]
 }

@@ -36,9 +36,13 @@ export const NO_OP_NUDGE_SCHEDULER: NudgeScheduler = {
  * identical with and without it (and with and without an LLM key).
  *
  * The "have we nudged this turn already" claim is a `draft_nudges` row keyed on
- * `(draftId, sequence)`, inserted with ON CONFLICT DO NOTHING … RETURNING: the writer that
+ * `(draftId, pickNumber)`, inserted with ON CONFLICT DO NOTHING … RETURNING: the writer that
  * gets a row back is the one that speaks. An in-memory set would forget across a restart and
  * would not be shared with a second instance; a committed row does neither.
+ *
+ * The key is the PICK, not `state.sequence`: a queue edit bumps the sequence without starting a
+ * new turn (that is deliberate — editing a queue must never touch anybody's clock), so a
+ * sequence-keyed claim let any manager re-arm the moderator mid-turn.
  */
 export function createNudgeScheduler({
   db,
@@ -62,9 +66,9 @@ export function createNudgeScheduler({
 
         const claimed = await db
           .insert(draftNudges)
-          .values({ draftId, sequence: state.sequence })
+          .values({ draftId, pickNumber: state.pickNumber })
           .onConflictDoNothing()
-          .returning({ sequence: draftNudges.sequence });
+          .returning({ pickNumber: draftNudges.pickNumber });
         if (claimed.length === 0) return "already-nudged";
 
         const [team] = await db.select({ name: teams.name }).from(teams).where(eq(teams.id, teamId));

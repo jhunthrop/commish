@@ -71,11 +71,16 @@ driver; there is no separate cron, no second interval.
   `teamOnClock(state) === null` skips the nudge entirely; **no nudge fires during a live
   auction lot.**
 - **Once per turn, durably.** The "have we nudged this turn already" claim is a `draft_nudges`
-  row keyed on `(draftId, sequence)`, inserted with `ON CONFLICT DO NOTHING … RETURNING`: the
+  row keyed on `(draftId, pickNumber)`, inserted with `ON CONFLICT DO NOTHING … RETURNING`: the
   writer that gets a row back is the one that speaks. An in-memory set would forget across a
   restart and wouldn't be shared with a second instance (see `docs/draft-engine.md`'s
   multi-instance notes); a committed row does neither. A second call for the same
-  `(draftId, sequence)` returns `"already-nudged"` and publishes nothing.
+  `(draftId, pickNumber)` returns `"already-nudged"` and publishes nothing.
+  The key is the **pick**, not the action `sequence`: `reduceSetQueue` deliberately leaves
+  `turnStartedAt` alone while `reduceDraft` still bumps `sequence`, so a sequence-keyed claim
+  released mid-turn — any manager editing a queue during somebody else's turn re-armed the
+  moderator, which meant duplicate nudges and an attacker-controlled lever on the model spend.
+  `pickNumber` advances exactly once per turn in both formats.
 - **Best-effort by contract.** Every path through `nudge()` is wrapped so a moderator that
   cannot speak — a DB hiccup, a publish failure — never stops or slows the draft itself; it
   logs via `onError` and returns `"skipped"`.
