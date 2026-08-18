@@ -1,6 +1,8 @@
 import type { ReactElement } from "react";
 import { render, type RenderResult } from "@testing-library/react";
-import type { LeagueSummary, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
+import type { TeamCard } from "@/domain/league";
+import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import type { LeagueHomeBody, LeagueSummary, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "./hooks/deps";
 
 export const LEAGUES: readonly LeagueSummary[] = [
@@ -72,6 +74,31 @@ export const WON: MatchupSummary = {
 
 /** The reverse of `WON` — same week, `t1` loses. */
 export const LOST: MatchupSummary = { ...WON, homeScore: 90, awayScore: 105 };
+
+/** The teams `listTeamCards` would hand back for the three `STANDINGS` rows. */
+export const TEAMS: readonly TeamCard[] = [
+  { id: "t1", name: "Bay Bandits", ownerDisplayName: "Alex Rivera", ownerAvatarUrl: null },
+  { id: "t2", name: "Iron Owls", ownerDisplayName: "Jordan Lee", ownerAvatarUrl: null },
+  { id: "t3", name: "Comet Crew", ownerDisplayName: "Sam Patel", ownerAvatarUrl: null },
+];
+
+/** Everything `LeagueHome` needs: a commissioner, mid-season, drafted, `t1` up this week. */
+export const HOME: LeagueHomeBody = {
+  leagueId: "l1",
+  name: "Sunday Money",
+  format: "snake",
+  teamCount: 12,
+  rosterSlots: STANDARD_ROSTER_SLOTS,
+  isCommissioner: true,
+  myTeamId: "t1",
+  teams: TEAMS,
+  standings: STANDINGS,
+  currentWeek: 3,
+  totalWeeks: 14,
+  myMatchup: WON,
+  draftId: "d1",
+  draftStatus: "complete",
+};
 
 export interface FixtureLeagueDeps {
   deps: LeagueRoomDeps;
