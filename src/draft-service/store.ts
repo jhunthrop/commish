@@ -1,5 +1,6 @@
 import { asc, eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
+import { isUniqueViolation } from "@/db/errors";
 import { draftActions, drafts, teams } from "@/db/schema";
 import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
@@ -57,23 +58,8 @@ export interface DraftStore {
   commitDraftResults(draftId: string): Promise<CommitResult>;
 }
 
-/** Postgres unique-violation SQLSTATE. */
-const UNIQUE_VIOLATION_SQLSTATE = "23505";
-
 /** The unique index `applyAction`'s append actually races on — see `schema.ts`. */
 const SEQUENCE_UNIQUE_INDEX = "draft_actions_draft_sequence_idx";
-
-/**
- * Reads one field off the driver's raw error, unwrapping the `DrizzleQueryError` that carries
- * it as `.cause` (confirmed empirically: `postgres-js` puts `code` and `constraint_name` on
- * the same object, one level under `.cause`, not on the `DrizzleQueryError` itself).
- */
-function driverErrorField(error: unknown, key: string): unknown {
-  if (typeof error !== "object" || error === null) return undefined;
-  if (key in error) return (error as Record<string, unknown>)[key];
-  if ("cause" in error) return driverErrorField((error as { cause?: unknown }).cause, key);
-  return undefined;
-}
 
 /**
  * True only for the specific race `applyAction` retries on: two writers both inserting the
@@ -84,10 +70,7 @@ function driverErrorField(error: unknown, key: string): unknown {
  * message instead of surfacing it as the unexpected error it is.
  */
 export function isSequenceConflict(error: unknown): boolean {
-  return (
-    driverErrorField(error, "code") === UNIQUE_VIOLATION_SQLSTATE &&
-    driverErrorField(error, "constraint_name") === SEQUENCE_UNIQUE_INDEX
-  );
+  return isUniqueViolation(error, SEQUENCE_UNIQUE_INDEX);
 }
 
 /**
