@@ -206,10 +206,12 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
       {/* Wide: the board itself, scrolling inside its own container so the page never does.
           The edge fades make a scrolled board read as intentional depth, not clipped stickers. */}
       <div className="relative hidden min-h-0 w-full flex-1 sm:block">
-        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 z-20 w-6 bg-gradient-to-r from-surface to-transparent" />
-        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 z-20 w-6 bg-gradient-to-l from-surface to-transparent" />
+        {/* The left fade starts past the sticky round gutter, exactly where a mid-scroll
+            column edge would otherwise show as a clipped sticker sliver. */}
+        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-10 z-20 w-10 bg-gradient-to-r from-surface via-surface/70 to-transparent" />
+        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 z-20 w-8 bg-gradient-to-l from-surface to-transparent" />
         {/* Column snap: a scrolled board always rests on whole stickers, never slivers. */}
-        <div ref={gridRef} data-testid="draft-board-grid" className="h-full w-full snap-x snap-proximity overflow-auto">
+        <div ref={gridRef} data-testid="draft-board-grid" className="h-full w-full overflow-auto">
         <table className="w-full border-separate border-spacing-1 text-left">
           <caption className="sr-only">The draft board: one row per round, one column per team.</caption>
           <thead>
