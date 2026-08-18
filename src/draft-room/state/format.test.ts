@@ -1,5 +1,13 @@
 import { describe, it, expect } from "vitest";
-import { formatCountdown, formatClockLength, formatGap, formatTightening } from "./format";
+import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+/**
+ * Test-only cross-check that `rosterSpots` agrees with the engine's own `totalRosterSlots`;
+ * this file never ships to the browser bundle, so the "no server-only values in draft-room
+ * client code" rule doesn't apply to the risk it guards against.
+ */
+// eslint-disable-next-line @typescript-eslint/no-restricted-imports
+import { totalRosterSlots } from "@/draft-engine";
+import { formatCountdown, formatClockLength, formatGap, formatTightening, rosterSpots } from "./format";
 
 describe("formatCountdown", () => {
   it.each([
@@ -47,5 +55,16 @@ describe("formatTightening", () => {
   it("says what it shortens to and when", () => {
     const now = Date.parse("2026-09-01T00:00:00.000Z");
     expect(formatTightening({ at: "2026-09-01T02:14:00.000Z", pickSeconds: 600 }, now)).toBe("Picks shorten to 10 minutes in 2h 14m");
+  });
+});
+
+describe("rosterSpots", () => {
+  it("sums the league's declared slot counts", () => {
+    expect(rosterSpots([{ slot: "QB", count: 1, eligiblePositions: ["QB"] }, { slot: "RB", count: 2, eligiblePositions: ["RB"] }])).toBe(3);
+    expect(rosterSpots([])).toBe(0);
+  });
+
+  it("agrees with the engine's own total, which is what pins the two together", () => {
+    expect(rosterSpots(STANDARD_ROSTER_SLOTS)).toBe(totalRosterSlots(STANDARD_ROSTER_SLOTS));
   });
 });

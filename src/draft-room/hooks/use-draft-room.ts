@@ -79,6 +79,11 @@ export function useDraftRoom(draftId: string): DraftRoom {
   // NEW draft's state (see the draftId-change effect below).
   const refreshPromiseRef = useRef<Promise<void> | null>(null);
   const generationRef = useRef(0);
+  // Monotonic id for each `refresh()` call, mirroring `generationRef`'s idiom: a call knows
+  // its own id before it starts, so its `finally` can tell — without any indirection through
+  // the promise it is itself in the middle of constructing — whether it is still the most
+  // recent call and therefore still owns `refreshPromiseRef`.
+  const refreshCallIdRef = useRef(0);
 
   const refresh = useCallback((): Promise<void> => {
     // Synchronous on purpose, with no `await` above this line: two `refresh()` calls made
@@ -89,13 +94,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
     if (inFlight !== null) return inFlight;
 
     const generation = generationRef.current;
-    // A mutable box, not a direct reference to `run` below: the closure below is invoked
-    // synchronously (so it exists before `const run = …` finishes), and TypeScript's
-    // definite-assignment analysis can't see that its `finally` only actually RUNS long after
-    // `run` (and this box) are assigned — referencing `run` itself inside its own initializer
-    // is a compile error even though it is safe at runtime. The box sidesteps that: it is
-    // "assigned" (to `null`) from the start, and set to the real promise one line below.
-    const runToken: { current: Promise<void> | null } = { current: null };
+    const callId = ++refreshCallIdRef.current;
     const run = (async () => {
       try {
         const [snapshotResponse, playersResponse] = await Promise.all([
@@ -138,11 +137,10 @@ export function useDraftRoom(draftId: string): DraftRoom {
       } finally {
         // Only release the slot if it's still ours — a stale run settling late must not
         // erase a newer refresh's in-flight tracking and cause a spurious duplicate fetch.
-        if (refreshPromiseRef.current === runToken.current) refreshPromiseRef.current = null;
+        if (refreshCallIdRef.current === callId) refreshPromiseRef.current = null;
       }
     })();
 
-    runToken.current = run;
     refreshPromiseRef.current = run;
     return run;
   }, [deps, draftId]);

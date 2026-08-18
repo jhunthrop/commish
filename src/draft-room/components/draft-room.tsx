@@ -6,6 +6,7 @@ import { Button, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { useDraftRoom } from "../hooks/use-draft-room";
 import { ConnectionBanner } from "./connection-banner";
 import { SnakeRoom } from "./snake-room";
+import { AuctionRoom } from "./auction-room";
 
 /**
  * The client entry point. Owns the three page-level states (loading / error / ready) and the
@@ -36,7 +37,11 @@ export function DraftRoom({ draftId }: { readonly draftId: string }) {
   return (
     <div className="flex flex-col gap-3">
       <ConnectionBanner connection={room.connection} />
-      <SnakeRoom room={room} playersById={playersById} onAct={act} />
+      {room.view.format === "auction" ? (
+        <AuctionRoom room={room} playersById={playersById} onAct={act} />
+      ) : (
+        <SnakeRoom room={room} playersById={playersById} onAct={act} />
+      )}
     </div>
   );
 }

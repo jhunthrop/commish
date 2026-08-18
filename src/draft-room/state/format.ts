@@ -1,4 +1,5 @@
 import type { Tightening } from "@/draft-engine";
+import type { RosterSlotConfig } from "@/domain/roster";
 
 const MS_PER_SECOND = 1_000;
 const SECONDS_PER_MINUTE = 60;
@@ -47,4 +48,14 @@ export function formatGap(ms: number): string {
 export function formatTightening(next: Tightening | null, nowMs: number): string | null {
   if (next === null) return null;
   return `Picks shorten to ${formatClockLength(next.pickSeconds)} in ${formatGap(Date.parse(next.at) - nowMs)}`;
+}
+
+/**
+ * How many roster spots the league declares. Config arithmetic, not a draft rule — which is
+ * why it lives here rather than being value-imported from `@/draft-engine` (the room imports
+ * types from the engine and nothing else, so no rule can leak into React). The test above
+ * asserts it agrees with the engine's `totalRosterSlots`, so the two cannot silently diverge.
+ */
+export function rosterSpots(slotConfig: readonly RosterSlotConfig[]): number {
+  return slotConfig.reduce((sum, config) => sum + config.count, 0);
 }
