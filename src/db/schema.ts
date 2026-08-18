@@ -151,6 +151,26 @@ export const draftActions = pgTable(
   ],
 );
 
+/**
+ * One row per nudge the moderator has already sent, keyed by the draft and the action
+ * sequence the nudge was for. This is what makes "we already nudged this turn" DURABLE:
+ * a process restart, or a second app instance, both lose an in-memory set — they cannot
+ * lose a committed row. Every accepted action bumps `sequence` and a new turn always
+ * follows an accepted action, so one turn is exactly one sequence, and therefore at most
+ * one nudge.
+ */
+export const draftNudges = pgTable(
+  "draft_nudges",
+  {
+    draftId: text("draft_id")
+      .notNull()
+      .references(() => drafts.id, { onDelete: "cascade" }),
+    sequence: integer("sequence").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.draftId, t.sequence] })],
+);
+
 export const draftPicks = pgTable(
   "draft_picks",
   {

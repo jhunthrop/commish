@@ -5,6 +5,7 @@ import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import { currentDeadline } from "@/draft-engine";
 import { DRAFT_SERVICE_CONFIG } from "./config";
+import { NO_OP_NUDGE_SCHEDULER, type NudgeScheduler } from "./nudge";
 import type { DraftStore } from "./store";
 
 export interface TickOutcome {
@@ -25,6 +26,8 @@ interface TickerDeps {
   readonly store: DraftStore;
   readonly clock: Clock;
   readonly intervalMs?: number;
+  /** The AI moderator. Defaults to a no-op so a ticker can run without one. */
+  readonly nudger?: NudgeScheduler;
   /**
    * Called for every `applied: false` outcome, rate-limited per draft id (see
    * `DRAFT_SERVICE_CONFIG.tickWarnIntervalMs`) so a stuck draft is visible in logs without
@@ -47,6 +50,7 @@ export function createDraftTicker({
   store,
   clock,
   intervalMs = DRAFT_SERVICE_CONFIG.tickIntervalMs,
+  nudger = NO_OP_NUDGE_SCHEDULER,
   onOutcome = defaultOnOutcome,
 }: TickerDeps): DraftTicker {
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -68,7 +72,12 @@ export function createDraftTicker({
     const state = await store.getDraftState(draftId);
     if (state === null) return null;
     const deadline = currentDeadline(state);
-    if (deadline === null || Date.parse(now) < Date.parse(deadline)) return null;
+    if (deadline === null || Date.parse(now) < Date.parse(deadline)) {
+      // The clock is still running — this is the window the moderator speaks in. It never
+      // applies an action, so it can never change what this tick would otherwise have done.
+      await nudger.nudge(state, now);
+      return null;
+    }
     const result = await store.applyAction(draftId, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: now });
     return result.ok ? { draftId, applied: true } : { draftId, applied: false, reason: result.reason };
   }

@@ -1,6 +1,10 @@
+import { MS_PER_SECOND } from "@/domain/duration";
 import { DRAFT_CLOCK_SCHEDULE, type ClockTier } from "./config";
 
-export const MS_PER_SECOND = 1000;
+// Re-exported for the module's existing consumers (`selectors.ts` imports it from here) —
+// `src/domain/duration.ts` is the one source of this constant now (controller ruling D-P1).
+export { MS_PER_SECOND };
+
 const MS_PER_HOUR = 60 * 60 * MS_PER_SECOND;
 
 export interface Tightening {

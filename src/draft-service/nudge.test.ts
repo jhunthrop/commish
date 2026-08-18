@@ -1,0 +1,157 @@
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import { createTestDb, truncateAll } from "@/db/test-db";
+import { players } from "@/db/schema";
+import type { DraftState } from "@/draft-engine";
+import { createDraftStore } from "./store";
+import { createNudgeScheduler, NO_OP_NUDGE_SCHEDULER } from "./nudge";
+import { DRAFT_NUDGE_CONFIG } from "./config";
+import { staticNudge, type NudgeCopyFn } from "./nudge-copy";
+import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
+
+const db = createTestDb();
+const START = "2026-09-01T00:00:00.000Z";
+const clock = { now: () => START };
+// The 8-hour tier is in force nine days from kickoff: the turn is 28,800s long, so the 75%
+// mark is +6h and the deadline is +8h.
+const BEFORE_THRESHOLD = "2026-09-01T05:00:00.000Z";
+const AFTER_THRESHOLD = "2026-09-01T07:00:00.000Z";
+const AFTER_DEADLINE = "2026-09-01T09:00:00.000Z";
+
+beforeEach(async () => {
+  await truncateAll(db);
+});
+
+afterAll(async () => {
+  await truncateAll(db);
+});
+
+async function liveDraft(format: "snake" | "auction" = "snake") {
+  const f = await seedDraftFixture(db, {
+    draftId: `draft_nudge_${format}`, leagueId: `league_nudge_${format}`, format, teamCount: 2,
+    slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+    auctionBudget: format === "auction" ? 200 : null,
+  });
+  await db.insert(players).values([
+    { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },
+    { id: "rb1", name: "RB One", position: "RB", nflTeam: "SF" },
+    { id: "wr1", name: "WR One", position: "WR", nflTeam: "NYJ" },
+    { id: "qb2", name: "QB Two", position: "QB", nflTeam: "KC" },
+    { id: "rb2", name: "RB Two", position: "RB", nflTeam: "SF" },
+    { id: "wr2", name: "WR Two", position: "WR", nflTeam: "NYJ" },
+  ]);
+  const store = createDraftStore({ db, clock, publish: async () => "1-0" });
+  await store.startDraft(f.draftId);
+  const state = (await store.getDraftState(f.draftId)) as DraftState;
+  return { ...f, store, state };
+}
+
+function schedulerWith(copy: NudgeCopyFn = async () => "Custom nudge.") {
+  const published: { type: string; leagueId: string; payload: unknown }[] = [];
+  const scheduler = createNudgeScheduler({
+    db,
+    copy,
+    publish: async (input) => {
+      published.push({ type: input.type, leagueId: input.leagueId, payload: input.payload });
+      return "1-0";
+    },
+  });
+  return { scheduler, published };
+}
+
+describe("nudge scheduler", () => {
+  it("says nothing before the threshold", async () => {
+    const draft = await liveDraft();
+    const { scheduler, published } = schedulerWith();
+    expect(await scheduler.nudge(draft.state, BEFORE_THRESHOLD)).toBe("skipped");
+    expect(published).toEqual([]);
+  });
+
+  it("publishes exactly one draft.nudge at the threshold, addressed to the team on the clock", async () => {
+    const draft = await liveDraft();
+    const { scheduler, published } = schedulerWith();
+    expect(await scheduler.nudge(draft.state, AFTER_THRESHOLD)).toBe("published");
+    expect(published).toHaveLength(1);
+    expect(published[0]!.type).toBe("draft.nudge");
+    expect(published[0]!.leagueId).toBe(draft.leagueId);
+    expect(published[0]!.payload).toMatchObject({
+      draftId: draft.draftId,
+      teamId: draft.state.draftOrder[0]!,
+      message: "Custom nudge.",
+    });
+    expect((published[0]!.payload as { clock: { sequence: number } }).clock.sequence).toBe(draft.state.sequence);
+  });
+
+  it("does not nudge the same turn twice", async () => {
+    const draft = await liveDraft();
+    const { scheduler, published } = schedulerWith();
+    expect(await scheduler.nudge(draft.state, AFTER_THRESHOLD)).toBe("published");
+    expect(await scheduler.nudge(draft.state, AFTER_THRESHOLD)).toBe("already-nudged");
+    expect(published).toHaveLength(1);
+  });
+
+  it("stays idempotent across a restart, because the claim is a row and not a memory", async () => {
+    const draft = await liveDraft();
+    const first = schedulerWith();
+    expect(await first.scheduler.nudge(draft.state, AFTER_THRESHOLD)).toBe("published");
+    // A brand-new scheduler is exactly what a redeploy or a second instance looks like.
+    const second = schedulerWith();
+    expect(await second.scheduler.nudge(draft.state, AFTER_THRESHOLD)).toBe("already-nudged");
+    expect(second.published).toEqual([]);
+  });
+
+  it("says nothing once the clock has already run out — that is the ticker's job", async () => {
+    const draft = await liveDraft();
+    const { scheduler, published } = schedulerWith();
+    expect(await scheduler.nudge(draft.state, AFTER_DEADLINE)).toBe("skipped");
+    expect(published).toEqual([]);
+  });
+
+  it("says nothing while an auction lot is live, because nobody is on the clock alone", async () => {
+    const draft = await liveDraft("auction");
+    const nominated = await draft.store.applyAction(draft.draftId, {
+      v: 1, type: "NOMINATE", timestamp: START, teamId: draft.state.draftOrder[0]!, playerId: "qb1", openingBid: 1,
+    });
+    expect(nominated.ok).toBe(true);
+    const { scheduler, published } = schedulerWith();
+    expect(await scheduler.nudge((nominated as { state: DraftState }).state, AFTER_THRESHOLD)).toBe("skipped");
+    expect(published).toEqual([]);
+  });
+
+  it("falls back to the static reminder, using the team's real name", async () => {
+    const draft = await liveDraft();
+    const { scheduler, published } = schedulerWith(async (input) => staticNudge(input));
+    await scheduler.nudge(draft.state, AFTER_THRESHOLD);
+    // Brief-test defect (documented, fixed minimally): `draftOrderFor` deterministically
+    // shuffles by a hash of the draft id, so `draftOrder[0]` isn't guaranteed to be the
+    // first-seeded team — for this fixture's draft id it is actually "Team 2". Derive the
+    // expected name from whichever team is really on the clock instead of hardcoding it.
+    const onClockIndex = draft.teamIds.indexOf(draft.state.draftOrder[0]!);
+    expect((published[0]!.payload as { message: string }).message).toContain(`Team ${onClockIndex + 1}`);
+    expect((published[0]!.payload as { message: string }).message).toContain("Make your pick");
+  });
+
+  it("reports a publish failure instead of throwing it at the ticker", async () => {
+    const draft = await liveDraft();
+    const onError = vi.fn();
+    const scheduler = createNudgeScheduler({
+      db,
+      copy: async () => "x",
+      publish: async () => {
+        throw new Error("redis down");
+      },
+      onError,
+    });
+    await expect(scheduler.nudge(draft.state, AFTER_THRESHOLD)).resolves.toBe("skipped");
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
+
+  it("uses the configured threshold, not a literal", () => {
+    expect(DRAFT_NUDGE_CONFIG.thresholdPct).toBeGreaterThan(0);
+    expect(DRAFT_NUDGE_CONFIG.thresholdPct).toBeLessThanOrEqual(100);
+  });
+
+  it("has a no-op scheduler for callers that do not want one", async () => {
+    const draft = await liveDraft();
+    expect(await NO_OP_NUDGE_SCHEDULER.nudge(draft.state, AFTER_THRESHOLD)).toBe("skipped");
+  });
+});

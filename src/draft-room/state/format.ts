@@ -1,20 +1,15 @@
 import type { Tightening } from "@/draft-engine";
 import type { RosterSlotConfig } from "@/domain/roster";
+import { MS_PER_SECOND, MINUTES_PER_HOUR, SECONDS_PER_HOUR, SECONDS_PER_MINUTE, formatClockLength, plural } from "@/domain/duration";
 import { DRAFT_ROOM_CONFIG } from "./config";
 
-const MS_PER_SECOND = 1_000;
-const SECONDS_PER_MINUTE = 60;
-const MINUTES_PER_HOUR = 60;
-const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
+export { formatClockLength };
+
 const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE;
 const MS_PER_HOUR = MS_PER_MINUTE * MINUTES_PER_HOUR;
 
 function pad(value: number): string {
   return value.toString().padStart(2, "0");
-}
-
-function plural(count: number, unit: string): string {
-  return `${count} ${unit}${count === 1 ? "" : "s"}`;
 }
 
 /** "0:09", "2:05", "1:04:09". Clamped at zero — a passed deadline reads 0:00, never negative. */
@@ -24,13 +19,6 @@ export function formatCountdown(msRemaining: number): string {
   const minutes = Math.floor((total % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
   const seconds = total % SECONDS_PER_MINUTE;
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
-}
-
-/** The plain-language length of a pick clock: "8 hours", "10 minutes", "45 seconds". */
-export function formatClockLength(seconds: number): string {
-  if (seconds >= SECONDS_PER_HOUR && seconds % SECONDS_PER_HOUR === 0) return plural(seconds / SECONDS_PER_HOUR, "hour");
-  if (seconds >= SECONDS_PER_MINUTE && seconds % SECONDS_PER_MINUTE === 0) return plural(seconds / SECONDS_PER_MINUTE, "minute");
-  return plural(seconds, "second");
 }
 
 /** A coarse distance: "2h 14m", "14m", "under a minute". */

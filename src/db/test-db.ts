@@ -30,7 +30,7 @@ export async function truncateAll(db: Db): Promise<void> {
   await db.execute(sql`
     TRUNCATE TABLE
       player_stat_lines, players,
-      matchups, weeks, draft_picks, draft_actions, drafts, roster_slots,
+      matchups, weeks, draft_picks, draft_nudges, draft_actions, drafts, roster_slots,
       scoring_settings, teams, leagues, users
     RESTART IDENTITY CASCADE
   `);
