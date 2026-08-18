@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { DraftClockView, DraftStateView } from "@/draft-engine";
+import { clockOf } from "../test-fixtures";
 import { applyDraftEvent } from "./apply-event";
 
 const clock = (over: Partial<DraftClockView> = {}): DraftClockView => ({
@@ -40,18 +41,6 @@ const auctionView: DraftStateView = {
 };
 
 const frame = (type: string, payload: unknown) => JSON.stringify({ id: "1-0", type, leagueId: "l1", timestamp: "2026-09-01T00:00:00.000Z", payload });
-
-/** The eight `DraftClockView` fields a view already carries, unchanged — the "sibling" clock. */
-const clockOf = (view: DraftStateView): DraftClockView => ({
-  phase: view.phase,
-  sequence: view.sequence,
-  pickNumber: view.pickNumber,
-  onClockTeamId: view.onClockTeamId,
-  deadlineAt: view.deadlineAt,
-  clockSeconds: view.clockSeconds,
-  nextTightening: view.nextTightening,
-  upcoming: view.upcoming,
-});
 
 const pickPayload = {
   draftId: "d1",
