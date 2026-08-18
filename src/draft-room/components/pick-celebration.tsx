@@ -29,7 +29,10 @@ export function PickCelebration({ lastPick, playersById, teams }: PickCelebratio
   const team = teamName(teamsById(teams), pick.teamId);
 
   return (
+    // Keyed on the pick number so a NEW pick landing mid-celebration remounts the panel and
+    // replays the entrance animation — same-key rerenders keep the node (no replay).
     <Celebration
+      key={pickNumber}
       testId="pick-celebration"
       emphasis={isMine ? "self" : "peer"}
       title={isMine ? `You drafted ${player}!` : `${team} drafted ${player}.`}

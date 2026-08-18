@@ -37,7 +37,9 @@ export function MatchupCelebration({ matchup, myTeamId, clinched }: MatchupCeleb
   const theirScore = matchup.homeTeamId === myTeamId ? matchup.awayScore : matchup.homeScore;
 
   return (
+    // Keyed like PickCelebration: a different week's result remounts and replays the entrance.
     <Celebration
+      key={key}
       testId="matchup-celebration"
       emphasis="self"
       title={won ? `You won in ${formatWeek(matchup.weekNumber)}!` : "You've clinched a playoff spot!"}

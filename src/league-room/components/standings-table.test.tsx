@@ -28,6 +28,25 @@ describe("StandingsTable", () => {
     expect(names[0]).toContain("Iron Owls");
   });
 
+  it("a GENUINE tie keeps the server's order through a sort round-trip — the client never restates a tiebreak", () => {
+    // Two rows identical on every sortable number; the server ranked t_b above t_c
+    // (its tiebreak is teamId — a rule this component must never re-derive).
+    const tied = [
+      { teamId: "t_a", teamName: "Front Runners", wins: 8, losses: 5, ties: 0, pointsFor: 1400, pointsAgainst: 1200, clinched: false },
+      { teamId: "t_b", teamName: "Twin Alpha", wins: 6, losses: 7, ties: 0, pointsFor: 1234.5, pointsAgainst: 1300, clinched: false },
+      { teamId: "t_c", teamName: "Twin Beta", wins: 6, losses: 7, ties: 0, pointsFor: 1234.5, pointsAgainst: 1300, clinched: false },
+    ];
+    render(<StandingsTable rows={tied} myTeamId={null} />);
+    const namesAfter = (label: string) => {
+      fireEvent.click(screen.getByRole("button", { name: label }));
+      return screen.getAllByRole("row").slice(1).map((row) => within(row).getAllByRole("cell")[0]!.textContent ?? "");
+    };
+    const byPointsFor = namesAfter("Sort by points for");
+    expect(byPointsFor.findIndex((n) => n.includes("Twin Alpha"))).toBeLessThan(byPointsFor.findIndex((n) => n.includes("Twin Beta")));
+    const byWins = namesAfter("Sort by standing");
+    expect(byWins.findIndex((n) => n.includes("Twin Alpha"))).toBeLessThan(byWins.findIndex((n) => n.includes("Twin Beta")));
+  });
+
   it("offers a next action before any week has been scored", async () => {
     await inBothThemes(<StandingsTable rows={[]} myTeamId={null} />, async ({ container }) => {
       expect(screen.getByText("No results yet")).toBeInTheDocument();

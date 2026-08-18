@@ -236,7 +236,7 @@ headings are `<h2>` — a jump to `<h3>` is a heading-order violation axe catche
 | `BidControls` | The bid form, and the dock's primary slot while a lot is live. `view.minBid` is the floor and `view.maxBids[myTeamId]` is the ceiling — both server-computed, never re-derived. A row rather than a stack, so it fits the dock's fixed band. |
 | `NominateModal` | Confirms a nomination (it commits money) before submitting `{ type: "NOMINATE", playerId, openingBid }`. |
 | `BudgetTable` | Remaining budget and ceiling per team, read straight off `view.budgets` / `view.maxBids`; own-row highlighted. |
-| `PickCelebration` | The pick-landing announcement, `role="status"`, keyed on `pickNumber` so a redelivered pick never re-animates. The **emphasis is on the board** — `DraftBoard` slaps the landing sticker — so this panel is the quiet caption: `animate-pick-landed` for every pick, an accent border and different copy for your own, and no animation class at all when `usePrefersReducedMotion()` is true. |
+| `PickCelebration` | The pick-landing announcement, `role="status"`, keyed on `pickNumber` — a redelivered pick never re-animates; a NEW pick remounts and replays the entrance. Since Plan D it is a thin caller of the shared `Celebration` primitive (`animate-celebrate-self` / `-peer`, see `docs/design-system.md`); the board still slaps the landing sticker, and reduced motion drops the animation class while keeping the panel. |
 | `ConnectionBanner` | Renders nothing when `connection === "live"`; a small `aria-live="polite"` badge for `"connecting"` / `"reconnecting"`. Information, not a control — the browser reconnects on its own. |
 
 ### What the board deliberately does NOT compute

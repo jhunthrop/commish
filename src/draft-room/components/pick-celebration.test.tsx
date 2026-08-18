@@ -84,4 +84,20 @@ describe("PickCelebration", () => {
     rerender(<PickCelebration lastPick={{ pick: pick2, isMine: true }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
     expect(screen.getByRole("status")).not.toHaveTextContent("Iron Owls drafted Marcus Reed.");
   });
+
+  it("remounts for a NEW pick (animation replays) but keeps the node on a same-pick rerender", () => {
+    stubMatchMedia(false);
+    const pick1 = { ...pick, pickNumber: 5 };
+    const pick2 = { ...pick, pickNumber: 6, playerId: "qb1", teamId: "t1" };
+    const { rerender } = render(<PickCelebration lastPick={{ pick: pick1, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
+    const first = screen.getByRole("status");
+
+    // Same pick, new render pass: same DOM node — the entrance animation must not restart.
+    rerender(<PickCelebration lastPick={{ pick: pick1, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
+    expect(screen.getByRole("status")).toBe(first);
+
+    // A new pick lands mid-celebration: keyed remount, fresh node, animation replays.
+    rerender(<PickCelebration lastPick={{ pick: pick2, isMine: true }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
+    expect(screen.getByRole("status")).not.toBe(first);
+  });
 });
