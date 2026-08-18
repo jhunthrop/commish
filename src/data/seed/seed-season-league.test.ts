@@ -33,6 +33,9 @@ describe("seedSeasonLeague", () => {
 
     const teamRows = await db.select().from(teams).where(eq(teams.leagueId, DEV_SEED.season.leagueId));
     expect(teamRows).toHaveLength(12);
+    // Named like the sibling dev leagues — "Team 1" placeholders failed the founder's
+    // legibility directive once already.
+    expect(teamRows.map((row) => row.name).sort()).toEqual([...DEV_SEED.teamNames].sort());
 
     // Every team's roster is completely filled, and every slot is legal by construction.
     const perTeam = totalRosterSlots(STANDARD_ROSTER_SLOTS);
@@ -58,13 +61,21 @@ describe("seedSeasonLeague", () => {
     expect(games).toBe(LEAGUE_CONFIG.regularSeasonWeeks * 12);
   });
 
-  it("is safe to run twice", async () => {
+  it("is safe to run twice — same rows AND the same numbers, not just the same counts", async () => {
     await seedSeasonLeague(db, clock);
     const before = await db.select().from(matchups).where(eq(matchups.leagueId, DEV_SEED.season.leagueId));
+    const rostersBefore = await db.select().from(rosterSlots);
     await seedSeasonLeague(db, clock);
     const after = await db.select().from(matchups).where(eq(matchups.leagueId, DEV_SEED.season.leagueId));
-    expect(after).toHaveLength(before.length);
-    expect(await db.select().from(rosterSlots)).toHaveLength(12 * totalRosterSlots(STANDARD_ROSTER_SLOTS));
+    // Deep equality: a re-run that duplicated rows, re-dealt different rosters, or re-scored a
+    // week to different numbers would all slip past a bare length check. Sorted first —
+    // an unordered SELECT does not promise a stable row order across runs.
+    const matchupKey = (row: { weekNumber: number; homeTeamId: string }) => `${row.weekNumber}:${row.homeTeamId}`;
+    const slotKey = (row: { teamId: string; slot: string; slotIndex: number }) => `${row.teamId}:${row.slot}:${row.slotIndex}`;
+    const sortBy = <T,>(rows: readonly T[], key: (row: T) => string): T[] => [...rows].sort((a, b) => key(a).localeCompare(key(b)));
+    expect(sortBy(after, matchupKey)).toEqual(sortBy(before, matchupKey));
+    expect(sortBy(await db.select().from(rosterSlots), slotKey)).toEqual(sortBy(rostersBefore, slotKey));
+    expect(rostersBefore).toHaveLength(12 * totalRosterSlots(STANDARD_ROSTER_SLOTS));
   });
 
   it("hands team 1 to the claiming user when one is given", async () => {

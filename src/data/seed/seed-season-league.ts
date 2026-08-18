@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { drafts, leagues, rosterSlots, scoringSettings, teams, users } from "@/db/schema";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotType } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { assignSlot, snakeTeamForPick, totalRosterSlots } from "@/draft-engine";
@@ -64,7 +64,7 @@ export async function seedSeasonLeague(
 
   await db
     .insert(teams)
-    .values(teamIds.map((id, i) => ({ id, leagueId, userId: ownerIds[i]!, name: `Team ${i + 1}` })))
+    .values(teamIds.map((id, i) => ({ id, leagueId, userId: ownerIds[i]!, name: DEV_SEED.teamNames[i] ?? `Team ${i + 1}` })))
     .onConflictDoUpdate({ target: teams.id, set: { userId: sql`excluded.user_id` } });
 
   // The draft already happened. Its kickoff sits in the past so nothing about this league
@@ -84,20 +84,23 @@ export async function seedSeasonLeague(
   // Deal legal rosters: snake order, best available the engine will accept.
   const pool = await rankedPlayers(db, leagueId);
   const taken = new Set<string>();
-  const rosters = new Map(teamIds.map((id) => [id, [] as { slot: string; slotIndex: number; playerId: string }[]]));
+  const rosters = new Map(teamIds.map((id) => [id, [] as { slot: RosterSlotType; slotIndex: number; playerId: string }[]]));
   const totalPicks = teamIds.length * totalRosterSlots(STANDARD_ROSTER_SLOTS);
 
   for (let pickNumber = 1; pickNumber <= totalPicks; pickNumber++) {
     const teamId = snakeTeamForPick(teamIds, pickNumber);
     const roster = rosters.get(teamId)!;
-    const current = roster.map((slot) => ({ slot: slot.slot as never, slotIndex: slot.slotIndex, playerId: slot.playerId }));
+    const sizeBefore = roster.length;
     for (const player of pool) {
       if (taken.has(player.id)) continue;
-      const assignment = assignSlot({ position: player.position, roster: current, slotConfig: STANDARD_ROSTER_SLOTS });
+      const assignment = assignSlot({ position: player.position, roster, slotConfig: STANDARD_ROSTER_SLOTS });
       if (!assignment.ok) continue;
       taken.add(player.id);
       roster.push({ slot: assignment.slot, slotIndex: assignment.slotIndex, playerId: player.id });
       break;
+    }
+    if (roster.length === sizeBefore) {
+      throw new Error(`seedSeasonLeague: no eligible player left in the pool for pick ${pickNumber} (team ${teamId}) — seed the player pool before the season league.`);
     }
   }
 
