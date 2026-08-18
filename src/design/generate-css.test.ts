@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { renderTokensCss } from "./generate-css";
+import { TOKENS } from "./tokens";
 
 describe("renderTokensCss", () => {
   const css = renderTokensCss();
@@ -17,10 +18,15 @@ describe("renderTokensCss", () => {
   });
 
   it("emits all three position-sticker variables per role, in both themes", () => {
-    expect(css).toMatch(/:root\s*\{[^}]*--commish-pos-qb-sticker:\s*#C8102E/i);
-    expect(css).toMatch(/:root\s*\{[^}]*--commish-pos-qb-sticker-text:\s*#FFFFFF/i);
-    expect(css).toMatch(/:root\s*\{[^}]*--commish-pos-def-text:\s*#2F3742/i);
-    expect(css).toMatch(/:root\[data-theme="dark"\]\s*\{[^}]*--commish-pos-def-text:\s*#A8B0BC/i);
+    // Values come from TOKENS itself — this test pins EMISSION shape, not palette choices
+    // (tokens.test.ts owns contrast/distinguishability; hardcoding hexes here made every
+    // deliberate palette tune a false drift failure).
+    const light = TOKENS.position.light.qb;
+    const darkDef = TOKENS.position.dark.def;
+    expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-pos-qb-sticker:\s*${light.sticker}`, "i"));
+    expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-pos-qb-sticker-text:\s*${light.stickerText}`, "i"));
+    expect(css).toMatch(new RegExp(String.raw`:root\s*\{[^}]*--commish-pos-def-text:\s*${TOKENS.position.light.def.text}`, "i"));
+    expect(css).toMatch(new RegExp(String.raw`:root\[data-theme="dark"\]\s*\{[^}]*--commish-pos-def-text:\s*${darkDef.text}`, "i"));
   });
 
   it("emits spacing, radius, font-size, display-size, shadow and motion vars, namespaced with the token var prefix", () => {
