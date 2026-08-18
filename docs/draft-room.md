@@ -229,5 +229,6 @@ still worth having, and is deliberately deferred:
   `afterAll` to close the pool, which is the existing mitigation. Vitest's `fileParallelism:
   false` (`vitest.config.mts`) already serializes test FILES against each other — tests
   *within* a file are already sequential by default, so this setting is what stops multiple
-  files' pools from ever being open at once, not the other way around. If the timeout recurs,
-  the fix is to raise `hookTimeout` for the affected DB-backed test files.
+  files' pools from ever being open at once, not the other way around. After a third
+  occurrence under CPU pressure, `vitest.config.mts` now sets `testTimeout: 15_000` and
+  `hookTimeout: 30_000` globally (ceilings, not targets — a healthy run is unaffected).

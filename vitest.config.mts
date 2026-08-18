@@ -26,6 +26,12 @@ export default defineConfig({
     // Integration tests share one real Postgres/Redis and truncate between tests, so
     // test FILES must not interleave. Tests within a file already run sequentially.
     fileParallelism: false,
+    // DB-backed files open a real Postgres pool in beforeEach/afterAll; under CPU pressure
+    // (CI, capped Docker) the default 10s hook budget has flaked three times. Vitest's
+    // defaults are 5s test / 10s hook — these are ceilings, not targets: a healthy run is
+    // unaffected, and a genuinely hung hook still fails, just later.
+    testTimeout: 15_000,
+    hookTimeout: 30_000,
     setupFiles: ["./vitest.setup.mts"],
     globals: false,
     coverage: {
