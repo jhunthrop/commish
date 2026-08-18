@@ -1,0 +1,79 @@
+import { describe, it, expect } from "vitest";
+import { parseChatFrame } from "./parse";
+
+const MESSAGE = {
+  type: "chat.message",
+  payload: {
+    message: {
+      id: "7",
+      authorUserId: "u1",
+      authorName: "Alex Rivera",
+      authorAvatarUrl: null,
+      body: "wheels up",
+      createdAt: "2026-08-18T12:00:00.000Z",
+      reactions: [{ emoji: "🔥", userId: "u2" }],
+    },
+  },
+};
+
+const REACTION = {
+  type: "chat.reaction",
+  payload: { messageId: "7", emoji: "🔥", userId: "u2", action: "added" },
+};
+
+describe("parseChatFrame", () => {
+  it("parses a chat.message frame into a message", () => {
+    const frame = parseChatFrame(JSON.stringify(MESSAGE));
+    expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+  });
+
+  it("parses a chat.reaction frame into a reaction", () => {
+    expect(parseChatFrame(JSON.stringify(REACTION))).toEqual({ kind: "reaction", reaction: REACTION.payload });
+  });
+
+  it("returns null for a frame that isn't JSON", () => {
+    expect(parseChatFrame("{not json")).toBeNull();
+  });
+
+  it("returns null for an event type this fold doesn't own", () => {
+    expect(parseChatFrame(JSON.stringify({ type: "draft.pick", payload: {} }))).toBeNull();
+  });
+
+  it("returns null when a message field is missing or the wrong type", () => {
+    expect(parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: { id: 7 } } }))).toBeNull();
+    expect(parseChatFrame(JSON.stringify({ type: "chat.message", payload: null }))).toBeNull();
+  });
+
+  it("returns null when a reaction field is missing or the action is unknown", () => {
+    expect(parseChatFrame(JSON.stringify({ type: "chat.reaction", payload: { ...REACTION.payload, action: "shrugged" } }))).toBeNull();
+    expect(parseChatFrame(JSON.stringify({ type: "chat.reaction", payload: { emoji: "🔥" } }))).toBeNull();
+  });
+
+  it("drops a malformed reaction entry rather than the whole message", () => {
+    const frame = parseChatFrame(
+      JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, reactions: [{ emoji: 1, userId: "u2" }] } } }),
+    );
+    expect(frame).toEqual({ kind: "message", message: { ...MESSAGE.payload.message, reactions: [] } });
+  });
+
+  it("treats a missing reactions field as no reactions", () => {
+    const messageWithoutReactions = {
+      id: MESSAGE.payload.message.id,
+      authorUserId: MESSAGE.payload.message.authorUserId,
+      authorName: MESSAGE.payload.message.authorName,
+      authorAvatarUrl: MESSAGE.payload.message.authorAvatarUrl,
+      body: MESSAGE.payload.message.body,
+      createdAt: MESSAGE.payload.message.createdAt,
+    };
+    const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: messageWithoutReactions } }));
+    expect(frame).toEqual({ kind: "message", message: { ...messageWithoutReactions, reactions: [] } });
+  });
+
+  it("returns null when the reaction payload isn't an object", () => {
+    expect(parseChatFrame(JSON.stringify({ type: "chat.reaction", payload: null }))).toBeNull();
+  });
+
+  it("returns null when the parsed frame itself isn't an object", () => {
+    expect(parseChatFrame(JSON.stringify("just a string"))).toBeNull();
+  });
+});
