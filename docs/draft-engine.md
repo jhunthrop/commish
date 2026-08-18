@@ -182,10 +182,21 @@ yet — noted here so Phase 2 doesn't have to rediscover them:
 ## The auto-commit-on-completion seam
 
 `commitDraftState` (`commit.ts`) is the single seam between "a draft happened" and "a season
-exists": in one transaction it writes `draft_picks`, upserts `roster_slots`, and flips
-`drafts.status` to `complete`. `applyAction` calls it automatically, inside the very same
-transaction that inserts the completing action row, the moment a draft's `phase` transitions
-to `complete` — so a draft can never be "done" in the log without also being committed.
+exists": in one transaction it writes `draft_picks`, upserts `roster_slots`, flips
+`drafts.status` to `complete`, and writes the season's fixtures
+(`writeSchedule`, `src/league-service/schedule.ts` → `weeks` + `matchups`). `applyAction`
+calls it automatically, inside the very same transaction that inserts the completing action
+row, the moment a draft's `phase` transitions to `complete` — so a draft can never be "done"
+in the log without also being committed.
+
+The schedule belongs in this transaction rather than in a follow-on call: a league with
+drafted rosters and no fixtures has nothing to play, and any later step is a step that can
+fail to run. `writeSchedule` is idempotent (`onConflictDoNothing` on both primary keys) and
+never throws on an unbuildable schedule — it logs and writes nothing — so neither the
+defensive re-commit below nor a one-team league can turn a legitimately complete draft into a
+failed commit. `draft-service` → `league-service` is the only direction this edge runs (a
+draft produces a season; a season never produces a draft), and `schedule.ts` imports nothing
+but `@/db/*`, `@/league` and Drizzle, so there is no cycle.
 
 `commitDraftResults(draftId)` is a defensive/admin seam, not the normal path — `applyAction`
 already commits automatically the instant a draft completes (previous paragraph). It exists,
