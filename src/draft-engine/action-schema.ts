@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
-import { AUCTION_CONFIG } from "./config";
+import { DRAFT_ACTION_VERSION, type DraftAction, type SetQueueAction } from "@/domain/draft";
+import { AUCTION_CONFIG, DRAFT_QUEUE_CONFIG } from "./config";
 
 const version = z.literal(DRAFT_ACTION_VERSION);
 // A strict ISO 8601 datetime (not just any non-empty string) so a malformed stamp can't
@@ -27,6 +27,7 @@ export const draftActionSchema: z.ZodType<DraftAction> = z.discriminatedUnion("t
   z.object({ v: version, type: z.literal("NOMINATE"), timestamp, teamId, playerId, openingBid: dollars }),
   z.object({ v: version, type: z.literal("BID"), timestamp, teamId, amount: dollars }),
   z.object({ v: version, type: z.literal("TIMER_EXPIRE"), timestamp }),
+  z.object({ v: version, type: z.literal("SET_QUEUE"), timestamp, teamId, playerIds: z.array(playerId).max(DRAFT_QUEUE_CONFIG.maxLength) }),
 ]);
 
 /**
@@ -58,4 +59,23 @@ export function toDraftAction(input: ClientDraftAction, teamId: string, timestam
     case "BID":
       return { v: DRAFT_ACTION_VERSION, type: "BID", timestamp, teamId, amount: input.amount };
   }
+}
+
+/**
+ * The HTTP boundary for POST /api/drafts/:draftId/queue.
+ *
+ * Deliberately SEPARATE from `clientDraftActionSchema` rather than a fourth member of it:
+ * that union is the set of *draft moves*, and `optimisticView` switches over it
+ * exhaustively — folding a queue edit in would force a meaningless optimistic branch and a
+ * second response shape onto the actions route. Same rule as the others: no `teamId`, no
+ * `timestamp`; the server resolves the acting team from the session and stamps the time.
+ */
+export const clientQueueSchema = z.object({
+  playerIds: z.array(playerId).max(DRAFT_QUEUE_CONFIG.maxLength),
+});
+
+export type ClientQueue = z.infer<typeof clientQueueSchema>;
+
+export function toSetQueueAction(playerIds: readonly string[], teamId: string, timestamp: string): SetQueueAction {
+  return { v: DRAFT_ACTION_VERSION, type: "SET_QUEUE", timestamp, teamId, playerIds };
 }

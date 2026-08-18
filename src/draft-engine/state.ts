@@ -65,6 +65,8 @@ export interface DraftState {
   readonly rosters: Readonly<Record<string, readonly RosterSlot[]>>;
   /** teamId → remaining auction dollars. Empty for snake drafts. */
   readonly budgets: Readonly<Record<string, number>>;
+  /** teamId → that team's ranked autopick queue, best first. Absent = no queue. */
+  readonly queues: Readonly<Record<string, readonly string[]>>;
   readonly auction: AuctionState | null;
   /** Snake: the pick about to be made. Auction: the lot about to be awarded. 1-based. */
   readonly pickNumber: number;
@@ -96,6 +98,7 @@ export function initialDraftState(config: DraftConfig): DraftState {
     picks: [],
     rosters: {},
     budgets: {},
+    queues: {},
     auction: null,
     pickNumber: 0,
     turnStartedAt: null,

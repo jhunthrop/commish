@@ -20,6 +20,14 @@ export const DRAFT_CLOCK_SCHEDULE: readonly ClockTier[] = [
   { untilHoursBeforeKickoff: 0, pickSeconds: 60 },
 ];
 
+export const DRAFT_QUEUE_CONFIG = {
+  /**
+   * Longest queue a team may store. Bounds both the jsonb action row and the reorder UI;
+   * a queue is a shortlist, not a mirror of the whole pool.
+   */
+  maxLength: 50,
+} as const;
+
 export const AUCTION_CONFIG = {
   /** Lowest legal opening bid, in whole dollars. */
   minBid: 1,

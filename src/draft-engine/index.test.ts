@@ -44,5 +44,12 @@ describe("the draft-engine public barrel", () => {
     expect(engine.nextTightening).toBeTypeOf("function");
     expect(engine.draftActionSchema).toBeDefined();
     expect(engine.clientDraftActionSchema).toBeDefined();
+    expect(engine.DRAFT_QUEUE_CONFIG).toBeDefined();
+    expect(engine.reduceSetQueue).toBeTypeOf("function");
+    expect(engine.queuedEntriesFor).toBeTypeOf("function");
+    expect(engine.queueFor).toBeTypeOf("function");
+    expect(engine.nudgeDeadline).toBeTypeOf("function");
+    expect(engine.clientQueueSchema).toBeDefined();
+    expect(engine.toSetQueueAction).toBeTypeOf("function");
   });
 });

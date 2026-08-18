@@ -6,6 +6,7 @@ import { snakeTeamForPick } from "./order";
 import { assignSlot } from "./slotting";
 import { AUCTION_CONFIG, type ClockTier } from "./config";
 import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
+import { queuedEntriesFor } from "./queue";
 
 export function draftedPlayerIds(state: DraftState): ReadonlySet<string> {
   return new Set(state.picks.map((p) => p.playerId));
@@ -61,15 +62,32 @@ export function teamOnClock(state: DraftState): string | null {
   return auction.lot === null ? auction.nominatingTeamId : null;
 }
 
+/** The ranked autopick queue this team stored, or an empty list. */
+export function queueFor(state: DraftState, teamId: string): readonly string[] {
+  return state.queues[teamId] ?? [];
+}
+
 /**
- * The autopick policy, stated once: the highest-ranked undrafted player this team can
- * legally roster. Ranking is `state.pool`'s order — an explicit input snapshotted at
- * START_DRAFT, never an ambient lookup — so the same log always autopicks the same player.
+ * The autopick policy, stated once, for BOTH formats — `reduceSnakeExpiry` and
+ * `reduceAuctionExpiry` each call exactly this, so the moderator's queue plugs into the one
+ * existing path rather than adding a second.
+ *
+ * Order of preference: the team's own ranked queue (first entry it can still legally roster
+ * and nobody has taken), then `state.pool`'s ranking. Both are explicit inputs carried in
+ * the action log, never an ambient lookup, so the same log always autopicks the same player.
  */
 export function bestAvailableFor(state: DraftState, teamId: string): DraftPoolEntry | null {
   const roster = rosterFor(state, teamId);
+  const drafted = draftedPlayerIds(state);
+  const canRoster = (entry: DraftPoolEntry): boolean =>
+    !drafted.has(entry.playerId) &&
+    assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig }).ok;
+
+  for (const entry of queuedEntriesFor(state, teamId)) {
+    if (canRoster(entry)) return entry;
+  }
   for (const entry of availablePool(state)) {
-    if (assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig }).ok) return entry;
+    if (canRoster(entry)) return entry;
   }
   return null;
 }
@@ -105,6 +123,18 @@ export function currentDeadline(state: DraftState): string | null {
   const turn = currentTurnClock(state);
   if (turn === null) return null;
   return new Date(Date.parse(turn.startedAt) + turn.seconds * MS_PER_SECOND).toISOString();
+}
+
+/**
+ * When the moderator should speak up on the current turn: `thresholdPct` of the way from
+ * `turnStartedAt` to the deadline. The percentage is an INPUT (the service's
+ * `DRAFT_NUDGE_CONFIG.thresholdPct`) so the engine stays free of service configuration and
+ * of any ambient clock. Null whenever no turn is running.
+ */
+export function nudgeDeadline(state: DraftState, thresholdPct: number): string | null {
+  const turn = currentTurnClock(state);
+  if (turn === null) return null;
+  return new Date(Date.parse(turn.startedAt) + turn.seconds * MS_PER_SECOND * (thresholdPct / 100)).toISOString();
 }
 
 /** When the clock next tightens and to what — null before/after the draft, or on the final tier. */

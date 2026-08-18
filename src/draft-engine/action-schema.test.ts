@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { clientDraftActionSchema, draftActionSchema, toDraftAction } from "./action-schema";
+import { clientDraftActionSchema, clientQueueSchema, draftActionSchema, toDraftAction, toSetQueueAction } from "./action-schema";
 
 describe("draftActionSchema (persisted jsonb boundary)", () => {
   it("accepts a v1 MAKE_PICK row", () => {
@@ -18,8 +18,18 @@ describe("draftActionSchema (persisted jsonb boundary)", () => {
     expect(draftActionSchema.parse(row)).toEqual(row);
   });
 
+  it("accepts a v1 SET_QUEUE row", () => {
+    const row = { v: 1, type: "SET_QUEUE", timestamp: "2026-09-01T00:00:00.000Z", teamId: "t1", playerIds: ["p1", "p2"] };
+    expect(draftActionSchema.parse(row)).toEqual(row);
+  });
+
   it("rejects an unknown version — old rows are never silently reinterpreted", () => {
     const row = { v: 2, type: "MAKE_PICK", timestamp: "2026-09-01T00:00:00.000Z", teamId: "t1", playerId: "p1" };
+    expect(draftActionSchema.safeParse(row).success).toBe(false);
+  });
+
+  it("rejects a SET_QUEUE row with an unknown version", () => {
+    const row = { v: 2, type: "SET_QUEUE", timestamp: "2026-09-01T00:00:00.000Z", teamId: "t1", playerIds: ["p1"] };
     expect(draftActionSchema.safeParse(row).success).toBe(false);
   });
 
@@ -61,6 +71,21 @@ describe("clientDraftActionSchema (HTTP body boundary)", () => {
   });
 });
 
+describe("clientQueueSchema (HTTP body boundary for POST /api/drafts/:draftId/queue)", () => {
+  it("accepts a ranked list of player ids", () => {
+    expect(clientQueueSchema.parse({ playerIds: ["p1", "p2"] })).toEqual({ playerIds: ["p1", "p2"] });
+  });
+
+  it("accepts an empty list, as a way to clear the queue", () => {
+    expect(clientQueueSchema.parse({ playerIds: [] })).toEqual({ playerIds: [] });
+  });
+
+  it("rejects a list longer than the configured maximum", () => {
+    const tooMany = Array.from({ length: 51 }, (_, i) => `p${i}`);
+    expect(clientQueueSchema.safeParse({ playerIds: tooMany }).success).toBe(false);
+  });
+});
+
 describe("toDraftAction (stamps the server-resolved teamId and timestamp)", () => {
   it("stamps a MAKE_PICK", () => {
     expect(toDraftAction({ type: "MAKE_PICK", playerId: "p1" }, "team_1", "2026-09-01T00:00:00.000Z")).toEqual({
@@ -90,6 +115,18 @@ describe("toDraftAction (stamps the server-resolved teamId and timestamp)", () =
       timestamp: "2026-09-01T00:00:00.000Z",
       teamId: "team_1",
       amount: 10,
+    });
+  });
+});
+
+describe("toSetQueueAction (stamps the server-resolved teamId and timestamp for a queue edit)", () => {
+  it("stamps a SET_QUEUE", () => {
+    expect(toSetQueueAction(["p1", "p2"], "team_1", "2026-09-01T00:00:00.000Z")).toEqual({
+      v: 1,
+      type: "SET_QUEUE",
+      timestamp: "2026-09-01T00:00:00.000Z",
+      teamId: "team_1",
+      playerIds: ["p1", "p2"],
     });
   });
 });

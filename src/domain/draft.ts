@@ -19,7 +19,7 @@ export interface Draft {
  */
 export const DRAFT_ACTION_VERSION = 1;
 
-export type DraftActionType = "START_DRAFT" | "MAKE_PICK" | "NOMINATE" | "BID" | "TIMER_EXPIRE";
+export type DraftActionType = "START_DRAFT" | "MAKE_PICK" | "NOMINATE" | "BID" | "TIMER_EXPIRE" | "SET_QUEUE";
 
 /** One draftable player, as the draft saw them: id plus the position roster rules key off. */
 export interface DraftPoolEntry {
@@ -74,12 +74,28 @@ export interface TimerExpireAction {
   readonly timestamp: string;
 }
 
+/**
+ * A team's ranked autopick queue. Persisted as an ACTION rather than threaded into
+ * TIMER_EXPIRE from outside, because `draft_actions` is the source of truth and state is
+ * derived by replay: an out-of-log queue would make the same log replay to different picks
+ * the moment somebody edited their queue afterwards.
+ */
+export interface SetQueueAction {
+  readonly v: 1;
+  readonly type: "SET_QUEUE";
+  readonly timestamp: string;
+  readonly teamId: string;
+  /** Ordered, best first. An empty array clears the queue. */
+  readonly playerIds: readonly string[];
+}
+
 export type DraftAction =
   | StartDraftAction
   | MakePickAction
   | NominateAction
   | BidAction
-  | TimerExpireAction;
+  | TimerExpireAction
+  | SetQueueAction;
 
 export interface DraftPick {
   readonly draftId: string;

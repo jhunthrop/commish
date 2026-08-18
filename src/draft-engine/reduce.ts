@@ -4,6 +4,7 @@ import { AUCTION_CONFIG } from "./config";
 import { currentDeadline } from "./selectors";
 import { reduceMakePick, reduceSnakeExpiry } from "./snake";
 import { reduceAuctionExpiry, reduceBid, reduceNominate } from "./auction";
+import { reduceSetQueue } from "./queue";
 
 export type { DraftReduceResult } from "./state";
 
@@ -53,10 +54,13 @@ function reduceStart(state: DraftState, action: StartDraftAction): DraftReduceRe
  * what the durable store uses as its optimistic-concurrency expectation.
  */
 export function reduceDraft(state: DraftState, action: DraftAction): DraftReduceResult {
-  if (action.type !== "START_DRAFT") {
-    if (state.phase === "scheduled") return { ok: false, reason: "This draft hasn't started yet." };
-    if (state.phase === "complete") return { ok: false, reason: "This draft has already finished." };
+  // START_DRAFT and SET_QUEUE are the two actions a scheduled draft accepts: a ranked queue
+  // is a PRE-draft artifact, and refusing it until the room opens would defeat the feature.
+  const allowedWhileScheduled = action.type === "START_DRAFT" || action.type === "SET_QUEUE";
+  if (state.phase === "scheduled" && !allowedWhileScheduled) {
+    return { ok: false, reason: "This draft hasn't started yet." };
   }
+  if (state.phase === "complete") return { ok: false, reason: "This draft has already finished." };
   const result = dispatch(state, action);
   if (!result.ok) return result;
   return { ok: true, state: { ...result.state, sequence: state.sequence + 1 } };
@@ -66,6 +70,8 @@ function dispatch(state: DraftState, action: DraftAction): DraftReduceResult {
   switch (action.type) {
     case "START_DRAFT":
       return reduceStart(state, action);
+    case "SET_QUEUE":
+      return reduceSetQueue(state, action);
     case "MAKE_PICK":
       return reduceMakePick(state, action);
     case "NOMINATE": {
