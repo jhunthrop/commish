@@ -1,6 +1,11 @@
 // Dev-only: drives the seeded snake draft to round 3 and parks it with team_01 on the clock.
-// Run: dotenv -e .env.local -- tsx scripts/drive-dev-draft.ts   (never in production)
+// Run: ALLOW_DESTRUCTIVE_SEED=1 dotenv -e .env.local -- tsx scripts/drive-dev-draft.ts
+//
+// "Never in production" is enforced, not asserted: `assertLocalSeedTarget` refuses unless the
+// operator opted in AND `DATABASE_URL` is loopback. This script applies up to 200 real
+// `MAKE_PICK` actions to a real draft — the hardcoded ids are not a guard.
 import { getDb } from "@/db/client";
+import { assertLocalSeedTarget } from "@/data/seed/guard";
 import { createDraftStore } from "@/draft-service/store";
 import { getPublisher } from "@/lib/realtime/publisher";
 import { teamOnClock, bestAvailableFor } from "@/draft-engine";
@@ -9,6 +14,7 @@ const MY_TEAM = "dev_league_snake_team_01";
 const DRAFT = "dev_draft_snake";
 
 async function main() {
+  assertLocalSeedTarget();
   const db = getDb();
   const publisher = getPublisher();
   const clock = { now: () => new Date().toISOString() };

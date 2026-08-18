@@ -41,6 +41,10 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# minted dev session credentials (scripts/mint-dev-session.ts) — bearer cookies, never commit
+.lab-session*.json
+lab-session*.json
+
 # local databases (Phase 1 SQLite dev)
 *.db
 *.sqlite

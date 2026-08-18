@@ -1,6 +1,6 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, afterEach, beforeEach, afterAll, vi } from "vitest";
 import { and, eq, sql } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
 import { playerStatLines } from "@/db/schema";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import { PLAYER_COUNT, SEASON_WEEKS } from "@/stats/mock/generate-dataset";
@@ -9,6 +9,14 @@ import { seedPlayers } from "./seed-players";
 
 const db = createTestDb();
 const provider = createMockStatsProvider();
+
+// `seedPlayers` refuses to run against a database it cannot prove is local (see `guard.ts`).
+// The test database IS local, so say so explicitly rather than letting the guard fail open.
+beforeEach(() => {
+  vi.stubEnv("ALLOW_DESTRUCTIVE_SEED", "1");
+  vi.stubEnv("DATABASE_URL", TEST_DATABASE_URL);
+});
+afterEach(() => { vi.unstubAllEnvs(); });
 
 beforeEach(async () => { await truncateAll(db); });
 afterAll(async () => { await truncateAll(db); });

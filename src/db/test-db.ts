@@ -3,7 +3,7 @@ import { afterAll } from "vitest";
 import { createDb, type Db } from "./client";
 import { DB_POOL_CONFIG } from "./config";
 
-const TEST_DATABASE_URL =
+export const TEST_DATABASE_URL =
   process.env.TEST_DATABASE_URL ?? "postgres://commish:commish@localhost:5433/commish_test";
 
 /**
