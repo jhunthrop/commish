@@ -3,10 +3,11 @@
 import type { TeamCard } from "@/domain/league";
 import type { DraftStateView } from "@/draft-engine";
 import { Badge, Card } from "@/components/ui";
-import { DRAFT_ROOM_CONFIG } from "../state/config";
-import { formatClockLength, formatCountdown, formatTightening } from "../state/format";
+import { formatClockLength, formatTightening } from "../state/format";
 import { useNow } from "../hooks/use-now";
+import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { teamsById } from "../lib/lookups";
+import { Countdown, useCountdown } from "./countdown";
 
 export interface ClockBannerProps {
   readonly view: DraftStateView;
@@ -23,6 +24,9 @@ export interface ClockBannerProps {
  */
 export function ClockBanner({ view, teams, myTeamId }: ClockBannerProps) {
   const now = useNow(DRAFT_ROOM_CONFIG.countdownTickMs);
+  // Called unconditionally, before the early returns below — React's Rules of Hooks — even
+  // though `remainingMs` is only rendered in the `in_progress` branch.
+  const remainingMs = useCountdown(view.deadlineAt);
 
   if (view.phase === "scheduled") {
     return (
@@ -44,7 +48,6 @@ export function ClockBanner({ view, teams, myTeamId }: ClockBannerProps) {
   const byId = teamsById(teams);
   const onClockTeam = view.onClockTeamId === null ? null : (byId.get(view.onClockTeamId) ?? null);
   const isMine = view.onClockTeamId !== null && view.onClockTeamId === myTeamId;
-  const remainingMs = view.deadlineAt === null ? null : Date.parse(view.deadlineAt) - now;
   const clockLength = view.clockSeconds === null ? null : formatClockLength(view.clockSeconds);
   const tightening = formatTightening(view.nextTightening, now);
   const who = onClockTeam?.name ?? "Nobody";
@@ -54,11 +57,7 @@ export function ClockBanner({ view, teams, myTeamId }: ClockBannerProps) {
       <div className="flex flex-wrap items-center gap-3">
         <Badge tone={isMine ? "accent" : "neutral"}>{isMine ? "You're on the clock" : "On the clock"}</Badge>
         <span className="text-xl font-semibold text-text-primary">{who}</span>
-        {remainingMs === null ? null : (
-          <span data-testid="countdown" aria-hidden="true" className="ml-auto text-2xl font-semibold tabular-nums text-text-primary">
-            {formatCountdown(remainingMs)}
-          </span>
-        )}
+        {remainingMs === null ? null : <Countdown remainingMs={remainingMs} data-testid="countdown" />}
       </div>
       <p className="text-sm text-text-muted">
         {who} is on the clock.{clockLength === null ? "" : ` This round's pick clock is ${clockLength}.`}

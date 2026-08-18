@@ -39,7 +39,7 @@ describe("BidControls", () => {
   it("tells you why you cannot bid instead of silently disabling", () => {
     const mine = { ...open, auction: { ...open.auction, lot: { ...open.auction.lot, highBidTeamId: "t1" } } };
     const { rerender } = render(<BidControls view={mine} myTeamId="t1" submitting={false} onBid={() => {}} />);
-    expect(screen.getByText("You already have the high bid.")).toBeInTheDocument();
+    expect(screen.getByText("You're the high bidder.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Bid" })).toBeDisabled();
 
     rerender(<BidControls view={{ ...open, maxBids: { t1: 10, t2: 97 } }} myTeamId="t1" submitting={false} onBid={() => {}} />);

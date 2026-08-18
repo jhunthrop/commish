@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
+import { inBothThemes } from "@/components/ui/test-utils";
 import { fixtureDeps, renderInRoom } from "../test-fixtures";
+import { DraftRoomDepsProvider } from "../hooks/deps";
 import { DraftRoom } from "./draft-room";
 
 function mount(fixture = fixtureDeps()) {
@@ -16,13 +18,22 @@ function mount(fixture = fixtureDeps()) {
 }
 
 describe("DraftRoom", () => {
-  it("shows a loading state, then the live snake room, axe-clean", async () => {
-    const { rendered } = mount();
-    expect(screen.getByText("Loading…")).toBeInTheDocument();
-    // "Bay Bandits" appears in the clock banner AND its roster card — assert presence, not uniqueness.
-    await waitFor(() => expect(screen.getAllByText("Bay Bandits").length).toBeGreaterThan(0));
-    expect(screen.getByRole("table", { name: /available players/i })).toBeInTheDocument();
-    expect(await axe(rendered.container)).toHaveNoViolations();
+  it("shows a loading state, then the live snake room — both themes, axe-clean", async () => {
+    const fixture = fixtureDeps();
+    await inBothThemes(
+      <DraftRoomDepsProvider deps={fixture.deps}>
+        <ToastProvider>
+          <DraftRoom draftId="d1" />
+        </ToastProvider>
+      </DraftRoomDepsProvider>,
+      async ({ container }) => {
+        expect(screen.getByText("Loading…")).toBeInTheDocument();
+        // "Bay Bandits" appears in the clock banner AND its roster card — assert presence, not uniqueness.
+        await waitFor(() => expect(screen.getAllByText("Bay Bandits").length).toBeGreaterThan(0));
+        expect(screen.getByRole("table", { name: /available players/i })).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
   });
 
   it("offers a retry when the draft cannot be loaded", async () => {

@@ -16,12 +16,14 @@ describe("BudgetTable", () => {
     });
   });
 
-  it("marks your own team", () => {
+  it("marks your own team, with a badge and a highlighted row", () => {
     render(<BudgetTable view={AUCTION_VIEW} teams={TEAMS} myTeamId="t1" />);
     const table = screen.getByRole("table", { name: /budgets/i });
     const mine = within(table).getByText("Bay Bandits").closest("tr")!;
     expect(within(mine).getByText("You")).toBeInTheDocument();
+    expect(mine.className).toContain("border-accent");
     const theirs = within(table).getByText("Iron Owls").closest("tr")!;
     expect(within(theirs).queryByText("You")).toBeNull();
+    expect(theirs.className).not.toContain("border-accent");
   });
 });

@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import { screen, waitFor, act, fireEvent, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
+import { inBothThemes } from "@/components/ui/test-utils";
 import { AUCTION_VIEW, fixtureDeps, renderInRoom } from "../test-fixtures";
+import { DraftRoomDepsProvider } from "../hooks/deps";
 import { DraftRoom } from "./draft-room";
 
 const clockOf = (view: typeof AUCTION_VIEW, sequence: number) => ({
@@ -27,12 +29,24 @@ function mountAuction(view = AUCTION_VIEW) {
 }
 
 describe("AuctionRoom", () => {
-  it("renders the auction layout — lot, bid controls, budgets — axe-clean", async () => {
-    const { rendered } = mountAuction();
-    await waitFor(() => expect(screen.getByRole("table", { name: /budgets/i })).toBeInTheDocument());
-    expect(screen.getByText("Bay Bandits is choosing who goes up next.")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Nominate" })[0]).toBeInTheDocument();
-    expect(await axe(rendered.container)).toHaveNoViolations();
+  it("renders the auction layout — lot, bid controls, budgets — both themes, axe-clean", async () => {
+    // `inBothThemes` does the render itself (once per theme), so the fixture's deps are wired
+    // up through the same provider `renderInRoom`/`mountAuction` use elsewhere in this file —
+    // the room still exercises the real loading → ready flow, in both themes.
+    const fixture = fixtureDeps(AUCTION_VIEW);
+    await inBothThemes(
+      <DraftRoomDepsProvider deps={fixture.deps}>
+        <ToastProvider>
+          <DraftRoom draftId="d1" />
+        </ToastProvider>
+      </DraftRoomDepsProvider>,
+      async ({ container }) => {
+        await waitFor(() => expect(screen.getByRole("table", { name: /budgets/i })).toBeInTheDocument());
+        expect(screen.getByText("Bay Bandits is choosing who goes up next.")).toBeInTheDocument();
+        expect(screen.getAllByRole("button", { name: "Nominate" })[0]).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
   });
 
   it("shows every team's remaining budget and reserve-adjusted ceiling from the server", async () => {
