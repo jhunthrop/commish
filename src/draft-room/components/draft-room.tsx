@@ -5,7 +5,6 @@ import type { ClientDraftAction } from "@/draft-engine";
 import { Button, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { useDraftRoom } from "../hooks/use-draft-room";
 import { playersById as buildPlayersById } from "../lib/lookups";
-import { ConnectionBanner } from "./connection-banner";
 import { SnakeRoom } from "./snake-room";
 import { AuctionRoom } from "./auction-room";
 
@@ -24,25 +23,30 @@ export function DraftRoom({ draftId }: { readonly draftId: string }) {
     });
   };
 
-  if (room.status === "loading") return <Skeleton lines={6} />;
+  // Loading and error are the only two states that are a PAGE rather than a room, so they are
+  // the only two that carry their own padding — the room itself is full-bleed by construction.
+  if (room.status === "loading") {
+    return (
+      <div className="p-4">
+        <Skeleton lines={6} />
+      </div>
+    );
+  }
   if (room.status === "error" || room.view === null) {
     return (
-      <ErrorState
-        title="We couldn't open this draft"
-        description={room.error ?? "Something went wrong on our side."}
-        action={<Button onClick={() => void room.refresh()}>Try again</Button>}
-      />
+      <div className="p-4">
+        <ErrorState
+          title="We couldn't open this draft"
+          description={room.error ?? "Something went wrong on our side."}
+          action={<Button onClick={() => void room.refresh()}>Try again</Button>}
+        />
+      </div>
     );
   }
 
-  return (
-    <div className="flex flex-col gap-3">
-      <ConnectionBanner connection={room.connection} />
-      {room.view.format === "auction" ? (
-        <AuctionRoom room={room} playersById={playersById} onAct={act} />
-      ) : (
-        <SnakeRoom room={room} playersById={playersById} onAct={act} />
-      )}
-    </div>
+  return room.view.format === "auction" ? (
+    <AuctionRoom room={room} playersById={playersById} onAct={act} />
+  ) : (
+    <SnakeRoom room={room} playersById={playersById} onAct={act} />
   );
 }

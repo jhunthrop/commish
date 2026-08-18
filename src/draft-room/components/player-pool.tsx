@@ -3,13 +3,12 @@
 import { useMemo, useState } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Badge, Button, EmptyState, Input, PositionBadge, Select, Table, type TableColumn } from "@/components/ui";
+import { Badge, Button, EmptyState, Input, PositionBadge } from "@/components/ui";
 import { queueButtonLabel } from "../lib/lookups";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 
 const ALL = "ALL";
 const POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
-const POSITION_OPTIONS = [{ value: ALL, label: "All positions" }, ...POSITIONS.map((position) => ({ value: position, label: position }))];
 
 export interface PlayerPoolProps {
   /** Server-ranked, best first. This component never re-ranks. */
@@ -32,6 +31,48 @@ interface PoolRow {
   readonly drafted: boolean;
 }
 
+/**
+ * The position filters, as the same stickers the board is made of. Toggles rather than a
+ * `<select>` because narrowing to "just the running backs" is the single most-used gesture in
+ * a draft, and it should cost one tap, not two plus a scroll. `aria-pressed` is what makes
+ * them real toggles to a screen reader rather than six unlabelled buttons.
+ */
+function PositionFilters({ value, onChange }: { readonly value: string; readonly onChange: (next: string) => void }) {
+  return (
+    <div role="group" aria-label="Filter by position" className="flex flex-wrap items-center gap-1">
+      <Button
+        size="sm"
+        variant={value === ALL ? "primary" : "ghost"}
+        aria-pressed={value === ALL}
+        onClick={() => onChange(ALL)}
+      >
+        All
+      </Button>
+      {POSITIONS.map((position) => (
+        <Button
+          key={position}
+          size="sm"
+          variant="ghost"
+          aria-pressed={value === position}
+          aria-label={`Show ${position} only`}
+          className={value === position ? "ring-2 ring-accent" : ""}
+          onClick={() => onChange(value === position ? ALL : position)}
+        >
+          <PositionBadge position={position} size="sm" />
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The pool, as the room's left-hand rail: search, position stickers, and one compact row per
+ * player. A list rather than a `Table` — at rail width there are no columns worth aligning,
+ * and the row's meaning is "this player, and the two things I can do with him".
+ *
+ * The star is the queue toggle; the button beside it is the act. Both are real, named
+ * controls, so the whole pool is walkable from the keyboard.
+ */
 export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel, submitting, onAct, queuedPlayerIds, onQueue }: PlayerPoolProps) {
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState(ALL);
@@ -52,70 +93,72 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
   const rows = useMemo(() => filtered.slice(0, DRAFT_ROOM_CONFIG.poolPageSize), [filtered]);
   const truncated = filtered.length > DRAFT_ROOM_CONFIG.poolPageSize;
 
-  const columns: readonly TableColumn<PoolRow>[] = [
-    { key: "name", header: "Player", cell: (row) => row.player.name },
-    { key: "position", header: "Pos", cell: (row) => <PositionBadge position={row.player.position} size="sm" /> },
-    { key: "team", header: "NFL", cell: (row) => row.player.nflTeam, hideOnNarrow: true },
-    { key: "rank", header: "Rank", cell: (row) => row.rank, numeric: true, hideOnNarrow: true },
-    {
-      key: "queue",
-      header: "Queue",
-      cell: (row) =>
-        row.drafted ? null : (
-          <Button size="sm" variant="ghost" disabled={submitting} onClick={() => onQueue(row.player.id)}>
-            {queueButtonLabel(row.player.name, queuedPlayerIds.has(row.player.id))}
-          </Button>
-        ),
-    },
-    {
-      key: "action",
-      header: "Action",
-      cell: (row) =>
-        preStart ? (
-          // Quiet, not disabled-looking: there is nothing to do here yet, and the header says why.
-          <span className="text-text-muted">—</span>
-        ) : row.drafted ? (
-          <Badge tone="neutral">Drafted</Badge>
-        ) : (
-          <Button size="sm" disabled={!canAct} loading={submitting && pendingPlayerId === row.player.id} onClick={() => onAct(row.player.id)}>
-            {actionLabel}
-          </Button>
-        ),
-    },
-  ];
-
   return (
-    <section className="flex flex-col gap-3">
-      <div className="grid gap-3 sm:grid-cols-2">
+    <section aria-label="Player pool" className="flex h-full min-h-0 flex-col gap-2 p-3">
+      <div className="flex shrink-0 flex-col gap-2">
         <Input label="Search players" value={query} placeholder="Name" onChange={(event) => setQuery(event.target.value)} />
-        <Select label="Position" options={POSITION_OPTIONS} value={position} onChange={(event) => setPosition(event.target.value)} />
+        <PositionFilters value={position} onChange={setPosition} />
       </div>
-      <Table
-        caption="Available players, best first"
-        columns={columns}
-        rows={rows}
-        rowKey={(row) => row.player.id}
-        rowClassName={(row) => (row.drafted ? "opacity-60" : "")}
-        empty={
-          <EmptyState
-            title="No players match"
-            description="Try a different name or position."
-            icon="search"
-            action={
-              <Button
-                onClick={() => {
-                  setQuery("");
-                  setPosition(ALL);
-                }}
+
+      {rows.length === 0 ? (
+        <EmptyState
+          title="No players match"
+          description="Try a different name or position."
+          icon="search"
+          action={
+            <Button
+              onClick={() => {
+                setQuery("");
+                setPosition(ALL);
+              }}
+            >
+              Clear filters
+            </Button>
+          }
+        />
+      ) : (
+        <ol aria-label="Available players, best first" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+          {rows.map((row) => {
+            const queued = queuedPlayerIds.has(row.player.id);
+            return (
+              <li
+                key={row.player.id}
+                className={`flex h-11 shrink-0 items-center gap-2 rounded-sm border border-border px-2 ${row.drafted ? "opacity-60" : "bg-surface-elevated"}`}
               >
-                Clear filters
-              </Button>
-            }
-          />
-        }
-      />
+                <span className="w-5 shrink-0 text-right font-mono text-xs tabular-nums text-text-muted">{row.rank}</span>
+                <PositionBadge position={row.player.position} size="sm" />
+                <span className="min-w-0 flex-1 truncate font-display font-semibold text-text-primary">{row.player.name}</span>
+                <span className="shrink-0 text-xs text-text-muted">{row.player.nflTeam}</span>
+                {row.drafted ? null : (
+                  <Button size="sm" variant="ghost" disabled={submitting} aria-label={queueButtonLabel(row.player.name, queued)} onClick={() => onQueue(row.player.id)}>
+                    <span aria-hidden="true" className={queued ? "text-accent" : "text-text-muted"}>
+                      {queued ? "★" : "☆"}
+                    </span>
+                  </Button>
+                )}
+                {preStart ? (
+                  // Quiet, not disabled-looking: there is nothing to do here yet, and the rail says why.
+                  <span className="shrink-0 text-text-muted">—</span>
+                ) : row.drafted ? (
+                  <Badge tone="neutral">Drafted</Badge>
+                ) : (
+                  <Button
+                    size="sm"
+                    disabled={!canAct}
+                    loading={submitting && pendingPlayerId === row.player.id}
+                    onClick={() => onAct(row.player.id)}
+                  >
+                    {actionLabel}
+                  </Button>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
+
       {truncated ? (
-        <p className="text-sm text-text-muted">
+        <p className="shrink-0 text-sm text-text-muted">
           Showing the top {rows.length} of {filtered.length} — narrow your search to see more.
         </p>
       ) : null}

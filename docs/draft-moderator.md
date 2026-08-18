@@ -3,7 +3,7 @@
 Read this with `docs/draft-engine.md` (the queue and event contracts) and `docs/draft-room.md`
 (how the client shows any of this) before touching `src/draft-service/nudge*.ts`,
 `src/draft-engine/queue.ts`/`selectors.ts`'s `bestAvailableFor`, or
-`src/draft-room/components/{queue-panel,nudge-banner}.tsx`.
+`src/draft-room/components/{room-dock,nudge-banner}.tsx`.
 
 ## What it replaces
 

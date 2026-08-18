@@ -32,6 +32,12 @@ describe("TvBoard", () => {
         await waitFor(() => expect(screen.getAllByText("Bay Bandits").length).toBeGreaterThan(0));
         expect(screen.queryAllByRole("button")).toHaveLength(0);
         expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+        // Stage-only: the rail and the board, with neither of the room's two personal regions.
+        expect(screen.getByTestId("room-rail")).toBeInTheDocument();
+        expect(screen.queryByTestId("room-dock")).toBeNull();
+        expect(screen.queryByRole("list", { name: /available players/i })).toBeNull();
+        // …and no personal chrome on the rail either, even though the viewer owns team 1.
+        expect(screen.queryByText(/Your team/)).toBeNull();
         expect(await axe(container)).toHaveNoViolations();
       },
     );

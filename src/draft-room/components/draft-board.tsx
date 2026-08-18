@@ -38,13 +38,26 @@ interface BoardRow {
   readonly cells: readonly BoardCell[];
 }
 
+/**
+ * Sticker lettering, at two sizes. The board auto-fits its columns to whatever width the stage
+ * gives it, so the type grows with them — comfortable above `xl`, compact below. A breakpoint
+ * rather than a container query on purpose: the stage IS the viewport minus one fixed-width
+ * rail, so viewport width and column width move together, and a breakpoint is the mechanism
+ * the rest of this codebase (and its happy-dom tests) already reasons about.
+ */
 const CELL_TEXT: Readonly<Record<DraftBoardVariant, string>> = {
-  room: "text-sm",
+  room: "text-sm xl:text-md",
   tv: "text-display-md",
 };
 
+/**
+ * The sticker minimum: the narrowest a column may get before the board stops shrinking and
+ * starts scrolling sideways inside its own container. Above it, `w-full` on an auto-layout
+ * table spreads the surplus evenly across the columns — which is what "maximize the width"
+ * actually means for a board whose column count is the league's, not ours.
+ */
 const CELL_MIN_WIDTH: Readonly<Record<DraftBoardVariant, string>> = {
-  room: "min-w-32",
+  room: "min-w-32 xl:min-w-40",
   tv: "min-w-48",
 };
 
@@ -172,9 +185,9 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
     .filter((row) => row.cells.some((cell) => cell.pick !== null || cell.onClock));
 
   return (
-    <section aria-label="Draft board" className="flex flex-col gap-3">
-      {/* Wide: the board itself, scrolling sideways inside its own container so the page never does. */}
-      <div data-testid="draft-board-grid" className="hidden w-full overflow-x-auto sm:block">
+    <section aria-label="Draft board" className="flex h-full min-h-0 flex-col gap-3">
+      {/* Wide: the board itself, scrolling inside its own container so the page never does. */}
+      <div data-testid="draft-board-grid" className="hidden min-h-0 w-full flex-1 overflow-auto sm:block">
         <table className="w-full border-separate border-spacing-1 text-left">
           <caption className="sr-only">The draft board: one row per round, one column per team.</caption>
           <thead>
@@ -228,7 +241,9 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
       <ol data-testid="draft-board-list" className="flex flex-col gap-4 sm:hidden">
         {listRows.map((row) => (
           <li key={row.round} className="flex flex-col gap-2">
-            <h3 className="font-display text-display-sm font-semibold leading-display text-text-primary">Round {row.round}</h3>
+            {/* `h2`, not `h3`: the rail's league name is the page's only `h1`, and a jump to
+                `h3` is a real heading-order violation (axe catches it). */}
+            <h2 className="font-display text-display-sm font-semibold leading-display text-text-primary">Round {row.round}</h2>
             <ul className="flex flex-col gap-2">
               {row.cells
                 .filter((cell) => cell.pick !== null || cell.onClock)

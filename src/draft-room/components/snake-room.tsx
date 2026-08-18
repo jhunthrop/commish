@@ -5,13 +5,12 @@ import type { ClientDraftAction } from "@/draft-engine";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";
 import { DraftBoard } from "./draft-board";
-import { RoomHeader } from "./room-header";
 import { NudgeBanner } from "./nudge-banner";
 import { PickCelebration } from "./pick-celebration";
 import { PlayerPool } from "./player-pool";
-import { QueuePanel } from "./queue-panel";
-import { RosterBoard } from "./roster-board";
-import { PickHistory } from "./pick-history";
+import { RoomDock } from "./room-dock";
+import { RoomLayout } from "./room-layout";
+import { RoomRail } from "./room-rail";
 
 export interface SnakeRoomProps {
   readonly room: DraftRoomState;
@@ -24,20 +23,21 @@ export function SnakeRoom({ room, playersById, onAct }: SnakeRoomProps) {
   // Affordance only — the server decides. `onClockTeamId` is the engine's answer, not ours.
   const canAct = view.phase === "in_progress" && room.myTeamId !== null && view.onClockTeamId === room.myTeamId;
   const { queuedPlayerIds, onQueueChange, onQueueToggle } = useQueueHandlers(room);
+  const draft = (playerId: string): void => onAct({ type: "MAKE_PICK", playerId });
 
   return (
-    <div className="flex flex-col gap-4">
-      <RoomHeader leagueName={room.leagueName} view={view} teams={room.teams} myTeamId={room.myTeamId} playersById={playersById} />
-      <NudgeBanner nudge={room.nudge} sequence={view.sequence} />
-      <DraftBoard
-        view={view}
-        teams={room.teams}
-        playersById={playersById}
-        myTeamId={room.myTeamId}
-        landedPickNumber={room.lastPick?.pick.pickNumber ?? null}
-      />
-      <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
-      <div className="grid gap-4 lg:grid-cols-2">
+    <RoomLayout
+      rail={
+        <RoomRail
+          leagueName={room.leagueName}
+          view={view}
+          teams={room.teams}
+          myTeamId={room.myTeamId}
+          playersById={playersById}
+          connection={room.connection}
+        />
+      }
+      pool={
         <PlayerPool
           players={room.players}
           view={view}
@@ -45,22 +45,37 @@ export function SnakeRoom({ room, playersById, onAct }: SnakeRoomProps) {
           canAct={canAct}
           actionLabel="Draft"
           submitting={room.submitting}
-          onAct={(playerId) => onAct({ type: "MAKE_PICK", playerId })}
+          onAct={draft}
           queuedPlayerIds={queuedPlayerIds}
           onQueue={onQueueToggle}
         />
-        <div className="flex flex-col gap-4">
-          <RosterBoard view={view} teams={room.teams} playersById={playersById} myTeamId={room.myTeamId} />
-          <QueuePanel
-            queue={room.queue}
+      }
+      stage={
+        <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+          <NudgeBanner nudge={room.nudge} sequence={view.sequence} />
+          <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
+          <DraftBoard
+            view={view}
+            teams={room.teams}
             playersById={playersById}
-            availablePlayerIds={view.availablePlayerIds}
-            busy={room.submitting}
-            onChange={onQueueChange}
+            myTeamId={room.myTeamId}
+            landedPickNumber={room.lastPick?.pick.pickNumber ?? null}
           />
-          <PickHistory view={view} teams={room.teams} playersById={playersById} />
         </div>
-      </div>
-    </div>
+      }
+      dock={
+        <RoomDock
+          view={view}
+          queue={room.queue}
+          playersById={playersById}
+          myTeamId={room.myTeamId}
+          submitting={room.submitting}
+          canAct={canAct}
+          actionLabel="Draft"
+          onAct={draft}
+          onQueueChange={onQueueChange}
+        />
+      }
+    />
   );
 }

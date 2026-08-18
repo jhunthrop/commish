@@ -3,10 +3,10 @@ import type { Player } from "@/domain/player";
 
 /**
  * The one place a draft-room component turns a `teamId`/`playerId` into the human it names.
- * Every component that renders a team or player name (`RoomHeader`, `DraftBoard`, `RosterBoard`,
- * `PickHistory`, and — from Task 7/9 on — `AuctionLotPanel`, `BudgetTable`, `TvBoard`) builds
- * its map once with `teamsById`/`playersById` and reads through `teamName`/`playerName`
- * rather than re-declaring a `.find(...)` closure per component.
+ * Every component that renders a team or player name (`RoomRail`, `RoomDock`, `DraftBoard`,
+ * `BudgetTable`, `TvBoard`) builds its map once with `teamsById`/`playersById` and reads
+ * through `teamName`/`playerName` rather than re-declaring a `.find(...)` closure per
+ * component.
  */
 export function teamsById(teams: readonly TeamCard[]): ReadonlyMap<string, TeamCard> {
   return new Map(teams.map((team) => [team.id, team]));
@@ -30,8 +30,8 @@ export function playerName(byId: ReadonlyMap<string, Player>, playerId: string, 
 }
 
 /**
- * The queue toggle button's accessible name — one sentence, declared once, so `PlayerPool`
- * and `QueuePanel` can never drift into two different phrasings of the same action.
+ * The queue toggle button's accessible name — one sentence, declared once, so the pool's star
+ * and the dock's chips can never drift into two different phrasings of the same action.
  */
 export function queueButtonLabel(name: string, queued: boolean): string {
   return queued ? `Remove ${name} from your queue` : `Queue ${name}`;

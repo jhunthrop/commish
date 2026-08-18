@@ -9,7 +9,7 @@ import type { DraftStateView } from "@/draft-engine";
  */
 export interface DraftSnapshotBody {
   readonly draft: DraftStateView;
-  /** The league's display name — what `RoomHeader` puts at the top of the board. */
+  /** The league's display name — what `RoomRail` puts at the top of the room. */
   readonly leagueName: string;
   /** The caller's own team, or null for a commissioner without one. */
   readonly teamId: string | null;

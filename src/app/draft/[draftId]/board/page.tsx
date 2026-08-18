@@ -20,9 +20,10 @@ interface PageProps {
 export default async function DraftBoardPage({ params }: PageProps) {
   await requireCurrentUser();
   const { draftId } = await params;
+  // Full-bleed, and no page heading of its own: `RoomRail` renders the league name as the
+  // page's `<h1>`, which is a better answer to "what am I looking at" than "Draft board" was.
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6">
-      <h1 className="sr-only">Draft board</h1>
+    <main className="w-full">
       <TvBoard draftId={draftId} />
     </main>
   );

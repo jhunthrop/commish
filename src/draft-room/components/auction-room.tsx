@@ -6,18 +6,16 @@ import type { ClientDraftAction } from "@/draft-engine";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";
 import { playerName } from "../lib/lookups";
+import { BidControls } from "./bid-controls";
+import { BudgetTable } from "./budget-table";
 import { DraftBoard } from "./draft-board";
-import { RoomHeader } from "./room-header";
+import { NominateModal } from "./nominate-modal";
 import { NudgeBanner } from "./nudge-banner";
 import { PickCelebration } from "./pick-celebration";
-import { AuctionLotPanel } from "./auction-lot";
-import { BidControls } from "./bid-controls";
-import { NominateModal } from "./nominate-modal";
-import { BudgetTable } from "./budget-table";
 import { PlayerPool } from "./player-pool";
-import { QueuePanel } from "./queue-panel";
-import { RosterBoard } from "./roster-board";
-import { PickHistory } from "./pick-history";
+import { RoomDock } from "./room-dock";
+import { RoomLayout } from "./room-layout";
+import { RoomRail } from "./room-rail";
 
 export interface AuctionRoomProps {
   readonly room: DraftRoomState;
@@ -31,48 +29,76 @@ export function AuctionRoom({ room, playersById, onAct }: AuctionRoomProps) {
   // Affordance only. `onClockTeamId` is the engine's nominator, and it is null while a lot is live.
   const canNominate = view.phase === "in_progress" && room.myTeamId !== null && view.onClockTeamId === room.myTeamId;
   const { queuedPlayerIds, onQueueChange, onQueueToggle } = useQueueHandlers(room);
+  const lotIsLive = view.auction?.lot != null;
 
   return (
-    <div className="flex flex-col gap-4">
-      <RoomHeader leagueName={room.leagueName} view={view} teams={room.teams} myTeamId={room.myTeamId} playersById={playersById} />
-      <NudgeBanner nudge={room.nudge} sequence={view.sequence} />
-      <DraftBoard
-        view={view}
-        teams={room.teams}
-        playersById={playersById}
-        myTeamId={room.myTeamId}
-        landedPickNumber={room.lastPick?.pick.pickNumber ?? null}
-      />
-      <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
-      <AuctionLotPanel view={view} teams={room.teams} playersById={playersById} />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="flex flex-col gap-4">
-          <BidControls view={view} myTeamId={room.myTeamId} submitting={room.submitting} onBid={(amount) => onAct({ type: "BID", amount })} />
-          <PlayerPool
-            players={room.players}
+    <>
+      <RoomLayout
+        rail={
+          <RoomRail
+            leagueName={room.leagueName}
             view={view}
-            pendingPlayerId={room.pendingPlayerId}
-            canAct={canNominate}
-            actionLabel="Nominate"
-            submitting={room.submitting}
-            onAct={setNominating}
-            queuedPlayerIds={queuedPlayerIds}
-            onQueue={onQueueToggle}
+            teams={room.teams}
+            myTeamId={room.myTeamId}
+            playersById={playersById}
+            connection={room.connection}
           />
-        </div>
-        <div className="flex flex-col gap-4">
-          <BudgetTable view={view} teams={room.teams} myTeamId={room.myTeamId} />
-          <RosterBoard view={view} teams={room.teams} playersById={playersById} myTeamId={room.myTeamId} />
-          <QueuePanel
+        }
+        pool={
+          // Money sits under the players you would spend it on. It is the one auction fact the
+          // board and the rail cannot carry — a sticker shows what a pick COST, never what
+          // anybody has left — so it gets the foot of this column and nowhere else.
+          <div className="flex h-full min-h-0 flex-col">
+            <div className="min-h-0 flex-1">
+              <PlayerPool
+                players={room.players}
+                view={view}
+                pendingPlayerId={room.pendingPlayerId}
+                canAct={canNominate}
+                actionLabel="Nominate"
+                submitting={room.submitting}
+                onAct={setNominating}
+                queuedPlayerIds={queuedPlayerIds}
+                onQueue={onQueueToggle}
+              />
+            </div>
+            <div className="max-h-48 shrink-0 overflow-auto border-t border-border p-3">
+              <BudgetTable view={view} teams={room.teams} myTeamId={room.myTeamId} />
+            </div>
+          </div>
+        }
+        stage={
+          <div className="flex h-full min-h-0 flex-col gap-3 p-4">
+            <NudgeBanner nudge={room.nudge} sequence={view.sequence} />
+            <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
+            <DraftBoard
+              view={view}
+              teams={room.teams}
+              playersById={playersById}
+              myTeamId={room.myTeamId}
+              landedPickNumber={room.lastPick?.pick.pickNumber ?? null}
+            />
+          </div>
+        }
+        dock={
+          <RoomDock
+            view={view}
             queue={room.queue}
             playersById={playersById}
-            availablePlayerIds={view.availablePlayerIds}
-            busy={room.submitting}
-            onChange={onQueueChange}
+            myTeamId={room.myTeamId}
+            submitting={room.submitting}
+            canAct={canNominate}
+            actionLabel="Nominate"
+            onAct={setNominating}
+            onQueueChange={onQueueChange}
+            bidConsole={
+              lotIsLive ? (
+                <BidControls view={view} myTeamId={room.myTeamId} submitting={room.submitting} onBid={(amount) => onAct({ type: "BID", amount })} />
+              ) : null
+            }
           />
-          <PickHistory view={view} teams={room.teams} playersById={playersById} />
-        </div>
-      </div>
+        }
+      />
       {/* `view.minBid` is only null before an auction has started (`draftStateView`,
           `src/draft-engine/selectors.ts`) — the modal itself only ever opens once `canNominate`
           is true, which already implies `phase === "in_progress"`, but narrowing here (rather
@@ -93,6 +119,6 @@ export function AuctionRoom({ room, playersById, onAct }: AuctionRoomProps) {
           }}
         />
       )}
-    </div>
+    </>
   );
 }

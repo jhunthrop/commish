@@ -108,6 +108,32 @@ Shadows are theme-independent on purpose: a shadow is cast light, and on the dar
 - Radii: `rounded-sm|md|lg|pill`. Stickers are `rounded-sm` — a sticker is a rectangle, not a pill.
 - Spacing via Tailwind's default 4px scale (matches `TOKENS.space`).
 
+## Layout: pages vs. rooms
+
+Two shapes, and a surface is one or the other — never a blend.
+
+**A page is a document.** Centered `max-w-*` container, normal page scroll, one `<h1>`,
+content flowing down it. Everything under `/app/**` except the draft room is a page.
+
+**A room is a frame.** A `100dvh`, `overflow-hidden` grid of fixed bands and scrolling
+regions; the page itself never scrolls, every region that can outgrow its band scrolls inside
+itself, and nothing reflows when state changes. The draft room and the TV board are the only
+rooms today (`RoomLayout`, `docs/draft-room.md`).
+
+Three rules any future room follows:
+
+1. **Bands are fixed height, regions are flexible.** A band whose height depends on its
+   contents will move the thing the user is watching. Rail `lg:h-20`, dock `lg:h-24`.
+2. **Full-bleed means full-bleed.** The route's `page.tsx` drops the container, and the room
+   supplies its own `<h1>`. A room inside a centered container is a page wearing a costume.
+3. **Below `lg`, linearize — never shrink.** Re-sequence the same regions into one scrolling
+   column with `order-*` utilities. Rendering a second, narrow copy of a region is only
+   justified when the two are genuinely different objects (`DraftBoard`'s grid and its
+   per-round list are, and the inactive one is `display: none` so nothing is announced twice).
+
+Widths come from the spacing scale (`lg:w-88` = 352px for the pool rail), never an arbitrary
+value — `w-88` is Tailwind v4's on-demand spacing utility, not a bracket escape hatch.
+
 ## Stacking
 No z-index scale yet — three sanctioned layers exist by convention: a sticky board header/gutter is `z-10` (inside its own scroll container), the toast region is `z-40`, and `Modal` is `z-50` (always above toasts). Any new overlay must pick a value against these, not invent an unrelated one.
 

@@ -28,9 +28,10 @@ describe("DraftRoom", () => {
       </DraftRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByText("Loading…")).toBeInTheDocument();
-        // "Bay Bandits" appears in the room header AND its roster card — assert presence, not uniqueness.
+        // "Bay Bandits" appears in the rail AND on the board's column head — presence, not uniqueness.
         await waitFor(() => expect(screen.getAllByText("Bay Bandits").length).toBeGreaterThan(0));
-        expect(screen.getByRole("table", { name: /available players/i })).toBeInTheDocument();
+        expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
+        expect(screen.getByTestId("room-layout")).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );

@@ -65,7 +65,7 @@ function mountAuctionWithQueue(over: Partial<Pick<FixtureDeps, "queue" | "queueR
 }
 
 describe("AuctionRoom", () => {
-  it("renders the auction layout — lot, bid controls, budgets — both themes, axe-clean", async () => {
+  it("renders the auction layout — rail lot, left pool, budgets, dock — both themes, axe-clean", async () => {
     // `inBothThemes` does the render itself (once per theme), so the fixture's deps are wired
     // up through the same provider `renderInRoom`/`mountAuction` use elsewhere in this file —
     // the room still exercises the real loading → ready flow, in both themes.
@@ -78,7 +78,8 @@ describe("AuctionRoom", () => {
       </DraftRoomDepsProvider>,
       async ({ container }) => {
         await waitFor(() => expect(screen.getByRole("table", { name: /budgets/i })).toBeInTheDocument());
-        expect(screen.getByText("Bay Bandits is choosing who goes up next.")).toBeInTheDocument();
+        // Between lots the rail names the nominator; the lot panel it replaced is gone.
+        expect(screen.getByText("Bay Bandits is nominating.")).toBeInTheDocument();
         expect(screen.getAllByRole("button", { name: "Nominate" })[0]).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
@@ -110,7 +111,10 @@ describe("AuctionRoom", () => {
         minBid: 6,
       }),
     );
-    await waitFor(() => expect(screen.getByText("$5")).toBeInTheDocument());
+    // The lot has exactly one home now: the rail. The dock becomes the bid console.
+    await waitFor(() => expect(screen.getByTestId("room-rail")).toHaveTextContent("Jalen Croft · $5"));
+    expect(screen.getByTestId("room-dock")).toHaveAttribute("data-mode", "bidding");
+    expect(screen.getByTestId("bid-console")).toBeInTheDocument();
 
     act(() =>
       fixture.sources[0]!.emit("draft.bid", {
@@ -122,8 +126,8 @@ describe("AuctionRoom", () => {
         minBid: 13,
       }),
     );
-    await waitFor(() => expect(screen.getByText("$12")).toBeInTheDocument());
-    expect(screen.getAllByText("Iron Owls").length).toBeGreaterThan(0);
+    await waitFor(() => expect(screen.getByTestId("room-rail")).toHaveTextContent("Jalen Croft · $12"));
+    expect(screen.getByText("Bidding is open on Jalen Croft. High bid $12 by Iron Owls.")).toBeInTheDocument();
   });
 
   it("resyncs the whole view when a bid arrives for a lot it never saw open — the missed bid war", async () => {
@@ -150,7 +154,7 @@ describe("AuctionRoom", () => {
       }),
     );
 
-    await waitFor(() => expect(screen.getByText("$31")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByTestId("room-rail")).toHaveTextContent("Jalen Croft · $31"));
     expect(fixture.calls.filter((call) => call === "GET /api/drafts/d1")).toHaveLength(before + 1);
   });
 
@@ -231,7 +235,7 @@ describe("AuctionRoom", () => {
     await waitFor(() => expect(bodies).toContainEqual(["qb1"]));
   });
 
-  it("reorders the queue through QueuePanel's own buttons, wired to room.setQueue", async () => {
+  it("reorders the queue through the dock's own chips, wired to room.setQueue", async () => {
     const { bodies } = mountAuctionWithQueue({ queue: ["rb1", "qb1"] });
     await waitFor(() => expect(screen.getByRole("button", { name: "Move Jalen Croft up" })).toBeInTheDocument());
     fireEvent.click(screen.getByRole("button", { name: "Move Jalen Croft up" }));
