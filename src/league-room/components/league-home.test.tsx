@@ -49,6 +49,15 @@ describe("LeagueHome", () => {
     expect(screen.getByText(/hasn't drafted yet/)).toBeInTheDocument();
   });
 
+  // Task 12 review follow-up: "scheduled" and "in_progress" are different moments. A manager
+  // whose draft is live needs "join now", not "hasn't drafted yet".
+  it("switches to live-draft copy while the draft is in progress", () => {
+    renderInLeague(<LeagueHome home={{ ...HOME, draftStatus: "in_progress" }} lineup={null} />, fixtureLeagueDeps().deps);
+    expect(screen.getByText("Your draft is live right now.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Join the draft" })).toHaveAttribute("href", `/app/drafts/${HOME.draftId}`);
+    expect(screen.queryByText(/hasn't drafted yet/)).not.toBeInTheDocument();
+  });
+
   it("says so plainly when this manager has no matchup this week, in both themes", async () => {
     await inBothThemes(wrap({ ...HOME, myMatchup: null }, LINEUP), async ({ container }) => {
       expect(screen.getByText(/no matchup this week/i)).toBeInTheDocument();

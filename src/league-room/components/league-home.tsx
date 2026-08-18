@@ -17,6 +17,7 @@ import { StandingsTable } from "./standings-table";
 export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; readonly lineup: LineupBody | null }) {
   const clinched = home.standings.some((row) => row.teamId === home.myTeamId && row.clinched);
   const drafted = home.draftStatus === "complete";
+  const draftLive = home.draftStatus === "in_progress";
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
@@ -31,10 +32,12 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
 
       {drafted ? null : (
         <Card>
-          <p className="text-text-primary">This league hasn&apos;t drafted yet.</p>
+          <p className="text-text-primary">
+            {draftLive ? "Your draft is live right now." : "This league hasn't drafted yet."}
+          </p>
           {home.draftId === null ? null : (
             <Link className="text-accent underline" href={`/app/drafts/${home.draftId}`}>
-              Open the draft room
+              {draftLive ? "Join the draft" : "Open the draft room"}
             </Link>
           )}
         </Card>
