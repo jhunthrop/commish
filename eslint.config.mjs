@@ -87,10 +87,10 @@ const eslintConfig = [
     // allowed — and in this codebase's existing route handlers, expected — to import
     // @/draft-engine/@/draft-service/@/league/@/league-service directly (see
     // docs/conventions.md, "Client boundary"). A page can't be told apart from a client
-    // component by its filename alone, so the only globs that can't misfire are the two
-    // directories that are BROWSER code by construction: everything under src/draft-room/**
-    // and src/league-room/**.
-    files: ["src/draft-room/**/*.{ts,tsx}", "src/league-room/**/*.{ts,tsx}"],
+    // component by its filename alone, so the only globs that can't misfire are the three
+    // directories that are BROWSER code by construction: everything under src/draft-room/**,
+    // src/league-room/** and src/chat-room/**.
+    files: ["src/draft-room/**/*.{ts,tsx}", "src/league-room/**/*.{ts,tsx}", "src/chat-room/**/*.{ts,tsx}"],
     plugins: { "@typescript-eslint": tseslint },
     rules: {
       "@typescript-eslint/no-restricted-imports": [
