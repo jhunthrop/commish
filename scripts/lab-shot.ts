@@ -4,7 +4,12 @@ import { chromium } from "playwright-core";
 import { readFileSync } from "node:fs";
 
 const [, , path = "/app/drafts/dev_draft_snake", out = "shot.png", w = "1440", h = "900", scheme = "light"] = process.argv;
-const session = JSON.parse(readFileSync(process.env.LAB_SESSION_FILE!, "utf8"));
+
+const sessionFile = process.env.LAB_SESSION_FILE;
+if (sessionFile === undefined || sessionFile.length === 0) {
+  throw new Error("LAB_SESSION_FILE is not set. Run scripts/mint-dev-session.ts first, or set it to that script's output path.");
+}
+const session = JSON.parse(readFileSync(sessionFile, "utf8"));
 
 async function main() {
   const browser = await chromium.launch({ channel: "chrome", headless: true });
