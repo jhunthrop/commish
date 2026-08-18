@@ -73,5 +73,3 @@ export const setLineupSchema = z.object({
     )
     .min(1),
 });
-
-export type CreateLeagueRequest = z.infer<typeof createLeagueSchema>;

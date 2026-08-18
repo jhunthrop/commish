@@ -1,18 +1,12 @@
-export { createLeague, type LeagueWriteDeps, type CreateLeagueInput, type CreateLeagueResult } from "./creation";
-export {
-  createInvite, acceptInvite,
-  type InviteDeps, type CreateInviteInput, type CreateInviteResult, type AcceptInviteInput, type AcceptInviteResult,
-} from "./invites";
+// Barrel surface: only names actually imported through `@/league-service` elsewhere in the
+// repo. Everything else (types, `getLineup`, `isWeekLocked`, `leagueStandings`, and
+// `writeSchedule` — whose only caller, `draft-service/commit.ts`, deliberately imports it
+// from `@/league-service/schedule` directly so the draft's commit seam never pulls in this
+// barrel, or `read.ts`'s import of `@/draft-service/teams` with it) is reached by importing
+// the owning submodule directly.
+export { createLeague } from "./creation";
+export { createInvite, acceptInvite } from "./invites";
 export { listLeaguesForUser, leagueHome, matchupWeek } from "./read";
-// `writeSchedule` is exported here for completeness; `draft-service/commit.ts` imports it from
-// `@/league-service/schedule` DIRECTLY, so the draft's commit seam never pulls in this barrel
-// (and with it `read.ts`'s import of `@/draft-service/teams`).
-export { writeSchedule, type WriteScheduleInput, type WrittenScheduleCounts } from "./schedule";
-export {
-  getLineup, isWeekLocked, setLineup, lineupView,
-  type GetLineupInput, type LineupSlotInput, type SetLineupInput, type SetLineupResult,
-} from "./lineups";
-export { scoreWeek, leagueStandings, type ScoreWeekResult } from "./results";
-export {
-  createLeagueSchema, createInviteSchema, acceptInviteSchema, setLineupSchema, weekNumberSchema, type CreateLeagueRequest,
-} from "./schemas";
+export { setLineup, lineupView } from "./lineups";
+export { scoreWeek } from "./results";
+export { createLeagueSchema, createInviteSchema, acceptInviteSchema, setLineupSchema, weekNumberSchema } from "./schemas";

@@ -18,5 +18,5 @@ export {
 } from "./selectors";
 export {
   draftActionSchema, clientDraftActionSchema, toDraftAction, type ClientDraftAction,
-  clientQueueSchema, toSetQueueAction, type ClientQueue,
+  clientQueueSchema, toSetQueueAction,
 } from "./action-schema";

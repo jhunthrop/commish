@@ -1,16 +1,6 @@
-import type { DraftFormat } from "./league";
 import type { Position } from "./player";
 
 export type DraftStatus = "scheduled" | "in_progress" | "complete";
-
-export interface Draft {
-  readonly id: string;
-  readonly leagueId: string;
-  readonly format: DraftFormat;
-  readonly status: DraftStatus;
-  readonly kickoffAt: string;
-  readonly auctionBudget: number | null;
-}
 
 /**
  * Persisted JSON shape version. `draft_actions.action` stores these rows forever, so the
@@ -18,8 +8,6 @@ export interface Draft {
  * explicit upgrade path, and never silently reinterprets a `v: 1` row.
  */
 export const DRAFT_ACTION_VERSION = 1;
-
-export type DraftActionType = "START_DRAFT" | "MAKE_PICK" | "NOMINATE" | "BID" | "TIMER_EXPIRE" | "SET_QUEUE";
 
 /** One draftable player, as the draft saw them: id plus the position roster rules key off. */
 export interface DraftPoolEntry {
@@ -96,12 +84,3 @@ export type DraftAction =
   | BidAction
   | TimerExpireAction
   | SetQueueAction;
-
-export interface DraftPick {
-  readonly draftId: string;
-  readonly teamId: string;
-  readonly playerId: string;
-  readonly round: number;
-  readonly pickNumber: number;
-  readonly price: number | null;
-}

@@ -165,10 +165,11 @@ actual live feed, and stays unused until one exists — Phase 1 never publishes 
 value-import `@/league`, `@/league-service`, `@/db*` or `@/lib/realtime*` — only
 `import type` (sharing a wire type like `LeagueHomeBody` costs nothing at runtime and is how
 the client and server sides stay in sync) and plain `fetch`/SSE against `/api/leagues/**` and
-`/api/invites/**`. `src/league-room/lib/lookups.ts` re-exports the shared
-`teamsById`/`playersById`/`teamName`/`playerName` pattern from `src/lib/display/lookups.ts` —
-the same module `src/draft-room/lib/lookups.ts` now re-exports from, closing what used to be
-two copies of the identical id→name lookup.
+`/api/invites/**`. The league room renders names straight off the server-shaped view (e.g.
+`MatchupSide.teamName`) rather than looking them up client-side, so it has no id→name lookup
+module of its own — `src/lib/display/lookups.ts`'s `teamsById`/`playersById`/`teamName`/
+`playerName` pattern is a `src/draft-room/**`-only need (the draft room resolves ids against a
+live pool the server never renders into text).
 
 Pages under `src/app/**` are Next.js Server Components (`page.tsx`) and route handlers
 (`route.ts`), which are outside that rule and read the service layer directly — the idiomatic

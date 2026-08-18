@@ -43,9 +43,10 @@ export function getDraftTicker(): DraftTicker {
   return ticker;
 }
 
-export { resolveDraftActor, type DraftActor, type ActorResult } from "./authz";
-export type { ApplyResult, CommitResult, DraftStore } from "./store";
-export type { DraftTicker, TickOutcome } from "./ticker";
-export { setTeamQueue, getTeamQueue, type QueueDeps, type QueueResult, type SetQueueInput } from "./queue";
-export { createNudgeScheduler, NO_OP_NUDGE_SCHEDULER, type NudgeScheduler, type NudgeOutcome } from "./nudge";
-export { createNudgeCopy, staticNudge, type NudgeCopyFn, type NudgeCopyInput } from "./nudge-copy";
+// Barrel surface: only names actually imported through `@/draft-service` elsewhere in the
+// repo. Everything else a submodule exports (types, alternate constructors, etc.) is reached
+// by importing that submodule directly. Unlike `src/draft-engine/index.ts` — whose breadth is
+// a deliberate coverage device, see `src/draft-engine/index.test.ts` — this barrel is not a
+// coverage gate, so it is trimmed to what is actually used.
+export { resolveDraftActor, type DraftActor } from "./authz";
+export { setTeamQueue, getTeamQueue } from "./queue";

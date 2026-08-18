@@ -75,8 +75,9 @@ export const WON: MatchupSummary = {
 /** The reverse of `WON` — same week, `t1` loses. */
 export const LOST: MatchupSummary = { ...WON, homeScore: 90, awayScore: 105 };
 
-/** The teams `listTeamCards` would hand back for the three `STANDINGS` rows. */
-export const TEAMS: readonly TeamCard[] = [
+/** The teams `listTeamCards` would hand back for the three `STANDINGS` rows. Module-private —
+ *  only consumed here, by `HOME` below. */
+const TEAMS: readonly TeamCard[] = [
   { id: "t1", name: "Bay Bandits", ownerDisplayName: "Alex Rivera", ownerAvatarUrl: null },
   { id: "t2", name: "Iron Owls", ownerDisplayName: "Jordan Lee", ownerAvatarUrl: null },
   { id: "t3", name: "Comet Crew", ownerDisplayName: "Sam Patel", ownerAvatarUrl: null },
@@ -100,7 +101,8 @@ export const HOME: LeagueHomeBody = {
   draftStatus: "complete",
 };
 
-export interface FixtureLeagueDeps {
+/** Module-private: only the return type of `fixtureLeagueDeps` below. */
+interface FixtureLeagueDeps {
   deps: LeagueRoomDeps;
   readonly calls: string[];
   /** Mutable: set the envelope the next POST/PUT should answer with. */

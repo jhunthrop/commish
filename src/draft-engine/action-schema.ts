@@ -77,8 +77,6 @@ export const clientQueueSchema = z.object({
   playerIds: z.array(playerId).max(DRAFT_QUEUE_CONFIG.maxLength),
 });
 
-export type ClientQueue = z.infer<typeof clientQueueSchema>;
-
 export function toSetQueueAction(playerIds: readonly string[], teamId: string, timestamp: string): SetQueueAction {
   return { v: DRAFT_ACTION_VERSION, type: "SET_QUEUE", timestamp, teamId, playerIds };
 }

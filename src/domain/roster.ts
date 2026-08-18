@@ -14,11 +14,6 @@ export interface RosterSlot {
   readonly playerId: string | null;
 }
 
-export interface Roster {
-  readonly teamId: string;
-  readonly slots: readonly RosterSlot[];
-}
-
 /** The one place the bench slot's name is written. Everything else compares against this. */
 export const BENCH_SLOT: RosterSlotType = "BENCH";
 

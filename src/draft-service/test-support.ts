@@ -10,7 +10,9 @@ export const SPRINT_ROSTER_SLOTS: readonly RosterSlotConfig[] = [
   { slot: "WR", count: 1, eligiblePositions: ["WR"] },
 ];
 
-export interface SeedDraftInput {
+/** Module-private: only the parameter/return type of `seedDraftFixture` below — no caller
+ *  imports this by name, they let it infer structurally. */
+interface SeedDraftInput {
   readonly draftId: string;
   readonly leagueId: string;
   readonly format: DraftFormat;
@@ -20,7 +22,8 @@ export interface SeedDraftInput {
   readonly auctionBudget: number | null;
 }
 
-export interface DraftFixture {
+/** Module-private — see `SeedDraftInput` above. */
+interface DraftFixture {
   readonly draftId: string;
   readonly leagueId: string;
   readonly teamIds: readonly string[];

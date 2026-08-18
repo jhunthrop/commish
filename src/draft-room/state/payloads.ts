@@ -93,6 +93,3 @@ export const draftEventSchema = z.discriminatedUnion("type", [
 
 export type DraftEventFrame = z.infer<typeof draftEventSchema>;
 export type DraftPickPayload = z.infer<typeof pickPayloadSchema>;
-export type DraftNominatePayload = z.infer<typeof nominatePayloadSchema>;
-export type DraftBidPayload = z.infer<typeof bidPayloadSchema>;
-export type DraftNudgePayload = z.infer<typeof nudgePayloadSchema>;
