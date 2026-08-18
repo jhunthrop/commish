@@ -82,6 +82,12 @@ export async function advisorFixture(
     { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: "rb_bell" },
     { teamId: created.teamId, slot: "BENCH", slotIndex: 0, playerId: "wr_volume" },
     { teamId: created.teamId, slot: "BENCH", slotIndex: 1, playerId: "rb_change" },
+    // The opponent fields the same four players, starters and bench swapped — real enough for
+    // the trade route to assemble both sides of an actual proposal, not just reject one.
+    { teamId: opponentTeamId, slot: "WR", slotIndex: 0, playerId: "wr_volume" },
+    { teamId: opponentTeamId, slot: "RB", slotIndex: 0, playerId: "rb_change" },
+    { teamId: opponentTeamId, slot: "BENCH", slotIndex: 0, playerId: "wr_deep" },
+    { teamId: opponentTeamId, slot: "BENCH", slotIndex: 1, playerId: "rb_bell" },
   ]);
 
   await db.transaction((tx) =>
