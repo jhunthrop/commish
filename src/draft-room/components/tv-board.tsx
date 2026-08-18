@@ -35,7 +35,7 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
 
   return (
     <div className="flex flex-col gap-6 text-lg">
-      <ClockBanner view={view} teams={room.teams} myTeamId={room.myTeamId} />
+      <ClockBanner view={view} teams={room.teams} myTeamId={room.myTeamId} playersById={playersById} />
       <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
 
       {/* A plain <section>, not <Card>: `data-*` attributes are not part of `CardProps`, and

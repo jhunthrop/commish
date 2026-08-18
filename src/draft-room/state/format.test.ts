@@ -7,7 +7,7 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
  */
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { totalRosterSlots } from "@/draft-engine";
-import { formatCountdown, formatClockLength, formatGap, formatTightening, rosterSpots } from "./format";
+import { formatCountdown, formatClockLength, formatCoarseRemaining, formatGap, formatTightening, rosterSpots } from "./format";
 
 describe("formatCountdown", () => {
   it.each([
@@ -32,6 +32,26 @@ describe("formatClockLength", () => {
     [90, "90 seconds"],
   ])("renders %i seconds as %s", (seconds, expected) => {
     expect(formatClockLength(seconds)).toBe(expected);
+  });
+});
+
+describe("formatCoarseRemaining", () => {
+  it.each([
+    [0, "Under a minute left"],
+    [-5_000, "Under a minute left"],
+    [59_000, "Under a minute left"],
+    [60_000, "About 1 minute left"],
+    [125_000, "About 2 minutes left"],
+    [3_599_999, "About 60 minutes left"],
+    [3_600_000, "About 1 hour left"],
+    [8 * 3_600_000, "About 8 hours left"],
+  ])("renders %i ms as %s", (ms, expected) => {
+    expect(formatCoarseRemaining(ms)).toBe(expected);
+  });
+
+  it("rounds rather than truncates, so it agrees with what a human would say", () => {
+    // 89 999 ms is 1.4999... minutes — rounds down to "1 minute", not up to "2".
+    expect(formatCoarseRemaining(89_999)).toBe("About 1 minute left");
   });
 });
 

@@ -14,7 +14,13 @@ import { DRAFT_ROOM_CONFIG } from "./config";
  */
 describe("DRAFT_ROOM_CONFIG", () => {
   it("defines every tunable as a positive number", () => {
-    const keys: readonly (keyof typeof DRAFT_ROOM_CONFIG)[] = ["countdownTickMs", "poolPageSize", "celebrationMs"];
+    const keys: readonly (keyof typeof DRAFT_ROOM_CONFIG)[] = [
+      "countdownTickMs",
+      "poolPageSize",
+      "celebrationMs",
+      "coarseRemainingMinuteMs",
+      "coarseRemainingHourMs",
+    ];
     expect(Object.keys(DRAFT_ROOM_CONFIG).sort()).toEqual([...keys].sort());
     for (const key of keys) {
       expect(Number.isFinite(DRAFT_ROOM_CONFIG[key])).toBe(true);

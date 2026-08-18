@@ -84,6 +84,10 @@ export function useDraftRoom(draftId: string): DraftRoom {
   // the promise it is itself in the middle of constructing — whether it is still the most
   // recent call and therefore still owns `refreshPromiseRef`.
   const refreshCallIdRef = useRef(0);
+  // The player dictionary never changes during a draft, so it's fetched once per `draftId`,
+  // not on every resync. Holds the `draftId` it was last fetched for; a mismatch (including
+  // the initial `null`) means the next `refresh()` must fetch it again.
+  const playersLoadedForRef = useRef<string | null>(null);
 
   const refresh = useCallback((): Promise<void> => {
     // Synchronous on purpose, with no `await` above this line: two `refresh()` calls made
@@ -95,11 +99,12 @@ export function useDraftRoom(draftId: string): DraftRoom {
 
     const generation = generationRef.current;
     const callId = ++refreshCallIdRef.current;
+    const needsPlayers = playersLoadedForRef.current !== draftId;
     const run = (async () => {
       try {
         const [snapshotResponse, playersResponse] = await Promise.all([
           deps.fetchJson(`/api/drafts/${draftId}`),
-          deps.fetchJson(`/api/drafts/${draftId}/players`),
+          needsPlayers ? deps.fetchJson(`/api/drafts/${draftId}/players`) : null,
         ]);
         const snapshot = (await snapshotResponse.json()) as ApiEnvelope<DraftSnapshotBody>;
         // A newer generation has already taken over (a draftId change while we were
@@ -110,12 +115,19 @@ export function useDraftRoom(draftId: string): DraftRoom {
           setState((prev) => ({ ...prev, status: "error", error: snapshot.error }));
           return;
         }
-        const players = (await playersResponse.json()) as ApiEnvelope<DraftPlayersBody>;
-        if (generation !== generationRef.current) return;
-        if (!players.ok) {
-          setState((prev) => ({ ...prev, status: "error", error: players.error }));
-          return;
+
+        let fetchedPlayers: readonly Player[] | null = null;
+        if (needsPlayers && playersResponse !== null) {
+          const players = (await playersResponse.json()) as ApiEnvelope<DraftPlayersBody>;
+          if (generation !== generationRef.current) return;
+          if (!players.ok) {
+            setState((prev) => ({ ...prev, status: "error", error: players.error }));
+            return;
+          }
+          fetchedPlayers = players.data.players;
+          playersLoadedForRef.current = draftId;
         }
+
         viewRef.current = snapshot.data.draft;
         teamRef.current = snapshot.data.teamId;
         setLeagueId(snapshot.data.draft.leagueId);
@@ -124,7 +136,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
           status: "ready",
           error: null,
           view: snapshot.data.draft,
-          players: players.data.players,
+          players: fetchedPlayers ?? prev.players,
           teams: snapshot.data.teams,
           myTeamId: snapshot.data.teamId,
           isCommissioner: snapshot.data.isCommissioner,
@@ -155,6 +167,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
     refreshPromiseRef.current = null;
     viewRef.current = null;
     teamRef.current = null;
+    playersLoadedForRef.current = null;
     setLeagueId(null);
     setState(INITIAL);
   }, [draftId]);
@@ -166,7 +179,6 @@ export function useDraftRoom(draftId: string): DraftRoom {
   useEffect(() => {
     if (leagueId === null) return;
     const source = deps.openEventSource(`/api/leagues/${leagueId}/events`);
-    let dropped = false;
 
     const onDraftEvent = (event: MessageEvent) => {
       const current = viewRef.current;
@@ -187,16 +199,16 @@ export function useDraftRoom(draftId: string): DraftRoom {
 
     const onOpen = () => {
       setState((prev) => ({ ...prev, connection: "live" }));
-      // Only a reconnect needs a refetch: the browser has already replayed whatever the
-      // stream still held, and a gap beyond retention is exactly what this covers.
-      if (dropped) {
-        dropped = false;
-        void refresh();
-      }
+      // Every open resyncs — the first one included. The stream only carries events
+      // published after it opens, and it opens after the mount snapshot has already
+      // resolved; an event published in that gap would otherwise sit unseen until the next
+      // one arrives. A reconnect's open covers the analogous gap beyond stream retention.
+      // Players are cached per `draftId` (see `refresh()`), so this is one extra state
+      // fetch, not a full re-fetch pair.
+      void refresh();
     };
 
     const onError = () => {
-      dropped = true;
       setState((prev) => ({ ...prev, connection: "reconnecting" }));
     };
 

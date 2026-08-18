@@ -29,7 +29,7 @@ export function AuctionRoom({ room, playersById, onAct }: AuctionRoomProps) {
 
   return (
     <div className="flex flex-col gap-4">
-      <ClockBanner view={view} teams={room.teams} myTeamId={room.myTeamId} />
+      <ClockBanner view={view} teams={room.teams} myTeamId={room.myTeamId} playersById={playersById} />
       <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
       <AuctionLotPanel view={view} teams={room.teams} playersById={playersById} />
       <div className="grid gap-4 lg:grid-cols-2">

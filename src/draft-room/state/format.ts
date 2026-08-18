@@ -1,11 +1,13 @@
 import type { Tightening } from "@/draft-engine";
 import type { RosterSlotConfig } from "@/domain/roster";
+import { DRAFT_ROOM_CONFIG } from "./config";
 
 const MS_PER_SECOND = 1_000;
 const SECONDS_PER_MINUTE = 60;
 const MINUTES_PER_HOUR = 60;
 const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
 const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE;
+const MS_PER_HOUR = MS_PER_MINUTE * MINUTES_PER_HOUR;
 
 function pad(value: number): string {
   return value.toString().padStart(2, "0");
@@ -38,6 +40,20 @@ export function formatGap(ms: number): string {
   const hours = Math.floor(totalMinutes / MINUTES_PER_HOUR);
   const minutes = totalMinutes % MINUTES_PER_HOUR;
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+}
+
+/**
+ * A coarse, rarely-changing summary of time remaining — "About 8 hours left", "About 2 minutes
+ * left", "Under a minute left" — for a screen-reader `aria-live` region paired with
+ * `Countdown`'s (`aria-hidden`) ticking digits. Rounds to the nearest whole minute or hour, so
+ * it updates on a boundary crossing rather than every second; the boundaries themselves are
+ * `DRAFT_ROOM_CONFIG.coarseRemainingMinuteMs` / `coarseRemainingHourMs`, not inline literals.
+ */
+export function formatCoarseRemaining(msRemaining: number): string {
+  const remaining = Math.max(0, msRemaining);
+  if (remaining < DRAFT_ROOM_CONFIG.coarseRemainingMinuteMs) return "Under a minute left";
+  if (remaining < DRAFT_ROOM_CONFIG.coarseRemainingHourMs) return `About ${plural(Math.round(remaining / MS_PER_MINUTE), "minute")} left`;
+  return `About ${plural(Math.round(remaining / MS_PER_HOUR), "hour")} left`;
 }
 
 /**

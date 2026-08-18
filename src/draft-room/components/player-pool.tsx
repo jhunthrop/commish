@@ -34,13 +34,16 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
   const [position, setPosition] = useState(ALL);
 
   const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
-  const rows = useMemo(() => {
+  // The full match set, before the page-size cap below — its length is what tells the
+  // truncation notice how many rows are hidden.
+  const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return players
       .map((player, index): PoolRow => ({ player, rank: index + 1, drafted: !available.has(player.id) }))
-      .filter((row) => (position === ALL || row.player.position === position) && (needle === "" || row.player.name.toLowerCase().includes(needle)))
-      .slice(0, DRAFT_ROOM_CONFIG.poolPageSize);
+      .filter((row) => (position === ALL || row.player.position === position) && (needle === "" || row.player.name.toLowerCase().includes(needle)));
   }, [players, available, query, position]);
+  const rows = useMemo(() => filtered.slice(0, DRAFT_ROOM_CONFIG.poolPageSize), [filtered]);
+  const truncated = filtered.length > DRAFT_ROOM_CONFIG.poolPageSize;
 
   const columns: readonly TableColumn<PoolRow>[] = [
     { key: "name", header: "Player", cell: (row) => row.player.name },
@@ -91,6 +94,11 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
           />
         }
       />
+      {truncated ? (
+        <p className="text-sm text-text-muted">
+          Showing the top {rows.length} of {filtered.length} — narrow your search to see more.
+        </p>
+      ) : null}
     </section>
   );
 }

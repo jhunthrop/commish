@@ -72,4 +72,16 @@ describe("PlayerPool", () => {
     const row = screen.getByText("Jalen Croft").closest("tr")!;
     expect(within(row).getByRole("button", { name: "Draft" })).toHaveAttribute("aria-busy", "true");
   });
+
+  it("says nothing when every match fits on the page", () => {
+    render(<PlayerPool {...props} />);
+    expect(screen.queryByText(/narrow your search/i)).toBeNull();
+  });
+
+  it("tells you when results are capped, and by how much, so narrowing the search isn't a mystery", () => {
+    const manyPlayers = Array.from({ length: 75 }, (_, index) => ({ id: `p${index}`, name: `Player ${index}`, position: "WR" as const, nflTeam: "DAL" }));
+    const view = { ...SNAKE_VIEW, availablePlayerIds: manyPlayers.map((player) => player.id) };
+    render(<PlayerPool {...props} players={manyPlayers} view={view} />);
+    expect(screen.getByText("Showing the top 60 of 75 — narrow your search to see more.")).toBeInTheDocument();
+  });
 });

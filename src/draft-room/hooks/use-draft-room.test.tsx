@@ -171,7 +171,26 @@ describe("useDraftRoom", () => {
     // Same count as the single-gap case above: the second resync attached to the first's
     // in-flight promise instead of starting a new fetch pair.
     expect(h.fetches.filter((f) => f === "GET /api/drafts/d1")).toHaveLength(2);
-    expect(h.fetches.filter((f) => f === "GET /api/drafts/d1/players")).toHaveLength(2);
+    // Players are fetched once per draftId — the mount fetch loaded them, so this resync
+    // (still `d1`) never asks again.
+    expect(h.fetches.filter((f) => f === "GET /api/drafts/d1/players")).toHaveLength(1);
+  });
+
+  it("fetches players once per draftId — not on every resync, but again after a draftId change", async () => {
+    const h = harness();
+    const { result, rerender } = renderHook(({ id }: { id: string }) => useDraftRoom(id), {
+      wrapper: wrapper(h.deps),
+      initialProps: { id: "d1" },
+    });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(h.fetches.filter((f) => f === "GET /api/drafts/d1/players")).toHaveLength(1);
+
+    h.snapshot = { ...VIEW, draftId: "d2", leagueId: "l2" };
+    rerender({ id: "d2" });
+    await waitFor(() => expect(result.current.view?.draftId).toBe("d2"));
+    expect(h.fetches.filter((f) => f === "GET /api/drafts/d2/players")).toHaveLength(1);
+    // The old draft's players are never asked for again either.
+    expect(h.fetches.filter((f) => f === "GET /api/drafts/d1/players")).toHaveLength(1);
   });
 
   it("bumps the generation on a draftId change so a slow response for the OLD draft can never overwrite the NEW draft's state", async () => {
@@ -250,13 +269,15 @@ describe("useDraftRoom", () => {
     await waitFor(() => expect(result.current.view?.sequence).toBe(12));
   });
 
-  it("does not refetch on the first open — only after a drop", async () => {
+  it("resyncs state (but not players, already cached) on the very first open — the gap between the mount snapshot and the stream opening", async () => {
     const h = harness();
     const { result } = await mounted(h);
-    const before = h.fetches.length;
+    const stateFetchesBefore = h.fetches.filter((f) => f === "GET /api/drafts/d1").length;
+    const playersFetchesBefore = h.fetches.filter((f) => f === "GET /api/drafts/d1/players").length;
     act(() => h.sources[0]!.emit("open"));
     await waitFor(() => expect(result.current.connection).toBe("live"));
-    expect(h.fetches).toHaveLength(before);
+    await waitFor(() => expect(h.fetches.filter((f) => f === "GET /api/drafts/d1")).toHaveLength(stateFetchesBefore + 1));
+    expect(h.fetches.filter((f) => f === "GET /api/drafts/d1/players")).toHaveLength(playersFetchesBefore);
   });
 
   it("renders a submitted pick immediately and settles on the server's view", async () => {

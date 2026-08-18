@@ -17,7 +17,7 @@ export interface AuctionLotPanelProps {
 export function AuctionLotPanel({ view, teams, playersById }: AuctionLotPanelProps) {
   // Called unconditionally, before the early return below — React's Rules of Hooks — even
   // though `remainingMs` is only rendered once a lot exists.
-  const remainingMs = useCountdown(view.deadlineAt);
+  const { remainingMs } = useCountdown(view.deadlineAt);
   const byId = teamsById(teams);
   const nameOf = (teamId: string | null) => (teamId === null ? "Someone" : teamName(byId, teamId, "Someone"));
   const lot = view.auction?.lot ?? null;

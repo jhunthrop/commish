@@ -53,11 +53,19 @@ it agrees with the engine's `totalRosterSlots` so the two cannot diverge.
    The state route returns the `DraftStateView`, the caller's own `teamId`, whether they are
    the commissioner, and the league's team cards. The players route returns ranked player
    metadata, and is separate precisely because the state route is refetched often and the
-   player dictionary never changes during a draft.
+   player dictionary never changes during a draft — `refresh()` (see step 4) fetches it
+   **once per `draftId`**, not on every resync, and refetches only when `draftId` itself
+   changes.
 2. **Subscribe** → a native `EventSource` on `/api/leagues/<leagueId>/events`, opened only
    once the mount fetch has resolved a `leagueId`. **The browser owns reconnect and
    `Last-Event-ID`.** There is no retry loop, no backoff timer and no polling anywhere in this
-   codebase; adding one would be a bug, not a feature.
+   codebase; adding one would be a bug, not a feature. **Every `open` resyncs the state view
+   — the first one included, not only a reconnect's.** The stream only carries events
+   published after it opens, and it opens after the mount snapshot has already resolved, so a
+   pick or bid published in that window would otherwise sit unseen until the next event
+   arrives; the first `open`'s resync closes that gap. A reconnect's `open` covers the
+   analogous gap beyond stream retention. Because players are cached per `draftId` (step 4),
+   every one of these resyncs is a single extra state fetch, never a full re-fetch pair.
 
    The stream carries **named SSE events**, not one generic `message` frame: `useDraftRoom`
    registers one listener per draft event type (`draft.pick`, `draft.nominate`, `draft.bid`,
@@ -81,10 +89,12 @@ it agrees with the engine's `totalRosterSlots` so the two cannot diverge.
    pick. The client never computes `highBid + bidIncrement`; the engine already applied the
    auction's reserve/increment rules and sent the answer.
 4. **Resync** → refetch the whole view. Triggered by a sequence gap, by a `draft.bid` against a
-   lot we never saw open, by a `draft.nominate` on a non-auction view, and by any `EventSource`
-   `open` that follows an `error`. This is the fallback `docs/conventions.md` names for a gap
-   that outlasted the stream's retention window, and it is what makes a missed auction bid war
-   and a budget desync self-healing.
+   lot we never saw open, by a `draft.nominate` on a non-auction view, and by **every**
+   `EventSource` `open` — always, not only one that follows an `error`. (See step 2: the first
+   `open` closes the mount→subscribe gap, a reconnect's `open` covers a gap beyond stream
+   retention — same trigger, two different gaps.) This is the fallback `docs/conventions.md`
+   names for a gap that outlasted the stream's retention window, and it is what makes a missed
+   auction bid war and a budget desync self-healing.
 
    `refresh()` (in `use-draft-room.ts`) is **single-flight**: a burst of gapped frames arriving
    in the same tick all see the same in-flight promise and share one fetch pair rather than
@@ -93,7 +103,10 @@ it agrees with the engine's `totalRosterSlots` so the two cannot diverge.
    applied, so navigating between drafts can never let a stale fetch write into the new
    draft's state. The hook's `draftId`-change effect is a hard reset: it clears the view, team
    id, league id and connection state back to `INITIAL` rather than showing the previous
-   draft while the new one loads.
+   draft while the new one loads. And it is **players-cached**: `refresh()` only ever fetches
+   `GET /api/drafts/[draftId]/players` once per `draftId` — every other resync (a gap, a
+   missed bid war, an `open`) fetches state alone — refetching players again only when
+   `draftId` itself changes, alongside the hard reset above.
 5. **Submit** → `optimisticView()` patches the view for instant feedback, the POST goes out,
    and the response replaces the view — unless SSE already carried us further (compared by
    `sequence`), in which case the newer view wins. A rejected submission (409, or any
