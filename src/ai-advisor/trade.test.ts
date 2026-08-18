@@ -21,8 +21,9 @@ async function setup() {
   const fixture = await advisorFixture(db, "ppr");
   const context = await assembleAdvisorContext(db, { ...fixture, weekNumber: 4 });
   if (context === null || context.opponent === null) throw new Error("no context");
-  // The opponent's roster is empty in this fixture; give the analyzer a real other side by
-  // treating MY bench as theirs — the analyzer only ever sees two valued sides.
+  // The analyzer only ever sees two valued sides, so building "theirs" from MY bench is just
+  // as valid a fixture as the fixture's real opponent roster — kept here to keep this file's
+  // proposal shape (rb_change for wr_volume) stable regardless of what the fixture opponent fields.
   const opponent = { ...context.opponent, players: context.me.players };
   const proposal: TradeProposal = {
     leagueId: context.leagueId,

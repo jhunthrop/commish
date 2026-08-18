@@ -1,3 +1,4 @@
+import { and, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import type { ScoringPresetName } from "@/domain/scoring";
 import { players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
@@ -95,4 +96,23 @@ export async function advisorFixture(
   );
 
   return { leagueId: created.leagueId, teamId: created.teamId, opponentTeamId };
+}
+
+/**
+ * A second, unrelated league whose team fields one genuinely real, rostered player — for
+ * proving that a proposal naming a player who is real and rostered ELSEWHERE, not merely a
+ * nonexistent id, still can't be read into a DIFFERENT league's trade. Built on
+ * `advisorFixture` and then repoints one of that team's real slots at the new player, so the
+ * id is exactly as "real" (an actual roster_slots row on an actual team) as any player named
+ * in this league.
+ */
+export async function foreignLeaguePlayer(db: Db): Promise<string> {
+  const fixture = await advisorFixture(db, "ppr", "_foreign");
+  const playerId = "wr_foreign_league";
+  await db.insert(players).values({ id: playerId, name: "Foreign Wideout", position: "WR", nflTeam: "LAC" }).onConflictDoNothing();
+  await db
+    .update(rosterSlots)
+    .set({ playerId })
+    .where(and(eq(rosterSlots.teamId, fixture.teamId), eq(rosterSlots.slot, "BENCH"), eq(rosterSlots.slotIndex, 0)));
+  return playerId;
 }

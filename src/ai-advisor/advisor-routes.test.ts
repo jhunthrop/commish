@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
+import { leagues, users } from "@/db/schema";
 import type { ApiEnvelope } from "@/lib/api/respond";
+import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import type { Advice } from "./start-sit";
 import type { TradeAssessment } from "./trade";
-import { advisorFixture } from "./test-support";
+import { advisorFixture, foreignLeaguePlayer } from "./test-support";
 
 const db: Db = createTestDb();
 const currentUser = vi.fn<() => Promise<{ readonly id: string } | null>>();
@@ -54,6 +56,22 @@ function context() {
   return { params: Promise.resolve({ leagueId }) };
 }
 
+/**
+ * A league whose commissioner never fielded a team of their own. `requireLeagueMember` lets a
+ * commissioner through even with no team — being commissioner is membership on its own — so
+ * each route's own `actor.teamId === null` guard is the only thing standing between a
+ * teamless commissioner and advice for a team that doesn't exist. Inserted directly rather
+ * than via `advisorFixture`/`createLeague`, which always seat their caller on a team.
+ */
+async function teamlessCommissionerLeague(): Promise<string> {
+  const commissionerId = "u_commish_only";
+  await db.insert(users).values({ id: commissionerId, email: `${commissionerId}@test.local`, displayName: "Commish Only" });
+  const teamlessLeagueId = "league_teamless_commissioner";
+  await db.insert(leagues).values({ id: teamlessLeagueId, name: "No Team Yet", format: "snake", teamCount: 2, commissionerUserId: commissionerId });
+  currentUser.mockResolvedValue({ id: commissionerId });
+  return teamlessLeagueId;
+}
+
 describe("POST /api/leagues/[leagueId]/advisor/start-sit", () => {
   it("answers 401 JSON when nobody is signed in", async () => {
     currentUser.mockResolvedValue(null);
@@ -90,6 +108,16 @@ describe("POST /api/leagues/[leagueId]/advisor/start-sit", () => {
   it("rejects a week outside the season", async () => {
     expect((await START_SIT(post({ weekNumber: 0, question: "Who?" }), context())).status).toBe(400);
   });
+
+  it("answers 403 for a commissioner who never fielded a team of their own", async () => {
+    const teamlessLeagueId = await teamlessCommissionerLeague();
+    const response = await START_SIT(post({ weekNumber: 4, question: "Who?" }), { params: Promise.resolve({ leagueId: teamlessLeagueId }) });
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as ApiEnvelope<never>;
+    expect(body.ok).toBe(false);
+    if (body.ok) return;
+    expect(body.error).toBe(NO_TEAM_MESSAGE);
+  });
 });
 
 describe("POST /api/leagues/[leagueId]/advisor/trade", () => {
@@ -112,6 +140,15 @@ describe("POST /api/leagues/[leagueId]/advisor/trade", () => {
   it("422s a proposal naming a player neither side actually holds", async () => {
     const response = await TRADE(
       post({ weekNumber: 4, counterpartyTeamId: opponentTeamId, give: ["ghost_player"], receive: ["wr_volume"] }),
+      context(),
+    );
+    expect(response.status).toBe(422);
+  });
+
+  it("422s a proposal naming a REAL player who is rostered only in a different league", async () => {
+    const foreignPlayerId = await foreignLeaguePlayer(db);
+    const response = await TRADE(
+      post({ weekNumber: 4, counterpartyTeamId: opponentTeamId, give: [foreignPlayerId], receive: ["wr_volume"] }),
       context(),
     );
     expect(response.status).toBe(422);
@@ -147,5 +184,18 @@ describe("POST /api/leagues/[leagueId]/advisor/trade", () => {
       context(),
     );
     expect(response.status).toBe(404);
+  });
+
+  it("answers 403 for a commissioner who never fielded a team of their own", async () => {
+    const teamlessLeagueId = await teamlessCommissionerLeague();
+    const response = await TRADE(
+      post({ weekNumber: 4, counterpartyTeamId: opponentTeamId, give: ["rb_change"], receive: ["wr_volume"] }),
+      { params: Promise.resolve({ leagueId: teamlessLeagueId }) },
+    );
+    expect(response.status).toBe(403);
+    const body = (await response.json()) as ApiEnvelope<never>;
+    expect(body.ok).toBe(false);
+    if (body.ok) return;
+    expect(body.error).toBe(NO_TEAM_MESSAGE);
   });
 });
