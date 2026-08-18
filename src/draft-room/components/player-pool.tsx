@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { Badge, Button, EmptyState, Input, Select, Table, type TableColumn } from "@/components/ui";
+import { queueButtonLabel } from "../lib/lookups";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 
 const ALL = "ALL";
@@ -58,7 +59,7 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
       cell: (row) =>
         row.drafted ? null : (
           <Button size="sm" variant="ghost" disabled={submitting} onClick={() => onQueue(row.player.id)}>
-            {queuedPlayerIds.has(row.player.id) ? `Remove ${row.player.name} from your queue` : `Queue ${row.player.name}`}
+            {queueButtonLabel(row.player.name, queuedPlayerIds.has(row.player.id))}
           </Button>
         ),
     },

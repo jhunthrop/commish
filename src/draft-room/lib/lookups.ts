@@ -28,3 +28,11 @@ export function teamName(byId: ReadonlyMap<string, TeamCard>, teamId: string, fa
 export function playerName(byId: ReadonlyMap<string, Player>, playerId: string, fallback: string = playerId): string {
   return byId.get(playerId)?.name ?? fallback;
 }
+
+/**
+ * The queue toggle button's accessible name — one sentence, declared once, so `PlayerPool`
+ * and `QueuePanel` can never drift into two different phrasings of the same action.
+ */
+export function queueButtonLabel(name: string, queued: boolean): string {
+  return queued ? `Remove ${name} from your queue` : `Queue ${name}`;
+}

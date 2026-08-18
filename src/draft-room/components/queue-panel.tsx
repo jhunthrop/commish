@@ -2,7 +2,7 @@
 
 import type { Player } from "@/domain/player";
 import { Badge, Button, EmptyState } from "@/components/ui";
-import { playerName } from "../lib/lookups";
+import { playerName, queueButtonLabel } from "../lib/lookups";
 import { moveInQueue, removeFromQueue } from "../state/queue";
 
 export interface QueuePanelProps {
@@ -49,7 +49,7 @@ export function QueuePanel({ queue, playersById, availablePlayerIds, busy, onCha
                 {`Move ${name} down`}
               </Button>
               <Button size="sm" variant="ghost" disabled={busy} onClick={() => onChange(removeFromQueue(queue, playerId))}>
-                {`Remove ${name} from your queue`}
+                {queueButtonLabel(name, true)}
               </Button>
             </li>
           );

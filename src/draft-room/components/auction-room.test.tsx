@@ -3,8 +3,8 @@ import { screen, waitFor, act, fireEvent, within } from "@testing-library/react"
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
 import { inBothThemes } from "@/components/ui/test-utils";
-import { AUCTION_VIEW, fixtureDeps, renderInRoom } from "../test-fixtures";
-import { DraftRoomDepsProvider } from "../hooks/deps";
+import { AUCTION_VIEW, fixtureDeps, renderInRoom, type FixtureDeps } from "../test-fixtures";
+import { DraftRoomDepsProvider, type DraftRoomDeps } from "../hooks/deps";
 import { DraftRoom } from "./draft-room";
 
 const clockOf = (view: typeof AUCTION_VIEW, sequence: number) => ({
@@ -26,6 +26,41 @@ function mountAuction(view = AUCTION_VIEW) {
     fixture.deps,
   );
   return { fixture, rendered };
+}
+
+/**
+ * `fixtureDeps`'s `calls` log records method + URL only. The queue tests below care about
+ * WHAT was queued, so this wraps `fetchJson` to also capture each `POST /queue` body's
+ * `playerIds` — without duplicating `fixtureDeps`'s own response-selection logic.
+ */
+function withQueueBodyCapture(deps: DraftRoomDeps): { readonly deps: DraftRoomDeps; readonly bodies: (readonly string[])[] } {
+  const bodies: (readonly string[])[] = [];
+  const inner = deps.fetchJson;
+  return {
+    bodies,
+    deps: {
+      ...deps,
+      fetchJson: async (url, init) => {
+        if (url.endsWith("/queue") && init?.method === "POST") {
+          bodies.push((JSON.parse(String(init.body)) as { playerIds: readonly string[] }).playerIds);
+        }
+        return inner(url, init);
+      },
+    },
+  };
+}
+
+function mountAuctionWithQueue(over: Partial<Pick<FixtureDeps, "queue" | "queueResponse">> = {}) {
+  const fixture = fixtureDeps(AUCTION_VIEW);
+  Object.assign(fixture, over);
+  const capture = withQueueBodyCapture(fixture.deps);
+  renderInRoom(
+    <ToastProvider>
+      <DraftRoom draftId="d1" />
+    </ToastProvider>,
+    capture.deps,
+  );
+  return { fixture, bodies: capture.bodies };
 }
 
 describe("AuctionRoom", () => {
@@ -157,5 +192,51 @@ describe("AuctionRoom", () => {
       fireEvent.click(screen.getByRole("button", { name: "Nominate for $7" }));
     });
     expect(fixture.calls).toContain("POST /api/drafts/d1/actions");
+  });
+
+  it("shows the moderator's nudge for my own team, and not for a rival's", async () => {
+    const { fixture } = mountAuction();
+    await waitFor(() => expect(fixture.sources).toHaveLength(1));
+
+    act(() =>
+      fixture.sources[0]!.emit("draft.nudge", {
+        draftId: "d1",
+        clock: clockOf(AUCTION_VIEW, AUCTION_VIEW.sequence),
+        teamId: "t2",
+        message: "Not for you.",
+      }),
+    );
+    expect(screen.queryByText("Not for you.")).toBeNull();
+
+    act(() =>
+      fixture.sources[0]!.emit("draft.nudge", {
+        draftId: "d1",
+        clock: clockOf(AUCTION_VIEW, AUCTION_VIEW.sequence),
+        teamId: "t1",
+        message: "You're up.",
+      }),
+    );
+    await waitFor(() => expect(screen.getByText("You're up.")).toBeInTheDocument());
+  });
+
+  it("queues a player from the pool, appending it to the request room.setQueue sends", async () => {
+    const { bodies } = mountAuctionWithQueue();
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Nominate" })[0]).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Queue Jalen Croft" }));
+    await waitFor(() => expect(bodies).toContainEqual(["qb1"]));
+  });
+
+  it("reorders the queue through QueuePanel's own buttons, wired to room.setQueue", async () => {
+    const { bodies } = mountAuctionWithQueue({ queue: ["rb1", "qb1"] });
+    await waitFor(() => expect(screen.getByRole("button", { name: "Move Jalen Croft up" })).toBeInTheDocument());
+    fireEvent.click(screen.getByRole("button", { name: "Move Jalen Croft up" }));
+    await waitFor(() => expect(bodies).toContainEqual(["qb1", "rb1"]));
+  });
+
+  it("toasts the reducer's reason when a queue change is rejected", async () => {
+    mountAuctionWithQueue({ queueResponse: { ok: false, error: "A queue can hold at most 50 players." } });
+    await waitFor(() => expect(screen.getAllByRole("button", { name: "Nominate" })[0]).toBeEnabled());
+    fireEvent.click(screen.getByRole("button", { name: "Queue Jalen Croft" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("A queue can hold at most 50 players.");
   });
 });
