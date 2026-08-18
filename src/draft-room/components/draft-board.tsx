@@ -208,7 +208,8 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
       <div className="relative hidden min-h-0 w-full flex-1 sm:block">
         <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-0 z-20 w-6 bg-gradient-to-r from-surface to-transparent" />
         <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 z-20 w-6 bg-gradient-to-l from-surface to-transparent" />
-        <div ref={gridRef} data-testid="draft-board-grid" className="h-full w-full overflow-auto">
+        {/* Column snap: a scrolled board always rests on whole stickers, never slivers. */}
+        <div ref={gridRef} data-testid="draft-board-grid" className="h-full w-full snap-x snap-proximity overflow-auto">
         <table className="w-full border-separate border-spacing-1 text-left">
           <caption className="sr-only">The draft board: one row per round, one column per team.</caption>
           <thead>
@@ -221,7 +222,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
                   key={teamId}
                   scope="col"
                   className={
-                    `${CELL_MIN_WIDTH[variant]} truncate rounded-sm px-2 py-1 font-display font-semibold leading-display ` +
+                    `${CELL_MIN_WIDTH[variant]} snap-start scroll-ml-10 truncate rounded-sm px-2 py-1 font-display font-semibold leading-display ` +
                     (teamId === myTeamId ? "ring-2 ring-accent text-accent" : "text-text-primary")
                   }
                 >
