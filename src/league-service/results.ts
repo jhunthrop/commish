@@ -4,7 +4,7 @@ import { leagues, matchups, players, playerStatLines, scoringSettings, teams } f
 import type { Position, StatLine } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
-import { clinchedTeamIds, computeStandings, LEAGUE_CONFIG, startersOf } from "@/league";
+import { clinchedTeamIds, computeStandings, LEAGUE_CONFIG, seasonProgress, startersOf } from "@/league";
 import type { TeamStandingsRow } from "@/league-room/contract";
 import { scoreLineup, type ScoringRules } from "@/scoring";
 import { getLineup } from "./lineups";
@@ -86,11 +86,8 @@ export async function leagueStandings(db: Db, leagueId: string): Promise<readonl
   const matchupRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
   const standings = computeStandings({ teamIds: teamRows.map((row) => row.id), matchups: matchupRows });
 
-  const totalWeeks = new Set(matchupRows.map((row) => row.weekNumber)).size || LEAGUE_CONFIG.regularSeasonWeeks;
-  const playedWeeks = new Set(matchupRows.filter((row) => row.homeScore !== null && row.awayScore !== null).map((row) => row.weekNumber)).size;
-  const clinched = new Set(
-    clinchedTeamIds({ standings, weeksRemaining: Math.max(0, totalWeeks - playedWeeks), playoffTeams: LEAGUE_CONFIG.playoffTeams }),
-  );
+  const { weeksRemaining } = seasonProgress(matchupRows, LEAGUE_CONFIG.regularSeasonWeeks);
+  const clinched = new Set(clinchedTeamIds({ standings, weeksRemaining, playoffTeams: LEAGUE_CONFIG.playoffTeams }));
   const nameById = new Map(teamRows.map((row) => [row.id, row.name]));
 
   return standings.map((row) => ({ ...row, teamName: nameById.get(row.teamId) ?? row.teamId, clinched: clinched.has(row.teamId) }));

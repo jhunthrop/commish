@@ -52,4 +52,25 @@ describe("computeStandings", () => {
     const rows = computeStandings({ teamIds: ["a", "b"], matchups: [m(1, "a", "b", 0.1, 0.2), m(2, "a", "b", 0.2, 0.1)] });
     expect(rows.find((r) => r.teamId === "a")!.pointsFor).toBe(0.3);
   });
+
+  it("ranks a 5-1-1 record above a 5-2-0 record, even when the 5-2-0 team has more points for", () => {
+    // x: 5 wins (low-scoring blowouts) + 1 tie + 1 loss → win pct 5.5/7.
+    // y: 5 wins (high-scoring blowouts) + 2 losses → win pct 5/7, but far more points for.
+    // A ties-blind sort (wins, then points for) would rank y above x; ties must count.
+    const matchups: Matchup[] = [
+      ...Array.from({ length: 5 }, (_, i) => m(i + 1, "x", "z", 10, 0)),
+      m(6, "x", "w", 5, 5),
+      m(7, "x", "w", 0, 100),
+      ...Array.from({ length: 5 }, (_, i) => m(i + 1, "y", "z", 100, 0)),
+      m(6, "y", "w", 0, 100),
+      m(7, "y", "w", 0, 100),
+    ];
+    const rows = computeStandings({ teamIds: ["x", "y", "z", "w"], matchups });
+    const x = rows.find((r) => r.teamId === "x")!;
+    const y = rows.find((r) => r.teamId === "y")!;
+    expect(x).toMatchObject({ wins: 5, losses: 1, ties: 1 });
+    expect(y).toMatchObject({ wins: 5, losses: 2, ties: 0 });
+    expect(y.pointsFor).toBeGreaterThan(x.pointsFor);
+    expect(rows.findIndex((r) => r.teamId === "x")).toBeLessThan(rows.findIndex((r) => r.teamId === "y"));
+  });
 });

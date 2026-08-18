@@ -18,9 +18,16 @@ interface Tally {
   pointsAgainst: number;
 }
 
-/** Wins first, then points for, then team id — a total order, so two clients never disagree. */
+/** A tie is worth half a win — standard fantasy practice, and the reason a ties-blind sort
+ *  (wins alone) can rank a worse record above a better one: 5-1-1 (5.5 win pct) must outrank
+ *  5-2-0 (5.0), even though a wins-only comparison calls them equal. */
+function winPct(row: StandingsRow): number {
+  return row.wins + row.ties / 2;
+}
+
+/** Win pct first, then points for, then team id — a total order, so two clients never disagree. */
 function byRecord(a: StandingsRow, b: StandingsRow): number {
-  return b.wins - a.wins || b.pointsFor - a.pointsFor || a.teamId.localeCompare(b.teamId);
+  return winPct(b) - winPct(a) || b.pointsFor - a.pointsFor || a.teamId.localeCompare(b.teamId);
 }
 
 /**

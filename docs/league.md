@@ -130,9 +130,12 @@ and reproduces identical numbers: it recomputes from the same stored lineups and
 overwrites.
 
 `computeStandings` (`src/league/standings.ts`) tallies wins, losses, ties and both points
-columns from finished matchups only, then sorts by the canonical ranking — **wins, then points
-for, then team id** — a total order, so two clients reading the same rows never disagree on
-placement. `roundPoints` (`src/scoring/`) is the same rounding function both the per-lineup
+columns from finished matchups only, then sorts by the canonical ranking — **win percentage
+(a tie counts as half a win), then points for, then team id** — a total order, so two clients
+reading the same rows never disagree on placement. Win percentage rather than raw win count is
+what keeps a 5-1-1 record ranked above a 5-2-0 one; a wins-only sort would call them equal and
+fall through to points for, which has nothing to do with which team actually has the better
+record. `roundPoints` (`src/scoring/`) is the same rounding function both the per-lineup
 score and the standings' points-for/points-against columns use, so a team's own weekly total
 and its season sum are never off by a rounding difference.
 

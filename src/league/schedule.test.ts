@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Matchup } from "@/domain/schedule";
 import { LEAGUE_CONFIG } from "./config";
-import { currentWeekNumber, generateSchedule } from "./schedule";
+import { currentWeekNumber, generateSchedule, seasonProgress } from "./schedule";
 
 const teamIds = (n: number) => Array.from({ length: n }, (_, i) => `t${i + 1}`);
 
@@ -177,5 +177,48 @@ describe("currentWeekNumber", () => {
 
   it("stops at the last week once the whole season is scored", () => {
     expect(currentWeekNumber([matchup(1, true), matchup(2, true)], 2)).toBe(2);
+  });
+});
+
+describe("seasonProgress", () => {
+  const matchup = (weekNumber: number, scored: boolean): Matchup => ({
+    leagueId: "L", weekNumber, homeTeamId: "t1", awayTeamId: "t2",
+    homeScore: scored ? 100 : null, awayScore: scored ? 90 : null,
+  });
+
+  it("folds totalWeeks, playedWeeks, weeksRemaining and currentWeek into one result", () => {
+    const matchups = [matchup(1, true), matchup(2, true), matchup(3, false), matchup(4, false)];
+    expect(seasonProgress(matchups, 14)).toEqual({
+      totalWeeks: 4,
+      playedWeeks: 2,
+      weeksRemaining: 2,
+      currentWeek: 3,
+    });
+  });
+
+  it("falls back to the configured season length when there is no schedule yet", () => {
+    expect(seasonProgress([], 14)).toEqual({
+      totalWeeks: 14,
+      playedWeeks: 0,
+      weeksRemaining: 14,
+      currentWeek: 1,
+    });
+  });
+
+  it("bottoms weeksRemaining out at zero once the whole season is scored", () => {
+    const matchups = [matchup(1, true), matchup(2, true)];
+    expect(seasonProgress(matchups, 2)).toEqual({
+      totalWeeks: 2,
+      playedWeeks: 2,
+      weeksRemaining: 0,
+      currentWeek: 2,
+    });
+  });
+
+  it("treats a half-scored matchup's week as unplayed", () => {
+    const halfScored: Matchup = { ...matchup(2, true), awayScore: null };
+    const progress = seasonProgress([matchup(1, true), halfScored], 14);
+    expect(progress.playedWeeks).toBe(1);
+    expect(progress.currentWeek).toBe(2);
   });
 });

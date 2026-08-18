@@ -82,3 +82,32 @@ export function currentWeekNumber(matchups: readonly Matchup[], totalWeeks: numb
   const unscored = matchups.filter((m) => m.homeScore === null || m.awayScore === null).map((m) => m.weekNumber);
   return unscored.length === 0 ? Math.max(1, totalWeeks) : Math.min(...unscored);
 }
+
+export interface SeasonProgress {
+  /** The weeks the league actually has fixtures for, falling back to `configuredWeeks` for a
+   *  league whose schedule hasn't been built yet. */
+  readonly totalWeeks: number;
+  /** Weeks where every matchup has both scores in. */
+  readonly playedWeeks: number;
+  readonly weeksRemaining: number;
+  readonly currentWeek: number;
+}
+
+/**
+ * The season-progress numbers that feed the clinch celebration: how far the league has gotten,
+ * and how many weeks are left to decide who makes the playoffs. Pure arithmetic over a
+ * schedule — the single home for math that used to be duplicated between `leagueHome` and
+ * `leagueStandings`, both of which need it (one directly, one via `clinchedTeamIds`).
+ */
+export function seasonProgress(matchups: readonly Matchup[], configuredWeeks: number): SeasonProgress {
+  const totalWeeks = new Set(matchups.map((m) => m.weekNumber)).size || configuredWeeks;
+  const playedWeeks = new Set(
+    matchups.filter((m) => m.homeScore !== null && m.awayScore !== null).map((m) => m.weekNumber),
+  ).size;
+  return {
+    totalWeeks,
+    playedWeeks,
+    weeksRemaining: Math.max(0, totalWeeks - playedWeeks),
+    currentWeek: currentWeekNumber(matchups, totalWeeks),
+  };
+}

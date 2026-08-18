@@ -3,7 +3,7 @@ import type { Db } from "@/db/client";
 import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, teams } from "@/db/schema";
 import { PPR_SCORING } from "@/domain/scoring";
 import { listTeamCards } from "@/draft-service/teams";
-import { benchOf, currentWeekNumber, LEAGUE_CONFIG, startersOf } from "@/league";
+import { benchOf, LEAGUE_CONFIG, seasonProgress, startersOf } from "@/league";
 import type {
   LeagueHomeBody,
   LeagueSummary,
@@ -66,14 +66,6 @@ function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyMap<stri
 }
 
 /**
- * The season length a league is actually living in: the weeks it has fixtures for, falling
- * back to the configured regular season for a league whose draft hasn't built one yet.
- */
-function totalWeeksOf(rows: readonly { readonly weekNumber: number }[]): number {
-  return new Set(rows.map((row) => row.weekNumber)).size || LEAGUE_CONFIG.regularSeasonWeeks;
-}
-
-/**
  * Everything the league home page renders, assembled once on the server. `listTeamCards` is
  * imported from `@/draft-service/teams` rather than re-implemented — it is already the one
  * "team + owner's public profile" query in this codebase, and a second would drift.
@@ -86,8 +78,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string): Prom
   const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
   const [draft] = await db.select({ id: drafts.id, status: drafts.status }).from(drafts).where(eq(drafts.leagueId, leagueId));
 
-  const totalWeeks = totalWeeksOf(matchupRows);
-  const currentWeek = currentWeekNumber(matchupRows, totalWeeks);
+  const { totalWeeks, currentWeek } = seasonProgress(matchupRows, LEAGUE_CONFIG.regularSeasonWeeks);
   const myTeamId = teamRows.find((row) => row.userId === userId)?.id ?? null;
   const nameById = new Map(teamRows.map((row) => [row.id, row.name]));
 
@@ -123,8 +114,8 @@ export async function matchupWeek(db: Db, leagueId: string, weekNumber: number, 
   const slotConfig = league.rosterSlots;
 
   const week = await db.select().from(matchups).where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)));
-  const allRows = await db.select({ weekNumber: matchups.weekNumber }).from(matchups).where(eq(matchups.leagueId, leagueId));
-  const totalWeeks = totalWeeksOf(allRows);
+  const allRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
+  const { totalWeeks } = seasonProgress(allRows, LEAGUE_CONFIG.regularSeasonWeeks);
   if (week.length === 0) return { leagueId, weekNumber, totalWeeks, myTeamId: null, matchups: [] };
 
   const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
@@ -162,15 +153,14 @@ export async function matchupWeek(db: Db, leagueId: string, weekNumber: number, 
     };
   }
 
-  const details: MatchupDetail[] = [];
-  for (const row of week) {
-    details.push({
-      weekNumber,
-      home: await sideFor(row.homeTeamId, row.homeScore),
-      away: await sideFor(row.awayTeamId, row.awayScore),
-      final: row.homeScore !== null && row.awayScore !== null,
-    });
-  }
+  // Every matchup's two sides are independent `getLineup` round trips — run the whole week's
+  // worth in parallel rather than awaiting each side, one matchup at a time.
+  const details: MatchupDetail[] = await Promise.all(
+    week.map(async (row): Promise<MatchupDetail> => {
+      const [home, away] = await Promise.all([sideFor(row.homeTeamId, row.homeScore), sideFor(row.awayTeamId, row.awayScore)]);
+      return { weekNumber, home, away, final: row.homeScore !== null && row.awayScore !== null };
+    }),
+  );
 
   return { leagueId, weekNumber, totalWeeks, myTeamId, matchups: details };
 }

@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import { afterAll } from "vitest";
+import { resetRankedPlayersCacheForTests } from "@/draft-service/pool";
 import { createDb, type Db } from "./client";
 import { DB_POOL_CONFIG } from "./config";
 
@@ -35,4 +36,9 @@ export async function truncateAll(db: Db): Promise<void> {
       scoring_settings, teams, leagues, users
     RESTART IDENTITY CASCADE
   `);
+  // `rankedPlayers` (src/draft-service/pool.ts) memoizes per league id across calls — safe in
+  // production (the player/stat-line universe is fixed), but a test suite reuses league ids
+  // across `it` blocks under a fresh seed each time. Without this, a cache entry built before
+  // this truncate would outlive the data it was computed from.
+  resetRankedPlayersCacheForTests();
 }
