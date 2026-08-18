@@ -19,6 +19,9 @@ export interface Roster {
   readonly slots: readonly RosterSlot[];
 }
 
+/** The one place the bench slot's name is written. Everything else compares against this. */
+export const BENCH_SLOT: RosterSlotType = "BENCH";
+
 /**
  * The canonical 15-slot roster. One definition, used by the `leagues.roster_slots`
  * column default, the dev seed, and every test — a league may override it per-league,
@@ -32,5 +35,5 @@ export const STANDARD_ROSTER_SLOTS: readonly RosterSlotConfig[] = [
   { slot: "FLEX", count: 1, eligiblePositions: ["RB", "WR", "TE"] },
   { slot: "K", count: 1, eligiblePositions: ["K"] },
   { slot: "DEF", count: 1, eligiblePositions: ["DEF"] },
-  { slot: "BENCH", count: 6, eligiblePositions: ["QB", "RB", "WR", "TE", "K", "DEF"] },
+  { slot: BENCH_SLOT, count: 6, eligiblePositions: ["QB", "RB", "WR", "TE", "K", "DEF"] },
 ];

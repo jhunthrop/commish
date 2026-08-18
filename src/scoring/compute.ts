@@ -3,7 +3,12 @@ import type { ScoringSettings } from "@/domain/scoring";
 
 export type ScoringRules = Omit<ScoringSettings, "leagueId">;
 
-function round2(n: number): number {
+/**
+ * The product's one rounding rule for fantasy points: two decimal places. Exported because
+ * standings sum already-rounded weekly scores and must round the total identically — two
+ * helpers is how a standings page ends up disagreeing with the matchup page it links to.
+ */
+export function roundPoints(n: number): number {
   return Math.round(n * 100) / 100;
 }
 
@@ -25,7 +30,7 @@ export function computeFantasyPoints(statLine: StatLine, position: Position, rul
     statLine.sacks * rules.pointsPerSack +
     statLine.defensiveInterceptions * rules.pointsPerDefensiveInterception +
     statLine.defensiveTouchdowns * rules.pointsPerDefensiveTouchdown;
-  return round2(total);
+  return roundPoints(total);
 }
 
 export interface Starter {
@@ -60,5 +65,5 @@ export function scoreLineup({ starters, statLinesByPlayerId, settings }: ScoreLi
     byPlayer.set(starter.playerId, pts);
     total += pts;
   }
-  return { total: round2(total), byPlayer };
+  return { total: roundPoints(total), byPlayer };
 }
