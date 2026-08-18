@@ -24,9 +24,11 @@ const BYE = "BYE";
  * Home and away alternate by ROUND, not by position in the wheel. That distinction is the
  * whole trick: a rotating team's wheel index falls by one every round, so any rule mixing the
  * index into the parity cancels out and pins that team to one side of the ball for a whole
- * half-cycle. Alternating on the round alone keeps every team within one game of even over a
- * full rotation, and flips the sides when a pairing comes back around (a cycle is an odd
- * number of rounds, so the parity is opposite the second time through).
+ * half-cycle. Alternating on the round alone keeps the imbalance small — bounded, not
+ * perfectly even: across the supported league sizes and season lengths no team drifts more
+ * than a few games from parity (the invariant suite pins |home − away| ≤ 4), and a rematch
+ * always swaps sides (a cycle is an odd number of rounds, so the parity is opposite the
+ * second time through).
  */
 function pairingsForRound(order: readonly string[], round: number): readonly (readonly [string, string])[] {
   const rest = order.slice(1);

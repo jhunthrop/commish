@@ -137,6 +137,20 @@ describe("round-robin invariants, for every league size", () => {
       for (let week = 1; week + cycle <= weeks; week++) {
         expect(pairsOfWeek(matchups, week + cycle)).toEqual(pairsOfWeek(matchups, week));
       }
+
+      // 5. Home/away never drifts far from even. The round-parity rule does not guarantee
+      // perfect balance for every size (odd sizes at some season lengths reach 3-4), but it
+      // must stay bounded — this is the assertion that catches a regression to the
+      // index-mixing rule, whose imbalance grows with the cycle length (8+ at 12 teams).
+      const homeCounts = new Map<string, number>(ids.map((id) => [id, 0]));
+      const awayCounts = new Map<string, number>(ids.map((id) => [id, 0]));
+      for (const m of matchups) {
+        homeCounts.set(m.homeTeamId, homeCounts.get(m.homeTeamId)! + 1);
+        awayCounts.set(m.awayTeamId, awayCounts.get(m.awayTeamId)! + 1);
+      }
+      for (const id of ids) {
+        expect(Math.abs(homeCounts.get(id)! - awayCounts.get(id)!)).toBeLessThanOrEqual(4);
+      }
     });
   }
 });
