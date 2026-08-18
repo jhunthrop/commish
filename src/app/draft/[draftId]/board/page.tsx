@@ -22,6 +22,7 @@ export default async function DraftBoardPage({ params }: PageProps) {
   const { draftId } = await params;
   return (
     <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 p-6">
+      <h1 className="sr-only">Draft board</h1>
       <TvBoard draftId={draftId} />
     </main>
   );

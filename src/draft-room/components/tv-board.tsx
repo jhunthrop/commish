@@ -1,12 +1,12 @@
 "use client";
 
 import { useMemo } from "react";
-import type { CompletedPick } from "@/draft-engine";
-import { Avatar, Badge, Button, EmptyState, ErrorState, Skeleton, Table, type TableColumn } from "@/components/ui";
+import { Avatar, Badge, Button, ErrorState, Skeleton } from "@/components/ui";
 import { useDraftRoom } from "../hooks/use-draft-room";
-import { teamsById, teamName, playerName } from "../lib/lookups";
+import { teamsById } from "../lib/lookups";
 import { ClockBanner } from "./clock-banner";
 import { PickCelebration } from "./pick-celebration";
+import { PickHistory } from "./pick-history";
 
 /**
  * The draft-party board: one URL you open on the laptop plugged into the TV. Read-only by
@@ -30,16 +30,8 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
   }
 
   const view = room.view;
-  const onClock = room.teams.find((team) => team.id === view.onClockTeamId) ?? null;
   const teamsMap = teamsById(room.teams);
-
-  const columns: readonly TableColumn<CompletedPick>[] = [
-    { key: "pick", header: "#", cell: (pick) => pick.pickNumber, numeric: true },
-    { key: "round", header: "Rd", cell: (pick) => pick.round, numeric: true, hideOnNarrow: true },
-    { key: "team", header: "Team", cell: (pick) => teamName(teamsMap, pick.teamId) },
-    { key: "player", header: "Player", cell: (pick) => playerName(playersById, pick.playerId) },
-    { key: "price", header: "Price", cell: (pick) => (pick.price === null ? "—" : `$${pick.price}`), numeric: true },
-  ];
+  const onClock = view.onClockTeamId === null ? null : (teamsMap.get(view.onClockTeamId) ?? null);
 
   return (
     <div className="flex flex-col gap-6 text-lg">
@@ -57,13 +49,12 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
         </div>
       </section>
 
-      <Table
-        caption="Every pick so far"
-        captionVisible
-        columns={columns}
-        rows={[...view.picks].reverse()}
-        rowKey={(pick) => String(pick.pickNumber)}
-        empty={<EmptyState title="The board is empty" description="Picks appear here the moment they land." action={<span className="text-text-muted">Waiting for the first pick</span>} />}
+      <PickHistory
+        view={view}
+        teams={room.teams}
+        playersById={playersById}
+        variant="tv"
+        emptyAction={<span className="text-text-muted">Waiting for the first pick</span>}
       />
     </div>
   );

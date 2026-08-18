@@ -28,4 +28,22 @@ describe("PickHistory", () => {
     render(<PickHistory view={SNAKE_VIEW} teams={TEAMS} playersById={playersById(PLAYERS)} />);
     expect(screen.getByRole("heading", { name: "No picks yet" })).toBeInTheDocument();
   });
+
+  it("renders tv variant with large-type columns and non-interactive empty action", async () => {
+    await inBothThemes(
+      <PickHistory view={withPicks} teams={TEAMS} playersById={playersById(PLAYERS)} variant="tv" emptyAction={<span>Waiting...</span>} />,
+      async ({ container }) => {
+        expect(screen.getByRole("columnheader", { name: "Rd" })).toBeInTheDocument();
+        const rows = screen.getAllByRole("row").slice(1);
+        expect(rows[0]).toHaveTextContent("Marcus Reed");
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+  });
+
+  it("tv variant empty state has no button when emptyAction is non-interactive", () => {
+    render(<PickHistory view={SNAKE_VIEW} teams={TEAMS} playersById={playersById(PLAYERS)} variant="tv" emptyAction={<span className="text-text-muted">Waiting for the first pick</span>} />);
+    expect(screen.getByRole("heading", { name: "The board is empty" })).toBeInTheDocument();
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
 });

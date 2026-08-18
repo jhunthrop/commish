@@ -1,6 +1,8 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, waitFor, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import { inBothThemes } from "@/components/ui/test-utils";
+import { DraftRoomDepsProvider } from "../hooks/deps";
 import { fixtureDeps, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
 import { TvBoard } from "./tv-board";
 
@@ -19,14 +21,42 @@ afterEach(() => {
 });
 
 describe("TvBoard", () => {
-  it("shows the board with no controls at all, axe-clean", async () => {
+  it("shows the board with no controls at all, axe-clean, both themes, empty grid", async () => {
     stubMatchMedia();
     const fixture = fixtureDeps();
-    const { container } = renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
-    await waitFor(() => expect(screen.getAllByText("Bay Bandits").length).toBeGreaterThan(0));
-    expect(screen.queryAllByRole("button")).toHaveLength(0);
-    expect(screen.queryAllByRole("textbox")).toHaveLength(0);
-    expect(await axe(container)).toHaveNoViolations();
+    await inBothThemes(
+      <DraftRoomDepsProvider deps={fixture.deps}>
+        <TvBoard draftId="d1" />
+      </DraftRoomDepsProvider>,
+      async ({ container }) => {
+        await waitFor(() => expect(screen.getAllByText("Bay Bandits").length).toBeGreaterThan(0));
+        expect(screen.queryAllByRole("button")).toHaveLength(0);
+        expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+  });
+
+  it("renders populated grid with real table markup, axe-clean, both themes", async () => {
+    stubMatchMedia();
+    const fixture = fixtureDeps({
+      ...SNAKE_VIEW,
+      picks: [
+        { pickNumber: 1, round: 1, teamId: "t1", playerId: "qb1", slot: "QB" as const, slotIndex: 0, price: null, timestamp: "2026-09-01T00:05:00.000Z", auto: false },
+      ],
+      availablePlayerIds: ["rb1", "rb2", "wr1"],
+    });
+    await inBothThemes(
+      <DraftRoomDepsProvider deps={fixture.deps}>
+        <TvBoard draftId="d1" />
+      </DraftRoomDepsProvider>,
+      async ({ container }) => {
+        await waitFor(() => expect(screen.getByRole("table", { name: /every pick/i })).toBeInTheDocument());
+        expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
+        expect(screen.getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
   });
 
   it("spotlights whoever is on the clock", async () => {
@@ -93,5 +123,4 @@ describe("TvBoard", () => {
     await waitFor(() => expect(screen.getByText("The board is empty")).toBeInTheDocument());
     expect(screen.getByText("Picks appear here the moment they land.")).toBeInTheDocument();
   });
-
 });
