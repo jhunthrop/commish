@@ -9,6 +9,14 @@ export const dynamic = "force-dynamic";
 
 const systemClock = { now: () => new Date().toISOString() };
 
+// Invite codes are membership capabilities, so their randomness must be unpredictable.
+// Math.random is seedable/observable; this derives a [0,1) float from crypto instead.
+function cryptoRandom(): number {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0]! / 2 ** 32;
+}
+
 /** Commissioner-only: mint a shareable link + short code for this league. */
 export async function POST(request: Request, context: LeagueRouteContext) {
   return withCommissioner(request, context, async (actor, req) => {
@@ -16,7 +24,7 @@ export async function POST(request: Request, context: LeagueRouteContext) {
     if (!parsed.ok) return parsed.response;
 
     const result = await createInvite(
-      { db: getDb(), clock: systemClock, random: Math.random },
+      { db: getDb(), clock: systemClock, random: cryptoRandom },
       { leagueId: actor.leagueId, createdByUserId: actor.userId, maxUses: parsed.value.maxUses },
     );
     if (!result.ok) return fail(result.reason, 503);

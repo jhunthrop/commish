@@ -145,6 +145,31 @@ describe("acceptInvite", () => {
     expect(row!.uses).toBe(1);
   });
 
+  it("returns THIS league's team on the unique-index backstop, even for a multi-league manager", async () => {
+    // Regression for the brief's unscoped recovery lookup: u2 already fields a team in a
+    // second league; if the same-person-twice 23505 recovery searched by userId alone it
+    // could hand back the other league's teamId as success. It must join through the
+    // accepted invite so only this league's team can resolve.
+    const first = await league();
+    // A second league with the SAME user pool (league() seeds users once per test).
+    const second = await createLeague(writeDeps(), {
+      name: "Tuesday Money", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Commish B",
+    });
+    if (!second.ok) throw new Error(second.reason);
+    const inviteA = await createInvite(inviteDeps(), { leagueId: first.leagueId, createdByUserId: "u1" });
+    const inviteB = await createInvite({ db, clock, random: () => 0.25 }, { leagueId: second.leagueId, createdByUserId: "u1" });
+    if (!inviteA.ok || !inviteB.ok) throw new Error("invites failed");
+    const joinedOther = await acceptInvite(writeDeps(), { code: inviteB.code, userId: "u2" });
+    if (!joinedOther.ok) throw new Error(joinedOther.reason);
+    const joined = await acceptInvite(writeDeps(), { code: inviteA.code, userId: "u2" });
+    if (!joined.ok) throw new Error(joined.reason);
+    // Re-accepting league A's link resolves league A's team — never league B's.
+    const again = await acceptInvite(writeDeps(), { code: inviteA.code, userId: "u2" });
+    expect(again).toEqual({ ok: true, leagueId: first.leagueId, teamId: joined.teamId, alreadyMember: true });
+    expect(joined.teamId).not.toBe(joinedOther.teamId);
+  });
+
   it("refuses an unknown, expired or exhausted code with a reason a person can act on", async () => {
     const created = await league();
     expect(await acceptInvite(writeDeps(), { code: "NOSUCH12", userId: "u2" })).toEqual({

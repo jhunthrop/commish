@@ -140,7 +140,8 @@ export async function acceptInvite(
         return { ok: true, leagueId: existing.leagueId, teamId: existing.id, alreadyMember: true };
       }
     }
-    console.error("[league] accept invite failed", { code: input.code }, error);
+    // The code is a membership capability — never write it to a log.
+    console.error("[league] accept invite failed", { league: "redacted-code" }, error);
     return { ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." };
   }
 }
