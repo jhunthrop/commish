@@ -35,7 +35,7 @@ const POOL: readonly DraftPoolEntry[] = (() => {
 })();
 
 const T = "2026-09-01T00:00:00.000Z";
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp: T, draftOrder: TEAMS, pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: TEAMS, pool: POOL };
 
 function apply(state: DraftState, action: Parameters<typeof submitCommand>[1]): DraftState {
   const result = submitCommand(state, action);

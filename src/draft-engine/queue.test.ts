@@ -32,7 +32,7 @@ const CONFIG: DraftConfig = {
 
 const START: StartDraftAction = {
   v: 1,
-  type: "START_DRAFT",
+  type: "START_DRAFT", minBid: 1,
   timestamp: "2026-09-01T00:00:00.000Z",
   draftOrder: ["t1", "t2"],
   pool: POOL,

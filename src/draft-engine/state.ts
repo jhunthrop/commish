@@ -50,6 +50,11 @@ export interface AuctionState {
   readonly nominatingTeamId: string | null;
   /** The player currently up for bid, or null between lots. */
   readonly lot: AuctionLot | null;
+  /**
+   * Opening price for auto-nominated lots, carried from the START_DRAFT action. Folding
+   * reads THIS, never `AUCTION_CONFIG.minBid` — a tunable change must not rewrite history.
+   */
+  readonly minBid: number;
 }
 
 export interface DraftState {

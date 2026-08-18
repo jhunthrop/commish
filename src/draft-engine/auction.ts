@@ -1,6 +1,5 @@
 import type { BidAction, NominateAction } from "@/domain/draft";
 import { rosterFor, type AuctionState, type DraftReduceResult, type DraftState } from "./state";
-import { AUCTION_CONFIG } from "./config";
 import { assignSlot } from "./slotting";
 import { applyPick, expectApplied } from "./apply-pick";
 import { bestAvailableFor, nextNominator, remainingBudget } from "./selectors";
@@ -50,6 +49,7 @@ function openLot(
   return {
     ...state,
     auction: {
+      ...state.auction!,
       nominatingTeamId: teamId,
       lot: { playerId, highBid: amount, highBidTeamId: teamId, nominatedByTeamId: teamId, autoNominated },
     },
@@ -88,7 +88,7 @@ export function reduceAuctionExpiry(state: DraftState, auction: AuctionState, ti
     const nominator = auction.nominatingTeamId!;
     const best = bestAvailableFor(state, nominator);
     if (best === null) return { ok: false, reason: "No eligible player is available to auto-pick." };
-    return { ok: true, state: openLot(state, nominator, best.playerId, AUCTION_CONFIG.minBid, timestamp, true) };
+    return { ok: true, state: openLot(state, nominator, best.playerId, auction.minBid, timestamp, true) };
   }
 
   const winner = lot.highBidTeamId;
@@ -114,7 +114,7 @@ export function reduceAuctionExpiry(state: DraftState, auction: AuctionState, ti
     ok: true,
     state:
       nominator === null
-        ? { ...paid, phase: "complete", auction: { nominatingTeamId: null, lot: null }, turnStartedAt: null }
-        : { ...paid, auction: { nominatingTeamId: nominator, lot: null }, turnStartedAt: timestamp },
+        ? { ...paid, phase: "complete", auction: { ...auction, nominatingTeamId: null, lot: null }, turnStartedAt: null }
+        : { ...paid, auction: { ...auction, nominatingTeamId: nominator, lot: null }, turnStartedAt: timestamp },
   };
 }

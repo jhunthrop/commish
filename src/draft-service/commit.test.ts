@@ -77,7 +77,7 @@ async function seedCompletedActionLog(draftId: string, leagueId: string, teamIds
     clockSchedule: DRAFT_CLOCK_SCHEDULE,
   };
   const actions: DraftAction[] = [
-    { v: 1, type: "START_DRAFT", timestamp: clock.now(), draftOrder: teamIds, pool: SPRINT_POOL },
+    { v: 1, type: "START_DRAFT", minBid: 1, timestamp: clock.now(), draftOrder: teamIds, pool: SPRINT_POOL },
   ];
   let state = initialDraftState(config);
   for (const action of actions) {

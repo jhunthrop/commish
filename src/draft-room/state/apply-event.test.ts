@@ -37,7 +37,7 @@ const auctionView: DraftStateView = {
   budgets: { t1: 100, t2: 100 },
   minBid: 1,
   maxBids: { t1: 99, t2: 99 },
-  auction: { nominatingTeamId: "t1", lot: null },
+  auction: { nominatingTeamId: "t1", lot: null, minBid: 1 },
 };
 
 const frame = (type: string, payload: unknown) => JSON.stringify({ id: "1-0", type, leagueId: "l1", timestamp: "2026-09-01T00:00:00.000Z", payload });
@@ -112,13 +112,13 @@ describe("applyDraftEvent — draft.pick", () => {
   });
 
   it("takes the awarded budgets, ceilings and next bid floor from the payload instead of doing arithmetic", () => {
-    const withLot: DraftStateView = { ...auctionView, auction: { nominatingTeamId: "t1", lot: { playerId: "qb1", highBid: 30, highBidTeamId: "t1", nominatedByTeamId: "t1", autoNominated: false } } };
+    const withLot: DraftStateView = { ...auctionView, auction: { minBid: 1, nominatingTeamId: "t1", lot: { playerId: "qb1", highBid: 30, highBidTeamId: "t1", nominatedByTeamId: "t1", autoNominated: false } } };
     const award = { ...pickPayload, price: 30, budgets: { t1: 70, t2: 100 }, maxBids: { t1: 70, t2: 99 }, minBid: 1, clock: clock({ onClockTeamId: "t2" }) };
     const view = (applyDraftEvent(withLot, frame("draft.pick", award)) as { view: DraftStateView }).view;
     expect(view.budgets).toEqual({ t1: 70, t2: 100 });
     expect(view.maxBids).toEqual({ t1: 70, t2: 99 });
     expect(view.minBid).toBe(1);
-    expect(view.auction).toEqual({ nominatingTeamId: "t2", lot: null });
+    expect(view.auction).toEqual({ nominatingTeamId: "t2", lot: null, minBid: 1 });
   });
 
   it("leaves minBid alone on a snake pick, where the payload never carries one", () => {
@@ -133,7 +133,7 @@ describe("applyDraftEvent — auction lots", () => {
   it("opens a lot on a nomination and takes the next bid floor from the payload", () => {
     const view = (applyDraftEvent(auctionView, frame("draft.nominate", nominate)) as { view: DraftStateView }).view;
     expect(view.auction).toEqual({
-      nominatingTeamId: "t1",
+      nominatingTeamId: "t1", minBid: 1,
       lot: { playerId: "qb1", highBid: 5, highBidTeamId: "t1", nominatedByTeamId: "t1", autoNominated: false },
     });
     expect(view.minBid).toBe(6);

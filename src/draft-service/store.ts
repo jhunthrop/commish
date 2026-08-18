@@ -6,6 +6,7 @@ import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import {
   admitCommand,
+  AUCTION_CONFIG,
   draftActionSchema,
   draftEventsFor,
   reduceDraft,
@@ -198,6 +199,9 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
           timestamp: clock.now(),
           draftOrder: draftOrderFor(draftId, teamRows.map((t) => t.id)),
           pool,
+          // Command time is the ONE place the tunable is read — it rides the persisted
+          // action from here on, so replay never consults AUCTION_CONFIG.
+          minBid: AUCTION_CONFIG.minBid,
         },
         {
           alsoInTransaction: async (tx) => {

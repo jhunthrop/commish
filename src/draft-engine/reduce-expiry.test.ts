@@ -23,7 +23,7 @@ const T = "2026-09-01T00:00:00.000Z";
 // A stale constant, used only where the exact timestamp doesn't matter (e.g. the
 // draft-hasn't-started rejection, which is decided before any deadline check runs).
 const EXPIRE: TimerExpireAction = { v: 1, type: "TIMER_EXPIRE", timestamp: "2026-09-01T01:00:00.000Z" };
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
 
 function apply(state: DraftState, action: Parameters<typeof reduceDraft>[1]): DraftState {
   const result = reduceDraft(state, action);
@@ -103,7 +103,7 @@ describe("TIMER_EXPIRE (auction)", () => {
     expect(remainingBudget(state, "t2")).toBe(6);
     expect(remainingBudget(state, "t1")).toBe(10);
     expect(state.pickNumber).toBe(2);
-    expect(state.auction).toEqual({ nominatingTeamId: "t2", lot: null });
+    expect(state.auction).toEqual({ nominatingTeamId: "t2", lot: null, minBid: 1 });
   });
 
   it("awards an unchallenged lot to the nominator at their opening bid", () => {

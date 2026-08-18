@@ -9,7 +9,7 @@ const open = {
   ...AUCTION_VIEW,
   minBid: 25,
   maxBids: { t1: 80, t2: 97 },
-  auction: { nominatingTeamId: "t1", lot: { playerId: "qb1", highBid: 24, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
+  auction: { minBid: 1, nominatingTeamId: "t1", lot: { playerId: "qb1", highBid: 24, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
 };
 
 describe("BidControls", () => {

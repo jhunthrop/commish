@@ -22,7 +22,9 @@ const poolEntry = z.object({
  * Unknown `v` values fail loudly instead of being reinterpreted as v1.
  */
 export const draftActionSchema: z.ZodType<DraftAction> = z.discriminatedUnion("type", [
-  z.object({ v: version, type: z.literal("START_DRAFT"), timestamp, draftOrder: z.array(teamId).min(2), pool: z.array(poolEntry).min(1) }),
+  // `minBid` defaults for logs persisted before it existed — the one place today's tunable
+  // may reach an old draft's replay, and only for those legacy rows (new logs carry it).
+  z.object({ v: version, type: z.literal("START_DRAFT"), timestamp, draftOrder: z.array(teamId).min(2), pool: z.array(poolEntry).min(1), minBid: dollars.default(AUCTION_CONFIG.minBid) }),
   z.object({ v: version, type: z.literal("MAKE_PICK"), timestamp, teamId, playerId }),
   z.object({ v: version, type: z.literal("NOMINATE"), timestamp, teamId, playerId, openingBid: dollars }),
   z.object({ v: version, type: z.literal("BID"), timestamp, teamId, amount: dollars }),

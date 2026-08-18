@@ -27,6 +27,11 @@ export interface StartDraftAction {
   readonly draftOrder: readonly string[];
   /** The full draftable pool, best player first. */
   readonly pool: readonly DraftPoolEntry[];
+  /**
+   * Opening price for auto-nominated auction lots, snapshotted here so replaying the log
+   * never reads `AUCTION_CONFIG` while folding state. Present-but-unused for snake drafts.
+   */
+  readonly minBid: number;
 }
 
 export interface MakePickAction {

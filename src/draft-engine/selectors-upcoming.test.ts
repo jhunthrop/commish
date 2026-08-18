@@ -47,7 +47,7 @@ function live(over: Partial<DraftState>, format: "snake" | "auction" = "snake"):
 }
 
 function auctionLive(over: Partial<DraftState>): DraftState {
-  return live({ auction: { nominatingTeamId: "t2", lot: null }, ...over }, "auction");
+  return live({ auction: { nominatingTeamId: "t2", lot: null, minBid: 1 }, ...over }, "auction");
 }
 
 describe("upcomingOnClock — snake", () => {
@@ -84,7 +84,7 @@ describe("upcomingOnClock — auction", () => {
   it("starts after the nominating team while their lot is still open — they have already acted", () => {
     const state = auctionLive({
       auction: {
-        nominatingTeamId: "t2",
+        nominatingTeamId: "t2", minBid: 1,
         lot: { playerId: "qb1", highBid: 5, highBidTeamId: "t3", nominatedByTeamId: "t2", autoNominated: false },
       },
     });
@@ -104,7 +104,7 @@ describe("upcomingOnClock — auction", () => {
   });
 
   it("is empty when the rotation has no nominator at all", () => {
-    expect(upcomingOnClock(auctionLive({ auction: { nominatingTeamId: null, lot: null } }), 5)).toEqual([]);
+    expect(upcomingOnClock(auctionLive({ auction: { nominatingTeamId: null, lot: null, minBid: 1 } }), 5)).toEqual([]);
   });
 });
 

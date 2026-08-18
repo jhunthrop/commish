@@ -23,7 +23,7 @@ const CONFIG: DraftConfig = {
   draftId: "d1", leagueId: "l1", format: "snake", kickoffAt: "2026-09-10T17:00:00.000Z",
   auctionBudget: null, slotConfig: SLOTS, clockSchedule: DRAFT_CLOCK_SCHEDULE,
 };
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
 
 /** Applies an action and returns both the new state and the events it produced. */
 function step(state: DraftState, action: DraftAction) {
@@ -240,7 +240,7 @@ function moneyConfigFor(format: "snake" | "auction"): DraftConfig {
 function moneyStartedDraft(format: "snake" | "auction"): DraftState {
   return moneyStep(initialDraftState(moneyConfigFor(format)), {
     v: DRAFT_ACTION_VERSION,
-    type: "START_DRAFT",
+    type: "START_DRAFT", minBid: 1,
     timestamp: "2026-09-01T00:00:00.000Z",
     draftOrder: ["t1", "t2"],
     pool: MONEY_POOL,

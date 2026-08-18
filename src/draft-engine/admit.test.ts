@@ -28,7 +28,7 @@ const POOL: readonly DraftPoolEntry[] = [
 ];
 
 const T = "2026-09-01T00:00:00.000Z";
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
 
 const snakeConfig: DraftConfig = {
   draftId: "d_s", leagueId: "l1", format: "snake", kickoffAt: "2026-09-10T17:00:00.000Z",

@@ -11,7 +11,7 @@ describe("draftActionSchema (persisted jsonb boundary)", () => {
   it("accepts a v1 START_DRAFT row with its order and pool", () => {
     const row = {
       v: 1,
-      type: "START_DRAFT",
+      type: "START_DRAFT", minBid: 1,
       timestamp: "2026-09-01T00:00:00.000Z",
       draftOrder: ["t1", "t2"],
       pool: [{ playerId: "p1", position: "QB" }],

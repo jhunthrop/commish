@@ -52,7 +52,7 @@ export const AUCTION_VIEW: DraftStateView = {
   budgets: { t1: 100, t2: 100 },
   minBid: 1,
   maxBids: { t1: 97, t2: 97 },
-  auction: { nominatingTeamId: "t1", lot: null },
+  auction: { nominatingTeamId: "t1", lot: null, minBid: 1 },
 };
 
 export function playersById(players: readonly Player[] = PLAYERS): ReadonlyMap<string, Player> {

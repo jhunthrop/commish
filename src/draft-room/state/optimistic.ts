@@ -30,6 +30,7 @@ export function optimisticView(view: DraftStateView, action: ClientDraftAction, 
         view: {
           ...view,
           auction: {
+            ...view.auction,
             nominatingTeamId: myTeamId,
             lot: { playerId: action.playerId, highBid: action.openingBid, highBidTeamId: myTeamId, nominatedByTeamId: myTeamId, autoNominated: false },
           },

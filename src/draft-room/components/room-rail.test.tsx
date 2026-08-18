@@ -103,7 +103,7 @@ describe("RoomRail", () => {
       ...AUCTION_VIEW,
       onClockTeamId: null,
       deadlineAt: new Date(Date.now() + 45_000).toISOString(),
-      auction: { nominatingTeamId: null, lot: { playerId: "qb1", highBid: 12, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
+      auction: { minBid: 1, nominatingTeamId: null, lot: { playerId: "qb1", highBid: 12, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
     };
     await inBothThemes(<RoomRail {...props} view={lotView} myTeamId="t1" />, async ({ container }) => {
       expect(screen.getByText("Live bid")).toBeInTheDocument();
@@ -117,14 +117,14 @@ describe("RoomRail", () => {
   });
 
   it("says who is nominating when the auction has no lot open yet", () => {
-    const nominateView: DraftStateView = { ...AUCTION_VIEW, onClockTeamId: null, auction: { nominatingTeamId: "t2", lot: null } };
+    const nominateView: DraftStateView = { ...AUCTION_VIEW, onClockTeamId: null, auction: { nominatingTeamId: "t2", lot: null, minBid: 1 } };
     render(<RoomRail {...props} view={nominateView} myTeamId="t1" />);
     expect(screen.getByText("Iron Owls is nominating.")).toBeInTheDocument();
     expect(screen.queryByText(/on the clock/i)).toBeNull();
   });
 
   it("says it is your turn to nominate when it is", () => {
-    const nominateView: DraftStateView = { ...AUCTION_VIEW, onClockTeamId: null, auction: { nominatingTeamId: "t1", lot: null } };
+    const nominateView: DraftStateView = { ...AUCTION_VIEW, onClockTeamId: null, auction: { nominatingTeamId: "t1", lot: null, minBid: 1 } };
     render(<RoomRail {...props} view={nominateView} myTeamId="t1" />);
     expect(screen.getByText("You're nominating")).toBeInTheDocument();
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "hot");

@@ -23,7 +23,7 @@ const CONFIG: DraftConfig = {
 };
 
 function startedAt(timestamp: string, config: DraftConfig = CONFIG): DraftState {
-  const start: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp, draftOrder: ["t1", "t2"], pool: POOL };
+  const start: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp, draftOrder: ["t1", "t2"], pool: POOL };
   const result = reduceDraft(initialDraftState(config), start);
   if (!result.ok) throw new Error(result.reason);
   return result.state;

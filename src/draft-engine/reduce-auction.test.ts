@@ -32,7 +32,7 @@ const CONFIG: DraftConfig = {
 };
 
 const T = "2026-09-01T00:00:00.000Z";
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
 
 function apply(state: DraftState, action: Parameters<typeof submitCommand>[1]): DraftState {
   const result = submitCommand(state, action);
@@ -53,7 +53,7 @@ describe("START_DRAFT (auction)", () => {
   it("seeds every team's budget and puts team one up to nominate", () => {
     const state = started();
     expect(state.budgets).toEqual({ t1: 10, t2: 10 });
-    expect(state.auction).toEqual({ nominatingTeamId: "t1", lot: null });
+    expect(state.auction).toEqual({ nominatingTeamId: "t1", lot: null, minBid: 1 });
     expect(teamOnClock(state)).toBe("t1");
     // $10 with 3 spots to fill: $2 is reserved for the other two spots.
     expect(maxBidFor(state, "t1")).toBe(8);
@@ -72,7 +72,7 @@ describe("NOMINATE", () => {
   it("opens a lot at the nominator's own opening bid and restarts the clock", () => {
     const state = apply(started(), nominate("t1", "qb1", 3, "2026-09-01T00:05:00.000Z"));
     expect(state.auction).toEqual({
-      nominatingTeamId: "t1",
+      nominatingTeamId: "t1", minBid: 1,
       lot: { playerId: "qb1", highBid: 3, highBidTeamId: "t1", nominatedByTeamId: "t1", autoNominated: false },
     });
     expect(state.turnStartedAt).toBe("2026-09-01T00:05:00.000Z");
@@ -192,7 +192,7 @@ describe("nomination rotation across three teams", () => {
     auctionBudget: 5, slotConfig: THREE_TEAM_SLOTS, clockSchedule: DRAFT_CLOCK_SCHEDULE,
   };
   const threeTeamStart: StartDraftAction = {
-    v: 1, type: "START_DRAFT", timestamp: T, draftOrder: ["t1", "t2", "t3"], pool: THREE_TEAM_POOL,
+    v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2", "t3"], pool: THREE_TEAM_POOL,
   };
 
   it("skips a team whose roster is already full to reach a non-adjacent open one", () => {
@@ -205,7 +205,7 @@ describe("nomination rotation across three teams", () => {
     expect(state.rosters.t2).toHaveLength(1);
     // Rotation resumes after the nominator (t1): t2 is full and gets skipped, landing on
     // t3 — which is not adjacent to t1 in the original draft order.
-    expect(state.auction).toEqual({ nominatingTeamId: "t3", lot: null });
+    expect(state.auction).toEqual({ nominatingTeamId: "t3", lot: null, minBid: 1 });
   });
 });
 

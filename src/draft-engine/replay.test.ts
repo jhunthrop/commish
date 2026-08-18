@@ -23,7 +23,7 @@ const CONFIG: DraftConfig = {
   draftId: "d1", leagueId: "l1", format: "snake", kickoffAt: "2026-09-10T17:00:00.000Z",
   auctionBudget: null, slotConfig: SLOTS, clockSchedule: DRAFT_CLOCK_SCHEDULE,
 };
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
 const LOG: readonly DraftAction[] = [
   START,
   { v: 1, type: "MAKE_PICK", timestamp: T, teamId: "t1", playerId: "qb1" },
@@ -101,5 +101,17 @@ describe("replayDraft survives a tunable changing under it", () => {
       ok: false,
       reason: `A queue can hold at most ${DRAFT_QUEUE_CONFIG.maxLength} players.`,
     });
+  });
+
+  it("auto-nominates a stalled auction at the START_DRAFT snapshot's minBid, not today's tunable", () => {
+    // A log recorded when the minimum bid was $3. If the fold read `AUCTION_CONFIG.minBid`
+    // ($1) instead of the snapshot, replaying this draft would silently rewrite the opening
+    // price of every auto-nominated lot in its history.
+    const auctionConfig: DraftConfig = { ...CONFIG, format: "auction", auctionBudget: 200 };
+    const start: StartDraftAction = { ...START, minBid: 3 };
+    const stalledNomination: DraftAction = { v: 1, type: "TIMER_EXPIRE", timestamp: T };
+
+    const replayed = replayDraft(auctionConfig, [start, stalledNomination]);
+    expect(replayed.auction?.lot).toMatchObject({ highBid: 3, autoNominated: true });
   });
 });

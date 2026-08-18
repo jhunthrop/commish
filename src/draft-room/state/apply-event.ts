@@ -60,7 +60,7 @@ function applyPick(view: DraftStateView, payload: DraftPickPayload): DraftStateV
     maxBids: payload.maxBids ?? view.maxBids,
     minBid: payload.minBid ?? view.minBid,
     // A resolved lot closes, and `onClockTeamId` is the engine's own next nominator.
-    auction: view.auction === null ? null : { nominatingTeamId: payload.clock.onClockTeamId, lot: null },
+    auction: view.auction === null ? null : { ...view.auction, nominatingTeamId: payload.clock.onClockTeamId, lot: null },
   };
 }
 
@@ -75,7 +75,7 @@ function applyFrame(view: DraftStateView, frame: DraftEventFrame): DraftStateVie
     case "draft.pick":
       return applyPick(view, frame.payload);
     case "draft.nominate":
-      return view.format !== "auction"
+      return view.format !== "auction" || view.auction === null
         ? null
         : {
             ...view,
@@ -83,6 +83,7 @@ function applyFrame(view: DraftStateView, frame: DraftEventFrame): DraftStateVie
             // re-derived here.
             minBid: frame.payload.minBid,
             auction: {
+              ...view.auction,
               nominatingTeamId: frame.payload.teamId,
               lot: {
                 playerId: frame.payload.playerId,

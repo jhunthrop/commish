@@ -139,7 +139,7 @@ describe("AuctionRoom", () => {
       ...AUCTION_VIEW,
       sequence: 7,
       onClockTeamId: null,
-      auction: { nominatingTeamId: "t1", lot: { playerId: "qb1", highBid: 31, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
+      auction: { minBid: 1, nominatingTeamId: "t1", lot: { playerId: "qb1", highBid: 31, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
     };
     // Sequence 2 is the very next one, so this is NOT a gap — it resyncs purely because a bid
     // arrived for a lot this client never saw open, which is the missed-bid-war case.
