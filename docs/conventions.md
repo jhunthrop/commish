@@ -24,9 +24,15 @@ The founder's standing direction (2026-08-17): *"I don't want an MVP. Let's work
 ```
 src/
   app/                    Next.js routes. API routes under app/api/**.
+  app/app/drafts/[draftId]/       The live draft room (snake + auction).
+  app/draft/[draftId]/board/      The read-only large-format TV draftboard.
   domain/                 Pure domain types + pure functions. NO I/O, NO Date.now(). readonly everywhere.
   draft-engine/           Pure draft reducer (snake + auction), clock schedule, selectors. 100% coverage.
   draft-service/          Durable replay-based draft store, commit seam, clock ticker, draft authz.
+  draft-room/             The browser half of the draft: pure view reducer (state/, 100% coverage),
+                          the useDraftRoom hook (hooks/), every room component (components/), and
+                          id→display-name lookups (lib/). Imports from draft-engine are TYPE-ONLY —
+                          no draft rule runs in React. See docs/draft-room.md.
   db/                     schema.ts (Drizzle, pg-core), client.ts (createDb/getDb), test-db.ts
   lib/
     auth/                 current-user.ts (server identity seam over WorkOS), user-sync.ts (profile upsert)
@@ -63,6 +69,11 @@ Anything time-dependent takes a `Clock` (`src/domain/timing.ts`) and calls `cloc
 - **Resume** is via the standard `Last-Event-ID` header (the SSE `id:` is the stream entry id). Full-state refetch is the fallback only when a gap outlasts stream retention.
 - **Event types** are enumerated once in `src/lib/realtime/events.ts` (`draft.*`, `chat.*`, `score.update`). Add there, nowhere else.
 - **Draft events** (`draft.pick`, `draft.nominate`, `draft.bid`, `draft.timer_expire`, `draft.status`) ride the **league** stream — there is no per-draft stream. Their payload contracts live in `docs/draft-engine.md`.
+- **On the browser side there is exactly one consumer:** `useDraftRoom` (`src/draft-room/hooks/`),
+  built on a native `EventSource`. The browser's own reconnect and `Last-Event-ID` are the whole
+  reconnect mechanism — **no retry loop, no backoff timer, no polling.** A full refetch of
+  `GET /api/drafts/[draftId]` is the documented fallback, and fires on a sequence gap or a
+  reconnect. See `docs/draft-room.md`.
 - No Socket.io, no managed realtime vendor, no second transport — ever.
 
 ### Draft state — the action log is the source of truth
@@ -74,7 +85,7 @@ See `docs/draft-engine.md`.
 
 ### Draft room client boundary
 Everything under `src/draft-room/**` is BROWSER code — the pure state reducer/formatters, the
-hooks, and (from Task 6 on) the client components that render the room. It talks to the draft
+hooks, and the client components that render the room. It talks to the draft
 engine and service ONLY over the wire (`GET`/`POST /api/drafts/[draftId]*`,
 `GET /api/leagues/[leagueId]/events`) — never by importing `@/draft-engine`, `@/draft-service`,
 `@/db*` or `@/lib/realtime*` as VALUES. An ESLint `@typescript-eslint/no-restricted-imports`
@@ -90,6 +101,7 @@ not a boundary violation. A page can't be told apart from a client component by 
 alone, so a glob covering `src/app/**` would either miss real client code elsewhere or
 wrongly flag a legitimate server import. Any client interactivity a page needs is a
 `"use client"` component imported FROM `src/draft-room/**`, not inlined into the page file.
+See `docs/draft-room.md` for the room's full fetch → SSE → apply → gap → refetch contract.
 
 ### API responses
 Every JSON route returns the envelope from `src/lib/api/respond.ts`: `{ ok: true, data }` or `{ ok: false, error }` with a meaningful HTTP status. Bodies are parsed with `parseJson(request, ZodSchema)`; a bad body is a 400 naming the field. Error strings are user-facing plain language — never raw DB/exception text.
@@ -101,7 +113,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**` and `src/draft-engine/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%). Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directory at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**` and `src/draft-room/state/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%). Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 
 ### Migrations
