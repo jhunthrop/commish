@@ -13,6 +13,7 @@ vi.mock("@/lib/auth/current-user", () => ({
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { leagues, users } from "@/db/schema";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
+import { LEAGUE_CONFIG } from "@/league";
 import { GET as getLineupRoute, PUT as putLineup } from "@/app/api/leagues/[leagueId]/teams/me/lineup/route";
 import { scoreWeek } from "./results";
 import { twoTeamLeague, validSwap } from "./test-support";
@@ -130,6 +131,21 @@ describe("GET /api/leagues/[leagueId]/teams/me/lineup", () => {
     const response = await getLineupRoute(new Request(`http://test/api/leagues/${league.leagueId}/teams/me/lineup?week=1`), { params });
     expect(response.status).toBe(200);
     expect((await response.json()).data.starters).toHaveLength(2);
+  });
+
+  it("holds `week` to the same bound the PUT body is held to", async () => {
+    const league = await twoTeamLeague(db);
+    signedInAs("u1");
+    const params = () => Promise.resolve({ leagueId: league.leagueId });
+    const get = (week: string) =>
+      getLineupRoute(new Request(`http://test/api/leagues/${league.leagueId}/teams/me/lineup?week=${week}`), { params: params() });
+
+    for (const week of ["0", "-1", "1.5", "nonsense", "", String(LEAGUE_CONFIG.maxWeeks + 1)]) {
+      const response = await get(week);
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe("That isn't a week we can show.");
+    }
+    expect((await get(String(LEAGUE_CONFIG.maxWeeks))).status).toBe(200);
   });
 
   it("answers 403 for a commissioner who never fielded a team of their own", async () => {

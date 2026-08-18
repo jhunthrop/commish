@@ -14,5 +14,5 @@ export {
 } from "./lineups";
 export { scoreWeek, leagueStandings, type ScoreWeekResult } from "./results";
 export {
-  createLeagueSchema, createInviteSchema, acceptInviteSchema, setLineupSchema, type CreateLeagueRequest,
+  createLeagueSchema, createInviteSchema, acceptInviteSchema, setLineupSchema, weekNumberSchema, type CreateLeagueRequest,
 } from "./schemas";

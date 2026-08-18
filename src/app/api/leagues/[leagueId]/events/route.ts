@@ -11,5 +11,7 @@ export const dynamic = "force-dynamic";
  * commissioner — must not be able to watch another league's picks, chat and scores.
  */
 export async function GET(request: Request, context: LeagueRouteContext) {
-  return withLeagueMemberActor(request, context, async (actor) => createLeagueEventStream(request, actor.leagueId));
+  return withLeagueMemberActor(request, context, async (actor) =>
+    createLeagueEventStream(request, actor.leagueId, actor.userId),
+  );
 }

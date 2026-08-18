@@ -1,7 +1,7 @@
 import { getDb } from "@/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
-import { lineupView, setLineup, setLineupSchema } from "@/league-service";
+import { lineupView, setLineup, setLineupSchema, weekNumberSchema } from "@/league-service";
 import type { LineupBody } from "@/league-room/contract";
 import { withLeagueMemberActor, type LeagueRouteContext } from "@/app/api/leagues/_shared";
 
@@ -15,10 +15,12 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request, context: LeagueRouteContext) {
   return withLeagueMemberActor(request, context, async (actor, req) => {
     if (actor.teamId === null) return fail(NO_TEAM_MESSAGE, 403);
-    const weekNumber = Number.parseInt(new URL(req.url).searchParams.get("week") ?? "1", 10);
-    if (!Number.isInteger(weekNumber) || weekNumber < 1) return fail("That isn't a week we can show.", 400);
+    // The same bound the PUT body is held to (`setLineupSchema.weekNumber`) — one week
+    // boundary for the resource, not one per verb.
+    const week = weekNumberSchema.safeParse(Number(new URL(req.url).searchParams.get("week") ?? "1"));
+    if (!week.success) return fail("That isn't a week we can show.", 400);
 
-    const view = await lineupView(getDb(), { leagueId: actor.leagueId, teamId: actor.teamId, weekNumber });
+    const view = await lineupView(getDb(), { leagueId: actor.leagueId, teamId: actor.teamId, weekNumber: week.data });
     if (view === null) return fail("That league doesn't exist.", 404);
     return ok<LineupBody>(view);
   });

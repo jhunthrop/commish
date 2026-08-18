@@ -50,12 +50,19 @@ export const acceptInviteSchema = z.object({
 });
 
 /**
+ * One week bound for every week-scoped surface, reads included. The GET half of the lineup
+ * route used to accept any `week >= 1` while the PUT half capped it at `maxWeeks`; both
+ * returned something harmless, but two boundaries for one concept is how they drift.
+ */
+export const weekNumberSchema = z.number().int().positive().max(LEAGUE_CONFIG.maxWeeks);
+
+/**
  * A caller only ever names the STARTING slots they want; the bench is derived server-side
  * (`setLineup`'s doc comment explains why), so a client that sends BENCH entries too is
  * accepted and those entries are simply recomputed rather than trusted.
  */
 export const setLineupSchema = z.object({
-  weekNumber: z.number().int().positive().max(LEAGUE_CONFIG.maxWeeks),
+  weekNumber: weekNumberSchema,
   slots: z
     .array(
       z.object({
