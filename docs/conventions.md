@@ -92,7 +92,7 @@ plans/                    the phase blueprints
 ## Rules
 
 ### Immutability
-Domain types are `readonly`; use `readonly T[]` / `Readonly<Record<…>>`. Update by spreading into new objects. (An ESLint `functional/*` rule for `src/domain/**` is pending — see `eslint.config.pending.mjs`.)
+Domain types are `readonly`; use `readonly T[]` / `Readonly<Record<…>>`. Update by spreading into new objects. Enforced for `src/domain/**` by `eslint-plugin-functional` (`functional/prefer-readonly-type`, `functional/immutable-data`, `functional/no-let` — see `eslint.config.mjs`).
 
 ### Timing — no ambient clock in domain/reducer code
 Anything time-dependent takes a `Clock` (`src/domain/timing.ts`) and calls `clock.now()`. Actions carry an explicit ISO `timestamp`. Tests inject a fixed clock. `Date.now()` / `new Date()` are only allowed at the outermost edge (route handlers, `current-user.ts`, `publisher.ts`).
@@ -133,11 +133,14 @@ state reducer/formatters, the hooks, and the client components that render the d
 the league room respectively. Each talks to its service layer ONLY over the wire
 (`GET`/`POST /api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`,
 `GET /api/leagues/[leagueId]/events`) — never by importing `@/draft-engine`, `@/draft-service`,
-`@/league`, `@/league-service`, `@/db*` or `@/lib/realtime*` as VALUES. An ESLint
-`@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`, scoped to
-`src/draft-room/**/*.{ts,tsx}` and `src/league-room/**/*.{ts,tsx}` only) enforces this;
-`import type` stays allowed, since sharing a TYPE (e.g. `DraftStateView`, `LeagueSummary`)
-costs nothing at runtime and is how the client and server sides of the wire stay in sync.
+`@/league`, `@/league-service`, `@/db`, `@/lib/realtime`, `@/lib/auth`, `@/lib/leagues`,
+`@/lib/llm`, `@/lib/api/respond` or `@/data/seed` as VALUES. An ESLint
+`@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`,
+scoped to `src/draft-room/**/*.{ts,tsx}` and `src/league-room/**/*.{ts,tsx}` only) enforces
+this — matched against a relative-path spelling of the same module too (`../../draft-engine`),
+not just the `@/` alias. `import type` stays allowed, since sharing a TYPE (e.g.
+`DraftStateView`, `LeagueSummary`, `ApiEnvelope`) costs nothing at runtime and is how the
+client and server sides of the wire stay in sync.
 
 The rule is deliberately **not** applied to `src/app/**`: pages and layouts there are Next.js
 Server Components (`page.tsx`, `layout.tsx`) and route handlers (`route.ts`), which are

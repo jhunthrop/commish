@@ -72,6 +72,9 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim/50 p-4 sm:items-center">
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the WAI-ARIA
+          APG dialog pattern: the keydown handler traps Tab focus inside the panel, which has to
+          live on the dialog container itself, not on an individual focusable child. */}
       <div
         ref={panelRef}
         role="dialog"

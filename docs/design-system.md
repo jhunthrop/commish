@@ -16,7 +16,7 @@ Default theme is still `system`; both themes are first-class and both are tested
 ## Principles
 - **Delightful, not merely functional.** The product thesis (strategy doc §4) is that this category feels flat and we won't. Optimistic UI, celebration moments, motion with intent.
 - **Both themes are first-class.** Every surface is designed and tested in light and dark. No color exists only in one theme.
-- **Accessible by default.** WCAG 2.2 AA. Every input has a visible label. Every icon is decorative or labeled. Keyboard-operable primary flows. `prefers-reduced-motion` honored globally.
+- **Accessible by default.** WCAG 2.2 AA. Every input has a visible label. Every icon is decorative or labeled. Keyboard-operable primary flows. `prefers-reduced-motion` honored globally. `eslint-plugin-jsx-a11y`'s `strict` rule set runs on every `.tsx` file (`eslint.config.mjs`) as an author-time guard, alongside the runtime `axe` checks every component test already carries.
 - **Never a dead end.** Empty and error states always offer an action.
 - **Mobile-first.** Minimum viewport 360px.
 
