@@ -121,10 +121,11 @@ Two frames, one client-side rule each (`applyDraftEvent`, `src/draft-room/state/
   changes, so a rival's queue edit can never force a resync, and the client's own `queue` state
   — held separately from `view`, loaded with the snapshot and written by `POST /queue` — is
   never touched by any `draft.queue` frame, including an echo of the caller's own edit. The
-  route (`POST /api/drafts/[draftId]/queue`) is the only place a queue mutates; its 409 (over
-  the room's own `DRAFT_QUEUE_CONFIG.maxLength`) surfaces as a toast the same way every other
-  rejected action does — the client enforces no length cap of its own, since duplicating an
-  engine value on this side of the wire is exactly the drift `docs/conventions.md` forbids.
+  route (`POST /api/drafts/[draftId]/queue`) is the only place a queue mutates; a queue over
+  the room's own `DRAFT_QUEUE_CONFIG.maxLength` (capped by the HTTP schema first, so it is a
+  400, not the reducer's own 409) surfaces as a toast the same way every other rejected action
+  does — the client enforces no length cap of its own, since duplicating an engine value on
+  this side of the wire is exactly the drift `docs/conventions.md` forbids.
 - **`draft.nudge` → `NudgeBanner`, for the named team only.** `applyDraftEvent` surfaces the
   parsed notice (`{ teamId, message, sequence }`) without moving the view. `useDraftRoom` keeps
   it only when `payload.teamId` matches the caller's own team — everybody on the league stream

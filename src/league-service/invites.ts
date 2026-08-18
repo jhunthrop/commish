@@ -14,7 +14,9 @@ const INVALID = "That invite link isn't valid. Ask your commissioner for a new o
 export interface InviteDeps {
   readonly db: Db;
   readonly clock: Clock;
-  /** Injected so the minted code is reproducible in a test. `Math.random` at the edge. */
+  /** Injected so the minted code is reproducible in a test. The edge is `crypto.getRandomValues`
+   *  (see `src/app/api/leagues/[leagueId]/invites/route.ts`) — invite codes are membership
+   *  capabilities, so `Math.random` (seedable/observable) is not an option here. */
   readonly random: () => number;
 }
 

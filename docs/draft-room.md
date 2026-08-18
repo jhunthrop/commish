@@ -232,7 +232,7 @@ headings are `<h2>` — a jump to `<h3>` is a heading-order violation axe catche
 | `TvBoard` | The read-only `/draft/[draftId]/board` shell, and the room's **stage alone**: `RoomRail` (`variant="tv"` — no team chip, no my-turn heat, because nobody across a room is "you"), pick-celebration, a "Now picking" portrait spotlight, and `DraftBoard` (`variant="tv"`). No pool and no dock: nobody acts from the other side of a living room. Shares `useDraftRoom` with the real room — no second data path. Renders no control except the error state's retry. |
 | `DraftBoard` | **The hero.** Teams across, rounds down, one position-colored sticker per pick, from `view.picks`/`view.slotConfig`/`view.draftOrder` alone. A semantic `<table>` scrolling sideways in its own container above `sm`; below it, the same board as a per-round list, newest round first. The on-the-clock cell gets an accent ring (breathing, or static under reduced motion); the pick that just landed gets `animate-sticker-slap`. `variant="tv"` is the same board at party scale. |
 | `RoomRail` | The masthead, and the ONLY clock in the room: league name (the page's `<h1>`), format chip, `ROUND X · PICK Y` (or `LOT N`), whose turn it is, the countdown digits, the tightening line, your team chip and a quiet `ConnectionBanner`. It publishes its morph as `data-mode` — `scheduled` / `watching` / `hot` / `complete` — and `hot` recolors the band and the digits into the negative family. It replaced `RoomHeader`, having already absorbed `ClockBanner` and now `AuctionLotPanel`: the standing bid and its holder are a fact about *the turn*, and the turn has exactly one home. |
-| `Countdown` / `useCountdown` | The one shared countdown implementation (see "Wall clock" above). `Countdown` itself is `aria-hidden`. |
+| `Countdown` / `useCountdown` | The one shared countdown implementation (see "Wall clock" above). Its ticking digits are `aria-hidden`, paired with an `sr-only`/`aria-live="polite"` SIBLING span that states the same time coarsely — the live region must sit outside the `aria-hidden` span, not inside it, or an `aria-hidden` ancestor hides it from assistive tech regardless of `sr-only`. |
 | `PlayerPool` | The left rail: name search, the six positions as `PositionBadge` toggles (`aria-pressed`, one tap to narrow, one to clear), and one compact 44px row per player — rank, sticker, name, NFL team, a ☆ queue toggle and the act button. A list rather than a `Table`: at rail width there are no columns worth aligning. Caps rendered rows at `DRAFT_ROOM_CONFIG.poolPageSize` and never re-ranks. **Before the draft starts (`view.phase === "scheduled"`) no row is marked "Drafted"** — the engine has no pool yet, so `availablePlayerIds` is empty, and reading that as "everyone is gone" was the room's most confusing bug. Pre-start rows are browsable and queueable, with a quiet "—" where the action button goes. |
 | `BidControls` | The bid form, and the dock's primary slot while a lot is live. `view.minBid` is the floor and `view.maxBids[myTeamId]` is the ceiling — both server-computed, never re-derived. A row rather than a stack, so it fits the dock's fixed band. |
 | `NominateModal` | Confirms a nomination (it commits money) before submitting `{ type: "NOMINATE", playerId, openingBid }`. |
@@ -259,17 +259,18 @@ headings are `<h2>` — a jump to `<h3>` is a heading-order violation axe catche
 `src/draft-room/lib/lookups.ts` — `teamsById` / `playerName` / `teamName`: the one place a
 `teamId`/`playerId` is turned into the human it names, built once per render and shared by
 every component above that needs it, instead of each component re-declaring its own
-`.find(...)`. Since Plan D this file is a thin re-export of `src/lib/display/lookups.ts` — the
-league room needs the identical pattern, and two copies of it was the DRY violation the shared
-module closes. `queueButtonLabel` stays local to `src/draft-room/lib/`: it is draft-room-only
-vocabulary (the pool's star and the dock's chips share its phrasing), and the league room has
-no queue.
+`.find(...)`. This file is a thin re-export of `src/lib/display/lookups.ts`, which the league
+room does NOT need — its pages render names straight off the server-shaped view (e.g.
+`MatchupSide.teamName`) instead of resolving ids client-side, so it has no lookup module of its
+own. `queueButtonLabel` stays local to `src/draft-room/lib/`: it is draft-room-only vocabulary
+(the pool's star and the dock's chips share its phrasing), and the league room has no queue.
 
 ## Accessibility notes specific to this room
 
-- Countdowns are `aria-hidden`. A number changing every second inside a live region is
-  unusable with a screen reader; each countdown is paired with a static sentence that says the
-  same thing.
+- Countdowns' ticking digits are `aria-hidden` — a number changing every second inside a live
+  region is unusable with a screen reader. Each is paired with a coarse `aria-live="polite"`
+  sibling (rounded to the minute/hour, so it announces rarely instead of every tick), plus a
+  static sentence stating the same time in words that differs by caller.
 - The pick-landing panel is `role="status"` — announced once, politely.
 - Toasts carry the failure channel: `tone: "error"` also sets `role="alert"`, because a user
   on a clock cannot wait behind a polite announcement queue.

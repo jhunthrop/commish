@@ -17,13 +17,13 @@ The founder's standing direction (2026-08-17): *"I don't want an MVP. Let's work
 | Validation | Zod v4 (`z.email()`, not the deprecated `z.string().email()`) | At every boundary. Zod schemas will also drive OpenAPI generation for native clients (Phase 7). |
 | Tests | Vitest + happy-dom + @testing-library/react + vitest-axe | jsdom was dropped (broken ESM/CJS transitive deps across two major versions). |
 | Local infra | `docker-compose.yml`: postgres (5432), postgres-test (5433, tmpfs), redis (6379, AOF everysec) | `npm run infra:up` |
+| LLM | `@anthropic-ai/sdk` behind `src/lib/llm/` | Optional — every AI surface must degrade gracefully with no key. |
 
 `docker-compose.yml` pins a top-level `name: fantasy`, so every git worktree of this repo
 resolves to the **same** Compose project instead of a `<directory-name>_default` derived from
 each worktree's own path — without it, an agent working in a worktree spins up its own
 redundant postgres/redis stack on the same host ports. Run `docker compose up -d` /
 `npm run infra:up` from any worktree; they all talk to one shared stack.
-| LLM | `@anthropic-ai/sdk` behind `src/lib/llm/` | Optional — every AI surface must degrade gracefully with no key. |
 
 ## Directory map
 
@@ -31,7 +31,14 @@ redundant postgres/redis stack on the same host ports. Run `docker compose up -d
 src/
   app/                    Next.js routes. API routes under app/api/**.
   app/app/drafts/[draftId]/       The live draft room (snake + auction).
+  app/app/leagues/                The league room's pages: the league list + create form
+                          (leagues/page.tsx), league home + lineup editor
+                          (leagues/[leagueId]/page.tsx), and the matchup page
+                          (leagues/[leagueId]/matchups/[week]/page.tsx).
+  app/app/join/[code]/            The invite-link landing page.
   app/draft/[draftId]/board/      The read-only large-format TV draftboard.
+  middleware.ts           WorkOS AuthKit session middleware — runs on every non-static request.
+  instrumentation.ts      Starts the dev draft ticker singleton once, server-side only.
   domain/                 Pure domain types + pure functions. NO I/O, NO Date.now(). readonly everywhere.
   draft-engine/           Pure draft reducer (snake + auction), clock schedule, selectors. 100% coverage.
   draft-service/          Durable replay-based draft store, commit seam, clock ticker, draft authz,
@@ -48,24 +55,34 @@ src/
                           route handlers and by app/**/*.tsx Server Components.
   league-room/            The browser half of the league: the create/join/invite client
                           components (components/), the fetchJson deps seam (hooks/), and
-                          id→display-name lookups (lib/, re-exported from src/lib/display).
-                          Imports from league/league-service are TYPE-ONLY — no league rule runs
-                          in React.
+                          id→display-name formatting (lib/format.ts). Imports from
+                          league/league-service are TYPE-ONLY — no league rule runs in React.
+  scoring/                Pure fantasy-scoring engine: computeFantasyPoints/scoreLineup, every
+                          preset (PPR/standard/K-DEF/TE-premium). NO I/O. 100% coverage.
+  stats/                  The fixed 2026 mock stat dataset this phase scores against
+                          (mock/generate-dataset.ts, mock/mock-stats-provider.ts) — no live feed.
   db/                     schema.ts (Drizzle, pg-core: users, leagues, teams, league_invites,
                           scoring_settings, roster_slots, lineup_slots, drafts, draft_actions,
                           draft_nudges, draft_picks, weeks, matchups, players,
                           player_stat_lines), client.ts (createDb/getDb), test-db.ts
   lib/
     auth/                 current-user.ts (server identity seam over WorkOS), user-sync.ts (profile upsert)
+    leagues/              membership.ts — resolveLeagueMembership/requireLeagueMember, the one
+                          seam every league route's auth+membership gate goes through.
     realtime/             publish.ts, subscribe.ts, sse.ts, redis.ts, publisher.ts, events.ts, config.ts
     api/                  respond.ts — the JSON envelope + parseJson boundary validation
-    display/              id→display-name lookups (teamsById/playersById/teamName/playerName)
-                          shared by the draft room and the league room, so a second `.find(...)`
-                          closure per room never appears.
-    llm/                  shared Anthropic client (to be built)
+    display/              id→display-name lookups (teamsById/playersById/teamName/playerName),
+                          re-exported from src/draft-room/lib/lookups.ts. Draft-room-only: the
+                          league room renders names straight off the server-shaped view instead.
+    llm/                  client.ts (createLlmClient/getLlmClient/isLLMEnabled/
+                          LlmUnavailableError) — shared Anthropic client. Optional: every
+                          AI surface degrades gracefully with no key.
   data/seed/              the ONE seeding entry point (`npm run seed`); later steps add seeders here
-  design/                 tokens (to be built — see design-system.md)
-  components/ui/          shared primitives (to be built — see design-system.md)
+  design/                 tokens.ts → generated tokens.css, ThemeProvider, motion/reduced-motion
+                          hooks — see design-system.md.
+  components/ui/          shared primitives (Button, Input, Card, Badge, PositionBadge, SlotChip,
+                          PageTitle, Table, Celebration, Avatar, Modal, ToastProvider, Select,
+                          Skeleton, EmptyState, ErrorState, Icon, …) — see design-system.md.
 drizzle/                  generated SQL migrations (committed)
 docs/                     conventions.md (this), design-system.md, draft-engine.md, draft-room.md,
                           draft-moderator.md, league.md, research/
@@ -137,7 +154,7 @@ See `docs/draft-room.md` for the draft room's full fetch → SSE → apply → g
 Every JSON route returns the envelope from `src/lib/api/respond.ts`: `{ ok: true, data }` or `{ ok: false, error }` with a meaningful HTTP status. Bodies are parsed with `parseJson(request, ZodSchema)`; a bad body is a 400 naming the field. Error strings are user-facing plain language — never raw DB/exception text.
 
 ### Config over magic numbers
-Thresholds, limits, durations, key formats live in a `config.ts` next to the module that uses them (`AUTH_CONFIG`, `REALTIME_CONFIG`, …). No inline literals for tunables.
+Thresholds, limits, durations, key formats live in a `config.ts` next to the module that uses them (`LEAGUE_CONFIG`, `REALTIME_CONFIG`, `DRAFT_QUEUE_CONFIG`, `UI_CONFIG`, …). No inline literals for tunables.
 
 ### Tests
 - **Test-first.** Every step's tests are written before its implementation.
