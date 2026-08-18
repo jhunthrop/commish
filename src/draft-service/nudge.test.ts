@@ -89,6 +89,22 @@ describe("nudge scheduler", () => {
     expect(published).toHaveLength(1);
   });
 
+  it("nudges exactly once when two independent scheduler instances race on the same turn", async () => {
+    const draft = await liveDraft();
+    const a = schedulerWith();
+    const b = schedulerWith();
+    // Two processes hit the same threshold in the same tick. The in-process code cannot
+    // coordinate them; the (draft_id, sequence) primary key's ON CONFLICT DO NOTHING is
+    // what must let exactly one claim through — mirroring the store's double-append race.
+    const results = await Promise.all([
+      a.scheduler.nudge(draft.state, AFTER_THRESHOLD),
+      b.scheduler.nudge(draft.state, AFTER_THRESHOLD),
+    ]);
+    expect(results.filter((r) => r === "published")).toHaveLength(1);
+    expect(results.filter((r) => r === "already-nudged")).toHaveLength(1);
+    expect(a.published.length + b.published.length).toBe(1);
+  });
+
   it("stays idempotent across a restart, because the claim is a row and not a memory", async () => {
     const draft = await liveDraft();
     const first = schedulerWith();
