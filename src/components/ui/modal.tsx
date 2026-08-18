@@ -79,7 +79,7 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="w-full max-w-md rounded-lg border border-border bg-surface-elevated p-4 focus-visible:outline-none"
+        className="w-full max-w-md rounded-lg border border-border bg-surface-elevated p-4 shadow-card focus-visible:outline-none"
       >
         <h2 id={titleId} className="text-lg font-semibold text-text-primary">
           {title}

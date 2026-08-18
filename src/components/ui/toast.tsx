@@ -60,7 +60,7 @@ function ToastItem({
        */}
       <div
         role={tone === "error" ? "alert" : undefined}
-        className={`flex items-start gap-3 rounded-md border bg-surface-elevated p-3 text-sm text-text-primary ${TONE[tone]}`}
+        className={`flex items-start gap-3 rounded-md border bg-surface-elevated p-3 text-sm text-text-primary shadow-card ${TONE[tone]}`}
       >
         <span className="grow">{toast.message}</span>
         {toast.action ? (

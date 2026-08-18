@@ -17,8 +17,31 @@
   --color-negative-text: var(--commish-color-negative-text);
   --color-warning: var(--commish-color-warning);
   --color-scrim: var(--commish-color-scrim);
+  /* Position stickers. Three per position: `pos-<role>` is the sticker fill (bg-pos-qb),
+     `pos-<role>-on` is the label printed ON that fill (text-pos-qb-on), and
+     `pos-<role>-text` is the same hue used as text on a surface (text-pos-qb-text).
+     Only PositionBadge and the draft board's cells may use them — see docs/design-system.md. */
+  --color-pos-qb: var(--commish-pos-qb-sticker);
+  --color-pos-qb-on: var(--commish-pos-qb-sticker-text);
+  --color-pos-qb-text: var(--commish-pos-qb-text);
+  --color-pos-rb: var(--commish-pos-rb-sticker);
+  --color-pos-rb-on: var(--commish-pos-rb-sticker-text);
+  --color-pos-rb-text: var(--commish-pos-rb-text);
+  --color-pos-wr: var(--commish-pos-wr-sticker);
+  --color-pos-wr-on: var(--commish-pos-wr-sticker-text);
+  --color-pos-wr-text: var(--commish-pos-wr-text);
+  --color-pos-te: var(--commish-pos-te-sticker);
+  --color-pos-te-on: var(--commish-pos-te-sticker-text);
+  --color-pos-te-text: var(--commish-pos-te-text);
+  --color-pos-k: var(--commish-pos-k-sticker);
+  --color-pos-k-on: var(--commish-pos-k-sticker-text);
+  --color-pos-k-text: var(--commish-pos-k-text);
+  --color-pos-def: var(--commish-pos-def-sticker);
+  --color-pos-def-on: var(--commish-pos-def-sticker-text);
+  --color-pos-def-text: var(--commish-pos-def-text);
   --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-display: var(--font-barlow-condensed), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --radius-sm: var(--commish-radius-sm);
   --radius-md: var(--commish-radius-md);
   --radius-lg: var(--commish-radius-lg);
@@ -30,6 +53,13 @@
   --text-xl: var(--commish-font-size-xl);
   --text-2xl: var(--commish-font-size-2xl);
   --text-3xl: var(--commish-font-size-3xl);
+  --text-display-sm: var(--commish-display-size-sm);
+  --text-display-md: var(--commish-display-size-md);
+  --text-display-lg: var(--commish-display-size-lg);
+  --text-display-xl: var(--commish-display-size-xl);
+  --leading-display: var(--commish-line-height-display);
+  --shadow-card: var(--commish-shadow-card);
+  --shadow-sticker: var(--commish-shadow-sticker);
 }
 
 html { color-scheme: light dark; }
@@ -45,25 +75,38 @@ body {
 
 /* The pick-landing moment. Durations and easings come from the generated token variables,
    never from a literal — see docs/design-system.md. The reduced-motion block below is the
-   safety net; PickCelebration also drops these classes outright when the user asks for
-   less motion, so nothing merely runs faster. */
+   safety net; PickCelebration and DraftBoard also drop these classes outright when the user
+   asks for less motion, so nothing merely runs faster.
+
+   The announcement panel gets the quiet one (`pick-landed`); the EMPHASIS lives on the board,
+   where the sticker for the pick that just landed slaps onto the grid. */
 @keyframes commish-pick-landed {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes commish-pick-mine {
-  0% { opacity: 0; transform: scale(0.96); }
-  60% { opacity: 1; transform: scale(1.03); }
-  100% { opacity: 1; transform: scale(1); }
+@keyframes commish-sticker-slap {
+  0% { opacity: 0; transform: scale(1.15) rotate(-2.5deg); }
+  70% { opacity: 1; transform: scale(0.99) rotate(0.75deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
+/* The cell whose pick is about to be made: a soft breathing ring, never a flash. */
+@keyframes commish-spotlight {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 
 .animate-pick-landed {
   animation: commish-pick-landed var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
 }
 
-.animate-pick-mine {
-  animation: commish-pick-mine var(--commish-motion-duration-slow) var(--commish-motion-easing-emphasized) both;
+.animate-sticker-slap {
+  animation: commish-sticker-slap var(--commish-motion-duration-slow) var(--commish-motion-easing-emphasized) both;
+}
+
+.animate-spotlight {
+  animation: commish-spotlight calc(var(--commish-motion-duration-slow) * 5) var(--commish-motion-easing-standard) infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
