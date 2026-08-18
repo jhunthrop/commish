@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { CHAT_CONFIG } from "@/chat/config";
 import type { Db } from "@/db/client";
+import { chatReactions } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import { listMessages, postMessage, toggleReaction } from "./chat";
@@ -58,6 +59,25 @@ describe("postMessage", () => {
         throw new Error("redis unreachable");
       },
     });
+    const page = await listMessages(db, { leagueId: "l1" });
+    expect(page.messages.map((m) => m.id)).toEqual([message.id]);
+  });
+
+  it("routes a publish failure through the injected error sink instead of console.error", async () => {
+    const failures: Array<{ readonly error: unknown; readonly type: string; readonly leagueId: string }> = [];
+    const message = await postMessage(db, {
+      leagueId: "l1",
+      userId: "u1",
+      body: "sink me",
+      publish: async () => {
+        throw new Error("redis unreachable");
+      },
+      onPublishError: (error, event) => {
+        failures.push({ error, type: event.type, leagueId: event.leagueId });
+      },
+    });
+
+    expect(failures).toEqual([{ error: expect.any(Error), type: "chat.message", leagueId: "l1" }]);
     const page = await listMessages(db, { leagueId: "l1" });
     expect(page.messages.map((m) => m.id)).toEqual([message.id]);
   });
@@ -123,5 +143,66 @@ describe("toggleReaction", () => {
     const bus = recorder();
     const result = await toggleReaction(db, { leagueId: "l1", messageId: "999999", userId: "u2", emoji: "🔥", publish: bus.publish });
     expect(result.ok).toBe(false);
+  });
+});
+
+describe("toggleReaction — atomic transition", () => {
+  it('reports "removed" when another writer already holds the reaction', async () => {
+    const bus = recorder();
+    const message = await postMessage(db, { leagueId: "l1", userId: "u1", body: "already there", publish: bus.publish });
+    // Bypasses the service, simulating a reaction some other writer already committed.
+    await db.insert(chatReactions).values({ messageId: Number(message.id), userId: "u2", emoji: "🔥" });
+
+    const result = await toggleReaction(db, { leagueId: "l1", messageId: message.id, userId: "u2", emoji: "🔥", publish: bus.publish });
+    expect(result).toEqual({ ok: true, action: "removed", reactions: [] });
+  });
+
+  it('reports "added" when nothing is there yet', async () => {
+    const bus = recorder();
+    const message = await postMessage(db, { leagueId: "l1", userId: "u1", body: "nothing yet", publish: bus.publish });
+
+    const result = await toggleReaction(db, { leagueId: "l1", messageId: message.id, userId: "u2", emoji: "🔥", publish: bus.publish });
+    expect(result).toEqual({ ok: true, action: "added", reactions: [{ emoji: "🔥", userId: "u2" }] });
+  });
+
+  it('resolves a concurrent double-add without double-reporting "added"', async () => {
+    const bus = recorder();
+    const message = await postMessage(db, { leagueId: "l1", userId: "u1", body: "race to add", publish: bus.publish });
+
+    const [r1, r2] = await Promise.all([
+      toggleReaction(db, { leagueId: "l1", messageId: message.id, userId: "u2", emoji: "🔥", publish: bus.publish }),
+      toggleReaction(db, { leagueId: "l1", messageId: message.id, userId: "u2", emoji: "🔥", publish: bus.publish }),
+    ]);
+
+    // Exactly one writer's INSERT wins the unique index and reports "added"; the other sees the
+    // conflict and, correctly, toggles it back off — never two "added"s for one physical row.
+    const actions = [r1, r2].map((r) => (r.ok ? r.action : "error")).sort();
+    expect(actions).toEqual(["added", "removed"]);
+
+    const reactionEvents = bus.sent.filter((event) => event.type === "chat.reaction");
+    expect(reactionEvents).toHaveLength(2);
+    expect(reactionEvents.map((event) => (event.payload as { readonly action: string }).action).sort()).toEqual(["added", "removed"]);
+  });
+
+  it("resolves a concurrent double-remove without a phantom publish", async () => {
+    const bus = recorder();
+    const message = await postMessage(db, { leagueId: "l1", userId: "u1", body: "race to remove", publish: bus.publish });
+    await db.insert(chatReactions).values({ messageId: Number(message.id), userId: "u2", emoji: "🔥" });
+
+    const [r1, r2] = await Promise.all([
+      toggleReaction(db, { leagueId: "l1", messageId: message.id, userId: "u2", emoji: "🔥", publish: bus.publish }),
+      toggleReaction(db, { leagueId: "l1", messageId: message.id, userId: "u2", emoji: "🔥", publish: bus.publish }),
+    ]);
+
+    // Both callers see the reaction gone and both honestly report "removed", but only the one
+    // whose DELETE actually removed a row gets to publish — the loser's would-be publish is the
+    // phantom this fix exists to prevent.
+    expect(r1).toEqual({ ok: true, action: "removed", reactions: [] });
+    expect(r2).toEqual({ ok: true, action: "removed", reactions: [] });
+
+    const reactionEvents = bus.sent.filter((event) => event.type === "chat.reaction");
+    expect(reactionEvents).toEqual([
+      { type: "chat.reaction", leagueId: "l1", payload: { messageId: message.id, emoji: "🔥", userId: "u2", action: "removed" } },
+    ]);
   });
 });
