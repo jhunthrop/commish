@@ -73,16 +73,24 @@ body {
   line-height: var(--commish-line-height-base);
 }
 
-/* The pick-landing moment. Durations and easings come from the generated token variables,
-   never from a literal — see docs/design-system.md. The reduced-motion block below is the
-   safety net; PickCelebration and DraftBoard also drop these classes outright when the user
-   asks for less motion, so nothing merely runs faster.
+/* The `Celebration` primitive's two moments — a pick landing, a matchup win, a clinched spot.
+   Durations and easings come from the generated token variables, never from a literal — see
+   docs/design-system.md. The reduced-motion block below is the safety net; `Celebration` also
+   drops these classes outright when the user asks for less motion, so nothing merely runs
+   faster.
 
-   The announcement panel gets the quiet one (`pick-landed`); the EMPHASIS lives on the board,
-   where the sticker for the pick that just landed slaps onto the grid. */
-@keyframes commish-pick-landed {
+   `celebrate-peer` is the quiet one — somebody else's moment, an 8px rise and fade.
+   `celebrate-self` is the louder one — your own moment, a small scale bounce. DraftBoard's
+   sticker-slap below is a SEPARATE animation on the grid cell, not the panel. */
+@keyframes commish-celebrate-peer {
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes commish-celebrate-self {
+  0% { opacity: 0; transform: scale(0.96); }
+  60% { opacity: 1; transform: scale(1.03); }
+  100% { opacity: 1; transform: scale(1); }
 }
 
 @keyframes commish-sticker-slap {
@@ -97,8 +105,12 @@ body {
   50% { opacity: 0.45; }
 }
 
-.animate-pick-landed {
-  animation: commish-pick-landed var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
+.animate-celebrate-peer {
+  animation: commish-celebrate-peer var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
+}
+
+.animate-celebrate-self {
+  animation: commish-celebrate-self var(--commish-motion-duration-slow) var(--commish-motion-easing-emphasized) both;
 }
 
 .animate-sticker-slap {

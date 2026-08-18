@@ -43,26 +43,25 @@ describe("PickCelebration", () => {
     render(<PickCelebration lastPick={{ pick, isMine: true }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
     const panel = screen.getByTestId("pick-celebration");
     expect(panel).toHaveTextContent("You drafted Marcus Reed!");
-    expect(panel).toHaveAttribute("data-own", "true");
+    expect(panel).toHaveAttribute("data-emphasis", "self");
     expect(panel.className).toMatch(/border-accent/);
   });
 
-  // The emphasis was deliberately retargeted onto the board (DraftBoard's `animate-sticker-slap`
-  // on the landing sticker). This panel is the caption, so it animates the same quiet way for
-  // every pick — one event is never animated twice in two different ways.
-  it("animates the caption the same quiet way for every pick, own or not", () => {
+  // The shared `Celebration` primitive carries the self/peer distinction itself now — one
+  // reduced-motion branch to maintain instead of two callers each rolling their own.
+  it("uses the peer animation for someone else's pick and the self animation for your own", () => {
     stubMatchMedia(false);
     const { rerender } = render(<PickCelebration lastPick={{ pick, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
-    expect(screen.getByTestId("pick-celebration").className).toMatch(/animate-pick-landed/);
+    expect(screen.getByTestId("pick-celebration").className).toMatch(/animate-celebrate-peer/);
     rerender(<PickCelebration lastPick={{ pick: { ...pick, pickNumber: 5 }, isMine: true }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
-    expect(screen.getByTestId("pick-celebration").className).toMatch(/animate-pick-landed/);
+    expect(screen.getByTestId("pick-celebration").className).toMatch(/animate-celebrate-self/);
   });
 
   it("drops every animation class when the user prefers reduced motion — but still shows the pick", () => {
     stubMatchMedia(true);
     render(<PickCelebration lastPick={{ pick, isMine: true }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
     const panel = screen.getByTestId("pick-celebration");
-    expect(panel.className).not.toMatch(/animate-pick/);
+    expect(panel.className).not.toMatch(/animate-celebrate/);
     expect(panel).toHaveTextContent("You drafted Marcus Reed!");
   });
 
@@ -75,37 +74,14 @@ describe("PickCelebration", () => {
     expect(screen.queryByTestId("pick-celebration")).toBeNull();
   });
 
-  it("preserves the DOM node when rerendered with the same pickNumber — no re-animation", () => {
+  it("swaps in the new pick's own words when a fresh pick lands", () => {
     stubMatchMedia(false);
     const pick1 = { ...pick, pickNumber: 5 };
-    const { rerender, container } = render(
-      <PickCelebration lastPick={{ pick: pick1, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />,
-    );
-    const firstNode = container.firstElementChild;
-    expect(firstNode).toBeInTheDocument();
-    expect(firstNode).toHaveAttribute("data-pick-number", "5");
+    const pick2 = { ...pick, pickNumber: 6, playerId: "qb1", teamId: "t1" };
+    const { rerender } = render(<PickCelebration lastPick={{ pick: pick1, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
+    expect(screen.getByRole("status")).toHaveTextContent("Iron Owls drafted Marcus Reed.");
 
-    rerender(<PickCelebration lastPick={{ pick: pick1, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
-
-    const secondNode = container.firstElementChild;
-    expect(secondNode).toBe(firstNode); // Same DOM node
-    expect(secondNode).toHaveAttribute("data-pick-number", "5");
-  });
-
-  it("updates the panel and animation class when rerendered with a new pickNumber", () => {
-    stubMatchMedia(false);
-    const pick1 = { ...pick, pickNumber: 5 };
-    const pick2 = { ...pick, pickNumber: 6 };
-    const { rerender, container } = render(
-      <PickCelebration lastPick={{ pick: pick1, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />,
-    );
-    const firstNode = container.firstElementChild;
-    expect(firstNode).toHaveAttribute("data-pick-number", "5");
-
-    rerender(<PickCelebration lastPick={{ pick: pick2, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
-
-    const secondNode = container.firstElementChild;
-    expect(secondNode).not.toBe(firstNode); // Different pick = new DOM node
-    expect(secondNode).toHaveAttribute("data-pick-number", "6");
+    rerender(<PickCelebration lastPick={{ pick: pick2, isMine: true }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
+    expect(screen.getByRole("status")).not.toHaveTextContent("Iron Owls drafted Marcus Reed.");
   });
 });
