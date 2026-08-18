@@ -41,11 +41,24 @@ src/
                           the useDraftRoom hook (hooks/), every room component (components/), and
                           id→display-name lookups (lib/). Imports from draft-engine are TYPE-ONLY —
                           no draft rule runs in React. See docs/draft-room.md.
+  league/                 Pure league rules: schedule generation, standings, clinch, lineup
+                          eligibility, invite codes, LEAGUE_CONFIG. NO I/O. 100% coverage.
+  league-service/         League read/write service layer over Postgres: creation, invites,
+                          schedule, lineups, results/standings. Consumed directly by app/api/leagues/**
+                          route handlers and by app/**/*.tsx Server Components.
+  league-room/            The browser half of the league: the create/join/invite client
+                          components (components/), the fetchJson deps seam (hooks/), and
+                          id→display-name lookups (lib/, re-exported from src/lib/display).
+                          Imports from league/league-service are TYPE-ONLY — no league rule runs
+                          in React.
   db/                     schema.ts (Drizzle, pg-core), client.ts (createDb/getDb), test-db.ts
   lib/
     auth/                 current-user.ts (server identity seam over WorkOS), user-sync.ts (profile upsert)
     realtime/             publish.ts, subscribe.ts, sse.ts, redis.ts, publisher.ts, events.ts, config.ts
     api/                  respond.ts — the JSON envelope + parseJson boundary validation
+    display/              id→display-name lookups (teamsById/playersById/teamName/playerName)
+                          shared by the draft room and the league room, so a second `.find(...)`
+                          closure per room never appears.
     llm/                  shared Anthropic client (to be built)
   data/seed/              the ONE seeding entry point (`npm run seed`); later steps add seeders here
   design/                 tokens (to be built — see design-system.md)
@@ -94,25 +107,28 @@ See `docs/draft-engine.md`. `draft_nudges` (keyed on `(draftId, sequence)`) sits
 `draft_actions` for a different job: it is the AI moderator's durable once-per-turn claim, not
 part of replay — see `docs/draft-moderator.md`.
 
-### Draft room client boundary
-Everything under `src/draft-room/**` is BROWSER code — the pure state reducer/formatters, the
-hooks, and the client components that render the room. It talks to the draft
-engine and service ONLY over the wire (`GET`/`POST /api/drafts/[draftId]*`,
+### Client boundary
+Everything under `src/draft-room/**` and `src/league-room/**` is BROWSER code — the pure
+state reducer/formatters, the hooks, and the client components that render the draft room and
+the league room respectively. Each talks to its service layer ONLY over the wire
+(`GET`/`POST /api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`,
 `GET /api/leagues/[leagueId]/events`) — never by importing `@/draft-engine`, `@/draft-service`,
-`@/db*` or `@/lib/realtime*` as VALUES. An ESLint `@typescript-eslint/no-restricted-imports`
-rule (`eslint.config.mjs`, scoped to `src/draft-room/**/*.{ts,tsx}` only) enforces this;
-`import type` stays allowed, since sharing a TYPE (e.g. `DraftStateView`) costs nothing at
-runtime and is how the client and server sides of the wire stay in sync.
+`@/league`, `@/league-service`, `@/db*` or `@/lib/realtime*` as VALUES. An ESLint
+`@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`, scoped to
+`src/draft-room/**/*.{ts,tsx}` and `src/league-room/**/*.{ts,tsx}` only) enforces this;
+`import type` stays allowed, since sharing a TYPE (e.g. `DraftStateView`, `LeagueSummary`)
+costs nothing at runtime and is how the client and server sides of the wire stay in sync.
 
 The rule is deliberately **not** applied to `src/app/**`: pages and layouts there are Next.js
 Server Components (`page.tsx`, `layout.tsx`) and route handlers (`route.ts`), which are
-allowed — and already do, in this codebase's existing draft routes — import service-layer
-code (`@/draft-engine`, `@/draft-service`) directly; that is the idiomatic Next.js pattern,
-not a boundary violation. A page can't be told apart from a client component by its filename
-alone, so a glob covering `src/app/**` would either miss real client code elsewhere or
-wrongly flag a legitimate server import. Any client interactivity a page needs is a
-`"use client"` component imported FROM `src/draft-room/**`, not inlined into the page file.
-See `docs/draft-room.md` for the room's full fetch → SSE → apply → gap → refetch contract.
+allowed — and already do, in this codebase's existing draft and league routes — import
+service-layer code (`@/draft-engine`, `@/draft-service`, `@/league`, `@/league-service`)
+directly; that is the idiomatic Next.js pattern, not a boundary violation. A page can't be
+told apart from a client component by its filename alone, so a glob covering `src/app/**`
+would either miss real client code elsewhere or wrongly flag a legitimate server import. Any
+client interactivity a page needs is a `"use client"` component imported FROM
+`src/draft-room/**` or `src/league-room/**`, not inlined into the page file.
+See `docs/draft-room.md` for the draft room's full fetch → SSE → apply → gap → refetch contract.
 
 ### API responses
 Every JSON route returns the envelope from `src/lib/api/respond.ts`: `{ ok: true, data }` or `{ ok: false, error }` with a meaningful HTTP status. Bodies are parsed with `parseJson(request, ZodSchema)`; a bad body is a 400 naming the field. Error strings are user-facing plain language — never raw DB/exception text.
