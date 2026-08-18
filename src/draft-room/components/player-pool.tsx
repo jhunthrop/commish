@@ -76,6 +76,8 @@ function PositionFilters({ value, onChange }: { readonly value: string; readonly
 export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel, submitting, onAct, queuedPlayerIds, onQueue }: PlayerPoolProps) {
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState(ALL);
+  // A live pool's one job is "who can I take" — drafted names hide unless asked for.
+  const [showDrafted, setShowDrafted] = useState(false);
 
   const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
   // Before START_DRAFT the engine has no pool yet, so `availablePlayerIds` is empty — which is
@@ -88,8 +90,9 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
     const needle = query.trim().toLowerCase();
     return players
       .map((player, index): PoolRow => ({ player, rank: index + 1, drafted: !preStart && !available.has(player.id) }))
-      .filter((row) => (position === ALL || row.player.position === position) && (needle === "" || row.player.name.toLowerCase().includes(needle)));
-  }, [players, available, preStart, query, position]);
+      .filter((row) => (position === ALL || row.player.position === position) && (needle === "" || row.player.name.toLowerCase().includes(needle)))
+      .filter((row) => showDrafted || !row.drafted);
+  }, [players, available, preStart, query, position, showDrafted]);
   const rows = useMemo(() => filtered.slice(0, DRAFT_ROOM_CONFIG.poolPageSize), [filtered]);
   const truncated = filtered.length > DRAFT_ROOM_CONFIG.poolPageSize;
 
@@ -98,6 +101,12 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
       <div className="flex shrink-0 flex-col gap-2">
         <Input label="Search players" value={query} placeholder="Name" onChange={(event) => setQuery(event.target.value)} />
         <PositionFilters value={position} onChange={setPosition} />
+        {preStart ? null : (
+          <label className="flex items-center gap-2 text-xs text-text-muted">
+            <input type="checkbox" checked={showDrafted} onChange={(event) => setShowDrafted(event.target.checked)} />
+            Show drafted players
+          </label>
+        )}
       </div>
 
       {rows.length === 0 ? (

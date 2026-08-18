@@ -60,8 +60,15 @@ describe("PlayerPool", () => {
     expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
   });
 
-  it("marks drafted players and refuses to act on them", () => {
+  it("hides drafted players by default — the pool's job is who you can still take", () => {
     render(<PlayerPool {...props} view={{ ...SNAKE_VIEW, availablePlayerIds: ["rb1", "rb2", "wr1"] }} />);
+    expect(screen.queryByText("Jalen Croft")).toBeNull();
+    expect(screen.getByText("Marcus Reed")).toBeInTheDocument();
+  });
+
+  it("shows drafted players behind the toggle, marked and inert", () => {
+    render(<PlayerPool {...props} view={{ ...SNAKE_VIEW, availablePlayerIds: ["rb1", "rb2", "wr1"] }} />);
+    fireEvent.click(screen.getByLabelText("Show drafted players"));
     const row = rowFor("Jalen Croft");
     expect(within(row).getByText("Drafted")).toBeInTheDocument();
     expect(within(row).queryByRole("button")).toBeNull();

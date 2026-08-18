@@ -66,11 +66,11 @@ const GRAPHITE = "#5A5E66";
 const PENCIL = "#8E8A7E";
 
 const lightPigments: Pigments = {
-  whistle: "#C8102E",
-  leaf: "#0B7A3E",
-  marker: "#1D4ED8",
-  clay: "#B45309",
-  grape: "#6D28D9",
+  whistle: "#B01F35",
+  leaf: "#146C3C",
+  marker: "#2547B8",
+  clay: "#9F5410",
+  grape: "#632EB8",
   slate: "#2F3742",
 };
 

@@ -4,6 +4,7 @@ import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { positionStickerClass } from "@/components/ui";
+import { useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { rosterSpots } from "../state/format";
 import { teamName, teamsById } from "../lib/lookups";
@@ -25,6 +26,7 @@ interface BoardCell {
   readonly teamId: string;
   readonly pick: CompletedPick | null;
   readonly onClock: boolean;
+  readonly future: boolean;
 }
 
 interface BoardRow {
@@ -89,6 +91,8 @@ function directionOf(picks: readonly CompletedPick[], columnIds: readonly string
 }
 
 function buildRows(view: DraftStateView, columnIds: readonly string[]): readonly BoardRow[] {
+  // The last round with any action; empties beyond the next round fade to quiet the wall.
+
   const byCell = new Map(view.picks.map((pick) => [pickKey(pick.teamId, pick.round), pick]));
   const byRound = new Map<number, CompletedPick[]>();
   for (const pick of view.picks) byRound.set(pick.round, [...(byRound.get(pick.round) ?? []), pick]);
@@ -96,6 +100,7 @@ function buildRows(view: DraftStateView, columnIds: readonly string[]): readonly
   const nextRound = nextRoundByTeam(view);
   const onClockTeamId = view.phase === "in_progress" ? view.onClockTeamId : null;
   const isSnake = view.format === "snake";
+  const activeRound = Math.max(1, ...view.picks.map((pick) => pick.round), ...(onClockTeamId ? [nextRound.get(onClockTeamId) ?? 1] : []));
 
   return Array.from({ length: rosterSpots(view.slotConfig) }, (_, index): BoardRow => {
     const round = index + 1;
@@ -106,6 +111,7 @@ function buildRows(view: DraftStateView, columnIds: readonly string[]): readonly
         teamId,
         pick: byCell.get(pickKey(teamId, round)) ?? null,
         onClock: teamId === onClockTeamId && (nextRound.get(teamId) ?? 1) === round,
+        future: round > activeRound + 1,
       })),
     };
   });
@@ -142,14 +148,14 @@ function StickerCell({
 
   if (cell.onClock) {
     return (
-      <div className="relative flex h-full items-center justify-center rounded-sm border border-dashed border-border px-2 py-2">
+      <div data-onclock-cell="true" className="relative flex h-full items-center justify-center rounded-sm border border-dashed border-border px-2 py-2">
         <span aria-hidden="true" className={`pointer-events-none absolute inset-0 rounded-sm ring-2 ring-accent ${spotlight ? "animate-spotlight" : ""}`} />
         <span className="font-display text-xs font-semibold uppercase tracking-wide text-accent">On the clock</span>
       </div>
     );
   }
 
-  return <div aria-hidden="true" className="h-full min-h-12 rounded-sm border border-dashed border-border" />;
+  return <div aria-hidden="true" className={`h-full min-h-12 rounded-sm border border-dashed ${cell.future ? "border-border/35" : "border-border"}`} />;
 }
 
 /**
@@ -167,6 +173,15 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
   const columnIds = columnIdsOf(view, teams);
   const rows = buildRows(view, columnIds);
   const slapPickNumber = reduced ? null : landedPickNumber;
+
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const onClockKey = view.phase === "in_progress" ? `${view.onClockTeamId ?? ""}:${view.pickNumber}` : "";
+  useEffect(() => {
+    // The current pick is the most important cell in the product: keep it in view. happy-dom
+    // implements scrollIntoView as a no-op, so tests exercise presence, not scrolling.
+    const cell = gridRef.current?.querySelector('[data-onclock-cell="true"]');
+    cell?.scrollIntoView?.({ block: "nearest", inline: "center", behavior: "smooth" });
+  }, [onClockKey]);
 
   const cellFor = (cell: BoardCell) => (
     <StickerCell
@@ -187,7 +202,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
   return (
     <section aria-label="Draft board" className="flex h-full min-h-0 flex-col gap-3">
       {/* Wide: the board itself, scrolling inside its own container so the page never does. */}
-      <div data-testid="draft-board-grid" className="hidden min-h-0 w-full flex-1 overflow-auto sm:block">
+      <div ref={gridRef} data-testid="draft-board-grid" className="hidden min-h-0 w-full flex-1 overflow-auto sm:block">
         <table className="w-full border-separate border-spacing-1 text-left">
           <caption className="sr-only">The draft board: one row per round, one column per team.</caption>
           <thead>
