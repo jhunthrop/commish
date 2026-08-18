@@ -3,6 +3,7 @@ import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import { DEV_SEED } from "./config";
 import { seedDevLeagues } from "./seed-dev-leagues";
 import { seedPlayers } from "./seed-players";
+import { seedSeasonLeague } from "./seed-season-league";
 
 /**
  * The ONE seed entry point (`npm run seed`). Later steps add seeders here — a demo league,
@@ -17,6 +18,8 @@ async function main(): Promise<void> {
   const claimUserId = process.env[DEV_SEED.claimUserIdEnvVar];
   const dev = await seedDevLeagues(db, { now: () => new Date().toISOString() }, claimUserId);
   console.log(`seeded ${dev.leagues} dev leagues, ${dev.teams} teams and ${dev.drafts} scheduled drafts`);
+  const season = await seedSeasonLeague(db, { now: () => new Date().toISOString() }, claimUserId);
+  console.log(`seeded a ${season.teams}-team season league with ${season.weeks} weeks (${season.scoredWeeks} scored)`);
 }
 
 main().then(() => process.exit(0)).catch((err: unknown) => {

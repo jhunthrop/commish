@@ -258,7 +258,11 @@ headings are `<h2>` — a jump to `<h3>` is a heading-order violation axe catche
 `src/draft-room/lib/lookups.ts` — `teamsById` / `playerName` / `teamName`: the one place a
 `teamId`/`playerId` is turned into the human it names, built once per render and shared by
 every component above that needs it, instead of each component re-declaring its own
-`.find(...)`.
+`.find(...)`. Since Plan D this file is a thin re-export of `src/lib/display/lookups.ts` — the
+league room needs the identical pattern, and two copies of it was the DRY violation the shared
+module closes. `queueButtonLabel` stays local to `src/draft-room/lib/`: it is draft-room-only
+vocabulary (the pool's star and the dock's chips share its phrasing), and the league room has
+no queue.
 
 ## Accessibility notes specific to this room
 

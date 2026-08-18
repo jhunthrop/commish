@@ -36,4 +36,5 @@ export const DEV_SEED = {
   ],
   snake: { leagueId: "dev_league_snake", draftId: "dev_draft_snake", name: "Dev Snake League" },
   auction: { leagueId: "dev_league_auction", draftId: "dev_draft_auction", name: "Dev Auction League", budget: 200 },
+  season: { leagueId: "dev_league_season", draftId: "dev_draft_season", name: "Dev Season League" },
 } as const;

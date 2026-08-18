@@ -51,7 +51,10 @@ src/
                           id→display-name lookups (lib/, re-exported from src/lib/display).
                           Imports from league/league-service are TYPE-ONLY — no league rule runs
                           in React.
-  db/                     schema.ts (Drizzle, pg-core), client.ts (createDb/getDb), test-db.ts
+  db/                     schema.ts (Drizzle, pg-core: users, leagues, teams, league_invites,
+                          scoring_settings, roster_slots, lineup_slots, drafts, draft_actions,
+                          draft_nudges, draft_picks, weeks, matchups, players,
+                          player_stat_lines), client.ts (createDb/getDb), test-db.ts
   lib/
     auth/                 current-user.ts (server identity seam over WorkOS), user-sync.ts (profile upsert)
     realtime/             publish.ts, subscribe.ts, sse.ts, redis.ts, publisher.ts, events.ts, config.ts
@@ -65,7 +68,7 @@ src/
   components/ui/          shared primitives (to be built — see design-system.md)
 drizzle/                  generated SQL migrations (committed)
 docs/                     conventions.md (this), design-system.md, draft-engine.md, draft-room.md,
-                          draft-moderator.md, research/
+                          draft-moderator.md, league.md, research/
 plans/                    the phase blueprints
 ```
 
@@ -140,7 +143,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**` and `src/draft-room/state/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%). Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**` and `src/league/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%). Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 
 ### Migrations
