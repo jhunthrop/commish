@@ -11,6 +11,7 @@ const props = {
   playerId: "qb1",
   playerName: "Jalen Croft",
   view: AUCTION_VIEW,
+  minBid: AUCTION_VIEW.minBid!,
   myTeamId: "t1",
   onClose: () => {},
   onNominate: () => {},

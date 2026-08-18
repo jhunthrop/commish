@@ -122,9 +122,18 @@ it agrees with the engine's `totalRosterSlots` so the two cannot diverge.
 ### What "optimistic" deliberately does not do
 
 `optimisticView` never guesses a roster slot, a round, a price, a budget or a turn change,
-because each is a draft rule. It removes the player from the pool, marks them **pending**, and
-(for an auction) shows the bid you just made as the high bid. Everything else waits the one
-round trip it takes for the truth to arrive.
+because each is a draft rule. What it does is specific to the action:
+
+- **`MAKE_PICK`** removes the player from `availablePlayerIds` immediately, so `PlayerPool`
+  renders that row as **drafted** (a `Badge`, no button) before the server has answered — the
+  pool never shows a stale "still available" row for a player you just took.
+- **`NOMINATE`** leaves the player in the pool but sets `pendingPlayerId`, so `PlayerPool`
+  renders that row's action button as **pending** (`aria-busy`) instead. It also patches
+  `view.auction` so the lot, opening bid and your team as high bidder appear at once.
+- **`BID`** sets `pendingPlayerId` to the lot's player and shows the bid you just made as the
+  new high bid.
+
+Everything else waits the one round trip it takes for the truth to arrive.
 
 ## Wall clock
 
@@ -203,8 +212,9 @@ still worth having, and is deliberately deferred:
    in both.
 4. Simulate a dropped connection (block the SSE request, or toggle offline) in one context,
    let the underlying pick continue elsewhere, restore the connection, and assert the dropped
-   context's `ConnectionBanner` shows "Reconnecting…" then clears, and the view catches up via
-   the gap-triggered `refresh()` rather than silently missing the pick.
+   context's `ConnectionBanner` shows "Reconnecting…" then goes visually quiet again once live,
+   and the view catches up via the gap-triggered `refresh()` rather than silently missing the
+   pick.
 5. Open `/draft/dev_draft_snake/board` and assert it mirrors the same picks as the room, with
    no interactive controls rendered anywhere on the page.
 
@@ -216,7 +226,8 @@ still worth having, and is deliberately deferred:
   connection-pool contention across the ~40 test files that each open their own pool via
   `createTestDb()` (`src/db/test-db.ts`). `createTestDb()` already uses a small pool
   (`DB_POOL_CONFIG.testMaxConnections`) with a short idle timeout and registers its own
-  `afterAll` to close the pool, which is the existing mitigation. If the timeout recurs: raise
-  Vitest's `hookTimeout` for the affected DB-backed test files, or serialize DB-backed test
-  files against each other (beyond the existing `fileParallelism: false`, which only
-  serializes tests *within* a file) so fewer pools are open at once.
+  `afterAll` to close the pool, which is the existing mitigation. Vitest's `fileParallelism:
+  false` (`vitest.config.mts`) already serializes test FILES against each other — tests
+  *within* a file are already sequential by default, so this setting is what stops multiple
+  files' pools from ever being open at once, not the other way around. If the timeout recurs,
+  the fix is to raise `hookTimeout` for the affected DB-backed test files.

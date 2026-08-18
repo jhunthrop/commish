@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import type { ClientDraftAction } from "@/draft-engine";
 import { Button, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { useDraftRoom } from "../hooks/use-draft-room";
+import { playersById as buildPlayersById } from "../lib/lookups";
 import { ConnectionBanner } from "./connection-banner";
 import { SnakeRoom } from "./snake-room";
 import { AuctionRoom } from "./auction-room";
@@ -15,7 +16,7 @@ import { AuctionRoom } from "./auction-room";
 export function DraftRoom({ draftId }: { readonly draftId: string }) {
   const room = useDraftRoom(draftId);
   const { show } = useToast();
-  const playersById = useMemo(() => new Map(room.players.map((player) => [player.id, player])), [room.players]);
+  const playersById = useMemo(() => buildPlayersById(room.players), [room.players]);
 
   const act = (action: ClientDraftAction): void => {
     void room.submit(action).then((outcome) => {

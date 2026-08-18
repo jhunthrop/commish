@@ -51,18 +51,26 @@ export function AuctionRoom({ room, playersById, onAct }: AuctionRoomProps) {
           <PickHistory view={view} teams={room.teams} playersById={playersById} />
         </div>
       </div>
-      <NominateModal
-        open={nominating !== null}
-        playerId={nominating}
-        playerName={nominating === null ? "" : playerName(playersById, nominating)}
-        view={view}
-        myTeamId={room.myTeamId}
-        onClose={() => setNominating(null)}
-        onNominate={(playerId, openingBid) => {
-          setNominating(null);
-          onAct({ type: "NOMINATE", playerId, openingBid });
-        }}
-      />
+      {/* `view.minBid` is only null before an auction has started (`draftStateView`,
+          `src/draft-engine/selectors.ts`) — the modal itself only ever opens once `canNominate`
+          is true, which already implies `phase === "in_progress"`, but narrowing here (rather
+          than defaulting to a magic `1` inside the modal) is what lets `NominateModal` require
+          a plain `number` instead of re-deriving a fallback of its own. */}
+      {view.minBid === null ? null : (
+        <NominateModal
+          open={nominating !== null}
+          playerId={nominating}
+          playerName={nominating === null ? "" : playerName(playersById, nominating)}
+          view={view}
+          minBid={view.minBid}
+          myTeamId={room.myTeamId}
+          onClose={() => setNominating(null)}
+          onNominate={(playerId, openingBid) => {
+            setNominating(null);
+            onAct({ type: "NOMINATE", playerId, openingBid });
+          }}
+        />
+      )}
     </div>
   );
 }

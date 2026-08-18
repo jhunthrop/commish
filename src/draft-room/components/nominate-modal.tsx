@@ -9,14 +9,20 @@ export interface NominateModalProps {
   readonly playerId: string | null;
   readonly playerName: string;
   readonly view: DraftStateView;
+  /**
+   * The legal opening bid floor. A plain `number`, not `view.minBid` (which is `number | null`
+   * — null only before an auction has started): this modal only ever renders once nominating
+   * is possible, so its caller narrows `view.minBid` to a number before rendering it, and no
+   * magic fallback literal is needed here.
+   */
+  readonly minBid: number;
   readonly myTeamId: string | null;
   readonly onClose: () => void;
   readonly onNominate: (playerId: string, openingBid: number) => void;
 }
 
 /** Nominating commits money, so it gets a deliberate confirm step rather than a single click. */
-export function NominateModal({ open, playerId, playerName, view, myTeamId, onClose, onNominate }: NominateModalProps) {
-  const minBid = view.minBid ?? 1;
+export function NominateModal({ open, playerId, playerName, view, minBid, myTeamId, onClose, onNominate }: NominateModalProps) {
   const maxBid = myTeamId === null ? null : (view.maxBids[myTeamId] ?? null);
   const [openingBid, setOpeningBid] = useState(minBid);
 

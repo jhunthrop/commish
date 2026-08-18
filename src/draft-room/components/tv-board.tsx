@@ -3,7 +3,7 @@
 import { useMemo } from "react";
 import { Avatar, Badge, Button, ErrorState, Skeleton } from "@/components/ui";
 import { useDraftRoom } from "../hooks/use-draft-room";
-import { teamsById } from "../lib/lookups";
+import { playersById as buildPlayersById, teamsById } from "../lib/lookups";
 import { ClockBanner } from "./clock-banner";
 import { PickCelebration } from "./pick-celebration";
 import { PickHistory } from "./pick-history";
@@ -16,7 +16,7 @@ import { PickHistory } from "./pick-history";
  */
 export function TvBoard({ draftId }: { readonly draftId: string }) {
   const room = useDraftRoom(draftId);
-  const playersById = useMemo(() => new Map(room.players.map((player) => [player.id, player])), [room.players]);
+  const playersById = useMemo(() => buildPlayersById(room.players), [room.players]);
 
   if (room.status === "loading") return <Skeleton lines={8} />;
   if (room.status === "error" || room.view === null) {

@@ -12,6 +12,13 @@ export function teamsById(teams: readonly TeamCard[]): ReadonlyMap<string, TeamC
   return new Map(teams.map((team) => [team.id, team]));
 }
 
+/** `teamsById`'s counterpart for the player dictionary — built once per render by `DraftRoom`
+ *  and `TvBoard` and shared by every component below them that needs a `playerId` → `Player`
+ *  lookup, instead of each one re-declaring its own `new Map(...)` memo. */
+export function playersById(players: readonly Player[]): ReadonlyMap<string, Player> {
+  return new Map(players.map((player) => [player.id, player]));
+}
+
 /** A team's display name, or `fallback` (default: the id itself) when the roster doesn't list it. */
 export function teamName(byId: ReadonlyMap<string, TeamCard>, teamId: string, fallback: string = teamId): string {
   return byId.get(teamId)?.name ?? fallback;

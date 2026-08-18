@@ -13,12 +13,26 @@ describe("ConnectionBanner", () => {
     });
   });
 
-  it("says nothing while connecting or live is silent, and shows a message while connecting", () => {
+  it("shows a message while connecting, and stays visually quiet (but not absent) once live", () => {
     const { rerender } = render(<ConnectionBanner connection="connecting" />);
     expect(screen.getByText("Connecting…")).toBeInTheDocument();
 
     rerender(<ConnectionBanner connection="live" />);
     expect(screen.queryByText("Connecting…")).toBeNull();
     expect(screen.queryByText("Reconnecting…")).toBeNull();
+  });
+
+  it("keeps the same aria-live region mounted across all three states, so a screen reader has something to diff against and actually announces a change", () => {
+    const { container, rerender } = render(<ConnectionBanner connection="connecting" />);
+    const live = () => container.querySelector('[aria-live="polite"]');
+    expect(live()).not.toBeNull();
+
+    rerender(<ConnectionBanner connection="live" />);
+    expect(live()).not.toBeNull();
+    expect(live()).toHaveTextContent("Connected.");
+
+    rerender(<ConnectionBanner connection="reconnecting" />);
+    expect(live()).not.toBeNull();
+    expect(live()).toHaveTextContent("Reconnecting…");
   });
 });

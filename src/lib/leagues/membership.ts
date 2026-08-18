@@ -4,6 +4,14 @@ import type { Db } from "@/db/client";
 import { leagues, teams } from "@/db/schema";
 import { fail } from "@/lib/api/respond";
 
+/**
+ * The one literal for "you don't field a team here" — shared by `requireLeagueMember` below
+ * (the league-membership gate: no team AND not commissioner) and
+ * `POST /api/drafts/[draftId]/actions` (a stricter, different rule: acting requires an actual
+ * team, commissioner or not), so the two routes can never drift apart on the wording.
+ */
+export const NO_TEAM_MESSAGE = "You don't have a team in this league.";
+
 export interface LeagueMembership {
   readonly leagueId: string;
   /** The caller's team in this league, or null if they don't have one. */
@@ -57,7 +65,7 @@ export interface LeagueMembershipLike {
  */
 export function requireLeagueMember(membership: LeagueMembershipLike): NextResponse | null {
   if (membership.teamId === null && !membership.isCommissioner) {
-    return fail("You don't have a team in this league.", 403);
+    return fail(NO_TEAM_MESSAGE, 403);
   }
   return null;
 }
