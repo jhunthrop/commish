@@ -4,7 +4,7 @@ import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
 import { DRAFT_CLOCK_SCHEDULE } from "./config";
 import { reduceDraft } from "./reduce";
-import { isComplete, currentDeadline, remainingBudget, teamOnClock } from "./selectors";
+import { isComplete, remainingBudget, teamOnClock } from "./selectors";
 import { expireAt } from "./test-support";
 
 const SPRINT_SLOTS: readonly RosterSlotConfig[] = [
@@ -23,7 +23,7 @@ const T = "2026-09-01T00:00:00.000Z";
 // A stale constant, used only where the exact timestamp doesn't matter (e.g. the
 // draft-hasn't-started rejection, which is decided before any deadline check runs).
 const EXPIRE: TimerExpireAction = { v: 1, type: "TIMER_EXPIRE", timestamp: "2026-09-01T01:00:00.000Z" };
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
 
 function apply(state: DraftState, action: Parameters<typeof reduceDraft>[1]): DraftState {
   const result = reduceDraft(state, action);
@@ -37,59 +37,9 @@ const snakeConfig: DraftConfig = {
 };
 const auctionConfig: DraftConfig = { ...snakeConfig, draftId: "d_a", format: "auction", auctionBudget: 10 };
 
-describe("TIMER_EXPIRE — the clock must actually have run out (R-B4)", () => {
-  it("rejects a snake expiry one second before the deadline, leaving state unchanged", () => {
-    const started = apply(initialDraftState(snakeConfig), START);
-    const deadline = currentDeadline(started)!;
-    const early = new Date(Date.parse(deadline) - 1_000).toISOString();
-
-    expect(reduceDraft(started, { v: 1, type: "TIMER_EXPIRE", timestamp: early })).toEqual({
-      ok: false,
-      reason: "The clock hasn't run out yet.",
-    });
-    // The rejected call must not have mutated the state we hold a reference to.
-    expect(started.picks).toHaveLength(0);
-    expect(started.turnStartedAt).toBe(T);
-  });
-
-  it("accepts a snake expiry exactly at the deadline", () => {
-    const started = apply(initialDraftState(snakeConfig), START);
-    const result = reduceDraft(started, expireAt(started));
-    expect(result.ok).toBe(true);
-  });
-
-  it("rejects an auction expiry before the bid window elapses, and awards once it does", () => {
-    let state = apply(initialDraftState(auctionConfig), START);
-    state = apply(state, { v: 1, type: "NOMINATE", timestamp: T, teamId: "t1", playerId: "qb1", openingBid: 3 });
-    state = apply(state, { v: 1, type: "BID", timestamp: T, teamId: "t2", amount: 4 });
-    const deadline = currentDeadline(state)!;
-    const early = new Date(Date.parse(deadline) - 1_000).toISOString();
-
-    const rejected = reduceDraft(state, { v: 1, type: "TIMER_EXPIRE", timestamp: early });
-    expect(rejected).toEqual({ ok: false, reason: "The clock hasn't run out yet." });
-    expect(state.auction?.lot?.highBidTeamId).toBe("t2"); // untouched by the rejected call
-
-    const awarded = apply(state, { v: 1, type: "TIMER_EXPIRE", timestamp: deadline });
-    expect(awarded.picks[0]).toMatchObject({ teamId: "t2", playerId: "qb1", price: 4 });
-  });
-
-  it("rejects a stale TIMER_EXPIRE whose timestamp predates a pick that already advanced the turn", () => {
-    // The ticker's check-then-act race: it reads state and computes a deadline, but before
-    // it submits TIMER_EXPIRE, the on-clock team makes a legitimate (if late) pick. The
-    // ticker's now-stale timestamp must not be allowed to autopick for whoever is next.
-    const started = apply(initialDraftState(snakeConfig), START); // t1 on the clock
-    const t1Deadline = currentDeadline(started)!; // T0 — what the ticker computed
-    const t1PickTime = new Date(Date.parse(t1Deadline) + 1_000).toISOString(); // T1 > T0
-
-    const afterPick = apply(started, { v: 1, type: "MAKE_PICK", timestamp: t1PickTime, teamId: "t1", playerId: "qb1" });
-    expect(teamOnClock(afterPick)).toBe("t2");
-    expect(afterPick.turnStartedAt).toBe(t1PickTime);
-
-    const staleExpire: TimerExpireAction = { v: 1, type: "TIMER_EXPIRE", timestamp: t1Deadline };
-    expect(reduceDraft(afterPick, staleExpire)).toEqual({ ok: false, reason: "The clock hasn't run out yet." });
-    expect(teamOnClock(afterPick)).toBe("t2"); // still t2's turn — unaffected by the rejected call
-  });
-});
+// The "the clock must actually have run out" cases (R-B4) live in `admit.test.ts`: that guard
+// reads `config.clockSchedule`, a tunable, so it is a command-time admission check rather than
+// a reducer guard — a persisted TIMER_EXPIRE must stay replayable under a later schedule.
 
 describe("TIMER_EXPIRE (snake)", () => {
   it("autopicks the best available player the team can roster and hands over the turn", () => {
@@ -153,7 +103,7 @@ describe("TIMER_EXPIRE (auction)", () => {
     expect(remainingBudget(state, "t2")).toBe(6);
     expect(remainingBudget(state, "t1")).toBe(10);
     expect(state.pickNumber).toBe(2);
-    expect(state.auction).toEqual({ nominatingTeamId: "t2", lot: null });
+    expect(state.auction).toEqual({ nominatingTeamId: "t2", lot: null, minBid: 1 });
   });
 
   it("awards an unchallenged lot to the nominator at their opening bid", () => {

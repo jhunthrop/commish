@@ -1,6 +1,6 @@
 import { z } from "zod";
-import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
-import { AUCTION_CONFIG } from "./config";
+import { DRAFT_ACTION_VERSION, type DraftAction, type SetQueueAction } from "@/domain/draft";
+import { AUCTION_CONFIG, DRAFT_QUEUE_CONFIG, PERSISTED_QUEUE_MAX } from "./config";
 
 const version = z.literal(DRAFT_ACTION_VERSION);
 // A strict ISO 8601 datetime (not just any non-empty string) so a malformed stamp can't
@@ -22,11 +22,17 @@ const poolEntry = z.object({
  * Unknown `v` values fail loudly instead of being reinterpreted as v1.
  */
 export const draftActionSchema: z.ZodType<DraftAction> = z.discriminatedUnion("type", [
-  z.object({ v: version, type: z.literal("START_DRAFT"), timestamp, draftOrder: z.array(teamId).min(2), pool: z.array(poolEntry).min(1) }),
+  // `minBid` defaults for logs persisted before it existed — the one place today's tunable
+  // may reach an old draft's replay, and only for those legacy rows (new logs carry it).
+  z.object({ v: version, type: z.literal("START_DRAFT"), timestamp, draftOrder: z.array(teamId).min(2), pool: z.array(poolEntry).min(1), minBid: dollars.default(AUCTION_CONFIG.minBid) }),
   z.object({ v: version, type: z.literal("MAKE_PICK"), timestamp, teamId, playerId }),
   z.object({ v: version, type: z.literal("NOMINATE"), timestamp, teamId, playerId, openingBid: dollars }),
   z.object({ v: version, type: z.literal("BID"), timestamp, teamId, amount: dollars }),
   z.object({ v: version, type: z.literal("TIMER_EXPIRE"), timestamp }),
+  // Capped at the frozen PERSISTED_QUEUE_MAX, not the tunable DRAFT_QUEUE_CONFIG.maxLength —
+  // see PERSISTED_QUEUE_MAX's doc comment: lowering the tunable must never break replay of
+  // rows already written under a higher one.
+  z.object({ v: version, type: z.literal("SET_QUEUE"), timestamp, teamId, playerIds: z.array(playerId).max(PERSISTED_QUEUE_MAX) }),
 ]);
 
 /**
@@ -58,4 +64,21 @@ export function toDraftAction(input: ClientDraftAction, teamId: string, timestam
     case "BID":
       return { v: DRAFT_ACTION_VERSION, type: "BID", timestamp, teamId, amount: input.amount };
   }
+}
+
+/**
+ * The HTTP boundary for POST /api/drafts/:draftId/queue.
+ *
+ * Deliberately SEPARATE from `clientDraftActionSchema` rather than a fourth member of it:
+ * that union is the set of *draft moves*, and `optimisticView` switches over it
+ * exhaustively — folding a queue edit in would force a meaningless optimistic branch and a
+ * second response shape onto the actions route. Same rule as the others: no `teamId`, no
+ * `timestamp`; the server resolves the acting team from the session and stamps the time.
+ */
+export const clientQueueSchema = z.object({
+  playerIds: z.array(playerId).max(DRAFT_QUEUE_CONFIG.maxLength),
+});
+
+export function toSetQueueAction(playerIds: readonly string[], teamId: string, timestamp: string): SetQueueAction {
+  return { v: DRAFT_ACTION_VERSION, type: "SET_QUEUE", timestamp, teamId, playerIds };
 }

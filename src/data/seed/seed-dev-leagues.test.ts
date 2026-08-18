@@ -30,7 +30,8 @@ describe("seedDevLeagues", () => {
 
     const [draft] = await db.select().from(drafts).where(eq(drafts.id, DEV_SEED.snake.draftId));
     expect(draft?.status).toBe("scheduled");
-    expect(draft?.kickoffAt.toISOString()).toBe("2026-09-02T02:00:00.000Z"); // clock.now() + 26h
+    // clock.now() + DEV_SEED.kickoffHoursFromNow (0h — the floor tier, live draft-night pace)
+    expect(draft?.kickoffAt.toISOString()).toBe("2026-09-01T00:00:00.000Z");
 
     const [auctionDraft] = await db.select().from(drafts).where(eq(drafts.id, DEV_SEED.auction.draftId));
     expect(auctionDraft?.auctionBudget).toBe(DEV_SEED.auction.budget);
@@ -60,6 +61,31 @@ describe("seedDevLeagues", () => {
         .from(teams)
         .where(and(eq(teams.leagueId, plan.leagueId), eq(teams.id, `${plan.leagueId}_team_01`)));
       expect(team1?.userId).toBe("workos_real_user");
+    }
+  });
+
+  it("does not un-claim a founder's team or commissioner's chair on a re-seed without a claim id", async () => {
+    await db.insert(users).values({ id: "workos_real_user", email: "real@test.local", displayName: "Real User" });
+    await seedDevLeagues(db, clock, "workos_real_user");
+
+    // Re-seed WITHOUT a claim id — e.g. a run where DEV_SEED_CLAIM_USER_ID isn't exported.
+    // The previously claimed team and commissioner's chair must hold in both leagues.
+    await seedDevLeagues(db, clock);
+
+    for (const plan of [DEV_SEED.snake, DEV_SEED.auction]) {
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, plan.leagueId));
+      expect(league?.commissionerUserId).toBe("workos_real_user");
+      const [team1] = await db
+        .select()
+        .from(teams)
+        .where(and(eq(teams.leagueId, plan.leagueId), eq(teams.id, `${plan.leagueId}_team_01`)));
+      expect(team1?.userId).toBe("workos_real_user");
+      // The rest of the roster is still refreshed to the (still-placeholder) dev owners.
+      const [team2] = await db
+        .select()
+        .from(teams)
+        .where(and(eq(teams.leagueId, plan.leagueId), eq(teams.id, `${plan.leagueId}_team_02`)));
+      expect(team2?.userId).toBe(`${DEV_SEED.userIdPrefix}02`);
     }
   });
 

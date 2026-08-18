@@ -1,3 +1,5 @@
+import { mulberry32 } from "@/lib/random/mulberry32";
+
 /** FNV-1a — a small, stable string hash. Same id, same seed, forever. */
 function hashString(value: string): number {
   let hash = 2166136261;
@@ -6,18 +8,6 @@ function hashString(value: string): number {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
-}
-
-/** mulberry32 — the same deterministic PRNG the mock dataset generator uses. */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 /**

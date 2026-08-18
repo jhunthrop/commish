@@ -38,7 +38,9 @@ export function BidControls({ view, myTeamId, submitting, onBid }: BidControlsPr
             : null;
 
   return (
-    <div className="flex flex-col gap-2">
+    // A row, not a stack: this is the dock's primary slot during a live lot, and the dock is a
+    // fixed-height band. Label above, hint below, button beside — one line of the room's height.
+    <div data-testid="bid-console" className="flex shrink-0 items-end gap-2">
       <Input
         label="Your bid"
         type="number"

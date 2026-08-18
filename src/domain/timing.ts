@@ -6,7 +6,3 @@
 export interface Clock {
   now(): string;
 }
-
-export function isoTimestamp(date: Date): string {
-  return date.toISOString();
-}

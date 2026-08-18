@@ -36,6 +36,27 @@
       "when": 1787000866136,
       "tag": "0004_overconfident_wither",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1787025139797,
+      "tag": "0005_wet_meggan",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1787059122362,
+      "tag": "0006_clean_infant_terrible",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787059122363,
+      "tag": "0007_nudge_claim_per_pick",
+      "breakpoints": true
     }
   ]
 }

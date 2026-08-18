@@ -1,4 +1,4 @@
-import { TOKENS, type ColorRole, type ThemeName } from "./tokens";
+import { TOKENS, type ColorRole, type PositionColorRole, type ThemeName } from "./tokens";
 
 /** Namespace for every generated CSS custom property, so `@theme inline` aliases in
  * globals.css can reference a distinct source variable instead of aliasing a name to itself. */
@@ -18,6 +18,23 @@ function colorVars(theme: ThemeName, indent: string): string {
     .join("\n");
 }
 
+/** The position sticker family: three variables per role, emitted per theme beside the colors. */
+function positionVars(theme: ThemeName, indent: string): string {
+  const palette = TOKENS.position[theme];
+  return (Object.keys(palette) as PositionColorRole[])
+    .flatMap((role) => [
+      `${indent}${tokenVar(`pos-${role}-sticker`)}: ${palette[role].sticker};`,
+      `${indent}${tokenVar(`pos-${role}-sticker-text`)}: ${palette[role].stickerText};`,
+      `${indent}${tokenVar(`pos-${role}-text`)}: ${palette[role].text};`,
+    ])
+    .join("\n");
+}
+
+/** Everything that changes with the theme, in the order every theme block emits it. */
+function themeVars(theme: ThemeName, indent: string): string {
+  return [colorVars(theme, indent), positionVars(theme, indent)].join("\n");
+}
+
 function scaleVars(prefix: string, obj: Readonly<Record<string, number | string>>, unit: string, indent: string): string {
   return Object.entries(obj)
     .map(([k, v]) => `${indent}${tokenVar(`${prefix}-${kebab(k)}`)}: ${typeof v === "number" ? `${v}${unit}` : v};`)
@@ -30,23 +47,23 @@ export function renderTokensCss(): string {
   return [
     "/* GENERATED from src/design/tokens.ts by `npm run tokens:build` — do not edit by hand. */",
     ":root {",
-    colorVars("light", i),
-    scaleVars("space", TOKENS.space, "px", i),
+    themeVars("light", i),
     scaleVars("radius", TOKENS.radius, "px", i),
     scaleVars("font-size", TOKENS.font.size, "px", i),
-    scaleVars("font-weight", TOKENS.font.weight, "", i),
+    scaleVars("display-size", TOKENS.font.display, "px", i),
     scaleVars("line-height", TOKENS.font.lineHeight, "", i),
+    scaleVars("shadow", TOKENS.shadow, "", i),
     scaleVars("motion-duration", TOKENS.motion.duration, "ms", i),
     scaleVars("motion-easing", TOKENS.motion.easing, "", i),
     "}",
     "",
     ':root[data-theme="dark"] {',
-    colorVars("dark", i),
+    themeVars("dark", i),
     "}",
     "",
     "@media (prefers-color-scheme: dark) {",
     '  :root:not([data-theme="light"]) {',
-    colorVars("dark", i + i),
+    themeVars("dark", i + i),
     "  }",
     "}",
     "",

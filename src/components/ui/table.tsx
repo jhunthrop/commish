@@ -19,6 +19,8 @@ export interface TableProps<T> {
   readonly rows: readonly T[];
   readonly rowKey: (row: T) => string;
   readonly rowClassName?: (row: T) => string;
+  /** Extra attributes (e.g. `data-own`) spread directly onto the `<tr>` — never a second wrapper element. */
+  readonly rowAttributes?: (row: T) => Record<string, string>;
   /** Required: a table with no rows must still offer the reader a next step. */
   readonly empty: ReactNode;
 }
@@ -33,7 +35,7 @@ function columnClass<T>(column: TableColumn<T>): string {
  * horizontally inside its own wrapper so the page body never scrolls sideways at the 360px
  * baseline.
  */
-export function Table<T>({ caption, captionVisible = false, columns, rows, rowKey, rowClassName, empty }: TableProps<T>) {
+export function Table<T>({ caption, captionVisible = false, columns, rows, rowKey, rowClassName, rowAttributes, empty }: TableProps<T>) {
   if (rows.length === 0) return <>{empty}</>;
 
   return (
@@ -51,7 +53,7 @@ export function Table<T>({ caption, captionVisible = false, columns, rows, rowKe
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)} className={`border-b border-border/50 ${rowClassName?.(row) ?? ""}`}>
+            <tr key={rowKey(row)} className={`border-b border-border/50 ${rowClassName?.(row) ?? ""}`} {...rowAttributes?.(row)}>
               {columns.map((column) => (
                 <td key={column.key} className={`${columnClass(column)}px-3 py-2`}>
                   {column.cell(row)}

@@ -1,17 +1,16 @@
-import { sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
+import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
 import { DEV_SEED } from "./config";
+import { ensureDevUsers, preserveRealCommissioner, preserveRealTeamOwner } from "./dev-users";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 
 interface LeaguePlan {
   readonly leagueId: string;
   readonly draftId: string;
-  readonly inviteCode: string;
   readonly name: string;
   readonly format: "snake" | "auction";
   readonly auctionBudget: number | null;
@@ -51,14 +50,7 @@ export async function seedDevLeagues(
   }
 
   const kickoffAt = new Date(Date.parse(clock.now()) + DEV_SEED.kickoffHoursFromNow * MS_PER_HOUR);
-
-  const devUserIds = Array.from({ length: DEV_SEED.teamCount }, (_, i) => `${DEV_SEED.userIdPrefix}${String(i + 1).padStart(2, "0")}`);
-  await db
-    .insert(users)
-    .values(devUserIds.map((id) => ({ id, email: `${id}@${DEV_SEED.emailDomain}`, displayName: `Dev Manager ${id.slice(-2)}` })))
-    .onConflictDoNothing({ target: users.id });
-
-  const ownerIds = devUserIds.map((id, index) => (index === 0 && claimUserId !== undefined ? claimUserId : id));
+  const ownerIds = await ensureDevUsers(db, claimUserId);
 
   const plans: readonly LeaguePlan[] = [
     { ...DEV_SEED.snake, format: "snake", auctionBudget: null },
@@ -73,11 +65,10 @@ export async function seedDevLeagues(
         name: plan.name,
         format: plan.format,
         teamCount: DEV_SEED.teamCount,
-        inviteCode: plan.inviteCode,
         commissionerUserId: ownerIds[0]!,
         rosterSlots: [...STANDARD_ROSTER_SLOTS],
       })
-      .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: sql`excluded.commissioner_user_id` } });
+      .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: preserveRealCommissioner() } });
 
     await db
       .insert(scoringSettings)
@@ -91,10 +82,10 @@ export async function seedDevLeagues(
           id: `${plan.leagueId}_team_${String(i + 1).padStart(2, "0")}`,
           leagueId: plan.leagueId,
           userId,
-          name: `Team ${i + 1}`,
+          name: DEV_SEED.teamNames[i] ?? `Team ${i + 1}`,
         })),
       )
-      .onConflictDoUpdate({ target: teams.id, set: { userId: sql`excluded.user_id` } });
+      .onConflictDoUpdate({ target: teams.id, set: { userId: preserveRealTeamOwner() } });
 
     await db
       .insert(drafts)

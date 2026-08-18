@@ -32,12 +32,18 @@ describe("TvBoard", () => {
         await waitFor(() => expect(screen.getAllByText("Bay Bandits").length).toBeGreaterThan(0));
         expect(screen.queryAllByRole("button")).toHaveLength(0);
         expect(screen.queryAllByRole("textbox")).toHaveLength(0);
+        // Stage-only: the rail and the board, with neither of the room's two personal regions.
+        expect(screen.getByTestId("room-rail")).toBeInTheDocument();
+        expect(screen.queryByTestId("room-dock")).toBeNull();
+        expect(screen.queryByRole("list", { name: /available players/i })).toBeNull();
+        // …and no personal chrome on the rail either, even though the viewer owns team 1.
+        expect(screen.queryByText(/Your team/)).toBeNull();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
   });
 
-  it("renders populated grid with real table markup, axe-clean, both themes", async () => {
+  it("renders the board itself with real table markup, axe-clean, both themes", async () => {
     stubMatchMedia();
     const fixture = fixtureDeps({
       ...SNAKE_VIEW,
@@ -51,9 +57,9 @@ describe("TvBoard", () => {
         <TvBoard draftId="d1" />
       </DraftRoomDepsProvider>,
       async ({ container }) => {
-        await waitFor(() => expect(screen.getByRole("table", { name: /every pick/i })).toBeInTheDocument());
-        expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
-        expect(screen.getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByRole("table", { name: /draft board/i })).toBeInTheDocument());
+        expect(screen.getAllByText("Jalen Croft").length).toBeGreaterThan(0);
+        expect(screen.getAllByRole("columnheader", { name: /Bay Bandits/ }).length).toBeGreaterThan(0);
         expect(await axe(container)).toHaveNoViolations();
       },
     );
@@ -75,7 +81,7 @@ describe("TvBoard", () => {
     act(() =>
       fixture.sources[0]!.emit("draft.pick", {
         draftId: "d1",
-        clock: { phase: "in_progress", sequence: 2, pickNumber: 2, onClockTeamId: "t2", deadlineAt: SNAKE_VIEW.deadlineAt, clockSeconds: 28_800, nextTightening: null },
+        clock: { phase: "in_progress", sequence: 2, pickNumber: 2, onClockTeamId: "t2", deadlineAt: SNAKE_VIEW.deadlineAt, clockSeconds: 28_800, nextTightening: null, upcoming: SNAKE_VIEW.upcoming },
         pickNumber: 1,
         round: 1,
         teamId: "t1",
@@ -89,7 +95,7 @@ describe("TvBoard", () => {
     );
 
     await waitFor(() => expect(screen.getByTestId("spotlight")).toHaveTextContent("Iron Owls"));
-    expect(screen.getByRole("table", { name: /every pick/i })).toHaveTextContent("Jalen Croft");
+    expect(screen.getByRole("table", { name: /draft board/i })).toHaveTextContent("Jalen Croft");
   });
 
   it("still offers a way forward if the board cannot load", async () => {
@@ -116,11 +122,14 @@ describe("TvBoard", () => {
     await waitFor(() => expect(screen.queryByText("Loading…")).not.toBeInTheDocument());
   });
 
-  it("shows an empty state when there are no picks yet", async () => {
+  it("shows an empty board — every slot dashed, nobody drafted — before the first pick", async () => {
     stubMatchMedia();
     const fixture = fixtureDeps();
     renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
-    await waitFor(() => expect(screen.getByText("The board is empty")).toBeInTheDocument());
-    expect(screen.getByText("Picks appear here the moment they land.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("table", { name: /draft board/i })).toBeInTheDocument());
+    // Not a "no picks yet" placeholder: the real board, every slot dashed, with the spotlight
+    // sitting on the cell about to be filled. A draft party wants to see the shape of the night.
+    expect(screen.queryByText("Jalen Croft")).toBeNull();
+    expect(screen.getAllByText("On the clock").length).toBeGreaterThan(0);
   });
 });

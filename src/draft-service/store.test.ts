@@ -63,7 +63,7 @@ async function fixture() {
 }
 
 const start = (teamIds: readonly string[]): DraftAction => ({
-  v: 1, type: "START_DRAFT", timestamp: T, draftOrder: teamIds, pool: POOL,
+  v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: teamIds, pool: POOL,
 });
 const pick = (teamId: string, playerId: string): DraftAction => ({ v: 1, type: "MAKE_PICK", timestamp: T, teamId, playerId });
 

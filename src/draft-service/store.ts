@@ -1,9 +1,12 @@
 import { asc, eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
+import { isUniqueViolation } from "@/db/errors";
 import { draftActions, drafts, teams } from "@/db/schema";
 import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import {
+  admitCommand,
+  AUCTION_CONFIG,
   draftActionSchema,
   draftEventsFor,
   reduceDraft,
@@ -57,23 +60,8 @@ export interface DraftStore {
   commitDraftResults(draftId: string): Promise<CommitResult>;
 }
 
-/** Postgres unique-violation SQLSTATE. */
-const UNIQUE_VIOLATION_SQLSTATE = "23505";
-
 /** The unique index `applyAction`'s append actually races on — see `schema.ts`. */
 const SEQUENCE_UNIQUE_INDEX = "draft_actions_draft_sequence_idx";
-
-/**
- * Reads one field off the driver's raw error, unwrapping the `DrizzleQueryError` that carries
- * it as `.cause` (confirmed empirically: `postgres-js` puts `code` and `constraint_name` on
- * the same object, one level under `.cause`, not on the `DrizzleQueryError` itself).
- */
-function driverErrorField(error: unknown, key: string): unknown {
-  if (typeof error !== "object" || error === null) return undefined;
-  if (key in error) return (error as Record<string, unknown>)[key];
-  if ("cause" in error) return driverErrorField((error as { cause?: unknown }).cause, key);
-  return undefined;
-}
 
 /**
  * True only for the specific race `applyAction` retries on: two writers both inserting the
@@ -84,10 +72,7 @@ function driverErrorField(error: unknown, key: string): unknown {
  * message instead of surfacing it as the unexpected error it is.
  */
 export function isSequenceConflict(error: unknown): boolean {
-  return (
-    driverErrorField(error, "code") === UNIQUE_VIOLATION_SQLSTATE &&
-    driverErrorField(error, "constraint_name") === SEQUENCE_UNIQUE_INDEX
-  );
+  return isUniqueViolation(error, SEQUENCE_UNIQUE_INDEX);
 }
 
 /**
@@ -149,6 +134,12 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
         const state = await load(draftId);
         if (state === null) return { ok: false, reason: "That draft doesn't exist." };
 
+        // Command-time preconditions — the tunable-reading guards the reducer must not own,
+        // because it also runs on replay. Inside the mutex, against the state we just loaded,
+        // so this is strictly stronger than checking them in the reducer was.
+        const admitted = admitCommand(state, action);
+        if (!admitted.ok) return admitted;
+
         const result = reduceDraft(state, action);
         if (!result.ok) return result;
 
@@ -184,6 +175,19 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
       // here too would deadlock, since the mutex is not reentrant.
       const config = await loadDraftConfig(db, draftId);
       if (config === null) return { ok: false, reason: "That draft doesn't exist." };
+
+      // Guards against a draft the reducer's own "already started"/"already finished" checks
+      // cannot see: one whose `drafts.status` was written straight to "complete" (e.g. the
+      // season-league seed, which deals rosters directly) without ever writing a single
+      // action. Replaying that empty log yields phase "scheduled" — indistinguishable, to the
+      // reducer, from a draft that has never run — so without this check START_DRAFT would be
+      // admitted and would draft a second time over rosters that already exist.
+      const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
+      if (row?.status === "complete") {
+        const existingActions = await db.select({ id: draftActions.draftId }).from(draftActions).where(eq(draftActions.draftId, draftId)).limit(1);
+        if (existingActions.length === 0) return { ok: false, reason: "This draft has already finished." };
+      }
+
       const teamRows = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, config.leagueId));
       const pool = await buildDraftPool(db, config.leagueId);
       if (pool.length === 0) return { ok: false, reason: "There are no players to draft yet." };
@@ -195,6 +199,9 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
           timestamp: clock.now(),
           draftOrder: draftOrderFor(draftId, teamRows.map((t) => t.id)),
           pool,
+          // Command time is the ONE place the tunable is read — it rides the persisted
+          // action from here on, so replay never consults AUCTION_CONFIG.
+          minBid: AUCTION_CONFIG.minBid,
         },
         {
           alsoInTransaction: async (tx) => {

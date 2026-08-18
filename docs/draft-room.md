@@ -36,6 +36,13 @@ The one place this rule was tested and held: `rosterSpots()` in `state/format.ts
 league's declared slot counts. It is config arithmetic, not a draft rule, and its test asserts
 it agrees with the engine's `totalRosterSlots` so the two cannot diverge.
 
+The second place it was tested and held: **"You're up in 7 picks (~24m)."** Working that out
+from `draftOrder` and `pickNumber` in React would be serpentine order restated — so the engine
+publishes the answer instead. `upcomingOnClock` (see `docs/draft-engine.md`) puts the next
+`DRAFT_VIEW_CONFIG.upcomingCount` teams on `DraftClockView.upcoming`, which rides every event
+payload; `formatYourTurn(upcoming, myTeamId, clockSeconds)` in `state/format.ts` is then an
+index lookup plus display arithmetic over two server values, and the dock renders its sentence.
+
 ## Layers
 
 | Path | Rule |
@@ -50,8 +57,9 @@ it agrees with the engine's `totalRosterSlots` so the two cannot diverge.
 ## The synchronization contract
 
 1. **Mount** → `GET /api/drafts/[draftId]` and `GET /api/drafts/[draftId]/players` in parallel.
-   The state route returns the `DraftStateView`, the caller's own `teamId`, whether they are
-   the commissioner, and the league's team cards. The players route returns ranked player
+   The state route returns the `DraftStateView`, the league's display name (`leagueName` —
+   the one thing `RoomRail` needs that the view itself cannot supply), the caller's own
+   `teamId`, whether they are the commissioner, and the league's team cards. The players route returns ranked player
    metadata, and is separate precisely because the state route is refetched often and the
    player dictionary never changes during a draft — `refresh()` (see step 4) fetches it
    **once per `draftId`**, not on every resync, and refetches only when `draftId` itself
@@ -69,10 +77,22 @@ it agrees with the engine's `totalRosterSlots` so the two cannot diverge.
 
    The stream carries **named SSE events**, not one generic `message` frame: `useDraftRoom`
    registers one listener per draft event type (`draft.pick`, `draft.nominate`, `draft.bid`,
-   `draft.timer_expire`, `draft.status`) via `source.addEventListener(type, handler)`, plus
-   separate `open` and `error` listeners for connection state. `chat.*` and `score.update`
-   frames ride the same stream under their own event names and are never listened for here —
-   the draft room is not their consumer.
+   `draft.timer_expire`, `draft.status`, `draft.queue`, `draft.nudge`) via
+   `source.addEventListener(type, handler)`, plus separate `open` and `error` listeners for
+   connection state. `chat.*` and `score.update` frames ride the same stream under their own
+   event names and are never listened for here — the draft room is not their consumer.
+
+   **`draft.queue` and `draft.nudge` are the two frames that never move the picture.**
+   `draft.queue` carries only `teamId` — the queue's own contents are never on the wire, since
+   a queue is a private draft plan — and folds exactly like `draft.status`: the clock (and
+   therefore `sequence`) advances, nothing else about `view` changes. This is what keeps a
+   rival's queue edit from ever forcing a resync. The room's OWN `queue` — loaded with the
+   snapshot, held separately from `view`, written by `setQueue` (below) — is never touched by
+   any `draft.queue` frame, including an echo of the caller's own edit; the local, optimistic
+   value stays authoritative until the POST's own response replaces it. `draft.nudge` carries
+   `teamId` and `message` and moves nothing at all — `applyDraftEvent` surfaces it as a
+   `NudgeNotice` alongside the (unchanged) view, and `useDraftRoom` keeps it only when
+   `payload.teamId` matches the caller's own team. See `docs/draft-moderator.md`.
 3. **Apply** → `applyDraftEvent(view, data)` (`src/draft-room/state/apply-event.ts`) validates
    the frame with Zod (`state/payloads.ts`), then compares `payload.clock.sequence` with
    `view.sequence`:
@@ -118,6 +138,16 @@ it agrees with the engine's `totalRosterSlots` so the two cannot diverge.
    money, its lot — so the rollback instead triggers a full `refresh()` and asks the server for
    the truth. Only a submission that landed with nothing else having happened gets the cheap,
    synchronous plain restore.
+6. **`setQueue`** (`useDraftRoom`) follows the same optimistic-then-settle shape as `submit`,
+   through `POST /api/drafts/[draftId]/queue` — but **a queue edit is not a draft action**: it
+   never touches `pendingPlayerId`, `submitting`, `optimisticView`, or `view` at all. Only
+   `queue` moves, optimistically, then settles on the server's own answer or rolls back with
+   the reducer's 409 reason on rejection (`"A queue can hold at most 50 players."` and similar
+   — the client enforces no length cap of its own; see `docs/draft-moderator.md`). `SnakeRoom`
+   and `AuctionRoom` each call the shared `useQueueHandlers` hook
+   (`src/draft-room/hooks/use-queue-handlers.ts`) rather than threading a queue callback down
+   from `DraftRoom` — it wraps `room.setQueue` and turns a rejection into the same `tone:
+   "error"` toast every other rejected action gets, so that wiring isn't declared twice.
 
 ### What "optimistic" deliberately does not do
 
@@ -141,40 +171,106 @@ Everything else waits the one round trip it takes for the truth to arrive.
 purely so countdowns tick. A countdown never decides anything: clock expiry is the server
 ticker's job, and `TIMER_EXPIRE` has no HTTP path a client could use. `Countdown`/`useCountdown`
 (`components/countdown.tsx`) is the one shared implementation of "milliseconds until
-`deadlineAt`, clamped to zero, ticking on `DRAFT_ROOM_CONFIG.countdownTickMs`" — both
-`ClockBanner` and `AuctionLotPanel` use it rather than each carrying its own `useNow` +
-`Date.parse` arithmetic.
+`deadlineAt`, clamped to zero, ticking on `DRAFT_ROOM_CONFIG.countdownTickMs`". `RoomRail`
+is now its only caller: there is one clock in the room, on one surface.
+
+## The two-mode room
+
+A draft has two emotional modes, and the room morphs between them rather than making anyone
+hunt for a control.
+
+- **WATCHING** (roughly 95% of a draft) — the board is the stage. The two live anxieties are
+  answered on screen at all times, without being asked for: *"when am I up?"* is the dock's
+  standing `formatYourTurn` line, and *"will my guy last?"* is the queue chips beside it, with
+  anybody already taken struck through.
+- **PICKING** (about sixty seconds) — the room leans in. The rail goes hot (the negative
+  family, the clock in the same red), and the dock's left edge becomes ONE primary button:
+  *Draft &lt;top of your queue&gt;*. One click if you planned; two if you pivot, because the
+  pool is already under your left hand.
+
+### Layout contract (`RoomLayout`)
+
+At `lg` and up the room is a `100dvh`, `overflow-hidden` frame with four regions:
+
+| Region | Component | Size | Scroll |
+|---|---|---|---|
+| RAIL | `RoomRail` | fixed band (`lg:h-20`), full width | none |
+| POOL | `PlayerPool` | fixed `lg:w-88` (352px) column, left | its own list scrolls |
+| STAGE | `DraftBoard` | every remaining pixel | its own, and only when the board hits the sticker minimum |
+| DOCK | `RoomDock` | fixed band (`lg:h-24`), **full width** | queue chips scroll sideways |
+
+**The page itself never scrolls.** Every region that can outgrow its band scrolls inside
+itself, and the two bands are fixed height, so a turn changing never moves the board a pixel.
+
+The dock spans the **full** width rather than stopping at the pool's edge: it is the widest,
+most reachable band on the screen, and running it to the left edge puts the primary action
+directly beneath the pool you would pivot into — the shortest possible travel between "change
+my mind" and "commit".
+
+**Below `lg` it linearizes, it does not shrink**: the same four regions become one scrolling
+column — rail, dock (sticky, so the action is always reachable), board (the existing per-round
+list), pool — via `order-*` classes, so no region is ever rendered twice. Down to the 360px
+baseline nothing scrolls horizontally except the board and the queue chips, each inside itself.
+
+Both draft pages are deliberately full-bleed: `src/app/app/drafts/[draftId]/page.tsx` and
+`src/app/draft/[draftId]/board/page.tsx` dropped the centered `max-w-*` container and their own
+`<h1>`. Every other app page keeps its container; a room is not a document. `RoomRail` renders
+the league name as the page's only `<h1>`, which is also why `DraftBoard`'s narrow-list round
+headings are `<h2>` — a jump to `<h3>` is a heading-order violation axe catches.
 
 ## Components inventory (`src/draft-room/components/`)
 
 | Component | Renders |
 |---|---|
 | `DraftRoom` | The client entry point for `/app/drafts/[draftId]`. Owns the loading/error/ready split and is the one place a rejected `submit()` becomes a toast. Picks `SnakeRoom` or `AuctionRoom` by `view.format`. |
-| `SnakeRoom` | Clock, pick-celebration, `PlayerPool` (action: "Draft"), `RosterBoard`, `PickHistory`. |
-| `AuctionRoom` | Clock, pick-celebration, `AuctionLotPanel`, `BidControls`, `PlayerPool` (action: "Nominate"), `BudgetTable`, `RosterBoard`, `PickHistory`, `NominateModal`. |
-| `TvBoard` | The read-only `/draft/[draftId]/board` shell: clock, pick-celebration, an "on the clock" spotlight, and `PickHistory` in `variant="tv"`. Shares `useDraftRoom` with the real room — no second data path. Renders no control except the error state's retry. |
-| `ClockBanner` | Whose turn it is, the countdown, the clock-length sentence, and `formatTightening`'s "picks shorten to …" line. Branches on `view.phase` (`scheduled` / `complete` / `in_progress`). |
-| `Countdown` / `useCountdown` | The one shared countdown implementation (see "Wall clock" above). `Countdown` itself is `aria-hidden`. |
-| `PlayerPool` | Server-ranked player list with name search and a position `Select`; caps rendered rows at `DRAFT_ROOM_CONFIG.poolPageSize`. Never re-ranks. |
-| `RosterBoard` | Expands each team's declared roster shape (`view.slotConfig`) into one cell per spot, filled or not, from `view.rosters`. |
-| `PickHistory` | A `Table` of `view.picks`, newest first. `variant="room"` (default) shows slot and auto-pick badge; `variant="tv"` drops those and widens for a TV audience. |
-| `AuctionLotPanel` | The lot everyone is watching: nominated player, standing high bid and bidder, and the bid-window countdown (from `view.deadlineAt`, via `useCountdown`). |
-| `BidControls` | The bid form. `view.minBid` is the floor and `view.maxBids[myTeamId]` is the ceiling — both server-computed, never re-derived. |
+| `RoomLayout` | The four-region frame above. Presentational and format-agnostic: it takes `rail`/`pool`/`stage`/`dock` nodes and owns the height, the scroll boundaries and the mobile re-ordering. |
+| `RoomShell` | `RoomLayout` wired up with `RoomRail`, `PlayerPool`, the stage (`NudgeBanner`, pick-celebration, `DraftBoard`) and `RoomDock` — the one frame `SnakeRoom` and `AuctionRoom` both render. Everything format-specific is a prop: `actionLabel`, `onAct`, an optional `poolFooter` under the pool, an optional `bidConsole` for the dock. |
+| `SnakeRoom` | `RoomShell` with `actionLabel="Draft"`, no `poolFooter`, no `bidConsole`. Reads `room.queue`/`room.nudge` and calls `room.setQueue` directly via `useQueueHandlers` — no queue props threaded from `DraftRoom`. |
+| `AuctionRoom` | `RoomShell` with `actionLabel="Nominate"`, `BudgetTable` as its `poolFooter` (money sits under the players you would spend it on), `BidControls` as its `bidConsole` while a lot is live, plus `NominateModal` rendered alongside the shell. Same `useQueueHandlers` wiring as `SnakeRoom`. |
+| `RoomDock` | The personal band: the manager's own queue as reorderable chips (`<ol>`, because position IS the meaning; named move/remove buttons, never drag-only; a player somebody has since taken is struck through, not dropped), their own roster fill per slot type, and `formatYourTurn`'s standing "You're up in N picks" line. On your turn its left edge becomes the single primary action — *Draft/Nominate &lt;top of your queue&gt;*, or a pointer at the pool when nothing queued is still available. It renders whatever `bidConsole` it is handed instead, which is how the auction's live lot turns the dock into a bid console without the dock knowing what an auction is. |
+| `NudgeBanner` | The moderator's prompt, verbatim, `role="status"`/`aria-live="polite"`. Renders only while `nudge.sequence === view.sequence`, so it clears itself the instant the turn moves on — no timer, nothing to leak. One surface, not two: a banner, never a toast as well. |
+| `TvBoard` | The read-only `/draft/[draftId]/board` shell, and the room's **stage alone**: `RoomRail` (`variant="tv"` — no team chip, no my-turn heat, because nobody across a room is "you"), pick-celebration, a "Now picking" portrait spotlight, and `DraftBoard` (`variant="tv"`). No pool and no dock: nobody acts from the other side of a living room. Shares `useDraftRoom` with the real room — no second data path. Renders no control except the error state's retry. |
+| `DraftBoard` | **The hero.** Teams across, rounds down, one position-colored sticker per pick, from `view.picks`/`view.slotConfig`/`view.draftOrder` alone. A semantic `<table>` scrolling sideways in its own container above `sm`; below it, the same board as a per-round list, newest round first. The on-the-clock cell gets an accent ring (breathing, or static under reduced motion); the pick that just landed gets `animate-sticker-slap`. `variant="tv"` is the same board at party scale. |
+| `RoomRail` | The masthead, and the ONLY clock in the room: league name (the page's `<h1>`), format chip, `ROUND X · PICK Y` (or `LOT N`), whose turn it is, the countdown digits, the tightening line, your team chip and a quiet `ConnectionBanner`. It publishes its morph as `data-mode` — `scheduled` / `watching` / `hot` / `complete` — and `hot` recolors the band and the digits into the negative family. It replaced `RoomHeader`, having already absorbed `ClockBanner` and now `AuctionLotPanel`: the standing bid and its holder are a fact about *the turn*, and the turn has exactly one home. |
+| `Countdown` / `useCountdown` | The one shared countdown implementation (see "Wall clock" above). Its ticking digits are `aria-hidden`, paired with an `sr-only`/`aria-live="polite"` SIBLING span that states the same time coarsely — the live region must sit outside the `aria-hidden` span, not inside it, or an `aria-hidden` ancestor hides it from assistive tech regardless of `sr-only`. |
+| `PlayerPool` | The left rail: name search, the six positions as `PositionBadge` toggles (`aria-pressed`, one tap to narrow, one to clear), and one compact 44px row per player — rank, sticker, name, NFL team, a ☆ queue toggle and the act button. A list rather than a `Table`: at rail width there are no columns worth aligning. Caps rendered rows at `DRAFT_ROOM_CONFIG.poolPageSize` and never re-ranks. **Before the draft starts (`view.phase === "scheduled"`) no row is marked "Drafted"** — the engine has no pool yet, so `availablePlayerIds` is empty, and reading that as "everyone is gone" was the room's most confusing bug. Pre-start rows are browsable and queueable, with a quiet "—" where the action button goes. |
+| `BidControls` | The bid form, and the dock's primary slot while a lot is live. `view.minBid` is the floor and `view.maxBids[myTeamId]` is the ceiling — both server-computed, never re-derived. A row rather than a stack, so it fits the dock's fixed band. |
 | `NominateModal` | Confirms a nomination (it commits money) before submitting `{ type: "NOMINATE", playerId, openingBid }`. |
 | `BudgetTable` | Remaining budget and ceiling per team, read straight off `view.budgets` / `view.maxBids`; own-row highlighted. |
-| `PickCelebration` | The pick-landing panel, `role="status"`, keyed on `pickNumber` so a redelivered pick never re-animates. Distinct treatment for the acting user's own pick (`animate-pick-mine` vs `animate-pick-landed`); no animation class at all when `usePrefersReducedMotion()` is true. |
+| `PickCelebration` | The pick-landing announcement, `role="status"`, keyed on `pickNumber` — a redelivered pick never re-animates; a NEW pick remounts and replays the entrance. Since Plan D it is a thin caller of the shared `Celebration` primitive (`animate-celebrate-self` / `-peer`, see `docs/design-system.md`); the board still slaps the landing sticker, and reduced motion drops the animation class while keeping the panel. |
 | `ConnectionBanner` | Renders nothing when `connection === "live"`; a small `aria-live="polite"` badge for `"connecting"` / `"reconnecting"`. Information, not a control — the browser reconnects on its own. |
+
+### What the board deliberately does NOT compute
+
+`DraftBoard` and `RoomRail` both need "which round is this team on" and the board needs
+"which way did this round run". Neither is re-derived from a turn-order rule — that would be
+`snakeTeamForPick` restated in React, which "the one rule" above forbids:
+
+- **The round a team is about to fill** is `their pick count + 1` — the first empty row in
+  their own column. It is a count of what already happened, not a prediction.
+- **A round's serpentine direction** is read off the pick numbers already in that round:
+  whichever team owns the round's lowest pick number sits earlier in `draftOrder` → the arrow
+  points forward, otherwise back. A round with fewer than two picks gets **no arrow at all**
+  rather than a guessed one, and an auction never gets one, because an auction "round" is a
+  count of players won, not an order.
+- **"When am I up?" is not computed here either** — it is `upcomingOnClock`'s answer, riding
+  `view.upcoming`, turned into a sentence by `formatYourTurn`. See the top of this document.
 
 `src/draft-room/lib/lookups.ts` — `teamsById` / `playerName` / `teamName`: the one place a
 `teamId`/`playerId` is turned into the human it names, built once per render and shared by
 every component above that needs it, instead of each component re-declaring its own
-`.find(...)`.
+`.find(...)`. This file is a thin re-export of `src/lib/display/lookups.ts`, which the league
+room does NOT need — its pages render names straight off the server-shaped view (e.g.
+`MatchupSide.teamName`) instead of resolving ids client-side, so it has no lookup module of its
+own. `queueButtonLabel` stays local to `src/draft-room/lib/`: it is draft-room-only vocabulary
+(the pool's star and the dock's chips share its phrasing), and the league room has no queue.
 
 ## Accessibility notes specific to this room
 
-- Countdowns are `aria-hidden`. A number changing every second inside a live region is
-  unusable with a screen reader; each countdown is paired with a static sentence that says the
-  same thing.
+- Countdowns' ticking digits are `aria-hidden` — a number changing every second inside a live
+  region is unusable with a screen reader. Each is paired with a coarse `aria-live="polite"`
+  sibling (rounded to the minute/hour, so it announces rarely instead of every tick), plus a
+  static sentence stating the same time in words that differs by caller.
 - The pick-landing panel is `role="status"` — announced once, politely.
 - Toasts carry the failure channel: `tone: "error"` also sets `role="alert"`, because a user
   on a clock cannot wait behind a polite announcement queue.
@@ -204,10 +300,10 @@ still worth having, and is deliberately deferred:
    into team 1 / commissioner of `dev_league_snake`, then drive the hosted sign-in flow for
    that user).
 2. Open `/app/drafts/dev_draft_snake` in two separate browser contexts (two "teams" at the
-   draft). Make a pick as one; assert the other's `RosterBoard`, `PlayerPool` and
-   `PickHistory` all update without a reload.
+   draft). Make a pick as one; assert the other's board, dock roster fill and `PlayerPool` all
+   update without a reload.
 3. Repeat against `dev_draft_auction`: run a bid war between the two contexts — nominate,
-   alternate bids, assert `AuctionLotPanel`'s high bid/bidder and `BudgetTable`'s remaining
+   alternate bids, assert the rail's high bid/bidder and `BudgetTable`'s remaining
    money update live in both contexts, and that the lot resolves to the same winner and price
    in both.
 4. Simulate a dropped connection (block the SSE request, or toggle offline) in one context,

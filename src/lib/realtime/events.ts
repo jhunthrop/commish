@@ -9,6 +9,15 @@ export type RealtimeEventType =
   | "draft.bid"
   | "draft.timer_expire"
   | "draft.status"
+  /**
+   * A team replaced its autopick queue. Carries the team id and the post-action clock —
+   * never the queue's contents, which are that team's private draft plan. It exists so a
+   * queue edit's `sequence` bump reaches every browser: without it the next real event would
+   * look like a gap and force a full-state refetch in every open room.
+   */
+  | "draft.queue"
+  /** The AI draft moderator's pacing prompt for the team currently on the clock. */
+  | "draft.nudge"
   | "chat.message"
   | "chat.reaction"
   | "score.update";

@@ -28,9 +28,10 @@ describe("DraftRoom", () => {
       </DraftRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByText("Loading…")).toBeInTheDocument();
-        // "Bay Bandits" appears in the clock banner AND its roster card — assert presence, not uniqueness.
+        // "Bay Bandits" appears in the rail AND on the board's column head — presence, not uniqueness.
         await waitFor(() => expect(screen.getAllByText("Bay Bandits").length).toBeGreaterThan(0));
-        expect(screen.getByRole("table", { name: /available players/i })).toBeInTheDocument();
+        expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
+        expect(screen.getByTestId("room-layout")).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
@@ -55,6 +56,19 @@ describe("DraftRoom", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("It's not your turn to pick.");
     // rolled back: the player is available again
     expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
+  });
+
+  it("queues a player and shows the reducer's reason in a toast when the queue change is rejected", async () => {
+    const fixture = fixtureDeps();
+    fixture.queueResponse = { ok: false, error: "A queue can hold at most 50 players." };
+    mount(fixture);
+    await waitFor(() => expect(screen.getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Queue Jalen Croft" }));
+    });
+    expect(await screen.findByRole("alert")).toHaveTextContent("A queue can hold at most 50 players.");
+    // Rolled back: the pool still offers to queue the player, not to remove them.
+    expect(screen.getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument();
   });
 
   it("tells the user when the connection drops", async () => {

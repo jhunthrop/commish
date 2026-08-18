@@ -9,7 +9,7 @@ import { draftClockView, maxBidsFor, minBidFor } from "./selectors";
  */
 export type DraftEventType = Extract<
   RealtimeEventType,
-  "draft.pick" | "draft.nominate" | "draft.bid" | "draft.timer_expire" | "draft.status"
+  "draft.pick" | "draft.nominate" | "draft.bid" | "draft.timer_expire" | "draft.status" | "draft.queue"
 >;
 
 export interface DraftEventEnvelope {
@@ -33,6 +33,11 @@ export function draftEventsFor(prev: DraftState, next: DraftState, action: Draft
     events.push({ type: "draft.timer_expire", payload: { ...base, pickNumber: prev.pickNumber } });
   }
 
+  if (action.type === "SET_QUEUE") {
+    // Team id only. The ordered list is this team's draft plan and is never broadcast.
+    events.push({ type: "draft.queue", payload: { ...base, teamId: action.teamId } });
+  }
+
   const afterAuction = auctionOf(next);
   // A lot being awarded is the only thing that moves money, so budgets, ceilings and the next
   // lot's opening floor all ride the pick event — the client assigns them rather than doing
@@ -46,7 +51,13 @@ export function draftEventsFor(prev: DraftState, next: DraftState, action: Draft
   const beforeAuction = auctionOf(prev);
   const before = beforeAuction === null ? null : beforeAuction.lot;
   const after = afterAuction === null ? null : afterAuction.lot;
-  if (after !== null) {
+  // Gated on the lot actually having MOVED, not merely being open: an action that changes
+  // something else entirely (a SET_QUEUE during a live lot) must not re-broadcast the
+  // standing bid as if somebody had raised it.
+  const lotMoved =
+    after !== null &&
+    (before === null || before.playerId !== after.playerId || before.highBid !== after.highBid || before.highBidTeamId !== after.highBidTeamId);
+  if (lotMoved) {
     // A nomination or a bid always moves the floor for the NEXT bid on this same lot — carried
     // here so a client folding the event never re-derives `highBid + bidIncrement` itself.
     const nextMinBid = minBidFor(next);

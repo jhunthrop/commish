@@ -1,0 +1,102 @@
+"use client";
+
+import { useState } from "react";
+import type { ApiEnvelope } from "@/lib/api/respond";
+import type { CreateLeagueBody } from "../contract";
+import { Button, Input, Select } from "@/components/ui";
+import { useLeagueRoomDeps } from "../hooks/deps";
+
+const FORMATS = [
+  { value: "snake", label: "Snake" },
+  { value: "auction", label: "Auction" },
+];
+const TEAM_COUNTS = [8, 10, 12, 14, 16].map((n) => ({ value: String(n), label: `${n} teams` }));
+const PRESETS = [
+  { value: "ppr", label: "PPR (a point per catch)" },
+  { value: "half_ppr", label: "Half PPR" },
+  { value: "standard", label: "Standard" },
+  { value: "te_premium", label: "TE premium" },
+];
+
+/**
+ * One visible field. Everything else is behind a closed disclosure, because every advanced
+ * setting already has a server-side default — a commissioner who types a name and presses
+ * the button gets a complete, playable league. That is the spec's exit criterion, and the
+ * interaction-count test in `create-league-interactions.test.tsx` makes it mechanical.
+ *
+ * The numeric fields are `<Select>`s of the values we actually support rather than free
+ * number inputs: there is no such thing as a 13-team league here, and a select cannot
+ * produce one.
+ */
+export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: CreateLeagueBody) => void }) {
+  const { fetchJson } = useLeagueRoomDeps();
+  const [name, setName] = useState("");
+  const [format, setFormat] = useState("snake");
+  const [teamCount, setTeamCount] = useState("12");
+  const [scoringPreset, setScoringPreset] = useState("ppr");
+  const [auctionBudget, setAuctionBudget] = useState("200");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  const submit = async (): Promise<void> => {
+    setSubmitting(true);
+    setError(null);
+    try {
+      const response = await fetchJson("/api/leagues", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          name,
+          format,
+          teamCount: Number(teamCount),
+          scoringPreset,
+          auctionBudget: Number(auctionBudget),
+        }),
+      });
+      const body = (await response.json()) as ApiEnvelope<CreateLeagueBody>;
+      if (!body.ok) {
+        setError(body.error);
+        return;
+      }
+      onCreated(body.data);
+    } catch {
+      setError("We couldn't reach the server. Check your connection and try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <form
+      className="flex flex-col gap-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submit();
+      }}
+    >
+      <Input label="League name" value={name} onChange={(event) => setName(event.target.value)} error={error ?? undefined} />
+
+      <details className="rounded-md border border-border p-3">
+        <summary className="cursor-pointer text-sm text-text-muted">Advanced settings</summary>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          <Select label="Draft format" options={FORMATS} value={format} onChange={(event) => setFormat(event.target.value)} />
+          <Select label="Teams" options={TEAM_COUNTS} value={teamCount} onChange={(event) => setTeamCount(event.target.value)} />
+          <Select label="Scoring" options={PRESETS} value={scoringPreset} onChange={(event) => setScoringPreset(event.target.value)} />
+          {format === "auction" ? (
+            <Input
+              label="Auction budget"
+              type="number"
+              value={auctionBudget}
+              hint="Dollars each manager has to spend."
+              onChange={(event) => setAuctionBudget(event.target.value)}
+            />
+          ) : null}
+        </div>
+      </details>
+
+      <Button type="submit" loading={submitting} disabled={submitting}>
+        Create league
+      </Button>
+    </form>
+  );
+}

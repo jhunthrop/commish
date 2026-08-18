@@ -6,7 +6,7 @@ export interface CardProps extends HTMLAttributes<HTMLElement> {
 
 export function Card({ as: Tag = "div", className = "", children, ...rest }: CardProps) {
   return (
-    <Tag className={`rounded-lg border border-border bg-surface-elevated p-4 ${className}`} {...rest}>
+    <Tag className={`rounded-lg border border-border bg-surface-elevated p-4 shadow-card ${className}`} {...rest}>
       {children}
     </Tag>
   );

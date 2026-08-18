@@ -50,6 +50,11 @@ export interface AuctionState {
   readonly nominatingTeamId: string | null;
   /** The player currently up for bid, or null between lots. */
   readonly lot: AuctionLot | null;
+  /**
+   * Opening price for auto-nominated lots, carried from the START_DRAFT action. Folding
+   * reads THIS, never `AUCTION_CONFIG.minBid` — a tunable change must not rewrite history.
+   */
+  readonly minBid: number;
 }
 
 export interface DraftState {
@@ -65,6 +70,8 @@ export interface DraftState {
   readonly rosters: Readonly<Record<string, readonly RosterSlot[]>>;
   /** teamId → remaining auction dollars. Empty for snake drafts. */
   readonly budgets: Readonly<Record<string, number>>;
+  /** teamId → that team's ranked autopick queue, best first. Absent = no queue. */
+  readonly queues: Readonly<Record<string, readonly string[]>>;
   readonly auction: AuctionState | null;
   /** Snake: the pick about to be made. Auction: the lot about to be awarded. 1-based. */
   readonly pickNumber: number;
@@ -86,6 +93,15 @@ export function totalRosterSlots(slotConfig: readonly RosterSlotConfig[]): numbe
   return slotConfig.reduce((sum, s) => sum + s.count, 0);
 }
 
+/**
+ * Every pick a snake draft will ever make: one per roster spot, per team. The ceiling
+ * `advanceSnake` completes the draft at, and the ceiling `upcomingOnClock` stops walking at —
+ * stated here once so the two can never disagree about where the board ends.
+ */
+export function totalPickCount(state: DraftState): number {
+  return state.draftOrder.length * totalRosterSlots(state.config.slotConfig);
+}
+
 export function initialDraftState(config: DraftConfig): DraftState {
   return {
     config,
@@ -96,6 +112,7 @@ export function initialDraftState(config: DraftConfig): DraftState {
     picks: [],
     rosters: {},
     budgets: {},
+    queues: {},
     auction: null,
     pickNumber: 0,
     turnStartedAt: null,

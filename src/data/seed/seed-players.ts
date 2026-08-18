@@ -2,6 +2,7 @@ import type { Db } from "@/db/client";
 import { players, playerStatLines } from "@/db/schema";
 import { excludedSetFor } from "@/db/upsert";
 import type { StatsProvider } from "@/stats/provider";
+import { assertLocalSeedTarget } from "./guard";
 
 const BATCH = 500;
 
@@ -17,8 +18,12 @@ function chunks<T>(arr: readonly T[], size: number): readonly (readonly T[])[] {
  * mid-week). The returned counts are the number of players / stat lines the provider
  * supplied for this run, not the number of rows newly inserted (the two are identical only
  * on a fresh, empty database). Safe to run repeatedly.
+ *
+ * Guarded in its own right, not only at the entry point: this is the largest write in the
+ * repo (every player × every week) and the one that used to run before any check at all.
  */
 export async function seedPlayers(db: Db, provider: StatsProvider): Promise<{ players: number; statLines: number }> {
+  assertLocalSeedTarget();
   const allPlayers = await provider.listPlayers();
   for (const batch of chunks(allPlayers, BATCH)) {
     await db

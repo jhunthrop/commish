@@ -7,7 +7,7 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
  */
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { totalRosterSlots } from "@/draft-engine";
-import { formatCountdown, formatClockLength, formatCoarseRemaining, formatGap, formatTightening, rosterSpots } from "./format";
+import { formatCountdown, formatClockLength, formatCoarseRemaining, formatGap, formatTightening, formatYourTurn, rosterSpots } from "./format";
 
 describe("formatCountdown", () => {
   it.each([
@@ -75,6 +75,37 @@ describe("formatTightening", () => {
   it("says what it shortens to and when", () => {
     const now = Date.parse("2026-09-01T00:00:00.000Z");
     expect(formatTightening({ at: "2026-09-01T02:14:00.000Z", pickSeconds: 600 }, now)).toBe("Picks shorten to 10 minutes in 2h 14m");
+  });
+});
+
+describe("formatYourTurn", () => {
+  const UPCOMING = ["t3", "t4", "t1", "t2", "t3"];
+
+  it("says nothing to a spectator who fields no team", () => {
+    expect(formatYourTurn(UPCOMING, null, 600)).toBeNull();
+  });
+
+  it("says nothing when this team is not in the lookahead at all", () => {
+    expect(formatYourTurn(UPCOMING, "t9", 600)).toBeNull();
+    expect(formatYourTurn([], "t1", 600)).toBeNull();
+  });
+
+  it("says you are on the clock when you are the one on it", () => {
+    expect(formatYourTurn(UPCOMING, "t3", 600)).toBe("You're on the clock.");
+  });
+
+  it.each([
+    [1, 600, "You're up in 1 pick (~10m)."],
+    [2, 600, "You're up in 2 picks (~20m)."],
+    [3, 28_800, "You're up in 3 picks (~24h 0m)."],
+    [1, 15, "You're up in 1 pick (any moment)."],
+  ])("counts %i picks ahead on a %i-second clock", (picksAway, clockSeconds, expected) => {
+    const upcoming = [...Array.from({ length: picksAway }, (_, i) => `other${i}`), "t1"];
+    expect(formatYourTurn(upcoming, "t1", clockSeconds)).toBe(expected);
+  });
+
+  it("counts the picks without estimating a wait when there is no clock to estimate from", () => {
+    expect(formatYourTurn(["t2", "t1"], "t1", null)).toBe("You're up in 1 pick.");
   });
 });
 

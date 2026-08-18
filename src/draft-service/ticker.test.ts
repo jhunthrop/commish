@@ -97,6 +97,19 @@ describe("draft ticker", () => {
   // which asserts nothing. Replaced with real assertions on the native timer plumbing: start()
   // creates exactly one interval even when called twice (idempotent), and stop() clears that
   // exact interval — including being idempotent itself — so no further tick can ever fire.
+  it("nudges a live draft instead of expiring it, and expires it without nudging", async () => {
+    const { store, fixture } = await liveDraft();
+    const calls: string[] = [];
+    const nudger = { nudge: async () => { calls.push("nudged"); return "published" as const; } };
+    const ticking = createDraftTicker({ db, store, clock, nudger });
+    now = "2026-09-01T07:00:00.000Z"; // inside the turn
+    expect(await ticking.tick()).toEqual([]);
+    expect(calls).toEqual(["nudged"]);
+    now = "2026-09-01T09:00:00.000Z"; // past the deadline
+    expect(await ticking.tick()).toEqual([{ draftId: fixture.draftId, applied: true }]);
+    expect(calls).toEqual(["nudged"]);
+  });
+
   it("start() creates exactly one interval (idempotent) and stop() clears it (idempotent)", async () => {
     const { ticker } = await liveDraft();
     const setIntervalSpy = vi.spyOn(globalThis, "setInterval");

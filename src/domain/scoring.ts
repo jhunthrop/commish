@@ -50,3 +50,17 @@ export const TE_PREMIUM_SCORING: Omit<ScoringSettings, "leagueId"> = {
   ...PPR_SCORING,
   teReceptionBonus: 0.5,
 };
+
+export type ScoringPresetName = "standard" | "ppr" | "half_ppr" | "te_premium";
+
+/**
+ * The one lookup from a preset's name to its rules. League creation stores a name; this is
+ * what turns that name into a `scoring_settings` row. Adding a preset means adding it here
+ * and nowhere else.
+ */
+export const SCORING_PRESETS: Readonly<Record<ScoringPresetName, Omit<ScoringSettings, "leagueId">>> = {
+  standard: STANDARD_SCORING,
+  ppr: PPR_SCORING,
+  half_ppr: HALF_PPR_SCORING,
+  te_premium: TE_PREMIUM_SCORING,
+};

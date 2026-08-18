@@ -3,7 +3,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { players, playerStatLines, scoringSettings } from "@/db/schema";
 import { STANDARD_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints } from "@/scoring";
-import { buildDraftPool, rankedPlayers } from "./pool";
+import { buildDraftPool, invalidateRankedPlayersCache, rankedPlayers } from "./pool";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
 const db = createTestDb();
@@ -119,5 +119,55 @@ describe("rankedPlayers", () => {
 
     const pool = await buildDraftPool(db, "league_without_settings");
     expect(pool.map((entry) => entry.playerId)).toEqual(ranked.map((player) => player.id));
+  });
+
+  it("caches the ranking per league id: a row written straight to the DB (bypassing the cache) is not reflected until invalidated", async () => {
+    await db.insert(players).values([
+      { id: "cache_low", name: "Cache Low", position: "RB", nflTeam: "SF" },
+      { id: "cache_high", name: "Cache High", position: "RB", nflTeam: "KC" },
+    ]);
+    await db.insert(playerStatLines).values([
+      { ...zeroLine, playerId: "cache_low", week: 1, rushingYards: 10 },
+      { ...zeroLine, playerId: "cache_high", week: 1, rushingYards: 200, rushingTouchdowns: 2 },
+    ]);
+
+    const first = await rankedPlayers(db, "league_cache");
+    expect(first.map((p) => p.id)).toEqual(["cache_high", "cache_low"]);
+
+    // Flip the underlying data WITHOUT going through the code path that would invalidate the
+    // cache (there isn't one — scoring settings are write-once). A memoized call must still
+    // return the first ranking.
+    await db.delete(playerStatLines);
+    await db.insert(playerStatLines).values([{ ...zeroLine, playerId: "cache_low", week: 1, rushingYards: 500 }]);
+
+    const stillCached = await rankedPlayers(db, "league_cache");
+    expect(stillCached.map((p) => p.id)).toEqual(["cache_high", "cache_low"]);
+
+    invalidateRankedPlayersCache("league_cache");
+    const fresh = await rankedPlayers(db, "league_cache");
+    expect(fresh.map((p) => p.id)).toEqual(["cache_low", "cache_high"]);
+  });
+
+  it("caches per league id, not globally: two leagues over the same players rank independently", async () => {
+    await seedDraftFixture(db, {
+      draftId: "draft_cache_standard", leagueId: "league_standard", format: "snake", teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    await db.insert(players).values([
+      { id: "grinder2", name: "Grinder Two", position: "RB", nflTeam: "KC" },
+      { id: "possession2", name: "Possession Two", position: "WR", nflTeam: "SF" },
+    ]);
+    await db.insert(playerStatLines).values([
+      { ...zeroLine, playerId: "grinder2", week: 1, rushingYards: 50 },
+      { ...zeroLine, playerId: "possession2", week: 1, receivingYards: 10, receptions: 20 },
+    ]);
+    // league_standard scores standard (no PPR); league_ppr has no settings row, so it falls
+    // back to PPR_SCORING. Same players, same stat lines, opposite ranking.
+    await db.insert(scoringSettings).values({ leagueId: "league_standard", ...STANDARD_SCORING });
+
+    const standard = await rankedPlayers(db, "league_standard");
+    const ppr = await rankedPlayers(db, "league_ppr");
+    expect(standard.map((p) => p.id)).toEqual(["grinder2", "possession2"]);
+    expect(ppr.map((p) => p.id)).toEqual(["possession2", "grinder2"]);
   });
 });

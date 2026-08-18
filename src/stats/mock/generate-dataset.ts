@@ -1,4 +1,5 @@
 import type { Player, Position, StatLine } from "@/domain/player";
+import { mulberry32 } from "@/lib/random/mulberry32";
 
 export const DATASET_SEED = 20260817;
 export const PLAYER_COUNT = 250;
@@ -7,18 +8,6 @@ export const SEASON_WEEKS = 17;
 export interface Dataset {
   readonly players: readonly Player[];
   readonly statLines: readonly StatLine[];
-}
-
-/** mulberry32 — small, fast, deterministic PRNG. Returns floats in [0,1). */
-function mulberry32(seed: number): () => number {
-  let a = seed >>> 0;
-  return () => {
-    a = (a + 0x6d2b79f5) >>> 0;
-    let t = a;
-    t = Math.imul(t ^ (t >>> 15), t | 1);
-    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
 }
 
 const NFL_TEAMS = ["ARI","ATL","BAL","BUF","CAR","CHI","CIN","CLE","DAL","DEN","DET","GB","HOU","IND","JAX","KC","LV","LAC","LAR","MIA","MIN","NE","NO","NYG","NYJ","PHI","PIT","SF","SEA","TB","TEN","WAS"] as const;

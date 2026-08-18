@@ -72,6 +72,9 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-end justify-center bg-scrim/50 p-4 sm:items-center">
+      {/* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- the WAI-ARIA
+          APG dialog pattern: the keydown handler traps Tab focus inside the panel, which has to
+          live on the dialog container itself, not on an individual focusable child. */}
       <div
         ref={panelRef}
         role="dialog"
@@ -79,7 +82,7 @@ export function Modal({ open, title, onClose, children, footer }: ModalProps) {
         aria-labelledby={titleId}
         tabIndex={-1}
         onKeyDown={onKeyDown}
-        className="w-full max-w-md rounded-lg border border-border bg-surface-elevated p-4 focus-visible:outline-none"
+        className="w-full max-w-md rounded-lg border border-border bg-surface-elevated p-4 shadow-card focus-visible:outline-none"
       >
         <h2 id={titleId} className="text-lg font-semibold text-text-primary">
           {title}

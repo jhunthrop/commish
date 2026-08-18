@@ -54,9 +54,8 @@ export function BudgetTable({ view, teams, myTeamId }: BudgetTableProps) {
       columns={columns}
       rows={rows}
       rowKey={(row) => row.team.id}
-      // The same `border-accent` token `RosterBoard` uses for its own-team card, plus a subtle
-      // accent-tinted background — a table row can't take a full border the way a card can, so
-      // it recolors the row's existing bottom rule instead of adding a new one.
+      // An accent-tinted row for your own money — a table row can't take a full border the
+      // way a card can, so it recolors the row's existing bottom rule instead of adding one.
       rowClassName={(row) => (row.team.id === myTeamId ? "border-accent bg-accent/10" : "")}
       empty={<EmptyState title="No teams yet" description="Budgets appear once the draft starts." action={<Button disabled>Waiting for the draft to start</Button>} />}
     />

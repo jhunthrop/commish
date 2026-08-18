@@ -81,4 +81,21 @@ describe("Table", () => {
     expect(screen.getByText("$42")).toHaveClass("text-right");
     expect(screen.getByRole("columnheader", { name: "Team" }).className).toMatch(/hidden/);
   });
+
+  it("spreads rowAttributes directly onto the row, not a second wrapper element", () => {
+    render(
+      <Table
+        caption="Auction results"
+        columns={columns}
+        rows={rows}
+        rowKey={(r) => r.id}
+        rowAttributes={(r) => ({ "data-own": r.id === "1" ? "true" : "false" })}
+        empty={<p>None.</p>}
+      />,
+    );
+    const ownRow = screen.getByText("Jalen Croft").closest("tr");
+    expect(ownRow).toHaveAttribute("data-own", "true");
+    expect(ownRow?.tagName).toBe("TR");
+    expect(screen.getByText("Marcus Reed").closest("tr")).toHaveAttribute("data-own", "false");
+  });
 });

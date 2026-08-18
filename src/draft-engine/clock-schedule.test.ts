@@ -17,7 +17,7 @@ describe("hoursUntil", () => {
   });
 });
 
-describe("clockTierFor — every boundary of the 8h → 4h → 1h → 10m → 60s schedule", () => {
+describe("clockTierFor — every boundary of the 8h → 4h → 1h → 10m → 1:30 schedule", () => {
   it.each([
     ["8 days out", "2026-09-02T09:00:00.000Z", 8 * 3600],
     ["exactly 168h out (boundary)", "2026-09-03T17:00:00.000Z", 4 * 3600],
@@ -26,10 +26,10 @@ describe("clockTierFor — every boundary of the 8h → 4h → 1h → 10m → 60
     ["13h out", "2026-09-10T04:00:00.000Z", 3600],
     ["exactly 12h out (boundary)", "2026-09-10T05:00:00.000Z", 600],
     ["2.5h out", "2026-09-10T14:30:00.000Z", 600],
-    ["exactly 2h out (boundary)", "2026-09-10T15:00:00.000Z", 60],
-    ["30m out", "2026-09-10T16:30:00.000Z", 60],
-    ["exactly at kickoff", "2026-09-10T17:00:00.000Z", 60],
-    ["after kickoff", "2026-09-10T20:00:00.000Z", 60],
+    ["exactly 2h out (boundary)", "2026-09-10T15:00:00.000Z", 90],
+    ["30m out", "2026-09-10T16:30:00.000Z", 90],
+    ["exactly at kickoff", "2026-09-10T17:00:00.000Z", 90],
+    ["after kickoff", "2026-09-10T20:00:00.000Z", 90],
   ])("%s → %i second picks", (_label, at, pickSeconds) => {
     expect(clockTierFor(at, KICKOFF).pickSeconds).toBe(pickSeconds);
   });
@@ -58,7 +58,7 @@ describe("nextTighteningAfter", () => {
     ["8 days out", "2026-09-02T09:00:00.000Z", "2026-09-03T17:00:00.000Z", 4 * 3600],
     ["100h out", "2026-09-06T13:00:00.000Z", "2026-09-08T17:00:00.000Z", 3600],
     ["13h out", "2026-09-10T04:00:00.000Z", "2026-09-10T05:00:00.000Z", 600],
-    ["2.5h out", "2026-09-10T14:30:00.000Z", "2026-09-10T15:00:00.000Z", 60],
+    ["2.5h out", "2026-09-10T14:30:00.000Z", "2026-09-10T15:00:00.000Z", 90],
   ])("from %s the clock next shortens at %s to %i seconds", (_label, at, expectedAt, pickSeconds) => {
     expect(nextTighteningAfter(at, KICKOFF)).toEqual({ at: expectedAt, pickSeconds });
   });

@@ -123,6 +123,16 @@ describe("GET /api/drafts/[draftId]", () => {
     expect(body.data.draft.draftId).toBe(DRAFT_ID);
   });
 
+  // The room header names the league you are drafting in. It is the one thing on that header
+  // the view itself cannot supply, so the snapshot carries it.
+  it("names the league in the draft state body", async () => {
+    const f = await fixture();
+    signedInAs(f.userIds[0]!);
+    const [league] = await db.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, f.leagueId));
+    const body = await (await getDraft(new Request(`http://test/api/drafts/${DRAFT_ID}`), { params })).json();
+    expect(body.data.leagueName).toBe(league!.name);
+  });
+
   it("includes every team card in the draft state body", async () => {
     const f = await fixture();
     signedInAs(f.userIds[0]!);

@@ -44,7 +44,6 @@ export const leagues = pgTable("leagues", {
   teamCount: integer("team_count").notNull(),
   stakeTier: integer("stake_tier").notNull().default(0),
   isPublicMatchmade: boolean("is_public_matchmade").notNull().default(false),
-  inviteCode: text("invite_code").notNull().unique(),
   commissionerUserId: text("commissioner_user_id")
     .notNull()
     .references(() => users.id),
@@ -70,6 +69,52 @@ export const teams = pgTable(
     index("teams_user_id_idx").on(t.userId),
     uniqueIndex("teams_league_user_idx").on(t.leagueId, t.userId),
   ],
+);
+
+/**
+ * A shareable way into a league: the short code IS the primary key, so the link
+ * (`/app/join/<code>`) and the code a commissioner reads aloud are the same thing rather
+ * than two artifacts to keep in step. Bounded on purpose — an invite expires and can be used
+ * a limited number of times, because a permanent unbounded link into a money league is a
+ * standing invitation to whoever forwards it.
+ */
+export const leagueInvites = pgTable(
+  "league_invites",
+  {
+    code: text("code").primaryKey(),
+    leagueId: text("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    createdByUserId: text("created_by_user_id")
+      .notNull()
+      .references(() => users.id),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    maxUses: integer("max_uses").notNull(),
+    uses: integer("uses").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("league_invites_league_id_idx").on(t.leagueId)],
+);
+
+/**
+ * Who a team STARTED in a given week. Distinct from `roster_slots`, which says who they own:
+ * a matchup page for week 3 must render week 3's lineup beside week 3's stored score, and a
+ * single un-versioned roster cannot do that honestly. Absent rows are normal, not an error —
+ * `defaultLineup()` derives a legal week from the roster for anyone who never opened the
+ * editor.
+ */
+export const lineupSlots = pgTable(
+  "lineup_slots",
+  {
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    weekNumber: integer("week_number").notNull(),
+    slot: text("slot").notNull(),
+    slotIndex: integer("slot_index").notNull(),
+    playerId: text("player_id"),
+  },
+  (t) => [primaryKey({ columns: [t.teamId, t.weekNumber, t.slot, t.slotIndex] })],
 );
 
 export const scoringSettings = pgTable("scoring_settings", {
@@ -149,6 +194,30 @@ export const draftActions = pgTable(
     index("draft_actions_draft_id_id_idx").on(t.draftId, t.id),
     uniqueIndex("draft_actions_draft_sequence_idx").on(t.draftId, t.sequence),
   ],
+);
+
+/**
+ * One row per nudge the moderator has already sent, keyed by the draft and the PICK the nudge
+ * was for. This is what makes "we already nudged this turn" DURABLE: a process restart, or a
+ * second app instance, both lose an in-memory set — they cannot lose a committed row.
+ *
+ * Keyed on `pick_number`, not on the action `sequence`: `sequence` counts accepted actions, and
+ * a SET_QUEUE by any manager deliberately does NOT start a new turn while still bumping it. So
+ * a sequence-keyed claim released mid-turn, letting the moderator speak again for the same turn
+ * — duplicate nudges to the team on the clock, and one manager able to drive another's nudges
+ * (and the model spend) by editing their own queue. `pick_number` advances exactly once per
+ * turn in both formats, so one turn is exactly one row.
+ */
+export const draftNudges = pgTable(
+  "draft_nudges",
+  {
+    draftId: text("draft_id")
+      .notNull()
+      .references(() => drafts.id, { onDelete: "cascade" }),
+    pickNumber: integer("pick_number").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.draftId, t.pickNumber] })],
 );
 
 export const draftPicks = pgTable(

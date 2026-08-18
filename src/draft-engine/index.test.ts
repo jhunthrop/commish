@@ -10,6 +10,7 @@ import * as engine from "./index";
 describe("the draft-engine public barrel", () => {
   it("re-exports the reducer, replay, events, selectors, slotting, clock schedule, state, and config surface", () => {
     expect(engine.reduceDraft).toBeTypeOf("function");
+    expect(engine.admitCommand).toBeTypeOf("function");
     expect(engine.replayDraft).toBeTypeOf("function");
     expect(engine.draftEventsFor).toBeTypeOf("function");
     expect(engine.draftStateView).toBeTypeOf("function");
@@ -34,6 +35,10 @@ describe("the draft-engine public barrel", () => {
     expect(engine.openSlotCount).toBeTypeOf("function");
     expect(engine.isComplete).toBeTypeOf("function");
     expect(engine.teamOnClock).toBeTypeOf("function");
+    expect(engine.upcomingOnClock).toBeTypeOf("function");
+    expect(engine.nextNominator).toBeTypeOf("function");
+    expect(engine.totalPickCount).toBeTypeOf("function");
+    expect(engine.DRAFT_VIEW_CONFIG).toBeDefined();
     expect(engine.bestAvailableFor).toBeTypeOf("function");
     expect(engine.remainingBudget).toBeTypeOf("function");
     expect(engine.minBidFor).toBeTypeOf("function");
@@ -44,5 +49,12 @@ describe("the draft-engine public barrel", () => {
     expect(engine.nextTightening).toBeTypeOf("function");
     expect(engine.draftActionSchema).toBeDefined();
     expect(engine.clientDraftActionSchema).toBeDefined();
+    expect(engine.DRAFT_QUEUE_CONFIG).toBeDefined();
+    expect(engine.reduceSetQueue).toBeTypeOf("function");
+    expect(engine.queuedEntriesFor).toBeTypeOf("function");
+    expect(engine.queueFor).toBeTypeOf("function");
+    expect(engine.nudgeDeadline).toBeTypeOf("function");
+    expect(engine.clientQueueSchema).toBeDefined();
+    expect(engine.toSetQueueAction).toBeTypeOf("function");
   });
 });

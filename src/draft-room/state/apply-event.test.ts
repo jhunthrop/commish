@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { DraftClockView, DraftStateView } from "@/draft-engine";
+import { clockOf } from "../test-fixtures";
 import { applyDraftEvent } from "./apply-event";
 
 const clock = (over: Partial<DraftClockView> = {}): DraftClockView => ({
@@ -10,6 +11,7 @@ const clock = (over: Partial<DraftClockView> = {}): DraftClockView => ({
   deadlineAt: "2026-09-01T08:00:00.000Z",
   clockSeconds: 28_800,
   nextTightening: null,
+  upcoming: ["t2", "t1"],
   ...over,
 });
 
@@ -35,7 +37,7 @@ const auctionView: DraftStateView = {
   budgets: { t1: 100, t2: 100 },
   minBid: 1,
   maxBids: { t1: 99, t2: 99 },
-  auction: { nominatingTeamId: "t1", lot: null },
+  auction: { nominatingTeamId: "t1", lot: null, minBid: 1 },
 };
 
 const frame = (type: string, payload: unknown) => JSON.stringify({ id: "1-0", type, leagueId: "l1", timestamp: "2026-09-01T00:00:00.000Z", payload });
@@ -110,13 +112,13 @@ describe("applyDraftEvent — draft.pick", () => {
   });
 
   it("takes the awarded budgets, ceilings and next bid floor from the payload instead of doing arithmetic", () => {
-    const withLot: DraftStateView = { ...auctionView, auction: { nominatingTeamId: "t1", lot: { playerId: "qb1", highBid: 30, highBidTeamId: "t1", nominatedByTeamId: "t1", autoNominated: false } } };
+    const withLot: DraftStateView = { ...auctionView, auction: { minBid: 1, nominatingTeamId: "t1", lot: { playerId: "qb1", highBid: 30, highBidTeamId: "t1", nominatedByTeamId: "t1", autoNominated: false } } };
     const award = { ...pickPayload, price: 30, budgets: { t1: 70, t2: 100 }, maxBids: { t1: 70, t2: 99 }, minBid: 1, clock: clock({ onClockTeamId: "t2" }) };
     const view = (applyDraftEvent(withLot, frame("draft.pick", award)) as { view: DraftStateView }).view;
     expect(view.budgets).toEqual({ t1: 70, t2: 100 });
     expect(view.maxBids).toEqual({ t1: 70, t2: 99 });
     expect(view.minBid).toBe(1);
-    expect(view.auction).toEqual({ nominatingTeamId: "t2", lot: null });
+    expect(view.auction).toEqual({ nominatingTeamId: "t2", lot: null, minBid: 1 });
   });
 
   it("leaves minBid alone on a snake pick, where the payload never carries one", () => {
@@ -131,7 +133,7 @@ describe("applyDraftEvent — auction lots", () => {
   it("opens a lot on a nomination and takes the next bid floor from the payload", () => {
     const view = (applyDraftEvent(auctionView, frame("draft.nominate", nominate)) as { view: DraftStateView }).view;
     expect(view.auction).toEqual({
-      nominatingTeamId: "t1",
+      nominatingTeamId: "t1", minBid: 1,
       lot: { playerId: "qb1", highBid: 5, highBidTeamId: "t1", nominatedByTeamId: "t1", autoNominated: false },
     });
     expect(view.minBid).toBe(6);
@@ -169,5 +171,52 @@ describe("applyDraftEvent — clock-only events", () => {
     const view = (applyDraftEvent(snakeView, frame("draft.status", payload)) as { view: DraftStateView }).view;
     expect(view.phase).toBe("complete");
     expect(view.deadlineAt).toBeNull();
+  });
+});
+
+describe("applyDraftEvent — draft.queue and draft.nudge", () => {
+  it("folds a draft.queue frame: the clock advances and nothing else changes", () => {
+    const queuePayload = { draftId: "d1", clock: { ...clockOf(snakeView), sequence: snakeView.sequence + 1 }, teamId: "t2" };
+    const result = applyDraftEvent(snakeView, frame("draft.queue", queuePayload));
+    expect(result).toEqual({
+      ok: true,
+      view: { ...snakeView, sequence: snakeView.sequence + 1 },
+      nudge: null,
+    });
+  });
+
+  // The CRITICAL closure check (Task 2 review requirement): a rival's queue edit must fold
+  // cleanly — clock/sequence advance, nothing else changes — so it never forces a resync, and
+  // the NEXT real event right behind it applies normally instead of tripping the gap detector.
+  it("a rival's draft.queue frame folds cleanly, and the next real event right behind it applies without a resync", () => {
+    const queuePayload = { draftId: "d1", clock: { ...clockOf(snakeView), sequence: snakeView.sequence + 1 }, teamId: "t2" };
+    const afterQueue = applyDraftEvent(snakeView, frame("draft.queue", queuePayload));
+    expect(afterQueue).toEqual({ ok: true, view: { ...snakeView, sequence: snakeView.sequence + 1 }, nudge: null });
+    const queuedView = (afterQueue as { view: DraftStateView }).view;
+
+    const nextPick = { ...pickPayload, clock: clock({ sequence: snakeView.sequence + 2 }) };
+    const afterPick = applyDraftEvent(queuedView, frame("draft.pick", nextPick));
+    expect(afterPick.ok).toBe(true);
+    expect((afterPick as { view: DraftStateView }).view.picks).toHaveLength(1);
+  });
+
+  it("surfaces a draft.nudge as a notice without moving the view", () => {
+    const nudgePayload = { draftId: "d1", clock: clockOf(snakeView), teamId: "t1", message: "You're on the clock." };
+    expect(applyDraftEvent(snakeView, frame("draft.nudge", nudgePayload))).toEqual({
+      ok: true,
+      view: snakeView,
+      nudge: { teamId: "t1", message: "You're on the clock.", sequence: snakeView.sequence },
+    });
+  });
+
+  it("ignores a nudge frame missing its message", () => {
+    const malformed = { draftId: "d1", clock: clockOf(snakeView), teamId: "t1" };
+    expect(applyDraftEvent(snakeView, frame("draft.nudge", malformed))).toEqual({ ok: false, outcome: "ignored" });
+  });
+
+  it("does not surface a nudge on a non-nudge frame", () => {
+    const result = applyDraftEvent(snakeView, frame("draft.pick", pickPayload));
+    expect(result.ok).toBe(true);
+    expect((result as { nudge: unknown }).nudge).toBeNull();
   });
 });

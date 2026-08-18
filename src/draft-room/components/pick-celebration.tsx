@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
-import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
+import { Celebration } from "@/components/ui";
+import { useTransientVisibility } from "@/design/use-transient-visibility";
 import { teamsById, teamName, playerName } from "../lib/lookups";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 import type { LandedPick } from "../hooks/use-draft-room";
@@ -15,43 +15,28 @@ export interface PickCelebrationProps {
 }
 
 /**
- * The moment a pick lands. Keyed on `pickNumber`, so the same pick never re-animates and no
- * clock is consulted. Reduced motion is a real branch — the panel still appears, it just
- * carries no animation class, because losing the information would be worse than the motion.
+ * The moment a pick lands. Keyed on `pickNumber`, so a redelivered pick never re-animates and
+ * no clock is consulted. The panel itself is the shared `Celebration` — the league's
+ * matchup-win moment is the same component with different words.
  */
 export function PickCelebration({ lastPick, playersById, teams }: PickCelebrationProps) {
-  const reduced = usePrefersReducedMotion();
-  const [visible, setVisible] = useState(false);
   const pickNumber = lastPick?.pick.pickNumber ?? null;
-
-  useEffect(() => {
-    if (pickNumber === null) return;
-    setVisible(true);
-    const timer = setTimeout(() => setVisible(false), DRAFT_ROOM_CONFIG.celebrationMs);
-    return () => clearTimeout(timer);
-  }, [pickNumber]);
-
+  const visible = useTransientVisibility(pickNumber, DRAFT_ROOM_CONFIG.celebrationMs);
   if (lastPick === null || !visible) return null;
 
   const { pick, isMine } = lastPick;
-  const teamsMap = teamsById(teams);
-  const playerDisplayName = playerName(playersById, pick.playerId);
-  const teamDisplayName = teamName(teamsMap, pick.teamId);
-  const motion = reduced ? "" : isMine ? "animate-pick-mine" : "animate-pick-landed";
+  const player = playerName(playersById, pick.playerId);
+  const team = teamName(teamsById(teams), pick.teamId);
 
   return (
-    <div
-      role="status"
-      data-testid="pick-celebration"
-      data-own={isMine ? "true" : "false"}
-      data-pick-number={pickNumber}
+    // Keyed on the pick number so a NEW pick landing mid-celebration remounts the panel and
+    // replays the entrance animation — same-key rerenders keep the node (no replay).
+    <Celebration
       key={pickNumber}
-      className={`rounded-lg border p-3 text-center ${isMine ? "border-accent bg-accent/10" : "border-border bg-surface-elevated"} ${motion}`}
-    >
-      <p className="text-lg font-semibold text-text-primary">
-        {isMine ? `You drafted ${playerDisplayName}!` : `${teamDisplayName} drafted ${playerDisplayName}.`}
-      </p>
-      {pick.price === null ? null : <p className="text-sm text-text-muted">Won for ${pick.price}.</p>}
-    </div>
+      testId="pick-celebration"
+      emphasis={isMine ? "self" : "peer"}
+      title={isMine ? `You drafted ${player}!` : `${team} drafted ${player}.`}
+      detail={pick.price === null ? undefined : `Won for $${pick.price}.`}
+    />
   );
 }

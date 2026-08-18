@@ -23,6 +23,12 @@ an explicit upgrade path in `draftActionSchema` — it never reinterprets an old
 - `MAKE_PICK` — `{ teamId, playerId }` (snake).
 - `NOMINATE` — `{ teamId, playerId, openingBid }` (auction; a nomination is a bid).
 - `BID` — `{ teamId, amount }` (auction).
+- `SET_QUEUE` — `{ teamId, playerIds }`, replacing a team's ranked autopick queue wholesale.
+  In the log rather than a side table, on purpose: `state.queues[teamId]` (`queueFor`) is
+  derived by replay exactly like `rosters` or `budgets`, so a queue edit is exactly as
+  replay-safe and durable as a pick. See `docs/draft-moderator.md`. Capped at
+  `DRAFT_QUEUE_CONFIG.maxLength` client-side; `PERSISTED_QUEUE_MAX` is the separate, frozen
+  ceiling for the jsonb row itself and must never decrease.
 - `TIMER_EXPIRE` — no payload. **Server-only**: produced by the ticker, never accepted over HTTP
   (the actions route's Zod schema has no `TIMER_EXPIRE` member a client can submit).
 
@@ -30,8 +36,10 @@ an explicit upgrade path in `draftActionSchema` — it never reinterprets an old
 
 `DraftState` = static `config` (from the `drafts` + `leagues` rows) + `phase` + `sequence` +
 `draftOrder` + `pool` + `picks` + `rosters` (filled slots only) + `budgets` + `auction` +
-`pickNumber` + `turnStartedAt`. Deadlines are **derived** from `turnStartedAt`, never stored,
-so no replay can resurrect a stale deadline.
+`pickNumber` + `turnStartedAt`. Deadlines are **derived** from `turnStartedAt` and
+`config.clockSchedule`, never stored — which means a deadline is only ever meaningful *now*,
+against the schedule in force at this deploy. That is exactly why the deadline check is a
+command-time admission guard (`admit.ts`) and not a reducer guard: see the R-B4 section below.
 
 ## The reducer result shape
 
@@ -62,10 +70,15 @@ clock — every timed decision consumes a timestamp the caller supplied.
    open spot can always afford the minimum bid — that is why auto-nomination can't deadlock. A
    draft can't start unless the budget covers at least `minBid` per roster spot
    (`reduceStart` in `reduce.ts`).
-5. Autopick and auto-nomination (`bestAvailableFor`) take the highest-ranked player the team
-   can legally roster, ranked by `state.pool`'s order — an input, never an ambient lookup.
+5. **Autopick and auto-nomination are queue-first.** `bestAvailableFor` (`selectors.ts`) is the
+   one policy both `reduceSnakeExpiry` and `reduceAuctionExpiry` call: it takes the first entry
+   in the team's own ranked queue (`queueFor`) that is still available and still legally
+   rosterable; only once the queue is empty or exhausted does it fall back to the
+   highest-ranked player by `state.pool`'s order. Both the queue and the pool are explicit
+   inputs carried in the action log, never an ambient lookup, so the same log always autopicks
+   the same player on replay.
 6. The pick clock auto-tightens against kickoff: `DRAFT_CLOCK_SCHEDULE` = 8h → 4h → 1h → 10m →
-   60s. A tier applies while the draft is more than `untilHoursBeforeKickoff` hours out; the
+   1:30. A tier applies while the draft is more than `untilHoursBeforeKickoff` hours out; the
    last tier is the floor. Live auction bidding uses the shorter of the tier and
    `AUCTION_CONFIG.bidWindowSeconds` (`currentClockSeconds`).
 
@@ -85,6 +98,34 @@ and to what, so the UI can show "clock tightens to 10m in 3h12m" ahead of time �
 the same way, from `turnStartedAt` forward, and is `null` before/after the draft or once the
 final tier is already in force.
 
+## The lookahead: `upcomingOnClock`
+
+`upcomingOnClock(state, count)` names the next `count` teams due to act, **current turn
+first**. It exists so a browser can answer "when am I up?" with an index lookup instead of
+re-implementing serpentine order — the one rule `docs/draft-room.md` forbids in React.
+
+It grows no third walk of its own:
+
+- **Snake** replays `snakeTeamForPick` forward from `state.pickNumber`, stopping at
+  `totalPickCount(state)` — the same ceiling `advanceSnake` completes the draft at, which is
+  why that ceiling now lives in `state.ts` and is called from both places. A snake draft never
+  skips a team: every team owns the same number of roster spots, so they all fill their last
+  one on the last round.
+- **Auction** chains `nextNominator` (which already skips full rosters) and cycles once the
+  rotation comes back around — an auction's order repeats, so a 12-deep lookahead in an 8-team
+  league legitimately names some teams twice. `nextNominator` moved from `auction.ts` to
+  `selectors.ts` for this: one rotation, imported by both the reducer and the lookahead.
+- **While a lot is open** there is no team on the clock (`teamOnClock` is null by design), so
+  the walk starts with the team due to nominate *after* the one whose lot is live. It reads
+  the rosters as they stand, so if the lot's winner fills their last spot the list shifts by
+  one — the next event's clock carries the corrected list, which is exactly why `upcoming`
+  rides every payload rather than being fetched.
+- **Outside `in_progress`** it is empty.
+
+`DraftClockView` carries `upcoming`, sized by `DRAFT_VIEW_CONFIG.upcomingCount` (12) in
+`config.ts`. Because it lives on the clock view, it rides `draftStateView` **and** every
+`draft.*` payload, so it can never be stale by more than the event that would refresh it.
+
 ## Auto-nominate on stall
 
 In an auction, `teamOnClock` returns the nominating team only while no lot is open — during
@@ -96,9 +137,9 @@ for a stalled snake pick. This is what keeps an idle nominator from stalling the
 
 ## The deadline guard on TIMER_EXPIRE (Ruling R-B4)
 
-`reduce.ts`'s `TIMER_EXPIRE` arm rejects the action outright — `"The clock hasn't run out
-yet."` — whenever `action.timestamp` is earlier than `currentDeadline(state)` computed against
-the state the action is being applied to (not the state the caller read earlier):
+`admitCommand` (`src/draft-engine/admit.ts`) rejects the action outright — `"The clock hasn't
+run out yet."` — whenever `action.timestamp` is earlier than `currentDeadline(state)` computed
+against the state the action is being applied to (not the state the caller read earlier):
 
 ```ts
 const deadline = currentDeadline(state);
@@ -111,10 +152,45 @@ This closes a check-then-act race: the ticker reads state and computes a deadlin
 then submits `TIMER_EXPIRE` in a later, separate step. A legitimate human action (a pick, a
 nomination, a bid) can land in the gap and start a fresh clock for someone else — the ticker's
 now-stale timestamp must not be allowed to expire *that* new clock. Because the guard is
-re-evaluated against the store's current, freshly-loaded state inside `applyAction`'s mutex
+evaluated against the store's current, freshly-loaded state inside `applyAction`'s mutex
 (not the ticker's cached read), the race is provably harmless: at worst the ticker's
 `TIMER_EXPIRE` is rejected and the next tick retries against the real deadline. No stale expiry
 can ever autopick or auto-award on behalf of the wrong turn.
+
+## Command-time admission vs. reducer guards
+
+**The invariant: a reducer guard may only read the action log and prior state — never a
+module-level tunable — because tunables change with deploys and logs do not.**
+
+`replayDraft` calls `reduceDraft` on every persisted action, so any guard the reducer owns is
+re-adjudicated every time a draft is loaded. A guard that reads a tunable therefore re-judges
+history against today's constants, and a single tuning change can turn a valid log into a
+`DraftReplayError` — a permanent 500 on `GET /api/drafts/:id`. This is not hypothetical: raising
+the clock schedule's floor from 60s to 90s did exactly that to a live draft.
+
+`admitCommand(state, action)` in `src/draft-engine/admit.ts` owns every such guard. It runs once,
+at command time, inside `applyAction`'s mutex against freshly-loaded state, and **is never called
+on the replay path**. The guards that live there:
+
+| Guard | Tunable it reads |
+|---|---|
+| `TIMER_EXPIRE` deadline | `config.clockSchedule`, and `AUCTION_CONFIG.bidWindowSeconds` via `currentClockSeconds` |
+| `SET_QUEUE` length cap | `DRAFT_QUEUE_CONFIG.maxLength` |
+| `NOMINATE` opening-bid floor | `AUCTION_CONFIG.minBid` |
+| `BID` increment | `AUCTION_CONFIG.bidIncrement` |
+| `NOMINATE`/`BID` budget ceiling | `AUCTION_CONFIG.reservePerOpenSlot` via `maxBidFor` |
+| `START_DRAFT` budget-per-slot floor | `AUCTION_CONFIG.minBid` |
+
+Everything else — turn order, phase, duplicate player, "not in this draft", roster shape, "there
+is no budget at all" — is a pure function of the log and prior state and stays in the reducer.
+
+Two consequences worth stating. First, the `SET_QUEUE` length message is now permanently
+unreachable through the reducer, which is correct: `PERSISTED_QUEUE_MAX` exists precisely so a
+persisted queue longer than today's cap still replays. Second, `config.slotConfig` and
+`config.auctionBudget` are still read *while folding state* (`apply-pick.ts`, `state.ts`,
+`reduce.ts`); they are per-league DB columns with no update path today, but the moment a
+commissioner-settings screen exists, editing the roster shape would silently rewrite draft
+history. Snapshot them into the `START_DRAFT` payload when that phase lands.
 
 ## The replay model
 
@@ -171,10 +247,21 @@ yet — noted here so Phase 2 doesn't have to rediscover them:
 ## The auto-commit-on-completion seam
 
 `commitDraftState` (`commit.ts`) is the single seam between "a draft happened" and "a season
-exists": in one transaction it writes `draft_picks`, upserts `roster_slots`, and flips
-`drafts.status` to `complete`. `applyAction` calls it automatically, inside the very same
-transaction that inserts the completing action row, the moment a draft's `phase` transitions
-to `complete` — so a draft can never be "done" in the log without also being committed.
+exists": in one transaction it writes `draft_picks`, upserts `roster_slots`, flips
+`drafts.status` to `complete`, and writes the season's fixtures
+(`writeSchedule`, `src/league-service/schedule.ts` → `weeks` + `matchups`). `applyAction`
+calls it automatically, inside the very same transaction that inserts the completing action
+row, the moment a draft's `phase` transitions to `complete` — so a draft can never be "done"
+in the log without also being committed.
+
+The schedule belongs in this transaction rather than in a follow-on call: a league with
+drafted rosters and no fixtures has nothing to play, and any later step is a step that can
+fail to run. `writeSchedule` is idempotent (`onConflictDoNothing` on both primary keys) and
+never throws on an unbuildable schedule — it logs and writes nothing — so neither the
+defensive re-commit below nor a one-team league can turn a legitimately complete draft into a
+failed commit. `draft-service` → `league-service` is the only direction this edge runs (a
+draft produces a season; a season never produces a draft), and `schedule.ts` imports nothing
+but `@/db/*`, `@/league` and Drizzle, so there is no cycle.
 
 `commitDraftResults(draftId)` is a defensive/admin seam, not the normal path — `applyAction`
 already commits automatically the instant a draft completes (previous paragraph). It exists,
@@ -189,7 +276,7 @@ roster slots.
 `draftEventsFor(prev, next, action)` derives events from the **state diff**, not the action
 alone. Every payload carries `draftId` and a `clock` block — exactly the `DraftClockView`
 (`phase`, `sequence`, `pickNumber`, `onClockTeamId`, `deadlineAt`, `clockSeconds`,
-`nextTightening`) that `draftStateView` also embeds. That is what lets a browser fold an
+`nextTightening`, `upcoming`) that `draftStateView` also embeds. That is what lets a browser fold an
 event into its view and know the new deadline and tier without re-deriving either; the
 sequence number a client uses for gap detection is `payload.clock.sequence`.
 
@@ -200,6 +287,8 @@ sequence number a client uses for gap detection is `payload.clock.sequence`.
 | `draft.nominate` | `teamId`, `playerId`, `openingBid`, `auto`, `minBid` (the floor for the NEXT bid on this lot) | A new lot opens. |
 | `draft.bid` | `teamId`, `playerId`, `amount`, `minBid` (the floor for the NEXT bid on this lot) | The open lot's high bid changes without a new player. |
 | `draft.timer_expire` | `pickNumber` (the pick the clock ran out on) | Every accepted `TIMER_EXPIRE`, always pushed first. |
+| `draft.queue` | `teamId` only — **the ordered list itself is never broadcast**, since a queue is a private draft plan. | Every accepted `SET_QUEUE`. Clock-only on the client: sequence advances, nothing else about the view changes. |
+| `draft.nudge` | `teamId`, `message` (the moderator's one sentence) | **Not emitted by `draftEventsFor`** — published directly by the nudge scheduler (`createNudgeScheduler`, `src/draft-service/nudge.ts`) on the ticker's own schedule, independent of any action. See `docs/draft-moderator.md`. |
 
 Two fields are easy to misread because a `pickNumber` appears twice with different meanings
 on the same payload. On `draft.pick`, the **top-level** `pickNumber` is that pick's own
@@ -214,6 +303,12 @@ always precedes the `draft.pick` or `draft.nominate` it caused, and both precede
 `draft.status` when the same action also completes the draft — so a client can render events in
 arrival order without reordering.
 
+`draftEventsFor`'s auction block (`draft.nominate`/`draft.bid`) is gated on the lot having
+**actually moved** — a new player, or a higher `highBid`/`highBidTeamId` — not merely on a lot
+being open. `SET_QUEUE` arriving while a lot is live changes nothing about that lot, so this
+gate is what stops a queue edit during a live auction from re-broadcasting the standing bid as
+if somebody had just raised it.
+
 ## API
 
 | Route | Who | Notes |
@@ -222,6 +317,8 @@ arrival order without reordering.
 | `GET /api/drafts/[draftId]/players` | a manager with a team in the league, or the commissioner | Ranked player metadata (id/name/position/nflTeam) for the pool. Separate from the state route because it never changes mid-draft and the state route is refetched on every resync. |
 | `POST /api/drafts/[draftId]/actions` | a manager with a team in the league | Body: `{ type: "MAKE_PICK" \| "NOMINATE" \| "BID", … }`. **No `teamId`** — the server resolves it from the session. A rejected action is a 409 with the reducer's reason. |
 | `POST /api/drafts/[draftId]/start` | commissioner only | Fixes the order and the ranked pool. |
+| `GET /api/drafts/[draftId]/queue` | a manager with a team in the league, or the commissioner | The caller's OWN autopick queue, never anybody else's. A commissioner with no team of their own gets `[]`, not a 403. |
+| `POST /api/drafts/[draftId]/queue` | a manager with a team in the league | Body: `{ playerIds: string[] }`. **No `teamId`** — the acting team is resolved from the session, same as `/actions`. A rejected change (a duplicate id) is a 409 with the reducer's reason; a queue over `DRAFT_QUEUE_CONFIG.maxLength` is capped by the HTTP schema first and returns 400. |
 | `GET /api/leagues/[leagueId]/events` | a manager with a team in the league, or the commissioner | The real-time fan-out: Redis Streams over SSE. Gated the same way as the draft board — a signed-in stranger with no team in the league gets 403, not another league's events. |
 
 There is no second transport and no per-draft stream — `draft.*` events ride the league stream

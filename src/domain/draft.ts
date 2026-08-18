@@ -1,16 +1,6 @@
-import type { DraftFormat } from "./league";
 import type { Position } from "./player";
 
 export type DraftStatus = "scheduled" | "in_progress" | "complete";
-
-export interface Draft {
-  readonly id: string;
-  readonly leagueId: string;
-  readonly format: DraftFormat;
-  readonly status: DraftStatus;
-  readonly kickoffAt: string;
-  readonly auctionBudget: number | null;
-}
 
 /**
  * Persisted JSON shape version. `draft_actions.action` stores these rows forever, so the
@@ -18,8 +8,6 @@ export interface Draft {
  * explicit upgrade path, and never silently reinterprets a `v: 1` row.
  */
 export const DRAFT_ACTION_VERSION = 1;
-
-export type DraftActionType = "START_DRAFT" | "MAKE_PICK" | "NOMINATE" | "BID" | "TIMER_EXPIRE";
 
 /** One draftable player, as the draft saw them: id plus the position roster rules key off. */
 export interface DraftPoolEntry {
@@ -39,6 +27,11 @@ export interface StartDraftAction {
   readonly draftOrder: readonly string[];
   /** The full draftable pool, best player first. */
   readonly pool: readonly DraftPoolEntry[];
+  /**
+   * Opening price for auto-nominated auction lots, snapshotted here so replaying the log
+   * never reads `AUCTION_CONFIG` while folding state. Present-but-unused for snake drafts.
+   */
+  readonly minBid: number;
 }
 
 export interface MakePickAction {
@@ -74,18 +67,25 @@ export interface TimerExpireAction {
   readonly timestamp: string;
 }
 
+/**
+ * A team's ranked autopick queue. Persisted as an ACTION rather than threaded into
+ * TIMER_EXPIRE from outside, because `draft_actions` is the source of truth and state is
+ * derived by replay: an out-of-log queue would make the same log replay to different picks
+ * the moment somebody edited their queue afterwards.
+ */
+export interface SetQueueAction {
+  readonly v: 1;
+  readonly type: "SET_QUEUE";
+  readonly timestamp: string;
+  readonly teamId: string;
+  /** Ordered, best first. An empty array clears the queue. */
+  readonly playerIds: readonly string[];
+}
+
 export type DraftAction =
   | StartDraftAction
   | MakePickAction
   | NominateAction
   | BidAction
-  | TimerExpireAction;
-
-export interface DraftPick {
-  readonly draftId: string;
-  readonly teamId: string;
-  readonly playerId: string;
-  readonly round: number;
-  readonly pickNumber: number;
-  readonly price: number | null;
-}
+  | TimerExpireAction
+  | SetQueueAction;

@@ -14,6 +14,10 @@ const clockSchema = z.object({
   deadlineAt: z.string().nullable(),
   clockSeconds: z.number().nullable(),
   nextTightening: z.object({ at: z.string(), pickSeconds: z.number() }).nullable(),
+  // `.readonly()` is load-bearing, not decoration: `DraftClockView.upcoming` is a
+  // `readonly string[]`, and a mutable `string[]` is not assignable to it in BOTH directions,
+  // so a plain `z.array` would fail the bidirectional shape assertion below.
+  upcoming: z.array(z.string()).readonly(),
 });
 
 /**
@@ -68,6 +72,10 @@ const bidPayloadSchema = z.object({
 });
 const statusPayloadSchema = z.object({ ...common, phase: z.enum(["scheduled", "in_progress", "complete"]) });
 const expirePayloadSchema = z.object({ ...common, pickNumber: z.number().int().nonnegative() });
+const queuePayloadSchema = z.object({ ...common, teamId: z.string().min(1) });
+
+/** The moderator's prompt. The queue itself is never on the wire — only this sentence. */
+const nudgePayloadSchema = z.object({ ...common, teamId: z.string().min(1), message: z.string().min(1) });
 
 /**
  * A `draft.*` frame off the league stream. Non-draft event types (`chat.*`, `score.update`)
@@ -79,9 +87,9 @@ export const draftEventSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("draft.bid"), payload: bidPayloadSchema }),
   z.object({ type: z.literal("draft.status"), payload: statusPayloadSchema }),
   z.object({ type: z.literal("draft.timer_expire"), payload: expirePayloadSchema }),
+  z.object({ type: z.literal("draft.queue"), payload: queuePayloadSchema }),
+  z.object({ type: z.literal("draft.nudge"), payload: nudgePayloadSchema }),
 ]);
 
 export type DraftEventFrame = z.infer<typeof draftEventSchema>;
 export type DraftPickPayload = z.infer<typeof pickPayloadSchema>;
-export type DraftNominatePayload = z.infer<typeof nominatePayloadSchema>;
-export type DraftBidPayload = z.infer<typeof bidPayloadSchema>;

@@ -1,20 +1,15 @@
 import type { Tightening } from "@/draft-engine";
 import type { RosterSlotConfig } from "@/domain/roster";
+import { MS_PER_SECOND, MINUTES_PER_HOUR, SECONDS_PER_HOUR, SECONDS_PER_MINUTE, formatClockLength, plural } from "@/domain/duration";
 import { DRAFT_ROOM_CONFIG } from "./config";
 
-const MS_PER_SECOND = 1_000;
-const SECONDS_PER_MINUTE = 60;
-const MINUTES_PER_HOUR = 60;
-const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * MINUTES_PER_HOUR;
+export { formatClockLength };
+
 const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE;
 const MS_PER_HOUR = MS_PER_MINUTE * MINUTES_PER_HOUR;
 
 function pad(value: number): string {
   return value.toString().padStart(2, "0");
-}
-
-function plural(count: number, unit: string): string {
-  return `${count} ${unit}${count === 1 ? "" : "s"}`;
 }
 
 /** "0:09", "2:05", "1:04:09". Clamped at zero — a passed deadline reads 0:00, never negative. */
@@ -24,13 +19,6 @@ export function formatCountdown(msRemaining: number): string {
   const minutes = Math.floor((total % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
   const seconds = total % SECONDS_PER_MINUTE;
   return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
-}
-
-/** The plain-language length of a pick clock: "8 hours", "10 minutes", "45 seconds". */
-export function formatClockLength(seconds: number): string {
-  if (seconds >= SECONDS_PER_HOUR && seconds % SECONDS_PER_HOUR === 0) return plural(seconds / SECONDS_PER_HOUR, "hour");
-  if (seconds >= SECONDS_PER_MINUTE && seconds % SECONDS_PER_MINUTE === 0) return plural(seconds / SECONDS_PER_MINUTE, "minute");
-  return plural(seconds, "second");
 }
 
 /** A coarse distance: "2h 14m", "14m", "under a minute". */
@@ -74,4 +62,27 @@ export function formatTightening(next: Tightening | null, nowMs: number): string
  */
 export function rosterSpots(slotConfig: readonly RosterSlotConfig[]): number {
   return slotConfig.reduce((sum, config) => sum + config.count, 0);
+}
+
+/**
+ * The anxiety-killer: "You're up in 7 picks (~24m)." — the dock's standing answer to "when am
+ * I up?", with no turn-order rule anywhere near it. `upcoming` is the engine's own lookahead
+ * (`DraftClockView.upcoming`, computed by `upcomingOnClock` and carried on every event's
+ * clock), so this is an index lookup plus display arithmetic over two server values.
+ *
+ * Null when there is nothing to say: a spectator with no team, or a team the lookahead does
+ * not reach (a long rotation, or a draft that isn't running). A sub-minute wait reads "any
+ * moment" rather than a duration rounded away to nothing — against the same one-minute floor
+ * `formatCoarseRemaining` uses, from the same config value rather than a second literal.
+ */
+export function formatYourTurn(upcoming: readonly string[], myTeamId: string | null, clockSeconds: number | null): string | null {
+  if (myTeamId === null) return null;
+  const picksAway = upcoming.indexOf(myTeamId);
+  if (picksAway < 0) return null;
+  if (picksAway === 0) return "You're on the clock.";
+  const picks = plural(picksAway, "pick");
+  if (clockSeconds === null) return `You're up in ${picks}.`;
+  const waitMs = picksAway * clockSeconds * MS_PER_SECOND;
+  const wait = waitMs < DRAFT_ROOM_CONFIG.coarseRemainingMinuteMs ? "any moment" : `~${formatGap(waitMs)}`;
+  return `You're up in ${picks} (${wait}).`;
 }

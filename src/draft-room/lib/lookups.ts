@@ -1,30 +1,11 @@
-import type { TeamCard } from "@/domain/league";
-import type { Player } from "@/domain/player";
-
 /**
- * The one place a draft-room component turns a `teamId`/`playerId` into the human it names.
- * Every component that renders a team or player name (`ClockBanner`, `RosterBoard`,
- * `PickHistory`, and — from Task 7/9 on — `AuctionLotPanel`, `BudgetTable`, `TvBoard`) builds
- * its map once with `teamsById`/`playersById` and reads through `teamName`/`playerName`
- * rather than re-declaring a `.find(...)` closure per component.
+ * The draft room's name lookups now live in the shared display module — the league room
+ * needs the identical `teamsById`/`playersById`/`teamName`/`playerName` pattern, and two
+ * copies of it was the DRY violation this re-export closes. `queueButtonLabel` stays here:
+ * it is draft-room-only vocabulary (the pool's star and the dock's chips share its phrasing).
  */
-export function teamsById(teams: readonly TeamCard[]): ReadonlyMap<string, TeamCard> {
-  return new Map(teams.map((team) => [team.id, team]));
-}
+export { teamsById, playersById, teamName, playerName } from "@/lib/display/lookups";
 
-/** `teamsById`'s counterpart for the player dictionary — built once per render by `DraftRoom`
- *  and `TvBoard` and shared by every component below them that needs a `playerId` → `Player`
- *  lookup, instead of each one re-declaring its own `new Map(...)` memo. */
-export function playersById(players: readonly Player[]): ReadonlyMap<string, Player> {
-  return new Map(players.map((player) => [player.id, player]));
-}
-
-/** A team's display name, or `fallback` (default: the id itself) when the roster doesn't list it. */
-export function teamName(byId: ReadonlyMap<string, TeamCard>, teamId: string, fallback: string = teamId): string {
-  return byId.get(teamId)?.name ?? fallback;
-}
-
-/** A player's display name, or `fallback` (default: the id itself) when the pool doesn't list it. */
-export function playerName(byId: ReadonlyMap<string, Player>, playerId: string, fallback: string = playerId): string {
-  return byId.get(playerId)?.name ?? fallback;
+export function queueButtonLabel(name: string, queued: boolean): string {
+  return queued ? `Remove ${name} from your queue` : `Queue ${name}`;
 }

@@ -11,14 +11,41 @@ export interface ClockTier {
   readonly pickSeconds: number;
 }
 
-/** 8h → 4h → 1h → 10m → 60s, per the strategy doc's named schedule. */
+/**
+ * 8h → 4h → 1h → 10m → 1:30, per the strategy doc's auto-tightening schedule. The floor is
+ * the live draft-night pace: 90 seconds is enough to act on a plan (the queue) and short
+ * enough to keep twelve people leaning in — a founder call (2026-08-18) over the original 60s.
+ */
 export const DRAFT_CLOCK_SCHEDULE: readonly ClockTier[] = [
   { untilHoursBeforeKickoff: 168, pickSeconds: 8 * 60 * 60 },
   { untilHoursBeforeKickoff: 48, pickSeconds: 4 * 60 * 60 },
   { untilHoursBeforeKickoff: 12, pickSeconds: 60 * 60 },
   { untilHoursBeforeKickoff: 2, pickSeconds: 10 * 60 },
-  { untilHoursBeforeKickoff: 0, pickSeconds: 60 },
+  { untilHoursBeforeKickoff: 0, pickSeconds: 90 },
 ];
+
+export const DRAFT_QUEUE_CONFIG = {
+  /**
+   * Longest queue a team may store. Bounds both the jsonb action row and the reorder UI;
+   * a queue is a shortlist, not a mirror of the whole pool.
+   */
+  maxLength: 50,
+} as const;
+
+/**
+ * Ceiling for the PERSISTED `SET_QUEUE` action row (`draftActionSchema`, the jsonb boundary),
+ * kept deliberately separate from `DRAFT_QUEUE_CONFIG.maxLength` (the client-submission
+ * tunable). Every `draft_actions` row ever written was validated against this number at
+ * write time; if it were tied to the tunable and someone later lowered `maxLength`, those
+ * older rows would stop parsing on replay and the draft would become unloadable. Never
+ * decrease this value — only ever raise it, and only as a deliberate, documented migration.
+ *
+ * `DRAFT_QUEUE_CONFIG.maxLength <= PERSISTED_QUEUE_MAX` is asserted by a test
+ * (`action-schema.test.ts`) rather than a module-load throw here: a throw's failing branch
+ * can never be exercised by a passing test suite, which would cost this file the 100%
+ * branch-coverage gate `src/draft-engine` is held to.
+ */
+export const PERSISTED_QUEUE_MAX = 100;
 
 export const AUCTION_CONFIG = {
   /** Lowest legal opening bid, in whole dollars. */
@@ -29,4 +56,13 @@ export const AUCTION_CONFIG = {
   bidWindowSeconds: 15,
   /** Dollars a team must keep in reserve for each roster spot it still has to fill. */
   reservePerOpenSlot: 1,
+} as const;
+
+/**
+ * Tunables for the serialized view, as opposed to the rules. `upcomingCount` is how far ahead
+ * `DraftClockView.upcoming` looks — long enough that a manager in a 12-team league can always
+ * see themselves in the queue, short enough that it costs nothing on every event payload.
+ */
+export const DRAFT_VIEW_CONFIG = {
+  upcomingCount: 12,
 } as const;

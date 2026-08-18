@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions, draftPicks, drafts, players, rosterSlots } from "@/db/schema";
+import { draftActions, draftPicks, drafts, matchups, players, rosterSlots, weeks } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
 import { DRAFT_CLOCK_SCHEDULE, currentDeadline, initialDraftState, reduceDraft, type DraftConfig } from "@/draft-engine";
+import { LEAGUE_CONFIG } from "@/league";
 import { createDraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -76,7 +77,7 @@ async function seedCompletedActionLog(draftId: string, leagueId: string, teamIds
     clockSchedule: DRAFT_CLOCK_SCHEDULE,
   };
   const actions: DraftAction[] = [
-    { v: 1, type: "START_DRAFT", timestamp: clock.now(), draftOrder: teamIds, pool: SPRINT_POOL },
+    { v: 1, type: "START_DRAFT", minBid: 1, timestamp: clock.now(), draftOrder: teamIds, pool: SPRINT_POOL },
   ];
   let state = initialDraftState(config);
   for (const action of actions) {
@@ -148,6 +149,20 @@ describe("startDraft", () => {
     expect(await store.startDraft(draftId)).toEqual({ ok: false, reason: "There are no players to draft yet." });
   });
 
+  it("refuses to start a draft marked complete with an empty action log — the seeded-season-league booby trap", async () => {
+    // Mirrors src/data/seed/seed-season-league.ts: rosters dealt directly, `drafts.status`
+    // written straight to "complete", and NO draft_actions ever written. Replaying an empty
+    // log yields phase "scheduled", so without this guard the reducer's own "already
+    // started"/"already finished" checks never fire and startDraft would happily re-run over
+    // rosters that already exist.
+    const { draftId } = await fixture("snake");
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.id, draftId));
+
+    const result = await store.startDraft(draftId);
+    expect(result).toEqual({ ok: false, reason: "This draft has already finished." });
+    expect(await db.select().from(draftActions).where(eq(draftActions.draftId, draftId))).toHaveLength(0);
+  });
+
   it("refuses to start a draft whose pool can't fill every roster", async () => {
     // SPRINT_ROSTER_SLOTS is 3 slots/team * 2 teams = 6 players needed; insert only 5.
     const { draftId } = await seedDraftFixture(db, {
@@ -197,6 +212,23 @@ describe("commitDraftResults — snake", () => {
     const again = await store.commitDraftResults(draftId);
     expect(again).toEqual({ ok: true, picks: 6, teams: 2, alreadyCommitted: true });
     expect(await db.select().from(draftPicks).where(eq(draftPicks.draftId, draftId))).toHaveLength(6);
+  });
+
+  it("gives the league a full season the moment the draft completes", async () => {
+    const { draftId, leagueId, teamIds } = await fixture("snake");
+    await store.startDraft(draftId);
+    await runOnTheClock(draftId);
+
+    const weekRows = await db.select().from(weeks).where(eq(weeks.leagueId, leagueId));
+    const matchupRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
+    expect(weekRows).toHaveLength(LEAGUE_CONFIG.regularSeasonWeeks);
+    expect(matchupRows.length).toBe(LEAGUE_CONFIG.regularSeasonWeeks * (teamIds.length / 2));
+    expect(matchupRows.every((row) => row.homeScore === null && row.awayScore === null)).toBe(true);
+
+    // …and the defensive re-commit does not duplicate it.
+    await store.commitDraftResults(draftId);
+    expect(await db.select().from(matchups).where(eq(matchups.leagueId, leagueId))).toHaveLength(matchupRows.length);
+    expect(await db.select().from(weeks).where(eq(weeks.leagueId, leagueId))).toHaveLength(weekRows.length);
   });
 
   it("refuses to commit a draft that hasn't finished", async () => {
@@ -249,6 +281,9 @@ describe("commitDraftResults — the real commit branch", () => {
     }
     const [after] = await db.select().from(drafts).where(eq(drafts.id, draftId));
     expect(after?.status).toBe("complete");
+    // The recovered commit builds the season too — crash recovery must not leave a league
+    // with rosters and no fixtures.
+    expect(await db.select().from(weeks).where(eq(weeks.leagueId, leagueId))).toHaveLength(LEAGUE_CONFIG.regularSeasonWeeks);
 
     // Calling it again now finds drafts.status already "complete" and takes the short-circuit.
     const again = await store.commitDraftResults(draftId);

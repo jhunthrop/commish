@@ -1,14 +1,21 @@
-export { Button, type ButtonProps, type ButtonVariant, type ButtonSize } from "./button";
-export { Input, type InputProps } from "./input";
-export { Card, type CardProps } from "./card";
-export { Badge, type BadgeProps, type BadgeTone } from "./badge";
-export { Skeleton, type SkeletonProps } from "./skeleton";
-export { EmptyState, type EmptyStateProps } from "./empty-state";
-export { ErrorState, type ErrorStateProps } from "./error-state";
-export { Icon, type IconName, type IconProps } from "./icon";
-export { Select, type SelectProps, type SelectOption } from "./select";
-export { Avatar, initialsFor, type AvatarProps, type AvatarSize } from "./avatar";
-export { Modal, type ModalProps } from "./modal";
-export { ToastProvider, useToast, type ToastInput, type ToastTone, type ToastAction, type ToastApi } from "./toast";
-export { Table, type TableProps, type TableColumn } from "./table";
-export { UI_CONFIG } from "./config";
+// Barrel surface: only names actually imported through `@/components/ui` elsewhere in the
+// repo. A type, alternate helper, or a component nothing yet renders (e.g. `Icon`) is reached
+// by importing its own file directly — see docs/design-system.md's primitives list for the
+// full catalog, which is broader than this barrel on purpose.
+export { Button } from "./button";
+export { Input } from "./input";
+export { Card } from "./card";
+export { Badge } from "./badge";
+export { PositionBadge, positionStickerClass } from "./position-badge";
+export { SlotChip } from "./slot-chip";
+export { PageTitle } from "./page-title";
+export { Skeleton } from "./skeleton";
+export { EmptyState } from "./empty-state";
+export { ErrorState } from "./error-state";
+export { Select } from "./select";
+export { Avatar } from "./avatar";
+export { Modal } from "./modal";
+export { ToastProvider, useToast } from "./toast";
+export { Table, type TableColumn } from "./table";
+export { Celebration } from "./celebration";
+export { EYEBROW } from "./config";

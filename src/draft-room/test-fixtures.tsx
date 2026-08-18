@@ -2,7 +2,7 @@ import type { ReactElement } from "react";
 import { render, type RenderResult } from "@testing-library/react";
 import type { Player } from "@/domain/player";
 import type { TeamCard } from "@/domain/league";
-import type { DraftStateView } from "@/draft-engine";
+import type { DraftClockView, DraftStateView } from "@/draft-engine";
 import { DraftRoomDepsProvider, type DraftRoomDeps, type EventSourceLike } from "./hooks/deps";
 
 export const PLAYERS: readonly Player[] = [
@@ -11,6 +11,8 @@ export const PLAYERS: readonly Player[] = [
   { id: "rb2", name: "Devon Marsh", position: "RB", nflTeam: "NYJ" },
   { id: "wr1", name: "Andre Salas", position: "WR", nflTeam: "DAL" },
 ];
+
+export const LEAGUE_NAME = "Sunday Money";
 
 export const TEAMS: readonly TeamCard[] = [
   { id: "t1", name: "Bay Bandits", ownerDisplayName: "Dana Whitfield", ownerAvatarUrl: null },
@@ -25,6 +27,7 @@ export const SNAKE_VIEW: DraftStateView = {
   deadlineAt: "2026-09-01T00:02:05.000Z",
   clockSeconds: 28_800,
   nextTightening: { at: "2026-09-01T02:14:00.000Z", pickSeconds: 600 },
+  upcoming: ["t1", "t2", "t2", "t1"],
   draftId: "d1",
   leagueId: "l1",
   format: "snake",
@@ -49,11 +52,26 @@ export const AUCTION_VIEW: DraftStateView = {
   budgets: { t1: 100, t2: 100 },
   minBid: 1,
   maxBids: { t1: 97, t2: 97 },
-  auction: { nominatingTeamId: "t1", lot: null },
+  auction: { nominatingTeamId: "t1", lot: null, minBid: 1 },
 };
 
 export function playersById(players: readonly Player[] = PLAYERS): ReadonlyMap<string, Player> {
   return new Map(players.map((player) => [player.id, player]));
+}
+
+/** The eight `DraftClockView` fields a view already carries — one shared clock literal
+ *  instead of every test file hand-writing its own. */
+export function clockOf(view: DraftStateView): DraftClockView {
+  return {
+    phase: view.phase,
+    sequence: view.sequence,
+    pickNumber: view.pickNumber,
+    onClockTeamId: view.onClockTeamId,
+    deadlineAt: view.deadlineAt,
+    clockSeconds: view.clockSeconds,
+    nextTightening: view.nextTightening,
+    upcoming: view.upcoming,
+  };
 }
 
 export class FakeEventSource implements EventSourceLike {
@@ -81,6 +99,10 @@ export interface FixtureDeps {
   view: DraftStateView;
   teamId: string | null;
   postResponse: unknown;
+  /** What the snapshot reports as the caller's own queue. */
+  queue: readonly string[];
+  /** What `POST /queue` answers with. */
+  queueResponse: unknown;
 }
 
 /** Injected doubles for the whole room: no module mocks, no real network, no real EventSource. */
@@ -91,14 +113,20 @@ export function fixtureDeps(view: DraftStateView = SNAKE_VIEW): FixtureDeps {
     view,
     teamId: "t1",
     postResponse: { ok: true, data: { draft: view } },
+    queue: [],
+    queueResponse: { ok: true, data: { queue: [] } },
     deps: {
       fetchJson: async (url, init) => {
         fixture.calls.push(`${init?.method ?? "GET"} ${url}`);
         const body = url.endsWith("/players")
           ? { ok: true, data: { players: PLAYERS } }
-          : init?.method === "POST"
-            ? fixture.postResponse
-            : { ok: true, data: { draft: fixture.view, teamId: fixture.teamId, isCommissioner: false, teams: TEAMS } };
+          : url.endsWith("/queue")
+            ? init?.method === "POST"
+              ? fixture.queueResponse
+              : { ok: true, data: { queue: fixture.queue } }
+            : init?.method === "POST"
+              ? fixture.postResponse
+              : { ok: true, data: { draft: fixture.view, leagueName: LEAGUE_NAME, teamId: fixture.teamId, isCommissioner: false, teams: TEAMS, queue: fixture.queue } };
         return { json: async () => body } as unknown as Response;
       },
       openEventSource: (url) => {

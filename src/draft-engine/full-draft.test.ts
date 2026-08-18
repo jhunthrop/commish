@@ -4,10 +4,9 @@ import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { initialDraftState, totalRosterSlots, type DraftConfig, type DraftState } from "./state";
 import { DRAFT_CLOCK_SCHEDULE } from "./config";
-import { reduceDraft } from "./reduce";
 import { snakeTeamForPick } from "./order";
 import { isComplete, remainingBudget } from "./selectors";
-import { expireAt } from "./test-support";
+import { expireAt, submitCommand } from "./test-support";
 
 const TEAMS = Array.from({ length: 12 }, (_, i) => `t${String(i + 1).padStart(2, "0")}`);
 
@@ -36,10 +35,10 @@ const POOL: readonly DraftPoolEntry[] = (() => {
 })();
 
 const T = "2026-09-01T00:00:00.000Z";
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp: T, draftOrder: TEAMS, pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: TEAMS, pool: POOL };
 
-function apply(state: DraftState, action: Parameters<typeof reduceDraft>[1]): DraftState {
-  const result = reduceDraft(state, action);
+function apply(state: DraftState, action: Parameters<typeof submitCommand>[1]): DraftState {
+  const result = submitCommand(state, action);
   if (!result.ok) throw new Error(`${action.type} rejected: ${result.reason}`);
   return result.state;
 }
@@ -87,7 +86,7 @@ describe("a full 12-team, 15-round snake draft", () => {
     const drafted = final.picks[0]!.playerId;
     let state = apply(initialDraftState(config), START);
     state = apply(state, { v: 1, type: "MAKE_PICK", timestamp: T, teamId: TEAMS[0]!, playerId: drafted });
-    expect(reduceDraft(state, { v: 1, type: "MAKE_PICK", timestamp: T, teamId: TEAMS[1]!, playerId: drafted })).toEqual({
+    expect(submitCommand(state, { v: 1, type: "MAKE_PICK", timestamp: T, teamId: TEAMS[1]!, playerId: drafted })).toEqual({
       ok: false,
       reason: "That player has already been drafted.",
     });
@@ -125,7 +124,7 @@ describe("a full 12-team auction draft", () => {
     state = apply(state, { v: 1, type: "BID", timestamp: T, teamId: TEAMS[1]!, amount: 120 });
     state = apply(state, { v: 1, type: "BID", timestamp: T, teamId: TEAMS[0]!, amount: 186 });
     // $200 less $14 held back for 14 unfilled spots.
-    expect(reduceDraft(state, { v: 1, type: "BID", timestamp: T, teamId: TEAMS[1]!, amount: 187 })).toEqual({
+    expect(submitCommand(state, { v: 1, type: "BID", timestamp: T, teamId: TEAMS[1]!, amount: 187 })).toEqual({
       ok: false,
       reason: "You can only bid up to $186 — you need $1 for each of your remaining roster spots.",
     });

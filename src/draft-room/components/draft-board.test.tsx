@@ -1,0 +1,181 @@
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { render, screen, within } from "@testing-library/react";
+import { axe } from "vitest-axe";
+import type { CompletedPick, DraftStateView } from "@/draft-engine";
+import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
+import { inBothThemes } from "@/components/ui/test-utils";
+import { AUCTION_VIEW, PLAYERS, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
+import { DraftBoard } from "./draft-board";
+
+function stubMatchMedia(reduced: boolean) {
+  vi.stubGlobal("matchMedia", (query: string) => ({
+    matches: query === REDUCED_MOTION_QUERY ? reduced : false,
+    media: query,
+    addEventListener: () => {},
+    removeEventListener: () => {},
+  }));
+}
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
+
+function pick(over: Partial<CompletedPick> = {}): CompletedPick {
+  return {
+    pickNumber: 1,
+    round: 1,
+    teamId: "t1",
+    playerId: "qb1",
+    slot: "QB",
+    slotIndex: 0,
+    price: null,
+    timestamp: "2026-09-01T00:05:00.000Z",
+    auto: false,
+    ...over,
+  };
+}
+
+/** Round 1 ran t1 → t2; round 2 turns around and runs t2 → t1. */
+const SERPENTINE: readonly CompletedPick[] = [
+  pick({ pickNumber: 1, round: 1, teamId: "t1", playerId: "qb1", slot: "QB" }),
+  pick({ pickNumber: 2, round: 1, teamId: "t2", playerId: "rb1", slot: "RB" }),
+  pick({ pickNumber: 3, round: 2, teamId: "t2", playerId: "rb2", slot: "RB" }),
+  pick({ pickNumber: 4, round: 2, teamId: "t1", playerId: "wr1", slot: "RB" }),
+];
+
+const props = {
+  teams: TEAMS,
+  playersById: playersById(PLAYERS),
+  myTeamId: "t1",
+};
+
+function grid(): HTMLElement {
+  return screen.getByTestId("draft-board-grid");
+}
+
+describe("DraftBoard", () => {
+  it("draws a column per team and a row per roster spot, axe-clean in both themes", async () => {
+    stubMatchMedia(false);
+    await inBothThemes(<DraftBoard {...props} view={SNAKE_VIEW} />, async ({ container }) => {
+      const table = within(grid()).getByRole("table", { name: /draft board/i });
+      // Header row plus one row per roster spot (SNAKE_VIEW declares QB×1 + RB×2).
+      expect(within(table).getAllByRole("row")).toHaveLength(1 + 3);
+      expect(within(table).getByRole("columnheader", { name: /Bay Bandits/ })).toBeInTheDocument();
+      expect(within(table).getByRole("columnheader", { name: /Iron Owls/ })).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("puts each pick in its own team's column and round's row, as a position-colored sticker", () => {
+    stubMatchMedia(false);
+    render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} />);
+    const rows = within(grid()).getAllByRole("row");
+    // rows[0] is the header; rows[1] is round 1.
+    const roundOne = within(rows[1]!).getAllByRole("cell");
+    expect(roundOne[0]).toHaveTextContent("Jalen Croft");
+    expect(roundOne[0]).toHaveTextContent("QB · KC");
+    expect(roundOne[1]).toHaveTextContent("Marcus Reed");
+    expect(roundOne[0]!.querySelector(".bg-pos-qb")).not.toBeNull();
+    expect(roundOne[1]!.querySelector(".bg-pos-rb")).not.toBeNull();
+  });
+
+  it("marks the team on the clock with a spotlight cell, in their next empty round", () => {
+    stubMatchMedia(false);
+    const view: DraftStateView = { ...SNAKE_VIEW, picks: SERPENTINE, onClockTeamId: "t1", pickNumber: 5 };
+    render(<DraftBoard {...props} view={view} />);
+    const rows = within(grid()).getAllByRole("row");
+    // t1 owns rounds 1 and 2, so their spotlight is round 3 — rows[3].
+    const roundThree = within(rows[3]!).getAllByRole("cell");
+    expect(roundThree[0]).toHaveTextContent("On the clock");
+    expect(roundThree[1]).not.toHaveTextContent("On the clock");
+    expect(roundThree[0]!.querySelector(".animate-spotlight")).not.toBeNull();
+  });
+
+  it("holds the spotlight ring still when the user prefers reduced motion", () => {
+    stubMatchMedia(true);
+    const view: DraftStateView = { ...SNAKE_VIEW, picks: SERPENTINE, onClockTeamId: "t1" };
+    const { container } = render(<DraftBoard {...props} view={view} />);
+    expect(container.querySelector(".ring-accent")).not.toBeNull();
+    expect(container.querySelector(".animate-spotlight")).toBeNull();
+  });
+
+  it("slaps only the sticker for the pick that just landed", () => {
+    stubMatchMedia(false);
+    const { container } = render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} landedPickNumber={4} />);
+    const slapped = container.querySelectorAll(".animate-sticker-slap");
+    // One in the wide grid, one in the narrow list — the same cell, rendered for two widths.
+    expect(slapped.length).toBeGreaterThan(0);
+    for (const node of slapped) expect(node.textContent).toContain("Andre Salas");
+  });
+
+  it("never animates a landing when the user prefers reduced motion — the sticker just appears", () => {
+    stubMatchMedia(true);
+    const { container } = render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} landedPickNumber={4} />);
+    expect(container.querySelector(".animate-sticker-slap")).toBeNull();
+    expect(screen.getAllByText("Andre Salas").length).toBeGreaterThan(0);
+  });
+
+  it("shows which way a snake round actually ran, read off the picks in it", () => {
+    stubMatchMedia(false);
+    render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} />);
+    const rows = within(grid()).getAllByRole("row");
+    expect(within(rows[1]!).getByRole("rowheader")).toHaveTextContent("picked left to right");
+    expect(within(rows[2]!).getByRole("rowheader")).toHaveTextContent("picked right to left");
+    // Round 3 has no picks, so there is nothing to report and no arrow is invented.
+    expect(within(rows[3]!).getByRole("rowheader")).not.toHaveTextContent("picked");
+  });
+
+  it("claims no direction for an auction, where a round is not an order", () => {
+    stubMatchMedia(false);
+    const view: DraftStateView = { ...AUCTION_VIEW, picks: SERPENTINE };
+    render(<DraftBoard {...props} view={view} />);
+    for (const row of within(grid()).getAllByRole("row").slice(1)) {
+      expect(within(row).getByRole("rowheader")).not.toHaveTextContent("picked");
+    }
+  });
+
+  it("marks your own column so you can find yourself at a glance", () => {
+    stubMatchMedia(false);
+    render(<DraftBoard {...props} view={SNAKE_VIEW} />);
+    expect(within(grid()).getByRole("columnheader", { name: /Bay Bandits/ })).toHaveTextContent("You");
+    expect(within(grid()).getByRole("columnheader", { name: /Iron Owls/ })).not.toHaveTextContent("You");
+  });
+
+  it("collapses to a per-round list, newest round first, for the 360px layout", () => {
+    stubMatchMedia(false);
+    render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} />);
+    const list = screen.getByTestId("draft-board-list");
+    // The round in progress leads, then the completed rounds newest-first. Rounds nobody has
+    // reached yet are left off — a phone screen of empty slots is a scroll, not information.
+    expect(within(list).getAllByRole("heading").map((heading) => heading.textContent)).toEqual(["Round 3", "Round 2", "Round 1"]);
+    expect(within(list).getByText("On the clock")).toBeInTheDocument();
+  });
+
+  it("says so plainly in the narrow list when nothing has been drafted yet", () => {
+    stubMatchMedia(false);
+    render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, phase: "scheduled", onClockTeamId: null }} />);
+    expect(within(screen.getByTestId("draft-board-list")).getByText(/Nothing has been drafted yet/)).toBeInTheDocument();
+  });
+
+  it("still draws a column per team before the draft order exists", () => {
+    stubMatchMedia(false);
+    const view: DraftStateView = { ...SNAKE_VIEW, phase: "scheduled", draftOrder: [], picks: [], onClockTeamId: null };
+    render(<DraftBoard {...props} view={view} />);
+    expect(within(grid()).getByRole("columnheader", { name: /Bay Bandits/ })).toBeInTheDocument();
+    expect(within(grid()).getByRole("columnheader", { name: /Iron Owls/ })).toBeInTheDocument();
+  });
+
+  it("shows the winning price on an auction sticker", () => {
+    stubMatchMedia(false);
+    const view: DraftStateView = { ...AUCTION_VIEW, picks: [pick({ price: 42 })] };
+    render(<DraftBoard {...props} view={view} />);
+    expect(within(grid()).getAllByText(/\$42/).length).toBeGreaterThan(0);
+  });
+
+  it("reads bigger on the TV without saying anything different", () => {
+    stubMatchMedia(false);
+    render(<DraftBoard {...props} view={{ ...SNAKE_VIEW, picks: SERPENTINE }} variant="tv" />);
+    const sticker = within(grid()).getAllByText("Jalen Croft")[0]!;
+    expect(sticker.className).toContain("text-display-md");
+  });
+});

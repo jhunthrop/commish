@@ -39,7 +39,7 @@ function apply(state: DraftState, action: DraftAction): DraftState {
 function started(format: "snake" | "auction"): DraftState {
   return apply(initialDraftState(configFor(format)), {
     v: 1,
-    type: "START_DRAFT",
+    type: "START_DRAFT", minBid: 1,
     timestamp: "2026-09-01T00:00:00.000Z",
     draftOrder: ["t1", "t2"],
     pool: POOL,
@@ -56,6 +56,7 @@ describe("draftClockView", () => {
       deadlineAt: null,
       clockSeconds: null,
       nextTightening: null,
+      upcoming: [],
     });
   });
 
