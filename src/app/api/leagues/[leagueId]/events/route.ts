@@ -1,31 +1,15 @@
-import { getDb } from "@/db/client";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { requireLeagueMember, resolveLeagueMembership } from "@/lib/leagues/membership";
 import { createLeagueEventStream } from "@/lib/realtime/sse";
-import { fail } from "@/lib/api/respond";
+import { withLeagueMemberActor, type LeagueRouteContext } from "../../_shared";
 
 // SSE streams are long-lived; this route must run on the Node runtime, not the Edge.
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-interface RouteContext {
-  readonly params: Promise<{ readonly leagueId: string }>;
-}
-
 /**
- * Gated the same way the draft board is (R-B5): a signed-in stranger with no team in this
- * league — and who isn't its commissioner — must not be able to subscribe to its stream and
- * watch picks, chat and scores land in another league's room.
+ * The real-time fan-out, gated by the one league-membership rule every `/api/leagues/**`
+ * route now shares (R-B5): a signed-in stranger with no team here — and who isn't the
+ * commissioner — must not be able to watch another league's picks, chat and scores.
  */
-export async function GET(request: Request, { params }: RouteContext) {
-  const user = await getCurrentUser();
-  if (user === null) return fail("Not signed in.", 401);
-  const { leagueId } = await params;
-
-  const membership = await resolveLeagueMembership(getDb(), leagueId, user.id);
-  if (!membership.ok) return fail(membership.error, membership.status);
-  const denied = requireLeagueMember(membership.membership);
-  if (denied !== null) return denied;
-
-  return createLeagueEventStream(request, leagueId);
+export async function GET(request: Request, context: LeagueRouteContext) {
+  return withLeagueMemberActor(request, context, async (actor) => createLeagueEventStream(request, actor.leagueId));
 }
