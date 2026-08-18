@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# One run per ref at a time — a superseded push cancels its predecessor's run instead of
+# racing it for the same shared local infrastructure.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Real Postgres (primary + the dedicated tmpfs-backed test DB) and Redis, from the
+      # SAME docker-compose.yml a contributor runs locally — one definition of "what infra
+      # this repo needs", not a second copy hand-rolled as GitHub Actions `services:`.
+      - name: Start local infra (Postgres x2, Redis)
+        run: npm run infra:up
+
+      # dotenv-cli (every db:*/seed/tokens:build script) reads `.env.local`, gitignored and
+      # normally created by hand from `.env.example` per the README. CI has no such file, so
+      # write one with the docker-compose credentials plus placeholder secrets for the
+      # first-party code that never actually reads them (nothing under src/ references the
+      # WorkOS vars directly — only the WorkOS SDK does, at request time) — real enough for
+      # migrate/test/build without depending on any repository secret.
+      - name: Write .env.local
+        run: |
+          cat > .env.local <<'EOF'
+          DATABASE_URL=postgres://commish:commish@localhost:5432/commish
+          REDIS_URL=redis://localhost:6379
+          TEST_DATABASE_URL=postgres://commish:commish@localhost:5433/commish_test
+          WORKOS_CLIENT_ID=client_ci_placeholder
+          WORKOS_API_KEY=sk_ci_placeholder
+          WORKOS_COOKIE_PASSWORD=ci_placeholder_password_at_least_32_characters_long
+          NEXT_PUBLIC_WORKOS_REDIRECT_URI=http://localhost:3000/callback
+          ALLOW_DESTRUCTIVE_SEED=1
+          DEV_SEED_CLAIM_USER_ID=
+          ANTHROPIC_API_KEY=
+          EOF
+
+      # Migrations before tests: sse.test.ts and every DB-backed suite run against a real
+      # schema in commish_test, not a mock.
+      - name: Migrate the primary database
+        run: npm run db:migrate
+      - name: Migrate the test database
+        run: npm run db:migrate:test
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      # Unfiltered, per vitest.config.mts's own note — a path-filtered run would report the
+      # other 100%-gated directories at 0% and silently pass.
+      - name: Test coverage (100% gate on src/scoring, src/draft-engine, src/draft-room/state, src/league)
+        run: npm run test:coverage
+
+      - name: Build
+        run: npm run build
+
+      - name: Stop local infra
+        if: always()
+        run: npm run infra:down
