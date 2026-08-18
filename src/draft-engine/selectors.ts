@@ -1,10 +1,10 @@
 import type { DraftPoolEntry, DraftStatus } from "@/domain/draft";
 import type { DraftFormat } from "@/domain/league";
 import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
-import { auctionOf, rosterFor, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
+import { auctionOf, rosterFor, totalPickCount, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
 import { assignSlot } from "./slotting";
-import { AUCTION_CONFIG, type ClockTier } from "./config";
+import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier } from "./config";
 import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
 import { queuedEntriesFor } from "./queue";
 
@@ -60,6 +60,57 @@ export function teamOnClock(state: DraftState): string | null {
   const auction = auctionOf(state);
   if (auction === null) return snakeTeamForPick(state.draftOrder, state.pickNumber);
   return auction.lot === null ? auction.nominatingTeamId : null;
+}
+
+/** Next team in nomination order after `afterTeamId`, skipping full rosters. Null when nobody can nominate. */
+export function nextNominator(state: DraftState, afterTeamId: string): string | null {
+  const order = state.draftOrder;
+  const start = order.indexOf(afterTeamId);
+  const rotated = [...order.slice(start + 1), ...order.slice(0, start + 1)];
+  return rotated.find((teamId) => openSlotCount(state, teamId) > 0) ?? null;
+}
+
+/**
+ * The next `count` teams due to act, current turn first — the answer to "when am I up?",
+ * computed once here rather than restated as serpentine arithmetic in a browser.
+ *
+ * Neither format grows a second walk. Snake replays the engine's own `snakeTeamForPick`
+ * forward, stopping at `totalPickCount` (the same ceiling `advanceSnake` completes the draft
+ * at); a snake draft never skips a team, because every team owns exactly the same number of
+ * roster spots and therefore fills its last one on the last round. Auction chains
+ * `nextNominator`, which already skips full rosters, and cycles once the rotation comes back
+ * around — an auction's order repeats, so a 12-deep lookahead in an 8-team league legitimately
+ * names some teams twice.
+ *
+ * While a lot is open there is no team "on the clock" (`teamOnClock` is null by design: the
+ * clock belongs to every bidder), so the walk starts with the team due to nominate AFTER the
+ * one whose lot is live. It is computed against the rosters as they stand, so if the lot's
+ * winner fills their last spot the list shifts by one — the next event's clock carries the
+ * corrected list, which is why `upcoming` rides every payload rather than being fetched.
+ */
+export function upcomingOnClock(state: DraftState, count: number): readonly string[] {
+  if (state.phase !== "in_progress") return [];
+  const auction = auctionOf(state);
+  return auction === null ? upcomingSnake(state, count) : upcomingNominators(state, auction, count);
+}
+
+function upcomingSnake(state: DraftState, count: number): readonly string[] {
+  const lastPick = totalPickCount(state);
+  const upcoming: string[] = [];
+  for (let pickNumber = state.pickNumber; pickNumber <= lastPick && upcoming.length < count; pickNumber++) {
+    upcoming.push(snakeTeamForPick(state.draftOrder, pickNumber));
+  }
+  return upcoming;
+}
+
+function upcomingNominators(state: DraftState, auction: AuctionState, count: number): readonly string[] {
+  const upcoming: string[] = [];
+  let team = auction.lot === null ? auction.nominatingTeamId : nextNominator(state, auction.lot.nominatedByTeamId);
+  while (team !== null && upcoming.length < count) {
+    upcoming.push(team);
+    team = nextNominator(state, team);
+  }
+  return upcoming;
 }
 
 /** The ranked autopick queue this team stored, or an empty list. */
@@ -156,6 +207,12 @@ export interface DraftClockView {
   readonly deadlineAt: string | null;
   readonly clockSeconds: number | null;
   readonly nextTightening: Tightening | null;
+  /**
+   * The next `DRAFT_VIEW_CONFIG.upcomingCount` teams due to act, current turn first. Rides
+   * every event payload so a client can answer "when am I up?" with an index lookup instead
+   * of a turn-order rule of its own.
+   */
+  readonly upcoming: readonly string[];
 }
 
 /**
@@ -172,6 +229,7 @@ export function draftClockView(state: DraftState): DraftClockView {
     deadlineAt: currentDeadline(state),
     clockSeconds: currentClockSeconds(state),
     nextTightening: nextTightening(state),
+    upcoming: upcomingOnClock(state, DRAFT_VIEW_CONFIG.upcomingCount),
   };
 }
 

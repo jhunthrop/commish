@@ -3,21 +3,17 @@ import { rosterFor, type AuctionState, type DraftReduceResult, type DraftState }
 import { AUCTION_CONFIG } from "./config";
 import { assignSlot } from "./slotting";
 import { applyPick, expectApplied } from "./apply-pick";
-import { bestAvailableFor, maxBidFor, openSlotCount, remainingBudget } from "./selectors";
+import { bestAvailableFor, maxBidFor, nextNominator, remainingBudget } from "./selectors";
 
 /**
  * Every function here takes the already-resolved `AuctionState`. The "is this even an
  * auction" question is answered once, in `reduce.ts`'s dispatch, so these functions have no
  * unreachable null-guard to defend (and no unreachable branch to chase for coverage).
+ *
+ * The nomination rotation itself (`nextNominator`) lives in `selectors.ts`, because the
+ * lookahead `upcomingOnClock` publishes on the clock view walks exactly the same rotation —
+ * one walk, imported by both, rather than two that could drift.
  */
-
-/** Next team in nomination order after `afterTeamId`, skipping full rosters. Null when nobody can nominate. */
-export function nextNominator(state: DraftState, afterTeamId: string): string | null {
-  const order = state.draftOrder;
-  const start = order.indexOf(afterTeamId);
-  const rotated = [...order.slice(start + 1), ...order.slice(0, start + 1)];
-  return rotated.find((teamId) => openSlotCount(state, teamId) > 0) ?? null;
-}
 
 /** Shared guard: this team can still roster this player, and the amount is within their budget. */
 function checkAffordable(state: DraftState, teamId: string, playerId: string, amount: number): string | null {

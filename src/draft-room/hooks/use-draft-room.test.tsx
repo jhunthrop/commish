@@ -29,6 +29,7 @@ const VIEW: DraftStateView = {
   deadlineAt: "2026-09-01T08:00:00.000Z",
   clockSeconds: 28_800,
   nextTightening: null,
+  upcoming: ["t1", "t2"],
   draftId: "d1",
   leagueId: "l1",
   format: "snake",

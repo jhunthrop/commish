@@ -36,6 +36,13 @@ The one place this rule was tested and held: `rosterSpots()` in `state/format.ts
 league's declared slot counts. It is config arithmetic, not a draft rule, and its test asserts
 it agrees with the engine's `totalRosterSlots` so the two cannot diverge.
 
+The second place it was tested and held: **"You're up in 7 picks (~24m)."** Working that out
+from `draftOrder` and `pickNumber` in React would be serpentine order restated — so the engine
+publishes the answer instead. `upcomingOnClock` (see `docs/draft-engine.md`) puts the next
+`DRAFT_VIEW_CONFIG.upcomingCount` teams on `DraftClockView.upcoming`, which rides every event
+payload; `formatYourTurn(upcoming, myTeamId, clockSeconds)` in `state/format.ts` is then an
+index lookup plus display arithmetic over two server values, and the dock renders its sentence.
+
 ## Layers
 
 | Path | Rule |

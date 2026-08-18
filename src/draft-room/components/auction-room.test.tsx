@@ -15,6 +15,7 @@ const clockOf = (view: typeof AUCTION_VIEW, sequence: number) => ({
   deadlineAt: "2026-09-01T00:00:12.000Z",
   clockSeconds: 15,
   nextTightening: null,
+  upcoming: view.upcoming,
 });
 
 function mountAuction(view = AUCTION_VIEW) {

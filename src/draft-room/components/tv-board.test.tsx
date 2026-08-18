@@ -75,7 +75,7 @@ describe("TvBoard", () => {
     act(() =>
       fixture.sources[0]!.emit("draft.pick", {
         draftId: "d1",
-        clock: { phase: "in_progress", sequence: 2, pickNumber: 2, onClockTeamId: "t2", deadlineAt: SNAKE_VIEW.deadlineAt, clockSeconds: 28_800, nextTightening: null },
+        clock: { phase: "in_progress", sequence: 2, pickNumber: 2, onClockTeamId: "t2", deadlineAt: SNAKE_VIEW.deadlineAt, clockSeconds: 28_800, nextTightening: null, upcoming: SNAKE_VIEW.upcoming },
         pickNumber: 1,
         round: 1,
         teamId: "t1",

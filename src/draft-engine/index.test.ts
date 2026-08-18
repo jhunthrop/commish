@@ -34,6 +34,10 @@ describe("the draft-engine public barrel", () => {
     expect(engine.openSlotCount).toBeTypeOf("function");
     expect(engine.isComplete).toBeTypeOf("function");
     expect(engine.teamOnClock).toBeTypeOf("function");
+    expect(engine.upcomingOnClock).toBeTypeOf("function");
+    expect(engine.nextNominator).toBeTypeOf("function");
+    expect(engine.totalPickCount).toBeTypeOf("function");
+    expect(engine.DRAFT_VIEW_CONFIG).toBeDefined();
     expect(engine.bestAvailableFor).toBeTypeOf("function");
     expect(engine.remainingBudget).toBeTypeOf("function");
     expect(engine.minBidFor).toBeTypeOf("function");

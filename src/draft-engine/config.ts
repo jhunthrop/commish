@@ -53,3 +53,12 @@ export const AUCTION_CONFIG = {
   /** Dollars a team must keep in reserve for each roster spot it still has to fill. */
   reservePerOpenSlot: 1,
 } as const;
+
+/**
+ * Tunables for the serialized view, as opposed to the rules. `upcomingCount` is how far ahead
+ * `DraftClockView.upcoming` looks — long enough that a manager in a 12-team league can always
+ * see themselves in the queue, short enough that it costs nothing on every event payload.
+ */
+export const DRAFT_VIEW_CONFIG = {
+  upcomingCount: 12,
+} as const;

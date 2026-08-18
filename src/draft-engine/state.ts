@@ -88,6 +88,15 @@ export function totalRosterSlots(slotConfig: readonly RosterSlotConfig[]): numbe
   return slotConfig.reduce((sum, s) => sum + s.count, 0);
 }
 
+/**
+ * Every pick a snake draft will ever make: one per roster spot, per team. The ceiling
+ * `advanceSnake` completes the draft at, and the ceiling `upcomingOnClock` stops walking at —
+ * stated here once so the two can never disagree about where the board ends.
+ */
+export function totalPickCount(state: DraftState): number {
+  return state.draftOrder.length * totalRosterSlots(state.config.slotConfig);
+}
+
 export function initialDraftState(config: DraftConfig): DraftState {
   return {
     config,

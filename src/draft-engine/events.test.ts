@@ -69,6 +69,8 @@ describe("draftEventsFor", () => {
             deadlineAt: expect.any(String),
             clockSeconds: expect.any(Number),
             nextTightening: expect.anything(),
+            // Two teams, two roster spots each: the whole board, current turn first.
+            upcoming: ["t1", "t2", "t2", "t1"],
           },
         },
       },
@@ -93,6 +95,7 @@ describe("draftEventsFor", () => {
             deadlineAt: expect.any(String),
             clockSeconds: expect.any(Number),
             nextTightening: expect.anything(),
+            upcoming: ["t2", "t2", "t1"],
           },
         },
       },
@@ -124,6 +127,7 @@ describe("draftEventsFor", () => {
           deadlineAt: "2026-09-01T16:00:00.000Z",
           clockSeconds: 8 * 60 * 60,
           nextTightening: { at: "2026-09-03T17:00:00.000Z", pickSeconds: 4 * 60 * 60 },
+          upcoming: ["t2", "t2", "t1"],
         },
       },
     });
@@ -153,6 +157,8 @@ describe("draftEventsFor", () => {
       deadlineAt: "2026-09-01T00:00:15.000Z",
       clockSeconds: 15,
       nextTightening: { at: "2026-09-03T17:00:00.000Z", pickSeconds: 4 * 60 * 60 },
+      // The lot's nominator has already acted, so the rotation ahead starts with the other team.
+      upcoming: ["t2", "t1", "t2", "t1", "t2", "t1", "t2", "t1", "t2", "t1", "t2", "t1"],
     };
 
     const nominated = step(opened, { v: 1, type: "NOMINATE", timestamp: T, teamId: "t1", playerId: "qb1", openingBid: 2 });

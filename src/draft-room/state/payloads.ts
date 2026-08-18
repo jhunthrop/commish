@@ -14,6 +14,10 @@ const clockSchema = z.object({
   deadlineAt: z.string().nullable(),
   clockSeconds: z.number().nullable(),
   nextTightening: z.object({ at: z.string(), pickSeconds: z.number() }).nullable(),
+  // `.readonly()` is load-bearing, not decoration: `DraftClockView.upcoming` is a
+  // `readonly string[]`, and a mutable `string[]` is not assignable to it in BOTH directions,
+  // so a plain `z.array` would fail the bidirectional shape assertion below.
+  upcoming: z.array(z.string()).readonly(),
 });
 
 /**

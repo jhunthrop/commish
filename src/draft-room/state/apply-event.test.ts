@@ -10,6 +10,7 @@ const clock = (over: Partial<DraftClockView> = {}): DraftClockView => ({
   deadlineAt: "2026-09-01T08:00:00.000Z",
   clockSeconds: 28_800,
   nextTightening: null,
+  upcoming: ["t2", "t1"],
   ...over,
 });
 
@@ -40,7 +41,7 @@ const auctionView: DraftStateView = {
 
 const frame = (type: string, payload: unknown) => JSON.stringify({ id: "1-0", type, leagueId: "l1", timestamp: "2026-09-01T00:00:00.000Z", payload });
 
-/** The seven `DraftClockView` fields a view already carries, unchanged — the "sibling" clock. */
+/** The eight `DraftClockView` fields a view already carries, unchanged — the "sibling" clock. */
 const clockOf = (view: DraftStateView): DraftClockView => ({
   phase: view.phase,
   sequence: view.sequence,
@@ -49,6 +50,7 @@ const clockOf = (view: DraftStateView): DraftClockView => ({
   deadlineAt: view.deadlineAt,
   clockSeconds: view.clockSeconds,
   nextTightening: view.nextTightening,
+  upcoming: view.upcoming,
 });
 
 const pickPayload = {

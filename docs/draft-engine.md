@@ -96,6 +96,34 @@ and to what, so the UI can show "clock tightens to 10m in 3h12m" ahead of time �
 the same way, from `turnStartedAt` forward, and is `null` before/after the draft or once the
 final tier is already in force.
 
+## The lookahead: `upcomingOnClock`
+
+`upcomingOnClock(state, count)` names the next `count` teams due to act, **current turn
+first**. It exists so a browser can answer "when am I up?" with an index lookup instead of
+re-implementing serpentine order — the one rule `docs/draft-room.md` forbids in React.
+
+It grows no third walk of its own:
+
+- **Snake** replays `snakeTeamForPick` forward from `state.pickNumber`, stopping at
+  `totalPickCount(state)` — the same ceiling `advanceSnake` completes the draft at, which is
+  why that ceiling now lives in `state.ts` and is called from both places. A snake draft never
+  skips a team: every team owns the same number of roster spots, so they all fill their last
+  one on the last round.
+- **Auction** chains `nextNominator` (which already skips full rosters) and cycles once the
+  rotation comes back around — an auction's order repeats, so a 12-deep lookahead in an 8-team
+  league legitimately names some teams twice. `nextNominator` moved from `auction.ts` to
+  `selectors.ts` for this: one rotation, imported by both the reducer and the lookahead.
+- **While a lot is open** there is no team on the clock (`teamOnClock` is null by design), so
+  the walk starts with the team due to nominate *after* the one whose lot is live. It reads
+  the rosters as they stand, so if the lot's winner fills their last spot the list shifts by
+  one — the next event's clock carries the corrected list, which is exactly why `upcoming`
+  rides every payload rather than being fetched.
+- **Outside `in_progress`** it is empty.
+
+`DraftClockView` carries `upcoming`, sized by `DRAFT_VIEW_CONFIG.upcomingCount` (12) in
+`config.ts`. Because it lives on the clock view, it rides `draftStateView` **and** every
+`draft.*` payload, so it can never be stale by more than the event that would refresh it.
+
 ## Auto-nominate on stall
 
 In an auction, `teamOnClock` returns the nominating team only while no lot is open — during
@@ -211,7 +239,7 @@ roster slots.
 `draftEventsFor(prev, next, action)` derives events from the **state diff**, not the action
 alone. Every payload carries `draftId` and a `clock` block — exactly the `DraftClockView`
 (`phase`, `sequence`, `pickNumber`, `onClockTeamId`, `deadlineAt`, `clockSeconds`,
-`nextTightening`) that `draftStateView` also embeds. That is what lets a browser fold an
+`nextTightening`, `upcoming`) that `draftStateView` also embeds. That is what lets a browser fold an
 event into its view and know the new deadline and tier without re-deriving either; the
 sequence number a client uses for gap detection is `payload.clock.sequence`.
 

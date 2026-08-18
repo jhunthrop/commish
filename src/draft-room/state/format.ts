@@ -63,3 +63,26 @@ export function formatTightening(next: Tightening | null, nowMs: number): string
 export function rosterSpots(slotConfig: readonly RosterSlotConfig[]): number {
   return slotConfig.reduce((sum, config) => sum + config.count, 0);
 }
+
+/**
+ * The anxiety-killer: "You're up in 7 picks (~24m)." — the dock's standing answer to "when am
+ * I up?", with no turn-order rule anywhere near it. `upcoming` is the engine's own lookahead
+ * (`DraftClockView.upcoming`, computed by `upcomingOnClock` and carried on every event's
+ * clock), so this is an index lookup plus display arithmetic over two server values.
+ *
+ * Null when there is nothing to say: a spectator with no team, or a team the lookahead does
+ * not reach (a long rotation, or a draft that isn't running). A sub-minute wait reads "any
+ * moment" rather than a duration rounded away to nothing — against the same one-minute floor
+ * `formatCoarseRemaining` uses, from the same config value rather than a second literal.
+ */
+export function formatYourTurn(upcoming: readonly string[], myTeamId: string | null, clockSeconds: number | null): string | null {
+  if (myTeamId === null) return null;
+  const picksAway = upcoming.indexOf(myTeamId);
+  if (picksAway < 0) return null;
+  if (picksAway === 0) return "You're on the clock.";
+  const picks = plural(picksAway, "pick");
+  if (clockSeconds === null) return `You're up in ${picks}.`;
+  const waitMs = picksAway * clockSeconds * MS_PER_SECOND;
+  const wait = waitMs < DRAFT_ROOM_CONFIG.coarseRemainingMinuteMs ? "any moment" : `~${formatGap(waitMs)}`;
+  return `You're up in ${picks} (${wait}).`;
+}

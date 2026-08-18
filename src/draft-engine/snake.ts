@@ -1,5 +1,5 @@
 import type { MakePickAction } from "@/domain/draft";
-import { totalRosterSlots, type DraftReduceResult, type DraftState } from "./state";
+import { totalPickCount, type DraftReduceResult, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
 import { applyPick, expectApplied } from "./apply-pick";
 import { bestAvailableFor } from "./selectors";
@@ -7,8 +7,7 @@ import { bestAvailableFor } from "./selectors";
 /** Moves to the next pick, or ends the draft once every roster spot is filled. */
 export function advanceSnake(state: DraftState, timestamp: string): DraftState {
   const next = state.pickNumber + 1;
-  const totalPicks = state.draftOrder.length * totalRosterSlots(state.config.slotConfig);
-  return next > totalPicks
+  return next > totalPickCount(state)
     ? { ...state, pickNumber: next, phase: "complete", turnStartedAt: null }
     : { ...state, pickNumber: next, turnStartedAt: timestamp };
 }

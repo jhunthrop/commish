@@ -56,6 +56,7 @@ describe("draftClockView", () => {
       deadlineAt: null,
       clockSeconds: null,
       nextTightening: null,
+      upcoming: [],
     });
   });
 

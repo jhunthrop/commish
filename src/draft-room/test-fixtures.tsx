@@ -27,6 +27,7 @@ export const SNAKE_VIEW: DraftStateView = {
   deadlineAt: "2026-09-01T00:02:05.000Z",
   clockSeconds: 28_800,
   nextTightening: { at: "2026-09-01T02:14:00.000Z", pickSeconds: 600 },
+  upcoming: ["t1", "t2", "t2", "t1"],
   draftId: "d1",
   leagueId: "l1",
   format: "snake",
@@ -58,7 +59,7 @@ export function playersById(players: readonly Player[] = PLAYERS): ReadonlyMap<s
   return new Map(players.map((player) => [player.id, player]));
 }
 
-/** The seven `DraftClockView` fields a view already carries — one shared clock literal
+/** The eight `DraftClockView` fields a view already carries — one shared clock literal
  *  instead of every test file hand-writing its own. */
 export function clockOf(view: DraftStateView): DraftClockView {
   return {
@@ -69,6 +70,7 @@ export function clockOf(view: DraftStateView): DraftClockView {
     deadlineAt: view.deadlineAt,
     clockSeconds: view.clockSeconds,
     nextTightening: view.nextTightening,
+    upcoming: view.upcoming,
   };
 }
 
