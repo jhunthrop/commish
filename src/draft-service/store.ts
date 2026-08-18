@@ -5,6 +5,7 @@ import { draftActions, drafts, teams } from "@/db/schema";
 import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import {
+  admitCommand,
   draftActionSchema,
   draftEventsFor,
   reduceDraft,
@@ -131,6 +132,12 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
       return mutex.run(draftId, async (): Promise<ApplyResult> => {
         const state = await load(draftId);
         if (state === null) return { ok: false, reason: "That draft doesn't exist." };
+
+        // Command-time preconditions — the tunable-reading guards the reducer must not own,
+        // because it also runs on replay. Inside the mutex, against the state we just loaded,
+        // so this is strictly stronger than checking them in the reducer was.
+        const admitted = admitCommand(state, action);
+        if (!admitted.ok) return admitted;
 
         const result = reduceDraft(state, action);
         if (!result.ok) return result;

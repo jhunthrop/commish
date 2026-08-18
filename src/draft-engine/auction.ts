@@ -3,7 +3,7 @@ import { rosterFor, type AuctionState, type DraftReduceResult, type DraftState }
 import { AUCTION_CONFIG } from "./config";
 import { assignSlot } from "./slotting";
 import { applyPick, expectApplied } from "./apply-pick";
-import { bestAvailableFor, maxBidFor, nextNominator, remainingBudget } from "./selectors";
+import { bestAvailableFor, nextNominator, remainingBudget } from "./selectors";
 
 /**
  * Every function here takes the already-resolved `AuctionState`. The "is this even an
@@ -15,29 +15,26 @@ import { bestAvailableFor, maxBidFor, nextNominator, remainingBudget } from "./s
  * one walk, imported by both, rather than two that could drift.
  */
 
-/** Shared guard: this team can still roster this player, and the amount is within their budget. */
-function checkAffordable(state: DraftState, teamId: string, playerId: string, amount: number): string | null {
+/**
+ * Shared guard: this team can still roster this player. The money half — the bid floor, the
+ * increment and the budget ceiling — reads `AUCTION_CONFIG` and therefore lives in `admit.ts`,
+ * so that raising a bid tunable can never make a persisted NOMINATE or BID unreplayable.
+ */
+function checkRosterable(state: DraftState, teamId: string, playerId: string): string | null {
   const entry = state.pool.find((p) => p.playerId === playerId);
   if (entry === undefined) return "That player isn't in this draft's player pool.";
   const assignment = assignSlot({ position: entry.position, roster: rosterFor(state, teamId), slotConfig: state.config.slotConfig });
   if (!assignment.ok) return assignment.reason;
-  const max = maxBidFor(state, teamId);
-  if (amount > max) {
-    return `You can only bid up to $${max} — you need $${AUCTION_CONFIG.reservePerOpenSlot} for each of your remaining roster spots.`;
-  }
   return null;
 }
 
 export function reduceNominate(state: DraftState, auction: AuctionState, action: NominateAction): DraftReduceResult {
   if (auction.lot !== null) return { ok: false, reason: "There's already a player up for bid." };
   if (auction.nominatingTeamId !== action.teamId) return { ok: false, reason: "It's not your turn to nominate." };
-  if (action.openingBid < AUCTION_CONFIG.minBid) {
-    return { ok: false, reason: `The opening bid must be at least $${AUCTION_CONFIG.minBid}.` };
-  }
   if (state.picks.some((p) => p.playerId === action.playerId)) {
     return { ok: false, reason: "That player has already been drafted." };
   }
-  const problem = checkAffordable(state, action.teamId, action.playerId, action.openingBid);
+  const problem = checkRosterable(state, action.teamId, action.playerId);
   if (problem !== null) return { ok: false, reason: problem };
   return { ok: true, state: openLot(state, action.teamId, action.playerId, action.openingBid, action.timestamp, false) };
 }
@@ -64,9 +61,7 @@ export function reduceBid(state: DraftState, auction: AuctionState, action: BidA
   const lot = auction.lot;
   if (lot === null) return { ok: false, reason: "There's no player up for bid right now." };
   if (lot.highBidTeamId === action.teamId) return { ok: false, reason: "You can't outbid yourself." };
-  const minimum = lot.highBid + AUCTION_CONFIG.bidIncrement;
-  if (action.amount < minimum) return { ok: false, reason: `Your bid must be at least $${minimum}.` };
-  const problem = checkAffordable(state, action.teamId, lot.playerId, action.amount);
+  const problem = checkRosterable(state, action.teamId, lot.playerId);
   if (problem !== null) return { ok: false, reason: problem };
   return {
     ok: true,

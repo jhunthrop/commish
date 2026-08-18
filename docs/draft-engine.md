@@ -36,8 +36,10 @@ an explicit upgrade path in `draftActionSchema` — it never reinterprets an old
 
 `DraftState` = static `config` (from the `drafts` + `leagues` rows) + `phase` + `sequence` +
 `draftOrder` + `pool` + `picks` + `rosters` (filled slots only) + `budgets` + `auction` +
-`pickNumber` + `turnStartedAt`. Deadlines are **derived** from `turnStartedAt`, never stored,
-so no replay can resurrect a stale deadline.
+`pickNumber` + `turnStartedAt`. Deadlines are **derived** from `turnStartedAt` and
+`config.clockSchedule`, never stored — which means a deadline is only ever meaningful *now*,
+against the schedule in force at this deploy. That is exactly why the deadline check is a
+command-time admission guard (`admit.ts`) and not a reducer guard: see the R-B4 section below.
 
 ## The reducer result shape
 
@@ -135,9 +137,9 @@ for a stalled snake pick. This is what keeps an idle nominator from stalling the
 
 ## The deadline guard on TIMER_EXPIRE (Ruling R-B4)
 
-`reduce.ts`'s `TIMER_EXPIRE` arm rejects the action outright — `"The clock hasn't run out
-yet."` — whenever `action.timestamp` is earlier than `currentDeadline(state)` computed against
-the state the action is being applied to (not the state the caller read earlier):
+`admitCommand` (`src/draft-engine/admit.ts`) rejects the action outright — `"The clock hasn't
+run out yet."` — whenever `action.timestamp` is earlier than `currentDeadline(state)` computed
+against the state the action is being applied to (not the state the caller read earlier):
 
 ```ts
 const deadline = currentDeadline(state);
@@ -150,10 +152,45 @@ This closes a check-then-act race: the ticker reads state and computes a deadlin
 then submits `TIMER_EXPIRE` in a later, separate step. A legitimate human action (a pick, a
 nomination, a bid) can land in the gap and start a fresh clock for someone else — the ticker's
 now-stale timestamp must not be allowed to expire *that* new clock. Because the guard is
-re-evaluated against the store's current, freshly-loaded state inside `applyAction`'s mutex
+evaluated against the store's current, freshly-loaded state inside `applyAction`'s mutex
 (not the ticker's cached read), the race is provably harmless: at worst the ticker's
 `TIMER_EXPIRE` is rejected and the next tick retries against the real deadline. No stale expiry
 can ever autopick or auto-award on behalf of the wrong turn.
+
+## Command-time admission vs. reducer guards
+
+**The invariant: a reducer guard may only read the action log and prior state — never a
+module-level tunable — because tunables change with deploys and logs do not.**
+
+`replayDraft` calls `reduceDraft` on every persisted action, so any guard the reducer owns is
+re-adjudicated every time a draft is loaded. A guard that reads a tunable therefore re-judges
+history against today's constants, and a single tuning change can turn a valid log into a
+`DraftReplayError` — a permanent 500 on `GET /api/drafts/:id`. This is not hypothetical: raising
+the clock schedule's floor from 60s to 90s did exactly that to a live draft.
+
+`admitCommand(state, action)` in `src/draft-engine/admit.ts` owns every such guard. It runs once,
+at command time, inside `applyAction`'s mutex against freshly-loaded state, and **is never called
+on the replay path**. The guards that live there:
+
+| Guard | Tunable it reads |
+|---|---|
+| `TIMER_EXPIRE` deadline | `config.clockSchedule`, and `AUCTION_CONFIG.bidWindowSeconds` via `currentClockSeconds` |
+| `SET_QUEUE` length cap | `DRAFT_QUEUE_CONFIG.maxLength` |
+| `NOMINATE` opening-bid floor | `AUCTION_CONFIG.minBid` |
+| `BID` increment | `AUCTION_CONFIG.bidIncrement` |
+| `NOMINATE`/`BID` budget ceiling | `AUCTION_CONFIG.reservePerOpenSlot` via `maxBidFor` |
+| `START_DRAFT` budget-per-slot floor | `AUCTION_CONFIG.minBid` |
+
+Everything else — turn order, phase, duplicate player, "not in this draft", roster shape, "there
+is no budget at all" — is a pure function of the log and prior state and stays in the reducer.
+
+Two consequences worth stating. First, the `SET_QUEUE` length message is now permanently
+unreachable through the reducer, which is correct: `PERSISTED_QUEUE_MAX` exists precisely so a
+persisted queue longer than today's cap still replays. Second, `config.slotConfig` and
+`config.auctionBudget` are still read *while folding state* (`apply-pick.ts`, `state.ts`,
+`reduce.ts`); they are per-league DB columns with no update path today, but the moment a
+commissioner-settings screen exists, editing the roster shape would silently rewrite draft
+history. Snapshot them into the `START_DRAFT` payload when that phase lands.
 
 ## The replay model
 
@@ -281,7 +318,7 @@ if somebody had just raised it.
 | `POST /api/drafts/[draftId]/actions` | a manager with a team in the league | Body: `{ type: "MAKE_PICK" \| "NOMINATE" \| "BID", … }`. **No `teamId`** — the server resolves it from the session. A rejected action is a 409 with the reducer's reason. |
 | `POST /api/drafts/[draftId]/start` | commissioner only | Fixes the order and the ranked pool. |
 | `GET /api/drafts/[draftId]/queue` | a manager with a team in the league, or the commissioner | The caller's OWN autopick queue, never anybody else's. A commissioner with no team of their own gets `[]`, not a 403. |
-| `POST /api/drafts/[draftId]/queue` | a manager with a team in the league | Body: `{ playerIds: string[] }`. **No `teamId`** — the acting team is resolved from the session, same as `/actions`. A rejected change (a duplicate id, or over `DRAFT_QUEUE_CONFIG.maxLength`) is a 409 with the reducer's reason. |
+| `POST /api/drafts/[draftId]/queue` | a manager with a team in the league | Body: `{ playerIds: string[] }`. **No `teamId`** — the acting team is resolved from the session, same as `/actions`. A rejected change (a duplicate id) is a 409 with the reducer's reason; a queue over `DRAFT_QUEUE_CONFIG.maxLength` is capped by the HTTP schema first and returns 400. |
 | `GET /api/leagues/[leagueId]/events` | a manager with a team in the league, or the commissioner | The real-time fan-out: Redis Streams over SSE. Gated the same way as the draft board — a signed-in stranger with no team in the league gets 403, not another league's events. |
 
 There is no second transport and no per-draft stream — `draft.*` events ride the league stream

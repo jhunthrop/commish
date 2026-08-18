@@ -1,6 +1,5 @@
 import type { DraftPoolEntry, SetQueueAction } from "@/domain/draft";
 import type { DraftReduceResult, DraftState } from "./state";
-import { DRAFT_QUEUE_CONFIG } from "./config";
 
 /**
  * Replaces one team's ranked autopick queue.
@@ -14,12 +13,13 @@ import { DRAFT_QUEUE_CONFIG } from "./config";
  *
  * Deliberately touches nothing but `queues`: editing a queue must never restart, extend or
  * shorten anybody's pick clock.
+ *
+ * The length cap lives in `admit.ts`, not here: `DRAFT_QUEUE_CONFIG.maxLength` is a tunable,
+ * and re-checking it on replay would brick every draft holding a longer persisted queue —
+ * which is precisely what `PERSISTED_QUEUE_MAX` exists to prevent.
  */
 export function reduceSetQueue(state: DraftState, action: SetQueueAction): DraftReduceResult {
   const { playerIds, teamId } = action;
-  if (playerIds.length > DRAFT_QUEUE_CONFIG.maxLength) {
-    return { ok: false, reason: `A queue can hold at most ${DRAFT_QUEUE_CONFIG.maxLength} players.` };
-  }
   if (new Set(playerIds).size !== playerIds.length) {
     return { ok: false, reason: "Each player may appear in your queue only once." };
   }

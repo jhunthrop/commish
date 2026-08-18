@@ -3,9 +3,8 @@ import type { BidAction, DraftPoolEntry, NominateAction, StartDraftAction } from
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
 import { DRAFT_CLOCK_SCHEDULE } from "./config";
-import { reduceDraft } from "./reduce";
 import { maxBidFor, minBidFor, remainingBudget, teamOnClock } from "./selectors";
-import { expireAt } from "./test-support";
+import { expireAt, submitCommand } from "./test-support";
 
 const SPRINT_SLOTS: readonly RosterSlotConfig[] = [
   { slot: "QB", count: 1, eligiblePositions: ["QB"] },
@@ -35,8 +34,8 @@ const CONFIG: DraftConfig = {
 const T = "2026-09-01T00:00:00.000Z";
 const START: StartDraftAction = { v: 1, type: "START_DRAFT", timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
 
-function apply(state: DraftState, action: Parameters<typeof reduceDraft>[1]): DraftState {
-  const result = reduceDraft(state, action);
+function apply(state: DraftState, action: Parameters<typeof submitCommand>[1]): DraftState {
+  const result = submitCommand(state, action);
   if (!result.ok) throw new Error(result.reason);
   return result.state;
 }
@@ -62,7 +61,7 @@ describe("START_DRAFT (auction)", () => {
 
   it("rejects a budget that can't cover $1 per roster spot", () => {
     const broke: DraftConfig = { ...CONFIG, auctionBudget: 2 };
-    expect(reduceDraft(initialDraftState(broke), START)).toEqual({
+    expect(submitCommand(initialDraftState(broke), START)).toEqual({
       ok: false,
       reason: "An auction budget must be at least $1 for every roster spot.",
     });
@@ -82,26 +81,26 @@ describe("NOMINATE", () => {
   });
 
   it("rejects a nomination from a team that isn't up", () => {
-    expect(reduceDraft(started(), nominate("t2", "qb1", 1))).toEqual({ ok: false, reason: "It's not your turn to nominate." });
+    expect(submitCommand(started(), nominate("t2", "qb1", 1))).toEqual({ ok: false, reason: "It's not your turn to nominate." });
   });
 
   it("rejects a nomination while a player is already up for bid", () => {
     const state = apply(started(), nominate("t1", "qb1", 1));
-    expect(reduceDraft(state, nominate("t1", "rb1", 1))).toEqual({ ok: false, reason: "There's already a player up for bid." });
+    expect(submitCommand(state, nominate("t1", "rb1", 1))).toEqual({ ok: false, reason: "There's already a player up for bid." });
   });
 
   it("rejects a player who isn't in the pool", () => {
-    expect(reduceDraft(started(), nominate("t1", "ghost", 1))).toEqual({ ok: false, reason: "That player isn't in this draft's player pool." });
+    expect(submitCommand(started(), nominate("t1", "ghost", 1))).toEqual({ ok: false, reason: "That player isn't in this draft's player pool." });
   });
 
   it("rejects an opening bid below the minimum", () => {
-    expect(reduceDraft(started(), nominate("t1", "qb1", 0))).toEqual({ ok: false, reason: "The opening bid must be at least $1." });
+    expect(submitCommand(started(), nominate("t1", "qb1", 0))).toEqual({ ok: false, reason: "The opening bid must be at least $1." });
   });
 
   it("rejects a nomination for an already-drafted player", () => {
     let state = apply(started(), nominate("t1", "qb1", 1));
     state = apply(state, expireAt(state)); // t1 wins qb1 uncontested; t2 is up next
-    expect(reduceDraft(state, nominate("t2", "qb1", 1))).toEqual({ ok: false, reason: "That player has already been drafted." });
+    expect(submitCommand(state, nominate("t2", "qb1", 1))).toEqual({ ok: false, reason: "That player has already been drafted." });
   });
 
   it("rejects a nomination for a position no slot in this league accepts", () => {
@@ -112,11 +111,11 @@ describe("NOMINATE", () => {
     ];
     const config: DraftConfig = { ...CONFIG, slotConfig: noWrSlots };
     const state = apply(initialDraftState(config), START);
-    expect(reduceDraft(state, nominate("t1", "wr1", 1))).toEqual({ ok: false, reason: "No roster slot in this league accepts a WR." });
+    expect(submitCommand(state, nominate("t1", "wr1", 1))).toEqual({ ok: false, reason: "No roster slot in this league accepts a WR." });
   });
 
   it("rejects an opening bid above the nominator's maximum", () => {
-    expect(reduceDraft(started(), nominate("t1", "qb1", 9))).toEqual({
+    expect(submitCommand(started(), nominate("t1", "qb1", 9))).toEqual({
       ok: false,
       reason: "You can only bid up to $8 — you need $1 for each of your remaining roster spots.",
     });
@@ -128,7 +127,7 @@ describe("NOMINATE", () => {
   });
 
   it("rejects a pick in an auction draft", () => {
-    expect(reduceDraft(started(), { v: 1, type: "MAKE_PICK", timestamp: T, teamId: "t1", playerId: "qb1" })).toEqual({
+    expect(submitCommand(started(), { v: 1, type: "MAKE_PICK", timestamp: T, teamId: "t1", playerId: "qb1" })).toEqual({
       ok: false,
       reason: "This is an auction draft — nominate a player instead of picking.",
     });
@@ -147,19 +146,19 @@ describe("BID", () => {
   });
 
   it("rejects a bid that doesn't clear the increment", () => {
-    expect(reduceDraft(withLot(), bid("t2", 3))).toEqual({ ok: false, reason: "Your bid must be at least $4." });
+    expect(submitCommand(withLot(), bid("t2", 3))).toEqual({ ok: false, reason: "Your bid must be at least $4." });
   });
 
   it("rejects a team outbidding itself", () => {
-    expect(reduceDraft(withLot(), bid("t1", 5))).toEqual({ ok: false, reason: "You can't outbid yourself." });
+    expect(submitCommand(withLot(), bid("t1", 5))).toEqual({ ok: false, reason: "You can't outbid yourself." });
   });
 
   it("rejects a bid when nothing is up for auction", () => {
-    expect(reduceDraft(started(), bid("t2", 5))).toEqual({ ok: false, reason: "There's no player up for bid right now." });
+    expect(submitCommand(started(), bid("t2", 5))).toEqual({ ok: false, reason: "There's no player up for bid right now." });
   });
 
   it("rejects a bid above the bidder's maximum", () => {
-    expect(reduceDraft(withLot(), bid("t2", 9))).toEqual({
+    expect(submitCommand(withLot(), bid("t2", 9))).toEqual({
       ok: false,
       reason: "You can only bid up to $8 — you need $1 for each of your remaining roster spots.",
     });
@@ -173,7 +172,7 @@ describe("BID", () => {
   it("rejects a bid in a snake draft", () => {
     const snake: DraftConfig = { ...CONFIG, format: "snake", auctionBudget: null };
     const state = apply(initialDraftState(snake), START);
-    expect(reduceDraft(state, bid("t2", 5))).toEqual({ ok: false, reason: "This is a snake draft — there's nothing to bid on." });
+    expect(submitCommand(state, bid("t2", 5))).toEqual({ ok: false, reason: "This is a snake draft — there's nothing to bid on." });
   });
 });
 

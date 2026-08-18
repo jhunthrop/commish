@@ -10,6 +10,7 @@ import * as engine from "./index";
 describe("the draft-engine public barrel", () => {
   it("re-exports the reducer, replay, events, selectors, slotting, clock schedule, state, and config surface", () => {
     expect(engine.reduceDraft).toBeTypeOf("function");
+    expect(engine.admitCommand).toBeTypeOf("function");
     expect(engine.replayDraft).toBeTypeOf("function");
     expect(engine.draftEventsFor).toBeTypeOf("function");
     expect(engine.draftStateView).toBeTypeOf("function");

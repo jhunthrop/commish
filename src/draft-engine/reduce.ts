@@ -1,12 +1,17 @@
 import type { DraftAction, StartDraftAction } from "@/domain/draft";
 import { auctionOf, totalRosterSlots, type DraftReduceResult, type DraftState } from "./state";
-import { AUCTION_CONFIG } from "./config";
-import { currentDeadline } from "./selectors";
 import { reduceMakePick, reduceSnakeExpiry } from "./snake";
 import { reduceAuctionExpiry, reduceBid, reduceNominate } from "./auction";
 import { reduceSetQueue } from "./queue";
 
 export type { DraftReduceResult } from "./state";
+
+/**
+ * THE RULE FOR EVERY GUARD IN THIS FILE (and in `snake.ts`, `auction.ts`, `queue.ts`): a
+ * reducer guard may only read the action log and prior state — never a module-level tunable —
+ * because tunables change with deploys and logs do not. Anything a deploy could flip belongs
+ * in `admit.ts`, which runs at command time only and is never called on the replay path.
+ */
 
 function reduceStart(state: DraftState, action: StartDraftAction): DraftReduceResult {
   if (state.phase !== "scheduled") return { ok: false, reason: "This draft has already started." };
@@ -25,9 +30,8 @@ function reduceStart(state: DraftState, action: StartDraftAction): DraftReduceRe
   if (isAuction && (budget === null || budget <= 0)) {
     return { ok: false, reason: "An auction draft needs a budget before it can start." };
   }
-  if (isAuction && (budget as number) < totalRosterSlots(state.config.slotConfig) * AUCTION_CONFIG.minBid) {
-    return { ok: false, reason: `An auction budget must be at least $${AUCTION_CONFIG.minBid} for every roster spot.` };
-  }
+  // "The budget covers `AUCTION_CONFIG.minBid` per roster spot" is a tunable read, so it is
+  // `admitCommand`'s, not this reducer's.
   const rosters = Object.fromEntries(action.draftOrder.map((teamId) => [teamId, []]));
   const budgets = isAuction ? Object.fromEntries(action.draftOrder.map((teamId) => [teamId, budget as number])) : {};
   return {
@@ -87,17 +91,9 @@ function dispatch(state: DraftState, action: DraftAction): DraftReduceResult {
         : reduceBid(state, auction, action);
     }
     case "TIMER_EXPIRE": {
-      // Checked once, here, so every expiry producer (the ticker today, anything else
-      // later) inherits it: a clock can only be expired once it has actually run out.
-      // This closes a check-then-act race — the ticker reads state and computes a
-      // deadline in one step, then submits TIMER_EXPIRE in a later, separate step; a
-      // legitimate action can land in between and start a fresh clock for someone else,
-      // and the ticker's now-stale timestamp must not be allowed to expire THAT clock.
-      // No clock running (`currentDeadline` null) means nothing to guard — allow through.
-      const deadline = currentDeadline(state);
-      if (deadline !== null && Date.parse(action.timestamp) < Date.parse(deadline)) {
-        return { ok: false, reason: "The clock hasn't run out yet." };
-      }
+      // "The clock has actually run out" is derived from `config.clockSchedule`, a tunable —
+      // so it is `admitCommand`'s check, applied to every expiry producer at command time and
+      // deliberately NOT re-applied when this log is replayed under a later schedule.
       const auction = auctionOf(state);
       return auction === null
         ? reduceSnakeExpiry(state, action.timestamp)

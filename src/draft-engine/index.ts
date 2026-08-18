@@ -6,6 +6,7 @@ export {
 export { assignSlot, type SlotAssignment } from "./slotting";
 export { snakeTeamForPick, roundForPick } from "./order";
 export { reduceDraft } from "./reduce";
+export { admitCommand, type AdmitResult } from "./admit";
 export { reduceSetQueue, queuedEntriesFor } from "./queue";
 export { replayDraft, DraftReplayError } from "./replay";
 export { draftEventsFor, type DraftEventEnvelope, type DraftEventType } from "./events";

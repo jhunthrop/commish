@@ -1,6 +1,21 @@
-import { DRAFT_ACTION_VERSION, type TimerExpireAction } from "@/domain/draft";
+import { DRAFT_ACTION_VERSION, type DraftAction, type TimerExpireAction } from "@/domain/draft";
+import { admitCommand } from "./admit";
+import { reduceDraft } from "./reduce";
 import { currentDeadline } from "./selectors";
-import type { DraftState } from "./state";
+import type { DraftReduceResult, DraftState } from "./state";
+
+/**
+ * The whole command path, exactly as `store.applyAction` composes it: admit first, then
+ * reduce. Test-only. A suite asserting "the engine rejects X" should exercise the same
+ * composition production does, rather than half of it — the split between `admit.ts` and
+ * `reduce.ts` is an implementation detail of *where* a guard lives, not of what a submitted
+ * command does.
+ */
+export function submitCommand(state: DraftState, action: DraftAction): DraftReduceResult {
+  const admitted = admitCommand(state, action);
+  if (!admitted.ok) return admitted;
+  return reduceDraft(state, action);
+}
 
 /**
  * A TIMER_EXPIRE action timestamped exactly at the state's current deadline — the earliest

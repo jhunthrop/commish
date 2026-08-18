@@ -6,7 +6,7 @@ import { DRAFT_CLOCK_SCHEDULE, DRAFT_QUEUE_CONFIG } from "./config";
 import { reduceDraft, type DraftReduceResult } from "./reduce";
 import { bestAvailableFor, nudgeDeadline, queueFor } from "./selectors";
 import { queuedEntriesFor } from "./queue";
-import { expireAt } from "./test-support";
+import { expireAt, submitCommand } from "./test-support";
 
 const SPRINT_SLOTS: readonly RosterSlotConfig[] = [
   { slot: "QB", count: 1, eligiblePositions: ["QB"] },
@@ -96,9 +96,9 @@ describe("SET_QUEUE", () => {
     });
   });
 
-  it("rejects a queue longer than the configured maximum", () => {
+  it("rejects a queue longer than the configured maximum at command time (never on replay — see admit.ts)", () => {
     const tooMany = Array.from({ length: DRAFT_QUEUE_CONFIG.maxLength + 1 }, (_, i) => `p${i}`);
-    expect(reduceDraft(initialDraftState(CONFIG), setQueue("t1", tooMany))).toEqual({
+    expect(submitCommand(initialDraftState(CONFIG), setQueue("t1", tooMany))).toEqual({
       ok: false,
       reason: `A queue can hold at most ${DRAFT_QUEUE_CONFIG.maxLength} players.`,
     });
