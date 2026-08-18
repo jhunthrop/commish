@@ -3,7 +3,7 @@ import type { Player } from "@/domain/player";
 
 /**
  * The one place a draft-room component turns a `teamId`/`playerId` into the human it names.
- * Every component that renders a team or player name (`ClockBanner`, `RosterBoard`,
+ * Every component that renders a team or player name (`RoomHeader`, `DraftBoard`, `RosterBoard`,
  * `PickHistory`, and — from Task 7/9 on — `AuctionLotPanel`, `BudgetTable`, `TvBoard`) builds
  * its map once with `teamsById`/`playersById` and reads through `teamName`/`playerName`
  * rather than re-declaring a `.find(...)` closure per component.

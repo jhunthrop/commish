@@ -59,6 +59,31 @@ describe("PlayerPool", () => {
     expect(within(row).queryByRole("button")).toBeNull();
   });
 
+  // Before START_DRAFT the engine has no pool, so `availablePlayerIds` is empty. That means
+  // "not known yet", not "all drafted" — the old room read it as the latter and told every
+  // manager waiting on their commissioner that all 300 players were already gone.
+  it("never says a player is drafted before the draft has started", () => {
+    const scheduled = { ...SNAKE_VIEW, phase: "scheduled" as const, availablePlayerIds: [], onClockTeamId: null };
+    render(<PlayerPool {...props} view={scheduled} canAct={false} />);
+    expect(screen.queryByText("Drafted")).toBeNull();
+    expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
+  });
+
+  it("shows a quiet dash instead of an action, and still lets you queue, before the draft starts", () => {
+    const scheduled = { ...SNAKE_VIEW, phase: "scheduled" as const, availablePlayerIds: [], onClockTeamId: null };
+    render(<PlayerPool {...props} view={scheduled} canAct={false} />);
+    const row = screen.getByText("Jalen Croft").closest("tr")!;
+    expect(within(row).getByText("—")).toBeInTheDocument();
+    expect(within(row).queryByRole("button", { name: "Draft" })).toBeNull();
+    expect(within(row).getByRole("button", { name: "Queue Jalen Croft" })).toBeInTheDocument();
+  });
+
+  it("shows each player's position as its sticker, not as bare text", () => {
+    render(<PlayerPool {...props} />);
+    const row = screen.getByText("Jalen Croft").closest("tr")!;
+    expect(within(row).getByText("QB").className).toContain("bg-pos-qb");
+  });
+
   it("disables acting when it is not your turn, and reports the player when it is", () => {
     const onAct = vi.fn();
     const { rerender } = render(<PlayerPool {...props} canAct={false} onAct={onAct} />);

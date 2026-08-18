@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { Player, Position } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Badge, Button, EmptyState, Input, Select, Table, type TableColumn } from "@/components/ui";
+import { Badge, Button, EmptyState, Input, PositionBadge, Select, Table, type TableColumn } from "@/components/ui";
 import { queueButtonLabel } from "../lib/lookups";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 
@@ -37,20 +37,24 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
   const [position, setPosition] = useState(ALL);
 
   const available = useMemo(() => new Set(view.availablePlayerIds), [view.availablePlayerIds]);
+  // Before START_DRAFT the engine has no pool yet, so `availablePlayerIds` is empty — which is
+  // "we don't know yet", NOT "everybody is drafted". Showing a board of "Drafted" badges to a
+  // manager waiting on their commissioner was the single most confusing thing in the room.
+  const preStart = view.phase === "scheduled";
   // The full match set, before the page-size cap below — its length is what tells the
   // truncation notice how many rows are hidden.
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return players
-      .map((player, index): PoolRow => ({ player, rank: index + 1, drafted: !available.has(player.id) }))
+      .map((player, index): PoolRow => ({ player, rank: index + 1, drafted: !preStart && !available.has(player.id) }))
       .filter((row) => (position === ALL || row.player.position === position) && (needle === "" || row.player.name.toLowerCase().includes(needle)));
-  }, [players, available, query, position]);
+  }, [players, available, preStart, query, position]);
   const rows = useMemo(() => filtered.slice(0, DRAFT_ROOM_CONFIG.poolPageSize), [filtered]);
   const truncated = filtered.length > DRAFT_ROOM_CONFIG.poolPageSize;
 
   const columns: readonly TableColumn<PoolRow>[] = [
     { key: "name", header: "Player", cell: (row) => row.player.name },
-    { key: "position", header: "Pos", cell: (row) => row.player.position },
+    { key: "position", header: "Pos", cell: (row) => <PositionBadge position={row.player.position} size="sm" /> },
     { key: "team", header: "NFL", cell: (row) => row.player.nflTeam, hideOnNarrow: true },
     { key: "rank", header: "Rank", cell: (row) => row.rank, numeric: true, hideOnNarrow: true },
     {
@@ -67,7 +71,10 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
       key: "action",
       header: "Action",
       cell: (row) =>
-        row.drafted ? (
+        preStart ? (
+          // Quiet, not disabled-looking: there is nothing to do here yet, and the header says why.
+          <span className="text-text-muted">—</span>
+        ) : row.drafted ? (
           <Badge tone="neutral">Drafted</Badge>
         ) : (
           <Button size="sm" disabled={!canAct} loading={submitting && pendingPlayerId === row.player.id} onClick={() => onAct(row.player.id)}>

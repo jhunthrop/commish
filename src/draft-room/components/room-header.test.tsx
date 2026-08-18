@@ -1,0 +1,131 @@
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { axe } from "vitest-axe";
+import type { CompletedPick, DraftStateView } from "@/draft-engine";
+import { inBothThemes } from "@/components/ui/test-utils";
+import { AUCTION_VIEW, LEAGUE_NAME, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
+import { RoomHeader } from "./room-header";
+
+/**
+ * Deadlines are built relative to the real clock rather than with fake timers: `useNow` reads
+ * `Date.now()` once on mount, and `formatCountdown` rounds up, so a 125-second gap renders
+ * "2:05" for any elapsed time under a second. Fake timers are avoided here on purpose — axe
+ * runs async and deadlocks against them.
+ */
+function liveView(over: Partial<DraftStateView> = {}): DraftStateView {
+  return {
+    ...SNAKE_VIEW,
+    deadlineAt: new Date(Date.now() + 125_000).toISOString(),
+    // 134.5 minutes out, so the floor-to-minutes gap reads "2h 14m" with room to spare.
+    nextTightening: { at: new Date(Date.now() + 134 * 60_000 + 30_000).toISOString(), pickSeconds: 600 },
+    ...over,
+  };
+}
+
+const finished: Partial<DraftStateView> = { onClockTeamId: null, deadlineAt: null, clockSeconds: null, nextTightening: null };
+
+const props = { leagueName: LEAGUE_NAME, teams: TEAMS, playersById: playersById() };
+
+function pick(over: Partial<CompletedPick> = {}): CompletedPick {
+  return {
+    pickNumber: 1,
+    round: 1,
+    teamId: "t1",
+    playerId: "qb1",
+    slot: "QB",
+    slotIndex: 0,
+    price: null,
+    timestamp: "2026-09-01T00:05:00.000Z",
+    auto: false,
+    ...over,
+  };
+}
+
+describe("RoomHeader", () => {
+  it("names the league, the format, the turn and your team — both themes, axe-clean", async () => {
+    await inBothThemes(<RoomHeader {...props} view={liveView()} myTeamId="t2" />, async ({ container }) => {
+      expect(screen.getByRole("heading", { name: LEAGUE_NAME })).toBeInTheDocument();
+      expect(screen.getByText("Snake draft")).toBeInTheDocument();
+      expect(screen.getByTestId("turn-label")).toHaveTextContent("Round 1 · Pick 1");
+      expect(screen.getByText("Your team: Iron Owls")).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("names who is on the clock, counts down, and says when the clock tightens", () => {
+    render(<RoomHeader {...props} view={liveView()} myTeamId="t2" />);
+    expect(screen.getByText("On the clock")).toBeInTheDocument();
+    expect(screen.getByTestId("countdown")).toHaveTextContent("2:05");
+    expect(screen.getByText("Picks shorten to 10 minutes in 2h 14m")).toBeInTheDocument();
+  });
+
+  it("hides the ticking digits from assistive tech and states the clock in words instead", () => {
+    render(<RoomHeader {...props} view={liveView()} myTeamId="t2" />);
+    expect(screen.getByTestId("countdown")).toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByText("Bay Bandits is on the clock. This round's pick clock is 8 hours.")).toBeInTheDocument();
+  });
+
+  it("says it is your turn when it is", () => {
+    render(<RoomHeader {...props} view={liveView()} myTeamId="t1" />);
+    expect(screen.getByText("You're on the clock")).toBeInTheDocument();
+  });
+
+  it("counts the round off the board rather than off a turn-order rule", () => {
+    const view = liveView({
+      onClockTeamId: "t2",
+      pickNumber: 4,
+      picks: [pick({ pickNumber: 1 }), pick({ pickNumber: 2, teamId: "t2", playerId: "rb1", slot: "RB" }), pick({ pickNumber: 3, round: 2, teamId: "t2", playerId: "rb2", slot: "RB" })],
+    });
+    render(<RoomHeader {...props} view={view} myTeamId="t1" />);
+    // t2 already owns two picks, so they are filling round 3.
+    expect(screen.getByTestId("turn-label")).toHaveTextContent("Round 3 · Pick 4");
+  });
+
+  it("explains a draft that has not started and one that has finished, and drops the turn label", () => {
+    const { rerender } = render(<RoomHeader {...props} view={{ ...SNAKE_VIEW, phase: "scheduled", ...finished }} myTeamId="t1" />);
+    expect(screen.getByText("This draft hasn't started yet.")).toBeInTheDocument();
+    expect(screen.queryByTestId("turn-label")).toBeNull();
+    rerender(<RoomHeader {...props} view={{ ...SNAKE_VIEW, phase: "complete", ...finished }} myTeamId="t1" />);
+    expect(screen.getByText("This draft is complete.")).toBeInTheDocument();
+  });
+
+  it("never claims a team is on the clock during a live auction lot — shows the bid instead", async () => {
+    const lotView: DraftStateView = {
+      ...AUCTION_VIEW,
+      onClockTeamId: null,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      auction: { nominatingTeamId: null, lot: { playerId: "qb1", highBid: 12, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
+    };
+    await inBothThemes(<RoomHeader {...props} view={lotView} myTeamId="t1" />, async ({ container }) => {
+      expect(screen.getByText("Live bid")).toBeInTheDocument();
+      expect(screen.getByText("Bidding is open on Jalen Croft. High bid $12 by Iron Owls.")).toBeInTheDocument();
+      expect(screen.queryByText(/on the clock/i)).toBeNull();
+      expect(screen.getByText("Auction draft")).toBeInTheDocument();
+      expect(screen.getByTestId("turn-label")).toHaveTextContent("Lot 1");
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("says who is nominating when the auction has no lot open yet", () => {
+    const nominateView: DraftStateView = { ...AUCTION_VIEW, onClockTeamId: null, auction: { nominatingTeamId: "t2", lot: null } };
+    render(<RoomHeader {...props} view={nominateView} myTeamId="t1" />);
+    expect(screen.getByText("Iron Owls is nominating.")).toBeInTheDocument();
+    expect(screen.queryByText(/on the clock/i)).toBeNull();
+  });
+
+  it("says it is your turn to nominate when it is", () => {
+    const nominateView: DraftStateView = { ...AUCTION_VIEW, onClockTeamId: null, auction: { nominatingTeamId: "t1", lot: null } };
+    render(<RoomHeader {...props} view={nominateView} myTeamId="t1" />);
+    expect(screen.getByText("You're nominating")).toBeInTheDocument();
+  });
+
+  it("says nothing about your team for a commissioner who fields none", () => {
+    render(<RoomHeader {...props} view={liveView()} myTeamId={null} />);
+    expect(screen.queryByText(/Your team:/)).toBeNull();
+  });
+
+  it("reads bigger on the TV without saying anything different", () => {
+    render(<RoomHeader {...props} view={liveView()} myTeamId="t1" variant="tv" />);
+    expect(screen.getByRole("heading", { name: LEAGUE_NAME }).className).toContain("text-display-xl");
+  });
+});

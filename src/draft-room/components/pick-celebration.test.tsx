@@ -44,15 +44,18 @@ describe("PickCelebration", () => {
     const panel = screen.getByTestId("pick-celebration");
     expect(panel).toHaveTextContent("You drafted Marcus Reed!");
     expect(panel).toHaveAttribute("data-own", "true");
-    expect(panel.className).toMatch(/animate-pick-mine/);
+    expect(panel.className).toMatch(/border-accent/);
   });
 
-  it("animates another team's pick differently from your own", () => {
+  // The emphasis was deliberately retargeted onto the board (DraftBoard's `animate-sticker-slap`
+  // on the landing sticker). This panel is the caption, so it animates the same quiet way for
+  // every pick — one event is never animated twice in two different ways.
+  it("animates the caption the same quiet way for every pick, own or not", () => {
     stubMatchMedia(false);
-    render(<PickCelebration lastPick={{ pick, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
-    const panel = screen.getByTestId("pick-celebration");
-    expect(panel.className).toMatch(/animate-pick-landed/);
-    expect(panel.className).not.toMatch(/animate-pick-mine/);
+    const { rerender } = render(<PickCelebration lastPick={{ pick, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
+    expect(screen.getByTestId("pick-celebration").className).toMatch(/animate-pick-landed/);
+    rerender(<PickCelebration lastPick={{ pick: { ...pick, pickNumber: 5 }, isMine: true }} playersById={playersById(PLAYERS)} teams={TEAMS} />);
+    expect(screen.getByTestId("pick-celebration").className).toMatch(/animate-pick-landed/);
   });
 
   it("drops every animation class when the user prefers reduced motion — but still shows the pick", () => {

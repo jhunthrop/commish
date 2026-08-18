@@ -32,6 +32,16 @@ const SIZE: Readonly<Record<PositionBadgeSize, string>> = {
   lg: "h-8 px-3 text-display-sm",
 };
 
+/**
+ * The sticker fill + on-fill label color for a position, as Tailwind classes. The ONE
+ * sanctioned way to color something that is not a `PositionBadge` — the draft board's cells
+ * are sticker-sized, so they take the same pigment rather than nesting a badge inside a badge.
+ * Nothing else may reach for `bg-pos-*` directly (docs/design-system.md).
+ */
+export function positionStickerClass(position: Position): string {
+  return FILL[position];
+}
+
 export function PositionBadge({ position, size = "md", className = "" }: PositionBadgeProps) {
   return (
     <span

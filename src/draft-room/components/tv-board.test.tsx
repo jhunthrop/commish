@@ -37,7 +37,7 @@ describe("TvBoard", () => {
     );
   });
 
-  it("renders populated grid with real table markup, axe-clean, both themes", async () => {
+  it("renders the board itself with real table markup, axe-clean, both themes", async () => {
     stubMatchMedia();
     const fixture = fixtureDeps({
       ...SNAKE_VIEW,
@@ -51,9 +51,9 @@ describe("TvBoard", () => {
         <TvBoard draftId="d1" />
       </DraftRoomDepsProvider>,
       async ({ container }) => {
-        await waitFor(() => expect(screen.getByRole("table", { name: /every pick/i })).toBeInTheDocument());
-        expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
-        expect(screen.getByRole("columnheader", { name: "#" })).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByRole("table", { name: /draft board/i })).toBeInTheDocument());
+        expect(screen.getAllByText("Jalen Croft").length).toBeGreaterThan(0);
+        expect(screen.getAllByRole("columnheader", { name: /Bay Bandits/ }).length).toBeGreaterThan(0);
         expect(await axe(container)).toHaveNoViolations();
       },
     );
@@ -89,7 +89,7 @@ describe("TvBoard", () => {
     );
 
     await waitFor(() => expect(screen.getByTestId("spotlight")).toHaveTextContent("Iron Owls"));
-    expect(screen.getByRole("table", { name: /every pick/i })).toHaveTextContent("Jalen Croft");
+    expect(screen.getByRole("table", { name: /draft board/i })).toHaveTextContent("Jalen Croft");
   });
 
   it("still offers a way forward if the board cannot load", async () => {
@@ -116,11 +116,14 @@ describe("TvBoard", () => {
     await waitFor(() => expect(screen.queryByText("Loading…")).not.toBeInTheDocument());
   });
 
-  it("shows an empty state when there are no picks yet", async () => {
+  it("shows an empty board — every slot dashed, nobody drafted — before the first pick", async () => {
     stubMatchMedia();
     const fixture = fixtureDeps();
     renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
-    await waitFor(() => expect(screen.getByText("The board is empty")).toBeInTheDocument());
-    expect(screen.getByText("Picks appear here the moment they land.")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("table", { name: /draft board/i })).toBeInTheDocument());
+    // Not a "no picks yet" placeholder: the real board, every slot dashed, with the spotlight
+    // sitting on the cell about to be filled. A draft party wants to see the shape of the night.
+    expect(screen.queryByText("Jalen Croft")).toBeNull();
+    expect(screen.getAllByText("On the clock").length).toBeGreaterThan(0);
   });
 });

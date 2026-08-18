@@ -15,9 +15,15 @@ export interface PickCelebrationProps {
 }
 
 /**
- * The moment a pick lands. Keyed on `pickNumber`, so the same pick never re-animates and no
- * clock is consulted. Reduced motion is a real branch — the panel still appears, it just
- * carries no animation class, because losing the information would be worse than the motion.
+ * The announcement that a pick landed. Keyed on `pickNumber`, so the same pick never
+ * re-animates and no clock is consulted. Reduced motion is a real branch — the panel still
+ * appears, it just carries no animation class, because losing the information would be worse
+ * than the motion.
+ *
+ * The EMPHASIS is not here. A pick's moment belongs to the board — `DraftBoard` slaps the
+ * landing sticker onto the grid (`animate-sticker-slap`) — and this panel is the quiet caption
+ * beneath it, so the same event is never animated twice in two different ways. What still
+ * distinguishes your own pick is the copy and the accent border, not a second animation.
  */
 export function PickCelebration({ lastPick, playersById, teams }: PickCelebrationProps) {
   const reduced = usePrefersReducedMotion();
@@ -37,7 +43,7 @@ export function PickCelebration({ lastPick, playersById, teams }: PickCelebratio
   const teamsMap = teamsById(teams);
   const playerDisplayName = playerName(playersById, pick.playerId);
   const teamDisplayName = teamName(teamsMap, pick.teamId);
-  const motion = reduced ? "" : isMine ? "animate-pick-mine" : "animate-pick-landed";
+  const motion = reduced ? "" : "animate-pick-landed";
 
   return (
     <div

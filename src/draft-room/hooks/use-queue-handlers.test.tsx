@@ -3,7 +3,7 @@ import { renderHook, screen, act, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { ToastProvider } from "@/components/ui";
 import type { DraftRoom as DraftRoomState } from "./use-draft-room";
-import { SNAKE_VIEW, PLAYERS, TEAMS } from "../test-fixtures";
+import { SNAKE_VIEW, PLAYERS, TEAMS, LEAGUE_NAME } from "../test-fixtures";
 import { useQueueHandlers } from "./use-queue-handlers";
 
 function fakeRoom(over: Partial<DraftRoomState> = {}): DraftRoomState {
@@ -13,6 +13,7 @@ function fakeRoom(over: Partial<DraftRoomState> = {}): DraftRoomState {
     view: SNAKE_VIEW,
     players: PLAYERS,
     teams: TEAMS,
+    leagueName: LEAGUE_NAME,
     myTeamId: "t1",
     isCommissioner: false,
     connection: "live",

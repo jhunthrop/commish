@@ -87,7 +87,7 @@ describe("AuctionRoom", () => {
   it("shows every team's remaining budget and reserve-adjusted ceiling from the server", async () => {
     mountAuction();
     await waitFor(() => expect(screen.getByRole("table", { name: /budgets/i })).toBeInTheDocument());
-    // Scope to the budgets table: team names also appear in the clock banner and roster cards.
+    // Scope to the budgets table: team names also appear in the room header and roster cards.
     const table = screen.getByRole("table", { name: /budgets/i });
     const row = within(table).getByText("Bay Bandits").closest("tr")!;
     expect(row).toHaveTextContent("$100");
@@ -156,6 +156,10 @@ describe("AuctionRoom", () => {
   it("resyncs budgets when the stream skips an award", async () => {
     const { fixture } = mountAuction();
     await waitFor(() => expect(screen.getByRole("table", { name: /budgets/i })).toBeInTheDocument());
+    // The stream opens on a LATER effect pass than the one that paints the snapshot (the
+    // subscription waits on `leagueId`), so the table being on screen is not proof the
+    // EventSource exists yet. Wait for the source itself, as every other stream test here does.
+    await waitFor(() => expect(fixture.sources).toHaveLength(1));
 
     fixture.view = { ...AUCTION_VIEW, sequence: 11, budgets: { t1: 63, t2: 100 }, maxBids: { t1: 61, t2: 97 } };
     act(() =>

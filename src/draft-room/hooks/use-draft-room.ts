@@ -37,6 +37,8 @@ interface RoomState {
   readonly view: DraftStateView | null;
   readonly players: readonly Player[];
   readonly teams: readonly TeamCard[];
+  /** The league's display name, straight off the snapshot. */
+  readonly leagueName: string;
   readonly myTeamId: string | null;
   readonly isCommissioner: boolean;
   readonly connection: ConnectionStatus;
@@ -60,6 +62,7 @@ const INITIAL: RoomState = {
   view: null,
   players: [],
   teams: [],
+  leagueName: "",
   myTeamId: null,
   isCommissioner: false,
   connection: "connecting",
@@ -156,6 +159,7 @@ export function useDraftRoom(draftId: string): DraftRoom {
           view: snapshot.data.draft,
           players: fetchedPlayers ?? prev.players,
           teams: snapshot.data.teams,
+          leagueName: snapshot.data.leagueName,
           myTeamId: snapshot.data.teamId,
           isCommissioner: snapshot.data.isCommissioner,
           pendingPlayerId: null,

@@ -2,7 +2,7 @@ import { getDb } from "@/db/client";
 import { fail, ok } from "@/lib/api/respond";
 import { draftStateView, queueFor } from "@/draft-engine";
 import { getDraftStore } from "@/draft-service";
-import { listTeamCards } from "@/draft-service/teams";
+import { leagueNameFor, listTeamCards } from "@/draft-service/teams";
 import type { DraftSnapshotBody } from "@/draft-room/contract";
 import { withLeagueMember, type RouteContext } from "./_shared";
 
@@ -21,11 +21,13 @@ export async function GET(request: Request, context: RouteContext) {
     const state = await getDraftStore().getDraftState(actor.draftId);
     if (state === null) return fail("That draft doesn't exist.", 404);
 
+    const [teams, leagueName] = await Promise.all([listTeamCards(getDb(), actor.leagueId), leagueNameFor(getDb(), actor.leagueId)]);
     const body: DraftSnapshotBody = {
       draft: draftStateView(state),
+      leagueName,
       teamId: actor.teamId,
       isCommissioner: actor.isCommissioner,
-      teams: await listTeamCards(getDb(), actor.leagueId),
+      teams,
       // Own queue only. `queueFor` returns [] for a commissioner with no team.
       queue: actor.teamId === null ? [] : queueFor(state, actor.teamId),
     };

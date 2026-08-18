@@ -12,6 +12,8 @@ export const PLAYERS: readonly Player[] = [
   { id: "wr1", name: "Andre Salas", position: "WR", nflTeam: "DAL" },
 ];
 
+export const LEAGUE_NAME = "Sunday Money";
+
 export const TEAMS: readonly TeamCard[] = [
   { id: "t1", name: "Bay Bandits", ownerDisplayName: "Dana Whitfield", ownerAvatarUrl: null },
   { id: "t2", name: "Iron Owls", ownerDisplayName: "Rey Okafor", ownerAvatarUrl: null },
@@ -122,7 +124,7 @@ export function fixtureDeps(view: DraftStateView = SNAKE_VIEW): FixtureDeps {
               : { ok: true, data: { queue: fixture.queue } }
             : init?.method === "POST"
               ? fixture.postResponse
-              : { ok: true, data: { draft: fixture.view, teamId: fixture.teamId, isCommissioner: false, teams: TEAMS, queue: fixture.queue } };
+              : { ok: true, data: { draft: fixture.view, leagueName: LEAGUE_NAME, teamId: fixture.teamId, isCommissioner: false, teams: TEAMS, queue: fixture.queue } };
         return { json: async () => body } as unknown as Response;
       },
       openEventSource: (url) => {

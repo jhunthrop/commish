@@ -4,7 +4,7 @@ import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
 import { inBothThemes } from "@/components/ui/test-utils";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
-import { PLAYERS, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
+import { LEAGUE_NAME, PLAYERS, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
 import { SnakeRoom } from "./snake-room";
 
 const room: DraftRoomState = {
@@ -13,6 +13,7 @@ const room: DraftRoomState = {
   view: SNAKE_VIEW,
   players: PLAYERS,
   teams: TEAMS,
+  leagueName: LEAGUE_NAME,
   myTeamId: "t1",
   isCommissioner: false,
   connection: "live",
