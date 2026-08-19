@@ -2,11 +2,12 @@ import Link from "next/link";
 import type { LeagueHomeBody, LineupBody } from "../contract";
 import { Card, PageTitle } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
-import { formatPoints, formatWeek } from "../lib/format";
+import { formatWeek } from "../lib/format";
 import { AdvisorPanel } from "./advisor-panel";
 import { InvitePanel } from "./invite-panel";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
+import { MatchupScoreboard } from "./matchup-scoreboard";
 import { ScoreWeekButton } from "./score-week-button";
 import { StandingsTable } from "./standings-table";
 
@@ -55,14 +56,7 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
         {home.myMatchup === null ? (
           <p className="text-text-muted">You have no matchup this week.</p>
         ) : (
-          <Card>
-            <p className="text-text-primary">
-              {`${home.myMatchup.homeTeamName} ${home.myMatchup.homeScore === null ? "—" : formatPoints(home.myMatchup.homeScore)}`}
-              {" vs "}
-              {`${home.myMatchup.awayTeamName} ${home.myMatchup.awayScore === null ? "—" : formatPoints(home.myMatchup.awayScore)}`}
-            </p>
-            <p className="text-sm text-text-muted">{home.myMatchup.final ? "Final." : "Not scored yet."}</p>
-          </Card>
+          <MatchupScoreboard matchup={home.myMatchup} myTeamId={home.myTeamId} />
         )}
         {home.isCommissioner ? <ScoreWeekButton leagueId={home.leagueId} weekNumber={home.currentWeek} /> : null}
       </section>
