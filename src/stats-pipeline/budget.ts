@@ -27,10 +27,44 @@ function currentMonthKey(clock: Clock): string {
 }
 
 /**
- * The monthly upstream request ledger. INCRBY-backed so concurrent tick reservations serialize
- * through Redis rather than racing in process memory: two ticks that both read "5 remaining"
- * and both reserve 5 would overspend by 5 with a read-then-write implementation, and INCRBY does
- * the read and the write atomically.
+ * `KEYS[1]` is the month's ledger key. `ARGV[1]` is the reservation count, `ARGV[2]` is the
+ * ingestion ceiling, `ARGV[3]` is the key's TTL in seconds.
+ *
+ * This is a single Lua script, not three separate client round trips (INCRBY, then decide, then
+ * maybe DECRBY), because a client-side sequence has a real window: a failure that lands *after*
+ * the INCRBY succeeds but *before* the compensating DECRBY completes — the EXPIRE call throwing,
+ * a dropped connection before the DECRBY reaches Redis — leaves the increment permanently
+ * stranded in the ledger even though `reserve()` reports the reservation denied. Proved
+ * empirically (a Proxy that lets INCRBY succeed and fails the next call): the ledger ends up
+ * inflated and never recovers on its own.
+ *
+ * Redis runs a whole script as one atomic unit — no other command interleaves with it, and if any
+ * `redis.call` inside it fails the script aborts as a whole rather than leaving a partial effect
+ * visible outside it. Folding INCRBY, the fresh-key EXPIRE, the ceiling check, and the
+ * compensating DECRBY into one EVAL therefore removes the window structurally: there is no
+ * client-observable state between "counted" and "rolled back" for a failure to land in, because
+ * from the client's point of view the whole reservation is a single request that either lands
+ * (script ran to completion, INCRBY and any compensating DECRBY both took effect) or didn't
+ * happen at all (the request never reached Redis, or Redis never executed it) — the same
+ * single-round-trip failure shape as any lone command, not a multi-step sequence a failure can
+ * land in the middle of.
+ */
+const RESERVE_SCRIPT = `
+local total = redis.call("INCRBY", KEYS[1], ARGV[1])
+if total == tonumber(ARGV[1]) then
+  redis.call("EXPIRE", KEYS[1], ARGV[3])
+end
+if total > tonumber(ARGV[2]) then
+  redis.call("DECRBY", KEYS[1], ARGV[1])
+  return 0
+end
+return 1
+`;
+
+/**
+ * The monthly upstream request ledger. `reserve()` runs as one atomic Lua script (see
+ * `RESERVE_SCRIPT`) so a reservation is either fully counted or fully rolled back — never left
+ * half-applied.
  *
  * Fails CLOSED on a Redis outage — the opposite of the realtime publisher's degrade-open rule.
  * The two failures are not symmetrical: a missed cache read or a lost publish costs milliseconds
@@ -41,17 +75,8 @@ export function createRequestBudget({ redis, clock }: RequestBudgetDeps): Reques
   async function reserve(count: number): Promise<boolean> {
     try {
       const key = currentMonthKey(clock);
-      const total = await redis.incrby(key, count);
-      // The first write to a fresh month's key: attach the TTL now so an abandoned month's
-      // counter is not immortal. Every later reservation in the same month skips this — the key
-      // already carries an expiry.
-      if (total === count) await redis.expire(key, STATS_INGESTION_CONFIG.ttlSeconds.budget);
-      if (total > INGESTION_CEILING) {
-        // Denial consumes nothing: undo the increment before reporting failure.
-        await redis.decrby(key, count);
-        return false;
-      }
-      return true;
+      const granted = await redis.eval(RESERVE_SCRIPT, 1, key, count, INGESTION_CEILING, STATS_INGESTION_CONFIG.ttlSeconds.budget);
+      return granted === 1;
     } catch {
       return false;
     }

@@ -24,6 +24,25 @@ function throwingRedis(): Redis {
   return new Redis("redis://localhost:1", { maxRetriesPerRequest: 0, lazyConnect: true, enableOfflineQueue: false });
 }
 
+/**
+ * A real, working connection whose `eval` call throws before the script ever reaches Redis —
+ * models a client-side failure on the one round trip `reserve()` now makes (an `EVAL`), the same
+ * way `throwingRedis()` models the connection being down for every command. Every other command
+ * (used by `control` for verification) passes through untouched.
+ */
+function evalThrowingRedis(base: Redis): Redis {
+  return new Proxy(base, {
+    get(target, prop, receiver: unknown) {
+      if (prop === "eval") {
+        return (): never => {
+          throw new Error("simulated eval failure");
+        };
+      }
+      return Reflect.get(target, prop, receiver);
+    },
+  });
+}
+
 const control = new Redis(REDIS_URL);
 const redis = new Redis(REDIS_URL);
 
@@ -79,12 +98,44 @@ describe("createRequestBudget", () => {
     // degrades CLOSED, because the two failures are not symmetrical: a missed cache read costs
     // milliseconds and a miscounted request budget costs the API key. A skipped tick is
     // recoverable in five minutes; a suspended key is not recoverable at all.
-    const budget = createRequestBudget({ redis: throwingRedis(), clock: fixedClock });
-    await expect(budget.reserve(1)).resolves.toBe(false);
+    const dead = throwingRedis();
+    try {
+      const budget = createRequestBudget({ redis: dead, clock: fixedClock });
+      await expect(budget.reserve(1)).resolves.toBe(false);
+    } finally {
+      dead.disconnect();
+    }
   });
 
   it("reports zero remaining, not a stale positive number, during an outage", async () => {
-    const budget = createRequestBudget({ redis: throwingRedis(), clock: fixedClock });
-    await expect(budget.remaining()).resolves.toBe(0);
+    const dead = throwingRedis();
+    try {
+      const budget = createRequestBudget({ redis: dead, clock: fixedClock });
+      await expect(budget.remaining()).resolves.toBe(0);
+    } finally {
+      dead.disconnect();
+    }
+  });
+
+  it("an eval that throws consumes nothing: the ledger key is left unchanged", async () => {
+    // reserve() now makes exactly one Redis round trip (RESERVE_SCRIPT). A failure on that
+    // single call can no longer land between "counted" and "rolled back" the way the old
+    // INCRBY-then-decide-then-DECRBY sequence could — there is nothing left to roll back,
+    // because the script (and therefore the INCRBY inside it) never ran.
+    const key = keyFor(AUGUST);
+    const budget = createRequestBudget({ redis: evalThrowingRedis(redis), clock: fixedClock });
+    await expect(budget.reserve(5)).resolves.toBe(false);
+    expect(await control.exists(key)).toBe(0);
+  });
+
+  it("under concurrent reservations that together exceed what's left near the ceiling, grants exactly one", async () => {
+    // The atomic Lua script serializes the ceiling check and the increment on Redis's side, so
+    // two callers racing for the last 5 requests can't both win — the same property the reviewer
+    // verified empirically against real Redis before this fix, now asserted as a test.
+    const budget = createRequestBudget({ redis, clock: fixedClock });
+    await expect(budget.reserve(INGESTION_CEILING - 5)).resolves.toBe(true);
+    const [first, second] = await Promise.all([budget.reserve(5), budget.reserve(5)]);
+    expect([first, second].filter(Boolean)).toHaveLength(1);
+    expect(await budget.remaining()).toBe(0);
   });
 });
