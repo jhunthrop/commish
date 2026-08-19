@@ -302,6 +302,19 @@ export function createIngestionWorker({
     const weeks = await weeksToExamine(db, STATS_INGESTION_CONFIG.maxWeeksPerTick);
     const nowMs = Date.parse(clock.now());
 
+    // An empty window means every week through `STATS_INGESTION_CONFIG.lastWeekOfSeason` is
+    // already final — the season is over, and there is nothing left to examine, ever, until
+    // next season resets the ledger. Checked BEFORE the reservation below, not after: reserving
+    // the worst-case budget on an empty window anyway would drain the monthly ledger for zero
+    // work every poll interval for as long as the season stays settled (~960 requests a day at
+    // the default 30-minute interval) — the one case `weeks.length + maxGamesPerTick` was never
+    // meant to cover, since there is no upstream call this tick could possibly make.
+    if (weeks.length === 0) {
+      const outcome: TickOutcome = { week: 0, applied: false, reason: "Nothing to examine — every week through the season's end is already final." };
+      reportIfDue(outcome, nowMs);
+      return [outcome];
+    }
+
     // Reserved BEFORE any upstream call: one request per week examined (`listGames`) plus the
     // ceiling on box scores a tick may fetch — a worst-case upper bound, not a tally of what
     // this tick turns out to need, because that number isn't known until `listGames` (itself

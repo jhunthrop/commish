@@ -568,4 +568,30 @@ describe("createIngestionWorker", () => {
     const [afterSecondTick] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
     expect(afterSecondTick).toMatchObject({ status: "final" });
   });
+
+  it("an empty window (season settled through the configured last week) skips the reservation entirely, and remaining() is unchanged", async () => {
+    // Every week through STATS_INGESTION_CONFIG.lastWeekOfSeason already final: weeksToExamine
+    // returns nothing to examine, ever, until next season resets the ledger. Reserving the
+    // worst-case budget on an empty window anyway would drain the monthly ledger for zero work
+    // every poll interval for as long as the season stays settled.
+    await db.insert(statWeeks).values(
+      Array.from({ length: STATS_INGESTION_CONFIG.lastWeekOfSeason }, (_, i) => ({ week: i + 1, status: "final" as const })),
+    );
+    const provider = fakeStatsProvider({ games: {} });
+    const listGamesSpy = vi.spyOn(provider, "listGames");
+    const reserveSpy = vi.spyOn(budget, "reserve");
+    const remainingBefore = await budget.remaining();
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
+
+    const outcomes = await worker.tick();
+
+    expect(outcomes).toHaveLength(1);
+    expect(outcomes[0]).toMatchObject({ applied: false });
+    // The reservation call itself never happened — not just "happened and was granted for free".
+    expect(reserveSpy).not.toHaveBeenCalled();
+    expect(listGamesSpy).not.toHaveBeenCalled();
+    expect(await budget.remaining()).toBe(remainingBefore);
+
+    reserveSpy.mockRestore();
+  });
 });
