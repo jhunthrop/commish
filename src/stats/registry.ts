@@ -1,7 +1,9 @@
-import { envOr } from "@/lib/env";
+import { envOr, envOrUndefined } from "@/lib/env";
 import { STATS_CONFIG, isStatsProviderName, type StatsProviderName } from "./config";
 import { createMockStatsProvider } from "./mock/mock-stats-provider";
 import type { StatsProvider } from "./provider";
+import { createTank01StatsProvider } from "./tank01/tank01-stats-provider";
+import { TANK01_CONFIG } from "./tank01/config";
 
 /**
  * A configured provider name that no implementation answers to.
@@ -37,10 +39,18 @@ function build(name: StatsProviderName): StatsProvider {
   switch (name) {
     case "mock":
       return createMockStatsProvider();
-    case "tank01":
-      // Task 10 replaces this. Until then the name is reachable and the failure is explicit,
-      // which is strictly better than the name not existing: `STATS_PROVIDER=tank01` says what
-      // is missing rather than reading as a typo.
-      throw new Error("The tank01 stats provider is not wired up yet.");
+    case "tank01": {
+      const apiKey = envOrUndefined(TANK01_CONFIG.envVars.apiKey);
+      if (apiKey === undefined) {
+        throw new Error(
+          `${STATS_CONFIG.envVars.provider}=tank01 needs ${TANK01_CONFIG.envVars.apiKey}. Get a key from RapidAPI's Tank01 NFL API and put it in .env.local.`,
+        );
+      }
+      const season = envOrUndefined(TANK01_CONFIG.envVars.season);
+      return createTank01StatsProvider({
+        apiKey,
+        season: season === undefined ? undefined : Number(season),
+      });
+    }
   }
 }

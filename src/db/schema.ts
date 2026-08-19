@@ -331,7 +331,7 @@ export const playerStatLines = pgTable(
     fumblesLost: integer("fumbles_lost").notNull().default(0),
     fieldGoalsMade: integer("field_goals_made").notNull().default(0),
     extraPointsMade: integer("extra_points_made").notNull().default(0),
-    sacks: integer("sacks").notNull().default(0),
+    sacks: real("sacks").notNull().default(0),
     defensiveInterceptions: integer("defensive_interceptions").notNull().default(0),
     defensiveTouchdowns: integer("defensive_touchdowns").notNull().default(0),
   },

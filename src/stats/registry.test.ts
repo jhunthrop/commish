@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { createStatsProvider, UnknownStatsProviderError } from "./registry";
 import { STATS_CONFIG } from "./config";
+import { TANK01_CONFIG } from "./tank01/config";
 
 afterEach(() => {
   delete process.env[STATS_CONFIG.envVars.provider];
@@ -35,5 +36,24 @@ describe("createStatsProvider", () => {
     // is serving a live feed and is quietly serving a fixed 2026 fake season instead.
     process.env[STATS_CONFIG.envVars.provider] = "definitely-not-a-provider";
     expect(() => createStatsProvider()).toThrow(UnknownStatsProviderError);
+  });
+
+  it("refuses tank01 without a key, and says which variable to set", () => {
+    delete process.env[TANK01_CONFIG.envVars.apiKey];
+    expect(() => createStatsProvider("tank01")).toThrow(TANK01_CONFIG.envVars.apiKey);
+  });
+
+  it("builds tank01 when a key is present, without making any request", () => {
+    process.env[TANK01_CONFIG.envVars.apiKey] = "test-key";
+    expect(() => createStatsProvider("tank01")).not.toThrow();
+    delete process.env[TANK01_CONFIG.envVars.apiKey];
+  });
+
+  it("builds tank01 with an explicit season when TANK01_SEASON is set", () => {
+    process.env[TANK01_CONFIG.envVars.apiKey] = "test-key";
+    process.env[TANK01_CONFIG.envVars.season] = "2025";
+    expect(() => createStatsProvider("tank01")).not.toThrow();
+    delete process.env[TANK01_CONFIG.envVars.apiKey];
+    delete process.env[TANK01_CONFIG.envVars.season];
   });
 });

@@ -1,0 +1,37 @@
+{
+  "gameID": "20260913_CAR@WSH",
+  "playerStats": {
+    "10007": {
+      "playerID": "10007",
+      "longName": "Grant Wexler",
+      "team": "CAR",
+      "teamID": "5",
+      "Passing": { "passAttempts": "28", "passCompletions": "17", "passYds": "198", "passTD": "1", "int": "0" },
+      "Rushing": { "carries": "5", "rushYds": "22", "rushTD": "1" }
+    },
+    "10008": {
+      "playerID": "10008",
+      "longName": "Deion Marsh",
+      "team": "CAR",
+      "teamID": "5",
+      "Rushing": { "carries": "14", "rushYds": "63", "rushTD": "0" }
+    },
+    "10009": {
+      "playerID": "10009",
+      "longName": "Corey Lattimore",
+      "team": "WSH",
+      "teamID": "32"
+    },
+    "10010": {
+      "playerID": "10010",
+      "longName": "Sam Bricker",
+      "team": "WSH",
+      "teamID": "32",
+      "Kicking": { "fgMade": "1", "fgAttempts": "1", "xpMade": "1" }
+    }
+  },
+  "DST": {
+    "away": { "teamAbv": "CAR", "teamID": "5", "defTD": "0", "defensiveInterceptions": "0", "sacks": "1.0", "ptsAllowed": "27" },
+    "home": { "teamAbv": "WSH", "teamID": "32", "defTD": "1", "defensiveInterceptions": "1", "sacks": "4.0", "ptsAllowed": "14" }
+  }
+}

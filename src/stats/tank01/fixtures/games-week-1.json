@@ -1,0 +1,24 @@
+[
+  {
+    "gameID": "20260913_SF@SEA",
+    "seasonType": "reg",
+    "away": "SF",
+    "home": "SEA",
+    "teamIDAway": "28",
+    "teamIDHome": "29",
+    "gameWeek": "1",
+    "gameDate": "20260913",
+    "gameTime": "4:05p"
+  },
+  {
+    "gameID": "20260913_CAR@WSH",
+    "seasonType": "reg",
+    "away": "CAR",
+    "home": "WSH",
+    "teamIDAway": "5",
+    "teamIDHome": "32",
+    "gameWeek": "1",
+    "gameDate": "20260913",
+    "gameTime": "1:00p"
+  }
+]
