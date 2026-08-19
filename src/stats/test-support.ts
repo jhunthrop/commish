@@ -43,6 +43,16 @@ export function describeStatsProviderContract(label: string, factory: () => Stat
       }
     });
 
+    it("lists at least one player at every position, DEF included", async () => {
+      // A legal-but-incomplete position union passes the previous case even if an adapter drops
+      // a whole position — DEF is the likeliest gap, since a real feed models it as a team
+      // defense/special-teams unit rather than an individual athlete and an adapter has to
+      // synthesize a Player row for it. This is the case that would catch that silently.
+      const players = await (await factory()).listPlayers();
+      const seen = new Set(players.map((player) => player.position));
+      for (const position of POSITIONS) expect(seen).toContain(position);
+    });
+
     it("never lists the same player id twice", async () => {
       const players = await (await factory()).listPlayers();
       const ids = players.map((player) => player.id);

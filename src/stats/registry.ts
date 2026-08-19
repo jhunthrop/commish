@@ -11,12 +11,12 @@ import type { StatsProvider } from "./provider";
  * mock season would look completely healthy and would be completely wrong.
  */
 export class UnknownStatsProviderError extends Error {
-  readonly name = "UnknownStatsProviderError";
   readonly provider: string;
   constructor(provider: string) {
     super(
       `Unknown stats provider "${provider}". Set ${STATS_CONFIG.envVars.provider} to one of: ${STATS_CONFIG.providers.join(", ")}.`,
     );
+    this.name = "UnknownStatsProviderError";
     this.provider = provider;
   }
 }
