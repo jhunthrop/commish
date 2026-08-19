@@ -11,12 +11,14 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
+import { drafts, leagues, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { POST as postLeague } from "@/app/api/leagues/route";
 import { GET as getLeague } from "@/app/api/leagues/[leagueId]/route";
 import { GET as getMatchups } from "@/app/api/leagues/[leagueId]/matchups/[week]/route";
 import { POST as postScore } from "@/app/api/leagues/[leagueId]/weeks/[week]/score/route";
+import { GET as browsePublic } from "@/app/api/public/leagues/route";
+import { PUBLIC_LEAGUE_FIELDS } from "@/league-service/browse";
 import { leagueHome, matchupWeek } from "./read";
 import { writeSchedule } from "./schedule";
 
@@ -189,5 +191,45 @@ describe("the read models' own guards", () => {
   it("answer null for a league that doesn't exist — the routes' 404 never reaches them", async () => {
     expect(await leagueHome(db, "nope", "u1")).toBeNull();
     expect(await matchupWeek(db, "nope", 1, "u1")).toBeNull();
+  });
+});
+
+describe("GET /api/public/leagues", () => {
+  it("answers a signed-OUT visitor, because public browse is deliberately unauthenticated", async () => {
+    signedInAs(null);
+    await db.insert(leagues).values({
+      id: "open", name: "Rookie Snake Room", format: "snake", teamCount: 12,
+      stakeTier: 0, experienceTier: "beginner", isPublicMatchmade: true, commissionerUserId: "u1",
+    });
+    await db.insert(drafts).values({
+      id: "open_draft", leagueId: "open", format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+
+    const response = await browsePublic(new Request("http://test/api/public/leagues"));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.leagues).toHaveLength(1);
+    expect(Object.keys(body.data.leagues[0]).sort()).toEqual([...PUBLIC_LEAGUE_FIELDS].sort());
+  });
+
+  it("narrows on the query string and shrugs off a format the engine cannot run", async () => {
+    signedInAs(null);
+    await db.insert(leagues).values([
+      { id: "s", name: "Rookie Snake Room", format: "snake", teamCount: 12, stakeTier: 0, experienceTier: "beginner", isPublicMatchmade: true, commissionerUserId: "u1" },
+      { id: "a", name: "Sharks Auction", format: "auction", teamCount: 12, stakeTier: 3, experienceTier: "experienced", isPublicMatchmade: true, commissionerUserId: "u1" },
+    ]);
+    await db.insert(drafts).values([
+      { id: "s_draft", leagueId: "s", format: "snake", status: "scheduled", kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null },
+      { id: "a_draft", leagueId: "a", format: "auction", status: "scheduled", kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: 200 },
+    ]);
+
+    const narrowed = await browsePublic(new Request("http://test/api/public/leagues?format=auction"));
+    expect((await narrowed.json()).data.leagues.map((l: { id: string }) => l.id)).toEqual(["a"]);
+
+    // A hand-edited URL naming a format we do not run is answered with the unfiltered list.
+    const junk = await browsePublic(new Request("http://test/api/public/leagues?format=dynasty"));
+    expect((await junk.json()).data.leagues).toHaveLength(2);
   });
 });
