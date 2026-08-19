@@ -72,6 +72,33 @@ function aliasOrRelative(moduleWithAlias) {
   return `^(?:@/|(?:\\.\\.?/)+)${bareName}(?:/|$)`;
 }
 
+/**
+ * Source code may never import upward out of the source root. `scripts/**` and `e2e/**` are
+ * build/verification tooling: they are allowed to import `src/**` (and do, via `@/`), but the
+ * reverse makes a production module depend on something no bundler, no `next build` and no
+ * deployment artifact is guaranteed to carry. `src/data/seed/index.ts` did exactly this with
+ * `../../../scripts/lib/env` until Phase 2 Plan A moved that helper to `src/lib/env.ts`; this
+ * rule is what stops the next one. There is no `@/` spelling to ban because the alias only maps
+ * into `src`, so a relative escape is the only reachable form.
+ *
+ * Shared (not inlined into a single config block) because it must be spliced into TWO
+ * `@typescript-eslint/no-restricted-imports` invocations below — see the comments on those
+ * blocks for why a same-glob, same-rule third block would silently replace one of them instead
+ * of adding to it.
+ */
+const SRC_ROOT_ESCAPE_PATTERNS = [
+  {
+    regex: "^(?:\\.\\.?/)+scripts(?:/|$)",
+    allowTypeImports: false,
+    message: "src/** must not import scripts/**. Build tooling may depend on source; source may not depend on build tooling. Move the shared helper into src/lib/.",
+  },
+  {
+    regex: "^(?:\\.\\.?/)+e2e(?:/|$)",
+    allowTypeImports: false,
+    message: "src/** must not import e2e/**. The browser suite depends on the app; the app must never depend on its test harness.",
+  },
+];
+
 const eslintConfig = [
   ...compat.extends("next/core-web-vitals", "next/typescript"),
   { files: ["src/**/*.tsx"], rules: { ...jsxA11y.flatConfigs.strict.rules } },
@@ -120,19 +147,54 @@ const eslintConfig = [
     // component by its filename alone, so the only globs that can't misfire are the three
     // directories that are BROWSER code by construction: everything under src/draft-room/**,
     // src/league-room/** and src/chat-room/**.
+    //
+    // This block also carries SRC_ROOT_ESCAPE_PATTERNS (below), not just the client-boundary
+    // patterns: ESLint flat config merges same-named rules across matching configs by shallow
+    // overwrite, not by concatenation, so a *second* config block also setting
+    // `@typescript-eslint/no-restricted-imports` for a file already matched here would silently
+    // replace this whole `patterns` array instead of adding to it — verified empirically, it is
+    // exactly how a temp `@/db` import under `src/draft-room/**` stopped being flagged when the
+    // source-root-escape rule below was first added as its own same-glob block. The
+    // source-root-escape block after this one scopes itself to everywhere in `src/**` EXCEPT
+    // these three directories for the same reason, so every file is covered by exactly one
+    // `no-restricted-imports` config for this rule.
     files: ["src/draft-room/**/*.{ts,tsx}", "src/league-room/**/*.{ts,tsx}", "src/chat-room/**/*.{ts,tsx}"],
     plugins: { "@typescript-eslint": tseslint },
     rules: {
       "@typescript-eslint/no-restricted-imports": [
         "error",
         {
-          patterns: SERVER_ONLY_MODULE_GROUPS.map((group) => ({
-            regex: aliasOrRelative(group),
-            allowTypeImports: true,
-            message: "Client room code (draft-room/league-room/chat-room) must go through the HTTP/SSE boundary (API routes), not import server-only modules as values. `import type` is fine.",
-          })),
+          patterns: [
+            ...SERVER_ONLY_MODULE_GROUPS.map((group) => ({
+              regex: aliasOrRelative(group),
+              allowTypeImports: true,
+              message: "Client room code (draft-room/league-room/chat-room) must go through the HTTP/SSE boundary (API routes), not import server-only modules as values. `import type` is fine.",
+            })),
+            ...SRC_ROOT_ESCAPE_PATTERNS,
+          ],
         },
       ],
+    },
+  },
+  {
+    // Source code may never import upward out of the source root. `scripts/**` and `e2e/**` are
+    // build/verification tooling: they are allowed to import `src/**` (and do, via `@/`), but the
+    // reverse makes a production module depend on something no bundler, no `next build` and no
+    // deployment artifact is guaranteed to carry. `src/data/seed/index.ts` did exactly this with
+    // `../../../scripts/lib/env` until Phase 2 Plan A moved that helper to `src/lib/env.ts`; this
+    // rule is what stops the next one. There is no `@/` spelling to ban because the alias only
+    // maps into `src`, so a relative escape is the only reachable form.
+    //
+    // `ignores` excludes the three client-room directories: they already carry
+    // SRC_ROOT_ESCAPE_PATTERNS via the block above, merged into the same
+    // `@typescript-eslint/no-restricted-imports` invocation as the client-boundary patterns —
+    // see the comment there for why a second, separately-scoped block targeting the same rule
+    // for those files would silently replace rather than extend it.
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/draft-room/**", "src/league-room/**", "src/chat-room/**"],
+    plugins: { "@typescript-eslint": tseslint },
+    rules: {
+      "@typescript-eslint/no-restricted-imports": ["error", { patterns: SRC_ROOT_ESCAPE_PATTERNS }],
     },
   },
 ];

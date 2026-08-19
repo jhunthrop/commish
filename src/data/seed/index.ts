@@ -1,6 +1,6 @@
 import { getDb } from "@/db/client";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
-import { envOrUndefined } from "../../../scripts/lib/env";
+import { envOrUndefined } from "@/lib/env";
 import { DEV_SEED } from "./config";
 import { assertLocalSeedTarget } from "./guard";
 import { seedDevLeagues } from "./seed-dev-leagues";
