@@ -19,6 +19,8 @@ interface SeedLeague {
   readonly filled: number;
   readonly isPublicMatchmade: boolean;
   readonly draftStatus?: "scheduled" | "in_progress" | "complete";
+  /** Defaults to the row's own `defaultNow()`. Set explicitly to pin ordering in a test. */
+  readonly createdAt?: Date;
 }
 
 async function seed(league: SeedLeague): Promise<void> {
@@ -31,6 +33,7 @@ async function seed(league: SeedLeague): Promise<void> {
     experienceTier: league.experienceTier,
     isPublicMatchmade: league.isPublicMatchmade,
     commissionerUserId: "owner",
+    ...(league.createdAt === undefined ? {} : { createdAt: league.createdAt }),
   });
   await db.insert(drafts).values({
     id: `${league.id}_draft`,
@@ -167,6 +170,30 @@ describe("listPublicLeagues", () => {
     expect((await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, experienceTier: "beginner" })).map((l) => l.id)).toEqual(["a"]);
     expect((await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, stakeTier: 3 })).map((l) => l.id)).toEqual(["b"]);
     expect(await listPublicLeagues(db, { format: "snake", experienceTier: "experienced", stakeTier: 3 })).toEqual([]);
+  });
+
+  it("returns matching leagues oldest-first, per the docblock's own promise", async () => {
+    // Seeded newest-first so a bug that returned insertion order (or any order but createdAt
+    // asc) would show up as a wrong sequence, not just a wrong set. Mutation check: flipping
+    // browse.ts's `asc(leagues.createdAt)` to `asc(leagues.name)` changes this order — see
+    // fix-wave-report.md for the before/after transcript.
+    await seed({
+      id: "newest", name: "Newest League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      createdAt: new Date("2026-09-03T00:00:00.000Z"),
+    });
+    await seed({
+      id: "oldest", name: "Oldest League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      createdAt: new Date("2026-09-01T00:00:00.000Z"),
+    });
+    await seed({
+      id: "middle", name: "Middle League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      createdAt: new Date("2026-09-02T00:00:00.000Z"),
+    });
+    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(rows.map((league) => league.id)).toEqual(["oldest", "middle", "newest"]);
   });
 
   it("caps how many leagues one browse can answer with", async () => {

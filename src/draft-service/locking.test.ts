@@ -158,10 +158,20 @@ describe("two app instances against one draft", () => {
     const [first, second] = twoDistinctPicksFor(state!);
     const results = await Promise.all([a.store.applyAction(DRAFT_ID, first), b.store.applyAction(DRAFT_ID, second)]);
 
-    expect(results.filter((result) => result.ok).length).toBeGreaterThanOrEqual(1);
+    // EXACTLY one, not "at least one": per twoDistinctPicksFor's own docblock, the second action
+    // can never be admitted once the first commits, because it is the same team picking again
+    // out of turn. Loose enough to tolerate a double-write, this assertion would not have been
+    // what held the line — a real row count is.
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
     for (const result of results) {
       if (!result.ok) expect(result.reason).not.toBe("Someone else acted first. Try again.");
     }
+
+    const [{ count }] = await a.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(draftActions)
+      .where(eq(draftActions.draftId, DRAFT_ID));
+    expect(count).toBe(state!.sequence + 1);
 
     await a.db.$client.end();
     await b.db.$client.end();

@@ -14,9 +14,22 @@ describe("createStatsProvider", () => {
   });
 
   it("reads the provider name from the environment", async () => {
-    process.env[STATS_CONFIG.envVars.provider] = "mock";
-    const provider = createStatsProvider();
-    expect((await provider.listPlayers()).length).toBeGreaterThan(0);
+    // STATS_PROVIDER=mock is indistinguishable from doing nothing at all — the mock is also the
+    // default. Selecting tank01 through the SAME env var, and observing it actually attempt a
+    // request the mock provider never would, proves the env var is what chose it.
+    process.env[STATS_CONFIG.envVars.provider] = "tank01";
+    process.env[TANK01_CONFIG.envVars.apiKey] = "test-key";
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (() => {
+      throw new Error("env-selected tank01 provider attempted a real request");
+    }) as typeof globalThis.fetch;
+    try {
+      const provider = createStatsProvider();
+      await expect(provider.listPlayers()).rejects.toThrow("env-selected tank01 provider attempted a real request");
+    } finally {
+      globalThis.fetch = originalFetch;
+      delete process.env[TANK01_CONFIG.envVars.apiKey];
+    }
   });
 
   it("treats an empty environment value as unset, not as a provider named ''", () => {
@@ -49,10 +62,30 @@ describe("createStatsProvider", () => {
     delete process.env[TANK01_CONFIG.envVars.apiKey];
   });
 
-  it("builds tank01 with an explicit season when TANK01_SEASON is set", () => {
+  it("builds tank01 with an explicit season when TANK01_SEASON is set, and sends the parsed value on the wire", async () => {
     process.env[TANK01_CONFIG.envVars.apiKey] = "test-key";
     process.env[TANK01_CONFIG.envVars.season] = "2025";
-    expect(() => createStatsProvider("tank01")).not.toThrow();
+    const requestedUrls: string[] = [];
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (async (input) => {
+      requestedUrls.push(typeof input === "string" ? input : input.toString());
+      return new Response(JSON.stringify({ statusCode: 200, body: [] }), { status: 200 });
+    }) as typeof globalThis.fetch;
+    try {
+      const provider = createStatsProvider("tank01");
+      await provider.getWeeklyStatLines(1);
+      expect(requestedUrls.some((url) => url.includes("season=2025"))).toBe(true);
+    } finally {
+      globalThis.fetch = originalFetch;
+      delete process.env[TANK01_CONFIG.envVars.apiKey];
+      delete process.env[TANK01_CONFIG.envVars.season];
+    }
+  });
+
+  it("fails fast on a TANK01_SEASON that is not a positive integer, naming the variable", () => {
+    process.env[TANK01_CONFIG.envVars.apiKey] = "test-key";
+    process.env[TANK01_CONFIG.envVars.season] = "banana";
+    expect(() => createStatsProvider("tank01")).toThrow(TANK01_CONFIG.envVars.season);
     delete process.env[TANK01_CONFIG.envVars.apiKey];
     delete process.env[TANK01_CONFIG.envVars.season];
   });
