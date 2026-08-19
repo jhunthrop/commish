@@ -1,11 +1,12 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
-import { leagueInvites, leagues, teams, users } from "@/db/schema";
+import { leagueInvites, teams } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { generateInviteCode, LEAGUE_CONFIG } from "@/league";
 import { MS_PER_DAY } from "./config";
 import type { LeagueWriteDeps } from "./creation";
+import { joinLeagueInTx, type JoinLeagueOutcome, type JoinPrecondition } from "./join";
 
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
 const TEAM_MEMBERSHIP_UNIQUE_INDEX = "teams_league_user_idx";
@@ -36,9 +37,7 @@ export interface AcceptInviteInput {
   readonly teamName?: string;
 }
 
-export type AcceptInviteResult =
-  | { readonly ok: true; readonly leagueId: string; readonly teamId: string; readonly alreadyMember: boolean }
-  | { readonly ok: false; readonly status: number; readonly reason: string };
+export type AcceptInviteResult = JoinLeagueOutcome;
 
 /**
  * Mints a bounded invite. The code IS the primary key, so the shareable link
@@ -86,55 +85,45 @@ export async function acceptInvite(
 ): Promise<AcceptInviteResult> {
   try {
     return await db.transaction(async (tx) => {
-      // `for update`: the cap check at the bottom reads `invite.uses`, so this row must be
-      // held until the matching increment commits.
+      // `for update`: the cap check below reads `invite.uses`, so this row must be held until
+      // the matching increment commits. Invite first, THEN league (`joinLeagueInTx` takes the
+      // league lock) — one fixed order, so no two accepts can deadlock.
       const [invite] = await tx.select().from(leagueInvites).where(eq(leagueInvites.code, input.code)).for("update");
       if (invite === undefined) return { ok: false as const, status: 404, reason: INVALID };
 
-      // Serializes every accept for this league, whatever code it came from.
-      const [league] = await tx
-        .select({ id: leagues.id, teamCount: leagues.teamCount })
-        .from(leagues)
-        .where(eq(leagues.id, invite.leagueId))
-        .for("update");
-      if (league === undefined) return { ok: false as const, status: 404, reason: INVALID };
+      /**
+       * The invite's own two bounds. Run through `joinLeagueInTx`'s precondition hook rather
+       * than before it, so they are checked only for somebody who is NOT already a member:
+       * re-opening your own invite link after it expired still returns your existing team,
+       * costs no use, and mutates nothing.
+       */
+      const invitePrecondition: JoinPrecondition = async () => {
+        if (Date.parse(clock.now()) >= invite.expiresAt.getTime()) {
+          return { ok: false, status: 410, reason: "That invite link has expired. Ask your commissioner for a new one." };
+        }
+        if (invite.uses >= invite.maxUses) {
+          return {
+            ok: false,
+            status: 410,
+            reason: "That invite link has already been used up. Ask your commissioner for a new one.",
+          };
+        }
+        return null;
+      };
 
-      const [existing] = await tx
-        .select({ id: teams.id })
-        .from(teams)
-        .where(and(eq(teams.leagueId, league.id), eq(teams.userId, input.userId)));
-      // Re-opening your own invite link is not an error, and costs nobody a use.
-      if (existing !== undefined) {
-        return { ok: true as const, leagueId: league.id, teamId: existing.id, alreadyMember: true };
-      }
+      const outcome = await joinLeagueInTx(
+        tx,
+        { leagueId: invite.leagueId, userId: input.userId, teamName: input.teamName, newId },
+        invitePrecondition,
+      );
+      // A league the invite points at but that no longer exists reads as an invalid invite,
+      // not as a missing league a stranger was never told about.
+      if (!outcome.ok) return outcome.status === 404 ? { ok: false as const, status: 404, reason: INVALID } : outcome;
+      // Re-arriving costs nobody a use.
+      if (outcome.alreadyMember) return outcome;
 
-      if (Date.parse(clock.now()) >= invite.expiresAt.getTime()) {
-        return { ok: false as const, status: 410, reason: "That invite link has expired. Ask your commissioner for a new one." };
-      }
-      if (invite.uses >= invite.maxUses) {
-        return {
-          ok: false as const,
-          status: 410,
-          reason: "That invite link has already been used up. Ask your commissioner for a new one.",
-        };
-      }
-
-      const filled = await tx.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, league.id));
-      if (filled.length >= league.teamCount) {
-        return { ok: false as const, status: 409, reason: "That league is already full." };
-      }
-
-      const [profile] = await tx.select({ displayName: users.displayName }).from(users).where(eq(users.id, input.userId));
-      const teamId = newId();
-      await tx.insert(teams).values({
-        id: teamId,
-        leagueId: league.id,
-        userId: input.userId,
-        name: input.teamName ?? profile?.displayName ?? "New team",
-      });
       await tx.update(leagueInvites).set({ uses: sql`${leagueInvites.uses} + 1` }).where(eq(leagueInvites.code, input.code));
-
-      return { ok: true as const, leagueId: league.id, teamId, alreadyMember: false };
+      return outcome;
     });
   } catch (error: unknown) {
     if (isUniqueViolation(error, TEAM_MEMBERSHIP_UNIQUE_INDEX)) {

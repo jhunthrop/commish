@@ -12,11 +12,12 @@ vi.mock("@/lib/auth/current-user", () => ({
 
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { leagues, users } from "@/db/schema";
+import { drafts, leagues, users } from "@/db/schema";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { GET as listLeagues, POST as postLeague } from "@/app/api/leagues/route";
 import { POST as postInvite } from "@/app/api/leagues/[leagueId]/invites/route";
 import { POST as postAccept } from "@/app/api/invites/[code]/accept/route";
+import { POST as postPublicJoin } from "@/app/api/public/leagues/[leagueId]/join/route";
 
 const db = createTestDb();
 
@@ -179,5 +180,55 @@ describe("invites", () => {
     });
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ ok: false, error: "That league doesn't exist." });
+  });
+});
+
+describe("POST /api/public/leagues/[leagueId]/join", () => {
+  async function openLeague(): Promise<string> {
+    await db.insert(leagues).values({
+      id: "open", name: "Rookie Snake Room", format: "snake", teamCount: 12,
+      stakeTier: 0, experienceTier: "beginner", isPublicMatchmade: true, commissionerUserId: "u1",
+    });
+    await db.insert(drafts).values({
+      id: "open_draft", leagueId: "open", format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    return "open";
+  }
+
+  it("answers 401 JSON when nobody is signed in, never a redirect", async () => {
+    const leagueId = await openLeague();
+    signedInAs(null);
+    const response = await postPublicJoin(post(`http://test/api/public/leagues/${leagueId}/join`, {}), {
+      params: Promise.resolve({ leagueId }),
+    });
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({ ok: false, error: "Not signed in." });
+  });
+
+  it("seats a signed-in visitor and hands back the league and team to land in", async () => {
+    const leagueId = await openLeague();
+    signedInAs("u2");
+    const response = await postPublicJoin(post(`http://test/api/public/leagues/${leagueId}/join`, {}), {
+      params: Promise.resolve({ leagueId }),
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data).toMatchObject({ leagueId, alreadyMember: false });
+    expect(typeof body.data.teamId).toBe("string");
+  });
+
+  it("refuses a private league with a 403 and a plain-language next step", async () => {
+    await db.insert(leagues).values({
+      id: "private", name: "Group Chat Only", format: "snake", teamCount: 12,
+      stakeTier: 0, experienceTier: "beginner", isPublicMatchmade: false, commissionerUserId: "u1",
+    });
+    signedInAs("u2");
+    const response = await postPublicJoin(post("http://test/api/public/leagues/private/join", {}), {
+      params: Promise.resolve({ leagueId: "private" }),
+    });
+    expect(response.status).toBe(403);
+    expect((await response.json()).error).toContain("invite link");
   });
 });
