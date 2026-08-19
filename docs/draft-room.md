@@ -215,11 +215,14 @@ baseline nothing scrolls horizontally except the board and the queue chips, each
 ### The aside band: league chat
 
 The room has a fourth region beyond the table above: an optional `aside` band carrying
-`LeagueChat` (`src/chat-room/**`, see `docs/chat.md`). It follows the same width and scroll
-rule as the pool rail (a fixed column, its own list scrolling inside itself), mirrored to the
-**right** edge with a left border instead of the pool's right one. Below `lg` it linearizes
-**last** — after rail, dock and board — so chat is never wedged between a manager and the board
-they're trying to watch.
+`LeagueChat` (`src/chat-room/**`, see `docs/chat.md`). It follows the same scroll rule as the
+pool rail (its own list scrolling inside itself), mirrored to the **right** edge with a left
+border instead of the pool's right one. Width lives on the band's *content*, not the frame:
+open it is the pool rail's width, and the **Hide chat** control collapses it to a slim strip
+holding a vertical **Show chat** tab, handing the board those pixels back. A closed chat
+unmounts — history is server-side, so reopening refetches through the hook's normal mount
+path and nothing is lost. Below `lg` it linearizes **last** — after rail, dock and board — so
+chat is never wedged between a manager and the board they're trying to watch.
 
 It is built once, in `DraftRoom` (`src/draft-room/components/draft-room.tsx`), and passed down
 as a prop exactly the way `bidConsole` and `poolFooter` already are: `DraftRoom` → `SnakeRoom` /
