@@ -15,8 +15,12 @@ test("a manager sets a lineup, scores a week, and reads the standings that follo
 
   // The lineup editor saves. The seeded season is fully scored, so the current week may be
   // locked; both outcomes are correct and the editor must say which plainly rather than
-  // failing silently.
+  // failing silently. Asserting the disjunction FIRST is what keeps this honest: without it, a
+  // regression that made BOTH "Save lineup" and the locked message disappear would silently
+  // skip the `if` below and still pass.
   const save = managerA.getByRole("button", { name: /Save lineup/i });
+  const locked = managerA.getByText(/lineup can.t change/i);
+  await expect(save.or(locked).first()).toBeVisible();
   if ((await save.count()) > 0) {
     await save.first().click();
     await expect(managerA.getByRole("status").or(managerA.getByRole("alert")).first()).toBeVisible();
