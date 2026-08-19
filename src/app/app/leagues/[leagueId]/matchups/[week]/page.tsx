@@ -4,7 +4,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
 import { leagueHome, matchupWeek } from "@/league-service";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
-import { MatchupPanel } from "@/league-room/components/matchup-panel";
+import { LiveMatchupWeek } from "@/league-room/components/live-matchup-week";
 import { WeekNav } from "@/league-room/components/week-nav";
 import { AppHeader } from "@/components/app-shell/app-header";
 import { liveScoringCopy } from "@/stats/live-scoring-copy";
@@ -42,14 +42,7 @@ export default async function MatchupWeekPage({ params }: PageProps) {
       {body.matchups.length === 0 ? (
         <p className="text-text-muted">There are no matchups in this week yet.</p>
       ) : (
-        body.matchups.map((matchup) => (
-          <MatchupPanel
-            key={`${matchup.home.teamId}:${matchup.away.teamId}`}
-            matchup={matchup}
-            myTeamId={body.myTeamId}
-            weekStatus={matchup.weekStatus}
-          />
-        ))
+        <LiveMatchupWeek leagueId={leagueId} body={body} />
       )}
       <p className="text-sm text-text-muted">{liveScoringCopy()}</p>
     </main>

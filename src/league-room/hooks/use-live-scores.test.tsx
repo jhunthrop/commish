@@ -146,6 +146,41 @@ describe("useLiveScores", () => {
     expect(result.current.scores.get("t2")).toBe(22);
   });
 
+  // Task 8 review, FIX 2: the report claimed this race was "tested adversarially", but no test
+  // constructed it — deleting the guard at use-live-scores.ts left all 9 original tests green.
+  // This is the scenario the guard exists for: a refetch is already in flight (the mount effect
+  // fired it) when a FRESHER score.update frame lands, and only THEN does the refetch resolve,
+  // carrying data that was already stale the moment it arrived. Without the
+  // `versionRef.current !== versionBeforeRequest` guard, this test fails — the refetch's older
+  // snapshot clobbers the frame's newer values.
+  it("keeps a fresher live frame's values when an in-flight refetch resolves after it, carrying older data", async () => {
+    const fixture = fixtureLeagueDeps({ ok: true, data: WEEK_BODY }, { deferred: true });
+    const { result } = renderHook(() => useLiveScores("l1", INITIAL), { wrapper: wrapper(fixture.deps) });
+    await waitFor(() => expect(fixture.pending()).toBe(1)); // the mount refresh, in flight
+
+    // A live frame lands WHILE the refetch above is still pending — strictly newer information.
+    act(() =>
+      fixture.emit("score.update", {
+        week: 5, status: "final", version: 9, gamesFinal: 4, gamesTotal: 4,
+        scores: [{ teamId: "t1", points: 40 }, { teamId: "t2", points: 33 }],
+      }),
+    );
+    await waitFor(() => expect(result.current.scores.get("t1")).toBe(40));
+    expect(result.current.status).toBe("final");
+
+    // NOW the in-flight refetch resolves, carrying the OLDER snapshot it was issued to fetch —
+    // this is the exact reorder the guard exists for.
+    await act(async () => {
+      await fixture.settle(0, { ok: true, data: WEEK_BODY });
+    });
+
+    // The frame's newer values must still hold — a score going backwards on screen reads as a
+    // bug at the worst possible moment.
+    expect(result.current.scores.get("t1")).toBe(40);
+    expect(result.current.scores.get("t2")).toBe(33);
+    expect(result.current.status).toBe("final");
+  });
+
   it("leaves the last-known state alone when the background refresh fails", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: WEEK_BODY });
     fixture.deps = {

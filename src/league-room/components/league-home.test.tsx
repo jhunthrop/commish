@@ -60,6 +60,28 @@ describe("LeagueHome", () => {
     expect(screen.queryByRole("button", { name: /^Score Week/ })).not.toBeInTheDocument();
   });
 
+  // Persona review (commissioner, FIX 3): the button vanished with zero in-product explanation.
+  // Same visibility the button had — commissioner only — but now a sentence instead of a
+  // control, so the absence reads as a designed change rather than a missing feature.
+  it("tells the commissioner scores run themselves now, in both themes, axe-clean", async () => {
+    await inBothThemes(wrap(), async ({ container }) => {
+      expect(
+        screen.getByText("Scores update automatically as games finish. There's nothing to run by hand."),
+      ).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("keeps that explanation away from a non-commissioner", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, isCommissioner: false }} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByText(/nothing to run by hand/)).not.toBeInTheDocument();
+  });
+
   it("points at the draft room while the draft has not finished", () => {
     renderInLeague(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>

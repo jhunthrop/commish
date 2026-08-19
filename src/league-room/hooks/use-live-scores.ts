@@ -29,11 +29,16 @@ function toScoresMap(scores: readonly TeamScore[]): ReadonlyMap<string, number> 
 }
 
 /** Every score for the week, home and away, from the ONE endpoint that has them:
- *  `GET /api/leagues/[leagueId]/matchups/[week]`. */
+ *  `GET /api/leagues/[leagueId]/matchups/[week]`. A side with no score yet (`null` — the
+ *  matchup hasn't started) is left OUT rather than coalesced to `0`: a team that has not
+ *  played is not the same fact as a team that played and scored zero, and the caller (a
+ *  scoreboard) renders those two states differently. Leaving a team out of this snapshot means
+ *  `useLiveScores`'s consumer sees it missing from the map and falls back to its own
+ *  server-rendered `null`, exactly as if no live data had arrived for it at all. */
 function scoresFromWeek(body: MatchupWeekBody): readonly TeamScore[] {
   return body.matchups.flatMap((matchup) => [
-    { teamId: matchup.home.teamId, points: matchup.home.score ?? 0 },
-    { teamId: matchup.away.teamId, points: matchup.away.score ?? 0 },
+    ...(matchup.home.score === null ? [] : [{ teamId: matchup.home.teamId, points: matchup.home.score }]),
+    ...(matchup.away.score === null ? [] : [{ teamId: matchup.away.teamId, points: matchup.away.score }]),
   ]);
 }
 

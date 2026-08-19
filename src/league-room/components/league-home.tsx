@@ -57,6 +57,13 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
         ) : (
           <MatchupScoreboard matchup={home.myMatchup} myTeamId={home.myTeamId} />
         )}
+        {/* Same visibility the retired "Score Week" button had: the commissioner's control is
+            gone, and this is what replaced it — an explanation of why, not a silent absence. */}
+        {home.isCommissioner ? (
+          <p className="text-sm text-text-muted">
+            {"Scores update automatically as games finish. There's nothing to run by hand."}
+          </p>
+        ) : null}
       </section>
 
       <StandingsTable rows={home.standings} myTeamId={home.myTeamId} />
@@ -71,7 +78,7 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
         <LeagueChat leagueId={home.leagueId} />
       </div>
 
-      {lineup === null ? null : <LineupEditor leagueId={home.leagueId} lineup={lineup} />}
+      {lineup === null ? null : <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} />}
 
       {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
 
