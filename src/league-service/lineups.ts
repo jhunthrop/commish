@@ -1,12 +1,33 @@
 import { and, eq } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
-import { leagues, lineupSlots, matchups, players, rosterSlots } from "@/db/schema";
+import { leagues, lineupSlots, matchups, players, rosterSlots, statWeeks } from "@/db/schema";
 import { validateLineup } from "@/domain/roster-eligibility";
 import { BENCH_SLOT } from "@/domain/roster";
 import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/roster";
-import { benchOf, defaultLineup, startersOf } from "@/league";
+import { benchOf, defaultLineup, isLineupLocked, startersOf, type WeekStatus } from "@/league";
 import { excludedSetFor } from "@/db/upsert";
 import type { LineupBody, LineupSlotView } from "@/league-room/contract";
+import type { ScoreCache } from "@/stats-pipeline/score-cache";
+
+/** No Redis connection needed: every existing caller of `setLineup` keeps working untouched. */
+const NOOP_SCORE_CACHE: Pick<ScoreCache, "invalidate"> = {
+  invalidate: async () => {},
+};
+
+/**
+ * Awaits the eviction and swallows its failure, with a log — the middle ground between `void`
+ * (the response can outrun the DEL, so an immediate re-read hits a stale entry) and a bare
+ * `await` (a caller that injects something less forgiving than `ScoreCache` could fail a write
+ * that already committed). A missed eviction is one stale read bounded by the key's TTL; it is
+ * never worth a 500, and it is never worth being silent about either.
+ */
+async function invalidateQuietly(cache: Pick<ScoreCache, "invalidate">, leagueId: string, weekNumber: number): Promise<void> {
+  try {
+    await cache.invalidate(leagueId, weekNumber);
+  } catch (error: unknown) {
+    console.error("[league-service] score cache invalidation failed", { leagueId, weekNumber }, error);
+  }
+}
 
 export interface GetLineupInput {
   readonly teamId: string;
@@ -67,14 +88,27 @@ export type SetLineupResult =
   | { readonly ok: false; readonly status: number; readonly reason: string };
 
 /**
- * A week is locked once it has been scored — the same condition `MatchupSummary.final` uses.
- * There is deliberately no clock-based lock: this phase has no live game data for a clock to
- * track, and pretending otherwise would break the "never imply live data" rule from the
- * server side rather than the copy side.
+ * The week's live status, read from `stat_weeks` (`src/db/schema.ts`) — global to the NFL
+ * calendar, never scoped by league. A week the ingestion worker has never reached has no row
+ * there at all, which is not the same as a week in progress: it is a week whose games have not
+ * even been listed, so it reads as `"scheduled"` — open, exactly like a week that is on the
+ * calendar but has not kicked off. Locking on absence would freeze every league's lineups the
+ * first time the worker was down.
  */
-export async function isWeekLocked(db: Db, leagueId: string, weekNumber: number): Promise<boolean> {
-  const week = await db.select().from(matchups).where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)));
-  return week.length > 0 && week.every((row) => row.homeScore !== null && row.awayScore !== null);
+export async function weekStatusFor(db: Db, weekNumber: number): Promise<WeekStatus> {
+  const [row] = await db.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, weekNumber));
+  return row?.status ?? "scheduled";
+}
+
+/**
+ * A week is locked once it has started, not once it has been scored — see `isLineupLocked`
+ * (`@/league/week-status.ts`) for the rationale. Phase 1's "both scores exist" rule was correct
+ * only when a score appeared solely because a commissioner pressed a button; live scoring makes
+ * that a hole, since a manager could watch a player leave the field and swap him out before the
+ * week is ever scored.
+ */
+export async function isWeekLocked(db: Db, weekNumber: number): Promise<boolean> {
+  return isLineupLocked(await weekStatusFor(db, weekNumber));
 }
 
 /**
@@ -88,8 +122,28 @@ export async function isWeekLocked(db: Db, leagueId: string, weekNumber: number)
  * The two checks around it are about this TEAM rather than about slot legality, so they are
  * the boundary's own: every named player must actually be on the roster, and no player may
  * occupy two spots.
+ *
+ * The lock is checked TWICE: once up front, so an obviously-locked week costs one query and a
+ * clear refusal, and again inside the write transaction, with `SELECT … FOR SHARE` on the week's
+ * `stat_weeks` row. The up-front check alone is a read-validate-write hole: four more round trips
+ * (roster, players, validation) run between it and the upsert, and the ingestion worker flips the
+ * week to `in_progress` inside `persistTick`'s own transaction with no coordination — so a lineup
+ * submitted in that window used to be accepted after kickoff. `FOR SHARE` blocks against
+ * `persistTick`'s upsert of that row, which is the same read-validate-write hole Plan A closed
+ * for drafts with `SELECT … FOR UPDATE` on the draft row.
+ *
+ * `cache` is injected with a no-op default so every existing caller keeps working without a
+ * Redis connection. When a real cache is supplied, its cached score for this league/week is
+ * invalidated AFTER the write below completes — not inside it. The failure mode of a
+ * slightly-late eviction is one stale read; the failure mode of an early one (evicting before
+ * the write is durable) is a cache that says a lineup changed when the write that would have
+ * changed it never actually landed.
  */
-export async function setLineup(db: Db, input: SetLineupInput): Promise<SetLineupResult> {
+export async function setLineup(
+  db: Db,
+  input: SetLineupInput,
+  cache: Pick<ScoreCache, "invalidate"> = NOOP_SCORE_CACHE,
+): Promise<SetLineupResult> {
   const [league] = await db.select({ rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId));
   if (league === undefined) return { ok: false, status: 404, reason: "That league doesn't exist." };
 
@@ -98,8 +152,8 @@ export async function setLineup(db: Db, input: SetLineupInput): Promise<SetLineu
     .from(matchups)
     .where(and(eq(matchups.leagueId, input.leagueId), eq(matchups.weekNumber, input.weekNumber)));
   if (week.length === 0) return { ok: false, status: 404, reason: "That week isn't part of this league's season." };
-  if (await isWeekLocked(db, input.leagueId, input.weekNumber)) {
-    return { ok: false, status: 409, reason: `Week ${input.weekNumber} is final, so its lineup can't change.` };
+  if (await isWeekLocked(db, input.weekNumber)) {
+    return { ok: false, status: 409, reason: `Week ${input.weekNumber} has started, so its lineup can't change.` };
   }
 
   const roster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, input.teamId));
@@ -128,13 +182,30 @@ export async function setLineup(db: Db, input: SetLineupInput): Promise<SetLineu
   const validation = validateLineup({ slotConfig: starterConfig, roster: startersOf(lineup), playerPositions });
   if (!validation.valid) return { ok: false, status: 422, reason: validation.reason };
 
-  await db
-    .insert(lineupSlots)
-    .values(lineup.map((slot) => ({ teamId: input.teamId, weekNumber: input.weekNumber, slot: slot.slot, slotIndex: slot.slotIndex, playerId: slot.playerId })))
-    .onConflictDoUpdate({
-      target: [lineupSlots.teamId, lineupSlots.weekNumber, lineupSlots.slot, lineupSlots.slotIndex],
-      set: excludedSetFor(lineupSlots, ["teamId", "weekNumber", "slot", "slotIndex"]),
-    });
+  const locked = await db.transaction(async (tx) => {
+    // The re-check, holding a share lock on the week's row for the rest of this transaction so
+    // `persistTick`'s upsert of it cannot commit underneath the write below. An absent row is a
+    // week the worker has never reached, which reads as open — exactly as `weekStatusFor` treats
+    // it — and is the one case no lock can cover, since there is no row yet to lock.
+    const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, input.weekNumber)).for("share");
+    if (isLineupLocked(week?.status ?? "scheduled")) return true;
+
+    await tx
+      .insert(lineupSlots)
+      .values(lineup.map((slot) => ({ teamId: input.teamId, weekNumber: input.weekNumber, slot: slot.slot, slotIndex: slot.slotIndex, playerId: slot.playerId })))
+      .onConflictDoUpdate({
+        target: [lineupSlots.teamId, lineupSlots.weekNumber, lineupSlots.slot, lineupSlots.slotIndex],
+        set: excludedSetFor(lineupSlots, ["teamId", "weekNumber", "slot", "slotIndex"]),
+      });
+    return false;
+  });
+  if (locked) return { ok: false, status: 409, reason: `Week ${input.weekNumber} has started, so its lineup can't change.` };
+
+  // After the write commits, never inside it — see the doc comment above. Awaited and caught
+  // rather than fire-and-forget: the cache degrades open on its own, so awaiting cannot fail this
+  // response, but a `void` would let the response reach the browser before the DEL reached Redis
+  // and an immediate re-read could hit the entry this write just made stale.
+  await invalidateQuietly(cache, input.leagueId, input.weekNumber);
 
   const view = await lineupView(db, { leagueId: input.leagueId, teamId: input.teamId, weekNumber: input.weekNumber });
   // `view` cannot be null here: the league row was read at the top of this function.
@@ -165,7 +236,7 @@ export async function lineupView(
 
   return {
     weekNumber: input.weekNumber,
-    locked: await isWeekLocked(db, input.leagueId, input.weekNumber),
+    locked: await isWeekLocked(db, input.weekNumber),
     starters: startersOf(lineup).map(toView),
     bench: benchOf(lineup).map(toView),
   };

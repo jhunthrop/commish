@@ -1,9 +1,11 @@
 import { sql } from "drizzle-orm";
+import { drizzle } from "drizzle-orm/postgres-js";
 import { afterAll } from "vitest";
 import { resetRankedPlayersCacheForTests } from "@/draft-service/pool";
 import { envOr } from "@/lib/env";
 import { createDb, type Db } from "./client";
 import { DB_POOL_CONFIG } from "./config";
+import * as schema from "./schema";
 
 export const TEST_DATABASE_URL = envOr("TEST_DATABASE_URL", "postgres://commish:commish@localhost:5433/commish_test");
 
@@ -31,7 +33,7 @@ export async function truncateAll(db: Db): Promise<void> {
   await db.execute(sql`
     TRUNCATE TABLE
       chat_reactions, chat_messages,
-      player_stat_lines, players,
+      player_stat_lines, players, stat_weeks,
       matchups, weeks, draft_picks, draft_nudges, draft_actions, drafts,
       lineup_slots, roster_slots, league_invites,
       scoring_settings, teams, leagues, users
@@ -42,4 +44,43 @@ export async function truncateAll(db: Db): Promise<void> {
   // across `it` blocks under a fresh seed each time. Without this, a cache entry built before
   // this truncate would outlive the data it was computed from.
   resetRankedPlayersCacheForTests();
+}
+
+export interface CountingDb {
+  /** A full `Db` — also assignable to `ReadonlyDb` for a caller (like `affectedTeams`) that
+   *  only needs the read half. */
+  readonly db: Db;
+  /** How many queries have actually gone over the wire since this was built. */
+  readonly selectCount: () => number;
+}
+
+/**
+ * A `Db` that counts actual round trips to Postgres, not calls to the `.select(...)` query
+ * builder — some read paths build a SECOND `db.select(...)` internally (e.g. a correlated
+ * subquery) that is embedded into the outer query's SQL text and never separately awaited, so
+ * counting `.select(...)` invocations would over-count. Counting at `$client.unsafe`, the one
+ * place postgres-js actually sends a query over the wire, counts what a query-count exit
+ * criterion means by "queries".
+ *
+ * Shared by every service whose docblock commits to a bounded query count regardless of how
+ * many leagues/teams a caller has — `affectedTeams` (`@/stats-pipeline/affected.ts`,
+ * `affected.test.ts`) established the idiom; `crossLeagueHome`
+ * (`@/league-service/home.ts`, `home.test.ts`) reuses it rather than re-inventing it.
+ */
+export function countingDb(base: Db): CountingDb {
+  let executions = 0;
+  const countedClient = new Proxy(base.$client, {
+    get(target, prop, receiver) {
+      const value: unknown = Reflect.get(target, prop, receiver);
+      if (prop === "unsafe" && typeof value === "function") {
+        return (...args: unknown[]) => {
+          executions += 1;
+          return (value as (...a: unknown[]) => unknown).apply(target, args);
+        };
+      }
+      return value;
+    },
+  });
+  const countedDb = drizzle(countedClient, { schema });
+  return { db: countedDb, selectCount: () => executions };
 }

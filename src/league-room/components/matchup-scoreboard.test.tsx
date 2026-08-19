@@ -14,6 +14,7 @@ const FINAL: MatchupSummary = {
   homeScore: 121.4,
   awayScore: 98.62,
   final: true,
+  weekStatus: "final",
 };
 
 describe("MatchupScoreboard", () => {
@@ -30,11 +31,21 @@ describe("MatchupScoreboard", () => {
   });
 
   it("marks the caller's own side with YOU and never guesses at unscored matchups", () => {
-    render(<MatchupScoreboard matchup={{ ...FINAL, final: false, homeScore: null, awayScore: null }} myTeamId="t2" />);
+    render(<MatchupScoreboard matchup={{ ...FINAL, final: false, weekStatus: "scheduled", homeScore: null, awayScore: null }} myTeamId="t2" />);
     expect(screen.getByText("YOU")).toBeInTheDocument();
-    expect(screen.getByText("Not scored yet")).toBeInTheDocument();
+    expect(screen.getByText("Not started")).toBeInTheDocument();
     expect(screen.getAllByText("—")).toHaveLength(2);
     // Nobody recedes before a result exists.
     expect(screen.getByText("Bay Bandits").className).not.toContain("text-text-muted");
+  });
+
+  // Task 7's review flagged this exact gap: the badge used to read `matchup.final` directly,
+  // which cannot tell "scheduled" from "in_progress" — both have `final: false`. WeekStatusBadge
+  // reads `weekStatus` instead, so a week mid-games says so rather than reading "Not started".
+  it("shows the week as in progress from weekStatus, not from final", () => {
+    render(<MatchupScoreboard matchup={{ ...FINAL, final: false, weekStatus: "in_progress" }} myTeamId="t1" />);
+    expect(screen.getByText("In progress")).toBeInTheDocument();
+    expect(screen.queryByText("Not started")).not.toBeInTheDocument();
+    expect(screen.queryByText("Final")).not.toBeInTheDocument();
   });
 });

@@ -7,8 +7,8 @@ import type { Clock } from "@/domain/timing";
 import { assignSlot, snakeTeamForPick, totalRosterSlots } from "@/draft-engine";
 import { rankedPlayers } from "@/draft-service/pool";
 import { LEAGUE_CONFIG } from "@/league";
-import { scoreWeek } from "@/league-service";
 import { writeSchedule } from "@/league-service/schedule";
+import { finalizeWeek } from "@/stats-pipeline/finalize";
 import { excludedSetFor } from "@/db/upsert";
 import { DEV_SEED } from "./config";
 import { ensureDevUsers, preserveRealCommissioner, preserveRealTeamOwner } from "./dev-users";
@@ -112,7 +112,7 @@ export async function seedSeasonLeague(
 
   let scoredWeeks = 0;
   for (let week = 1; week <= LEAGUE_CONFIG.regularSeasonWeeks; week++) {
-    const result = await scoreWeek(db, leagueId, week);
+    const result = await finalizeWeek(db, leagueId, week);
     if (result.ok) scoredWeeks += 1;
   }
 

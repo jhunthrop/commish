@@ -3,9 +3,11 @@ import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
 import { leagueHome, matchupWeek } from "@/league-service";
-import { MatchupPanel } from "@/league-room/components/matchup-panel";
+import { getReferenceCache } from "@/league-service/reference-cache-instance";
+import { LiveMatchupWeek } from "@/league-room/components/live-matchup-week";
 import { WeekNav } from "@/league-room/components/week-nav";
 import { AppHeader } from "@/components/app-shell/app-header";
+import { liveScoringCopy } from "@/stats/live-scoring-copy";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +30,7 @@ export default async function MatchupWeekPage({ params }: PageProps) {
   const home = await leagueHome(getDb(), leagueId, user.id);
   if (home === null || (home.myTeamId === null && !home.isCommissioner)) notFound();
 
-  const body = await matchupWeek(getDb(), leagueId, weekNumber, user.id);
+  const body = await matchupWeek(getDb(), leagueId, weekNumber, user.id, getReferenceCache());
   if (body === null) notFound();
 
   return (
@@ -40,13 +42,9 @@ export default async function MatchupWeekPage({ params }: PageProps) {
       {body.matchups.length === 0 ? (
         <p className="text-text-muted">There are no matchups in this week yet.</p>
       ) : (
-        body.matchups.map((matchup) => (
-          <MatchupPanel key={`${matchup.home.teamId}:${matchup.away.teamId}`} matchup={matchup} myTeamId={body.myTeamId} />
-        ))
+        <LiveMatchupWeek leagueId={leagueId} body={body} />
       )}
-      <p className="text-sm text-text-muted">
-        {"Scores come from this preview's fixed 2026 stat set. There's no live scoring yet."}
-      </p>
+      <p className="text-sm text-text-muted">{liveScoringCopy()}</p>
     </main>
     </>
   );

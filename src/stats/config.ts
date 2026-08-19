@@ -16,6 +16,8 @@ export const STATS_CONFIG = {
   defaultProvider: "mock",
   envVars: {
     provider: "STATS_PROVIDER",
+    /** Only read when `provider` resolves to `mock`. See `MockProviderOptions.liveWeek`. */
+    mockLiveWeek: "MOCK_STATS_LIVE_WEEK",
   },
 } as const;
 

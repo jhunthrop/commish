@@ -8,7 +8,8 @@
  *
  *   pool_size_per_instance = (postgres_max_connections
  *                             - reserved_superuser_connections
- *                             - background_job_pool_size) / expected_max_instances
+ *                             - background_job_pool_size * expected_max_instances)
+ *                            / expected_max_instances
  *
  * `background_job_pool_size` is subtracted BEFORE the division, not carved out of one
  * instance's share, because it is a separate pool with a separate lifetime: Plan B's
@@ -16,6 +17,14 @@
  * can borrow from the request path's budget is a batch job that can take the request path down
  * on the busiest day of the week. Reserving it up front is what makes "a batch can never starve
  * a request" arithmetic rather than a hope.
+ *
+ * It is subtracted `expected_max_instances` TIMES because the background pool is PER-INSTANCE,
+ * not cluster-wide: `src/instrumentation.ts` starts an ingestion worker in every Node process
+ * and `src/stats-pipeline/index.ts` gives each one its own `createDb(undefined,
+ * ingestionPoolOptions())` pool. Subtracting it once was correct only while there was exactly
+ * one background worker anywhere, which stopped being true the moment Plan B's worker shipped:
+ * at four instances the old formula budgeted 4 x 23 + 5 = 97 connections and the deployment
+ * would actually open 4 x 23 + 4 x 5 = 112, fifteen past what Postgres would grant.
  *
  * The three inputs are Postgres's own defaults today (`max_connections = 100`,
  * `superuser_reserved_connections = 3`) plus this product's own scaling ceiling for the phase.
@@ -29,7 +38,7 @@ export const DB_POOL_CONFIG = {
   reservedSuperuserConnections: 3,
   /** How many app instances may run at once this phase. Plan D's hosting sets the real ceiling. */
   expectedMaxInstances: 4,
-  /** The separate pool background/batch work uses, subtracted from the budget before the split. */
+  /** The separate pool background/batch work uses, PER INSTANCE, subtracted from the budget before the split. */
   backgroundJobPoolSize: 5,
   /** Computed below; kept as a field so `createDb` reads one name rather than calling a function. */
   get defaultMaxConnections(): number {
@@ -52,6 +61,6 @@ export function requestPoolSizePerInstance(): number {
   const available =
     DB_POOL_CONFIG.postgresMaxConnections -
     DB_POOL_CONFIG.reservedSuperuserConnections -
-    DB_POOL_CONFIG.backgroundJobPoolSize;
+    DB_POOL_CONFIG.backgroundJobPoolSize * DB_POOL_CONFIG.expectedMaxInstances;
   return Math.floor(available / DB_POOL_CONFIG.expectedMaxInstances);
 }

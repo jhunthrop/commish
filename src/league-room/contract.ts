@@ -3,7 +3,7 @@ import type { DraftFormat, TeamCard } from "@/domain/league";
 import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { TradeFlag, TradeVerdict } from "@/ai-advisor/valuation";
-import type { StandingsRow } from "@/league";
+import type { NextAction, StandingsRow, WeekStatus } from "@/league";
 
 /**
  * TYPES ONLY, no runtime code. Imported by the `/api/leagues/**` routes as their return shape
@@ -60,8 +60,38 @@ export interface MatchupSummary {
   readonly awayTeamName: string;
   readonly homeScore: number | null;
   readonly awayScore: number | null;
-  /** True once both scores exist. The UI never infers "final" from a null check of its own. */
+  /**
+   * True once the settlement write has happened (`finalizeWeek`, `src/stats-pipeline/finalize.ts`)
+   * — the two scores above are stamped and will not move again. It does NOT mean the week's games
+   * are done; a week can be `in_progress` for hours before this flips. Every "is this live" UI
+   * decision reads `weekStatus` instead, never this field.
+   */
   readonly final: boolean;
+  readonly weekStatus: WeekStatus;
+}
+
+/**
+ * One league, as the cross-league home renders it: everything `LeagueSummary` already carries,
+ * plus the record, this week's matchup, and the one next action — the three things `/app`
+ * exists to answer per league (Task 9, Spec Step 8).
+ */
+export interface HomeLeagueCard extends LeagueSummary {
+  /** This user's own win-loss-tie record, from matchups already played. `null` only for the
+   *  degenerate case of no team in this league at all — every card the home page actually
+   *  renders has one, since it lists leagues by team membership. */
+  readonly record: { readonly wins: number; readonly losses: number; readonly ties: number } | null;
+  /** The current week, always present — `seasonProgress` never returns undefined even for a
+   *  league with no matchups yet, so there is no "no week" state to represent. */
+  readonly weekNumber: number;
+  readonly weekStatus: WeekStatus;
+  /** This user's matchup for `weekNumber`, or `null` on a bye or before the schedule exists. */
+  readonly matchup: MatchupSummary | null;
+  /** `null` renders as no action at all — never a disabled button (`@/league/next-action.ts`). */
+  readonly nextAction: NextAction | null;
+}
+
+export interface HomeBody {
+  readonly leagues: readonly HomeLeagueCard[];
 }
 
 export interface LeagueHomeBody {
@@ -77,6 +107,8 @@ export interface LeagueHomeBody {
   readonly currentWeek: number;
   readonly totalWeeks: number;
   readonly myMatchup: MatchupSummary | null;
+  /** `currentWeek`'s status. Present even when `myMatchup` is null — a bye week is still live. */
+  readonly weekStatus: WeekStatus;
   readonly draftId: string | null;
   readonly draftStatus: DraftStatus | null;
 }
@@ -102,7 +134,9 @@ export interface MatchupDetail {
   readonly weekNumber: number;
   readonly home: MatchupSide;
   readonly away: MatchupSide;
+  /** True once the settlement write has happened — see `MatchupSummary.final`'s docblock. */
   readonly final: boolean;
+  readonly weekStatus: WeekStatus;
 }
 
 export interface MatchupWeekBody {
@@ -111,6 +145,7 @@ export interface MatchupWeekBody {
   readonly totalWeeks: number;
   readonly myTeamId: string | null;
   readonly matchups: readonly MatchupDetail[];
+  readonly weekStatus: WeekStatus;
 }
 
 export interface LineupSlotView {
@@ -123,7 +158,10 @@ export interface LineupSlotView {
 
 export interface LineupBody {
   readonly weekNumber: number;
-  /** True once the week has been scored. The editor renders read-only rather than disabled-and-silent. */
+  /**
+   * True once the week has started (`isLineupLocked`, `@/league/week-status.ts`) — not once it
+   * has been scored. The editor renders read-only rather than disabled-and-silent.
+   */
   readonly locked: boolean;
   readonly starters: readonly LineupSlotView[];
   readonly bench: readonly LineupSlotView[];

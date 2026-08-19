@@ -38,6 +38,7 @@ describe("CreateLeagueForm", () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "l1", teamId: "t1", draftId: "d1" } });
     const bodies: unknown[] = [];
     fixture.deps = {
+      ...fixture.deps,
       fetchJson: async (_url, init) => {
         bodies.push(JSON.parse(String(init?.body)));
         return { json: async () => fixture.response } as unknown as Response;
@@ -63,7 +64,7 @@ describe("CreateLeagueForm", () => {
 
   it("disables the button while the request is in flight", async () => {
     const fixture = fixtureLeagueDeps();
-    fixture.deps = { fetchJson: () => new Promise(() => {}) };
+    fixture.deps = { ...fixture.deps, fetchJson: () => new Promise(() => {}) };
     renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixture.deps);
     fireEvent.change(screen.getByLabelText("League name"), { target: { value: "Sunday Money" } });
     fireEvent.click(screen.getByRole("button", { name: "Create league" }));
@@ -74,6 +75,7 @@ describe("CreateLeagueForm", () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "l1", teamId: "t1", draftId: "d1" } });
     const bodies: unknown[] = [];
     fixture.deps = {
+      ...fixture.deps,
       fetchJson: async (_url, init) => {
         bodies.push(JSON.parse(String(init?.body)));
         return { json: async () => fixture.response } as unknown as Response;

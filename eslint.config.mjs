@@ -56,6 +56,16 @@ const SERVER_ONLY_MODULE_GROUPS = [
   "@/lib/llm",
   "@/lib/api/respond",
   "@/data/seed",
+  // The stats ingestion worker, the finalize settlement write and the reference cache — all
+  // Postgres/Redis-backed. `@/stats-pipeline/contract` is the one exception the client boundary
+  // needs (Task 8's `useLiveScores` imports `ScoreUpdatePayload`/`TeamScore` from it), and
+  // `import type` stays allowed for exactly that reason.
+  "@/stats-pipeline",
+  // The provider seam itself: `registry.ts` reads TANK01_API_KEY and `tank01/client.ts` holds it
+  // and issues the upstream fetch, so `@/stats` is exactly as server-only as `@/stats-pipeline`
+  // and was the one-hop way around its ban. `aliasOrRelative` anchors on the full segment, so
+  // this cannot accidentally catch `@/stats-pipeline` (or any other `@/stats-…` sibling).
+  "@/stats",
 ];
 
 /**

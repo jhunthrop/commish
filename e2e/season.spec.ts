@@ -2,11 +2,12 @@ import { expect, SEEDED_SEASON_LEAGUE_ID, test } from "./support/fixtures";
 
 /**
  * The season half, against the seeded league `global-setup` handed manager A the
- * commissioner's chair in: set a lineup, score a week, read the standings, ask the advisor,
- * and browse. Every one of these has unit and route coverage already — what a browser adds is
- * that the page actually renders them, in the real production build, with real data.
+ * commissioner's chair in: set a lineup, read a week's honest state, read the standings, ask
+ * the advisor, and browse. Every one of these has unit and route coverage already — what a
+ * browser adds is that the page actually renders them, in the real production build, with real
+ * data.
  */
-test("a manager sets a lineup, scores a week, and reads the standings that follow", async ({ managerA }) => {
+test("a manager sets a lineup, and sees the week's real state and the standings that follow", async ({ managerA }) => {
   await managerA.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}`);
   await expect(managerA.getByRole("heading", { level: 1 })).toBeVisible();
 
@@ -26,11 +27,24 @@ test("a manager sets a lineup, scores a week, and reads the standings that follo
     await expect(managerA.getByRole("status").or(managerA.getByRole("alert")).first()).toBeVisible();
   }
 
-  // The commissioner can score the current week, and the page reflects it.
-  const score = managerA.getByRole("button", { name: /^Score Week/ });
-  await expect(score).toBeVisible();
-  await score.click();
-  await expect(managerA.getByRole("status").filter({ hasText: /Scored \d+ matchups\./ })).toBeVisible();
+  // The manual "Score Week" control is retired — live scoring exists, so no commissioner
+  // stamps a week final by hand. The week instead carries an honest state badge, and the
+  // lineup editor's lock message agrees with it: a week that has started is locked, a week
+  // that hasn't is still editable. Asserting the disjunction FIRST is what keeps this honest —
+  // without it, a regression that removed all three states would silently skip past both `if`
+  // branches below and still pass.
+  const notStarted = managerA.getByText("Not started");
+  const inProgress = managerA.getByText("In progress");
+  const final = managerA.getByText("Final", { exact: true });
+  await expect(notStarted.or(inProgress).or(final).first()).toBeVisible();
+  await expect(managerA.getByRole("button", { name: /^Score Week/ })).toHaveCount(0);
+
+  const started = (await inProgress.count()) > 0 || (await final.count()) > 0;
+  if (started) {
+    await expect(locked).toBeVisible();
+  } else {
+    await expect(save).toBeVisible();
+  }
 });
 
 test("the advisor answers from this league's own numbers, with or without a model key", async ({ managerA }) => {

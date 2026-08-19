@@ -27,7 +27,7 @@ Not a UX preference — no code path lets the AI submit a lineup or accept a tra
 1. **`assembleAdvisorContext` only ever `select`s.** Every statement in `context.ts` is a read.
 2. **`advisory-only.test.ts` fails the build** if any non-test file under `src/ai-advisor/**`
    contains a write verb (`.insert(`, `.update(`, `.delete(`, `.transaction(`, `setLineup`,
-   `scoreWeek`, `applyAction`, `commitDraft`, `acceptInvite`) or reads `process.env` /
+   `finalizeWeek`, `applyAction`, `commitDraft`, `acceptInvite`) or reads `process.env` /
    `isLLMEnabled` directly — enablement is decided once, at the route edge (see "The LLM seam"
    below), never inside the advisor's own modules.
 3. **`AdvisorPanel` has no apply button**, asserted by its own component test — there is no
@@ -113,7 +113,7 @@ the sanitize step is exercised by the exact attack it exists to stop, not just b
 Recorded here so nobody "fixes" the omission later. The gate (`vitest.config.mts`'s
 `COVERAGE_GATED_DIRS`) is reserved for pure, deterministic modules where "100%" is a meaningful,
 achievable bar — `src/scoring`, `src/draft-engine`, `src/draft-room/state`, `src/league`,
-`src/chat`, `src/matchmaking` and `src/stats`. `src/ai-advisor/**` mixes that kind of pure code
+`src/chat`, `src/matchmaking`, `src/stats` and `src/stats-pipeline`. `src/ai-advisor/**` mixes that kind of pure code
 (`valuation.ts`) with a genuinely
 nondeterministic dependency — a real LLM call, mocked in every test — and a database-backed
 context assembly. Both are already thoroughly tested (`context.test.ts`, `start-sit.test.ts`,

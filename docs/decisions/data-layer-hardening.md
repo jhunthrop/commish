@@ -56,12 +56,15 @@ join needs restructuring (e.g. filtering `teams` by the narrowed `leagues` set b
 rather than assuming the fix is "add an index," since one already exists.
 
 **Plan D runbook note:** migrations `0011` (`leagues_public_browse_idx`, plain `CREATE INDEX`,
-takes a `SHARE` lock blocking writes to `leagues`) and `0012` (`player_stat_lines.sacks` widened
-to `real`, `ALTER COLUMN ... TYPE`, takes `ACCESS EXCLUSIVE` and rewrites the table) both run as
-written here. Safe at current and near-term table sizes, and there is no production database yet
-— but whoever runs these against a live table with real traffic should use `CREATE INDEX
-CONCURRENTLY` for `0011` and a batched backfill for `0012` instead of running the checked-in SQL
-verbatim.
+takes a `SHARE` lock blocking writes to `leagues`), `0012` (`player_stat_lines.sacks` widened
+to `real`, `ALTER COLUMN ... TYPE`, takes `ACCESS EXCLUSIVE` and rewrites the table) and `0013`
+(Plan B's `lineup_slots_player_week_idx` and `roster_slots_player_idx`, the two indexes
+`affectedTeams` — `src/stats-pipeline/affected.ts` — reads; plain `CREATE INDEX`, each taking a
+`SHARE` lock blocking writes to `lineup_slots`/`roster_slots` respectively while it builds) all
+run as written here. Safe at current and near-term table sizes, and there is no production
+database yet — but whoever runs these against a live table with real traffic should use `CREATE
+INDEX CONCURRENTLY` for `0011` and `0013` and a batched backfill for `0012` instead of running
+the checked-in SQL verbatim.
 
 ## The balance-as-rollup convention
 
@@ -100,7 +103,8 @@ roll up a total over an unbounded one. A payment ledger is unbounded. A league's
 ```
 pool_size_per_instance = (postgres_max_connections
                           - reserved_superuser_connections
-                          - background_job_pool_size) / expected_max_instances
+                          - background_job_pool_size * expected_max_instances)
+                         / expected_max_instances
 ```
 
 Executable as `requestPoolSizePerInstance()` in `src/db/config.ts`, with each input a named
@@ -109,9 +113,21 @@ follow. `src/db/config.test.ts` asserts that every instance's pool plus the back
 never exceed what Postgres will actually grant.
 
 `background_job_pool_size` is subtracted **before** the division rather than carved out of one
-instance's share. Plan B's stats-ingestion worker holds connections for the length of a poll
-cycle; a batch job that can borrow from the request path's budget is a batch job that can take
-the request path down on the busiest day of the week.
+instance's share, and it is subtracted `expected_max_instances` TIMES, because the background pool
+is per instance rather than cluster-wide: `src/instrumentation.ts` starts an ingestion worker in
+every Node process and each one opens its own pool. Subtracting it once was correct only while
+there was exactly one background worker anywhere, which stopped being true the moment Plan B's
+worker shipped — the old formula budgeted 4 x 23 + 5 = 97 connections while the deployment would
+actually open 4 x 23 + 4 x 5 = 112, fifteen past what Postgres would grant. Corrected, it is 19 per
+instance and 4 x (19 + 5) = 96. Plan B's stats-ingestion worker is that pool's first named consumer:
+`ingestionPoolOptions()` (`src/stats-pipeline/index.ts`) hands `DB_POOL_CONFIG.backgroundJobPoolSize`
+straight to the worker's own `createDb(undefined, ingestionPoolOptions())` call, a dedicated pool
+it never shares with the request path's `getDb()`, and holds those connections for the length of
+a poll cycle. `src/stats-pipeline/index.test.ts` asserts on `ingestionPoolOptions()` directly
+(asserting on a live `postgres` pool's internals would mean asserting on `postgres` itself) — the
+formula above is only true if the worker actually honors it, and that is what proves it does. A
+batch job that can borrow from the request path's budget is a batch job that can take the request
+path down on the busiest day of the week.
 
 ## PgBouncer, transaction pooling, and what it forbids
 

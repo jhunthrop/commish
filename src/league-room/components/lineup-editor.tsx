@@ -17,7 +17,17 @@ const slotKey = (slot: LineupSlotView): string => `${slot.slot}:${slot.slotIndex
  * happens in React — which it could not anyway, since this directory may not value-import
  * `@/league`. A rejection is shown in the server's own words.
  */
-export function LineupEditor({ leagueId, lineup }: { readonly leagueId: string; readonly lineup: LineupBody }) {
+export function LineupEditor({
+  leagueId,
+  lineup,
+  totalWeeks,
+}: {
+  readonly leagueId: string;
+  readonly lineup: LineupBody;
+  /** The season's last week number. Names the reopening condition in the locked message —
+   *  "next week" only means something if there is one. */
+  readonly totalWeeks: number;
+}) {
   const { fetchJson } = useLeagueRoomDeps();
   const [assignments, setAssignments] = useState<Readonly<Record<string, string | null>>>(
     () => Object.fromEntries(lineup.starters.map((slot) => [slotKey(slot), slot.playerId])),
@@ -29,10 +39,19 @@ export function LineupEditor({ leagueId, lineup }: { readonly leagueId: string; 
   const everyone = useMemo(() => [...lineup.starters, ...lineup.bench].filter((slot) => slot.playerId !== null), [lineup]);
 
   if (lineup.locked) {
+    // Persona review (first-timer, FIX 4): stating the situation without naming what happens
+    // next reads as a dead end. There IS a next step — it just isn't available yet — so say
+    // when. The season's final week has no next week to point at, so the second sentence is
+    // dropped rather than promising a lineup that will never open.
+    const hasNextWeek = lineup.weekNumber < totalWeeks;
     return (
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-medium text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
-        <p className="text-sm text-text-muted">{`${formatWeek(lineup.weekNumber)} is final, so its lineup can't change.`}</p>
+        <p className="text-sm text-text-muted">
+          {hasNextWeek
+            ? `${formatWeek(lineup.weekNumber)} has started, so its lineup can't change. You can set next week's lineup as soon as this week ends.`
+            : `${formatWeek(lineup.weekNumber)} has started, so its lineup can't change.`}
+        </p>
         <ul className="flex flex-col gap-1">
           {lineup.starters.map((slot) => (
             <li key={slotKey(slot)} className="flex items-center gap-2 text-text-primary">
@@ -74,6 +93,11 @@ export function LineupEditor({ leagueId, lineup }: { readonly leagueId: string; 
   return (
     <section className="flex flex-col gap-3">
       <h2 className="text-lg font-medium text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
+      {/* Persona review (veteran, FIX 5): the lock is coarse — the WHOLE week locks at the
+          first kickoff, not each player at their own — and nothing said so before this. A
+          manager who plans to swap a Monday-night player after watching Sunday's early games
+          needs to know that plan won't work before they're locked out of trying it. */}
+      <p className="text-sm text-text-muted">Lineups lock for the whole week when its first game kicks off.</p>
       <div className="grid gap-2 sm:grid-cols-2">
         {lineup.starters.map((slot) => (
           <Select

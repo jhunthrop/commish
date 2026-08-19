@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import type { ScoringPresetName } from "@/domain/scoring";
-import { players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
+import { drafts, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
 import { createLeague } from "./creation";
 import { writeSchedule } from "./schedule";
 
@@ -17,11 +17,13 @@ let nextId = 0;
 const newId = () => `id_${++nextId}`;
 
 /**
- * Two teams, a legal starting QB/RB each, two bench spots, and a two-week schedule. Both
- * lineup test files build off this exact roster shape so a lineup swap ("start the bench QB
- * and RB") means the same thing in both places.
+ * Two teams, a legal starting QB/RB each, two bench spots, and a schedule (two weeks by
+ * default; `weeks` widens it for a test that needs a week further out, e.g. the lock tests
+ * probing a week the ingestion worker has never reached). Both lineup test files build off this
+ * exact roster shape so a lineup swap ("start the bench QB and RB") means the same thing in
+ * both places.
  */
-export async function twoTeamLeague(db: Db) {
+export async function twoTeamLeague(db: Db, { weeks = 2 }: { readonly weeks?: number } = {}) {
   await db.insert(users).values([
     { id: "u1", email: "u1@test.local", displayName: "Manager 1" },
     { id: "u2", email: "u2@test.local", displayName: "Manager 2" },
@@ -33,6 +35,9 @@ export async function twoTeamLeague(db: Db) {
   });
   if (!created.ok) throw new Error(created.reason);
   await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
+  // `finalizeWeek` refuses an undrafted league (Plan B Task 5's guard) — this fixture stands
+  // in for a season already underway, so the draft it's built on is done.
+  await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
   await db.insert(players).values([
     { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },
     { id: "qb2", name: "QB Two", position: "QB", nflTeam: "SF" },
@@ -45,7 +50,7 @@ export async function twoTeamLeague(db: Db) {
     { teamId: created.teamId, slot: "BENCH", slotIndex: 0, playerId: "qb2" },
     { teamId: created.teamId, slot: "BENCH", slotIndex: 1, playerId: "rb2" },
   ]);
-  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, "team_2"], weeks: 2 }));
+  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, "team_2"], weeks }));
   return created;
 }
 

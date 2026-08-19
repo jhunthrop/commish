@@ -49,6 +49,43 @@ describe("Tank01StatsProvider", () => {
     expect(lines.some((l) => l.playerId === "10024")).toBe(false);
   });
 
+  it("drops a box-score stat line for a player on neither of the game's two teams", async () => {
+    // The bug this guards against: a box score keyed to the wrong fixture, or one that leaks a
+    // player from a third team, would otherwise attribute real points to a real, listed player
+    // in a game they did not play — the case the listed-players filter alone cannot catch, since
+    // that player is legitimately listed, just not in this game.
+    const players = [
+      { playerID: "1", longName: "Home Player", pos: "WR", team: "SEA" },
+      { playerID: "2", longName: "Away Player", pos: "WR", team: "SF" },
+      { playerID: "3", longName: "Stray Player", pos: "WR", team: "KC" },
+    ];
+    const box = {
+      gameID: "20260913_SF@SEA",
+      playerStats: {
+        "1": { playerID: "1", Receiving: { receptions: "3", recYds: "40" } },
+        "2": { playerID: "2", Receiving: { receptions: "2", recYds: "20" } },
+        "3": { playerID: "3", Receiving: { receptions: "9", recYds: "150" } },
+      },
+    };
+    const fetchStub: typeof globalThis.fetch = async (input) => {
+      const url = new URL(typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url);
+      if (url.pathname === TANK01_CONFIG.paths.playerList) {
+        return new Response(JSON.stringify({ statusCode: 200, body: players }), { status: 200 });
+      }
+      if (url.pathname === TANK01_CONFIG.paths.teams) {
+        return new Response(JSON.stringify({ statusCode: 200, body: [] }), { status: 200 });
+      }
+      if (url.pathname === TANK01_CONFIG.paths.boxScore) {
+        return new Response(JSON.stringify({ statusCode: 200, body: box }), { status: 200 });
+      }
+      throw new Error(`unexpected request to ${url.pathname}`);
+    };
+    const subject = createTank01StatsProvider({ apiKey: "test-key", fetch: fetchStub, season: 2026 });
+    const game = { gameId: "20260913_SF@SEA", week: 1, status: "final" as const, homeNflTeam: "SEA", awayNflTeam: "SF" };
+    const lines = await subject.getGameStatLines(game);
+    expect(lines.map((line) => line.playerId).sort()).toEqual(["1", "2"]);
+  });
+
   it("answers an out-of-season week without making a request at all", async () => {
     // The fixture fetch throws by name on anything unrecorded, and there IS a recorded week-99
     // schedule, so this passing proves the short circuit rather than proving the fixture exists.

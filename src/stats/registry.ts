@@ -1,4 +1,4 @@
-import { envOr, envOrUndefined } from "@/lib/env";
+import { envOr, envOrUndefined, parsePositiveInteger } from "@/lib/env";
 import { STATS_CONFIG, isStatsProviderName, type StatsProviderName } from "./config";
 import { createMockStatsProvider } from "./mock/mock-stats-provider";
 import type { StatsProvider } from "./provider";
@@ -35,25 +35,14 @@ export function createStatsProvider(name: string = envOr(STATS_CONFIG.envVars.pr
   return build(name);
 }
 
-/**
- * `TANK01_SEASON` is a boundary value from `.env.local`, not from code, so it is validated here
- * rather than trusted. `Number("banana")` is `NaN`, and `tank01-stats-provider.ts` stringifies
- * whatever it is handed straight into the `season` query parameter — an unvalidated `NaN` would
- * ship as the literal string `"NaN"` on the wire, in the one module whose entire purpose is
- * fail-fast selection.
- */
-function parseSeason(raw: string): number {
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${TANK01_CONFIG.envVars.season}="${raw}" is not a positive integer season year.`);
-  }
-  return parsed;
-}
-
 function build(name: StatsProviderName): StatsProvider {
   switch (name) {
-    case "mock":
-      return createMockStatsProvider();
+    case "mock": {
+      const liveWeek = envOrUndefined(STATS_CONFIG.envVars.mockLiveWeek);
+      return createMockStatsProvider(undefined, {
+        liveWeek: liveWeek === undefined ? undefined : parsePositiveInteger(STATS_CONFIG.envVars.mockLiveWeek, liveWeek),
+      });
+    }
     case "tank01": {
       const apiKey = envOrUndefined(TANK01_CONFIG.envVars.apiKey);
       if (apiKey === undefined) {
@@ -64,7 +53,7 @@ function build(name: StatsProviderName): StatsProvider {
       const season = envOrUndefined(TANK01_CONFIG.envVars.season);
       return createTank01StatsProvider({
         apiKey,
-        season: season === undefined ? undefined : parseSeason(season),
+        season: season === undefined ? undefined : parsePositiveInteger(TANK01_CONFIG.envVars.season, season),
       });
     }
   }

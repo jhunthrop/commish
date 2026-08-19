@@ -10,7 +10,7 @@ either directly.
 | Layer | Path | Rule |
 |---|---|---|
 | Engine | `src/league/` | Pure. No I/O, no `Date.now()`, `readonly` everywhere, 100% test coverage enforced: schedule generation (the circle method), standings, clinching, lineup shaping, invite codes, `LEAGUE_CONFIG`. |
-| Service | `src/league-service/` | The only part that talks to Postgres: league creation, invites, the schedule write, lineups, scoring and standings assembly. Consumed directly by `/api/leagues/**` route handlers and by `src/app/**` Server Components. |
+| Service | `src/league-service/` | The only part that talks to Postgres: league creation, invites, the schedule write, lineups, and standings assembly. Consumed directly by `/api/leagues/**` route handlers and by `src/app/**` Server Components. Scoring a week's matchups is `src/stats-pipeline/finalize.ts`'s job now, called by the stats-ingestion worker — see "Scoring and standings" below. |
 
 Same rationale as the draft: a schedule, a standings table or a clinch computation is a pure
 function of rows already in hand, so it lives where it can be tested exhaustively without a
@@ -110,24 +110,49 @@ exactly "everyone on this roster who isn't starting" — that is what lets `Line
 no lineup arithmetic of its own, which matters because `src/league-room/**` may not
 value-import `@/league` at all (see "The client boundary" below).
 
-**A week locks when it is scored.** `isWeekLocked` is true once every matchup in that week has
-both scores set — the same condition `MatchupSummary.final` uses — and `setLineup` refuses a
-write against a locked week with a 409. There is deliberately no clock-based lock: this phase
-has no live game data for a clock to track, and pretending otherwise from the server side would
-undercut the same "never imply live data" rule the matchup copy already enforces from the
-client side.
+**A week locks when it starts, not when it is scored.** `isWeekLocked` (`src/league-service/lineups.ts`)
+reads the week's `stat_weeks.status` (global to the NFL calendar, never scoped by league — see
+`weekStatusFor`) and delegates to `isLineupLocked` (`src/league/week-status.ts`): a week is
+locked once its status is anything but `scheduled`, and `setLineup` refuses a write against a
+locked week with a 409. A week the stats-ingestion worker has never reached has no `stat_weeks`
+row at all, and that reads as `scheduled` — open — rather than as locked, because locking on the
+row's absence would freeze every league's lineups the first time the worker was down, turning a
+background-job outage into a product outage. This replaced Phase 1's "both scores exist" rule,
+which was correct only when a score appeared solely because a commissioner pressed a button: with
+scores that move on their own, a manager could otherwise watch a player leave the field and swap
+him out before the week was ever scored. The lock is week-level, not per-player kickoff — it
+errs toward locking a manager out early, which costs flexibility and costs nobody money; a
+per-player lock needs a kickoff time this seam does not carry yet.
 
 ## Scoring and standings
 
-`scoreWeek` (`src/league-service/results.ts`) scores one week from the **fixed, static mock
-stat set** — there is no live feed in this phase, so a week becomes final the moment a
-commissioner presses the button, not when a calendar says so. For each matchup it reads both
+`finalizeWeek` (`src/stats-pipeline/finalize.ts`) scores and settles one week. Phase 2 Plan B
+retired the commissioner's manual "Score Week" button and route: the stats ingestion worker
+calls `finalizeWeek` itself once a week's games are done, the same settlement write a
+commissioner used to trigger by hand. `src/league-service/results.ts` carried a thin `scoreWeek`
+delegate to it during the transition (R-B1); Plan B Task 8 deleted both the delegate and the
+route together, so the worker is now the only caller. For each matchup it reads both
 teams' saved (or default) starting lineup, scores the starters with `scoreLineup`
 (`src/scoring/`) against the league's own `scoring_settings`, and writes both scores inside one
 transaction — a half-scored week is not a result, it's a bug in progress, and
-`computeStandings` deliberately ignores a matchup with only one score set. Re-running is safe
-and reproduces identical numbers: it recomputes from the same stored lineups and stat lines and
-overwrites.
+`computeStandings` deliberately ignores a matchup with only one score set. The scores are computed
+INSIDE that transaction, from matchups read in a deterministic order, so a settlement can neither
+be computed from a snapshot older than the data it writes against nor deadlock with a concurrent
+copy of itself. Re-running is safe and reproduces identical numbers: it recomputes from the same
+stored lineups and stat lines and overwrites.
+
+Re-running is not hypothetical, and that matters for a week's final number. NFL official scoring
+revisions run into the following week, and the worker records a game's box score the first moment
+the provider calls it final — the earliest, least settled version of it. For three days after a
+week settles the worker re-reads that week's box scores once a calendar day (its **correction
+window**, `docs/decisions/live-scoring-pipeline.md` §10), and a revision that lands flows through
+`finalizeWeek` into `matchups` and from there into the standings by the same machinery a first
+settlement uses. After that window closes, the week's numbers are the ones that stand.
+
+A league that finishes its draft AFTER one of its weeks has already settled is not left behind:
+`finalizeWeek` refuses an undrafted league (its rosters do not exist, so every team would score zero
+and the standings would show phantom losses), and the worker catches those weeks up on a later tick
+once the draft is complete, a bounded number at a time.
 
 `computeStandings` (`src/league/standings.ts`) tallies wins, losses, ties and both points
 columns from finished matchups only, then sorts by the canonical ranking — **win percentage
@@ -147,15 +172,21 @@ mathematically certain outcome.
 
 ## Real-time
 
-**No `league.*`, `lineup.*` or `matchup.*` event type exists, on purpose.** Standings and
-scoring are batch operations: a commissioner presses "score this week", the numbers land in
-Postgres, and the next page load already reflects them — there is nothing "live" to push. A
-lineup change is visible only to the manager who made it (`GET /api/leagues/[leagueId]/teams/me/lineup`
-answers the caller's own team, never anybody else's), so broadcasting it would tell every other
-manager in the league about a private roster move nobody asked to watch. Adding a channel
-nothing subscribes to would violate `docs/conventions.md`'s "one closed taxonomy" rule for no
-gain. `score.update` is enumerated in `src/lib/realtime/events.ts` for a later phase with an
-actual live feed, and stays unused until one exists — Phase 1 never publishes it.
+**No `league.*`, `lineup.*` or `matchup.*` event type exists, on purpose.** Standings are still
+a batch operation from the manager's point of view: nothing about a lineup save or the standings
+table itself needs a push channel. A lineup change is visible only to the manager who made it
+(`GET /api/leagues/[leagueId]/teams/me/lineup` answers the caller's own team, never anybody
+else's), so broadcasting it would tell every other manager in the league about a private roster
+move nobody asked to watch. Adding a channel nothing subscribes to would violate
+`docs/conventions.md`'s "one closed taxonomy" rule for no gain.
+
+**`score.update` is the one exception, and it now carries real traffic.** Phase 1 enumerated it
+in `src/lib/realtime/events.ts` and never published it — there was no live feed to publish from.
+Plan B's stats-ingestion worker (`src/stats-pipeline/worker.ts`) publishes it once per league per
+tick that changed a player's stats or finalized a week, batched across every team the change could
+have moved rather than per-player. See `docs/decisions/live-scoring-pipeline.md` for the full
+contract (the payload shape, the version field, and why the score cache and the request budget
+degrade in opposite directions).
 
 League chat is the one thing on this page that IS live. `chat.message` and `chat.reaction` ride
 the same `league:<id>:events` stream, gated by the same membership rule, and are consumed by
@@ -191,7 +222,8 @@ from that same directory, never inlined into the page file.
 Every `/api/leagues/**` and `/api/invites/**` route goes through `src/app/api/leagues/_shared.ts`:
 `withCurrentUser` (401 JSON, never a redirect), `withLeagueMemberActor` (membership required,
 403 for a signed-in stranger with no team and no commissioner role), and `withCommissioner`
-(the two commissioner-only actions). Every response is the same envelope
+(the one commissioner-only action, minting an invite — the manual "Score Week" action Plan B
+retired was the other). Every response is the same envelope
 (`{ ok: true, data }` / `{ ok: false, error }`) every other route in the app uses.
 
 | Route | Who | Notes |
@@ -204,8 +236,7 @@ Every `/api/leagues/**` and `/api/invites/**` route goes through `src/app/api/le
 | `GET /api/leagues/[leagueId]/matchups/[week]` | a manager with a team in the league, or the commissioner | Both sides' full lineups and every starter's per-player points for that week. |
 | `GET /api/leagues/[leagueId]/teams/me/lineup` | a manager with a team in the league | `?week=N`. The caller's OWN lineup, never `teams/[teamId]/lineup` — there is no path or body shape in which a manager can read or set somebody else's. |
 | `PUT /api/leagues/[leagueId]/teams/me/lineup` | a manager with a team in the league | Body: `{ weekNumber, slots }`. A rejected lineup (illegal slot, unowned player, a locked week) is a 409/422 with `validateLineup`'s reason verbatim. |
-| `POST /api/leagues/[leagueId]/weeks/[week]/score` | commissioner only | Scores a week from the mock dataset and stores it. Publishes no event — see "Real-time" above. |
-| `GET /api/leagues/[leagueId]/events` | a manager with a team in the league, or the commissioner | The same Redis-Streams-over-SSE fan-out the draft room uses (`docs/draft-engine.md`), gated by the same membership rule — a signed-in stranger gets 403, not another league's stream. |
+| `GET /api/leagues/[leagueId]/events` | a manager with a team in the league, or the commissioner | The same Redis-Streams-over-SSE fan-out the draft room uses (`docs/draft-engine.md`), gated by the same membership rule — a signed-in stranger gets 403, not another league's stream. Now also carries `score.update`, published by the stats-ingestion worker — see "Real-time" above. |
 | `GET /api/leagues/[leagueId]/chat` | a manager with a team in the league, or the commissioner | `?before=<messageId>`. One page of `CHAT_CONFIG.pageSize` messages, oldest first, with `hasMore`. There is no unpaginated read. |
 | `POST /api/leagues/[leagueId]/chat` | same | Body: `{ body }`. The author is the session's user; no body field can change it. |
 | `POST /api/leagues/[leagueId]/chat/[messageId]/reactions` | same | Body: `{ emoji }` from `CHAT_CONFIG.reactions`. One verb toggles both directions. |

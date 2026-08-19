@@ -1,7 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { pgTable, text } from "drizzle-orm/pg-core";
+import { pgTable, text, PgDialect } from "drizzle-orm/pg-core";
+import type { SQL } from "drizzle-orm";
 import { players, rosterSlots } from "@/db/schema";
-import { excludedSetFor } from "./upsert";
+import { changedRowWhere, excludedSetFor } from "./upsert";
+
+/** Renders a whole `SQL` fragment to real Postgres text — `changedRowWhere` mixes `sql.raw`
+ *  identifiers with column-reference chunks, so a plain "read the first chunk" helper (like
+ *  `rawTextOf` below) can't capture enough of it; the dialect is what the real query builder
+ *  itself uses to do this, so it's the one source of truth for what actually reaches Postgres. */
+const dialect = new PgDialect();
+function fullTextOf(fragment: SQL): string {
+  return dialect.sqlToQuery(fragment).sql;
+}
 
 /** Reads the raw SQL text out of a `sql.raw(...)` fragment, for assertion purposes only. */
 function rawTextOf(fragment: unknown): string {
@@ -40,5 +50,27 @@ describe("excludedSetFor", () => {
       bad: text("bad; DROP TABLE users; --"),
     });
     expect(() => excludedSetFor(unsafeTable, ["id"])).toThrow(/unsafe|identifier/i);
+  });
+});
+
+describe("changedRowWhere", () => {
+  it("compares every non-key column between the table and excluded via IS DISTINCT FROM", () => {
+    const where = changedRowWhere(players, ["id"]);
+    expect(fullTextOf(where)).toBe(
+      '("players"."name", "players"."position", "players"."nfl_team") IS DISTINCT FROM (excluded.name, excluded.position, excluded.nfl_team)',
+    );
+  });
+
+  it("excludes every key column, even when there is more than one", () => {
+    const where = changedRowWhere(rosterSlots, ["teamId", "slot", "slotIndex"]);
+    expect(fullTextOf(where)).toBe('("roster_slots"."player_id") IS DISTINCT FROM (excluded.player_id)');
+  });
+
+  it("throws a clear error instead of interpolating an unsafe column identifier into raw SQL", () => {
+    const unsafeTable = pgTable("upsert_test_unsafe_where", {
+      id: text("id").primaryKey(),
+      bad: text("bad; DROP TABLE users; --"),
+    });
+    expect(() => changedRowWhere(unsafeTable, ["id"])).toThrow(/unsafe|identifier/i);
   });
 });

@@ -2,6 +2,11 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium, type FullConfig } from "@playwright/test";
+import { eq } from "drizzle-orm";
+import { createDb } from "../src/db/client";
+import { statWeeks } from "../src/db/schema";
+import { LEAGUE_CONFIG } from "../src/league";
+import { createRedisConnection } from "../src/lib/realtime/redis";
 import { mintLabSession, SESSION_COOKIE_NAME } from "../scripts/lib/lab-session";
 
 export const AUTH_DIR = resolve(process.cwd(), "e2e/.auth");
@@ -41,7 +46,125 @@ function storageState(baseURL: string, cookie: string): string {
 }
 
 /**
- * Two real managers, one seeded season, no bypass.
+ * `seedSeasonLeague` (`src/data/seed/seed-season-league.ts`) scores every week of the seeded
+ * season directly, so its own `matchups` rows already make this the league's current week —
+ * see `currentWeekNumber` (`src/league/schedule.ts`): once every week has both scores in,
+ * "current" falls to the last one.
+ */
+export const SEEDED_SEASON_CURRENT_WEEK = LEAGUE_CONFIG.regularSeasonWeeks;
+
+/**
+ * The safety net: a hard stop so a worker that can never converge fails the suite rather than
+ * looping forever.
+ */
+const MAX_TICKS_TO_REACH_LIVE_WEEK = 40;
+
+/**
+ * The actual bound. A correct worker converges from a completely empty `stat_weeks` table in 13
+ * ticks against the committed mock dataset's 16 games a week and the default 20-game tick budget:
+ * a tick examining a brand new week finalizes it and starts the next, then a tick examining only
+ * that week (the steady-state one-week window) finishes it. The safety net above cannot catch a
+ * regression from 13 to 39 — it would pass, silently, while every real tick's request cost rose
+ * with it. This is the assertion that fails instead: tight enough to notice, loose enough to
+ * survive a dataset that grows a little.
+ */
+const EXPECTED_MAX_TICKS_TO_REACH_LIVE_WEEK = 15;
+
+const LOCAL_REDIS_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
+
+/**
+ * `resetIngestionRedisState`'s `stats:*` wildcard reset includes the request-budget ledger
+ * itself (`stats:budget:*`, `@/stats-pipeline/budget.ts`) — the one thing `RequestBudget` is
+ * deliberately designed to fail CLOSED to protect. Refusing to run it against anything but a
+ * local Redis mirrors `assertLocalSeedTarget`'s idiom (`src/data/seed/guard.ts`, which the seed
+ * step above already runs before this): a wildcard reset of a budget ledger has no business
+ * running anywhere `.env.local` could plausibly point at something real.
+ */
+function assertLocalRedisTarget(url: string): void {
+  let host: string;
+  try {
+    host = new URL(url).hostname;
+  } catch {
+    throw new Error("Refusing to reset Redis: REDIS_URL could not be parsed, so the target cannot be verified as local.");
+  }
+  if (!LOCAL_REDIS_HOSTS.has(host)) {
+    throw new Error(
+      `Refusing to reset Redis: REDIS_URL points at "${host}", not a local Redis. This suite wildcard-clears every "stats:*" key, including the live request-budget ledger.`,
+    );
+  }
+}
+
+/**
+ * Clears every `stats:*` key so a previous run's request-budget ledger can never deny THIS run's
+ * reservations — the same reset `worker.test.ts` does in its own `beforeEach`, against the
+ * shared dev Redis this suite reuses rather than a dedicated test instance. `REDIS_URL` is read
+ * (and validated local) here rather than left to `createRedisConnection`'s own default: that
+ * function already fails fast on an unset `REDIS_URL` — mirrored by reading it explicitly here —
+ * but has no reason to also know this caller's local-only requirement.
+ */
+async function resetIngestionRedisState(): Promise<void> {
+  const url = process.env.REDIS_URL;
+  if (url === undefined || url === "") {
+    throw new Error("Refusing to reset Redis: REDIS_URL is not set. Copy .env.example to .env.local and run `docker compose up -d`.");
+  }
+  assertLocalRedisTarget(url);
+
+  const redis = createRedisConnection();
+  try {
+    const keys = await redis.keys("stats:*");
+    if (keys.length > 0) await redis.unlink(...keys);
+  } finally {
+    redis.disconnect();
+  }
+}
+
+/**
+ * Clears `stat_weeks` (Postgres) so the ingestion worker's OWN "current week" — a separate,
+ * global ledger from the season league's `matchups`-derived current week above — starts every
+ * run from the same empty state, then ticks `scripts/ingest-once.ts` (with
+ * `MOCK_STATS_LIVE_WEEK` overridden the same way `DEV_SEED_CLAIM_USER_ID` is above) until
+ * `SEEDED_SEASON_CURRENT_WEEK` itself reports `in_progress` — deterministically, rather than
+ * waiting out `STATS_INGESTION_CONFIG.pollIntervalMs` (30 minutes): a browser test that waits
+ * half an hour is a browser test nobody runs.
+ *
+ * This is a real, unmodified exercise of `weeksToExamine`'s own cold-start-mid-season fix
+ * (`@/stats-pipeline/worker.ts`): on a fresh table the worker starts at week 1 and, once every
+ * EXISTING row is final, resumes at `MAX(week) + 1` rather than resetting to week 1 — so a burst
+ * of ticks fired back-to-back correctly walks the whole season forward and converges on the live
+ * week, with no backdoor Postgres write of any kind priming where it should resume.
+ */
+async function tickUntilLiveWeekReached(): Promise<void> {
+  const db = createDb();
+  try {
+    await db.delete(statWeeks);
+
+    for (let tick = 0; tick < MAX_TICKS_TO_REACH_LIVE_WEEK; tick++) {
+      execFileSync(
+        "npx",
+        ["dotenv", "-e", ".env.local", "-v", `MOCK_STATS_LIVE_WEEK=${SEEDED_SEASON_CURRENT_WEEK}`, "--", "tsx", "scripts/ingest-once.ts"],
+        { stdio: "inherit", cwd: resolve(AUTH_DIR, "../..") },
+      );
+      const [current] = await db.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, SEEDED_SEASON_CURRENT_WEEK));
+      if (current?.status === "in_progress") {
+        const used = tick + 1;
+        console.log(`[e2e] stats:ingest reached week ${SEEDED_SEASON_CURRENT_WEEK} in ${used} ticks`);
+        if (used > EXPECTED_MAX_TICKS_TO_REACH_LIVE_WEEK) {
+          throw new Error(
+            `stats:ingest took ${used} ticks to reach week ${SEEDED_SEASON_CURRENT_WEEK}, past the expected bound of ${EXPECTED_MAX_TICKS_TO_REACH_LIVE_WEEK}. Convergence has regressed, and every tick costs upstream requests.`,
+          );
+        }
+        return;
+      }
+    }
+
+    throw new Error(`stats:ingest never reached week ${SEEDED_SEASON_CURRENT_WEEK} within ${MAX_TICKS_TO_REACH_LIVE_WEEK} ticks.`);
+  } finally {
+    await db.$client.end();
+  }
+}
+
+/**
+ * Two real managers, one seeded season, its live week ticked into progress, no bypass.
  *
  * The order matters and each step earns its place:
  *
@@ -55,6 +178,10 @@ function storageState(baseURL: string, cookie: string): string {
  *    suite should fail here rather than paper over it.
  * 3. **Seed** with manager A's id as `DEV_SEED_CLAIM_USER_ID`, so A owns team 1 and the
  *    commissioner's chair in the seeded season league and can actually score a week.
+ * 4. **Reset** the ingestion worker's Redis state (`resetIngestionRedisState`) and **tick** it,
+ *    deterministically and repeatedly, until the live week is reached (`tickUntilLiveWeekReached`
+ *    — see its own docblock). This is what makes `e2e/live-scoring.spec.ts`'s "week in progress"
+ *    state real rather than mocked.
  */
 export default async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL = config.projects[0]?.use.baseURL ?? "http://localhost:3100";
@@ -92,4 +219,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     ["dotenv", "-e", ".env.local", "-v", `DEV_SEED_CLAIM_USER_ID=${a.userId}`, "--", "tsx", "src/data/seed/index.ts"],
     { stdio: "inherit", cwd: resolve(AUTH_DIR, "../..") },
   );
+
+  await resetIngestionRedisState();
+  await tickUntilLiveWeekReached();
 }

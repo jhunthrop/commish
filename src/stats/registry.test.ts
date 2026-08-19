@@ -89,4 +89,32 @@ describe("createStatsProvider", () => {
     delete process.env[TANK01_CONFIG.envVars.apiKey];
     delete process.env[TANK01_CONFIG.envVars.season];
   });
+
+  it("builds the mock provider with no live week by default, matching Plan A's shipped behavior", async () => {
+    const provider = createStatsProvider("mock");
+    const games = await provider.listGames(1);
+    expect(games.every((game) => game.status === "final")).toBe(true);
+  });
+
+  it("builds the mock provider with the configured live week when MOCK_STATS_LIVE_WEEK is set", async () => {
+    process.env[STATS_CONFIG.envVars.mockLiveWeek] = "2";
+    try {
+      const provider = createStatsProvider("mock");
+      const liveGames = await provider.listGames(2);
+      expect(liveGames.every((game) => game.status === "in_progress")).toBe(true);
+      const finalGames = await provider.listGames(1);
+      expect(finalGames.every((game) => game.status === "final")).toBe(true);
+    } finally {
+      delete process.env[STATS_CONFIG.envVars.mockLiveWeek];
+    }
+  });
+
+  it("fails fast on a MOCK_STATS_LIVE_WEEK that is not a positive integer, naming the variable", () => {
+    process.env[STATS_CONFIG.envVars.mockLiveWeek] = "banana";
+    try {
+      expect(() => createStatsProvider("mock")).toThrow(STATS_CONFIG.envVars.mockLiveWeek);
+    } finally {
+      delete process.env[STATS_CONFIG.envVars.mockLiveWeek];
+    }
+  });
 });

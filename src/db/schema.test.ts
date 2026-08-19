@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
-import { users, leagues, teams, scoringSettings, leagueInvites, lineupSlots } from "./schema";
+import { users, leagues, teams, scoringSettings, leagueInvites, lineupSlots, statWeeks } from "./schema";
 import { PPR_SCORING } from "@/domain/scoring";
 
 const db = createTestDb();
@@ -141,5 +141,24 @@ describe("league_invites and lineup_slots", () => {
     await db.delete(leagues).where(eq(leagues.id, LEAGUE_ID));
     expect(await db.select().from(leagueInvites)).toEqual([]);
     expect(await db.select().from(lineupSlots)).toEqual([]);
+  });
+});
+
+describe("stat_weeks", () => {
+  it("round-trips the enum's three values and the row's defaults", async () => {
+    await db.insert(statWeeks).values({ week: 1 });
+    await db.insert(statWeeks).values({ week: 2, status: "in_progress" });
+    await db.insert(statWeeks).values({ week: 3, status: "final", version: 5, gamesTotal: 16, gamesFinal: 16 });
+
+    const [scheduled] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+    expect(scheduled).toMatchObject({ status: "scheduled", version: 0, gamesTotal: 0, gamesFinal: 0 });
+
+    const [inProgress] = await db.select().from(statWeeks).where(eq(statWeeks.week, 2));
+    expect(inProgress?.status).toBe("in_progress");
+
+    const [final] = await db.select().from(statWeeks).where(eq(statWeeks.week, 3));
+    expect(final).toMatchObject({ status: "final", version: 5, gamesTotal: 16, gamesFinal: 16 });
+
+    await expect(db.insert(statWeeks).values({ week: 1 })).rejects.toThrow();
   });
 });

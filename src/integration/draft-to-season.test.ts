@@ -4,7 +4,8 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { draftPicks, drafts, matchups, rosterSlots, weeks } from "@/db/schema";
 import { AUCTION_CONFIG } from "@/draft-engine";
 import { LEAGUE_CONFIG } from "@/league";
-import { leagueHome, matchupWeek, scoreWeek } from "@/league-service";
+import { leagueHome, matchupWeek } from "@/league-service";
+import { finalizeWeek } from "@/stats-pipeline/finalize";
 import { AUCTION_WAR_BUDGET, runAuctionDraftWithBiddingWar, runRealDraft, seedWeekStats } from "./pipeline";
 
 const db = createTestDb();
@@ -86,7 +87,7 @@ describe.each(["snake", "auction"] as const)("a real %s draft becomes a real sea
     const league = await runRealDraft(db, format, `score_${format}`);
     await seedWeekStats(db, 1);
 
-    const scored = await scoreWeek(db, league.leagueId, 1);
+    const scored = await finalizeWeek(db, league.leagueId, 1);
     expect(scored.ok).toBe(true);
 
     const week = await matchupWeek(db, league.leagueId, 1, league.userIds[0]!);

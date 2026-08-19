@@ -1,0 +1,1 @@
+CREATE INDEX "matchups_unsettled_idx" ON "matchups" USING btree ("week_number","league_id") WHERE "matchups"."home_score" is null;

@@ -3,11 +3,80 @@
   "recordedAt": null,
   "note": "Bodies are the `body` value of Tank01's {statusCode, body} envelope, byte-shaped as the API returns it: every value a string except where noted. Written from published captures and the RapidAPI schema, NOT recorded from the live API, because Plan A is built before a key exists. `npm run stats:tank01:record` rewrites every file here from the live API and flips provenance to recorded-from-live-api. The adapter's tests must pass unchanged across that flip; if they do not, the fixtures were wrong and the flip is what caught it.",
   "entries": [
-    { "file": "player-list.json", "path": "/getNFLPlayerList", "query": {}, "trimmed": true, "trimmedNote": "The live response is 4,500+ players and about 5.5 MB. Trimmed to 24 players spanning QB/RB/WR/TE/K plus two unscored positions, keeping every field the mapper reads." },
-    { "file": "teams.json", "path": "/getNFLTeams", "query": {}, "trimmed": false },
-    { "file": "games-week-1.json", "path": "/getNFLGamesForWeek", "query": { "week": "1", "season": "2026", "seasonType": "reg" }, "trimmed": true, "trimmedNote": "Two games rather than a full week, so the box-score fixtures stay to two." },
-    { "file": "boxscore-20260913_SF@SEA.json", "path": "/getNFLBoxScore", "query": { "gameID": "20260913_SF@SEA" }, "trimmed": true, "trimmedNote": "Seven players spanning every stat group, plus both DST sides. The seventh, 10024, is an unscored position (LB) with tackle stats — playerStats carries every player who appeared regardless of position, so this is what a real box score's unscored entries look like, and it is the fixture the adapter's listed-players filter is proven against." },
-    { "file": "boxscore-20260913_CAR@WSH.json", "path": "/getNFLBoxScore", "query": { "gameID": "20260913_CAR@WSH" }, "trimmed": true, "trimmedNote": "Same shape, different teams, one player with no stat groups at all, one with negative rushing yardage (10008, a real NFL occurrence the adapter must not clamp to zero)." },
-    { "file": "games-week-99.json", "path": "/getNFLGamesForWeek", "query": { "week": "99", "season": "2026", "seasonType": "reg" }, "trimmed": false, "note": "An out-of-range week. Kept to document what upstream does, even though the adapter answers this locally and never sends it." }
+    {
+      "file": "player-list.json",
+      "path": "/getNFLPlayerList",
+      "query": {},
+      "trimmed": true,
+      "trimmedNote": "The live response is 4,500+ players and about 5.5 MB. Trimmed to 24 players spanning QB/RB/WR/TE/K plus two unscored positions, keeping every field the mapper reads."
+    },
+    {
+      "file": "teams.json",
+      "path": "/getNFLTeams",
+      "query": {},
+      "trimmed": false
+    },
+    {
+      "file": "games-week-1.json",
+      "path": "/getNFLGamesForWeek",
+      "query": {
+        "week": "1",
+        "season": "2026",
+        "seasonType": "reg"
+      },
+      "trimmed": true,
+      "trimmedNote": "Two games rather than a full week, so the box-score fixtures stay to two.",
+      "note": "Three entries, each proving one gameStatus mapping: SF@SEA carries \"Completed\" (-> final), CAR@WSH carries \"Live - In Progress\" (-> in_progress), and KC@BUF carries \"Weather Delay\", a spelling the vocabulary does not know, to prove the unrecognized-status default (-> in_progress) against a real listGames payload rather than only against a synthetic one in map.test.ts."
+    },
+    {
+      "file": "boxscore-20260913_SF@SEA.json",
+      "path": "/getNFLBoxScore",
+      "query": {
+        "gameID": "20260913_SF@SEA"
+      },
+      "trimmed": true,
+      "trimmedNote": "Seven players spanning every stat group, plus both DST sides. The seventh, 10024, is an unscored position (LB) with tackle stats \u2014 playerStats carries every player who appeared regardless of position, so this is what a real box score's unscored entries look like, and it is the fixture the adapter's listed-players filter is proven against."
+    },
+    {
+      "file": "boxscore-20260913_CAR@WSH.json",
+      "path": "/getNFLBoxScore",
+      "query": {
+        "gameID": "20260913_CAR@WSH"
+      },
+      "trimmed": true,
+      "trimmedNote": "Same shape, different teams, one player with no stat groups at all, one with negative rushing yardage (10008, a real NFL occurrence the adapter must not clamp to zero)."
+    },
+    {
+      "file": "boxscore-20260913_KC@BUF.json",
+      "path": "/getNFLBoxScore",
+      "query": {
+        "gameID": "20260913_KC@BUF"
+      },
+      "trimmed": false,
+      "note": "Empty playerStats and DST: a weather-delayed game has no plays yet. Added so the shared StatsProvider contract suite's per-game cases (which call getGameStatLines on every game listGames(1) returns, including this one) can exercise the Tank01 provider over KC@BUF without a live request; mapBoxScoreToStatLines correctly answers no stat lines for it."
+    },
+    {
+      "file": "games-week-18.json",
+      "path": "/getNFLGamesForWeek",
+      "query": {
+        "week": "18",
+        "season": "2026",
+        "seasonType": "reg"
+      },
+      "trimmed": true,
+      "trimmedNote": "Two games rather than a full week; only the week's existence is under assertion here.",
+      "note": "The LAST week of the regular season (TANK01_CONFIG.weeks.last). The shared StatsProvider contract suite asserts that a provider's declared lastWeekOfSeason is a week it actually answers with games \u2014 a provider that overshoots by even one week leaves the ingestion worker's pointer stalled on a week that can never get a stat_weeks row, which is the exact failure a pipeline-level constant of 18 caused against the 17-week mock dataset."
+    },
+    {
+      "file": "games-week-99.json",
+      "path": "/getNFLGamesForWeek",
+      "query": {
+        "week": "99",
+        "season": "2026",
+        "seasonType": "reg"
+      },
+      "trimmed": false,
+      "note": "An out-of-range week. Kept to document what upstream does, even though the adapter answers this locally and never sends it."
+    }
   ]
 }

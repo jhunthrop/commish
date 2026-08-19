@@ -6,26 +6,30 @@ describe("connection-pool budget", () => {
     // The two property tests below hold for ANY (postgresMaxConnections, reservedSuperuserConnections,
     // backgroundJobPoolSize, expectedMaxInstances) — including a silent change to
     // postgresMaxConnections that no longer matches the real server. These literals are what
-    // actually pins the shipped budget: 100 - 3 - 5 = 92, floor(92 / 4) = 23 per instance,
-    // and 23 * 4 + 5 = 97 <= 97 (100 - 3) is the boundary the docblock and the decision doc cite.
+    // actually pins the shipped budget: the background pool is PER INSTANCE (one ingestion worker
+    // per Node process), so 100 - 3 - 5 * 4 = 77, floor(77 / 4) = 19 per instance, and
+    // 19 * 4 + 5 * 4 = 96 <= 97 (100 - 3) is the boundary the docblock and the decision doc cite.
     expect(DB_POOL_CONFIG.postgresMaxConnections).toBe(100);
     expect(DB_POOL_CONFIG.reservedSuperuserConnections).toBe(3);
     expect(DB_POOL_CONFIG.backgroundJobPoolSize).toBe(5);
     expect(DB_POOL_CONFIG.expectedMaxInstances).toBe(4);
-    expect(requestPoolSizePerInstance()).toBe(23);
-    expect(23 * 4 + 5).toBe(97);
-    expect(97).toBeLessThanOrEqual(100 - 3);
+    expect(requestPoolSizePerInstance()).toBe(19);
+    expect(19 * 4 + 5 * 4).toBe(96);
+    expect(96).toBeLessThanOrEqual(100 - 3);
   });
 
   it("divides the real connection budget among the instances that will compete for it", () => {
     const { postgresMaxConnections, reservedSuperuserConnections, backgroundJobPoolSize, expectedMaxInstances } = DB_POOL_CONFIG;
-    const available = postgresMaxConnections - reservedSuperuserConnections - backgroundJobPoolSize;
+    const available = postgresMaxConnections - reservedSuperuserConnections - backgroundJobPoolSize * expectedMaxInstances;
     expect(requestPoolSizePerInstance()).toBe(Math.floor(available / expectedMaxInstances));
   });
 
-  it("never lets every instance plus the batch pool exceed what Postgres will actually grant", () => {
+  it("never lets every instance plus ITS OWN batch pool exceed what Postgres will actually grant", () => {
+    // Every instance runs its own ingestion worker (`src/instrumentation.ts` starts one in every
+    // Node process, `src/stats-pipeline/index.ts` gives it its own pool), so the background pool
+    // is counted per instance here. Counting it once was the arithmetic error that overshot by 15.
     const { postgresMaxConnections, reservedSuperuserConnections, backgroundJobPoolSize, expectedMaxInstances } = DB_POOL_CONFIG;
-    const worstCase = requestPoolSizePerInstance() * expectedMaxInstances + backgroundJobPoolSize;
+    const worstCase = (requestPoolSizePerInstance() + backgroundJobPoolSize) * expectedMaxInstances;
     expect(worstCase).toBeLessThanOrEqual(postgresMaxConnections - reservedSuperuserConnections);
   });
 
