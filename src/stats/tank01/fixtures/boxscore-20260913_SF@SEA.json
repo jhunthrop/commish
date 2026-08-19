@@ -45,6 +45,13 @@
       "team": "SEA",
       "teamID": "29",
       "Kicking": { "fgMade": "2", "fgAttempts": "3", "xpMade": "3" }
+    },
+    "10024": {
+      "playerID": "10024",
+      "longName": "Marcus Dill",
+      "team": "SEA",
+      "teamID": "29",
+      "Defense": { "totalTackles": "9", "sacks": "1.0", "fumblesLost": "0" }
     }
   },
   "DST": {

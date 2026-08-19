@@ -22,6 +22,15 @@ const STAT_FIELDS = [
 ] as const;
 
 /**
+ * Yardage is the one family of stat fields real NFL data reports negative: a sack-for-loss, a
+ * broken-up screen, a QB scramble that ends behind the line. Every other field is a count
+ * (touchdowns, receptions, attempts, fumbles, sacks, interceptions) and a negative count is
+ * always a parsing bug, never a real value — clamping yardage to non-negative would silently
+ * score a real loss as a null play, which is the wrong kind of "safe."
+ */
+const YARDAGE_FIELDS: ReadonlySet<(typeof STAT_FIELDS)[number]> = new Set(["passingYards", "rushingYards", "receivingYards"]);
+
+/**
  * The contract EVERY `StatsProvider` implementation must satisfy, written against the interface
  * and never against an implementation's internals — so a future licensed feed is verified by
  * this same suite unchanged rather than by a second suite that agrees with it by coincidence.
@@ -65,15 +74,17 @@ export function describeStatsProviderContract(label: string, factory: () => Stat
       for (const line of lines) expect(line.week).toBe(1);
     });
 
-    it("returns every stat field as a finite, non-negative number", async () => {
+    it("returns every stat field as a finite number, non-negative except for yardage", async () => {
       // Every implementation over a real feed parses strings into numbers, and the failure mode
       // is NaN silently reaching the scoring engine and turning a team's total into NaN. This is
-      // the assertion that makes that a test failure instead of a Sunday.
+      // the assertion that makes that a test failure instead of a Sunday. Yardage is exempted
+      // from the non-negative half of this check — see YARDAGE_FIELDS — because real NFL data
+      // reports it negative and a provider that clamped it would be wrong, not safe.
       const lines = await (await factory()).getWeeklyStatLines(1);
       for (const line of lines) {
         for (const field of STAT_FIELDS) {
           expect(Number.isFinite(line[field])).toBe(true);
-          expect(line[field]).toBeGreaterThanOrEqual(0);
+          if (!YARDAGE_FIELDS.has(field)) expect(line[field]).toBeGreaterThanOrEqual(0);
         }
       }
     });

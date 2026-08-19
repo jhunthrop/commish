@@ -85,8 +85,18 @@ describe("mapBoxScoreToStatLines", () => {
     },
   };
 
+  // Every case below is about parsing, not filtering, so the id set is deliberately "everything
+  // BOX mentions" — the filtering behavior itself is covered by the dedicated cases further down.
+  const BOX_LISTED_IDS = new Set([
+    "12483",
+    "4240499",
+    "9999",
+    `${TANK01_CONFIG.defensePlayerIdPrefix}SF`,
+    `${TANK01_CONFIG.defensePlayerIdPrefix}SEA`,
+  ]);
+
   it("parses every stat out of its string, from the group it actually lives in", () => {
-    const lines = mapBoxScoreToStatLines(BOX, 7);
+    const lines = mapBoxScoreToStatLines(BOX, 7, BOX_LISTED_IDS);
     const qb = lines.find((line) => line.playerId === "12483");
     expect(qb).toEqual({
       playerId: "12483",
@@ -109,7 +119,7 @@ describe("mapBoxScoreToStatLines", () => {
   });
 
   it("zero-fills every group a player does not have, because groups are absent and not empty", () => {
-    const wr = mapBoxScoreToStatLines(BOX, 7).find((line) => line.playerId === "4240499");
+    const wr = mapBoxScoreToStatLines(BOX, 7, BOX_LISTED_IDS).find((line) => line.playerId === "4240499");
     expect(wr?.receptions).toBe(9);
     expect(wr?.receivingYards).toBe(134);
     expect(wr?.passingYards).toBe(0);
@@ -117,13 +127,13 @@ describe("mapBoxScoreToStatLines", () => {
   });
 
   it("reads kicking out of the Kicking group", () => {
-    const k = mapBoxScoreToStatLines(BOX, 7).find((line) => line.playerId === "9999");
+    const k = mapBoxScoreToStatLines(BOX, 7, BOX_LISTED_IDS).find((line) => line.playerId === "9999");
     expect(k?.fieldGoalsMade).toBe(3);
     expect(k?.extraPointsMade).toBe(2);
   });
 
   it("emits one DEF stat line per side, keyed by the same id listPlayers mints", () => {
-    const lines = mapBoxScoreToStatLines(BOX, 7);
+    const lines = mapBoxScoreToStatLines(BOX, 7, BOX_LISTED_IDS);
     const sf = lines.find((line) => line.playerId === `${TANK01_CONFIG.defensePlayerIdPrefix}SF`);
     expect(sf?.defensiveTouchdowns).toBe(1);
     expect(sf?.defensiveInterceptions).toBe(2);
@@ -131,24 +141,60 @@ describe("mapBoxScoreToStatLines", () => {
   });
 
   it("keeps a half sack as a half sack", () => {
-    const sea = mapBoxScoreToStatLines(BOX, 7).find(
+    const sea = mapBoxScoreToStatLines(BOX, 7, BOX_LISTED_IDS).find(
       (line) => line.playerId === `${TANK01_CONFIG.defensePlayerIdPrefix}SEA`,
     );
     expect(sea?.sacks).toBe(1.5);
+  });
+
+  it("drops a stat line for a player getWeeklyStatLines was not told to list, instead of a foreign-key failure at seed time", () => {
+    // The bug this guards against: a box score's playerStats carries no position, so it includes
+    // every player who appeared, not only the scored positions listPlayers() kept. "12483" is a
+    // real entry in BOX but deliberately absent from this id set.
+    const lines = mapBoxScoreToStatLines(BOX, 7, new Set(["4240499", "9999"]));
+    expect(lines.map((line) => line.playerId)).not.toContain("12483");
+    expect(lines.map((line) => line.playerId).sort()).toEqual(["4240499", "9999"]);
+  });
+
+  it("drops a DEF stat line for a team defense that was not listed", () => {
+    const lines = mapBoxScoreToStatLines(BOX, 7, new Set(["12483", "4240499", "9999", `${TANK01_CONFIG.defensePlayerIdPrefix}SF`]));
+    expect(lines.map((line) => line.playerId)).not.toContain(`${TANK01_CONFIG.defensePlayerIdPrefix}SEA`);
+  });
+
+  it("keeps negative rushing/receiving/passing yardage rather than clamping it to zero", () => {
+    // Real NFL data: a sack-for-loss or a broken-up screen routinely nets negative yardage.
+    const lines = mapBoxScoreToStatLines(
+      {
+        playerStats: {
+          "1": {
+            playerID: "1",
+            Passing: { passYds: "-2" },
+            Rushing: { rushYds: "-4" },
+            Receiving: { recYds: "-1" },
+          },
+        },
+      },
+      3,
+      new Set(["1"]),
+    );
+    expect(lines[0]?.passingYards).toBe(-2);
+    expect(lines[0]?.rushingYards).toBe(-4);
+    expect(lines[0]?.receivingYards).toBe(-1);
   });
 
   it("never produces NaN from a missing, empty or non-numeric value", () => {
     const lines = mapBoxScoreToStatLines(
       { playerStats: { "1": { playerID: "1", Passing: { passYds: "", passTD: "n/a" } } } },
       3,
+      new Set(["1"]),
     );
     expect(lines[0]?.passingYards).toBe(0);
     expect(lines[0]?.passingTouchdowns).toBe(0);
   });
 
   it("tolerates a 2022-era box score with no DST block at all", () => {
-    expect(() => mapBoxScoreToStatLines({ playerStats: {} }, 1)).not.toThrow();
-    expect(mapBoxScoreToStatLines({ playerStats: {} }, 1)).toEqual([]);
+    expect(() => mapBoxScoreToStatLines({ playerStats: {} }, 1, new Set())).not.toThrow();
+    expect(mapBoxScoreToStatLines({ playerStats: {} }, 1, new Set())).toEqual([]);
   });
 });
 
@@ -183,33 +229,88 @@ describe("defensive parsing of shapes the fixtures never exercise", () => {
   });
 
   it("mapBoxScoreToStatLines returns an empty list for a body that is not an object at all", () => {
-    expect(mapBoxScoreToStatLines("not a box score", 1)).toEqual([]);
-    expect(mapBoxScoreToStatLines(null, 1)).toEqual([]);
+    expect(mapBoxScoreToStatLines("not a box score", 1, new Set())).toEqual([]);
+    expect(mapBoxScoreToStatLines(null, 1, new Set())).toEqual([]);
   });
 
   it("mapBoxScoreToStatLines treats a missing playerStats key as no players", () => {
-    expect(mapBoxScoreToStatLines({}, 1)).toEqual([]);
+    expect(mapBoxScoreToStatLines({}, 1, new Set())).toEqual([]);
   });
 
   it("falls back to the object key as the player id when playerID is absent", () => {
-    const lines = mapBoxScoreToStatLines({ playerStats: { "55555": { Kicking: { fgMade: "1" } } } }, 4);
+    const lines = mapBoxScoreToStatLines({ playerStats: { "55555": { Kicking: { fgMade: "1" } } } }, 4, new Set(["55555"]));
     expect(lines).toHaveLength(1);
     expect(lines[0]?.playerId).toBe("55555");
     expect(lines[0]?.fieldGoalsMade).toBe(1);
   });
 
   it("drops an entry keyed by an empty string with no playerID rather than emitting a blank id", () => {
-    expect(mapBoxScoreToStatLines({ playerStats: { "": { Kicking: { fgMade: "1" } } } }, 4)).toEqual([]);
+    expect(mapBoxScoreToStatLines({ playerStats: { "": { Kicking: { fgMade: "1" } } } }, 4, new Set([""]))).toEqual([]);
   });
 
   it("zero-fills every stat for an entry whose value is not an object at all", () => {
-    const lines = mapBoxScoreToStatLines({ playerStats: { "77777": "garbage" } }, 2);
-    expect(lines).toEqual([{ ...lines[0]!, playerId: "77777", week: 2 }]);
-    expect(lines[0]?.passingYards).toBe(0);
-    expect(lines[0]?.sacks).toBe(0);
+    const lines = mapBoxScoreToStatLines({ playerStats: { "77777": "garbage" } }, 2, new Set(["77777"]));
+    // Every field spelled out literally — not derived from `lines[0]` — so a mutation to
+    // `emptyStats`'s defaults (see the DEF-synthesis case in the "emits a literal DEF line"
+    // test below for the same principle) is caught here too.
+    expect(lines).toEqual([
+      {
+        playerId: "77777",
+        week: 2,
+        passingYards: 0,
+        passingTouchdowns: 0,
+        interceptions: 0,
+        rushingYards: 0,
+        rushingTouchdowns: 0,
+        receivingYards: 0,
+        receivingTouchdowns: 0,
+        receptions: 0,
+        fumblesLost: 0,
+        fieldGoalsMade: 0,
+        extraPointsMade: 0,
+        sacks: 0,
+        defensiveInterceptions: 0,
+        defensiveTouchdowns: 0,
+      },
+    ]);
   });
 
   it("drops a DST side that is not an object, and one missing teamAbv", () => {
-    expect(mapBoxScoreToStatLines({ playerStats: {}, DST: { away: null, home: { ptsAllowed: "10" } } }, 1)).toEqual([]);
+    expect(
+      mapBoxScoreToStatLines({ playerStats: {}, DST: { away: null, home: { ptsAllowed: "10" } } }, 1, new Set()),
+    ).toEqual([]);
+  });
+
+  it("emits a literal DEF stat line, not one compared against its own computed values", () => {
+    // Proven by mutation: before this fix, `emits one DEF stat line per side` above compared
+    // fourteen of `emptyStats`'s fields against themselves, so setting `emptyStats`'s
+    // `passingYards`/`interceptions` to 999 left every test in this file green. This case pins
+    // every field to a literal, including the eleven the player branch always overrides but the
+    // DEF branch never does.
+    const lines = mapBoxScoreToStatLines(
+      { playerStats: {}, DST: { away: { teamAbv: "SF", defTD: "1", defensiveInterceptions: "2", sacks: "4.0" } } },
+      7,
+      new Set([`${TANK01_CONFIG.defensePlayerIdPrefix}SF`]),
+    );
+    expect(lines).toEqual([
+      {
+        playerId: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`,
+        week: 7,
+        passingYards: 0,
+        passingTouchdowns: 0,
+        interceptions: 0,
+        rushingYards: 0,
+        rushingTouchdowns: 0,
+        receivingYards: 0,
+        receivingTouchdowns: 0,
+        receptions: 0,
+        fumblesLost: 0,
+        fieldGoalsMade: 0,
+        extraPointsMade: 0,
+        sacks: 4,
+        defensiveInterceptions: 2,
+        defensiveTouchdowns: 1,
+      },
+    ]);
   });
 });

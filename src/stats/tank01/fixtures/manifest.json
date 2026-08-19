@@ -6,8 +6,8 @@
     { "file": "player-list.json", "path": "/getNFLPlayerList", "query": {}, "trimmed": true, "trimmedNote": "The live response is 4,500+ players and about 5.5 MB. Trimmed to 24 players spanning QB/RB/WR/TE/K plus two unscored positions, keeping every field the mapper reads." },
     { "file": "teams.json", "path": "/getNFLTeams", "query": {}, "trimmed": false },
     { "file": "games-week-1.json", "path": "/getNFLGamesForWeek", "query": { "week": "1", "season": "2026", "seasonType": "reg" }, "trimmed": true, "trimmedNote": "Two games rather than a full week, so the box-score fixtures stay to two." },
-    { "file": "boxscore-20260913_SF@SEA.json", "path": "/getNFLBoxScore", "query": { "gameID": "20260913_SF@SEA" }, "trimmed": true, "trimmedNote": "Six players spanning every stat group, plus both DST sides." },
-    { "file": "boxscore-20260913_CAR@WSH.json", "path": "/getNFLBoxScore", "query": { "gameID": "20260913_CAR@WSH" }, "trimmed": true, "trimmedNote": "Same shape, different teams, one player with no stat groups at all." },
+    { "file": "boxscore-20260913_SF@SEA.json", "path": "/getNFLBoxScore", "query": { "gameID": "20260913_SF@SEA" }, "trimmed": true, "trimmedNote": "Seven players spanning every stat group, plus both DST sides. The seventh, 10024, is an unscored position (LB) with tackle stats — playerStats carries every player who appeared regardless of position, so this is what a real box score's unscored entries look like, and it is the fixture the adapter's listed-players filter is proven against." },
+    { "file": "boxscore-20260913_CAR@WSH.json", "path": "/getNFLBoxScore", "query": { "gameID": "20260913_CAR@WSH" }, "trimmed": true, "trimmedNote": "Same shape, different teams, one player with no stat groups at all, one with negative rushing yardage (10008, a real NFL occurrence the adapter must not clamp to zero)." },
     { "file": "games-week-99.json", "path": "/getNFLGamesForWeek", "query": { "week": "99", "season": "2026", "seasonType": "reg" }, "trimmed": false, "note": "An out-of-range week. Kept to document what upstream does, even though the adapter answers this locally and never sends it." }
   ]
 }

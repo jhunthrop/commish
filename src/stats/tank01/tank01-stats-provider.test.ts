@@ -32,6 +32,23 @@ describe("Tank01StatsProvider", () => {
     expect(defenses.every((player) => player.id.startsWith(TANK01_CONFIG.defensePlayerIdPrefix))).toBe(true);
   });
 
+  it("reports negative rushing yardage from the committed fixture rather than clamping it to zero", async () => {
+    // Player 10008 in boxscore-20260913_CAR@WSH.json carries "rushYds": "-4" — real NFL data.
+    const lines = await provider().getWeeklyStatLines(1);
+    const line = lines.find((l) => l.playerId === "10008");
+    expect(line?.rushingYards).toBe(-4);
+  });
+
+  it("does not report a stat line for an unlisted (unscored-position) player in the fixture", async () => {
+    // Player 10024 (LB) appears in boxscore-20260913_SF@SEA.json's playerStats but is not a
+    // scored position, so listPlayers() never mints a `players` row for it. A stat line
+    // referencing it would be a foreign-key failure at seed time.
+    const players = await provider().listPlayers();
+    expect(players.some((p) => p.id === "10024")).toBe(false);
+    const lines = await provider().getWeeklyStatLines(1);
+    expect(lines.some((l) => l.playerId === "10024")).toBe(false);
+  });
+
   it("answers an out-of-season week without making a request at all", async () => {
     // The fixture fetch throws by name on anything unrecorded, and there IS a recorded week-99
     // schedule, so this passing proves the short circuit rather than proving the fixture exists.

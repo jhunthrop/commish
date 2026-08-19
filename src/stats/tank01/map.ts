@@ -105,7 +105,7 @@ function emptyStats(playerId: string, week: number): StatLine {
 /**
  * `/getNFLBoxScore` → one `StatLine` per player who appeared, plus one per team defense.
  *
- * Three upstream behaviors this has to survive, all of them verified against captured responses:
+ * Four upstream behaviors this has to survive, all of them verified against captured responses:
  *
  * 1. **Stat groups are ABSENT, not empty**, when a player has none of that kind of stat. Every
  *    read goes through `group()`, which yields `{}` for a missing group, so a receiver simply
@@ -115,8 +115,21 @@ function emptyStats(playerId: string, week: number): StatLine {
  *    lost fumble in the league as zero, which is a silent scoring bug, not a crash.
  * 3. **2022-era responses have no `DST` block at all**, and some have a duplicate-casing bug in
  *    their team-id keys. Nothing here requires `DST` to exist.
+ * 4. **A box score's `playerStats` carries no position** — unlike `/getNFLPlayerList`, there is
+ *    no `pos` field to filter on here, and it includes every player who appeared, not only the
+ *    scored positions `mapPlayerList` keeps (defensive backs, linemen, punters, ...). Emitting a
+ *    line for one of those is a foreign-key failure at seed time, because `listPlayers()` never
+ *    minted a `players` row for it. `listedPlayerIds` is the single source of truth for "which
+ *    ids are allowed to exist" — the SAME ids `mapPlayerList`'s `isScoredPosition` predicate (and
+ *    `mapTeamsToDefensePlayers`) already produced — so this function does not re-derive or
+ *    duplicate a position list of its own; it only ever intersects against what was already
+ *    decided once, upstream.
  */
-export function mapBoxScoreToStatLines(body: unknown, week: number): readonly StatLine[] {
+export function mapBoxScoreToStatLines(
+  body: unknown,
+  week: number,
+  listedPlayerIds: ReadonlySet<string>,
+): readonly StatLine[] {
   const record = typeof body === "object" && body !== null ? (body as Record<string, unknown>) : {};
 
   const playerStats = record.playerStats;
@@ -124,7 +137,7 @@ export function mapBoxScoreToStatLines(body: unknown, week: number): readonly St
     typeof playerStats === "object" && playerStats !== null
       ? Object.entries(playerStats as Record<string, unknown>).flatMap(([key, entry]): readonly StatLine[] => {
           const playerId = str((entry as Record<string, unknown> | null)?.playerID) || key;
-          if (playerId === "") return [];
+          if (playerId === "" || !listedPlayerIds.has(playerId)) return [];
           const passing = group(entry, "Passing");
           const rushing = group(entry, "Rushing");
           const receiving = group(entry, "Receiving");
@@ -158,10 +171,11 @@ export function mapBoxScoreToStatLines(body: unknown, week: number): readonly St
   const defenses: readonly StatLine[] = sides.flatMap((side): readonly StatLine[] => {
     const entry = typeof side === "object" && side !== null ? (side as Record<string, unknown>) : {};
     const abbreviation = str(entry.teamAbv);
-    if (abbreviation === "") return [];
+    const defenseId = `${TANK01_CONFIG.defensePlayerIdPrefix}${abbreviation}`;
+    if (abbreviation === "" || !listedPlayerIds.has(defenseId)) return [];
     return [
       {
-        ...emptyStats(`${TANK01_CONFIG.defensePlayerIdPrefix}${abbreviation}`, week),
+        ...emptyStats(defenseId, week),
         sacks: num(entry.sacks),
         defensiveInterceptions: num(entry.defensiveInterceptions),
         defensiveTouchdowns: num(entry.defTD),
