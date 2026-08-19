@@ -112,8 +112,9 @@ the sanitize step is exercised by the exact attack it exists to stop, not just b
 
 Recorded here so nobody "fixes" the omission later. The gate (`vitest.config.mts`'s
 `COVERAGE_GATED_DIRS`) is reserved for pure, deterministic modules where "100%" is a meaningful,
-achievable bar — `src/scoring`, `src/draft-engine`, `src/draft-room/state`, `src/league`, and
-`src/chat`. `src/ai-advisor/**` mixes that kind of pure code (`valuation.ts`) with a genuinely
+achievable bar — `src/scoring`, `src/draft-engine`, `src/draft-room/state`, `src/league`,
+`src/chat`, `src/matchmaking` and `src/stats`. `src/ai-advisor/**` mixes that kind of pure code
+(`valuation.ts`) with a genuinely
 nondeterministic dependency — a real LLM call, mocked in every test — and a database-backed
 context assembly. Both are already thoroughly tested (`context.test.ts`, `start-sit.test.ts`,
 `trade.test.ts`, `prompt.test.ts`, `valuation.test.ts`, plus the route tests and

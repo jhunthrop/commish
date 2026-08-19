@@ -11,12 +11,12 @@ The founder's standing direction (2026-08-17): *"I don't want an MVP. Let's work
 | Concern | Choice | Notes |
 |---|---|---|
 | App | Next.js 15 (App Router), React 19, TypeScript strict | `"type": "module"` in `package.json` |
-| Database | **Postgres 17** via Drizzle ORM (`drizzle-orm/postgres-js`, `postgres` driver) | Pure-JS wire protocol, no native compilation. SQLite was dropped (better-sqlite3 segfaults on this dev machine; and no-MVP directive). |
+| Database | **Postgres 17** via Drizzle ORM (`drizzle-orm/postgres-js`, `postgres` driver), reached through **PgBouncer in transaction pooling mode** | Pure-JS wire protocol, no native compilation. `prepare: false` is unconditional (transaction pooling gives a client a different backend between transactions). Nothing may rely on session state: no `pg_advisory_lock`, no session `SET`, no `LISTEN`/`NOTIFY`. See `docs/decisions/data-layer-hardening.md`. |
 | Real-time | **Redis 7 Streams → Server-Sent Events** | The one and only real-time mechanism. See below. |
 | Auth | **WorkOS AuthKit** (`@workos-inc/authkit-nextjs`) — hosted sign-in/up, sessions, MFA, OAuth | We do not roll our own auth. Local `users` row keyed by the WorkOS user id holds app-owned fields. |
 | Validation | Zod v4 (`z.email()`, not the deprecated `z.string().email()`) | At every boundary. Zod schemas will also drive OpenAPI generation for native clients (Phase 7). |
 | Tests | Vitest + happy-dom + @testing-library/react + vitest-axe | jsdom was dropped (broken ESM/CJS transitive deps across two major versions). |
-| Local infra | `docker-compose.yml`: postgres (5432), postgres-test (5433, tmpfs), redis (6379, AOF everysec) | `npm run infra:up` |
+| Local infra | `docker-compose.yml`: postgres (5432), postgres-test (5433, tmpfs), pgbouncer (6432 → postgres), pgbouncer-test (6433 → postgres-test), redis (6379, AOF everysec) | `npm run infra:up` |
 | LLM | `@anthropic-ai/sdk` behind `src/lib/llm/` | Optional — every AI surface must degrade gracefully with no key. |
 
 `docker-compose.yml` pins a top-level `name: fantasy`, so every git worktree of this repo
@@ -78,14 +78,20 @@ src/
                           constraint, enforced by advisory-only.test.ts. See docs/advisor.md.
   scoring/                Pure fantasy-scoring engine: computeFantasyPoints/scoreLineup, every
                           preset (PPR/standard/K-DEF/TE-premium). NO I/O. 100% coverage.
-  stats/                  The fixed 2026 mock stat dataset this phase scores against
-                          (mock/generate-dataset.ts, mock/mock-stats-provider.ts) — no live feed.
+  stats/                  The stats seam. provider.ts (the interface), config.ts + registry.ts
+                          (STATS_PROVIDER selection, fail-fast on an unknown name),
+                          test-support.ts (the contract every implementation passes),
+                          mock/ (the fixed 2026 dataset) and tank01/ (the live adapter, tested
+                          against committed fixtures). See docs/decisions/stats-provider-adapter.md.
   db/                     schema.ts (Drizzle, pg-core: users, leagues, teams, league_invites,
                           scoring_settings, roster_slots, lineup_slots, drafts, draft_actions,
                           draft_nudges, draft_picks, weeks, matchups, players,
                           player_stat_lines, chat_messages, chat_reactions), client.ts
                           (createDb/getDb), test-db.ts
   lib/
+    env.ts                envOr/envOrUndefined — the ONE place an optional env var is read with a
+                          fallback. `.env.example` ships some vars as empty lines and dotenv reads
+                          those as "", which `??` does not fall back on.
     auth/                 current-user.ts (server identity seam over WorkOS), user-sync.ts (profile upsert)
     leagues/              membership.ts — resolveLeagueMembership/requireLeagueMember, the one
                           seam every league route's auth+membership gate goes through.
@@ -153,6 +159,14 @@ See `docs/draft-engine.md`. `draft_nudges` (keyed on `(draftId, sequence)`) sits
 `draft_actions` for a different job: it is the AI moderator's durable once-per-turn claim, not
 part of replay — see `docs/draft-moderator.md`.
 
+Every accepted action is applied inside ONE transaction holding `SELECT … FOR UPDATE` on the
+draft's own row, and the in-memory materialization validates itself against
+`MAX(draft_actions.sequence)` before it is trusted. That is what makes "replay the action log"
+the single-writer path across any number of app instances, not just across restarts. A row lock
+and not `pg_advisory_lock`, because advisory locks are session-scoped and this connection reaches
+Postgres through a transaction pooler. The in-process mutex in `src/draft-service/mutex.ts`
+remains as an intra-process fast path, not as the safety mechanism.
+
 ### Client boundary
 Everything under `src/draft-room/**`, `src/league-room/**` and `src/chat-room/**` is BROWSER
 code — the pure state reducer/formatters, the hooks, and the client components that render the
@@ -182,6 +196,10 @@ lives in `src/league-service/browse.ts`, which the existing `@/league-service` b
 covers. There is no `@/matchmaking-service`, because a second service directory for one query
 would be a boundary to maintain rather than a boundary to enforce.
 
+A second, simpler layering rule sits beside this one: nothing under `src/**` may import from
+`scripts/**` or `e2e/**`. Build tooling and the browser suite may depend on source; source may
+not depend on either. Enforced by its own `no-restricted-imports` block in `eslint.config.mjs`.
+
 The rule is deliberately **not** applied to `src/app/**`: pages and layouts there are Next.js
 Server Components (`page.tsx`, `layout.tsx`) and route handlers (`route.ts`), which are
 allowed — and already do, in this codebase's existing draft and league routes — import
@@ -203,7 +221,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**` and `src/matchmaking/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%). Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**` and `src/stats/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%). Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
 - **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 
@@ -214,7 +232,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`). Commit after every completed step; commit bodies explain *why* and record any deviation from the plan.
 
 ### Environment
-`.env.example` is committed; `.env.local` is gitignored. Required: `DATABASE_URL`, `REDIS_URL`, `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD`, `NEXT_PUBLIC_WORKOS_REDIRECT_URI`; test-only: `TEST_DATABASE_URL`; optional: `ANTHROPIC_API_KEY`. Fail fast with a clear message when a required var is missing (see `db/client.ts`, `realtime/redis.ts`).
+`.env.example` is committed; `.env.local` is gitignored. Required: `DATABASE_URL`, `REDIS_URL`, `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD`, `NEXT_PUBLIC_WORKOS_REDIRECT_URI`; test-only: `TEST_DATABASE_URL`, `TEST_PGBOUNCER_URL`; optional: `ANTHROPIC_API_KEY`, `STATS_PROVIDER` (default `mock`), `TANK01_API_KEY` + `TANK01_SEASON` (only when `STATS_PROVIDER=tank01`). Fail fast with a clear message when a required var is missing (see `db/client.ts`, `realtime/redis.ts`).
 
 ## Verification commands (every step)
 

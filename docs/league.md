@@ -245,6 +245,16 @@ commissioner's own profile: deriving it from a person would leak that person int
 unauthenticated read and would silently re-tier every league they run whenever they edited
 their profile.
 
+Browse is ONE grouped query (`src/league-service/browse.ts`): the fill count is
+`count(teams.id)` over a `LEFT JOIN` (so a league with no managers still appears), the open-seat
+rule is a `HAVING count(teams.id) < leagues.team_count` predicate, and every narrowing is applied
+before the `LIMIT`. That ordering is the correctness property — the earlier two-query form
+applied the cap first and filtered in JavaScript afterwards, so a narrow filter over a large
+public pool returned an under-filled page. `matchesBrowseFilter`/`hasOpenSeat` remain the
+canonical, 100%-covered statement of the rule, and `browse.test.ts` runs all 45 filter
+combinations through both the query and the pure rule over one corpus, demanding identical
+answers.
+
 **Stake tier is cosmetic.** No entry fee is charged, no prize is paid and no balance exists
 anywhere in Phase 1. `MATCHMAKING_CONFIG.stakeDisclosure` is the one wording of that promise,
 rendered on the create form beside the tier control and on the browse page beside the cards.

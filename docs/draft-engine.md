@@ -209,6 +209,10 @@ Two guards stop a double append:
    deliberately not a Postgres advisory lock — see `mutex.ts`'s docblock for why
    (`pg_advisory_lock` is session-scoped, and this app reaches Postgres through PgBouncer in
    transaction pooling mode, where a session isn't a stable thing to hold anything on).
+   `src/draft-service/locking.test.ts` is the two-instance proof: two independent app instances,
+   each its own connection pool and its own in-process mutex, submit simultaneous conflicting
+   actions against the same draft, and the test asserts exactly one is accepted and the log for
+   that draft is left fully consistent.
 2. **The unique index on `(draft_id, sequence)`** (`draft_actions_draft_sequence_idx`) is the
    real backstop: even if the in-process lock is bypassed (a second instance, a bug), two
    writers racing to insert the same `(draftId, sequence)` collide at the database, and
@@ -223,8 +227,8 @@ A bug in the mutex therefore costs a retry, never a duplicated pick.
 
 ### Multi-instance considerations (Phase 2 Plan A)
 
-Three things change once more than one process runs this service. One is already fixed (Task
-6); the other two are still open, noted here so a later task doesn't have to rediscover them:
+Three things change once more than one process runs this service. Two are already fixed (Tasks
+6 and 7); the third is still open, noted here so a later task doesn't have to rediscover it:
 
 - **The per-process cache under multiple instances — fixed (Task 6).** `cache` in `store.ts` is
   scoped to one process, so a second instance's write used to be invisible to the first
@@ -238,14 +242,14 @@ Three things change once more than one process runs this service. One is already
   state's own `sequence`; a mismatch drops the entry and the read replays from the log. One
   extra indexed read on every cache hit, not a full replay, and it protects readers and writers
   alike — a writer's own `load()` goes through the same check before computing what to append.
-- **`lock_timeout`.** Today the per-draft mutex above is usually what keeps two writers from
-  even reaching the database at the same moment. Once the `SELECT ... FOR UPDATE` row lock
-  described above lands and takes over cross-instance write safety (not yet landed — tracked as
-  a follow-up task in this plan), a second writer's `INSERT` can block for the full duration of
-  the first writer's transaction — including `commitDraftState`'s multi-table commit on the
-  completing action. That task should set a `lock_timeout` on the lock acquisition so a stuck
-  or slow instance fails fast with a retryable error instead of hanging every other writer for
-  that draft.
+- **`lock_timeout` — still open.** The `SELECT ... FOR UPDATE` row lock above has landed (Task
+  7) and now owns cross-instance write safety; the per-draft mutex is what usually keeps two
+  writers in the *same* process from even reaching the database at the same moment. Across
+  instances, though, a second writer's `INSERT` can still block for the full duration of the
+  first writer's transaction — including `commitDraftState`'s multi-table commit on the
+  completing action — because no `lock_timeout` is set on the lock acquisition. A future task
+  should add one so a stuck or slow instance fails fast with a retryable error instead of
+  hanging every other writer for that draft.
 - **N instances means N tickers.** Every instance that calls `getDraftTicker()` runs its own
   `setInterval` scan of `drafts` with `status = 'in_progress'`. This is harmless
   correctness-wise — R-B4 plus the `(draft_id, sequence)` unique index mean at most one
