@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TANK01_CONFIG } from "./config";
-import { mapBoxScoreToStatLines, mapGameIds, mapPlayerList, mapTeamsToDefensePlayers } from "./map";
+import { mapBoxScoreToStatLines, mapGames, mapPlayerList, mapTeamsToDefensePlayers } from "./map";
 
 describe("mapPlayerList", () => {
   it("keeps only the positions the scoring engine handles", () => {
@@ -41,18 +41,71 @@ describe("mapTeamsToDefensePlayers", () => {
   });
 });
 
-describe("mapGameIds", () => {
-  it("reads the composite gameID off each scheduled game", () => {
+describe("mapGames", () => {
+  it("reads the composite gameID, both teams and the mapped status off each scheduled game", () => {
     expect(
-      mapGameIds([
-        { gameID: "20261018_CAR@WSH", away: "CAR", home: "WSH" },
-        { gameID: "20261018_SF@SEA", away: "SF", home: "SEA" },
-      ]),
-    ).toEqual(["20261018_CAR@WSH", "20261018_SF@SEA"]);
+      mapGames(
+        [
+          { gameID: "20261018_CAR@WSH", away: "CAR", home: "WSH", gameStatus: "Completed" },
+          { gameID: "20261018_SF@SEA", away: "SF", home: "SEA", gameStatus: "Scheduled" },
+        ],
+        7,
+      ),
+    ).toEqual([
+      { gameId: "20261018_CAR@WSH", week: 7, status: "final", homeNflTeam: "WSH", awayNflTeam: "CAR" },
+      { gameId: "20261018_SF@SEA", week: 7, status: "scheduled", homeNflTeam: "SEA", awayNflTeam: "SF" },
+    ]);
   });
 
-  it("ignores a game with no id instead of producing an undefined request", () => {
-    expect(mapGameIds([{ away: "CAR", home: "WSH" }, { gameID: "20261018_SF@SEA" }])).toEqual(["20261018_SF@SEA"]);
+  it("ignores a game missing an id, a home team or an away team instead of producing a broken fixture", () => {
+    expect(
+      mapGames(
+        [
+          { away: "CAR", home: "WSH", gameID: "" },
+          { gameID: "20261018_SF@SEA", home: "SEA" },
+          { gameID: "20261018_NO@ATL", away: "NO" },
+        ],
+        7,
+      ),
+    ).toEqual([]);
+  });
+
+  it("stamps every game with the week it was asked for, not a week read off the payload", () => {
+    const games = mapGames([{ gameID: "20261018_SF@SEA", away: "SF", home: "SEA", gameWeek: "1" }], 12);
+    expect(games).toEqual([{ gameId: "20261018_SF@SEA", week: 12, status: "in_progress", homeNflTeam: "SEA", awayNflTeam: "SF" }]);
+  });
+
+  it("maps every configured spelling, case-insensitively, to its domain status", () => {
+    for (const spelling of TANK01_CONFIG.gameStatuses.final) {
+      expect(mapGames([{ gameID: "g", away: "A", home: "B", gameStatus: spelling.toUpperCase() }], 1)).toEqual([
+        { gameId: "g", week: 1, status: "final", homeNflTeam: "B", awayNflTeam: "A" },
+      ]);
+    }
+    for (const spelling of TANK01_CONFIG.gameStatuses.scheduled) {
+      expect(mapGames([{ gameID: "g", away: "A", home: "B", gameStatus: spelling.toUpperCase() }], 1)).toEqual([
+        { gameId: "g", week: 1, status: "scheduled", homeNflTeam: "B", awayNflTeam: "A" },
+      ]);
+    }
+    for (const spelling of TANK01_CONFIG.gameStatuses.in_progress) {
+      expect(mapGames([{ gameID: "g", away: "A", home: "B", gameStatus: spelling.toUpperCase() }], 1)).toEqual([
+        { gameId: "g", week: 1, status: "in_progress", homeNflTeam: "B", awayNflTeam: "A" },
+      ]);
+    }
+  });
+
+  it("maps an unrecognized, missing or absent gameStatus to in_progress, the safe default", () => {
+    expect(mapGames([{ gameID: "g", away: "A", home: "B", gameStatus: "Weather Delay" }], 1)).toEqual([
+      { gameId: "g", week: 1, status: "in_progress", homeNflTeam: "B", awayNflTeam: "A" },
+    ]);
+    expect(mapGames([{ gameID: "g", away: "A", home: "B" }], 1)).toEqual([
+      { gameId: "g", week: 1, status: "in_progress", homeNflTeam: "B", awayNflTeam: "A" },
+    ]);
+  });
+
+  it("returns an empty list for a body that is not an array, and drops a non-object entry", () => {
+    expect(mapGames({}, 1)).toEqual([]);
+    expect(mapGames(null, 1)).toEqual([]);
+    expect(mapGames([null, "not a game"], 1)).toEqual([]);
   });
 });
 
@@ -220,12 +273,6 @@ describe("defensive parsing of shapes the fixtures never exercise", () => {
     expect(mapTeamsToDefensePlayers([{ teamAbv: "SF" }])).toEqual([
       { id: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`, name: "SF", position: "DEF", nflTeam: "SF" },
     ]);
-  });
-
-  it("mapGameIds returns an empty list for a body that is not an array, and drops a non-object entry", () => {
-    expect(mapGameIds({})).toEqual([]);
-    expect(mapGameIds(null)).toEqual([]);
-    expect(mapGameIds([null, "not a game"])).toEqual([]);
   });
 
   it("mapBoxScoreToStatLines returns an empty list for a body that is not an object at all", () => {

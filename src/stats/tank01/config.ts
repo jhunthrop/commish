@@ -37,6 +37,16 @@ export const TANK01_CONFIG = {
   defensePlayerIdPrefix: "DST-",
   /** The positions the scoring engine handles. Everything else in the player list is dropped. */
   scoredPositions: ["QB", "RB", "WR", "TE", "K"],
+  /**
+   * Upstream's `gameStatus` spellings, lowercased, mapped to the domain's three. Anything not in
+   * this table — a new spelling, a missing field, a null — becomes `in_progress`, which is the
+   * safe direction: it costs one more request and nothing else. See `GameStatus`.
+   */
+  gameStatuses: {
+    scheduled: ["scheduled", "not started", "pre-game"],
+    final: ["completed", "final"],
+    in_progress: ["live - in progress", "in progress", "halftime"],
+  },
   envVars: {
     apiKey: "TANK01_API_KEY",
     season: "TANK01_SEASON",

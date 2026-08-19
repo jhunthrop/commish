@@ -1,8 +1,8 @@
 import type { Player, StatLine } from "@/domain/player";
-import type { StatsProvider } from "../provider";
+import type { GameSummary, StatsProvider } from "../provider";
 import { createTank01Client, type Tank01ClientOptions } from "./client";
 import { TANK01_CONFIG } from "./config";
-import { mapBoxScoreToStatLines, mapGameIds, mapPlayerList, mapTeamsToDefensePlayers } from "./map";
+import { mapBoxScoreToStatLines, mapGames, mapPlayerList, mapTeamsToDefensePlayers } from "./map";
 
 export interface Tank01ProviderOptions extends Tank01ClientOptions {
   /** Defaults to `TANK01_CONFIG.defaultSeason`. A season is adapter config, not an interface parameter. */
@@ -29,34 +29,47 @@ export function createTank01StatsProvider(options: Tank01ProviderOptions): Stats
     return players;
   }
 
+  async function listGames(week: number): Promise<readonly GameSummary[]> {
+    // Answered locally, without a request. `seedPlayers` walks weeks upward until it gets an
+    // empty array, so an unbounded provider would burn a month's free-tier quota discovering
+    // where the season ends.
+    if (week < TANK01_CONFIG.weeks.first || week > TANK01_CONFIG.weeks.last) return [];
+    const body = await client.get(TANK01_CONFIG.paths.gamesForWeek, {
+      week: String(week),
+      season,
+      seasonType: TANK01_CONFIG.seasonType,
+    });
+    return mapGames(body, week);
+  }
+
+  async function getGameStatLines(game: GameSummary): Promise<readonly StatLine[]> {
+    const list = await fetchPlayers();
+    const listedPlayerIds = new Set(list.map((player) => player.id));
+    const teams = new Set([game.homeNflTeam, game.awayNflTeam]);
+    const gameTeamPlayerIds = new Set(list.filter((player) => teams.has(player.nflTeam)).map((player) => player.id));
+    const box = await client.get(TANK01_CONFIG.paths.boxScore, { gameID: game.gameId });
+    // The listed-players filter Plan A's fix wave added, plus the game's own two teams: a box
+    // score keyed to the wrong fixture would otherwise attribute real points to a real player
+    // in a game they did not play, which no week-level check can catch.
+    return mapBoxScoreToStatLines(box, game.week, listedPlayerIds).filter((line) => gameTeamPlayerIds.has(line.playerId));
+  }
+
   return {
     async listPlayers() {
       return fetchPlayers();
     },
 
+    listGames,
+
+    getGameStatLines,
+
     async getWeeklyStatLines(week) {
-      // Answered locally, without a request. `seedPlayers` walks weeks upward until it gets an
-      // empty array, so an unbounded provider would burn a month's free-tier quota discovering
-      // where the season ends.
-      if (week < TANK01_CONFIG.weeks.first || week > TANK01_CONFIG.weeks.last) return [];
-
-      const [listedPlayerIds, schedule] = await Promise.all([
-        fetchPlayers().then((list) => new Set(list.map((player) => player.id))),
-        client.get(TANK01_CONFIG.paths.gamesForWeek, {
-          week: String(week),
-          season,
-          seasonType: TANK01_CONFIG.seasonType,
-        }),
-      ]);
-
-      // SEQUENTIAL, not `Promise.all`. A week is around sixteen box scores; issuing them at once
-      // is the fastest way to a 429 on any plan below Ultra, and a rate-limit failure part way
-      // through a burst leaves you with no idea which games you got. One at a time fails on the
-      // first refusal with every prior game already mapped.
+      // SEQUENTIAL, not `Promise.all` — unchanged reasoning: a week is around sixteen box scores,
+      // issuing them at once is the fastest way to a 429 on any plan below Ultra, and a
+      // rate-limit failure part way through a burst leaves you with no idea which games you got.
       const lines: StatLine[] = [];
-      for (const gameId of mapGameIds(schedule)) {
-        const box = await client.get(TANK01_CONFIG.paths.boxScore, { gameID: gameId });
-        lines.push(...mapBoxScoreToStatLines(box, week, listedPlayerIds));
+      for (const game of await listGames(week)) {
+        lines.push(...(await getGameStatLines(game)));
       }
       return lines;
     },

@@ -52,6 +52,8 @@ describe("seedPlayers", () => {
     // never mutates a line returned by the underlying provider.
     const revisedProvider: StatsProvider = {
       listPlayers: () => provider.listPlayers(),
+      listGames: (week) => provider.listGames(week),
+      getGameStatLines: (game) => provider.getGameStatLines(game),
       getWeeklyStatLines: async (week) => {
         const lines = await provider.getWeeklyStatLines(week);
         if (week !== 1) return lines;

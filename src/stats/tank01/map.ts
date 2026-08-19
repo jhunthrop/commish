@@ -1,4 +1,5 @@
 import type { Player, Position, StatLine } from "@/domain/player";
+import type { GameStatus, GameSummary } from "../provider";
 import { TANK01_CONFIG } from "./config";
 
 /**
@@ -71,14 +72,25 @@ export function mapTeamsToDefensePlayers(body: unknown): readonly Player[] {
   });
 }
 
-/** `/getNFLGamesForWeek` → the composite `YYYYMMDD_AWAY@HOME` ids the box-score call needs. */
-export function mapGameIds(body: unknown): readonly string[] {
+/** `/getNFLGamesForWeek` → the fixtures, with the composite `YYYYMMDD_AWAY@HOME` id the box-score call needs. */
+export function mapGames(body: unknown, week: number): readonly GameSummary[] {
   if (!Array.isArray(body)) return [];
-  return body.flatMap((raw): readonly string[] => {
+  return body.flatMap((raw): readonly GameSummary[] => {
     const record = typeof raw === "object" && raw !== null ? (raw as Record<string, unknown>) : {};
     const gameId = str(record.gameID);
-    return gameId === "" ? [] : [gameId];
+    const home = str(record.home);
+    const away = str(record.away);
+    if (gameId === "" || home === "" || away === "") return [];
+    return [{ gameId, week, status: mapGameStatus(record.gameStatus), homeNflTeam: home, awayNflTeam: away }];
   });
+}
+
+function mapGameStatus(raw: unknown): GameStatus {
+  const value = str(raw).toLowerCase();
+  if ((TANK01_CONFIG.gameStatuses.final as readonly string[]).includes(value)) return "final";
+  if ((TANK01_CONFIG.gameStatuses.scheduled as readonly string[]).includes(value)) return "scheduled";
+  // Everything else, INCLUDING an absent or unrecognized value. See `GameStatus`.
+  return "in_progress";
 }
 
 function emptyStats(playerId: string, week: number): StatLine {
