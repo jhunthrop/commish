@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, teams, users } from "@/db/schema";
-import { DRAFT_ALREADY_STARTED, joinPublicLeague, LEAGUE_FULL, LEAGUE_MISSING, NOT_PUBLIC } from "./join";
+import { DRAFT_ALREADY_STARTED, joinPublicLeague, LEAGUE_FULL, NOT_PUBLIC } from "./join";
 
 const db = createTestDb();
 let nextId = 0;
@@ -77,7 +77,7 @@ describe("joinPublicLeague", () => {
   it("refuses a league that is not publicly listed", async () => {
     const leagueId = await seedLeague({ isPublicMatchmade: false });
     expect(await joinPublicLeague(deps(), { leagueId, userId: "joiner" })).toEqual({
-      ok: false, status: 403, reason: NOT_PUBLIC,
+      ok: false, status: 404, reason: NOT_PUBLIC,
     });
   });
 
@@ -95,10 +95,16 @@ describe("joinPublicLeague", () => {
     });
   });
 
-  it("refuses a league that does not exist", async () => {
-    expect(await joinPublicLeague(deps(), { leagueId: "nope", userId: "joiner" })).toEqual({
-      ok: false, status: 404, reason: LEAGUE_MISSING,
-    });
+  it("refuses a league that does not exist, identically to one that is not publicly listed", async () => {
+    // Not `LEAGUE_MISSING`: a caller posting a league id must not be able to tell "no such
+    // league" apart from "a real league that just isn't public" — see `publicJoinPrecondition`'s
+    // docblock. The two cases answer byte-identically.
+    const missing = await joinPublicLeague(deps(), { leagueId: "nope", userId: "joiner" });
+    expect(missing).toEqual({ ok: false, status: 404, reason: NOT_PUBLIC });
+
+    const privateLeagueId = await seedLeague({ id: "private", isPublicMatchmade: false });
+    const notPublic = await joinPublicLeague(deps(), { leagueId: privateLeagueId, userId: "joiner" });
+    expect(notPublic).toEqual(missing);
   });
 
   it("lets an existing member back in even after the league closed behind them", async () => {

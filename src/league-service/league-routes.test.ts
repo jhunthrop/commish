@@ -219,7 +219,7 @@ describe("POST /api/public/leagues/[leagueId]/join", () => {
     expect(typeof body.data.teamId).toBe("string");
   });
 
-  it("refuses a private league with a 403 and a plain-language next step", async () => {
+  it("refuses a private league with a 404 and a plain-language next step, identically to a league that doesn't exist", async () => {
     await db.insert(leagues).values({
       id: "private", name: "Group Chat Only", format: "snake", teamCount: 12,
       stakeTier: 0, experienceTier: "beginner", isPublicMatchmade: false, commissionerUserId: "u1",
@@ -228,7 +228,16 @@ describe("POST /api/public/leagues/[leagueId]/join", () => {
     const response = await postPublicJoin(post("http://test/api/public/leagues/private/join", {}), {
       params: Promise.resolve({ leagueId: "private" }),
     });
-    expect(response.status).toBe(403);
-    expect((await response.json()).error).toContain("invite link");
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body.error).toContain("invite link");
+
+    // Not a 403: this route must not tell a caller apart "this id names a real, private
+    // league" from "this id names nothing" — see `publicJoinPrecondition`'s docblock.
+    const missing = await postPublicJoin(post("http://test/api/public/leagues/nope/join", {}), {
+      params: Promise.resolve({ leagueId: "nope" }),
+    });
+    expect(missing.status).toBe(404);
+    expect(await missing.json()).toEqual(body);
   });
 });

@@ -100,6 +100,14 @@ export async function joinLeagueInTx(
  * The public browse page's gate: a league must still be LISTED and still be PRE-DRAFT. Both are
  * re-checked here rather than trusted from the card the visitor clicked, because a browse page
  * is a snapshot and a league can fill or start between the render and the press.
+ *
+ * Answers 404, not 403, for "not public": `acceptInvite` deliberately collapses "the league is
+ * gone" into "the invite is invalid" rather than confirming a league id is real to a stranger
+ * who merely holds it (`invites.ts:119-121`). The public join door must make the same call — a
+ * 403 here would tell a caller "this id names a real, private league", which is exactly the
+ * existence oracle a signed-in stranger posting an id should not get. `joinPublicLeague`, below,
+ * remaps `joinLeagueInTx`'s own LEAGUE_MISSING 404 to this same shape so the two cases (no such
+ * league; a real but private one) answer byte-identically.
  */
 const publicJoinPrecondition: JoinPrecondition = async (tx, leagueId) => {
   const [row] = await tx
@@ -107,7 +115,7 @@ const publicJoinPrecondition: JoinPrecondition = async (tx, leagueId) => {
     .from(leagues)
     .leftJoin(drafts, eq(drafts.leagueId, leagues.id))
     .where(eq(leagues.id, leagueId));
-  if (row === undefined || !row.isPublicMatchmade) return { ok: false, status: 403, reason: NOT_PUBLIC };
+  if (row === undefined || !row.isPublicMatchmade) return { ok: false, status: 404, reason: NOT_PUBLIC };
   if (row.draftStatus !== null && row.draftStatus !== "scheduled") {
     return { ok: false, status: 409, reason: DRAFT_ALREADY_STARTED };
   }
@@ -130,7 +138,13 @@ export async function joinPublicLeague(
   input: JoinPublicLeagueInput,
 ): Promise<JoinLeagueOutcome> {
   try {
-    return await db.transaction((tx) => joinLeagueInTx(tx, { ...input, newId }, publicJoinPrecondition));
+    const outcome = await db.transaction((tx) => joinLeagueInTx(tx, { ...input, newId }, publicJoinPrecondition));
+    // `joinLeagueInTx` itself answers LEAGUE_MISSING (404) before `publicJoinPrecondition` ever
+    // runs — remap it to the SAME shape the precondition answers a real-but-private league
+    // with, so a caller cannot tell "no such league" apart from "a league that exists but isn't
+    // public" (see `publicJoinPrecondition`'s docblock, and `acceptInvite`'s identical collapse).
+    if (!outcome.ok && outcome.status === 404) return { ok: false, status: 404, reason: NOT_PUBLIC };
+    return outcome;
   } catch (error: unknown) {
     if (isUniqueViolation(error, TEAM_MEMBERSHIP_UNIQUE_INDEX)) {
       // The unique-index backstop fired: a concurrent join created this user's team first.
