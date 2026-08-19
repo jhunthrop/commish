@@ -17,7 +17,7 @@ export default function NotFound() {
       <EmptyState
         icon="search"
         title="We couldn't find that page."
-        description="The link may be old, or the league may have been removed. Here is where to go next."
+        description="That link may be outdated. Your leagues are still where you left them."
         action={
           <div className="flex flex-wrap items-center justify-center gap-3">
             <Link href="/app" className={`${LINK_CLASS} bg-accent text-accent-text hover:brightness-110`}>

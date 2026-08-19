@@ -26,7 +26,7 @@ export default function AppError({
       <div className="w-full">
         <ErrorState
           title="Something went wrong on our side."
-          description="This one is on us, not on you. Try again, and if it keeps happening head back to your leagues."
+          description="This one is on us, not on you. Nothing about your leagues has changed. Try again, or head back to your leagues."
           action={
             <div className="flex flex-wrap items-center justify-center gap-3">
               <Button variant="primary" onClick={reset}>

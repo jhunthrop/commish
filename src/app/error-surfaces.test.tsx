@@ -5,14 +5,14 @@ import { axe } from "vitest-axe";
 import type { ReactElement } from "react";
 import { inBothThemes } from "@/components/ui/test-utils";
 import AppError from "./error";
-import GlobalError from "./global-error";
+import GlobalError, { GlobalErrorContent } from "./global-error";
 import NotFound from "./not-found";
 
 /**
  * `global-error.tsx` renders its own `<html>`/`<body>`, which RTL's default container (a `div`
  * appended to `document.body`) cannot legally hold. happy-dom tolerates the nesting well enough
- * to assert on structure and text, which is all this suite needs; the real document shell is
- * exercised by Next at runtime, not here.
+ * to assert on the document shell's own attributes and top-level text; the actual accessible
+ * content is tested separately, through `GlobalErrorContent`, via `inBothThemes`.
  */
 function renderGlobal(ui: ReactElement) {
   const container = document.createElement("div");
@@ -61,17 +61,40 @@ describe("app/error.tsx", () => {
 });
 
 describe("app/global-error.tsx", () => {
-  it("renders its own document shell with a retry, axe-clean", async () => {
+  // React treats <html> and <body> as host singletons: it always reconciles them against the
+  // real document.documentElement/document.body rather than nesting fresh ones inside an RTL
+  // container (happy-dom enforces the same one-<html>-per-document rule a real browser does).
+  // That puts the actual accessible content out of `inBothThemes`/`axe`'s reach if exercised
+  // only through the full `GlobalError`, so the two concerns are split: the document-shell
+  // attributes are proven here against the real document, and the accessible content — copy,
+  // headings, the retry control — is proven below through `GlobalErrorContent`, the same tree
+  // `GlobalError` renders inside `<body>`, run through `inBothThemes` and `axe` like every
+  // other suite in this file.
+  it("renders its own document shell with a retry", () => {
     const reset = vi.fn();
     const { container } = renderGlobal(<GlobalError error={BOOM} reset={reset} />);
-    // React treats <html> and <body> as host singletons: it always reconciles them against the
-    // real document.documentElement/document.body rather than nesting fresh ones inside the RTL
-    // container (happy-dom enforces the same one-<html>-per-document rule a real browser does).
-    // The shell is proven against those two nodes, not against `container.querySelector`.
     expect(document.documentElement).toHaveAttribute("lang", "en");
     expect(document.body.className).toContain("antialiased");
     expect(container.textContent).toContain("Something went wrong on our side.");
     expect(container.textContent).not.toContain("relation");
+  });
+
+  it("says what happened and offers a way forward, in both themes, axe-clean", async () => {
+    await inBothThemes(<GlobalErrorContent error={BOOM} reset={() => {}} />, async ({ container }) => {
+      expect(screen.getByRole("heading", { name: "Something went wrong on our side." })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
+      expect(container.textContent).not.toContain("relation");
+      expect(container.textContent).not.toContain("does not exist");
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("calls reset when the retry button is pressed", async () => {
+    const reset = vi.fn();
+    await inBothThemes(<GlobalErrorContent error={BOOM} reset={reset} />, async () => {
+      await userEvent.click(screen.getByRole("button", { name: "Try again" }));
+    });
+    expect(reset).toHaveBeenCalledTimes(2); // once per theme render
   });
 });
 
