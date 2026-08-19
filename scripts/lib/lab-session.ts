@@ -28,6 +28,23 @@ function requiredEnv(name: string): string {
 }
 
 /**
+ * Creates the test-directory user for `email`/`password`, or returns the id of the one already
+ * there. Only consulted for an explicit (stable) email: a generated one is unique enough that
+ * the lookup would just be a wasted round trip, and every caller that generates its own email
+ * wants a fresh account every time anyway.
+ */
+async function ensureUserId(workos: WorkOS, email: string, password: string, mintIfAbsent: boolean): Promise<string> {
+  if (mintIfAbsent) {
+    const existing = (await workos.userManagement.listUsers({ email })).data[0];
+    if (existing !== undefined) {
+      return existing.id;
+    }
+  }
+  const created = await workos.userManagement.createUser({ email, password, emailVerified: true, firstName: "Commish", lastName: "Lab" });
+  return created.id;
+}
+
+/**
  * Refuses anything but a WorkOS TEST key: `createUser({ emailVerified: true })` against a
  * production key silently plants a permanent, pre-verified account in the real directory.
  */
@@ -49,18 +66,16 @@ export async function mintLabSession(options: { readonly email?: string; readonl
   const password = options.password ?? `Lab-${randomBytes(24).toString("base64url")}-1!x`;
 
   const workos = new WorkOS(apiKey);
-  const user = await workos.userManagement.createUser({
-    email,
-    password,
-    emailVerified: true,
-    firstName: "Commish",
-    lastName: "Lab",
-  });
+  // Mint-if-absent, for an explicit email only: a caller naming its own address (e2e's stable
+  // manager identities, below) means to reuse the same account run over run, and `createUser`
+  // against an email that already exists in this directory throws. A generated email has never
+  // been seen before, so that caller always takes the plain `createUser` path.
+  const userId = await ensureUserId(workos, email, password, options.email !== undefined);
   const auth = await workos.userManagement.authenticateWithPassword({ clientId, email, password });
   const cookie = await sealData(
     { accessToken: auth.accessToken, refreshToken: auth.refreshToken, user: auth.user },
     { password: cookiePassword, ttl: 0 },
   );
 
-  return { userId: user.id, email, cookie };
+  return { userId, email, cookie };
 }

@@ -8,6 +8,19 @@ export const AUTH_DIR = resolve(process.cwd(), "e2e/.auth");
 export const MANAGER_A_STATE = resolve(AUTH_DIR, "manager-a.json");
 export const MANAGER_B_STATE = resolve(AUTH_DIR, "manager-b.json");
 
+// Stable, not secret: two fixed WorkOS TEST-directory identities, minted once and reused on
+// every rerun (`mintLabSession`'s mint-if-absent path). A fresh random identity per run used to
+// be minted here, which collided with the seed's OWN first-claim-sticks rule
+// (`src/data/seed/dev-users.ts`'s `preserveRealTeamOwner`): run 1 claims the seeded season
+// league's team 1 for identity A1 and that claim sticks forever, but run 2 minted a brand new
+// A2, seeded with A2 as the claim id (a no-op, since team 1 already belongs to A1), and then
+// authenticated the browser AS A2, a manager whose session no longer matches the team the
+// seed handed them. `season.spec.ts` then failed to find its own commissioner controls. A
+// stable identity makes every run's claim id the SAME as the one that stuck on run 1.
+const MANAGER_A_EMAIL = "e2e-manager-a@commish-lab.test";
+const MANAGER_B_EMAIL = "e2e-manager-b@commish-lab.test";
+const MANAGER_PASSWORD = "E2e-Manager-Lab-Password-1!";
+
 function storageState(baseURL: string, cookie: string): string {
   const { hostname } = new URL(baseURL);
   return JSON.stringify({
@@ -32,8 +45,10 @@ function storageState(baseURL: string, cookie: string): string {
  *
  * The order matters and each step earns its place:
  *
- * 1. **Mint** two WorkOS test-directory sessions. This throws with a named variable if the
- *    WorkOS test credentials are absent — a loud stop, never a silently skipped suite.
+ * 1. **Mint** two WorkOS test-directory sessions for the two STABLE identities above
+ *    (mint-if-absent: created on the first run, reused on every rerun). This throws with a
+ *    named variable if the WorkOS test credentials are absent — a loud stop, never a silently
+ *    skipped suite.
  * 2. **Warm** each session by loading `/app` once. That is what makes `getCurrentUser()` write
  *    the local `users` row, and step 3 has a foreign key onto it. Doing it through the real
  *    page rather than a direct insert is the whole point: if identity sync is broken, the e2e
@@ -44,7 +59,10 @@ function storageState(baseURL: string, cookie: string): string {
 export default async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL = config.projects[0]?.use.baseURL ?? "http://localhost:3100";
 
-  const [a, b] = await Promise.all([mintLabSession(), mintLabSession()]);
+  const [a, b] = await Promise.all([
+    mintLabSession({ email: MANAGER_A_EMAIL, password: MANAGER_PASSWORD }),
+    mintLabSession({ email: MANAGER_B_EMAIL, password: MANAGER_PASSWORD }),
+  ]);
 
   mkdirSync(AUTH_DIR, { recursive: true });
   // Bearer credentials on disk: same 0600 treatment the mint script gives its own output.
