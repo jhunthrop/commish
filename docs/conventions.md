@@ -78,11 +78,17 @@ src/
                           constraint, enforced by advisory-only.test.ts. See docs/advisor.md.
   scoring/                Pure fantasy-scoring engine: computeFantasyPoints/scoreLineup, every
                           preset (PPR/standard/K-DEF/TE-premium). NO I/O. 100% coverage.
-  stats/                  The stats seam. provider.ts (the interface), config.ts + registry.ts
-                          (STATS_PROVIDER selection, fail-fast on an unknown name),
-                          test-support.ts (the contract every implementation passes),
-                          mock/ (the fixed 2026 dataset) and tank01/ (the live adapter, tested
-                          against committed fixtures). See docs/decisions/stats-provider-adapter.md.
+  stats/                  The stats seam. provider.ts (the interface: listPlayers, listGames,
+                          getGameStatLines, getWeeklyStatLines, and the request-cost table),
+                          config.ts + registry.ts (STATS_PROVIDER selection, fail-fast on an
+                          unknown name), test-support.ts (the contract every implementation
+                          passes), mock/ (the fixed 2026 dataset) and tank01/ (the live adapter,
+                          tested against committed fixtures). See
+                          docs/decisions/stats-provider-adapter.md.
+  stats-pipeline/         The live-scoring ingestion worker: the request-budget ledger, the
+                          delta-diff snapshot, the affected-roster resolver, persistTick, the
+                          score/reference caches and the worker loop itself. 100% coverage. See
+                          docs/decisions/live-scoring-pipeline.md.
   db/                     schema.ts (Drizzle, pg-core: users, leagues, teams, league_invites,
                           scoring_settings, roster_slots, lineup_slots, drafts, draft_actions,
                           draft_nudges, draft_picks, weeks, matchups, players,
@@ -136,7 +142,7 @@ Anything time-dependent takes a `Clock` (`src/domain/timing.ts`) and calls `cloc
 - **Writes are plain HTTP.** Validate → persist to Postgres → then `getPublisher().publish(...)`. Postgres is authoritative; publishing is best-effort and must never fail the write.
 - **Delivery is Redis Streams over SSE.** Stream key `league:<id>:events`. Read with plain `XREAD BLOCK` from a per-connection cursor. **Never `XREADGROUP`** — consumer groups partition entries across consumers; a draft room needs every viewer to see every pick.
 - **Resume** is via the standard `Last-Event-ID` header (the SSE `id:` is the stream entry id). Full-state refetch is the fallback only when a gap outlasts stream retention.
-- **Event types** are enumerated once in `src/lib/realtime/events.ts` (`draft.*`, `chat.*`, `score.update`). Add there, nowhere else. `chat.message`/`chat.reaction` are published by `src/chat-service/chat.ts` and consumed by `useLeagueChat` (`docs/chat.md`); `score.update` remains reserved for a later phase with a live feed and is never published in Phase 1.
+- **Event types** are enumerated once in `src/lib/realtime/events.ts` (`draft.*`, `chat.*`, `score.update`). Add there, nowhere else. `chat.message`/`chat.reaction` are published by `src/chat-service/chat.ts` and consumed by `useLeagueChat` (`docs/chat.md`); `score.update` is published by the stats-ingestion worker (`src/stats-pipeline/worker.ts`) once per league per tick that changed a player's stats or finalized a week — see `docs/decisions/live-scoring-pipeline.md`. It stayed reserved and unpublished through Phase 1; Plan B is what turns it on.
 - **Draft events** (`draft.pick`, `draft.nominate`, `draft.bid`, `draft.timer_expire`, `draft.status`, `draft.queue`, `draft.nudge`) ride the **league** stream — there is no per-draft stream. Their payload contracts live in `docs/draft-engine.md`. `draft.nudge` is the one exception to "derived from the action log": it is published directly by the nudge scheduler on the ticker's own schedule, not by `draftEventsFor`. See `docs/draft-moderator.md`.
 - **On the browser side there are two consumers:** `useDraftRoom` (`src/draft-room/hooks/`) and
   `useLeagueChat` (`src/chat-room/hooks/`), both built on the SAME native `EventSource` for a
@@ -223,7 +229,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**` and `src/stats/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%). Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**` and `src/stats-pipeline/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — eight gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
 - **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 
@@ -234,7 +240,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`). Commit after every completed step; commit bodies explain *why* and record any deviation from the plan.
 
 ### Environment
-`.env.example` is committed; `.env.local` is gitignored. Required: `DATABASE_URL`, `REDIS_URL`, `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD`, `NEXT_PUBLIC_WORKOS_REDIRECT_URI`; test-only: `TEST_DATABASE_URL`, `TEST_PGBOUNCER_URL`; optional: `ANTHROPIC_API_KEY`, `STATS_PROVIDER` (default `mock`), `TANK01_API_KEY` + `TANK01_SEASON` (only when `STATS_PROVIDER=tank01`). Fail fast with a clear message when a required var is missing (see `db/client.ts`, `realtime/redis.ts`).
+`.env.example` is committed; `.env.local` is gitignored. Required: `DATABASE_URL`, `REDIS_URL`, `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD`, `NEXT_PUBLIC_WORKOS_REDIRECT_URI`; test-only: `TEST_DATABASE_URL`, `TEST_PGBOUNCER_URL`; optional: `ANTHROPIC_API_KEY`, `STATS_PROVIDER` (default `mock`), `TANK01_API_KEY` + `TANK01_SEASON` (only when `STATS_PROVIDER=tank01`), `MOCK_STATS_LIVE_WEEK` (only when `STATS_PROVIDER=mock`), `STATS_INGESTION_MODE` + `STATS_POLL_INTERVAL_MS` + `STATS_MONTHLY_REQUEST_BUDGET` (override `STATS_INGESTION_CONFIG`'s defaults). Fail fast with a clear message when a required var is missing (see `db/client.ts`, `realtime/redis.ts`).
 
 ## Verification commands (every step)
 

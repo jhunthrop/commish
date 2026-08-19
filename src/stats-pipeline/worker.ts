@@ -10,7 +10,7 @@ import { affectedTeams } from "./affected";
 import { STATS_INGESTION_CONFIG } from "./config";
 import type { ScoreUpdatePayload, TeamScore, WeekStatus } from "./contract";
 import { diffStatLines } from "./digest";
-import { finalizeWeek, scoreTeamsForWeek } from "./finalize";
+import { finalizeWeek, requireScore, scoreTeamsForWeek } from "./finalize";
 import { persistTick } from "./persist";
 import type { RequestBudget } from "./budget";
 
@@ -166,7 +166,11 @@ export function createIngestionWorker({
           version,
           gamesFinal,
           gamesTotal,
-          scores: teamIds.map((teamId) => ({ teamId, points: scores.get(teamId) ?? 0 })),
+          // requireScore, not `?? 0`: teamIds came from this same leagueId via affectedTeams, so
+          // a missing entry means scoreTeamsForWeek and that lookup have drifted apart — the
+          // surrounding try/catch is what turns that into a skipped, retried-next-tick publish
+          // rather than a fabricated zero shown live to a manager watching the game.
+          scores: teamIds.map((teamId) => ({ teamId, points: requireScore(scores, teamId) })),
         };
         // Best-effort by contract (`createPublisher`): a Redis failure here returns null and
         // never throws, so the write above is never at risk from a publish failure.
@@ -195,9 +199,12 @@ export function createIngestionWorker({
         if (!result.ok) continue;
 
         const settled = await db.select().from(matchups).where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, week)));
+        // Non-null by construction: finalizeWeek (which just returned ok: true) writes both
+        // scores via requireScore inside its own transaction, and nothing else in this codebase
+        // ever nulls a matchup's score back out once finalizeWeek has set it.
         const scores: TeamScore[] = settled.flatMap((row) => [
-          { teamId: row.homeTeamId, points: row.homeScore ?? 0 },
-          { teamId: row.awayTeamId, points: row.awayScore ?? 0 },
+          { teamId: row.homeTeamId, points: row.homeScore! },
+          { teamId: row.awayTeamId, points: row.awayScore! },
         ]);
         const payload: ScoreUpdatePayload = { week, status: "final", version, gamesFinal, gamesTotal, scores };
         await publish({ leagueId, type: "score.update", payload });
@@ -321,7 +328,8 @@ export function createIngestionWorker({
     // an upstream call) has already run.
     const reserved = await budget.reserve(weeks.length + STATS_INGESTION_CONFIG.maxGamesPerTick);
     if (!reserved) {
-      const outcome: TickOutcome = { week: weeks[0] ?? 0, applied: false, reason: "This tick's request budget reservation was denied." };
+      // `weeks[0]` is never undefined here: the `weeks.length === 0` case already returned above.
+      const outcome: TickOutcome = { week: weeks[0]!, applied: false, reason: "This tick's request budget reservation was denied." };
       reportIfDue(outcome, nowMs);
       return [outcome];
     }

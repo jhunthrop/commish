@@ -10,7 +10,7 @@ either directly.
 | Layer | Path | Rule |
 |---|---|---|
 | Engine | `src/league/` | Pure. No I/O, no `Date.now()`, `readonly` everywhere, 100% test coverage enforced: schedule generation (the circle method), standings, clinching, lineup shaping, invite codes, `LEAGUE_CONFIG`. |
-| Service | `src/league-service/` | The only part that talks to Postgres: league creation, invites, the schedule write, lineups, scoring and standings assembly. Consumed directly by `/api/leagues/**` route handlers and by `src/app/**` Server Components. |
+| Service | `src/league-service/` | The only part that talks to Postgres: league creation, invites, the schedule write, lineups, and standings assembly. Consumed directly by `/api/leagues/**` route handlers and by `src/app/**` Server Components. Scoring a week's matchups is `src/stats-pipeline/finalize.ts`'s job now, called by the stats-ingestion worker — see "Scoring and standings" below. |
 
 Same rationale as the draft: a schedule, a standings table or a clinch computation is a pure
 function of rows already in hand, so it lives where it can be tested exhaustively without a
@@ -110,12 +110,19 @@ exactly "everyone on this roster who isn't starting" — that is what lets `Line
 no lineup arithmetic of its own, which matters because `src/league-room/**` may not
 value-import `@/league` at all (see "The client boundary" below).
 
-**A week locks when it is scored.** `isWeekLocked` is true once every matchup in that week has
-both scores set — the same condition `MatchupSummary.final` uses — and `setLineup` refuses a
-write against a locked week with a 409. There is deliberately no clock-based lock: this phase
-has no live game data for a clock to track, and pretending otherwise from the server side would
-undercut the same "never imply live data" rule the matchup copy already enforces from the
-client side.
+**A week locks when it starts, not when it is scored.** `isWeekLocked` (`src/league-service/lineups.ts`)
+reads the week's `stat_weeks.status` (global to the NFL calendar, never scoped by league — see
+`weekStatusFor`) and delegates to `isLineupLocked` (`src/league/week-status.ts`): a week is
+locked once its status is anything but `scheduled`, and `setLineup` refuses a write against a
+locked week with a 409. A week the stats-ingestion worker has never reached has no `stat_weeks`
+row at all, and that reads as `scheduled` — open — rather than as locked, because locking on the
+row's absence would freeze every league's lineups the first time the worker was down, turning a
+background-job outage into a product outage. This replaced Phase 1's "both scores exist" rule,
+which was correct only when a score appeared solely because a commissioner pressed a button: with
+scores that move on their own, a manager could otherwise watch a player leave the field and swap
+him out before the week was ever scored. The lock is week-level, not per-player kickoff — it
+errs toward locking a manager out early, which costs flexibility and costs nobody money; a
+per-player lock needs a kickoff time this seam does not carry yet.
 
 ## Scoring and standings
 
@@ -150,15 +157,21 @@ mathematically certain outcome.
 
 ## Real-time
 
-**No `league.*`, `lineup.*` or `matchup.*` event type exists, on purpose.** Standings and
-scoring are batch operations: a commissioner presses "score this week", the numbers land in
-Postgres, and the next page load already reflects them — there is nothing "live" to push. A
-lineup change is visible only to the manager who made it (`GET /api/leagues/[leagueId]/teams/me/lineup`
-answers the caller's own team, never anybody else's), so broadcasting it would tell every other
-manager in the league about a private roster move nobody asked to watch. Adding a channel
-nothing subscribes to would violate `docs/conventions.md`'s "one closed taxonomy" rule for no
-gain. `score.update` is enumerated in `src/lib/realtime/events.ts` for a later phase with an
-actual live feed, and stays unused until one exists — Phase 1 never publishes it.
+**No `league.*`, `lineup.*` or `matchup.*` event type exists, on purpose.** Standings are still
+a batch operation from the manager's point of view: nothing about a lineup save or the standings
+table itself needs a push channel. A lineup change is visible only to the manager who made it
+(`GET /api/leagues/[leagueId]/teams/me/lineup` answers the caller's own team, never anybody
+else's), so broadcasting it would tell every other manager in the league about a private roster
+move nobody asked to watch. Adding a channel nothing subscribes to would violate
+`docs/conventions.md`'s "one closed taxonomy" rule for no gain.
+
+**`score.update` is the one exception, and it now carries real traffic.** Phase 1 enumerated it
+in `src/lib/realtime/events.ts` and never published it — there was no live feed to publish from.
+Plan B's stats-ingestion worker (`src/stats-pipeline/worker.ts`) publishes it once per league per
+tick that changed a player's stats or finalized a week, batched across every team the change could
+have moved rather than per-player. See `docs/decisions/live-scoring-pipeline.md` for the full
+contract (the payload shape, the version field, and why the score cache and the request budget
+degrade in opposite directions).
 
 League chat is the one thing on this page that IS live. `chat.message` and `chat.reaction` ride
 the same `league:<id>:events` stream, gated by the same membership rule, and are consumed by
@@ -194,7 +207,8 @@ from that same directory, never inlined into the page file.
 Every `/api/leagues/**` and `/api/invites/**` route goes through `src/app/api/leagues/_shared.ts`:
 `withCurrentUser` (401 JSON, never a redirect), `withLeagueMemberActor` (membership required,
 403 for a signed-in stranger with no team and no commissioner role), and `withCommissioner`
-(the two commissioner-only actions). Every response is the same envelope
+(the one commissioner-only action, minting an invite — the manual "Score Week" action Plan B
+retired was the other). Every response is the same envelope
 (`{ ok: true, data }` / `{ ok: false, error }`) every other route in the app uses.
 
 | Route | Who | Notes |
@@ -207,8 +221,7 @@ Every `/api/leagues/**` and `/api/invites/**` route goes through `src/app/api/le
 | `GET /api/leagues/[leagueId]/matchups/[week]` | a manager with a team in the league, or the commissioner | Both sides' full lineups and every starter's per-player points for that week. |
 | `GET /api/leagues/[leagueId]/teams/me/lineup` | a manager with a team in the league | `?week=N`. The caller's OWN lineup, never `teams/[teamId]/lineup` — there is no path or body shape in which a manager can read or set somebody else's. |
 | `PUT /api/leagues/[leagueId]/teams/me/lineup` | a manager with a team in the league | Body: `{ weekNumber, slots }`. A rejected lineup (illegal slot, unowned player, a locked week) is a 409/422 with `validateLineup`'s reason verbatim. |
-| `POST /api/leagues/[leagueId]/weeks/[week]/score` | commissioner only | Scores a week from the mock dataset and stores it. Publishes no event — see "Real-time" above. |
-| `GET /api/leagues/[leagueId]/events` | a manager with a team in the league, or the commissioner | The same Redis-Streams-over-SSE fan-out the draft room uses (`docs/draft-engine.md`), gated by the same membership rule — a signed-in stranger gets 403, not another league's stream. |
+| `GET /api/leagues/[leagueId]/events` | a manager with a team in the league, or the commissioner | The same Redis-Streams-over-SSE fan-out the draft room uses (`docs/draft-engine.md`), gated by the same membership rule — a signed-in stranger gets 403, not another league's stream. Now also carries `score.update`, published by the stats-ingestion worker — see "Real-time" above. |
 | `GET /api/leagues/[leagueId]/chat` | a manager with a team in the league, or the commissioner | `?before=<messageId>`. One page of `CHAT_CONFIG.pageSize` messages, oldest first, with `hasMore`. There is no unpaginated read. |
 | `POST /api/leagues/[leagueId]/chat` | same | Body: `{ body }`. The author is the session's user; no body field can change it. |
 | `POST /api/leagues/[leagueId]/chat/[messageId]/reactions` | same | Body: `{ emoji }` from `CHAT_CONFIG.reactions`. One verb toggles both directions. |

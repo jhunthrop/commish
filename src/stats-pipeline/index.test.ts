@@ -10,8 +10,13 @@ vi.hoisted(() => {
   process.env.REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 });
 
+const publishSpy = vi.fn(async () => "1-0");
+vi.mock("@/lib/realtime/publisher", () => ({
+  getPublisher: vi.fn(() => ({ publish: publishSpy })),
+}));
+
 import { DB_POOL_CONFIG } from "@/db/config";
-import { getIngestionWorker, ingestionPoolOptions } from "./index";
+import { getIngestionWorker, ingestionPoolOptions, publishViaSharedPublisher, systemClock } from "./index";
 
 describe("stats-pipeline edge wiring", () => {
   it("draws its connections from the background job budget, never from the request path's", () => {
@@ -24,5 +29,21 @@ describe("stats-pipeline edge wiring", () => {
 
   it("is a singleton, so two calls never mint two pools", () => {
     expect(getIngestionWorker()).toBe(getIngestionWorker());
+  });
+
+  it("systemClock.now() reads the wall clock", () => {
+    const before = Date.now();
+    const parsed = Date.parse(systemClock.now());
+    expect(parsed).toBeGreaterThanOrEqual(before);
+    expect(parsed).toBeLessThanOrEqual(Date.now());
+  });
+
+  it("publishViaSharedPublisher delegates to the process-wide publisher", async () => {
+    // The worker only calls its injected `publish` dependency on a tick with something to
+    // publish, which a full ingestion tick would be a heavy way to reach — this calls the
+    // extracted wiring directly instead.
+    const input = { leagueId: "league_wiring_test", type: "score.update" as const, payload: { week: 1 } };
+    await expect(publishViaSharedPublisher(input)).resolves.toBe("1-0");
+    expect(publishSpy).toHaveBeenCalledWith(input);
   });
 });

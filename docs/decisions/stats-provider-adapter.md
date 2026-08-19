@@ -4,16 +4,36 @@
 
 ## What this seam guarantees
 
-`StatsProvider` (`src/stats/provider.ts`) is two methods: `listPlayers()` and
-`getWeeklyStatLines(week)`. `createStatsProvider(name?)` (`src/stats/registry.ts`) is the one
+`StatsProvider` (`src/stats/provider.ts`) is four methods: `listPlayers()`, `listGames(week)`,
+`getGameStatLines(game)` and `getWeeklyStatLines(week)`. Plan B added the middle two so the unit
+of upstream work is a game rather than a week — the ingestion worker (`src/stats-pipeline/**`)
+can decline to re-fetch a game it already has, which is what turns a naive full-Sunday poll into
+a request count the free tier can afford. `getWeeklyStatLines` stays on the interface as a
+composition of the other two, not a second implementation of "this week's stats": `seedPlayers`
+still walks weeks upward with it, and the shared contract suite asserts it agrees with the
+per-game path exactly, which is what stops the two from drifting.
+
+REQUEST COST is part of the contract now, not an afterthought: `provider.ts`'s docblock carries a
+table of what each method costs in upstream requests, and `src/stats-pipeline/budget.ts` reserves
+against those exact numbers. See `docs/decisions/live-scoring-pipeline.md` for the full
+request-cost contract and the monthly arithmetic it makes possible.
+
+`createStatsProvider(name?)` (`src/stats/registry.ts`) is the one
 place a name becomes an implementation, selected by `STATS_PROVIDER`, defaulting to `mock`, and
 throwing `UnknownStatsProviderError` by name on anything else.
 
 `describeStatsProviderContract` (`src/stats/test-support.ts`) is what "an implementation" means:
 stable non-empty ids, known positions, stat lines stamped with the requested week, every stat
-field finite and non-negative, no player reported twice, no stats for a player the provider does
-not also list, and an empty list rather than an error for a week outside the season. Both
-implementations run it. A future licensed feed runs the same suite unchanged.
+field finite and non-negative except yardage (which real NFL data reports negative), no player
+reported twice, no stats for a player the provider does not also list, and an empty list rather
+than an error for a week outside the season. Plan B added the per-game half of the suite: every
+game has a known status and two distinct teams, no game id repeats in a week, a game's own stat
+lines are stamped with that game's week and attributed only to players on one of its two teams, a
+final game's box score reads identically twice (the property `final-only` mode is built on), and
+the per-game reads sum to exactly the same lines `getWeeklyStatLines` returns — the anti-drift
+assertion that stops a seeded season and a live season from disagreeing about what "week 1's
+stats" means. Both implementations run the whole suite. A future licensed feed runs the same
+suite unchanged.
 
 ## What it deliberately does not guarantee
 
@@ -70,8 +90,14 @@ fixture diff, then `npm run seed`. No code change.
 
 ## Cost
 
-The free tier is 1,000 requests a month. `listPlayers()` costs two requests. One week of stat
-lines costs one schedule request plus roughly sixteen box scores. A full 18-week backfill is
-about 300 requests. `getWeeklyStatLines` fetches box scores **sequentially**, not in parallel: a
-burst is the fastest way to a 429, and a rate-limit failure part way through a burst leaves you
-unable to say which games you got.
+This is the cost of the backfill path (`npm run seed`), not the ongoing ingestion cadence — see
+`docs/decisions/live-scoring-pipeline.md` for the monthly arithmetic that shapes the worker's
+polling interval and mode, and for what the approved paid tier changes and does not change.
+
+`listPlayers()` costs two requests. One week of stat lines costs one schedule request plus
+roughly sixteen box scores. A full 18-week backfill is about 300 requests, which is why
+`STATS_INGESTION_CONFIG.reservedForBackfill` holds 150 requests out of the monthly ingestion
+budget: a live season's polling must never be able to starve `npm run seed`.
+`getWeeklyStatLines` fetches box scores **sequentially**, not in parallel: a burst is the fastest
+way to a 429, and a rate-limit failure part way through a burst leaves you unable to say which
+games you got.

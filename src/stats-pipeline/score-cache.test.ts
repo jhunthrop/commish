@@ -109,6 +109,20 @@ describe("createScoreCache", () => {
       expect(result.has(keyFor(LEAGUE, WEEK))).toBe(false);
     });
 
+    it("omits a corrupt (non-JSON) entry from the map rather than throwing", async () => {
+      await control.set(keyFor(LEAGUE, WEEK), "not-json-at-all{{{");
+      const cache = createScoreCache({ redis });
+      const result = await cache.readMany([{ leagueId: LEAGUE, week: WEEK, version: 3 }]);
+      expect(result.has(keyFor(LEAGUE, WEEK))).toBe(false);
+    });
+
+    it("omits an entry whose JSON is the wrong shape", async () => {
+      await control.set(keyFor(LEAGUE, WEEK), JSON.stringify({ unrelated: "shape" }));
+      const cache = createScoreCache({ redis });
+      const result = await cache.readMany([{ leagueId: LEAGUE, week: WEEK, version: 3 }]);
+      expect(result.has(keyFor(LEAGUE, WEEK))).toBe(false);
+    });
+
     it("degrades OPEN on a Redis outage: an empty map, never a throw", async () => {
       const dead = throwingRedis();
       try {

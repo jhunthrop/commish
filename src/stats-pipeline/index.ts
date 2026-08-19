@@ -1,13 +1,23 @@
 import { createDb } from "@/db/client";
 import { DB_POOL_CONFIG } from "@/db/config";
+import type { PublishFn } from "@/lib/realtime/publish";
 import { getPublisher } from "@/lib/realtime/publisher";
 import { getSharedRedis } from "@/lib/realtime/redis";
 import { createStatsProvider } from "@/stats/registry";
 import { createRequestBudget, type RequestBudget } from "./budget";
 import { createIngestionWorker, type IngestionWorker } from "./worker";
 
-/** The outermost edge is the only place a wall clock is allowed. */
-const systemClock = { now: () => new Date().toISOString() };
+/**
+ * The worker's `publish` dependency: delegates to the process-wide publisher. Extracted to its
+ * own name, rather than inlined into `getIngestionWorker()`'s construction, so this one line of
+ * wiring is directly unit-testable — a full ingestion tick is what would otherwise be needed to
+ * reach it, since it only runs when a tick actually has something to publish.
+ */
+export const publishViaSharedPublisher: PublishFn = (input) => getPublisher().publish(input);
+
+/** The outermost edge is the only place a wall clock is allowed. Exported so its own `now()` is
+ *  directly unit-testable without needing a real tick to reach it. */
+export const systemClock = { now: () => new Date().toISOString() };
 
 /**
  * The pool size a background job is allowed: `DB_POOL_CONFIG.backgroundJobPoolSize`, exported
@@ -66,7 +76,7 @@ export function getIngestionWorker(): IngestionWorker {
     db: createDb(undefined, ingestionPoolOptions()),
     provider: createStatsProvider(),
     redis: getSharedRedis(),
-    publish: (input) => getPublisher().publish(input),
+    publish: publishViaSharedPublisher,
     clock: systemClock,
     budget: getIngestionBudget(),
   });

@@ -19,7 +19,7 @@ export type FinalizeResult =
  * loudly on rather than one a `?? 0` fallback would quietly turn into a wrong score written to
  * the season record.
  */
-function requireScore(scores: ReadonlyMap<string, number>, teamId: string): number {
+export function requireScore(scores: ReadonlyMap<string, number>, teamId: string): number {
   const score = scores.get(teamId);
   if (score === undefined) {
     throw new Error(`finalizeWeek: no computed score for team "${teamId}" — scoreTeamsForWeek and the matchup rows have drifted apart.`);

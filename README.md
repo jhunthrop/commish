@@ -18,7 +18,7 @@ npm test                  # run the test suite once
 npm run test:watch        # run tests in watch mode
 npm run test:coverage     # run tests with coverage — verify UNFILTERED before merging any change
                           # touching src/scoring, src/draft-engine, src/draft-room/state,
-                          # src/league, src/chat, src/matchmaking or src/stats
+                          # src/league, src/chat, src/matchmaking, src/stats or src/stats-pipeline
 npm run lint              # lint
 npm run typecheck         # type-check with no emit
 npm run build             # production build — part of the verification gate for every step
@@ -42,7 +42,10 @@ just not what the app itself does. See `docs/decisions/data-layer-hardening.md`.
 `src/design/tokens.css` from `src/design/tokens.ts`; `npm run stats:generate` regenerates the
 mock stat dataset; `npm run stats:tank01:record` re-records the Tank01 fixtures
 (`src/stats/tank01/fixtures/`) from the live API — needs `TANK01_API_KEY` in `.env.local`;
-`npm run infra:down` stops the local stack.
+`npm run stats:ingest` runs the live-scoring ingestion worker for exactly one tick and exits,
+printing what it found and what it cost against the monthly request budget — the way to see the
+pipeline work without waiting on `STATS_INGESTION_CONFIG.pollIntervalMs` (thirty minutes), and
+what to run first against a real `TANK01_API_KEY`; `npm run infra:down` stops the local stack.
 
 The whole suite also runs through PgBouncer in transaction pooling mode as an explicit release
 gate, rather than as the everyday default (a pooler in the path would slow down every one of the

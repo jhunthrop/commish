@@ -325,6 +325,28 @@ describe("createIngestionWorker", () => {
     expect(await db.select().from(statWeeks)).toHaveLength(0);
   });
 
+  it("reportIfDue suppresses a repeat of the same outcome inside warnIntervalMs, and reports again once it's passed", async () => {
+    let ts = "2026-09-14T20:00:00.000Z";
+    const localClock = { now: () => ts };
+    const provider = fakeStatsProvider({
+      games: { 1: [{ gameId: "g_denied2", week: 1, status: "scheduled", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
+    });
+    const deniedBudget: RequestBudget = { reserve: async () => false, remaining: async () => 0 };
+    const onOutcome = vi.fn();
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock: localClock, budget: deniedBudget, onOutcome });
+
+    await worker.tick();
+    expect(onOutcome).toHaveBeenCalledTimes(1);
+
+    ts = "2026-09-14T20:05:00.000Z"; // 5 minutes later, well inside warnIntervalMs (60 minutes)
+    await worker.tick();
+    expect(onOutcome).toHaveBeenCalledTimes(1); // same outcome key, suppressed
+
+    ts = "2026-09-14T21:05:00.000Z"; // 65 minutes after the first report, past warnIntervalMs
+    await worker.tick();
+    expect(onOutcome).toHaveBeenCalledTimes(2); // reported again
+  });
+
   it("one examined week's failure does not stop the other week in the same tick", async () => {
     // `maxWeeksPerTick` examines week 1 and week 2 together on a fresh database. `listGames`
     // throws for week 1 only — week 2 must still be recorded, mirroring the draft ticker's
@@ -477,6 +499,29 @@ describe("createIngestionWorker", () => {
       worker.stop();
       consoleErrorSpy.mockRestore();
     }
+  });
+
+  it("start() is idempotent — a second call does not create a second interval", () => {
+    const provider = fakeStatsProvider({ games: {} });
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, intervalMs: 1_000_000 });
+    const setIntervalSpy = vi.spyOn(global, "setInterval");
+    try {
+      worker.start();
+      worker.start(); // the guard this exercises: a second call must not mint a second timer
+      expect(setIntervalSpy).toHaveBeenCalledTimes(1);
+    } finally {
+      worker.stop();
+      setIntervalSpy.mockRestore();
+    }
+  });
+
+  it("stop() before start(), or a second stop(), is a no-op rather than an error", () => {
+    const provider = fakeStatsProvider({ games: {} });
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, intervalMs: 1_000_000 });
+    expect(() => worker.stop()).not.toThrow(); // never started
+    worker.start();
+    worker.stop();
+    expect(() => worker.stop()).not.toThrow(); // already stopped
   });
 
   it("cold start mid-season: reaches and ingests the live week within a bounded number of ticks, never re-listing a finalized week", async () => {

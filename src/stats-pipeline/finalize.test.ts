@@ -7,7 +7,7 @@ import { HALF_PPR_SCORING, PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints } from "@/scoring";
 import { createLeague } from "@/league-service/creation";
 import { writeSchedule } from "@/league-service/schedule";
-import { finalizeWeek, scoreTeamsForWeek } from "./finalize";
+import { finalizeWeek, requireScore, scoreTeamsForWeek } from "./finalize";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-17T12:00:00.000Z" };
@@ -129,6 +129,23 @@ describe("finalizeWeek", () => {
     expect([row!.homeScore, row!.awayScore]).toContain(32);
   });
 
+  it("scores around a starter whose player row is gone, rather than throwing", async () => {
+    // lineup_slots.player_id carries no foreign key to players (unlike player_stat_lines, which
+    // does) — the fallback half of getLineup exists precisely because a stored slot can outlive
+    // its player. scoreTeam's positionById lookup is the guard: a starter with no known position
+    // scores as though the slot were empty instead of crashing the whole week's settlement.
+    const league = await twoTeamLeague();
+    await db.insert(lineupSlots).values([
+      { teamId: league.teamId, weekNumber: 1, slot: "QB", slotIndex: 0, playerId: "ghost_player" },
+      { teamId: league.teamId, weekNumber: 1, slot: "BENCH", slotIndex: 0, playerId: null },
+    ]);
+    const result = await finalizeWeek(db, league.leagueId, 1);
+    expect(result).toEqual({ ok: true, weekNumber: 1, matchupsScored: 1 });
+    const [row] = await db.select().from(matchups).where(and(eq(matchups.leagueId, league.leagueId), eq(matchups.weekNumber, 1)));
+    const ourScore = row!.homeTeamId === league.teamId ? row!.homeScore : row!.awayScore;
+    expect(ourScore).toBe(0); // the ghost starter contributes nothing, same as an empty slot
+  });
+
   it("scores a week with no stat lines as zero rather than failing", async () => {
     const league = await twoTeamLeague();
     const result = await finalizeWeek(db, league.leagueId, 2);
@@ -190,5 +207,22 @@ describe("scoreTeamsForWeek", () => {
     // guard against a league vanishing between that lookup and this one, exercised directly
     // since no current caller can otherwise reach it through a real league that's gone missing.
     expect(await scoreTeamsForWeek(db, "does-not-exist", 1, ["some-team"])).toEqual(new Map());
+  });
+});
+
+describe("requireScore", () => {
+  it("returns the score a team has", () => {
+    expect(requireScore(new Map([["team_1", 12.5]]), "team_1")).toBe(12.5);
+  });
+
+  it("throws rather than silently defaulting when scoreTeamsForWeek and the matchup rows have drifted apart", () => {
+    // finalizeWeek's own invariant: every teamId it asks requireScore about came from the exact
+    // same matchup rows scoreTeamsForWeek was called with, so a missing entry here means the two
+    // have disagreed — a bug worth failing loudly on, never a `?? 0` fallback that would quietly
+    // write a wrong score to the season record. Exercised directly since finalizeWeek's own two
+    // lookups can never actually disagree with each other in a single call.
+    expect(() => requireScore(new Map(), "team_missing")).toThrow(
+      'finalizeWeek: no computed score for team "team_missing" — scoreTeamsForWeek and the matchup rows have drifted apart.',
+    );
   });
 });
