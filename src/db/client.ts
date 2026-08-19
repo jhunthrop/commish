@@ -42,12 +42,17 @@ export function createDb(connectionString: string = requireDatabaseUrl(), option
   return drizzle(client, { schema });
 }
 
-let singleton: Db | undefined;
+/**
+ * The singleton lives on `globalThis`, NOT in a module-level `let`: in `next dev`, every
+ * recompile creates a fresh module instance, so a module-level singleton resets per rebuild
+ * and each reset mints another pool while the old one's connections linger. A day of hot
+ * reloads exhausted Postgres ("sorry, too many clients already"). `globalThis` survives
+ * recompiles; in production the module loads once and this is equivalent to the plain let.
+ */
+const globalDb = globalThis as { __commishDb?: Db };
 
 /** Process-wide default connection. Tests should use createDb(TEST_DATABASE_URL) instead. */
 export function getDb(): Db {
-  if (singleton === undefined) {
-    singleton = createDb();
-  }
-  return singleton;
+  globalDb.__commishDb ??= createDb();
+  return globalDb.__commishDb;
 }
