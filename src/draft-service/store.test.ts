@@ -248,41 +248,40 @@ describe("draft store — concurrency", () => {
   });
 });
 
-describe("draft store — sequence conflict (real Postgres, deterministic)", () => {
-  it("translates a genuine unique-index violation into the friendly rejection, not a raw driver error", async () => {
+describe("draft store — sequence conflict (defensive backstop)", () => {
+  it("translates a raw unique-index violation into the friendly rejection, not a driver error", async () => {
     const { draftId, teamIds } = await fixture();
     const store = newStore();
-    await store.applyAction(draftId, start(teamIds)); // cache now holds sequence 1
+    await store.applyAction(draftId, start(teamIds));
 
-    // A `Db` whose `.transaction(...)` first inserts a REAL competing row at exactly the
-    // sequence (2) this store's own write is about to target, then runs the real transaction —
-    // a genuine Postgres unique-index collision on `(draft_id, sequence)`, not a fake
-    // driver-error shape. Constructed deterministically: the ordering is enforced by this
-    // proxy intercepting the store's own commit path, not by racing two promises and hoping
-    // they interleave a particular way (contrast the timing-dependent test above).
-    const racedDb = new Proxy(db, {
+    // A genuine LIVE Postgres race on `draft_actions` can no longer be constructed here, and
+    // that is Task 7 working as designed, not a gap: `draft_actions.draft_id` REFERENCES
+    // `drafts.id`, so ANY insert into `draft_actions` for this draft first needs a lock on
+    // that exact `drafts` row — the same row `applyAction`'s transaction now holds
+    // `FOR UPDATE` for its entire duration. A second writer's insert therefore queues behind
+    // that lock instead of racing it (confirmed empirically: attempting to race one in via a
+    // proxied `tx.insert` deadlocked the test at the client level, because the second insert
+    // blocked on the FK's implicit lock while the locked transaction sat waiting on that very
+    // insert to return). So the only writer left who could ever trip this catch branch in real
+    // operation is something that bypasses `draft_actions`'s own foreign key entirely — nothing
+    // in this codebase does — which is exactly what the docblock in `store.ts` now says. This
+    // test exercises the translation directly with the real driver-error shape
+    // (`db/errors.ts`'s documented `.cause.code` / `.cause.constraint_name`) instead.
+    const driverError = Object.assign(
+      new Error('duplicate key value violates unique constraint "draft_actions_draft_sequence_idx"'),
+      { cause: { code: "23505", constraint_name: "draft_actions_draft_sequence_idx" } },
+    );
+    const brokenDb = new Proxy(db, {
       get(target, prop, receiver) {
-        if (prop === "transaction") {
-          return async (callback: Parameters<Db["transaction"]>[0]) => {
-            await db.insert(draftActions).values({
-              draftId, sequence: 2, action: pick(teamIds[0]!, "rb1"), timestamp: new Date(T),
-            });
-            return target.transaction(callback);
-          };
-        }
+        if (prop === "transaction") return () => Promise.reject(driverError);
         return Reflect.get(target, prop, receiver);
       },
     }) as Db;
-    const racedStore = createDraftStore({ db: racedDb, publish, clock });
-    // Warm the raced store's cache to sequence 1 — matching what's actually in the DB right
-    // now, since the competing row above hasn't landed yet — so its freshness probe (Task 6)
-    // passes and it proceeds to attempt the same sequence. This exercises the store's real
-    // commit path (`applyAction`'s own `db.transaction` + catch block), not a fabricated error.
-    await racedStore.getDraftState(draftId);
+    const brokenStore = createDraftStore({ db: brokenDb, publish, clock });
 
-    const result = await racedStore.applyAction(draftId, pick(teamIds[0]!, "qb1"));
+    const result = await brokenStore.applyAction(draftId, pick(teamIds[0]!, "qb1"));
     expect(result).toEqual({ ok: false, reason: "Someone else acted first. Try again." });
-    expect(await actionRows(draftId)).toHaveLength(2); // only the competing row's insert survived
+    expect(isSequenceConflict(driverError)).toBe(true);
   });
 });
 

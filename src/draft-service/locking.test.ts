@@ -1,10 +1,11 @@
+import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createDb } from "@/db/client";
 import { DB_POOL_CONFIG } from "@/db/config";
 import { TEST_DATABASE_URL, createTestDb, truncateAll } from "@/db/test-db";
-import { players } from "@/db/schema";
+import { draftActions, players } from "@/db/schema";
 import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
-import { bestAvailableFor, teamOnClock, type DraftState } from "@/draft-engine";
+import { availablePool, bestAvailableFor, teamOnClock, type DraftState } from "@/draft-engine";
 import { createDraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -36,6 +37,29 @@ function firstPickFor(state: DraftState): DraftAction {
   const best = bestAvailableFor(state, teamId);
   if (best === null) throw new Error("No player is available to draft");
   return { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp: new Date().toISOString(), teamId, playerId: best.playerId };
+}
+
+/**
+ * The on-clock team's pick of the two best available players, as two `MAKE_PICK` actions. Both
+ * are individually legal from `state` — the team's roster is empty, so either player fits — but
+ * only the first can ever be admitted once submitted, because the second is evaluated against a
+ * log that already contains the first and turn order has moved on. That's the point: a lock
+ * that merely rejected the loser via the sequence clash would produce the SAME two actions
+ * without ever exercising the draft's own turn-order rule.
+ */
+function twoDistinctPicksFor(state: DraftState): [DraftAction, DraftAction] {
+  const teamId = teamOnClock(state);
+  if (teamId === null) throw new Error("No team is on the clock");
+  const [first, second] = availablePool(state);
+  if (first === undefined || second === undefined) throw new Error("Fewer than two players are available to draft");
+  const pickOf = (playerId: string): DraftAction => ({
+    v: DRAFT_ACTION_VERSION,
+    type: "MAKE_PICK",
+    timestamp: new Date().toISOString(),
+    teamId,
+    playerId,
+  });
+  return [pickOf(first.playerId), pickOf(second.playerId)];
 }
 
 /** Seeds a league/draft and starts it, so both instances see an in-progress snake draft. */
@@ -87,6 +111,57 @@ describe("two app instances against one draft", () => {
     const after = await b.store.getDraftState(DRAFT_ID);
     expect(after?.picks).toHaveLength(1);
     expect(after?.sequence).toBe(before!.sequence + 1);
+
+    await a.db.$client.end();
+    await b.db.$client.end();
+  });
+
+  it("accepts exactly one of two simultaneous picks and rejects the other cleanly", async () => {
+    const a = instance();
+    const b = instance();
+
+    const state = await a.store.getDraftState(DRAFT_ID);
+    await b.store.getDraftState(DRAFT_ID); // warm B too, so both hold the same view
+    const action = firstPickFor(state!);
+
+    const [resultA, resultB] = await Promise.all([
+      a.store.applyAction(DRAFT_ID, action),
+      b.store.applyAction(DRAFT_ID, action),
+    ]);
+
+    const accepted = [resultA, resultB].filter((result) => result.ok);
+    expect(accepted).toHaveLength(1);
+
+    const rejected = [resultA, resultB].find((result) => !result.ok);
+    // A user-facing plain-language reason, per conventions.md. Never a driver message.
+    expect(rejected && "reason" in rejected ? rejected.reason : "").not.toContain("duplicate key");
+
+    // And exactly one pick landed in the log, not two.
+    const [{ count }] = await a.db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(draftActions)
+      .where(eq(draftActions.draftId, DRAFT_ID));
+    expect(count).toBe(state!.sequence + 1);
+
+    await a.db.$client.end();
+    await b.db.$client.end();
+  });
+
+  it("serializes two different legal actions rather than losing one to a sequence clash", async () => {
+    const a = instance();
+    const b = instance();
+    const state = await a.store.getDraftState(DRAFT_ID);
+
+    // Two distinct picks, both legal from `state`, submitted at once. Under a row lock the
+    // second one re-reads the log inside the lock, sees the first, and is admitted or rejected
+    // on the DRAFT'S OWN RULES (whose turn it is) rather than on a sequence collision.
+    const [first, second] = twoDistinctPicksFor(state!);
+    const results = await Promise.all([a.store.applyAction(DRAFT_ID, first), b.store.applyAction(DRAFT_ID, second)]);
+
+    expect(results.filter((result) => result.ok).length).toBeGreaterThanOrEqual(1);
+    for (const result of results) {
+      if (!result.ok) expect(result.reason).not.toBe("Someone else acted first. Try again.");
+    }
 
     await a.db.$client.end();
     await b.db.$client.end();

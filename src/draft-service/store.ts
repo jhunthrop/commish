@@ -154,20 +154,46 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
 
     async applyAction(draftId, action, options?: ApplyOptions) {
       return mutex.run(draftId, async (): Promise<ApplyResult> => {
-        const state = await load(draftId);
-        if (state === null) return { ok: false, reason: "That draft doesn't exist." };
-
-        // Command-time preconditions — the tunable-reading guards the reducer must not own,
-        // because it also runs on replay. Inside the mutex, against the state we just loaded,
-        // so this is strictly stronger than checking them in the reducer was.
-        const admitted = admitCommand(state, action);
-        if (!admitted.ok) return admitted;
-
-        const result = reduceDraft(state, action);
-        if (!result.ok) return result;
+        // `previous` is captured out of the transaction so `broadcast` (which must run AFTER
+        // the commit, because publishing is best-effort and must never fail a committed write)
+        // still has the before-state to diff against.
+        let previous: DraftState | null = null;
 
         try {
-          await db.transaction(async (tx) => {
+          const outcome = await db.transaction(async (tx): Promise<ApplyResult> => {
+            /**
+             * THE CROSS-INSTANCE LOCK. Every accepted action for this draft passes through this
+             * one row, so "replay the action log" becomes the single-writer path across any
+             * number of app instances rather than only across restarts.
+             *
+             * `SELECT ... FOR UPDATE` and not `pg_advisory_lock`: this connection reaches
+             * Postgres through PgBouncer in transaction pooling mode, where session-scoped state
+             * does not survive statement boundaries. A row lock is transaction-scoped by
+             * construction, so it is taken and released entirely inside this block — which is
+             * exactly the property transaction pooling requires and exactly the trap the spec
+             * warns about. See docs/decisions/data-layer-hardening.md.
+             *
+             * Lock order: this is a leaf. `joinLeagueInTx` takes `league_invites` then `leagues`;
+             * nothing takes `drafts` before either of those, and this function takes nothing
+             * after `drafts`, so no cycle exists.
+             */
+            const [locked] = await tx.select({ id: drafts.id }).from(drafts).where(eq(drafts.id, draftId)).for("update");
+            if (locked === undefined) return { ok: false, reason: "That draft doesn't exist." };
+
+            // Loaded INSIDE the lock and validated against the log, so a state another instance
+            // has already advanced can never be the state this action is admitted against.
+            const state = await load(draftId, tx);
+            if (state === null) return { ok: false, reason: "That draft doesn't exist." };
+            previous = state;
+
+            // Command-time preconditions — the tunable-reading guards the reducer must not own,
+            // because it also runs on replay.
+            const admitted = admitCommand(state, action);
+            if (!admitted.ok) return admitted;
+
+            const result = reduceDraft(state, action);
+            if (!result.ok) return result;
+
             await tx.insert(draftActions).values({
               draftId,
               sequence: result.state.sequence,
@@ -179,17 +205,29 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
             if (result.state.phase === "complete" && state.phase !== "complete") {
               await commitDraftState(tx, result.state);
             }
+            return { ok: true, state: result.state };
           });
+
+          if (!outcome.ok) {
+            // A rejection may have been decided against a state we loaded inside the lock and
+            // then rolled back with it. Drop the materialization rather than keep one whose
+            // provenance is a rolled-back transaction.
+            cache.delete(draftId);
+            return outcome;
+          }
+
+          cache.set(draftId, outcome.state);
+          if (previous !== null) await broadcast(previous, outcome.state, action);
+          return outcome;
         } catch (error: unknown) {
           // Our view of the log is provably stale — drop it so the next read replays.
           cache.delete(draftId);
+          // The unique index remains the backstop. With the row lock in place this should be
+          // unreachable; if it fires, that is a real signal that something wrote outside the
+          // lock, so it keeps its user-facing retry message rather than being swallowed.
           if (isSequenceConflict(error)) return { ok: false, reason: "Someone else acted first. Try again." };
           throw error;
         }
-
-        cache.set(draftId, result.state);
-        await broadcast(state, result.state, action);
-        return { ok: true, state: result.state };
       });
     },
 
