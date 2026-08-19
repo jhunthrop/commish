@@ -159,8 +159,8 @@ code — the pure state reducer/formatters, the hooks, and the client components
 draft room, the league room and the chat surface respectively. Each talks to its service layer
 ONLY over the wire (`GET`/`POST /api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`,
 `GET /api/leagues/[leagueId]/events`) — never by importing `@/draft-engine`, `@/draft-service`,
-`@/league`, `@/league-service`, `@/db`, `@/lib/realtime`, `@/lib/auth`, `@/lib/leagues`,
-`@/lib/llm`, `@/lib/api/respond` or `@/data/seed` as VALUES. An ESLint
+`@/league`, `@/league-service`, `@/chat-service`, `@/ai-advisor`, `@/db`, `@/lib/realtime`,
+`@/lib/auth`, `@/lib/leagues`, `@/lib/llm`, `@/lib/api/respond` or `@/data/seed` as VALUES. An ESLint
 `@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`,
 scoped to `src/draft-room/**/*.{ts,tsx}`, `src/league-room/**/*.{ts,tsx}` and
 `src/chat-room/**/*.{ts,tsx}` only) enforces this — matched against a relative-path spelling of

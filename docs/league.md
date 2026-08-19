@@ -197,7 +197,7 @@ Every `/api/leagues/**` and `/api/invites/**` route goes through `src/app/api/le
 | Route | Who | Notes |
 |---|---|---|
 | `GET /api/leagues` | any signed-in user | Every league the caller fields a team in, oldest first, with fill count and draft status. |
-| `POST /api/leagues` | any signed-in user | Body: `{ name, format?, teamCount?, scoringPreset?, auctionBudget?, teamName? }` — only `name` is required. Creates the league, the caller's team and a scheduled draft in one transaction. |
+| `POST /api/leagues` | any signed-in user | Body: `{ name, format?, teamCount?, scoringPreset?, auctionBudget?, teamName?, visibility?, stakeTier?, experienceTier? }` — only `name` is required. Creates the league, the caller's team and a scheduled draft in one transaction. `visibility: "public"` (default `"invite_only"`) is what sets `is_public_matchmade` and makes the league eligible for `GET /api/public/leagues`; `stakeTier` (0-3, default 0) and `experienceTier` are the cosmetic/matching fields a public listing shows. |
 | `GET /api/leagues/[leagueId]` | a manager with a team in the league, or the commissioner | `leagueHome`: standings, this week's matchup, the roster shape and the draft's status, in one payload. |
 | `POST /api/leagues/[leagueId]/invites` | commissioner only | Body: `{ maxUses? }`. Mints a code; randomness is `crypto.getRandomValues`-backed, never `Math.random`, since a code is a membership capability. |
 | `POST /api/invites/[code]/accept` | any signed-in user | Body: `{ teamName? }`. Joins the caller to the invite's league. Re-accepting your own invite is a 200, not an error. |
@@ -212,7 +212,7 @@ Every `/api/leagues/**` and `/api/invites/**` route goes through `src/app/api/le
 | `POST /api/leagues/[leagueId]/advisor/start-sit` | a manager with a team in the league | Body: `{ weekNumber, question }`. Answers advice. Writes nothing. |
 | `POST /api/leagues/[leagueId]/advisor/trade` | a manager with a team in the league | Body: `{ weekNumber, counterpartyTeamId, give, receive }`. Assesses a proposal. Never executes one. |
 | `GET /api/public/leagues` | **anyone, signed in or not** | `?format=&experienceTier=&stakeTier=`. Open, publicly listed, pre-draft leagues only, projected to `PublicLeagueSummary`. The one unauthenticated read in the app. |
-| `POST /api/public/leagues/[leagueId]/join` | any signed-in user | Seats the caller in an open public league. 403 if the league is not listed, 409 if its draft started or it is full. Re-joining is a 200. |
+| `POST /api/public/leagues/[leagueId]/join` | any signed-in user | Seats the caller in an open public league. 404 (same body either way) if the league id names nothing OR names a league that isn't public — deliberately collapsed, the same way `acceptInvite` collapses an invalid invite, so a caller cannot use this route to learn whether a private league id is real. 409 if its draft started or it is full, 500 on an unexpected failure. Re-joining is a 200. |
 
 ## Public matchmaking
 
@@ -235,7 +235,7 @@ test fails if the wire body ever grows a field the contract does not name. A lea
 full, or whose draft has already started, is not listed at all: a card a visitor cannot act on
 is a dead end wearing a badge.
 
-**Filtering** is `User.experienceTier`, `League.format` and `League.stakeTier`, normalized by
+**Filtering** is `League.experienceTier`, `League.format` and `League.stakeTier`, normalized by
 `normalizeBrowseFilter`, the pure function that turns a query string into a `BrowseFilter`.
 Unknown values (`?format=dynasty`) normalize to "any" rather than erroring, because browse is
 reached by hand-edited URLs and stale bookmarks and the honest answer is the list we can offer.
