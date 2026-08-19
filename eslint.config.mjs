@@ -23,6 +23,12 @@ const compat = new FlatCompat({
  * client and server sides of the wire stay in sync; several client files already
  * `import type { ApiEnvelope } from "@/lib/api/respond"` and must keep working.
  *
+ * `@/event-stream` is deliberately NOT on this list and must not be added to it: it is browser
+ * code (one shared `EventSource` per league stream url, constructed lazily), it is what both
+ * rooms' `deps.tsx` factories value-import, and nothing server-side imports it. That is also
+ * why it is a top-level sibling rather than a child of `@/lib/realtime` — `aliasOrRelative`
+ * below would match any `@/lib/realtime-…` or `@/lib/realtime/…` spelling and ban it.
+ *
  * Only the bare module name is listed here — `aliasOrRelative` below turns each one into a
  * single `regex` pattern that matches BOTH the `@/` alias (`@/db`, `@/db/client`, any subpath)
  * AND the equivalent relative-path spelling (`../db`, `../../db/client`, …), which a plain

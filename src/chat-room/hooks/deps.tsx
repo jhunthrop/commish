@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, type ReactNode } from "react";
+import { subscribeLeagueStream } from "@/event-stream/league-stream";
 
 /** The slice of `EventSource` chat uses. Narrow on purpose, so a test double is trivial. */
 export interface EventSourceLike {
@@ -14,12 +15,15 @@ export interface ChatRoomDeps {
 }
 
 /**
- * Real browser dependencies. `new EventSource(...)` is constructed lazily inside the factory
- * so importing this module is safe in happy-dom, which has no `EventSource`.
+ * Real browser dependencies. The stream is the SHARED one from `@/event-stream`, not a
+ * connection of chat's own: a draft room mounts this hook alongside `useDraftRoom`, both want
+ * the same league stream, and one `EventSource` per url serves both (see that module's
+ * docblock). The connection is still constructed lazily inside the factory, so importing this
+ * module is safe in happy-dom, which has no `EventSource`.
  */
 const BROWSER_DEPS: ChatRoomDeps = {
   fetchJson: (url, init) => fetch(url, init),
-  openEventSource: (url) => new EventSource(url),
+  openEventSource: (url) => subscribeLeagueStream(url),
 };
 
 const DepsContext = createContext<ChatRoomDeps>(BROWSER_DEPS);
