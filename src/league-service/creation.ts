@@ -4,6 +4,7 @@ import type { DraftFormat } from "@/domain/league";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { SCORING_PRESETS, type ScoringPresetName } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
+import type { ExperienceTier } from "@/domain/user";
 import { LEAGUE_CONFIG } from "@/league";
 import { MS_PER_DAY } from "./config";
 
@@ -24,6 +25,12 @@ export interface CreateLeagueInput {
   readonly rosterSlots: readonly RosterSlotConfig[];
   readonly commissionerUserId: string;
   readonly teamName: string;
+  /** Who the league is advertised for on public browse. Defaults from the creator at the route. */
+  readonly experienceTier: ExperienceTier;
+  /** Cosmetic tier index only — no entry fee is charged and no balance exists in this phase. */
+  readonly stakeTier: number;
+  /** Opt-in. A league is invite-only and unlisted unless its creator chose otherwise. */
+  readonly isPublicMatchmade: boolean;
 }
 
 export type CreateLeagueResult =
@@ -57,6 +64,9 @@ export async function createLeague(
         teamCount: input.teamCount,
         commissionerUserId: input.commissionerUserId,
         rosterSlots: [...input.rosterSlots],
+        experienceTier: input.experienceTier,
+        stakeTier: input.stakeTier,
+        isPublicMatchmade: input.isPublicMatchmade,
       });
       await tx.insert(scoringSettings).values({ leagueId, ...SCORING_PRESETS[input.scoringPreset] });
       await tx.insert(teams).values({ id: teamId, leagueId, userId: input.commissionerUserId, name: input.teamName });

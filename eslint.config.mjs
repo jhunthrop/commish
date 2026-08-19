@@ -88,12 +88,28 @@ const eslintConfig = [
     ignores: [
       "node_modules/**",
       ".next/**",
+      // Isolated build output for the e2e suite (see next.config.ts, playwright.config.ts) —
+      // generated the same way `.next/**` is, and just as much not source.
+      ".next-e2e/**",
       "out/**",
       "build/**",
       "next-env.d.ts",
       "coverage/**",
       ".claude/**",
+      "playwright-report/**",
+      "test-results/**",
     ],
+  },
+  {
+    // Playwright fixtures/specs, not React: `e2e/support/fixtures.ts` destructures a second
+    // fixture-function parameter literally named `use` (Playwright's own API, e.g.
+    // `managerA: async ({ browser }, use) => { ... }`) which `react-hooks/rules-of-hooks`
+    // otherwise flags as an unlawfully-named/placed React Hook call. Scoped to `e2e/**` only —
+    // every other directory keeps the full `next/core-web-vitals` rule set.
+    files: ["e2e/**/*.ts"],
+    rules: {
+      "react-hooks/rules-of-hooks": "off",
+    },
   },
   {
     // Scoped to src/draft-room/** and src/league-room/** ONLY, not src/app/**/*.tsx: files

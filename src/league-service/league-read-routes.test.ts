@@ -10,13 +10,24 @@ vi.mock("@/lib/auth/current-user", () => ({
   requireCurrentUser: vi.fn(),
 }));
 
+// Wraps the real implementation by default (every existing test below hits the real DB
+// through it unchanged); only the 500-boundary test overrides it for one call.
+vi.mock("@/league-service/browse", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/league-service/browse")>();
+  return { ...actual, listPublicLeagues: vi.fn(actual.listPublicLeagues) };
+});
+
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
+import { drafts, leagues, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { POST as postLeague } from "@/app/api/leagues/route";
 import { GET as getLeague } from "@/app/api/leagues/[leagueId]/route";
 import { GET as getMatchups } from "@/app/api/leagues/[leagueId]/matchups/[week]/route";
 import { POST as postScore } from "@/app/api/leagues/[leagueId]/weeks/[week]/score/route";
+import { GET as browsePublic } from "@/app/api/public/leagues/route";
+import { resetBrowseRateLimit } from "@/app/api/public/leagues/_shared";
+import { listPublicLeagues, PUBLIC_LEAGUE_FIELDS } from "@/league-service/browse";
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { leagueHome, matchupWeek } from "./read";
 import { writeSchedule } from "./schedule";
 
@@ -37,6 +48,7 @@ beforeEach(async () => {
   await truncateAll(db);
   vi.mocked(getCurrentUser).mockReset();
   vi.mocked(requireCurrentUser).mockReset();
+  resetBrowseRateLimit();
   await db.insert(users).values([
     { id: "u1", email: "u1@test.local", displayName: "Manager u1" },
     { id: "u2", email: "u2@test.local", displayName: "Manager u2" },
@@ -189,5 +201,99 @@ describe("the read models' own guards", () => {
   it("answer null for a league that doesn't exist — the routes' 404 never reaches them", async () => {
     expect(await leagueHome(db, "nope", "u1")).toBeNull();
     expect(await matchupWeek(db, "nope", 1, "u1")).toBeNull();
+  });
+});
+
+describe("GET /api/public/leagues", () => {
+  it("answers a signed-OUT visitor, because public browse is deliberately unauthenticated", async () => {
+    signedInAs(null);
+    await db.insert(leagues).values({
+      id: "open", name: "Rookie Snake Room", format: "snake", teamCount: 12,
+      stakeTier: 0, experienceTier: "beginner", isPublicMatchmade: true, commissionerUserId: "u1",
+    });
+    await db.insert(drafts).values({
+      id: "open_draft", leagueId: "open", format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+
+    const response = await browsePublic(new Request("http://test/api/public/leagues"));
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data.leagues).toHaveLength(1);
+    expect(Object.keys(body.data.leagues[0]).sort()).toEqual([...PUBLIC_LEAGUE_FIELDS].sort());
+  });
+
+  it("narrows on the query string and shrugs off a format the engine cannot run", async () => {
+    signedInAs(null);
+    await db.insert(leagues).values([
+      { id: "s", name: "Rookie Snake Room", format: "snake", teamCount: 12, stakeTier: 0, experienceTier: "beginner", isPublicMatchmade: true, commissionerUserId: "u1" },
+      { id: "a", name: "Sharks Auction", format: "auction", teamCount: 12, stakeTier: 3, experienceTier: "experienced", isPublicMatchmade: true, commissionerUserId: "u1" },
+    ]);
+    await db.insert(drafts).values([
+      { id: "s_draft", leagueId: "s", format: "snake", status: "scheduled", kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null },
+      { id: "a_draft", leagueId: "a", format: "auction", status: "scheduled", kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: 200 },
+    ]);
+
+    const narrowed = await browsePublic(new Request("http://test/api/public/leagues?format=auction"));
+    expect((await narrowed.json()).data.leagues.map((l: { id: string }) => l.id)).toEqual(["a"]);
+
+    // A hand-edited URL naming a format we do not run is answered with the unfiltered list.
+    const junk = await browsePublic(new Request("http://test/api/public/leagues?format=dynasty"));
+    expect((await junk.json()).data.leagues).toHaveLength(2);
+  });
+
+  it("answers a signed-in and a signed-out caller with a byte-identical body", async () => {
+    await db.insert(leagues).values({
+      id: "open", name: "Rookie Snake Room", format: "snake", teamCount: 12,
+      stakeTier: 0, experienceTier: "beginner", isPublicMatchmade: true, commissionerUserId: "u1",
+    });
+    await db.insert(drafts).values({
+      id: "open_draft", leagueId: "open", format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+
+    signedInAs(null);
+    const signedOutBody = await (await browsePublic(new Request("http://test/api/public/leagues"))).text();
+    signedInAs("u1");
+    const signedInBody = await (await browsePublic(new Request("http://test/api/public/leagues"))).text();
+    // Pins the property to a BEHAVIOUR (the two responses are literally identical bytes), not
+    // to a reading of the handler's imports — a later refactor that starts branching on the
+    // caller's identity would fail this even if it never touched `getCurrentUser` by name.
+    expect(signedInBody).toEqual(signedOutBody);
+  });
+
+  it("refuses a caller looping the endpoint past the per-IP ceiling, before the query ever runs", async () => {
+    signedInAs(null);
+    const request = () => new Request("http://test/api/public/leagues", { headers: { "x-forwarded-for": "203.0.113.9" } });
+    for (let i = 0; i < MATCHMAKING_CONFIG.browseRateLimit.maxRequests; i += 1) {
+      expect((await browsePublic(request())).status).toBe(200);
+    }
+    const callsBeforeLimit = vi.mocked(listPublicLeagues).mock.calls.length;
+    const limited = await browsePublic(request());
+    expect(limited.status).toBe(429);
+    // The rate limit runs BEFORE the query: a limited request never reaches `listPublicLeagues`.
+    expect(vi.mocked(listPublicLeagues).mock.calls.length).toBe(callsBeforeLimit);
+
+    // A DIFFERENT caller (a different forwarded-for) spends its own budget, not this one's.
+    const other = await browsePublic(new Request("http://test/api/public/leagues", { headers: { "x-forwarded-for": "203.0.113.99" } }));
+    expect(other.status).toBe(200);
+  });
+
+  it("answers a generic 500 and never leaks the raw error — with no session read at all", async () => {
+    vi.mocked(listPublicLeagues).mockRejectedValueOnce(new Error("raw exception text that must never reach the client"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = await browsePublic(new Request("http://test/api/public/leagues"));
+      expect(response.status).toBe(500);
+      const body = await response.json();
+      expect(body).toEqual({ ok: false, error: "Something went wrong on our side. Please try again." });
+      expect(JSON.stringify(body)).not.toContain("raw exception text");
+      expect(consoleSpy).toHaveBeenCalled();
+      // The 500 boundary caught the throw before any identity check could even run.
+      expect(getCurrentUser).not.toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 });

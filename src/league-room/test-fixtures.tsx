@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import { render, type RenderResult } from "@testing-library/react";
 import type { TeamCard } from "@/domain/league";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import type { LeagueHomeBody, LeagueSummary, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "./hooks/deps";
 
@@ -127,3 +128,9 @@ export function fixtureLeagueDeps(response: unknown = { ok: true, data: {} }): F
 export function renderInLeague(ui: ReactElement, deps: LeagueRoomDeps): RenderResult {
   return render(<LeagueRoomDepsProvider deps={deps}>{ui}</LeagueRoomDepsProvider>);
 }
+
+/** Open leagues as `listPublicLeagues` hands them back: one nearly empty, one nearly full. */
+export const PUBLIC_LEAGUES: readonly PublicLeagueSummary[] = [
+  { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 3 },
+  { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 10, filledTeams: 9 },
+];

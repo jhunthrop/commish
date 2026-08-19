@@ -1,0 +1,1 @@
+ALTER TABLE "leagues" ADD COLUMN "experience_tier" "experience_tier" DEFAULT 'beginner' NOT NULL;

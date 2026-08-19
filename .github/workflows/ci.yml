@@ -70,7 +70,7 @@ jobs:
 
       # Unfiltered, per vitest.config.mts's own note — a path-filtered run would report the
       # other 100%-gated directories at 0% and silently pass.
-      - name: Test coverage (100% gate on src/scoring, src/draft-engine, src/draft-room/state, src/league)
+      - name: Test coverage (100% gate on src/scoring, src/draft-engine, src/draft-room/state, src/league, src/chat, src/matchmaking)
         run: npm run test:coverage
 
       - name: Build
@@ -78,4 +78,108 @@ jobs:
 
       - name: Stop local infra
         if: always()
+        run: npm run infra:down
+
+  # The browser end-to-end suite. It needs a WorkOS TEST directory (it creates and authenticates
+  # real test users), which is a repository secret rather than something a fork or a first-time
+  # clone has. When the secret is absent this job runs, says so loudly in the run summary and in
+  # a PR annotation, and stops. It never fakes a pass by skipping assertions, and it never fails
+  # a contributor's PR for lacking a credential they cannot be given.
+  e2e:
+    name: End-to-end (needs WorkOS test credentials)
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for WorkOS test credentials
+        id: creds
+        env:
+          E2E_API_KEY: ${{ secrets.WORKOS_TEST_API_KEY }}
+          E2E_CLIENT_ID: ${{ secrets.WORKOS_TEST_CLIENT_ID }}
+        run: |
+          if [ -n "$E2E_API_KEY" ] && [ -n "$E2E_CLIENT_ID" ]; then
+            echo "have=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "have=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=E2E skipped::WORKOS_TEST_API_KEY / WORKOS_TEST_CLIENT_ID are not configured, so the browser end-to-end suite did not run. Nothing was checked by this job."
+            {
+              echo "## End-to-end suite SKIPPED"
+              echo ""
+              echo "\`WORKOS_TEST_API_KEY\` and \`WORKOS_TEST_CLIENT_ID\` are not configured as repository secrets."
+              echo "The e2e suite authenticates by minting a real WorkOS **test-directory** session"
+              echo "(\`scripts/lib/lab-session.ts\`); there is no dev auth bypass to fall back on, by design."
+              echo ""
+              echo "**Nothing was checked by this job.** Configure the two secrets to enable it."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.creds.outputs.have == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.creds.outputs.have == 'true'
+        run: npm ci
+
+      - name: Install the Playwright browser
+        if: steps.creds.outputs.have == 'true'
+        run: npm run e2e:install
+
+      - name: Start local infra (Postgres x2, Redis)
+        if: steps.creds.outputs.have == 'true'
+        run: npm run infra:up
+
+      # The same file the build-and-test job writes, with the placeholder WorkOS values replaced
+      # by the real test-directory secrets. The e2e suite is the one thing in this repo that
+      # actually calls WorkOS.
+      - name: Write .env.local
+        if: steps.creds.outputs.have == 'true'
+        env:
+          E2E_API_KEY: ${{ secrets.WORKOS_TEST_API_KEY }}
+          E2E_CLIENT_ID: ${{ secrets.WORKOS_TEST_CLIENT_ID }}
+          E2E_COOKIE_PASSWORD: ${{ secrets.WORKOS_TEST_COOKIE_PASSWORD }}
+        run: |
+          cat > .env.local <<EOF
+          DATABASE_URL=postgres://commish:commish@localhost:5432/commish
+          REDIS_URL=redis://localhost:6379
+          TEST_DATABASE_URL=postgres://commish:commish@localhost:5433/commish_test
+          WORKOS_CLIENT_ID=${E2E_CLIENT_ID}
+          WORKOS_API_KEY=${E2E_API_KEY}
+          WORKOS_COOKIE_PASSWORD=${E2E_COOKIE_PASSWORD:-ci_placeholder_password_at_least_32_characters_long}
+          NEXT_PUBLIC_WORKOS_REDIRECT_URI=http://localhost:3000/callback
+          ALLOW_DESTRUCTIVE_SEED=1
+          DEV_SEED_CLAIM_USER_ID=
+          ANTHROPIC_API_KEY=
+          EOF
+
+      - name: Migrate the primary database
+        if: steps.creds.outputs.have == 'true'
+        run: npm run db:migrate
+
+      # NEXT_DIST_DIR isolates this build from a `.next` a concurrent `next dev` might also be
+      # writing (see playwright.config.ts). It is the same var its webServer passes to
+      # `next start`, so the build and the served app share one dist dir.
+      - name: Build
+        if: steps.creds.outputs.have == 'true'
+        run: npm run build
+        env:
+          NEXT_DIST_DIR: .next-e2e
+
+      - name: End-to-end
+        if: steps.creds.outputs.have == 'true'
+        run: npm run e2e
+
+      - name: Upload the Playwright report
+        if: always() && steps.creds.outputs.have == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Stop local infra
+        if: always() && steps.creds.outputs.have == 'true'
         run: npm run infra:down

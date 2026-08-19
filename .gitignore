@@ -15,6 +15,9 @@
 
 # next.js
 /.next/
+# isolated build dir for e2e (see next.config.ts, playwright.config.ts) — a `next dev` sharing
+# the default /.next/ would corrupt an e2e `next build`/`next start`'s asset manifest
+/.next-e2e/
 /out/
 
 # production
@@ -41,9 +44,13 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# minted dev session credentials (scripts/mint-dev-session.ts) — bearer cookies, never commit
+# minted dev session credentials (scripts/mint-dev-session.ts, e2e/global-setup.ts) — bearer
+# cookies, never commit
 .lab-session*.json
 lab-session*.json
+e2e/.auth/
+playwright-report/
+test-results/
 
 # local databases (Phase 1 SQLite dev)
 *.db

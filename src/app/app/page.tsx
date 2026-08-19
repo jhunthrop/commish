@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
@@ -27,6 +28,13 @@ export default async function AppHome() {
         <section aria-label="Join a league" className="flex flex-col gap-2">
           <h2 className="text-lg font-medium text-text-primary">Invited by a friend?</h2>
           <JoinLeagueEntry />
+        </section>
+        <section aria-label="Find a league" className="flex flex-col gap-2">
+          <h2 className="text-lg font-medium text-text-primary">No group to play with yet?</h2>
+          <p className="text-sm text-text-muted">Browse leagues that are still looking for managers.</p>
+          <Link href="/browse" className="text-accent underline">
+            Browse open leagues
+          </Link>
         </section>
         <section id="create-league" className="flex flex-col gap-2">
           <h2 className="text-lg font-medium text-text-primary">Start a league</h2>

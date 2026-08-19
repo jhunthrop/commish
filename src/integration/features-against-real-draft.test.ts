@@ -1,10 +1,13 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftNudges, drafts } from "@/db/schema";
+import { draftNudges, drafts, leagues } from "@/db/schema";
 import { assembleAdvisorContext } from "@/ai-advisor/context";
 import { listMessages, postMessage } from "@/chat-service/chat";
 import { getLineup, setLineup } from "@/league-service/lineups";
+import { listPublicLeagues } from "@/league-service/browse";
+import { DRAFT_ALREADY_STARTED, joinPublicLeague } from "@/league-service/join";
+import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { runRealDraft, seedWeekStats } from "./pipeline";
 
 const db = createTestDb();
@@ -21,13 +24,6 @@ afterAll(async () => {
  * Steps 6, 8, 9 and 10 were all built against SEEDED fixtures. This is the one place each is
  * exercised against a league an actual draft produced, which is the only way drift between
  * "what a seeder writes" and "what a draft writes" is ever caught.
- *
- * NOTE: the brief for this suite also called for a public-browse-and-join case, driven by
- * `listPublicLeagues` (`@/league-service/browse`), `joinPublicLeague` (`@/league-service/join`)
- * and `EMPTY_BROWSE_FILTER` (`@/matchmaking/filter`). None of those modules exist on this
- * track's base (24d8c91) — `src/matchmaking/**` and league-service browse/join are Track A's
- * work, landing in a separate worktree. That case is intentionally omitted here; see the task
- * report for the follow-up once the tracks merge.
  */
 describe("features built on fixtures, run against a real drafted league", () => {
   it("the lineup editor's seam accepts a lineup made of genuinely drafted players", async () => {
@@ -44,8 +40,12 @@ describe("features built on fixtures, run against a real drafted league", () => 
       ],
     });
     // A manager who never opened the editor still fields a legal team, derived from the roster
-    // the DRAFT wrote rather than from a fixture.
-    expect(before.filter((slot) => slot.slot !== "BENCH").every((slot) => slot.playerId !== null)).toBe(true);
+    // the DRAFT wrote rather than from a fixture. The length assertion comes first: `.every()`
+    // on a possibly-empty array is vacuously true, so without it a regression that made
+    // `getLineup` return `[]` would pass this line silently.
+    const starters = before.filter((slot) => slot.slot !== "BENCH");
+    expect(starters).toHaveLength(3);
+    expect(starters.every((slot) => slot.playerId !== null)).toBe(true);
 
     const result = await setLineup(db, {
       leagueId: league.leagueId,
@@ -97,14 +97,40 @@ describe("features built on fixtures, run against a real drafted league", () => 
     expect(context!.opponent!.teamName).toBeTruthy();
   });
 
-  it("the draft moderator's nudge claim survives a real draft's action log", async () => {
+  it("a store-driven draft writes no moderator claims, and still finishes complete", async () => {
     const league = await runRealDraft(db, "snake", "nudge");
     // The moderator's claim table is keyed on (draftId, pickNumber) and is NOT part of replay.
+    // `runRealDraft` drives every turn with TIMER_EXPIRE directly through `store.applyAction`
+    // and never through the ticker (`src/draft-service/ticker.ts:78` is the only caller of the
+    // nudge scheduler) — so this asserts the real, falsifiable invariant a store-driven draft
+    // proves: it is provably empty here, not merely "an array". Real nudge-path coverage (drive
+    // `createNudgeScheduler` through a ticker run) is a separate, Phase 2 ledger item.
+    const claims = await db.select().from(draftNudges).where(eq(draftNudges.draftId, league.draftId));
+    expect(claims).toEqual([]);
     // A draft that ran to completion must leave the draft itself complete regardless of what
     // the moderator did or did not write.
-    const claims = await db.select().from(draftNudges).where(eq(draftNudges.draftId, league.draftId));
-    expect(Array.isArray(claims)).toBe(true);
     const [row] = await db.select().from(drafts).where(eq(drafts.id, league.draftId));
     expect(row?.status).toBe("complete");
+  });
+
+  it("public browse and public join both correctly exclude a league a real draft already started", async () => {
+    const league = await runRealDraft(db, "snake", "browse");
+    // `runRealDraft` runs the draft to completion, so this league's `drafts.status` is
+    // "complete" — set by the store's OWN commit-on-completion, not by a seeded status column.
+    // Flipping it public afterward is what proves the exclusion rule against a genuinely
+    // drafted league, which a seeded fixture with a hand-set status can never do.
+    await db.update(leagues).set({ isPublicMatchmade: true }).where(eq(leagues.id, league.leagueId));
+
+    // Browse must never surface a league whose draft already ran, even though it is now public.
+    const listed = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(listed.some((row) => row.id === league.leagueId)).toBe(false);
+
+    // And the join door agrees: a stranger posting this league's real id is refused because its
+    // draft already started, not silently seated into a league mid-season.
+    const result = await joinPublicLeague(
+      { db, newId: () => "browse_newcomer_team" },
+      { leagueId: league.leagueId, userId: "browse_newcomer" },
+    );
+    expect(result).toEqual({ ok: false, status: 409, reason: DRAFT_ALREADY_STARTED });
   });
 });

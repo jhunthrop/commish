@@ -29,6 +29,7 @@ export async function twoTeamLeague(db: Db) {
   const created = await createLeague({ db, clock, newId }, {
     name: "Duel", format: "snake", teamCount: 2, scoringPreset: "ppr", auctionBudget: null,
     rosterSlots: SLOTS, commissionerUserId: "u1", teamName: "Team One",
+    experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);
   await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
@@ -102,6 +103,9 @@ export async function advisorFixture(
     rosterSlots: ADVISOR_SLOTS,
     commissionerUserId: commissioner,
     teamName: "Bay Bandits",
+    experienceTier: "beginner",
+    stakeTier: 0,
+    isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);
 

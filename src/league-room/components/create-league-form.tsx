@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { CreateLeagueBody } from "../contract";
 import { Button, Input, Select } from "@/components/ui";
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
 const FORMATS = [
@@ -17,6 +18,11 @@ const PRESETS = [
   { value: "standard", label: "Standard" },
   { value: "te_premium", label: "TE premium" },
 ];
+const VISIBILITIES = [
+  { value: "invite_only", label: "Invite only" },
+  { value: "public", label: "Anyone can find and join" },
+];
+const STAKE_TIERS = MATCHMAKING_CONFIG.stakeTiers.map((entry) => ({ value: String(entry.tier), label: entry.label }));
 
 /**
  * One visible field. Everything else is behind a closed disclosure, because every advanced
@@ -35,6 +41,8 @@ export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: 
   const [teamCount, setTeamCount] = useState("12");
   const [scoringPreset, setScoringPreset] = useState("ppr");
   const [auctionBudget, setAuctionBudget] = useState("200");
+  const [visibility, setVisibility] = useState("invite_only");
+  const [stakeTier, setStakeTier] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -51,6 +59,8 @@ export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: 
           teamCount: Number(teamCount),
           scoringPreset,
           auctionBudget: Number(auctionBudget),
+          visibility,
+          stakeTier: Number(stakeTier),
         }),
       });
       const body = (await response.json()) as ApiEnvelope<CreateLeagueBody>;
@@ -91,6 +101,9 @@ export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: 
               onChange={(event) => setAuctionBudget(event.target.value)}
             />
           ) : null}
+          <Select label="Who can join" options={VISIBILITIES} value={visibility} onChange={(event) => setVisibility(event.target.value)} />
+          <Select label="Stake tier" options={STAKE_TIERS} value={stakeTier} onChange={(event) => setStakeTier(event.target.value)} />
+          <p className="text-sm text-text-muted sm:col-span-2">{MATCHMAKING_CONFIG.stakeDisclosure}</p>
         </div>
       </details>
 

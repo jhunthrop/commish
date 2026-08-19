@@ -45,6 +45,7 @@ async function league(teamCount = 4) {
   const created = await createLeague(writeDeps(), {
     name: "Sunday Money", format: "snake", teamCount, scoringPreset: "ppr", auctionBudget: null,
     rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Commish",
+    experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);
   return created;
@@ -155,6 +156,7 @@ describe("acceptInvite", () => {
     const second = await createLeague(writeDeps(), {
       name: "Tuesday Money", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
       rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Commish B",
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
     });
     if (!second.ok) throw new Error(second.reason);
     const inviteA = await createInvite(inviteDeps(), { leagueId: first.leagueId, createdByUserId: "u1" });

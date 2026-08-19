@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { CreateLeagueForm } from "./create-league-form";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
@@ -67,5 +68,24 @@ describe("CreateLeagueForm", () => {
     fireEvent.change(screen.getByLabelText("League name"), { target: { value: "Sunday Money" } });
     fireEvent.click(screen.getByRole("button", { name: "Create league" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Create league" })).toBeDisabled());
+  });
+
+  it("sends the visibility and stake-tier choices, and says plainly that no money changes hands", async () => {
+    const fixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "l1", teamId: "t1", draftId: "d1" } });
+    const bodies: unknown[] = [];
+    fixture.deps = {
+      fetchJson: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return { json: async () => fixture.response } as unknown as Response;
+      },
+    };
+    renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixture.deps);
+    fireEvent.change(screen.getByLabelText("League name"), { target: { value: "Open Room" } });
+    fireEvent.change(screen.getByLabelText("Who can join"), { target: { value: "public" } });
+    fireEvent.change(screen.getByLabelText("Stake tier"), { target: { value: "2" } });
+    expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Create league" }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toMatchObject({ visibility: "public", stakeTier: 2 });
   });
 });

@@ -64,6 +64,20 @@
       "when": 1787089064436,
       "tag": "0008_salty_synch",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1787106895068,
+      "tag": "0009_fearless_psylocke",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1787115974434,
+      "tag": "0010_public_northstar",
+      "breakpoints": true
     }
   ]
 }

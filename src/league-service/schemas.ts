@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { LEAGUE_CONFIG } from "@/league";
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 
 const name = z
   .string()
@@ -32,6 +33,21 @@ export const createLeagueSchema = z.object({
     .int()
     .positive({ message: "An auction budget must be more than zero." })
     .default(LEAGUE_CONFIG.defaults.auctionBudget),
+  /**
+   * Opt-in, and deliberately worded as visibility rather than a boolean flag: "public" here
+   * means "listed on the public browse page and joinable without an invite", which is a real
+   * decision a commissioner makes, not a checkbox default anybody should trip over.
+   */
+  visibility: z.enum(["invite_only", "public"]).default("invite_only"),
+  /** Cosmetic only. Bounded to the tiers `MATCHMAKING_CONFIG` actually labels. */
+  stakeTier: z
+    .number()
+    .int()
+    .min(0)
+    .max(MATCHMAKING_CONFIG.stakeTiers.length - 1, { message: "Please choose one of the listed stake tiers." })
+    .default(0),
+  /** Defaults at the route to the creator's own tier, which the route knows and the service does not. */
+  experienceTier: z.enum(["beginner", "experienced"]).optional(),
   /** Defaults at the route to the creator's display name, which the route knows and the service does not. */
   teamName: name.optional(),
 });
