@@ -59,6 +59,7 @@ describe("seedPlayers", () => {
     // never mutates a line returned by the underlying provider. The revision rides on the
     // per-GAME read, which is what `seedPlayers` walks a week with.
     const revisedProvider: StatsProvider = {
+      requestCost: provider.requestCost,
       lastWeekOfSeason: provider.lastWeekOfSeason,
       listPlayers: () => provider.listPlayers(),
       listGames: (week) => provider.listGames(week),
@@ -98,15 +99,44 @@ describe("seedPlayers", () => {
 
     await seedPlayers(db, provider, undefined, budget);
 
-    // 2 for listPlayers, then per week 1 for the schedule and one per game, then the 1 that
-    // discovers the season is over.
+    // 2 for listPlayers, then per week 1 for the schedule and one per game. Nothing beyond the
+    // provider's own last week: walking one week past the end to discover it reserved a request
+    // for a call a real adapter answers locally, which is what put the measured backfill one
+    // above the number `reservedForBackfill` pins.
     expect(reserved[0]).toBe(2);
     const gamesInWeekOne = (await provider.listGames(1)).length;
     expect(reserved[1]).toBe(1);
     expect(reserved[2]).toBe(gamesInWeekOne);
-    expect(reserved.reduce((total, count) => total + count, 0)).toBeLessThanOrEqual(
-      STATS_INGESTION_CONFIG.reservedForBackfill,
-    );
+    expect(reserved).toHaveLength(1 + provider.lastWeekOfSeason * 2);
+
+    const total = reserved.reduce((count, each) => count + each, 0);
+    expect(total).toBe(2 + provider.lastWeekOfSeason * (1 + gamesInWeekOne));
+    // And the same shape at Tank01's 18 weeks is exactly what is held back for it.
+    expect(2 + 18 * (1 + 16)).toBe(STATS_INGESTION_CONFIG.reservedForBackfill);
+    expect(total).toBeLessThanOrEqual(STATS_INGESTION_CONFIG.reservedForBackfill);
+  }, 30_000);
+
+  it("says what landed when the ledger denies it partway, and a re-run finishes the job", async () => {
+    // Not atomic, and honest about it: a season-sized backfill in one transaction would hold a
+    // background connection open for its whole duration to buy nothing that re-running does not
+    // already give, since every write is an idempotent upsert.
+    let allowed = 5;
+    const stingy = { reserveBackfill: async () => (allowed-- > 0 ? { granted: true as const } : { granted: false as const, denial: "budget-exhausted" as const }) };
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      await expect(seedPlayers(db, provider, undefined, stingy)).rejects.toThrow(/STATS_MONTHLY_REQUEST_BUDGET/);
+      const partial = await countOf("player_stat_lines");
+      expect(partial).toBeGreaterThan(0);
+      expect(partial).toBeLessThan(PLAYER_COUNT * SEASON_WEEKS);
+      expect(consoleErrorSpy.mock.calls.some(([message]) => /Re-run `npm run seed`/.test(String(message)))).toBe(true);
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+
+    // The re-run completes the rest and duplicates nothing.
+    await seedPlayers(db, provider);
+    expect(await countOf("player_stat_lines")).toBe(PLAYER_COUNT * SEASON_WEEKS);
   }, 30_000);
 
   it("stops the whole backfill rather than seeding half a season when the ledger denies it", async () => {

@@ -1,5 +1,5 @@
 import type { Player, StatLine } from "@/domain/player";
-import type { GameStatus, GameSummary, StatsProvider } from "@/stats/provider";
+import type { GameStatus, GameSummary, RequestCost, StatsProvider } from "@/stats/provider";
 
 /** One game the fake provider knows about, plus the box score it hands back for it. */
 export interface ScriptedGame {
@@ -25,6 +25,9 @@ export interface FakeStatsProviderScript {
   /** Defaults to `STATS_INGESTION_CONFIG.lastWeekOfSeason`'s old value of 18, which is past every
    *  week these scripts use — a test that cares about the season clamp sets its own. */
   lastWeekOfSeason?: number;
+  /** Defaults to `metered`, which is what the worker's ledger tests need: a free provider is not
+   *  debited at all, so a fake that claimed to be free could not demonstrate the arithmetic. */
+  requestCost?: RequestCost;
 }
 
 const DEFAULT_LAST_WEEK = 18;
@@ -40,6 +43,7 @@ export function fakeStatsProvider(script: FakeStatsProviderScript): StatsProvide
   const gamesFor = (week: number): readonly ScriptedGame[] => script.games[week] ?? [];
 
   return {
+    requestCost: script.requestCost ?? "metered",
     lastWeekOfSeason: script.lastWeekOfSeason ?? DEFAULT_LAST_WEEK,
 
     async listPlayers(): Promise<readonly Player[]> {

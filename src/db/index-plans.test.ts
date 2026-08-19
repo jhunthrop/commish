@@ -1,8 +1,8 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
-import { chatMessages, draftActions, lineupSlots, rosterSlots, teams } from "./schema";
+import { chatMessages, draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
 import { explainPlan, indexScanNode, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
 import { browseQuery } from "@/league-service/browse";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
@@ -28,6 +28,10 @@ const USER_COUNT = 200;
 const LINEUP_STARTER_SLOTS = sql`(VALUES ('QB',0),('RB',0),('RB',1),('WR',0),('WR',1),('TE',0),('FLEX',0),('K',0),('DEF',0)) AS s(slot, idx)`;
 const ROSTER_SLOTS = sql`(VALUES ('QB',0),('RB',0),('RB',1),('WR',0),('WR',1),('TE',0),('FLEX',0),('K',0),('DEF',0),('BENCH',0),('BENCH',1),('BENCH',2),('BENCH',3),('BENCH',4),('BENCH',5)) AS s(slot, idx)`;
 const LINEUP_WEEKS = 3;
+/** A full regular season of fixtures per league, which is what makes `matchups` the largest table here. */
+const SEASON_WEEKS = 14;
+/** One league in every this-many is left unsettled, so the partial index has a realistic slice to hold. */
+const UNSETTLED_LEAGUE_INTERVAL = 500;
 /** Distinct synthetic player ids spread across the corpus, so `p-1`..`p-3` stay a small, selective slice. */
 const PLAYER_POOL_SIZE = 5_000;
 
@@ -88,9 +92,20 @@ async function seedCorpus(): Promise<void> {
            'p-' || (1 + ((g * 31 + w * 13 + s.idx * 7) % ${PLAYER_POOL_SIZE}))
     FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${LINEUP_WEEKS}) w, ${LINEUP_STARTER_SLOTS}
   `);
+  // A full season of fixtures for every league: 5,000 x 14 = 70,000 rows, nearly all of them
+  // SETTLED. That ratio is the point — the ingestion worker's late-settlement query looks for the
+  // handful that are not, every thirty minutes, and a partial index is only worth having if the
+  // corpus reflects how rare its rows are.
+  await db.execute(sql`
+    INSERT INTO matchups (league_id, week_number, home_team_id, away_team_id, home_score, away_score)
+    SELECT 'lg' || g, w, 'tm' || g || '_1', 'tm' || g || '_2',
+           CASE WHEN g % ${UNSETTLED_LEAGUE_INTERVAL} = 0 THEN NULL ELSE 100 + (g % 40) END,
+           CASE WHEN g % ${UNSETTLED_LEAGUE_INTERVAL} = 0 THEN NULL ELSE 90 + (g % 35) END
+    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${SEASON_WEEKS}) w
+  `);
   // Without ANALYZE the planner works from empty-table statistics and will choose a sequential
   // scan for everything, which would make this whole suite a false negative.
-  await db.execute(sql`ANALYZE users, leagues, drafts, teams, chat_messages, roster_slots, lineup_slots`);
+  await db.execute(sql`ANALYZE users, leagues, drafts, teams, chat_messages, roster_slots, lineup_slots, matchups`);
 }
 
 describe("hot read paths use indexes", () => {
@@ -167,6 +182,26 @@ describe("hot read paths use indexes", () => {
         .where(and(eq(lineupSlots.weekNumber, 3), inArray(lineupSlots.playerId, ["p-1", "p-2", "p-3"]))),
     );
     expect(planUsesSeqScanOn(plan, "lineup_slots")).toBe(false);
+  });
+
+  it("finds the weeks a league never settled by index, not by scanning every matchup every tick", async () => {
+    // `settleMissedWeeks` (`@/stats-pipeline/worker.ts`) runs this on EVERY tick — every thirty
+    // minutes, forever, on the background pool — and neither of its predicates can use the primary
+    // key, which leads with `league_id`. Unindexed, it is a sequential scan of every fixture in the
+    // product; the partial index holds only the rows that are actually waiting to be settled.
+    const query = db
+      .selectDistinct({ leagueId: matchups.leagueId, week: matchups.weekNumber })
+      .from(matchups)
+      .where(and(inArray(matchups.weekNumber, [1, 2, 3, 4, 5]), isNull(matchups.homeScore)))
+      .orderBy(asc(matchups.weekNumber), asc(matchups.leagueId))
+      .limit(20);
+    const plan = await explainPlan(db, query);
+
+    expect(planUsesSeqScanOn(plan, "matchups")).toBe(false);
+    // Pinned by name, like the chat page above: avoiding a Seq Scan is not enough on its own,
+    // because a plain index on `(week_number, league_id)` would also avoid one while carrying every
+    // settled row in the product. The partial index is what keeps this near-free forever.
+    expect(indexScanNode(plan, "matchups_unsettled_idx")).toBeDefined();
   });
 
   it("finds the teams that OWN a changed player by index, for teams with no saved lineup", async () => {

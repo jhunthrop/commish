@@ -1,0 +1,26 @@
+[
+  {
+    "gameID": "20270103_SF@SEA",
+    "seasonType": "reg",
+    "away": "SF",
+    "home": "SEA",
+    "teamIDAway": "28",
+    "teamIDHome": "29",
+    "gameWeek": "18",
+    "gameDate": "20270103",
+    "gameTime": "4:25p",
+    "gameStatus": "Completed"
+  },
+  {
+    "gameID": "20270103_KC@BUF",
+    "seasonType": "reg",
+    "away": "KC",
+    "home": "BUF",
+    "teamIDAway": "16",
+    "teamIDHome": "4",
+    "gameWeek": "18",
+    "gameDate": "20270103",
+    "gameTime": "4:25p",
+    "gameStatus": "Completed"
+  }
+]

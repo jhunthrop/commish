@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vitest";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import Redis from "ioredis";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { crossLeagueHome } from "@/league-service/home";
@@ -14,7 +14,7 @@ import { STATS_INGESTION_CONFIG } from "./config";
 import type { ScoreUpdatePayload } from "./contract";
 import { createScoreCache } from "./score-cache";
 import { fakeStatsProvider, type FakeStatsProviderScript, type ScriptedGame } from "./test-support";
-import { createIngestionWorker } from "./worker";
+import { createIngestionWorker, examinationWindow } from "./worker";
 
 // Lets one test force `finalizeWeek` to throw for a single named league, without disturbing
 // every other test's real scoring — the mock delegates to the real implementation by default.
@@ -1224,5 +1224,252 @@ describe("createIngestionWorker", () => {
     // The lease is still held — by this instance, harmlessly, until its own TTL runs out.
     expect(await redis.exists(STATS_INGESTION_CONFIG.keys.tickLease)).toBe(1);
     expect(await redis.pttl(STATS_INGESTION_CONFIG.keys.tickLease)).toBeGreaterThan(0);
+  });
+
+  it("warns about a wedged week ONCE per warn interval, however many passes it counts", async () => {
+    // The count belongs in the message and never in the rate-limit key. Embedding it made every
+    // tick mint a fresh key: `reportIfDue` found no prior entry, warned again, and inserted
+    // another entry — a false "has not finished after N passes" line every thirty minutes for
+    // days, plus an unbounded Map in a process designed to run for months.
+    const provider = fakeStatsProvider({
+      games: { 1: [{ gameId: "g_wedge_spam", week: 1, status: "in_progress", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
+    });
+    const onOutcome = vi.fn();
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, wedgedWeekTicks: 1, onOutcome });
+
+    for (let i = 0; i < 6; i++) await worker.tick();
+
+    const wedgeWarnings = onOutcome.mock.calls.filter(([outcome]) => /has not finished after/.test(String(outcome.reason)));
+    expect(wedgeWarnings).toHaveLength(1);
+    // The count is still there for whoever reads the log — it is just not what keys the limiter.
+    expect(String(wedgeWarnings[0]![0].reason)).toMatch(/after \d+ ingestion passes/);
+  });
+
+  it("forgets a wedge once the week finally settles, and warns afresh if a later week wedges", async () => {
+    // The counter has to reset, or a season that recovers from one stuck week carries the wedge
+    // forever and keeps paying for a widened window.
+    let ts = "2026-09-14T20:00:00.000Z";
+    const movingClock = { now: () => ts };
+    const script: FakeStatsProviderScript = {
+      games: { 1: [{ gameId: "g_recover", week: 1, status: "in_progress", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
+    };
+    const provider = fakeStatsProvider(script);
+    const onOutcome = vi.fn();
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock: movingClock, budget, wedgedWeekTicks: 1, onOutcome });
+
+    await worker.tick();
+    await worker.tick();
+    await worker.tick(); // wedged: one warning for week 1
+    expect(onOutcome.mock.calls.filter(([o]) => /Week 1 has not finished/.test(String(o.reason)))).toHaveLength(1);
+
+    // Week 1 settles. The window moves on and the counter starts over on the new week.
+    script.games[1] = [{ gameId: "g_recover", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }];
+    script.games[2] = [{ gameId: "g_recover_2", week: 2, status: "in_progress", homeNflTeam: "SF", awayNflTeam: "LAR", lines: [] }];
+    ts = "2026-09-15T20:00:00.000Z";
+    await worker.tick();
+    const [weekOne] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+    expect(weekOne).toMatchObject({ status: "final" });
+
+    // Two more ticks on week 2 and it trips its own threshold — proving the counter restarted
+    // rather than carrying week 1's total forward, which would have warned immediately.
+    await worker.tick();
+    expect(onOutcome.mock.calls.filter(([o]) => /Week 2 has not finished/.test(String(o.reason)))).toHaveLength(0);
+    await worker.tick();
+    await worker.tick();
+    expect(onOutcome.mock.calls.filter(([o]) => /Week 2 has not finished/.test(String(o.reason)))).toHaveLength(1);
+  });
+
+  it("a permanently wedged week does not cap the season at one more week: later weeks keep settling", async () => {
+    // Widening to `[wedged, wedged + 1]` buys the season exactly one week and then stalls again at
+    // `wedged + 1`. The window is the wedged week PLUS a full window opening at the first non-final
+    // week after it, so the season walks on for as long as the wedge holds.
+    await seedPlayers(["p1"]);
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: [{ gameId: "g_404", week: 1, status: "in_progress", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }],
+        2: [{ gameId: "g_w2", week: 2, status: "final", homeNflTeam: "SF", awayNflTeam: "LAR", lines: [statLine("p1", 2, { passingYards: 100 })] }],
+        3: [{ gameId: "g_w3", week: 3, status: "final", homeNflTeam: "GB", awayNflTeam: "CHI", lines: [statLine("p1", 3, { passingYards: 110 })] }],
+        4: [{ gameId: "g_w4", week: 4, status: "final", homeNflTeam: "NE", awayNflTeam: "NYJ", lines: [statLine("p1", 4, { passingYards: 120 })] }],
+      },
+    };
+    const provider = fakeStatsProvider(script);
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, wedgedWeekTicks: 1 });
+
+    // Tick 1 opens on a fresh table (weeks 1 and 2), tick 2 narrows to the stuck week, and from
+    // tick 3 the wedge holds and the window carries the rest of the season with it.
+    for (let i = 0; i < 4; i++) await worker.tick();
+
+    const settled = await db.select().from(statWeeks).orderBy(asc(statWeeks.week));
+    expect(settled.find((row) => row.week === 1)).toMatchObject({ status: "in_progress" });
+    for (const week of [2, 3, 4]) {
+      expect(settled.find((row) => row.week === week)).toMatchObject({ status: "final" });
+    }
+  });
+
+  it("a correction sweep starved of game budget does not claim the day, and the next tick retries it", async () => {
+    // `correctionWindowDays` gives a settled week three chances. A busy live week spending
+    // `maxGamesPerTick` would otherwise let a sweep that examined nothing mark the day done and
+    // burn a third of the correction coverage without reading a single box score.
+    await seedPlayers(["p1", "p2"]);
+    let ts = "2026-09-14T20:00:00.000Z";
+    const movingClock = { now: () => ts };
+    const settledGames: ScriptedGame[] = Array.from({ length: 4 }, (_, i) => ({
+      gameId: `g_sweep_${i}`, week: 1, status: "final" as const, homeNflTeam: `H${i}`, awayNflTeam: `A${i}`,
+      lines: [statLine(`p${(i % 2) + 1}`, 1, { passingYards: 100 + i })],
+    }));
+    const script: FakeStatsProviderScript = { games: { 1: settledGames } };
+    const provider = fakeStatsProvider(script);
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock: movingClock, budget });
+
+    await worker.tick(); // week 1 settles; today counts as read
+    const [afterSettle] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+    expect(afterSettle).toMatchObject({ status: "final" });
+
+    // The next day, week 2 goes live with a full slate that eats the whole per-tick game budget,
+    // so the sweep of week 1 gets nothing.
+    ts = "2026-09-15T20:00:00.000Z";
+    // One more game than the tick can fetch, and one of them still playing — so week 2 takes the
+    // entire game budget and does NOT settle, which keeps week 1 the most recent settled week.
+    script.games[2] = [
+      ...Array.from({ length: STATS_INGESTION_CONFIG.maxGamesPerTick }, (_, i) => ({
+        gameId: `g_live_${i}`, week: 2, status: "final" as const, homeNflTeam: `L${i}`, awayNflTeam: `V${i}`, lines: [],
+      })),
+      { gameId: "g_live_open", week: 2, status: "in_progress" as const, homeNflTeam: "OPN", awayNflTeam: "END", lines: [] },
+    ];
+    const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
+    await worker.tick();
+
+    // Nothing from week 1 was re-read, and the day is NOT claimed.
+    expect(getGameStatLinesSpy.mock.calls.every(([game]) => game.week === 2)).toBe(true);
+    expect(await redis.exists(STATS_INGESTION_CONFIG.keys.correctionSweep(1, "2026-09-15"))).toBe(0);
+
+    // Same calendar day, and now the live week is fully ingested: the sweep gets its turn.
+    await worker.tick();
+    expect(getGameStatLinesSpy.mock.calls.some(([game]) => game.week === 1)).toBe(true);
+    expect(await redis.exists(STATS_INGESTION_CONFIG.keys.correctionSweep(1, "2026-09-15"))).toBe(1);
+  });
+
+  it("sweeps only what it can finish: a partial re-read leaves the day unclaimed", async () => {
+    // The other starvation shape: the sweep gets SOME budget but not enough for the whole week.
+    // It reads what it can — a correction in one of those games would still land — but it must not
+    // claim the day, because the games it did not reach are the ones that might have moved.
+    await seedPlayers(["p1", "p2", "p3"]);
+    let ts = "2026-09-14T20:00:00.000Z";
+    const movingClock = { now: () => ts };
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: Array.from({ length: 3 }, (_, i) => ({
+          gameId: `g_partial_${i}`, week: 1, status: "final" as const, homeNflTeam: `H${i}`, awayNflTeam: `A${i}`,
+          lines: [statLine(`p${i + 1}`, 1, { passingYards: 100 + i })],
+        })),
+      },
+    };
+    const provider = fakeStatsProvider(script);
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock: movingClock, budget });
+
+    await worker.tick(); // week 1 settles
+
+    // A live week that leaves exactly one slot of the tick's game budget for the sweep.
+    ts = "2026-09-15T20:00:00.000Z";
+    script.games[2] = [
+      ...Array.from({ length: STATS_INGESTION_CONFIG.maxGamesPerTick - 1 }, (_, i) => ({
+        gameId: `g_partial_live_${i}`, week: 2, status: "final" as const, homeNflTeam: `L${i}`, awayNflTeam: `V${i}`, lines: [],
+      })),
+      { gameId: "g_partial_open", week: 2, status: "in_progress" as const, homeNflTeam: "OPN", awayNflTeam: "END", lines: [] },
+    ];
+    const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
+    await worker.tick();
+
+    // It re-read part of week 1 — and found nothing changed, so it wrote nothing — but the day is
+    // still open, because two of week 1's three games were never looked at.
+    const weekOneReads = getGameStatLinesSpy.mock.calls.filter(([game]) => game.week === 1);
+    expect(weekOneReads.length).toBeGreaterThan(0);
+    expect(weekOneReads.length).toBeLessThan(script.games[1]!.length);
+    expect(await redis.exists(STATS_INGESTION_CONFIG.keys.correctionSweep(1, "2026-09-15"))).toBe(0);
+  });
+
+  it("sweeps a settled season with no live week left to examine", async () => {
+    // Every week through the provider's last is final, so there is no forward window at all — but a
+    // week that settled yesterday is still inside its correction window, and the season being over
+    // is not a reason to stop listening for a revision to its last week.
+    await seedPlayers(["p1"]);
+    let ts = "2026-09-14T20:00:00.000Z";
+    const movingClock = { now: () => ts };
+    const script: FakeStatsProviderScript = {
+      lastWeekOfSeason: 1,
+      games: {
+        1: [{ gameId: "g_last", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 200 })] }],
+      },
+    };
+    const provider = fakeStatsProvider(script);
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock: movingClock, budget });
+
+    await worker.tick();
+    script.games[1] = [{ gameId: "g_last", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 275 })] }];
+
+    ts = "2026-09-15T20:00:00.000Z";
+    const outcomes = await worker.tick();
+
+    expect(outcomes.some((outcome) => outcome.week === 1 && outcome.applied)).toBe(true);
+    const [line] = await db.select().from(playerStatLines).where(eq(playerStatLines.week, 1));
+    expect(line!.passingYards).toBe(275);
+  });
+
+  it("reports a sweep the ledger will not pay for, distinctly from a denied live week", async () => {
+    await seedPlayers(["p1"]);
+    let ts = "2026-09-14T20:00:00.000Z";
+    const movingClock = { now: () => ts };
+    const provider = fakeStatsProvider({
+      lastWeekOfSeason: 1,
+      games: {
+        1: [{ gameId: "g_sweep_denied", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 200 })] }],
+      },
+    });
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock: movingClock, budget });
+    await worker.tick();
+
+    // The sweep's schedule call is reserved on its own, so it can be denied on its own.
+    ts = "2026-09-15T20:00:00.000Z";
+    const brokeBudget: RequestBudget = {
+      reserve: async () => ({ granted: false, denial: "budget-exhausted" }),
+      reserveBackfill: async () => ({ granted: false, denial: "budget-exhausted" }),
+      remaining: async () => 0,
+    };
+    const onOutcome = vi.fn();
+    const brokeWorker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock: movingClock, budget: brokeBudget, onOutcome });
+    const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
+
+    await brokeWorker.tick();
+
+    expect(getGameStatLinesSpy).not.toHaveBeenCalled();
+    expect(onOutcome).toHaveBeenCalledWith(expect.objectContaining({ week: 1, reason: expect.stringMatching(/budget is spent/) }));
+    expect(await redis.exists(STATS_INGESTION_CONFIG.keys.correctionSweep(1, "2026-09-15"))).toBe(0);
+  });
+});
+
+describe("examinationWindow", () => {
+  const settled = (week: number) => ({ week, status: "final" as const });
+  const live = (week: number) => ({ week, status: "in_progress" as const });
+  const options = { lastWeek: 18, maxWeeks: 2, widen: false };
+
+  it("examines one week in steady state, and two when it resumes at a week with no row", () => {
+    expect(examinationWindow([settled(1), live(2)], options).weeks).toEqual([2]);
+    expect(examinationWindow([settled(1), settled(2)], options).weeks).toEqual([3, 4]);
+    expect(examinationWindow([], options).weeks).toEqual([1, 2]);
+  });
+
+  it("carries the rest of the season alongside a wedged week, resuming after it", () => {
+    const widen = { ...options, widen: true };
+    // Everything after the wedge has settled: resume past the newest row.
+    expect(examinationWindow([live(3), settled(4)], widen).weeks).toEqual([3, 5, 6]);
+    // A later week is still open: resume THERE, not past the end — otherwise the wedge would
+    // carry the window past a week that has not finished and abandon it.
+    expect(examinationWindow([live(3), settled(4), live(5), settled(6)], widen).weeks).toEqual([3, 5, 6]);
+    expect(examinationWindow([live(3), live(4)], widen).weeks).toEqual([3, 4, 5]);
+  });
+
+  it("never asks for a week past the provider's own season, wedged or not", () => {
+    expect(examinationWindow([settled(17)], { lastWeek: 17, maxWeeks: 2, widen: false }).weeks).toEqual([]);
+    expect(examinationWindow([live(17)], { lastWeek: 17, maxWeeks: 2, widen: true }).weeks).toEqual([17]);
   });
 });

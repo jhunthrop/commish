@@ -55,6 +55,8 @@ export function createTank01StatsProvider(options: Tank01ProviderOptions): Stats
   }
 
   return {
+    /** A paid RapidAPI account with a monthly quota. Every call below is a real request. */
+    requestCost: "metered",
     /** The same bound `listGames` answers locally against — one number, read twice. */
     lastWeekOfSeason: TANK01_CONFIG.weeks.last,
 

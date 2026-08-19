@@ -9,6 +9,11 @@ import type { ZodType } from "zod";
  * code: a route that ever stops declaring it, or a proxy that reads the header rather than the
  * framework's intent, would start caching one manager's data for the next. Stating it here costs
  * one header and makes it true by construction.
+ *
+ * SET, not defaulted: a caller-supplied `Cache-Control` is overwritten rather than respected. That
+ * is the right way round for an envelope whose whole payload is one signed-in caller's own data —
+ * a route that wanted a shared cache would be a route that should not be using this envelope — and
+ * no caller in `src/` passes one today. If one ever needs to, it should say so here.
  */
 const NO_STORE = "no-store";
 

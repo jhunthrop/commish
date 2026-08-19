@@ -2,6 +2,7 @@ import type { Db } from "@/db/client";
 import { players, playerStatLines } from "@/db/schema";
 import { excludedSetFor } from "@/db/upsert";
 import type { StatLine } from "@/domain/player";
+import { dedupedByPlayerId } from "@/stats-pipeline/persist";
 import type { StatsProvider } from "@/stats/provider";
 import type { RequestBudget } from "@/stats-pipeline/budget";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
@@ -66,6 +67,21 @@ function chunks<T>(arr: readonly T[], size: number): readonly (readonly T[])[] {
  * `listGames` first makes the week's cost exactly knowable (1 + one per game) before a single
  * box score is fetched, so the reservation is the real number and never a worst case. The
  * contract suite asserts the two reads return identical lines, so the seeded rows are unchanged.
+ *
+ * The loop is bounded by the PROVIDER's own `lastWeekOfSeason` rather than walking until it gets
+ * an empty answer. Walking one week past the end reserved a request for a call the adapter
+ * answers locally without one (`tank01-stats-provider.ts` short-circuits outside its week range),
+ * which put the measured backfill at 309 against a `reservedForBackfill` of 308 — a reservation
+ * that is one larger than the thing it reserves for is not a measurement, it is a rounding error
+ * with a number attached.
+ *
+ * NOT ATOMIC, and it does not pretend to be. A denial partway through leaves the weeks already
+ * written durably in place and throws, naming what landed. That is safe rather than tidy because
+ * the whole function is idempotent — every write is an upsert of absolute values — so the recovery
+ * is to run `npm run seed` again once the ledger allows it, and the second run overwrites the
+ * partial one and finishes the rest. Rolling a season-sized backfill into one transaction would
+ * hold a background connection open for its whole duration to buy nothing the rerun does not
+ * already give.
  */
 export async function seedPlayers(
   db: Db,
@@ -85,28 +101,44 @@ export async function seedPlayers(
   void cache.invalidatePlayers();
 
   let statCount = 0;
+  let weeksWritten = 0;
   // Ask the provider week by week — the interface is week-scoped so a live feed can be polled the same way.
-  for (let week = 1; ; week++) {
-    await reserveOrThrow(budget, 1, `week ${week}'s schedule`);
-    const games = await provider.listGames(week);
-    // An empty schedule is how a provider says "past the end of the season" — the same boundary
-    // an empty stat-line list marks, asserted by the contract suite so the two always agree.
-    if (games.length === 0) break;
+  for (let week = 1; week <= provider.lastWeekOfSeason; week++) {
+    try {
+      await reserveOrThrow(budget, 1, `week ${week}'s schedule`);
+      const games = await provider.listGames(week);
+      // A week inside the season with no games is a gap in the schedule, not the end of it — the
+      // end is `lastWeekOfSeason`, which the provider names and the contract suite pins.
+      if (games.length === 0) continue;
 
-    await reserveOrThrow(budget, games.length, `week ${week}'s ${games.length} box scores`);
-    const lines: StatLine[] = [];
-    for (const game of games) lines.push(...(await provider.getGameStatLines(game)));
-    if (lines.length === 0) continue;
-    for (const batch of chunks(lines, BATCH)) {
-      await db
-        .insert(playerStatLines)
-        .values([...batch])
-        .onConflictDoUpdate({
-          target: [playerStatLines.playerId, playerStatLines.week],
-          set: excludedSetFor(playerStatLines, ["playerId", "week"]),
-        });
+      await reserveOrThrow(budget, games.length, `week ${week}'s ${games.length} box scores`);
+      const lines: StatLine[] = [];
+      for (const game of games) lines.push(...(await provider.getGameStatLines(game)));
+      if (lines.length === 0) continue;
+      // Deduped for the same reason `persistTick` dedupes: a player who appears in two of a week's
+      // box scores would otherwise repeat the `(player_id, week)` conflict key inside one
+      // multi-row upsert, and Postgres rejects that statement whole (21000).
+      const weekLines = dedupedByPlayerId(lines);
+      for (const batch of chunks(weekLines, BATCH)) {
+        await db
+          .insert(playerStatLines)
+          .values([...batch])
+          .onConflictDoUpdate({
+            target: [playerStatLines.playerId, playerStatLines.week],
+            set: excludedSetFor(playerStatLines, ["playerId", "week"]),
+          });
+      }
+      statCount += weekLines.length;
+      weeksWritten += 1;
+    } catch (error: unknown) {
+      // Say exactly what landed before rethrowing. A backfill that stops halfway looks identical
+      // to a complete one from the database's point of view, and "run it again" is only useful
+      // advice if the operator can see that it stopped.
+      console.error(
+        `[seed] the player backfill stopped during week ${week}: ${weeksWritten} week(s) and ${statCount} stat lines were written and are durable. Re-run \`npm run seed\` to finish — every write is an idempotent upsert, so a re-run completes the rest without duplicating anything.`,
+      );
+      throw error;
     }
-    statCount += lines.length;
   }
   return { players: allPlayers.length, statLines: statCount };
 }

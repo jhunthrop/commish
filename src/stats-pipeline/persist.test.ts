@@ -5,7 +5,7 @@ import type { Db, DbTx } from "@/db/client";
 import { players, playerStatLines, statWeeks } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
 import type { WeekStatus } from "./contract";
-import { byPlayerId, persistTick, type PersistTickInput } from "./persist";
+import { dedupedByPlayerId, persistTick, type PersistTickInput } from "./persist";
 
 const db = createTestDb();
 const NOW = "2026-09-14T20:00:00.000Z";
@@ -192,14 +192,17 @@ describe("persistTick", () => {
     expect(week!.status).toBe("in_progress");
   });
 
-  it("orders a tick's changed lines by playerId, whatever order the fetch produced them in", () => {
-    // Two instances inserting the same two rows in opposite orders is a deadlock; one agreed
-    // order is the whole fix, and this is the only place it can be observed — the SQL it protects
-    // looks identical either way.
+  it("orders a bulk write by playerId and keeps one line per player, last wins", () => {
+    // Two writers inserting the same two rows in opposite orders is a deadlock, and a repeated
+    // conflict key is a rejected statement. Both are unobservable in the SQL, which looks
+    // identical either way, so they are asserted here.
     const shuffled = [line("p9"), line("p1"), line("p5")];
-    expect(byPlayerId(shuffled).map((row) => row.playerId)).toEqual(["p1", "p5", "p9"]);
-    // Stable for a repeated id, and non-mutating: the caller's array is untouched.
-    expect(byPlayerId([line("p1"), line("p1")]).map((row) => row.playerId)).toEqual(["p1", "p1"]);
-    expect(shuffled.map((row) => row.playerId)).toEqual(["p9", "p1", "p5"]);
+    expect(dedupedByPlayerId(shuffled).map((row) => row.playerId)).toEqual(["p1", "p5", "p9"]);
+    expect(shuffled.map((row) => row.playerId)).toEqual(["p9", "p1", "p5"]); // non-mutating
+
+    const duplicated = [line("p1", { passingYards: 10 }), line("p2"), line("p1", { passingYards: 99 })];
+    const deduped = dedupedByPlayerId(duplicated);
+    expect(deduped.map((row) => row.playerId)).toEqual(["p1", "p2"]);
+    expect(deduped[0]!.passingYards).toBe(99);
   });
 });

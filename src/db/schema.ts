@@ -327,7 +327,25 @@ export const matchups = pgTable(
     homeScore: real("home_score"),
     awayScore: real("away_score"),
   },
-  (t) => [primaryKey({ columns: [t.leagueId, t.weekNumber, t.homeTeamId] })],
+  (t) => [
+    primaryKey({ columns: [t.leagueId, t.weekNumber, t.homeTeamId] }),
+    /**
+     * The ingestion worker's late-settlement catch-up (`settleMissedWeeks`,
+     * `src/stats-pipeline/worker.ts`) asks, on EVERY tick, "which leagues have an unscored matchup
+     * in a week that is already final?" — `week_number IN (...) AND home_score IS NULL`. Neither
+     * predicate can use the primary key, which leads with `league_id`, so without this the query
+     * is a sequential scan of every matchup in the product every thirty minutes on the background
+     * pool.
+     *
+     * PARTIAL, on the null-score predicate, because the answer is almost always the empty set: a
+     * settled matchup has both scores, so the index holds only rows that are genuinely waiting to
+     * be settled — normally a handful, and zero for a fully caught-up product. That makes it a few
+     * pages rather than a copy of the table, and it keeps the write cost of settling a week to
+     * REMOVING an entry rather than updating one. `(week_number, league_id)` in that order matches
+     * both the `IN` predicate and the query's `ORDER BY`.
+     */
+    index("matchups_unsettled_idx").on(t.weekNumber, t.leagueId).where(sql`${t.homeScore} is null`),
+  ],
 );
 
 export const players = pgTable(

@@ -4,6 +4,7 @@ import type { PublishFn } from "@/lib/realtime/publish";
 import { getPublisher } from "@/lib/realtime/publisher";
 import { getSharedRedis } from "@/lib/realtime/redis";
 import { getScoreCache } from "@/league-service/score-cache-instance";
+import type { StatsProvider } from "@/stats/provider";
 import { createStatsProvider } from "@/stats/registry";
 import { createRequestBudget, type RequestBudget } from "./budget";
 import { resolveIngestionSettings, type IngestionSettings } from "./settings";
@@ -48,7 +49,19 @@ const globalIngestion = globalThis as {
   __commishIngestionWorker?: IngestionWorker;
   __commishIngestionBudget?: RequestBudget;
   __commishIngestionSettings?: IngestionSettings;
+  __commishStatsProvider?: StatsProvider;
 };
+
+/**
+ * The process-wide `StatsProvider`. One instance, not one per consumer: the Tank01 adapter
+ * memoizes its player list for the life of the instance (two upstream requests), and the worker,
+ * the ledger and `npm run seed` all need to agree about which provider is configured — including
+ * whether its calls cost anything (`requestCost`, read by `getIngestionBudget` below).
+ */
+export function getStatsProvider(): StatsProvider {
+  globalIngestion.__commishStatsProvider ??= createStatsProvider();
+  return globalIngestion.__commishStatsProvider;
+}
 
 /**
  * `STATS_INGESTION_MODE`, `STATS_POLL_INTERVAL_MS` and `STATS_MONTHLY_REQUEST_BUDGET`, resolved
@@ -72,6 +85,9 @@ export function getIngestionBudget(): RequestBudget {
     redis: getSharedRedis(),
     clock: systemClock,
     monthlyRequestBudget: getIngestionSettings().monthlyRequestBudget,
+    // The ledger exists to protect a paid API key. A provider that never reaches a network has no
+    // key to protect, and debiting it would spend a real ceiling on imaginary requests.
+    metered: getStatsProvider().requestCost === "metered",
   });
   return globalIngestion.__commishIngestionBudget;
 }
@@ -94,7 +110,7 @@ export function getIngestionWorker(): IngestionWorker {
   const settings = getIngestionSettings();
   globalIngestion.__commishIngestionWorker ??= createIngestionWorker({
     db: createDb(undefined, ingestionPoolOptions()),
-    provider: createStatsProvider(),
+    provider: getStatsProvider(),
     redis: getSharedRedis(),
     publish: publishViaSharedPublisher,
     clock: systemClock,

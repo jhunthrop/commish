@@ -178,4 +178,21 @@ describe("createRequestBudget", () => {
     await expect(budget.reserve(2)).resolves.toEqual(GRANTED);
     await expect(budget.reserve(1)).resolves.toEqual(EXHAUSTED);
   });
+
+  it("counts nothing at all for a provider whose calls never leave the process", async () => {
+    // The ledger exists to protect a paid API key. The mock answers out of a committed JSON file,
+    // so debiting it spends a real ceiling on imaginary requests — and the failure that caused was
+    // quiet: ten `npm run seed` runs in a month exhausted the ceiling and the dev worker simply
+    // stopped ticking, recoverable only by deleting a Redis key.
+    const key = keyFor(AUGUST);
+    const budget = createRequestBudget({ redis, clock: fixedClock, metered: false });
+
+    await expect(budget.reserve(STATS_INGESTION_CONFIG.monthlyRequestBudget * 10)).resolves.toEqual(GRANTED);
+    await expect(budget.reserveBackfill(STATS_INGESTION_CONFIG.monthlyRequestBudget * 10)).resolves.toEqual(GRANTED);
+    // Not "granted and counted" — the ledger key is never touched at all.
+    expect(await control.exists(key)).toBe(0);
+    // And it reports the whole ceiling, because nothing has been spent. A falling number here
+    // would be reporting fiction.
+    expect(await budget.remaining()).toBe(INGESTION_CEILING);
+  });
 });

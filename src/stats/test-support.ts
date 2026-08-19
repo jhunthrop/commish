@@ -102,15 +102,47 @@ export function describeStatsProviderContract(label: string, factory: () => Stat
       expect(new Set(ids).size).toBe(ids.length);
     });
 
-    it("names the last week of its own season, and answers the week after it with no games", async () => {
-      // The ingestion worker clamps its forward-advancing week pointer to this number. A provider
-      // that names a week it will not actually answer with games leaves the pointer stalled on a
-      // week that can never get a `stat_weeks` row, spending a listing request every tick forever
-      // — which is exactly what a pipeline-level constant of 18 did to the 17-week mock dataset.
+    it("names the last week of its own season, answers it with games, and answers the week after it with none", async () => {
+      // The ingestion worker clamps its forward-advancing week pointer to this number. Both halves
+      // matter and each fails differently. A provider that OVERSHOOTS leaves the pointer stalled on
+      // a week that can never get a `stat_weeks` row, spending a listing request every tick forever
+      // — exactly what a pipeline-level constant of 18 did to the 17-week mock dataset. A provider
+      // that UNDERSHOOTS silently drops the last week of its own season from the product.
       const provider = await factory();
       expect(Number.isInteger(provider.lastWeekOfSeason)).toBe(true);
       expect(provider.lastWeekOfSeason).toBeGreaterThan(0);
+      expect((await provider.listGames(provider.lastWeekOfSeason)).length).toBeGreaterThan(0);
       await expect(provider.listGames(provider.lastWeekOfSeason + 1)).resolves.toEqual([]);
+    });
+
+    it("says whether its calls cost anything upstream", async () => {
+      // Read by the edge (`src/stats-pipeline/index.ts`) to decide whether the monthly request
+      // ledger counts this provider at all. A wrong answer is expensive in one direction (a metered
+      // provider spending uncounted against a real key) and quietly confusing in the other (a free
+      // provider exhausting a ceiling with requests nothing ever made).
+      expect(["free", "metered"]).toContain((await factory()).requestCost);
+    });
+
+    it("lists the same game ids on a second call for the same week", async () => {
+      // `final-only` keys its fetch-once marker on `gameId` (`stats:game:<id>:final`). An id that
+      // changes between calls turns fetch-once into fetch-forever: every tick sees an unmarked
+      // game, re-fetches its box score, and the monthly budget goes with it.
+      const provider = await factory();
+      const first = await provider.listGames(1);
+      const second = await provider.listGames(1);
+      expect(second.map((game) => game.gameId)).toEqual(first.map((game) => game.gameId));
+    });
+
+    it("never reports the same player twice across the union of a week's per-game reads", async () => {
+      // The week-level uniqueness case below asserts this through `getWeeklyStatLines`, and the
+      // per-game/week agreement case compares SETS, which collapse duplicates — so neither one
+      // states the property the ingestion worker actually depends on. A player appearing in two of
+      // a week's box scores repeats a `(player_id, week)` conflict key inside one multi-row upsert,
+      // and Postgres rejects that statement whole (`21000`), failing the entire tick.
+      const provider = await factory();
+      const perGame = (await Promise.all((await provider.listGames(1)).map((game) => provider.getGameStatLines(game)))).flat();
+      const ids = perGame.map((line) => line.playerId);
+      expect(new Set(ids).size).toBe(ids.length);
     });
 
     it("answers a week outside the season with no games, the same way it answers with no stat lines", async () => {

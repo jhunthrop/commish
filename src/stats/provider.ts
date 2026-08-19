@@ -40,7 +40,20 @@ export interface GameSummary {
  * An implementation that cannot honor that table must say so in its own docblock rather than
  * quietly costing more, because `src/stats-pipeline/budget.ts` reserves against these numbers.
  */
+/**
+ * Whether this provider's calls cost anything upstream.
+ *
+ * `metered` means a real account with a real monthly quota behind it, and every call has to be
+ * counted through `RequestBudget`. `free` means the calls never leave the process — the committed
+ * mock dataset, a fixture-backed adapter — so counting them is counting fiction: it spends a
+ * ledger that exists to protect an API key, against calls no key ever sees. A developer who runs
+ * `npm run seed` ten times in a month should not silently stop their own worker from ticking.
+ */
+export type RequestCost = "free" | "metered";
+
 export interface StatsProvider {
+  /** See `RequestCost`. Config on the provider, not a special case at the call site. */
+  readonly requestCost: RequestCost;
   /**
    * The last week this provider will ever answer with games. The ingestion worker clamps its
    * forward-advancing week pointer to it, so a fully-settled season stops the pointer rather than

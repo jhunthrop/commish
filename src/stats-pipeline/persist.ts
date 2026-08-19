@@ -21,19 +21,30 @@ export interface PersistTickResult {
 }
 
 /**
- * One agreed insertion order for a tick's changed lines.
+ * One agreed insertion order for a set of stat lines, and one line per player.
  *
- * Two instances whose fetch sets overlap but were built in different orders (each takes "the
- * first N games in `listGames` order" against a different `maxGamesPerTick` remainder) take row
- * locks on `player_stat_lines` in different orders, and two transactions taking the same two
+ * **Order**, because two writers whose sets overlap but were built in different orders (each takes
+ * "the first N games in `listGames` order" against a different `maxGamesPerTick` remainder) take
+ * row locks on `player_stat_lines` in different orders, and two transactions taking the same two
  * locks in opposite orders is a deadlock (`40P01`) — one aborted tick, and Postgres picks which.
- * Sorting is free next to the round trip and makes the whole class unrepresentable.
  *
- * Exported so the ordering itself is directly assertable: it is a property nothing else in the
- * write path can demonstrate, since the SQL it protects looks identical either way.
+ * **Uniqueness**, because a multi-row `ON CONFLICT DO UPDATE` whose values repeat a conflict key
+ * is rejected WHOLE by Postgres (`21000`, "cannot affect row a second time"): one player appearing
+ * in two of a week's box scores fails the entire write. `diffStatLines` already dedupes what the
+ * worker passes in, but this is the last gate before the SQL and the seed reaches it by a
+ * different road, so the guarantee belongs here rather than only upstream. Last line wins, the
+ * same documented rule the digest uses.
+ *
+ * Both are free next to the round trip. Exported because it is the shared precondition of every
+ * bulk write of stat lines in the repo, and because the properties are otherwise unobservable —
+ * the SQL it protects looks identical either way.
  */
-export function byPlayerId(lines: readonly StatLine[]): readonly StatLine[] {
-  return [...lines].sort((a, b) => (a.playerId < b.playerId ? -1 : a.playerId > b.playerId ? 1 : 0));
+export function dedupedByPlayerId(lines: readonly StatLine[]): readonly StatLine[] {
+  const byId = new Map<string, StatLine>();
+  for (const line of lines) byId.set(line.playerId, line);
+  // No equality case: the Map above has already made every id unique, so two entries can never
+  // compare equal here.
+  return [...byId.values()].sort((a, b) => (a.playerId < b.playerId ? -1 : 1));
 }
 
 /**
@@ -64,10 +75,10 @@ export function byPlayerId(lines: readonly StatLine[]): readonly StatLine[] {
  * The correction sweep needs no exception to this: every game in the week it re-reads is final and
  * already marked, so the sweep re-persists `final` over `final`.
  *
- * Rows are inserted in `playerId` order — see `byPlayerId`.
+ * Rows are inserted one per player, in `playerId` order — see `dedupedByPlayerId`.
  */
 export async function persistTick(db: Db, input: PersistTickInput): Promise<PersistTickResult> {
-  const ordered = byPlayerId(input.changed);
+  const ordered = dedupedByPlayerId(input.changed);
   return db.transaction(async (tx) => {
     let actuallyChanged = 0;
     if (ordered.length > 0) {

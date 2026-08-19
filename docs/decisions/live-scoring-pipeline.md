@@ -57,12 +57,26 @@ which is the arithmetic error that made the shipped configuration unrunnable.
 |---|---|---|
 | Ticks per month | 86,400,000 / 1,800,000 x 31 days | 1,488 ticks |
 | Schedule calls, steady state (one examined week) | 1 x 1,488 | 1,488 |
-| Schedule calls, the extra lookahead week on a rollover | 1 x 5 week rollovers | 5 |
+| Schedule calls, the second week on a rollover tick | 1 x 5 week rollovers | 5 |
 | Box scores, `final-only` (each fetched once, ever) | 16 games x 5 weeks | 80 |
 | The correction sweep (§10) | (1 schedule + 16 box scores) x 3 days x 5 weeks | 255 |
-| **Ingestion total** | | **1,828** |
+| A sweep cut short by a live week, retried next tick | 1 schedule x 3 days x 5 weeks | 15 |
+| **Ingestion total** | | **1,843** |
 | The season backfill (`npm run seed`) | 2 + 18 x (1 + 16) | 308 |
-| **Everything** | | **2,136** |
+| **Everything** | | **2,151** |
+
+The rollover line is ONE tick, not a tail: the tick that resumes at a week with no `stat_weeks` row
+examines two weeks and plants both rows, so the tick after it is narrow again. Five a month is an
+upper bound — in continuous operation the lookahead row is already there about half the time.
+
+The line that is deliberately absent is a wedged week's widened window, and its absence is the
+premise the whole table rests on. `wedgedWeekTicks` is 384: eight days at the shipped cadence,
+against the ~336 ticks a week is legitimately un-advanceable for (it becomes the earliest non-final
+week the moment the previous week settles and stays that way until its own last game ends). A
+threshold below that makes the WIDENED window the steady state for most of the season and puts the
+real figure at ~3,300 against a 2,692 ceiling — over by enough to go dark in the last week of every
+month. `config.test.ts` asserts `wedgedWeekTicks > ticksPerDay * 7`, and asserts that a permanently
+widened window would NOT fit, so the tunable and the projection cannot drift apart again.
 
 `monthlyRequestBudget` therefore defaults to **3,000**, not 1,000: a 24/7 worker at a thirty-minute
 cadence spends 1,488 requests on schedule calls alone, more than a 1,000-request tier's whole
@@ -76,8 +90,15 @@ it when the earliest non-final week has no `stat_weeks` row yet (a cold start, o
 after a week rolls over) or when that week has wedged (§11). Otherwise the week after the current
 one is entirely `scheduled` games that cannot have moved, and re-listing it every thirty minutes
 for a week straight was the single largest line in this table for no information at all. Nothing
-depends on the lookahead planting a row: `weeksToExamine`'s third case resumes at `MAX(week) + 1`
+depends on the lookahead planting a row: `examinationWindow`'s third case resumes at `MAX(week) + 1`
 once every existing row is final, which is what advances the pointer.
+
+**Who the ledger counts.** Only a provider that actually spends money. `StatsProvider.requestCost`
+is `metered` for Tank01 and `free` for the mock, and the edge (`src/stats-pipeline/index.ts`) hands
+that through to `createRequestBudget`. A free provider answers out of a committed JSON file and
+never reaches a network, so counting its calls spends a ceiling that exists to protect an API key
+against requests no key ever sees — which used to mean ten `npm run seed` runs in a month silently
+stopped a developer's own worker from ticking.
 
 **Where the pointer stops.** `StatsProvider.lastWeekOfSeason` — the provider's own number, not this
 module's. Tank01's regular season runs to week 18 and the committed mock dataset is 17 weeks; a
@@ -330,6 +351,14 @@ would never close. A sweep that DOES land a revision bumps it, which extends the
 more days from the revision: a week that was corrected once is the likeliest week to be corrected
 again.
 
+**A sweep only claims the day if it read the whole week.** The live weeks take what they need of
+`maxGamesPerTick` first, so a busy Sunday can leave the sweep with too little budget to fetch the
+week it came for — and a denied box-score reservation empties its fetch list entirely. Either way
+the day is left unclaimed and the next tick retries it, because three chances is the whole window
+and spending one of them on a sweep that examined nothing is spending a third of the coverage. The
+sweep's own schedule call is reserved separately and skipped altogether when there is no game budget
+left to act on it, so a starved tick costs nothing rather than paying for a schedule it cannot use.
+
 What is still out of scope: a revision that arrives after the window closes, and a revision to any
 week but the most recent settled one. Both are deliberate — the sweep costs 17 requests a day and
 the ledger has to hold — and both are visible rather than silent, because the numbers above say what
@@ -342,11 +371,22 @@ state that keeps moving.
 
 **A wedged week.** A postponed or cancelled game whose upstream status never flips, or a game whose
 box score permanently 404s, pins the examination window on one week forever — and since the window
-starts at the earliest non-final week, every later week is never examined again. The worker now
-counts how many consecutive ticks the window has opened on the same un-advanceable week, and past
-`STATS_INGESTION_CONFIG.wedgedWeekTicks` (48, a full day at the default cadence) it logs loudly on
-the `warnIntervalMs` rate limit and WIDENS the window to include the following week. Widen, never
+starts at the earliest non-final week, every later week is never examined again. The worker counts
+how many consecutive ticks the window has opened on the same un-advanceable week, and past
+`STATS_INGESTION_CONFIG.wedgedWeekTicks` (384, eight days at the default cadence, deliberately
+longer than the ~336 ticks a healthy week is unsettled for) it logs loudly on the `warnIntervalMs`
+rate limit and widens the window.
+
+It widens to the wedged week PLUS a full window opening at the first non-final week AFTER it — not
+simply to two weeks. Widening to `[wedged, wedged + 1]` buys the season exactly one week and then
+stalls again at `wedged + 1`, which mitigates the failure rather than closing it. Widen, never
 skip: the stuck week is still examined every tick, because its games may yet be played.
+
+The warning names how many passes the week has taken, but the count is deliberately NOT part of
+what rate-limits it. A limiter keyed on a message containing a counter is a fresh key every tick,
+which limits nothing and retains an entry for each — the wedge warning did exactly that until the
+rate-limit key was made stable per wedged week and the map was bounded to entries still suppressing
+something.
 
 **A league that drafts late.** `finalizeWeek` refuses an undrafted league — its rosters do not exist
 yet, so every team would score zero and the standings would show a season of phantom losses — and

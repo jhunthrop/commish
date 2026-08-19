@@ -12,6 +12,18 @@ interface RequestBudgetDeps {
    * dependencies and a test can drive a small ceiling without touching the environment.
    */
   readonly monthlyRequestBudget?: number;
+  /**
+   * Whether the configured provider's calls actually cost anything upstream
+   * (`StatsProvider.requestCost`). Defaults to true.
+   *
+   * An unmetered ledger grants everything and touches Redis for nothing, because there is nothing
+   * to protect: the mock provider answers out of a committed JSON file and never reaches a
+   * network, so debiting it spends a real ceiling against imaginary requests. The failure that
+   * caused was quiet and confusing — ten `npm run seed` runs in a month exhausted the ceiling and
+   * the dev worker simply stopped ticking, recoverable only by deleting a Redis key. The flag is
+   * config carried by the provider, not a name check at the call site.
+   */
+  readonly metered?: boolean;
 }
 
 /**
@@ -103,9 +115,24 @@ return 1
  * to the user, while a miscounted request budget costs the upstream API key. A skipped tick is
  * recoverable in half an hour; a suspended key is not recoverable at all.
  */
-export function createRequestBudget({ redis, clock, monthlyRequestBudget = STATS_INGESTION_CONFIG.monthlyRequestBudget }: RequestBudgetDeps): RequestBudget {
+export function createRequestBudget({
+  redis,
+  clock,
+  monthlyRequestBudget = STATS_INGESTION_CONFIG.monthlyRequestBudget,
+  metered = true,
+}: RequestBudgetDeps): RequestBudget {
   /** The share of the monthly ceiling ingestion may spend; the rest is held for `npm run seed`. */
   const ingestionCeiling = monthlyRequestBudget - STATS_INGESTION_CONFIG.reservedForBackfill;
+
+  if (!metered) {
+    return {
+      reserve: async () => GRANTED,
+      reserveBackfill: async () => GRANTED,
+      // The whole ceiling, always: nothing has been spent because nothing this provider does
+      // costs anything. Reporting a falling number would be reporting fiction.
+      remaining: async () => ingestionCeiling,
+    };
+  }
 
   async function reserveAgainst(count: number, ceiling: number): Promise<Reservation> {
     try {

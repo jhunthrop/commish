@@ -31,12 +31,19 @@ export const STATS_INGESTION_CONFIG = {
    * |--------------------------------------------------------|---------------------------------------------|--------------------|
    * | Ticks per month                                        | 86,400,000 / 1,800,000 x 31 days            | 1,488 ticks        |
    * | Schedule calls, steady state (one examined week)       | 1 x 1,488                                   | 1,488              |
-   * | Schedule calls, the extra lookahead week on a rollover | 1 x 5 week rollovers                        | 5                  |
+   * | Schedule calls, the second week on a rollover tick     | 1 x 5 week rollovers                        | 5                  |
    * | Box scores, `final-only` (each fetched once, ever)     | 16 games x 5 weeks                          | 80                 |
    * | The correction sweep (see `correctionWindowDays`)      | (1 schedule + 16 box scores) x 3 days x 5   | 255                |
-   * | **Ingestion total**                                    |                                             | **1,828**          |
+   * | A sweep cut short by the live week, retried next tick  | 1 schedule x 3 days x 5                     | 15                 |
+   * | **Ingestion total**                                    |                                             | **1,843**          |
    * | The season backfill (`npm run seed`)                   | see `reservedForBackfill`                   | 308                |
-   * | **Everything**                                         |                                             | **2,136**          |
+   * | **Everything**                                         |                                             | **2,151**          |
+   *
+   * The rollover line is one tick, not a tail: the tick that resumes at a week with no
+   * `stat_weeks` row examines two weeks and PLANTS both rows, so the tick after it is narrow
+   * again. The line that is NOT in this table is a wedged week's widened window, and that is
+   * deliberate rather than an omission — `wedgedWeekTicks` is set longer than any week can
+   * legitimately stay unsettled, so widening is an incident and not a term. See that field.
    *
    * `live` mode replaces the box-score line with "every game that is not final, every tick" —
    * roughly 16 games x 14 ticks across a Sunday's game window, about 900 a month on top of the
@@ -80,14 +87,26 @@ export const STATS_INGESTION_CONFIG = {
   /**
    * How many consecutive ticks the earliest non-final week may stay un-advanceable before the
    * worker treats it as wedged: it logs loudly (rate-limited by `warnIntervalMs`) and WIDENS the
-   * examination window to include the following week, so the season keeps progressing while the
-   * wedge stays visible. Never skips the wedged week — a postponed game that eventually gets
-   * played must still land.
+   * examination window to the wedged week plus a full window opening after it, so the season keeps
+   * progressing while the wedge stays visible. Never skips the wedged week — a postponed game that
+   * eventually gets played must still land.
    *
-   * Generous on purpose: 48 ticks is a full day at the default `pollIntervalMs`, so an ordinary
-   * mid-week lull (every game `scheduled` from Tuesday to Thursday) never trips it.
+   * **This number is load-bearing for the arithmetic above, not a cosmetic threshold**, and it has
+   * to be read against how long a week is legitimately un-advanceable rather than against how long
+   * feels like a while. A week becomes the earliest non-final week the moment the previous week
+   * settles (Monday night) and stays that way until its own last game ends (the following Monday
+   * night): a full seven days, which at `pollIntervalMs` is **336 ticks**. A whole quiet stretch
+   * inside that — every game `scheduled` from Tuesday to Thursday — is 96 to 144 ticks on its own.
+   *
+   * So 384 (eight days), not one day: anything shorter fires on every ordinary NFL week, and since
+   * `trackWedge` only resets when the window opens on a different week, a threshold below 336 makes
+   * the WIDENED window the steady state for most of the season. That would silently double the
+   * dominant line in the request budget above — the projection assumes the window is one week wide
+   * except at a rollover, and this is the tunable that assumption depends on.
+   * `src/stats-pipeline/config.test.ts` asserts `wedgedWeekTicks > ticksPerDay * 7` so the premise
+   * cannot drift away from the number that rests on it.
    */
-  wedgedWeekTicks: 48,
+  wedgedWeekTicks: 384,
   /**
    * How long after a week settles the worker keeps re-examining it for corrections. NFL official
    * scoring revisions run into the following week, and `final-only` records whatever the box

@@ -114,18 +114,28 @@ interface ExaminationWindow {
  *    request budget on the same already-settled weeks tick after tick.
  *
  * The WIDTH is the part that costs money. A `listGames` call is one upstream request per examined
- * week per tick, and at the default cadence that is 1,488 ticks a month — so the window widens to
- * `maxWeeks` only when the extra request can actually buy something:
+ * week per tick, and at the default cadence that is 1,488 ticks a month — so the window is ONE
+ * week wide in steady state, and widens only when the extra request can buy something:
  *
- * - the start week has no row yet (cases 2 and 3, and the first tick after a week rolls over), so
- *   the tick is walking forward and a second week keeps a cold start converging in bounded ticks;
- * - or the start week has WEDGED (`wedgedWeekTicks`), in which case the window widens rather than
- *   skips, so the season progresses while the stuck week stays visible and still ingestible.
+ * - **The start week has no row yet** (cases 2 and 3): the tick is walking forward, and a second
+ *   week keeps a cold start converging in a bounded number of ticks. This costs one extra request
+ *   on the tick that resumes at a fresh week and nothing afterwards, because that same tick plants
+ *   the row that makes the next tick narrow again. It is not a tail.
+ * - **The start week has WEDGED** (`wedgedWeekTicks`): see below. An incident, never steady state
+ *   — `wedgedWeekTicks` is deliberately longer than any week can legitimately stay unsettled.
  *
  * Otherwise the week after the current one is all `scheduled` games that cannot have moved, and
  * re-listing it every thirty minutes for a week straight is the single largest line in the
  * request budget for no information at all. Nothing depends on the lookahead planting a row:
  * case 3 is what advances the pointer once a week settles.
+ *
+ * **The wedged shape is not simply "two weeks".** A week that can never reach `final` — a
+ * postponed game whose upstream status never flips, a box score that permanently 404s — pins
+ * `start` forever, and a window of `[start, start+1]` would buy the season exactly one week and
+ * then stall again at `start+1`. So while a wedge holds the window is the wedged week PLUS a full
+ * normal window opening at the first non-final week AFTER it: the wedge stays visible and still
+ * ingestible (its games may yet be played), and the rest of the season genuinely advances past it,
+ * one settled week at a time, for as long as the wedge lasts.
  *
  * Clamped to the PROVIDER's own last week either way — never a constant of this module's — so a
  * fully-settled season's pointer stops advancing past the season rather than listing a week the
@@ -139,12 +149,27 @@ export function examinationWindow(
   const firstNonFinal = rows.find((row) => row.status !== "final");
   const start = firstNonFinal !== undefined ? firstNonFinal.week : rows.length === 0 ? 1 : rows[rows.length - 1]!.week + 1;
   const startIsNew = firstNonFinal === undefined;
-  const width = startIsNew || options.widen ? options.maxWeeks : 1;
-  return {
-    weeks: Array.from({ length: width }, (_, i) => start + i).filter((week) => week <= options.lastWeek),
-    start,
-    startIsNew,
-  };
+  const forward = (from: number, count: number): readonly number[] => Array.from({ length: count }, (_, i) => from + i);
+
+  const weeks = options.widen
+    ? [start, ...forward(resumeAfterWedge(rows, start), options.maxWeeks)]
+    : forward(start, startIsNew ? options.maxWeeks : 1);
+
+  return { weeks: weeks.filter((week) => week <= options.lastWeek), start, startIsNew };
+}
+
+/**
+ * Where the season resumes while `wedged` is stuck: the earliest non-final week after it, or — if
+ * every later week has settled, or none has been examined yet — the week after the newest row.
+ * The same three-case reasoning `examinationWindow` uses for `start`, applied to the remainder of
+ * the season rather than to the whole of it.
+ */
+function resumeAfterWedge(rows: readonly { readonly week: number; readonly status: WeekStatus }[], wedged: number): number {
+  const firstNonFinal = rows.find((row) => row.week > wedged && row.status !== "final");
+  if (firstNonFinal !== undefined) return firstNonFinal.week;
+  // `reduce` seeded with the wedged week rather than an index into `rows`: it needs no special
+  // case for a row set that holds nothing later than the wedge, and none for an empty one.
+  return rows.reduce((newest, row) => Math.max(newest, row.week), wedged) + 1;
 }
 
 /**
@@ -180,6 +205,13 @@ interface WeekPlan {
   readonly toFetch: readonly GameSummary[];
   /** A correction sweep re-reads a settled week; a normal pass walks the live one. */
   readonly correction: boolean;
+  /**
+   * False when the tick's game budget cut the fetch list short, or a denied box-score reservation
+   * emptied it. It is what stops a correction sweep from claiming a calendar day it barely
+   * examined: `correctionWindowDays` gives a settled week three chances, and one busy Sunday
+   * spending `maxGamesPerTick` on the live week would otherwise burn a third of them.
+   */
+  readonly complete: boolean;
 }
 
 /**
@@ -216,18 +248,37 @@ export function createIngestionWorker({
   let wedgeWeek: number | null = null;
   let wedgeTicks = 0;
 
-  /** Rate-limited per (week, league, reason): two different problems with the same week are two
-   *  different things to know about, and only a repeat of the SAME one is noise. */
+  /**
+   * Rate-limited per (week, league, reason) by default: two different problems with the same week
+   * are two different things to know about, and only a repeat of the SAME one is noise.
+   *
+   * A caller whose `reason` carries a VARYING detail must pass its own stable key. A key derived
+   * from a message containing a counter is a fresh key every tick, which does not rate-limit
+   * anything and grows this map forever — the wedge warning did exactly that, warning every thirty
+   * minutes for days and retaining an entry for each.
+   */
   function outcomeKey(outcome: TickOutcome): string {
     return [outcome.week, outcome.leagueId, outcome.reason].join(":");
   }
 
-  function reportIfDue(outcome: TickOutcome, nowMs: number): void {
+  /**
+   * Bounds the map to keys that are still suppressing something. An entry older than
+   * `warnIntervalMs` no longer changes any decision, so deleting it is semantically free — and
+   * without it the map grows one entry per (week, league) pair that ever failed, in a process
+   * designed to run for months.
+   */
+  function forgetExpiredWarnings(nowMs: number): void {
+    for (const [key, warnedAt] of lastWarnedAtMs) {
+      if (nowMs - warnedAt >= STATS_INGESTION_CONFIG.warnIntervalMs) lastWarnedAtMs.delete(key);
+    }
+  }
+
+  function reportIfDue(outcome: TickOutcome, nowMs: number, rateLimitKey: string = outcomeKey(outcome)): void {
     if (outcome.applied) return;
-    const key = outcomeKey(outcome);
-    const lastWarnedAt = lastWarnedAtMs.get(key);
+    const lastWarnedAt = lastWarnedAtMs.get(rateLimitKey);
     if (lastWarnedAt !== undefined && nowMs - lastWarnedAt < STATS_INGESTION_CONFIG.warnIntervalMs) return;
-    lastWarnedAtMs.set(key, nowMs);
+    forgetExpiredWarnings(nowMs);
+    lastWarnedAtMs.set(rateLimitKey, nowMs);
     onOutcome(outcome);
   }
 
@@ -473,7 +524,7 @@ export function createIngestionWorker({
     // the correction window is measured from `updated_at`, a no-op write would push the deadline
     // out by another day on every sweep and the window would never close.
     if (correction && changed.length === 0) {
-      await markSwept(week, nowIso);
+      if (plan.complete) await markSwept(week, nowIso);
       return { week, applied: true };
     }
 
@@ -496,11 +547,12 @@ export function createIngestionWorker({
       await redis.hset(snapshotKey, Object.fromEntries(digests));
       await redis.expire(snapshotKey, STATS_INGESTION_CONFIG.ttlSeconds.snapshot);
     }
-    // A sweep counts for the day, and so does the tick that SETTLED the week: the box scores were
-    // read today either way, so the first correction sweep is tomorrow's. That is also what keeps
-    // the sweep from re-reading a week within minutes of it settling, which would spend requests
-    // to re-confirm numbers the same tick just wrote.
-    if (correction || status === "final") await markSwept(week, nowIso);
+    // A sweep counts for the day only if it actually read the whole week, and so does the tick
+    // that SETTLED the week (which by definition ingested every final game, or it would not have
+    // settled): the box scores were read today either way, so the first correction sweep is
+    // tomorrow's. That is also what keeps the sweep from re-reading a week within minutes of it
+    // settling, which would spend requests to re-confirm numbers the same tick just wrote.
+    if ((correction && plan.complete) || status === "final") await markSwept(week, nowIso);
 
     if (changed.length > 0) {
       await publishAffected(week, status, gamesFinal, gamesTotal, persisted.version, changed, nowMs);
@@ -556,13 +608,16 @@ export function createIngestionWorker({
       wedgeTicks = 1;
     }
     if (wedgeTicks <= wedgedWeekTicks) return false;
+    // The count is in the MESSAGE (an operator wants to know how long) and deliberately not in the
+    // rate-limit key, which is stable per wedged week — see `reportIfDue`.
     reportIfDue(
       {
         week: window.start,
         applied: false,
-        reason: `Week ${window.start} has not finished after ${wedgeTicks} ingestion passes. The following week is being examined too so the season keeps moving.`,
+        reason: `Week ${window.start} has not finished after ${wedgeTicks} ingestion passes. The rest of the season is being examined alongside it so it keeps moving.`,
       },
       nowMs,
+      `wedged:${window.start}`,
     );
     return true;
   }
@@ -612,10 +667,7 @@ export function createIngestionWorker({
       : provisional;
 
     const correctionWeek = await correctionWeekDue(rows, nowMs, nowIso);
-    const weeks: readonly { readonly week: number; readonly correction: boolean }[] = [
-      ...window.weeks.map((week) => ({ week, correction: false })),
-      ...(correctionWeek !== null && !window.weeks.includes(correctionWeek) ? [{ week: correctionWeek, correction: true }] : []),
-    ];
+    const sweepWeek = correctionWeek !== null && !window.weeks.includes(correctionWeek) ? correctionWeek : null;
 
     // An empty window means every week through the provider's last is already final and no
     // correction is due — the season is over, and there is nothing to examine until next season
@@ -624,40 +676,34 @@ export function createIngestionWorker({
     // stays settled. Reported (rate-limited) rather than returned silently, so a season that has
     // genuinely stopped advancing is visible in the log instead of being indistinguishable from a
     // worker that is not running at all.
-    if (weeks.length === 0) {
+    if (window.weeks.length === 0 && sweepWeek === null) {
       const outcome: TickOutcome = { week: 0, applied: false, reason: "Nothing to examine — every week through the season's end is already final." };
       reportIfDue(outcome, nowMs);
       return [outcome, ...(await settleMissedWeeks(rows, nowMs))];
     }
 
-    // PHASE ONE of the reservation: exactly one `listGames` per week about to be examined. This
-    // is the number of requests the next few lines actually make, not an upper bound on the whole
-    // tick — the tick cannot know what its box-score fetches will cost until these calls return,
-    // and reserving that unknown as a worst case with no release path is what turned an 850-request
-    // ingestion budget into 38 grants a month.
-    const scheduleReservation = await budget.reserve(weeks.length);
-    if (!scheduleReservation.granted) {
-      const outcome: TickOutcome = { week: weeks[0]!.week, applied: false, reason: DENIAL_REASONS[scheduleReservation.denial] };
-      reportIfDue(outcome, nowMs);
-      return [outcome];
-    }
-
     const outcomes: TickOutcome[] = [];
     const plans: WeekPlan[] = [];
     let gamesBudgetRemaining = STATS_INGESTION_CONFIG.maxGamesPerTick;
-    for (const { week, correction } of weeks) {
+
+    /** Lists one week and decides, exactly, which of its box scores this tick will fetch. */
+    async function planWeek(week: number, correction: boolean): Promise<void> {
       try {
         const games = await provider.listGames(week);
         // No games at all means this week is outside the provider's season (or hasn't been
         // scheduled yet) — nothing to record, nothing to score.
-        if (games.length === 0) continue;
+        if (games.length === 0) return;
         const toFetch: GameSummary[] = [];
+        let truncated = false;
         for (const game of games) {
-          if (toFetch.length >= gamesBudgetRemaining) break;
+          if (toFetch.length >= gamesBudgetRemaining) {
+            truncated = true;
+            break;
+          }
           if (await needsBoxScore(game, correction)) toFetch.push(game);
         }
         gamesBudgetRemaining -= toFetch.length;
-        plans.push({ week, games, toFetch, correction });
+        plans.push({ week, games, toFetch, correction, complete: !truncated });
       } catch (error: unknown) {
         // One week's failure (a dropped connection, an upstream 500) must not stop the other
         // week examined this tick from being checked.
@@ -668,13 +714,38 @@ export function createIngestionWorker({
       }
     }
 
+    // PHASE ONE of the reservation: exactly one `listGames` per LIVE week about to be examined.
+    // This is the number of requests the next few lines actually make, not an upper bound on the
+    // whole tick — the tick cannot know what its box-score fetches will cost until these calls
+    // return, and reserving that unknown as a worst case with no release path is what turned an
+    // 850-request ingestion budget into 38 grants a month.
+    if (window.weeks.length > 0) {
+      const scheduleReservation = await budget.reserve(window.weeks.length);
+      if (!scheduleReservation.granted) {
+        const outcome: TickOutcome = { week: window.weeks[0]!, applied: false, reason: DENIAL_REASONS[scheduleReservation.denial] };
+        reportIfDue(outcome, nowMs);
+        return [outcome];
+      }
+      for (const week of window.weeks) await planWeek(week, false);
+    }
+
+    // PHASE ONE-B: the correction sweep's own schedule call, reserved separately and made only if
+    // there is game budget left to do anything with it. The live weeks come first and take what
+    // they need; a sweep with nothing left to fetch would spend a request to learn a schedule it
+    // cannot act on, and would then have to leave the day unclaimed anyway.
+    if (sweepWeek !== null && gamesBudgetRemaining > 0) {
+      const sweepReservation = await budget.reserve(1);
+      if (sweepReservation.granted) await planWeek(sweepWeek, true);
+      else reportIfDue({ week: sweepWeek, applied: false, reason: DENIAL_REASONS[sweepReservation.denial] }, nowMs);
+    }
+
     // PHASE TWO: the exact box scores this tick has decided to fetch, now that it knows. A denial
     // here skips the fetches and keeps the schedules — they are already paid for, and the week's
     // honest game counts and status are worth persisting even on a tick that can afford no box
     // scores. `everyFinalGameIngested` above is what stops that from marking a week final early.
     const boxScoreCount = plans.reduce((total, plan) => total + plan.toFetch.length, 0);
     const boxScoreReservation = boxScoreCount === 0 ? { granted: true as const } : await budget.reserve(boxScoreCount);
-    const fetchPlans = boxScoreReservation.granted ? plans : plans.map((plan) => ({ ...plan, toFetch: [] }));
+    const fetchPlans = boxScoreReservation.granted ? plans : plans.map((plan) => ({ ...plan, toFetch: [], complete: false }));
     if (!boxScoreReservation.granted) {
       // `plans` is never empty here: a denial only happens when `boxScoreCount` is positive, and
       // that count comes from the plans themselves.

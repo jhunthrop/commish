@@ -22,9 +22,15 @@ describe("the ingestion request budget arithmetic", () => {
 
     // Steady state examines ONE week per tick: the week after the current one is all `scheduled`
     // games that cannot have moved, and re-listing it every thirty minutes is the single largest
-    // line here for no information at all. The window widens to `maxWeeksPerTick` only when the
-    // start week has no row yet, which is once per week rollover.
-    const scheduleCalls = ticksPerMonth + WEEKS_PER_MONTH * (STATS_INGESTION_CONFIG.maxWeeksPerTick - 1);
+    // line here for no information at all.
+    //
+    // The window widens to `maxWeeksPerTick` on the tick that resumes at a week with no
+    // `stat_weeks` row. That is ONE tick per week rollover and not a tail, because the same tick
+    // plants both rows and the tick after it is narrow again. Five a month is the upper bound: in
+    // continuous operation the lookahead row is already there half the time, so the real figure is
+    // nearer two or three, and over-counting here is the safe direction.
+    const widenedTicksPerMonth = WEEKS_PER_MONTH;
+    const scheduleCalls = ticksPerMonth + widenedTicksPerMonth * (STATS_INGESTION_CONFIG.maxWeeksPerTick - 1);
     expect(scheduleCalls).toBe(1_493);
 
     // `final-only` fetches each box score exactly once, ever.
@@ -32,19 +38,37 @@ describe("the ingestion request budget arithmetic", () => {
     expect(boxScores).toBe(80);
 
     // The correction sweep re-reads the most recent settled week once per calendar day for
-    // `correctionWindowDays`: one schedule call plus that week's box scores, each time.
-    const correctionSweeps = STATS_INGESTION_CONFIG.correctionWindowDays * WEEKS_PER_MONTH * (1 + GAMES_PER_WEEK);
+    // `correctionWindowDays`: one schedule call plus that week's box scores, each time. A sweep
+    // whose fetch list is cut short by a live week does not claim the day, so it costs its
+    // schedule call and is retried; one such attempt per sweep day is allowed for here.
+    const sweepDays = STATS_INGESTION_CONFIG.correctionWindowDays * WEEKS_PER_MONTH;
+    const correctionSweeps = sweepDays * (1 + GAMES_PER_WEEK);
+    const sweepRetries = sweepDays;
     expect(correctionSweeps).toBe(255);
+    expect(sweepRetries).toBe(15);
 
-    const ingestionPerMonth = scheduleCalls + boxScores + correctionSweeps;
-    expect(ingestionPerMonth).toBe(1_828);
+    const ingestionPerMonth = scheduleCalls + boxScores + correctionSweeps + sweepRetries;
+    expect(ingestionPerMonth).toBe(1_843);
 
     const ingestionCeiling = STATS_INGESTION_CONFIG.monthlyRequestBudget - STATS_INGESTION_CONFIG.reservedForBackfill;
     expect(ingestionCeiling).toBe(2_692);
     expect(ingestionPerMonth).toBeLessThan(ingestionCeiling);
-    // Real headroom, not a rounding error: a month of ticking leaves a third of the ceiling spare
-    // for a wedged week's widened window, a re-listed week after a restart, and a slow month.
+    // Real headroom, not a rounding error: a month of ticking leaves nearly a third of the ceiling
+    // spare for a re-listed week after a restart, an actual wedge, and a slow month.
     expect(ingestionCeiling / ingestionPerMonth).toBeGreaterThan(1.4);
+
+    // THE PREMISE THE WHOLE TABLE RESTS ON. `trackWedge` resets only when the window opens on a
+    // different week, so a `wedgedWeekTicks` below the ~336 ticks a week is legitimately unsettled
+    // for would make the WIDENED window the steady state for most of the season — and a permanently
+    // widened window does not fit the ceiling, as the next assertion shows. Pinning the threshold
+    // to the arithmetic that depends on it is what stops the two from drifting apart again.
+    const ticksPerHealthyWeek = ticksPerDay * 7;
+    expect(ticksPerHealthyWeek).toBe(336);
+    expect(STATS_INGESTION_CONFIG.wedgedWeekTicks).toBeGreaterThan(ticksPerHealthyWeek);
+
+    const alwaysWidened = ticksPerMonth * STATS_INGESTION_CONFIG.maxWeeksPerTick + boxScores + correctionSweeps + sweepRetries;
+    expect(alwaysWidened).toBe(3_326);
+    expect(alwaysWidened).toBeGreaterThan(ingestionCeiling);
 
     // And the backfill fits in what is held back for it, so the two together fit the quota.
     expect(2 + 18 * (1 + GAMES_PER_WEEK)).toBe(STATS_INGESTION_CONFIG.reservedForBackfill);

@@ -31,6 +31,8 @@ export function createMockStatsProvider(dataset: Dataset = committed as Dataset,
   }
 
   return {
+    // Every answer comes out of a committed JSON file. Nothing here reaches a network.
+    requestCost: "free",
     // Derived from the dataset rather than declared beside it: `generateDataset`'s SEASON_WEEKS
     // and a hand-written constant here would be two expressions of one fact, and the committed
     // `dataset.json` is what actually ships. A caller passing its own dataset gets its own bound.

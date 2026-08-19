@@ -128,6 +128,17 @@ export async function finalizeWeek(
   const [league] = await db.select({ rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, leagueId));
   if (league === undefined) return { ok: false, status: 404, reason: "That league doesn't exist." };
 
+  // Guard order is "does this thing exist" before "is it allowed", so a week the league does not
+  // have answers 404 whatever the state of its draft. The check is one indexed existence probe
+  // rather than the week's rows, which are read inside the transaction below where they are also
+  // locked and ordered.
+  const [exists] = await db
+    .select({ weekNumber: matchups.weekNumber })
+    .from(matchups)
+    .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)))
+    .limit(1);
+  if (exists === undefined) return { ok: false, status: 404, reason: "That week isn't part of this league's season." };
+
   // A league that has not drafted has no rosters, so every team would score zero and the
   // standings would show a season of phantom losses. An undrafted league is not behind on
   // scoring, it has not started. Read outside the transaction on purpose: it takes no lock on
@@ -143,7 +154,6 @@ export async function finalizeWeek(
       .from(matchups)
       .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)))
       .orderBy(asc(matchups.homeTeamId));
-    if (week.length === 0) return 0;
 
     const teamIds = [...new Set(week.flatMap((row) => [row.homeTeamId, row.awayTeamId]))];
     const scores = await scoreTeamsForWeek(tx, leagueId, weekNumber, teamIds);
@@ -156,7 +166,6 @@ export async function finalizeWeek(
     }
     return week.length;
   });
-  if (matchupsScored === 0) return { ok: false, status: 404, reason: "That week isn't part of this league's season." };
 
   await cache.invalidate(leagueId, weekNumber);
   return { ok: true, weekNumber, matchupsScored };

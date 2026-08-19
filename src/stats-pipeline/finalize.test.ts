@@ -191,6 +191,19 @@ describe("finalizeWeek", () => {
     expect(cache.invalidate).not.toHaveBeenCalled();
   });
 
+  it("answers 404 for a week the league doesn't have even when its draft is unfinished", async () => {
+    // Guard order: "does this exist" before "is this allowed". An undrafted league asked about a
+    // week outside its season is two problems at once, and the one that names a thing that does
+    // not exist is the more useful answer — the other tells a caller to finish a draft that would
+    // not help.
+    const { leagueId } = await twoTeamLeague("ppr", "scheduled");
+    expect(await finalizeWeek(db, leagueId, 99)).toEqual({
+      ok: false,
+      status: 404,
+      reason: "That week isn't part of this league's season.",
+    });
+  });
+
   it("refuses a league that doesn't exist", async () => {
     expect(await finalizeWeek(db, "nope", 1)).toEqual({
       ok: false, status: 404, reason: "That league doesn't exist.",
