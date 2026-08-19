@@ -17,7 +17,7 @@ export interface KeyedMutex {
  * pooling mode, where a session is not a stable thing to hold anything on. `SELECT ... FOR
  * UPDATE` is transaction-scoped by construction, so it is released by the same COMMIT that
  * makes the write visible and it cannot leak onto whichever pooled backend serves the next
- * statement. See `docs/decisions/data-layer-hardening.md`.
+ * statement.
  *
  * The unique index on `(draft_id, sequence)` remains the database's own backstop: a bug in
  * either lock can then cost a rejected action, never a double-drafted player.

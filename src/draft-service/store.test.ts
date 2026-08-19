@@ -248,6 +248,44 @@ describe("draft store — concurrency", () => {
   });
 });
 
+describe("draft store — sequence conflict (real Postgres, deterministic)", () => {
+  it("translates a genuine unique-index violation into the friendly rejection, not a raw driver error", async () => {
+    const { draftId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds)); // cache now holds sequence 1
+
+    // A `Db` whose `.transaction(...)` first inserts a REAL competing row at exactly the
+    // sequence (2) this store's own write is about to target, then runs the real transaction —
+    // a genuine Postgres unique-index collision on `(draft_id, sequence)`, not a fake
+    // driver-error shape. Constructed deterministically: the ordering is enforced by this
+    // proxy intercepting the store's own commit path, not by racing two promises and hoping
+    // they interleave a particular way (contrast the timing-dependent test above).
+    const racedDb = new Proxy(db, {
+      get(target, prop, receiver) {
+        if (prop === "transaction") {
+          return async (callback: Parameters<Db["transaction"]>[0]) => {
+            await db.insert(draftActions).values({
+              draftId, sequence: 2, action: pick(teamIds[0]!, "rb1"), timestamp: new Date(T),
+            });
+            return target.transaction(callback);
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    }) as Db;
+    const racedStore = createDraftStore({ db: racedDb, publish, clock });
+    // Warm the raced store's cache to sequence 1 — matching what's actually in the DB right
+    // now, since the competing row above hasn't landed yet — so its freshness probe (Task 6)
+    // passes and it proceeds to attempt the same sequence. This exercises the store's real
+    // commit path (`applyAction`'s own `db.transaction` + catch block), not a fabricated error.
+    await racedStore.getDraftState(draftId);
+
+    const result = await racedStore.applyAction(draftId, pick(teamIds[0]!, "qb1"));
+    expect(result).toEqual({ ok: false, reason: "Someone else acted first. Try again." });
+    expect(await actionRows(draftId)).toHaveLength(2); // only the competing row's insert survived
+  });
+});
+
 describe("draft store — cache freshness", () => {
   it("serves the cache on a hit instead of replaying the log, and replays on a miss", async () => {
     const { draftId, teamIds } = await fixture();
@@ -269,6 +307,25 @@ describe("draft store — cache freshness", () => {
     await store.getDraftState(draftId);
     const missSelects = counting.selectCount() - beforeMiss;
     expect(missSelects).toBeGreaterThan(hitSelects);
+  });
+
+  it("treats a cache entry for a never-started draft (sequence 0) as fresh, not perpetually stale", async () => {
+    const { draftId } = await fixture(); // scheduled, no actions — an empty log
+    const counting = countingDb(db);
+    const store = createDraftStore({ db: counting.db, publish, clock });
+    const first = await store.getDraftState(draftId);
+    expect(first?.sequence).toBe(0);
+
+    // `MAX(sequence)` over a draft with zero action rows still returns one row from Postgres,
+    // with `latest: null` — not zero rows. `latestActionSequence`'s `row?.latest ?? 0` is what
+    // turns that into `0`, matching a fresh cache's `sequence: 0`. Without that fallback this
+    // read would see `null !== 0`, treat every hit on an unstarted draft as stale, and force a
+    // full replay on every single read of it — so assert the same one-select cache-hit cost
+    // proven above, not just that the returned value happens to match.
+    const beforeHit = counting.selectCount();
+    const second = await store.getDraftState(draftId);
+    expect(second).toEqual(first);
+    expect(counting.selectCount() - beforeHit).toBe(1);
   });
 });
 

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { players } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
-import { bestAvailableFor, currentDeadline, teamOnClock } from "@/draft-engine";
+import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "./store";
 import { createDraftTicker } from "./ticker";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
@@ -74,45 +74,18 @@ describe("draft ticker", () => {
     expect(await ticker.tick()).toEqual([{ draftId: fixture.draftId, applied: true }]);
   });
 
-  it("reports applied:false with the store's own rejection reason when applyAction is rejected", async () => {
-    const { ticker, store, fixture } = await liveDraft();
-    now = "2026-09-01T09:00:00.000Z"; // past the deadline
-    // A real MAKE_PICK from a second store instance, landing between the ticker's read (which
-    // decides the clock has run out) and its own TIMER_EXPIRE write. This is exactly the race
-    // `admitTimerExpire` (admit.ts) exists to close: "the ticker reads state and computes a
-    // deadline in one step, then submits TIMER_EXPIRE in a later, separate step; a legitimate
-    // action can land in between and start a fresh clock for someone else." Task 6's freshness
-    // check makes that race easier to hit (a raw out-of-band DB insert used to be enough to
-    // force `applyAction`'s stale-cache/unique-index rejection — now the store just self-heals
-    // from that on the next read — so provoking a genuine "reducer rejected" here means
-    // injecting a real accepted action, not sabotaging the log directly).
-    const secondStore = createDraftStore({ db, publish: async () => "1-0", clock });
-    const spy = vi.spyOn(store, "getDraftState").mockImplementationOnce(async (draftId) => {
-      const state = await secondStore.getDraftState(draftId);
-      const onClock = state === null ? null : teamOnClock(state);
-      const best = state === null || onClock === null ? null : bestAvailableFor(state, onClock);
-      if (state === null || onClock === null || best === null) {
-        throw new Error("test setup: expected a live draft with an available player");
-      }
-      const raced = await secondStore.applyAction(draftId, {
-        v: DRAFT_ACTION_VERSION,
-        type: "MAKE_PICK",
-        timestamp: now,
-        teamId: onClock,
-        playerId: best.playerId,
-      });
-      if (!raced.ok) throw new Error(`test setup: racing pick was rejected: ${raced.reason}`);
-      // Return the PRE-race state — this is what the ticker's own read actually saw, and is
-      // still past its deadline, so `tickOne` proceeds to submit TIMER_EXPIRE against a clock
-      // that (unbeknownst to it) has already been reset by the pick above.
-      return state;
-    });
-
-    expect(await ticker.tick()).toEqual([
-      { draftId: fixture.draftId, applied: false, reason: "The clock hasn't run out yet." },
-    ]);
-    spy.mockRestore();
-  });
+  // A real "applyAction rejected" outcome reaching `ticker.tick()` is covered two ways
+  // elsewhere, and a third test here would just restate one of them under a spy:
+  //   - "draft ticker — R-B4 store-level regression" below proves the actual rejection this
+  //     scenario produces — a real concurrent pick racing a now-stale TIMER_EXPIRE — comes back
+  //     as `{ ok: false, reason: "The clock hasn't run out yet." }` from `store.applyAction`
+  //     itself (Task 6's freshness check is what makes a raw out-of-band DB insert no longer
+  //     enough to force that path — see the comment there).
+  //   - "draft ticker — onOutcome logging (I5)" below proves `tickOne`'s own plumbing: given
+  //     ANY `{ ok: false, reason }` from `store.applyAction`, `tick()` surfaces exactly
+  //     `{ draftId, applied: false, reason }` in its result and to `onOutcome`.
+  // Together those cover both halves (the rejection reason is real; the ticker forwards it
+  // faithfully) without re-deriving the race through a `getDraftState` spy here too.
 
   // P3 (controller ruling): the brief's version of this test ended in `expect(true).toBe(true)`,
   // which asserts nothing. Replaced with real assertions on the native timer plumbing: start()
