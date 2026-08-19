@@ -172,7 +172,13 @@ export const drafts = pgTable(
     auctionBudget: integer("auction_budget"),
   },
   (t) => [
-    index("drafts_league_id_idx").on(t.leagueId),
+    // UNIQUE, not a plain index: nothing else in the schema enforces "one draft per league",
+    // and two live call sites already assume it — browse.ts's innerJoin (a second draft row
+    // duplicates the league card and burns two of the browse LIMIT slots) and join.ts's
+    // leftJoin + single-row read (an arbitrary draft row decides whether a join is accepted).
+    // This converts that invariant-by-convention into an invariant-by-constraint before any
+    // Phase 1 data exists to violate it.
+    uniqueIndex("drafts_league_id_idx").on(t.leagueId),
     // The ticker scans every in_progress draft on a fixed interval — this is what makes
     // that scan an index lookup instead of a sequential scan as the table grows.
     index("drafts_status_idx").on(t.status),
