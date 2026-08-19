@@ -2,6 +2,11 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium, type FullConfig } from "@playwright/test";
+import Redis from "ioredis";
+import { createDb } from "../src/db/client";
+import { statWeeks } from "../src/db/schema";
+import { LEAGUE_CONFIG } from "../src/league";
+import { STATS_INGESTION_CONFIG } from "../src/stats-pipeline/config";
 import { mintLabSession, SESSION_COOKIE_NAME } from "../scripts/lib/lab-session";
 
 export const AUTH_DIR = resolve(process.cwd(), "e2e/.auth");
@@ -41,7 +46,67 @@ function storageState(baseURL: string, cookie: string): string {
 }
 
 /**
- * Two real managers, one seeded season, no bypass.
+ * `seedSeasonLeague` (`src/data/seed/seed-season-league.ts`) scores every week of the seeded
+ * season directly, so its own `matchups` rows already make this the league's current week —
+ * see `currentWeekNumber` (`src/league/schedule.ts`): once every week has both scores in,
+ * "current" falls to the last one.
+ */
+export const SEEDED_SEASON_CURRENT_WEEK = LEAGUE_CONFIG.regularSeasonWeeks;
+
+/**
+ * The live-scoring worker's own "current week" is a SEPARATE, global `stat_weeks` ledger
+ * (`weeksToExamine`, `@/stats-pipeline/worker.ts`): a tick examines the `maxWeeksPerTick` weeks
+ * starting from the EARLIEST week that has a row and isn't `final` — falling back to week 1 only
+ * when NO such row exists at all. In production that pointer walks forward naturally: a week
+ * gets a `scheduled` row long before it's `final` (its games haven't happened yet on the
+ * calendar), and that row is what keeps the pointer from resetting once the week before it
+ * finalizes. A burst of ticks fired back-to-back against the mock has no such row: every
+ * non-live week reports `final` on the very FIRST tick that examines it (`statusFor`,
+ * `mock-stats-provider.ts`), so once weeks 1–2 both land `final` with nothing else in the
+ * table, `weeksToExamine` finds no non-final row anywhere and resets to week 1 forever — proven
+ * empirically (seven ticks in a row never moved past week 2).
+ *
+ * `resetIngestionState` below plants the ONE thing production would have grown naturally: a
+ * `scheduled` placeholder row at the last week the window before the live week needs, so the
+ * very next tick's window lands exactly on `[..., SEEDED_SEASON_CURRENT_WEEK]`. This is not
+ * faking the worker's result — the tick that follows still does the real work (a real
+ * `provider.listGames`, a real `persistTick`) — it only supplies the calendar-time fact a
+ * single burst of ticks can't otherwise produce.
+ */
+const RESUME_POINTER_WEEK = SEEDED_SEASON_CURRENT_WEEK - (STATS_INGESTION_CONFIG.maxWeeksPerTick - 1);
+
+/**
+ * Resets both stores the ingestion worker owns, so this run's single tick (below) starts from
+ * exactly `RESUME_POINTER_WEEK` regardless of what an earlier run (or a developer's own `npm
+ * run dev`) left behind in the shared dev Postgres/Redis this suite reuses rather than a
+ * dedicated test instance:
+ *
+ * - `stat_weeks` (Postgres) is cleared and given exactly one row, at `RESUME_POINTER_WEEK`,
+ *   `scheduled` — see `RESUME_POINTER_WEEK`'s own docblock for why.
+ * - `stats:*` (Redis) is cleared so a previous run's request-budget ledger
+ *   (`stats:budget:*`, `@/stats-pipeline/budget.ts`) can never deny this run's reservation, the
+ *   same reset `worker.test.ts` does in its own `beforeEach`.
+ */
+async function resetIngestionState(): Promise<void> {
+  const db = createDb();
+  try {
+    await db.delete(statWeeks);
+    await db.insert(statWeeks).values({ week: RESUME_POINTER_WEEK });
+  } finally {
+    await db.$client.end();
+  }
+
+  const redis = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379", { maxRetriesPerRequest: null });
+  try {
+    const keys = await redis.keys("stats:*");
+    if (keys.length > 0) await redis.unlink(...keys);
+  } finally {
+    redis.disconnect();
+  }
+}
+
+/**
+ * Two real managers, one seeded season, its live week ticked into progress, no bypass.
  *
  * The order matters and each step earns its place:
  *
@@ -55,6 +120,12 @@ function storageState(baseURL: string, cookie: string): string {
  *    suite should fail here rather than paper over it.
  * 3. **Seed** with manager A's id as `DEV_SEED_CLAIM_USER_ID`, so A owns team 1 and the
  *    commissioner's chair in the seeded season league and can actually score a week.
+ * 4. **Reset** the ingestion worker's own state (`resetIngestionState`) and **tick** it exactly
+ *    ONCE — its underlying script directly, so `MOCK_STATS_LIVE_WEEK` can be overridden the same
+ *    way `DEV_SEED_CLAIM_USER_ID` is above — deterministically, rather than waiting out
+ *    `STATS_INGESTION_CONFIG.pollIntervalMs` (30 minutes): a browser test that waits half an
+ *    hour is a browser test nobody runs. This is what makes `e2e/live-scoring.spec.ts`'s "week
+ *    in progress" state real rather than mocked.
  */
 export default async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL = config.projects[0]?.use.baseURL ?? "http://localhost:3100";
@@ -90,6 +161,13 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   execFileSync(
     "npx",
     ["dotenv", "-e", ".env.local", "-v", `DEV_SEED_CLAIM_USER_ID=${a.userId}`, "--", "tsx", "src/data/seed/index.ts"],
+    { stdio: "inherit", cwd: resolve(AUTH_DIR, "../..") },
+  );
+
+  await resetIngestionState();
+  execFileSync(
+    "npx",
+    ["dotenv", "-e", ".env.local", "-v", `MOCK_STATS_LIVE_WEEK=${SEEDED_SEASON_CURRENT_WEEK}`, "--", "tsx", "scripts/ingest-once.ts"],
     { stdio: "inherit", cwd: resolve(AUTH_DIR, "../..") },
   );
 }

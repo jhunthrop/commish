@@ -20,6 +20,7 @@
     "db:migrate:test": "dotenv -e .env.local -v DATABASE_URL=postgres://commish:commish@localhost:5433/commish_test -- drizzle-kit migrate",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
     "seed": "dotenv -e .env.local -- tsx src/data/seed/index.ts",
+    "stats:ingest": "dotenv -e .env.local -- tsx scripts/ingest-once.ts",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down",
     "e2e": "dotenv -e .env.local -- playwright test",
