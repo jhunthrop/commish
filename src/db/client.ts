@@ -16,6 +16,17 @@ export type Db = ReturnType<typeof createDb>;
 /** The transaction handle Drizzle hands a `db.transaction` callback. */
 export type DbTx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
+/**
+ * A connection a function may only READ through. `Db` and `DbTx` are both structurally
+ * assignable to it, so a caller passes `getDb()` verbatim and nothing at the boundary changes
+ * — but inside, `.insert(`, `.update(`, `.delete(` and `.transaction(` are type errors.
+ *
+ * Used where read-only is a CONSTRAINT rather than a habit: the AI advisor is advisory-only by
+ * law (strategy doc §4.2), and this is what makes `tsc` the thing enforcing it instead of a
+ * grep over the directory.
+ */
+export type ReadonlyDb = Pick<Db, "select">;
+
 export interface DbOptions {
   /** Pool size. Defaults to `DB_POOL_CONFIG.defaultMaxConnections`. */
   readonly max?: number;

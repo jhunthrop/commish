@@ -1,5 +1,5 @@
 import { and, eq, gte, lt } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { ReadonlyDb } from "@/db/client";
 import { leagues, matchups, players, playerStatLines, scoringSettings, teams } from "@/db/schema";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import { getLineup } from "@/league-service/lineups";
@@ -69,10 +69,12 @@ function recordOf(rows: readonly (typeof matchups.$inferSelect)[], teamId: strin
  * the league's exact scoring settings and the actual opponent are here with no sync step, no
  * pasted screenshot and no "which site are you on?" question.
  *
- * Read-only by construction: every statement in this file is a `select`. Nothing under
- * `src/ai-advisor/**` may write — see `advisory-only.test.ts`.
+ * Read-only by CONSTRUCTION, not by convention: `ReadonlyDb` exposes `select` and nothing
+ * else, so a write anywhere down this call path is a compile error rather than something a
+ * directory scan has to notice. `advisory-only.test.ts` stays as defense in depth for the
+ * things a type cannot say.
  */
-export async function assembleAdvisorContext(db: Db, input: AssembleContextInput): Promise<AdvisorContext | null> {
+export async function assembleAdvisorContext(db: ReadonlyDb, input: AssembleContextInput): Promise<AdvisorContext | null> {
   const [league] = await db.select().from(leagues).where(eq(leagues.id, input.leagueId));
   if (league === undefined) return null;
 

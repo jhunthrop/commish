@@ -7,7 +7,7 @@ import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import type { Advice } from "./start-sit";
 import type { TradeAssessment } from "./trade";
 import { ADVISOR_CONFIG } from "./config";
-import { advisorFixture, foreignLeague } from "./test-support";
+import { advisorFixture, foreignLeague } from "@/league-service/test-support";
 
 const db: Db = createTestDb();
 const currentUser = vi.fn<() => Promise<{ readonly id: string } | null>>();

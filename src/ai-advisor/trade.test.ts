@@ -4,7 +4,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import type { LlmClient } from "@/lib/llm/client";
 import type { TradeProposal } from "@/domain/trade";
 import { assembleAdvisorContext } from "./context";
-import { advisorFixture } from "./test-support";
+import { advisorFixture } from "@/league-service/test-support";
 import { createTradeAnalyzer } from "./trade";
 
 const db: Db = createTestDb();

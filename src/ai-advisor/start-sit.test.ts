@@ -4,7 +4,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import type { LlmClient } from "@/lib/llm/client";
 import { assembleAdvisorContext, type AdvisorContext } from "./context";
 import { createStartSitAdvisor } from "./start-sit";
-import { advisorFixture } from "./test-support";
+import { advisorFixture } from "@/league-service/test-support";
 
 const db: Db = createTestDb();
 

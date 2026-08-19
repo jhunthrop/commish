@@ -3,7 +3,7 @@ import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { assembleAdvisorContext } from "./context";
 import { ADVISOR_SYSTEM_PROMPT, startSitPrompt, tradePrompt } from "./prompt";
-import { advisorFixture } from "./test-support";
+import { advisorFixture } from "@/league-service/test-support";
 import { tradeBalance } from "./valuation";
 
 const db: Db = createTestDb();
