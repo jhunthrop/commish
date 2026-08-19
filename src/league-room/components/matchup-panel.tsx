@@ -55,7 +55,7 @@ export function MatchupPanel({ matchup, myTeamId }: { readonly matchup: MatchupD
         <Side side={matchup.away} />
       </div>
       <p className="text-sm text-text-muted">
-        {"Scores come from this preview's fixed 2026 stat set — there's no live scoring yet."}
+        {"Scores come from this preview's fixed 2026 stat set. There's no live scoring yet."}
       </p>
     </section>
   );

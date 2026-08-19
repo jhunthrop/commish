@@ -49,6 +49,6 @@ describe("BidControls", () => {
     expect(screen.getByText("Nobody is up for bid right now.")).toBeInTheDocument();
 
     rerender(<BidControls view={open} myTeamId={null} submitting={false} onBid={() => {}} />);
-    expect(screen.getByText("You're watching this draft — you don't have a team in it.")).toBeInTheDocument();
+    expect(screen.getByText("You're watching this draft. You don't have a team in it.")).toBeInTheDocument();
   });
 });

@@ -22,7 +22,7 @@ describe("AdvisorPanel", () => {
         <AdvisorPanel leagueId="l1" weekNumber={4} />
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
-        expect(screen.getByText("Advice only — you make the move.")).toBeInTheDocument();
+        expect(screen.getByText("Advice only. You make the move.")).toBeInTheDocument();
         expect(screen.getByLabelText("Ask about your lineup")).toBeInTheDocument();
         expect(screen.getByRole("button", { name: "Get advice" })).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();

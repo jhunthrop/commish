@@ -7,7 +7,7 @@ export const startSitRequestSchema = z.object({
   question: z
     .string()
     .trim()
-    .min(1, { message: "Ask a question first — for example, who to start at flex." })
+    .min(1, { message: "Ask a question first. For example: who to start at flex." })
     .max(ADVISOR_CONFIG.maxQuestionLength, {
       message: `Please keep this to ${ADVISOR_CONFIG.maxQuestionLength} characters or fewer.`,
     }),

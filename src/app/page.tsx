@@ -64,7 +64,7 @@ async function loadShowcase(): Promise<Showcase | null> {
     const latest = state.picks[state.picks.length - 1]!;
     const caption =
       state.phase === "complete"
-        ? "A finished draft on Commish — every pick, live on the board"
+        ? "A finished draft on Commish. Every pick, live on the board."
         : `Round ${latest.round} · Pick ${latest.pickNumber} · drafted live on Commish`;
     return { caption, rows };
   } catch {
@@ -109,11 +109,11 @@ const PROOF = [
   },
   {
     title: "The trash talk stays in",
-    body: "League chat lives beside the board and the standings — not in a separate app.",
+    body: "League chat lives beside the board and the standings, not in a separate app.",
   },
   {
     title: "An advisor on your bench",
-    body: "Start/sit and trade calls computed from your league's own scoring. Advice only — you make the move.",
+    body: "Start/sit and trade calls computed from your league's own scoring. Advice only. You make the move.",
   },
 ] as const;
 
@@ -142,7 +142,7 @@ export default async function Home() {
             The money league your group chat deserves
           </h1>
           <p className="max-w-prose text-lg text-text-muted">
-            Live drafts, standings that settle arguments, and the trash talk built in — season-long fantasy football
+            Live drafts, standings that settle arguments, and the trash talk built in. Season-long fantasy football
             without the twenty-year-old software.
           </p>
           <Link
@@ -170,7 +170,7 @@ export default async function Home() {
       </section>
 
       <footer className="mx-auto w-full max-w-6xl px-6 py-8">
-        <p className="text-sm text-text-muted">Commish — season-long fantasy football, run properly.</p>
+        <p className="text-sm text-text-muted">Commish. Season-long fantasy football, run properly.</p>
       </footer>
     </main>
   );

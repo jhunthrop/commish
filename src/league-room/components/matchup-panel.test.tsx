@@ -18,7 +18,7 @@ describe("MatchupPanel", () => {
 
   it("never implies live scoring", async () => {
     render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" />);
-    expect(screen.getByText(/there's no live scoring yet/)).toBeInTheDocument();
+    expect(screen.getByText(/There's no live scoring yet/)).toBeInTheDocument();
     expect(screen.queryByText(/live/i)?.textContent).not.toMatch(/in progress|live now|updating/i);
   });
 

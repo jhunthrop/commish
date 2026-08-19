@@ -14,7 +14,7 @@ export function advanceSnake(state: DraftState, timestamp: string): DraftState {
 
 export function reduceMakePick(state: DraftState, action: MakePickAction): DraftReduceResult {
   if (state.config.format !== "snake") {
-    return { ok: false, reason: "This is an auction draft — nominate a player instead of picking." };
+    return { ok: false, reason: "This is an auction draft. Nominate a player instead of picking." };
   }
   if (snakeTeamForPick(state.draftOrder, state.pickNumber) !== action.teamId) {
     return { ok: false, reason: "It's not your turn to pick." };

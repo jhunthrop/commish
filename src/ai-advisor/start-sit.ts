@@ -13,7 +13,7 @@ function baselineAdvice(context: AdvisorContext): Advice {
     headline: baseline.changed ? `Start ${baseline.start.map((player) => player.name).join(", ")}.` : "Your current lineup is already your best one.",
     reasoning:
       names.length === 0
-        ? "There isn't enough scored history yet to rank this roster — check back once a week has been scored."
+        ? "There isn't enough scored history yet to rank this roster. Check back once a week has been scored."
         : `Under this league's scoring, ${names} are your highest per-week scorers over the last few weeks.`,
     degraded: true,
   };

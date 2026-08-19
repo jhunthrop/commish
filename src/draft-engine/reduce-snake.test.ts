@@ -153,7 +153,7 @@ describe("MAKE_PICK (snake)", () => {
 
   it("rejects a nomination in a snake draft", () => {
     const result = reduceDraft(started(), { v: 1, type: "NOMINATE", timestamp: START.timestamp, teamId: "t1", playerId: "qb1", openingBid: 1 });
-    expect(result).toEqual({ ok: false, reason: "This is a snake draft — make a pick instead of nominating." });
+    expect(result).toEqual({ ok: false, reason: "This is a snake draft. Make a pick instead of nominating." });
   });
 
   it("completes the draft after the last pick and stops the clock", () => {

@@ -51,7 +51,7 @@ export function AdvisorPanel({ leagueId, weekNumber }: { readonly leagueId: stri
   return (
     <section aria-label="Lineup advisor" className="flex flex-col gap-2">
       <h2 className={`${EYEBROW} text-text-muted`}>Lineup advisor</h2>
-      <p className="text-sm text-text-muted">Advice only — you make the move.</p>
+      <p className="text-sm text-text-muted">Advice only. You make the move.</p>
 
       <form
         className="flex flex-col gap-2"

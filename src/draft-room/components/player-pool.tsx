@@ -170,7 +170,7 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
 
       {truncated ? (
         <p className="shrink-0 text-sm text-text-muted">
-          Showing the top {rows.length} of {filtered.length} — narrow your search to see more.
+          Showing the top {rows.length} of {filtered.length}. Narrow your search to see more.
         </p>
       ) : null}
     </section>

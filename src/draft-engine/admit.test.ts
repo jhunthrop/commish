@@ -166,7 +166,7 @@ describe("admitCommand — NOMINATE", () => {
     // $10 with 3 spots to fill: $2 is reserved for the other two.
     expect(admitCommand(auction(), nominate("t1", "qb1", 9))).toEqual({
       ok: false,
-      reason: "You can only bid up to $8 — you need $1 for each of your remaining roster spots.",
+      reason: "You can only bid up to $8. You need $1 for each of your remaining roster spots.",
     });
   });
 
@@ -202,7 +202,7 @@ describe("admitCommand — BID", () => {
   it("rejects a bid above the bidder's maximum", () => {
     expect(admitCommand(withLot(), bid("t2", 9))).toEqual({
       ok: false,
-      reason: "You can only bid up to $8 — you need $1 for each of your remaining roster spots.",
+      reason: "You can only bid up to $8. You need $1 for each of your remaining roster spots.",
     });
   });
 

@@ -60,7 +60,7 @@ export async function POST(request: Request, context: LeagueRouteContext) {
       },
     });
     if (assessment === null) {
-      return fail("We couldn't read that trade — check that both sides name players those teams actually have.", 422);
+      return fail("We couldn't read that trade. Check that both sides name players those teams actually have.", 422);
     }
     return ok<TradeAssessmentBody>(assessment);
   });

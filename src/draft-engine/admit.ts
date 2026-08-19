@@ -110,7 +110,7 @@ function admitAmount(state: DraftState, teamId: string, amount: number): AdmitRe
   if (amount > max) {
     return {
       ok: false,
-      reason: `You can only bid up to $${max} — you need $${AUCTION_CONFIG.reservePerOpenSlot} for each of your remaining roster spots.`,
+      reason: `You can only bid up to $${max}. You need $${AUCTION_CONFIG.reservePerOpenSlot} for each of your remaining roster spots.`,
     };
   }
   return ADMITTED;
