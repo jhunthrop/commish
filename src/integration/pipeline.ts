@@ -1,5 +1,6 @@
 import type { Db } from "@/db/client";
 import { players, playerStatLines } from "@/db/schema";
+import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import type { DraftFormat } from "@/domain/league";
 import { AUCTION_CONFIG, currentDeadline } from "@/draft-engine";
 import { createDraftStore, type DraftStore } from "@/draft-service/store";
@@ -69,7 +70,7 @@ async function finishByAutoExpire(store: DraftStore, draftId: string): Promise<v
     // The reducer rejects an expiry before the deadline it actually set, so advance to that
     // deadline rather than reasoning about the clock's tightening tiers here.
     const result = await store.applyAction(draftId, {
-      v: 1,
+      v: DRAFT_ACTION_VERSION,
       type: "TIMER_EXPIRE",
       timestamp: currentDeadline(state) ?? CLOCK.now(),
     });
@@ -167,7 +168,7 @@ async function contestAuctionLot(
   raises: readonly { readonly teamId: string; readonly amount: number }[],
 ): Promise<AuctionLotContest> {
   const nominated = await store.applyAction(draftId, {
-    v: 1,
+    v: DRAFT_ACTION_VERSION,
     type: "NOMINATE",
     timestamp: CLOCK.now(),
     teamId: nominatingTeamId,
@@ -177,7 +178,7 @@ async function contestAuctionLot(
   if (!nominated.ok) throw new Error(`nominate rejected: ${nominated.reason}`);
 
   for (const raise of raises) {
-    const bid = await store.applyAction(draftId, { v: 1, type: "BID", timestamp: CLOCK.now(), teamId: raise.teamId, amount: raise.amount });
+    const bid = await store.applyAction(draftId, { v: DRAFT_ACTION_VERSION, type: "BID", timestamp: CLOCK.now(), teamId: raise.teamId, amount: raise.amount });
     if (!bid.ok) throw new Error(`bid rejected: ${bid.reason}`);
   }
   // Guarded by every caller passing a non-empty `raises` — asserted here so a future caller's
@@ -188,7 +189,7 @@ async function contestAuctionLot(
   const beforeExpiry = await store.getDraftState(draftId);
   if (beforeExpiry === null) throw new Error("draft vanished mid-run");
   const expired = await store.applyAction(draftId, {
-    v: 1,
+    v: DRAFT_ACTION_VERSION,
     type: "TIMER_EXPIRE",
     timestamp: currentDeadline(beforeExpiry) ?? CLOCK.now(),
   });
