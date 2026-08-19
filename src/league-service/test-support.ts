@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import type { ScoringPresetName } from "@/domain/scoring";
-import { players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
+import { drafts, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
 import { createLeague } from "./creation";
 import { writeSchedule } from "./schedule";
 
@@ -33,6 +33,9 @@ export async function twoTeamLeague(db: Db) {
   });
   if (!created.ok) throw new Error(created.reason);
   await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
+  // `scoreWeek`/`finalizeWeek` refuse an undrafted league (Plan B Task 5's guard) — this
+  // fixture stands in for a season already underway, so the draft it's built on is done.
+  await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
   await db.insert(players).values([
     { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },
     { id: "qb2", name: "QB Two", position: "QB", nflTeam: "SF" },

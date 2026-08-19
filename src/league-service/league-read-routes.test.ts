@@ -17,6 +17,7 @@ vi.mock("@/league-service/browse", async (importOriginal) => {
   return { ...actual, listPublicLeagues: vi.fn(actual.listPublicLeagues) };
 });
 
+import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
@@ -69,6 +70,9 @@ async function createDefaultLeague(userId = "u1") {
 /** A second team, a two-week schedule, and one scoreable quarterback per side. */
 async function playableSeason(leagueId: string, homeTeamId: string) {
   await db.insert(teams).values({ id: "team_2", leagueId, userId: "u2", name: "Team Two" });
+  // `scoreWeek` (via `finalizeWeek`) now refuses an undrafted league (Plan B Task 5's guard) —
+  // this fixture stands in for a season already underway, so the draft it's built on is done.
+  await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, leagueId));
   await db.insert(players).values([
     { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },
     { id: "qb2", name: "QB Two", position: "QB", nflTeam: "SF" },
