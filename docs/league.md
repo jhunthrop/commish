@@ -119,9 +119,12 @@ client side.
 
 ## Scoring and standings
 
-`scoreWeek` (`src/league-service/results.ts`) scores one week from the **fixed, static mock
-stat set** — there is no live feed in this phase, so a week becomes final the moment a
-commissioner presses the button, not when a calendar says so. For each matchup it reads both
+`finalizeWeek` (`src/stats-pipeline/finalize.ts`) scores and settles one week. Phase 2 Plan B
+retired the commissioner's manual "Score Week" button and route: the stats ingestion worker
+calls `finalizeWeek` itself once a week's games are done, the same settlement write a
+commissioner used to trigger by hand. `src/league-service/results.ts` carried a thin `scoreWeek`
+delegate to it during the transition (R-B1); Plan B Task 8 deleted both the delegate and the
+route together, so the worker is now the only caller. For each matchup it reads both
 teams' saved (or default) starting lineup, scores the starters with `scoreLineup`
 (`src/scoring/`) against the league's own `scoring_settings`, and writes both scores inside one
 transaction — a half-scored week is not a result, it's a bug in progress, and

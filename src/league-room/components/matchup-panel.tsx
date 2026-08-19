@@ -1,3 +1,4 @@
+import type { WeekStatus } from "@/league";
 import type { MatchupDetail, MatchupSide } from "../contract";
 import { Card, PositionBadge, SlotChip, Table, type TableColumn } from "@/components/ui";
 import { formatPoints } from "../lib/format";
@@ -34,11 +35,22 @@ function Side({ side }: { readonly side: MatchupSide }) {
 /**
  * One matchup, both lineups, every number already computed on the server.
  *
- * The copy is deliberate: this phase has a fixed 2026 stat set and no feed, so a week is
- * either "Final" or "Not scored yet". There is no "in progress", because there is no such
- * thing here, and implying otherwise is the one thing the spec calls out by name.
+ * `weekStatus` is a prop of its own, not read off `matchup.weekStatus`: it decouples "what
+ * state the week is in right now" from the server-rendered snapshot `matchup` carries, which is
+ * what lets a caller fold a live `score.update` frame (`useLiveScores`) over it without having
+ * to reconstruct the whole `MatchupDetail`. Live scoring exists now, so a week says which of
+ * the three states it's in — scheduled, in progress, or final — and never shows a moving number
+ * with no state beside it.
  */
-export function MatchupPanel({ matchup, myTeamId }: { readonly matchup: MatchupDetail; readonly myTeamId: string | null }) {
+export function MatchupPanel({
+  matchup,
+  myTeamId,
+  weekStatus,
+}: {
+  readonly matchup: MatchupDetail;
+  readonly myTeamId: string | null;
+  readonly weekStatus: WeekStatus;
+}) {
   return (
     <section aria-label={`${matchup.home.teamName} against ${matchup.away.teamName}`} className="flex flex-col gap-3">
       <MatchupScoreboard
@@ -51,7 +63,7 @@ export function MatchupPanel({ matchup, myTeamId }: { readonly matchup: MatchupD
           homeScore: matchup.home.score,
           awayScore: matchup.away.score,
           final: matchup.final,
-          weekStatus: matchup.weekStatus,
+          weekStatus,
         }}
         myTeamId={myTeamId}
       />

@@ -56,6 +56,11 @@ const SERVER_ONLY_MODULE_GROUPS = [
   "@/lib/llm",
   "@/lib/api/respond",
   "@/data/seed",
+  // The stats ingestion worker, the finalize settlement write and the reference cache — all
+  // Postgres/Redis-backed. `@/stats-pipeline/contract` is the one exception the client boundary
+  // needs (Task 8's `useLiveScores` imports `ScoreUpdatePayload`/`TeamScore` from it), and
+  // `import type` stays allowed for exactly that reason.
+  "@/stats-pipeline",
 ];
 
 /**

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { screen, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
@@ -7,14 +7,6 @@ import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { HOME, LINEUP, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { LeagueHome } from "./league-home";
-
-// `LeagueHome` renders `ScoreWeekButton` for its commissioner, which navigates via
-// `next/navigation`'s `useRouter` and throws outside a mounted App Router. Stubbing the hook
-// — not the component — is the idiom `join-form.test.tsx` and `create-league-panel.test.tsx`
-// established.
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
-}));
 
 const wrap = (home = HOME, lineup = LINEUP) => (
   <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
@@ -43,7 +35,6 @@ describe("LeagueHome", () => {
       fixtureLeagueDeps().deps,
     );
     expect(screen.getByRole("button", { name: "Create invite link" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Score Week 3" })).toBeInTheDocument();
   });
 
   it("hides them from everybody else", () => {
@@ -54,7 +45,19 @@ describe("LeagueHome", () => {
       fixtureLeagueDeps().deps,
     );
     expect(screen.queryByRole("button", { name: "Create invite link" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Score Week 3" })).not.toBeInTheDocument();
+  });
+
+  // The commissioner's "Score Week" control is retired — a feed that finalizes a week when the
+  // games end makes manual scoring not a control but the ability to stamp a week the games have
+  // not finished. The week's state now reads honestly off WeekStatusBadge instead.
+  it("no longer offers a manual scoring control to anyone, commissioner included", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByRole("button", { name: /^Score Week/ })).not.toBeInTheDocument();
   });
 
   it("points at the draft room while the draft has not finished", () => {

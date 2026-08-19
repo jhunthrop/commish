@@ -1,6 +1,7 @@
 import type { MatchupSummary } from "../contract";
-import { Badge, Card, EYEBROW } from "@/components/ui";
+import { Card, EYEBROW } from "@/components/ui";
 import { formatPoints } from "../lib/format";
+import { WeekStatusBadge } from "./week-status-badge";
 
 export interface MatchupScoreboardProps {
   readonly matchup: MatchupSummary;
@@ -39,7 +40,9 @@ export function MatchupScoreboard({ matchup, myTeamId }: MatchupScoreboardProps)
       className="flex flex-col gap-3"
     >
       <div className="flex items-center justify-end">
-        <Badge tone={matchup.final ? "positive" : "neutral"}>{matchup.final ? "Final" : "Not scored yet"}</Badge>
+        {/* `weekStatus`, never `matchup.final`: a week can be `in_progress` for hours before
+            `final` flips, and `final` alone can't tell that apart from `scheduled`. */}
+        <WeekStatusBadge status={matchup.weekStatus} />
       </div>
       <div className="flex items-center gap-4">
         {side(matchup.homeTeamName, matchup.homeScore, matchup.homeTeamId, homeWon)}

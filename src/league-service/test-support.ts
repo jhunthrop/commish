@@ -35,8 +35,8 @@ export async function twoTeamLeague(db: Db, { weeks = 2 }: { readonly weeks?: nu
   });
   if (!created.ok) throw new Error(created.reason);
   await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
-  // `scoreWeek`/`finalizeWeek` refuse an undrafted league (Plan B Task 5's guard) — this
-  // fixture stands in for a season already underway, so the draft it's built on is done.
+  // `finalizeWeek` refuses an undrafted league (Plan B Task 5's guard) — this fixture stands
+  // in for a season already underway, so the draft it's built on is done.
   await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
   await db.insert(players).values([
     { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },

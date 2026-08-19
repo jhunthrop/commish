@@ -8,7 +8,6 @@ import { InvitePanel } from "./invite-panel";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupScoreboard } from "./matchup-scoreboard";
-import { ScoreWeekButton } from "./score-week-button";
 import { StandingsTable } from "./standings-table";
 
 /**
@@ -58,7 +57,6 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
         ) : (
           <MatchupScoreboard matchup={home.myMatchup} myTeamId={home.myTeamId} />
         )}
-        {home.isCommissioner ? <ScoreWeekButton leagueId={home.leagueId} weekNumber={home.currentWeek} /> : null}
       </section>
 
       <StandingsTable rows={home.standings} myTeamId={home.myTeamId} />

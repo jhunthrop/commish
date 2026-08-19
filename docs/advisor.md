@@ -27,7 +27,7 @@ Not a UX preference — no code path lets the AI submit a lineup or accept a tra
 1. **`assembleAdvisorContext` only ever `select`s.** Every statement in `context.ts` is a read.
 2. **`advisory-only.test.ts` fails the build** if any non-test file under `src/ai-advisor/**`
    contains a write verb (`.insert(`, `.update(`, `.delete(`, `.transaction(`, `setLineup`,
-   `scoreWeek`, `applyAction`, `commitDraft`, `acceptInvite`) or reads `process.env` /
+   `finalizeWeek`, `applyAction`, `commitDraft`, `acceptInvite`) or reads `process.env` /
    `isLLMEnabled` directly — enablement is decided once, at the route edge (see "The LLM seam"
    below), never inside the advisor's own modules.
 3. **`AdvisorPanel` has no apply button**, asserted by its own component test — there is no

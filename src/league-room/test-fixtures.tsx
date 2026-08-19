@@ -111,18 +111,38 @@ interface FixtureLeagueDeps {
   readonly calls: string[];
   /** Mutable: set the envelope the next POST/PUT should answer with. */
   response: unknown;
+  /** Push a frame down the fake stream, exactly as the SSE route would. */
+  emit: (type: string, payload: unknown) => void;
+  /** Fire the stream's own lifecycle events. */
+  fire: (type: "open" | "error") => void;
 }
 
-/** One injected `fetchJson` for every league component. No module mocks, no real network. */
+/** One injected `fetchJson` + one fake `EventSource` for every league component. No module
+ *  mocks, no real network — mirrors `fixtureChatDeps` (`@/chat-room/test-fixtures`). */
 export function fixtureLeagueDeps(response: unknown = { ok: true, data: {} }): FixtureLeagueDeps {
+  const listeners = new Map<string, ((event: MessageEvent) => void)[]>();
   const fixture: FixtureLeagueDeps = {
     calls: [],
     response,
+    emit: (type, payload) => {
+      for (const listener of listeners.get(type) ?? []) {
+        listener({ data: JSON.stringify({ type, leagueId: "l1", payload }) } as MessageEvent);
+      }
+    },
+    fire: (type) => {
+      for (const listener of listeners.get(type) ?? []) listener({ data: "" } as MessageEvent);
+    },
     deps: {
       fetchJson: async (url, init) => {
         fixture.calls.push(`${init?.method ?? "GET"} ${url}`);
         return { json: async () => fixture.response } as unknown as Response;
       },
+      openEventSource: () => ({
+        addEventListener: (type, listener) => {
+          listeners.set(type, [...(listeners.get(type) ?? []), listener]);
+        },
+        close: () => listeners.clear(),
+      }),
     },
   };
   return fixture;

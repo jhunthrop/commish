@@ -15,7 +15,7 @@ const WRITE_PATTERNS = [
   ".delete(",
   ".transaction(",
   "setLineup",
-  "scoreWeek",
+  "finalizeWeek",
   "applyAction",
   "commitDraft",
   "acceptInvite",

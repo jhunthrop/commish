@@ -26,6 +26,7 @@ describe("LineupEditor", () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: LINEUP });
     const bodies: unknown[] = [];
     fixture.deps = {
+      ...fixture.deps,
       fetchJson: async (_url, init) => {
         bodies.push(JSON.parse(String(init?.body)));
         return { json: async () => fixture.response } as unknown as Response;

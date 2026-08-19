@@ -27,12 +27,12 @@ import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { POST as postLeague } from "@/app/api/leagues/route";
 import { GET as getLeague } from "@/app/api/leagues/[leagueId]/route";
 import { GET as getMatchups } from "@/app/api/leagues/[leagueId]/matchups/[week]/route";
-import { POST as postScore } from "@/app/api/leagues/[leagueId]/weeks/[week]/score/route";
 import { GET as browsePublic } from "@/app/api/public/leagues/route";
 import { resetBrowseRateLimit } from "@/app/api/public/leagues/_shared";
 import { listPublicLeagues, PUBLIC_LEAGUE_FIELDS } from "@/league-service/browse";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
+import { finalizeWeek } from "@/stats-pipeline/finalize";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { leagueHome, matchupWeek } from "./read";
 import { writeSchedule } from "./schedule";
@@ -90,8 +90,8 @@ async function createDefaultLeague(userId = "u1") {
 /** A second team, a two-week schedule, and one scoreable quarterback per side. */
 async function playableSeason(leagueId: string, homeTeamId: string) {
   await db.insert(teams).values({ id: "team_2", leagueId, userId: "u2", name: "Team Two" });
-  // `scoreWeek` (via `finalizeWeek`) now refuses an undrafted league (Plan B Task 5's guard) —
-  // this fixture stands in for a season already underway, so the draft it's built on is done.
+  // `finalizeWeek` refuses an undrafted league (Plan B Task 5's guard) — this fixture stands
+  // in for a season already underway, so the draft it's built on is done.
   await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, leagueId));
   await db.insert(players).values([
     { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },
@@ -143,42 +143,14 @@ describe("GET /api/leagues/[leagueId]", () => {
   });
 });
 
-describe("POST /api/leagues/[leagueId]/weeks/[week]/score", () => {
-  it("is commissioner-only and rejects a week that isn't in the season", async () => {
-    const created = await createDefaultLeague("u1");
-    signedInAs("u2");
-    const denied = await postScore(new Request("http://test", { method: "POST" }), {
-      params: Promise.resolve({ leagueId: created.leagueId, week: "1" }),
-    });
-    expect(denied.status).toBe(403);
-
-    signedInAs("u1");
-    const missing = await postScore(new Request("http://test", { method: "POST" }), {
-      params: Promise.resolve({ leagueId: created.leagueId, week: "1" }),
-    });
-    expect(missing.status).toBe(404);
-    expect((await missing.json()).error).toBe("That week isn't part of this league's season.");
-  });
-
-  it("answers 400 for a week that isn't a number", async () => {
-    const created = await createDefaultLeague("u1");
-    signedInAs("u1");
-    const response = await postScore(new Request("http://test", { method: "POST" }), {
-      params: Promise.resolve({ leagueId: created.leagueId, week: "banana" }),
-    });
-    expect(response.status).toBe(400);
-  });
-
-  it("scores the week for the commissioner, and the matchup page shows both lineups", async () => {
+describe("GET /api/leagues/[leagueId]/matchups/[week]", () => {
+  it("shows both lineups once finalizeWeek has settled the week", async () => {
     const created = await createDefaultLeague("u1");
     await playableSeason(created.leagueId, created.teamId);
 
     signedInAs("u1");
-    const scored = await postScore(new Request("http://test", { method: "POST" }), {
-      params: Promise.resolve({ leagueId: created.leagueId, week: "1" }),
-    });
-    expect(scored.status).toBe(200);
-    expect((await scored.json()).data).toEqual({ weekNumber: 1, matchupsScored: 1 });
+    const scored = await finalizeWeek(db, created.leagueId, 1);
+    expect(scored).toEqual({ ok: true, weekNumber: 1, matchupsScored: 1 });
 
     const body = (await (await getMatchups(new Request(`http://test/api/leagues/${created.leagueId}/matchups/1`), {
       params: Promise.resolve({ leagueId: created.leagueId, week: "1" }),

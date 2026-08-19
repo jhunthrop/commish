@@ -41,6 +41,7 @@ describe("JoinPublicLeagueButton", () => {
   it("says something useful when the server cannot be reached at all", async () => {
     const fixture = fixtureLeagueDeps();
     fixture.deps = {
+      ...fixture.deps,
       fetchJson: async () => {
         throw new Error("offline");
       },

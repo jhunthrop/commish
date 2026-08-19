@@ -7,6 +7,7 @@ import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import { MatchupPanel } from "@/league-room/components/matchup-panel";
 import { WeekNav } from "@/league-room/components/week-nav";
 import { AppHeader } from "@/components/app-shell/app-header";
+import { liveScoringCopy } from "@/stats/live-scoring-copy";
 
 export const dynamic = "force-dynamic";
 
@@ -42,12 +43,15 @@ export default async function MatchupWeekPage({ params }: PageProps) {
         <p className="text-text-muted">There are no matchups in this week yet.</p>
       ) : (
         body.matchups.map((matchup) => (
-          <MatchupPanel key={`${matchup.home.teamId}:${matchup.away.teamId}`} matchup={matchup} myTeamId={body.myTeamId} />
+          <MatchupPanel
+            key={`${matchup.home.teamId}:${matchup.away.teamId}`}
+            matchup={matchup}
+            myTeamId={body.myTeamId}
+            weekStatus={matchup.weekStatus}
+          />
         ))
       )}
-      <p className="text-sm text-text-muted">
-        {"Scores come from this preview's fixed 2026 stat set. There's no live scoring yet."}
-      </p>
+      <p className="text-sm text-text-muted">{liveScoringCopy()}</p>
     </main>
     </>
   );

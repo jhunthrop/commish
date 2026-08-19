@@ -174,14 +174,16 @@ draft room, the league room and the chat surface respectively. Each talks to its
 ONLY over the wire (`GET`/`POST /api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`,
 `GET /api/leagues/[leagueId]/events`) — never by importing `@/draft-engine`, `@/draft-service`,
 `@/league`, `@/league-service`, `@/chat-service`, `@/ai-advisor`, `@/db`, `@/lib/realtime`,
-`@/lib/auth`, `@/lib/leagues`, `@/lib/llm`, `@/lib/api/respond` or `@/data/seed` as VALUES. An ESLint
+`@/lib/auth`, `@/lib/leagues`, `@/lib/llm`, `@/lib/api/respond`, `@/data/seed` or
+`@/stats-pipeline` as VALUES. An ESLint
 `@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`,
 scoped to `src/draft-room/**/*.{ts,tsx}`, `src/league-room/**/*.{ts,tsx}` and
 `src/chat-room/**/*.{ts,tsx}` only) enforces this — matched against a relative-path spelling of
 the same module too (`../../draft-engine`), not just the `@/` alias. `import type` stays
 allowed, since sharing a TYPE (e.g. `DraftStateView`, `LeagueSummary`, `ChatMessageView`,
-`ApiEnvelope`) costs nothing at runtime and is how the client and server sides of the wire stay
-in sync.
+`ApiEnvelope`, or `ScoreUpdatePayload`/`TeamScore` from `@/stats-pipeline/contract`, which
+`useLiveScores` — `src/league-room/hooks/use-live-scores.ts` — imports that way) costs nothing
+at runtime and is how the client and server sides of the wire stay in sync.
 
 `src/chat/**` is deliberately **not** in that blocked list: unlike `draft-engine`/`league`, it is
 pure, I/O-free, browser-safe fold code (`mergeMessages`, `applyReaction`, `CHAT_CONFIG`), so
