@@ -48,7 +48,7 @@ export const DEV_SEED = {
     { leagueId: "dev_public_sunday_snake", draftId: "dev_public_sunday_snake_draft", name: "Sunday Regulars", format: "snake" as const, experienceTier: "experienced" as const, stakeTier: 1, teamCount: 12, filled: 8 },
     { leagueId: "dev_public_first_auction", draftId: "dev_public_first_auction_draft", name: "First Auction, No Pressure", format: "auction" as const, experienceTier: "beginner" as const, stakeTier: 0, teamCount: 10, filled: 5 },
     { leagueId: "dev_public_sharks_auction", draftId: "dev_public_sharks_auction_draft", name: "Sharks Only Auction", format: "auction" as const, experienceTier: "experienced" as const, stakeTier: 3, teamCount: 10, filled: 9 },
-    { leagueId: "dev_public_two_slots", draftId: "dev_public_two_slots_draft", name: "Two Slots Left", format: "snake" as const, experienceTier: "experienced" as const, stakeTier: 2, teamCount: 8, filled: 6 },
+    { leagueId: "dev_public_two_slots", draftId: "dev_public_two_slots_draft", name: "Backyard Brawl", format: "snake" as const, experienceTier: "experienced" as const, stakeTier: 2, teamCount: 8, filled: 6 },
     { leagueId: "dev_public_packed", draftId: "dev_public_packed_draft", name: "Packed House", format: "snake" as const, experienceTier: "beginner" as const, stakeTier: 1, teamCount: 8, filled: 8 },
   ],
 } as const;

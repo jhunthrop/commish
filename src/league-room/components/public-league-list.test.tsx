@@ -22,6 +22,8 @@ describe("PublicLeagueList", () => {
         expect(screen.getByText("Rookie Snake Room")).toBeInTheDocument();
         expect(screen.getByText(/3 of 12 joined/)).toBeInTheDocument();
         expect(screen.getByText(/9 of 10 joined/)).toBeInTheDocument();
+        expect(screen.getByText("9 spots left")).toBeInTheDocument();
+        expect(screen.getByText("1 spot left")).toBeInTheDocument();
         expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
@@ -35,16 +37,18 @@ describe("PublicLeagueList", () => {
     expect(screen.getByRole("button", { name: "Join Sharks Only Auction" })).toBeInTheDocument();
   });
 
-  it("sends a signed-out visitor to sign in rather than to a button that cannot work", () => {
+  it("sends a signed-out visitor to sign in, named per league so the offer reads as honest rather than a bait-and-switch", () => {
     render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn={false} />);
     expect(screen.queryByRole("button", { name: /^Join / })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: "Sign in to join" })[0]).toHaveAttribute("href", "/sign-in");
+    expect(screen.getByRole("link", { name: "Sign in to join Rookie Snake Room" })).toHaveAttribute("href", "/sign-in");
+    expect(screen.getByRole("link", { name: "Sign in to join Sharks Only Auction" })).toHaveAttribute("href", "/sign-in");
   });
 
   it("offers a next action when no league matches, rather than a dead end", async () => {
     await inBothThemes(<PublicLeagueList leagues={[]} signedIn />, async ({ container }) => {
       expect(screen.getByText("No open leagues match")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Clear the filters" })).toHaveAttribute("href", "/browse");
+      expect(screen.getByRole("link", { name: "Start your own league" })).toHaveAttribute("href", "/app#create-league");
       expect(await axe(container)).toHaveNoViolations();
     });
   });

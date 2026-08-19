@@ -23,6 +23,11 @@ const first = (value: string | readonly string[] | undefined): string | null =>
  * signed-out visitor by design — `getCurrentUser()` returning null is the expected case, not an
  * error, and the only thing it changes is whether a card offers a join button or a sign-in
  * link. The signed-in chrome (`AppHeader`) appears only when there is a person to name.
+ *
+ * The intro line always offers a "Start your own league" path alongside the browse, not only
+ * inside `PublicLeagueList`'s empty state: a commissioner arriving to recruit for their own
+ * group is a real visitor to this page, and results matching their filters should not be the
+ * only way they find their way out of browsing someone else's leagues.
  */
 export default async function BrowsePage({ searchParams }: PageProps) {
   const params = await searchParams;
@@ -57,7 +62,13 @@ export default async function BrowsePage({ searchParams }: PageProps) {
         <PageTitle>Open leagues</PageTitle>
         <p className="max-w-prose text-text-muted">
           Leagues looking for managers, with a draft still to come. Pick one that matches how you
-          like to play.
+          like to play. Recruiting your own group instead?{" "}
+          {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
+              first rather than an error, exactly like the empty state's identical link. */}
+          <Link href="/app#create-league" className="font-medium text-accent underline">
+            Start your own league
+          </Link>
+          .
         </p>
         <BrowseFilters filter={filter} />
         <PublicLeagueList leagues={leagues} signedIn={user !== null} />

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { BrowseFilters } from "./browse-filters";
 
@@ -14,6 +15,11 @@ describe("BrowseFilters", () => {
       expect(screen.getByRole("button", { name: "Show leagues" })).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+
+  it("carries the no-money disclosure right under the stake tier control, not only in the footer", () => {
+    render(<BrowseFilters filter={EMPTY_BROWSE_FILTER} />);
+    expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
   });
 
   it("submits as a plain GET to /browse, so the URL is the filter and it works with no JavaScript", () => {

@@ -28,13 +28,24 @@ const STAKE_OPTIONS = [
  *
  * `defaultValue` rather than `value`: an uncontrolled native control needs no state and no
  * hydration, and the server has already rendered the applied filter into it.
+ *
+ * The stake tier control carries `MATCHMAKING_CONFIG.stakeDisclosure` as its own hint, right
+ * where a visitor is about to narrow by "High stakes" and would otherwise wonder what that
+ * costs. `PublicLeagueList` repeats the SAME constant once more, below the results it labels —
+ * the two sites share one source of truth rather than two copies of the sentence drifting apart.
  */
 export function BrowseFilters({ filter }: { readonly filter: BrowseFilter }) {
   return (
     <form method="get" action="/browse" className="grid gap-3 sm:grid-cols-4 sm:items-end">
       <Select label="Draft format" name="format" options={FORMAT_OPTIONS} defaultValue={String(filter.format)} />
       <Select label="Experience" name="experienceTier" options={EXPERIENCE_OPTIONS} defaultValue={String(filter.experienceTier)} />
-      <Select label="Stake tier" name="stakeTier" options={STAKE_OPTIONS} defaultValue={String(filter.stakeTier)} />
+      <Select
+        label="Stake tier"
+        name="stakeTier"
+        options={STAKE_OPTIONS}
+        defaultValue={String(filter.stakeTier)}
+        hint={MATCHMAKING_CONFIG.stakeDisclosure}
+      />
       <Button type="submit" variant="secondary">
         Show leagues
       </Button>

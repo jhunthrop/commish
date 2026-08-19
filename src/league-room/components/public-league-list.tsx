@@ -9,13 +9,26 @@ const FORMAT_LABEL: Readonly<Record<string, string>> = { snake: "Snake", auction
 const TIER_LABEL: Readonly<Record<string, string>> = { beginner: "New to fantasy", experienced: "Played before" };
 
 /**
+ * "6 of 8 joined" answers "how full is it"; a visitor's actual decision is "is there room for
+ * me", so the seat count gets its own clause. Singular "1 spot left" reads right for the one
+ * case it applies to; a league with zero seats left never reaches this list at all (`browse`
+ * only ever returns leagues `hasOpenSeat` accepts), so there is no "0 spots left" to word.
+ */
+function spotsLeftLabel(league: Pick<PublicLeagueSummary, "teamCount" | "filledTeams">): string {
+  const spotsLeft = league.teamCount - league.filledTeams;
+  return `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`;
+}
+
+/**
  * The matching open leagues. Not a client component: it renders server-shaped data, and the one
  * interactive part is a child that owns its own state.
  *
  * Fill status is stated plainly ("3 of 12 joined") rather than drawn as a bar, because the
- * number is the decision a visitor is actually making and a bar makes them estimate it. Every
- * fact on a card comes from `PublicLeagueSummary` and nothing else — see that contract for what
- * a stranger is and is not told.
+ * number is the decision a visitor is actually making and a bar makes them estimate it — and
+ * the seat count that follows it (`spotsLeftLabel`) answers that decision directly rather than
+ * asking a visitor to do the subtraction themselves. Every fact on a card comes from
+ * `PublicLeagueSummary` and nothing else — see that contract for what a stranger is and is not
+ * told.
  */
 export function PublicLeagueList({
   leagues,
@@ -61,13 +74,18 @@ export function PublicLeagueList({
               <p className={EYEBROW}>
                 {`${FORMAT_LABEL[league.format] ?? league.format} · ${TIER_LABEL[league.experienceTier] ?? league.experienceTier}`}
               </p>
-              <p className="text-sm text-text-muted">{`${league.filledTeams} of ${league.teamCount} joined`}</p>
+              <p className="text-sm text-text-muted">
+                {`${league.filledTeams} of ${league.teamCount} joined`}
+                {" · "}
+                <span className="font-medium">{spotsLeftLabel(league)}</span>
+              </p>
               <div className="mt-auto">
                 {signedIn ? (
                   <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} />
                 ) : (
                   <Link
                     href="/sign-in"
+                    aria-label={`Sign in to join ${league.name}`}
                     className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   >
                     Sign in to join
