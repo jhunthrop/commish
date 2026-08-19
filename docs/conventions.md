@@ -174,22 +174,23 @@ Postgres through a transaction pooler. The in-process mutex in `src/draft-servic
 remains as an intra-process fast path, not as the safety mechanism.
 
 ### Client boundary
-Everything under `src/draft-room/**`, `src/league-room/**` and `src/chat-room/**` is BROWSER
-code — the pure state reducer/formatters, the hooks, and the client components that render the
-draft room, the league room and the chat surface respectively. Each talks to its service layer
-ONLY over the wire (`GET`/`POST /api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`,
-`GET /api/leagues/[leagueId]/events`) — never by importing `@/draft-engine`, `@/draft-service`,
-`@/league`, `@/league-service`, `@/chat-service`, `@/ai-advisor`, `@/db`, `@/lib/realtime`,
-`@/lib/auth`, `@/lib/leagues`, `@/lib/llm`, `@/lib/api/respond`, `@/data/seed` or
-`@/stats-pipeline` as VALUES. An ESLint
-`@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`,
-scoped to `src/draft-room/**/*.{ts,tsx}`, `src/league-room/**/*.{ts,tsx}` and
-`src/chat-room/**/*.{ts,tsx}` only) enforces this — matched against a relative-path spelling of
+Everything under `src/draft-room/**`, `src/league-room/**`, `src/chat-room/**` and
+`src/account-room/**` is BROWSER code — the pure state reducer/formatters, the hooks, and the
+client components that render the draft room, the league room, the chat surface and the profile
+surface respectively. Each talks to its service layer ONLY over the wire (`GET`/`POST
+/api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`, `GET /api/leagues/[leagueId]/events`,
+`PATCH /api/profile`) — never by importing `@/draft-engine`, `@/draft-service`, `@/league`,
+`@/league-service`, `@/chat-service`, `@/ai-advisor`, `@/db`, `@/lib/realtime`, `@/lib/auth`,
+`@/lib/leagues`, `@/lib/llm`, `@/lib/api/respond`, `@/data/seed` or `@/stats-pipeline` as VALUES.
+An ESLint `@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`'s
+`SERVER_ONLY_MODULE_GROUPS`, scoped to `src/draft-room/**/*.{ts,tsx}`,
+`src/league-room/**/*.{ts,tsx}`, `src/chat-room/**/*.{ts,tsx}` and
+`src/account-room/**/*.{ts,tsx}` only) enforces this — matched against a relative-path spelling of
 the same module too (`../../draft-engine`), not just the `@/` alias. `import type` stays
 allowed, since sharing a TYPE (e.g. `DraftStateView`, `LeagueSummary`, `ChatMessageView`,
-`ApiEnvelope`, or `ScoreUpdatePayload`/`TeamScore` from `@/stats-pipeline/contract`, which
-`useLiveScores` — `src/league-room/hooks/use-live-scores.ts` — imports that way) costs nothing
-at runtime and is how the client and server sides of the wire stay in sync.
+`ProfileBody`, `ApiEnvelope`, or `ScoreUpdatePayload`/`TeamScore` from `@/stats-pipeline/contract`,
+which `useLiveScores` — `src/league-room/hooks/use-live-scores.ts` — imports that way) costs
+nothing at runtime and is how the client and server sides of the wire stay in sync.
 
 `src/chat/**` is deliberately **not** in that blocked list: unlike `draft-engine`/`league`, it is
 pure, I/O-free, browser-safe fold code (`mergeMessages`, `applyReaction`, `CHAT_CONFIG`), so
@@ -216,7 +217,8 @@ directly; that is the idiomatic Next.js pattern, not a boundary violation. A pag
 told apart from a client component by its filename alone, so a glob covering `src/app/**`
 would either miss real client code elsewhere or wrongly flag a legitimate server import. Any
 client interactivity a page needs is a `"use client"` component imported FROM
-`src/draft-room/**`, `src/league-room/**` or `src/chat-room/**`, not inlined into the page file.
+`src/draft-room/**`, `src/league-room/**`, `src/chat-room/**` or `src/account-room/**`, not
+inlined into the page file.
 See `docs/draft-room.md` for the draft room's full fetch → SSE → apply → gap → refetch contract.
 
 ### API responses

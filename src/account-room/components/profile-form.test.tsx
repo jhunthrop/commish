@@ -49,6 +49,32 @@ describe("ProfileForm", () => {
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
   });
 
+  it("saves avatarPreset: null over the wire when no preset has ever been chosen, and still succeeds", async () => {
+    // Mirrors identity-service/profile.test.ts's "leaves the WorkOS-supplied picture in place
+    // until a preset is chosen" — but proven through ProfileForm's actual PATCH body, not just
+    // the service call, since the decline-preserves-WorkOS-picture contract only holds end to
+    // end if the form sends `null` rather than, say, omitting the field or sending a stale key.
+    const bodies: unknown[] = [];
+    const fixture = fixtureAccountDeps({ ok: true, data: PROFILE });
+    fixture.deps = {
+      ...fixture.deps,
+      fetchJson: async (url, init) => {
+        bodies.push({ url, body: JSON.parse(String(init?.body)) });
+        return { json: async () => fixture.response } as unknown as Response;
+      },
+    };
+    renderInAccount(<ProfileForm profile={PROFILE} />, fixture.deps);
+    fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Ada B." } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toEqual({
+      url: "/api/profile",
+      body: { displayName: "Ada B.", experienceTier: "beginner", avatarPreset: null },
+    });
+    await waitFor(() => expect(refresh).toHaveBeenCalled());
+    expect(await screen.findByText("Saved.")).toBeInTheDocument();
+  });
+
   it("shows the server's reason without losing what was typed", async () => {
     const fixture = fixtureAccountDeps({ ok: false, error: "displayName: Your name needs at least 2 characters." });
     renderInAccount(<ProfileForm profile={PROFILE} />, fixture.deps);
