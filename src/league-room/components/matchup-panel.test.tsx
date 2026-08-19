@@ -17,9 +17,11 @@ describe("MatchupPanel", () => {
   });
 
   it("never implies live scoring", async () => {
+    // The stat-set disclaimer lives once at page level now; the panel's own duty is narrower:
+    // a week is "Final" or "Not scored yet", never "in progress" or "live".
     render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" />);
-    expect(screen.getByText(/There's no live scoring yet/)).toBeInTheDocument();
-    expect(screen.queryByText(/live/i)?.textContent).not.toMatch(/in progress|live now|updating/i);
+    expect(screen.queryByText(/in progress|live now|updating/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Final")).toBeInTheDocument();
   });
 
   it("says a week is not scored yet rather than showing a zero", async () => {

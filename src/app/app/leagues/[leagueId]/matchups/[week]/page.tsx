@@ -35,7 +35,7 @@ export default async function MatchupWeekPage({ params }: PageProps) {
     <>
     <AppHeader displayName={user.displayName} />
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
-      <PageTitle>{`${home.name} — Week ${weekNumber}`}</PageTitle>
+      <PageTitle>{`${home.name} · Week ${weekNumber}`}</PageTitle>
       <WeekNav leagueId={leagueId} weekNumber={weekNumber} totalWeeks={body.totalWeeks} />
       {body.matchups.length === 0 ? (
         <p className="text-text-muted">There are no matchups in this week yet.</p>
@@ -44,6 +44,9 @@ export default async function MatchupWeekPage({ params }: PageProps) {
           <MatchupPanel key={`${matchup.home.teamId}:${matchup.away.teamId}`} matchup={matchup} myTeamId={body.myTeamId} />
         ))
       )}
+      <p className="text-sm text-text-muted">
+        {"Scores come from this preview's fixed 2026 stat set. There's no live scoring yet."}
+      </p>
     </main>
     </>
   );
