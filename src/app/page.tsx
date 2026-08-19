@@ -123,12 +123,20 @@ export default async function Home() {
     <main className="min-h-screen bg-surface">
       <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
         <p className="font-display text-2xl font-bold uppercase tracking-wide text-text-primary">Commish</p>
-        <Link
-          href="/sign-in"
-          className="rounded-md px-4 py-2 font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          Sign in
-        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/browse"
+            className="rounded-md px-4 py-2 font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Browse open leagues
+          </Link>
+          <Link
+            href="/sign-in"
+            className="rounded-md px-4 py-2 font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Sign in
+          </Link>
+        </div>
       </header>
 
       <section
