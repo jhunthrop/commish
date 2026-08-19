@@ -103,7 +103,8 @@ roll up a total over an unbounded one. A payment ledger is unbounded. A league's
 ```
 pool_size_per_instance = (postgres_max_connections
                           - reserved_superuser_connections
-                          - background_job_pool_size) / expected_max_instances
+                          - background_job_pool_size * expected_max_instances)
+                         / expected_max_instances
 ```
 
 Executable as `requestPoolSizePerInstance()` in `src/db/config.ts`, with each input a named
@@ -112,7 +113,13 @@ follow. `src/db/config.test.ts` asserts that every instance's pool plus the back
 never exceed what Postgres will actually grant.
 
 `background_job_pool_size` is subtracted **before** the division rather than carved out of one
-instance's share. Plan B's stats-ingestion worker is that pool's first named consumer:
+instance's share, and it is subtracted `expected_max_instances` TIMES, because the background pool
+is per instance rather than cluster-wide: `src/instrumentation.ts` starts an ingestion worker in
+every Node process and each one opens its own pool. Subtracting it once was correct only while
+there was exactly one background worker anywhere, which stopped being true the moment Plan B's
+worker shipped — the old formula budgeted 4 x 23 + 5 = 97 connections while the deployment would
+actually open 4 x 23 + 4 x 5 = 112, fifteen past what Postgres would grant. Corrected, it is 19 per
+instance and 4 x (19 + 5) = 96. Plan B's stats-ingestion worker is that pool's first named consumer:
 `ingestionPoolOptions()` (`src/stats-pipeline/index.ts`) hands `DB_POOL_CONFIG.backgroundJobPoolSize`
 straight to the worker's own `createDb(undefined, ingestionPoolOptions())` call, a dedicated pool
 it never shares with the request path's `getDb()`, and holds those connections for the length of

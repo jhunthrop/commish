@@ -133,6 +133,39 @@ describe("setLineup", () => {
     });
   });
 
+  it("refuses a save whose week is flipped to in_progress after the up-front lock check passed", async () => {
+    // The read-validate-write hole: the up-front `isWeekLocked` read is followed by four more
+    // round trips (roster, players, validation) before the upsert, and the ingestion worker flips
+    // the week inside `persistTick`'s own transaction with no coordination. A lineup submitted in
+    // that window used to be accepted after kickoff — a manager watching a running back get hurt
+    // at 1:15pm and swapping him out at 1:16.
+    //
+    // Driven for real, not simulated: a concurrent transaction updates the week's row and holds
+    // it uncommitted, so the up-front check reads the still-committed `scheduled` value while the
+    // re-check's `FOR SHARE` blocks on the uncommitted row and sees `in_progress` once it lands.
+    const league = await twoTeamLeague(db, { weeks: 10 });
+    await setWeekStatus(2, "scheduled");
+
+    let release: () => void = () => {};
+    const flipped = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const flip = db.transaction(async (tx) => {
+      await tx.update(statWeeks).set({ status: "in_progress" }).where(eq(statWeeks.week, 2));
+      await flipped;
+    });
+
+    const saving = setLineup(db, validLineupInput(league, 2));
+    // Long enough for `setLineup` to clear its up-front check and reach the locking read.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    release();
+    await flip;
+
+    expect(await saving).toMatchObject({ ok: false, status: 409 });
+    const saved = await db.select().from(lineupSlots).where(eq(lineupSlots.teamId, league.teamId));
+    expect(saved.filter((row) => row.weekNumber === 2)).toHaveLength(0);
+  });
+
   it("refuses a week the league doesn't have", async () => {
     const league = await twoTeamLeague(db);
     expect(

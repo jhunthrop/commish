@@ -62,6 +62,38 @@ describe("useLiveScores", () => {
     expect(result.current.scores.get("t2")).toBe(9);
   });
 
+  it("ignores a frame for a different week, however new its version", async () => {
+    // The SSE stream is per LEAGUE; `stat_weeks.version` is per WEEK. A tick publishes for the
+    // week it examined, and team ids are stable across weeks within a league — so a frame for
+    // another week merged straight over this week's totals, under this week's header, with that
+    // week's status. Most reachable trigger: a manager leaves last week's matchup page open on
+    // Sunday, the current week settles, and last week repaints with this week's scores marked
+    // Final.
+    const fixture = fixtureLeagueDeps({ ok: true, data: WEEK_BODY });
+    const { result } = renderHook(() => useLiveScores("l1", INITIAL), { wrapper: wrapper(fixture.deps) });
+
+    act(() =>
+      fixture.emit("score.update", {
+        week: 6, status: "final", version: 99, gamesFinal: 4, gamesTotal: 4,
+        scores: [{ teamId: "t1", points: 101 }, { teamId: "t2", points: 88 }],
+      }),
+    );
+
+    expect(result.current.scores.get("t1")).toBe(12);
+    expect(result.current.scores.get("t2")).toBe(9);
+    expect(result.current.status).toBe("in_progress");
+
+    // And the foreign frame did not poison the version gate either: this week's next frame,
+    // whose version is far lower than the one that was ignored, still applies.
+    act(() =>
+      fixture.emit("score.update", {
+        week: 5, status: "in_progress", version: 2, gamesFinal: 1, gamesTotal: 4,
+        scores: [{ teamId: "t1", points: 20 }],
+      }),
+    );
+    await waitFor(() => expect(result.current.scores.get("t1")).toBe(20));
+  });
+
   it("moves the week to final once a frame says so", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: WEEK_BODY });
     const { result } = renderHook(() => useLiveScores("l1", INITIAL), { wrapper: wrapper(fixture.deps) });

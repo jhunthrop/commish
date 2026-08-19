@@ -135,9 +135,24 @@ route together, so the worker is now the only caller. For each matchup it reads 
 teams' saved (or default) starting lineup, scores the starters with `scoreLineup`
 (`src/scoring/`) against the league's own `scoring_settings`, and writes both scores inside one
 transaction — a half-scored week is not a result, it's a bug in progress, and
-`computeStandings` deliberately ignores a matchup with only one score set. Re-running is safe
-and reproduces identical numbers: it recomputes from the same stored lineups and stat lines and
-overwrites.
+`computeStandings` deliberately ignores a matchup with only one score set. The scores are computed
+INSIDE that transaction, from matchups read in a deterministic order, so a settlement can neither
+be computed from a snapshot older than the data it writes against nor deadlock with a concurrent
+copy of itself. Re-running is safe and reproduces identical numbers: it recomputes from the same
+stored lineups and stat lines and overwrites.
+
+Re-running is not hypothetical, and that matters for a week's final number. NFL official scoring
+revisions run into the following week, and the worker records a game's box score the first moment
+the provider calls it final — the earliest, least settled version of it. For three days after a
+week settles the worker re-reads that week's box scores once a calendar day (its **correction
+window**, `docs/decisions/live-scoring-pipeline.md` §10), and a revision that lands flows through
+`finalizeWeek` into `matchups` and from there into the standings by the same machinery a first
+settlement uses. After that window closes, the week's numbers are the ones that stand.
+
+A league that finishes its draft AFTER one of its weeks has already settled is not left behind:
+`finalizeWeek` refuses an undrafted league (its rosters do not exist, so every team would score zero
+and the standings would show phantom losses), and the worker catches those weeks up on a later tick
+once the draft is complete, a bounded number at a time.
 
 `computeStandings` (`src/league/standings.ts`) tallies wins, losses, ties and both points
 columns from finished matchups only, then sorts by the canonical ranking — **win percentage

@@ -54,13 +54,19 @@ function storageState(baseURL: string, cookie: string): string {
 export const SEEDED_SEASON_CURRENT_WEEK = LEAGUE_CONFIG.regularSeasonWeeks;
 
 /**
- * Generous, not tight: a correct worker converges from a completely empty `stat_weeks` table in
- * well under this many ticks (11, measured against the committed mock dataset's 16 games/week
- * and the default 20-game/tick budget — two examined weeks sharing one tick's budget means
- * roughly one real week finalizes per tick, not two). This cap exists only to fail loudly if
- * that ever regresses, never to be a precise bound tied to today's dataset shape.
+ * The safety net: a hard stop so a worker that can never converge fails the suite rather than
+ * looping forever.
  */
 const MAX_TICKS_TO_REACH_LIVE_WEEK = 40;
+
+/**
+ * The actual bound. A correct worker converges from a completely empty `stat_weeks` table in 11
+ * ticks against the committed mock dataset's 16 games a week and the default 20-game tick budget.
+ * The safety net above cannot catch a regression from 11 to 39: it would pass, silently, while
+ * every real tick's request cost rose with it. This is the assertion that fails instead — tight
+ * enough to notice, loose enough to survive a dataset that grows a little.
+ */
+const EXPECTED_MAX_TICKS_TO_REACH_LIVE_WEEK = 15;
 
 const LOCAL_REDIS_HOSTS: ReadonlySet<string> = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
@@ -137,7 +143,16 @@ async function tickUntilLiveWeekReached(): Promise<void> {
         { stdio: "inherit", cwd: resolve(AUTH_DIR, "../..") },
       );
       const [current] = await db.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, SEEDED_SEASON_CURRENT_WEEK));
-      if (current?.status === "in_progress") return;
+      if (current?.status === "in_progress") {
+        const used = tick + 1;
+        console.log(`[e2e] stats:ingest reached week ${SEEDED_SEASON_CURRENT_WEEK} in ${used} ticks`);
+        if (used > EXPECTED_MAX_TICKS_TO_REACH_LIVE_WEEK) {
+          throw new Error(
+            `stats:ingest took ${used} ticks to reach week ${SEEDED_SEASON_CURRENT_WEEK}, past the expected bound of ${EXPECTED_MAX_TICKS_TO_REACH_LIVE_WEEK}. Convergence has regressed, and every tick costs upstream requests.`,
+          );
+        }
+        return;
+      }
     }
 
     throw new Error(`stats:ingest never reached week ${SEEDED_SEASON_CURRENT_WEEK} within ${MAX_TICKS_TO_REACH_LIVE_WEEK} ticks.`);

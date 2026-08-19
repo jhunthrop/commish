@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, lineupSlots, matchups, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
@@ -168,6 +168,27 @@ describe("finalizeWeek", () => {
     expect(await finalizeWeek(db, league.leagueId, 9)).toEqual({
       ok: false, status: 404, reason: "That week isn't part of this league's season.",
     });
+  });
+
+  it("drops the week's cached live scores once the settled numbers are the ones that stand", async () => {
+    // The cached value was computed from a week in progress. After settlement `matchups` holds the
+    // numbers that count, and a surviving cache entry at the same version would keep serving the
+    // mid-game total on the cross-league home.
+    const { leagueId } = await twoTeamLeague();
+    const cache = { invalidate: vi.fn(async () => {}) };
+
+    const result = await finalizeWeek(db, leagueId, 1, cache);
+
+    expect(result.ok).toBe(true);
+    expect(cache.invalidate).toHaveBeenCalledWith(leagueId, 1);
+  });
+
+  it("does not drop a cached score for a week it refused to settle", async () => {
+    const { leagueId } = await twoTeamLeague("ppr", "scheduled");
+    const cache = { invalidate: vi.fn(async () => {}) };
+
+    expect((await finalizeWeek(db, leagueId, 1, cache)).ok).toBe(false);
+    expect(cache.invalidate).not.toHaveBeenCalled();
   });
 
   it("refuses a league that doesn't exist", async () => {

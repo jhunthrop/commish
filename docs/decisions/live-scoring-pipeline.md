@@ -30,49 +30,87 @@ afford (see §2). `getGameStatLines(game)` gives the worker a per-game decision 
 `needsBoxScore` (`src/stats-pipeline/worker.ts`) is where that decision actually gets made, once
 per game per tick, against the Redis `finalGame` marker.
 
-`getWeeklyStatLines` stays on the interface anyway, as a **composition of the other two**, not a
-second implementation of "this week's stats." `seedPlayers` still walks weeks upward with it
-until it gets an empty array, and removing it would break that for no gain. Keeping it as an
-independently-written method would be two expressions of the same fact that could quietly drift;
-the shared contract suite (`describeStatsProviderContract`, `src/stats/test-support.ts`) asserts
-the per-game reads sum to exactly the same lines the week-level read returns, which is the
-cheapest way to keep two things agreeing forever: make one of them *be* the other.
+`getWeeklyStatLines` stays on the interface as a **composition of the other two**, not a second
+implementation of "this week's stats." It is the shared contract suite's anti-drift device
+(`describeStatsProviderContract`, `src/stats/test-support.ts` asserts the per-game reads sum to
+exactly the same lines the week-level read returns), which is the cheapest way to keep two things
+agreeing forever: make one of them *be* the other. `seedPlayers` used to walk weeks with it and now
+reads per game like the worker does, for a budget reason rather than a correctness one — see §2.
+
+The interface also carries `lastWeekOfSeason`, a value and not a method, because it costs no request
+and every provider knows it. It is where the worker's week pointer stops (§2).
 
 ## 2. The budget arithmetic
 
 This is the section a founder reads before buying a tier. `STATS_INGESTION_CONFIG`
-(`src/stats-pipeline/config.ts`) carries the arithmetic in its own docblock, reproduced here:
+(`src/stats-pipeline/config.ts`) carries the arithmetic in its own docblock and
+`src/stats-pipeline/config.test.ts` asserts it in literal numbers, so it cannot drift from the
+tunables it is derived from.
 
-| Cadence | Requests per Sunday | Per month (4.3 weeks) | Fits 1,000? |
-|---|---|---|---|
-| Poll every game every 5 minutes across a 10.5h Sunday | 126 polls x (1 schedule + ~10 live games) ~= 1,386 | ~5,960 | No, by 6x |
-| Poll every game every 15 minutes | 42 x 11 ~= 462 | ~1,990 | No, by 2x |
-| Poll the schedule every 30 minutes, fetch each box score exactly once, when it first reports final | 24 schedule calls + 16 box scores = 40 | ~195 (with Thursday and Monday) | Yes, with room |
+The numbers below are the LEDGER's numbers: what `RequestBudget.reserve()` debits, which since the
+two-phase reservation landed is exactly what the tick spends upstream. A month is 31 days of
+uninterrupted ticking, because the worker runs on a timer and not on an NFL calendar — the earlier
+version of this table counted a Sunday's polling and then compared it against a monthly ceiling,
+which is the arithmetic error that made the shipped configuration unrunnable.
 
-That third row is `final-only` mode, and it is the default `STATS_INGESTION_CONFIG.mode` ships
-with, because it is what the provider tier that existed when this was written could afford. It
-polls the schedule every `pollIntervalMs` (30 minutes) and fetches a game's box score exactly
-once — the first tick it reports final, tracked by the `finalGame` Redis marker — never again
-after. `live` mode fetches every non-final game's box score on every tick instead, which is what
-the first two rows cost: it is the shape that shows a score moving mid-quarter rather than only
-once a game ends, and it is fully built and tested today. Turning it on is a config value
-(`STATS_INGESTION_MODE=live` or `STATS_INGESTION_CONFIG.mode`), not a code change — nothing in
-this plan waits on that decision, because the mock provider runs either mode at zero request
-cost, so both are exercised in tests regardless of which one is live.
+| Line item | Arithmetic | Requests per month |
+|---|---|---|
+| Ticks per month | 86,400,000 / 1,800,000 x 31 days | 1,488 ticks |
+| Schedule calls, steady state (one examined week) | 1 x 1,488 | 1,488 |
+| Schedule calls, the extra lookahead week on a rollover | 1 x 5 week rollovers | 5 |
+| Box scores, `final-only` (each fetched once, ever) | 16 games x 5 weeks | 80 |
+| The correction sweep (§10) | (1 schedule + 16 box scores) x 3 days x 5 weeks | 255 |
+| **Ingestion total** | | **1,828** |
+| The season backfill (`npm run seed`) | 2 + 18 x (1 + 16) | 308 |
+| **Everything** | | **2,136** |
+
+`monthlyRequestBudget` therefore defaults to **3,000**, not 1,000: a 24/7 worker at a thirty-minute
+cadence spends 1,488 requests on schedule calls alone, more than a 1,000-request tier's whole
+ingestion share, before a single box score. That is a ceiling on what THIS deployment is allowed to
+spend, not a claim about the purchased quota — `STATS_MONTHLY_REQUEST_BUDGET` must be set to the
+quota actually bought, and if that number is smaller the ledger will start denying partway through
+the month, which is the correct and visible failure.
+
+**Why one examined week and not two.** `maxWeeksPerTick` is still 2, but the window only widens to
+it when the earliest non-final week has no `stat_weeks` row yet (a cold start, or the first tick
+after a week rolls over) or when that week has wedged (§11). Otherwise the week after the current
+one is entirely `scheduled` games that cannot have moved, and re-listing it every thirty minutes
+for a week straight was the single largest line in this table for no information at all. Nothing
+depends on the lookahead planting a row: `weeksToExamine`'s third case resumes at `MAX(week) + 1`
+once every existing row is final, which is what advances the pointer.
+
+**Where the pointer stops.** `StatsProvider.lastWeekOfSeason` — the provider's own number, not this
+module's. Tank01's regular season runs to week 18 and the committed mock dataset is 17 weeks; a
+pipeline constant of 18 left the pointer asking the default provider for a week it can never answer,
+`tickWeek` returned before writing a row, the pointer never advanced, and every tick paid for the
+same empty listing forever.
+
+**Two-phase reservation.** The tick reserves what it is about to spend, twice, and never a worst
+case: `weeks.length` before the `listGames` calls, then — once the schedules are in hand and the
+mode, the `finalGame` markers and `maxGamesPerTick` have decided exactly which box scores this tick
+will fetch — that exact count. There is deliberately no release path: a release is a second round
+trip that can be lost, and a lost release is a permanently over-counted ledger. The earlier shape
+reserved `weeks.length + maxGamesPerTick` up front with no release, so 850 requests bought 38 ticks
+and the ledger went dead about nineteen hours into every month. A denial at phase two skips the
+fetches and keeps the schedules, which are already paid for; the week's honest game counts are still
+persisted, and `everyFinalGameIngested` is what stops that from marking a week final early.
 
 **Where this stands today:** a paid Tank01 tier is approved and the key already lives in
-`.env.local`. `STATS_MONTHLY_REQUEST_BUDGET` (and `STATS_INGESTION_CONFIG.monthlyRequestBudget`)
-stays at its `1,000` default until the founder names the purchased quota — raising the ceiling
-before that number is known would just move where the ledger denies a reservation, not change
-what the upstream account actually allows. `live` mode is the launch target: `final-only` is safe
-and cheap enough to run against the free tier's arithmetic today, but a manager watching a score
-move only at the final whistle is not the product. Flipping `STATS_INGESTION_MODE=live` once the
-paid quota is known is the whole rollout — no other change.
+`.env.local`. `live` mode is the launch target — `final-only` is cheap, but a manager watching a
+score move only at the final whistle is not the product — and flipping `STATS_INGESTION_MODE=live`
+is the whole rollout, now that the variable is actually read (`resolveIngestionSettings`,
+`src/stats-pipeline/settings.ts`). It is not a free flip: live mode fetches every non-final game
+every tick, roughly 900 requests a month on top of the schedule calls, so
+`STATS_MONTHLY_REQUEST_BUDGET` moves with it.
 
-`STATS_INGESTION_CONFIG.reservedForBackfill` (150 of the 1,000) is held out of the ingestion
-budget `RequestBudget.reserve()` draws against, so a live season's polling can never starve
-`npm run seed`'s ability to backfill a season (about 300 requests for 18 weeks against a
-`listPlayers` + `getWeeklyStatLines` walk — see `docs/decisions/stats-provider-adapter.md`).
+`STATS_INGESTION_CONFIG.reservedForBackfill` (308 of the 3,000) is held out of the ingestion budget
+`RequestBudget.reserve()` draws against, so a live season's polling can never starve `npm run seed`.
+It is a real reservation and not merely a smaller ingestion ceiling, because `seedPlayers` now
+reserves through `RequestBudget.reserveBackfill` — against the FULL monthly quota — at the exact
+cost of each call it makes: 2 for `listPlayers`, then per week one `listGames` and one box score per
+game. It reads per game rather than through `getWeeklyStatLines` for exactly that reason: listing
+the week first makes its cost knowable before a single box score is fetched. The contract suite
+asserts the two reads return identical lines, so the seeded rows are unchanged.
 
 ## 3. The unrecognized-status ruling
 
@@ -206,9 +244,23 @@ the write path; idempotence comes entirely from the **storage model**:
   positive from inflating the version and invalidating every cached score for nothing.
 - A partial-week tick never **deletes** a row a fuller tick already wrote. "This tick returned
   fewer players than last time" is indistinguishable from an upstream hiccup, and treating it as a
-  correction would let one bad response erase a Sunday's data. Removal (`persist.ts`'s `dropped`
-  parameter) only ever comes from an explicit upstream absence inside a game the tick actually
-  fetched — never inferred from a shrinking row count.
+  correction would let one bad response erase a Sunday's data. There is no removal path at all:
+  `persistTick` had a `dropped` parameter for an explicit upstream absence that no provider signals
+  and no caller ever passed, and a dead parameter with a green test defending it reads as covered
+  behavior. It is gone. A player who genuinely disappears from a box score keeps his stored line,
+  which is the safe direction.
+- `stat_weeks.status` is **monotonic at `final`**. Two instances partition a week's games
+  differently under `maxGamesPerTick`, so the one that fetched fewer of them computes
+  `everyFinalGameIngested = false` from markers the other has not committed yet, and used to write
+  `in_progress` over `final` — re-arming the examination window and re-spending the budget on a
+  settled week. The correction sweep needs no exception: every game in the week it re-reads is
+  already final and already marked, so it re-persists `final` over `final`.
+- A tick's changed lines are **deduplicated by `playerId`** (last wins) and inserted in `playerId`
+  **order**. The first is survival, not tidiness: `persistTick` inserts them as one multi-row
+  `ON CONFLICT DO UPDATE`, and Postgres rejects the whole statement with `21000` if a conflict key
+  repeats, so a player appearing in two of a week's box scores used to fail the entire tick every
+  thirty minutes until upstream cleared. The second removes a deadlock class — two instances
+  inserting an overlapping set in different orders take the same row locks in opposite orders.
 
 Because idempotence is unrepresentable-as-a-bug rather than guarded-against, there is nothing to
 add to keep correct that isn't already load-bearing for a different reason. The test that proves
@@ -235,13 +287,108 @@ exists to make:
   contract types (`ScoreUpdatePayload`, `TeamScore`, `WeekStatus`) do not change — none of them
   import anything from `src/stats/**`.
 - The budget ledger's arithmetic does not change in shape — only its configured
-  `monthlyRequestBudget` moves, which is already a config value, not a code path.
+  `monthlyRequestBudget` moves, which is already a config value (and now an environment variable,
+  `STATS_MONTHLY_REQUEST_BUDGET`), not a code path.
 - The shared contract suite (`describeStatsProviderContract`) does not change. A real vendor
   adapter is verified by the exact same suite the mock and Tank01 already pass, unchanged — that
   is what makes it a proof the seam holds rather than a claim about it.
 
-What a real vendor adapter *does* have to supply: an implementation of all four `StatsProvider`
-methods honoring the request-cost table in §1 (or documenting in its own docblock why it cannot,
+What a real vendor adapter *does* have to supply: its own `lastWeekOfSeason` and an implementation
+of all four `StatsProvider` methods honoring the request-cost table in §1 (or documenting in its own docblock why it cannot,
 since `budget.ts` reserves against those exact numbers), and a `config.ts` naming its own season
 and rate-tier constants the way `TANK01_CONFIG` does today. Everything this document describes
 above that line was built to that seam and stops there on purpose.
+
+## 10. The correction window
+
+A week, once settled, used to be unrevisable: `weeksToExamine` walked forward from the first
+NON-final row, so a `final` week never came back; `needsBoxScore` refused a game whose `finalGame`
+marker existed; `finalizeWeek` ran only on the transition; and the manual scoring route was deleted
+in Task 8. NFL official scoring revisions run into the following week, and `final-only` records
+whatever the box score said the first moment the provider called the game final — by construction
+the earliest and least settled version of it. So the season record was frozen at a number the league
+itself no longer agreed with, permanently, with no operator path back short of direct SQL.
+
+The **correction sweep** closes it. The examination window additionally includes the most recent
+`final` week for `STATS_INGESTION_CONFIG.correctionWindowDays` (3) after its `stat_weeks.updated_at`,
+re-reading that week's box scores at most once per calendar day — a Redis marker
+(`STATS_INGESTION_CONFIG.keys.correctionSweep`) is what makes it once, and the tick that SETTLED the
+week counts as that day's read, so the first sweep is the next day's. Inside a sweep,
+`needsBoxScore` ignores both the `finalGame` marker and `final-only`'s fetch-once rule, because
+re-reading is the entire point.
+
+Nothing downstream needed building: `persistTick` and `finalizeWeek` are already
+recompute-and-overwrite idempotent, so a landed revision flows into `player_stat_lines`, bumps
+`stat_weeks.version` (which propagates to the score cache and every open matchup page over SSE),
+re-settles `matchups` through `finalizeWeek`, and reaches the standings by `computeStandings`
+reading those rows. That is why the sweep is cheap to have: the machinery it drives already existed
+and was only missing a caller.
+
+**A sweep that finds nothing writes nothing** — not even `updated_at`. The window is measured from
+`updated_at`, so a no-op write would push its own deadline out by a day on every pass and the window
+would never close. A sweep that DOES land a revision bumps it, which extends the window by three
+more days from the revision: a week that was corrected once is the likeliest week to be corrected
+again.
+
+What is still out of scope: a revision that arrives after the window closes, and a revision to any
+week but the most recent settled one. Both are deliberate — the sweep costs 17 requests a day and
+the ledger has to hold — and both are visible rather than silent, because the numbers above say what
+a wider window would cost.
+
+## 11. A wedged week, and a league that drafts late
+
+Two ways the pipeline used to lose a week permanently, both closed by the same instinct: prefer the
+state that keeps moving.
+
+**A wedged week.** A postponed or cancelled game whose upstream status never flips, or a game whose
+box score permanently 404s, pins the examination window on one week forever — and since the window
+starts at the earliest non-final week, every later week is never examined again. The worker now
+counts how many consecutive ticks the window has opened on the same un-advanceable week, and past
+`STATS_INGESTION_CONFIG.wedgedWeekTicks` (48, a full day at the default cadence) it logs loudly on
+the `warnIntervalMs` rate limit and WIDENS the window to include the following week. Widen, never
+skip: the stuck week is still examined every tick, because its games may yet be played.
+
+**A league that drafts late.** `finalizeWeek` refuses an undrafted league — its rosters do not exist
+yet, so every team would score zero and the standings would show a season of phantom losses — and
+the tick that settled the week moved on. A league drafting on a Sunday afternoon silently forfeited
+that week from its record. The worker now catches those up from the DATA rather than from a flag the
+draft would have to remember to write: a `matchups` row in a `final` week with no score is exactly
+the state that needs settling, whatever produced it. Bounded at
+`STATS_INGESTION_CONFIG.maxSettlementsPerTick` per tick, so a league that completes a mid-season
+draft catches up over a few ticks rather than doing a season of settlement writes inside one.
+
+## 12. Cross-instance serialization
+
+`src/instrumentation.ts` starts the worker in EVERY Node process, and the phase's own scaling
+ceiling is four instances. Without serialization each one fetches every unmarked box score
+independently: N times the upstream spend, N times the ledger debit, and two publishes stamped with
+the same `stat_weeks.version` where the second — often the fresher — is dropped by
+`useLiveScores`'s version gate.
+
+The tick takes a **best-effort Redis lease**: `SET NX PX` on
+`STATS_INGESTION_CONFIG.keys.tickLease`, held for one poll interval, released on completion with a
+compare-and-delete script so a tick that overran its TTL cannot delete the next instance's freshly
+acquired lease. A held lease skips the tick entirely, before any reservation or any upstream call.
+
+Best-effort is the design, not a shortcut, and the failure mode is stated rather than guarded: if
+Redis is unreachable the tick runs UNLEASED. Duplicate work is safe — persistence is idempotent by
+storage model and serialized by the `stat_weeks` primary key (§8) — so the cost of a Redis outage is
+requests, never correctness. A lease that failed closed would take live scoring down whenever Redis
+hiccuped, which is strictly worse. A Postgres row lock was rejected for a different reason: it would
+have to span the HTTP fetch phase, pinning a pooled connection on external latency, which this
+codebase avoids everywhere else.
+
+## 13. Who writes the score cache
+
+The ingestion worker, and only the worker. `publishAffected` writes each affected league's computed
+scores at the version `persistTick` just returned, immediately before the SSE publish and after the
+commit — the values are already in hand, so it costs no query. `src/stats-pipeline/index.ts` wires
+the same `getScoreCache()` singleton the read paths use, so the version a value is stamped with and
+the version a read compares against are two ends of one key.
+
+This is what makes `crossLeagueHome`'s live branch real. Before it, `ScoreCache.write()` had no
+production caller anywhere: the home board's `MGET` always missed, an `in_progress` week fell
+through to `matchups.home_score` (null until settlement), and every live league rendered a dash on
+the one afternoon the number matters. `setLineup`'s invalidation deleted a key that never existed,
+and `finalizeWeek` now invalidates too — the cached value was computed from a week in progress, and
+after settlement the numbers that stand live in `matchups`.
