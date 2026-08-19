@@ -59,6 +59,26 @@ describe("RoomRail", () => {
     expect(screen.getByText("Picks shorten to 10 minutes in 2h 14m")).toBeInTheDocument();
   });
 
+  // Step 15's audit: the rail named whose turn it was but never showed a face. `Avatar` falls
+  // back to initials with no `ownerAvatarUrl` on the fixture team, so Bay Bandits' owner (Dana
+  // Whitfield) shows as "DW" beside the name while she is on the clock.
+  it("puts a face beside the on-clock team's name", () => {
+    render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
+    expect(screen.getByText("DW")).toBeInTheDocument();
+  });
+
+  it("puts no face beside a live bid — the subject there is the player, not a team", async () => {
+    const lotView: DraftStateView = {
+      ...AUCTION_VIEW,
+      onClockTeamId: null,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      auction: { minBid: 1, nominatingTeamId: null, lot: { playerId: "qb1", highBid: 12, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
+    };
+    render(<RoomRail {...props} view={lotView} myTeamId="t1" />);
+    expect(screen.queryByText("DW")).toBeNull();
+    expect(screen.queryByText("RO")).toBeNull();
+  });
+
   it("hides the ticking digits from assistive tech and states the clock in words instead", () => {
     render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
     expect(screen.getByTestId("countdown")).toHaveAttribute("aria-hidden", "true");

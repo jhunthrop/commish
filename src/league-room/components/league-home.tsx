@@ -5,6 +5,7 @@ import { LeagueChat } from "@/chat-room/components/league-chat";
 import { formatWeek } from "../lib/format";
 import { AdvisorPanel } from "./advisor-panel";
 import { InvitePanel } from "./invite-panel";
+import { LeagueMembersPanel } from "./league-members-panel";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupScoreboard } from "./matchup-scoreboard";
@@ -81,6 +82,16 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
       {lineup === null ? null : <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} />}
 
       {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
+
+      {/*
+        The members panel and the invite panel sit here, in that order, as siblings in ordinary
+        document flow rather than inside a layout that claims the space between them: the
+        commissioner's "who is missing" question (the panel above) and their "invite someone"
+        answer (the panel below) read together without either one owning the section. A future
+        panel — the league-terms panel this same spot is expected to grow — composes the same
+        way, as one more sibling, not as a change to how these two are laid out.
+      */}
+      <LeagueMembersPanel teams={home.teams} teamCount={home.teamCount} commissionerUserId={home.commissionerUserId} myTeamId={home.myTeamId} />
 
       {home.isCommissioner ? <InvitePanel leagueId={home.leagueId} /> : null}
     </main>

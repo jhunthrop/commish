@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
+import { listTeamCards } from "@/draft-service/teams";
 import { finalizeWeek } from "@/stats-pipeline/finalize";
 import { createLeague } from "./creation";
 import { writeSchedule } from "./schedule";
@@ -64,17 +65,19 @@ async function twoTeamLeague(draftStatus: "scheduled" | "complete") {
 }
 
 describe("leagueStandings", () => {
-  it("reflects the scored weeks, with team names and the clinch flag", async () => {
+  it("reflects the scored weeks, with team names, the owner's face, and the clinch flag", async () => {
     const league = await twoTeamLeague("complete");
     await finalizeWeek(db, league.leagueId, 1);
-    const rows = await leagueStandings(db, league.leagueId);
+    const teamCards = await listTeamCards(db, league.leagueId);
+    const rows = await leagueStandings(db, league.leagueId, teamCards);
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({ wins: 1, losses: 0, pointsFor: 24 });
     expect(rows[0]!.teamName).toBeTruthy();
+    expect(rows[0]!.ownerDisplayName).toBeTruthy();
     expect(rows.every((row) => typeof row.clinched === "boolean")).toBe(true);
   });
 
   it("is an empty table for a league with no teams at all", async () => {
-    expect(await leagueStandings(db, "nope")).toEqual([]);
+    expect(await leagueStandings(db, "nope", [])).toEqual([]);
   });
 });

@@ -50,6 +50,21 @@ export interface TeamStandingsRow extends StandingsRow {
   readonly teamName: string;
   /** Can no longer be caught for a playoff spot. Computed server-side, never in React. */
   readonly clinched: boolean;
+  readonly ownerDisplayName: string;
+  /** The owner's STORED avatar ref, not a URL — same contract as `TeamCard.ownerAvatarUrl`. */
+  readonly ownerAvatar: string | null;
+}
+
+/**
+ * One league member as the members panel (`LeagueMembersPanel`) renders it: `TeamCard` plus
+ * the one raw fact needed to find the commissioner among peers. `ownerUserId` is never shown —
+ * it is only ever compared against `LeagueHomeBody.commissionerUserId` to mark the single row
+ * that runs the league. That comparison, and the display name and face it sits beside, are
+ * fair game inside a league by design: the public-browse contract (Task 6) is the one place
+ * commissioner identity stays hidden, and this panel is members-only.
+ */
+export interface LeagueMemberCard extends TeamCard {
+  readonly ownerUserId: string;
 }
 
 export interface MatchupSummary {
@@ -101,8 +116,11 @@ export interface LeagueHomeBody {
   readonly teamCount: number;
   readonly rosterSlots: readonly RosterSlotConfig[];
   readonly isCommissioner: boolean;
+  /** The commissioner's raw user id — never rendered on its own, only handed to
+   *  `LeagueMembersPanel` so it can mark the one member who runs the league. */
+  readonly commissionerUserId: string;
   readonly myTeamId: string | null;
-  readonly teams: readonly TeamCard[];
+  readonly teams: readonly LeagueMemberCard[];
   readonly standings: readonly TeamStandingsRow[];
   readonly currentWeek: number;
   readonly totalWeeks: number;

@@ -159,4 +159,19 @@ describe("LeagueHome", () => {
     );
     expect(screen.getByRole("region", { name: "Lineup advisor" })).toBeInTheDocument();
   });
+
+  // Step 15's audit: a league had no members list at all. It renders for every member, not
+  // just the commissioner — the invite panel below it stays commissioner-only, but knowing who
+  // is in the league is not a commissioner-only fact.
+  it("shows the league's members list, naming the commissioner, for every viewer", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, isCommissioner: false }} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByRole("list", { name: "Managers" })).toBeInTheDocument();
+    expect(screen.getByText("Commissioner")).toBeInTheDocument();
+    expect(screen.getByText("9 seats still open")).toBeInTheDocument();
+  });
 });

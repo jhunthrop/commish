@@ -19,7 +19,7 @@ vi.mock("@/league-service/browse", async (importOriginal) => {
 
 import { eq } from "drizzle-orm";
 import Redis from "ioredis";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
 import type { Player } from "@/domain/player";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
@@ -130,10 +130,44 @@ describe("GET /api/leagues/[leagueId]", () => {
     expect(body).toMatchObject({
       leagueId: created.leagueId, name: "Sunday Money", isCommissioner: true,
       myTeamId: created.teamId, draftId: created.draftId, draftStatus: "scheduled",
-      currentWeek: 1, myMatchup: null,
+      currentWeek: 1, myMatchup: null, commissionerUserId: "u1",
     });
     expect(body.standings).toHaveLength(1);
     expect(body.rosterSlots.length).toBeGreaterThan(0);
+  });
+
+  // Step 15's audit: standings and the members list both need the owner, not just the team —
+  // and both must carry it without a second query duplicating what `listTeamCards` already read.
+  it("carries the owner's name and face through to both the members list and the standings row", async () => {
+    const created = await createDefaultLeague("u1");
+    await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
+    signedInAs("u1");
+    const body = (await (await getLeague(leagueRequest(created.leagueId), {
+      params: Promise.resolve({ leagueId: created.leagueId }),
+    })).json()).data;
+
+    const mine = body.teams.find((team: { id: string }) => team.id === created.teamId);
+    expect(mine).toMatchObject({ ownerUserId: "u1", ownerDisplayName: "Manager u1" });
+    const other = body.teams.find((team: { id: string }) => team.id === "team_2");
+    expect(other).toMatchObject({ ownerUserId: "u2", ownerDisplayName: "Manager u2" });
+
+    const standingsRow = body.standings.find((row: { teamId: string }) => row.teamId === created.teamId);
+    expect(standingsRow).toMatchObject({ ownerDisplayName: "Manager u1" });
+    expect(standingsRow.ownerAvatar).toBeNull();
+  });
+
+  it("costs the same bounded number of queries whether or not the standings and members list carry the owner", async () => {
+    const created = await createDefaultLeague("u1");
+    await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
+
+    const counting = countingDb(db);
+    const home = await leagueHome(counting.db, created.leagueId, "u1");
+    expect(home?.teams).toHaveLength(2);
+    expect(home?.standings).toHaveLength(2);
+    // leagues, matchups, teams (plain), drafts, stat_weeks, the one team+owner join
+    // (`listTeamCards`), and `leagueStandings`'s own matchups read: seven, whichever league is
+    // asked, and `leagueStandings` no longer runs a second `teams` query of its own for names.
+    expect(counting.selectCount()).toBeLessThanOrEqual(7);
   });
 
   it("answers 404 for a league that doesn't exist", async () => {

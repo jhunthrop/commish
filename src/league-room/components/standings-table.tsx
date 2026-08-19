@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { TeamStandingsRow } from "../contract";
-import { Badge, Button, EmptyState, Table, type TableColumn } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, Table, type TableColumn } from "@/components/ui";
 import { formatPoints, formatRecord } from "../lib/format";
 
 type SortKey = "rank" | "pointsFor" | "pointsAgainst";
@@ -46,8 +46,9 @@ export function StandingsTable({ rows, myTeamId }: StandingsTableProps) {
       key: "team",
       header: "Team",
       cell: (row) => (
-        <span className="flex items-center gap-2">
-          {row.teamName}
+        <span className="flex min-w-0 items-center gap-2">
+          <Avatar name={row.ownerDisplayName} avatar={row.ownerAvatar} size="sm" />
+          <span className="truncate">{row.teamName}</span>
           {showClinchBadges && row.clinched ? <Badge tone="positive">Clinched</Badge> : null}
         </span>
       ),

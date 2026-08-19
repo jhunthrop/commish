@@ -7,6 +7,7 @@ import { listTeamCards } from "@/draft-service/teams";
 import { benchOf, LEAGUE_CONFIG, seasonProgress, startersOf, type WeekStatus } from "@/league";
 import type {
   LeagueHomeBody,
+  LeagueMemberCard,
   LeagueSummary,
   MatchupDetail,
   MatchupLineupEntry,
@@ -120,11 +121,25 @@ export async function leagueHome(db: Db, leagueId: string, userId: string): Prom
   const { totalWeeks, currentWeek } = seasonProgress(matchupRows, LEAGUE_CONFIG.regularSeasonWeeks);
   const myTeamId = teamRows.find((row) => row.userId === userId)?.id ?? null;
   const nameById = new Map(teamRows.map((row) => [row.id, row.name]));
+  // `teamRows` above is the one place this function already knows each team's OWNER, not just
+  // its owner's public profile — `listTeamCards` below never selects `userId` at all, on
+  // purpose (it feeds the draft room too, and a team's owner id has no business on that wire).
+  // Reusing this map rather than adding a second query is what keeps `listTeamCards` untouched.
+  const ownerUserIdByTeamId = new Map(teamRows.map((row) => [row.id, row.userId]));
 
   const mine = matchupRows.find(
     (row) => row.weekNumber === currentWeek && (row.homeTeamId === myTeamId || row.awayTeamId === myTeamId),
   );
   const weekStatus = await weekStatusFor(db, currentWeek);
+
+  // The one "team + owner's public profile" query, read once and shared: `listTeamCards`
+  // enriches both `teams` (for the members panel) and `standings` (for the face beside each
+  // row), so a page that already paid for this join never pays for it twice.
+  const teamCards = await listTeamCards(db, leagueId);
+  const members: readonly LeagueMemberCard[] = teamCards.map((card) => ({
+    ...card,
+    ownerUserId: ownerUserIdByTeamId.get(card.id) ?? card.id,
+  }));
 
   return {
     leagueId,
@@ -133,9 +148,10 @@ export async function leagueHome(db: Db, leagueId: string, userId: string): Prom
     teamCount: league.teamCount,
     rosterSlots: league.rosterSlots,
     isCommissioner: league.commissionerUserId === userId,
+    commissionerUserId: league.commissionerUserId,
     myTeamId,
-    teams: await listTeamCards(db, leagueId),
-    standings: await leagueStandings(db, leagueId),
+    teams: members,
+    standings: await leagueStandings(db, leagueId, teamCards),
     currentWeek,
     totalWeeks,
     myMatchup: mine === undefined ? null : toSummary(mine, nameById, weekStatus),

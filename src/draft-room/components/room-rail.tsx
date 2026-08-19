@@ -3,7 +3,7 @@
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Badge, EYEBROW } from "@/components/ui";
+import { Avatar, Badge, EYEBROW } from "@/components/ui";
 import { formatClockLength, formatTightening } from "../state/format";
 import { playerName, teamName, teamsById } from "../lib/lookups";
 import type { ConnectionStatus } from "../hooks/use-draft-room";
@@ -54,6 +54,9 @@ interface TurnSummary {
   /** The same fact as a sentence, for screen readers, since the digits are `aria-hidden`. */
   readonly sentence: string;
   readonly mine: boolean;
+  /** The team `subject` names, for the face beside it — `null` when the subject is a PLAYER
+   *  (a live bid) rather than a team, since a face belongs next to the person it names. */
+  readonly team: TeamCard | null;
 }
 
 /**
@@ -100,6 +103,7 @@ function turnSummary(
       subject: `${name} · $${lot.highBid}`,
       sentence: `Bidding is open on ${name}. High bid $${lot.highBid} by ${bidder}.`,
       mine: false,
+      team: null,
     };
   }
 
@@ -107,13 +111,25 @@ function turnSummary(
     const nominatorId = view.auction?.nominatingTeamId ?? null;
     const who = nominatorId === null ? "Nobody" : teamName(byId, nominatorId, "Someone");
     const mine = nominatorId !== null && nominatorId === myTeamId;
-    return { label: mine ? "You're nominating" : "Nominating", subject: who, sentence: `${who} is nominating.`, mine };
+    return {
+      label: mine ? "You're nominating" : "Nominating",
+      subject: who,
+      sentence: `${who} is nominating.`,
+      mine,
+      team: nominatorId === null ? null : (byId.get(nominatorId) ?? null),
+    };
   }
 
   const who = view.onClockTeamId === null ? "Nobody" : teamName(byId, view.onClockTeamId, "Someone");
   const mine = view.onClockTeamId !== null && view.onClockTeamId === myTeamId;
   const clockLength = view.clockSeconds === null ? "" : ` This round's pick clock is ${formatClockLength(view.clockSeconds)}.`;
-  return { label: mine ? "You're on the clock" : "On the clock", subject: who, sentence: `${who} is on the clock.${clockLength}`, mine };
+  return {
+    label: mine ? "You're on the clock" : "On the clock",
+    subject: who,
+    sentence: `${who} is on the clock.${clockLength}`,
+    mine,
+    team: view.onClockTeamId === null ? null : (byId.get(view.onClockTeamId) ?? null),
+  };
 }
 
 function modeOf(view: DraftStateView, turn: TurnSummary): RoomMode {
@@ -176,11 +192,16 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
           <StaticState headline="Draft complete" detail="Every roster is final." />
         ) : (
           <>
-            <div className="flex min-w-0 flex-col">
-              <span className={`${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
-                {turn.label}
-              </span>
-              <span className="truncate font-display text-display-sm font-bold leading-display text-text-primary">{turn.subject}</span>
+            <div className="flex min-w-0 items-center gap-2">
+              {turn.team === null ? null : (
+                <Avatar name={turn.team.ownerDisplayName} avatar={turn.team.ownerAvatarUrl} size="sm" />
+              )}
+              <div className="flex min-w-0 flex-col">
+                <span className={`${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
+                  {turn.label}
+                </span>
+                <span className="truncate font-display text-display-sm font-bold leading-display text-text-primary">{turn.subject}</span>
+              </div>
             </div>
             <div className="flex flex-col items-end">
               {remainingMs === null ? null : <Countdown remainingMs={remainingMs} size="lg" tone={turn.mine ? "hot" : "default"} data-testid="countdown" />}

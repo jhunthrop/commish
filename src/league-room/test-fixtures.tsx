@@ -1,16 +1,15 @@
 import type { ReactElement } from "react";
 import { render, type RenderResult } from "@testing-library/react";
-import type { TeamCard } from "@/domain/league";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import type { LeagueHomeBody, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
+import type { LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "./hooks/deps";
 
 /** Server rank order (wins, then points for, then team id) — never re-derived in a test. */
 export const STANDINGS: readonly TeamStandingsRow[] = [
-  { teamId: "t1", teamName: "Bay Bandits", wins: 9, losses: 4, ties: 0, pointsFor: 1412.5, pointsAgainst: 1200, clinched: true },
-  { teamId: "t2", teamName: "Iron Owls", wins: 7, losses: 6, ties: 0, pointsFor: 1300, pointsAgainst: 1500, clinched: false },
-  { teamId: "t3", teamName: "Comet Crew", wins: 5, losses: 8, ties: 0, pointsFor: 1100, pointsAgainst: 1350, clinched: false },
+  { teamId: "t1", teamName: "Bay Bandits", wins: 9, losses: 4, ties: 0, pointsFor: 1412.5, pointsAgainst: 1200, clinched: true, ownerDisplayName: "Alex Rivera", ownerAvatar: null },
+  { teamId: "t2", teamName: "Iron Owls", wins: 7, losses: 6, ties: 0, pointsFor: 1300, pointsAgainst: 1500, clinched: false, ownerDisplayName: "Jordan Lee", ownerAvatar: null },
+  { teamId: "t3", teamName: "Comet Crew", wins: 5, losses: 8, ties: 0, pointsFor: 1100, pointsAgainst: 1350, clinched: false, ownerDisplayName: "Sam Patel", ownerAvatar: null },
 ];
 
 /** Every row clinched, as `clinchedTeamIds` degenerately reports for `playoffTeams >= teamCount`. */
@@ -67,12 +66,12 @@ export const WON: MatchupSummary = {
 /** The reverse of `WON` — same week, `t1` loses. */
 export const LOST: MatchupSummary = { ...WON, homeScore: 90, awayScore: 105 };
 
-/** The teams `listTeamCards` would hand back for the three `STANDINGS` rows. Module-private —
- *  only consumed here, by `HOME` below. */
-const TEAMS: readonly TeamCard[] = [
-  { id: "t1", name: "Bay Bandits", ownerDisplayName: "Alex Rivera", ownerAvatarUrl: null },
-  { id: "t2", name: "Iron Owls", ownerDisplayName: "Jordan Lee", ownerAvatarUrl: null },
-  { id: "t3", name: "Comet Crew", ownerDisplayName: "Sam Patel", ownerAvatarUrl: null },
+/** The members `leagueHome` would hand back for the three `STANDINGS` rows: `t1`'s owner is
+ *  also the league's commissioner. Module-private — only consumed here, by `HOME` below. */
+const TEAMS: readonly LeagueMemberCard[] = [
+  { id: "t1", name: "Bay Bandits", ownerDisplayName: "Alex Rivera", ownerAvatarUrl: null, ownerUserId: "u1" },
+  { id: "t2", name: "Iron Owls", ownerDisplayName: "Jordan Lee", ownerAvatarUrl: null, ownerUserId: "u2" },
+  { id: "t3", name: "Comet Crew", ownerDisplayName: "Sam Patel", ownerAvatarUrl: null, ownerUserId: "u3" },
 ];
 
 /** Everything `LeagueHome` needs: a commissioner, mid-season, drafted, `t1` up this week. */
@@ -83,6 +82,7 @@ export const HOME: LeagueHomeBody = {
   teamCount: 12,
   rosterSlots: STANDARD_ROSTER_SLOTS,
   isCommissioner: true,
+  commissionerUserId: "u1",
   myTeamId: "t1",
   teams: TEAMS,
   standings: STANDINGS,
@@ -93,6 +93,10 @@ export const HOME: LeagueHomeBody = {
   draftId: "d1",
   draftStatus: "complete",
 };
+
+/** Three managers, an open seat implied by `teamCount`, and `t1`'s owner running the league —
+ *  the fixture `LeagueMembersPanel`'s own tests build on (`components/league-members-panel.test.tsx`). */
+export const THREE_TEAMS: readonly LeagueMemberCard[] = TEAMS;
 
 /** Module-private: only the return type of `fixtureLeagueDeps` below. */
 interface FixtureLeagueDeps {
