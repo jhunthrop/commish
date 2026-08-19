@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { HomeLeagueCard as HomeLeagueCardData } from "../contract";
-import { Card, EYEBROW } from "@/components/ui";
+import { Badge, Card, EYEBROW } from "@/components/ui";
 import { formatRecord, formatWeek } from "../lib/format";
 import { MatchupScoreboard } from "./matchup-scoreboard";
 import { WeekStatusBadge } from "./week-status-badge";
@@ -24,9 +24,10 @@ function actionHref(league: HomeLeagueCardData): string {
  * live-or-final score, and the one next action — never a disabled one, since `league.nextAction`
  * is `null` exactly when there is nothing to do (`@/league/next-action.ts`).
  *
- * A live draft gets the same accent ring `LeagueList` gives it, for the same reason: everything
- * else on this page should read at a glance, and a league on the clock is the one thing that
- * should not.
+ * A live draft gets the same accent ring `LeagueList` (the card this replaced) gave it, for the
+ * same reason: everything else on this page should read at a glance, and a league on the clock
+ * is the one thing that should not — paired with the same visible "Draft live" badge that card
+ * carried, since a ring alone is invisible to the accessibility tree.
  */
 export function HomeLeagueCard({ league }: { readonly league: HomeLeagueCardData }) {
   const draftLive = league.draftStatus === "in_progress";
@@ -40,9 +41,24 @@ export function HomeLeagueCard({ league }: { readonly league: HomeLeagueCardData
         >
           {league.name}
         </Link>
-        {league.record === null ? null : (
-          <span className="shrink-0 text-sm font-semibold tabular-nums text-text-muted">{formatRecord(league.record)}</span>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {draftLive ? <Badge tone="accent">Draft live</Badge> : null}
+          {league.record === null ? null : (
+            // Casual users have no prior convention for a bare "5-2" to lean on, so the eyebrow
+            // label is visible, not just an accessible-name fallback. The two inner spans are
+            // `aria-hidden`: the group's own `aria-label` is the one accessible name a screen
+            // reader gets for this whole cluster, so the label and the value aren't announced
+            // a second time as separate nodes.
+            <div role="group" aria-label={`Record: ${formatRecord(league.record)}`} className="flex flex-col items-end gap-0.5">
+              <span className={EYEBROW} aria-hidden="true">
+                Record
+              </span>
+              <span className="text-sm font-semibold tabular-nums text-text-muted" aria-hidden="true">
+                {formatRecord(league.record)}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
       <p className={EYEBROW}>
         {`${league.format === "auction" ? "Auction" : "Snake"} · ${league.filledTeams} of ${league.teamCount} managers`}
@@ -59,8 +75,12 @@ export function HomeLeagueCard({ league }: { readonly league: HomeLeagueCardData
       )}
 
       {league.nextAction === null ? null : (
+        // The visible label is the same short verb phrase on every card ("Watch the scores" can
+        // repeat across many leagues); the accessible name is not, so two cards' action links
+        // are never indistinguishable to a screen reader reading the page's link list.
         <Link
           href={actionHref(league)}
+          aria-label={`${league.nextAction.label} for ${league.name}`}
           className="mt-auto self-start rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
         >
           {league.nextAction.label}

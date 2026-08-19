@@ -48,7 +48,7 @@ function setVisibility(state: DocumentVisibilityState): void {
 describe("HomeBoard", () => {
   it("renders the server's payload immediately, in both themes", async () => {
     await inBothThemes(<HomeBoard initial={ONE_SCHEDULED} />, async ({ container }) => {
-      expect(screen.getByRole("link", { name: /Sunday Money/ })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Sunday Money" })).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
   });
@@ -96,7 +96,7 @@ describe("HomeBoard", () => {
       await vi.advanceTimersByTimeAsync(LEAGUE_ROOM_CONFIG.homeRefreshIntervalMs);
     });
     expect(fixture.calls).toEqual(["GET /api/home"]);
-    expect(screen.getByRole("link", { name: /Auction Night Refreshed/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Auction Night Refreshed" })).toBeInTheDocument();
   });
 
   it("stops polling on its own once a refreshed payload says every week is done", async () => {
@@ -133,6 +133,6 @@ describe("HomeBoard", () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(LEAGUE_ROOM_CONFIG.homeRefreshIntervalMs);
     });
-    expect(screen.getByRole("link", { name: /Auction Night/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Auction Night" })).toBeInTheDocument();
   });
 });
