@@ -140,11 +140,37 @@ describe("useLeagueChat", () => {
     await waitFor(() => expect(result.current.status).toBe("ready"));
 
     act(() => fixture.fire("open"));
-    await waitFor(() => expect(result.current.connection).toBe("live"));
-    expect(fixture.calls.filter((call) => call === "GET /api/leagues/l1/chat")).toHaveLength(2);
+    await waitFor(() => expect(fixture.calls.filter((call) => call === "GET /api/leagues/l1/chat")).toHaveLength(2));
+    expect(result.current.connection).toBe("live");
 
     act(() => fixture.fire("error"));
     await waitFor(() => expect(result.current.connection).toBe("reconnecting"));
+  });
+
+  // The mount effect and the SSE `open` handler BOTH fire `void refresh()`, with no ordering
+  // between them. Before the generation guard, whichever response landed LAST won the write,
+  // so a slow first request could overwrite a fresh second one: after a reconnect the pane
+  // silently reverted to an older page. This test forces that order deliberately.
+  it("keeps the newest refresh when an older one resolves after it", async () => {
+    const fixture = fixtureChatDeps(CHAT_PAGE, { deferred: true });
+    const { result } = renderHook(() => useLeagueChat("l1"), { wrapper: wrapper(fixture.deps) });
+    await waitFor(() => expect(fixture.pending()).toBe(1)); // the mount refresh
+
+    act(() => fixture.fire("open"));
+    await waitFor(() => expect(fixture.pending()).toBe(2)); // plus the open refresh
+
+    const stale = { ok: true, data: { ...CHAT_PAGE, messages: [chatMessage("1", { body: "stale page" })] } };
+    const fresh = { ok: true, data: { ...CHAT_PAGE, messages: [chatMessage("9", { body: "fresh page" })] } };
+
+    // Newest resolves FIRST, oldest resolves SECOND — the exact interleaving that loses data.
+    await act(async () => {
+      await fixture.settle(1, fresh);
+      await fixture.settle(0, stale);
+    });
+
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(result.current.messages.map((message) => message.body)).toContain("fresh page");
+    expect(result.current.messages.map((message) => message.body)).not.toContain("stale page");
   });
 
   it("reports a network failure as an error state, not a crash", async () => {
@@ -209,11 +235,17 @@ describe("useLeagueChat", () => {
     expect(result.current.messages[0]?.body).toBe("older");
 
     fixture.response = { ok: true, data: { ...CHAT_PAGE, hasMore: false } };
+    const before = fixture.calls.filter((call) => call === "GET /api/leagues/l1/chat").length;
     act(() => fixture.fire("open"));
-    await waitFor(() => expect(result.current.connection).toBe("live"));
+    // Gate on the REFETCH landing, not on `connection`: `onOpen` sets connection: "live"
+    // synchronously and only then fires `void refresh()`, so a connection-gated wait opens
+    // while the write it is really waiting for is still in flight.
+    await waitFor(() =>
+      expect(fixture.calls.filter((call) => call === "GET /api/leagues/l1/chat")).toHaveLength(before + 1),
+    );
+    await waitFor(() => expect(result.current.messages.length).toBeGreaterThan(CHAT_CONFIG.maxHeldMessages));
 
     expect(result.current.messages[0]?.body).toBe("older");
-    expect(result.current.messages.length).toBeGreaterThan(CHAT_CONFIG.maxHeldMessages);
     // The refreshed page also brings back id "1", which the live-frame cap had trimmed off the
     // front earlier — a page the client is holding is never partially applied.
     expect(result.current.messages.slice(0, 3).map((message) => message.id)).toEqual(["0", "1", "2"]);
