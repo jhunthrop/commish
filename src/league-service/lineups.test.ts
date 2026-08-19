@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { lineupSlots, matchups } from "@/db/schema";
+import { lineupSlots, statWeeks } from "@/db/schema";
+import type { WeekStatus } from "@/league";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
-import { getLineup, isWeekLocked, lineupView, setLineup } from "./lineups";
+import { getLineup, isWeekLocked, lineupView, setLineup, type SetLineupInput } from "./lineups";
 import { SLOTS, twoTeamLeague, validSwap } from "./test-support";
 
 /** A recording stand-in for the injected score cache, so a test can assert exactly what was invalidated. */
@@ -12,6 +13,16 @@ function recordingScoreCache(): Pick<ScoreCache, "invalidate"> & { invalidate: R
 }
 
 const db = createTestDb();
+
+/** Writes (or overwrites) one week's `stat_weeks` row — the lock tests' only way to move a week off `scheduled`. */
+async function setWeekStatus(week: number, status: WeekStatus): Promise<void> {
+  await db.insert(statWeeks).values({ week, status }).onConflictDoUpdate({ target: statWeeks.week, set: { status } });
+}
+
+/** A legal lineup swap for the named week, on the caller's own team in `league`. */
+function validLineupInput(league: { readonly leagueId: string; readonly teamId: string }, weekNumber: number): SetLineupInput {
+  return { leagueId: league.leagueId, teamId: league.teamId, weekNumber, slots: validSwap };
+}
 
 beforeEach(async () => {
   await truncateAll(db);
@@ -88,16 +99,38 @@ describe("setLineup", () => {
     ).toEqual({ ok: false, status: 422, reason: "You can only start a player in one spot." });
   });
 
-  it("refuses a week that has already been scored", async () => {
-    const league = await twoTeamLeague(db);
-    await db
-      .update(matchups)
-      .set({ homeScore: 100, awayScore: 90 })
-      .where(and(eq(matchups.leagueId, league.leagueId), eq(matchups.weekNumber, 1)));
-    expect(await isWeekLocked(db, league.leagueId, 1)).toBe(true);
-    expect(
-      await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, slots: validSwap }),
-    ).toEqual({ ok: false, status: 409, reason: "Week 1 is final, so its lineup can't change." });
+  it("locks a week the moment its first game kicks off, not when it finishes", async () => {
+    const league = await twoTeamLeague(db, { weeks: 10 });
+    await setWeekStatus(3, "in_progress");
+    expect(await isWeekLocked(db, 3)).toBe(true);
+    const result = await setLineup(db, validLineupInput(league, 3));
+    expect(result).toMatchObject({ ok: false, status: 409 });
+    expect(result.ok ? "" : result.reason).toBe("Week 3 has started, so its lineup can't change.");
+  });
+
+  it("leaves a week open while it is still scheduled", async () => {
+    const league = await twoTeamLeague(db, { weeks: 10 });
+    await setWeekStatus(4, "scheduled");
+    await expect(setLineup(db, validLineupInput(league, 4))).resolves.toMatchObject({ ok: true });
+  });
+
+  it("treats a week with no stat_weeks row at all as open", async () => {
+    // A week the ingestion worker has never reached is a week whose games have not been listed,
+    // which is not the same as a week in progress. Locking on absence would freeze every
+    // league's lineups the first time the worker was down.
+    const league = await twoTeamLeague(db, { weeks: 10 });
+    await expect(setLineup(db, validLineupInput(league, 9))).resolves.toMatchObject({ ok: true });
+  });
+
+  it("locks a week that has finished, the same as one still in progress", async () => {
+    const league = await twoTeamLeague(db, { weeks: 10 });
+    await setWeekStatus(1, "final");
+    expect(await isWeekLocked(db, 1)).toBe(true);
+    expect(await setLineup(db, validLineupInput(league, 1))).toEqual({
+      ok: false,
+      status: 409,
+      reason: "Week 1 has started, so its lineup can't change.",
+    });
   });
 
   it("refuses a week the league doesn't have", async () => {

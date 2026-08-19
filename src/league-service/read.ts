@@ -1,9 +1,9 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, teams } from "@/db/schema";
-import { PPR_SCORING } from "@/domain/scoring";
+import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import { listTeamCards } from "@/draft-service/teams";
-import { benchOf, LEAGUE_CONFIG, seasonProgress, startersOf } from "@/league";
+import { benchOf, LEAGUE_CONFIG, seasonProgress, startersOf, type WeekStatus } from "@/league";
 import type {
   LeagueHomeBody,
   LeagueSummary,
@@ -14,8 +14,15 @@ import type {
   MatchupWeekBody,
 } from "@/league-room/contract";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring";
-import { getLineup } from "./lineups";
+import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
+import { getLineup, weekStatusFor } from "./lineups";
 import { leagueStandings } from "./results";
+
+/** No Redis connection needed: every existing caller of `matchupWeek` keeps working untouched. */
+const NOOP_REFERENCE_CACHE: Pick<ReferenceCache, "players" | "scoringSettings"> = {
+  players: (load) => load(),
+  scoringSettings: (_leagueId, load) => load(),
+};
 
 /**
  * Every league the caller fields a team in, oldest first, with the two numbers the list needs:
@@ -52,7 +59,7 @@ export async function listLeaguesForUser(db: Db, userId: string): Promise<readon
   }));
 }
 
-function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyMap<string, string>): MatchupSummary {
+function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyMap<string, string>, weekStatus: WeekStatus): MatchupSummary {
   return {
     weekNumber: row.weekNumber,
     homeTeamId: row.homeTeamId,
@@ -62,6 +69,7 @@ function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyMap<stri
     homeScore: row.homeScore,
     awayScore: row.awayScore,
     final: row.homeScore !== null && row.awayScore !== null,
+    weekStatus,
   };
 }
 
@@ -85,6 +93,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string): Prom
   const mine = matchupRows.find(
     (row) => row.weekNumber === currentWeek && (row.homeTeamId === myTeamId || row.awayTeamId === myTeamId),
   );
+  const weekStatus = await weekStatusFor(db, currentWeek);
 
   return {
     leagueId,
@@ -98,7 +107,8 @@ export async function leagueHome(db: Db, leagueId: string, userId: string): Prom
     standings: await leagueStandings(db, leagueId),
     currentWeek,
     totalWeeks,
-    myMatchup: mine === undefined ? null : toSummary(mine, nameById),
+    myMatchup: mine === undefined ? null : toSummary(mine, nameById, weekStatus),
+    weekStatus,
     draftId: draft?.id ?? null,
     draftStatus: draft?.status ?? null,
   };
@@ -107,8 +117,21 @@ export async function leagueHome(db: Db, leagueId: string, userId: string): Prom
 /**
  * One week's matchups with both lineups and per-player points. Every number the page shows is
  * computed here — the matchup view does no arithmetic of its own.
+ *
+ * `referenceCache` is injected with a no-op default (falls straight through to the real read),
+ * the same idiom `setLineup`'s score-cache parameter uses — so every existing caller keeps
+ * working without a Redis connection. When a real cache is supplied, the whole-table `players`
+ * read and the league's `scoringSettings` row become a cache hit on every request but the one
+ * that populates or invalidates them, rather than two thousand-row reads on every matchup page
+ * view.
  */
-export async function matchupWeek(db: Db, leagueId: string, weekNumber: number, userId: string): Promise<MatchupWeekBody | null> {
+export async function matchupWeek(
+  db: Db,
+  leagueId: string,
+  weekNumber: number,
+  userId: string,
+  referenceCache: Pick<ReferenceCache, "players" | "scoringSettings"> = NOOP_REFERENCE_CACHE,
+): Promise<MatchupWeekBody | null> {
   const [league] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
   if (league === undefined) return null;
   const slotConfig = league.rosterSlots;
@@ -116,15 +139,19 @@ export async function matchupWeek(db: Db, leagueId: string, weekNumber: number, 
   const week = await db.select().from(matchups).where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)));
   const allRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
   const { totalWeeks } = seasonProgress(allRows, LEAGUE_CONFIG.regularSeasonWeeks);
-  if (week.length === 0) return { leagueId, weekNumber, totalWeeks, myTeamId: null, matchups: [] };
+  const weekStatus = await weekStatusFor(db, weekNumber);
+  if (week.length === 0) return { leagueId, weekNumber, totalWeeks, myTeamId: null, matchups: [], weekStatus };
 
   const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
   const nameById = new Map(teamRows.map((row) => [row.id, row.name]));
   const myTeamId = teamRows.find((row) => row.userId === userId)?.id ?? null;
 
-  const [settings] = await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, leagueId));
-  const rules: ScoringRules = settings ?? PPR_SCORING;
-  const playerRows = await db.select().from(players);
+  const settings = await referenceCache.scoringSettings(leagueId, async (): Promise<ScoringSettings> => {
+    const [row] = await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, leagueId));
+    return row ?? { leagueId, ...PPR_SCORING };
+  });
+  const rules: ScoringRules = settings;
+  const playerRows = await referenceCache.players(async () => db.select().from(players));
   const playerById = new Map(playerRows.map((row) => [row.id, row]));
   const lines = await db.select().from(playerStatLines).where(eq(playerStatLines.week, weekNumber));
   const statLines = new Map(lines.map((line) => [line.playerId, line]));
@@ -158,9 +185,9 @@ export async function matchupWeek(db: Db, leagueId: string, weekNumber: number, 
   const details: MatchupDetail[] = await Promise.all(
     week.map(async (row): Promise<MatchupDetail> => {
       const [home, away] = await Promise.all([sideFor(row.homeTeamId, row.homeScore), sideFor(row.awayTeamId, row.awayScore)]);
-      return { weekNumber, home, away, final: row.homeScore !== null && row.awayScore !== null };
+      return { weekNumber, home, away, final: row.homeScore !== null && row.awayScore !== null, weekStatus };
     }),
   );
 
-  return { leagueId, weekNumber, totalWeeks, myTeamId, matchups: details };
+  return { leagueId, weekNumber, totalWeeks, myTeamId, matchups: details, weekStatus };
 }

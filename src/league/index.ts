@@ -4,3 +4,4 @@ export { computeStandings, type StandingsRow } from "./standings";
 export { clinchedTeamIds, type ClinchInput } from "./clinch";
 export { defaultLineup, setSlotPlayer, startersOf, benchOf } from "./lineup";
 export { generateInviteCode } from "./invite-code";
+export { weekStatusFromGames, isLineupLocked, type WeekStatus } from "./week-status";

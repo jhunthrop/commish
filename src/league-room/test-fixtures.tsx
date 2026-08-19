@@ -42,6 +42,7 @@ export const LINEUP: LineupBody = {
 export const MATCHUP: MatchupDetail = {
   weekNumber: 5,
   final: true,
+  weekStatus: "final",
   home: {
     teamId: "t1",
     teamName: "Bay Bandits",
@@ -71,6 +72,7 @@ export const WON: MatchupSummary = {
   homeScore: 112.5,
   awayScore: 98.25,
   final: true,
+  weekStatus: "final",
 };
 
 /** The reverse of `WON` — same week, `t1` loses. */
@@ -98,6 +100,7 @@ export const HOME: LeagueHomeBody = {
   currentWeek: 3,
   totalWeeks: 14,
   myMatchup: WON,
+  weekStatus: "final",
   draftId: "d1",
   draftStatus: "complete",
 };

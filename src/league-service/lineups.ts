@@ -1,10 +1,10 @@
 import { and, eq } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
-import { leagues, lineupSlots, matchups, players, rosterSlots } from "@/db/schema";
+import { leagues, lineupSlots, matchups, players, rosterSlots, statWeeks } from "@/db/schema";
 import { validateLineup } from "@/domain/roster-eligibility";
 import { BENCH_SLOT } from "@/domain/roster";
 import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/roster";
-import { benchOf, defaultLineup, startersOf } from "@/league";
+import { benchOf, defaultLineup, isLineupLocked, startersOf, type WeekStatus } from "@/league";
 import { excludedSetFor } from "@/db/upsert";
 import type { LineupBody, LineupSlotView } from "@/league-room/contract";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
@@ -73,14 +73,27 @@ export type SetLineupResult =
   | { readonly ok: false; readonly status: number; readonly reason: string };
 
 /**
- * A week is locked once it has been scored — the same condition `MatchupSummary.final` uses.
- * There is deliberately no clock-based lock: this phase has no live game data for a clock to
- * track, and pretending otherwise would break the "never imply live data" rule from the
- * server side rather than the copy side.
+ * The week's live status, read from `stat_weeks` (`src/db/schema.ts`) — global to the NFL
+ * calendar, never scoped by league. A week the ingestion worker has never reached has no row
+ * there at all, which is not the same as a week in progress: it is a week whose games have not
+ * even been listed, so it reads as `"scheduled"` — open, exactly like a week that is on the
+ * calendar but has not kicked off. Locking on absence would freeze every league's lineups the
+ * first time the worker was down.
  */
-export async function isWeekLocked(db: Db, leagueId: string, weekNumber: number): Promise<boolean> {
-  const week = await db.select().from(matchups).where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)));
-  return week.length > 0 && week.every((row) => row.homeScore !== null && row.awayScore !== null);
+export async function weekStatusFor(db: Db, weekNumber: number): Promise<WeekStatus> {
+  const [row] = await db.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, weekNumber));
+  return row?.status ?? "scheduled";
+}
+
+/**
+ * A week is locked once it has started, not once it has been scored — see `isLineupLocked`
+ * (`@/league/week-status.ts`) for the rationale. Phase 1's "both scores exist" rule was correct
+ * only when a score appeared solely because a commissioner pressed a button; live scoring makes
+ * that a hole, since a manager could watch a player leave the field and swap him out before the
+ * week is ever scored.
+ */
+export async function isWeekLocked(db: Db, weekNumber: number): Promise<boolean> {
+  return isLineupLocked(await weekStatusFor(db, weekNumber));
 }
 
 /**
@@ -115,8 +128,8 @@ export async function setLineup(
     .from(matchups)
     .where(and(eq(matchups.leagueId, input.leagueId), eq(matchups.weekNumber, input.weekNumber)));
   if (week.length === 0) return { ok: false, status: 404, reason: "That week isn't part of this league's season." };
-  if (await isWeekLocked(db, input.leagueId, input.weekNumber)) {
-    return { ok: false, status: 409, reason: `Week ${input.weekNumber} is final, so its lineup can't change.` };
+  if (await isWeekLocked(db, input.weekNumber)) {
+    return { ok: false, status: 409, reason: `Week ${input.weekNumber} has started, so its lineup can't change.` };
   }
 
   const roster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, input.teamId));
@@ -185,7 +198,7 @@ export async function lineupView(
 
   return {
     weekNumber: input.weekNumber,
-    locked: await isWeekLocked(db, input.leagueId, input.weekNumber),
+    locked: await isWeekLocked(db, input.weekNumber),
     starters: startersOf(lineup).map(toView),
     bench: benchOf(lineup).map(toView),
   };

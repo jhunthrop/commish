@@ -32,7 +32,7 @@ export function LineupEditor({ leagueId, lineup }: { readonly leagueId: string; 
     return (
       <section className="flex flex-col gap-2">
         <h2 className="text-lg font-medium text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
-        <p className="text-sm text-text-muted">{`${formatWeek(lineup.weekNumber)} is final, so its lineup can't change.`}</p>
+        <p className="text-sm text-text-muted">{`${formatWeek(lineup.weekNumber)} has started, so its lineup can't change.`}</p>
         <ul className="flex flex-col gap-1">
           {lineup.starters.map((slot) => (
             <li key={slotKey(slot)} className="flex items-center gap-2 text-text-primary">

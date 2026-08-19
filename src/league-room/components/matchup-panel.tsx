@@ -51,6 +51,7 @@ export function MatchupPanel({ matchup, myTeamId }: { readonly matchup: MatchupD
           homeScore: matchup.home.score,
           awayScore: matchup.away.score,
           final: matchup.final,
+          weekStatus: matchup.weekStatus,
         }}
         myTeamId={myTeamId}
       />

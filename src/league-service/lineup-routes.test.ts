@@ -11,11 +11,10 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { leagues, users } from "@/db/schema";
+import { leagues, statWeeks, users } from "@/db/schema";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { LEAGUE_CONFIG } from "@/league";
 import { GET as getLineupRoute, PUT as putLineup } from "@/app/api/leagues/[leagueId]/teams/me/lineup/route";
-import { scoreWeek } from "./results";
 import { twoTeamLeague, validSwap } from "./test-support";
 
 const db = createTestDb();
@@ -103,14 +102,14 @@ describe("PUT /api/leagues/[leagueId]/teams/me/lineup", () => {
     expect((await response.json()).error).toBe("RB is not eligible for the QB slot.");
   });
 
-  it("answers 409 once the week is final", async () => {
+  it("answers 409 once the week has started", async () => {
     const league = await twoTeamLeague(db);
-    await scoreWeek(db, league.leagueId, 1);
+    await db.insert(statWeeks).values({ week: 1, status: "in_progress" });
     signedInAs("u1");
     const params = Promise.resolve({ leagueId: league.leagueId });
     const response = await putLineup(put({ weekNumber: 1, slots: validSwap }), { params });
     expect(response.status).toBe(409);
-    expect((await response.json()).error).toBe("Week 1 is final, so its lineup can't change.");
+    expect((await response.json()).error).toBe("Week 1 has started, so its lineup can't change.");
   });
 
   it("answers 400 naming the field for a malformed body", async () => {

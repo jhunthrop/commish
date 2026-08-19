@@ -17,11 +17,13 @@ let nextId = 0;
 const newId = () => `id_${++nextId}`;
 
 /**
- * Two teams, a legal starting QB/RB each, two bench spots, and a two-week schedule. Both
- * lineup test files build off this exact roster shape so a lineup swap ("start the bench QB
- * and RB") means the same thing in both places.
+ * Two teams, a legal starting QB/RB each, two bench spots, and a schedule (two weeks by
+ * default; `weeks` widens it for a test that needs a week further out, e.g. the lock tests
+ * probing a week the ingestion worker has never reached). Both lineup test files build off this
+ * exact roster shape so a lineup swap ("start the bench QB and RB") means the same thing in
+ * both places.
  */
-export async function twoTeamLeague(db: Db) {
+export async function twoTeamLeague(db: Db, { weeks = 2 }: { readonly weeks?: number } = {}) {
   await db.insert(users).values([
     { id: "u1", email: "u1@test.local", displayName: "Manager 1" },
     { id: "u2", email: "u2@test.local", displayName: "Manager 2" },
@@ -48,7 +50,7 @@ export async function twoTeamLeague(db: Db) {
     { teamId: created.teamId, slot: "BENCH", slotIndex: 0, playerId: "qb2" },
     { teamId: created.teamId, slot: "BENCH", slotIndex: 1, playerId: "rb2" },
   ]);
-  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, "team_2"], weeks: 2 }));
+  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, "team_2"], weeks }));
   return created;
 }
 

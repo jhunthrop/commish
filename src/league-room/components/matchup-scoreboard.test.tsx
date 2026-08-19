@@ -14,6 +14,7 @@ const FINAL: MatchupSummary = {
   homeScore: 121.4,
   awayScore: 98.62,
   final: true,
+  weekStatus: "final",
 };
 
 describe("MatchupScoreboard", () => {
@@ -30,7 +31,7 @@ describe("MatchupScoreboard", () => {
   });
 
   it("marks the caller's own side with YOU and never guesses at unscored matchups", () => {
-    render(<MatchupScoreboard matchup={{ ...FINAL, final: false, homeScore: null, awayScore: null }} myTeamId="t2" />);
+    render(<MatchupScoreboard matchup={{ ...FINAL, final: false, weekStatus: "scheduled", homeScore: null, awayScore: null }} myTeamId="t2" />);
     expect(screen.getByText("YOU")).toBeInTheDocument();
     expect(screen.getByText("Not scored yet")).toBeInTheDocument();
     expect(screen.getAllByText("—")).toHaveLength(2);

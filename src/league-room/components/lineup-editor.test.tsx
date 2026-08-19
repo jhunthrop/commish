@@ -49,7 +49,7 @@ describe("LineupEditor", () => {
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("RB is not eligible for the QB slot."));
   });
 
-  it("goes read-only once the week is final, and says why", async () => {
+  it("goes read-only once the week has started, and says why", async () => {
     const fixture = fixtureLeagueDeps();
     await inBothThemes(
       <LeagueRoomDepsProvider deps={fixture.deps}>
@@ -57,7 +57,7 @@ describe("LineupEditor", () => {
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.queryByRole("button", { name: "Save lineup" })).not.toBeInTheDocument();
-        expect(screen.getByText(/final, so its lineup can't change/)).toBeInTheDocument();
+        expect(screen.getByText(/started, so its lineup can't change/)).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
