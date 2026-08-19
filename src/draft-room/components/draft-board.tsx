@@ -212,8 +212,11 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
       <div className="relative hidden min-h-0 w-full flex-1 sm:block">
         {/* The left fade starts past the sticky round gutter, exactly where a mid-scroll
             column edge would otherwise show as a clipped sticker sliver. */}
-        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-10 z-20 w-10 bg-gradient-to-r from-surface via-surface/70 to-transparent" />
-        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 z-20 w-8 bg-gradient-to-l from-surface to-transparent" />
+        {/* bottom-3, not inset-y-0: the fades must stop above the grid's horizontal scrollbar
+            track — a fade painted over the track shades a segment of it, which reads as a
+            second, separate scrollbar. */}
+        <span aria-hidden="true" className="pointer-events-none absolute top-0 bottom-3 left-10 z-20 w-10 bg-gradient-to-r from-surface via-surface/70 to-transparent" />
+        <span aria-hidden="true" className="pointer-events-none absolute top-0 bottom-3 right-0 z-20 w-8 bg-gradient-to-l from-surface to-transparent" />
         {/* Column snap: a scrolled board always rests on whole stickers, never slivers. */}
         <div ref={gridRef} data-testid="draft-board-grid" className="h-full w-full overflow-auto">
         <table className="w-full border-separate border-spacing-1 text-left">
