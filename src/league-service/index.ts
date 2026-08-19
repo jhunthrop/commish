@@ -6,9 +6,7 @@
 // the owning submodule directly.
 export { createLeague } from "./creation";
 export { createInvite, acceptInvite } from "./invites";
-export { joinPublicLeague } from "./join";
 export { listLeaguesForUser, leagueHome, matchupWeek } from "./read";
-export { listPublicLeagues, PUBLIC_LEAGUE_FIELDS } from "./browse";
 export { setLineup, lineupView } from "./lineups";
 export { scoreWeek } from "./results";
 export { createLeagueSchema, createInviteSchema, acceptInviteSchema, setLineupSchema, weekNumberSchema } from "./schemas";

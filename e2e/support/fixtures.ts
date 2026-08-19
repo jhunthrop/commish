@@ -27,6 +27,3 @@ export const expect = test.expect;
 
 /** The already-played league `npm run seed` hands manager A the commissioner's chair in. */
 export const SEEDED_SEASON_LEAGUE_ID = DEV_SEED.season.leagueId;
-/** The seeded snake draft, scheduled and ready to run. */
-export const SEEDED_SNAKE_DRAFT_ID = DEV_SEED.snake.draftId;
-export const SEEDED_SNAKE_LEAGUE_ID = DEV_SEED.snake.leagueId;
