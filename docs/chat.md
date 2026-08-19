@@ -81,6 +81,21 @@ handlers (`GET`/`POST /api/leagues/[leagueId]/chat`, `POST .../reactions`) and t
 `subscribe()` helper a browser's `EventSource` is the client-side counterpart of, against the
 real test Redis. It is the server half of the two-SSE-client exit criterion.
 
+**One shared `EventSource` per league stream, browser-side.** `DraftRoom` (`useDraftRoom`) and
+the `LeagueChat` it mounts as `aside` (`useLeagueChat`) both subscribe to
+`/api/leagues/[leagueId]/events`, but neither hook opens its own connection: both hooks'
+`openEventSource` factories default to `subscribeLeagueStream` from the browser-only
+`src/event-stream/league-stream.ts`, a ref-counted manager keyed by url. The first subscriber
+constructs the real `EventSource`; a second subscriber to the same url joins it; the connection
+closes only once the last subscriber leaves. A draft-room viewer therefore holds ONE live SSE
+connection, not two — one Redis socket, one `Last-Event-ID` cursor. `open`/`error` are forwarded
+to every current subscriber (each hook keeps its own `onOpen → refresh()`), and a subscriber
+that attaches after the connection is already open gets a synthetic `open` so its own mount-gap
+resync still fires. See the module's own docblock for why no `Last-Event-ID` handling lives in
+the manager itself — one browser-owned cursor is safe to share because both folds are already
+idempotent under replay (`mergeMessages`/`applyReaction` are set-shaped; `applyDraftEvent`
+answers a gap with `outcome: "resync"`).
+
 ## Pagination
 
 Every read is `CHAT_CONFIG.pageSize` (50) messages. `GET .../chat?before=<messageId>` pages
@@ -156,10 +171,3 @@ a manager with a team in the league, or the commissioner; a signed-in stranger g
   looking — that needs a per-user read-cursor this phase doesn't have a table for.
 - **Typing indicators.** Would need its own ephemeral (non-persisted) event on the stream, and
   this phase's real-time budget went to the two frames above instead.
-- **KNOWN LIMITATION — two `EventSource`s per draft-room viewer.** `DraftRoom` opens its own
-  `EventSource` on `/api/leagues/[leagueId]/events` via `useDraftRoom`, and the `LeagueChat` it
-  mounts as `aside` opens a **second, independent** `EventSource` on the same URL via
-  `useLeagueChat`. Both work correctly — the server has no `XREADGROUP` fan-out problem, every
-  connection gets every event — but a draft-room viewer holds two live SSE connections to the
-  same stream instead of one, each doing its own `Last-Event-ID` bookkeeping and its own resync on
-  `open`. Left for the final review to consolidate into one shared subscription.

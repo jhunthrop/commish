@@ -22,7 +22,17 @@ export function advisorRateLimited(userId: string): Response | null {
   return fail("You've asked for a lot of advice at once. Give it a minute and try again.", 429);
 }
 
-/** Test seam: the limiter outlives a single test, so route tests reset it between cases. */
+/**
+ * Test seam: the limiter outlives a single test, so route tests reset it between cases.
+ *
+ * `sse.test.ts` needs no equivalent for `openPerUser` because that ceiling's resource (a live
+ * connection) releases itself on close — its `afterEach` aborts connections and the module's own
+ * cleanup does the rest. A request-per-window ceiling has no analogous release: the window only
+ * lapses with time, never with an action a test can trigger. `reset()` is not a one-off escape
+ * hatch invented here — it is `RateLimiter`'s own sanctioned member (`src/lib/api/rate-limit.ts`,
+ * "what a process restart does, made explicit so tests stay independent"); this just forwards it
+ * for the one singleton instance both advisor routes share.
+ */
 export function resetAdvisorRateLimit(): void {
   advisorRequests.reset();
 }

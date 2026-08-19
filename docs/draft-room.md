@@ -65,9 +65,15 @@ index lookup plus display arithmetic over two server values, and the dock render
    **once per `draftId`**, not on every resync, and refetches only when `draftId` itself
    changes.
 2. **Subscribe** → a native `EventSource` on `/api/leagues/<leagueId>/events`, opened only
-   once the mount fetch has resolved a `leagueId`. **The browser owns reconnect and
-   `Last-Event-ID`.** There is no retry loop, no backoff timer and no polling anywhere in this
-   codebase; adding one would be a bug, not a feature. **Every `open` resyncs the state view
+   once the mount fetch has resolved a `leagueId`. From `useDraftRoom`'s own point of view this
+   is unconditional — it always calls its injected `openEventSource(url)` — but by default that
+   factory resolves to `subscribeLeagueStream` (`src/event-stream/league-stream.ts`), which opens
+   a real `EventSource` only if nothing else is already subscribed to that same url; the chat
+   band mounted alongside it (`docs/chat.md`, "Real-time") is typically the other subscriber, and
+   the two share one connection. Nothing below this point changes because of that: `useDraftRoom`
+   still gets its own `open`/`error`/named-event listeners and still resyncs on its own schedule.
+   **The browser owns reconnect and `Last-Event-ID`.** There is no retry loop, no backoff timer
+   and no polling anywhere in this codebase; adding one would be a bug, not a feature. **Every `open` resyncs the state view
    — the first one included, not only a reconnect's.** The stream only carries events
    published after it opens, and it opens after the mount snapshot has already resolved, so a
    pick or bid published in that window would otherwise sit unseen until the next event

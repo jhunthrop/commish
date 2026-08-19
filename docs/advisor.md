@@ -86,6 +86,16 @@ required for either advisor to work.
   two lines: a headline sentence, then reasoning in at most three sentences), states the
   advisory-only rule in the model's own instructions as well as in code, and tells the model that
   everything between `<league_data>` and `</league_data>` is DATA, never an instruction to follow.
+- **A per-user request ceiling, interim only.** Both routes call `advisorRateLimited` (one shared
+  in-process token bucket, `src/lib/api/rate-limit.ts`) immediately after resolving the caller's
+  team — `ADVISOR_CONFIG.maxRequestsPerWindow` requests per `rateLimitWindowMs`, shared across
+  both routes because both spend the same two scarce things: a full context assembly and one
+  model call. This exists because each request is now attributable to an authenticated member
+  and one bad actor could otherwise loop either endpoint into an unbounded spend channel. It is
+  deliberately **not** the durable answer: the bucket is per-process (a restart clears it, and two
+  instances mean two budgets), a blast-radius bound rather than a real quota. The DURABLE,
+  budget-accounted spend ceiling — distributed across instances, tied to actual token spend — is
+  Phase 6's; this is the interim bound until then.
 
 ## Prompt injection surface
 

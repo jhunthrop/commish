@@ -110,6 +110,21 @@ describe("LeagueHome", () => {
     await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
   });
 
+  // L2, final review: in document flow (unlike the draft room's fixed-height aside band),
+  // LeagueChat's own h-full/flex-1 chain resolves to auto and grows unbounded. The mount needs
+  // its own bounded height so the panel scrolls internally instead of the page growing to fit
+  // every held message.
+  it("bounds the chat mount to a fixed height so it scrolls internally rather than growing the page", async () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    const chat = await waitFor(() => screen.getByRole("region", { name: "League chat" }));
+    expect(chat.parentElement).toHaveClass("h-96");
+  });
+
   it("offers the advisor to a manager with a team", () => {
     renderInLeague(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>

@@ -68,6 +68,13 @@ const INITIAL: LeagueChatState = {
  *    history is never delta-applied from frames. So the instant a message is loaded at all
  *    (whether it was already held, or arrives later via `loadEarlier`), its reactions are
  *    already correct; a frame dropped before that point was redundant, not a lost update.
+ *
+ * A third, narrower gap of the SAME CLASS as (1) remains, by design, out of this fix wave's
+ * scope: a single LIVE `chat.message` frame still goes through `mergeMessages`, so a user who has
+ * paged back past `maxHeldMessages` and then receives one live frame will have that cap re-apply
+ * and trim their paged-in history. `refresh()` (fired on every reconnect) is fixed because a
+ * reconnect is common; one live message arriving while deep in scrollback is rarer and bounded —
+ * the buffer stays capped, not corrupted, and `hasMore` is unaffected. Left for a later pass.
  */
 export function useLeagueChat(leagueId: string): LeagueChat {
   const deps = useChatRoomDeps();

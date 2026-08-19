@@ -124,11 +124,16 @@ Anything time-dependent takes a `Clock` (`src/domain/timing.ts`) and calls `cloc
 - **Resume** is via the standard `Last-Event-ID` header (the SSE `id:` is the stream entry id). Full-state refetch is the fallback only when a gap outlasts stream retention.
 - **Event types** are enumerated once in `src/lib/realtime/events.ts` (`draft.*`, `chat.*`, `score.update`). Add there, nowhere else. `chat.message`/`chat.reaction` are published by `src/chat-service/chat.ts` and consumed by `useLeagueChat` (`docs/chat.md`); `score.update` remains reserved for a later phase with a live feed and is never published in Phase 1.
 - **Draft events** (`draft.pick`, `draft.nominate`, `draft.bid`, `draft.timer_expire`, `draft.status`, `draft.queue`, `draft.nudge`) ride the **league** stream — there is no per-draft stream. Their payload contracts live in `docs/draft-engine.md`. `draft.nudge` is the one exception to "derived from the action log": it is published directly by the nudge scheduler on the ticker's own schedule, not by `draftEventsFor`. See `docs/draft-moderator.md`.
-- **On the browser side there is exactly one consumer:** `useDraftRoom` (`src/draft-room/hooks/`),
-  built on a native `EventSource`. The browser's own reconnect and `Last-Event-ID` are the whole
-  reconnect mechanism — **no retry loop, no backoff timer, no polling.** A full refetch of
-  `GET /api/drafts/[draftId]` is the documented fallback, and fires on a sequence gap or a
-  reconnect. See `docs/draft-room.md`.
+- **On the browser side there are two consumers:** `useDraftRoom` (`src/draft-room/hooks/`) and
+  `useLeagueChat` (`src/chat-room/hooks/`), both built on the SAME native `EventSource` for a
+  given league — a draft room mounting the chat band shares one connection to
+  `/api/leagues/[leagueId]/events` between the two hooks rather than opening two. The sharing
+  lives in `src/event-stream/league-stream.ts`, a ref-counted manager both hooks' `openEventSource`
+  factories go through by default; neither hook is aware the connection might be shared. The
+  browser's own reconnect and `Last-Event-ID` are the whole reconnect mechanism — **no retry
+  loop, no backoff timer, no polling.** A full refetch (`GET /api/drafts/[draftId]` for the
+  draft, a chat page refetch for the chat band) is the documented fallback, and fires on a
+  sequence gap or a reconnect. See `docs/draft-room.md` and `docs/chat.md`.
 - No Socket.io, no managed realtime vendor, no second transport — ever.
 
 ### Draft state — the action log is the source of truth

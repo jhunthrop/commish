@@ -160,7 +160,7 @@ export async function listMessages(db: Db, input: ListMessagesInput): Promise<Ch
 }
 
 export type ToggleReactionResult =
-  | { readonly ok: true; readonly action: "added" | "removed"; readonly reactions: readonly ChatReactionView[] }
+  | { readonly ok: true; readonly action: "added" | "removed" }
   | { readonly ok: false; readonly status: number; readonly reason: string };
 
 export interface ToggleReactionInput {
@@ -221,11 +221,11 @@ export async function toggleReaction(db: Db, input: ToggleReactionInput): Promis
           .returning({ emoji: chatReactions.emoji })
       ).length > 0;
 
-  const grouped = await reactionsFor(db, [messageId]);
-  const reactions = grouped.get(messageId) ?? [];
-  // Absent from `reactions` whenever this call didn't add it — whether this call's own DELETE
-  // removed it or a concurrent caller's did. Both are honestly reported as "removed": it is the
-  // true resulting state either way.
+  // "removed" whenever this call didn't add it — whether this call's own DELETE removed it or
+  // a concurrent caller's did. Both are honestly reported as "removed": it is the true
+  // resulting state either way. The route's only consumer is this action, not a snapshot of the
+  // reaction set — the client already holds its own copy and folds the transition into it
+  // (`applyReaction`), so there is no second read of `reactionsFor` to build one here.
   const action: "added" | "removed" = didAdd ? "added" : "removed";
 
   // Only a write THIS call actually made gets published — never the phantom no-op where a
@@ -238,5 +238,5 @@ export async function toggleReaction(db: Db, input: ToggleReactionInput): Promis
     );
   }
 
-  return { ok: true, action, reactions };
+  return { ok: true, action };
 }

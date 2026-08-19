@@ -69,7 +69,15 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
 
       <StandingsTable rows={home.standings} myTeamId={home.myTeamId} />
 
-      <LeagueChat leagueId={home.leagueId} />
+      {/*
+        Unlike the draft room's `aside` band, this section sits in ordinary document flow, so
+        `LeagueChat`'s own `h-full min-h-0` chain has nothing bounded to fill and would grow to
+        fit every held message. A fixed height from the spacing scale is all the inner
+        `min-h-0`/`flex-1` chain needs to scroll inside itself instead (L2, final review).
+      */}
+      <div className="h-96">
+        <LeagueChat leagueId={home.leagueId} />
+      </div>
 
       {lineup === null ? null : <LineupEditor leagueId={home.leagueId} lineup={lineup} />}
 

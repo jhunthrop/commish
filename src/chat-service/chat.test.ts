@@ -121,10 +121,10 @@ describe("toggleReaction", () => {
     const message = await postMessage(db, { leagueId: "l1", userId: "u1", body: "clutch", publish: bus.publish });
 
     const added = await toggleReaction(db, { leagueId: "l1", messageId: message.id, userId: "u2", emoji: "🔥", publish: bus.publish });
-    expect(added).toEqual({ ok: true, action: "added", reactions: [{ emoji: "🔥", userId: "u2" }] });
+    expect(added).toEqual({ ok: true, action: "added" });
 
     const removed = await toggleReaction(db, { leagueId: "l1", messageId: message.id, userId: "u2", emoji: "🔥", publish: bus.publish });
-    expect(removed).toEqual({ ok: true, action: "removed", reactions: [] });
+    expect(removed).toEqual({ ok: true, action: "removed" });
 
     expect(bus.sent.slice(1)).toEqual([
       { type: "chat.reaction", leagueId: "l1", payload: { messageId: message.id, emoji: "🔥", userId: "u2", action: "added" } },
@@ -159,7 +159,7 @@ describe("toggleReaction", () => {
       },
     });
 
-    expect(result).toEqual({ ok: true, action: "added", reactions: [{ emoji: "🔥", userId: "u2" }] });
+    expect(result).toEqual({ ok: true, action: "added" });
   });
 
   it("routes a publish failure through the injected error sink instead of console.error", async () => {
@@ -181,7 +181,7 @@ describe("toggleReaction", () => {
     });
 
     expect(failures).toEqual([{ error: expect.any(Error), type: "chat.reaction", leagueId: "l1" }]);
-    expect(result).toEqual({ ok: true, action: "added", reactions: [{ emoji: "🔥", userId: "u2" }] });
+    expect(result).toEqual({ ok: true, action: "added" });
   });
 });
 
@@ -193,7 +193,7 @@ describe("toggleReaction — atomic transition", () => {
     await db.insert(chatReactions).values({ messageId: Number(message.id), userId: "u2", emoji: "🔥" });
 
     const result = await toggleReaction(db, { leagueId: "l1", messageId: message.id, userId: "u2", emoji: "🔥", publish: bus.publish });
-    expect(result).toEqual({ ok: true, action: "removed", reactions: [] });
+    expect(result).toEqual({ ok: true, action: "removed" });
   });
 
   it('reports "added" when nothing is there yet', async () => {
@@ -201,7 +201,7 @@ describe("toggleReaction — atomic transition", () => {
     const message = await postMessage(db, { leagueId: "l1", userId: "u1", body: "nothing yet", publish: bus.publish });
 
     const result = await toggleReaction(db, { leagueId: "l1", messageId: message.id, userId: "u2", emoji: "🔥", publish: bus.publish });
-    expect(result).toEqual({ ok: true, action: "added", reactions: [{ emoji: "🔥", userId: "u2" }] });
+    expect(result).toEqual({ ok: true, action: "added" });
   });
 
   it('resolves a concurrent double-add without double-reporting "added"', async () => {
@@ -236,8 +236,8 @@ describe("toggleReaction — atomic transition", () => {
     // Both callers see the reaction gone and both honestly report "removed", but only the one
     // whose DELETE actually removed a row gets to publish — the loser's would-be publish is the
     // phantom this fix exists to prevent.
-    expect(r1).toEqual({ ok: true, action: "removed", reactions: [] });
-    expect(r2).toEqual({ ok: true, action: "removed", reactions: [] });
+    expect(r1).toEqual({ ok: true, action: "removed" });
+    expect(r2).toEqual({ ok: true, action: "removed" });
 
     const reactionEvents = bus.sent.filter((event) => event.type === "chat.reaction");
     expect(reactionEvents).toEqual([
