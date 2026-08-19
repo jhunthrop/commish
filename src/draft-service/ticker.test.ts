@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions, players } from "@/db/schema";
+import { players } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
-import { currentDeadline } from "@/draft-engine";
+import { bestAvailableFor, currentDeadline, teamOnClock } from "@/draft-engine";
 import { createDraftStore } from "./store";
 import { createDraftTicker } from "./ticker";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
@@ -77,20 +77,41 @@ describe("draft ticker", () => {
   it("reports applied:false with the store's own rejection reason when applyAction is rejected", async () => {
     const { ticker, store, fixture } = await liveDraft();
     now = "2026-09-01T09:00:00.000Z"; // past the deadline
-    const state = await store.getDraftState(fixture.draftId); // warms the ticker's shared store cache
-    // Sabotage the log: insert a row at the sequence number the ticker's own applyAction
-    // call will try to use next, so the store's optimistic-concurrency check rejects it —
-    // exercising the real "reducer rejected" branch, not a thrown exception.
-    await db.insert(draftActions).values({
-      draftId: fixture.draftId,
-      sequence: state!.sequence + 1,
-      action: { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: now },
-      timestamp: new Date(now),
+    // A real MAKE_PICK from a second store instance, landing between the ticker's read (which
+    // decides the clock has run out) and its own TIMER_EXPIRE write. This is exactly the race
+    // `admitTimerExpire` (admit.ts) exists to close: "the ticker reads state and computes a
+    // deadline in one step, then submits TIMER_EXPIRE in a later, separate step; a legitimate
+    // action can land in between and start a fresh clock for someone else." Task 6's freshness
+    // check makes that race easier to hit (a raw out-of-band DB insert used to be enough to
+    // force `applyAction`'s stale-cache/unique-index rejection — now the store just self-heals
+    // from that on the next read — so provoking a genuine "reducer rejected" here means
+    // injecting a real accepted action, not sabotaging the log directly).
+    const secondStore = createDraftStore({ db, publish: async () => "1-0", clock });
+    const spy = vi.spyOn(store, "getDraftState").mockImplementationOnce(async (draftId) => {
+      const state = await secondStore.getDraftState(draftId);
+      const onClock = state === null ? null : teamOnClock(state);
+      const best = state === null || onClock === null ? null : bestAvailableFor(state, onClock);
+      if (state === null || onClock === null || best === null) {
+        throw new Error("test setup: expected a live draft with an available player");
+      }
+      const raced = await secondStore.applyAction(draftId, {
+        v: DRAFT_ACTION_VERSION,
+        type: "MAKE_PICK",
+        timestamp: now,
+        teamId: onClock,
+        playerId: best.playerId,
+      });
+      if (!raced.ok) throw new Error(`test setup: racing pick was rejected: ${raced.reason}`);
+      // Return the PRE-race state — this is what the ticker's own read actually saw, and is
+      // still past its deadline, so `tickOne` proceeds to submit TIMER_EXPIRE against a clock
+      // that (unbeknownst to it) has already been reset by the pick above.
+      return state;
     });
 
     expect(await ticker.tick()).toEqual([
-      { draftId: fixture.draftId, applied: false, reason: "Someone else acted first. Try again." },
+      { draftId: fixture.draftId, applied: false, reason: "The clock hasn't run out yet." },
     ]);
+    spy.mockRestore();
   });
 
   // P3 (controller ruling): the brief's version of this test ended in `expect(true).toBe(true)`,

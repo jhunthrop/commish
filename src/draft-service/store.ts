@@ -1,4 +1,4 @@
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
 import { draftActions, drafts, teams } from "@/db/schema";
@@ -73,6 +73,26 @@ export function isSequenceConflict(error: unknown): boolean {
 }
 
 /**
+ * The highest `sequence` this draft's action log holds, or 0 for a log with no rows.
+ *
+ * This is the whole cross-instance freshness mechanism. `DraftState.sequence` counts accepted
+ * actions and is exactly the value written to `draft_actions.sequence` for the row that action
+ * produced, so a cached state whose `sequence` equals this is provably a materialization of the
+ * complete log and a cached state whose `sequence` is lower is provably behind. One row, served
+ * by the existing unique index on `(draft_id, sequence)`.
+ *
+ * Takes `Db | DbTx` because Task 7's locked write path calls it INSIDE the transaction that
+ * holds the draft's row lock, where using the outer `db` would read outside the lock.
+ */
+export async function latestActionSequence(db: Db | DbTx, draftId: string): Promise<number> {
+  const [row] = await db
+    .select({ latest: sql<number | null>`max(${draftActions.sequence})` })
+    .from(draftActions)
+    .where(eq(draftActions.draftId, draftId));
+  return row?.latest ?? 0;
+}
+
+/**
  * The durable draft session store.
  *
  * The `draft_actions` log is the source of truth; `cache` is only a materialization of it,
@@ -91,12 +111,18 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
   const cache = new Map<string, DraftState>();
   const mutex = createKeyedMutex();
 
-  async function load(draftId: string): Promise<DraftState | null> {
+  async function load(draftId: string, tx?: DbTx): Promise<DraftState | null> {
+    const source = tx ?? db;
     const cached = cache.get(draftId);
-    if (cached !== undefined) return cached;
-    const config = await loadDraftConfig(db, draftId);
+    if (cached !== undefined) {
+      // A cache built by THIS process can still be behind: another instance may have appended
+      // to the same log. Verified, not assumed — see `latestActionSequence`.
+      if ((await latestActionSequence(source, draftId)) === cached.sequence) return cached;
+      cache.delete(draftId);
+    }
+    const config = await loadDraftConfig(source, draftId);
     if (config === null) return null;
-    const rows = await db
+    const rows = await source
       .select()
       .from(draftActions)
       .where(eq(draftActions.draftId, draftId))
