@@ -24,7 +24,7 @@ export default async function AppHome() {
 
   return (
     <>
-      <AppHeader displayName={user.displayName} />
+      <AppHeader displayName={user.displayName} avatar={user.avatarUrl} />
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
         <PageTitle>Your leagues</PageTitle>
         <HomeBoard initial={home} />

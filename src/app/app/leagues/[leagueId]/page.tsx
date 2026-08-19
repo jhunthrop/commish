@@ -31,7 +31,7 @@ export default async function LeaguePage({ params }: PageProps) {
 
   return (
     <>
-      <AppHeader displayName={user.displayName} />
+      <AppHeader displayName={user.displayName} avatar={user.avatarUrl} />
       <LeagueHome home={home} lineup={lineup} />
     </>
   );

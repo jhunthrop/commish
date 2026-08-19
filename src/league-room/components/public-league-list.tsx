@@ -1,12 +1,12 @@
 import Link from "next/link";
 import { Badge, Card, EmptyState, EYEBROW } from "@/components/ui";
+import { EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
 import { JoinPublicLeagueButton } from "./join-public-league-button";
 
 const FORMAT_LABEL: Readonly<Record<string, string>> = { snake: "Snake", auction: "Auction" };
-const TIER_LABEL: Readonly<Record<string, string>> = { beginner: "New to fantasy", experienced: "Played before" };
 
 /**
  * "6 of 8 joined" answers "how full is it"; a visitor's actual decision is "is there room for
@@ -72,7 +72,7 @@ export function PublicLeagueList({
                 <Badge tone="neutral">{stakeTierLabel(league.stakeTier)}</Badge>
               </div>
               <p className={EYEBROW}>
-                {`${FORMAT_LABEL[league.format] ?? league.format} · ${TIER_LABEL[league.experienceTier] ?? league.experienceTier}`}
+                {`${FORMAT_LABEL[league.format] ?? league.format} · ${EXPERIENCE_TIER_LABEL[league.experienceTier] ?? league.experienceTier}`}
               </p>
               <p className="text-sm text-text-muted">
                 {`${league.filledTeams} of ${league.teamCount} joined`}

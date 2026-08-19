@@ -14,4 +14,18 @@ export const IDENTITY_CONFIG = {
     /** The only URL scheme ever rendered into an `<img src>`. See `parseAvatarRef`. */
     allowedUrlPrefix: "https://",
   },
+  /** `PATCH /api/profile`'s ceiling — keyed per user id, see `profileRateLimited`. */
+  profileRateLimit: { maxRequests: 10, windowMs: 60_000 },
 } as const;
+
+/**
+ * The one copy vocabulary for `experienceTier`, shared by every surface that shows it:
+ * `PublicLeagueList` (a stranger sizing up an open league) and `ProfileForm` (the same manager
+ * choosing their own). Copy, not enum values — `"New to fantasy"` / `"Played before"` say more
+ * than `"beginner"` / `"experienced"` would, and a single map is what stops the two surfaces
+ * from ever describing the same tier differently.
+ */
+export const EXPERIENCE_TIER_LABEL: Readonly<Record<string, string>> = {
+  beginner: "New to fantasy",
+  experienced: "Played before",
+};
