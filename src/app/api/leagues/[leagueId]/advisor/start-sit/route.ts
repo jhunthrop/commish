@@ -6,6 +6,7 @@ import { fail, ok, parseJson } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import { getLlmClient, isLLMEnabled } from "@/lib/llm/client";
 import { withLeagueMemberActor, type LeagueRouteContext } from "@/app/api/leagues/_shared";
+import { advisorRateLimited } from "../_shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,6 +21,8 @@ export const dynamic = "force-dynamic";
 export async function POST(request: Request, context: LeagueRouteContext) {
   return withLeagueMemberActor(request, context, async (actor, req) => {
     if (actor.teamId === null) return fail(NO_TEAM_MESSAGE, 403);
+    const limited = advisorRateLimited(actor.userId);
+    if (limited !== null) return limited;
 
     const parsed = await parseJson(req, startSitRequestSchema);
     if (!parsed.ok) return parsed.response;

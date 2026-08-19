@@ -6,6 +6,7 @@ import type { ApiEnvelope } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import type { Advice } from "./start-sit";
 import type { TradeAssessment } from "./trade";
+import { ADVISOR_CONFIG } from "./config";
 import { advisorFixture, foreignLeague } from "./test-support";
 
 const db: Db = createTestDb();
@@ -32,6 +33,7 @@ vi.mock("@/lib/llm/client", () => ({
 
 const { POST: START_SIT } = await import("@/app/api/leagues/[leagueId]/advisor/start-sit/route");
 const { POST: TRADE } = await import("@/app/api/leagues/[leagueId]/advisor/trade/route");
+const { resetAdvisorRateLimit } = await import("@/app/api/leagues/[leagueId]/advisor/_shared");
 
 function post(body: unknown): Request {
   return new Request("http://localhost/api/leagues/l/advisor", {
@@ -45,6 +47,9 @@ let leagueId = "";
 let opponentTeamId = "";
 
 beforeEach(async () => {
+  // The advisor's request ceiling lives in module memory for the whole file, so a case that
+  // spends it must not change what the next case sees.
+  resetAdvisorRateLimit();
   await truncateAll(db);
   const fixture = await advisorFixture(db, "ppr");
   leagueId = fixture.leagueId;
@@ -211,5 +216,36 @@ describe("POST /api/leagues/[leagueId]/advisor/trade", () => {
     expect(body.ok).toBe(false);
     if (body.ok) return;
     expect(body.error).toBe(NO_TEAM_MESSAGE);
+  });
+});
+
+/**
+ * The ceiling is per USER and shared by both advisor routes, because both spend the same two
+ * scarce things: a full context assembly and one model call. Signed in as the rival manager so
+ * these cases spend their own budget rather than the one every other case in this file uses.
+ */
+describe("the advisor's per-user request ceiling", () => {
+  it("refuses a member looping the endpoint, in plain language, once the window's budget is gone", async () => {
+    currentUser.mockResolvedValue({ id: "u2" });
+    for (let i = 0; i < ADVISOR_CONFIG.maxRequestsPerWindow; i += 1) {
+      expect((await START_SIT(post({ weekNumber: 4, question: "Who do I start?" }), context())).status).toBe(200);
+    }
+
+    const response = await START_SIT(post({ weekNumber: 4, question: "Who do I start?" }), context());
+    expect(response.status).toBe(429);
+    const body = (await response.json()) as ApiEnvelope<never>;
+    expect(body.ok).toBe(false);
+    if (body.ok) return;
+    expect(body.error).toBe("You've asked for a lot of advice at once. Give it a minute and try again.");
+  });
+
+  it("spends ONE budget across both advisor routes, not one each", async () => {
+    currentUser.mockResolvedValue({ id: "u2" });
+    for (let i = 0; i < ADVISOR_CONFIG.maxRequestsPerWindow; i += 1) {
+      expect((await START_SIT(post({ weekNumber: 4, question: "Who do I start?" }), context())).status).toBe(200);
+    }
+
+    const trade = post({ weekNumber: 4, counterpartyTeamId: opponentTeamId, give: ["wr_volume"], receive: ["wr_deep"] });
+    expect((await TRADE(trade, context())).status).toBe(429);
   });
 });

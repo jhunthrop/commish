@@ -22,4 +22,16 @@ export const ADVISOR_CONFIG = {
   evenDelta: 3,
   /** Points-per-week gap past which a trade is called lopsided rather than merely favouring somebody. */
   lopsidedDelta: 12,
+  /**
+   * Advisor requests one member may make per window, and the window (ms). Both advisor routes
+   * share one budget per user: each request costs a full context assembly plus one model call
+   * at `maxTokens`, so without a ceiling an authenticated member is an unbounded spend channel.
+   * Sized well above honest use — nobody asks twenty lineup questions in a minute — because
+   * this is a blast-radius bound, not a quota anybody should feel.
+   *
+   * The DURABLE, budget-accounted spend ceiling (distributed, across instances) remains Phase
+   * 6's; the in-process limiter this configures is the interim bound.
+   */
+  maxRequestsPerWindow: 20,
+  rateLimitWindowMs: 60_000,
 } as const;
