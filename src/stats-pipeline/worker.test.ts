@@ -2,11 +2,13 @@ import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vites
 import { and, eq } from "drizzle-orm";
 import Redis from "ioredis";
 import { createTestDb, truncateAll } from "@/db/test-db";
+import type { Db } from "@/db/client";
 import { drafts, leagues, matchups, playerStatLines, players, rosterSlots, statWeeks, teams, users } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
 import { writeSchedule } from "@/league-service/schedule";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { createRequestBudget, type RequestBudget } from "./budget";
+import { STATS_INGESTION_CONFIG } from "./config";
 import type { ScoreUpdatePayload } from "./contract";
 import { fakeStatsProvider, type FakeStatsProviderScript } from "./test-support";
 import { createIngestionWorker } from "./worker";
@@ -21,6 +23,25 @@ vi.mock("./finalize", async (importOriginal) => {
     finalizeWeek: vi.fn(async (db: Parameters<typeof actual.finalizeWeek>[0], leagueId: string, week: number) => {
       if (leagueId === throwFinalizeForLeague) throw new Error("simulated finalize failure");
       return actual.finalizeWeek(db, leagueId, week);
+    }),
+  };
+});
+
+// Lets one test force `persistTick` to throw exactly once (a simulated transient Postgres
+// failure AFTER a box score has already been fetched), then fall through to the real
+// implementation on every other call — including the very next tick in the same test, which is
+// the recovery half of that test.
+let throwPersistOnce = false;
+vi.mock("./persist", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./persist")>();
+  return {
+    ...actual,
+    persistTick: vi.fn(async (db: Parameters<typeof actual.persistTick>[0], input: Parameters<typeof actual.persistTick>[1]) => {
+      if (throwPersistOnce) {
+        throwPersistOnce = false;
+        throw new Error("simulated persist failure");
+      }
+      return actual.persistTick(db, input);
     }),
   };
 });
@@ -42,6 +63,7 @@ beforeEach(async () => {
 
 afterEach(() => {
   throwFinalizeForLeague = null;
+  throwPersistOnce = false;
 });
 
 afterAll(async () => {
@@ -142,6 +164,49 @@ describe("createIngestionWorker", () => {
 
     await worker.tick(); // tick 3: still final, the redis marker stops a refetch
     expect(getGameStatLinesSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("a persist failure after a successful fetch leaves no Redis trace, and the next tick recovers", async () => {
+    // The failure mode Case 2 depends on not existing: a marker or snapshot write BEFORE
+    // persistTick commits would make a fetched-but-never-stored game permanently unfetchable
+    // under final-only mode. This forces persistTick to fail on the tick that fetches the game.
+    await seedPlayers(["p1"]);
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: [{
+          gameId: "g_persist_fail", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN",
+          lines: [statLine("p1", 1, { passingYards: 200, passingTouchdowns: 2 })],
+        }],
+      },
+    };
+    const provider = fakeStatsProvider(script);
+    const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
+
+    throwPersistOnce = true;
+    const outcomes = await worker.tick(); // fetches the box score, then persistTick throws
+    expect(outcomes.some((o) => o.week === 1 && o.applied === false)).toBe(true);
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(1);
+
+    // (a) the finalGame marker was never set
+    const markerExists = await redis.exists(STATS_INGESTION_CONFIG.keys.finalGame("g_persist_fail"));
+    expect(markerExists).toBe(0);
+    // (b) the digest snapshot is unchanged (still empty — nothing was ever written to it)
+    const snapshot = await redis.hgetall(STATS_INGESTION_CONFIG.keys.snapshot(1));
+    expect(snapshot).toEqual({});
+    // and nothing landed in Postgres either — persistTick itself never ran this time
+    expect(await db.select().from(playerStatLines).where(eq(playerStatLines.week, 1))).toHaveLength(0);
+
+    // (c) recovery: the NEXT tick (persistTick no longer forced to fail) refetches the same
+    // game — proving final-only didn't wrongly mark it as already handled — and this time it
+    // actually lands.
+    const secondOutcomes = await worker.tick();
+    expect(secondOutcomes.some((o) => o.week === 1 && o.applied === true)).toBe(true);
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(2);
+    const lines = await db.select().from(playerStatLines).where(eq(playerStatLines.week, 1));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({ playerId: "p1", passingYards: 200 });
+    expect(await redis.exists(STATS_INGESTION_CONFIG.keys.finalGame("g_persist_fail"))).toBe(1);
   });
 
   it("live mode fetches every non-final game every tick, the same script producing three fetches", async () => {
@@ -366,6 +431,43 @@ describe("createIngestionWorker", () => {
       releaseListGames?.();
       worker.stop();
       reserveSpy.mockRestore();
+    }
+  });
+
+  it("start()'s outer catch survives a failure before per-week isolation begins, and the interval keeps running", async () => {
+    // `weeksToExamine` is the very first thing `tick()` does, before `budget.reserve` and
+    // before the per-week `try/catch` even exists. A `db` outage there (or `budget.reserve`
+    // itself throwing instead of failing closed, which it's designed not to) propagates out of
+    // `tick()` uncaught by anything inside it — only `start()`'s own outer `.catch()` stands
+    // between that and an unhandled rejection killing the interval for good.
+    const throwingDb = new Proxy(db, {
+      get(target, prop, receiver: unknown) {
+        if (prop === "select") {
+          return (): never => {
+            throw new Error("simulated db outage before weeksToExamine can run");
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const provider = fakeStatsProvider({ games: {} });
+    const worker = createIngestionWorker({
+      db: throwingDb as Db, provider, redis, publish: publishRecorder().fn, clock, budget, intervalMs: 20,
+    });
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      worker.start();
+      await new Promise((resolve) => setTimeout(resolve, 70)); // several interval periods
+
+      const tickerFailures = consoleErrorSpy.mock.calls.filter((args) => args[0] === "[stats-pipeline] ticker failed");
+      // More than one failure logged proves `running` reset after each throw rather than
+      // freezing the interval forever after the first one — which is the whole point of the
+      // outer catch existing at all.
+      expect(tickerFailures.length).toBeGreaterThanOrEqual(2);
+    } finally {
+      worker.stop();
+      consoleErrorSpy.mockRestore();
     }
   });
 });

@@ -12,6 +12,21 @@ export type FinalizeResult =
   | { readonly ok: true; readonly weekNumber: number; readonly matchupsScored: number }
   | { readonly ok: false; readonly status: number; readonly reason: string };
 
+/**
+ * `scoreTeamsForWeek` is always called (below, and here) with `teamIds` built from the exact
+ * same matchup rows this reads back for, so every team it's asked about is guaranteed a score —
+ * a missing entry would mean the two have silently drifted apart, which is a bug worth failing
+ * loudly on rather than one a `?? 0` fallback would quietly turn into a wrong score written to
+ * the season record.
+ */
+function requireScore(scores: ReadonlyMap<string, number>, teamId: string): number {
+  const score = scores.get(teamId);
+  if (score === undefined) {
+    throw new Error(`finalizeWeek: no computed score for team "${teamId}" — scoreTeamsForWeek and the matchup rows have drifted apart.`);
+  }
+  return score;
+}
+
 /** One team's week: the starters it fielded and what they were worth. */
 async function scoreTeam(
   db: Db,
@@ -103,7 +118,7 @@ export async function finalizeWeek(db: Db, leagueId: string, weekNumber: number)
     for (const row of week) {
       await tx
         .update(matchups)
-        .set({ homeScore: scores.get(row.homeTeamId) ?? 0, awayScore: scores.get(row.awayTeamId) ?? 0 })
+        .set({ homeScore: requireScore(scores, row.homeTeamId), awayScore: requireScore(scores, row.awayTeamId) })
         .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber), eq(matchups.homeTeamId, row.homeTeamId)));
     }
   });

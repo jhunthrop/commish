@@ -199,14 +199,15 @@ export function createIngestionWorker({
 
     let gamesFetched = 0;
     const fetchedLines: StatLine[] = [];
+    // Games actually fetched THIS tick whose box score is now final — the finalGame marker for
+    // each is set only after `persistTick` below commits, never here at fetch time.
+    const finalGamesFetched: GameSummary[] = [];
     for (const game of games) {
       if (gamesFetched >= gamesBudgetRemaining) break;
       if (!(await needsBoxScore(redis, game, mode))) continue;
       fetchedLines.push(...(await provider.getGameStatLines(game)));
       gamesFetched += 1;
-      if (game.status === "final") {
-        await redis.set(STATS_INGESTION_CONFIG.keys.finalGame(game.gameId), "1", "EX", STATS_INGESTION_CONFIG.ttlSeconds.finalGame);
-      }
+      if (game.status === "final") finalGamesFetched.push(game);
     }
 
     const gamesTotal = games.length;
@@ -217,11 +218,11 @@ export function createIngestionWorker({
     const previousRaw = await redis.hgetall(snapshotKey);
     const previous = new Map(Object.entries(previousRaw));
     const { changed, digests } = diffStatLines(previous, fetchedLines);
-    if (digests.size > 0) {
-      await redis.hset(snapshotKey, Object.fromEntries(digests));
-      await redis.expire(snapshotKey, STATS_INGESTION_CONFIG.ttlSeconds.snapshot);
-    }
 
+    // The write. If this throws, NOTHING below runs — no finalGame marker, no snapshot update —
+    // so a transient persist failure leaves Redis exactly as it was before this tick touched it,
+    // and the next tick refetches and re-diffs from scratch. Same principle as publish-after-
+    // commit: a Redis claim of "already ingested" may only be made once Postgres actually agrees.
     const persisted = await persistTick(db, {
       week,
       changed,
@@ -229,6 +230,14 @@ export function createIngestionWorker({
       games: { total: gamesTotal, final: gamesFinal },
       now: clock.now(),
     });
+
+    for (const game of finalGamesFetched) {
+      await redis.set(STATS_INGESTION_CONFIG.keys.finalGame(game.gameId), "1", "EX", STATS_INGESTION_CONFIG.ttlSeconds.finalGame);
+    }
+    if (digests.size > 0) {
+      await redis.hset(snapshotKey, Object.fromEntries(digests));
+      await redis.expire(snapshotKey, STATS_INGESTION_CONFIG.ttlSeconds.snapshot);
+    }
 
     if (changed.length > 0) {
       await publishAffected(week, status, gamesFinal, gamesTotal, persisted.version, changed, nowMs);

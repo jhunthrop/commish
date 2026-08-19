@@ -70,6 +70,28 @@ describe("persistTick", () => {
     expect(week).toMatchObject({ version: 1, gamesFinal: 2 });
   });
 
+  it("advances version from 1 to exactly 2 on a second tick with genuinely changed values", async () => {
+    // The first-ever tick for a week inserts `stat_weeks` fresh (the `values: { version:
+    // versionBump }` branch of the upsert) — every other test above that asserts a version
+    // number only ever exercises that branch once. This is the one that exercises the SIBLING
+    // branch, the `onConflictDoUpdate` `set: { version: sql`${statWeeks.version} + ...` }` path,
+    // against an already-versioned row: a bug in that arithmetic (e.g. a stray reference to
+    // `excluded.version`) would pass every other test here, since they only ever add 0 to an
+    // existing row.
+    await seedPlayers(["p1"]);
+    const first = await persistTick(db, tick({ week: 3, changed: [line("p1", { rushingYards: 40 })], status: "in_progress", games: { total: 2, final: 0 } }));
+    expect(first).toEqual({ version: 1, changedCount: 1 });
+
+    // A genuinely different number for the same player — not a re-submission of tick one's line.
+    const second = await persistTick(db, tick({ week: 3, changed: [line("p1", { rushingYards: 87 })], status: "in_progress", games: { total: 2, final: 1 } }));
+    expect(second).toEqual({ version: 2, changedCount: 1 });
+
+    const [week] = await db.select().from(statWeeks).where(eq(statWeeks.week, 3));
+    expect(week!.version).toBe(2);
+    const [line1] = await db.select().from(playerStatLines).where(eq(playerStatLines.playerId, "p1"));
+    expect(line1!.rushingYards).toBe(87);
+  });
+
   it("re-ingesting a week it has already ingested changes no number and no version", async () => {
     await seedPlayers(["p1", "p2", "p3", "p4", "p5", "p6", "p7", "p8"]);
     await persistTick(db, tick({ week: 3, changed: WEEK_3_LINES, status: "final", games: { total: 2, final: 2 } }));
