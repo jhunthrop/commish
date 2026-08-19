@@ -32,11 +32,14 @@ describe("RoomLayout", () => {
     expect(frame.className).toContain("lg:overflow-hidden");
   });
 
-  it("gives the pool and the stage each their own scroll, so neither pushes the other", () => {
+  it("clips every band and delegates scrolling to the content that owns it", () => {
     render(<RoomLayout {...slots} />);
-    // The pool column clips and lets `PlayerPool` scroll its own list; the stage scrolls itself.
+    // The pool column clips and lets `PlayerPool` scroll its own list; the stage clips too —
+    // the board grid inside it is the ONE horizontal scroller (two nested auto containers
+    // once rendered two stacked scrollbars).
     expect(bandFor("Pool").className).toContain("lg:overflow-hidden");
-    expect(bandFor("Stage").className).toContain("lg:overflow-auto");
+    expect(bandFor("Stage").className).toContain("lg:overflow-hidden");
+    expect(bandFor("Stage").className).not.toContain("overflow-auto");
   });
 
   it("re-sequences the same four regions on a phone rather than rendering any of them twice", () => {

@@ -48,6 +48,19 @@ describe("DraftRoom", () => {
     await waitFor(() => expect(screen.getByTestId("room-aside")).toBeInTheDocument());
   });
 
+  it("collapses the chat band to a reopen strip and brings it back", async () => {
+    mount();
+    await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole("button", { name: "Hide chat" }));
+    expect(screen.queryByRole("region", { name: "League chat" })).not.toBeInTheDocument();
+    // The band itself stays — a slim strip holding the way back in.
+    expect(screen.getByTestId("room-aside")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Show chat" }));
+    expect(await screen.findByRole("region", { name: "League chat" })).toBeInTheDocument();
+  });
+
   it("offers a retry when the draft cannot be loaded", async () => {
     const fixture = fixtureDeps();
     fixture.deps = { ...fixture.deps, fetchJson: async () => ({ json: async () => ({ ok: false, error: "That draft doesn't exist." }) }) as unknown as Response };

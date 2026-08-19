@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import type { ClientDraftAction } from "@/draft-engine";
 import { Button, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
@@ -17,6 +17,7 @@ export function DraftRoom({ draftId }: { readonly draftId: string }) {
   const room = useDraftRoom(draftId);
   const { show } = useToast();
   const playersById = useMemo(() => buildPlayersById(room.players), [room.players]);
+  const [chatOpen, setChatOpen] = useState(true);
 
   const act = (action: ClientDraftAction): void => {
     void room.submit(action).then((outcome) => {
@@ -48,7 +49,33 @@ export function DraftRoom({ draftId }: { readonly draftId: string }) {
   // Built here, not inside RoomShell: DraftRoom is the one component that knows the league id
   // and the only one whose test renders a fully-loaded room, so the chat's dependencies enter
   // the tree in exactly one place — the same reason `bidConsole` and `poolFooter` are props.
-  const chat = <LeagueChat leagueId={room.view.leagueId} />;
+  // Collapsible on the founder's ask: closed, the band shrinks to a slim reopen strip so the
+  // board gets the width back; the closed chat unmounts (its SSE messages are server history,
+  // nothing is lost) — reopening refetches, which is the hook's normal mount path.
+  const chat = chatOpen ? (
+    <div className="flex h-full min-h-0 flex-col lg:w-88">
+      <div className="flex shrink-0 justify-end px-3 pt-2">
+        <Button variant="ghost" size="sm" aria-expanded="true" onClick={() => setChatOpen(false)}>
+          Hide chat
+        </Button>
+      </div>
+      <div className="min-h-0 flex-1 px-3 pb-3">
+        <LeagueChat leagueId={room.view.leagueId} />
+      </div>
+    </div>
+  ) : (
+    <div className="flex justify-center p-2 lg:h-full lg:w-12 lg:items-start">
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-expanded="false"
+        onClick={() => setChatOpen(true)}
+        className="lg:mt-2 lg:[writing-mode:vertical-rl]"
+      >
+        Show chat
+      </Button>
+    </div>
+  );
 
   return room.view.format === "auction" ? (
     <AuctionRoom room={room} playersById={playersById} onAct={act} aside={chat} />
