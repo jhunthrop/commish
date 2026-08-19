@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { ChatMessageView, ChatPageBody, PostChatBody, ReactionBody } from "@/chat/contract";
-import { applyReaction, mergeMessages } from "@/chat/messages";
+import { applyReaction, mergeMessages, unionMessages } from "@/chat/messages";
 import { parseChatFrame } from "@/chat/parse";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { useChatRoomDeps } from "./deps";
@@ -57,10 +57,10 @@ const INITIAL: LeagueChatState = {
  * Two carried findings from the Task 1 review of `@/chat/messages`, both resolved here:
  *
  * 1. `mergeMessages`'s cap-and-trim always keeps the NEWEST `CHAT_CONFIG.maxHeldMessages`
- *    entries, which is correct for live-frame growth but would defeat backward pagination if
- *    `loadEarlier` routed through it too — a full held buffer plus an older page would have the
- *    trim discard exactly the page just fetched. `loadEarlier` below never calls `mergeMessages`
- *    for that reason; see its own docblock.
+ *    entries, which is correct for live-frame growth but defeats backward pagination. Only the
+ *    LIVE-frame path goes through it. `loadEarlier` prepends directly (see its own docblock)
+ *    and `refresh` unions without trimming — otherwise any reconnect, which fires `refresh`,
+ *    would re-cap a buffer pagination had deliberately grown and discard loaded history.
  * 2. An out-of-order `chat.reaction` frame (for a message not currently held) is silently
  *    dropped by `applyReaction`'s no-op branch, with no queue or later re-application. That is
  *    provably safe here: every fetch this hook makes (`refresh`, the mount effect, and
@@ -88,7 +88,12 @@ export function useLeagueChat(leagueId: string): LeagueChat {
         setState((prev) => ({ ...prev, status: "error", error: body.error }));
         return;
       }
-      const merged = mergeMessages(messagesRef.current, body.data.messages);
+      // `unionMessages`, NOT `mergeMessages`: the cap keeps the newest `maxHeldMessages`, and
+      // every reconnect fires this (see the `open` handler). Capping here would re-trim a
+      // buffer that `loadEarlier` deliberately grew past the cap and discard the history the
+      // user explicitly paged in — unreachably, since `hasMore` may already be false. This
+      // input is one server page, so the union cannot grow the buffer without bound.
+      const merged = unionMessages(messagesRef.current, body.data.messages);
       messagesRef.current = merged;
       setState((prev) => ({
         ...prev,

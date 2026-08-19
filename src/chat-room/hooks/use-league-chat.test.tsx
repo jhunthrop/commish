@@ -157,6 +157,43 @@ describe("useLeagueChat", () => {
     expect(result.current.messages[0]?.body).toBe("older");
   });
 
+  // The other half of carried finding 1, which the test above could not see: `refresh()` used
+  // to route the newest page through `mergeMessages` too, so ANY reconnect (every SSE `open`
+  // fires `void refresh()`) re-applied the newest-500 cap to a buffer that backward pagination
+  // had deliberately grown past it — silently discarding pages the user explicitly loaded, and
+  // leaving them unreachable because `hasMore` was already false.
+  it("keeps paged-in history across a reconnect's refresh", async () => {
+    const fixture = fixtureChatDeps({ ...CHAT_PAGE, hasMore: true });
+    const { result } = renderHook(() => useLeagueChat("l1"), { wrapper: wrapper(fixture.deps) });
+    await waitFor(() => expect(result.current.hasMore).toBe(true));
+
+    act(() => {
+      for (let i = 3; i <= CHAT_CONFIG.maxHeldMessages + 1; i += 1) {
+        fixture.emit("chat.message", { message: chatMessage(String(i)) });
+      }
+    });
+    await waitFor(() => expect(result.current.messages).toHaveLength(CHAT_CONFIG.maxHeldMessages));
+
+    fixture.response = { ok: true, data: { ...CHAT_PAGE, messages: [chatMessage("0", { body: "older" })], hasMore: false } };
+    await act(async () => {
+      await result.current.loadEarlier();
+    });
+    expect(result.current.messages[0]?.body).toBe("older");
+
+    fixture.response = { ok: true, data: { ...CHAT_PAGE, hasMore: false } };
+    act(() => fixture.fire("open"));
+    await waitFor(() => expect(result.current.connection).toBe("live"));
+
+    expect(result.current.messages[0]?.body).toBe("older");
+    expect(result.current.messages.length).toBeGreaterThan(CHAT_CONFIG.maxHeldMessages);
+    // The refreshed page also brings back id "1", which the live-frame cap had trimmed off the
+    // front earlier — a page the client is holding is never partially applied.
+    expect(result.current.messages.slice(0, 3).map((message) => message.id)).toEqual(["0", "1", "2"]);
+    // Truthful either way: `loadEarlier` reached the start of the history, and a refresh of the
+    // NEWEST page cannot discover anything about what is behind the oldest held message.
+    expect(result.current.hasMore).toBe(false);
+  });
+
   // --- Carried finding 2 (Task 1 review): a chat.reaction frame for a message this browser
   // doesn't hold is dropped by applyReaction's no-op branch, with no queue or later
   // re-application. That is provably safe here, not silent data loss: every fetch this hook

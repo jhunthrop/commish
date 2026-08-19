@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { CHAT_CONFIG } from "./config";
 import type { ChatMessageView } from "./contract";
-import { applyReaction, mergeMessages, summarizeReactions } from "./messages";
+import { applyReaction, mergeMessages, summarizeReactions, unionMessages } from "./messages";
 
 function message(id: string, overrides: Partial<ChatMessageView> = {}): ChatMessageView {
   return {
@@ -45,6 +45,31 @@ describe("mergeMessages", () => {
     const merged = mergeMessages([], many);
     expect(merged).toHaveLength(CHAT_CONFIG.maxHeldMessages);
     expect(merged[0]?.id).toBe("3");
+  });
+});
+
+/**
+ * The same fold WITHOUT the cap — what a refetch of the newest page goes through, so a
+ * reconnect can't re-trim a buffer backward pagination deliberately grew past the cap.
+ */
+describe("unionMessages", () => {
+  it("keeps everything, past the buffer cap", () => {
+    const many = Array.from({ length: CHAT_CONFIG.maxHeldMessages + 2 }, (_, i) => message(String(i + 1)));
+    const united = unionMessages([], many);
+    expect(united).toHaveLength(CHAT_CONFIG.maxHeldMessages + 2);
+    expect(united[0]?.id).toBe("1");
+  });
+
+  it("orders and dedupes exactly as the capped fold does", () => {
+    const united = unionMessages([message("2", { body: "held" })], [message("1"), message("2", { body: "fresher" })]);
+    expect(united.map((entry) => entry.id)).toEqual(["1", "2"]);
+    expect(united[1]?.body).toBe("fresher");
+  });
+
+  it("unions reactions rather than letting a replayed empty list erase them", () => {
+    const held = [message("1", { reactions: [{ emoji: "🔥", userId: "u2" }] })];
+    const united = unionMessages(held, [message("1", { reactions: [] })]);
+    expect(united[0]?.reactions).toEqual([{ emoji: "🔥", userId: "u2" }]);
   });
 });
 

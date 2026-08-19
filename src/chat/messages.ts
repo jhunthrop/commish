@@ -20,14 +20,20 @@ function dedupeReactions(reactions: readonly ChatReactionView[]): readonly ChatR
 }
 
 /**
- * Folds a page or a live frame into the list a client holds.
+ * Folds messages together by id, in chronological order, WITHOUT the held-buffer cap.
  *
  * Reactions are UNIONED rather than overwritten: a `Last-Event-ID` replay redelivers a
  * `chat.message` frame whose payload was built before anybody reacted, and taking that frame's
  * empty list literally would silently erase reactions already folded from later frames.
  * Everything here is set-shaped, so replay is a no-op instead of a correction.
+ *
+ * Separate from `mergeMessages` because the cap is only correct for GROWTH the client did not
+ * ask for. A refetch of the newest page is bounded by the server's own page size, so unioning
+ * it into the buffer cannot grow that buffer without bound — while capping it would re-apply
+ * "keep the newest 500" to a buffer that backward pagination deliberately grew past 500, and
+ * throw away exactly the history a user asked for.
  */
-export function mergeMessages(
+export function unionMessages(
   held: readonly ChatMessageView[],
   incoming: readonly ChatMessageView[],
 ): readonly ChatMessageView[] {
@@ -40,7 +46,19 @@ export function mergeMessages(
     });
   }
   // Ids are a bigserial, so a numeric compare IS chronological order — no timestamp tie to break.
-  const ordered = [...byId.values()].sort((a, b) => Number(a.id) - Number(b.id));
+  return [...byId.values()].sort((a, b) => Number(a.id) - Number(b.id));
+}
+
+/**
+ * `unionMessages` plus the held-buffer cap: what a LIVE frame goes through, where growth is
+ * unbounded (a busy league can publish all day) and the newest messages are the ones worth
+ * keeping.
+ */
+export function mergeMessages(
+  held: readonly ChatMessageView[],
+  incoming: readonly ChatMessageView[],
+): readonly ChatMessageView[] {
+  const ordered = unionMessages(held, incoming);
   return ordered.length <= CHAT_CONFIG.maxHeldMessages ? ordered : ordered.slice(ordered.length - CHAT_CONFIG.maxHeldMessages);
 }
 
