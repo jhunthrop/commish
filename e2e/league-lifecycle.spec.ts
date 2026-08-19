@@ -73,14 +73,30 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
     .first()
     .locator("span.truncate.font-display")
     .innerText();
+
+  // Scoped to the watcher's OWN available-pool list (player-pool.tsx's `aria-label="Available
+  // players, best first"` `<ol>`), not the whole page: every available player's name already
+  // renders there before any pick happens, so a page-wide text match would resolve at t=0
+  // whether or not anything reached the watcher over Redis Streams and SSE. Asserting the row
+  // is present here first is what makes the disappearance below unable to pass vacuously.
+  const watcherPool = watcher.getByRole("list", { name: "Available players, best first" });
+  await expect(watcherPool.getByRole("listitem").filter({ hasText: pickedName })).toHaveCount(1);
+
   await picker.getByRole("button", { name: "Draft" }).first().click();
 
-  // THE assertion: the other browser learns about the pick with no reload and no polling.
-  await expect(watcher.getByText(pickedName, { exact: false }).first()).toBeVisible({ timeout: 20_000 });
+  // THE assertion: the pick reached the other browser with no reload and no polling. The row
+  // only leaves this list when `view.availablePlayerIds` changes (player-pool.tsx filters
+  // `showDrafted || !row.drafted`, and `showDrafted` defaults false) — which only happens when
+  // an event arrives over the real-time stream.
+  await expect(watcherPool.getByRole("listitem").filter({ hasText: pickedName })).toHaveCount(0, { timeout: 20_000 });
 
   // --- And so does a chat message ----------------------------------------------------------
+  // Scoped to the message log region (message-list.tsx's `role="log" aria-label="Messages"`),
+  // not the whole page, for the same anchoring rigor as the pool assertion above — even though
+  // `shout` is a unique, freshly-generated string that could not already be on the page.
   const shout = `Nice pick ${Date.now()}`;
   await watcher.getByLabel("Message").fill(shout);
   await watcher.getByLabel("Message").press("Enter");
-  await expect(picker.getByText(shout)).toBeVisible({ timeout: 20_000 });
+  const pickerLog = picker.getByRole("log", { name: "Messages" });
+  await expect(pickerLog.getByText(shout)).toBeVisible({ timeout: 20_000 });
 });
