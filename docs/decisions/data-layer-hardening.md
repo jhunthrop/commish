@@ -18,9 +18,14 @@ model (`enable_seqscan` at its default `on`).
 **Diagnosis:** Re-running the identical `EXPLAIN (ANALYZE, FORMAT JSON)` under
 `SET LOCAL enable_seqscan = off` (diagnostic only — never how the test or production runs)
 confirms an index path exists: the planner falls back to a `Nested Loop` with an `Index Scan`
-on `teams` via `teams_league_id_idx`, at a *higher* total cost (1100.48 vs. 557.94) and
-comparable actual execution time (~2.6ms vs. ~3.2ms at this corpus size — the seq-scan plan is
-not slower on this data).
+on `teams` via `teams_league_id_idx`, at a *higher estimated* cost (1100.48 vs. 557.94) but
+*lower measured* time — repeated cache-warm measurement puts the forced-index plan roughly
+35-40% faster at this corpus size (median ~2.2ms vs ~3.6ms). The planner's estimate and the
+measurement disagree because the default `random_page_cost` (4.0) prices random I/O for
+spinning disks; on SSD-backed storage it overprices index access. We deliberately do NOT
+force the plan here: the gap is milliseconds on an anonymous read, and the correct fix is
+cost-model tuning (`random_page_cost`) alongside the pooling configuration, tracked as a
+follow-up in this document rather than a planner hint scattered in query code.
 
 At 5,000 leagues / 15,000 teams, the unnarrowed browse still matches roughly 500 leagues and
 1,500 teams after the `is_public_matchmade` and `status = 'scheduled'` predicates. A `Seq Scan`
