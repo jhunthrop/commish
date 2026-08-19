@@ -135,4 +135,36 @@ describe("POST /api/leagues/[leagueId]/chat/[messageId]/reactions", () => {
     const response = await REACT(post({ emoji: "🔥" }), context);
     expect(response.status).toBe(404);
   });
+
+  // The path param reached `Number(messageId)` and then a bigint comparison: `Number("abc")`
+  // is NaN, which the driver serializes as "NaN" and Postgres rejects outright, so the route's
+  // error boundary answered a generic 500 and logged a database error for what is plainly a
+  // malformed request. The `before` cursor on the sibling GET has been guarded against exactly
+  // this since day one; the path param never was.
+  it("rejects a message id that isn't a number with a 400, naming the param — never a 500", async () => {
+    const context = { params: Promise.resolve({ leagueId: "l1", messageId: "drop-table" }) };
+    const response = await REACT(post({ emoji: "🔥" }), context);
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as ApiEnvelope<never>;
+    expect(body.ok).toBe(false);
+    if (body.ok) return;
+    expect(body.error).toContain("messageId");
+  });
+
+  // All digits, and still not an id any bigserial can hold: `^\d{1,19}$` admitted values above
+  // int8's max (9223372036854775807), which fails in the driver the same way "NaN" does.
+  it("rejects an all-digits id larger than a bigint with a 400, not a 500", async () => {
+    const context = { params: Promise.resolve({ leagueId: "l1", messageId: "9999999999999999999" }) };
+    expect((await REACT(post({ emoji: "🔥" }), context)).status).toBe(400);
+  });
+
+  it("still 404s a well-formed id that simply isn't there", async () => {
+    const context = { params: Promise.resolve({ leagueId: "l1", messageId: "424242" }) };
+    const response = await REACT(post({ emoji: "🔥" }), context);
+    expect(response.status).toBe(404);
+    const body = (await response.json()) as ApiEnvelope<never>;
+    expect(body.ok).toBe(false);
+    if (body.ok) return;
+    expect(body.error).toBe("That message is no longer here.");
+  });
 });

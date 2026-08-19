@@ -1,4 +1,4 @@
-import { reactionSchema, toggleReaction } from "@/chat-service";
+import { chatMessageIdSchema, reactionSchema, toggleReaction } from "@/chat-service";
 import type { ReactionBody } from "@/chat/contract";
 import { getDb } from "@/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
@@ -20,6 +20,13 @@ export interface ChatMessageRouteContext {
 export async function POST(request: Request, context: ChatMessageRouteContext) {
   return withLeagueMemberActor(request, context, async (actor, req) => {
     const { messageId } = await context.params;
+    // A path param is untrusted input like any other, and this one reaches a bigint comparison
+    // as `Number(messageId)`. Validated HERE, before the service touches the database, so a
+    // malformed id is a 400 naming the param — the same answer shape `parseJson` gives a bad
+    // body — instead of a driver error surfacing as a generic 500.
+    const id = chatMessageIdSchema.safeParse(messageId);
+    if (!id.success) return fail(`messageId: ${id.error.issues[0]?.message ?? "That isn't a message id."}`, 400);
+
     const parsed = await parseJson(req, reactionSchema);
     if (!parsed.ok) return parsed.response;
 
