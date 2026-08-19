@@ -3,19 +3,8 @@ import { render, type RenderResult } from "@testing-library/react";
 import type { TeamCard } from "@/domain/league";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import type { LeagueHomeBody, LeagueSummary, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
+import type { LeagueHomeBody, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "./hooks/deps";
-
-export const LEAGUES: readonly LeagueSummary[] = [
-  {
-    id: "l1", name: "Sunday Money", format: "snake", teamCount: 12, filledTeams: 8,
-    isCommissioner: true, myTeamId: "t1", draftId: "d1", draftStatus: "scheduled",
-  },
-  {
-    id: "l2", name: "Auction Night", format: "auction", teamCount: 10, filledTeams: 10,
-    isCommissioner: false, myTeamId: "t9", draftId: "d2", draftStatus: "complete",
-  },
-];
 
 /** Server rank order (wins, then points for, then team id) — never re-derived in a test. */
 export const STANDINGS: readonly TeamStandingsRow[] = [

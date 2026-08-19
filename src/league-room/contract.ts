@@ -3,7 +3,7 @@ import type { DraftFormat, TeamCard } from "@/domain/league";
 import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { TradeFlag, TradeVerdict } from "@/ai-advisor/valuation";
-import type { StandingsRow, WeekStatus } from "@/league";
+import type { NextAction, StandingsRow, WeekStatus } from "@/league";
 
 /**
  * TYPES ONLY, no runtime code. Imported by the `/api/leagues/**` routes as their return shape
@@ -68,6 +68,30 @@ export interface MatchupSummary {
    */
   readonly final: boolean;
   readonly weekStatus: WeekStatus;
+}
+
+/**
+ * One league, as the cross-league home renders it: everything `LeagueSummary` already carries,
+ * plus the record, this week's matchup, and the one next action — the three things `/app`
+ * exists to answer per league (Task 9, Spec Step 8).
+ */
+export interface HomeLeagueCard extends LeagueSummary {
+  /** This user's own win-loss-tie record, from matchups already played. `null` only for the
+   *  degenerate case of no team in this league at all — every card the home page actually
+   *  renders has one, since it lists leagues by team membership. */
+  readonly record: { readonly wins: number; readonly losses: number; readonly ties: number } | null;
+  /** The current week, always present — `seasonProgress` never returns undefined even for a
+   *  league with no matchups yet, so there is no "no week" state to represent. */
+  readonly weekNumber: number;
+  readonly weekStatus: WeekStatus;
+  /** This user's matchup for `weekNumber`, or `null` on a bye or before the schedule exists. */
+  readonly matchup: MatchupSummary | null;
+  /** `null` renders as no action at all — never a disabled button (`@/league/next-action.ts`). */
+  readonly nextAction: NextAction | null;
+}
+
+export interface HomeBody {
+  readonly leagues: readonly HomeLeagueCard[];
 }
 
 export interface LeagueHomeBody {

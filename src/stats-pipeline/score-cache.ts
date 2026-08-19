@@ -8,9 +8,28 @@ export interface CachedScores {
   readonly scores: readonly TeamScore[];
 }
 
+/** One (league, week) pair to batch-read, at the version the caller considers fresh. */
+export interface ScoreCacheBatchRequest {
+  readonly leagueId: string;
+  readonly week: number;
+  readonly version: number;
+}
+
 export interface ScoreCache {
   /** A miss (including a stale-version miss and a corrupt-value miss) resolves `null`, never throws. */
   read(leagueId: string, week: number, version: number): Promise<readonly TeamScore[] | null>;
+  /**
+   * Many (league, week) pairs in ONE round trip — the cross-league home's read, where a manager
+   * in ten leagues must cost one `MGET`, not ten `GET`s. Keyed in the returned map by
+   * `STATS_INGESTION_CONFIG.keys.score(leagueId, week)`, the same key `read`/`write` use — a
+   * caller already holding that key (or able to recompute it) needs no second key scheme.
+   *
+   * A miss for a given pair — absent, corrupt, or stale-version — is simply absent from the
+   * returned map, never a `null` entry or a throw: the same degrade-open contract as `read`,
+   * extended to "the whole call degrades open" rather than "each entry degrades open
+   * independently", since one dead Redis fails every key in the batch identically.
+   */
+  readMany(requests: readonly ScoreCacheBatchRequest[]): Promise<ReadonlyMap<string, readonly TeamScore[]>>;
   write(leagueId: string, week: number, version: number, scores: readonly TeamScore[]): Promise<void>;
   invalidate(leagueId: string, week: number): Promise<void>;
 }
@@ -65,6 +84,33 @@ export function createScoreCache({ redis }: ScoreCacheDeps): ScoreCache {
     }
   }
 
+  async function readMany(requests: readonly ScoreCacheBatchRequest[]): Promise<ReadonlyMap<string, readonly TeamScore[]>> {
+    const result = new Map<string, readonly TeamScore[]>();
+    if (requests.length === 0) return result;
+    try {
+      const keys = requests.map((request) => STATS_INGESTION_CONFIG.keys.score(request.leagueId, request.week));
+      const raws = await redis.mget(...keys);
+      raws.forEach((raw, index) => {
+        const request = requests[index]!;
+        if (raw === null) return;
+
+        let parsed: unknown;
+        try {
+          parsed = JSON.parse(raw);
+        } catch {
+          return; // Corrupt value: not JSON.
+        }
+        if (!isCachedScores(parsed)) return; // Corrupt value: JSON of the wrong shape.
+        if (parsed.version !== request.version) return; // Stale version.
+
+        result.set(keys[index]!, parsed.scores);
+      });
+      return result;
+    } catch {
+      return result; // Redis outage. Degrade OPEN, same as `read`.
+    }
+  }
+
   async function write(leagueId: string, week: number, version: number, scores: readonly TeamScore[]): Promise<void> {
     try {
       const value: CachedScores = { version, scores };
@@ -87,5 +133,5 @@ export function createScoreCache({ redis }: ScoreCacheDeps): ScoreCache {
     }
   }
 
-  return { read, write, invalidate };
+  return { read, readMany, write, invalidate };
 }

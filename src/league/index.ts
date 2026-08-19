@@ -5,3 +5,4 @@ export { clinchedTeamIds, type ClinchInput } from "./clinch";
 export { defaultLineup, setSlotPlayer, startersOf, benchOf } from "./lineup";
 export { generateInviteCode } from "./invite-code";
 export { weekStatusFromGames, isLineupLocked, type WeekStatus } from "./week-status";
+export { nextAction, type NextAction, type NextActionKind, type NextActionInput } from "./next-action";

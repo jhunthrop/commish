@@ -65,6 +65,61 @@ describe("createScoreCache", () => {
     expect(ttl).toBeLessThanOrEqual(STATS_INGESTION_CONFIG.ttlSeconds.score);
   });
 
+  describe("readMany", () => {
+    const LEAGUE_B = "league_score_cache_test_b";
+
+    beforeEach(async () => {
+      await control.del(keyFor(LEAGUE_B, WEEK));
+    });
+
+    afterAll(async () => {
+      await control.del(keyFor(LEAGUE_B, WEEK));
+    });
+
+    it("short-circuits an empty request list without touching Redis", async () => {
+      const cache = createScoreCache({ redis });
+      await expect(cache.readMany([])).resolves.toEqual(new Map());
+    });
+
+    it("reads several leagues in one call, keyed by the same key `read` uses", async () => {
+      const cache = createScoreCache({ redis });
+      const otherScores = [{ teamId: "t3", points: 55 }];
+      await cache.write(LEAGUE, WEEK, 3, SCORES);
+      await cache.write(LEAGUE_B, WEEK, 1, otherScores);
+
+      const result = await cache.readMany([
+        { leagueId: LEAGUE, week: WEEK, version: 3 },
+        { leagueId: LEAGUE_B, week: WEEK, version: 1 },
+      ]);
+      expect(result.get(keyFor(LEAGUE, WEEK))).toEqual(SCORES);
+      expect(result.get(keyFor(LEAGUE_B, WEEK))).toEqual(otherScores);
+      expect(result.size).toBe(2);
+    });
+
+    it("omits a stale-version entry from the map rather than including a null", async () => {
+      const cache = createScoreCache({ redis });
+      await cache.write(LEAGUE, WEEK, 3, SCORES);
+      const result = await cache.readMany([{ leagueId: LEAGUE, week: WEEK, version: 4 }]);
+      expect(result.has(keyFor(LEAGUE, WEEK))).toBe(false);
+    });
+
+    it("omits an unwritten key from the map", async () => {
+      const cache = createScoreCache({ redis });
+      const result = await cache.readMany([{ leagueId: LEAGUE, week: WEEK, version: 3 }]);
+      expect(result.has(keyFor(LEAGUE, WEEK))).toBe(false);
+    });
+
+    it("degrades OPEN on a Redis outage: an empty map, never a throw", async () => {
+      const dead = throwingRedis();
+      try {
+        const cache = createScoreCache({ redis: dead });
+        await expect(cache.readMany([{ leagueId: LEAGUE, week: WEEK, version: 3 }])).resolves.toEqual(new Map());
+      } finally {
+        dead.disconnect();
+      }
+    });
+  });
+
   describe("degrades OPEN on a Redis outage", () => {
     it("read resolves to a miss, not a throw", async () => {
       const dead = throwingRedis();

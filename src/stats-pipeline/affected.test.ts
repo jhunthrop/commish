@@ -1,10 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { and, eq, inArray, sql } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
-import * as schema from "@/db/schema";
 import { leagues, lineupSlots, rosterSlots, teams, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import type { Db, ReadonlyDb } from "@/db/client";
+import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { BENCH_SLOT } from "@/domain/roster";
 import { affectedTeams } from "./affected";
 
@@ -34,33 +31,6 @@ async function seedLeague(leagueId: string, teamSpecs: readonly TeamSpec[]): Pro
     commissionerUserId: teamSpecs[0].userId,
   });
   await db.insert(teams).values(teamSpecs.map((t) => ({ id: t.teamId, leagueId, userId: t.userId, name: t.teamId })));
-}
-
-/**
- * A `Db` that counts actual round trips to Postgres, not calls to the `.select(...)` query
- * builder. The two calls matter because `affected.ts`'s roster fallback builds a SECOND
- * `db.select(...)` internally — for the `notExists` correlated subquery — that is embedded into
- * the outer query's SQL text and never separately awaited. Counting `.select(...)` invocations
- * would see three calls for two real queries and fail the call-count guarantee for the wrong
- * reason. Counting at `$client.unsafe`, the one place postgres-js actually sends a query over
- * the wire, counts what the spec's exit criterion means by "queries".
- */
-function countingDb(base: Db): { readonly db: ReadonlyDb; readonly selectCount: () => number } {
-  let executions = 0;
-  const countedClient = new Proxy(base.$client, {
-    get(target, prop, receiver) {
-      const value: unknown = Reflect.get(target, prop, receiver);
-      if (prop === "unsafe" && typeof value === "function") {
-        return (...args: unknown[]) => {
-          executions += 1;
-          return (value as (...a: unknown[]) => unknown).apply(target, args);
-        };
-      }
-      return value;
-    },
-  });
-  const countedDb = drizzle(countedClient, { schema });
-  return { db: countedDb, selectCount: () => executions };
 }
 
 describe("affectedTeams", () => {
@@ -174,6 +144,11 @@ describe("affectedTeams", () => {
       .set({ playerId: "p-shared" })
       .where(and(inArray(rosterSlots.teamId, SHARED_TEAM_IDS), eq(rosterSlots.slot, "STARTER"), eq(rosterSlots.slotIndex, 0)));
 
+    // `countingDb` (`@/db/test-db`) counts at `$client.unsafe`, not `.select(...)` calls: the
+    // bound of 2 below is 2 real round trips, even though `affected.ts`'s roster fallback builds
+    // a SECOND `db.select(...)` internally for a `notExists` correlated subquery — that one is
+    // embedded into the outer query's SQL text and never separately awaited, so counting
+    // `.select(...)` invocations would see three calls for two real queries.
     const counting = countingDb(db);
     const affected = await affectedTeams(counting.db, { week: 3, playerIds: ["p-shared"] });
     expect(affected).toHaveLength(3);

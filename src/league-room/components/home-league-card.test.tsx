@@ -1,0 +1,71 @@
+import { describe, it, expect } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { axe } from "vitest-axe";
+import { inBothThemes } from "@/components/ui/test-utils";
+import type { HomeLeagueCard as HomeLeagueCardData } from "../contract";
+import { WON } from "../test-fixtures";
+import { HomeLeagueCard } from "./home-league-card";
+
+const BASE: HomeLeagueCardData = {
+  id: "l1",
+  name: "Sunday Money",
+  format: "snake",
+  teamCount: 10,
+  filledTeams: 10,
+  isCommissioner: false,
+  myTeamId: "t1",
+  draftId: "d1",
+  draftStatus: "complete",
+  record: { wins: 5, losses: 2, ties: 0 },
+  weekNumber: 3,
+  weekStatus: "final",
+  matchup: WON,
+  nextAction: { kind: "review-week", label: "See how the week went" },
+};
+
+describe("HomeLeagueCard", () => {
+  it("renders the league name, record, and this week's matchup, in both themes", async () => {
+    await inBothThemes(<HomeLeagueCard league={BASE} />, async ({ container }) => {
+      expect(screen.getByRole("link", { name: /Sunday Money/ })).toHaveAttribute("href", "/app/leagues/l1");
+      expect(screen.getByText("5-2")).toBeInTheDocument();
+      expect(screen.getByText(/Bay Bandits/)).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("marks the leagues the caller commissions", () => {
+    render(<HomeLeagueCard league={{ ...BASE, isCommissioner: true }} />);
+    expect(screen.getByText(/· Commissioner/)).toBeInTheDocument();
+  });
+
+  it("shows a plain no-matchup message with the week's own badge when there is none", () => {
+    render(<HomeLeagueCard league={{ ...BASE, matchup: null, weekStatus: "scheduled" }} />);
+    expect(screen.getByText(/no matchup/i)).toBeInTheDocument();
+    expect(screen.getByText("Not started")).toBeInTheDocument();
+  });
+
+  it("renders no action at all for a league with nothing pending, rather than a disabled button", () => {
+    render(<HomeLeagueCard league={{ ...BASE, nextAction: null }} />);
+    expect(screen.queryByRole("link", { name: /See how the week went/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("sends a live draft's action into the draft room, not the league page", () => {
+    render(
+      <HomeLeagueCard
+        league={{ ...BASE, draftStatus: "in_progress", nextAction: { kind: "join-draft", label: "Join the draft" } }}
+      />,
+    );
+    expect(screen.getByRole("link", { name: "Join the draft" })).toHaveAttribute("href", "/app/drafts/d1");
+  });
+
+  it("sends every other action into the league's own home", () => {
+    render(<HomeLeagueCard league={{ ...BASE, nextAction: { kind: "set-lineup", label: "Set your lineup" } }} />);
+    expect(screen.getByRole("link", { name: "Set your lineup" })).toHaveAttribute("href", "/app/leagues/l1");
+  });
+
+  it("gives a live draft the same loud ring treatment LeagueList gives it", () => {
+    const { container } = render(<HomeLeagueCard league={{ ...BASE, draftStatus: "in_progress" }} />);
+    expect(container.querySelector("article")).toHaveClass("ring-2");
+  });
+});

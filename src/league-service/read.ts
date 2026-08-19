@@ -1,6 +1,7 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, teams } from "@/db/schema";
+import type { DraftStatus } from "@/domain/draft";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import { listTeamCards } from "@/draft-service/teams";
 import { benchOf, LEAGUE_CONFIG, seasonProgress, startersOf, type WeekStatus } from "@/league";
@@ -24,27 +25,53 @@ const NOOP_REFERENCE_CACHE: Pick<ReferenceCache, "players" | "scoringSettings"> 
   scoringSettings: (_leagueId, load) => load(),
 };
 
+/** One row of `leagues`, exactly as Drizzle selects it — the shape `myLeaguesOverview` and
+ *  `listLeaguesForUser` share. */
+type LeagueRow = typeof leagues.$inferSelect;
+
+/** Every league the caller fields a team in, oldest first, plus the team and draft rows over
+ *  that same league-id set — the one shared read `listLeaguesForUser` and `crossLeagueHome`
+ *  (`@/league-service/home.ts`) both extend rather than each re-querying it their own way. One
+ *  query per table, not one per league — a manager in ten leagues must not cost thirty round
+ *  trips, whichever of the two callers is asking. */
+export interface LeagueMembershipRows {
+  readonly leagueRows: readonly LeagueRow[];
+  readonly teamRows: readonly { readonly id: string; readonly leagueId: string; readonly name: string }[];
+  readonly draftRows: readonly { readonly id: string; readonly leagueId: string; readonly status: DraftStatus }[];
+  /** This user's own team in each league they're in. */
+  readonly myTeamByLeague: ReadonlyMap<string, string>;
+}
+
 /**
- * Every league the caller fields a team in, oldest first, with the two numbers the list needs:
- * how full it is, and what its draft is doing. One query per table, not one per league — a
- * manager in ten leagues must not cost thirty round trips.
+ * Every league the given user fields a team in, with every OTHER team, and every draft, over
+ * that same league-id set. Nothing here is scoped to a single league or filtered by anything but
+ * membership, which is what makes the authorization guarantee simple to state: a league this
+ * user has no team in never enters `ids`, so it can never appear in any of the three row sets
+ * below, no matter what a caller does with them afterward.
  */
-export async function listLeaguesForUser(db: Db, userId: string): Promise<readonly LeagueSummary[]> {
+export async function myLeaguesOverview(db: Db, userId: string): Promise<LeagueMembershipRows> {
   const mine = await db.select({ leagueId: teams.leagueId, teamId: teams.id }).from(teams).where(eq(teams.userId, userId));
-  if (mine.length === 0) return [];
+  if (mine.length === 0) return { leagueRows: [], teamRows: [], draftRows: [], myTeamByLeague: new Map() };
   const ids = mine.map((row) => row.leagueId);
 
   const leagueRows = await db.select().from(leagues).where(inArray(leagues.id, ids)).orderBy(asc(leagues.createdAt));
-  const teamRows = await db.select({ leagueId: teams.leagueId }).from(teams).where(inArray(teams.leagueId, ids));
+  const teamRows = await db.select({ id: teams.id, leagueId: teams.leagueId, name: teams.name }).from(teams).where(inArray(teams.leagueId, ids));
   const draftRows = await db
     .select({ id: drafts.id, leagueId: drafts.leagueId, status: drafts.status })
     .from(drafts)
     .where(inArray(drafts.leagueId, ids));
 
+  return { leagueRows, teamRows, draftRows, myTeamByLeague: new Map(mine.map((row) => [row.leagueId, row.teamId])) };
+}
+
+/** The two numbers the league list needs beyond the raw rows: how full a league is, and what
+ *  its draft is doing. */
+export async function listLeaguesForUser(db: Db, userId: string): Promise<readonly LeagueSummary[]> {
+  const { leagueRows, teamRows, draftRows, myTeamByLeague } = await myLeaguesOverview(db, userId);
+
   const filledByLeague = new Map<string, number>();
   for (const row of teamRows) filledByLeague.set(row.leagueId, (filledByLeague.get(row.leagueId) ?? 0) + 1);
   const draftByLeague = new Map(draftRows.map((row) => [row.leagueId, row]));
-  const myTeamByLeague = new Map(mine.map((row) => [row.leagueId, row.teamId]));
 
   return leagueRows.map((league) => ({
     id: league.id,
@@ -59,7 +86,11 @@ export async function listLeaguesForUser(db: Db, userId: string): Promise<readon
   }));
 }
 
-function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyMap<string, string>, weekStatus: WeekStatus): MatchupSummary {
+/** One matchup row rendered as the summary every list and card shows: names resolved, `final`
+ *  derived from whether both scores have landed, and the week's live status carried alongside
+ *  it. Exported for `crossLeagueHome` (`@/league-service/home.ts`), which builds the exact same
+ *  shape for a different set of matchup rows rather than re-deriving it. */
+export function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyMap<string, string>, weekStatus: WeekStatus): MatchupSummary {
   return {
     weekNumber: row.weekNumber,
     homeTeamId: row.homeTeamId,

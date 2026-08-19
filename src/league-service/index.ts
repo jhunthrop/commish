@@ -7,5 +7,6 @@
 export { createLeague } from "./creation";
 export { createInvite, acceptInvite } from "./invites";
 export { listLeaguesForUser, leagueHome, matchupWeek } from "./read";
+export { crossLeagueHome } from "./home";
 export { setLineup, lineupView } from "./lineups";
 export { createLeagueSchema, createInviteSchema, acceptInviteSchema, setLineupSchema, weekNumberSchema } from "./schemas";
