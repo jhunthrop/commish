@@ -60,11 +60,13 @@ export const SEEDED_SEASON_CURRENT_WEEK = LEAGUE_CONFIG.regularSeasonWeeks;
 const MAX_TICKS_TO_REACH_LIVE_WEEK = 40;
 
 /**
- * The actual bound. A correct worker converges from a completely empty `stat_weeks` table in 11
- * ticks against the committed mock dataset's 16 games a week and the default 20-game tick budget.
- * The safety net above cannot catch a regression from 11 to 39: it would pass, silently, while
- * every real tick's request cost rose with it. This is the assertion that fails instead — tight
- * enough to notice, loose enough to survive a dataset that grows a little.
+ * The actual bound. A correct worker converges from a completely empty `stat_weeks` table in 13
+ * ticks against the committed mock dataset's 16 games a week and the default 20-game tick budget:
+ * a tick examining a brand new week finalizes it and starts the next, then a tick examining only
+ * that week (the steady-state one-week window) finishes it. The safety net above cannot catch a
+ * regression from 13 to 39 — it would pass, silently, while every real tick's request cost rose
+ * with it. This is the assertion that fails instead: tight enough to notice, loose enough to
+ * survive a dataset that grows a little.
  */
 const EXPECTED_MAX_TICKS_TO_REACH_LIVE_WEEK = 15;
 
