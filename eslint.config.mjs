@@ -69,6 +69,16 @@ const SERVER_ONLY_MODULE_GROUPS = [
 ];
 
 /**
+ * NOT on the list above, deliberately: `@/identity` (`src/identity/**`) joins `@/chat`
+ * (`src/chat/**`) and `@/matchmaking` (`src/matchmaking/**`) in the browser-safe exempt set —
+ * pure, I/O-free code with no server module behind it, so client code may value-import it
+ * directly. `src/chat-room/**` reaches `parseAvatarRef` indirectly through `Avatar`
+ * (`src/components/ui/avatar.tsx`) rather than importing `@/identity` itself, but the omission
+ * here is what keeps that path legal. See docs/conventions.md's directory map for the same note
+ * on `@/chat` and `@/matchmaking`.
+ */
+
+/**
  * One regex per module matching either spelling: `@/<module>` (optionally with a subpath) or
  * any number of leading `../`/`./` segments followed by `<module>` (optionally with a
  * subpath). A single regex per module rather than a `group` glob PLUS a `/*` sibling for deep

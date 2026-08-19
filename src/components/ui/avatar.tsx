@@ -1,9 +1,13 @@
+import { parseAvatarRef, type AvatarTone } from "@/identity/avatars";
+import { Icon } from "./icon";
+
 export type AvatarSize = "sm" | "md" | "lg";
 
 export interface AvatarProps {
   /** The person's display name — the source of the initials fallback. */
   readonly name: string;
-  readonly src?: string | null;
+  /** The STORED avatar ref (`users.avatar_url`), not a URL. `parseAvatarRef` decides what it is. */
+  readonly avatar?: string | null;
   readonly size?: AvatarSize;
   /** Provide to make the avatar an accessible image; omit to leave it decorative. */
   readonly label?: string;
@@ -14,6 +18,27 @@ const SIZE: Readonly<Record<AvatarSize, string>> = {
   sm: "size-6 text-xs",
   md: "size-8 text-sm",
   lg: "size-12 text-lg",
+};
+
+const ICON_SIZE: Readonly<Record<AvatarSize, number>> = {
+  sm: 14,
+  md: 18,
+  lg: 26,
+};
+
+/**
+ * Preset tiles reuse the existing token roles rather than inventing a fill for each tone: only
+ * `accent` and `negative` have a dedicated `-text` role for a solid fill (see
+ * docs/design-system.md, "Semantic-on-fill"), so those two get one; `positive`/`warning`/
+ * `neutral` render their icon in the tone's own text color on the same neutral surface the
+ * initials fallback already uses — the same choice `Badge` makes for the tones it does not fill.
+ */
+const TONE: Readonly<Record<AvatarTone, string>> = {
+  accent: "bg-accent text-accent-text",
+  negative: "bg-negative text-negative-text",
+  positive: "bg-surface-elevated text-positive",
+  warning: "bg-surface-elevated text-warning",
+  neutral: "bg-surface-elevated text-text-muted",
 };
 
 /** First letter of the first and last words, upper-cased. "Ada Byron Lovelace" → "AL". */
@@ -29,7 +54,8 @@ export function initialsFor(name: string): string {
  * Decorative by default — an avatar almost always sits beside the same person's name, and
  * announcing it twice is noise. Pass `label` when the avatar stands alone.
  */
-export function Avatar({ name, src, size = "md", label, className = "" }: AvatarProps) {
+export function Avatar({ name, avatar, size = "md", label, className = "" }: AvatarProps) {
+  const ref = parseAvatarRef(avatar ?? null);
   const a11y = label === undefined ? { "aria-hidden": true as const } : { role: "img", "aria-label": label };
   return (
     <span
@@ -39,9 +65,13 @@ export function Avatar({ name, src, size = "md", label, className = "" }: Avatar
         `border border-border bg-surface-elevated font-semibold text-text-primary ${SIZE[size]} ${className}`
       }
     >
-      {src ? (
-        // eslint-disable-next-line @next/next/no-img-element -- avatar URLs are arbitrary remote hosts; next/image would need a per-host allowlist we do not have in Phase 1
-        <img src={src} alt="" className="size-full object-cover" />
+      {ref.kind === "preset" ? (
+        <span className={`flex size-full items-center justify-center ${TONE[ref.preset.tone]}`}>
+          <Icon name={ref.preset.icon} size={ICON_SIZE[size]} />
+        </span>
+      ) : ref.kind === "remote" ? (
+        // eslint-disable-next-line @next/next/no-img-element -- parseAvatarRef already enforces the https-only allowlist; next/image is still not used because that would need a per-host allowlist we do not have
+        <img src={ref.url} alt="" className="size-full object-cover" />
       ) : (
         <span>{initialsFor(name)}</span>
       )}

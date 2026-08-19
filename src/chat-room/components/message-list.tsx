@@ -48,7 +48,7 @@ export function MessageList({ messages, meUserId, hasMore, loadingEarlier, onLoa
         <ul className="flex flex-col gap-3">
           {messages.map((message) => (
             <li key={message.id} className="flex gap-2">
-              <Avatar name={message.authorName} src={message.authorAvatarUrl} />
+              <Avatar name={message.authorName} avatar={message.authorAvatarUrl} />
               <div className="flex min-w-0 flex-1 flex-col gap-1">
                 <p className="flex flex-wrap items-baseline gap-2">
                   <span
