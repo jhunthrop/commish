@@ -41,6 +41,14 @@ const SERVER_ONLY_MODULE_GROUPS = [
   "@/draft-service",
   "@/league",
   "@/league-service",
+  // Both are Postgres-backed (`chat-service/chat.ts`, `ai-advisor/context.ts`) and were the
+  // one-hop way around the `@/db` ban: a client file importing `@/chat-service` was legal to
+  // this rule, while the `@/db` import that makes it server-only sat in a file the glob below
+  // does not cover. `aliasOrRelative` anchors on the full segment, so banning `@/chat-service`
+  // cannot catch the PURE `@/chat` (contract, config, folds) that `src/chat-room/**`
+  // legitimately value-imports.
+  "@/chat-service",
+  "@/ai-advisor",
   "@/db",
   "@/lib/realtime",
   "@/lib/auth",
