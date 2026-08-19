@@ -53,6 +53,11 @@ export function sequentiallyScannedRelations(plan: PlanNode): readonly string[] 
   return found;
 }
 
+/** Whether `plan` reads `relation` with a sequential scan anywhere in the tree. */
+export function planUsesSeqScanOn(plan: PlanNode, relation: string): boolean {
+  return sequentiallyScannedRelations(plan).includes(relation);
+}
+
 /**
  * The first node anywhere in the plan whose `Index Name` matches, or `undefined` if the plan
  * never touches that index. `not.toContain("chat_messages")` on `sequentiallyScannedRelations`

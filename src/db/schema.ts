@@ -20,6 +20,7 @@ export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experi
 export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
 export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress", "complete"]);
 export const playerPositionEnum = pgEnum("player_position", ["QB", "RB", "WR", "TE", "K", "DEF"]);
+export const weekStatusEnum = pgEnum("week_status", ["scheduled", "in_progress", "final"]);
 
 // Identity (credentials, sessions, MFA, OAuth) is owned by WorkOS AuthKit. This table is
 // the app's own profile row for a WorkOS user — `id` IS the WorkOS user id — holding the
@@ -147,7 +148,18 @@ export const lineupSlots = pgTable(
     slotIndex: integer("slot_index").notNull(),
     playerId: text("player_id"),
   },
-  (t) => [primaryKey({ columns: [t.teamId, t.weekNumber, t.slot, t.slotIndex] })],
+  (t) => [
+    primaryKey({ columns: [t.teamId, t.weekNumber, t.slot, t.slotIndex] }),
+    /**
+     * THE inverted index the live-scoring pipeline needs, maintained by the database rather than
+     * by a second copy in Redis that could drift from this table. A stat change for one player
+     * resolves to the teams that started that player in that week by an index range scan, which
+     * is what keeps a tick O(changed players) instead of O(leagues x teams x starters). The
+     * column order is (player, week) and not (week, player) because the worker always knows the
+     * week and asks about a set of players: the players are the selective half.
+     */
+    index("lineup_slots_player_week_idx").on(t.playerId, t.weekNumber),
+  ],
 );
 
 export const scoringSettings = pgTable("scoring_settings", {
@@ -181,7 +193,16 @@ export const rosterSlots = pgTable(
     slotIndex: integer("slot_index").notNull(),
     playerId: text("player_id"),
   },
-  (t) => [primaryKey({ columns: [t.teamId, t.slot, t.slotIndex] })],
+  (t) => [
+    primaryKey({ columns: [t.teamId, t.slot, t.slotIndex] }),
+    /**
+     * The fallback half. `getLineup` derives a legal lineup from the roster for any team whose
+     * manager never opened the editor, so a changed player can affect a team with no
+     * `lineup_slots` row for the week at all. No week column, because a roster is not versioned
+     * by week.
+     */
+    index("roster_slots_player_idx").on(t.playerId),
+  ],
 );
 
 export const drafts = pgTable(
@@ -342,6 +363,34 @@ export const playerStatLines = pgTable(
   },
   (t) => [primaryKey({ columns: [t.playerId, t.week] }), index("player_stat_lines_week_idx").on(t.week)],
 );
+
+/**
+ * The ingestion state of record for one NFL week. One row per week, not per league: a week is
+ * final when the NFL's games are over, which is a fact about the world rather than about any
+ * league. Phase 1 already conflates league week number with NFL week number (`weeks.week_number`
+ * indexes into `player_stat_lines.week` directly) and this table inherits that; a phase that runs
+ * leagues on offset calendars is the phase that changes it.
+ *
+ * `version` is the rollup this table exists for, in the sense `docs/decisions/data-layer-
+ * hardening.md` means: it is advanced in the SAME transaction as the stat-line writes it
+ * summarizes, never after them and never on a schedule. It is what the computed-score cache keys
+ * its freshness on, so a cache entry written against version 7 is discarded the instant version 8
+ * commits. A version that could be advanced separately from its stat lines is a version that can
+ * disagree with them, and a score cache that disagrees with the stats under it is worse than no
+ * cache at all.
+ *
+ * The append-only source of truth remains `player_stat_lines`: this row is derived from it and
+ * can be rebuilt from it, which is the second half of the same convention.
+ */
+export const statWeeks = pgTable("stat_weeks", {
+  week: integer("week").primaryKey(),
+  status: weekStatusEnum("status").notNull().default("scheduled"),
+  /** Monotonic, advanced only on a tick that actually changed a stat line. */
+  version: integer("version").notNull().default(0),
+  gamesTotal: integer("games_total").notNull().default(0),
+  gamesFinal: integer("games_final").notNull().default(0),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 /**
  * League chat. Keyed on the LEAGUE, not on a draft: the draft room and the league room mount

@@ -31,7 +31,7 @@ export async function truncateAll(db: Db): Promise<void> {
   await db.execute(sql`
     TRUNCATE TABLE
       chat_reactions, chat_messages,
-      player_stat_lines, players,
+      player_stat_lines, players, stat_weeks,
       matchups, weeks, draft_picks, draft_nudges, draft_actions, drafts,
       lineup_slots, roster_slots, league_invites,
       scoring_settings, teams, leagues, users

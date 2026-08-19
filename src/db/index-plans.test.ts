@@ -1,9 +1,9 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, inArray } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
-import { chatMessages, draftActions, teams } from "./schema";
-import { explainPlan, indexScanNode, sequentiallyScannedRelations } from "./explain";
+import { chatMessages, draftActions, lineupSlots, rosterSlots, teams } from "./schema";
+import { explainPlan, indexScanNode, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
 import { browseQuery } from "@/league-service/browse";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 
@@ -18,6 +18,18 @@ const db = createTestDb();
 const LEAGUE_COUNT = 5_000;
 const TEAMS_PER_LEAGUE = 3;
 const USER_COUNT = 200;
+
+/**
+ * The full 15-slot roster and its 9-slot starting subset, inlined as raw-SQL `VALUES` lists
+ * rather than imported from `@/domain/roster`: this file seeds through `db.execute(sql\`...\`)`,
+ * not the domain layer, and the shape only needs to produce a realistic row count and column
+ * spread, not stay wired to `STANDARD_ROSTER_SLOTS`.
+ */
+const LINEUP_STARTER_SLOTS = sql`(VALUES ('QB',0),('RB',0),('RB',1),('WR',0),('WR',1),('TE',0),('FLEX',0),('K',0),('DEF',0)) AS s(slot, idx)`;
+const ROSTER_SLOTS = sql`(VALUES ('QB',0),('RB',0),('RB',1),('WR',0),('WR',1),('TE',0),('FLEX',0),('K',0),('DEF',0),('BENCH',0),('BENCH',1),('BENCH',2),('BENCH',3),('BENCH',4),('BENCH',5)) AS s(slot, idx)`;
+const LINEUP_WEEKS = 3;
+/** Distinct synthetic player ids spread across the corpus, so `p-1`..`p-3` stay a small, selective slice. */
+const PLAYER_POOL_SIZE = 5_000;
 
 async function seedCorpus(): Promise<void> {
   await db.execute(sql`
@@ -56,9 +68,29 @@ async function seedCorpus(): Promise<void> {
     SELECT 'lg' || (1 + (g % 50)), 'u' || (1 + (g % ${USER_COUNT})), 'message ' || g
     FROM generate_series(1, 20000) g
   `);
+  // Every team's full roster — every drafted team has one, so this is the whole population, not
+  // a slice of it. 5,000 leagues x 3 teams x 15 slots = 225,000 rows, comfortably past the
+  // 50,000-row floor a real planner choice needs.
+  await db.execute(sql`
+    INSERT INTO roster_slots (team_id, slot, slot_index, player_id)
+    SELECT 'tm' || g || '_' || t, s.slot, s.idx,
+           'p-' || (1 + ((g * 17 + t * 11 + s.idx * 5) % ${PLAYER_POOL_SIZE}))
+    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${TEAMS_PER_LEAGUE}) t, ${ROSTER_SLOTS}
+  `);
+  // A genuine subset, not the whole population: `lineup_slots`'s own docstring says an absent row
+  // is normal, since `defaultLineup()` derives a legal lineup from the roster for anyone who never
+  // opened the editor. One team per league across 3 weeks of starters: 5,000 x 3 x 9 = 135,000
+  // rows, again well past the floor, while leaving most teams with no lineup row for most weeks —
+  // which is exactly the shape "finds the teams that OWN a changed player" below exists to cover.
+  await db.execute(sql`
+    INSERT INTO lineup_slots (team_id, week_number, slot, slot_index, player_id)
+    SELECT 'tm' || g || '_1', w, s.slot, s.idx,
+           'p-' || (1 + ((g * 31 + w * 13 + s.idx * 7) % ${PLAYER_POOL_SIZE}))
+    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${LINEUP_WEEKS}) w, ${LINEUP_STARTER_SLOTS}
+  `);
   // Without ANALYZE the planner works from empty-table statistics and will choose a sequential
   // scan for everything, which would make this whole suite a false negative.
-  await db.execute(sql`ANALYZE users, leagues, drafts, teams, chat_messages`);
+  await db.execute(sql`ANALYZE users, leagues, drafts, teams, chat_messages, roster_slots, lineup_slots`);
 }
 
 describe("hot read paths use indexes", () => {
@@ -124,5 +156,28 @@ describe("hot read paths use indexes", () => {
       .where(eq(draftActions.draftId, "df1"))
       .orderBy(asc(draftActions.sequence));
     expect(sequentiallyScannedRelations(await explainPlan(db, query))).not.toContain("draft_actions");
+  });
+
+  it("finds the teams that started a changed player by index, not by scanning lineups", async () => {
+    const plan = await explainPlan(
+      db,
+      db
+        .select({ teamId: lineupSlots.teamId })
+        .from(lineupSlots)
+        .where(and(eq(lineupSlots.weekNumber, 3), inArray(lineupSlots.playerId, ["p-1", "p-2", "p-3"]))),
+    );
+    expect(planUsesSeqScanOn(plan, "lineup_slots")).toBe(false);
+  });
+
+  it("finds the teams that OWN a changed player by index, for teams with no saved lineup", async () => {
+    // The fallback half of the resolver: `getLineup` derives a legal lineup from the roster when
+    // a manager never opened the editor, so a changed player can affect a team that has no
+    // lineup_slots row at all. Both halves have to be index lookups or the "only affected
+    // rosters" guarantee is only half true.
+    const plan = await explainPlan(
+      db,
+      db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(inArray(rosterSlots.playerId, ["p-1", "p-2", "p-3"])),
+    );
+    expect(planUsesSeqScanOn(plan, "roster_slots")).toBe(false);
   });
 });
