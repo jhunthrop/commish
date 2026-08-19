@@ -1,5 +1,5 @@
 import { getDb } from "@/db/client";
-import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
+import { createStatsProvider } from "@/stats/registry";
 import { envOrUndefined } from "@/lib/env";
 import { DEV_SEED } from "./config";
 import { assertLocalSeedTarget } from "./guard";
@@ -17,7 +17,7 @@ async function main(): Promise<void> {
   // and `player_stat_lines` row, so a guard placed after it would fire far too late.
   assertLocalSeedTarget();
   const db = getDb();
-  const playerCounts = await seedPlayers(db, createMockStatsProvider());
+  const playerCounts = await seedPlayers(db, createStatsProvider());
   console.log(`seeded ${playerCounts.players} players and ${playerCounts.statLines} stat lines`);
   // The only place that reads DEV_SEED_CLAIM_USER_ID — seedDevLeagues takes it as an explicit
   // parameter rather than reaching into process.env itself. See seed-dev-leagues.ts.

@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { createMockStatsProvider } from "./mock-stats-provider";
 import { PLAYER_COUNT } from "./generate-dataset";
+import { describeStatsProviderContract } from "../test-support";
+
+describeStatsProviderContract("MockStatsProvider", () => createMockStatsProvider());
 
 describe("MockStatsProvider", () => {
   const provider = createMockStatsProvider();
