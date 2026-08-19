@@ -36,7 +36,7 @@ const STAKE_OPTIONS = [
  */
 export function BrowseFilters({ filter }: { readonly filter: BrowseFilter }) {
   return (
-    <form method="get" action="/browse" className="grid gap-3 sm:grid-cols-4 sm:items-end">
+    <form method="get" action="/browse" className="grid gap-3 sm:grid-cols-4 sm:items-start">
       <Select label="Draft format" name="format" options={FORMAT_OPTIONS} defaultValue={String(filter.format)} />
       <Select label="Experience" name="experienceTier" options={EXPERIENCE_OPTIONS} defaultValue={String(filter.experienceTier)} />
       <Select
