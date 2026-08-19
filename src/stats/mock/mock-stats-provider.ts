@@ -19,28 +19,35 @@ export interface MockProviderOptions {
 export function createMockStatsProvider(dataset: Dataset = committed as Dataset, options: MockProviderOptions = {}): StatsProvider {
   const linesFor = (week: number): readonly StatLine[] => dataset.statLines.filter((line) => line.week === week);
   const statusFor = (week: number): GameStatus => (week === options.liveWeek ? "in_progress" : "final");
-  const gamesFor = (week: number): readonly GameSummary[] =>
-    deriveMockGames(week, dataset.players, linesFor(week), statusFor(week));
+  const teamById = new Map(dataset.players.map((player) => [player.id, player.nflTeam]));
+
+  async function listGames(week: number): Promise<readonly GameSummary[]> {
+    return deriveMockGames(week, dataset.players, linesFor(week), statusFor(week));
+  }
+
+  async function getGameStatLines(game: GameSummary): Promise<readonly StatLine[]> {
+    const teams = new Set([game.homeNflTeam, game.awayNflTeam]);
+    return linesFor(game.week).filter((line) => teams.has(teamById.get(line.playerId) ?? ""));
+  }
 
   return {
     async listPlayers() {
       return dataset.players;
     },
-    async listGames(week) {
-      return gamesFor(week);
-    },
-    async getGameStatLines(game) {
-      const teams = new Set([game.homeNflTeam, game.awayNflTeam]);
-      const teamById = new Map(dataset.players.map((player) => [player.id, player.nflTeam]));
-      return linesFor(game.week).filter((line) => teams.has(teamById.get(line.playerId) ?? ""));
-    },
+
+    listGames,
+
+    getGameStatLines,
+
     async getWeeklyStatLines(week) {
       // Composed, not filtered independently: the contract asserts these agree, and the cheapest
-      // way to keep them agreeing forever is for one of them to BE the other.
-      const games = gamesFor(week);
-      const teams = new Set(games.flatMap((game) => [game.homeNflTeam, game.awayNflTeam]));
-      const teamById = new Map(dataset.players.map((player) => [player.id, player.nflTeam]));
-      return linesFor(week).filter((line) => teams.has(teamById.get(line.playerId) ?? ""));
+      // way to keep them agreeing forever is for one of them to BE the other. In-memory, so a
+      // plain sequential loop (no Promise.all) is fine — there is no request cost to parallelize.
+      const lines: StatLine[] = [];
+      for (const game of await listGames(week)) {
+        lines.push(...(await getGameStatLines(game)));
+      }
+      return lines;
     },
   };
 }
