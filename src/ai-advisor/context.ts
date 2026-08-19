@@ -84,6 +84,12 @@ export async function assembleAdvisorContext(db: Db, input: AssembleContextInput
     .from(teams)
     .where(eq(teams.leagueId, input.leagueId));
   const nameById = new Map(teamRows.map((row) => [row.id, row.name]));
+  // `leagueId` and `teamId` arrive as INDEPENDENT inputs, and the roster read below
+  // (`getLineup`) filters by `teamId` alone — so without this line a team id from another
+  // league assembles that team's real roster under this league's name and scoring. That is an
+  // authorization check, not a lookup convenience: the trade route takes `counterpartyTeamId`
+  // straight from the request body. Both routes already answer `null` as a 404.
+  if (!nameById.has(input.teamId)) return null;
 
   const allMatchups = await db.select().from(matchups).where(eq(matchups.leagueId, input.leagueId));
   const thisWeek = allMatchups.find(

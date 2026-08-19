@@ -6,7 +6,7 @@ import type { ApiEnvelope } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import type { Advice } from "./start-sit";
 import type { TradeAssessment } from "./trade";
-import { advisorFixture, foreignLeaguePlayer } from "./test-support";
+import { advisorFixture, foreignLeague } from "./test-support";
 
 const db: Db = createTestDb();
 const currentUser = vi.fn<() => Promise<{ readonly id: string } | null>>();
@@ -146,12 +146,26 @@ describe("POST /api/leagues/[leagueId]/advisor/trade", () => {
   });
 
   it("422s a proposal naming a REAL player who is rostered only in a different league", async () => {
-    const foreignPlayerId = await foreignLeaguePlayer(db);
+    const foreign = await foreignLeague(db);
     const response = await TRADE(
-      post({ weekNumber: 4, counterpartyTeamId: opponentTeamId, give: [foreignPlayerId], receive: ["wr_volume"] }),
+      post({ weekNumber: 4, counterpartyTeamId: opponentTeamId, give: [foreign.playerId], receive: ["wr_volume"] }),
       context(),
     );
     expect(response.status).toBe(422);
+  });
+
+  // The counterparty is an AUTHORIZATION input, not just a lookup key: `getLineup` filters by
+  // teamId alone, so without a league check a team id from ANOTHER league assembles that team's
+  // real roster and the analyzer answers with per-week valuations for its named players — a
+  // cross-league oracle, and those names go into the prompt. `receive` deliberately names a
+  // player that team really holds, so the pre-fix answer was a genuine 200, not a shape error.
+  it("404s a counterparty team that is real but belongs to a DIFFERENT league", async () => {
+    const foreign = await foreignLeague(db);
+    const response = await TRADE(
+      post({ weekNumber: 4, counterpartyTeamId: foreign.teamId, give: ["rb_change"], receive: ["wr_deep"] }),
+      context(),
+    );
+    expect(response.status).toBe(404);
   });
 
   it("rejects more players per side than the config allows", async () => {
