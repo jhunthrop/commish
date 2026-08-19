@@ -42,8 +42,10 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
  * bounds what Postgres does the work of returning, and it bounds the second query too, because
  * that query only ever reads the teams of leagues the first query actually returned — with the
  * cap applied there, `ids` can never grow past `maxResults` regardless of how many public,
- * joinable leagues exist. Filtering (open-seat, format/tier) still runs after both reads,
- * against that already-bounded page, exactly as it did before.
+ * joinable leagues exist. KNOWN TRADEOFF: the open-seat/format/tier filters run in JS against
+ * that already-capped page, so once more than `maxResults` public leagues exist, a filtered
+ * browse can return fewer matches than the database holds. Unreachable at this phase's scale;
+ * the end-state fix is pushing the filters into the SQL itself (tracked for the final review).
  */
 export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<readonly PublicLeagueSummary[]> {
   const leagueRows = await db
