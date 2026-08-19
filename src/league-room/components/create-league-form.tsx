@@ -77,7 +77,7 @@ export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: 
       <Input label="League name" value={name} onChange={(event) => setName(event.target.value)} error={error ?? undefined} />
 
       <details className="rounded-md border border-border p-3">
-        <summary className="cursor-pointer text-sm text-text-muted">Advanced settings</summary>
+        <summary className="cursor-pointer text-sm text-text-muted">Advanced settings: draft format, team count, scoring</summary>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Select label="Draft format" options={FORMATS} value={format} onChange={(event) => setFormat(event.target.value)} />
           <Select label="Teams" options={TEAM_COUNTS} value={teamCount} onChange={(event) => setTeamCount(event.target.value)} />

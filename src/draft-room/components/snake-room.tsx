@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import type { Player } from "@/domain/player";
 import type { ClientDraftAction } from "@/draft-engine";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
@@ -10,9 +11,11 @@ export interface SnakeRoomProps {
   readonly room: DraftRoomState;
   readonly playersById: ReadonlyMap<string, Player>;
   readonly onAct: (action: ClientDraftAction) => void;
+  /** The social band down the right edge (league chat), or nothing. Built by `DraftRoom`. */
+  readonly aside?: ReactNode;
 }
 
-export function SnakeRoom({ room, playersById, onAct }: SnakeRoomProps) {
+export function SnakeRoom({ room, playersById, onAct, aside }: SnakeRoomProps) {
   const view = room.view!;
   // Affordance only — the server decides. `onClockTeamId` is the engine's answer, not ours.
   const canAct = view.phase === "in_progress" && room.myTeamId !== null && view.onClockTeamId === room.myTeamId;
@@ -28,6 +31,7 @@ export function SnakeRoom({ room, playersById, onAct }: SnakeRoomProps) {
       actionLabel="Draft"
       onAct={draft}
       {...queueHandlers}
+      aside={aside}
     />
   );
 }

@@ -126,7 +126,7 @@ describe("a full 12-team auction draft", () => {
     // $200 less $14 held back for 14 unfilled spots.
     expect(submitCommand(state, { v: 1, type: "BID", timestamp: T, teamId: TEAMS[1]!, amount: 187 })).toEqual({
       ok: false,
-      reason: "You can only bid up to $186 — you need $1 for each of your remaining roster spots.",
+      reason: "You can only bid up to $186. You need $1 for each of your remaining roster spots.",
     });
     state = apply(state, expireAt(state));
     expect(remainingBudget(state, TEAMS[0]!)).toBe(14);

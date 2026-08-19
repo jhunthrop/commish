@@ -157,11 +157,18 @@ nothing subscribes to would violate `docs/conventions.md`'s "one closed taxonomy
 gain. `score.update` is enumerated in `src/lib/realtime/events.ts` for a later phase with an
 actual live feed, and stays unused until one exists — Phase 1 never publishes it.
 
+League chat is the one thing on this page that IS live. `chat.message` and `chat.reaction` ride
+the same `league:<id>:events` stream, gated by the same membership rule, and are consumed by
+`useLeagueChat` rather than by anything in `src/league-room/**` — the panel is imported from
+`src/chat-room/**` and mounted here. See `docs/chat.md`. That does not weaken the rule above:
+a chat message is a genuinely new fact somebody just produced, whereas standings and lineups
+are batch results with nothing to push.
+
 ## The client boundary
 
 `src/league-room/**` is browser code under the **same** ESLint
-`@typescript-eslint/no-restricted-imports` rule as `src/draft-room/**`
-(`eslint.config.mjs`, scoped to both directories' `*.{ts,tsx}` files): it may not
+`@typescript-eslint/no-restricted-imports` rule as `src/draft-room/**` and `src/chat-room/**`
+(`eslint.config.mjs`, scoped to all three directories' `*.{ts,tsx}` files): it may not
 value-import `@/league`, `@/league-service`, `@/db*` or `@/lib/realtime*` — only
 `import type` (sharing a wire type like `LeagueHomeBody` costs nothing at runtime and is how
 the client and server sides stay in sync) and plain `fetch`/SSE against `/api/leagues/**` and
@@ -199,6 +206,11 @@ Every `/api/leagues/**` and `/api/invites/**` route goes through `src/app/api/le
 | `PUT /api/leagues/[leagueId]/teams/me/lineup` | a manager with a team in the league | Body: `{ weekNumber, slots }`. A rejected lineup (illegal slot, unowned player, a locked week) is a 409/422 with `validateLineup`'s reason verbatim. |
 | `POST /api/leagues/[leagueId]/weeks/[week]/score` | commissioner only | Scores a week from the mock dataset and stores it. Publishes no event — see "Real-time" above. |
 | `GET /api/leagues/[leagueId]/events` | a manager with a team in the league, or the commissioner | The same Redis-Streams-over-SSE fan-out the draft room uses (`docs/draft-engine.md`), gated by the same membership rule — a signed-in stranger gets 403, not another league's stream. |
+| `GET /api/leagues/[leagueId]/chat` | a manager with a team in the league, or the commissioner | `?before=<messageId>`. One page of `CHAT_CONFIG.pageSize` messages, oldest first, with `hasMore`. There is no unpaginated read. |
+| `POST /api/leagues/[leagueId]/chat` | same | Body: `{ body }`. The author is the session's user; no body field can change it. |
+| `POST /api/leagues/[leagueId]/chat/[messageId]/reactions` | same | Body: `{ emoji }` from `CHAT_CONFIG.reactions`. One verb toggles both directions. |
+| `POST /api/leagues/[leagueId]/advisor/start-sit` | a manager with a team in the league | Body: `{ weekNumber, question }`. Answers advice. Writes nothing. |
+| `POST /api/leagues/[leagueId]/advisor/trade` | a manager with a team in the league | Body: `{ weekNumber, counterpartyTeamId, give, receive }`. Assesses a proposal. Never executes one. |
 
 ## Known follow-ups
 

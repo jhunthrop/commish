@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import type { ReactNode } from "react";
 import type { Player } from "@/domain/player";
 import type { ClientDraftAction } from "@/draft-engine";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
@@ -15,9 +16,11 @@ export interface AuctionRoomProps {
   readonly room: DraftRoomState;
   readonly playersById: ReadonlyMap<string, Player>;
   readonly onAct: (action: ClientDraftAction) => void;
+  /** The social band down the right edge (league chat), or nothing. Built by `DraftRoom`. */
+  readonly aside?: ReactNode;
 }
 
-export function AuctionRoom({ room, playersById, onAct }: AuctionRoomProps) {
+export function AuctionRoom({ room, playersById, onAct, aside }: AuctionRoomProps) {
   const view = room.view!;
   const [nominating, setNominating] = useState<string | null>(null);
   // Affordance only. `onClockTeamId` is the engine's nominator, and it is null while a lot is live.
@@ -41,6 +44,7 @@ export function AuctionRoom({ room, playersById, onAct }: AuctionRoomProps) {
             <BidControls view={view} myTeamId={room.myTeamId} submitting={room.submitting} onBid={(amount) => onAct({ type: "BID", amount })} />
           ) : null
         }
+        aside={aside}
       />
       {/* `view.minBid` is only null before an auction has started (`draftStateView`,
           `src/draft-engine/selectors.ts`) — the modal itself only ever opens once `canNominate`

@@ -93,7 +93,7 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
   if (queue.length === 0) {
     return (
       <p className="min-w-0 flex-1 self-center text-sm text-text-muted">
-        Star players in the pool to build your queue — we&apos;ll auto-pick the top one if your clock runs out.
+        Star players in the pool to build your queue. We&apos;ll auto-pick the top one if your clock runs out.
       </p>
     );
   }
@@ -167,7 +167,7 @@ function PrimarySlot({
   if (canAct) {
     return (
       <p data-testid="dock-primary-empty" className="shrink-0 self-center font-display text-display-sm font-bold leading-display text-negative">
-        Your pick — take somebody from the pool.
+        Your pick. Take somebody from the pool.
       </p>
     );
   }

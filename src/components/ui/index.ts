@@ -7,6 +7,7 @@ export { Input } from "./input";
 export { Card } from "./card";
 export { Badge } from "./badge";
 export { PositionBadge, positionStickerClass } from "./position-badge";
+export { Sticker } from "./sticker";
 export { SlotChip } from "./slot-chip";
 export { PageTitle } from "./page-title";
 export { Skeleton } from "./skeleton";

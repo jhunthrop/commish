@@ -70,7 +70,9 @@ export function StandingsTable({ rows, myTeamId }: StandingsTableProps) {
         columns={columns}
         rows={ordered}
         rowKey={(row) => row.teamId}
-        rowClassName={(row) => (row.teamId === myTeamId ? "bg-surface-elevated font-medium" : "")}
+        rowClassName={(row) =>
+          row.teamId === myTeamId ? "border-l-2 border-l-accent bg-surface-elevated font-medium" : ""
+        }
         rowAttributes={(row) => ({ "data-own": row.teamId === myTeamId ? "true" : "false" })}
         empty={
           <EmptyState
@@ -81,6 +83,14 @@ export function StandingsTable({ rows, myTeamId }: StandingsTableProps) {
           />
         }
       />
+      {rows.length === 0 ? null : (
+        // The rule the server ranks by, said out loud: nobody should have to guess how a
+        // 7-7 logjam resolves. (Persona review: veterans want the tiebreak named.)
+        <p className="text-xs text-text-muted">
+          Ties in the standings break on points for.
+          {showClinchBadges ? " Clinched means a guaranteed playoff spot." : ""}
+        </p>
+      )}
     </section>
   );
 }

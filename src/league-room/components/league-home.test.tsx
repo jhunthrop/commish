@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
+import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
+import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { HOME, LINEUP, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { LeagueHome } from "./league-home";
@@ -15,9 +17,11 @@ vi.mock("next/navigation", () => ({
 }));
 
 const wrap = (home = HOME, lineup = LINEUP) => (
-  <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
-    <LeagueHome home={home} lineup={lineup} />
-  </LeagueRoomDepsProvider>
+  <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+    <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
+      <LeagueHome home={home} lineup={lineup} />
+    </LeagueRoomDepsProvider>
+  </ChatRoomDepsProvider>
 );
 
 describe("LeagueHome", () => {
@@ -32,19 +36,34 @@ describe("LeagueHome", () => {
   });
 
   it("shows the commissioner's tools only to the commissioner", () => {
-    renderInLeague(<LeagueHome home={HOME} lineup={LINEUP} />, fixtureLeagueDeps().deps);
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
     expect(screen.getByRole("button", { name: "Create invite link" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Score Week 3" })).toBeInTheDocument();
   });
 
   it("hides them from everybody else", () => {
-    renderInLeague(<LeagueHome home={{ ...HOME, isCommissioner: false }} lineup={LINEUP} />, fixtureLeagueDeps().deps);
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, isCommissioner: false }} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
     expect(screen.queryByRole("button", { name: "Create invite link" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Score Week 3" })).not.toBeInTheDocument();
   });
 
   it("points at the draft room while the draft has not finished", () => {
-    renderInLeague(<LeagueHome home={{ ...HOME, draftStatus: "scheduled" }} lineup={null} />, fixtureLeagueDeps().deps);
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, draftStatus: "scheduled" }} lineup={null} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
     expect(screen.getByRole("link", { name: /draft room/i })).toHaveAttribute("href", `/app/drafts/${HOME.draftId}`);
     expect(screen.getByText(/hasn't drafted yet/)).toBeInTheDocument();
   });
@@ -52,7 +71,12 @@ describe("LeagueHome", () => {
   // Task 12 review follow-up: "scheduled" and "in_progress" are different moments. A manager
   // whose draft is live needs "join now", not "hasn't drafted yet".
   it("switches to live-draft copy while the draft is in progress", () => {
-    renderInLeague(<LeagueHome home={{ ...HOME, draftStatus: "in_progress" }} lineup={null} />, fixtureLeagueDeps().deps);
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, draftStatus: "in_progress" }} lineup={null} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
     expect(screen.getByText("Your draft is live right now.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Join the draft" })).toHaveAttribute("href", `/app/drafts/${HOME.draftId}`);
     expect(screen.queryByText(/hasn't drafted yet/)).not.toBeInTheDocument();
@@ -66,8 +90,48 @@ describe("LeagueHome", () => {
   });
 
   it("handles a viewer with no team of their own", () => {
-    renderInLeague(<LeagueHome home={{ ...HOME, myTeamId: null, myMatchup: null }} lineup={null} />, fixtureLeagueDeps().deps);
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, myTeamId: null, myMatchup: null }} lineup={null} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
     expect(screen.queryByRole("button", { name: "Save lineup" })).not.toBeInTheDocument();
     expect(screen.getByText("League standings")).toBeInTheDocument();
+  });
+
+  it("mounts the league chat alongside the standings", async () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
+  });
+
+  // L2, final review: in document flow (unlike the draft room's fixed-height aside band),
+  // LeagueChat's own h-full/flex-1 chain resolves to auto and grows unbounded. The mount needs
+  // its own bounded height so the panel scrolls internally instead of the page growing to fit
+  // every held message.
+  it("bounds the chat mount to a fixed height so it scrolls internally rather than growing the page", async () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    const chat = await waitFor(() => screen.getByRole("region", { name: "League chat" }));
+    expect(chat.parentElement).toHaveClass("h-96");
+  });
+
+  it("offers the advisor to a manager with a team", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByRole("region", { name: "Lineup advisor" })).toBeInTheDocument();
   });
 });

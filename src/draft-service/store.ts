@@ -14,17 +14,14 @@ import {
   type DraftState,
 } from "@/draft-engine";
 import type { RealtimeEventType } from "@/lib/realtime/events";
+import type { PublishFn } from "@/lib/realtime/publish";
 import { commitDraftState } from "./commit";
 import { createKeyedMutex } from "./mutex";
 import { draftOrderFor } from "./order";
 import { buildDraftPool } from "./pool";
 import { loadDraftConfig } from "./setup";
 
-export type PublishFn = (input: {
-  readonly leagueId: string;
-  readonly type: RealtimeEventType;
-  readonly payload: unknown;
-}) => Promise<string | null>;
+export type { PublishFn } from "@/lib/realtime/publish";
 
 interface PublishFailureEvent {
   readonly type: RealtimeEventType;

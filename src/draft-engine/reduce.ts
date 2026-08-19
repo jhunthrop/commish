@@ -81,13 +81,13 @@ function dispatch(state: DraftState, action: DraftAction): DraftReduceResult {
     case "NOMINATE": {
       const auction = auctionOf(state);
       return auction === null
-        ? { ok: false, reason: "This is a snake draft — make a pick instead of nominating." }
+        ? { ok: false, reason: "This is a snake draft. Make a pick instead of nominating." }
         : reduceNominate(state, auction, action);
     }
     case "BID": {
       const auction = auctionOf(state);
       return auction === null
-        ? { ok: false, reason: "This is a snake draft — there's nothing to bid on." }
+        ? { ok: false, reason: "This is a snake draft. There's nothing to bid on." }
         : reduceBid(state, auction, action);
     }
     case "TIMER_EXPIRE": {

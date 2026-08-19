@@ -51,7 +51,7 @@ describe("RoomDock", () => {
 
   it("points at the pool rather than offering a button it cannot fill", () => {
     render(<RoomDock {...props} queue={[]} canAct />);
-    expect(screen.getByTestId("dock-primary-empty")).toHaveTextContent("Your pick — take somebody from the pool.");
+    expect(screen.getByTestId("dock-primary-empty")).toHaveTextContent("Your pick. Take somebody from the pool.");
     expect(screen.queryByRole("button", { name: /^Draft/ })).toBeNull();
   });
 

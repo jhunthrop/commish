@@ -1,0 +1,53 @@
+import type { MatchupSummary } from "../contract";
+import { Badge, Card, EYEBROW } from "@/components/ui";
+import { formatPoints } from "../lib/format";
+
+export interface MatchupScoreboardProps {
+  readonly matchup: MatchupSummary;
+  readonly myTeamId: string | null;
+}
+
+/**
+ * The scoreboard poster — the league room's hero shape, shared by the league home and the
+ * weekly matchup page so a score always looks like a score. Names in the display face,
+ * numerals big and tabular; once a matchup is final the winner keeps full ink and the loser
+ * recedes. Your own side carries the same "YOU" mark the draft board's column header wears.
+ */
+export function MatchupScoreboard({ matchup, myTeamId }: MatchupScoreboardProps) {
+  const decided = matchup.final && matchup.homeScore !== null && matchup.awayScore !== null;
+  const homeWon = decided && matchup.homeScore! > matchup.awayScore!;
+  const awayWon = decided && matchup.awayScore! > matchup.homeScore!;
+
+  const side = (name: string, score: number | null, teamId: string, won: boolean) => (
+    <div className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
+      <p className={`truncate font-display text-xl font-bold uppercase leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
+        {name}
+        {teamId === myTeamId ? <span className="ml-1.5 align-middle text-xs font-semibold text-accent">YOU</span> : null}
+      </p>
+      <p className={`font-display text-display-lg font-bold tabular-nums leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
+        {score === null ? "—" : formatPoints(score)}
+      </p>
+    </div>
+  );
+
+  return (
+    // The week itself is NOT repeated here: every context that renders a scoreboard already
+    // carries a week heading above it, and saying it twice reads like a template.
+    <Card
+      as="section"
+      aria-label={`${matchup.homeTeamName} versus ${matchup.awayTeamName}`}
+      className="flex flex-col gap-3"
+    >
+      <div className="flex items-center justify-end">
+        <Badge tone={matchup.final ? "positive" : "neutral"}>{matchup.final ? "Final" : "Not scored yet"}</Badge>
+      </div>
+      <div className="flex items-center gap-4">
+        {side(matchup.homeTeamName, matchup.homeScore, matchup.homeTeamId, homeWon)}
+        <span aria-hidden="true" className={`${EYEBROW} shrink-0`}>
+          vs
+        </span>
+        {side(matchup.awayTeamName, matchup.awayScore, matchup.awayTeamId, awayWon)}
+      </div>
+    </Card>
+  );
+}

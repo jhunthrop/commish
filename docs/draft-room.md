@@ -65,9 +65,15 @@ index lookup plus display arithmetic over two server values, and the dock render
    **once per `draftId`**, not on every resync, and refetches only when `draftId` itself
    changes.
 2. **Subscribe** → a native `EventSource` on `/api/leagues/<leagueId>/events`, opened only
-   once the mount fetch has resolved a `leagueId`. **The browser owns reconnect and
-   `Last-Event-ID`.** There is no retry loop, no backoff timer and no polling anywhere in this
-   codebase; adding one would be a bug, not a feature. **Every `open` resyncs the state view
+   once the mount fetch has resolved a `leagueId`. From `useDraftRoom`'s own point of view this
+   is unconditional — it always calls its injected `openEventSource(url)` — but by default that
+   factory resolves to `subscribeLeagueStream` (`src/event-stream/league-stream.ts`), which opens
+   a real `EventSource` only if nothing else is already subscribed to that same url; the chat
+   band mounted alongside it (`docs/chat.md`, "Real-time") is typically the other subscriber, and
+   the two share one connection. Nothing below this point changes because of that: `useDraftRoom`
+   still gets its own `open`/`error`/named-event listeners and still resyncs on its own schedule.
+   **The browser owns reconnect and `Last-Event-ID`.** There is no retry loop, no backoff timer
+   and no polling anywhere in this codebase; adding one would be a bug, not a feature. **Every `open` resyncs the state view
    — the first one included, not only a reconnect's.** The stream only carries events
    published after it opens, and it opens after the mount snapshot has already resolved, so a
    pick or bid published in that window would otherwise sit unseen until the next event
@@ -211,6 +217,29 @@ my mind" and "commit".
 column — rail, dock (sticky, so the action is always reachable), board (the existing per-round
 list), pool — via `order-*` classes, so no region is ever rendered twice. Down to the 360px
 baseline nothing scrolls horizontally except the board and the queue chips, each inside itself.
+
+### The aside band: league chat
+
+The room has a fourth region beyond the table above: an optional `aside` band carrying
+`LeagueChat` (`src/chat-room/**`, see `docs/chat.md`). It follows the same scroll rule as the
+pool rail (its own list scrolling inside itself), mirrored to the **right** edge with a left
+border instead of the pool's right one. Width lives on the band's *content*, not the frame:
+open it is the pool rail's width, and the **Hide chat** control collapses it to a slim strip
+holding a vertical **Show chat** tab, handing the board those pixels back. A closed chat
+unmounts — history is server-side, so reopening refetches through the hook's normal mount
+path and nothing is lost. Below `lg` it linearizes **last** — after rail, dock and board — so
+chat is never wedged between a manager and the board they're trying to watch.
+
+It is built once, in `DraftRoom` (`src/draft-room/components/draft-room.tsx`), and passed down
+as a prop exactly the way `bidConsole` and `poolFooter` already are: `DraftRoom` → `SnakeRoom` /
+`AuctionRoom` → `RoomShell` → `RoomLayout`'s optional `aside`. That is why only `DraftRoom`'s own
+test needs to wrap the tree in the chat deps provider — every component below it just renders
+whatever node it was handed, with no idea a chat surface is even involved.
+
+**The conversation is the league's, not the draft's.** `LeagueChat` is mounted with
+`room.view.leagueId`, the same id the league home page uses, so it is the identical
+conversation in both places — it survives the draft room closing, rather than starting over
+empty the next time two managers argue about a pick.
 
 Both draft pages are deliberately full-bleed: `src/app/app/drafts/[draftId]/page.tsx` and
 `src/app/draft/[draftId]/board/page.tsx` dropped the centered `max-w-*` container and their own

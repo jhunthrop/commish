@@ -8,6 +8,7 @@ import {
   timestamp,
   jsonb,
   bigserial,
+  bigint,
   primaryKey,
   index,
   uniqueIndex,
@@ -302,4 +303,49 @@ export const playerStatLines = pgTable(
     defensiveTouchdowns: integer("defensive_touchdowns").notNull().default(0),
   },
   (t) => [primaryKey({ columns: [t.playerId, t.week] }), index("player_stat_lines_week_idx").on(t.week)],
+);
+
+/**
+ * League chat. Keyed on the LEAGUE, not on a draft: the draft room and the league room mount
+ * the same conversation, so the trash talk from draft night is still there in week 9 rather
+ * than dying with the room it was said in.
+ *
+ * `id` is a bigserial because it is also the page cursor — a monotonic integer orders the
+ * history with no timestamp tie to break, and `(league_id, id)` makes one page an index range
+ * scan rather than a sort of the whole league's history.
+ */
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: bigserial("id", { mode: "number" }).primaryKey(),
+    leagueId: text("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    authorUserId: text("author_user_id")
+      .notNull()
+      .references(() => users.id),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("chat_messages_league_id_idx").on(t.leagueId, t.id)],
+);
+
+/**
+ * One row per person per emoji per message — the pair IS the identity, so a reaction is a
+ * toggle (delete-or-insert) rather than a counter two writers can disagree about. There is no
+ * count column anywhere: every count in the product is derived from these rows.
+ */
+export const chatReactions = pgTable(
+  "chat_reactions",
+  {
+    messageId: bigint("message_id", { mode: "number" })
+      .notNull()
+      .references(() => chatMessages.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id),
+    emoji: text("emoji").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.messageId, t.userId, t.emoji] })],
 );

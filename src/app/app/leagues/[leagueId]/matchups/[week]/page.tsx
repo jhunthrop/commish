@@ -5,6 +5,7 @@ import { PageTitle } from "@/components/ui";
 import { leagueHome, matchupWeek } from "@/league-service";
 import { MatchupPanel } from "@/league-room/components/matchup-panel";
 import { WeekNav } from "@/league-room/components/week-nav";
+import { AppHeader } from "@/components/app-shell/app-header";
 
 export const dynamic = "force-dynamic";
 
@@ -31,6 +32,8 @@ export default async function MatchupWeekPage({ params }: PageProps) {
   if (body === null) notFound();
 
   return (
+    <>
+    <AppHeader displayName={user.displayName} />
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
       <PageTitle>{`${home.name} — Week ${weekNumber}`}</PageTitle>
       <WeekNav leagueId={leagueId} weekNumber={weekNumber} totalWeeks={body.totalWeeks} />
@@ -42,5 +45,6 @@ export default async function MatchupWeekPage({ params }: PageProps) {
         ))
       )}
     </main>
+    </>
   );
 }

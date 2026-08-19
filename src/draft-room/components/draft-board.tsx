@@ -3,7 +3,7 @@
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
-import { Avatar, EYEBROW, positionStickerClass } from "@/components/ui";
+import { Avatar, EYEBROW, Sticker } from "@/components/ui";
 import { useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 import { rosterSpots } from "../state/format";
@@ -132,9 +132,9 @@ function StickerCell({
 }) {
   if (cell.pick !== null) {
     const player = playersById.get(cell.pick.playerId) ?? null;
-    const fill = player === null ? "border border-border bg-surface-elevated text-text-primary" : positionStickerClass(player.position);
-    return (
-      <div className={`flex h-full items-center gap-2 rounded-sm px-2 py-2 shadow-sticker ${fill} ${slap ? "animate-sticker-slap" : ""}`}>
+    const layout = `flex h-full items-center gap-2 px-2 py-2 ${slap ? "animate-sticker-slap" : ""}`;
+    const body = (
+      <>
         {/* Initials until the licensed stats feed brings real headshots (Phase 2). */}
         <Avatar name={player?.name ?? cell.pick.playerId} size="sm" className="shrink-0 bg-scrim/20" />
         <div className="flex min-w-0 flex-col justify-center gap-0.5">
@@ -146,7 +146,15 @@ function StickerCell({
             {cell.pick.price === null ? "" : ` · $${cell.pick.price}`}
           </span>
         </div>
-      </div>
+      </>
+    );
+    // A pick whose player metadata hasn't loaded yet is the one sticker with no pigment.
+    return player === null ? (
+      <div className={`rounded-sm border border-border bg-surface-elevated text-text-primary shadow-sticker ${layout}`}>{body}</div>
+    ) : (
+      <Sticker position={player.position} className={layout}>
+        {body}
+      </Sticker>
     );
   }
 
@@ -212,8 +220,11 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
       <div className="relative hidden min-h-0 w-full flex-1 sm:block">
         {/* The left fade starts past the sticky round gutter, exactly where a mid-scroll
             column edge would otherwise show as a clipped sticker sliver. */}
-        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 left-10 z-20 w-10 bg-gradient-to-r from-surface via-surface/70 to-transparent" />
-        <span aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 z-20 w-8 bg-gradient-to-l from-surface to-transparent" />
+        {/* bottom-3, not inset-y-0: the fades must stop above the grid's horizontal scrollbar
+            track — a fade painted over the track shades a segment of it, which reads as a
+            second, separate scrollbar. */}
+        <span aria-hidden="true" className="pointer-events-none absolute top-0 bottom-3 left-10 z-20 w-10 bg-gradient-to-r from-surface via-surface/70 to-transparent" />
+        <span aria-hidden="true" className="pointer-events-none absolute top-0 bottom-3 right-0 z-20 w-8 bg-gradient-to-l from-surface to-transparent" />
         {/* Column snap: a scrolled board always rests on whole stickers, never slivers. */}
         <div ref={gridRef} data-testid="draft-board-grid" className="h-full w-full overflow-auto">
         <table className="w-full border-separate border-spacing-1 text-left">

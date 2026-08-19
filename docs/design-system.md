@@ -26,7 +26,7 @@ Single source of truth: `src/design/tokens.ts` → generated `src/design/tokens.
 
 This two-layer scheme (generated `--commish-*` source vars → `@theme inline` Tailwind aliases → utility classes) exists because aliasing a theme variable to itself (`--color-surface: var(--color-surface);`) is a CSS custom-property cycle — it only resolved before because the unlayered token import happened to outrank `@layer theme` in the cascade, which is not a property to depend on.
 
-**No raw hex, no raw px, no arbitrary values in feature code.** `src/design/tokens.ts` is the only file in the repo allowed to contain a color literal.
+**No raw hex, no raw px, no arbitrary values in feature code.** `src/design/tokens.ts` is the only file in the repo allowed to contain a color literal. The one sanctioned exception: `draft-room.tsx`'s collapsed chat toggle uses `lg:[writing-mode:vertical-rl]` to rotate its "Show chat" label — Tailwind has no `writing-mode` utility, so there is no non-arbitrary spelling available, and the rest of that button's classes still come from the spacing scale.
 
 ### One pigment, two jobs
 
@@ -84,7 +84,7 @@ Tailwind aliases: `bg-surface`, `bg-surface-elevated`, `border-border`, `text-te
 
 In light, every sticker is a dark marker with a white label, and `text` equals `sticker`. In dark, five stickers are bright with a near-black label — but **DEF stays dark** (chalk label, and a brightened steel for its `text` variant — see `darkPositions.def` in `src/design/tokens.ts`), because DEF's meaning is "no color of its own" and a bright slate would be indistinguishable from the WR blue beside it.
 
-**`PositionBadge` is the only way to render a position.** Nothing else may reach for `bg-pos-*`, except `DraftBoard`'s own sticker cells (which are `PositionBadge`-colored fills at cell scale). A bare `"QB"` string in a table cell is a bug.
+**`PositionBadge` is the only way to render a position label; `Sticker` is the only way to render a position-pigmented tile.** `Sticker` (`src/components/ui/sticker.tsx`) owns the sticker look — rounded corner, `shadow-sticker`, fill via `positionStickerClass` — and is what `DraftBoard`'s pick cells and the landing page's showcase board both build on. Nothing else may reach for `bg-pos-*` directly. A bare `"QB"` string in a table cell is a bug.
 
 **Carve-out: a native `<select>` option label.** An `<option>` cannot contain an element, so `lineup-editor.tsx`'s slot picker renders a position as plain text inside the option label. This is the one legitimate exception to the rule above — it is a markup constraint, not a lapse — and it does not license a bare position anywhere text CAN hold an element.
 
@@ -144,6 +144,11 @@ Three rules any future room follows:
    column with `order-*` utilities. Rendering a second, narrow copy of a region is only
    justified when the two are genuinely different objects (`DraftBoard`'s grid and its
    per-round list are, and the inactive one is `display: none` so nothing is announced twice).
+
+`RoomLayout`'s regions are rail, pool, stage, dock and an optional **aside** — the social band
+down the right edge (league chat). It follows rule 1 (fixed width, scrolls inside itself) and
+rule 3 (linearizes last on a phone, never shrinks), and it is optional because the TV board is
+the same frame with nobody to talk to.
 
 Widths come from the spacing scale (`lg:w-88` = 352px for the pool rail), never an arbitrary
 value — `w-88` is Tailwind v4's on-demand spacing utility, not a bracket escape hatch.

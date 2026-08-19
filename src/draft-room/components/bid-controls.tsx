@@ -28,7 +28,7 @@ export function BidControls({ view, myTeamId, submitting, onBid }: BidControlsPr
 
   const blocked =
     myTeamId === null
-      ? "You're watching this draft — you don't have a team in it."
+      ? "You're watching this draft. You don't have a team in it."
       : lot === null || minBid === null
         ? "Nobody is up for bid right now."
         : lot.highBidTeamId === myTeamId

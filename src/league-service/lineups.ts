@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db, ReadonlyDb } from "@/db/client";
 import { leagues, lineupSlots, matchups, players, rosterSlots } from "@/db/schema";
 import { validateLineup } from "@/domain/roster-eligibility";
 import { BENCH_SLOT } from "@/domain/roster";
@@ -33,8 +33,12 @@ function toRosterSlots(rows: readonly StoredSlotRow[]): readonly RosterSlot[] {
  * Either way the rows go through `defaultLineup`, so the result always has exactly one entry
  * per configured slot — a saved lineup written against an older roster shape can't hand the
  * caller a slot the league no longer has.
+ *
+ * Takes a `ReadonlyDb` because it only selects, and because the advisor's read-only guarantee
+ * is only as strong as its transitive dependencies: this is the one function outside
+ * `src/ai-advisor/**` that `assembleAdvisorContext` calls with its connection.
  */
-export async function getLineup(db: Db, { teamId, weekNumber, slotConfig }: GetLineupInput): Promise<readonly RosterSlot[]> {
+export async function getLineup(db: ReadonlyDb, { teamId, weekNumber, slotConfig }: GetLineupInput): Promise<readonly RosterSlot[]> {
   const saved = await db
     .select()
     .from(lineupSlots)

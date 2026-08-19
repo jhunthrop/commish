@@ -9,6 +9,13 @@ interface PublishInput {
   readonly payload: unknown;
 }
 
+/**
+ * The publish capability a feature is handed. Declared here, beside the only implementation,
+ * so the draft service and the chat service inject the SAME contract rather than two
+ * structurally-identical copies that can drift.
+ */
+export type PublishFn = (input: PublishInput) => Promise<string | null>;
+
 interface PublisherDeps {
   readonly redis: Redis;
   readonly clock: Clock;

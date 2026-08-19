@@ -2,6 +2,7 @@ import type { DraftStatus } from "@/domain/draft";
 import type { DraftFormat, TeamCard } from "@/domain/league";
 import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
+import type { TradeFlag, TradeVerdict } from "@/ai-advisor/valuation";
 import type { StandingsRow } from "@/league";
 
 /**
@@ -126,4 +127,30 @@ export interface LineupBody {
   readonly locked: boolean;
   readonly starters: readonly LineupSlotView[];
   readonly bench: readonly LineupSlotView[];
+}
+
+/** What the start/sit advisor answers with. Advice, never an action. */
+export interface AdviceBody {
+  readonly headline: string;
+  readonly reasoning: string;
+  /**
+   * True when this came from the app's own deterministic math because the assistant was
+   * unavailable. A designed state, not an error — the answer is still complete.
+   */
+  readonly degraded: boolean;
+}
+
+/**
+ * What the trade analyzer answers with: the deterministic verdict, plus prose about it.
+ *
+ * `verdict` and `flags` are the SAME `TradeVerdict`/`TradeFlag` unions `tradeBalance` (the
+ * platform's own fairness detector, `@/ai-advisor/valuation`) produces — imported as a type
+ * only, so a flag this contract doesn't know about is a compile error here rather than a
+ * value that silently widens to `string` on the wire.
+ */
+export interface TradeAssessmentBody extends AdviceBody {
+  readonly verdict: TradeVerdict;
+  readonly flags: readonly TradeFlag[];
+  readonly givingValue: number;
+  readonly receivingValue: number;
 }

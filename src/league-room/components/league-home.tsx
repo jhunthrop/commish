@@ -1,10 +1,13 @@
 import Link from "next/link";
 import type { LeagueHomeBody, LineupBody } from "../contract";
 import { Card, PageTitle } from "@/components/ui";
-import { formatPoints, formatWeek } from "../lib/format";
+import { LeagueChat } from "@/chat-room/components/league-chat";
+import { formatWeek } from "../lib/format";
+import { AdvisorPanel } from "./advisor-panel";
 import { InvitePanel } from "./invite-panel";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
+import { MatchupScoreboard } from "./matchup-scoreboard";
 import { ScoreWeekButton } from "./score-week-button";
 import { StandingsTable } from "./standings-table";
 
@@ -53,21 +56,26 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
         {home.myMatchup === null ? (
           <p className="text-text-muted">You have no matchup this week.</p>
         ) : (
-          <Card>
-            <p className="text-text-primary">
-              {`${home.myMatchup.homeTeamName} ${home.myMatchup.homeScore === null ? "—" : formatPoints(home.myMatchup.homeScore)}`}
-              {" vs "}
-              {`${home.myMatchup.awayTeamName} ${home.myMatchup.awayScore === null ? "—" : formatPoints(home.myMatchup.awayScore)}`}
-            </p>
-            <p className="text-sm text-text-muted">{home.myMatchup.final ? "Final." : "Not scored yet."}</p>
-          </Card>
+          <MatchupScoreboard matchup={home.myMatchup} myTeamId={home.myTeamId} />
         )}
         {home.isCommissioner ? <ScoreWeekButton leagueId={home.leagueId} weekNumber={home.currentWeek} /> : null}
       </section>
 
       <StandingsTable rows={home.standings} myTeamId={home.myTeamId} />
 
+      {/*
+        Unlike the draft room's `aside` band, this section sits in ordinary document flow, so
+        `LeagueChat`'s own `h-full min-h-0` chain has nothing bounded to fill and would grow to
+        fit every held message. A fixed height from the spacing scale is all the inner
+        `min-h-0`/`flex-1` chain needs to scroll inside itself instead (L2, final review).
+      */}
+      <div className="h-96">
+        <LeagueChat leagueId={home.leagueId} />
+      </div>
+
       {lineup === null ? null : <LineupEditor leagueId={home.leagueId} lineup={lineup} />}
+
+      {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
 
       {home.isCommissioner ? <InvitePanel leagueId={home.leagueId} /> : null}
     </main>

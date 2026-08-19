@@ -117,7 +117,7 @@ describe("NOMINATE", () => {
   it("rejects an opening bid above the nominator's maximum", () => {
     expect(submitCommand(started(), nominate("t1", "qb1", 9))).toEqual({
       ok: false,
-      reason: "You can only bid up to $8 — you need $1 for each of your remaining roster spots.",
+      reason: "You can only bid up to $8. You need $1 for each of your remaining roster spots.",
     });
   });
 
@@ -129,7 +129,7 @@ describe("NOMINATE", () => {
   it("rejects a pick in an auction draft", () => {
     expect(submitCommand(started(), { v: 1, type: "MAKE_PICK", timestamp: T, teamId: "t1", playerId: "qb1" })).toEqual({
       ok: false,
-      reason: "This is an auction draft — nominate a player instead of picking.",
+      reason: "This is an auction draft. Nominate a player instead of picking.",
     });
   });
 });
@@ -160,7 +160,7 @@ describe("BID", () => {
   it("rejects a bid above the bidder's maximum", () => {
     expect(submitCommand(withLot(), bid("t2", 9))).toEqual({
       ok: false,
-      reason: "You can only bid up to $8 — you need $1 for each of your remaining roster spots.",
+      reason: "You can only bid up to $8. You need $1 for each of your remaining roster spots.",
     });
   });
 
@@ -172,7 +172,7 @@ describe("BID", () => {
   it("rejects a bid in a snake draft", () => {
     const snake: DraftConfig = { ...CONFIG, format: "snake", auctionBudget: null };
     const state = apply(initialDraftState(snake), START);
-    expect(submitCommand(state, bid("t2", 5))).toEqual({ ok: false, reason: "This is a snake draft — there's nothing to bid on." });
+    expect(submitCommand(state, bid("t2", 5))).toEqual({ ok: false, reason: "This is a snake draft. There's nothing to bid on." });
   });
 });
 

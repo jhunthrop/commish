@@ -32,11 +32,14 @@ describe("RoomLayout", () => {
     expect(frame.className).toContain("lg:overflow-hidden");
   });
 
-  it("gives the pool and the stage each their own scroll, so neither pushes the other", () => {
+  it("clips every band and delegates scrolling to the content that owns it", () => {
     render(<RoomLayout {...slots} />);
-    // The pool column clips and lets `PlayerPool` scroll its own list; the stage scrolls itself.
+    // The pool column clips and lets `PlayerPool` scroll its own list; the stage clips too —
+    // the board grid inside it is the ONE horizontal scroller (two nested auto containers
+    // once rendered two stacked scrollbars).
     expect(bandFor("Pool").className).toContain("lg:overflow-hidden");
-    expect(bandFor("Stage").className).toContain("lg:overflow-auto");
+    expect(bandFor("Stage").className).toContain("lg:overflow-hidden");
+    expect(bandFor("Stage").className).not.toContain("overflow-auto");
   });
 
   it("re-sequences the same four regions on a phone rather than rendering any of them twice", () => {
@@ -49,5 +52,15 @@ describe("RoomLayout", () => {
     expect(bandFor("Pool").className).toContain("lg:order-1");
     expect(bandFor("Stage").className).toContain("order-1");
     expect(bandFor("Stage").className).toContain("lg:order-2");
+  });
+
+  it("renders the aside band when one is given", () => {
+    render(<RoomLayout rail={<p>rail</p>} pool={<p>pool</p>} stage={<p>stage</p>} dock={<p>dock</p>} aside={<p>aside</p>} />);
+    expect(screen.getByText("aside")).toBeInTheDocument();
+  });
+
+  it("renders no aside band at all when none is given — the TV board has none", () => {
+    render(<RoomLayout rail={<p>rail</p>} pool={<p>pool</p>} stage={<p>stage</p>} dock={<p>dock</p>} />);
+    expect(screen.queryByTestId("room-aside")).not.toBeInTheDocument();
   });
 });

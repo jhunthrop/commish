@@ -124,7 +124,7 @@ describe("PlayerPool", () => {
     const manyPlayers = Array.from({ length: 75 }, (_, index) => ({ id: `p${index}`, name: `Player ${index}`, position: "WR" as const, nflTeam: "DAL" }));
     const view = { ...SNAKE_VIEW, availablePlayerIds: manyPlayers.map((player) => player.id) };
     render(<PlayerPool {...props} players={manyPlayers} view={view} />);
-    expect(screen.getByText("Showing the top 60 of 75 — narrow your search to see more.")).toBeInTheDocument();
+    expect(screen.getByText("Showing the top 60 of 75. Narrow your search to see more.")).toBeInTheDocument();
   });
 
   it("queues and un-queues a player from the pool", () => {

@@ -7,6 +7,12 @@ export interface RoomLayoutProps {
   readonly pool: ReactNode;
   readonly stage: ReactNode;
   readonly dock: ReactNode;
+  /**
+   * The social column down the right edge — league chat. Optional because the TV board is the
+   * same frame with nobody to talk to. It is a fixed-width band that scrolls inside itself,
+   * mirroring the pool rail on the left, so the board never moves when a message lands.
+   */
+  readonly aside?: ReactNode;
 }
 
 /**
@@ -25,14 +31,29 @@ export interface RoomLayoutProps {
  *
  * The `order-*` classes are what re-sequence the column on a phone without duplicating any
  * region into a second rendering.
+ * - **The aside is the social band.** Same width and scroll rule as the pool, mirrored to the
+ *   right edge with a left border. Below `lg` it linearizes last, under the pool — chat is the
+ *   thing you scroll to on a phone, never the thing between you and the board.
  */
-export function RoomLayout({ rail, pool, stage, dock }: RoomLayoutProps) {
+export function RoomLayout({ rail, pool, stage, dock, aside }: RoomLayoutProps) {
   return (
     <div data-testid="room-layout" className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
       <div className="order-1">{rail}</div>
       <div className="order-3 flex min-h-0 flex-1 flex-col lg:order-2 lg:flex-row">
         <div className="order-2 min-w-0 border-border lg:order-1 lg:w-88 lg:shrink-0 lg:overflow-hidden lg:border-r">{pool}</div>
-        <div className="order-1 min-w-0 lg:order-2 lg:min-h-0 lg:flex-1 lg:overflow-auto">{stage}</div>
+        {/* overflow-HIDDEN, not auto: the board grid inside the stage is the one horizontal
+            scroller. Two nested auto containers rendered two scrollbars stacked on each other. */}
+        <div className="order-1 min-w-0 lg:order-2 lg:min-h-0 lg:flex-1 lg:overflow-hidden">{stage}</div>
+        {aside === undefined ? null : (
+          <div
+            data-testid="room-aside"
+            className="order-3 min-w-0 border-border lg:order-3 lg:shrink-0 lg:overflow-hidden lg:border-l"
+          >
+            {/* Width lives on the aside CONTENT (lg:w-88 open, slim strip collapsed) so the
+                band can collapse without this frame knowing chat exists. */}
+            {aside}
+          </div>
+        )}
       </div>
       <div className="sticky top-0 z-10 order-2 lg:static lg:order-3">{dock}</div>
     </div>
