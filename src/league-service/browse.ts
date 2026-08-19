@@ -59,9 +59,13 @@ function narrowingFor(filter: BrowseFilter): readonly (SQL | undefined)[] {
  * the 3 x 3 x 5 filter combinations through BOTH this query and that pure rule over one seeded
  * corpus, demanding identical answers. Two expressions of one rule is how a drift starts; that
  * test is what makes a drift a failing build.
+ *
+ * Exported as a builder, not just run inline, so `src/db/index-plans.test.ts` can `EXPLAIN`
+ * exactly what production runs rather than a hand-copied lookalike that could drift into being
+ * fast while the real one is slow.
  */
-export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<readonly PublicLeagueSummary[]> {
-  const rows = await db
+export function browseQuery(db: Db, filter: BrowseFilter) {
+  return db
     .select({
       id: leagues.id,
       name: leagues.name,
@@ -79,6 +83,8 @@ export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<r
     .having(sql`count(${teams.id}) < ${leagues.teamCount}`)
     .orderBy(asc(leagues.createdAt))
     .limit(MATCHMAKING_CONFIG.maxResults);
+}
 
-  return rows;
+export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<readonly PublicLeagueSummary[]> {
+  return browseQuery(db, filter);
 }

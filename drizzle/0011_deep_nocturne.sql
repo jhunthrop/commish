@@ -1,0 +1,1 @@
+CREATE INDEX "leagues_public_browse_idx" ON "leagues" USING btree ("created_at") WHERE "leagues"."is_public_matchmade";
