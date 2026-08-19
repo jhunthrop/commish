@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { inArray } from "drizzle-orm";
 import type { DraftFormat } from "@/domain/league";
 import type { DraftStatus } from "@/domain/draft";
 import { drafts, leagues, matchups, statWeeks, teams, users } from "@/db/schema";
@@ -134,22 +135,53 @@ describe("crossLeagueHome", () => {
   });
 
   it("does not leak a second user's leagues into the first user's payload", async () => {
+    // Deliberately overlapping-LOOKING, not disjoint: same league name, same current week (2),
+    // both leagues have a completed week 1 and a live week 2 — so a join or filter bug that
+    // pulled the wrong owner's rows would produce visibly WRONG data (the intruder's team names,
+    // or a record padded by the intruder's own week-1 result), not merely an extra league id. A
+    // test that only compares id lists would still pass if `myLeaguesOverview` forgot to scope
+    // `teams`/`drafts`/`matchups` to `ids` at all, since both leagues share a name and a week.
     await seedLeague({
       leagueId: "lgA",
       commissionerUserId: "u1",
       teamCount: 2,
-      teams: [{ teamId: "a1", userId: "u1" }, { teamId: "a2", userId: "u2" }],
+      teams: [{ teamId: "a1", userId: "u1", name: "Bay Bandits" }, { teamId: "a2", userId: "rival1", name: "Iron Owls" }],
     });
+    await seedMatchup("lgA", 1, "a1", "a2", 30, 20); // u1's team wins week 1
+    await seedMatchup("lgA", 2, "a1", "a2", null, null); // current week, live
+
     await seedLeague({
       leagueId: "lgB",
-      commissionerUserId: "u2",
+      commissionerUserId: "intruder",
       teamCount: 2,
-      teams: [{ teamId: "b1", userId: "u2" }, { teamId: "b2", userId: "u3" }],
+      teams: [{ teamId: "b1", userId: "intruder", name: "Shadow Squad" }, { teamId: "b2", userId: "intruderMate", name: "Ghost Riders" }],
+      // Same name as `lgA` on purpose — a card keyed on name rather than id would collide.
     });
+    // Give lgB an id-shadowing look too: same display name as lgA.
+    await db.update(leagues).set({ name: "Money League" }).where(inArray(leagues.id, ["lgA", "lgB"]));
+    await seedMatchup("lgB", 1, "b1", "b2", 40, 35); // the intruder's own team wins week 1
+    await seedMatchup("lgB", 2, "b1", "b2", null, null); // same current week as lgA
+
+    // One shared, global `stat_weeks` row for week 2 — exactly how production works, and exactly
+    // the kind of shared state a leak could ride in on.
+    await setWeekStatus(2, "in_progress", 5, 4, 1);
 
     const result = await crossLeagueHome(db, "u1");
     expect(result.leagues.map((league) => league.id)).toEqual(["lgA"]);
     expect(result.leagues.some((league) => league.id === "lgB")).toBe(false);
+
+    const card = result.leagues[0]!;
+    expect(card.matchup).toMatchObject({ homeTeamName: "Bay Bandits", awayTeamName: "Iron Owls" });
+    // u1's own record only — not padded by the intruder's week-1 win in the other league.
+    expect(card.record).toEqual({ wins: 1, losses: 0, ties: 0 });
+    expect(card.filledTeams).toBe(2);
+
+    // Nowhere in the payload — not on this card, not on a stray extra card — does the other
+    // user's team content appear.
+    const serialized = JSON.stringify(result);
+    expect(serialized).not.toContain("Shadow Squad");
+    expect(serialized).not.toContain("Ghost Riders");
+    expect(serialized).not.toContain("intruder");
   });
 
   it("a user in zero leagues gets an empty list, not an error", async () => {

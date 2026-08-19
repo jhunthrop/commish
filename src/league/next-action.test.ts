@@ -82,6 +82,21 @@ describe("nextAction", () => {
     expect(nextAction(BASE)).toEqual(null);
   });
 
+  it("treats a league with no draft row (draftStatus null) like a completed draft: falls through to the week's own state", () => {
+    // `crossLeagueHome` can legitimately pass `null` here — a league whose draft row doesn't
+    // exist. Neither `draftStatus === "in_progress"` nor `=== "scheduled"` matches `null`, so
+    // this must fall straight through to the week-state checks, exactly as "complete" does.
+    expect(nextAction({ ...BASE, draftStatus: null, weekStatus: "scheduled" })).toEqual({
+      kind: "set-lineup",
+      label: "Set your lineup",
+    });
+    expect(nextAction({ ...BASE, draftStatus: null, weekStatus: "in_progress" })).toEqual({
+      kind: "watch-scores",
+      label: "Watch the scores",
+    });
+    expect(nextAction({ ...BASE, draftStatus: null })).toEqual(null);
+  });
+
   describe("precedence", () => {
     it("a live draft beats an unfilled league for its commissioner", () => {
       const input: NextActionInput = {
