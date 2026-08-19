@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ADVISOR_CONFIG } from "./config";
+import { ADVISOR_CONFIG } from "@/domain/advisor";
 import { baselineStartSit, tradeBalance, type StartSitCandidate, type ValuedPlayer } from "./valuation";
 
 function player(playerId: string, averagePoints: number, position: ValuedPlayer["position"] = "RB"): ValuedPlayer {

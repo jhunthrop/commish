@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { ADVISOR_CONFIG } from "./config";
+import { ADVISOR_CONFIG } from "@/domain/advisor";
 import { assembleAdvisorContext, valuePlayers } from "./context";
 import { advisorFixture } from "@/league-service/test-support";
 

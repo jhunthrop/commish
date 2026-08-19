@@ -1,7 +1,7 @@
+import { ADVISOR_CONFIG } from "@/domain/advisor";
 import type { Position } from "@/domain/player";
 import type { RosterSlotType } from "@/domain/roster";
 import { roundPoints } from "@/scoring";
-import { ADVISOR_CONFIG } from "./config";
 
 export interface ValuedPlayer {
   readonly playerId: string;

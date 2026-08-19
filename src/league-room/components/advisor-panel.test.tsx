@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import { ADVISOR_CONFIG } from "@/domain/advisor";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
@@ -59,6 +60,12 @@ describe("AdvisorPanel", () => {
 
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("You don't have a team in this league."));
     expect(screen.getByLabelText("Ask about your lineup")).toHaveValue("Who do I start?");
+  });
+
+  it("caps the question at the server's own limit, imported not restated", () => {
+    const fixture = fixtureLeagueDeps(ADVICE);
+    renderInLeague(<AdvisorPanel leagueId="l1" weekNumber={4} />, fixture.deps);
+    expect(screen.getByLabelText("Ask about your lineup")).toHaveAttribute("maxLength", String(ADVISOR_CONFIG.maxQuestionLength));
   });
 
   it("does not call the advisor for an empty question", () => {

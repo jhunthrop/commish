@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ADVISOR_CONFIG } from "@/domain/advisor";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { AdviceBody } from "../contract";
 import { Badge, Button, Card, EYEBROW, Input } from "@/components/ui";
@@ -62,6 +63,7 @@ export function AdvisorPanel({ leagueId, weekNumber }: { readonly leagueId: stri
         <Input
           label="Ask about your lineup"
           value={question}
+          maxLength={ADVISOR_CONFIG.maxQuestionLength}
           autoComplete="off"
           onChange={(event) => setQuestion(event.target.value)}
         />

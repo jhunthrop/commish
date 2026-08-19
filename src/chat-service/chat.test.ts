@@ -144,6 +144,45 @@ describe("toggleReaction", () => {
     const result = await toggleReaction(db, { leagueId: "l1", messageId: "999999", userId: "u2", emoji: "🔥", publish: bus.publish });
     expect(result.ok).toBe(false);
   });
+
+  it("does not fail the toggle when publishing fails — the write is authoritative", async () => {
+    const bus = recorder();
+    const message = await postMessage(db, { leagueId: "l1", userId: "u1", body: "redis is down", publish: bus.publish });
+
+    const result = await toggleReaction(db, {
+      leagueId: "l1",
+      messageId: message.id,
+      userId: "u2",
+      emoji: "🔥",
+      publish: async () => {
+        throw new Error("redis unreachable");
+      },
+    });
+
+    expect(result).toEqual({ ok: true, action: "added", reactions: [{ emoji: "🔥", userId: "u2" }] });
+  });
+
+  it("routes a publish failure through the injected error sink instead of console.error", async () => {
+    const bus = recorder();
+    const message = await postMessage(db, { leagueId: "l1", userId: "u1", body: "sink me", publish: bus.publish });
+    const failures: Array<{ readonly error: unknown; readonly type: string; readonly leagueId: string }> = [];
+
+    const result = await toggleReaction(db, {
+      leagueId: "l1",
+      messageId: message.id,
+      userId: "u2",
+      emoji: "🔥",
+      publish: async () => {
+        throw new Error("redis unreachable");
+      },
+      onPublishError: (error, event) => {
+        failures.push({ error, type: event.type, leagueId: event.leagueId });
+      },
+    });
+
+    expect(failures).toEqual([{ error: expect.any(Error), type: "chat.reaction", leagueId: "l1" }]);
+    expect(result).toEqual({ ok: true, action: "added", reactions: [{ emoji: "🔥", userId: "u2" }] });
+  });
 });
 
 describe("toggleReaction — atomic transition", () => {

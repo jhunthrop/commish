@@ -1,10 +1,10 @@
 import { and, eq, gte, lt } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
 import { leagues, matchups, players, playerStatLines, scoringSettings, teams } from "@/db/schema";
+import { ADVISOR_CONFIG } from "@/domain/advisor";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import { getLineup } from "@/league-service/lineups";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
-import { ADVISOR_CONFIG } from "./config";
 import type { StartSitCandidate, ValuedPlayer } from "./valuation";
 
 export interface AdvisorPlayerContext extends StartSitCandidate {
@@ -122,9 +122,11 @@ export async function assembleAdvisorContext(db: ReadonlyDb, input: AssembleCont
       if (slot.playerId === null) return [];
       const player = playerById.get(slot.playerId);
       if (player === undefined) return [];
+      // computeFantasyPoints already rounds internally (src/scoring/compute.ts) — rounding its
+      // result again would be a second spelling of a rule that has exactly one owner.
       const recentPoints = [...(linesByPlayer.get(slot.playerId) ?? [])]
         .sort((a, b) => a.week - b.week)
-        .map((line) => roundPoints(computeFantasyPoints(line, player.position, rules)));
+        .map((line) => computeFantasyPoints(line, player.position, rules));
       const averagePoints =
         recentPoints.length === 0
           ? 0

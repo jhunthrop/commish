@@ -1,6 +1,6 @@
 import { z } from "zod";
+import { ADVISOR_CONFIG } from "@/domain/advisor";
 import { weekNumberSchema } from "@/league-service";
-import { ADVISOR_CONFIG } from "./config";
 
 export const startSitRequestSchema = z.object({
   weekNumber: weekNumberSchema,

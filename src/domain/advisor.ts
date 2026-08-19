@@ -1,4 +1,14 @@
-/** Every tunable the advisor has. No prompt, service or route may inline one of these. */
+/**
+ * Every tunable the advisor has. No prompt, service, route or client component may inline one
+ * of these.
+ *
+ * Lives beside `src/domain/trade.ts` rather than inside `src/ai-advisor/**` — the same
+ * pure/shared role: the fairness thresholds (`evenDelta`, `lopsidedDelta`) are what a future
+ * automated collusion sweep needs to read without importing the advisor service, and
+ * `maxQuestionLength` is what `AdvisorPanel` needs client-side to cap the question field before
+ * a round trip, which it cannot reach through `@/ai-advisor` once that module is server-only
+ * (see the client ESLint boundary in `eslint.config.mjs`).
+ */
 export const ADVISOR_CONFIG = {
   /**
    * How many completed weeks of form the context carries per player. Bounded because an

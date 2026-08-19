@@ -1,6 +1,6 @@
+import { ADVISOR_CONFIG } from "@/domain/advisor";
 import { withTimeout } from "@/lib/llm/with-timeout";
 import type { LlmClient } from "@/lib/llm/client";
-import { ADVISOR_CONFIG } from "./config";
 import { ADVISOR_SYSTEM_PROMPT } from "./prompt";
 
 /**
