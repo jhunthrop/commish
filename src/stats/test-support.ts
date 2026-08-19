@@ -1,27 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { STAT_FIELDS } from "@/domain/player";
 import type { Position, StatLine } from "@/domain/player";
 import type { GameStatus, StatsProvider } from "./provider";
 
 const POSITIONS: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
 const GAME_STATUSES: readonly GameStatus[] = ["scheduled", "in_progress", "final"];
-
-const STAT_FIELDS = [
-  "passingYards",
-  "passingTouchdowns",
-  "interceptions",
-  "rushingYards",
-  "rushingTouchdowns",
-  "receivingYards",
-  "receivingTouchdowns",
-  "receptions",
-  "fumblesLost",
-  "fieldGoalsMade",
-  "extraPointsMade",
-  "sacks",
-  "defensiveInterceptions",
-  "defensiveTouchdowns",
-] as const;
 
 /**
  * Yardage is the one family of stat fields real NFL data reports negative: a sack-for-loss, a
