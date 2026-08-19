@@ -25,7 +25,9 @@ import { GET as getLeague } from "@/app/api/leagues/[leagueId]/route";
 import { GET as getMatchups } from "@/app/api/leagues/[leagueId]/matchups/[week]/route";
 import { POST as postScore } from "@/app/api/leagues/[leagueId]/weeks/[week]/score/route";
 import { GET as browsePublic } from "@/app/api/public/leagues/route";
+import { resetBrowseRateLimit } from "@/app/api/public/leagues/_shared";
 import { listPublicLeagues, PUBLIC_LEAGUE_FIELDS } from "@/league-service/browse";
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { leagueHome, matchupWeek } from "./read";
 import { writeSchedule } from "./schedule";
 
@@ -46,6 +48,7 @@ beforeEach(async () => {
   await truncateAll(db);
   vi.mocked(getCurrentUser).mockReset();
   vi.mocked(requireCurrentUser).mockReset();
+  resetBrowseRateLimit();
   await db.insert(users).values([
     { id: "u1", email: "u1@test.local", displayName: "Manager u1" },
     { id: "u2", email: "u2@test.local", displayName: "Manager u2" },
@@ -238,6 +241,43 @@ describe("GET /api/public/leagues", () => {
     // A hand-edited URL naming a format we do not run is answered with the unfiltered list.
     const junk = await browsePublic(new Request("http://test/api/public/leagues?format=dynasty"));
     expect((await junk.json()).data.leagues).toHaveLength(2);
+  });
+
+  it("answers a signed-in and a signed-out caller with a byte-identical body", async () => {
+    await db.insert(leagues).values({
+      id: "open", name: "Rookie Snake Room", format: "snake", teamCount: 12,
+      stakeTier: 0, experienceTier: "beginner", isPublicMatchmade: true, commissionerUserId: "u1",
+    });
+    await db.insert(drafts).values({
+      id: "open_draft", leagueId: "open", format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+
+    signedInAs(null);
+    const signedOutBody = await (await browsePublic(new Request("http://test/api/public/leagues"))).text();
+    signedInAs("u1");
+    const signedInBody = await (await browsePublic(new Request("http://test/api/public/leagues"))).text();
+    // Pins the property to a BEHAVIOUR (the two responses are literally identical bytes), not
+    // to a reading of the handler's imports — a later refactor that starts branching on the
+    // caller's identity would fail this even if it never touched `getCurrentUser` by name.
+    expect(signedInBody).toEqual(signedOutBody);
+  });
+
+  it("refuses a caller looping the endpoint past the per-IP ceiling, before the query ever runs", async () => {
+    signedInAs(null);
+    const request = () => new Request("http://test/api/public/leagues", { headers: { "x-forwarded-for": "203.0.113.9" } });
+    for (let i = 0; i < MATCHMAKING_CONFIG.browseRateLimit.maxRequests; i += 1) {
+      expect((await browsePublic(request())).status).toBe(200);
+    }
+    const callsBeforeLimit = vi.mocked(listPublicLeagues).mock.calls.length;
+    const limited = await browsePublic(request());
+    expect(limited.status).toBe(429);
+    // The rate limit runs BEFORE the query: a limited request never reaches `listPublicLeagues`.
+    expect(vi.mocked(listPublicLeagues).mock.calls.length).toBe(callsBeforeLimit);
+
+    // A DIFFERENT caller (a different forwarded-for) spends its own budget, not this one's.
+    const other = await browsePublic(new Request("http://test/api/public/leagues", { headers: { "x-forwarded-for": "203.0.113.99" } }));
+    expect(other.status).toBe(200);
   });
 
   it("answers a generic 500 and never leaks the raw error — with no session read at all", async () => {

@@ -37,4 +37,12 @@ export const MATCHMAKING_CONFIG = {
   stakeDisclosure: "Stake tiers are labels only in this preview. No money changes hands.",
   /** Most open leagues one browse answers with. A list nobody can scan is not a shortlist. */
   maxResults: 48,
+  /**
+   * The anonymous browse read's per-IP ceiling (`src/app/api/public/leagues/route.ts`, the
+   * app's only unauthenticated endpoint). Generous enough that nobody clicking through filters
+   * by hand ever notices it, tight enough to bound one instance's blast radius against a
+   * scripted scrape — see `createRateLimiter`'s own docblock for what this is (a single-process
+   * fixed window) and is not (a distributed, spoof-proof quota).
+   */
+  browseRateLimit: { maxRequests: 60, windowMs: 60_000 },
 } as const;
