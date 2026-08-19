@@ -1,11 +1,11 @@
 import { assembleAdvisorContext, createStartSitAdvisor } from "@/ai-advisor";
 import { startSitRequestSchema } from "@/ai-advisor/schemas";
-import type { Advice } from "@/ai-advisor/start-sit";
 import { getDb } from "@/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import { getLlmClient, isLLMEnabled } from "@/lib/llm/client";
 import { withLeagueMemberActor, type LeagueRouteContext } from "@/app/api/leagues/_shared";
+import type { AdviceBody } from "@/league-room/contract";
 import { advisorRateLimited } from "../_shared";
 
 export const runtime = "nodejs";
@@ -35,6 +35,6 @@ export async function POST(request: Request, context: LeagueRouteContext) {
     if (advisorContext === null) return fail("That league doesn't exist.", 404);
 
     const advise = createStartSitAdvisor({ enabled: isLLMEnabled(), llm: getLlmClient() });
-    return ok<Advice>(await advise({ context: advisorContext, question: parsed.value.question }));
+    return ok<AdviceBody>(await advise({ context: advisorContext, question: parsed.value.question }));
   });
 }

@@ -1,5 +1,6 @@
 import { formatClockLength } from "@/domain/duration";
 import type { LlmClient } from "@/lib/llm/client";
+import { withTimeout } from "@/lib/llm/with-timeout";
 import { DRAFT_NUDGE_CONFIG } from "./config";
 
 export type NudgeAction = "pick" | "nominate";
@@ -43,21 +44,6 @@ function userPrompt({ teamName, secondsRemaining, action }: NudgeCopyInput): str
   return `<league_data>\nteam_name: ${teamName}\nseconds_remaining: ${secondsRemaining}\naction_needed: ${action}\n</league_data>`;
 }
 
-/** Rejects after `ms`, and always clears its timer so no handle is left dangling. */
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(() => reject(new Error("nudge copy timed out")), ms);
-      }),
-    ]);
-  } finally {
-    if (timer !== undefined) clearTimeout(timer);
-  }
-}
-
 /**
  * Degrade, never fail. The static sentence is computed FIRST and returned for every path
  * that isn't a clean, short, non-empty model answer: disabled, thrown, timed out, empty, or
@@ -76,6 +62,7 @@ export function createNudgeCopy({ enabled, llm, timeoutMs = DRAFT_NUDGE_CONFIG.l
       const result = await withTimeout(
         llm.generateCompletion({ system: SYSTEM, user: userPrompt(input), maxTokens: DRAFT_NUDGE_CONFIG.maxTokens }),
         timeoutMs,
+        "nudge copy",
       );
       const text = result.text.replace(/\s+/g, " ").trim();
       return text.length === 0 || text.length > DRAFT_NUDGE_CONFIG.maxCopyChars ? fallback : text;

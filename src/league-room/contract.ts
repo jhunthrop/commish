@@ -2,6 +2,7 @@ import type { DraftStatus } from "@/domain/draft";
 import type { DraftFormat, TeamCard } from "@/domain/league";
 import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
+import type { TradeFlag, TradeVerdict } from "@/ai-advisor/valuation";
 import type { StandingsRow } from "@/league";
 
 /**
@@ -139,10 +140,17 @@ export interface AdviceBody {
   readonly degraded: boolean;
 }
 
-/** What the trade analyzer answers with: the deterministic verdict, plus prose about it. */
+/**
+ * What the trade analyzer answers with: the deterministic verdict, plus prose about it.
+ *
+ * `verdict` and `flags` are the SAME `TradeVerdict`/`TradeFlag` unions `tradeBalance` (the
+ * platform's own fairness detector, `@/ai-advisor/valuation`) produces — imported as a type
+ * only, so a flag this contract doesn't know about is a compile error here rather than a
+ * value that silently widens to `string` on the wire.
+ */
 export interface TradeAssessmentBody extends AdviceBody {
-  readonly verdict: "even" | "favors_proposer" | "favors_receiver" | "lopsided";
-  readonly flags: readonly string[];
+  readonly verdict: TradeVerdict;
+  readonly flags: readonly TradeFlag[];
   readonly givingValue: number;
   readonly receivingValue: number;
 }

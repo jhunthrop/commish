@@ -4,7 +4,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { leagues, users } from "@/db/schema";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
-import type { Advice } from "./start-sit";
+import type { Advice } from "./llm-fallback";
 import type { TradeAssessment } from "./trade";
 import { ADVISOR_CONFIG } from "./config";
 import { advisorFixture, foreignLeague } from "@/league-service/test-support";

@@ -1,11 +1,11 @@
 import { assembleAdvisorContext, createTradeAnalyzer } from "@/ai-advisor";
 import { tradeRequestSchema } from "@/ai-advisor/schemas";
-import type { TradeAssessment } from "@/ai-advisor/trade";
 import { getDb } from "@/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import { getLlmClient, isLLMEnabled } from "@/lib/llm/client";
 import { withLeagueMemberActor, type LeagueRouteContext } from "@/app/api/leagues/_shared";
+import type { TradeAssessmentBody } from "@/league-room/contract";
 import { advisorRateLimited } from "../_shared";
 
 export const runtime = "nodejs";
@@ -62,6 +62,6 @@ export async function POST(request: Request, context: LeagueRouteContext) {
     if (assessment === null) {
       return fail("We couldn't read that trade — check that both sides name players those teams actually have.", 422);
     }
-    return ok<TradeAssessment>(assessment);
+    return ok<TradeAssessmentBody>(assessment);
   });
 }

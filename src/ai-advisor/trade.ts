@@ -1,7 +1,7 @@
 import { isBalancedProposal, type TradeProposal } from "@/domain/trade";
 import { valuePlayers, type AdvisorContext, type AdvisorTeamContext } from "./context";
+import { adviseOrFallback, type Advice, type AdvisorLlmDeps } from "./llm-fallback";
 import { tradePrompt } from "./prompt";
-import { adviseOrFallback, type Advice, type AdvisorLlmDeps } from "./start-sit";
 import { tradeBalance, type TradeBalance } from "./valuation";
 
 export interface TradeAssessment extends Advice {
