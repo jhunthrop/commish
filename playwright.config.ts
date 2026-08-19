@@ -1,10 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
+import { envOr } from "./scripts/lib/env";
 
 // DEVIATION from the original spec: port 3000 is occupied by another developer's live `next
 // dev` server on this machine, and this suite must never touch it. The default here is 3100,
 // not 3000 — set E2E_BASE_URL to point elsewhere. The port is also threaded into the
 // `webServer.command` below so `next start` listens on the same port `baseURL` points at.
-const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3100";
+// `envOr`, not `??`: `.env.example` ships `E2E_BASE_URL=` (an intentionally empty line, so a
+// fresh `.env.local` copy documents the var without forcing a value), and dotenv-cli sets
+// `process.env.E2E_BASE_URL` to `""` for that line — `??` only catches `undefined`/`null`, so
+// an empty string would defeat the fallback and `new URL("")` below would throw.
+const BASE_URL = envOr("E2E_BASE_URL", "http://localhost:3100");
 const PORT = new URL(BASE_URL).port || "3100";
 
 // A `next dev` process can be running against this same checkout at the same time as this

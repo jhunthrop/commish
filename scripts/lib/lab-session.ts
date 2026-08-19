@@ -55,6 +55,17 @@ export async function mintLabSession(options: { readonly email?: string; readonl
       `Refusing to run: WORKOS_API_KEY is not a test key (expected a "${TEST_KEY_PREFIX}" prefix). This creates a permanent, pre-verified user in whatever directory the key names.`,
     );
   }
+  // An explicit email names a STABLE identity meant to be reused run over run (`ensureUserId`'s
+  // mint-if-absent path, below) — which only works if the same password is supplied every time
+  // too. Without this check, LAB_EMAIL set with LAB_PASSWORD unset would silently take the
+  // generated-password branch below, re-use the existing WorkOS user under a freshly generated
+  // password, and then fail authentication with an opaque WorkOS error that never names which
+  // env var was missing.
+  if (options.email !== undefined && options.password === undefined) {
+    throw new Error(
+      "An explicit email was given without a password (LAB_EMAIL set, LAB_PASSWORD unset). Both must be set together for a stable, reusable identity — set LAB_PASSWORD, or unset LAB_EMAIL to mint a fresh throwaway identity instead.",
+    );
+  }
   const clientId = requiredEnv("WORKOS_CLIENT_ID");
   const cookiePassword = requiredEnv("WORKOS_COOKIE_PASSWORD");
 

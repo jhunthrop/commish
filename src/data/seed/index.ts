@@ -1,5 +1,6 @@
 import { getDb } from "@/db/client";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
+import { envOrUndefined } from "../../../scripts/lib/env";
 import { DEV_SEED } from "./config";
 import { assertLocalSeedTarget } from "./guard";
 import { seedDevLeagues } from "./seed-dev-leagues";
@@ -20,7 +21,12 @@ async function main(): Promise<void> {
   console.log(`seeded ${playerCounts.players} players and ${playerCounts.statLines} stat lines`);
   // The only place that reads DEV_SEED_CLAIM_USER_ID — seedDevLeagues takes it as an explicit
   // parameter rather than reaching into process.env itself. See seed-dev-leagues.ts.
-  const claimUserId = process.env[DEV_SEED.claimUserIdEnvVar];
+  // `envOrUndefined`, not a bare `process.env[...]` read: `.env.example` ships
+  // `DEV_SEED_CLAIM_USER_ID=` (an intentionally empty line), so an un-set-up `.env.local` reads
+  // as `""`, not `undefined` — and `ensureDevUsers` branches on `claimUserId !== undefined`, so
+  // an unguarded `""` would pass that check and get written as a `teams.user_id`/
+  // `leagues.commissioner_user_id` FK to a `users` row that does not exist.
+  const claimUserId = envOrUndefined(DEV_SEED.claimUserIdEnvVar);
   const dev = await seedDevLeagues(db, { now: () => new Date().toISOString() }, claimUserId);
   console.log(`seeded ${dev.leagues} dev leagues, ${dev.teams} teams and ${dev.drafts} scheduled drafts`);
   const season = await seedSeasonLeague(db, { now: () => new Date().toISOString() }, claimUserId);
