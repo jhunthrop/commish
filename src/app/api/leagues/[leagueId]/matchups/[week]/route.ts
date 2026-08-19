@@ -1,6 +1,7 @@
 import { getDb } from "@/db/client";
 import { fail, ok } from "@/lib/api/respond";
 import { matchupWeek } from "@/league-service";
+import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import type { MatchupWeekBody } from "@/league-room/contract";
 import { withLeagueMemberActor } from "@/app/api/leagues/_shared";
 
@@ -18,7 +19,7 @@ export async function GET(request: Request, context: RouteContext) {
   if (!Number.isInteger(weekNumber) || weekNumber < 1) return fail("That isn't a week we can show.", 400);
 
   return withLeagueMemberActor(request, { params: context.params }, async (actor) => {
-    const body = await matchupWeek(getDb(), actor.leagueId, weekNumber, actor.userId);
+    const body = await matchupWeek(getDb(), actor.leagueId, weekNumber, actor.userId, getReferenceCache());
     if (body === null) return fail("That league doesn't exist.", 404);
     return ok<MatchupWeekBody>(body);
   });

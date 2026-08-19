@@ -18,8 +18,11 @@ vi.mock("@/league-service/browse", async (importOriginal) => {
 });
 
 import { eq } from "drizzle-orm";
+import Redis from "ioredis";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
+import type { Player } from "@/domain/player";
+import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { POST as postLeague } from "@/app/api/leagues/route";
 import { GET as getLeague } from "@/app/api/leagues/[leagueId]/route";
@@ -29,10 +32,24 @@ import { GET as browsePublic } from "@/app/api/public/leagues/route";
 import { resetBrowseRateLimit } from "@/app/api/public/leagues/_shared";
 import { listPublicLeagues, PUBLIC_LEAGUE_FIELDS } from "@/league-service/browse";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
+import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { leagueHome, matchupWeek } from "./read";
 import { writeSchedule } from "./schedule";
 
 const db = createTestDb();
+
+/**
+ * `GET /matchups/[week]` is now wired to the process-wide `getReferenceCache()`
+ * (`@/league-service/reference-cache-instance.ts`), a REAL Redis connection — `truncateAll`
+ * clears Postgres between tests but has nothing to do with Redis, and the player index lives
+ * under one GLOBAL key (`STATS_INGESTION_CONFIG.keys.playerIndex`, never scoped by league), so a
+ * value one test's `playableSeason` cached would otherwise outlive that test and answer a LATER
+ * one with a stale roster. `fileParallelism: false` (`vitest.config.mts`) is what makes a
+ * beforeEach/afterAll `del` here — mirroring `reference-cache.test.ts`'s own `control` connection
+ * — sufficient rather than racy.
+ */
+const redisControl = new Redis(process.env.REDIS_URL ?? "redis://localhost:6379");
 
 const profile = (id: string) => ({
   id, email: `${id}@test.local`, displayName: `Manager ${id}`,
@@ -47,6 +64,7 @@ const post = (url: string, body: unknown) =>
 
 beforeEach(async () => {
   await truncateAll(db);
+  await redisControl.del(STATS_INGESTION_CONFIG.keys.playerIndex);
   vi.mocked(getCurrentUser).mockReset();
   vi.mocked(requireCurrentUser).mockReset();
   resetBrowseRateLimit();
@@ -58,6 +76,8 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await truncateAll(db);
+  await redisControl.del(STATS_INGESTION_CONFIG.keys.playerIndex);
+  redisControl.disconnect();
 });
 
 async function createDefaultLeague(userId = "u1") {
@@ -205,6 +225,66 @@ describe("the read models' own guards", () => {
   it("answer null for a league that doesn't exist — the routes' 404 never reaches them", async () => {
     expect(await leagueHome(db, "nope", "u1")).toBeNull();
     expect(await matchupWeek(db, "nope", 1, "u1")).toBeNull();
+  });
+});
+
+/**
+ * A stand-in `ReferenceCache` that records whether its OWN `load` argument was ever invoked —
+ * mirroring `reference-cache.test.ts`'s `vi.fn(load)` idiom one remove out, since `matchupWeek`
+ * builds `load` itself rather than taking one from the caller. A `hit` value is returned WITHOUT
+ * ever calling `load` (a cache hit, `loadCalls` stays 0); omitting one always calls through and
+ * returns its result (a miss) — structurally identical to `matchupWeek`'s own unexported no-op
+ * default, `players: (load) => load()` / `scoringSettings: (_, load) => load()`, which is what
+ * makes this the faithful stand-in for "no cache injected at all".
+ */
+function recordingReferenceCache(hit: { readonly players?: readonly Player[]; readonly scoringSettings?: ScoringSettings } = {}): {
+  readonly cache: Pick<ReferenceCache, "players" | "scoringSettings">;
+  readonly loadCalls: { players: number; scoringSettings: number };
+} {
+  const loadCalls = { players: 0, scoringSettings: 0 };
+  const cache: Pick<ReferenceCache, "players" | "scoringSettings"> = {
+    players: async (load) => {
+      if (hit.players !== undefined) return hit.players;
+      loadCalls.players += 1;
+      return load();
+    },
+    scoringSettings: async (_leagueId, load) => {
+      if (hit.scoringSettings !== undefined) return hit.scoringSettings;
+      loadCalls.scoringSettings += 1;
+      return load();
+    },
+  };
+  return { cache, loadCalls };
+}
+
+describe("matchupWeek's reference cache", () => {
+  it("calls load on a miss, and skips it entirely on a hit", async () => {
+    const created = await createDefaultLeague("u1");
+    await playableSeason(created.leagueId, created.teamId);
+
+    // MISS: structurally the no-op default's own behavior — `load` runs, and its result (the
+    // TRUE roster and settings) is what the response reflects.
+    const miss = recordingReferenceCache();
+    const missBody = await matchupWeek(db, created.leagueId, 1, "u1", miss.cache);
+    expect(miss.loadCalls).toEqual({ players: 1, scoringSettings: 1 });
+    const trueQb = [...missBody!.matchups[0]!.home.starters, ...missBody!.matchups[0]!.away.starters].find(
+      (entry) => entry.playerId === "qb1",
+    );
+    expect(trueQb).toMatchObject({ playerName: "QB One", points: 24 });
+
+    // HIT: `load` never runs at all. A decoy player index (wrong name) and decoy scoring rules
+    // (touchdowns worth 0) prove the response came from the CACHE, not from a DB read that just
+    // happened to agree with it.
+    const decoyPlayers: readonly Player[] = [{ id: "qb1", name: "Cached Impostor", position: "QB", nflTeam: "KC" }];
+    const decoySettings: ScoringSettings = { leagueId: created.leagueId, ...PPR_SCORING, pointsPerPassingTouchdown: 0 };
+    const hit = recordingReferenceCache({ players: decoyPlayers, scoringSettings: decoySettings });
+    const hitBody = await matchupWeek(db, created.leagueId, 1, "u1", hit.cache);
+    expect(hit.loadCalls).toEqual({ players: 0, scoringSettings: 0 });
+    const cachedQb = [...hitBody!.matchups[0]!.home.starters, ...hitBody!.matchups[0]!.away.starters].find(
+      (entry) => entry.playerId === "qb1",
+    );
+    // 300 * 0.04 + 3 * 0 = 12, not the true 24 — the decoy settings drove the math.
+    expect(cachedQb).toMatchObject({ playerName: "Cached Impostor", points: 12 });
   });
 });
 

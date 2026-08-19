@@ -3,6 +3,7 @@ import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
 import { leagueHome, matchupWeek } from "@/league-service";
+import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import { MatchupPanel } from "@/league-room/components/matchup-panel";
 import { WeekNav } from "@/league-room/components/week-nav";
 import { AppHeader } from "@/components/app-shell/app-header";
@@ -28,7 +29,7 @@ export default async function MatchupWeekPage({ params }: PageProps) {
   const home = await leagueHome(getDb(), leagueId, user.id);
   if (home === null || (home.myTeamId === null && !home.isCommissioner)) notFound();
 
-  const body = await matchupWeek(getDb(), leagueId, weekNumber, user.id);
+  const body = await matchupWeek(getDb(), leagueId, weekNumber, user.id, getReferenceCache());
   if (body === null) notFound();
 
   return (
