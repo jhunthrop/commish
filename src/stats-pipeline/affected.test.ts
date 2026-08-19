@@ -178,5 +178,9 @@ describe("affectedTeams", () => {
     const affected = await affectedTeams(counting.db, { week: 3, playerIds: ["p-shared"] });
     expect(affected).toHaveLength(3);
     expect(counting.selectCount()).toBeLessThanOrEqual(2);
+    // Task 5's per-league fan-out order rides on this: the result must arrive already sorted by
+    // (leagueId, teamId), not merely happen to be. A dropped sort would still pass toHaveLength.
+    const keys = affected.map((row) => `${row.leagueId}:${row.teamId}`);
+    expect(keys).toEqual([...keys].sort((a, b) => a.localeCompare(b)));
   });
 });
