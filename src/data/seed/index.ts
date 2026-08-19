@@ -4,6 +4,7 @@ import { DEV_SEED } from "./config";
 import { assertLocalSeedTarget } from "./guard";
 import { seedDevLeagues } from "./seed-dev-leagues";
 import { seedPlayers } from "./seed-players";
+import { seedPublicLeagues } from "./seed-public-leagues";
 import { seedSeasonLeague } from "./seed-season-league";
 
 /**
@@ -24,6 +25,8 @@ async function main(): Promise<void> {
   console.log(`seeded ${dev.leagues} dev leagues, ${dev.teams} teams and ${dev.drafts} scheduled drafts`);
   const season = await seedSeasonLeague(db, { now: () => new Date().toISOString() }, claimUserId);
   console.log(`seeded a ${season.teams}-team season league with ${season.weeks} weeks (${season.scoredWeeks} scored)`);
+  const open = await seedPublicLeagues(db, { now: () => new Date().toISOString() });
+  console.log(`seeded ${open.leagues} public matchmaking leagues with ${open.teams} joined managers`);
 }
 
 main().then(() => process.exit(0)).catch((err: unknown) => {
