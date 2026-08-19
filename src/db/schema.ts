@@ -45,6 +45,13 @@ export const leagues = pgTable("leagues", {
   teamCount: integer("team_count").notNull(),
   stakeTier: integer("stake_tier").notNull().default(0),
   isPublicMatchmade: boolean("is_public_matchmade").notNull().default(false),
+  /**
+   * Which managers this league is FOR, as advertised on the public browse page. A league-level
+   * fact, not a mirror of the commissioner's own `users.experience_tier`: deriving it from a
+   * person would leak that person into an unauthenticated read and would silently re-tier every
+   * league they run the moment they updated their own profile.
+   */
+  experienceTier: experienceTierEnum("experience_tier").notNull().default("beginner"),
   commissionerUserId: text("commissioner_user_id")
     .notNull()
     .references(() => users.id),

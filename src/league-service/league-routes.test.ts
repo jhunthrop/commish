@@ -10,8 +10,9 @@ vi.mock("@/lib/auth/current-user", () => ({
   requireCurrentUser: vi.fn(),
 }));
 
+import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { users } from "@/db/schema";
+import { leagues, users } from "@/db/schema";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { GET as listLeagues, POST as postLeague } from "@/app/api/leagues/route";
 import { POST as postInvite } from "@/app/api/leagues/[leagueId]/invites/route";
@@ -85,6 +86,33 @@ describe("POST /api/leagues", () => {
     const response = await postLeague(post("http://test/api/leagues", { name: "Too Big", teamCount: 24 }));
     expect(response.status).toBe(400);
     expect((await response.json()).error).toBe("teamCount: A league can have at most 16 teams.");
+  });
+
+  it("creates an invite-only league by default and takes the creator's own experience tier", async () => {
+    signedInAs("u1");
+    const response = await postLeague(post("http://test/api/leagues", { name: "Sunday Money" }));
+    expect(response.status).toBe(201);
+    const { leagueId } = (await response.json()).data as { leagueId: string };
+    const [row] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
+    expect(row).toMatchObject({ isPublicMatchmade: false, stakeTier: 0, experienceTier: "beginner" });
+  });
+
+  it("lists the league publicly when the creator asks for it, at the stake tier they chose", async () => {
+    signedInAs("u1");
+    const response = await postLeague(
+      post("http://test/api/leagues", { name: "Open Room", visibility: "public", stakeTier: 2 }),
+    );
+    expect(response.status).toBe(201);
+    const { leagueId } = (await response.json()).data as { leagueId: string };
+    const [row] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
+    expect(row).toMatchObject({ isPublicMatchmade: true, stakeTier: 2 });
+  });
+
+  it("rejects a stake tier nothing configures, naming the field", async () => {
+    signedInAs("u1");
+    const response = await postLeague(post("http://test/api/leagues", { name: "Too Rich", stakeTier: 9 }));
+    expect(response.status).toBe(400);
+    expect((await response.json()).error).toContain("stakeTier");
   });
 });
 

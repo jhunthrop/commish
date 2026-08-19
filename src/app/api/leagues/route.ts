@@ -36,6 +36,9 @@ export async function POST(request: Request) {
         rosterSlots: STANDARD_ROSTER_SLOTS,
         commissionerUserId: userId,
         teamName: parsed.value.teamName ?? `${user.displayName}'s team`,
+        experienceTier: parsed.value.experienceTier ?? user.experienceTier,
+        stakeTier: parsed.value.stakeTier,
+        isPublicMatchmade: parsed.value.visibility === "public",
       },
     );
     if (!result.ok) return fail(result.reason, 500);

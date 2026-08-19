@@ -28,6 +28,7 @@ async function leagueWithTeams(count: number) {
   const created = await createLeague({ db, clock, newId }, {
     name: "Sunday Money", format: "snake", teamCount: count, scoringPreset: "ppr", auctionBudget: null,
     rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Commish",
+    experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);
   const extra = Array.from({ length: count - 1 }, (_, i) => ({

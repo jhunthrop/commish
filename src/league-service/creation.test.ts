@@ -34,6 +34,9 @@ describe("createLeague", () => {
       rosterSlots: STANDARD_ROSTER_SLOTS,
       commissionerUserId: "u1",
       teamName: "Dana's Team",
+      experienceTier: "beginner",
+      stakeTier: 0,
+      isPublicMatchmade: false,
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -59,6 +62,7 @@ describe("createLeague", () => {
     const result = await createLeague(deps(), {
       name: "Auction Night", format: "auction", teamCount: 10, scoringPreset: "te_premium",
       auctionBudget: 200, rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Dana's Team",
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
     });
     if (!result.ok) throw new Error(result.reason);
     const [draft] = await db.select().from(drafts).where(eq(drafts.id, result.draftId));
@@ -72,6 +76,7 @@ describe("createLeague", () => {
       const result = await createLeague(deps(), {
         name: "Ghost League", format: "snake", teamCount: 12, scoringPreset: "ppr", auctionBudget: null,
         rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "nobody", teamName: "Ghost",
+        experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
       });
       expect(result).toEqual({ ok: false, reason: "We couldn't create that league. Please try again." });
       expect(await db.select().from(leagues)).toEqual([]);
@@ -79,5 +84,47 @@ describe("createLeague", () => {
     } finally {
       consoleSpy.mockRestore();
     }
+  });
+
+  it("records the matchmaking facts a public browse reads: visibility, stake tier and experience tier", async () => {
+    const result = await createLeague(deps(), {
+      name: "Open Auction Night",
+      format: "auction",
+      teamCount: 10,
+      scoringPreset: "ppr",
+      auctionBudget: 200,
+      rosterSlots: STANDARD_ROSTER_SLOTS,
+      commissionerUserId: "u1",
+      teamName: "Dana's Team",
+      experienceTier: "experienced",
+      stakeTier: 2,
+      isPublicMatchmade: true,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
+    expect(league).toMatchObject({ experienceTier: "experienced", stakeTier: 2, isPublicMatchmade: true });
+  });
+
+  it("keeps a league private and unlisted unless it is created public on purpose", async () => {
+    const result = await createLeague(deps(), {
+      name: "Group Chat Only",
+      format: "snake",
+      teamCount: 12,
+      scoringPreset: "ppr",
+      auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS,
+      commissionerUserId: "u1",
+      teamName: "Dana's Team",
+      experienceTier: "beginner",
+      stakeTier: 0,
+      isPublicMatchmade: false,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
+    expect(league).toMatchObject({ isPublicMatchmade: false, stakeTier: 0, experienceTier: "beginner" });
   });
 });
