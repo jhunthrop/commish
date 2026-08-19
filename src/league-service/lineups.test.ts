@@ -1,9 +1,15 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { lineupSlots, matchups } from "@/db/schema";
+import type { ScoreCache } from "@/stats-pipeline/score-cache";
 import { getLineup, isWeekLocked, lineupView, setLineup } from "./lineups";
 import { SLOTS, twoTeamLeague, validSwap } from "./test-support";
+
+/** A recording stand-in for the injected score cache, so a test can assert exactly what was invalidated. */
+function recordingScoreCache(): Pick<ScoreCache, "invalidate"> & { invalidate: ReturnType<typeof vi.fn> } {
+  return { invalidate: vi.fn(async () => {}) };
+}
 
 const db = createTestDb();
 
@@ -99,6 +105,33 @@ describe("setLineup", () => {
     expect(
       await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 9, slots: validSwap }),
     ).toEqual({ ok: false, status: 404, reason: "That week isn't part of this league's season." });
+  });
+
+  it("invalidates the score cache for this league and week after a successful save", async () => {
+    const league = await twoTeamLeague(db);
+    const cache = recordingScoreCache();
+    const result = await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, slots: validSwap }, cache);
+    expect(result.ok).toBe(true);
+    expect(cache.invalidate).toHaveBeenCalledTimes(1);
+    expect(cache.invalidate).toHaveBeenCalledWith(league.leagueId, 1);
+  });
+
+  it("does not invalidate the score cache when the save is rejected", async () => {
+    const league = await twoTeamLeague(db);
+    const cache = recordingScoreCache();
+    const result = await setLineup(
+      db,
+      {
+        leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1,
+        slots: [
+          { slot: "QB", slotIndex: 0, playerId: null },
+          { slot: "RB", slotIndex: 0, playerId: "rb1" },
+        ],
+      },
+      cache,
+    );
+    expect(result.ok).toBe(false);
+    expect(cache.invalidate).not.toHaveBeenCalled();
   });
 });
 

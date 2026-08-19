@@ -5,10 +5,16 @@ import { playerStatLines } from "@/db/schema";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import { PLAYER_COUNT, SEASON_WEEKS } from "@/stats/mock/generate-dataset";
 import type { StatsProvider } from "@/stats/provider";
+import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { seedPlayers } from "./seed-players";
 
 const db = createTestDb();
 const provider = createMockStatsProvider();
+
+/** A recording stand-in for the injected reference cache, so a test can assert exactly what was invalidated. */
+function recordingReferenceCache(): Pick<ReferenceCache, "invalidatePlayers"> & { invalidatePlayers: ReturnType<typeof vi.fn> } {
+  return { invalidatePlayers: vi.fn(async () => {}) };
+}
 
 // `seedPlayers` refuses to run against a database it cannot prove is local (see `guard.ts`).
 // The test database IS local, so say so explicitly rather than letting the guard fail open.
@@ -72,4 +78,19 @@ describe("seedPlayers", () => {
     expect(row?.passingYards).toBe(revisedPassingYards);
     expect(await countOf("player_stat_lines")).toBe(PLAYER_COUNT * SEASON_WEEKS);
   }, 30_000);
+
+  it("invalidates the player index after a successful seed", async () => {
+    const cache = recordingReferenceCache();
+    await seedPlayers(db, provider, cache);
+    expect(cache.invalidatePlayers).toHaveBeenCalledTimes(1);
+  }, 30_000);
+
+  it("does not invalidate the player index when the local-target guard refuses to run", async () => {
+    // The guard throws before a single row is written — the earliest reachable failure this
+    // function has. `beforeEach` above opts in for every other test; this one opts back out.
+    vi.stubEnv("ALLOW_DESTRUCTIVE_SEED", "0");
+    const cache = recordingReferenceCache();
+    await expect(seedPlayers(db, provider, cache)).rejects.toThrow(/Refusing to seed/);
+    expect(cache.invalidatePlayers).not.toHaveBeenCalled();
+  });
 });

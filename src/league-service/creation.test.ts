@@ -5,13 +5,19 @@ import { drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
 import { LEAGUE_CONFIG } from "@/league";
+import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { createLeague } from "./creation";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-17T12:00:00.000Z" };
 let nextId = 0;
 const newId = () => `id_${++nextId}`;
-const deps = () => ({ db, clock, newId });
+const deps = (cache?: Pick<ReferenceCache, "invalidateScoringSettings">) => ({ db, clock, newId, cache });
+
+/** A recording stand-in for the injected reference cache, so a test can assert exactly what was invalidated. */
+function recordingReferenceCache(): Pick<ReferenceCache, "invalidateScoringSettings"> & { invalidateScoringSettings: ReturnType<typeof vi.fn> } {
+  return { invalidateScoringSettings: vi.fn(async () => {}) };
+}
 
 beforeEach(async () => {
   await truncateAll(db);
@@ -81,6 +87,35 @@ describe("createLeague", () => {
       expect(result).toEqual({ ok: false, reason: "We couldn't create that league. Please try again." });
       expect(await db.select().from(leagues)).toEqual([]);
       expect(consoleSpy).toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it("invalidates the new league's cached scoring settings after a successful create", async () => {
+    const cache = recordingReferenceCache();
+    const result = await createLeague(deps(cache), {
+      name: "Sunday Money", format: "snake", teamCount: LEAGUE_CONFIG.defaults.teamCount, scoringPreset: "ppr",
+      auctionBudget: null, rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Dana's Team",
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(cache.invalidateScoringSettings).toHaveBeenCalledTimes(1);
+    expect(cache.invalidateScoringSettings).toHaveBeenCalledWith(result.leagueId);
+  });
+
+  it("does not invalidate scoring settings when league creation fails", async () => {
+    const cache = recordingReferenceCache();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await createLeague(deps(cache), {
+        name: "Ghost League", format: "snake", teamCount: 12, scoringPreset: "ppr", auctionBudget: null,
+        rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "nobody", teamName: "Ghost",
+        experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
+      });
+      expect(result.ok).toBe(false);
+      expect(cache.invalidateScoringSettings).not.toHaveBeenCalled();
     } finally {
       consoleSpy.mockRestore();
     }
