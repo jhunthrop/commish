@@ -74,8 +74,8 @@ premise the whole table rests on. `wedgedWeekTicks` is 384: eight days at the sh
 against the ~336 ticks a week is legitimately un-advanceable for (it becomes the earliest non-final
 week the moment the previous week settles and stays that way until its own last game ends). A
 threshold below that makes the WIDENED window the steady state for most of the season and puts the
-real figure at ~3,300 against a 2,692 ceiling — over by enough to go dark in the last week of every
-month. `config.test.ts` asserts `wedgedWeekTicks > ticksPerDay * 7`, and asserts that a permanently
+real figure at ~4,800 against a 2,692 ceiling (a wedged window is three schedule calls per tick,
+the wedged week plus the two forward weeks) — over by enough to go dark before mid-month. `config.test.ts` asserts `wedgedWeekTicks > ticksPerDay * 7`, and asserts that a permanently
 widened window would NOT fit, so the tunable and the projection cannot drift apart again.
 
 `monthlyRequestBudget` therefore defaults to **3,000**, not 1,000: a 24/7 worker at a thirty-minute

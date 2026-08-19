@@ -1,5 +1,5 @@
 import { getDb } from "@/db/client";
-import { createStatsProvider } from "@/stats/registry";
+import { getStatsProvider } from "@/stats-pipeline";
 import { getIngestionBudget } from "@/stats-pipeline";
 import { envOrUndefined } from "@/lib/env";
 import { DEV_SEED } from "./config";
@@ -21,7 +21,7 @@ async function main(): Promise<void> {
   // The real ledger, not the unmetered default: this is the one caller whose provider may be a
   // live feed with a real key behind it, so this is where the backfill's spending has to be
   // counted. Everything else that calls `seedPlayers` drives the mock and costs nothing upstream.
-  const playerCounts = await seedPlayers(db, createStatsProvider(), undefined, getIngestionBudget());
+  const playerCounts = await seedPlayers(db, getStatsProvider(), undefined, getIngestionBudget());
   console.log(`seeded ${playerCounts.players} players and ${playerCounts.statLines} stat lines`);
   // The only place that reads DEV_SEED_CLAIM_USER_ID — seedDevLeagues takes it as an explicit
   // parameter rather than reaching into process.env itself. See seed-dev-leagues.ts.

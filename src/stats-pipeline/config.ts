@@ -60,7 +60,7 @@ export const STATS_INGESTION_CONFIG = {
    * This is a ceiling on what THIS deployment is allowed to spend, not a claim about what the
    * upstream account allows. Set `STATS_MONTHLY_REQUEST_BUDGET` to the purchased quota; if that
    * quota is smaller than this default the ledger will start denying partway through the month,
-   * which is the correct and visible failure. The default is the arithmetic above (2,136) rounded
+   * which is the correct and visible failure. The default is the arithmetic above (2,151) rounded
    * up to 3,000 for headroom — deliberately not the 1,000-request free tier, because a 24/7
    * worker at a 30-minute cadence cannot fit inside 1,000: 1,488 ticks a month at one schedule
    * call each is already 1,488 requests before a single box score is fetched.

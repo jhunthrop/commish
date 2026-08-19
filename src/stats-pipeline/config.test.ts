@@ -66,8 +66,10 @@ describe("the ingestion request budget arithmetic", () => {
     expect(ticksPerHealthyWeek).toBe(336);
     expect(STATS_INGESTION_CONFIG.wedgedWeekTicks).toBeGreaterThan(ticksPerHealthyWeek);
 
-    const alwaysWidened = ticksPerMonth * STATS_INGESTION_CONFIG.maxWeeksPerTick + boxScores + correctionSweeps + sweepRetries;
-    expect(alwaysWidened).toBe(3_326);
+    // A wedged window is [wedged week] + maxWeeksPerTick forward weeks: 1 + maxWeeksPerTick
+    // schedule calls per tick, per worker.ts's wedge widening.
+    const alwaysWidened = ticksPerMonth * (1 + STATS_INGESTION_CONFIG.maxWeeksPerTick) + boxScores + correctionSweeps + sweepRetries;
+    expect(alwaysWidened).toBe(4_814);
     expect(alwaysWidened).toBeGreaterThan(ingestionCeiling);
 
     // And the backfill fits in what is held back for it, so the two together fit the quota.
