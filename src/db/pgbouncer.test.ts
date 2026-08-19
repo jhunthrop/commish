@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { eq, sql } from "drizzle-orm";
+import postgres from "postgres";
 import { createDb } from "./client";
 import { DB_POOL_CONFIG } from "./config";
 import { truncateAll } from "./test-db";
@@ -16,6 +17,29 @@ const PGBOUNCER_URL = envOr("TEST_PGBOUNCER_URL", "postgres://commish:commish@lo
 
 function pooled() {
   return createDb(PGBOUNCER_URL, { max: DB_POOL_CONFIG.testMaxConnections, idleTimeoutSeconds: DB_POOL_CONFIG.testIdleTimeoutSeconds });
+}
+
+/**
+ * PgBouncer's virtual admin database — same host/port/credentials as `PGBOUNCER_URL`, database
+ * name swapped to `pgbouncer`. `docker-compose.yml`'s `ADMIN_USERS: commish` grants the app's
+ * own user access to it (the image's default admin user, `postgres`, is not in `userlist.txt`
+ * and can never authenticate at all).
+ */
+function adminConsoleUrl(): string {
+  const url = new URL(PGBOUNCER_URL);
+  url.pathname = "/pgbouncer";
+  return url.toString();
+}
+
+/**
+ * The admin console only speaks the SIMPLE query protocol — `postgres-js`'s default extended
+ * protocol (Parse/Bind/Execute, used even for a zero-parameter tagged-template query) gets back
+ * `extended query protocol not supported by admin console`. `.simple()` switches the query to
+ * simple mode; `fetch_types: false` skips postgres-js's own startup query for array-type OIDs,
+ * which would otherwise fail the same way before a single admin command is ever sent.
+ */
+function connectToAdminConsole() {
+  return postgres(adminConsoleUrl(), { prepare: false, fetch_types: false });
 }
 
 describe("the app against PgBouncer in transaction pooling mode", () => {
@@ -37,18 +61,34 @@ describe("the app against PgBouncer in transaction pooling mode", () => {
       const [row] = await db.select({ pid: sql<number>`pg_backend_pid()` }).from(sql`(select 1) as t`);
       pids.add(row!.pid);
     }
-    // Not an assertion about a specific number of backends — only that a client must not ASSUME
-    // one. If this ever reports exactly one pid across twenty statements, that is a sign the
-    // pooler is in session mode, which would silently re-enable the trap.
+    // NOT the load-bearing assertion for pool mode — a small local pool can coincidentally
+    // reuse one backend across many fast statements even in transaction mode, so a passing
+    // count here proves nothing on its own. It is kept only as a secondary signal (a real
+    // session-mode regression would make this exactly 1 as well). The next case asserts the
+    // pool mode directly.
     expect(pids.size).toBeGreaterThanOrEqual(1);
-    // `SHOW POOL_MODE` is a PgBouncer admin command, only answerable on its own `pgbouncer`
-    // admin database — confirmed empirically: `SHOW POOL_MODE` against the application
-    // database (commish_test, through this same connection) fails with `ERROR: unrecognized
-    // configuration parameter "pool_mode"`, because PgBouncer forwards unrecognized SHOW
-    // commands to the backend instead of answering them itself once it's not the admin db.
-    // The mode is verified instead by reading POOL_MODE out of `docker compose config` — see
-    // the verification step in docs/decisions/data-layer-hardening.md.
     await db.$client.end();
+  });
+
+  it("is configured as pool_mode transaction, verified against PgBouncer's own admin console", async () => {
+    // The direct assertion the previous case cannot make: PgBouncer's admin console (the
+    // virtual `pgbouncer` database) reports pool_mode for real, rather than inferring it from
+    // observed backend-pid behavior. Proven by mutation: flipping docker-compose.yml's
+    // `pgbouncer-test` service to `POOL_MODE: session` and recreating the container makes this
+    // assertion fail (`pool_mode: "session"`), while the previous case's loose
+    // `toBeGreaterThanOrEqual(1)` still passes — see fix-wave-report.md for the transcript.
+    const admin = connectToAdminConsole();
+    try {
+      const pools = await admin`SHOW POOLS`.simple();
+      const testDbUrl = new URL(PGBOUNCER_URL);
+      const targetDatabase = testDbUrl.pathname.replace(/^\//, "");
+      const pool = (pools as unknown as readonly { readonly database: string; readonly pool_mode: string }[]).find(
+        (row) => row.database === targetDatabase,
+      );
+      expect(pool?.pool_mode).toBe("transaction");
+    } finally {
+      await admin.end();
+    }
   });
 
   it("takes and releases the draft row lock entirely inside one transaction", async () => {

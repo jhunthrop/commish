@@ -67,9 +67,14 @@ export const leagues = pgTable(
      * PARTIAL, on purpose. `is_public_matchmade` is false for the overwhelming majority of
      * leagues (a league is private unless a commissioner opts in), and the only query that
      * reads this column reads `= true` and then orders by `created_at`. A partial index on
-     * `created_at` over just those rows is therefore both the smallest index that serves the
-     * query and one that supplies the sort order directly, so the browse `LIMIT` can stop
-     * early instead of sorting the qualifying set first.
+     * `created_at` over just those rows is therefore the smallest index that serves the
+     * `WHERE is_public_matchmade` filter without a sequential scan of `leagues`.
+     *
+     * It does NOT let the browse `LIMIT` stop early on its own: `browseQuery` groups by league
+     * (for the fill-count `HAVING`) before it orders, and the measured plan is
+     * `Limit -> Sort (top-N heapsort) -> HashAggregate -> ...` — the `HashAggregate` destroys
+     * whatever order the index scan produced, so `created_at` is re-sorted afterward regardless.
+     * The index's payoff is entirely the filter, verified in `src/db/index-plans.test.ts`.
      *
      * There is deliberately NO index on `commissioner_user_id`: every read of it fetches the
      * league by primary key and compares in application code (`src/lib/leagues/membership.ts`,

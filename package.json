@@ -16,7 +16,7 @@
     "stats:generate": "tsx scripts/gen-mock-dataset.ts",
     "stats:tank01:record": "dotenv -e .env.local -- tsx scripts/record-tank01-fixtures.ts",
     "db:generate": "dotenv -e .env.local -- drizzle-kit generate",
-    "db:migrate": "dotenv -e .env.local -- drizzle-kit migrate",
+    "db:migrate": "dotenv -e .env.local -v DATABASE_URL=postgres://commish:commish@localhost:5432/commish -- drizzle-kit migrate",
     "db:migrate:test": "dotenv -e .env.local -v DATABASE_URL=postgres://commish:commish@localhost:5433/commish_test -- drizzle-kit migrate",
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
     "seed": "dotenv -e .env.local -- tsx src/data/seed/index.ts",

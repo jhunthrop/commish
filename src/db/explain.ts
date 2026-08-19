@@ -4,6 +4,9 @@ import type { Db } from "./client";
 export interface PlanNode {
   readonly "Node Type": string;
   readonly "Relation Name"?: string;
+  readonly "Index Name"?: string;
+  /** Present only when a `Filter` clause discarded rows an index/scan condition did not exclude. */
+  readonly "Rows Removed by Filter"?: number;
   readonly Plans?: readonly PlanNode[];
 }
 
@@ -48,4 +51,20 @@ export function sequentiallyScannedRelations(plan: PlanNode): readonly string[] 
   };
   walk(plan);
   return found;
+}
+
+/**
+ * The first node anywhere in the plan whose `Index Name` matches, or `undefined` if the plan
+ * never touches that index. `not.toContain("chat_messages")` on `sequentiallyScannedRelations`
+ * only rules out a full-table scan; it passes just as well on an index scan over the WRONG index
+ * (e.g. the primary key, filtering rather than seeking) — this is the assertion that pins WHICH
+ * index the planner actually chose.
+ */
+export function indexScanNode(plan: PlanNode, indexName: string): PlanNode | undefined {
+  if (plan["Index Name"] === indexName) return plan;
+  for (const child of plan.Plans ?? []) {
+    const found = indexScanNode(child, indexName);
+    if (found !== undefined) return found;
+  }
+  return undefined;
 }

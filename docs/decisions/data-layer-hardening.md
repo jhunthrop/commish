@@ -55,6 +55,14 @@ in practice — at that point, re-run this diagnostic against real data before d
 join needs restructuring (e.g. filtering `teams` by the narrowed `leagues` set before the join)
 rather than assuming the fix is "add an index," since one already exists.
 
+**Plan D runbook note:** migrations `0011` (`leagues_public_browse_idx`, plain `CREATE INDEX`,
+takes a `SHARE` lock blocking writes to `leagues`) and `0012` (`player_stat_lines.sacks` widened
+to `real`, `ALTER COLUMN ... TYPE`, takes `ACCESS EXCLUSIVE` and rewrites the table) both run as
+written here. Safe at current and near-term table sizes, and there is no production database yet
+— but whoever runs these against a live table with real traffic should use `CREATE INDEX
+CONCURRENTLY` for `0011` and a batched backfill for `0012` instead of running the checked-in SQL
+verbatim.
+
 ## The balance-as-rollup convention
 
 **Rule.** Any running total in this product is maintained as a **rollup row, updated in the same
@@ -119,6 +127,12 @@ different backend between transactions, so **nothing may rely on session-scoped 
   direct connection as well as the pooled one, so a bug cannot hide behind a mode difference.
 - **No `SET` outside a transaction**, no session-scoped temporary tables, no `LISTEN`/`NOTIFY`.
   The last one costs nothing here: real-time is Redis Streams over SSE and always has been.
+- **No DDL through the pooler.** `npm run db:migrate` pins `DATABASE_URL` to the direct port
+  (`postgres://…@localhost:5432/commish`), the same way `db:migrate:test` already pins the
+  direct test port. `drizzle-kit migrate` opens its own connection, not `createDb`'s, so it never
+  gets `prepare: false` — and PgBouncer's transaction pooling is the wrong transport for schema
+  changes regardless: a migration's DDL can span multiple statements the pooler is free to spread
+  across different backends between them.
 
 Verification: `npm test -- src/db/pgbouncer`, plus the whole suite run through the pooler
 (`TEST_DATABASE_URL=postgres://commish:commish@localhost:6433/commish_test npm test`) as a

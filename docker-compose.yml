@@ -64,6 +64,11 @@ services:
       MAX_CLIENT_CONN: "500"
       DEFAULT_POOL_SIZE: "25"
       LISTEN_PORT: "6432"
+      # Grants the app's own user admin-console access (the virtual `pgbouncer` database, `SHOW
+      # POOLS`/`SHOW CONFIG`) instead of the image's default `postgres`, which is not in
+      # userlist.txt and so can never authenticate. src/db/pgbouncer.test.ts uses this to assert
+      # pool_mode directly rather than by inference.
+      ADMIN_USERS: commish
     ports:
       - "6432:6432"
     depends_on:
@@ -91,6 +96,8 @@ services:
       MAX_CLIENT_CONN: "500"
       DEFAULT_POOL_SIZE: "25"
       LISTEN_PORT: "6432"
+      # See the same key on the `pgbouncer` service above.
+      ADMIN_USERS: commish
     ports:
       - "6433:6432"
     depends_on:

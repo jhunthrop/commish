@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { asc, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
 import { chatMessages, draftActions, teams } from "./schema";
-import { explainPlan, sequentiallyScannedRelations } from "./explain";
+import { explainPlan, indexScanNode, sequentiallyScannedRelations } from "./explain";
 import { browseQuery } from "@/league-service/browse";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 
@@ -69,10 +69,11 @@ describe("hot read paths use indexes", () => {
 
   // `teams` is deliberately not asserted here: at this corpus size, the planner's genuine
   // cost-based choice is a sequential scan of `teams` hashed once against ~500 matching
-  // leagues, cheaper than ~1,500 individual index lookups even though `teams_league_id_idx`
-  // exists and is exercised elsewhere (see "a user's teams are found by index" below, and the
-  // narrowed browse test). See docs/decisions/data-layer-hardening.md for the
-  // `enable_seqscan = off` diagnostic that confirmed the index path exists at all.
+  // leagues, cheaper than ~1,500 individual index lookups. `teams_league_id_idx` — the index
+  // this join could use — is NOT exercised by any plan test in this file: "a user's teams are
+  // found by index" below covers a different index, `teams_user_id_idx`, via a different query
+  // (`WHERE user_id = ...`, no join). See docs/decisions/data-layer-hardening.md for the
+  // `enable_seqscan = off` diagnostic that confirmed the `teams_league_id_idx` path exists at all.
   it("public browse does not sequential-scan leagues", async () => {
     const plan = await explainPlan(db, browseQuery(db, EMPTY_BROWSE_FILTER));
     expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
@@ -98,7 +99,16 @@ describe("hot read paths use indexes", () => {
       .where(eq(chatMessages.leagueId, "lg7"))
       .orderBy(asc(chatMessages.id))
       .limit(50);
-    expect(sequentiallyScannedRelations(await explainPlan(db, query))).not.toContain("chat_messages");
+    const plan = await explainPlan(db, query);
+    expect(sequentiallyScannedRelations(plan)).not.toContain("chat_messages");
+    // Not enough on its own: dropping `chat_messages_league_id_idx` still avoids a Seq Scan by
+    // falling back to an Index Scan on the primary key, filtering out every other league's rows
+    // rather than seeking straight to this one's range — a ratio that grows with total chat
+    // volume. Pin the index by name, and confirm nothing was discarded by a Filter clause (the
+    // signature of exactly that pkey-scan-and-discard fallback).
+    const usedIndex = indexScanNode(plan, "chat_messages_league_id_idx");
+    expect(usedIndex).toBeDefined();
+    expect(usedIndex?.["Rows Removed by Filter"] ?? 0).toBe(0);
   });
 
   it("a draft's action log replays by index", async () => {
