@@ -22,7 +22,7 @@ export default defineConfig({
   test: {
     environment: "happy-dom",
     // Harness worktrees are nested checkouts — never collect their tests from the parent.
-    exclude: ["**/node_modules/**", "**/.claude/**", "**/.next/**"],
+    exclude: ["**/node_modules/**", "**/.claude/**", "**/.next/**", "e2e/**"],
     // Integration tests share one real Postgres/Redis and truncate between tests, so
     // test FILES must not interleave. Tests within a file already run sequentially.
     fileParallelism: false,
