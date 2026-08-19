@@ -111,11 +111,13 @@ describe("POST /api/leagues/[leagueId]/chat/[messageId]/reactions", () => {
     const messageId = posted.data.message.id;
     const context = { params: Promise.resolve({ leagueId: "l1", messageId }) };
 
+    // The wire carries the TRANSITION this call made, not a re-read of the whole set: the
+    // client folds it exactly as it folds a `chat.reaction` frame.
     const added = (await (await REACT(post({ emoji: "🔥" }), context)).json()) as ApiEnvelope<ReactionBody>;
-    expect(added).toEqual({ ok: true, data: { messageId, reactions: [{ emoji: "🔥", userId: "u1" }] } });
+    expect(added).toEqual({ ok: true, data: { messageId, action: "added" } });
 
     const removed = (await (await REACT(post({ emoji: "🔥" }), context)).json()) as ApiEnvelope<ReactionBody>;
-    expect(removed).toEqual({ ok: true, data: { messageId, reactions: [] } });
+    expect(removed).toEqual({ ok: true, data: { messageId, action: "removed" } });
   });
 
   it("rejects an emoji outside the league's set, naming the offending field", async () => {

@@ -179,17 +179,24 @@ export function useLeagueChat(leagueId: string): LeagueChat {
         });
         const envelope = (await response.json()) as ApiEnvelope<ReactionBody>;
         if (!envelope.ok) return { ok: false, reason: envelope.error };
+        // FOLDED, never replaced: the response says what this toggle did, and `applyReaction`
+        // applies it exactly as a `chat.reaction` frame would. Replacing the array with a
+        // server-side snapshot would erase a peer's reaction this browser had already folded in
+        // from a frame, and nothing would restore it until the next refresh.
         write(
-          messagesRef.current.map((message) =>
-            message.id === envelope.data.messageId ? { ...message, reactions: envelope.data.reactions } : message,
-          ),
+          applyReaction(messagesRef.current, {
+            messageId: envelope.data.messageId,
+            emoji,
+            userId: state.meUserId,
+            action: envelope.data.action,
+          }),
         );
         return { ok: true };
       } catch {
         return { ok: false, reason: SEND_ERROR };
       }
     },
-    [deps, leagueId, write],
+    [deps, leagueId, state.meUserId, write],
   );
 
   const loadEarlier = useCallback(async (): Promise<void> => {

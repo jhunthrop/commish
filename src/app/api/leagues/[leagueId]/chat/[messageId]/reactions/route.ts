@@ -38,6 +38,6 @@ export async function POST(request: Request, context: ChatMessageRouteContext) {
       publish: (input) => getPublisher().publish(input),
     });
     if (!result.ok) return fail(result.reason, result.status);
-    return ok<ReactionBody>({ messageId, reactions: result.reactions });
+    return ok<ReactionBody>({ messageId, action: result.action });
   });
 }

@@ -84,12 +84,40 @@ describe("useLeagueChat", () => {
     const { result } = renderHook(() => useLeagueChat("l1"), { wrapper: wrapper(fixture.deps) });
     await waitFor(() => expect(result.current.status).toBe("ready"));
 
-    fixture.response = { ok: true, data: { messageId: "1", reactions: [{ emoji: "🔥", userId: "u1" }] } };
+    fixture.response = { ok: true, data: { messageId: "1", action: "added" } };
     await act(async () => {
       await result.current.react("1", "🔥");
     });
     expect(fixture.calls).toContain("POST /api/leagues/l1/chat/1/reactions");
     expect(result.current.messages[0]?.reactions).toEqual([{ emoji: "🔥", userId: "u1" }]);
+  });
+
+  // The response used to carry the whole reaction array and this hook REPLACED the message's
+  // reactions with it, which made a transient server-side staleness durable: a peer's reaction
+  // already folded in from a chat.reaction frame was erased until the next refresh. The wire
+  // now carries the TRANSITION, and the client folds it by the same idempotent rule replay uses.
+  it("folds its own reaction in without clobbering a peer's", async () => {
+    const fixture = fixtureChatDeps();
+    const { result } = renderHook(() => useLeagueChat("l1"), { wrapper: wrapper(fixture.deps) });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    act(() => fixture.emit("chat.reaction", { messageId: "1", emoji: "😂", userId: "u2", action: "added" }));
+    await waitFor(() => expect(result.current.messages[0]?.reactions).toHaveLength(1));
+
+    fixture.response = { ok: true, data: { messageId: "1", action: "added" } };
+    await act(async () => {
+      await result.current.react("1", "🔥");
+    });
+    expect(result.current.messages[0]?.reactions).toEqual([
+      { emoji: "😂", userId: "u2" },
+      { emoji: "🔥", userId: "u1" },
+    ]);
+
+    fixture.response = { ok: true, data: { messageId: "1", action: "removed" } };
+    await act(async () => {
+      await result.current.react("1", "🔥");
+    });
+    expect(result.current.messages[0]?.reactions).toEqual([{ emoji: "😂", userId: "u2" }]);
   });
 
   it("prepends an earlier page and stops offering more when the history runs out", async () => {

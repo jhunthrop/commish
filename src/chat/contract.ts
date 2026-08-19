@@ -48,7 +48,16 @@ export interface PostChatBody {
   readonly message: ChatMessageView;
 }
 
+/**
+ * The TRANSITION a toggle made, not the resulting set.
+ *
+ * Returning the whole array would be returning a read taken after the write, which a
+ * concurrent reaction can already have moved on from — and the client, holding reactions
+ * folded from live frames, would make that momentary staleness durable by replacing its own
+ * state with it. An action is exactly what `applyReaction` needs, so the client's own toggle
+ * folds in by the same idempotent rule replay already uses.
+ */
 export interface ReactionBody {
   readonly messageId: string;
-  readonly reactions: readonly ChatReactionView[];
+  readonly action: "added" | "removed";
 }
