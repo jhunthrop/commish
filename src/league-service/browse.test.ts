@@ -1,4 +1,13 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+
+// Wraps the real `inArray` so the query still runs for real against Postgres — this only lets
+// the "scopes the team-count read" test below inspect what it was actually called with.
+vi.mock("drizzle-orm", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("drizzle-orm")>();
+  return { ...actual, inArray: vi.fn(actual.inArray) };
+});
+
+import { inArray } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, teams, users } from "@/db/schema";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
@@ -132,5 +141,25 @@ describe("listPublicLeagues", () => {
       });
     }
     expect(await listPublicLeagues(db, EMPTY_BROWSE_FILTER)).toHaveLength(MATCHMAKING_CONFIG.maxResults);
+  });
+
+  it("scopes the team-count read to the capped leagues, not every public league", async () => {
+    const total = MATCHMAKING_CONFIG.maxResults + 5;
+    for (let i = 0; i < total; i++) {
+      await seed({
+        id: `l${i}`, name: `Open League ${i}`, format: "snake", experienceTier: "beginner",
+        stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      });
+    }
+    vi.mocked(inArray).mockClear();
+
+    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(rows).toHaveLength(MATCHMAKING_CONFIG.maxResults);
+
+    // The team-count query's `inArray` must only ever see the ids the capped leagues query
+    // actually returned — never all `total` seeded leagues' worth.
+    expect(inArray).toHaveBeenCalledTimes(1);
+    const [, scopedIds] = vi.mocked(inArray).mock.calls[0]!;
+    expect(scopedIds).toHaveLength(MATCHMAKING_CONFIG.maxResults);
   });
 });

@@ -10,6 +10,13 @@ vi.mock("@/lib/auth/current-user", () => ({
   requireCurrentUser: vi.fn(),
 }));
 
+// Wraps the real implementation by default (every existing test below hits the real DB
+// through it unchanged); only the 500-boundary test overrides it for one call.
+vi.mock("@/league-service/browse", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/league-service/browse")>();
+  return { ...actual, listPublicLeagues: vi.fn(actual.listPublicLeagues) };
+});
+
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
@@ -18,7 +25,7 @@ import { GET as getLeague } from "@/app/api/leagues/[leagueId]/route";
 import { GET as getMatchups } from "@/app/api/leagues/[leagueId]/matchups/[week]/route";
 import { POST as postScore } from "@/app/api/leagues/[leagueId]/weeks/[week]/score/route";
 import { GET as browsePublic } from "@/app/api/public/leagues/route";
-import { PUBLIC_LEAGUE_FIELDS } from "@/league-service/browse";
+import { listPublicLeagues, PUBLIC_LEAGUE_FIELDS } from "@/league-service/browse";
 import { leagueHome, matchupWeek } from "./read";
 import { writeSchedule } from "./schedule";
 
@@ -231,5 +238,22 @@ describe("GET /api/public/leagues", () => {
     // A hand-edited URL naming a format we do not run is answered with the unfiltered list.
     const junk = await browsePublic(new Request("http://test/api/public/leagues?format=dynasty"));
     expect((await junk.json()).data.leagues).toHaveLength(2);
+  });
+
+  it("answers a generic 500 and never leaks the raw error — with no session read at all", async () => {
+    vi.mocked(listPublicLeagues).mockRejectedValueOnce(new Error("raw exception text that must never reach the client"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const response = await browsePublic(new Request("http://test/api/public/leagues"));
+      expect(response.status).toBe(500);
+      const body = await response.json();
+      expect(body).toEqual({ ok: false, error: "Something went wrong on our side. Please try again." });
+      expect(JSON.stringify(body)).not.toContain("raw exception text");
+      expect(consoleSpy).toHaveBeenCalled();
+      // The 500 boundary caught the throw before any identity check could even run.
+      expect(getCurrentUser).not.toHaveBeenCalled();
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 });

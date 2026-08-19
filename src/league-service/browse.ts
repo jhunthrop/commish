@@ -37,6 +37,13 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
  * scanning fifty open leagues must not cost fifty round trips. The format/tier narrowing runs
  * through the SAME pure `matchesBrowseFilter` the browse page's tests exercise, so the wire and
  * the rule cannot drift.
+ *
+ * The cap is a `LIMIT` on the FIRST query, not a `.slice()` after both have run: a `LIMIT`
+ * bounds what Postgres does the work of returning, and it bounds the second query too, because
+ * that query only ever reads the teams of leagues the first query actually returned — with the
+ * cap applied there, `ids` can never grow past `maxResults` regardless of how many public,
+ * joinable leagues exist. Filtering (open-seat, format/tier) still runs after both reads,
+ * against that already-bounded page, exactly as it did before.
  */
 export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<readonly PublicLeagueSummary[]> {
   const leagueRows = await db
@@ -51,7 +58,8 @@ export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<r
     .from(leagues)
     .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
     .where(and(eq(leagues.isPublicMatchmade, true), eq(drafts.status, "scheduled")))
-    .orderBy(asc(leagues.createdAt));
+    .orderBy(asc(leagues.createdAt))
+    .limit(MATCHMAKING_CONFIG.maxResults);
   if (leagueRows.length === 0) return [];
 
   const ids = leagueRows.map((row) => row.id);
@@ -61,6 +69,5 @@ export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<r
 
   return leagueRows
     .map((row): PublicLeagueSummary => ({ ...row, filledTeams: filledByLeague.get(row.id) ?? 0 }))
-    .filter((league) => hasOpenSeat(league) && matchesBrowseFilter(league, filter))
-    .slice(0, MATCHMAKING_CONFIG.maxResults);
+    .filter((league) => hasOpenSeat(league) && matchesBrowseFilter(league, filter));
 }
