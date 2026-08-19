@@ -211,14 +211,62 @@ Every `/api/leagues/**` and `/api/invites/**` route goes through `src/app/api/le
 | `POST /api/leagues/[leagueId]/chat/[messageId]/reactions` | same | Body: `{ emoji }` from `CHAT_CONFIG.reactions`. One verb toggles both directions. |
 | `POST /api/leagues/[leagueId]/advisor/start-sit` | a manager with a team in the league | Body: `{ weekNumber, question }`. Answers advice. Writes nothing. |
 | `POST /api/leagues/[leagueId]/advisor/trade` | a manager with a team in the league | Body: `{ weekNumber, counterpartyTeamId, give, receive }`. Assesses a proposal. Never executes one. |
+| `GET /api/public/leagues` | **anyone, signed in or not** | `?format=&experienceTier=&stakeTier=`. Open, publicly listed, pre-draft leagues only, projected to `PublicLeagueSummary`. The one unauthenticated read in the app. |
+| `POST /api/public/leagues/[leagueId]/join` | any signed-in user | Seats the caller in an open public league. 403 if the league is not listed, 409 if its draft started or it is full. Re-joining is a 200. |
+
+## Public matchmaking
+
+Two ways into a league, one core. An **invite** is the private path (`acceptInvite`); **public
+browse** is the open one (`joinPublicLeague`). Both call `joinLeagueInTx`
+(`src/league-service/join.ts`), which takes the league row `FOR UPDATE` before counting teams
+and inserts inside the caller's transaction. Two independently-written capacity checks are two
+places the same league's fill count can disagree, and the disagreement only ever shows up as a
+13th team in a 12-team league. Each path's own rules (an invite's expiry and use cap; a public
+league's listing and draft status) run through a `JoinPrecondition` hook that fires only for a
+caller who is **not** already a member, which is what keeps re-arriving free on both paths.
+
+**The privacy boundary.** `GET /api/public/leagues` is the one unauthenticated read in this
+application. What a stranger may learn is `PublicLeagueSummary` (`src/matchmaking/contract.ts`)
+and nothing else: id, name, format, experience tier, stake tier, team count, filled count. No
+commissioner identity, no team or owner names, no invite code, no draft id, no standings, no
+rosters, no chat, no scoring settings. Three things enforce it: `is_public_matchmade` is opt-in
+and false by default, `listPublicLeagues` selects exactly the contract's columns, and a key-set
+test fails if the wire body ever grows a field the contract does not name. A league that is
+full, or whose draft has already started, is not listed at all: a card a visitor cannot act on
+is a dead end wearing a badge.
+
+**Filtering** is `User.experienceTier`, `League.format` and `League.stakeTier`, normalized by
+`normalizeBrowseFilter`, the pure function that turns a query string into a `BrowseFilter`.
+Unknown values (`?format=dynasty`) normalize to "any" rather than erroring, because browse is
+reached by hand-edited URLs and stale bookmarks and the honest answer is the list we can offer.
+Only `'snake' | 'auction'` are offered, because those are the two formats the draft engine
+runs. `leagues.experience_tier` is a **league-level** column rather than a read of the
+commissioner's own profile: deriving it from a person would leak that person into an
+unauthenticated read and would silently re-tier every league they run whenever they edited
+their profile.
+
+**Stake tier is cosmetic.** No entry fee is charged, no prize is paid and no balance exists
+anywhere in Phase 1. `MATCHMAKING_CONFIG.stakeDisclosure` is the one wording of that promise,
+rendered on the create form beside the tier control and on the browse page beside the cards.
+Real money arrives in a later phase behind FBO/agent-of-payee handling, KYC/AML screening and
+tax reporting.
+
+**Signed in changes the button, not the list.** `GET /browse` itself needs no session (the
+whole point is that a stranger can see what is on offer before creating an account), but joining
+does. `PublicLeagueList` (`src/league-room/components/public-league-list.tsx`) renders every
+card from the same `PublicLeagueSummary` rows either way; only the call to action differs. A
+signed-in visitor gets the real `JoinPublicLeagueButton`. A signed-out one gets a plain "Sign in
+to join" link to `/sign-in`, so the page never shows a button whose press would just bounce off
+a 401. The two states are two different pieces of markup, not one button with a client-side
+guard in front of it.
 
 ## Known follow-ups
 
-- **A browser end-to-end pass over the league flows** — deferred for exactly the reasons
-  `docs/draft-room.md` already records for the draft room: Playwright is not yet a project
-  dependency, and the sign-in flow is hosted by WorkOS and needs test-tenant credentials that
-  don't exist at plan time. Create → invite → join → draft → score → standings is the flow
-  such a suite would cover first.
+- **No UI starts a draft.** `POST /api/drafts/[draftId]/start` exists and is commissioner-gated,
+  but nothing in the draft room calls it. The seeded dev drafts are driven by
+  `scripts/drive-dev-draft.ts`, and `e2e/league-lifecycle.spec.ts` posts the route directly with
+  its real session. A commissioner using the product has no button. That is a real gap, not a
+  test-harness convenience, and it belongs in the next phase's scope.
 - **Playoff brackets and a championship.** `clinchedTeamIds` names who is in; nothing in Phase 1
   plays a postseason. A bracket needs seeding rules, a tiebreak policy and a bye structure that
   no spec step has defined yet.

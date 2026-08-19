@@ -57,6 +57,13 @@ src/
                           components (components/), the fetchJson deps seam (hooks/), and
                           id→display-name formatting (lib/format.ts). Imports from
                           league/league-service are TYPE-ONLY — no league rule runs in React.
+  matchmaking/            Pure public-matchmaking rules: the browse filter, the cosmetic stake
+                          tiers, and PublicLeagueSummary, the field-by-field privacy boundary of
+                          the app's ONE unauthenticated league read. NO I/O. 100% coverage.
+                          Browser-safe, so src/league-room/** value-imports it directly, the
+                          same way src/chat-room/** value-imports @/chat.
+  integration/            Cross-module proofs: a real draft, run through the real store, into
+                          real standings, chat, advisor and browse reads. Test-only.
   chat/                   Pure chat fold + wire contract + CHAT_CONFIG. NO I/O. 100% coverage.
   chat-service/           Chat read/write service over Postgres: postMessage, paginated
                           listMessages, toggleReaction, each publishing on the league stream.
@@ -99,6 +106,7 @@ src/
 drizzle/                  generated SQL migrations (committed)
 docs/                     conventions.md (this), design-system.md, draft-engine.md, draft-room.md,
                           draft-moderator.md, league.md, research/
+e2e/                      Playwright specs plus the sealed-session global setup (see README).
 plans/                    the phase blueprints
 ```
 
@@ -167,6 +175,13 @@ pure, I/O-free, browser-safe fold code (`mergeMessages`, `applyReaction`, `CHAT_
 shared. `@/chat-service` is not imported by `src/chat-room/**` at all (type or value); chat's
 service layer is reached only over the wire, the same as every other service module above.
 
+`src/matchmaking/**` is exempt for the same reason as `src/chat/**`: it is pure, I/O-free,
+browser-safe rule code (`normalizeBrowseFilter`, `matchesBrowseFilter`, `stakeTierLabel`,
+`MATCHMAKING_CONFIG`), so `src/league-room/**` value-imports it directly. Its Postgres half
+lives in `src/league-service/browse.ts`, which the existing `@/league-service` ban already
+covers. There is no `@/matchmaking-service`, because a second service directory for one query
+would be a boundary to maintain rather than a boundary to enforce.
+
 The rule is deliberately **not** applied to `src/app/**`: pages and layouts there are Next.js
 Server Components (`page.tsx`, `layout.tsx`) and route handlers (`route.ts`), which are
 allowed — and already do, in this codebase's existing draft and league routes — import
@@ -188,7 +203,8 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**` and `src/chat/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%). Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**` and `src/matchmaking/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%). Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 
 ### Migrations
