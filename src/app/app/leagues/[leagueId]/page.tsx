@@ -3,6 +3,7 @@ import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { leagueHome, lineupView } from "@/league-service";
 import { LeagueHome } from "@/league-room/components/league-home";
+import { AppHeader } from "@/components/app-shell/app-header";
 
 export const dynamic = "force-dynamic";
 
@@ -28,5 +29,10 @@ export default async function LeaguePage({ params }: PageProps) {
       ? null
       : await lineupView(getDb(), { leagueId, teamId: home.myTeamId, weekNumber: home.currentWeek });
 
-  return <LeagueHome home={home} lineup={lineup} />;
+  return (
+    <>
+      <AppHeader displayName={user.displayName} />
+      <LeagueHome home={home} lineup={lineup} />
+    </>
+  );
 }
