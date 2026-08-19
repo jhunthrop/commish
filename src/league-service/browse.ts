@@ -1,9 +1,8 @@
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, sql, type SQL } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
-import { hasOpenSeat, matchesBrowseFilter } from "@/matchmaking/filter";
 
 /**
  * The disclosure allowlist, in one place. Exported so the tests and the route assert against
@@ -20,6 +19,20 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
 ];
 
 /**
+ * Turns a normalized filter into the narrowing predicates the query applies. `undefined` for a
+ * field means "any", and Drizzle's `and()` drops `undefined` operands, so an unnarrowed browse
+ * produces exactly the two mandatory predicates and nothing else.
+ */
+function narrowingFor(filter: BrowseFilter): readonly (SQL | undefined)[] {
+  const ANY = MATCHMAKING_CONFIG.anyValue;
+  return [
+    filter.format === ANY ? undefined : eq(leagues.format, filter.format),
+    filter.experienceTier === ANY ? undefined : eq(leagues.experienceTier, filter.experienceTier),
+    filter.stakeTier === ANY ? undefined : eq(leagues.stakeTier, filter.stakeTier),
+  ];
+}
+
+/**
  * The ONE unauthenticated league read in this application.
  *
  * Three things make it safe, and all three are here rather than spread over a route and a
@@ -33,22 +46,26 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
  * 3. **Joinable or nothing.** A full league, or one whose draft has already started, is not a
  *    thing a stranger can act on, and listing it would be a card that only leads to a refusal.
  *
- * Two queries, not one per league: a league's fill count is a `teams` tally, and a manager
- * scanning fifty open leagues must not cost fifty round trips. The format/tier narrowing runs
- * through the SAME pure `matchesBrowseFilter` the browse page's tests exercise, so the wire and
- * the rule cannot drift.
+ * ONE query, not two: a league's fill count is a grouped `count(teams.id)`, and the open-seat
+ * rule is a `HAVING` predicate rather than a JS filter over an already-capped page. That
+ * ordering is the correctness property — every narrowing (format, experience tier, stake tier,
+ * open seat) is applied BEFORE the `LIMIT`, so a filtered browse returns every match the
+ * database holds up to the cap, never an under-filled page because the cap ate the candidates
+ * first. That was a real defect in the previous two-query form, documented there as a known
+ * tradeoff and closed here.
  *
- * The cap is a `LIMIT` on the FIRST query, not a `.slice()` after both have run: a `LIMIT`
- * bounds what Postgres does the work of returning, and it bounds the second query too, because
- * that query only ever reads the teams of leagues the first query actually returned — with the
- * cap applied there, `ids` can never grow past `maxResults` regardless of how many public,
- * joinable leagues exist. KNOWN TRADEOFF: the open-seat/format/tier filters run in JS against
- * that already-capped page, so once more than `maxResults` public leagues exist, a filtered
- * browse can return fewer matches than the database holds. Unreachable at this phase's scale;
- * the end-state fix is pushing the filters into the SQL itself (tracked for the final review).
+ * `matchesBrowseFilter`/`hasOpenSeat` in `src/matchmaking/filter.ts` remain the product's
+ * canonical, 100%-covered statement of the same rule, and `browse.test.ts` runs every one of
+ * the 3 x 3 x 5 filter combinations through BOTH this query and that pure rule over one seeded
+ * corpus, demanding identical answers. Two expressions of one rule is how a drift starts; that
+ * test is what makes a drift a failing build.
+ *
+ * Exported as a builder, not just run inline, so `src/db/index-plans.test.ts` can `EXPLAIN`
+ * exactly what production runs rather than a hand-copied lookalike that could drift into being
+ * fast while the real one is slow.
  */
-export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<readonly PublicLeagueSummary[]> {
-  const leagueRows = await db
+export function browseQuery(db: Db, filter: BrowseFilter) {
+  return db
     .select({
       id: leagues.id,
       name: leagues.name,
@@ -56,20 +73,18 @@ export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<r
       experienceTier: leagues.experienceTier,
       stakeTier: leagues.stakeTier,
       teamCount: leagues.teamCount,
+      filledTeams: sql<number>`count(${teams.id})::int`,
     })
     .from(leagues)
     .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
-    .where(and(eq(leagues.isPublicMatchmade, true), eq(drafts.status, "scheduled")))
+    .leftJoin(teams, eq(teams.leagueId, leagues.id))
+    .where(and(eq(leagues.isPublicMatchmade, true), eq(drafts.status, "scheduled"), ...narrowingFor(filter)))
+    .groupBy(leagues.id)
+    .having(sql`count(${teams.id}) < ${leagues.teamCount}`)
     .orderBy(asc(leagues.createdAt))
     .limit(MATCHMAKING_CONFIG.maxResults);
-  if (leagueRows.length === 0) return [];
+}
 
-  const ids = leagueRows.map((row) => row.id);
-  const teamRows = await db.select({ leagueId: teams.leagueId }).from(teams).where(inArray(teams.leagueId, ids));
-  const filledByLeague = new Map<string, number>();
-  for (const row of teamRows) filledByLeague.set(row.leagueId, (filledByLeague.get(row.leagueId) ?? 0) + 1);
-
-  return leagueRows
-    .map((row): PublicLeagueSummary => ({ ...row, filledTeams: filledByLeague.get(row.id) ?? 0 }))
-    .filter((league) => hasOpenSeat(league) && matchesBrowseFilter(league, filter));
+export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<readonly PublicLeagueSummary[]> {
+  return browseQuery(db, filter);
 }

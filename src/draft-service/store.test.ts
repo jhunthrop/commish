@@ -31,6 +31,28 @@ function newStore(publishFn: PublishFn = publish) {
 }
 
 /**
+ * A `Db` proxy that counts every `.select(...)` call made through it, so a test can tell a
+ * cache hit (one `MAX(sequence)` probe) apart from a full replay (config + action-row selects
+ * on top of that probe) without reaching into `store.ts` internals.
+ */
+function countingDb(base: Db): { db: Db; selectCount: () => number } {
+  let selects = 0;
+  const proxy = new Proxy(base, {
+    get(target, prop, receiver) {
+      const value: unknown = Reflect.get(target, prop, receiver);
+      if (prop === "select" && typeof value === "function") {
+        return (...args: unknown[]) => {
+          selects += 1;
+          return (value as (...a: unknown[]) => unknown).apply(target, args);
+        };
+      }
+      return value;
+    },
+  }) as Db;
+  return { db: proxy, selectCount: () => selects };
+}
+
+/**
  * A `Db` whose `transaction(...)` always rejects with a connection-style error rather than a
  * Postgres unique violation — the store's non-race failure path, distinct from the
  * (draft_id, sequence) backstop exercised elsewhere. `applyAction` does its append inside
@@ -192,13 +214,13 @@ describe("draft store — concurrency", () => {
     expect(await actionRows(draftId)).toHaveLength(2);
   });
 
-  it("stops a double append at the database when two independent stores race", async () => {
+  it("lets exactly one of two independent stores' picks through, in-process lock or not", async () => {
     const { draftId, teamIds } = await fixture();
     const storeA = newStore();
     const storeB = newStore();
     await storeA.applyAction(draftId, start(teamIds));
-    // Warm B's cache so both stores believe the next sequence is 2 — the in-process lock
-    // can't help across processes; the unique index is what must stop this.
+    // Warm B's cache to sequence 1 — the in-process lock can't help across processes, so
+    // something else has to stop a double append.
     await storeB.getDraftState(draftId);
     const results = await Promise.all([
       storeA.applyAction(draftId, pick(teamIds[0]!, "qb1")),
@@ -206,11 +228,103 @@ describe("draft store — concurrency", () => {
     ]);
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     const loser = results.find((r) => !r.ok);
-    expect(loser).toEqual({ ok: false, reason: "Someone else acted first. Try again." });
+    // Which mechanism catches the loser is a timing race, not a contract: if B's freshness
+    // probe (Task 6) runs before A's write commits, both still see sequence 1 and race the
+    // insert, so the database's unique index on (draft_id, sequence) is what stops the
+    // double append — the loser gets "Someone else acted first." If B's probe instead runs
+    // AFTER A's commit, B self-heals by replaying A's pick before it ever attempts its own
+    // write, and is rejected by ordinary game rules instead — "It's not your turn to pick."
+    // Either way exactly one pick lands; only the *reason* the loser sees is nondeterministic.
+    // (Empirically this always lands on the second path, because the probe query gives A's
+    // already-scheduled write enough of a head start to commit first — but nothing here
+    // guarantees that, so the assertion accepts both.)
+    expect(["Someone else acted first. Try again.", "It's not your turn to pick."]).toContain(
+      loser && !loser.ok ? loser.reason : undefined,
+    );
     expect(await actionRows(draftId)).toHaveLength(2);
     // One event for START_DRAFT plus one for the winning pick — the loser's rejected
     // write never reaches `broadcast`, so it contributes nothing.
     expect(published).toHaveLength(2);
+  });
+});
+
+describe("draft store — sequence conflict (defensive backstop)", () => {
+  it("translates a raw unique-index violation into the friendly rejection, not a driver error", async () => {
+    const { draftId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+
+    // A genuine LIVE Postgres race on `draft_actions` can no longer be constructed here, and
+    // that is Task 7 working as designed, not a gap: `draft_actions.draft_id` REFERENCES
+    // `drafts.id`, so ANY insert into `draft_actions` for this draft first needs a lock on
+    // that exact `drafts` row — the same row `applyAction`'s transaction now holds
+    // `FOR UPDATE` for its entire duration. A second writer's insert therefore queues behind
+    // that lock instead of racing it (confirmed empirically: attempting to race one in via a
+    // proxied `tx.insert` deadlocked the test at the client level, because the second insert
+    // blocked on the FK's implicit lock while the locked transaction sat waiting on that very
+    // insert to return). So the only writer left who could ever trip this catch branch in real
+    // operation is something that bypasses `draft_actions`'s own foreign key entirely — nothing
+    // in this codebase does — which is exactly what the docblock in `store.ts` now says. This
+    // test exercises the translation directly with the real driver-error shape
+    // (`db/errors.ts`'s documented `.cause.code` / `.cause.constraint_name`) instead.
+    const driverError = Object.assign(
+      new Error('duplicate key value violates unique constraint "draft_actions_draft_sequence_idx"'),
+      { cause: { code: "23505", constraint_name: "draft_actions_draft_sequence_idx" } },
+    );
+    const brokenDb = new Proxy(db, {
+      get(target, prop, receiver) {
+        if (prop === "transaction") return () => Promise.reject(driverError);
+        return Reflect.get(target, prop, receiver);
+      },
+    }) as Db;
+    const brokenStore = createDraftStore({ db: brokenDb, publish, clock });
+
+    const result = await brokenStore.applyAction(draftId, pick(teamIds[0]!, "qb1"));
+    expect(result).toEqual({ ok: false, reason: "Someone else acted first. Try again." });
+    expect(isSequenceConflict(driverError)).toBe(true);
+  });
+});
+
+describe("draft store — cache freshness", () => {
+  it("serves the cache on a hit instead of replaying the log, and replays on a miss", async () => {
+    const { draftId, teamIds } = await fixture();
+    const counting = countingDb(db);
+    const store = createDraftStore({ db: counting.db, publish, clock });
+    await store.applyAction(draftId, start(teamIds)); // `applyAction` already sets the cache
+
+    const beforeHit = counting.selectCount();
+    await store.getDraftState(draftId);
+    // A cache hit costs exactly one indexed `MAX(sequence)` probe — not the config + action-row
+    // selects a full replay would also need.
+    const hitSelects = counting.selectCount() - beforeHit;
+    expect(hitSelects).toBe(1);
+
+    // Force a genuine miss: drop the cache and read again — this must fall through to a full
+    // replay (the probe is skipped entirely because there's nothing cached to validate).
+    store.invalidate(draftId);
+    const beforeMiss = counting.selectCount();
+    await store.getDraftState(draftId);
+    const missSelects = counting.selectCount() - beforeMiss;
+    expect(missSelects).toBeGreaterThan(hitSelects);
+  });
+
+  it("treats a cache entry for a never-started draft (sequence 0) as fresh, not perpetually stale", async () => {
+    const { draftId } = await fixture(); // scheduled, no actions — an empty log
+    const counting = countingDb(db);
+    const store = createDraftStore({ db: counting.db, publish, clock });
+    const first = await store.getDraftState(draftId);
+    expect(first?.sequence).toBe(0);
+
+    // `MAX(sequence)` over a draft with zero action rows still returns one row from Postgres,
+    // with `latest: null` — not zero rows. `latestActionSequence`'s `row?.latest ?? 0` is what
+    // turns that into `0`, matching a fresh cache's `sequence: 0`. Without that fallback this
+    // read would see `null !== 0`, treat every hit on an unstarted draft as stale, and force a
+    // full replay on every single read of it — so assert the same one-select cache-hit cost
+    // proven above, not just that the returned value happens to match.
+    const beforeHit = counting.selectCount();
+    const second = await store.getDraftState(draftId);
+    expect(second).toEqual(first);
+    expect(counting.selectCount() - beforeHit).toBe(1);
   });
 });
 

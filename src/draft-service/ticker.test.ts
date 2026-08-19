@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions, players } from "@/db/schema";
+import { players } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "./store";
@@ -74,24 +74,18 @@ describe("draft ticker", () => {
     expect(await ticker.tick()).toEqual([{ draftId: fixture.draftId, applied: true }]);
   });
 
-  it("reports applied:false with the store's own rejection reason when applyAction is rejected", async () => {
-    const { ticker, store, fixture } = await liveDraft();
-    now = "2026-09-01T09:00:00.000Z"; // past the deadline
-    const state = await store.getDraftState(fixture.draftId); // warms the ticker's shared store cache
-    // Sabotage the log: insert a row at the sequence number the ticker's own applyAction
-    // call will try to use next, so the store's optimistic-concurrency check rejects it —
-    // exercising the real "reducer rejected" branch, not a thrown exception.
-    await db.insert(draftActions).values({
-      draftId: fixture.draftId,
-      sequence: state!.sequence + 1,
-      action: { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: now },
-      timestamp: new Date(now),
-    });
-
-    expect(await ticker.tick()).toEqual([
-      { draftId: fixture.draftId, applied: false, reason: "Someone else acted first. Try again." },
-    ]);
-  });
+  // A real "applyAction rejected" outcome reaching `ticker.tick()` is covered two ways
+  // elsewhere, and a third test here would just restate one of them under a spy:
+  //   - "draft ticker — R-B4 store-level regression" below proves the actual rejection this
+  //     scenario produces — a real concurrent pick racing a now-stale TIMER_EXPIRE — comes back
+  //     as `{ ok: false, reason: "The clock hasn't run out yet." }` from `store.applyAction`
+  //     itself (Task 6's freshness check is what makes a raw out-of-band DB insert no longer
+  //     enough to force that path — see the comment there).
+  //   - "draft ticker — onOutcome logging (I5)" below proves `tickOne`'s own plumbing: given
+  //     ANY `{ ok: false, reason }` from `store.applyAction`, `tick()` surfaces exactly
+  //     `{ draftId, applied: false, reason }` in its result and to `onOutcome`.
+  // Together those cover both halves (the rejection reason is real; the ticker forwards it
+  // faithfully) without re-deriving the race through a `getDraftState` spy here too.
 
   // P3 (controller ruling): the brief's version of this test ended in `expect(true).toBe(true)`,
   // which asserts nothing. Replaced with real assertions on the native timer plumbing: start()

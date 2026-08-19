@@ -200,10 +200,19 @@ from it, and the store's in-memory map is only a materialization — dropping it
 
 Two guards stop a double append:
 
-1. **The per-draft mutex** (`createKeyedMutex`, Phase 1 only): an in-process, per-key promise
-   chain that serializes `getDraftState`/`applyAction`/`commitDraftResults` calls for the same
-   draft id. It is *not reentrant* — no method may call another store method while already
-   holding it. Phase 2 (multi-instance) replaces this with a Postgres advisory lock.
+1. **The per-draft mutex** (`createKeyedMutex`): an in-process, per-key promise chain that
+   serializes `getDraftState`/`applyAction`/`commitDraftResults` calls for the same draft id.
+   It is *not reentrant* — no method may call another store method while already holding it.
+   Single-process only: it stays in place as an intra-process fast path even once more than one
+   instance runs (below), but the write path's cross-instance safety comes from a
+   `SELECT ... FOR UPDATE` transaction lock on the draft's own row, not this mutex and
+   deliberately not a Postgres advisory lock — see `mutex.ts`'s docblock for why
+   (`pg_advisory_lock` is session-scoped, and this app reaches Postgres through PgBouncer in
+   transaction pooling mode, where a session isn't a stable thing to hold anything on).
+   `src/draft-service/locking.test.ts` is the two-instance proof: two independent app instances,
+   each its own connection pool and its own in-process mutex, submit simultaneous conflicting
+   actions against the same draft, and the test asserts exactly one is accepted and the log for
+   that draft is left fully consistent.
 2. **The unique index on `(draft_id, sequence)`** (`draft_actions_draft_sequence_idx`) is the
    real backstop: even if the in-process lock is bypassed (a second instance, a bug), two
    writers racing to insert the same `(draftId, sequence)` collide at the database, and
@@ -216,33 +225,41 @@ Two guards stop a double append:
 
 A bug in the mutex therefore costs a retry, never a duplicated pick.
 
-### Multi-instance considerations (Phase 2)
+### Multi-instance considerations (Phase 2 Plan A)
 
-Three things change once more than one process runs this service, none of which are handled
-yet — noted here so Phase 2 doesn't have to rediscover them:
+Three things change once more than one process runs this service. Two are already fixed (Tasks
+6 and 7); the third is still open, noted here so a later task doesn't have to rediscover it:
 
-- **`lock_timeout`.** Today the per-draft mutex above is usually what keeps two writers from
-  even reaching the database at the same moment. Once a Postgres advisory lock replaces it (see
-  above), a second writer's `INSERT` can block for the full duration of the first writer's
-  transaction — including `commitDraftState`'s multi-table commit on the completing action.
-  Phase 2 should set a `lock_timeout` on that acquisition so a stuck or slow instance fails fast
-  with a retryable error instead of hanging every other writer for that draft.
-- **The per-process cache under multiple instances.** `cache` in `store.ts` is scoped to one
-  process. A WRITER on a stale instance self-heals: its `INSERT` loses the unique-index race,
-  `isSequenceConflict` fires, the stale cache entry is dropped, and the caller sees "Someone
-  else acted first. Try again." A READER on a stale instance has no such signal —
-  `getDraftState` happily serves a frozen board forever, since nothing tells it another
-  instance moved the draft forward. Recommended fix: have every instance subscribe to the
-  league streams of drafts it has cached and call `invalidate(draftId)` on any `draft.*` event,
-  rather than trusting the cache until the next write it personally makes.
+- **The per-process cache under multiple instances — fixed (Task 6).** `cache` in `store.ts` is
+  scoped to one process, so a second instance's write used to be invisible to the first
+  forever: a WRITER on a stale instance self-healed (its `INSERT` lost the unique-index race,
+  `isSequenceConflict` fired, the stale entry was dropped, and the caller saw "Someone else
+  acted first. Try again."), but a READER on a stale instance had no such signal —
+  `getDraftState` would happily serve a frozen board forever, since nothing told it another
+  instance had moved the draft forward. Fixed by making the cache validate itself instead of
+  trusting itself: `latestActionSequence(db, draftId)` is one indexed
+  `MAX(draft_actions.sequence)` query, and a cache hit is only served when it equals the cached
+  state's own `sequence`; a mismatch drops the entry and the read replays from the log. One
+  extra indexed read on every cache hit, not a full replay, and it protects readers and writers
+  alike — a writer's own `load()` goes through the same check before computing what to append.
+- **`lock_timeout` — still open.** The `SELECT ... FOR UPDATE` row lock above has landed (Task
+  7) and now owns cross-instance write safety; the per-draft mutex is what usually keeps two
+  writers in the *same* process from even reaching the database at the same moment. Across
+  instances, though, a second writer's `INSERT` can still block for the full duration of the
+  first writer's transaction — including `commitDraftState`'s multi-table commit on the
+  completing action — because no `lock_timeout` is set on the lock acquisition. A future task
+  should add one so a stuck or slow instance fails fast with a retryable error instead of
+  hanging every other writer for that draft.
 - **N instances means N tickers.** Every instance that calls `getDraftTicker()` runs its own
   `setInterval` scan of `drafts` with `status = 'in_progress'`. This is harmless
   correctness-wise — R-B4 plus the `(draft_id, sequence)` unique index mean at most one
   instance's `TIMER_EXPIRE` ever lands — but it's `N`× the redundant scanning and `N`× the
   rejected-write noise (the ticker's `onOutcome` rate-limits its own logging per draft, but
-  doesn't reduce the underlying write attempts). Phase 2 should elect a single ticker via a
-  Postgres advisory lock (one instance holds it for the ticker role and actually ticks; the
-  rest skip their interval) rather than accept the redundancy indefinitely.
+  doesn't reduce the underlying write attempts). A future phase should elect a single ticker
+  some other way; a session-scoped Postgres advisory lock has the same PgBouncer transaction-
+  pooling problem here as it does for the write path above, so whatever replaces this needs to
+  be transaction-scoped or backed by a row (e.g. a lease row a ticker instance holds and
+  periodically renews) rather than a session-scoped lock.
 
 ## The auto-commit-on-completion seam
 

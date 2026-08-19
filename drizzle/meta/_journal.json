@@ -78,6 +78,20 @@
       "when": 1787115974434,
       "tag": "0010_public_northstar",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1787122877888,
+      "tag": "0011_deep_nocturne",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1787143029165,
+      "tag": "0012_talented_cerise",
+      "breakpoints": true
     }
   ]
 }

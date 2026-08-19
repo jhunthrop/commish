@@ -1,0 +1,61 @@
+{
+  "gameID": "20260913_SF@SEA",
+  "playerStats": {
+    "10001": {
+      "playerID": "10001",
+      "longName": "Derek Sanders",
+      "team": "SF",
+      "teamID": "28",
+      "Passing": { "passAttempts": "31", "passCompletions": "19", "passYds": "224", "passTD": "2", "int": "1" },
+      "Rushing": { "carries": "3", "rushYds": "9", "rushTD": "0" },
+      "Defense": { "fumblesLost": "1", "totalTackles": "0" }
+    },
+    "10002": {
+      "playerID": "10002",
+      "longName": "Cody Marsh",
+      "team": "SF",
+      "teamID": "28",
+      "Rushing": { "carries": "18", "rushYds": "87", "rushTD": "1" },
+      "Receiving": { "receptions": "3", "targets": "4", "recYds": "22", "recTD": "0" }
+    },
+    "10003": {
+      "playerID": "10003",
+      "longName": "Trevon Blake",
+      "team": "SF",
+      "teamID": "28",
+      "Receiving": { "receptions": "6", "targets": "9", "recYds": "78", "recTD": "1" }
+    },
+    "10004": {
+      "playerID": "10004",
+      "longName": "Antoine Reyes",
+      "team": "SEA",
+      "teamID": "29",
+      "Receiving": { "receptions": "7", "targets": "10", "recYds": "101", "recTD": "1" }
+    },
+    "10005": {
+      "playerID": "10005",
+      "longName": "Colton Vance",
+      "team": "SEA",
+      "teamID": "29",
+      "Receiving": { "receptions": "4", "targets": "5", "recYds": "39", "recTD": "0" }
+    },
+    "10006": {
+      "playerID": "10006",
+      "longName": "Milo Hartt",
+      "team": "SEA",
+      "teamID": "29",
+      "Kicking": { "fgMade": "2", "fgAttempts": "3", "xpMade": "3" }
+    },
+    "10024": {
+      "playerID": "10024",
+      "longName": "Marcus Dill",
+      "team": "SEA",
+      "teamID": "29",
+      "Defense": { "totalTackles": "9", "sacks": "1.0", "fumblesLost": "0" }
+    }
+  },
+  "DST": {
+    "away": { "teamAbv": "SF", "teamID": "28", "defTD": "1", "defensiveInterceptions": "1", "sacks": "3.0", "ptsAllowed": "20" },
+    "home": { "teamAbv": "SEA", "teamID": "29", "defTD": "0", "defensiveInterceptions": "2", "sacks": "2.5", "ptsAllowed": "24" }
+  }
+}

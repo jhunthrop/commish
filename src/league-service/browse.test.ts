@@ -1,17 +1,10 @@
-import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
-
-// Wraps the real `inArray` so the query still runs for real against Postgres — this only lets
-// the "scopes the team-count read" test below inspect what it was actually called with.
-vi.mock("drizzle-orm", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("drizzle-orm")>();
-  return { ...actual, inArray: vi.fn(actual.inArray) };
-});
-
-import { inArray } from "drizzle-orm";
+import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, teams, users } from "@/db/schema";
-import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
+import { EMPTY_BROWSE_FILTER, hasOpenSeat, matchesBrowseFilter } from "@/matchmaking/filter";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
 import { listPublicLeagues, PUBLIC_LEAGUE_FIELDS } from "./browse";
 
 const db = createTestDb();
@@ -26,6 +19,8 @@ interface SeedLeague {
   readonly filled: number;
   readonly isPublicMatchmade: boolean;
   readonly draftStatus?: "scheduled" | "in_progress" | "complete";
+  /** Defaults to the row's own `defaultNow()`. Set explicitly to pin ordering in a test. */
+  readonly createdAt?: Date;
 }
 
 async function seed(league: SeedLeague): Promise<void> {
@@ -38,6 +33,7 @@ async function seed(league: SeedLeague): Promise<void> {
     experienceTier: league.experienceTier,
     isPublicMatchmade: league.isPublicMatchmade,
     commissionerUserId: "owner",
+    ...(league.createdAt === undefined ? {} : { createdAt: league.createdAt }),
   });
   await db.insert(drafts).values({
     id: `${league.id}_draft`,
@@ -52,6 +48,49 @@ async function seed(league: SeedLeague): Promise<void> {
     await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: `Manager ${i}` });
     await db.insert(teams).values({ id: `${league.id}_t${i}`, leagueId: league.id, userId, name: `Team ${i}` });
   }
+}
+
+let seedCounter = 0;
+
+/**
+ * The brief's convenience seeder: one open, public, joinable league from a filter-shaped
+ * overrides object, returning the `PublicLeagueSummary` the pure rule (`matchesBrowseFilter`,
+ * `hasOpenSeat`) can be run against directly. Built on `seed()` above rather than duplicating
+ * its insert logic — this only adds id/name generation and the shape translation
+ * (`filledTeams` -> `filled`) `seed()` doesn't do itself.
+ */
+async function seedPublicLeague(
+  db: Db,
+  overrides: {
+    readonly format: "snake" | "auction";
+    readonly experienceTier: "beginner" | "experienced";
+    readonly stakeTier: number;
+    readonly teamCount: number;
+    readonly filledTeams: number;
+  },
+): Promise<PublicLeagueSummary> {
+  seedCounter += 1;
+  const id = `seed_${seedCounter}`;
+  const name = `Seeded League ${seedCounter}`;
+  await seed({
+    id,
+    name,
+    format: overrides.format,
+    experienceTier: overrides.experienceTier,
+    stakeTier: overrides.stakeTier,
+    teamCount: overrides.teamCount,
+    filled: overrides.filledTeams,
+    isPublicMatchmade: true,
+  });
+  return {
+    id,
+    name,
+    format: overrides.format,
+    experienceTier: overrides.experienceTier,
+    stakeTier: overrides.stakeTier,
+    teamCount: overrides.teamCount,
+    filledTeams: overrides.filledTeams,
+  };
 }
 
 beforeEach(async () => {
@@ -133,6 +172,30 @@ describe("listPublicLeagues", () => {
     expect(await listPublicLeagues(db, { format: "snake", experienceTier: "experienced", stakeTier: 3 })).toEqual([]);
   });
 
+  it("returns matching leagues oldest-first, per the docblock's own promise", async () => {
+    // Seeded newest-first so a bug that returned insertion order (or any order but createdAt
+    // asc) would show up as a wrong sequence, not just a wrong set. Mutation check: flipping
+    // browse.ts's `asc(leagues.createdAt)` to `asc(leagues.name)` changes this order — see
+    // fix-wave-report.md for the before/after transcript.
+    await seed({
+      id: "newest", name: "Newest League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      createdAt: new Date("2026-09-03T00:00:00.000Z"),
+    });
+    await seed({
+      id: "oldest", name: "Oldest League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      createdAt: new Date("2026-09-01T00:00:00.000Z"),
+    });
+    await seed({
+      id: "middle", name: "Middle League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      createdAt: new Date("2026-09-02T00:00:00.000Z"),
+    });
+    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(rows.map((league) => league.id)).toEqual(["oldest", "middle", "newest"]);
+  });
+
   it("caps how many leagues one browse can answer with", async () => {
     for (let i = 0; i < MATCHMAKING_CONFIG.maxResults + 3; i++) {
       await seed({
@@ -143,23 +206,74 @@ describe("listPublicLeagues", () => {
     expect(await listPublicLeagues(db, EMPTY_BROWSE_FILTER)).toHaveLength(MATCHMAKING_CONFIG.maxResults);
   });
 
-  it("scopes the team-count read to the capped leagues, not every public league", async () => {
-    const total = MATCHMAKING_CONFIG.maxResults + 5;
-    for (let i = 0; i < total; i++) {
-      await seed({
-        id: `l${i}`, name: `Open League ${i}`, format: "snake", experienceTier: "beginner",
-        stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
-      });
+});
+
+describe("listPublicLeagues narrows in SQL", () => {
+  /**
+   * The anti-drift device. `matchesBrowseFilter`/`hasOpenSeat` are the product's ONE filter
+   * rule and are gated at 100% coverage; the SQL is a second expression of the same rule, and
+   * two expressions of one rule is exactly how a privacy/behavior drift starts. So rather than
+   * asserting hand-picked cases, this runs EVERY filter combination over one corpus and demands
+   * the database and the pure rule return the same league ids, in the same order.
+   */
+  it("agrees with the pure filter for every filter combination", async () => {
+    const corpus: PublicLeagueSummary[] = [];
+    for (const format of MATCHMAKING_CONFIG.formats) {
+      for (const experienceTier of MATCHMAKING_CONFIG.experienceTiers) {
+        for (const { tier } of MATCHMAKING_CONFIG.stakeTiers) {
+          for (const filledTeams of [0, 6, 12]) {
+            const league = await seedPublicLeague(db, { format, experienceTier, stakeTier: tier, teamCount: 12, filledTeams });
+            corpus.push(league);
+          }
+        }
+      }
     }
-    vi.mocked(inArray).mockClear();
 
+    const combinations: BrowseFilter[] = [];
+    for (const format of [...MATCHMAKING_CONFIG.formats, "any" as const]) {
+      for (const experienceTier of [...MATCHMAKING_CONFIG.experienceTiers, "any" as const]) {
+        for (const stakeTier of [...MATCHMAKING_CONFIG.stakeTiers.map((entry) => entry.tier), "any" as const]) {
+          combinations.push({ format, experienceTier, stakeTier });
+        }
+      }
+    }
+    expect(combinations).toHaveLength(3 * 3 * 5);
+
+    for (const filter of combinations) {
+      const fromSql = await listPublicLeagues(db, filter);
+      const fromRule = corpus.filter((league) => hasOpenSeat(league) && matchesBrowseFilter(league, filter));
+      expect(fromSql.map((league) => league.id).sort()).toEqual(fromRule.map((league) => league.id).sort());
+    }
+  });
+
+  it("returns every match even when far more than maxResults public leagues exist", async () => {
+    // The bug this task closes: the LIMIT used to be applied BEFORE the format/tier/open-seat
+    // filters ran in JS, so a narrow filter over a large public pool returned an under-filled
+    // page (often zero) while the database held plenty of matches.
+    for (let i = 0; i < MATCHMAKING_CONFIG.maxResults + 10; i += 1) {
+      await seedPublicLeague(db, { format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 0 });
+    }
+    for (let i = 0; i < 5; i += 1) {
+      await seedPublicLeague(db, { format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 12, filledTeams: 0 });
+    }
+
+    const narrow = await listPublicLeagues(db, { format: "auction", experienceTier: "experienced", stakeTier: 3 });
+    expect(narrow).toHaveLength(5);
+  });
+
+  it("still caps an unnarrowed browse at maxResults", async () => {
+    for (let i = 0; i < MATCHMAKING_CONFIG.maxResults + 10; i += 1) {
+      await seedPublicLeague(db, { format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 0 });
+    }
+    const all = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(all).toHaveLength(MATCHMAKING_CONFIG.maxResults);
+  });
+
+  it("counts fill with a grouped count, so a full league is excluded by the database", async () => {
+    await seedPublicLeague(db, { format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 4, filledTeams: 4 });
+    const open = await seedPublicLeague(db, { format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 4, filledTeams: 3 });
     const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
-    expect(rows).toHaveLength(MATCHMAKING_CONFIG.maxResults);
-
-    // The team-count query's `inArray` must only ever see the ids the capped leagues query
-    // actually returned — never all `total` seeded leagues' worth.
-    expect(inArray).toHaveBeenCalledTimes(1);
-    const [, scopedIds] = vi.mocked(inArray).mock.calls[0]!;
-    expect(scopedIds).toHaveLength(MATCHMAKING_CONFIG.maxResults);
+    expect(rows.map((league) => league.id)).toEqual([open.id]);
+    expect(rows[0]?.filledTeams).toBe(3);
   });
 });

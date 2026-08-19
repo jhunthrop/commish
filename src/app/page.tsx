@@ -4,6 +4,7 @@ import { Sticker } from "@/components/ui";
 import { getDb } from "@/db/client";
 import { getDraftStore } from "@/draft-service";
 import { rankedPlayers } from "@/draft-service/pool";
+import { envOr } from "@/lib/env";
 
 /**
  * The signed-out landing page. The hero panel is NOT a mock: it renders the first rounds of a
@@ -19,7 +20,7 @@ import { rankedPlayers } from "@/draft-service/pool";
 // Reads DB per request (no build-time prerender against a database that may not exist).
 export const dynamic = "force-dynamic";
 
-const SHOWCASE_DRAFT_ID = process.env.SHOWCASE_DRAFT_ID ?? "dev_draft_snake";
+const SHOWCASE_DRAFT_ID = envOr("SHOWCASE_DRAFT_ID", "dev_draft_snake");
 const SHOWCASE_ROUNDS = 4;
 const SHOWCASE_TEAMS = 4;
 

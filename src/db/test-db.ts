@@ -1,11 +1,11 @@
 import { sql } from "drizzle-orm";
 import { afterAll } from "vitest";
 import { resetRankedPlayersCacheForTests } from "@/draft-service/pool";
+import { envOr } from "@/lib/env";
 import { createDb, type Db } from "./client";
 import { DB_POOL_CONFIG } from "./config";
 
-export const TEST_DATABASE_URL =
-  process.env.TEST_DATABASE_URL ?? "postgres://commish:commish@localhost:5433/commish_test";
+export const TEST_DATABASE_URL = envOr("TEST_DATABASE_URL", "postgres://commish:commish@localhost:5433/commish_test");
 
 /**
  * Connects to the dedicated test database (docker-compose `postgres-test`, tmpfs-backed).

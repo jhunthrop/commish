@@ -81,6 +81,16 @@ export function useLeagueChat(leagueId: string): LeagueChat {
   const [state, setState] = useState<LeagueChatState>(INITIAL);
   // Long-lived closures (the SSE listeners) need today's messages without re-subscribing.
   const messagesRef = useRef<readonly ChatMessageView[]>([]);
+  /**
+   * Monotonic id for the newest `refresh` in flight. `refresh` is fired fire-and-forget from
+   * TWO places (the mount effect and the SSE `open` handler) and there is no ordering between
+   * their responses, so without this the last response to arrive wins the write — a slow first
+   * request overwriting a fresh second one, which after a reconnect reads as the pane reverting
+   * to an older page. A response whose generation is no longer the newest is dropped whole: it
+   * is strictly older information about the same resource, so there is nothing in it worth
+   * merging.
+   */
+  const refreshGeneration = useRef(0);
 
   const write = useCallback((messages: readonly ChatMessageView[]): void => {
     messagesRef.current = messages;
@@ -88,9 +98,13 @@ export function useLeagueChat(leagueId: string): LeagueChat {
   }, []);
 
   const refresh = useCallback(async (): Promise<void> => {
+    refreshGeneration.current += 1;
+    const generation = refreshGeneration.current;
+    const isStale = (): boolean => generation !== refreshGeneration.current;
     try {
       const response = await deps.fetchJson(`/api/leagues/${leagueId}/chat`);
       const body = (await response.json()) as ApiEnvelope<ChatPageBody>;
+      if (isStale()) return;
       if (!body.ok) {
         setState((prev) => ({ ...prev, status: "error", error: body.error }));
         return;
@@ -112,6 +126,7 @@ export function useLeagueChat(leagueId: string): LeagueChat {
         hasMore: prev.status === "loading" ? body.data.hasMore : prev.hasMore,
       }));
     } catch {
+      if (isStale()) return;
       setState((prev) => ({ ...prev, status: "error", error: LOAD_ERROR }));
     }
   }, [deps, leagueId]);

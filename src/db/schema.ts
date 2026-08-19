@@ -13,6 +13,7 @@ import {
   index,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
@@ -38,27 +39,51 @@ export const users = pgTable(
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
 
-export const leagues = pgTable("leagues", {
-  id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  format: draftFormatEnum("format").notNull(),
-  teamCount: integer("team_count").notNull(),
-  stakeTier: integer("stake_tier").notNull().default(0),
-  isPublicMatchmade: boolean("is_public_matchmade").notNull().default(false),
-  /**
-   * Which managers this league is FOR, as advertised on the public browse page. A league-level
-   * fact, not a mirror of the commissioner's own `users.experience_tier`: deriving it from a
-   * person would leak that person into an unauthenticated read and would silently re-tier every
-   * league they run the moment they updated their own profile.
-   */
-  experienceTier: experienceTierEnum("experience_tier").notNull().default("beginner"),
-  commissionerUserId: text("commissioner_user_id")
-    .notNull()
-    .references(() => users.id),
-  /** The league's roster shape. The draft reads this to know its rounds and slot rules. */
-  rosterSlots: jsonb("roster_slots").$type<readonly RosterSlotConfig[]>().notNull().default([...STANDARD_ROSTER_SLOTS]),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
+export const leagues = pgTable(
+  "leagues",
+  {
+    id: text("id").primaryKey(),
+    name: text("name").notNull(),
+    format: draftFormatEnum("format").notNull(),
+    teamCount: integer("team_count").notNull(),
+    stakeTier: integer("stake_tier").notNull().default(0),
+    isPublicMatchmade: boolean("is_public_matchmade").notNull().default(false),
+    /**
+     * Which managers this league is FOR, as advertised on the public browse page. A league-level
+     * fact, not a mirror of the commissioner's own `users.experience_tier`: deriving it from a
+     * person would leak that person into an unauthenticated read and would silently re-tier every
+     * league they run the moment they updated their own profile.
+     */
+    experienceTier: experienceTierEnum("experience_tier").notNull().default("beginner"),
+    commissionerUserId: text("commissioner_user_id")
+      .notNull()
+      .references(() => users.id),
+    /** The league's roster shape. The draft reads this to know its rounds and slot rules. */
+    rosterSlots: jsonb("roster_slots").$type<readonly RosterSlotConfig[]>().notNull().default([...STANDARD_ROSTER_SLOTS]),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    /**
+     * PARTIAL, on purpose. `is_public_matchmade` is false for the overwhelming majority of
+     * leagues (a league is private unless a commissioner opts in), and the only query that
+     * reads this column reads `= true` and then orders by `created_at`. A partial index on
+     * `created_at` over just those rows is therefore the smallest index that serves the
+     * `WHERE is_public_matchmade` filter without a sequential scan of `leagues`.
+     *
+     * It does NOT let the browse `LIMIT` stop early on its own: `browseQuery` groups by league
+     * (for the fill-count `HAVING`) before it orders, and the measured plan is
+     * `Limit -> Sort (top-N heapsort) -> HashAggregate -> ...` — the `HashAggregate` destroys
+     * whatever order the index scan produced, so `created_at` is re-sorted afterward regardless.
+     * The index's payoff is entirely the filter, verified in `src/db/index-plans.test.ts`.
+     *
+     * There is deliberately NO index on `commissioner_user_id`: every read of it fetches the
+     * league by primary key and compares in application code (`src/lib/leagues/membership.ts`,
+     * `src/league-service/read.ts`). An index on a column nothing filters on is maintenance
+     * cost with no read to pay for it. Add one the day a "leagues I commission" query exists.
+     */
+    index("leagues_public_browse_idx").on(t.createdAt).where(sql`${t.isPublicMatchmade}`),
+  ],
+);
 
 export const teams = pgTable(
   "teams",
@@ -311,7 +336,7 @@ export const playerStatLines = pgTable(
     fumblesLost: integer("fumbles_lost").notNull().default(0),
     fieldGoalsMade: integer("field_goals_made").notNull().default(0),
     extraPointsMade: integer("extra_points_made").notNull().default(0),
-    sacks: integer("sacks").notNull().default(0),
+    sacks: real("sacks").notNull().default(0),
     defensiveInterceptions: integer("defensive_interceptions").notNull().default(0),
     defensiveTouchdowns: integer("defensive_touchdowns").notNull().default(0),
   },

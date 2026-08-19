@@ -1,0 +1,1 @@
+ALTER TABLE "player_stat_lines" ALTER COLUMN "sacks" SET DATA TYPE real;

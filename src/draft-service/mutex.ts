@@ -5,11 +5,22 @@ export interface KeyedMutex {
 /**
  * Serializes work per key by chaining promises.
  *
- * Phase 1 runs a single Node process, so an in-process queue is enough to keep two
- * submissions for the same draft from interleaving their read-validate-write. Phase 2 (multi
- * instance) replaces this with a Postgres advisory lock — which is exactly why the unique
- * index on (draft_id, sequence) exists as well: the database, not this map, is what makes a
- * double append impossible.
+ * Phase 1 ran a single Node process, so an in-process queue was enough to keep two submissions
+ * for the same draft from interleaving their read-validate-write. It is still worth keeping as
+ * an intra-process fast path — it turns same-process contention into a cheap queue instead of a
+ * round trip to Postgres — but it is no longer what makes the write path safe. Phase 2 Plan A
+ * moved the read-validate-write inside one transaction holding `SELECT ... FOR UPDATE` on the
+ * draft's own row (`store.ts`), and made the cache validate itself against `MAX(sequence)`.
+ *
+ * A ROW lock and not a Postgres advisory lock, deliberately: `pg_advisory_lock` is
+ * SESSION-scoped, and this app's connection reaches Postgres through PgBouncer in transaction
+ * pooling mode, where a session is not a stable thing to hold anything on. `SELECT ... FOR
+ * UPDATE` is transaction-scoped by construction, so it is released by the same COMMIT that
+ * makes the write visible and it cannot leak onto whichever pooled backend serves the next
+ * statement.
+ *
+ * The unique index on `(draft_id, sequence)` remains the database's own backstop: a bug in
+ * either lock can then cost a rejected action, never a double-drafted player.
  */
 export function createKeyedMutex(): KeyedMutex {
   const tails = new Map<string, Promise<unknown>>();

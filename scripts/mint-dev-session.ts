@@ -10,7 +10,7 @@
 // production key silently plants a permanent, pre-verified account in the real directory.
 import { chmodSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { envOrUndefined } from "./lib/env";
+import { envOrUndefined } from "@/lib/env";
 import { mintLabSession } from "./lib/lab-session";
 
 const DEFAULT_OUT = ".lab-session.json";
@@ -18,7 +18,7 @@ const DEFAULT_OUT = ".lab-session.json";
 async function main() {
   // `envOrUndefined`, not `??`: `.env.example` ships `LAB_SESSION_FILE=`/`LAB_EMAIL=`/
   // `LAB_PASSWORD=` as intentionally empty lines, which `??` alone would not treat as absent —
-  // see `scripts/lib/env.ts`.
+  // see `src/lib/env.ts`.
   const outPath = resolve(process.argv[2] ?? envOrUndefined("LAB_SESSION_FILE") ?? DEFAULT_OUT);
   const session = await mintLabSession({ email: envOrUndefined("LAB_EMAIL"), password: envOrUndefined("LAB_PASSWORD") });
   // The sealed cookie is a complete bearer credential, so it is NEVER printed: it goes to a

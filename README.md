@@ -9,7 +9,7 @@ first run — every command below that touches Postgres reads its connection str
 
 ```bash
 npm install               # install dependencies
-npm run infra:up          # start local Postgres x2 + Redis (docker compose)
+npm run infra:up          # start local Postgres x2 + PgBouncer x2 + Redis (docker compose)
 npm run db:migrate        # apply the drizzle migrations (required before the first seed)
 npm run seed              # seed players, dev leagues and the demo season league
 npm run dev               # start the dev server
@@ -18,7 +18,7 @@ npm test                  # run the test suite once
 npm run test:watch        # run tests in watch mode
 npm run test:coverage     # run tests with coverage — verify UNFILTERED before merging any change
                           # touching src/scoring, src/draft-engine, src/draft-room/state,
-                          # src/league, src/chat or src/matchmaking
+                          # src/league, src/chat, src/matchmaking or src/stats
 npm run lint              # lint
 npm run typecheck         # type-check with no emit
 npm run build             # production build — part of the verification gate for every step
@@ -28,12 +28,30 @@ npm run e2e               # browser end-to-end suite (needs a build + a WorkOS t
 npm run e2e:ui            # same suite, in Playwright's interactive UI mode
 ```
 
+`npm run infra:up` brings up all five docker-compose services: `postgres` (5432), `postgres-test`
+(5433, tmpfs), `pgbouncer` (6432 → postgres, transaction pooling mode), `pgbouncer-test`
+(6433 → postgres-test) and `redis` (6379). `DATABASE_URL` points at port **6432** (the pooler),
+not 5432 — that is how the deployed app connects, and a pooler that is only in the path in
+production is a pooler nobody has tested. Connecting directly to 5432 with `psql` is fine; it is
+just not what the app itself does. See `docs/decisions/data-layer-hardening.md`.
+
 `npm run db:migrate:test` applies the same migrations to the dedicated test database
 (`docker-compose.yml`'s `postgres-test`, tmpfs-backed) that `npm test` runs against.
 `npm run db:generate` regenerates a drizzle migration after a schema change;
 `npm run db:studio` opens Drizzle Studio; `npm run tokens:build` regenerates
 `src/design/tokens.css` from `src/design/tokens.ts`; `npm run stats:generate` regenerates the
-mock stat dataset; `npm run infra:down` stops the local stack.
+mock stat dataset; `npm run stats:tank01:record` re-records the Tank01 fixtures
+(`src/stats/tank01/fixtures/`) from the live API — needs `TANK01_API_KEY` in `.env.local`;
+`npm run infra:down` stops the local stack.
+
+The whole suite also runs through PgBouncer in transaction pooling mode as an explicit release
+gate, rather than as the everyday default (a pooler in the path would slow down every one of the
+suite's 1,300-plus tests and can turn a real regression into something that looks like a pooling
+artifact):
+
+```bash
+TEST_DATABASE_URL=postgres://commish:commish@localhost:6433/commish_test npm test
+```
 
 `npm run seed` seeds three leagues: `Dev Snake League` and `Dev Auction League`, both empty and
 scheduled so you can actually run a draft in them, and `Dev Season League` — a full 12-team
