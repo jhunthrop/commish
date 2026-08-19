@@ -216,8 +216,10 @@ export function createIngestionWorker({
   let wedgeWeek: number | null = null;
   let wedgeTicks = 0;
 
+  /** Rate-limited per (week, league, reason): two different problems with the same week are two
+   *  different things to know about, and only a repeat of the SAME one is noise. */
   function outcomeKey(outcome: TickOutcome): string {
-    return `${outcome.week}:${outcome.leagueId ?? ""}:${outcome.reason ?? ""}`;
+    return [outcome.week, outcome.leagueId, outcome.reason].join(":");
   }
 
   function reportIfDue(outcome: TickOutcome, nowMs: number): void {
@@ -674,7 +676,9 @@ export function createIngestionWorker({
     const boxScoreReservation = boxScoreCount === 0 ? { granted: true as const } : await budget.reserve(boxScoreCount);
     const fetchPlans = boxScoreReservation.granted ? plans : plans.map((plan) => ({ ...plan, toFetch: [] }));
     if (!boxScoreReservation.granted) {
-      reportIfDue({ week: plans[0]?.week ?? 0, applied: false, reason: DENIAL_REASONS[boxScoreReservation.denial] }, nowMs);
+      // `plans` is never empty here: a denial only happens when `boxScoreCount` is positive, and
+      // that count comes from the plans themselves.
+      reportIfDue({ week: plans[0]!.week, applied: false, reason: DENIAL_REASONS[boxScoreReservation.denial] }, nowMs);
     }
 
     for (const plan of fetchPlans) {

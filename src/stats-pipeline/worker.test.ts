@@ -23,9 +23,11 @@ vi.mock("./finalize", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./finalize")>();
   return {
     ...actual,
-    finalizeWeek: vi.fn(async (db: Parameters<typeof actual.finalizeWeek>[0], leagueId: string, week: number) => {
-      if (leagueId === throwFinalizeForLeague) throw new Error("simulated finalize failure");
-      return actual.finalizeWeek(db, leagueId, week);
+    // Every argument forwarded, including the injected score cache: a mock that quietly drops a
+    // parameter is a mock that proves the caller passes it and the callee ignores it.
+    finalizeWeek: vi.fn(async (...args: Parameters<typeof actual.finalizeWeek>) => {
+      if (args[1] === throwFinalizeForLeague) throw new Error("simulated finalize failure");
+      return actual.finalizeWeek(...args);
     }),
   };
 });
@@ -1020,6 +1022,12 @@ describe("createIngestionWorker", () => {
     const [beforeDraft] = await db.select().from(matchups).where(eq(matchups.leagueId, "lg_late_draft"));
     expect(beforeDraft!.homeScore).toBeNull();
 
+    // A tick while the league is STILL undrafted finds the unsettled week, is refused by
+    // finalizeWeek's own guard, and says nothing about it: a league that has not started its
+    // season is not an incident to report every thirty minutes.
+    const stillUndrafted = await worker.tick();
+    expect(stillUndrafted.some((outcome) => outcome.leagueId === "lg_late_draft")).toBe(false);
+
     // The draft completes: rosters exist now.
     await addRoster("ld1", "p1");
     await addRoster("ld2", "p2");
@@ -1117,5 +1125,104 @@ describe("createIngestionWorker", () => {
     // A settled season is loud, not silent: the one thing worse than a stalled pointer is a
     // stalled pointer nobody can see.
     expect(onOutcome).toHaveBeenCalledTimes(1);
+  });
+
+  it("isolates a late settlement that fails, and keeps the rest of the tick", async () => {
+    // Same per-league isolation the transition path has: one league's settlement blowing up must
+    // not stop the tick, and it must be visible rather than swallowed.
+    await seedPlayers(["p1", "p2"]);
+    await seedLeagueShell("lg_late_fail", [{ teamId: "lf1", userId: "ulf1" }, { teamId: "lf2", userId: "ulf2" }], "scheduled", 2);
+    const provider = fakeStatsProvider({
+      games: {
+        1: [{
+          gameId: "g_late_fail", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN",
+          lines: [statLine("p1", 1, { passingYards: 300 }), statLine("p2", 1, { passingYards: 100 })],
+        }],
+      },
+    });
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
+    await worker.tick();
+
+    await addRoster("lf1", "p1");
+    await addRoster("lf2", "p2");
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, "lg_late_fail"));
+    throwFinalizeForLeague = "lg_late_fail";
+    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    try {
+      const outcomes = await worker.tick();
+      expect(outcomes).toContainEqual({
+        week: 1,
+        leagueId: "lg_late_fail",
+        applied: false,
+        reason: "Couldn't settle this league's already-finished week.",
+      });
+      const [row] = await db.select().from(matchups).where(eq(matchups.leagueId, "lg_late_fail"));
+      expect(row!.homeScore).toBeNull();
+    } finally {
+      consoleErrorSpy.mockRestore();
+    }
+  });
+
+  it("skips the correction sweep rather than spending on it when Redis cannot say whether today's sweep already ran", async () => {
+    // The sweep's marker is what makes it once-a-day. Without a readable marker the honest choice
+    // is to skip: the conservative direction spends nothing, and a missed day's sweep is one more
+    // day of a window that is three days wide.
+    await seedPlayers(["p1"]);
+    let ts = "2026-09-14T20:00:00.000Z";
+    const movingClock = { now: () => ts };
+    const provider = fakeStatsProvider({
+      games: {
+        1: [{ gameId: "g_sweep_blind", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 200 })] }],
+      },
+    });
+    const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
+    const sweepBlindRedis = new Proxy(redis, {
+      get(target, prop, receiver: unknown) {
+        if (prop === "exists") {
+          return (...args: unknown[]) => {
+            if (String(args[0]).startsWith("stats:correction:")) throw new Error("simulated redis outage on the sweep marker");
+            return (Reflect.get(target, prop, receiver) as (...a: unknown[]) => unknown).apply(target, args);
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const worker = createIngestionWorker({ db, provider, redis: sweepBlindRedis as Redis, publish: publishRecorder().fn, clock: movingClock, budget });
+
+    await worker.tick();
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(1);
+
+    ts = "2026-09-15T20:00:00.000Z"; // a sweep would be due, but its marker cannot be read
+    await worker.tick();
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("a lease it cannot release still expires on its own, and never fails the tick", async () => {
+    await seedPlayers(["p1"]);
+    const provider = fakeStatsProvider({
+      games: {
+        1: [{ gameId: "g_release_fail", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 40 })] }],
+      },
+    });
+    const releaseBlindRedis = new Proxy(redis, {
+      get(target, prop, receiver: unknown) {
+        if (prop === "eval") {
+          return (...args: unknown[]) => {
+            if (args[2] === STATS_INGESTION_CONFIG.keys.tickLease) throw new Error("simulated redis outage on the release");
+            return (Reflect.get(target, prop, receiver) as (...a: unknown[]) => unknown).apply(target, args);
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const worker = createIngestionWorker({ db, provider, redis: releaseBlindRedis as Redis, publish: publishRecorder().fn, clock, budget });
+
+    const outcomes = await worker.tick();
+
+    expect(outcomes.some((outcome) => outcome.week === 1 && outcome.applied)).toBe(true);
+    // The lease is still held — by this instance, harmlessly, until its own TTL runs out.
+    expect(await redis.exists(STATS_INGESTION_CONFIG.keys.tickLease)).toBe(1);
+    expect(await redis.pttl(STATS_INGESTION_CONFIG.keys.tickLease)).toBeGreaterThan(0);
   });
 });
