@@ -38,6 +38,21 @@ export function createDb(connectionString: string = requireDatabaseUrl(), option
   const client = postgres(connectionString, {
     max: options.max ?? DB_POOL_CONFIG.defaultMaxConnections,
     idle_timeout: options.idleTimeoutSeconds,
+    /**
+     * UNCONDITIONAL, whether this connection string points at Postgres or at PgBouncer.
+     *
+     * postgres-js names and caches prepared statements per backend connection by default.
+     * PgBouncer in transaction pooling mode hands a client a different backend between
+     * transactions, so a named statement prepared on one is missing on the next and the query
+     * fails with "prepared statement does not exist" under load and not in development, which
+     * is the worst possible time to discover it.
+     *
+     * It is set for the DIRECT connection too, deliberately: one behavior everywhere means a
+     * bug cannot hide behind a mode difference between dev and production. The cost is that
+     * each statement uses the unnamed prepared statement instead of a cached named one, which
+     * is not an extra round trip in the extended protocol.
+     */
+    prepare: false,
   });
   return drizzle(client, { schema });
 }

@@ -46,6 +46,62 @@ services:
       timeout: 3s
       retries: 10
 
+  # Transaction-mode connection pooler in front of the dev Postgres. Production will run one of
+  # these too (Plan D), and the app talks to it rather than to Postgres directly — so it has to
+  # be in the loop locally, or the first time anyone finds out that transaction pooling breaks
+  # a pattern will be in production. See docs/decisions/data-layer-hardening.md.
+  pgbouncer:
+    # edoburu/pgbouncer:latest resolved 2026-08-19.
+    image: edoburu/pgbouncer@sha256:4c1ca296ef525f108f5d3552cc337c0c09587cf8dae7f0067fd93349e47dc1cd
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: commish
+      DB_PASSWORD: commish
+      DB_NAME: commish
+      POOL_MODE: transaction
+      AUTH_TYPE: scram-sha-256
+      MAX_CLIENT_CONN: "500"
+      DEFAULT_POOL_SIZE: "25"
+      LISTEN_PORT: "6432"
+    ports:
+      - "6432:6432"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U commish -d commish"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # The same pooler in front of the TEST Postgres, so src/db/pgbouncer.test.ts exercises
+  # transaction pooling for real rather than describing it.
+  pgbouncer-test:
+    # edoburu/pgbouncer:latest resolved 2026-08-19.
+    image: edoburu/pgbouncer@sha256:4c1ca296ef525f108f5d3552cc337c0c09587cf8dae7f0067fd93349e47dc1cd
+    environment:
+      DB_HOST: postgres-test
+      DB_PORT: "5432"
+      DB_USER: commish
+      DB_PASSWORD: commish
+      DB_NAME: commish_test
+      POOL_MODE: transaction
+      AUTH_TYPE: scram-sha-256
+      MAX_CLIENT_CONN: "500"
+      DEFAULT_POOL_SIZE: "25"
+      LISTEN_PORT: "6432"
+    ports:
+      - "6433:6432"
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 6432 -U commish -d commish_test"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
 volumes:
   postgres-data:
   redis-data:

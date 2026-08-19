@@ -1,9 +1,14 @@
 # Data layer hardening: decisions
 
-Findings from the `src/db/index-plans.test.ts` EXPLAIN gate (Task 5 of Phase 2 Plan A) that
-affected which sequential-scan assertions the gate makes. Each entry records what the planner
-chose, why, and how it was verified — so a later change that makes one of these true again is a
-deliberate decision to revisit, not a silent regression nobody explains.
+**Phase 2, Plan A** · Spec: `plans/phase-2-accounts-and-data-foundation.md` Step 2
+
+Decisions from this phase's data-layer hardening work. The first section below records findings
+from the `src/db/index-plans.test.ts` EXPLAIN gate (Task 5) that affected which sequential-scan
+assertions the gate makes. The sections after it (Task 8) cover the balance-as-rollup convention,
+connection-pool sizing, PgBouncer transaction pooling and what it forbids, and the full index
+list including what the spec asked for that was struck. Each entry records what was chosen, why,
+and how it was verified — so a later change that makes one of these true again is a deliberate
+decision to revisit, not a silent regression nobody explains.
 
 ## `teams` in the unnarrowed public browse: seq scan is the planner's genuine choice, not a missing index
 
@@ -49,3 +54,110 @@ if `teams` grows large enough in production that this same query starts sequenti
 in practice — at that point, re-run this diagnostic against real data before deciding whether the
 join needs restructuring (e.g. filtering `teams` by the narrowed `leagues` set before the join)
 rather than assuming the fix is "add an index," since one already exists.
+
+## The balance-as-rollup convention
+
+**Rule.** Any running total in this product is maintained as a **rollup row, updated in the same
+transaction as each contributing write**, over an **append-only source table that remains the
+reconciliation source of truth**. A running total is never computed as a `SUM()` or a table scan
+on the read path.
+
+That is two obligations, not one:
+
+1. The append-only table is never deleted from or updated in place. It is what an audit,
+   a dispute, or a regulator reconstructs the total from, and it is what a corrupted rollup is
+   rebuilt from.
+2. The rollup is updated **inside the same transaction** as the write it summarizes. Not after
+   it, not in a job, not on a schedule. A rollup that can be updated separately is a rollup that
+   can disagree with its source, and a balance that disagrees with its ledger is the single worst
+   failure a money product has.
+
+**Why it is written down here, in a phase with no ledger.** Phase 4 introduces a payment ledger
+and Phase 3 an audit log, and both are the shape that invites `SELECT sum(amount) FROM …` on
+every read. Writing the convention after those tables exist means retrofitting it; writing it now
+means those phases can follow it instead of re-deriving it. This file does not edit those phase
+files — another process owns cross-file reconciliation.
+
+**Applied in this phase.** The one aggregate-style read that exists is public browse's fill count.
+It is now a grouped `count(teams.id)` with the open-seat rule as a `HAVING` predicate
+(`src/league-service/browse.ts`), served by `leagues_public_browse_idx`, rather than a second
+query folded in JavaScript over an already-capped page. `teams` is the append-only source; the
+count is derived per query rather than stored, which is the correct call at this cardinality (a
+league has at most a few dozen teams, and a stored counter would be a second thing to keep
+honest). The convention's threshold is **unbounded growth**: derive a count over a bounded set,
+roll up a total over an unbounded one. A payment ledger is unbounded. A league's roster is not.
+
+## Connection-pool sizing
+
+```
+pool_size_per_instance = (postgres_max_connections
+                          - reserved_superuser_connections
+                          - background_job_pool_size) / expected_max_instances
+```
+
+Executable as `requestPoolSizePerInstance()` in `src/db/config.ts`, with each input a named
+field so changing a managed provider's `max_connections` changes one number and the pool sizes
+follow. `src/db/config.test.ts` asserts that every instance's pool plus the background pool can
+never exceed what Postgres will actually grant.
+
+`background_job_pool_size` is subtracted **before** the division rather than carved out of one
+instance's share. Plan B's stats-ingestion worker holds connections for the length of a poll
+cycle; a batch job that can borrow from the request path's budget is a batch job that can take
+the request path down on the busiest day of the week.
+
+## PgBouncer, transaction pooling, and what it forbids
+
+The app connects through PgBouncer in **transaction pooling** mode, locally
+(`docker-compose.yml`, port 6432) and in the deployed environment (Plan D). A client is handed a
+different backend between transactions, so **nothing may rely on session-scoped state**:
+
+- **No `pg_advisory_lock`.** It is session-scoped. The per-draft lock is
+  `SELECT … FOR UPDATE` on the `drafts` row, taken and released entirely inside one transaction
+  (`src/draft-service/store.ts`). `src/db/pgbouncer.test.ts` proves the lock is released by the
+  commit and immediately available to an independent client.
+- **No named prepared statements.** `createDb` sets `prepare: false` unconditionally, on the
+  direct connection as well as the pooled one, so a bug cannot hide behind a mode difference.
+- **No `SET` outside a transaction**, no session-scoped temporary tables, no `LISTEN`/`NOTIFY`.
+  The last one costs nothing here: real-time is Redis Streams over SSE and always has been.
+
+Verification: `npm test -- src/db/pgbouncer`, plus the whole suite run through the pooler
+(`TEST_DATABASE_URL=postgres://commish:commish@localhost:6433/commish_test npm test`) as a
+release-gate step rather than a default, since a pooler in the path slows every test and can
+disguise a regression as a pooling artifact.
+
+**How this relates to the outstanding `random_page_cost` follow-up above.** The `teams` seq-scan
+diagnosis noted the correct fix for that gap is planner cost-model tuning
+(`random_page_cost`), tracked as a follow-up "alongside the pooling configuration." Pooling and
+cost-model tuning are independent tunables — PgBouncer changes which backend a statement lands
+on between transactions, not what the planner estimates a page fetch costs once it gets there —
+so landing the pooler in this task does not by itself close that gap. It remains open: the
+`random_page_cost` change is a single Postgres-instance-level setting, best made once (Plan D
+provisions the real managed instance) and re-verified against the same diagnostic used above,
+rather than tuned twice against a local container whose storage characteristics won't match
+production's.
+
+## The index list, including what was struck and why
+
+**Added:** `leagues_public_browse_idx` — partial, `ON leagues (created_at) WHERE
+is_public_matchmade`. The only table with no index beyond its primary key, and the one the app's
+single unauthenticated endpoint filters and sorts on.
+
+**Already present and verified by `src/db/index-plans.test.ts`:** `teams_league_id_idx`,
+`teams_user_id_idx`, `teams_league_user_idx`, `chat_messages_league_id_idx (league_id, id)`,
+`draft_actions_draft_id_id_idx`, `draft_actions_draft_sequence_idx`, `drafts_league_id_idx`
+(unique), `drafts_status_idx`, `league_invites_league_id_idx`, `players_position_idx`,
+`player_stat_lines_week_idx`, `users_email_idx`.
+
+**Struck from the spec's list, with reasons:**
+
+| Spec asked for | Why it is not built |
+|---|---|
+| `Session(token)`, `Session(userId)` | There is no `sessions` table and there will not be one. WorkOS AuthKit owns sessions; `users.id` **is** the WorkOS user id. Indexing a table that does not exist is not a deferral, it is a category error in the spec, which was written against a Phase 1 that planned hand-rolled auth. |
+| chat messages by `(leagueId, createdAt)` | Already served, better, by `chat_messages_league_id_idx` on `(league_id, id)`. `id` is a `bigserial` that doubles as the page cursor, so a page is an index range scan with no timestamp tie to break. A `createdAt` index would be a second index serving strictly less. |
+| `draft_actions(draftId, timestamp)` | Already served by `draft_actions_draft_id_id_idx` for the replay read and by the unique `draft_actions_draft_sequence_idx` for the append. Replay orders by `sequence`, never by `timestamp`. |
+| An index on `leagues.commissioner_user_id` | Nothing filters on it. Every read fetches the league by primary key and compares in application code (`src/lib/leagues/membership.ts`, `src/league-service/read.ts`). Add it the day a "leagues I commission" query exists, not before. |
+
+**How the list stays honest:** `src/db/index-plans.test.ts` seeds 5,000 leagues, 20,000 chat
+messages and 400 draft actions, runs `ANALYZE`, and fails the build if any named hot path
+sequential-scans. A plan assertion over a hundred rows asserts nothing, which is why the corpus
+is that size.
