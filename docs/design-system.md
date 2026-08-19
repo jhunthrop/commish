@@ -84,7 +84,7 @@ Tailwind aliases: `bg-surface`, `bg-surface-elevated`, `border-border`, `text-te
 
 In light, every sticker is a dark marker with a white label, and `text` equals `sticker`. In dark, five stickers are bright with a near-black label — but **DEF stays dark** (chalk label, and a brightened steel for its `text` variant — see `darkPositions.def` in `src/design/tokens.ts`), because DEF's meaning is "no color of its own" and a bright slate would be indistinguishable from the WR blue beside it.
 
-**`PositionBadge` is the only way to render a position.** Nothing else may reach for `bg-pos-*`, except `DraftBoard`'s own sticker cells (which are `PositionBadge`-colored fills at cell scale). A bare `"QB"` string in a table cell is a bug.
+**`PositionBadge` is the only way to render a position label; `Sticker` is the only way to render a position-pigmented tile.** `Sticker` (`src/components/ui/sticker.tsx`) owns the sticker look — rounded corner, `shadow-sticker`, fill via `positionStickerClass` — and is what `DraftBoard`'s pick cells and the landing page's showcase board both build on. Nothing else may reach for `bg-pos-*` directly. A bare `"QB"` string in a table cell is a bug.
 
 **Carve-out: a native `<select>` option label.** An `<option>` cannot contain an element, so `lineup-editor.tsx`'s slot picker renders a position as plain text inside the option label. This is the one legitimate exception to the rule above — it is a markup constraint, not a lapse — and it does not license a bare position anywhere text CAN hold an element.
 
