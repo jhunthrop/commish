@@ -16,7 +16,7 @@ describe("CreateLeagueForm", () => {
       async ({ container }) => {
         expect(screen.getByLabelText("League name")).toBeInTheDocument();
         expect(screen.getByRole("group")).toBeInTheDocument(); // the <details> disclosure
-        expect(screen.getByText("Advanced settings")).toBeInTheDocument();
+        expect(screen.getByText(/Advanced settings/)).toBeInTheDocument();
         expect(container.querySelector("details")).not.toHaveAttribute("open");
         expect(await axe(container)).toHaveNoViolations();
       },

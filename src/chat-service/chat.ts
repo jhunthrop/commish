@@ -2,7 +2,7 @@ import { and, desc, eq, inArray, lt } from "drizzle-orm";
 import type { ChatMessageView, ChatReactionView } from "@/chat/contract";
 import { CHAT_CONFIG } from "@/chat/config";
 import type { Db } from "@/db/client";
-import { chatMessages, chatReactions, users } from "@/db/schema";
+import { chatMessages, chatReactions, teams, users } from "@/db/schema";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
 
@@ -89,6 +89,13 @@ export async function postMessage(db: Db, input: PostMessageInput): Promise<Chat
     .select({ displayName: users.displayName, avatarUrl: users.avatarUrl })
     .from(users)
     .where(eq(users.id, input.userId));
+  // You talk as your TEAM in a league's chat, not as your legal name (persona review: real
+  // names kill the trash-talk energy and leak identity in a money league). Display name is
+  // only the fallback for a teamless commissioner.
+  const [team] = await db
+    .select({ name: teams.name })
+    .from(teams)
+    .where(and(eq(teams.leagueId, input.leagueId), eq(teams.userId, input.userId)));
 
   const [row] = await db
     .insert(chatMessages)
@@ -99,7 +106,7 @@ export async function postMessage(db: Db, input: PostMessageInput): Promise<Chat
     {
       id: row!.id,
       authorUserId: input.userId,
-      authorName: author?.displayName ?? "A manager",
+      authorName: team?.name ?? author?.displayName ?? "A manager",
       authorAvatarUrl: author?.avatarUrl ?? null,
       body: input.body,
       createdAt: row!.createdAt,
@@ -138,13 +145,16 @@ export async function listMessages(db: Db, input: ListMessagesInput): Promise<Ch
     .select({
       id: chatMessages.id,
       authorUserId: chatMessages.authorUserId,
-      authorName: users.displayName,
+      authorName: teams.name,
+      authorFallbackName: users.displayName,
       authorAvatarUrl: users.avatarUrl,
       body: chatMessages.body,
       createdAt: chatMessages.createdAt,
     })
     .from(chatMessages)
     .innerJoin(users, eq(users.id, chatMessages.authorUserId))
+    // Team identity, same rule as postMessage: you speak as your team in this league.
+    .leftJoin(teams, and(eq(teams.leagueId, chatMessages.leagueId), eq(teams.userId, chatMessages.authorUserId)))
     .where(scope)
     .orderBy(desc(chatMessages.id))
     .limit(CHAT_CONFIG.pageSize + 1);
@@ -154,7 +164,9 @@ export async function listMessages(db: Db, input: ListMessagesInput): Promise<Ch
   const grouped = await reactionsFor(db, page.map((row) => row.id));
 
   return {
-    messages: [...page].reverse().map((row) => toView(row, grouped.get(row.id) ?? [])),
+    messages: [...page]
+      .reverse()
+      .map((row) => toView({ ...row, authorName: row.authorName ?? row.authorFallbackName }, grouped.get(row.id) ?? [])),
     hasMore,
   };
 }

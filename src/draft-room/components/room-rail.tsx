@@ -195,7 +195,9 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
             Your team: <span className="font-display font-semibold text-text-primary">{myTeamName}</span>
           </span>
         )}
-        <ConnectionBanner connection={connection} />
+        {/* A finished draft has nothing left to deliver: a connection chip beside
+            "Every roster is final" reads as broken, not informative. */}
+        {view.phase === "complete" ? null : <ConnectionBanner connection={connection} />}
       </div>
     </header>
   );

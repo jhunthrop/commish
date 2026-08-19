@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { CHAT_CONFIG } from "@/chat/config";
 import type { Db } from "@/db/client";
-import { chatReactions } from "@/db/schema";
+import { chatReactions, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import { listMessages, postMessage, toggleReaction } from "./chat";
@@ -32,15 +32,26 @@ beforeEach(async () => {
 });
 
 describe("postMessage", () => {
-  it("persists the message with the author's profile and publishes chat.message", async () => {
+  it("speaks as the author's TEAM in this league, and publishes chat.message", async () => {
     const bus = recorder();
     const message = await postMessage(db, { leagueId: "l1", userId: "u1", body: "wheels up", publish: bus.publish });
 
     expect(message.body).toBe("wheels up");
     expect(message.authorUserId).toBe("u1");
-    expect(message.authorName).toBe("Alex Rivera");
+    // Team identity, not legal identity (persona review): u1 owns Bay Bandits in l1.
+    expect(message.authorName).toBe("Bay Bandits");
     expect(message.reactions).toEqual([]);
     expect(bus.sent).toEqual([{ type: "chat.message", leagueId: "l1", payload: { message } }]);
+  });
+
+  it("falls back to the display name for an author with no team here (a teamless commissioner)", async () => {
+    const bus = recorder();
+    await db.insert(users).values({ id: "u_comm", email: "comm@test.local", displayName: "Sam Field" });
+    const message = await postMessage(db, { leagueId: "l1", userId: "u_comm", body: "settle down", publish: bus.publish });
+    expect(message.authorName).toBe("Sam Field");
+
+    const page = await listMessages(db, { leagueId: "l1" });
+    expect(page.messages.map((m) => m.authorName)).toEqual(["Sam Field"]);
   });
 
   it("survives a reload — the message is still there on a fresh read", async () => {

@@ -5,6 +5,7 @@ import { AppHeader } from "@/components/app-shell/app-header";
 import { listLeaguesForUser } from "@/league-service";
 import { LeagueList } from "@/league-room/components/league-list";
 import { CreateLeaguePanel } from "@/league-room/components/create-league-panel";
+import { JoinLeagueEntry } from "@/league-room/components/join-league-entry";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,10 @@ export default async function AppHome() {
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
         <PageTitle>Your leagues</PageTitle>
         <LeagueList leagues={leagues} />
+        <section aria-label="Join a league" className="flex flex-col gap-2">
+          <h2 className="text-lg font-medium text-text-primary">Invited by a friend?</h2>
+          <JoinLeagueEntry />
+        </section>
         <section id="create-league" className="flex flex-col gap-2">
           <h2 className="text-lg font-medium text-text-primary">Start a league</h2>
           <CreateLeaguePanel />

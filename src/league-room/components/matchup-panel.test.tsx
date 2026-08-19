@@ -8,8 +8,8 @@ import { MatchupPanel } from "./matchup-panel";
 describe("MatchupPanel", () => {
   it("shows both lineups, per-player points and the final score, in both themes, axe-clean", async () => {
     await inBothThemes(<MatchupPanel matchup={MATCHUP} myTeamId="t1" />, async ({ container }) => {
-      expect(screen.getByText("Bay Bandits")).toBeInTheDocument();
-      expect(screen.getByText("Iron Owls")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Bay Bandits" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Iron Owls" })).toBeInTheDocument();
       expect(screen.getByText("112.50")).toBeInTheDocument();
       expect(screen.getByText("Final")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();

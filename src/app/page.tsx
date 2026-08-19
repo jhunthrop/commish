@@ -145,15 +145,18 @@ export default async function Home() {
             Live drafts, standings that settle arguments, and the trash talk built in. Season-long fantasy football
             without the twenty-year-old software.
           </p>
-          <Link
-            href="/sign-in"
-            className={
-              "inline-flex h-12 items-center justify-center rounded-md bg-accent px-8 text-lg font-medium text-accent-text transition-colors " +
-              "hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-            }
-          >
-            Get in the room
-          </Link>
+          <div className="flex flex-col gap-2">
+            <Link
+              href="/sign-in"
+              className={
+                "inline-flex h-12 items-center justify-center rounded-md bg-accent px-8 text-lg font-medium text-accent-text transition-colors " +
+                "hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+              }
+            >
+              Get in the room
+            </Link>
+            <p className="text-sm text-text-muted">Free to sign up. Set up a league and invite your group in minutes.</p>
+          </div>
         </div>
         {showcase === null ? null : <ShowcaseBoard showcase={showcase} />}
       </section>

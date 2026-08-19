@@ -1,6 +1,7 @@
 import type { MatchupDetail, MatchupSide } from "../contract";
-import { Badge, Card, PositionBadge, SlotChip, Table, type TableColumn } from "@/components/ui";
-import { formatPoints, formatWeek } from "../lib/format";
+import { Card, PositionBadge, SlotChip, Table, type TableColumn } from "@/components/ui";
+import { formatPoints } from "../lib/format";
+import { MatchupScoreboard } from "./matchup-scoreboard";
 
 const COLUMNS: readonly TableColumn<MatchupSide["starters"][number]>[] = [
   { key: "slot", header: "Slot", cell: (row) => <SlotChip slot={row.slot} /> },
@@ -15,14 +16,10 @@ const COLUMNS: readonly TableColumn<MatchupSide["starters"][number]>[] = [
 ];
 
 function Side({ side }: { readonly side: MatchupSide }) {
+  // The score lives on the scoreboard above; down here the roster is the story.
   return (
     <Card>
-      <div className="flex items-baseline justify-between gap-2">
-        <h3 className="text-lg font-medium text-text-primary">{side.teamName}</h3>
-        <span className="text-xl font-semibold tabular-nums text-text-primary">
-          {side.score === null ? "—" : formatPoints(side.score)}
-        </span>
-      </div>
+      <h3 className="font-display text-lg font-bold uppercase leading-display text-text-primary">{side.teamName}</h3>
       <Table
         caption={`${side.teamName} starters`}
         columns={COLUMNS}
@@ -42,14 +39,21 @@ function Side({ side }: { readonly side: MatchupSide }) {
  * thing here, and implying otherwise is the one thing the spec calls out by name.
  */
 export function MatchupPanel({ matchup, myTeamId }: { readonly matchup: MatchupDetail; readonly myTeamId: string | null }) {
-  const mine = matchup.home.teamId === myTeamId ? matchup.home : matchup.away.teamId === myTeamId ? matchup.away : null;
   return (
-    <section className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <h2 className="text-lg font-medium text-text-primary">{formatWeek(matchup.weekNumber)}</h2>
-        <Badge tone={matchup.final ? "positive" : "neutral"}>{matchup.final ? "Final" : "Not scored yet"}</Badge>
-        {mine === null ? null : <Badge tone="accent">Your team</Badge>}
-      </div>
+    <section aria-label={`${matchup.home.teamName} against ${matchup.away.teamName}`} className="flex flex-col gap-3">
+      <MatchupScoreboard
+        matchup={{
+          weekNumber: matchup.weekNumber,
+          homeTeamId: matchup.home.teamId,
+          awayTeamId: matchup.away.teamId,
+          homeTeamName: matchup.home.teamName,
+          awayTeamName: matchup.away.teamName,
+          homeScore: matchup.home.score,
+          awayScore: matchup.away.score,
+          final: matchup.final,
+        }}
+        myTeamId={myTeamId}
+      />
       <div className="grid gap-3 lg:grid-cols-2">
         <Side side={matchup.home} />
         <Side side={matchup.away} />
