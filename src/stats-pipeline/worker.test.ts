@@ -10,7 +10,7 @@ import type { PublishFn } from "@/lib/realtime/publish";
 import { createRequestBudget, type RequestBudget } from "./budget";
 import { STATS_INGESTION_CONFIG } from "./config";
 import type { ScoreUpdatePayload } from "./contract";
-import { fakeStatsProvider, type FakeStatsProviderScript } from "./test-support";
+import { fakeStatsProvider, type FakeStatsProviderScript, type ScriptedGame } from "./test-support";
 import { createIngestionWorker } from "./worker";
 
 // Lets one test force `finalizeWeek` to throw for a single named league, without disturbing
@@ -209,7 +209,7 @@ describe("createIngestionWorker", () => {
     expect(await redis.exists(STATS_INGESTION_CONFIG.keys.finalGame("g_persist_fail"))).toBe(1);
   });
 
-  it("live mode fetches every non-final game every tick, the same script producing three fetches", async () => {
+  it("live mode fetches every non-final game every tick while the week is still open, turns final the tick it settles, and is never re-listed after", async () => {
     await seedPlayers(["p1"]);
     const script: FakeStatsProviderScript = {
       games: { 1: [{ gameId: "g_live", week: 1, status: "in_progress", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
@@ -218,16 +218,24 @@ describe("createIngestionWorker", () => {
     const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
     const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, mode: "live" });
 
-    await worker.tick();
+    await worker.tick(); // still in progress: live mode fetches it anyway
     expect(getGameStatLinesSpy).toHaveBeenCalledTimes(1);
+
+    await worker.tick(); // in progress again — unlike final-only mode, live refetches every tick
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(2);
 
     script.games[1] = [{
       gameId: "g_live", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN",
       lines: [statLine("p1", 1, { passingYards: 200, passingTouchdowns: 2 })],
     }];
-    await worker.tick();
-    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(2);
+    await worker.tick(); // turns final: live mode still fetches it THIS tick too
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(3);
+    const [settled] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+    expect(settled).toMatchObject({ status: "final" });
 
+    // Fully ingested and final now: `weeksToExamine`'s cold-start-mid-season fix advances the
+    // pointer past a genuinely settled week regardless of mode, so a further tick never re-lists
+    // week 1 — no further fetch, live mode or not.
     await worker.tick();
     expect(getGameStatLinesSpy).toHaveBeenCalledTimes(3);
   });
@@ -469,5 +477,95 @@ describe("createIngestionWorker", () => {
       worker.stop();
       consoleErrorSpy.mockRestore();
     }
+  });
+
+  it("cold start mid-season: reaches and ingests the live week within a bounded number of ticks, never re-listing a finalized week", async () => {
+    // Weeks 1-5 already final on the calendar, week 6 in progress — exactly the shape of
+    // starting the pipeline for the first time partway through a season, or restarting after an
+    // outage spanning more than `maxWeeksPerTick - 1` weeks. On a totally EMPTY `stat_weeks`
+    // table, the old fallback ("no non-final row exists -> start at week 1") marked weeks 1-2
+    // final on tick 1, found no non-final row on tick 2, and reset to week 1 forever — never
+    // reaching week 6 in any number of ticks. The fix resumes at `MAX(week) + 1` once every
+    // EXISTING row is final, so the pointer walks 1-2, 3-4, 5-6 and converges in bounded ticks.
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: [{ gameId: "g_w1", week: 1, status: "final", homeNflTeam: "A1", awayNflTeam: "A2", lines: [] }],
+        2: [{ gameId: "g_w2", week: 2, status: "final", homeNflTeam: "B1", awayNflTeam: "B2", lines: [] }],
+        3: [{ gameId: "g_w3", week: 3, status: "final", homeNflTeam: "C1", awayNflTeam: "C2", lines: [] }],
+        4: [{ gameId: "g_w4", week: 4, status: "final", homeNflTeam: "D1", awayNflTeam: "D2", lines: [] }],
+        5: [{ gameId: "g_w5", week: 5, status: "final", homeNflTeam: "E1", awayNflTeam: "E2", lines: [] }],
+        6: [{ gameId: "g_w6", week: 6, status: "in_progress", homeNflTeam: "F1", awayNflTeam: "F2", lines: [] }],
+      },
+    };
+    const provider = fakeStatsProvider(script);
+    const listGamesSpy = vi.spyOn(provider, "listGames");
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
+
+    // Generous but bounded: `ceil(6 / maxWeeksPerTick)` is the minimum ticks a correct
+    // implementation needs (1-2, 3-4, 5-6); the old bug never converged in ANY number of ticks,
+    // so this loop existing at all — and terminating — is itself part of the proof.
+    const MAX_TICKS = Math.ceil(6 / STATS_INGESTION_CONFIG.maxWeeksPerTick) + 1;
+    let reachedLiveWeek = false;
+    for (let i = 0; i < MAX_TICKS && !reachedLiveWeek; i++) {
+      await worker.tick();
+      const [week6] = await db.select().from(statWeeks).where(eq(statWeeks.week, 6));
+      reachedLiveWeek = week6?.status === "in_progress";
+    }
+
+    expect(reachedLiveWeek).toBe(true);
+
+    // Each already-settled week was examined exactly once, on the tick that finalized it — never
+    // re-listed afterward, which is the failure mode the fix closes.
+    for (const settledWeek of [1, 2, 3, 4, 5]) {
+      expect(listGamesSpy.mock.calls.filter(([week]) => week === settledWeek)).toHaveLength(1);
+    }
+  });
+
+  it("resumes at the week after the settled history, not week 1, once every existing row is final", async () => {
+    // The shape two prior ticks would have left behind: weeks 1 and 2 both settled. This is
+    // exactly the state that used to fall back to week 1 forever.
+    await db.insert(statWeeks).values([
+      { week: 1, status: "final" },
+      { week: 2, status: "final" },
+    ]);
+    const script: FakeStatsProviderScript = {
+      games: { 3: [{ gameId: "g_w3", week: 3, status: "scheduled", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
+    };
+    const provider = fakeStatsProvider(script);
+    const listGamesSpy = vi.spyOn(provider, "listGames");
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
+
+    await worker.tick();
+
+    expect(listGamesSpy).toHaveBeenCalledWith(3);
+    expect(listGamesSpy).not.toHaveBeenCalledWith(1);
+    expect(listGamesSpy).not.toHaveBeenCalledWith(2);
+  });
+
+  it("a week's final games exceeding maxGamesPerTick's budget stay in_progress until every one is ingested, over two ticks", async () => {
+    // More final games in one week than a single tick's budget can fetch — a real Sunday's ~16
+    // games can still exceed `maxGamesPerTick` once a second examined week's own budget share is
+    // subtracted, and this is the boundary case: everything in ONE week alone.
+    const gameCount = STATS_INGESTION_CONFIG.maxGamesPerTick + 5;
+    const games: ScriptedGame[] = Array.from({ length: gameCount }, (_, i) => ({
+      gameId: `g_budget_${i}`, week: 1, status: "final", homeNflTeam: `H${i}`, awayNflTeam: `A${i}`, lines: [],
+    }));
+    const script: FakeStatsProviderScript = { games: { 1: games } };
+    const provider = fakeStatsProvider(script);
+    const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
+
+    await worker.tick(); // fetches only the first maxGamesPerTick box scores
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(STATS_INGESTION_CONFIG.maxGamesPerTick);
+    const [afterFirstTick] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+    // The provider reports every game final, but not every final game's box score has been
+    // ingested yet — the week must not be marked final on the provider's word alone, or the
+    // unfetched games' points would never be fetched again (a final week is never re-examined).
+    expect(afterFirstTick).toMatchObject({ status: "in_progress", gamesFinal: gameCount });
+
+    await worker.tick(); // fetches the remainder — and only now finalizes
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(gameCount);
+    const [afterSecondTick] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+    expect(afterSecondTick).toMatchObject({ status: "final" });
   });
 });

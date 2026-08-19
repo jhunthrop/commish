@@ -1,4 +1,4 @@
-import { and, asc, eq, ne } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import type Redis from "ioredis";
 import type { Db } from "@/db/client";
 import { matchups, statWeeks } from "@/db/schema";
@@ -57,18 +57,37 @@ const defaultOnOutcome = (outcome: TickOutcome): void => {
 
 /**
  * The earliest week not yet final, and the `maxWeeks - 1` weeks after it. Never the whole
- * season. A week with no `stat_weeks` row at all (never ticked) counts as not-final by absence,
- * which is what makes week 1 the starting point on a completely fresh database.
+ * season.
+ *
+ * Three cases, not two:
+ *
+ * 1. A non-final row exists — resume there, same as always. This is the steady-state case:
+ *    continuous operation always has a `scheduled` lookahead row for the week after the one
+ *    currently in flight (planted by THIS tick's own window before that week ever finalizes),
+ *    so the pointer walks forward one week at a time, indefinitely, and never needs case 3.
+ * 2. The table is completely empty (never ticked at all) — start at week 1. Absence counts as
+ *    not-final here, and only here: there is no history yet to have settled.
+ * 3. Every EXISTING row is final, but the table isn't empty — resume at `MAX(week) + 1`, never
+ *    back at week 1. Without this, a cold start partway through a season (or a restart after an
+ *    outage spanning more than `maxWeeks - 1` weeks) marks its first window's weeks final in a
+ *    single tick, finds no non-final row anywhere on the NEXT tick, and falls through to case 2's
+ *    week-1 fallback forever — a permanent stall that never reaches the live week and burns the
+ *    monthly request budget on the same two already-settled weeks tick after tick. See
+ *    `worker.test.ts`'s "cold start mid-season" case.
+ *
+ * Clamped to `STATS_INGESTION_CONFIG.lastWeekOfSeason` either way, so a fully-settled season's
+ * pointer stops advancing past the season rather than examining weeks that will never exist.
  */
 async function weeksToExamine(db: Db, maxWeeks: number): Promise<readonly number[]> {
-  const [row] = await db
-    .select({ week: statWeeks.week })
-    .from(statWeeks)
-    .where(ne(statWeeks.status, "final"))
-    .orderBy(asc(statWeeks.week))
-    .limit(1);
-  const start = row?.week ?? 1;
-  return Array.from({ length: maxWeeks }, (_, i) => start + i);
+  // The whole table, not a single-row query: it holds at most one row per week of a season
+  // (~18 at the outside), so reading it in full is cheap, and only reading it in full lets this
+  // tell "empty" (case 2) apart from "every row is final" (case 3) — a `WHERE status != 'final'
+  // LIMIT 1` query can't distinguish the two, because both return no row.
+  const rows = await db.select({ week: statWeeks.week, status: statWeeks.status }).from(statWeeks).orderBy(asc(statWeeks.week));
+  const firstNonFinal = rows.find((row) => row.status !== "final");
+  const start = firstNonFinal !== undefined ? firstNonFinal.week : rows.length === 0 ? 1 : rows[rows.length - 1]!.week + 1;
+  const lastWeek = STATS_INGESTION_CONFIG.lastWeekOfSeason;
+  return Array.from({ length: maxWeeks }, (_, i) => start + i).filter((week) => week <= lastWeek);
 }
 
 async function needsBoxScore(redis: Redis, game: GameSummary, mode: IngestionMode): Promise<boolean> {
@@ -202,17 +221,47 @@ export function createIngestionWorker({
     // Games actually fetched THIS tick whose box score is now final — the finalGame marker for
     // each is set only after `persistTick` below commits, never here at fetch time.
     const finalGamesFetched: GameSummary[] = [];
+    const finalGamesFetchedIds = new Set<string>();
     for (const game of games) {
       if (gamesFetched >= gamesBudgetRemaining) break;
       if (!(await needsBoxScore(redis, game, mode))) continue;
       fetchedLines.push(...(await provider.getGameStatLines(game)));
       gamesFetched += 1;
-      if (game.status === "final") finalGamesFetched.push(game);
+      if (game.status === "final") {
+        finalGamesFetched.push(game);
+        finalGamesFetchedIds.add(game.gameId);
+      }
     }
 
     const gamesTotal = games.length;
-    const gamesFinal = games.filter((game) => game.status === "final").length;
-    const status = weekStatusOf(games);
+    const finalGames = games.filter((game) => game.status === "final");
+    const gamesFinal = finalGames.length;
+
+    // A week may only be reported `final` once EVERY final game's box score has actually been
+    // ingested — not merely once the provider's schedule says every game ended. `maxGamesPerTick`
+    // can leave a final game's box score unfetched (a real Sunday runs more games than the
+    // budget allows in one tick), and marking the week `final` anyway would mean that game's
+    // points are NEVER fetched again: a `final` week is never re-examined (`weeksToExamine`
+    // above only resumes at a non-final row, or the week immediately after the settled history).
+    //
+    // Checked against the `finalGame` Redis marker directly (set below, after `persistTick`
+    // commits) rather than `needsBoxScore`: `needsBoxScore` also folds in `live` mode's "always
+    // refetch a final game" rule, which answers a different question ("should THIS tick fetch
+    // it") than the one asked here ("has it EVER been ingested"). A game fetched THIS tick counts
+    // too, even though its marker isn't written until after `persistTick` below — it's about to
+    // be, by the same transaction this status is persisted alongside.
+    let everyFinalGameIngested = true;
+    for (const game of finalGames) {
+      if (finalGamesFetchedIds.has(game.gameId)) continue;
+      const alreadyIngested = await redis.exists(STATS_INGESTION_CONFIG.keys.finalGame(game.gameId));
+      if (alreadyIngested === 0) {
+        everyFinalGameIngested = false;
+        break;
+      }
+    }
+
+    const providerStatus = weekStatusOf(games);
+    const status: WeekStatus = providerStatus === "final" && !everyFinalGameIngested ? "in_progress" : providerStatus;
 
     const snapshotKey = STATS_INGESTION_CONFIG.keys.snapshot(week);
     const previousRaw = await redis.hgetall(snapshotKey);

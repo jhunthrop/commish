@@ -26,6 +26,19 @@ export const STATS_INGESTION_CONFIG = {
   pollIntervalMs: 30 * 60_000,
   /** Weeks examined per tick. A tick scans forward from the newest non-final week, not the whole season. */
   maxWeeksPerTick: 2,
+  /**
+   * The last week any provider will ever be asked about. `weeksToExamine` (`worker.ts`) clamps
+   * its forward-advancing window to this so a fully-settled season doesn't march the "next week
+   * to examine" pointer past the season forever, spending a `listGames` request every tick on a
+   * week that will never exist.
+   *
+   * Provider-agnostic on purpose — this module must not import a specific provider's config —
+   * but chosen to cover every provider this product has: Tank01's regular season runs
+   * `TANK01_CONFIG.weeks.first..last` (`src/stats/tank01/config.ts`, `last: 18`), and the mock's
+   * committed dataset (`SEASON_WEEKS`, `src/stats/mock/generate-dataset.ts`) is 17. 18 is the
+   * ceiling either provider needs.
+   */
+  lastWeekOfSeason: 18,
   /** Ceiling on box scores fetched in one tick, so one tick cannot spend a week's budget. */
   maxGamesPerTick: 20,
   /** Minimum gap between two logs about the same stuck week, mirroring DRAFT_SERVICE_CONFIG.tickWarnIntervalMs. */
