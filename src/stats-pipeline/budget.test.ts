@@ -7,6 +7,9 @@ import { STATS_INGESTION_CONFIG } from "./config";
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 
 const INGESTION_CEILING = STATS_INGESTION_CONFIG.monthlyRequestBudget - STATS_INGESTION_CONFIG.reservedForBackfill;
+const GRANTED = { granted: true };
+const EXHAUSTED = { granted: false, denial: "budget-exhausted" };
+const UNAVAILABLE = { granted: false, denial: "ledger-unavailable" };
 
 const AUGUST = "2026-08-17T12:00:00.000Z";
 const AUGUST_LATE = "2026-08-31T23:00:00.000Z";
@@ -60,17 +63,17 @@ describe("createRequestBudget", () => {
   it("grants a reservation on a fresh month and remaining() drops by exactly that many", async () => {
     const budget = createRequestBudget({ redis, clock: fixedClock });
     expect(await budget.remaining()).toBe(INGESTION_CEILING);
-    await expect(budget.reserve(40)).resolves.toBe(true);
+    await expect(budget.reserve(40)).resolves.toEqual(GRANTED);
     expect(await budget.remaining()).toBe(INGESTION_CEILING - 40);
   });
 
   it("denies a reservation that would exceed the ceiling, and a denial consumes nothing", async () => {
     const budget = createRequestBudget({ redis, clock: fixedClock });
-    await expect(budget.reserve(INGESTION_CEILING)).resolves.toBe(true);
+    await expect(budget.reserve(INGESTION_CEILING)).resolves.toEqual(GRANTED);
     const remainingBeforeDenial = await budget.remaining();
     expect(remainingBeforeDenial).toBe(0);
 
-    await expect(budget.reserve(1)).resolves.toBe(false);
+    await expect(budget.reserve(1)).resolves.toEqual(EXHAUSTED);
     expect(await budget.remaining()).toBe(remainingBeforeDenial);
   });
 
@@ -78,11 +81,11 @@ describe("createRequestBudget", () => {
     const augustBudget = createRequestBudget({ redis, clock: clockAt(AUGUST_LATE) });
     const septemberBudget = createRequestBudget({ redis, clock: clockAt(SEPTEMBER) });
 
-    await expect(augustBudget.reserve(INGESTION_CEILING)).resolves.toBe(true);
+    await expect(augustBudget.reserve(INGESTION_CEILING)).resolves.toEqual(GRANTED);
     expect(await augustBudget.remaining()).toBe(0);
     // September's ledger is untouched by August spending every last request it had.
     expect(await septemberBudget.remaining()).toBe(INGESTION_CEILING);
-    await expect(septemberBudget.reserve(INGESTION_CEILING)).resolves.toBe(true);
+    await expect(septemberBudget.reserve(INGESTION_CEILING)).resolves.toEqual(GRANTED);
   });
 
   it("carries a TTL, so an abandoned month's counter is not immortal", async () => {
@@ -101,7 +104,7 @@ describe("createRequestBudget", () => {
     const dead = throwingRedis();
     try {
       const budget = createRequestBudget({ redis: dead, clock: fixedClock });
-      await expect(budget.reserve(1)).resolves.toBe(false);
+      await expect(budget.reserve(1)).resolves.toEqual(UNAVAILABLE);
     } finally {
       dead.disconnect();
     }
@@ -124,7 +127,7 @@ describe("createRequestBudget", () => {
     // because the script (and therefore the INCRBY inside it) never ran.
     const key = keyFor(AUGUST);
     const budget = createRequestBudget({ redis: evalThrowingRedis(redis), clock: fixedClock });
-    await expect(budget.reserve(5)).resolves.toBe(false);
+    await expect(budget.reserve(5)).resolves.toEqual(UNAVAILABLE);
     expect(await control.exists(key)).toBe(0);
   });
 
@@ -133,9 +136,46 @@ describe("createRequestBudget", () => {
     // two callers racing for the last 5 requests can't both win — the same property the reviewer
     // verified empirically against real Redis before this fix, now asserted as a test.
     const budget = createRequestBudget({ redis, clock: fixedClock });
-    await expect(budget.reserve(INGESTION_CEILING - 5)).resolves.toBe(true);
+    await expect(budget.reserve(INGESTION_CEILING - 5)).resolves.toEqual(GRANTED);
     const [first, second] = await Promise.all([budget.reserve(5), budget.reserve(5)]);
-    expect([first, second].filter(Boolean)).toHaveLength(1);
+    expect([first, second].filter((result) => result.granted)).toHaveLength(1);
     expect(await budget.remaining()).toBe(0);
+  });
+
+  it("the backfill draws on the whole monthly quota, not the ingestion share, and both count into one ledger", async () => {
+    // `reservedForBackfill` is only a real reservation if the backfill can actually reach it:
+    // ingestion is capped at (monthly - reserved), so whatever ingestion leaves untouched at that
+    // cap is exactly what a backfill can still spend, and the two together can never exceed the
+    // month's quota because they increment the same key.
+    const budget = createRequestBudget({ redis, clock: fixedClock });
+    await expect(budget.reserve(INGESTION_CEILING)).resolves.toEqual(GRANTED);
+    await expect(budget.reserve(1)).resolves.toEqual(EXHAUSTED);
+
+    await expect(budget.reserveBackfill(STATS_INGESTION_CONFIG.reservedForBackfill)).resolves.toEqual(GRANTED);
+    await expect(budget.reserveBackfill(1)).resolves.toEqual(EXHAUSTED);
+    expect(Number(await control.get(keyFor(AUGUST)))).toBe(STATS_INGESTION_CONFIG.monthlyRequestBudget);
+  });
+
+  it("an unreachable ledger denies a backfill too, rather than letting the largest write in the repo spend uncounted", async () => {
+    const dead = throwingRedis();
+    try {
+      const budget = createRequestBudget({ redis: dead, clock: fixedClock });
+      await expect(budget.reserveBackfill(2)).resolves.toEqual(UNAVAILABLE);
+    } finally {
+      dead.disconnect();
+    }
+  });
+
+  it("honors an injected monthly ceiling, which is how STATS_MONTHLY_REQUEST_BUDGET reaches the ledger", async () => {
+    // The operator lever C2 wired: the edge resolves the env var and hands the number here. A
+    // ceiling of 310 leaves 2 for ingestion once the backfill reserve is held back.
+    const budget = createRequestBudget({
+      redis,
+      clock: fixedClock,
+      monthlyRequestBudget: STATS_INGESTION_CONFIG.reservedForBackfill + 2,
+    });
+    expect(await budget.remaining()).toBe(2);
+    await expect(budget.reserve(2)).resolves.toEqual(GRANTED);
+    await expect(budget.reserve(1)).resolves.toEqual(EXHAUSTED);
   });
 });

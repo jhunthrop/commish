@@ -14,6 +14,21 @@ const NOOP_SCORE_CACHE: Pick<ScoreCache, "invalidate"> = {
   invalidate: async () => {},
 };
 
+/**
+ * Awaits the eviction and swallows its failure, with a log — the middle ground between `void`
+ * (the response can outrun the DEL, so an immediate re-read hits a stale entry) and a bare
+ * `await` (a caller that injects something less forgiving than `ScoreCache` could fail a write
+ * that already committed). A missed eviction is one stale read bounded by the key's TTL; it is
+ * never worth a 500, and it is never worth being silent about either.
+ */
+async function invalidateQuietly(cache: Pick<ScoreCache, "invalidate">, leagueId: string, weekNumber: number): Promise<void> {
+  try {
+    await cache.invalidate(leagueId, weekNumber);
+  } catch (error: unknown) {
+    console.error("[league-service] score cache invalidation failed", { leagueId, weekNumber }, error);
+  }
+}
+
 export interface GetLineupInput {
   readonly teamId: string;
   readonly weekNumber: number;
@@ -108,6 +123,15 @@ export async function isWeekLocked(db: Db, weekNumber: number): Promise<boolean>
  * the boundary's own: every named player must actually be on the roster, and no player may
  * occupy two spots.
  *
+ * The lock is checked TWICE: once up front, so an obviously-locked week costs one query and a
+ * clear refusal, and again inside the write transaction, with `SELECT … FOR SHARE` on the week's
+ * `stat_weeks` row. The up-front check alone is a read-validate-write hole: four more round trips
+ * (roster, players, validation) run between it and the upsert, and the ingestion worker flips the
+ * week to `in_progress` inside `persistTick`'s own transaction with no coordination — so a lineup
+ * submitted in that window used to be accepted after kickoff. `FOR SHARE` blocks against
+ * `persistTick`'s upsert of that row, which is the same read-validate-write hole Plan A closed
+ * for drafts with `SELECT … FOR UPDATE` on the draft row.
+ *
  * `cache` is injected with a no-op default so every existing caller keeps working without a
  * Redis connection. When a real cache is supplied, its cached score for this league/week is
  * invalidated AFTER the write below completes — not inside it. The failure mode of a
@@ -158,16 +182,30 @@ export async function setLineup(
   const validation = validateLineup({ slotConfig: starterConfig, roster: startersOf(lineup), playerPositions });
   if (!validation.valid) return { ok: false, status: 422, reason: validation.reason };
 
-  await db
-    .insert(lineupSlots)
-    .values(lineup.map((slot) => ({ teamId: input.teamId, weekNumber: input.weekNumber, slot: slot.slot, slotIndex: slot.slotIndex, playerId: slot.playerId })))
-    .onConflictDoUpdate({
-      target: [lineupSlots.teamId, lineupSlots.weekNumber, lineupSlots.slot, lineupSlots.slotIndex],
-      set: excludedSetFor(lineupSlots, ["teamId", "weekNumber", "slot", "slotIndex"]),
-    });
+  const locked = await db.transaction(async (tx) => {
+    // The re-check, holding a share lock on the week's row for the rest of this transaction so
+    // `persistTick`'s upsert of it cannot commit underneath the write below. An absent row is a
+    // week the worker has never reached, which reads as open — exactly as `weekStatusFor` treats
+    // it — and is the one case no lock can cover, since there is no row yet to lock.
+    const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, input.weekNumber)).for("share");
+    if (isLineupLocked(week?.status ?? "scheduled")) return true;
 
-  // After the write commits, never inside it — see the doc comment above.
-  void cache.invalidate(input.leagueId, input.weekNumber);
+    await tx
+      .insert(lineupSlots)
+      .values(lineup.map((slot) => ({ teamId: input.teamId, weekNumber: input.weekNumber, slot: slot.slot, slotIndex: slot.slotIndex, playerId: slot.playerId })))
+      .onConflictDoUpdate({
+        target: [lineupSlots.teamId, lineupSlots.weekNumber, lineupSlots.slot, lineupSlots.slotIndex],
+        set: excludedSetFor(lineupSlots, ["teamId", "weekNumber", "slot", "slotIndex"]),
+      });
+    return false;
+  });
+  if (locked) return { ok: false, status: 409, reason: `Week ${input.weekNumber} has started, so its lineup can't change.` };
+
+  // After the write commits, never inside it — see the doc comment above. Awaited and caught
+  // rather than fire-and-forget: the cache degrades open on its own, so awaiting cannot fail this
+  // response, but a `void` would let the response reach the browser before the DEL reached Redis
+  // and an immediate re-read could hit the entry this write just made stale.
+  await invalidateQuietly(cache, input.leagueId, input.weekNumber);
 
   const view = await lineupView(db, { leagueId: input.leagueId, teamId: input.teamId, weekNumber: input.weekNumber });
   // `view` cannot be null here: the league row was read at the top of this function.

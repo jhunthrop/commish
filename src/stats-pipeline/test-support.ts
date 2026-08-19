@@ -22,7 +22,12 @@ export interface ScriptedGame {
 export interface FakeStatsProviderScript {
   players?: readonly Player[];
   games: Partial<Record<number, readonly ScriptedGame[]>>;
+  /** Defaults to `STATS_INGESTION_CONFIG.lastWeekOfSeason`'s old value of 18, which is past every
+   *  week these scripts use — a test that cares about the season clamp sets its own. */
+  lastWeekOfSeason?: number;
 }
+
+const DEFAULT_LAST_WEEK = 18;
 
 /**
  * A `StatsProvider` whose every answer comes straight out of `script`, for driving the ingestion
@@ -35,6 +40,8 @@ export function fakeStatsProvider(script: FakeStatsProviderScript): StatsProvide
   const gamesFor = (week: number): readonly ScriptedGame[] => script.games[week] ?? [];
 
   return {
+    lastWeekOfSeason: script.lastWeekOfSeason ?? DEFAULT_LAST_WEEK,
+
     async listPlayers(): Promise<readonly Player[]> {
       return script.players ?? [];
     },

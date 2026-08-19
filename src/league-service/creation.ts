@@ -101,8 +101,14 @@ export async function createLeague(
 
   // After the transaction commits, never inside it — the same reason `setLineup` invalidates
   // post-commit (`lineups.ts`): an eviction for a write that then rolls back is worse than a
-  // brief stale read.
-  void cache.invalidateScoringSettings(leagueId);
+  // brief stale read. Awaited and caught rather than fire-and-forget, so the response cannot
+  // outrun the DEL, and a failure is surfaced in the log instead of vanishing into a floating
+  // promise.
+  try {
+    await cache.invalidateScoringSettings(leagueId);
+  } catch (error: unknown) {
+    console.error("[league] scoring settings cache invalidation failed", { leagueId }, error);
+  }
 
   return { ok: true, leagueId, teamId, draftId };
 }

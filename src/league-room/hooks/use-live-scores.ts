@@ -180,6 +180,12 @@ export function useLiveScores(leagueId: string, initial: LiveScoresInitial): Liv
     const onScoreEvent = (event: MessageEvent): void => {
       const payload = parseScoreFrame(String(event.data));
       if (payload === null) return;
+      // The stream is per LEAGUE; `stat_weeks.version` is per WEEK. A tick can publish for the
+      // week this page shows AND for another week in the same pass, and team ids are stable
+      // across weeks within a league — so without this gate another week's totals merge straight
+      // over this week's, under this week's header, carrying that week's status and Final badge.
+      // The most reachable trigger is a manager leaving last week's matchup page open on Sunday.
+      if (payload.week !== initial.week) return;
       if (payload.version <= versionRef.current) return; // stale — a reorder across a reconnect
       versionRef.current = payload.version;
       const merged = new Map(scoresRef.current);
@@ -202,7 +208,7 @@ export function useLiveScores(leagueId: string, initial: LiveScoresInitial): Liv
     source.addEventListener("error", onError);
 
     return () => source.close();
-  }, [deps, leagueId, refresh]);
+  }, [deps, initial.week, leagueId, refresh]);
 
   return state;
 }

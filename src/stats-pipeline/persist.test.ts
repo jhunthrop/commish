@@ -5,7 +5,7 @@ import type { Db, DbTx } from "@/db/client";
 import { players, playerStatLines, statWeeks } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
 import type { WeekStatus } from "./contract";
-import { persistTick, type PersistTickInput } from "./persist";
+import { byPlayerId, persistTick, type PersistTickInput } from "./persist";
 
 const db = createTestDb();
 const NOW = "2026-09-14T20:00:00.000Z";
@@ -29,7 +29,6 @@ const line = (playerId: string, over: Partial<StatLine> = {}): StatLine => ({
 function tick(input: {
   readonly week: number;
   readonly changed: readonly StatLine[];
-  readonly dropped?: readonly string[];
   readonly status: WeekStatus;
   readonly games: { readonly total: number; readonly final: number };
 }): PersistTickInput {
@@ -125,15 +124,6 @@ describe("persistTick", () => {
     }
   });
 
-  it("drops a player's line only when the `dropped` list explicitly names it", async () => {
-    await seedPlayers(["p1", "p2"]);
-    await persistTick(db, tick({ week: 3, changed: [line("p1"), line("p2")], status: "final", games: { total: 1, final: 1 } }));
-    await persistTick(db, tick({ week: 3, changed: [], dropped: ["p2"], status: "final", games: { total: 1, final: 1 } }));
-
-    const rows = await db.select().from(playerStatLines).where(eq(playerStatLines.week, 3));
-    expect(rows.map((row) => row.playerId)).toEqual(["p1"]);
-  });
-
   it("writes the stat lines and the stat_weeks advance in one transaction — a failure on the second write rolls back the first", async () => {
     await seedPlayers(["p1"]);
 
@@ -174,5 +164,42 @@ describe("persistTick", () => {
     expect(rows).toHaveLength(0);
     const weeks = await db.select().from(statWeeks).where(eq(statWeeks.week, 3));
     expect(weeks).toHaveLength(0);
+  });
+
+  it("never lets a stale tick regress a settled week back to in_progress", async () => {
+    // Two instances partition a week's games differently under `maxGamesPerTick`, so the one that
+    // fetched fewer of them computes `everyFinalGameIngested = false` from markers the other has
+    // not committed yet. Without monotonicity that instance writes `in_progress` over `final`,
+    // which re-arms the examination window and re-spends the request budget on a settled week.
+    await seedPlayers(["p1"]);
+    await persistTick(db, tick({ week: 3, changed: [line("p1")], status: "final", games: { total: 2, final: 2 } }));
+
+    await persistTick(db, tick({ week: 3, changed: [], status: "in_progress", games: { total: 2, final: 1 } }));
+
+    const [week] = await db.select().from(statWeeks).where(eq(statWeeks.week, 3));
+    expect(week!.status).toBe("final");
+    // The honest facts a stale tick DOES carry still land: only the settled status is pinned.
+    expect(week!.gamesFinal).toBe(1);
+  });
+
+  it("a week that has not settled still moves through every status", async () => {
+    // The other half of monotonicity: it pins `final` and nothing else, so a week walking
+    // scheduled -> in_progress is untouched by the rule above.
+    await persistTick(db, tick({ week: 4, changed: [], status: "scheduled", games: { total: 2, final: 0 } }));
+    await persistTick(db, tick({ week: 4, changed: [], status: "in_progress", games: { total: 2, final: 1 } }));
+
+    const [week] = await db.select().from(statWeeks).where(eq(statWeeks.week, 4));
+    expect(week!.status).toBe("in_progress");
+  });
+
+  it("orders a tick's changed lines by playerId, whatever order the fetch produced them in", () => {
+    // Two instances inserting the same two rows in opposite orders is a deadlock; one agreed
+    // order is the whole fix, and this is the only place it can be observed — the SQL it protects
+    // looks identical either way.
+    const shuffled = [line("p9"), line("p1"), line("p5")];
+    expect(byPlayerId(shuffled).map((row) => row.playerId)).toEqual(["p1", "p5", "p9"]);
+    // Stable for a repeated id, and non-mutating: the caller's array is untouched.
+    expect(byPlayerId([line("p1"), line("p1")]).map((row) => row.playerId)).toEqual(["p1", "p1"]);
+    expect(shuffled.map((row) => row.playerId)).toEqual(["p9", "p1", "p5"]);
   });
 });

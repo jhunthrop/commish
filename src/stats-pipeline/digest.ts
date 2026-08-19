@@ -27,14 +27,25 @@ export interface DiffResult {
  * what the caller writes back as the next tick's snapshot. Returning only the changed digests
  * would drop every unchanged player from the snapshot and make them all look changed on the
  * following tick, which is the same bug as having no diff at all.
+ *
+ * `changed` is keyed by `playerId`, LAST LINE WINS — the same de-duplication `digests` always
+ * had, and for a harder reason. `persistTick` inserts `changed` as one multi-row
+ * `ON CONFLICT DO UPDATE`, and Postgres rejects the WHOLE statement with `21000` ("ON CONFLICT DO
+ * UPDATE command cannot affect row a second time") if any key repeats: one duplicated player id
+ * anywhere in a tick's fetched lines fails that tick's entire transaction, every poll interval,
+ * until the upstream duplicate clears. A player appearing in two of a week's box scores, or an
+ * adapter emitting a team defense twice, is a data-quality problem worth fixing at its source —
+ * but it must never be able to take the pipeline down, so the last line for a player wins here
+ * and the tick lands.
  */
 export function diffStatLines(previous: ReadonlyMap<string, string>, next: readonly StatLine[]): DiffResult {
   const digests = new Map<string, string>();
-  const changed: StatLine[] = [];
+  const changed = new Map<string, StatLine>();
   for (const line of next) {
     const digest = statLineDigest(line);
     digests.set(line.playerId, digest);
-    if (previous.get(line.playerId) !== digest) changed.push(line);
+    if (previous.get(line.playerId) !== digest) changed.set(line.playerId, line);
+    else changed.delete(line.playerId);
   }
-  return { changed, digests };
+  return { changed: [...changed.values()], digests };
 }

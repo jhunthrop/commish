@@ -25,3 +25,24 @@ export function envOrUndefined(name: string): string | undefined {
   const value = process.env[name];
   return value === undefined || value === "" ? undefined : value;
 }
+
+/**
+ * A boundary value from `.env.local`, not from code, so it is validated here rather than
+ * trusted. `Number("banana")` is `NaN`, and an unvalidated `NaN` is worse than a crash in every
+ * consumer this has: a season stringified straight onto a query string ships the literal `"NaN"`,
+ * a poll interval of `NaN` makes `setInterval` fire continuously, and a request budget of `NaN`
+ * compares false against every ceiling.
+ *
+ * Lives here rather than in one consumer because three modules now need the identical rule
+ * (`src/stats/registry.ts`'s season and mock live week, `src/stats-pipeline/settings.ts`'s poll
+ * interval and monthly budget). The error names the VARIABLE, never just the value, because the
+ * whole point of failing fast on a boundary value is telling the operator which line of
+ * `.env.local` to fix.
+ */
+export function parsePositiveInteger(name: string, raw: string): number {
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed) || parsed <= 0) {
+    throw new Error(`${name}="${raw}" is not a positive integer.`);
+  }
+  return parsed;
+}

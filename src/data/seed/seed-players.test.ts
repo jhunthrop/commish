@@ -5,6 +5,7 @@ import { playerStatLines } from "@/db/schema";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import { PLAYER_COUNT, SEASON_WEEKS } from "@/stats/mock/generate-dataset";
 import type { StatsProvider } from "@/stats/provider";
+import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { seedPlayers } from "./seed-players";
 
@@ -55,18 +56,20 @@ describe("seedPlayers", () => {
     const revisedPassingYards = target.passingYards + 100;
 
     // Delegates to the mock provider and maps only the one targeted line — immutable,
-    // never mutates a line returned by the underlying provider.
+    // never mutates a line returned by the underlying provider. The revision rides on the
+    // per-GAME read, which is what `seedPlayers` walks a week with.
     const revisedProvider: StatsProvider = {
+      lastWeekOfSeason: provider.lastWeekOfSeason,
       listPlayers: () => provider.listPlayers(),
       listGames: (week) => provider.listGames(week),
-      getGameStatLines: (game) => provider.getGameStatLines(game),
-      getWeeklyStatLines: async (week) => {
-        const lines = await provider.getWeeklyStatLines(week);
-        if (week !== 1) return lines;
+      getGameStatLines: async (game) => {
+        const lines = await provider.getGameStatLines(game);
+        if (game.week !== 1) return lines;
         return lines.map((line) =>
           line.playerId === target.playerId ? { ...line, passingYards: revisedPassingYards } : line,
         );
       },
+      getWeeklyStatLines: (week) => provider.getWeeklyStatLines(week),
     };
 
     await seedPlayers(db, revisedProvider);
@@ -84,6 +87,33 @@ describe("seedPlayers", () => {
     await seedPlayers(db, provider, cache);
     expect(cache.invalidatePlayers).toHaveBeenCalledTimes(1);
   }, 30_000);
+
+  it("reserves every upstream call it makes against the backfill ledger, at the count that call costs", async () => {
+    // `reservedForBackfill` was only ever a reduction of the ingestion ceiling: the largest
+    // spender in the repo reserved nothing at all, so the month's real total could exceed the
+    // quota by the whole cost of a backfill. Each reservation here is an exact number, never a
+    // worst case — the week's schedule is listed first precisely so its box-score count is known.
+    const reserved: number[] = [];
+    const budget = { reserveBackfill: vi.fn(async (count: number) => { reserved.push(count); return { granted: true as const }; }) };
+
+    await seedPlayers(db, provider, undefined, budget);
+
+    // 2 for listPlayers, then per week 1 for the schedule and one per game, then the 1 that
+    // discovers the season is over.
+    expect(reserved[0]).toBe(2);
+    const gamesInWeekOne = (await provider.listGames(1)).length;
+    expect(reserved[1]).toBe(1);
+    expect(reserved[2]).toBe(gamesInWeekOne);
+    expect(reserved.reduce((total, count) => total + count, 0)).toBeLessThanOrEqual(
+      STATS_INGESTION_CONFIG.reservedForBackfill,
+    );
+  }, 30_000);
+
+  it("stops the whole backfill rather than seeding half a season when the ledger denies it", async () => {
+    const budget = { reserveBackfill: async () => ({ granted: false as const, denial: "budget-exhausted" as const }) };
+    await expect(seedPlayers(db, provider, undefined, budget)).rejects.toThrow(/STATS_MONTHLY_REQUEST_BUDGET/);
+    expect(await countOf("players")).toBe(0);
+  });
 
   it("does not invalidate the player index when the local-target guard refuses to run", async () => {
     // The guard throws before a single row is written — the earliest reachable failure this

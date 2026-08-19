@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { StatLine } from "@/domain/player";
-import { fakeStatsProvider } from "./test-support";
+import type { Player, StatLine } from "@/domain/player";
+import { describeStatsProviderContract } from "@/stats/test-support";
+import { fakeStatsProvider, type FakeStatsProviderScript } from "./test-support";
 
 const LINE: StatLine = {
   playerId: "p1",
@@ -53,3 +54,66 @@ describe("fakeStatsProvider", () => {
     await expect(provider.getWeeklyStatLines(2)).resolves.toEqual([]);
   });
 });
+
+/**
+ * A representative script for the contract suite below: every position including DEF, two games
+ * in week 1 (one final, so the "identical on a second read" case has something to read), and each
+ * game's lines drawn only from that game's own two teams.
+ */
+const CONTRACT_PLAYERS: readonly Player[] = [
+  { id: "qb_sf", name: "A Quarterback", position: "QB", nflTeam: "SF" },
+  { id: "rb_sf", name: "A Running Back", position: "RB", nflTeam: "SF" },
+  { id: "wr_sea", name: "A Receiver", position: "WR", nflTeam: "SEA" },
+  { id: "te_sea", name: "A Tight End", position: "TE", nflTeam: "SEA" },
+  { id: "k_kc", name: "A Kicker", position: "K", nflTeam: "KC" },
+  { id: "def_den", name: "DEN Defense", position: "DEF", nflTeam: "DEN" },
+];
+
+const CONTRACT_SCRIPT: FakeStatsProviderScript = {
+  players: CONTRACT_PLAYERS,
+  lastWeekOfSeason: 2,
+  games: {
+    1: [
+      {
+        gameId: "g_sf_sea",
+        week: 1,
+        status: "final",
+        homeNflTeam: "SEA",
+        awayNflTeam: "SF",
+        lines: [
+          { ...LINE, playerId: "qb_sf", passingYards: 240, passingTouchdowns: 2 },
+          { ...LINE, playerId: "rb_sf", rushingYards: -3 },
+          { ...LINE, playerId: "wr_sea", receptions: 6, receivingYards: 88 },
+          { ...LINE, playerId: "te_sea", receptions: 2 },
+        ],
+      },
+      {
+        gameId: "g_kc_den",
+        week: 1,
+        status: "in_progress",
+        homeNflTeam: "DEN",
+        awayNflTeam: "KC",
+        lines: [
+          { ...LINE, playerId: "k_kc", fieldGoalsMade: 2, extraPointsMade: 3 },
+          { ...LINE, playerId: "def_den", sacks: 3, defensiveInterceptions: 1 },
+        ],
+      },
+    ],
+    2: [
+      {
+        gameId: "g_sf_kc",
+        week: 2,
+        status: "final",
+        homeNflTeam: "KC",
+        awayNflTeam: "SF",
+        lines: [{ ...LINE, playerId: "qb_sf", week: 2, passingYards: 310 }],
+      },
+    ],
+  },
+};
+
+// The fake is a THIRD `StatsProvider` implementation, and every worker test is written against
+// its semantics — so it has to obey the same laws the mock and the Tank01 adapter do, or those
+// tests prove the worker correct against a provider that cannot exist. Bound to the same suite,
+// not exempted from it.
+describeStatsProviderContract("FakeStatsProvider", () => fakeStatsProvider(CONTRACT_SCRIPT));

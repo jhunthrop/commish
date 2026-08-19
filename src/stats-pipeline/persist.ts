@@ -1,4 +1,4 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { playerStatLines, statWeeks } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
@@ -9,13 +9,6 @@ export interface PersistTickInput {
   readonly week: number;
   /** Absolute-valued lines whose digest moved since the prior tick, per `diffStatLines`. */
   readonly changed: readonly StatLine[];
-  /**
-   * Player ids to remove from this week's stored lines. Only ever populated from an EXPLICIT
-   * upstream absence within a game the tick actually fetched — never inferred from "this tick
-   * returned fewer rows than last time," which is exactly the upstream hiccup this parameter
-   * must not react to.
-   */
-  readonly dropped?: readonly string[];
   readonly status: WeekStatus;
   readonly games: { readonly total: number; readonly final: number };
   /** ISO timestamp for `stat_weeks.updated_at`, from the caller's injected `Clock` — never a wall clock read in here. */
@@ -25,6 +18,22 @@ export interface PersistTickInput {
 export interface PersistTickResult {
   readonly version: number;
   readonly changedCount: number;
+}
+
+/**
+ * One agreed insertion order for a tick's changed lines.
+ *
+ * Two instances whose fetch sets overlap but were built in different orders (each takes "the
+ * first N games in `listGames` order" against a different `maxGamesPerTick` remainder) take row
+ * locks on `player_stat_lines` in different orders, and two transactions taking the same two
+ * locks in opposite orders is a deadlock (`40P01`) — one aborted tick, and Postgres picks which.
+ * Sorting is free next to the round trip and makes the whole class unrepresentable.
+ *
+ * Exported so the ordering itself is directly assertable: it is a property nothing else in the
+ * write path can demonstrate, since the SQL it protects looks identical either way.
+ */
+export function byPlayerId(lines: readonly StatLine[]): readonly StatLine[] {
+  return [...lines].sort((a, b) => (a.playerId < b.playerId ? -1 : a.playerId > b.playerId ? 1 : 0));
 }
 
 /**
@@ -46,14 +55,25 @@ export interface PersistTickResult {
  * Absolute values upserted on `(player_id, week)` are what makes re-ingestion incapable of
  * double-counting: there is nothing to accumulate, only a row to overwrite with the same numbers
  * it already held.
+ *
+ * `status` is MONOTONIC at `final`: a week that has settled can never be written back to
+ * `in_progress` or `scheduled`. Two instances ticking the same week partition its games
+ * differently, and the one that fetched fewer of them computes `everyFinalGameIngested = false`
+ * from markers the other has not committed yet — which used to let a stale tick regress a settled
+ * week, re-arm the examination window and re-spend the request budget on a week that was done.
+ * The correction sweep needs no exception to this: every game in the week it re-reads is final and
+ * already marked, so the sweep re-persists `final` over `final`.
+ *
+ * Rows are inserted in `playerId` order — see `byPlayerId`.
  */
 export async function persistTick(db: Db, input: PersistTickInput): Promise<PersistTickResult> {
+  const ordered = byPlayerId(input.changed);
   return db.transaction(async (tx) => {
     let actuallyChanged = 0;
-    if (input.changed.length > 0) {
+    if (ordered.length > 0) {
       const written = await tx
         .insert(playerStatLines)
-        .values(input.changed.map((line) => ({ ...line, week: input.week })))
+        .values(ordered.map((line) => ({ ...line, week: input.week })))
         .onConflictDoUpdate({
           target: [playerStatLines.playerId, playerStatLines.week],
           set: excludedSetFor(playerStatLines, ["playerId", "week"]),
@@ -61,12 +81,6 @@ export async function persistTick(db: Db, input: PersistTickInput): Promise<Pers
         })
         .returning({ playerId: playerStatLines.playerId });
       actuallyChanged = written.length;
-    }
-
-    if (input.dropped !== undefined && input.dropped.length > 0) {
-      await tx
-        .delete(playerStatLines)
-        .where(and(eq(playerStatLines.week, input.week), inArray(playerStatLines.playerId, [...input.dropped])));
     }
 
     // A fresh week starts at `versionBump` (0 or 1) — there is no prior row to add to. An
@@ -88,7 +102,10 @@ export async function persistTick(db: Db, input: PersistTickInput): Promise<Pers
       .onConflictDoUpdate({
         target: statWeeks.week,
         set: {
-          status: input.status,
+          // Monotonic at `final` — see this function's docblock. `excluded.status` rather than a
+          // bound parameter so both branches of the CASE are already the `week_status` enum and
+          // Postgres needs no cast to reconcile them.
+          status: sql`case when ${statWeeks.status} = 'final' then ${statWeeks.status} else excluded.status end`,
           version: sql`${statWeeks.version} + ${versionBump}`,
           gamesTotal: input.games.total,
           gamesFinal: input.games.final,

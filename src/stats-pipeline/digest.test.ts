@@ -57,4 +57,26 @@ describe("diffStatLines", () => {
     const next = [line("p1"), line("p2")];
     expect([...diffStatLines(new Map(), next).digests.keys()].sort()).toEqual(["p1", "p2"]);
   });
+
+  it("never hands back the same playerId twice, even when the tick's lines carry it twice", () => {
+    // `persistTick` inserts `changed` as one multi-row ON CONFLICT DO UPDATE, and Postgres
+    // rejects the WHOLE statement with 21000 if a conflict key repeats — so one duplicated player
+    // in a week's box scores used to fail the entire tick, every poll interval, until upstream
+    // cleared it. Last line wins, which is the documented rule.
+    const duplicated = [line("p1", { rushingYards: 40 }), line("p2"), line("p1", { rushingYards: 62 })];
+    const { changed, digests } = diffStatLines(new Map(), duplicated);
+
+    expect(changed.map((entry) => entry.playerId).sort()).toEqual(["p1", "p2"]);
+    expect(changed.find((entry) => entry.playerId === "p1")!.rushingYards).toBe(62);
+    expect(digests.get("p1")).toBe(statLineDigest(line("p1", { rushingYards: 62 })));
+  });
+
+  it("drops a player from `changed` when a later duplicate matches what is already stored", () => {
+    // The other direction of last-wins: the first copy differs from the snapshot and the second
+    // does not, so the tick has nothing to write for that player and must not claim it changed.
+    const stored = line("p1", { rushingYards: 40 });
+    const previous = new Map([[stored.playerId, statLineDigest(stored)]]);
+    const { changed } = diffStatLines(previous, [line("p1", { rushingYards: 62 }), stored]);
+    expect(changed).toEqual([]);
+  });
 });

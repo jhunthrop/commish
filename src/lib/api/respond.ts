@@ -2,15 +2,32 @@ import { NextResponse } from "next/server";
 import type { ZodType } from "zod";
 
 /**
+ * Every route behind this envelope answers with data scoped to the signed-in caller — a league
+ * they are in, a lineup they own, a draft they are drafting in. Next.js already sends
+ * `private, no-cache, no-store` for a `dynamic = "force-dynamic"` route, which every API route
+ * here declares, but that makes the protection a framework default rather than a property of the
+ * code: a route that ever stops declaring it, or a proxy that reads the header rather than the
+ * framework's intent, would start caching one manager's data for the next. Stating it here costs
+ * one header and makes it true by construction.
+ */
+const NO_STORE = "no-store";
+
+function withNoStore(init?: ResponseInit): ResponseInit {
+  const headers = new Headers(init?.headers);
+  headers.set("cache-control", NO_STORE);
+  return { ...init, headers };
+}
+
+/**
  * Consistent JSON envelope for every API response (per the project's API-response rule):
  * { ok: true, data } on success, { ok: false, error } on failure.
  */
 export function ok<T>(data: T, init?: ResponseInit): NextResponse {
-  return NextResponse.json({ ok: true, data }, init);
+  return NextResponse.json({ ok: true, data }, withNoStore(init));
 }
 
 export function fail(error: string, status: number): NextResponse {
-  return NextResponse.json({ ok: false, error }, { status });
+  return NextResponse.json({ ok: false, error }, withNoStore({ status }));
 }
 
 /** The shape a browser parses back out of `ok()` / `fail()`. One envelope, both directions. */

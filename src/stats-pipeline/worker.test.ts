@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach, afterEach, afterAll, vi } from "vites
 import { and, eq } from "drizzle-orm";
 import Redis from "ioredis";
 import { createTestDb, truncateAll } from "@/db/test-db";
+import { crossLeagueHome } from "@/league-service/home";
+import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import type { Db } from "@/db/client";
 import { drafts, leagues, matchups, playerStatLines, players, rosterSlots, statWeeks, teams, users } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
@@ -10,6 +12,7 @@ import type { PublishFn } from "@/lib/realtime/publish";
 import { createRequestBudget, type RequestBudget } from "./budget";
 import { STATS_INGESTION_CONFIG } from "./config";
 import type { ScoreUpdatePayload } from "./contract";
+import { createScoreCache } from "./score-cache";
 import { fakeStatsProvider, type FakeStatsProviderScript, type ScriptedGame } from "./test-support";
 import { createIngestionWorker } from "./worker";
 
@@ -125,7 +128,7 @@ function publishRecorder() {
 }
 
 describe("createIngestionWorker", () => {
-  it("a week whose games are all scheduled costs one request and writes nothing", async () => {
+  it("a week whose games are all scheduled debits one schedule request, fetches no box score and writes only the week's row", async () => {
     const script: FakeStatsProviderScript = {
       games: { 1: [{ gameId: "g_sched", week: 1, status: "scheduled", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
     };
@@ -315,7 +318,11 @@ describe("createIngestionWorker", () => {
     const provider = fakeStatsProvider({
       games: { 1: [{ gameId: "g_denied", week: 1, status: "scheduled", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
     });
-    const deniedBudget: RequestBudget = { reserve: async () => false, remaining: async () => 0 };
+    const deniedBudget: RequestBudget = {
+      reserve: async () => ({ granted: false, denial: "budget-exhausted" }),
+      reserveBackfill: async () => ({ granted: false, denial: "budget-exhausted" }),
+      remaining: async () => 0,
+    };
     const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget: deniedBudget });
 
     const outcomes = await worker.tick();
@@ -331,7 +338,11 @@ describe("createIngestionWorker", () => {
     const provider = fakeStatsProvider({
       games: { 1: [{ gameId: "g_denied2", week: 1, status: "scheduled", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
     });
-    const deniedBudget: RequestBudget = { reserve: async () => false, remaining: async () => 0 };
+    const deniedBudget: RequestBudget = {
+      reserve: async () => ({ granted: false, denial: "budget-exhausted" }),
+      reserveBackfill: async () => ({ granted: false, denial: "budget-exhausted" }),
+      remaining: async () => 0,
+    };
     const onOutcome = vi.fn();
     const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock: localClock, budget: deniedBudget, onOutcome });
 
@@ -570,8 +581,8 @@ describe("createIngestionWorker", () => {
     // The shape two prior ticks would have left behind: weeks 1 and 2 both settled. This is
     // exactly the state that used to fall back to week 1 forever.
     await db.insert(statWeeks).values([
-      { week: 1, status: "final" },
-      { week: 2, status: "final" },
+      { week: 1, status: "final", updatedAt: new Date("2026-08-01T00:00:00.000Z") },
+      { week: 2, status: "final", updatedAt: new Date("2026-08-01T00:00:00.000Z") },
     ]);
     const script: FakeStatsProviderScript = {
       games: { 3: [{ gameId: "g_w3", week: 3, status: "scheduled", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
@@ -615,14 +626,20 @@ describe("createIngestionWorker", () => {
   });
 
   it("an empty window (season settled through the configured last week) skips the reservation entirely, and remaining() is unchanged", async () => {
-    // Every week through STATS_INGESTION_CONFIG.lastWeekOfSeason already final: weeksToExamine
+    // Every week through the PROVIDER's own last week already final: the examination window
     // returns nothing to examine, ever, until next season resets the ledger. Reserving the
     // worst-case budget on an empty window anyway would drain the monthly ledger for zero work
     // every poll interval for as long as the season stays settled.
+    const provider = fakeStatsProvider({ games: {}, lastWeekOfSeason: 4 });
     await db.insert(statWeeks).values(
-      Array.from({ length: STATS_INGESTION_CONFIG.lastWeekOfSeason }, (_, i) => ({ week: i + 1, status: "final" as const })),
+      Array.from({ length: provider.lastWeekOfSeason }, (_, i) => ({
+        week: i + 1,
+        status: "final" as const,
+        // Well outside the correction window, so no sweep is due either — an empty window means
+        // empty, not "empty except for the sweep".
+        updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+      })),
     );
-    const provider = fakeStatsProvider({ games: {} });
     const listGamesSpy = vi.spyOn(provider, "listGames");
     const reserveSpy = vi.spyOn(budget, "reserve");
     const remainingBefore = await budget.remaining();
@@ -638,5 +655,467 @@ describe("createIngestionWorker", () => {
     expect(await budget.remaining()).toBe(remainingBefore);
 
     reserveSpy.mockRestore();
+  });
+
+  it("debits the ledger exactly what the tick actually spends upstream, in final-only mode", async () => {
+    // THE C1 CASE. The tick used to reserve `weeks.length + maxGamesPerTick` — a worst case, with
+    // no release path — so a month's ledger was spent in tens of ticks while the pipeline made a
+    // fraction of those requests. Reservation is now two-phase: the schedule calls it is about to
+    // make, then, once the schedules are in hand, the exact box scores it has decided to fetch.
+    await seedPlayers(["p1"]);
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: [
+          { gameId: "g_cost_final", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 120 })] },
+          { gameId: "g_cost_live", week: 1, status: "in_progress", homeNflTeam: "SF", awayNflTeam: "LAR", lines: [] },
+        ],
+      },
+    };
+    const provider = fakeStatsProvider(script);
+    const listGamesSpy = vi.spyOn(provider, "listGames");
+    const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
+
+    const before = await budget.remaining();
+    await worker.tick();
+    const spent = before - (await budget.remaining());
+
+    const upstreamCalls = listGamesSpy.mock.calls.length + getGameStatLinesSpy.mock.calls.length;
+    expect(upstreamCalls).toBe(3); // two weeks listed (week 2 is empty), one box score fetched
+    expect(spent).toBe(upstreamCalls);
+  });
+
+  it("debits the ledger exactly what the tick actually spends upstream, in live mode", async () => {
+    // Live mode fetches every non-final game every tick, so the same window costs strictly more —
+    // and the ledger has to say so, or the mode that needs a bigger quota is the one the ledger
+    // under-counts.
+    await seedPlayers(["p1"]);
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: [
+          { gameId: "g_live_cost_a", week: 1, status: "in_progress", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 60 })] },
+          { gameId: "g_live_cost_b", week: 1, status: "in_progress", homeNflTeam: "SF", awayNflTeam: "LAR", lines: [] },
+        ],
+      },
+    };
+    const provider = fakeStatsProvider(script);
+    const listGamesSpy = vi.spyOn(provider, "listGames");
+    const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, mode: "live" });
+
+    const before = await budget.remaining();
+    await worker.tick();
+    const spent = before - (await budget.remaining());
+
+    const upstreamCalls = listGamesSpy.mock.calls.length + getGameStatLinesSpy.mock.calls.length;
+    expect(upstreamCalls).toBe(4); // two weeks listed, both of week 1's live games fetched
+    expect(spent).toBe(upstreamCalls);
+  });
+
+  it("a box-score reservation denied after the schedules are in keeps the week's status honest and fetches nothing", async () => {
+    // Phase two of the reservation can be denied on its own. The schedules are already paid for,
+    // so the week's game counts are still worth persisting — but the week must not be marked
+    // final off the provider's word when none of its box scores were actually ingested.
+    await seedPlayers(["p1"]);
+    const provider = fakeStatsProvider({
+      games: {
+        1: [{ gameId: "g_phase2", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 200 })] }],
+      },
+    });
+    const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
+    let call = 0;
+    const scheduleOnlyBudget: RequestBudget = {
+      reserve: async () => (++call === 1 ? { granted: true } : { granted: false, denial: "budget-exhausted" }),
+      reserveBackfill: async () => ({ granted: true }),
+      remaining: async () => 0,
+    };
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget: scheduleOnlyBudget });
+
+    await worker.tick();
+
+    expect(getGameStatLinesSpy).not.toHaveBeenCalled();
+    const [week] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+    expect(week).toMatchObject({ status: "in_progress", gamesTotal: 1, gamesFinal: 1 });
+  });
+
+  it("names WHY a reservation was denied, so an exhausted budget and an unreachable ledger read differently", async () => {
+    const provider = fakeStatsProvider({ games: { 1: [{ gameId: "g_why", week: 1, status: "scheduled", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] } });
+    const outOfBudget: RequestBudget = {
+      reserve: async () => ({ granted: false, denial: "budget-exhausted" }),
+      reserveBackfill: async () => ({ granted: false, denial: "budget-exhausted" }),
+      remaining: async () => 0,
+    };
+    const noLedger: RequestBudget = {
+      reserve: async () => ({ granted: false, denial: "ledger-unavailable" }),
+      reserveBackfill: async () => ({ granted: false, denial: "ledger-unavailable" }),
+      remaining: async () => 0,
+    };
+
+    const [exhausted] = await createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget: outOfBudget }).tick();
+    const [unavailable] = await createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget: noLedger }).tick();
+
+    expect(exhausted!.reason).toMatch(/budget is spent/);
+    expect(unavailable!.reason).toMatch(/ledger could not be reached/);
+    expect(exhausted!.reason).not.toBe(unavailable!.reason);
+  });
+
+  it("skips the tick entirely while another instance holds the lease", async () => {
+    await redis.set(STATS_INGESTION_CONFIG.keys.tickLease, "another-instance", "PX", 30_000);
+    const provider = fakeStatsProvider({
+      games: { 1: [{ gameId: "g_leased", week: 1, status: "scheduled", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
+    });
+    const listGamesSpy = vi.spyOn(provider, "listGames");
+    const reserveSpy = vi.spyOn(budget, "reserve");
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
+
+    try {
+      const outcomes = await worker.tick();
+
+      expect(outcomes).toEqual([{ week: 0, applied: false, reason: "Another instance is already running this tick." }]);
+      expect(reserveSpy).not.toHaveBeenCalled();
+      expect(listGamesSpy).not.toHaveBeenCalled();
+      expect(await db.select().from(statWeeks)).toHaveLength(0);
+      // Someone else's lease is still someone else's: a skipped tick must never release it.
+      expect(await redis.get(STATS_INGESTION_CONFIG.keys.tickLease)).toBe("another-instance");
+    } finally {
+      reserveSpy.mockRestore();
+    }
+  });
+
+  it("releases its own lease on the way out, so the next tick runs", async () => {
+    const provider = fakeStatsProvider({
+      games: { 1: [{ gameId: "g_lease_release", week: 1, status: "scheduled", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
+    });
+    const listGamesSpy = vi.spyOn(provider, "listGames");
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
+
+    await worker.tick();
+    expect(await redis.exists(STATS_INGESTION_CONFIG.keys.tickLease)).toBe(0);
+
+    await worker.tick();
+    expect(listGamesSpy.mock.calls.filter(([week]) => week === 1)).toHaveLength(2);
+  });
+
+  it("an expired lease lets the next tick run, so a crashed instance cannot freeze the pipeline", async () => {
+    // The lease is held for one poll interval and then expires on its own. An instance that dies
+    // mid-tick therefore costs at most one interval, never a stuck pipeline needing an operator.
+    await redis.set(STATS_INGESTION_CONFIG.keys.tickLease, "crashed-instance", "PX", 40);
+    const provider = fakeStatsProvider({
+      games: { 1: [{ gameId: "g_lease_expiry", week: 1, status: "scheduled", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
+    });
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
+
+    expect((await worker.tick())[0]).toMatchObject({ applied: false });
+    await new Promise((resolve) => setTimeout(resolve, 80));
+
+    const outcomes = await worker.tick();
+    expect(outcomes.some((outcome) => outcome.week === 1 && outcome.applied)).toBe(true);
+  });
+
+  it("ticks unleased rather than not at all when Redis cannot serve the lease", async () => {
+    // Best-effort BY DESIGN: an unreachable Redis means duplicate work across instances, which is
+    // safe (the storage model is idempotent and the stat_weeks primary key serializes the write)
+    // — where a lease that failed CLOSED would take live scoring down whenever Redis hiccuped.
+    await seedPlayers(["p1"]);
+    const provider = fakeStatsProvider({
+      games: {
+        1: [{ gameId: "g_unleased", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 90 })] }],
+      },
+    });
+    const leaseBlindRedis = new Proxy(redis, {
+      get(target, prop, receiver: unknown) {
+        if (prop === "set") {
+          return (...args: unknown[]) => {
+            if (args[0] === STATS_INGESTION_CONFIG.keys.tickLease) throw new Error("simulated redis outage on the lease");
+            return (Reflect.get(target, prop, receiver) as (...a: unknown[]) => unknown).apply(target, args);
+          };
+        }
+        return Reflect.get(target, prop, receiver);
+      },
+    });
+    const worker = createIngestionWorker({ db, provider, redis: leaseBlindRedis as Redis, publish: publishRecorder().fn, clock, budget });
+
+    const outcomes = await worker.tick();
+
+    expect(outcomes.some((outcome) => outcome.week === 1 && outcome.applied)).toBe(true);
+    const [week] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+    expect(week).toMatchObject({ status: "final" });
+  });
+
+  it("fills the score cache for every affected league, at the version it just persisted", async () => {
+    await seedPlayers(["p1"]);
+    await seedLeagueShell("lg_cache", [{ teamId: "cache1", userId: "ucache1" }, { teamId: "cache2", userId: "ucache2" }], "complete", 2);
+    await addRoster("cache1", "p1");
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: [
+          { gameId: "g_cache_final", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 250, passingTouchdowns: 2 })] },
+          { gameId: "g_cache_live", week: 1, status: "in_progress", homeNflTeam: "SF", awayNflTeam: "LAR", lines: [] },
+        ],
+      },
+    };
+    const scoreCache = createScoreCache({ redis });
+    const worker = createIngestionWorker({ db, provider: fakeStatsProvider(script), redis, publish: publishRecorder().fn, clock, budget, scoreCache });
+
+    await worker.tick();
+
+    const [week] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+    expect(week).toMatchObject({ status: "in_progress", version: 1 });
+    await expect(scoreCache.read("lg_cache", 1, week!.version)).resolves.toEqual([{ teamId: "cache1", points: 18 }]);
+    // Version is the freshness signal: a read at any other version is a miss, not a wrong number.
+    await expect(scoreCache.read("lg_cache", 1, week!.version + 1)).resolves.toBeNull();
+  });
+
+  it("the cross-league home shows the worker's live score for a week Postgres has no score for yet", async () => {
+    // The read half of the cache had no producer at all: `crossLeagueHome`'s MGET always missed,
+    // so on a live Sunday every league's card fell through to `matchups.home_score`, which is null
+    // until the week settles — a dash where the score should be.
+    await seedPlayers(["p1"]);
+    await seedLeagueShell("lg_home_live", [{ teamId: "hl1", userId: "uhl1" }, { teamId: "hl2", userId: "uhl2" }], "complete", 2);
+    await addRoster("hl1", "p1");
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: [
+          { gameId: "g_home_final", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 250, passingTouchdowns: 2 })] },
+          { gameId: "g_home_live", week: 1, status: "in_progress", homeNflTeam: "SF", awayNflTeam: "LAR", lines: [] },
+        ],
+      },
+    };
+    const scoreCache = createScoreCache({ redis });
+    const worker = createIngestionWorker({ db, provider: fakeStatsProvider(script), redis, publish: publishRecorder().fn, clock, budget, scoreCache });
+
+    await worker.tick();
+
+    const [stored] = await db.select().from(matchups).where(and(eq(matchups.leagueId, "lg_home_live"), eq(matchups.weekNumber, 1)));
+    expect(stored!.homeScore).toBeNull(); // the week is still in progress: Postgres has nothing to show
+
+    const home = await crossLeagueHome(db, "uhl1", { scoreCache });
+    const card = home.leagues.find((league) => league.id === "lg_home_live");
+    expect(card!.weekStatus).toBe("in_progress");
+    const live = card!.matchup!.homeTeamId === "hl1" ? card!.matchup!.homeScore : card!.matchup!.awayScore;
+    expect(live).toBe(18);
+  });
+
+  it("a correction inside the window lands, and re-settles the week's matchup", async () => {
+    // NFL scoring revisions run into the following week, and final-only stores whatever the box
+    // score said the first moment the game reported final — by construction the least settled
+    // version of it. Without the sweep no revision could EVER land: a final week left the
+    // examination window for good, and there is no operator path back.
+    await seedPlayers(["p1", "p2"]);
+    await seedLeagueShell("lg_correct", [{ teamId: "cor1", userId: "ucor1" }, { teamId: "cor2", userId: "ucor2" }], "complete", 2);
+    await addRoster("cor1", "p1");
+    await addRoster("cor2", "p2");
+    let ts = "2026-09-14T20:00:00.000Z";
+    const movingClock = { now: () => ts };
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: [{
+          gameId: "g_correct", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN",
+          lines: [statLine("p1", 1, { passingYards: 200 }), statLine("p2", 1, { passingYards: 100 })],
+        }],
+      },
+    };
+    const provider = fakeStatsProvider(script);
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock: movingClock, budget });
+
+    await worker.tick();
+    const [settled] = await db.select().from(matchups).where(and(eq(matchups.leagueId, "lg_correct"), eq(matchups.weekNumber, 1)));
+    const scoreOf = (row: typeof settled) => (row!.homeTeamId === "cor1" ? row!.homeScore : row!.awayScore);
+    expect(scoreOf(settled)).toBe(8); // 200 * 0.04
+
+    // The official revision: 200 passing yards were really 325.
+    script.games[1] = [{
+      gameId: "g_correct", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN",
+      lines: [statLine("p1", 1, { passingYards: 325 }), statLine("p2", 1, { passingYards: 100 })],
+    }];
+    ts = "2026-09-15T20:00:00.000Z"; // the next calendar day, still inside the correction window
+    await worker.tick();
+
+    const [corrected] = await db.select().from(matchups).where(and(eq(matchups.leagueId, "lg_correct"), eq(matchups.weekNumber, 1)));
+    expect(scoreOf(corrected)).toBe(13); // 325 * 0.04
+    const [week] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+    // Still final — the sweep never regresses a settled week — and the version moved, so every
+    // cached score and every open matchup page hears about it.
+    expect(week).toMatchObject({ status: "final" });
+    expect(week!.version).toBe(2);
+  });
+
+  it("a revision after the correction window closes is never fetched", async () => {
+    await seedPlayers(["p1"]);
+    let ts = "2026-09-14T20:00:00.000Z";
+    const movingClock = { now: () => ts };
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: [{ gameId: "g_late", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 200 })] }],
+      },
+    };
+    const provider = fakeStatsProvider(script);
+    const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock: movingClock, budget });
+
+    await worker.tick();
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(1);
+
+    // A day inside the window, with nothing to find: the sweep writes NOTHING, so it cannot push
+    // the deadline out by re-stamping stat_weeks.updated_at on every pass.
+    ts = "2026-09-15T20:00:00.000Z";
+    await worker.tick();
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(2);
+
+    script.games[1] = [{ gameId: "g_late", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 400 })] }];
+    ts = "2026-09-19T20:00:00.000Z"; // five days after settlement, past correctionWindowDays
+    await worker.tick();
+
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(2);
+    const [line] = await db.select().from(playerStatLines).where(eq(playerStatLines.week, 1));
+    expect(line!.passingYards).toBe(200);
+  });
+
+  it("sweeps a settled week at most once per calendar day", async () => {
+    await seedPlayers(["p1"]);
+    let ts = "2026-09-14T20:00:00.000Z";
+    const movingClock = { now: () => ts };
+    const provider = fakeStatsProvider({
+      games: {
+        1: [{ gameId: "g_daily", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 200 })] }],
+      },
+    });
+    const getGameStatLinesSpy = vi.spyOn(provider, "getGameStatLines");
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock: movingClock, budget });
+
+    await worker.tick(); // settles the week, and counts as that day's read
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(1);
+
+    ts = "2026-09-14T23:30:00.000Z"; // later the same day
+    await worker.tick();
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(1);
+
+    ts = "2026-09-15T00:30:00.000Z"; // a new calendar day: exactly one sweep
+    await worker.tick();
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(2);
+
+    ts = "2026-09-15T12:00:00.000Z";
+    await worker.tick();
+    expect(getGameStatLinesSpy).toHaveBeenCalledTimes(2);
+  });
+
+  it("settles a week for a league that finished its draft after that week was already final", async () => {
+    // The undrafted-league guard is right — a league with no rosters would score a season of
+    // phantom zeroes — but nothing used to bring that league back once its draft completed, so a
+    // league that drafted on a Sunday afternoon silently forfeited that week from its record.
+    await seedPlayers(["p1", "p2"]);
+    await seedLeagueShell("lg_late_draft", [{ teamId: "ld1", userId: "uld1" }, { teamId: "ld2", userId: "uld2" }], "scheduled", 2);
+    const provider = fakeStatsProvider({
+      games: {
+        1: [{
+          gameId: "g_late_draft", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN",
+          lines: [statLine("p1", 1, { passingYards: 300 }), statLine("p2", 1, { passingYards: 100 })],
+        }],
+      },
+    });
+    const { fn: publish, calls } = publishRecorder();
+    const worker = createIngestionWorker({ db, provider, redis, publish, clock, budget });
+
+    await worker.tick();
+    const [beforeDraft] = await db.select().from(matchups).where(eq(matchups.leagueId, "lg_late_draft"));
+    expect(beforeDraft!.homeScore).toBeNull();
+
+    // The draft completes: rosters exist now.
+    await addRoster("ld1", "p1");
+    await addRoster("ld2", "p2");
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, "lg_late_draft"));
+
+    const outcomes = await worker.tick();
+
+    const [afterDraft] = await db.select().from(matchups).where(and(eq(matchups.leagueId, "lg_late_draft"), eq(matchups.weekNumber, 1)));
+    expect(afterDraft!.homeScore).not.toBeNull();
+    expect(afterDraft!.awayScore).not.toBeNull();
+    expect(outcomes.some((outcome) => outcome.leagueId === "lg_late_draft" && outcome.applied)).toBe(true);
+    expect(calls.some((call) => call.leagueId === "lg_late_draft")).toBe(true);
+  });
+
+  it("a wedged week does not freeze the season: the window widens and the next week still ingests", async () => {
+    // A postponed game whose upstream status never flips, or a box score that permanently 404s,
+    // pins the examination window on one week forever. Widen, never skip: the stuck week is still
+    // examined every tick (its games may yet be played) while the season moves on around it.
+    await seedPlayers(["p1"]);
+    const script: FakeStatsProviderScript = {
+      games: {
+        1: [{ gameId: "g_wedged", week: 1, status: "in_progress", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }],
+      },
+    };
+    const provider = fakeStatsProvider(script);
+    const listGamesSpy = vi.spyOn(provider, "listGames");
+    const onOutcome = vi.fn();
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, wedgedWeekTicks: 1, onOutcome });
+
+    await worker.tick(); // week 1 gets its row; week 2 has no games yet
+    await worker.tick(); // steady state: only week 1 is worth a schedule call
+    expect(await db.select().from(statWeeks).where(eq(statWeeks.week, 2))).toHaveLength(0);
+    const listedWeekTwo = listGamesSpy.mock.calls.filter(([week]) => week === 2).length;
+
+    // Week 2's games appear while week 1 is still stuck.
+    script.games[2] = [{
+      gameId: "g_after_wedge", week: 2, status: "final", homeNflTeam: "SF", awayNflTeam: "LAR",
+      lines: [statLine("p1", 2, { passingYards: 150 })],
+    }];
+    await worker.tick(); // wedgedWeekTicks passed: the window widens
+
+    expect(listGamesSpy.mock.calls.filter(([week]) => week === 2).length).toBeGreaterThan(listedWeekTwo);
+    const [weekTwo] = await db.select().from(statWeeks).where(eq(statWeeks.week, 2));
+    expect(weekTwo).toMatchObject({ status: "final" });
+    const [weekOne] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+    expect(weekOne).toMatchObject({ status: "in_progress" }); // still examined, still not settled
+    expect(onOutcome.mock.calls.some(([outcome]) => /has not finished after/.test(String(outcome.reason)))).toBe(true);
+  });
+
+  it("a duplicated playerId in one tick's box scores persists cleanly, last line winning", async () => {
+    // A player in two of a week's box scores (or an adapter emitting a team defense twice) used to
+    // fail the whole transaction with Postgres 21000 — every tick, until upstream cleared it.
+    await seedPlayers(["p1"]);
+    const provider = fakeStatsProvider({
+      games: {
+        1: [
+          { gameId: "g_dup_a", week: 1, status: "final", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [statLine("p1", 1, { passingYards: 100 })] },
+          { gameId: "g_dup_b", week: 1, status: "final", homeNflTeam: "SF", awayNflTeam: "LAR", lines: [statLine("p1", 1, { passingYards: 275 })] },
+        ],
+      },
+    });
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget });
+
+    const outcomes = await worker.tick();
+
+    expect(outcomes.some((outcome) => outcome.week === 1 && outcome.applied)).toBe(true);
+    const lines = await db.select().from(playerStatLines).where(eq(playerStatLines.week, 1));
+    expect(lines).toHaveLength(1);
+    expect(lines[0]!.passingYards).toBe(275);
+  });
+
+  it("clamps its week pointer to the real mock provider's own season, not a pipeline constant", async () => {
+    // The shipping default provider's dataset is 17 weeks. A pipeline constant of 18 left the
+    // pointer asking for a week the provider can never answer: `tickWeek` returns before writing a
+    // row, so the pointer never advances, nothing is ever logged, and every tick pays for the same
+    // empty listing forever. Driven by the REAL provider from a reachable state — every week of
+    // its own season settled — rather than by a manufactured 18-row table.
+    const provider = createMockStatsProvider();
+    expect(provider.lastWeekOfSeason).toBe(17);
+    await db.insert(statWeeks).values(
+      Array.from({ length: provider.lastWeekOfSeason }, (_, i) => ({
+        week: i + 1,
+        status: "final" as const,
+        updatedAt: new Date("2026-08-01T00:00:00.000Z"),
+      })),
+    );
+    const listGamesSpy = vi.spyOn(provider, "listGames");
+    const onOutcome = vi.fn();
+    const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, onOutcome });
+
+    const outcomes = await worker.tick();
+
+    expect(listGamesSpy).not.toHaveBeenCalled();
+    expect(outcomes).toEqual([{ week: 0, applied: false, reason: "Nothing to examine — every week through the season's end is already final." }]);
+    // A settled season is loud, not silent: the one thing worse than a stalled pointer is a
+    // stalled pointer nobody can see.
+    expect(onOutcome).toHaveBeenCalledTimes(1);
   });
 });

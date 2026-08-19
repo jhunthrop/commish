@@ -1,4 +1,4 @@
-import { envOr, envOrUndefined } from "@/lib/env";
+import { envOr, envOrUndefined, parsePositiveInteger } from "@/lib/env";
 import { STATS_CONFIG, isStatsProviderName, type StatsProviderName } from "./config";
 import { createMockStatsProvider } from "./mock/mock-stats-provider";
 import type { StatsProvider } from "./provider";
@@ -33,21 +33,6 @@ export class UnknownStatsProviderError extends Error {
 export function createStatsProvider(name: string = envOr(STATS_CONFIG.envVars.provider, STATS_CONFIG.defaultProvider)): StatsProvider {
   if (!isStatsProviderName(name)) throw new UnknownStatsProviderError(name);
   return build(name);
-}
-
-/**
- * A boundary value from `.env.local`, not from code, so it is validated here rather than
- * trusted. `Number("banana")` is `NaN`, and both `TANK01_SEASON` and `MOCK_STATS_LIVE_WEEK` are
- * stringified or compared straight through — an unvalidated `NaN` would ship as the literal
- * string `"NaN"` on the wire (season) or simply never match a real week (live week), in the one
- * module whose entire purpose is fail-fast selection.
- */
-function parsePositiveInteger(name: string, raw: string): number {
-  const parsed = Number(raw);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name}="${raw}" is not a positive integer.`);
-  }
-  return parsed;
 }
 
 function build(name: StatsProviderName): StatsProvider {

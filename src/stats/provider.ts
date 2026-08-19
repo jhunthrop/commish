@@ -41,6 +41,20 @@ export interface GameSummary {
  * quietly costing more, because `src/stats-pipeline/budget.ts` reserves against these numbers.
  */
 export interface StatsProvider {
+  /**
+   * The last week this provider will ever answer with games. The ingestion worker clamps its
+   * forward-advancing week pointer to it, so a fully-settled season stops the pointer rather than
+   * marching it past the season forever, spending a `listGames` request every tick on a week that
+   * cannot exist.
+   *
+   * It lives on the PROVIDER and not in `STATS_INGESTION_CONFIG` because it is a property of the
+   * data source, not of the pipeline: Tank01's regular season runs to week 18 and the committed
+   * mock dataset is 17 weeks. A pipeline constant covering "every provider this product has" is
+   * correct for at most one of them, and for the other it is a permanent stall — the worker asks
+   * for week 18, the mock answers with no games, `tickWeek` returns before writing a row, the
+   * pointer never advances, and every tick pays for the same empty listing forever.
+   */
+  readonly lastWeekOfSeason: number;
   listPlayers(): Promise<readonly Player[]>;
   /** Empty outside the provider's season, which is what terminates the worker's week scan. */
   listGames(week: number): Promise<readonly GameSummary[]>;

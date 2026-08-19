@@ -55,6 +55,9 @@ export function createTank01StatsProvider(options: Tank01ProviderOptions): Stats
   }
 
   return {
+    /** The same bound `listGames` answers locally against — one number, read twice. */
+    lastWeekOfSeason: TANK01_CONFIG.weeks.last,
+
     async listPlayers() {
       return fetchPlayers();
     },

@@ -102,6 +102,17 @@ export function describeStatsProviderContract(label: string, factory: () => Stat
       expect(new Set(ids).size).toBe(ids.length);
     });
 
+    it("names the last week of its own season, and answers the week after it with no games", async () => {
+      // The ingestion worker clamps its forward-advancing week pointer to this number. A provider
+      // that names a week it will not actually answer with games leaves the pointer stalled on a
+      // week that can never get a `stat_weeks` row, spending a listing request every tick forever
+      // — which is exactly what a pipeline-level constant of 18 did to the 17-week mock dataset.
+      const provider = await factory();
+      expect(Number.isInteger(provider.lastWeekOfSeason)).toBe(true);
+      expect(provider.lastWeekOfSeason).toBeGreaterThan(0);
+      await expect(provider.listGames(provider.lastWeekOfSeason + 1)).resolves.toEqual([]);
+    });
+
     it("answers a week outside the season with no games, the same way it answers with no stat lines", async () => {
       // `seedPlayers` terminates on an empty stat-line array and the ingestion worker terminates
       // on an empty game list. Two loops, one boundary — they must agree.

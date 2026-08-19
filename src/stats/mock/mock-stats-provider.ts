@@ -31,6 +31,11 @@ export function createMockStatsProvider(dataset: Dataset = committed as Dataset,
   }
 
   return {
+    // Derived from the dataset rather than declared beside it: `generateDataset`'s SEASON_WEEKS
+    // and a hand-written constant here would be two expressions of one fact, and the committed
+    // `dataset.json` is what actually ships. A caller passing its own dataset gets its own bound.
+    lastWeekOfSeason: dataset.statLines.reduce((last, line) => Math.max(last, line.week), 0),
+
     async listPlayers() {
       return dataset.players;
     },

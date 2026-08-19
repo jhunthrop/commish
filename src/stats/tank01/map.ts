@@ -180,20 +180,26 @@ export function mapBoxScoreToStatLines(
 
   const dst = record.DST;
   const sides = typeof dst === "object" && dst !== null ? Object.values(dst as Record<string, unknown>) : [];
-  const defenses: readonly StatLine[] = sides.flatMap((side): readonly StatLine[] => {
+  // Keyed by the synthesized defense id, not accumulated into an array — behavior (3) above is
+  // not only "the block may be missing", it is also that some responses carry the SAME team under
+  // two differently-cased keys (`home` and `Home`), which `Object.values` yields twice and which
+  // would put one player id in the emitted lines twice. That is a duplicate the ingestion worker
+  // cannot survive: `persistTick` inserts a tick's lines as one multi-row `ON CONFLICT DO UPDATE`,
+  // and Postgres rejects the whole statement (`21000`) when a conflict key repeats. Last side
+  // wins, which for a duplicate-cased key is the same numbers either way.
+  const defenses = new Map<string, StatLine>();
+  for (const side of sides) {
     const entry = typeof side === "object" && side !== null ? (side as Record<string, unknown>) : {};
     const abbreviation = str(entry.teamAbv);
     const defenseId = `${TANK01_CONFIG.defensePlayerIdPrefix}${abbreviation}`;
-    if (abbreviation === "" || !listedPlayerIds.has(defenseId)) return [];
-    return [
-      {
-        ...emptyStats(defenseId, week),
-        sacks: num(entry.sacks),
-        defensiveInterceptions: num(entry.defensiveInterceptions),
-        defensiveTouchdowns: num(entry.defTD),
-      },
-    ];
-  });
+    if (abbreviation === "" || !listedPlayerIds.has(defenseId)) continue;
+    defenses.set(defenseId, {
+      ...emptyStats(defenseId, week),
+      sacks: num(entry.sacks),
+      defensiveInterceptions: num(entry.defensiveInterceptions),
+      defensiveTouchdowns: num(entry.defTD),
+    });
+  }
 
-  return [...players, ...defenses];
+  return [...players, ...defenses.values()];
 }

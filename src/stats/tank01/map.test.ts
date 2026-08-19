@@ -322,6 +322,33 @@ describe("defensive parsing of shapes the fixtures never exercise", () => {
     ]);
   });
 
+  it("emits one line per TEAM defense, not one per DST key, when a response repeats a side under a second casing", () => {
+    // Behavior (3) in `mapBoxScoreToStatLines`'s docblock: some 2022-era responses carry the same
+    // side under two differently-cased keys. `Object.values` yields both, and emitting both put
+    // one player id in the tick's lines twice — which `persistTick` cannot survive, because
+    // Postgres rejects a whole multi-row ON CONFLICT DO UPDATE (21000) when a key repeats.
+    const lines = mapBoxScoreToStatLines(
+      {
+        playerStats: {},
+        DST: {
+          home: { teamAbv: "SF", sacks: "3.0", defensiveInterceptions: "1", defTD: "0" },
+          Home: { teamAbv: "SF", sacks: "4.0", defensiveInterceptions: "2", defTD: "1" },
+          away: { teamAbv: "SEA", sacks: "1.0", defensiveInterceptions: "0", defTD: "0" },
+        },
+      },
+      1,
+      new Set([`${TANK01_CONFIG.defensePlayerIdPrefix}SF`, `${TANK01_CONFIG.defensePlayerIdPrefix}SEA`]),
+    );
+
+    expect(lines.map((line) => line.playerId)).toEqual([
+      `${TANK01_CONFIG.defensePlayerIdPrefix}SF`,
+      `${TANK01_CONFIG.defensePlayerIdPrefix}SEA`,
+    ]);
+    // Last side wins, which for a genuinely duplicate-cased key is the same numbers either way.
+    expect(lines[0]!.sacks).toBe(4);
+    expect(lines[0]!.defensiveTouchdowns).toBe(1);
+  });
+
   it("drops a DST side that is not an object, and one missing teamAbv", () => {
     expect(
       mapBoxScoreToStatLines({ playerStats: {}, DST: { away: null, home: { ptsAllowed: "10" } } }, 1, new Set()),

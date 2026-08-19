@@ -1,5 +1,5 @@
-import { and, eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import { and, asc, eq } from "drizzle-orm";
+import type { Db, ReadonlyDb } from "@/db/client";
 import { drafts, leagues, matchups, players, playerStatLines, scoringSettings } from "@/db/schema";
 import type { Position, StatLine } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
@@ -7,6 +7,12 @@ import { PPR_SCORING } from "@/domain/scoring";
 import { startersOf } from "@/league";
 import { getLineup } from "@/league-service/lineups";
 import { scoreLineup, type ScoringRules } from "@/scoring";
+import type { ScoreCache } from "./score-cache";
+
+/** No Redis connection needed: every existing caller of `finalizeWeek` keeps working untouched. */
+const NOOP_SCORE_CACHE: Pick<ScoreCache, "invalidate"> = {
+  invalidate: async () => {},
+};
 
 export type FinalizeResult =
   | { readonly ok: true; readonly weekNumber: number; readonly matchupsScored: number }
@@ -29,7 +35,7 @@ export function requireScore(scores: ReadonlyMap<string, number>, teamId: string
 
 /** One team's week: the starters it fielded and what they were worth. */
 async function scoreTeam(
-  db: Db,
+  db: ReadonlyDb,
   teamId: string,
   weekNumber: number,
   slotConfig: readonly RosterSlotConfig[],
@@ -54,7 +60,7 @@ async function scoreTeam(
  * two different ways.
  */
 export async function scoreTeamsForWeek(
-  db: Db,
+  db: ReadonlyDb,
   leagueId: string,
   weekNumber: number,
   teamIds: readonly string[],
@@ -94,34 +100,64 @@ export async function scoreTeamsForWeek(
  *
  * Re-running is safe and produces identical numbers, which is the whole reason re-ingestion
  * cannot double-count: every number here is recomputed from absolute stored values and
- * overwrites. Nothing accumulates.
+ * overwrites. Nothing accumulates — and re-running is not hypothetical: the worker's correction
+ * sweep calls this again for a settled week inside its correction window, which is how a post-
+ * final stat revision reaches `matchups` and the standings.
+ *
+ * THE SCORES ARE COMPUTED INSIDE THE TRANSACTION THAT WRITES THEM. `scoreTeamsForWeek` is four
+ * queries plus one per team, and under read-committed each of them sees whatever was committed
+ * when it ran: a `persistTick` landing in the middle used to mean a week settled from a snapshot
+ * older than the data at write time. Reading the matchups, the lineups and the stat lines inside
+ * the same transaction as the update makes the settled number a function of one consistent view.
+ *
+ * The matchup rows are read with an explicit `ORDER BY` and updated in that order. Postgres heap
+ * order is not stable — the first UPDATE rewrites tuples and moves them — so two concurrent
+ * copies of this function reading without an ORDER BY could take row locks on `matchups` in
+ * opposite orders and deadlock (`40P01`). One agreed order makes that unrepresentable.
+ *
+ * `cache` is injected with a no-op default. When a real cache is supplied, this league/week's
+ * cached live scores are dropped AFTER the settlement commits: they were computed from a week in
+ * progress, and the numbers that stand now live in `matchups`.
  */
-export async function finalizeWeek(db: Db, leagueId: string, weekNumber: number): Promise<FinalizeResult> {
+export async function finalizeWeek(
+  db: Db,
+  leagueId: string,
+  weekNumber: number,
+  cache: Pick<ScoreCache, "invalidate"> = NOOP_SCORE_CACHE,
+): Promise<FinalizeResult> {
   const [league] = await db.select({ rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, leagueId));
   if (league === undefined) return { ok: false, status: 404, reason: "That league doesn't exist." };
 
-  const week = await db.select().from(matchups).where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)));
-  if (week.length === 0) return { ok: false, status: 404, reason: "That week isn't part of this league's season." };
-
   // A league that has not drafted has no rosters, so every team would score zero and the
   // standings would show a season of phantom losses. An undrafted league is not behind on
-  // scoring, it has not started.
+  // scoring, it has not started. Read outside the transaction on purpose: it takes no lock on
+  // `drafts`, which is what keeps this function a leaf in the codebase's lock order.
   const [draft] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, leagueId));
   if (draft?.status !== "complete") return { ok: false, status: 409, reason: "That league hasn't finished its draft yet." };
 
-  const teamIds = [...new Set(week.flatMap((row) => [row.homeTeamId, row.awayTeamId]))];
-  const scores = await scoreTeamsForWeek(db, leagueId, weekNumber, teamIds);
-
   // One transaction for the whole week: a half-scored week is not a result, it's a bug in
   // progress — `computeStandings` deliberately ignores a matchup with only one score.
-  await db.transaction(async (tx) => {
+  const matchupsScored = await db.transaction(async (tx) => {
+    const week = await tx
+      .select()
+      .from(matchups)
+      .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)))
+      .orderBy(asc(matchups.homeTeamId));
+    if (week.length === 0) return 0;
+
+    const teamIds = [...new Set(week.flatMap((row) => [row.homeTeamId, row.awayTeamId]))];
+    const scores = await scoreTeamsForWeek(tx, leagueId, weekNumber, teamIds);
+
     for (const row of week) {
       await tx
         .update(matchups)
         .set({ homeScore: requireScore(scores, row.homeTeamId), awayScore: requireScore(scores, row.awayTeamId) })
         .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber), eq(matchups.homeTeamId, row.homeTeamId)));
     }
+    return week.length;
   });
+  if (matchupsScored === 0) return { ok: false, status: 404, reason: "That week isn't part of this league's season." };
 
-  return { ok: true, weekNumber, matchupsScored: week.length };
+  await cache.invalidate(leagueId, weekNumber);
+  return { ok: true, weekNumber, matchupsScored };
 }

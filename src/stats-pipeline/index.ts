@@ -3,8 +3,10 @@ import { DB_POOL_CONFIG } from "@/db/config";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { getPublisher } from "@/lib/realtime/publisher";
 import { getSharedRedis } from "@/lib/realtime/redis";
+import { getScoreCache } from "@/league-service/score-cache-instance";
 import { createStatsProvider } from "@/stats/registry";
 import { createRequestBudget, type RequestBudget } from "./budget";
+import { resolveIngestionSettings, type IngestionSettings } from "./settings";
 import { createIngestionWorker, type IngestionWorker } from "./worker";
 
 /**
@@ -45,7 +47,20 @@ export function ingestionPoolOptions(): { readonly max: number } {
 const globalIngestion = globalThis as {
   __commishIngestionWorker?: IngestionWorker;
   __commishIngestionBudget?: RequestBudget;
+  __commishIngestionSettings?: IngestionSettings;
 };
+
+/**
+ * `STATS_INGESTION_MODE`, `STATS_POLL_INTERVAL_MS` and `STATS_MONTHLY_REQUEST_BUDGET`, resolved
+ * ONCE per process and shared by the budget and the worker — they have to agree, and resolving
+ * them twice is how they would eventually stop agreeing. Memoized alongside the singletons
+ * because a bad value throws, and throwing on the first construction rather than on every hot
+ * reload is what makes the failure legible.
+ */
+export function getIngestionSettings(): IngestionSettings {
+  globalIngestion.__commishIngestionSettings ??= resolveIngestionSettings();
+  return globalIngestion.__commishIngestionSettings;
+}
 
 /**
  * The process-wide ingestion request budget — the same instance `getIngestionWorker()` wires
@@ -53,7 +68,11 @@ const globalIngestion = globalThis as {
  * without a second Redis connection or a second wiring of its own.
  */
 export function getIngestionBudget(): RequestBudget {
-  globalIngestion.__commishIngestionBudget ??= createRequestBudget({ redis: getSharedRedis(), clock: systemClock });
+  globalIngestion.__commishIngestionBudget ??= createRequestBudget({
+    redis: getSharedRedis(),
+    clock: systemClock,
+    monthlyRequestBudget: getIngestionSettings().monthlyRequestBudget,
+  });
   return globalIngestion.__commishIngestionBudget;
 }
 
@@ -72,6 +91,7 @@ export function getIngestionBudget(): RequestBudget {
  * BLOCK`, so sharing is safe.
  */
 export function getIngestionWorker(): IngestionWorker {
+  const settings = getIngestionSettings();
   globalIngestion.__commishIngestionWorker ??= createIngestionWorker({
     db: createDb(undefined, ingestionPoolOptions()),
     provider: createStatsProvider(),
@@ -79,6 +99,12 @@ export function getIngestionWorker(): IngestionWorker {
     publish: publishViaSharedPublisher,
     clock: systemClock,
     budget: getIngestionBudget(),
+    // The one production writer of the score cache the cross-league home reads. The SAME
+    // singleton `/api/home` and `/app` read through (`getScoreCache`), so the version the worker
+    // stamps a value with and the version a read compares against are two ends of one key.
+    scoreCache: getScoreCache(),
+    mode: settings.mode,
+    intervalMs: settings.pollIntervalMs,
   });
   return globalIngestion.__commishIngestionWorker;
 }
