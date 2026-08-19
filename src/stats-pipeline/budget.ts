@@ -66,10 +66,11 @@ return 1
  * `RESERVE_SCRIPT`) so a reservation is either fully counted or fully rolled back — never left
  * half-applied.
  *
- * Fails CLOSED on a Redis outage — the opposite of the realtime publisher's degrade-open rule.
- * The two failures are not symmetrical: a missed cache read or a lost publish costs milliseconds
- * and is invisible to the user, while a miscounted request budget costs the upstream API key. A
- * skipped tick is recoverable in half an hour; a suspended key is not recoverable at all.
+ * Fails CLOSED on a Redis outage — the deliberate opposite of `score-cache.ts` (and
+ * `reference-cache.ts`, and the realtime publisher), which all degrade OPEN. The two failures
+ * are not symmetrical: a missed cache read or a lost publish costs milliseconds and is invisible
+ * to the user, while a miscounted request budget costs the upstream API key. A skipped tick is
+ * recoverable in half an hour; a suspended key is not recoverable at all.
  */
 export function createRequestBudget({ redis, clock }: RequestBudgetDeps): RequestBudget {
   async function reserve(count: number): Promise<boolean> {

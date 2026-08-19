@@ -2,9 +2,15 @@ import type { Db } from "@/db/client";
 import { players, playerStatLines } from "@/db/schema";
 import { excludedSetFor } from "@/db/upsert";
 import type { StatsProvider } from "@/stats/provider";
+import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { assertLocalSeedTarget } from "./guard";
 
 const BATCH = 500;
+
+/** No Redis connection needed: every existing caller of `seedPlayers` keeps working untouched. */
+const NOOP_REFERENCE_CACHE: Pick<ReferenceCache, "invalidatePlayers"> = {
+  invalidatePlayers: async () => {},
+};
 
 function chunks<T>(arr: readonly T[], size: number): readonly (readonly T[])[] {
   const out: T[][] = [];
@@ -21,8 +27,16 @@ function chunks<T>(arr: readonly T[], size: number): readonly (readonly T[])[] {
  *
  * Guarded in its own right, not only at the entry point: this is the largest write in the
  * repo (every player × every week) and the one that used to run before any check at all.
+ *
+ * `cache` is injected with a no-op default so every existing caller keeps working without a
+ * Redis connection. When a real cache is supplied, the player index is invalidated after the
+ * upsert completes, because the seed is the only writer of `players` today.
  */
-export async function seedPlayers(db: Db, provider: StatsProvider): Promise<{ players: number; statLines: number }> {
+export async function seedPlayers(
+  db: Db,
+  provider: StatsProvider,
+  cache: Pick<ReferenceCache, "invalidatePlayers"> = NOOP_REFERENCE_CACHE,
+): Promise<{ players: number; statLines: number }> {
   assertLocalSeedTarget();
   const allPlayers = await provider.listPlayers();
   for (const batch of chunks(allPlayers, BATCH)) {
@@ -31,6 +45,7 @@ export async function seedPlayers(db: Db, provider: StatsProvider): Promise<{ pl
       .values(batch.map((p) => ({ id: p.id, name: p.name, position: p.position, nflTeam: p.nflTeam })))
       .onConflictDoUpdate({ target: players.id, set: excludedSetFor(players, ["id"]) });
   }
+  void cache.invalidatePlayers();
 
   let statCount = 0;
   // Ask the provider week by week — the interface is week-scoped so a live feed can be polled the same way.

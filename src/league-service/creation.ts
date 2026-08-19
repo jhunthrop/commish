@@ -6,13 +6,27 @@ import { SCORING_PRESETS, type ScoringPresetName } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { LEAGUE_CONFIG } from "@/league";
+import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { MS_PER_DAY } from "./config";
+
+/** No Redis connection needed: every existing caller of `createLeague` keeps working untouched. */
+const NOOP_REFERENCE_CACHE: Pick<ReferenceCache, "invalidateScoringSettings"> = {
+  invalidateScoringSettings: async () => {},
+};
 
 export interface LeagueWriteDeps {
   readonly db: Db;
   readonly clock: Clock;
   /** Injected so ids are deterministic in a test and in the seed. `crypto.randomUUID` at the edge. */
   readonly newId: () => string;
+  /**
+   * Invalidates this new league's cached scoring settings after they're written, no-op by
+   * default. `createLeague` is one of two writers of `scoring_settings` today (the other is the
+   * seed) — the day a settings-edit route exists, it must call `invalidateScoringSettings` too,
+   * and that is the day this becomes a shared helper both call, rather than two call sites that
+   * can silently drift apart.
+   */
+  readonly cache?: Pick<ReferenceCache, "invalidateScoringSettings">;
 }
 
 export interface CreateLeagueInput {
@@ -47,7 +61,7 @@ export type CreateLeagueResult =
  * auto-tightening clock starts in a slow tier rather than at the 60-second floor.
  */
 export async function createLeague(
-  { db, clock, newId }: LeagueWriteDeps,
+  { db, clock, newId, cache = NOOP_REFERENCE_CACHE }: LeagueWriteDeps,
   input: CreateLeagueInput,
 ): Promise<CreateLeagueResult> {
   const leagueId = newId();
@@ -84,6 +98,11 @@ export async function createLeague(
     console.error("[league] create failed", { commissionerUserId: input.commissionerUserId }, error);
     return { ok: false, reason: "We couldn't create that league. Please try again." };
   }
+
+  // After the transaction commits, never inside it — the same reason `setLineup` invalidates
+  // post-commit (`lineups.ts`): an eviction for a write that then rolls back is worse than a
+  // brief stale read.
+  void cache.invalidateScoringSettings(leagueId);
 
   return { ok: true, leagueId, teamId, draftId };
 }

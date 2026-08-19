@@ -7,6 +7,12 @@ import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/rost
 import { benchOf, defaultLineup, startersOf } from "@/league";
 import { excludedSetFor } from "@/db/upsert";
 import type { LineupBody, LineupSlotView } from "@/league-room/contract";
+import type { ScoreCache } from "@/stats-pipeline/score-cache";
+
+/** No Redis connection needed: every existing caller of `setLineup` keeps working untouched. */
+const NOOP_SCORE_CACHE: Pick<ScoreCache, "invalidate"> = {
+  invalidate: async () => {},
+};
 
 export interface GetLineupInput {
   readonly teamId: string;
@@ -88,8 +94,19 @@ export async function isWeekLocked(db: Db, leagueId: string, weekNumber: number)
  * The two checks around it are about this TEAM rather than about slot legality, so they are
  * the boundary's own: every named player must actually be on the roster, and no player may
  * occupy two spots.
+ *
+ * `cache` is injected with a no-op default so every existing caller keeps working without a
+ * Redis connection. When a real cache is supplied, its cached score for this league/week is
+ * invalidated AFTER the write below completes — not inside it. The failure mode of a
+ * slightly-late eviction is one stale read; the failure mode of an early one (evicting before
+ * the write is durable) is a cache that says a lineup changed when the write that would have
+ * changed it never actually landed.
  */
-export async function setLineup(db: Db, input: SetLineupInput): Promise<SetLineupResult> {
+export async function setLineup(
+  db: Db,
+  input: SetLineupInput,
+  cache: Pick<ScoreCache, "invalidate"> = NOOP_SCORE_CACHE,
+): Promise<SetLineupResult> {
   const [league] = await db.select({ rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId));
   if (league === undefined) return { ok: false, status: 404, reason: "That league doesn't exist." };
 
@@ -135,6 +152,9 @@ export async function setLineup(db: Db, input: SetLineupInput): Promise<SetLineu
       target: [lineupSlots.teamId, lineupSlots.weekNumber, lineupSlots.slot, lineupSlots.slotIndex],
       set: excludedSetFor(lineupSlots, ["teamId", "weekNumber", "slot", "slotIndex"]),
     });
+
+  // After the write commits, never inside it — see the doc comment above.
+  void cache.invalidate(input.leagueId, input.weekNumber);
 
   const view = await lineupView(db, { leagueId: input.leagueId, teamId: input.teamId, weekNumber: input.weekNumber });
   // `view` cannot be null here: the league row was read at the top of this function.
