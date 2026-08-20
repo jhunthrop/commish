@@ -10,8 +10,9 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { users } from "@/db/schema";
+import { reviews, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { removeReview } from "@/review-service/reviews";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { GET, POST } from "./route";
 import { resetReviewRateLimits } from "./_shared";
@@ -133,6 +134,21 @@ describe("POST /api/reviews", () => {
     const list = await GET(get());
     const body = (await list.json()) as { readonly ok: true; readonly data: { readonly reviews: readonly unknown[] } };
     expect(body.data.reviews).toHaveLength(1);
+  });
+
+  it("answers 409 at the wire when the caller's review has been removed", async () => {
+    await db.insert(users).values([
+      { id: "u1", email: "u1@test.local", displayName: "u1" },
+      { id: "operator", email: "operator@test.local", displayName: "operator" },
+    ]);
+    signedInAs("u1");
+    await POST(post({ rating: 1, body: LONG_ENOUGH }));
+    const [row] = await db.select({ id: reviews.id }).from(reviews);
+    await removeReview(db, { reviewId: row!.id, removedByUserId: "operator", reason: "spam" });
+
+    const response = await POST(post({ rating: 5, body: "Trying to write over the review that was taken down for spam." }));
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ ok: false, error: "Your review was removed and can't be edited." });
   });
 
   it("answers 429 once the caller is past the rate-limit threshold", async () => {

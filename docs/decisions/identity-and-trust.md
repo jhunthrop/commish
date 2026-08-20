@@ -340,6 +340,18 @@ whichever plan picks them up next:
   with no admin role (ruling 18, above). Phase 3 owns building an actual moderation surface —
   a triage queue, a role, an audit trail beyond the removal row — and this plan deliberately did
   not build a smaller version of it first.
+- **Chat has no removal path at all**, and that is a larger gap than the review one above. A
+  posted message or GIF in a league chat cannot be deleted, hidden or reported by anyone: not its
+  author, not the commissioner, not the operator. `src/chat-service` has no delete, no hide and no
+  report; ruling 18 forbids the role that would own one. This plan opened the higher-volume
+  user-content surface (an open GIF search, whose rating ceiling is the engineering default noted
+  above) without the removal path the lower-volume one got, and says so here rather than leaving it
+  to be discovered in a real league. Phase 3's moderation surface owns chat, not just reviews.
+- **A removed review's author is told, and told the operator's own words.** `myReview` reports the
+  removed state and `ReviewComposer` renders it instead of an editable form, because the
+  alternative — letting them edit into a write `submitReview` refuses at the database — is a
+  silent shadow-ban. The consequence to keep in mind: `--reason` in `scripts/remove-review.ts` is
+  author-facing copy, not an internal note. What this still does not have is an appeal path.
 - **The PG-13 founder question.** `GIPHY_CONFIG.rating: "pg-13"` is an engineering default, not a
   founder-reviewed content policy. Whether that's the right ceiling for a real-money product with
   real leagues talking in real chat rooms is a product decision nobody with the authority to make

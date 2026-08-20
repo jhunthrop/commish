@@ -25,12 +25,12 @@ export default async function ReviewsPage() {
   const mine = user === null ? null : await myReview(getDb(), user.id);
 
   const emptyAction =
-    user === null ? (
+    user === null || mine === null ? (
       <Link href="/sign-in" className="text-sm font-medium text-accent underline">
         Sign in to write the first review
       </Link>
     ) : (
-      <ReviewComposer existingReview={mine} />
+      <ReviewComposer myReview={mine} />
     );
 
   return (

@@ -3,7 +3,7 @@ import type { Db } from "@/db/client";
 import { reviewReports, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { REVIEW_CONFIG } from "@/reviews/config";
-import type { ReviewView, ReviewsPage } from "@/reviews/contract";
+import type { MyReviewState, ReviewView, ReviewsPage } from "@/reviews/contract";
 
 const systemClock: Clock = { now: () => new Date().toISOString() };
 
@@ -98,14 +98,30 @@ export interface SubmitReviewInput {
   readonly newId?: () => string;
 }
 
+/** What the API says when a removed author tries to write over their removed review. */
+const REMOVED_REFUSAL = "Your review was removed and can't be edited.";
+
+export type SubmitReviewResult =
+  | { readonly ok: true; readonly review: ReviewView }
+  | { readonly ok: false; readonly status: number; readonly reason: string };
+
 /**
  * Writes the caller's own review — inserted if this is their first, edited in place if they
  * already have one. `reviews.user_id` is UNIQUE, so `ON CONFLICT (user_id) DO UPDATE` is the
  * one statement that both cases need: a fresh `id` is only ever assigned on the branch that
  * actually inserts, and an edit keeps the original row's `id` and `created_at` untouched,
  * exactly what the "edits the existing review rather than adding a second" test demands.
+ *
+ * REMOVAL WINS. `setWhere: removed_at IS NULL` is what makes `removeReview`'s stamp mean what
+ * `reviews`' schema docblock says it means: a removed review keeps "its author, its text, who
+ * removed it and why", and the author of a removed review cannot overwrite the very text the
+ * removal row exists to preserve. The guard is in the statement's own `WHERE`, not in a prior
+ * read, for the same reason `removeReview`'s is — a removal committing between a read and this
+ * write would slip straight past a check made anywhere else. When the guard bites, Postgres
+ * updates nothing and `RETURNING` yields no row, so the refusal below costs one extra `SELECT`
+ * only on the path that was already refused.
  */
-export async function submitReview(db: Db, input: SubmitReviewInput): Promise<ReviewView> {
+export async function submitReview(db: Db, input: SubmitReviewInput): Promise<SubmitReviewResult> {
   const clock = input.clock ?? systemClock;
   const newId = input.newId ?? (() => crypto.randomUUID());
   const now = new Date(clock.now());
@@ -116,19 +132,28 @@ export async function submitReview(db: Db, input: SubmitReviewInput): Promise<Re
     .onConflictDoUpdate({
       target: reviews.userId,
       set: { rating: input.rating, body: input.body, updatedAt: now },
+      setWhere: isNull(reviews.removedAt),
     })
     .returning();
-  if (row === undefined) throw new Error(`submitReview: no row returned for user ${input.userId}.`);
+
+  if (row === undefined) {
+    const [existing] = await db.select({ removedAt: reviews.removedAt }).from(reviews).where(eq(reviews.userId, input.userId));
+    if (existing !== undefined && existing.removedAt !== null) return { ok: false, status: 409, reason: REMOVED_REFUSAL };
+    throw new Error(`submitReview: no row returned for user ${input.userId}.`);
+  }
 
   const [author] = await db.select({ displayName: users.displayName, avatarUrl: users.avatarUrl }).from(users).where(eq(users.id, input.userId));
-  return toView({ ...row, authorName: author?.displayName ?? "A manager", authorAvatar: author?.avatarUrl ?? null }, row.rating);
+  return { ok: true, review: toView({ ...row, authorName: author?.displayName ?? "A manager", authorAvatar: author?.avatarUrl ?? null }, row.rating) };
 }
 
 /**
- * The caller's own review, or `null` if they've never written one. `ReviewComposer` uses this to
- * load an existing draft and say so ("You've already left a review. Editing replaces it.").
+ * The caller's own review in the three states it can be in: never written, live and editable,
+ * or removed and frozen. Removal-AWARE on purpose — the previous version selected no removal
+ * columns and filtered on none, so a removed author was shown an apparently-live review, told
+ * "Editing replaces it.", and got a success for an edit `submitReview` now refuses outright.
+ * Telling them nothing was a silent shadow-ban; this is the read half of saying so.
  */
-export async function myReview(db: Db, userId: string): Promise<ReviewView | null> {
+export async function myReview(db: Db, userId: string): Promise<MyReviewState> {
   const [row] = await db
     .select({
       id: reviews.id,
@@ -138,11 +163,18 @@ export async function myReview(db: Db, userId: string): Promise<ReviewView | nul
       updatedAt: reviews.updatedAt,
       authorName: users.displayName,
       authorAvatar: users.avatarUrl,
+      removedAt: reviews.removedAt,
+      removalReason: reviews.removalReason,
     })
     .from(reviews)
     .innerJoin(users, eq(users.id, reviews.userId))
     .where(eq(reviews.userId, userId));
-  return row === undefined ? null : toView(row, row.rating);
+
+  if (row === undefined) return { state: "none" };
+  if (row.removedAt !== null) {
+    return { state: "removed", reason: row.removalReason ?? "breaking the review rules", removedAt: row.removedAt.toISOString() };
+  }
+  return { state: "live", review: toView(row, row.rating) };
 }
 
 export interface ReportReviewInput {

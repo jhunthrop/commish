@@ -44,7 +44,7 @@ export default async function ProfilePage() {
               .
             </p>
           </div>
-          <ReviewComposer existingReview={review} />
+          <ReviewComposer myReview={review} />
         </section>
       </main>
     </>

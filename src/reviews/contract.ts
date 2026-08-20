@@ -31,6 +31,19 @@ export interface ReviewsPage {
   readonly nextBefore: string | null;
 }
 
+/**
+ * The caller's own review, in the three states the product actually has. `removed` is the one
+ * the feed's `ReviewView` deliberately cannot express: a removed review is absent from the
+ * public feed, but its AUTHOR still has to be told what happened to it, or they edit into a
+ * silent shadow-ban. `reason` is the operator's own removal reason — the author sees the same
+ * sentence the operator wrote, which is why `scripts/remove-review.ts` says so before it asks
+ * for confirmation.
+ */
+export type MyReviewState =
+  | { readonly state: "none" }
+  | { readonly state: "live"; readonly review: ReviewView }
+  | { readonly state: "removed"; readonly reason: string; readonly removedAt: string };
+
 /** `GET /api/reviews`'s response body. */
 export type ReviewsListBody = ReviewsPage;
 

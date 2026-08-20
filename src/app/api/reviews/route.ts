@@ -1,7 +1,7 @@
 import { getDb } from "@/db/client";
 import { listReviews, submitReview } from "@/review-service/reviews";
 import { listReviewsQuerySchema, submitReviewSchema } from "@/review-service/schemas";
-import { ok, parseJson, parseQuery } from "@/lib/api/respond";
+import { fail, ok, parseJson, parseQuery } from "@/lib/api/respond";
 import type { ReviewsListBody, ReviewSubmitBody } from "@/reviews/contract";
 import { withCurrentUser } from "@/app/api/leagues/_shared";
 import { browseRateLimited, submitRateLimited } from "./_shared";
@@ -35,6 +35,9 @@ export async function GET(request: Request) {
  * Writes the caller's own review. `submitReview`'s upsert (`reviews.user_id` is UNIQUE) is what
  * makes this route double as both "leave a review" and "edit my review" with no separate PATCH —
  * `ReviewComposer` always POSTs here, whichever case it is.
+ *
+ * A removed author is refused with `submitReview`'s own 409, not a success for a write that
+ * never landed: removal wins, and this is where the product says so out loud.
  */
 export async function POST(request: Request) {
   return withCurrentUser(request, async (userId, req) => {
@@ -44,7 +47,8 @@ export async function POST(request: Request) {
     const parsed = await parseJson(req, submitReviewSchema);
     if (!parsed.ok) return parsed.response;
 
-    const review = await submitReview(getDb(), { userId, rating: parsed.value.rating, body: parsed.value.body });
-    return ok<ReviewSubmitBody>(review);
+    const result = await submitReview(getDb(), { userId, rating: parsed.value.rating, body: parsed.value.body });
+    if (!result.ok) return fail(result.reason, result.status);
+    return ok<ReviewSubmitBody>(result.review);
   });
 }

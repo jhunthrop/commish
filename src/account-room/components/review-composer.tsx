@@ -1,21 +1,44 @@
 "use client";
 
 import { useId, useState } from "react";
+import Link from "next/link";
 import { Button, Textarea } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { validateReviewDraft } from "@/reviews/validate";
-import type { ReviewView } from "@/reviews/contract";
+import type { MyReviewState, ReviewView } from "@/reviews/contract";
 import { useAccountRoomDeps } from "../hooks/deps";
 
 const RATING_LABELS = ["1, poor", "2, fair", "3, good", "4, very good", "5, excellent"] as const;
 
 export interface ReviewComposerProps {
-  /** The caller's own review, if they've already written one — loaded server-side, same
-   *  precedent as `ProfileForm`'s `profile` prop. */
-  readonly existingReview: ReviewView | null;
+  /** The caller's own review and its state, loaded server-side — same precedent as
+   *  `ProfileForm`'s `profile` prop. */
+  readonly myReview: MyReviewState;
   /** Called after a successful submit with the review as the server now has it. */
   readonly onSubmitted?: (review: ReviewView) => void;
+}
+
+/**
+ * The state a REMOVED author sees instead of an editable form. `submitReview` refuses their
+ * write at the database (`setWhere: removed_at IS NULL`), so rendering the form would be an
+ * invitation to type something the server will never accept — and rendering it while saying
+ * "Editing replaces it." is the shadow-ban this replaces. Not a dead end: the feed they were
+ * removed from is one link away, and the reason is the operator's own words.
+ */
+function RemovedNotice({ reason }: { readonly reason: string }) {
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-elevated p-4">
+      <p className="text-sm font-medium text-text-primary">{`Your review was removed for ${reason}. It can't be edited.`}</p>
+      <p className="text-sm text-text-muted">
+        Everything you wrote is kept on record, and it no longer appears in public.{" "}
+        <Link href="/reviews" className="font-medium text-accent underline">
+          Read what other managers are saying
+        </Link>
+        .
+      </p>
+    </div>
+  );
 }
 
 /**
@@ -26,7 +49,8 @@ export interface ReviewComposerProps {
  * `validateReviewDraft` (`@/reviews/validate`) — the SAME rule `submitReviewSchema` enforces at
  * the API boundary — so this form can never promise a length the server then rejects.
  */
-export function ReviewComposer({ existingReview, onSubmitted }: ReviewComposerProps) {
+export function ReviewComposer({ myReview, onSubmitted }: ReviewComposerProps) {
+  const existingReview = myReview.state === "live" ? myReview.review : null;
   const { fetchJson } = useAccountRoomDeps();
   const legendId = useId();
   const [rating, setRating] = useState<number | null>(existingReview?.rating ?? null);
@@ -69,6 +93,10 @@ export function ReviewComposer({ existingReview, onSubmitted }: ReviewComposerPr
       setSaving(false);
     }
   };
+
+  // After the hooks, never before them: the state is a prop, and React needs the same hook
+  // order on every render regardless of which branch this component takes.
+  if (myReview.state === "removed") return <RemovedNotice reason={myReview.reason} />;
 
   return (
     <form

@@ -95,17 +95,55 @@ describe("listReviews / feedQuery — the curation proof", () => {
 describe("submitReview", () => {
   it("returns the author's name and stored avatar ref", async () => {
     await db.insert(users).values({ id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", avatarUrl: "preset:shield" });
-    const review = await submitReview(db, { userId: "u1", rating: 5, body: LONG_ENOUGH, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
-    expect(review).toMatchObject({ authorName: "Ada Lovelace", authorAvatar: "preset:shield" });
+    const result = await submitReview(db, { userId: "u1", rating: 5, body: LONG_ENOUGH, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
+    expect(result.ok && result.review).toMatchObject({ authorName: "Ada Lovelace", authorAvatar: "preset:shield" });
+  });
+
+  it("refuses a removed author's write and leaves the removed row byte-unchanged", async () => {
+    await seedUser("u1");
+    await seedUser("operator");
+    await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
+    await removeReview(db, { reviewId: "r1", removedByUserId: "operator", reason: "spam", clock: at("2026-08-04T00:00:00Z") });
+    const [before] = await db.select().from(reviews).where(eq(reviews.id, "r1"));
+
+    const result = await submitReview(db, { userId: "u1", rating: 5, body: REVISED, clock: at("2026-08-05T00:00:00Z"), newId: () => "r-never" });
+    expect(result).toEqual({ ok: false, status: 409, reason: "Your review was removed and can't be edited." });
+
+    // The evidence ruling 18's removal row exists to preserve — every column of it.
+    const [after] = await db.select().from(reviews).where(eq(reviews.id, "r1"));
+    expect(after).toEqual(before);
+    // And no second row was inserted to sneak past the unique index either.
+    expect(await db.select().from(reviews)).toHaveLength(1);
+  });
+
+  it("still lets a NON-removed author edit their own review", async () => {
+    await seedUser("u1");
+    await seedUser("u2");
+    await seedUser("operator");
+    await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
+    await submitReview(db, { userId: "u2", rating: 2, body: LONG_ENOUGH, clock: at("2026-08-02T00:00:00Z"), newId: () => "r2" });
+    await removeReview(db, { reviewId: "r1", removedByUserId: "operator", reason: "spam", clock: at("2026-08-04T00:00:00Z") });
+
+    const result = await submitReview(db, { userId: "u2", rating: 4, body: REVISED, clock: at("2026-08-05T00:00:00Z"), newId: () => "r-unused" });
+    expect(result).toMatchObject({ ok: true, review: { id: "r2", rating: 4, body: REVISED } });
   });
 });
 
 describe("myReview", () => {
-  it("is null before a user has ever written one, and the row after", async () => {
+  it("reports none before a user has ever written one, and the live review after", async () => {
     await seedUser("u1");
-    expect(await myReview(db, "u1")).toBeNull();
+    expect(await myReview(db, "u1")).toEqual({ state: "none" });
     await submitReview(db, { userId: "u1", rating: 4, body: LONG_ENOUGH, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
-    expect(await myReview(db, "u1")).toMatchObject({ id: "r1", rating: 4 });
+    expect(await myReview(db, "u1")).toMatchObject({ state: "live", review: { id: "r1", rating: 4 } });
+  });
+
+  it("reports the removed state with the operator's reason, never an editable-looking review", async () => {
+    await seedUser("u1");
+    await seedUser("operator");
+    await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
+    await removeReview(db, { reviewId: "r1", removedByUserId: "operator", reason: "spam", clock: at("2026-08-04T00:00:00Z") });
+
+    expect(await myReview(db, "u1")).toEqual({ state: "removed", reason: "spam", removedAt: "2026-08-04T00:00:00.000Z" });
   });
 });
 

@@ -8,6 +8,10 @@
 // `--by` is an existing `users.id` — `removed_by_user_id` is a real foreign key, so a name that
 // isn't a signed-up user's own id fails fast with a Postgres constraint violation rather than
 // being silently accepted as free text.
+//
+// `--reason` IS SHOWN TO THE AUTHOR, verbatim: `myReview` reports the removed state and
+// `ReviewComposer` renders "Your review was removed for <reason>. It can't be edited." Write a
+// short phrase the author should read ("spam", "abusive language"), never an internal note.
 import { createInterface } from "node:readline/promises";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
@@ -82,7 +86,7 @@ async function main(): Promise<void> {
   console.log(`  author: ${row.authorName}`);
   console.log(`  rating: ${row.rating}`);
   console.log(`  body:   ${row.body}`);
-  console.log(`  reason: ${args.reason}`);
+  console.log(`  reason: ${args.reason}   (the author will read this)`);
   console.log(`  by:     ${args.by}`);
 
   const proceed = await confirm("Remove this review?");

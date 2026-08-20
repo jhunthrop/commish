@@ -3,7 +3,7 @@ import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { REVIEW_CONFIG } from "@/reviews/config";
-import type { ReviewView } from "@/reviews/contract";
+import type { MyReviewState, ReviewView } from "@/reviews/contract";
 import { fixtureAccountDeps, renderInAccount } from "../test-fixtures";
 import { AccountRoomDepsProvider } from "../hooks/deps";
 import { ReviewComposer } from "./review-composer";
@@ -18,6 +18,8 @@ const EXISTING: ReviewView = {
   authorAvatar: null,
 };
 
+const NONE: MyReviewState = { state: "none" };
+
 const LONG_ENOUGH = "This league runs itself. Draft night was smooth and scoring settled fast.";
 
 describe("ReviewComposer", () => {
@@ -25,7 +27,7 @@ describe("ReviewComposer", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: EXISTING });
     await inBothThemes(
       <AccountRoomDepsProvider deps={fixture.deps}>
-        <ReviewComposer existingReview={null} />
+        <ReviewComposer myReview={NONE} />
       </AccountRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByRole("radiogroup", { name: "Rating" })).toBeInTheDocument();
@@ -38,7 +40,7 @@ describe("ReviewComposer", () => {
   });
 
   it("invites reviewing Commish itself, not a specific league or commissioner", () => {
-    renderInAccount(<ReviewComposer existingReview={null} />, fixtureAccountDeps().deps);
+    renderInAccount(<ReviewComposer myReview={NONE} />, fixtureAccountDeps().deps);
     expect(
       screen.getByText(`Tell other managers what using Commish is like. At least ${REVIEW_CONFIG.body.minLength} characters.`),
     ).toBeInTheDocument();
@@ -46,7 +48,7 @@ describe("ReviewComposer", () => {
 
   it("says nothing about an existing review when there isn't one, and posts the review", async () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { ...EXISTING, rating: 5, body: LONG_ENOUGH } });
-    renderInAccount(<ReviewComposer existingReview={null} />, fixture.deps);
+    renderInAccount(<ReviewComposer myReview={NONE} />, fixture.deps);
     expect(screen.queryByText(/already left a review/)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole("radio", { name: "5, excellent" }));
@@ -58,16 +60,33 @@ describe("ReviewComposer", () => {
   });
 
   it("says an existing review will be replaced, pre-fills it, and shows Save changes", () => {
-    renderInAccount(<ReviewComposer existingReview={EXISTING} />, fixtureAccountDeps().deps);
+    renderInAccount(<ReviewComposer myReview={{ state: "live", review: EXISTING }} />, fixtureAccountDeps().deps);
     expect(screen.getByText("You've already left a review. Editing replaces it.")).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "4, very good" })).toBeChecked();
     expect(screen.getByLabelText("Your review")).toHaveValue(EXISTING.body);
     expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();
   });
 
+  it("shows a removed author the reason and no form at all, with a way back to the feed", () => {
+    const fixture = fixtureAccountDeps();
+    renderInAccount(
+      <ReviewComposer myReview={{ state: "removed", reason: "spam", removedAt: "2026-08-04T00:00:00.000Z" }} />,
+      fixture.deps,
+    );
+
+    expect(screen.getByText("Your review was removed for spam. It can't be edited.")).toBeInTheDocument();
+    // No editable form anywhere: the server refuses this author's write (`submitReview`'s
+    // `setWhere`), so offering a textarea and a Save button would be a promise it will break.
+    expect(screen.queryByLabelText("Your review")).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Rating" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/already left a review/)).not.toBeInTheDocument();
+    // Not a dead end.
+    expect(screen.getByRole("link", { name: "Read what other managers are saying" })).toHaveAttribute("href", "/reviews");
+  });
+
   it("blocks submit and explains why when no rating is chosen", async () => {
     const fixture = fixtureAccountDeps();
-    renderInAccount(<ReviewComposer existingReview={null} />, fixture.deps);
+    renderInAccount(<ReviewComposer myReview={NONE} />, fixture.deps);
     fireEvent.change(screen.getByLabelText("Your review"), { target: { value: LONG_ENOUGH } });
     fireEvent.click(screen.getByRole("button", { name: "Post review" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Choose a rating."));
@@ -76,7 +95,7 @@ describe("ReviewComposer", () => {
 
   it("blocks submit and explains why the body is too short, reading validateReviewDraft's own message", async () => {
     const fixture = fixtureAccountDeps();
-    renderInAccount(<ReviewComposer existingReview={null} />, fixture.deps);
+    renderInAccount(<ReviewComposer myReview={NONE} />, fixture.deps);
     fireEvent.click(screen.getByRole("radio", { name: "3, good" }));
     fireEvent.change(screen.getByLabelText("Your review"), { target: { value: "too short" } });
     fireEvent.click(screen.getByRole("button", { name: "Post review" }));
@@ -88,7 +107,7 @@ describe("ReviewComposer", () => {
 
   it("shows the server's reason without losing what was typed", async () => {
     const fixture = fixtureAccountDeps({ ok: false, error: "You've changed that a lot in a short time. Give it a minute and try again." });
-    renderInAccount(<ReviewComposer existingReview={null} />, fixture.deps);
+    renderInAccount(<ReviewComposer myReview={NONE} />, fixture.deps);
     fireEvent.click(screen.getByRole("radio", { name: "2, fair" }));
     fireEvent.change(screen.getByLabelText("Your review"), { target: { value: LONG_ENOUGH } });
     fireEvent.click(screen.getByRole("button", { name: "Post review" }));
@@ -99,7 +118,7 @@ describe("ReviewComposer", () => {
   it("calls onSubmitted with the server's review on success", async () => {
     const submitted = vi.fn();
     const fixture = fixtureAccountDeps({ ok: true, data: { ...EXISTING, rating: 5, body: LONG_ENOUGH } });
-    renderInAccount(<ReviewComposer existingReview={null} onSubmitted={submitted} />, fixture.deps);
+    renderInAccount(<ReviewComposer myReview={NONE} onSubmitted={submitted} />, fixture.deps);
     fireEvent.click(screen.getByRole("radio", { name: "5, excellent" }));
     fireEvent.change(screen.getByLabelText("Your review"), { target: { value: LONG_ENOUGH } });
     fireEvent.click(screen.getByRole("button", { name: "Post review" }));
@@ -109,7 +128,7 @@ describe("ReviewComposer", () => {
   it("disables the button while the request is in flight", async () => {
     const fixture = fixtureAccountDeps();
     fixture.deps = { ...fixture.deps, fetchJson: () => new Promise(() => {}) };
-    renderInAccount(<ReviewComposer existingReview={null} />, fixture.deps);
+    renderInAccount(<ReviewComposer myReview={NONE} />, fixture.deps);
     fireEvent.click(screen.getByRole("radio", { name: "3, good" }));
     fireEvent.change(screen.getByLabelText("Your review"), { target: { value: LONG_ENOUGH } });
     fireEvent.click(screen.getByRole("button", { name: "Post review" }));
