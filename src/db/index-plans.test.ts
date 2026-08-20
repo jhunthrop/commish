@@ -248,3 +248,29 @@ describe("chat_messages_league_id_idx stays a covering index", () => {
     expect(rows[0]!.indexdef).toContain("INCLUDE (body)");
   });
 });
+
+/**
+ * `audit_events`'s indexes and triggers, read back out of the catalog rather than trusted from
+ * the SQL: the same reason `chat_messages_league_id_idx` is proven this way above. The triggers
+ * in particular are hand-written (`drizzle/0019_audit_spine.sql`'s note) and invisible to
+ * `drizzle-kit generate`'s diffing — a future migration that recreates this table and forgets
+ * them fails HERE, in the build, rather than silently reopening the table to UPDATE and DELETE.
+ */
+describe("audit_events carries its indexes and its append-only triggers", () => {
+  it("carries both composite indexes the scaling review named, plus the sequence backstop", async () => {
+    const rows = await db.execute<{ indexname: string; indexdef: string }>(
+      sql`SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'audit_events'`,
+    );
+    const byName = new Map(rows.map((row) => [row.indexname, row.indexdef]));
+    expect(byName.get("audit_events_scope_sequence_idx")).toMatch(/UNIQUE.*\(chain_scope, sequence\)/);
+    expect(byName.get("audit_events_league_occurred_idx")).toMatch(/\(league_id, occurred_at\)/);
+    expect(byName.get("audit_events_actor_type_occurred_idx")).toMatch(/\(actor_id, event_type, occurred_at\)/);
+  });
+
+  it("carries the append-only triggers, so a migration that recreates the table cannot drop them", async () => {
+    const rows = await db.execute<{ tgname: string }>(sql`
+      SELECT tgname FROM pg_trigger WHERE tgrelid = 'audit_events'::regclass AND NOT tgisinternal
+    `);
+    expect(rows.map((row) => row.tgname).sort()).toEqual(["audit_events_no_delete", "audit_events_no_update"]);
+  });
+});
