@@ -105,6 +105,26 @@ describe("verifyChainIntegrity", () => {
     });
   });
 
+  it("degrades safely to a full walk when the checkpoint row itself is gone, and mints a fresh one", async () => {
+    // `audit_chain_checkpoints` carries no append-only trigger — it is verification's own mutable
+    // state, not the record itself — so a missing row here needs no `tamperWithAuditEvent` session
+    // trick to produce; a plain delete does it. The point: losing the checkpoint is not a break in
+    // the chain, it is just amnesia about how far verification got. `verifyChainIntegrity` already
+    // treats "no checkpoint row" as "never verified" (the `checkpoint === undefined` branch), so
+    // this walks from genesis exactly like the very first run and writes a brand new row.
+    await seed(3);
+    await verifyChainIntegrity(db, "league_1");
+    await db.delete(auditChainCheckpoints).where(eq(auditChainCheckpoints.scope, "league_1"));
+
+    const hash = vi.fn(computeEventHash);
+    const result = await verifyChainIntegrity(db, "league_1", { hash });
+    expect(result).toEqual({ valid: true, scope: "league_1", verifiedThrough: 3, hashed: 3 });
+    expect(hash).toHaveBeenCalledTimes(3); // resumed from nothing, not from the deleted checkpoint's stale position
+
+    const [checkpoint] = await db.select().from(auditChainCheckpoints).where(eq(auditChainCheckpoints.scope, "league_1"));
+    expect(checkpoint?.verifiedThroughSequence).toBe(3);
+  });
+
   it("does NOT catch a tamper before the checkpoint — that is the full walk's job", async () => {
     // Stated as a test rather than left implicit, because it is the honest cost of being able to
     // afford to run verification at all, and it is a spec exit criterion in both directions.
@@ -135,7 +155,14 @@ describe("verifyFullChainIntegrity", () => {
     const { db: counted, selectCount } = countingDb(db);
     const before = selectCount();
     await verifyFullChainIntegrity(counted, "league_1", { batchSize: 3 });
-    // 3 pages of events + the empty page that ends the walk + the checkpoint read + its write.
+    // 7 events at batchSize 3 is 3 page reads (events 1-3, 4-6, then 7 — that last page is
+    // SHORTER than batchSize, which ends the walk immediately with no trailing empty-page fetch)
+    // plus the checkpoint's one upsert write: 4 queries. `verifyFullChainIntegrity` never reads
+    // an existing checkpoint (it always walks from genesis), so there is no checkpoint READ to
+    // count here, only the write. The bound below is left generous rather than pinned to exactly
+    // 4, so a harmless future change in query shape doesn't turn this into a brittle assertion —
+    // what it must never do is scale with the number of EVENTS, which loading the whole chain
+    // in one shot would.
     expect(selectCount() - before).toBeLessThanOrEqual(7);
   });
 
@@ -173,6 +200,35 @@ describe("concurrency", () => {
 
     release();
     await held;
+  });
+});
+
+describe("ruling 8: detecting a tamper is itself auditable, even on the chain that caught it", () => {
+  it("still records a system_action on a corrupt platform chain, without masking the break it is reporting", async () => {
+    await db.transaction((tx) => logger.record(tx, { ...input(1), leagueId: null, eventType: "session_started", payload: {} }));
+    await tamperWithAuditEvent(db, "evt_1", { payload: { tampered: true } });
+
+    const before = await verifyChainIntegrity(db, "platform");
+    expect(before).toMatchObject({
+      valid: false, scope: "platform", firstBrokenEventId: "evt_1", firstBrokenSequence: 1, reason: "hash_mismatch",
+    });
+
+    // scripts/verify-audit-chain.ts's recordDetection appends exactly this shape to the SAME
+    // (still-corrupt) scope on a failure. AuditLogger only cares about the anchor row's live
+    // head — untouched by the tamper — so the append is not blocked by, and does not retroactively
+    // paper over, the break it is reporting: a fresh verify still finds the same original break.
+    const recorded = await db.transaction((tx) =>
+      logger.record(tx, {
+        ...input(2), leagueId: null, eventType: "system_action",
+        payload: { action: "chain_verification_failed", scopes: ["platform"] },
+      }),
+    );
+    expect(recorded).toMatchObject({ chainScope: "platform", sequence: 2 });
+
+    const after = await verifyChainIntegrity(db, "platform");
+    expect(after).toMatchObject({
+      valid: false, scope: "platform", firstBrokenEventId: "evt_1", firstBrokenSequence: 1, reason: "hash_mismatch",
+    });
   });
 });
 
