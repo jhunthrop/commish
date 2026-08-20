@@ -1,7 +1,7 @@
 import { asc, eq, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
-import { draftActions, drafts, teams } from "@/db/schema";
+import { draftActions, drafts, leagues, players, teams } from "@/db/schema";
 import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import {
@@ -14,6 +14,7 @@ import {
   type DraftState,
 } from "@/draft-engine";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { auditEventsForPicks, ownerIdsForContestedPicks } from "./audit";
@@ -99,6 +100,33 @@ export async function latestActionSequence(db: Db | DbTx, draftId: string): Prom
 }
 
 /**
+ * The one query Task 7's autopick notice needs: the picked-for team's owner and the league's own
+ * name, joined against the specific player the clock drafted. One row, only on the autopick path
+ * (`auditEventsForPicks` only ever attributes ONE new pick to `actorType: "system"` per accepted
+ * `TIMER_EXPIRE` — see its own docblock), so this never runs per-pick in a batch.
+ *
+ * Returns `undefined` only for a team/league/player combination that cannot exist through
+ * ordinary use: `pick.teamId` and its league come from `drafts`/`teams` FKs this same transaction
+ * already trusts, and `pick.playerId` came out of THIS draft's own snapshotted pool
+ * (`buildDraftPool`, itself sourced from `players`). Guarded rather than asserted, because unlike
+ * a pure lookup this is a database round trip — and a lookup failure here must never turn an
+ * already-decided pick into a rolled-back transaction over a notification nicety.
+ */
+async function autopickNoticeContext(
+  tx: DbTx,
+  teamId: string,
+  playerId: string,
+): Promise<{ readonly userId: string; readonly leagueName: string; readonly playerName: string } | undefined> {
+  const [row] = await tx
+    .select({ userId: teams.userId, leagueName: leagues.name, playerName: players.name })
+    .from(teams)
+    .innerJoin(leagues, eq(leagues.id, teams.leagueId))
+    .innerJoin(players, eq(players.id, playerId))
+    .where(eq(teams.id, teamId));
+  return row;
+}
+
+/**
  * The durable draft session store.
  *
  * The `draft_actions` log is the source of truth; `cache` is only a materialization of it,
@@ -162,8 +190,12 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
       return mutex.run(draftId, async (): Promise<ApplyResult> => {
         // `previous` is captured out of the transaction so `broadcast` (which must run AFTER
         // the commit, because publishing is best-effort and must never fail a committed write)
-        // still has the before-state to diff against.
+        // still has the before-state to diff against. `pendingNotices` is the same idea for
+        // `deliverNotice` — the durable row commits INSIDE the transaction (ruling 4's inverse-
+        // publish discipline), but the Redis frame that nudges an open room is best-effort AFTER
+        // it, exactly like `broadcast`.
         let previous: DraftState | null = null;
+        let pendingNotices: readonly MemberNotice[] = [];
 
         try {
           const outcome = await db.transaction(async (tx): Promise<ApplyResult> => {
@@ -219,7 +251,35 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
               : [];
             const ownerOf = await ownerIdsForContestedPicks(tx, contestedWinners);
             const picked = auditEventsForPicks(state, result.state, submittedActorId, ownerOf);
-            await audit.recordAll(tx, picked);
+            const pickedEvents = await audit.recordAll(tx, picked);
+
+            // Task 7's first real sender: the manager whose pick the clock made for them is told
+            // nothing today, and this is that telling. `picked`/`pickedEvents`/the new picks
+            // slice are all built from the SAME diff (`next.picks.slice(previous.picks.length)`),
+            // so index `i` names the same pick in all three.
+            const newPicks = result.state.picks.slice(state.picks.length);
+            const positionOf = new Map(result.state.pool.map((entry) => [entry.playerId, entry.position]));
+            const notices: MemberNotice[] = [];
+            for (let i = 0; i < picked.length; i += 1) {
+              if (picked[i]!.actorType !== "system") continue;
+              const newPick = newPicks[i]!;
+              const event = pickedEvents[i]!;
+              const context = await autopickNoticeContext(tx, newPick.teamId, newPick.playerId);
+              const position = positionOf.get(newPick.playerId);
+              if (context === undefined || position === undefined) continue;
+              notices.push(
+                await notifyAffectedMember(tx, {
+                  leagueId: result.state.config.leagueId,
+                  userId: context.userId,
+                  noticeType: "draft_auto_picked",
+                  context: { leagueName: context.leagueName, pickNumber: newPick.pickNumber, playerName: context.playerName, position },
+                  occurredAt: event.occurredAt,
+                  auditEventId: event.eventId,
+                }),
+              );
+            }
+            pendingNotices = notices;
+
             if (options?.alsoInTransaction !== undefined) await options.alsoInTransaction(tx);
             // A completed draft becomes a season in the same transaction that completed it.
             if (result.state.phase === "complete" && state.phase !== "complete") {
@@ -246,6 +306,7 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
 
           cache.set(draftId, outcome.state);
           if (previous !== null) await broadcast(previous, outcome.state, action);
+          for (const notice of pendingNotices) await deliverNotice(notice, publish);
           return outcome;
         } catch (error: unknown) {
           // Our view of the log is provably stale — drop it so the next read replays.

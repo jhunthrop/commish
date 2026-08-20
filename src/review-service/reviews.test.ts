@@ -3,9 +3,10 @@ import { eq, getTableName, is, Table } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { Db } from "@/db/client";
 import * as schema from "@/db/schema";
-import { auditEvents, reviews, users } from "@/db/schema";
+import { auditEvents, memberNotices, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
+import { notifyAffectedMember } from "@/integrity-service/notify";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { parseReviewCursor } from "@/reviews/cursor";
 import { feedQuery, listReviews, myReview, removeReview, reportReview, submitReview } from "./reviews";
@@ -421,5 +422,67 @@ describe("removeReview", () => {
 
     const [row] = await db.select().from(reviews).where(eq(reviews.id, "r1"));
     expect(row?.removedAt).toBeNull();
+  });
+});
+
+describe("removeReview — notices", () => {
+  it("writes the notice the removed review's author can read, quoting the operator's reason verbatim", async () => {
+    await seedUser("user_bob");
+    await seedUser("user_operator");
+    await submitReview(db, { userId: "user_bob", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "rev_1" });
+
+    await removeReview(db, { reviewId: "rev_1", removedByUserId: "user_operator", reason: "off topic", clock: at("2026-08-04T00:00:00Z"), audit: logger });
+
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "review_removed"));
+    const [notice] = await db.select().from(memberNotices);
+    expect(notice).toMatchObject({
+      userId: "user_bob",
+      leagueId: null,
+      noticeType: "review_removed",
+      title: "Your review was removed",
+      auditEventId: event!.eventId,
+      readAt: null,
+    });
+    expect(notice!.body).toBe(
+      'An operator removed your review. The reason they gave was: "off topic". Your review is kept on file exactly as you wrote it.',
+    );
+    expect(notice!.context).toEqual({ reason: "off topic" });
+  });
+
+  it("writes no notice when there is nothing to remove", async () => {
+    await removeReview(db, { reviewId: "missing", removedByUserId: "operator", reason: "spam", audit: logger });
+    expect(await db.select().from(memberNotices)).toHaveLength(0);
+  });
+
+  it("writes no second notice for a re-stamp attempt the WHERE clause refuses", async () => {
+    await seedUser("u1");
+    await seedUser("operator");
+    await seedUser("operator2");
+    await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
+
+    await removeReview(db, { reviewId: "r1", removedByUserId: "operator", reason: "spam", clock: at("2026-08-04T00:00:00Z"), audit: logger });
+    await removeReview(db, { reviewId: "r1", removedByUserId: "operator2", reason: "abusive", clock: at("2026-08-05T00:00:00Z"), audit: logger });
+
+    expect(await db.select().from(memberNotices)).toHaveLength(1);
+  });
+
+  it("rolls back the removal stamp and its audit event when the notice write fails", async () => {
+    await seedUser("u1");
+    await seedUser("operator");
+    await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
+
+    const brokenNotify: typeof notifyAffectedMember = async () => {
+      throw new Error("notice write failed");
+    };
+    await expect(
+      removeReview(db, {
+        reviewId: "r1", removedByUserId: "operator", reason: "spam", clock: at("2026-08-04T00:00:00Z"),
+        audit: logger, notify: brokenNotify,
+      }),
+    ).rejects.toThrow("notice write failed");
+
+    const [row] = await db.select().from(reviews).where(eq(reviews.id, "r1"));
+    expect(row?.removedAt).toBeNull();
+    expect(await db.select().from(auditEvents)).toHaveLength(0);
   });
 });

@@ -632,3 +632,48 @@ export const auditChainCheckpoints = pgTable("audit_chain_checkpoints", {
   verifiedThroughHash: text("verified_through_hash").notNull(),
   verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull().defaultNow(),
 });
+
+/**
+ * What the platform told one member it did, and when they read it.
+ *
+ * The row stores the RENDERED copy, not only the type and the context (ruling 12). What a person
+ * was told is a historical fact: if a template is reworded next month, the notice they already
+ * read must not silently become different words. `context` is kept beside it so a later reader
+ * can see what it was rendered from, which is also what makes a template change auditable.
+ *
+ * `league_id` is nullable, because not every automated action happens inside a league: a review
+ * removal does not. Unlike `audit_events` this table DOES carry foreign keys with cascade: it is
+ * a delivery record, not the record, and a deleted user's undelivered notices are noise.
+ *
+ * `notice_type` is TEXT and not a pg enum, unlike `audit_event_type`. The audit vocabulary is
+ * fixed and fully declared today; notice types are added by Plans B, C and D, and `ALTER TYPE …
+ * ADD VALUE` inside drizzle-kit's transaction-wrapped migration is a trap (the new value cannot
+ * be used in the same transaction). `NoticeType` plus `NOTICE_TEMPLATES` is the vocabulary, and
+ * `notify.test.ts` asserts every stored value is one of its keys.
+ */
+export const memberNotices = pgTable(
+  "member_notices",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    leagueId: text("league_id").references(() => leagues.id, { onDelete: "cascade" }),
+    noticeType: text("notice_type").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    context: jsonb("context").$type<JsonObject>().notNull(),
+    /** The audit event this notice explains. No FK, for the same reason `audit_events` has none. */
+    auditEventId: text("audit_event_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [
+    /**
+     * The inbox's only ordering. `(user_id, created_at)` and not a partial index on unread: the
+     * inbox reads a member's most recent notices whether or not they are read, and the unread
+     * count is a `count(*)` over that same bounded page rather than a rollup — the balance-as-
+     * rollup convention's own threshold (derive over a bounded set, roll up over an unbounded
+     * one), and a member's recent notices are bounded by `INTEGRITY_CONFIG.notices.inboxSize`.
+     */
+    index("member_notices_user_created_idx").on(t.userId, t.createdAt),
+  ],
+);

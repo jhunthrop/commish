@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, draftActions } from "@/db/schema";
+import { auditEvents, draftActions, memberNotices, players } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore, isSequenceConflict, type ApplyResult, type DraftStore, type PublishFn } from "./store";
@@ -20,6 +20,12 @@ const POOL: readonly DraftPoolEntry[] = [
   { playerId: "rb2", position: "RB" },
   { playerId: "wr2", position: "WR" },
 ];
+
+/** Real names for `POOL`, so the notice-copy assertions below have something to match against. */
+const PLAYER_NAMES: Readonly<Record<string, string>> = {
+  qb1: "Quincy Bishop", rb1: "Reggie Barnes", wr1: "Wesley Reed",
+  qb2: "Quentin Boyd", rb2: "Riley Banks", wr2: "Wyatt Ross",
+};
 
 let published: { type: string; leagueId: string; payload: unknown }[] = [];
 const publish: PublishFn = async (input) => {
@@ -133,6 +139,11 @@ async function runFullDraft(store: DraftStore, draftId: string): Promise<void> {
 beforeEach(async () => {
   await truncateAll(db);
   published = [];
+  // The `players` row every POOL entry needs for `autopickNoticeContext`'s join. Absent, the
+  // autopick notice path skips itself rather than fail an already-decided pick over it (see
+  // `store.ts`) — most tests above never look at `member_notices` and are unaffected either way;
+  // seeding here lets the "draft store — notices" tests below assert the real thing.
+  await db.insert(players).values(POOL.map((entry) => ({ id: entry.playerId, name: PLAYER_NAMES[entry.playerId]!, position: entry.position, nflTeam: "FA" })));
 });
 
 afterAll(async () => {
@@ -472,5 +483,63 @@ describe("draft store — audit — auction attribution", () => {
     const [row] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
     expect(row).toMatchObject({ chainScope: leagueId, actorId: null, actorType: "system" });
     expect(row!.payload).toMatchObject({ teamId: teamIds[0], auto: true });
+  });
+});
+
+describe("draft store — notices", () => {
+  it("notifies the manager whose pick the clock made for them, in the same transaction, and pushes a live frame", async () => {
+    const { draftId, leagueId, teamIds, userIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const result = await expireOnTheClock(store, draftId);
+    expect(result.ok).toBe(true);
+
+    const [pickEvent] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    const payload = pickEvent!.payload as unknown as { teamId: string; playerId: string; pickNumber: number };
+    const pickerIndex = teamIds.indexOf(payload.teamId);
+
+    const [notice] = await db.select().from(memberNotices);
+    expect(notice).toMatchObject({
+      userId: userIds[pickerIndex],
+      leagueId,
+      noticeType: "draft_auto_picked",
+      title: "Your pick was made automatically",
+      auditEventId: pickEvent!.eventId,
+      readAt: null,
+    });
+    expect(notice!.body).toBe(
+      `The clock ran out on pick ${payload.pickNumber} in league_1, so we used your queue and drafted ${PLAYER_NAMES[payload.playerId]} (${payload.playerId.startsWith("qb") ? "QB" : payload.playerId.startsWith("rb") ? "RB" : "WR"}).`,
+    );
+
+    // The same live frame `broadcast` already uses, after the same commit — no separate
+    // per-user channel, just the league stream with the target `userId` in the payload.
+    const frame = published.find((e) => e.type === "notice.created");
+    expect(frame).toBeDefined();
+    expect(frame!.leagueId).toBe(leagueId);
+    expect(frame!.payload).toMatchObject({ userId: userIds[pickerIndex], noticeType: "draft_auto_picked" });
+  });
+
+  it("writes no notice for a pick a person submitted directly", async () => {
+    const { draftId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    await store.applyAction(draftId, pick(teamIds[0]!, "qb1"), { actor: { id: "user_alice" } });
+
+    expect(await db.select().from(memberNotices)).toHaveLength(0);
+    expect(published.some((e) => e.type === "notice.created")).toBe(false);
+  });
+
+  it("skips the notice, without failing the pick, when the join finds no row (e.g. an unseeded player)", async () => {
+    const { draftId, teamIds } = await fixture();
+    // Undo this file's own beforeEach seeding, reproducing the gap `autopickNoticeContext`
+    // guards — this must never turn an already-decided pick into a rolled-back transaction.
+    await db.delete(players);
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const result = await expireOnTheClock(store, draftId);
+
+    expect(result.ok).toBe(true);
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"))).toHaveLength(1);
+    expect(await db.select().from(memberNotices)).toHaveLength(0);
   });
 });

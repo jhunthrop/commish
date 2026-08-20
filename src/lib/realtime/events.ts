@@ -26,6 +26,14 @@ export const REALTIME_EVENT_TYPES = [
   "chat.message",
   "chat.reaction",
   "score.update",
+  /**
+   * A `member_notices` row was written for one member (`src/integrity-service/notify.ts`). Sent
+   * on the LEAGUE stream, not a per-user one — no per-user channel exists — carrying the target
+   * `userId` in its payload so every other open browser in the room ignores it. Only sent when
+   * the notice HAS a league (ruling 13); a league-less notice (e.g. `review_removed`) reaches its
+   * reader on their next inbox load instead, which is what the durable row is for.
+   */
+  "notice.created",
 ] as const;
 
 export type RealtimeEventType = (typeof REALTIME_EVENT_TYPES)[number];

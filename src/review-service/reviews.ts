@@ -3,6 +3,7 @@ import type { Db } from "@/db/client";
 import { reviewReports, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { notifyAffectedMember } from "@/integrity-service/notify";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { formatReviewCursor, type ReviewCursor } from "@/reviews/cursor";
 import type { MyReviewState, ReviewView, ReviewsPage } from "@/reviews/contract";
@@ -232,6 +233,8 @@ export interface RemoveReviewInput {
   readonly clock?: Clock;
   /** Defaults to the process-wide logger (`getAuditLogger()`). */
   readonly audit?: AuditLogger;
+  /** Defaults to the real `notifyAffectedMember`. Injectable so a test can force its failure. */
+  readonly notify?: typeof notifyAffectedMember;
 }
 
 export interface RemovalRecord {
@@ -265,10 +268,17 @@ export type RemoveReviewResult =
  * refuses is not a removal and must record nothing, the same "judged by this write's own
  * returned rows" rule the stamp itself uses. The whole function runs inside one transaction now
  * (it used to be a single bare `UPDATE`) so the stamp and its audit event commit together.
+ *
+ * Task 7's second real sender: the `--reason` this script has always taken has been "author-
+ * facing copy" since Phase 2 with nowhere for the author to read it. `notifyAffectedMember` joins
+ * the same transaction as the stamp and the audit event — the operator's own words, quoted
+ * verbatim, never paraphrased. No `deliverNotice` call here: a removal has no league (ruling 13),
+ * so there is no room to nudge and the author's next inbox load is the honest delivery.
  */
 export async function removeReview(db: Db, input: RemoveReviewInput): Promise<RemoveReviewResult> {
   const clock = input.clock ?? systemClock;
   const audit = input.audit ?? getAuditLogger();
+  const notify = input.notify ?? notifyAffectedMember;
   const now = new Date(clock.now());
 
   return db.transaction(async (tx) => {
@@ -279,13 +289,21 @@ export async function removeReview(db: Db, input: RemoveReviewInput): Promise<Re
       .returning({ id: reviews.id, userId: reviews.userId, removedByUserId: reviews.removedByUserId, removalReason: reviews.removalReason, removedAt: reviews.removedAt });
 
     if (row !== undefined && row.removedAt !== null && row.removedByUserId !== null && row.removalReason !== null) {
-      await audit.record(tx, {
+      const event = await audit.record(tx, {
         eventType: "review_removed",
         actorId: row.removedByUserId,
         actorType: "user",
         leagueId: null,
         payload: { reviewId: row.id, authorUserId: row.userId, reason: row.removalReason },
         occurredAt: clock.now(),
+      });
+      await notify(tx, {
+        leagueId: null,
+        userId: row.userId,
+        noticeType: "review_removed",
+        context: { reason: row.removalReason },
+        occurredAt: clock.now(),
+        auditEventId: event.eventId,
       });
       return {
         ok: true,
