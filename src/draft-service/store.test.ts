@@ -6,7 +6,7 @@ import { auditEvents, draftActions, memberNotices, players } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
 import { currentDeadline } from "@/draft-engine";
 import type { MemberNotice } from "@/integrity-service/notify";
-import { createDraftStore, isSequenceConflict, type ApplyResult, type DraftStore, type PublishFn } from "./store";
+import { createDraftStore, isSequenceConflict, type ApplyResult, type DraftStore, type DraftStoreDeps, type PublishFn } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
 const db = createTestDb();
@@ -44,8 +44,17 @@ const deliverNoticeFake = async (notice: MemberNotice): Promise<void> => {
   deliveredNotices.push(notice);
 };
 
-function newStore(publishFn: PublishFn = publish) {
-  return createDraftStore({ db, publish: publishFn, clock, deliverNotice: deliverNoticeFake });
+function newStore(
+  publishFn: PublishFn = publish,
+  overrides: { deliverNotice?: (notice: MemberNotice) => Promise<void>; onPublishError?: DraftStoreDeps["onPublishError"] } = {},
+) {
+  return createDraftStore({
+    db,
+    publish: publishFn,
+    clock,
+    deliverNotice: overrides.deliverNotice ?? deliverNoticeFake,
+    onPublishError: overrides.onPublishError,
+  });
 }
 
 /**
@@ -582,5 +591,44 @@ describe("draft store — notices", () => {
 
     expect(await db.select().from(memberNotices)).toHaveLength(0);
     expect(deliveredNotices).toHaveLength(0);
+  });
+
+  it("a deliverNotice failure never fails, and never rolls back, an already-committed pick", async () => {
+    // The inverse of `notifyAffectedMember`'s own discipline, pinned as a regression guard: the
+    // durable row and the pick are ALREADY COMMITTED by the time `deliver` runs (it's called
+    // strictly after `db.transaction` resolves — see the code right above `createdNotices`'s
+    // loop), so a rejecting `deliverNotice` must be swallowed exactly like a Redis outage in
+    // `broadcast`, reported through the same `onPublishError` sink, and never surface as a
+    // rejection of `applyAction` or undo anything already written.
+    const publishFailures: { type: string; leagueId: string }[] = [];
+    const throwingDeliverNotice = async (): Promise<void> => {
+      throw new Error("Redis is unreachable");
+    };
+    const { draftId, leagueId, teamIds, userIds } = await fixture();
+    const store = newStore(publish, {
+      deliverNotice: throwingDeliverNotice,
+      onPublishError: (_error, event) => publishFailures.push({ type: event.type, leagueId: event.leagueId }),
+    });
+    await store.applyAction(draftId, start(teamIds));
+
+    const result = await expireOnTheClock(store, draftId);
+
+    // No throw escaped `applyAction`, and the pick is genuinely accepted — not merely
+    // "didn't throw": ok:true is the store's own verdict that this action was admitted.
+    expect(result.ok).toBe(true);
+
+    const [pickEvent] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    expect(pickEvent).toBeDefined();
+    const payload = pickEvent!.payload as unknown as { teamId: string };
+    const pickerIndex = teamIds.indexOf(payload.teamId);
+
+    // The durable notice row landed — it was written and committed BEFORE `deliver` ever ran,
+    // so a delivery failure has no way to touch it.
+    const [notice] = await db.select().from(memberNotices);
+    expect(notice).toMatchObject({ userId: userIds[pickerIndex], leagueId, noticeType: "draft_auto_picked" });
+
+    // The failure was reported through the existing sink, not swallowed silently, and not
+    // thrown back at the caller.
+    expect(publishFailures).toEqual([{ type: "notice.created", leagueId }]);
   });
 });
