@@ -282,8 +282,9 @@ million-row chain into memory to check it is the same class of mistake as re-has
 request. `page()` in `verify.ts` reads `INTEGRITY_CONFIG.verification.batchSize` (500) rows at a
 time by `audit_events_scope_sequence_idx`, the same index the activity feed reads by.
 `fullVerifyIntervalHours` (24) is the number a production scheduler is configured with —
-`scripts/verify-audit-chain.ts`, run by hand, is the only caller today, and Plan D is the plan that
-has a scheduler.
+`scripts/verify-audit-chain.ts`, run by hand, is the only caller today, and Phase 2's Plan D (the
+founder-gated deploy plan) is the plan that has a scheduler — see section 9 for why that runner is
+a requirement, not a convenience.
 
 ## 5. The audited set
 
