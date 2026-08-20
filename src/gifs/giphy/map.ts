@@ -1,7 +1,23 @@
+import { CHAT_CONFIG } from "@/chat/config";
 import type { GifResult } from "../provider";
 
 function str(value: unknown): string {
   return typeof value === "string" ? value.trim() : "";
+}
+
+/**
+ * The alt text a GIF carries BECOMES the message body (`ChatComposer` sends `gif.alt` as
+ * `body`), which `postMessageSchema` caps at `CHAT_CONFIG.maxBodyLength`. An uncapped Giphy
+ * title longer than that made a GIF unsendable and surfaced the TEXT path's error — "Please keep
+ * this to 500 characters or fewer" — for a GIF the user never typed a word into. So the cap is
+ * applied here, at the seam that synthesizes the string, rather than left to fail at the wire.
+ *
+ * Plain truncation, no ellipsis: an ellipsis is a claim that something was cut, and this is alt
+ * text read aloud by a screen reader, where a trailing "dot dot dot" is noise. Trimmed after the
+ * slice so a cut landing on a space cannot leave trailing whitespace behind.
+ */
+function fitAlt(text: string): string {
+  return text.length <= CHAT_CONFIG.gif.maxAltLength ? text : text.slice(0, CHAT_CONFIG.gif.maxAltLength).trim();
 }
 
 /** Giphy reports every rendition's width/height as a STRING. Anything not a finite positive number becomes 0, never NaN. */
@@ -44,6 +60,6 @@ export function mapSearchResults(data: unknown, query: string): readonly GifResu
     if (id === "" || url === "" || previewUrl === "" || width === 0 || height === 0 || seen.has(id)) return [];
     seen.add(id);
     const title = str(record.title);
-    return [{ id, url, previewUrl, width, height, alt: title !== "" ? title : `A GIF for "${query}"` }];
+    return [{ id, url, previewUrl, width, height, alt: fitAlt(title !== "" ? title : `A GIF for "${query}"`) }];
   });
 }

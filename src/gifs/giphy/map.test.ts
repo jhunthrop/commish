@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { CHAT_CONFIG } from "@/chat/config";
 import { mapSearchResults } from "./map";
 
 const VALID = {
@@ -33,6 +34,29 @@ describe("mapSearchResults", () => {
     const withoutTitle = { id: VALID.id, images: VALID.images };
     const results = mapSearchResults([withoutTitle], "touchdown");
     expect(results[0]?.alt).toBe('A GIF for "touchdown"');
+  });
+
+  // A Giphy title over the chat body cap made the GIF unsendable and surfaced the TEXT path's
+  // "Please keep this to 500 characters or fewer" for a GIF nobody typed a word into. The cap
+  // belongs at the seam that synthesizes the string.
+  it("truncates a title longer than the chat body cap, so a long-titled GIF is still sendable", () => {
+    const title = "Touchdown ".repeat(60); // 600 characters
+    expect(title.length).toBeGreaterThan(CHAT_CONFIG.gif.maxAltLength);
+
+    const results = mapSearchResults([{ ...VALID, title }], "touchdown");
+    const alt = results[0]?.alt ?? "";
+    expect(alt.length).toBeLessThanOrEqual(CHAT_CONFIG.gif.maxAltLength);
+    expect(title.startsWith(alt)).toBe(true);
+    // Plain truncation: no ellipsis for a screen reader to read out, no trailing space.
+    expect(alt).toBe(alt.trim());
+    expect(alt.endsWith("…")).toBe(false);
+    // The claim that actually matters: this alt fits the body length `postMessageSchema` enforces.
+    expect(alt.length).toBeLessThanOrEqual(CHAT_CONFIG.maxBodyLength);
+  });
+
+  it("leaves a title inside the cap exactly as it is", () => {
+    const results = mapSearchResults([{ ...VALID, title: "x".repeat(CHAT_CONFIG.gif.maxAltLength) }], "touchdown");
+    expect(results[0]?.alt).toHaveLength(CHAT_CONFIG.gif.maxAltLength);
   });
 
   it("drops an entry missing an id rather than emitting a broken result", () => {

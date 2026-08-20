@@ -3,6 +3,7 @@ import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { ChatPageBody, PostChatBody, ReactionBody } from "@/chat/contract";
+import { CHAT_CONFIG } from "@/chat/config";
 import { chatLeagueFixture } from "./test-support";
 
 const db: Db = createTestDb();
@@ -128,6 +129,44 @@ describe("POST /api/leagues/[leagueId]/chat", () => {
 
   it("refuses a GIF whose dimensions are outside the configured bounds", async () => {
     const response = await POST(post({ body: "look", gif: { ...TOUCHDOWN_GIF, width: 0 } }), leagueContext);
+    expect(response.status).toBe(400);
+  });
+
+  // The dimensions were bounded from the start and the three STRINGS were not, so a league
+  // member could write unbounded text into `chat_messages` through a field nobody measured.
+  // Each refusal names the field it is about.
+  it("refuses a GIF url past the configured length ceiling, naming the field", async () => {
+    const longUrl = `https://media.giphy.com/${"a".repeat(CHAT_CONFIG.gif.maxUrlLength)}.gif`;
+    const response = await POST(post({ body: "look", gif: { ...TOUCHDOWN_GIF, url: longUrl } }), leagueContext);
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as ApiEnvelope<never>;
+    expect(body.ok).toBe(false);
+    if (body.ok) return;
+    expect(body.error).toContain("url");
+  });
+
+  it("refuses a GIF preview url past the configured length ceiling, naming the field", async () => {
+    const longUrl = `https://media.giphy.com/${"a".repeat(CHAT_CONFIG.gif.maxUrlLength)}.gif`;
+    const response = await POST(post({ body: "look", gif: { ...TOUCHDOWN_GIF, previewUrl: longUrl } }), leagueContext);
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as ApiEnvelope<never>;
+    expect(body.ok).toBe(false);
+    if (body.ok) return;
+    expect(body.error).toContain("previewUrl");
+  });
+
+  it("refuses a GIF description past the configured length ceiling, naming the field", async () => {
+    const longAlt = "x".repeat(CHAT_CONFIG.gif.maxAltLength + 1);
+    const response = await POST(post({ body: "look", gif: { ...TOUCHDOWN_GIF, alt: longAlt } }), leagueContext);
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as ApiEnvelope<never>;
+    expect(body.ok).toBe(false);
+    if (body.ok) return;
+    expect(body.error).toContain("alt");
+  });
+
+  it("refuses a GIF whose preview url isn't https, the same as its url", async () => {
+    const response = await POST(post({ body: "look", gif: { ...TOUCHDOWN_GIF, previewUrl: "http://media.giphy.com/200.gif" } }), leagueContext);
     expect(response.status).toBe(400);
   });
 });
