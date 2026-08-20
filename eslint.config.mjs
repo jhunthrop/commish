@@ -54,6 +54,10 @@ const SERVER_ONLY_MODULE_GROUPS = [
   // note below — and stays off this list on purpose so `ReviewComposer`'s live character count
   // can value-import `validateReviewDraft` directly.
   "@/review-service",
+  // Postgres-backed (`identity-service/profile.ts`, `preferences.ts`) — the same one-hop
+  // shape as `@/chat-service`. The browser-safe pure half is `@/identity` (presets, refs,
+  // first-run, notifications), which stays legitimately value-importable.
+  "@/identity-service",
   "@/db",
   "@/lib/realtime",
   "@/lib/auth",
