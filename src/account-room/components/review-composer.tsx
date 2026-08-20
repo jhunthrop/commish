@@ -111,7 +111,7 @@ export function ReviewComposer({ existingReview, onSubmitted }: ReviewComposerPr
         value={body}
         onChange={(event) => setBody(event.target.value)}
         maxLength={REVIEW_CONFIG.body.maxLength}
-        hint={`Tell other managers what to expect. At least ${REVIEW_CONFIG.body.minLength} characters.`}
+        hint={`Tell other managers what using Commish is like. At least ${REVIEW_CONFIG.body.minLength} characters.`}
       />
 
       {error === null ? null : (

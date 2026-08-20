@@ -188,26 +188,50 @@ export interface RemovalRecord {
   readonly removedAt: string;
 }
 
+export type RemoveReviewResult =
+  | { readonly ok: true; readonly record: RemovalRecord }
+  | { readonly ok: false; readonly reason: string };
+
 /**
  * Removal is a STAMP, never a delete (ruling 18, `reviews`' own docblock in `@/db/schema`): the
  * row keeps its author, its text, who removed it and why. The one and only writer of this
  * function is the operator script (`scripts/remove-review.ts`) — there is no admin UI and no
  * staff role calling it, by design.
+ *
+ * The no-re-stamp invariant is enforced HERE, in the `UPDATE`'s own `WHERE` clause
+ * (`isNull(reviews.removedAt)`), not just in the script's pre-confirmation read — the same
+ * "judge by this write's own returned rows, not a prior read" discipline `toggleReaction`
+ * (`@/chat-service/chat.ts`) uses. Two concurrent removal attempts for the same review serialize
+ * on the row lock: whichever commits first wins, and the second's `UPDATE` matches zero rows
+ * because Postgres re-evaluates `removed_at IS NULL` against the now-committed row before it can
+ * match — so a second operator can never silently overwrite the first one's reason and timestamp.
  */
-export async function removeReview(db: Db, input: RemoveReviewInput): Promise<RemovalRecord | null> {
+export async function removeReview(db: Db, input: RemoveReviewInput): Promise<RemoveReviewResult> {
   const clock = input.clock ?? systemClock;
   const now = new Date(clock.now());
   const [row] = await db
     .update(reviews)
     .set({ removedAt: now, removedByUserId: input.removedByUserId, removalReason: input.reason })
-    .where(eq(reviews.id, input.reviewId))
+    .where(and(eq(reviews.id, input.reviewId), isNull(reviews.removedAt)))
     .returning({ id: reviews.id, userId: reviews.userId, removedByUserId: reviews.removedByUserId, removalReason: reviews.removalReason, removedAt: reviews.removedAt });
-  if (row === undefined || row.removedAt === null || row.removedByUserId === null || row.removalReason === null) return null;
-  return {
-    reviewId: row.id,
-    userId: row.userId,
-    removedByUserId: row.removedByUserId,
-    reason: row.removalReason,
-    removedAt: row.removedAt.toISOString(),
-  };
+
+  if (row !== undefined && row.removedAt !== null && row.removedByUserId !== null && row.removalReason !== null) {
+    return {
+      ok: true,
+      record: {
+        reviewId: row.id,
+        userId: row.userId,
+        removedByUserId: row.removedByUserId,
+        reason: row.removalReason,
+        removedAt: row.removedAt.toISOString(),
+      },
+    };
+  }
+
+  // The UPDATE matched nothing — either no review has this id, or it's already removed. A
+  // second SELECT (outside the write, so it costs nothing when the write succeeds) tells the
+  // two apart for a message that actually helps the operator running the script.
+  const [existing] = await db.select({ removedAt: reviews.removedAt }).from(reviews).where(eq(reviews.id, input.reviewId));
+  if (existing === undefined) return { ok: false, reason: `No review with id "${input.reviewId}".` };
+  return { ok: false, reason: `Review "${input.reviewId}" is already removed.` };
 }

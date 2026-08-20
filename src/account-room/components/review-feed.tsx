@@ -19,6 +19,11 @@ function ratingLabel(rating: number): string {
   return `${rating} out of 5, ${RATING_WORD[rating] ?? "rated"}`;
 }
 
+/** Absolute date, same idiom as `InvitePanel`'s expiry line (`new Date(...).toLocaleDateString()`). */
+function formatReviewDate(iso: string): string {
+  return new Date(iso).toLocaleDateString();
+}
+
 function ReportControl({ reviewId }: { readonly reviewId: string }) {
   const { fetchJson } = useAccountRoomDeps();
   const [open, setOpen] = useState(false);
@@ -65,24 +70,27 @@ function ReportControl({ reviewId }: { readonly reviewId: string }) {
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 text-sm">
-      <label className="flex items-center gap-2">
-        <span className="text-text-muted">Reason</span>
-        <select
-          value={reason}
-          onChange={(event) => setReason(event.target.value as ReportReasonValue)}
-          className="h-8 rounded-md border border-border bg-surface-elevated px-2 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          {REVIEW_CONFIG.reportReasons.map((entry) => (
-            <option key={entry.value} value={entry.value}>
-              {entry.label}
-            </option>
-          ))}
-        </select>
-      </label>
-      <Button type="button" variant="secondary" size="sm" loading={status === "sending"} disabled={status === "sending"} onClick={() => void submit()}>
-        Send report
-      </Button>
+    <div className="flex flex-col gap-2 text-sm">
+      <p className="text-text-muted">Report reviews that break the rules. Disagreeing with a rating isn&apos;t a reason to report it.</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <label className="flex items-center gap-2">
+          <span className="text-text-muted">Reason</span>
+          <select
+            value={reason}
+            onChange={(event) => setReason(event.target.value as ReportReasonValue)}
+            className="h-8 rounded-md border border-border bg-surface-elevated px-2 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            {REVIEW_CONFIG.reportReasons.map((entry) => (
+              <option key={entry.value} value={entry.value}>
+                {entry.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Button type="button" variant="secondary" size="sm" loading={status === "sending"} disabled={status === "sending"} onClick={() => void submit()}>
+          Send report
+        </Button>
+      </div>
       {error === null ? null : (
         <p role="alert" className="text-negative">
           {error}
@@ -99,7 +107,11 @@ function ReviewRow({ review }: { readonly review: ReviewView }) {
         <Avatar name={review.authorName} avatar={review.authorAvatar} />
         <div className="flex flex-col">
           <span className="font-medium text-text-primary">{review.authorName}</span>
-          <span className="text-sm text-text-muted">{ratingLabel(review.rating)}</span>
+          <span className="text-sm text-text-muted">
+            {ratingLabel(review.rating)}
+            {" · "}
+            <time dateTime={review.createdAt}>{formatReviewDate(review.createdAt)}</time>
+          </span>
         </div>
       </div>
       <p className="text-md text-text-primary">{review.body}</p>
@@ -149,7 +161,7 @@ export function ReviewFeed({ initialPage, emptyAction }: ReviewFeedProps) {
   };
 
   if (reviews.length === 0) {
-    return <EmptyState title="No reviews yet" description="Be the first to say what running a league here is like." action={emptyAction} />;
+    return <EmptyState title="No reviews yet" description="Be the first to say what Commish is like to use." action={emptyAction} />;
   }
 
   return (

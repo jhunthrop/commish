@@ -91,13 +91,17 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
+  // The service's own `WHERE ... AND removed_at IS NULL` is what actually enforces the
+  // no-re-stamp invariant (a concurrent second removal between the print above and this call is
+  // the one case the earlier read here cannot catch); this branch is what turns that refusal
+  // into a readable message instead of a silently-empty JSON line.
   const result = await removeReview(db, { reviewId: args.id, removedByUserId: args.by, reason: args.reason });
-  if (result === null) {
-    console.error(`Removal failed for review "${args.id}".`);
+  if (!result.ok) {
+    console.error(result.reason);
     process.exit(1);
   }
 
-  console.log(JSON.stringify(result));
+  console.log(JSON.stringify(result.record));
 }
 
 main()

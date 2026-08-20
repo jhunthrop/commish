@@ -136,16 +136,39 @@ describe("removeReview", () => {
 
     const result = await removeReview(db, { reviewId: "r1", removedByUserId: "operator", reason: "spam", clock: at("2026-08-04T00:00:00Z") });
     expect(result).toEqual({
-      reviewId: "r1",
-      userId: "u1",
-      removedByUserId: "operator",
-      reason: "spam",
-      removedAt: "2026-08-04T00:00:00.000Z",
+      ok: true,
+      record: {
+        reviewId: "r1",
+        userId: "u1",
+        removedByUserId: "operator",
+        reason: "spam",
+        removedAt: "2026-08-04T00:00:00.000Z",
+      },
     });
   });
 
-  it("returns null for a review id that doesn't exist", async () => {
+  it("refuses a review id that doesn't exist", async () => {
     const result = await removeReview(db, { reviewId: "missing", removedByUserId: "operator", reason: "spam" });
-    expect(result).toBeNull();
+    expect(result).toEqual({ ok: false, reason: 'No review with id "missing".' });
+  });
+
+  it("refuses to re-stamp an already-removed review — the no-re-stamp invariant, enforced here and not just in the script", async () => {
+    await seedUser("u1");
+    await seedUser("operator");
+    await seedUser("operator2");
+    await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
+
+    const first = await removeReview(db, { reviewId: "r1", removedByUserId: "operator", reason: "spam", clock: at("2026-08-04T00:00:00Z") });
+    expect(first.ok).toBe(true);
+
+    // A second operator's attempt is refused, not a silent overwrite of the first operator's
+    // reason and timestamp.
+    const second = await removeReview(db, { reviewId: "r1", removedByUserId: "operator2", reason: "abusive", clock: at("2026-08-05T00:00:00Z") });
+    expect(second).toEqual({ ok: false, reason: 'Review "r1" is already removed.' });
+
+    // The original stamp is untouched by the refused second attempt.
+    const [row] = await db.select().from(reviews).where(eq(reviews.id, "r1"));
+    expect(row).toMatchObject({ removedByUserId: "operator", removalReason: "spam" });
+    expect(row?.removedAt?.toISOString()).toBe("2026-08-04T00:00:00.000Z");
   });
 });

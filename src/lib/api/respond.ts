@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { ZodType } from "zod";
+import type { ZodError, ZodType } from "zod";
 
 /**
  * Every route behind this envelope answers with data scoped to the signed-in caller — a league
@@ -42,6 +42,14 @@ export type ApiEnvelope<T> =
 
 export type Parsed<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly response: NextResponse };
 
+/** The one place a Zod failure becomes a 400: the field name (if any) plus the first issue's message. */
+function badRequest(error: ZodError): NextResponse {
+  const first = error.issues[0];
+  const path = first?.path.join(".");
+  const message = first?.message ?? "Invalid request.";
+  return fail(path ? `${path}: ${message}` : message, 400);
+}
+
 /** Parses and validates a JSON request body at the boundary; a bad body is a 400 with the first issue's message. */
 export async function parseJson<T>(request: Request, schema: ZodType<T>): Promise<Parsed<T>> {
   let raw: unknown;
@@ -51,11 +59,19 @@ export async function parseJson<T>(request: Request, schema: ZodType<T>): Promis
     return { ok: false, response: fail("Request body must be valid JSON.", 400) };
   }
   const result = schema.safeParse(raw);
-  if (!result.success) {
-    const first = result.error.issues[0];
-    const path = first?.path.join(".");
-    const message = first?.message ?? "Invalid request.";
-    return { ok: false, response: fail(path ? `${path}: ${message}` : message, 400) };
-  }
+  if (!result.success) return { ok: false, response: badRequest(result.error) };
+  return { ok: true, value: result.data };
+}
+
+/**
+ * Parses and validates a plain object at the boundary — built by the caller from
+ * `URLSearchParams`, since a `GET` route has no JSON body to run `parseJson` against. Same 400
+ * shape as `parseJson`: an invalid query string (a malformed `?before=` cursor, for instance)
+ * answers 400 naming the field, never an uncaught exception from code downstream that assumed
+ * the string was already well-formed.
+ */
+export function parseQuery<T>(input: unknown, schema: ZodType<T>): Parsed<T> {
+  const result = schema.safeParse(input);
+  if (!result.success) return { ok: false, response: badRequest(result.error) };
   return { ok: true, value: result.data };
 }

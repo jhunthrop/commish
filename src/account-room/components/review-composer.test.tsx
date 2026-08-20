@@ -37,6 +37,13 @@ describe("ReviewComposer", () => {
     );
   });
 
+  it("invites reviewing Commish itself, not a specific league or commissioner", () => {
+    renderInAccount(<ReviewComposer existingReview={null} />, fixtureAccountDeps().deps);
+    expect(
+      screen.getByText(`Tell other managers what using Commish is like. At least ${REVIEW_CONFIG.body.minLength} characters.`),
+    ).toBeInTheDocument();
+  });
+
   it("says nothing about an existing review when there isn't one, and posts the review", async () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { ...EXISTING, rating: 5, body: LONG_ENOUGH } });
     renderInAccount(<ReviewComposer existingReview={null} />, fixture.deps);

@@ -76,6 +76,27 @@ describe("GET /api/reviews", () => {
     const limited = await GET(get());
     expect(limited.status).toBe(429);
   });
+
+  // FIX 1: a malformed `before` cursor used to reach `new Date(garbage).toISOString()` inside
+  // `feedQuery` unvalidated and throw an uncaught RangeError on this PUBLIC, unauthenticated
+  // route. It must now be a 400 naming the field, never a 500.
+  it("answers 400 naming the field for a garbage before cursor", async () => {
+    const response = await GET(get("?before=not-a-date-at-all"));
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { readonly ok: false; readonly error: string };
+    expect(body.error).toContain("before");
+  });
+
+  it("answers 400 for a date-only (non-ISO-datetime) before value", async () => {
+    const response = await GET(get("?before=2026-08-19"));
+    expect(response.status).toBe(400);
+  });
+
+  it("accepts a well-formed ISO datetime before cursor", async () => {
+    const response = await GET(get(`?before=${encodeURIComponent("2026-08-19T00:00:00.000Z")}`));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ ok: true, data: { reviews: [], hasMore: false, nextBefore: null } });
+  });
 });
 
 describe("POST /api/reviews", () => {

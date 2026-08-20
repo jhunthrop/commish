@@ -40,8 +40,8 @@ describe("ReviewFeed", () => {
       async ({ container }) => {
         const names = screen.getAllByText(/Hopper|Lovelace/).map((node) => node.textContent);
         expect(names).toEqual(["Grace Hopper", "Ada Lovelace"]);
-        expect(screen.getByText("1 out of 5, poor")).toBeInTheDocument();
-        expect(screen.getByText("5 out of 5, excellent")).toBeInTheDocument();
+        expect(screen.getByText(/1 out of 5, poor/)).toBeInTheDocument();
+        expect(screen.getByText(/5 out of 5, excellent/)).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
@@ -53,9 +53,20 @@ describe("ReviewFeed", () => {
     expect(screen.getByText(REVIEW_B.body)).toBeInTheDocument();
   });
 
-  it("shows the empty state's action when there are no reviews", () => {
+  it("renders each review's date as a screen-reader-friendly <time> element", () => {
+    renderInAccount(<ReviewFeed initialPage={PAGE} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
+    const times = document.querySelectorAll("time");
+    expect(times).toHaveLength(2);
+    expect(times[0]).toHaveAttribute("dateTime", REVIEW_A.createdAt);
+    expect(times[0]?.textContent).toBe(new Date(REVIEW_A.createdAt).toLocaleDateString());
+    expect(times[1]).toHaveAttribute("dateTime", REVIEW_B.createdAt);
+    expect(times[1]?.textContent).toBe(new Date(REVIEW_B.createdAt).toLocaleDateString());
+  });
+
+  it("invites reviewing Commish itself in the empty state, not a specific league", () => {
     renderInAccount(<ReviewFeed initialPage={EMPTY_PAGE} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
     expect(screen.getByText("No reviews yet")).toBeInTheDocument();
+    expect(screen.getByText("Be the first to say what Commish is like to use.")).toBeInTheDocument();
     expect(screen.getByText("Write the first review")).toBeInTheDocument();
   });
 
@@ -75,6 +86,17 @@ describe("ReviewFeed", () => {
   it("does not render Show more when hasMore is false", () => {
     renderInAccount(<ReviewFeed initialPage={PAGE} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
     expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+  });
+
+  it("explains report scope alongside the reason select once the control opens", () => {
+    renderInAccount(<ReviewFeed initialPage={PAGE} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
+    expect(screen.queryByText(/break the rules/)).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Report" })[0]!);
+    expect(
+      screen.getByText("Report reviews that break the rules. Disagreeing with a rating isn't a reason to report it."),
+    ).toBeInTheDocument();
+    expect(screen.getAllByRole("combobox")[0]).toBeInTheDocument();
   });
 
   it("has a Report control per row that sends a reason and confirms once sent", async () => {
