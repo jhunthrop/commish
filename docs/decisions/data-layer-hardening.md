@@ -66,6 +66,13 @@ database yet — but whoever runs these against a live table with real traffic s
 INDEX CONCURRENTLY` for `0011` and `0013` and a batched backfill for `0012` instead of running
 the checked-in SQL verbatim.
 
+Same note for `0016` (Plan C's `reviews_user_idx`, a plain `CREATE UNIQUE INDEX`, and
+`reviews_feed_idx`, a plain partial `CREATE INDEX` on `created_at` filtered to un-removed rows —
+the feed's only ordering, see `feedQuery` in `src/review-service/reviews.ts`), each taking a
+`SHARE` lock blocking writes to `reviews` while it builds. Safe today for the same reason as the
+others: no production database yet, and the table starts empty. `CREATE INDEX CONCURRENTLY`
+against a live `reviews` table with real traffic, same as above.
+
 ## The balance-as-rollup convention
 
 **Rule.** Any running total in this product is maintained as a **rollup row, updated in the same

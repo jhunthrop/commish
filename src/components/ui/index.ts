@@ -4,6 +4,7 @@
 // full catalog, which is broader than this barrel on purpose.
 export { Button } from "./button";
 export { Input } from "./input";
+export { Textarea } from "./textarea";
 export { Card } from "./card";
 export { Badge } from "./badge";
 export { PositionBadge, positionStickerClass } from "./position-badge";

@@ -216,6 +216,15 @@ through `InfoTip` (`src/components/ui/info-tip.tsx`) — the one component that 
 `@/help/glossary` — but the exemption is what would keep a future direct `GLOSSARY` import from
 a room component legal too.
 
+`src/reviews/**` joins the exempt set for the same reason and is reached DIRECTLY rather than
+indirectly: `REVIEW_CONFIG`, `ReviewView`/`ReviewsPage` and `validateReviewDraft` are pure,
+I/O-free rule code, and `ReviewComposer` (`src/account-room/components/review-composer.tsx`)
+value-imports `validateReviewDraft` for its live remaining-character count — the SAME rule
+`submitReviewSchema` (`@/review-service/schemas`) enforces at the API boundary, so the number a
+manager watches tick down while they type can never be a different number than the one the
+server accepts. `@/review-service` is the Postgres half and is on the blocked list above, reached
+only over the wire from `src/account-room/**`, same as every other service module.
+
 A second, simpler layering rule sits beside this one: nothing under `src/**` may import from
 `scripts/**` or `e2e/**`. Build tooling and the browser suite may depend on source; source may
 not depend on either. Enforced by its own `no-restricted-imports` block in `eslint.config.mjs`.

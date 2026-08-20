@@ -49,6 +49,11 @@ const SERVER_ONLY_MODULE_GROUPS = [
   // legitimately value-imports.
   "@/chat-service",
   "@/ai-advisor",
+  // Postgres-backed (`review-service/reviews.ts`). `@/reviews` (pure config/contract/validate,
+  // no I/O) is the browser-safe half — see the `@/identity`/`@/chat`/`@/matchmaking`/`@/help`
+  // note below — and stays off this list on purpose so `ReviewComposer`'s live character count
+  // can value-import `validateReviewDraft` directly.
+  "@/review-service",
   "@/db",
   "@/lib/realtime",
   "@/lib/auth",
@@ -70,15 +75,19 @@ const SERVER_ONLY_MODULE_GROUPS = [
 
 /**
  * NOT on the list above, deliberately: `@/identity` (`src/identity/**`) joins `@/chat`
- * (`src/chat/**`), `@/matchmaking` (`src/matchmaking/**`) and `@/help` (`src/help/**`) in the
- * browser-safe exempt set — pure, I/O-free code with no server module behind it, so client code
- * may value-import it directly. `src/chat-room/**` reaches `parseAvatarRef` indirectly through
- * `Avatar` (`src/components/ui/avatar.tsx`) rather than importing `@/identity` itself, but the
- * omission here is what keeps that path legal. `@/help` is reached the same indirect way today —
- * every room directory renders `InfoTip` (`src/components/ui/info-tip.tsx`), which is the only
- * thing that value-imports `@/help/glossary` — but the omission is what would keep a future
- * direct `GLOSSARY` lookup from a room component legal too, exactly like the other three. See
- * docs/conventions.md's directory map for the same note on `@/chat` and `@/matchmaking`.
+ * (`src/chat/**`), `@/matchmaking` (`src/matchmaking/**`), `@/help` (`src/help/**`) and
+ * `@/reviews` (`src/reviews/**`) in the browser-safe exempt set — pure, I/O-free code with no
+ * server module behind it, so client code may value-import it directly. `src/chat-room/**`
+ * reaches `parseAvatarRef` indirectly through `Avatar` (`src/components/ui/avatar.tsx`) rather
+ * than importing `@/identity` itself, but the omission here is what keeps that path legal.
+ * `@/help` is reached the same indirect way today — every room directory renders `InfoTip`
+ * (`src/components/ui/info-tip.tsx`), which is the only thing that value-imports
+ * `@/help/glossary` — but the omission is what would keep a future direct `GLOSSARY` lookup from
+ * a room component legal too, exactly like the other three. `@/reviews` IS reached directly:
+ * `ReviewComposer` (`src/account-room/components/review-composer.tsx`) value-imports
+ * `validateReviewDraft` for its live character count, the same rule `submitReviewSchema`
+ * (`@/review-service/schemas`) enforces server-side. See docs/conventions.md's directory map for
+ * the same note on `@/chat` and `@/matchmaking`.
  */
 
 /**

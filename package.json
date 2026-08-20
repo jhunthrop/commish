@@ -21,6 +21,7 @@
     "db:studio": "dotenv -e .env.local -- drizzle-kit studio",
     "seed": "dotenv -e .env.local -- tsx src/data/seed/index.ts",
     "stats:ingest": "dotenv -e .env.local -- tsx scripts/ingest-once.ts",
+    "reviews:remove": "dotenv -e .env.local -- tsx scripts/remove-review.ts",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down",
     "e2e": "dotenv -e .env.local -- playwright test",

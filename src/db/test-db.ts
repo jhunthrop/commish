@@ -32,6 +32,7 @@ export function createTestDb(): Db {
 export async function truncateAll(db: Db): Promise<void> {
   await db.execute(sql`
     TRUNCATE TABLE
+      review_reports, reviews,
       chat_reactions, chat_messages,
       player_stat_lines, players, stat_weeks,
       matchups, weeks, draft_picks, draft_nudges, draft_actions, drafts,

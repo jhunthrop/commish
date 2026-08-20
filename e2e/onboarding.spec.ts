@@ -37,3 +37,29 @@ test("a manager with zero leagues sees the fork, ordered and explained, and brow
   await expect(managerZero).toHaveURL(/\/browse$/);
   await expect(managerZero.getByRole("heading", { name: "Open leagues" })).toBeVisible();
 });
+
+/**
+ * Task 9's own exit criterion, end to end: a real signed-in manager writes a real 1-star review
+ * through `ReviewComposer` on `/app/profile`, and a SEPARATE, signed-out browser context (`page`,
+ * the base Playwright fixture — no `storageState`, unlike `managerA`/`managerB`/`managerZero`)
+ * sees it lead `/reviews` — proving the feed is both unfiltered by rating and readable by the
+ * first-timer persona it's for, who has not signed up yet.
+ */
+test("a signed-in manager writes a 1-star review, and it leads the public feed signed out", async ({ managerA, page }) => {
+  await managerA.goto("/app/profile");
+  await managerA.getByRole("radio", { name: "1, poor" }).check();
+  await managerA
+    .getByLabel("Your review")
+    .fill(`This league ate my roster overnight and nobody ever explained why. Filed at ${Date.now()}.`);
+  // "Post review" the first time this stable e2e identity ever runs this spec, "Save changes"
+  // on every rerun after that (`ReviewComposer`'s upsert — `managerA` keeps the same one review
+  // across runs, same stable-identity rationale as `MANAGER_A_STATE` itself).
+  await managerA.getByRole("button", { name: /Post review|Save changes/ }).click();
+  await expect(managerA.getByText("Saved.")).toBeVisible();
+
+  await page.goto("/reviews");
+  await expect(page.getByRole("heading", { name: "What managers are saying" })).toBeVisible();
+  const firstReview = page.getByRole("listitem").first();
+  await expect(firstReview).toContainText("1 out of 5, poor");
+  await expect(page.getByRole("link", { name: "Sign in" })).toBeVisible();
+});

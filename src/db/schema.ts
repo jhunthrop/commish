@@ -473,3 +473,49 @@ export const chatReactions = pgTable(
   },
   (t) => [primaryKey({ columns: [t.messageId, t.userId, t.emoji] })],
 );
+
+/**
+ * One review per person, edited rather than duplicated: `user_id` is UNIQUE, so "I already wrote
+ * one" is a database fact and not a count the service has to get right.
+ *
+ * Removal is a stamp, never a delete. A removed review keeps its author, its text, who removed it
+ * and why, because the alternative is that a product with an unfiltered review feed can make a
+ * review disappear leaving nothing behind. Phase 3 owns the real audit log; this row is the
+ * interim record it will read, not a second system it will have to reconcile.
+ */
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    rating: integer("rating").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedByUserId: text("removed_by_user_id").references(() => users.id),
+    removalReason: text("removal_reason"),
+  },
+  (t) => [
+    uniqueIndex("reviews_user_idx").on(t.userId),
+    /** The feed's only ordering. Partial on visibility, because the feed never reads removed rows. */
+    index("reviews_feed_idx").on(t.createdAt).where(sql`${t.removedAt} is null`),
+  ],
+);
+
+/**
+ * A report is in-product moderation SIGNAL, not moderation ACTION (ruling 18: no admin role
+ * exists to act on it in this phase). One row per reporter per review — the primary key is the
+ * pair, so reporting twice is a no-op upsert (`onConflictDoNothing`) rather than a duplicate or
+ * an error: reporting the same review again is the same report, not a second one.
+ */
+export const reviewReports = pgTable(
+  "review_reports",
+  {
+    reviewId: text("review_id").notNull().references(() => reviews.id, { onDelete: "cascade" }),
+    reporterUserId: text("reporter_user_id").notNull().references(() => users.id),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.reviewId, t.reporterUserId] })],
+);

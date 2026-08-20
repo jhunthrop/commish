@@ -132,6 +132,12 @@ export default async function Home() {
             Browse open leagues
           </Link>
           <Link
+            href="/reviews"
+            className="rounded-md px-4 py-2 font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            Reviews
+          </Link>
+          <Link
             href="/sign-in"
             className="rounded-md px-4 py-2 font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
