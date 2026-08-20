@@ -65,4 +65,24 @@ describe("LeagueTermsPanel", () => {
     const labels = screen.getAllByRole("term").map((node) => node.textContent);
     expect(labels).toEqual(["Format", "Stake", "Size", "Scoring", "Roster", "Commissioner"]);
   });
+
+  // Task 9 e2e regression (league-lifecycle.spec.ts): on the invite page there is no other
+  // heading naming the league, so the default (`titleAs` omitted) keeps rendering an `h2` — this
+  // is JoinForm's real, primary heading for its content.
+  it("renders its name as a real heading by default, for the invite page", () => {
+    render(<LeagueTermsPanel terms={TERMS} />);
+    expect(screen.getByRole("heading", { name: "Sunday Money" }).tagName).toBe("H2");
+  });
+
+  // `LeagueHome` passes `titleAs="p"` because its own page `h1` already carries the league's
+  // name — a second element exposed with `role="heading"` and the SAME accessible name is what
+  // broke `league-lifecycle.spec.ts`'s `getByRole("heading", { name })` with a strict-mode
+  // ambiguity. `terms.name` still renders, just not as a competing heading.
+  it("renders its name as plain text, not a second heading, when embedded on a page with its own heading", async () => {
+    await inBothThemes(<LeagueTermsPanel terms={TERMS} titleAs="p" />, async ({ container }) => {
+      expect(screen.queryByRole("heading", { name: "Sunday Money" })).not.toBeInTheDocument();
+      expect(screen.getByText("Sunday Money").tagName).toBe("P");
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
 });

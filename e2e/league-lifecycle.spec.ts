@@ -14,6 +14,16 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   managerA,
   managerB,
 }) => {
+  // This is the one spec in the suite driving TWO real browser contexts through create, invite,
+  // join, start-the-draft and a live pick's SSE fan-out — a dozen-plus real navigations, not the
+  // handful every other spec makes. The DOM at each step is healthy well inside the default
+  // budget on a quiet machine; under a shared machine's contention (concurrent builds/tests from
+  // other work on the same checkout) the cumulative page-load time alone can exceed the suite's
+  // default 90s, closing the context mid-action with an unhelpful "target page ... has been
+  // closed" rather than a real product failure. Scoped to only this test, not the global default
+  // every lighter spec still runs under.
+  test.setTimeout(180_000);
+
   const leagueName = `E2E League ${Date.now()}`;
 
   // --- Create, accepting every default except the size ------------------------------------
@@ -33,7 +43,10 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   await expect(managerA.getByRole("heading", { name: leagueName })).toBeVisible();
   const leagueId = new URL(managerA.url()).pathname.split("/").pop()!;
   expect(leagueId).toBeTruthy();
-  await expect(managerA.getByText("1 of 8 managers")).toBeVisible();
+  // Scoped to the page header: Task 8's terms panel now ALSO states the fill count (its own
+  // "Size" row), so the bare substring is ambiguous — this locator names the header's own
+  // "N of 8 managers · Snake draft" line specifically, not the terms panel's restatement of it.
+  await expect(managerA.locator("header").getByText("1 of 8 managers")).toBeVisible();
 
   // --- Invite ------------------------------------------------------------------------------
   await managerA.getByRole("button", { name: "Create invite link" }).click();
@@ -42,11 +55,14 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
 
   // --- Join, as a genuinely different person ----------------------------------------------
   await managerB.goto(invitePath);
-  await managerB.getByRole("button", { name: "Join this league" }).click();
+  // The button reads "Join <league name>" (`JoinForm`, Task 7's terms preview), not the static
+  // "Join this league" this spec was still asserting on — a latent mismatch that predates Task 8
+  // and only surfaced once the heading fix above let the test reach this far.
+  await managerB.getByRole("button", { name: `Join ${leagueName}` }).click();
   await expect(managerB.getByRole("heading", { name: leagueName })).toBeVisible();
 
   await managerA.reload();
-  await expect(managerA.getByText("2 of 8 managers")).toBeVisible();
+  await expect(managerA.locator("header").getByText("2 of 8 managers")).toBeVisible();
 
   // --- Open the draft ----------------------------------------------------------------------
   // No UI starts a draft yet (see the plan's open questions), so this drives the REAL

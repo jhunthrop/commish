@@ -27,6 +27,23 @@ describe("LeagueHome", () => {
     });
   });
 
+  // Task 9 e2e regression: `league-lifecycle.spec.ts` asserts on `getByRole("heading", { name:
+  // leagueName })` with no level filter, and the terms panel's OWN `h2` — before this fix —
+  // carried that exact same text as the page's `h1`, so the query resolved two elements and
+  // failed with a Playwright strict-mode violation. Pinned here at the unit level too: only the
+  // page's own `h1` may answer a heading query for the league's name.
+  it("names the league in exactly one heading, not two", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getAllByRole("heading", { name: HOME.name })).toHaveLength(1);
+    // The terms panel still shows the name — just not as a second heading.
+    expect(screen.getByRole("region", { name: "League terms" })).toHaveTextContent(HOME.name);
+  });
+
   it("shows the commissioner's tools only to the commissioner", () => {
     renderInLeague(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>

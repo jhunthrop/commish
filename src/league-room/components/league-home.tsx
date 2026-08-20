@@ -106,8 +106,15 @@ export function LeagueHome({
         panel below) read together without any one of them owning the section. Every member sees
         the terms panel — it is not gated on `isCommissioner` — because the terms are what
         everybody in the league is playing under, not a commissioner-only fact.
+
+        `titleAs="p"`: this page's own `PageTitle` above already renders `home.name` (the same
+        string as `home.terms.name`) as its `h1`. Left at the panel's default `h2`, that is a
+        second heading with the identical accessible name — a real e2e regression Task 9 caught
+        (`league-lifecycle.spec.ts`, strict-mode ambiguity on `getByRole("heading", { name })`),
+        not just a cosmetic one: a screen reader's headings list would carry the league's name
+        twice for one fact. See `LeagueTermsPanel`'s own docblock.
       */}
-      <LeagueTermsPanel terms={home.terms} helpLevel={helpLevel} />
+      <LeagueTermsPanel terms={home.terms} helpLevel={helpLevel} titleAs="p" />
 
       <LeagueMembersPanel teams={home.teams} teamCount={home.teamCount} commissionerUserId={home.commissionerUserId} myTeamId={home.myTeamId} />
 

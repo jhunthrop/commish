@@ -30,10 +30,32 @@ const SCORING_LABEL_TERM: Readonly<Record<string, TermKey>> = {
  * fetch on the invite page, a server render inside the league — and this component's whole job
  * is to render identically either way.
  */
-export function LeagueTermsPanel({ terms, helpLevel }: { readonly terms: LeagueTerms; readonly helpLevel?: HelpLevel }) {
+export function LeagueTermsPanel({
+  terms,
+  helpLevel,
+  titleAs: Title = "h2",
+}: {
+  readonly terms: LeagueTerms;
+  readonly helpLevel?: HelpLevel;
+  /**
+   * `Card`'s own `as` idiom, one remove out. `"h2"` (the default, used unchanged on `JoinForm`)
+   * is the real, primary heading for that page's content — the invite page's own `PageTitle`
+   * reads "Join a league", so `terms.name` here is the only heading naming the actual league.
+   *
+   * `"p"` is what `LeagueHome` (Task 8) passes: that page already has an `h1` (`PageTitle`)
+   * carrying `terms.name` verbatim, so a SECOND element exposed with `role="heading"` and the
+   * identical accessible name gives a screen reader's headings list two entries for one fact and
+   * fails any accessible-name-scoped query with a strict-mode ambiguity — exactly the Task 9 e2e
+   * regression (`league-lifecycle.spec.ts`) this fixes. `terms.name` still renders, still reads
+   * identically to the eye; it is only no longer announced as a second heading, because the
+   * page's own `h1` and this panel's `aria-label="League terms"` landmark already say who and
+   * what it is.
+   */
+  readonly titleAs?: "h2" | "p";
+}) {
   return (
     <Card as="section" aria-label="League terms" className="flex flex-col gap-3">
-      <h2 className="font-display text-2xl font-bold uppercase leading-display text-text-primary">{terms.name}</h2>
+      <Title className="font-display text-2xl font-bold uppercase leading-display text-text-primary">{terms.name}</Title>
       <dl className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Format</dt>
