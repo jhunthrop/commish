@@ -298,6 +298,31 @@ describe("raiseFlag", () => {
     expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "flag_raised"))).toHaveLength(2);
   });
 
+  it("rolls back the flag insert when the audit append fails — ruling 4, the same guard grantAdmin holds", async () => {
+    await seedUser("u_commish");
+    await seedLeague("league_y", "u_commish");
+
+    const brokenAudit = { ...logger, record: async () => { throw new Error("audit append failed"); } };
+    await expect(
+      db.transaction((tx) =>
+        raiseFlag(tx, {
+          flagType: "multi_account",
+          subjectId: "u3_u4",
+          leagueId: "league_y",
+          evidence: {},
+          raisedByUserId: null,
+          occurredAt: NOW,
+          newId: newFlagId,
+          audit: brokenAudit,
+        }),
+      ),
+    ).rejects.toThrow("audit append failed");
+
+    // No orphan row: the integrity_flags insert commits with the audit append, or not at all.
+    expect(await db.select().from(integrityFlags)).toHaveLength(0);
+    expect(await db.select().from(auditEvents)).toHaveLength(0);
+  });
+
   /**
    * `existingOpenFlagFor`'s impossible-state guard. Real Postgres cannot reach it: the conflict
    * that routes `raiseFlag` here is proof an open row exists for this subject. A stub `DbTx` is
