@@ -30,6 +30,17 @@ export interface NoticeContexts {
      */
     readonly reason: string;
   };
+  /**
+   * The one notice `scripts/grant-admin.ts` sends, and the only door this privilege arrives
+   * through at all (ruling 15). `grantedByUserId` is the operator id who ran the script, or the
+   * literal `"bootstrap"` sentinel on a fresh database's first grant — carried in `context` for
+   * the audit trail even though the rendered copy below names no one, because THIS notice is
+   * deliberately the one place in this product that tells a member about a privilege rather than
+   * an action taken on their own data.
+   */
+  readonly admin_granted: {
+    readonly grantedByUserId: string;
+  };
 }
 
 export type NoticeType = keyof NoticeContexts;
@@ -55,12 +66,17 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
     title: "We removed your review",
     body: "An operator removed your review. We keep your review on file exactly as you wrote it.",
   }),
+  admin_granted: () => ({
+    title: "You can now use the operator tools",
+    body: "Someone with database access turned on operator access for your account. You can open the dispute queue from your account menu. Every decision you record there carries your name and cannot be taken back.",
+  }),
 };
 
 /** One neutral context per type, so the denylist and em-dash checks have something to render. */
 export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } = {
   draft_auto_picked: { leagueName: "Sunday Money", pickNumber: 24, playerName: "Bijan Robinson", position: "RB" },
   review_removed: { reason: "off topic" },
+  admin_granted: { grantedByUserId: "bootstrap" },
 };
 
 export function renderNotice<T extends NoticeType>(type: T, context: NoticeContexts[T]): RenderedNotice {

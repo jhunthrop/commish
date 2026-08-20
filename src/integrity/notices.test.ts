@@ -39,11 +39,17 @@ describe("NOTICE_TEMPLATES", () => {
     const removed = renderNotice("review_removed", NOTICE_SAMPLES.review_removed);
     expect(removed.title).toBe("We removed your review");
     expect(removed.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it.");
+
+    const granted = renderNotice("admin_granted", NOTICE_SAMPLES.admin_granted);
+    expect(granted.title).toBe("You can now use the operator tools");
+    expect(granted.body).toBe(
+      "Someone with database access turned on operator access for your account. You can open the dispute queue from your account menu. Every decision you record there carries your name and cannot be taken back.",
+    );
   });
 
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
-    expect([...TYPES].sort()).toEqual(["draft_auto_picked", "review_removed"]);
+    expect([...TYPES].sort()).toEqual(["admin_granted", "draft_auto_picked", "review_removed"]);
   });
 });

@@ -26,7 +26,7 @@ const db = createTestDb();
 
 const profile = (id: string) => ({
   id, email: `${id}@test.local`, displayName: `Manager ${id}`,
-  experienceTier: "beginner" as const, avatarUrl: null, createdAt: "2026-08-17T12:00:00.000Z",
+  experienceTier: "beginner" as const, avatarUrl: null, createdAt: "2026-08-17T12:00:00.000Z", isAdmin: false,
 });
 const signedInAs = (id: string | null) => {
   vi.mocked(getCurrentUser).mockResolvedValue(id === null ? null : profile(id));

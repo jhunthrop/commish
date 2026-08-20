@@ -122,7 +122,7 @@ describe("the league activity page says nothing that breaks the house copy rules
 
     vi.mocked(requireCurrentUser).mockResolvedValue({
       id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", experienceTier: "beginner", avatarUrl: null,
-      createdAt: "2026-08-01T00:00:00.000Z",
+      createdAt: "2026-08-01T00:00:00.000Z", isAdmin: false,
     });
     vi.mocked(resolveLeagueMembership).mockResolvedValue({
       ok: true,

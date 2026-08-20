@@ -5,6 +5,7 @@ import { envOrUndefined } from "@/lib/env";
 import { DEV_SEED } from "./config";
 import { assertLocalSeedTarget } from "./guard";
 import { seedDevLeagues } from "./seed-dev-leagues";
+import { seedOperator } from "./seed-operator";
 import { seedPlayers } from "./seed-players";
 import { seedPublicLeagues } from "./seed-public-leagues";
 import { seedSeasonLeague } from "./seed-season-league";
@@ -33,6 +34,13 @@ async function main(): Promise<void> {
   const claimUserId = envOrUndefined(DEV_SEED.claimUserIdEnvVar);
   const dev = await seedDevLeagues(db, { now: () => new Date().toISOString() }, claimUserId);
   console.log(`seeded ${dev.leagues} dev leagues, ${dev.teams} teams and ${dev.drafts} scheduled drafts`);
+
+  // AFTER seedDevLeagues, not before: `ensureDevUsers` (called inside it) is what creates the
+  // fallback `dev_user_01` row this grants when no `claimUserId` is set, and `grantAdmin`'s own
+  // UPDATE only ever matches an EXISTING user.
+  const operator = await seedOperator(db, { now: () => new Date().toISOString() }, claimUserId);
+  console.log(operator.ok ? `granted operator access to ${operator.userId}` : `operator grant skipped: ${operator.reason}`);
+
   const season = await seedSeasonLeague(db, { now: () => new Date().toISOString() }, claimUserId);
   console.log(`seeded a ${season.teams}-team season league with ${season.weeks} weeks (${season.scoredWeeks} scored)`);
   const open = await seedPublicLeagues(db, { now: () => new Date().toISOString() });

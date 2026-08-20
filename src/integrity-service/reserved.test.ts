@@ -32,7 +32,13 @@ const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "p
   // a second call site, not a second owner.
   flag_raised: "plan-b",
   flag_resolved: "plan-b",
-  admin_action: "plan-b",
+  // Task 1 lands the first (and, per ruling 15, the ONLY) publisher: `grantAdmin`
+  // (`src/integrity-service/flags.ts`), called exclusively from `scripts/grant-admin.ts` and from
+  // the seed's own bootstrap grant. Moved to "plan-a" territory the same way this comment block
+  // describes for `flag_raised` above — the value marks PUBLISHED, not "written by Plan A"
+  // specifically, so the two checks below now hold this type to the same bar as every other
+  // published type: a real writer must exist, and no OTHER reserved type may gain one by accident.
+  admin_action: "plan-a",
 };
 
 interface SourceFile {

@@ -72,6 +72,7 @@ describe("/app/join/[code] — signed in", () => {
       experienceTier: "beginner",
       avatarUrl: null,
       createdAt: "2026-08-01T00:00:00.000Z",
+      isAdmin: false,
     });
     vi.mocked(readPreferences).mockResolvedValue({ helpLevel: "standard", draftTourDismissedAt: null });
     const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });

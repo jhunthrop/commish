@@ -7,7 +7,13 @@ import { syncUserFromWorkOS } from "./user-sync";
 
 const systemClock = { now: () => new Date().toISOString() };
 
-export interface CurrentUser extends User {
+/**
+ * `isAdmin` is `Readonly<Pick<…, "isAdmin">>` off the same Drizzle-inferred row shape
+ * `user-sync.ts`'s `UserRow` uses, not a hand-retyped `boolean` — the operator flag's type has
+ * exactly one source of truth (the column), so a future migration that ever changed its shape
+ * would fail this file's compile instead of silently drifting from it.
+ */
+export interface CurrentUser extends User, Readonly<Pick<typeof users.$inferSelect, "isAdmin">> {
   readonly email: string;
 }
 
@@ -27,6 +33,13 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   const [row] = await db.select().from(users).where(eq(users.id, wu.id));
   const profile = row !== undefined ? row : null;
 
+  // A row this read just found carries the flag straight through — no second lookup. A row this
+  // read did NOT find is about to be created (or was just created) by the backfill below, and a
+  // brand-new row is never an operator: `scripts/grant-admin.ts` is the only writer of this
+  // column, and it grants an EXISTING user, so "no local row yet" and "not an operator" are the
+  // same fact here.
+  const isAdmin = profile?.isAdmin ?? false;
+
   const local =
     profile !== null
       ? {
@@ -42,11 +55,26 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
         // callback, and the audit row says which (`SessionEntry`).
         await syncUserFromWorkOS({ db, clock: systemClock, via: "session_backfill" }, wu);
 
-  return { ...local, email: wu.email };
+  return { ...local, isAdmin, email: wu.email };
 }
 
 export async function requireCurrentUser(): Promise<CurrentUser> {
   const user = await getCurrentUser();
   if (user === null) throw new Error("Not authenticated.");
+  return user;
+}
+
+/**
+ * The operator gate. Composes `requireCurrentUser` rather than reading the session again, so
+ * there is exactly one answer to "who is this" in this codebase and this function only answers
+ * the second question.
+ *
+ * It THROWS rather than returning a `Response`, matching `requireCurrentUser`. Route handlers
+ * translate; `withAdmin` (`src/app/api/admin/_shared.ts`) is the one place that translation lives
+ * and it answers 404, never 403 (ruling 14).
+ */
+export async function requireAdmin(): Promise<CurrentUser> {
+  const user = await requireCurrentUser();
+  if (!user.isAdmin) throw new Error("Not an operator.");
   return user;
 }

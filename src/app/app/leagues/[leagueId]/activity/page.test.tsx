@@ -21,7 +21,7 @@ import { listLeagueActivity } from "@/integrity-service/activity";
 import { listNotices } from "@/integrity-service/notify";
 import LeagueActivityPage from "./page";
 
-const USER = { id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", experienceTier: "beginner" as const, avatarUrl: null, createdAt: "2026-08-01T00:00:00.000Z" };
+const USER = { id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", experienceTier: "beginner" as const, avatarUrl: null, createdAt: "2026-08-01T00:00:00.000Z", isAdmin: false };
 
 function callPage(leagueId = "league_1") {
   return LeagueActivityPage({ params: Promise.resolve({ leagueId }), searchParams: Promise.resolve({}) });

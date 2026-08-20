@@ -51,6 +51,19 @@ export const users = pgTable(
     avatarUrl: text("avatar_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * The product's first authority beyond league membership, and deliberately the smallest one
+     * that can exist: a boolean, not a role, not a permission set, not an RBAC framework (the
+     * spec's own out-of-scope list forbids one). An operator can read every pending flag on the
+     * platform and record one decision on each. They cannot restrict an account, because nothing
+     * in this product can (founder decision 5, ruling 2).
+     *
+     * There is NO in-product path that writes this column: `scripts/grant-admin.ts` is the only
+     * writer, and it runs against the database host, not through a session (ruling 15). A
+     * privilege escalation bug therefore has to be a bug in Postgres access control rather than a
+     * bug here.
+     */
+    isAdmin: boolean("is_admin").notNull().default(false),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
