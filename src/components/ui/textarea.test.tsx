@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { useState } from "react";
 import { axe } from "vitest-axe";
+import { REVIEW_CONFIG } from "@/reviews/config";
 import { Textarea } from "./textarea";
 import { inBothThemes } from "./test-utils";
 
@@ -57,10 +58,14 @@ describe("Textarea", () => {
     expect(screen.getByText(/over the limit/)).toBeInTheDocument();
   });
 
-  it("reads validateReviewDraft's own length window when used by the composer", () => {
-    // Not a re-implementation of the rule — see review-composer.test.tsx for the composer wiring
-    // through `validateReviewDraft` itself. This just proves the count is exact at the boundary.
-    render(<ControlledTextarea maxLength={1000} initial={"x".repeat(1000)} />);
+  it("counts down to exactly zero at the review body's own configured ceiling", () => {
+    // The name used to claim this "reads validateReviewDraft's own length window" while the body
+    // hardcoded 1000 and imported no config at all — so a change to the ceiling would have left
+    // this green and the claim false. It now reads the same constant the composer passes.
+    // (The composer's wiring through `validateReviewDraft` is review-composer.test.tsx's job;
+    // this proves the count is exact at the boundary.)
+    const max = REVIEW_CONFIG.body.maxLength;
+    render(<ControlledTextarea maxLength={max} initial={"x".repeat(max)} />);
     expect(screen.getByText("0 characters left")).toBeInTheDocument();
   });
 });

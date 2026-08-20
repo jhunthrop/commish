@@ -15,6 +15,17 @@ describe("LeagueMembersPanel", () => {
         // they can see: every member can find out who runs the league they are in.
         expect(screen.getByText("Commissioner")).toBeInTheDocument();
         expect(screen.getByText("You")).toBeInTheDocument();
+        // "gives every manager a face" is a third of this test's name and used to have zero
+        // assertions behind it. Every manager gets an `Avatar`, and one with no stored ref falls
+        // back to initials rather than rendering an empty circle.
+        // These fixtures carry no stored avatar ref, so a face here is `Avatar`'s initials
+        // fallback — the case that must never render an empty circle.
+        THREE_TEAMS.forEach((team) => {
+          expect(screen.getByText(team.ownerDisplayName)).toBeInTheDocument();
+        });
+        expect(screen.getByText("AR")).toBeInTheDocument();
+        expect(screen.getByText("JL")).toBeInTheDocument();
+        expect(screen.getByText("SP")).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );

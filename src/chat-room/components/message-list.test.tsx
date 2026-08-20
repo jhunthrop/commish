@@ -3,6 +3,7 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { chatMessage, TOUCHDOWN_GIF } from "../test-fixtures";
+import { formatChatTime } from "../lib/format";
 import { MessageList } from "./message-list";
 
 const MESSAGES = [
@@ -18,6 +19,11 @@ describe("MessageList", () => {
         expect(screen.getByText("wheels up")).toBeInTheDocument();
         expect(screen.getByText("let's go")).toBeInTheDocument();
         expect(screen.getAllByRole("listitem")).toHaveLength(2);
+        // "with its author and time" is two thirds of this test's name and used to query
+        // neither: only the bodies were asserted, so a render that dropped both would pass.
+        expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
+        expect(screen.getByText("Alex Rivera")).toBeInTheDocument();
+        expect(screen.getAllByText(formatChatTime(MESSAGES[0]!.createdAt))).toHaveLength(2);
         expect(await axe(container)).toHaveNoViolations();
       },
     );

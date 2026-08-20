@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
@@ -11,9 +11,14 @@ import { LeagueRoomDepsProvider } from "../hooks/deps";
 // `JoinForm` navigates via `next/navigation`'s `useRouter` after a successful join, which
 // throws outside a mounted App Router. Stubbing the hook — not the component — keeps this a
 // real render of `JoinForm`'s own markup and logic.
+// `push` is a shared spy rather than a fresh throwaway, so a test can assert WHERE a successful
+// join actually sends somebody.
+const push = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
+  useRouter: () => ({ push, refresh: vi.fn() }),
 }));
+
+beforeEach(() => push.mockReset());
 
 const TERMS: LeagueTerms = {
   name: "Sunday Money",
@@ -41,7 +46,9 @@ describe("JoinForm", () => {
         expect(await axe(container)).toHaveNoViolations();
       },
     );
-    expect(fixture.calls.every((call) => call === "GET /api/invites/SUNDAY12")).toBe(true);
+    // Not `.every(...)`, which is vacuously true on an empty array and so proved nothing about
+    // whether the preview was fetched at all. Both theme renders fetch the preview once.
+    expect(fixture.calls).toEqual(["GET /api/invites/SUNDAY12", "GET /api/invites/SUNDAY12"]);
   });
 
   // First-timer persona review, fix round 1: nothing anywhere in the invite flow said what
@@ -73,7 +80,7 @@ describe("JoinForm", () => {
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  it("accepts the invite and reports where to go next", async () => {
+  it("accepts the invite and sends the new member into the league they just joined", async () => {
     const fixture = fixtureLeagueDeps(undefined, { deferred: true });
     renderInLeague(<JoinForm code="SUNDAY12" />, fixture.deps);
     await fixture.settle(0, { ok: true, data: TERMS });
@@ -86,6 +93,9 @@ describe("JoinForm", () => {
     await waitFor(() =>
       expect(fixture.calls).toEqual(["GET /api/invites/SUNDAY12", "POST /api/invites/SUNDAY12/accept"]),
     );
+    // The half this test's name always claimed and never checked: a wrong destination used to
+    // ship green, because nothing ever observed `router.push`.
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/app/leagues/l1"));
   });
 
   it("offers a way back to Commish, never a dead end, when the code itself is invalid", async () => {

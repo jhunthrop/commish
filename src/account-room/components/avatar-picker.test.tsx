@@ -27,10 +27,22 @@ describe("AvatarPicker", () => {
     expect(screen.getByRole("radio", { name: "Shield" })).toHaveAttribute("aria-checked", "false");
   });
 
-  it("only the checked tile is tabbable — the first tile, when nothing is chosen yet", () => {
+  // "only the checked tile is tabbable" is a claim about EVERY tile, and the old version checked
+  // two of eight — a third tile wrongly left at tabindex 0 would have shipped green, which is
+  // exactly the roving-tabindex bug this asserts against.
+  it("leaves exactly one tile tabbable — the first, when nothing is chosen yet", () => {
     render(<AvatarPicker displayName="Ada Lovelace" value={null} onChange={vi.fn()} />);
-    expect(screen.getByRole("radio", { name: "Shield" })).toHaveAttribute("tabindex", "0");
-    expect(screen.getByRole("radio", { name: "Flame" })).toHaveAttribute("tabindex", "-1");
+    const tiles = screen.getAllByRole("radio");
+    expect(tiles.length).toBe(AVATAR_PRESETS.length);
+    expect(tiles.map((tile) => tile.getAttribute("tabindex"))).toEqual(["0", ...tiles.slice(1).map(() => "-1")]);
+  });
+
+  it("moves the one tabbable tile to whichever is chosen", () => {
+    render(<AvatarPicker displayName="Ada Lovelace" value="flame" onChange={vi.fn()} />);
+    const tiles = screen.getAllByRole("radio");
+    const tabbable = tiles.filter((tile) => tile.getAttribute("tabindex") === "0");
+    expect(tabbable).toHaveLength(1);
+    expect(tabbable[0]).toHaveAccessibleName("Flame");
   });
 
   it("clicking a tile reports its key", () => {

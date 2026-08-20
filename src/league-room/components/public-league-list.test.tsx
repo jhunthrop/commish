@@ -30,7 +30,6 @@ vi.mock("next/navigation", () => ({
 
 describe("PublicLeagueList", () => {
   it("shows each league's format, tiers and fill status, in both themes, axe-clean", async () => {
-    const fixture = fixtureLeagueDeps();
     await inBothThemes(
       <PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />,
       async ({ container }) => {
@@ -43,7 +42,10 @@ describe("PublicLeagueList", () => {
         expect(await axe(container)).toHaveNoViolations();
       },
     );
-    expect(fixture.calls).toEqual([]);
+    // The `expect(fixture.calls).toEqual([])` that used to sit here was trivially green: the
+    // fixture's deps were never provided to this render, so `calls` could not have been anything
+    // else. `PublicLeagueList` renders server-shaped data and fetches nothing of its own — the
+    // one interactive child (`JoinPublicLeagueButton`) owns its own request and its own test.
   });
 
   it("shows the scoring label beside the format, each with its own InfoTip", () => {

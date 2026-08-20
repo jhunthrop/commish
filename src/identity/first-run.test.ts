@@ -62,12 +62,21 @@ describe("firstRunPlan", () => {
     }
   });
 
-  it("gives each path plain, active-voice copy with no em-dash", () => {
+  // The name used to promise "plain, active-voice copy" and assert `.length > 0` — true of any
+  // non-empty string, including a paragraph of passive jargon. These are the shape rules the
+  // copy actually follows, so a rewrite that abandons one goes red.
+  it("keeps each path's copy short, sentence-shaped and free of em-dashes", () => {
     const plan = firstRunPlan({ experienceTier: "beginner", helpLevel: "guided", leagueCount: 0 })!;
     for (const path of plan.paths) {
-      expect(path.title.length).toBeGreaterThan(0);
-      expect(path.detail.length).toBeGreaterThan(0);
-      expect(path.cta.length).toBeGreaterThan(0);
+      // A title and a call to action are labels, not sentences: a few words, no full stop.
+      expect(path.title.split(" ").length).toBeLessThanOrEqual(5);
+      expect(path.title.endsWith(".")).toBe(false);
+      expect(path.cta.split(" ").length).toBeLessThanOrEqual(4);
+      expect(path.cta.endsWith(".")).toBe(false);
+      // The detail is the one line that explains, so it is a real sentence and says something.
+      expect(path.detail.length).toBeGreaterThanOrEqual(20);
+      expect(path.detail.endsWith(".")).toBe(true);
+
       expect(path.title).not.toMatch(/—/);
       expect(path.detail).not.toMatch(/—/);
       expect(path.cta).not.toMatch(/—/);

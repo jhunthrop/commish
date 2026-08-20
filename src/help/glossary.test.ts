@@ -22,8 +22,15 @@ describe("GLOSSARY", () => {
   });
 
   it("term() looks up the exact entry a key names", () => {
+    // `expect(term(key)).toBe(GLOSSARY[key])` used to lead this case: the constant compared to
+    // itself through one indirection, green for any lookup that returns SOMETHING from the map.
+    // These name the entry each key must resolve to.
     const key: TermKey = "snake-draft";
-    expect(term(key)).toBe(GLOSSARY[key]);
+    expect(term(key).key).toBe("snake-draft");
+    expect(term(key).term).toBe("a snake draft");
     expect(term("ppr").term).toBe("PPR");
+    expect(term("on-the-clock").short).toMatch(/\S/);
+    // Two different keys never resolve to one entry.
+    expect(term("ppr")).not.toBe(term("half-ppr"));
   });
 });

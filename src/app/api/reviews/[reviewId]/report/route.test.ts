@@ -9,8 +9,9 @@ vi.mock("@/lib/auth/current-user", () => ({
   getCurrentUser: vi.fn(),
 }));
 
+import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { reviews, users } from "@/db/schema";
+import { reviewReports, reviews, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { POST } from "./route";
 import { resetReviewRateLimits } from "../../_shared";
@@ -74,5 +75,12 @@ describe("POST /api/reviews/[reviewId]/report", () => {
     expect(first.status).toBe(200);
     const second = await post("r1", { reason: "spam" });
     expect(second.status).toBe(200);
+
+    // Two 200s alone proved nothing: an insert that duplicated the row would pass them both.
+    // `review_reports`' primary key is (review_id, reporter_user_id), and "the SAME report"
+    // means exactly one row.
+    const rows = await db.select().from(reviewReports).where(eq(reviewReports.reviewId, "r1"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ reporterUserId: "u1", reason: "spam" });
   });
 });
