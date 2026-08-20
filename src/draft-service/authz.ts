@@ -6,6 +6,9 @@ import { resolveLeagueMembership } from "@/lib/leagues/membership";
 export interface DraftActor {
   readonly draftId: string;
   readonly leagueId: string;
+  /** The caller's own id — never client-supplied, always the resolved session user. Read by
+   *  `POST /api/drafts/[draftId]/actions` to attribute a pick's audit event to a real person. */
+  readonly userId: string;
   /** The caller's team in this draft's league, or null if they don't have one. */
   readonly teamId: string | null;
   readonly isCommissioner: boolean;
@@ -39,6 +42,7 @@ export async function resolveDraftActor(db: Db, draftId: string, userId: string)
     actor: {
       draftId,
       leagueId: draft.leagueId,
+      userId,
       teamId: membership.membership.teamId,
       isCommissioner: membership.membership.isCommissioner,
     },

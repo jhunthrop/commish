@@ -5,6 +5,7 @@ import type { RosterSlotConfig } from "@/domain/roster";
 import { SCORING_PRESETS, type ScoringPresetName } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { LEAGUE_CONFIG } from "@/league";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { MS_PER_DAY } from "./config";
@@ -27,6 +28,8 @@ export interface LeagueWriteDeps {
    * can silently drift apart.
    */
   readonly cache?: Pick<ReferenceCache, "invalidateScoringSettings">;
+  /** Defaults to the process-wide logger (`getAuditLogger()`), the same way every other writer here defaults its collaborators. */
+  readonly audit?: AuditLogger;
 }
 
 export interface CreateLeagueInput {
@@ -61,7 +64,7 @@ export type CreateLeagueResult =
  * auto-tightening clock starts in a slow tier rather than at the 60-second floor.
  */
 export async function createLeague(
-  { db, clock, newId, cache = NOOP_REFERENCE_CACHE }: LeagueWriteDeps,
+  { db, clock, newId, cache = NOOP_REFERENCE_CACHE, audit = getAuditLogger() }: LeagueWriteDeps,
   input: CreateLeagueInput,
 ): Promise<CreateLeagueResult> {
   const leagueId = newId();
@@ -91,6 +94,22 @@ export async function createLeague(
         status: "scheduled",
         kickoffAt,
         auctionBudget: input.format === "auction" ? input.auctionBudget : null,
+      });
+      await audit.record(tx, {
+        eventType: "league_created",
+        actorId: input.commissionerUserId,
+        actorType: "user",
+        leagueId,
+        payload: {
+          name: input.name,
+          format: input.format,
+          teamCount: input.teamCount,
+          stakeTier: input.stakeTier,
+          isPublicMatchmade: input.isPublicMatchmade,
+          experienceTier: input.experienceTier,
+          scoringPreset: input.scoringPreset,
+        },
+        occurredAt: clock.now(),
       });
     });
   } catch (error: unknown) {

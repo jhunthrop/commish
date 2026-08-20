@@ -13,8 +13,10 @@ import {
   replayDraft,
   type DraftState,
 } from "@/draft-engine";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
+import { auditEventsForPicks } from "./audit";
 import { commitDraftState } from "./commit";
 import { createKeyedMutex } from "./mutex";
 import { draftOrderFor } from "./order";
@@ -34,6 +36,8 @@ export interface DraftStoreDeps {
   readonly clock: Clock;
   /** Optional sink for publish failures — mirrors `PublisherDeps.onError`. Defaults to a no-op. */
   readonly onPublishError?: (error: unknown, event: PublishFailureEvent) => void;
+  /** Defaults to the process-wide logger (`getAuditLogger()`). */
+  readonly audit?: AuditLogger;
 }
 
 export type ApplyResult =
@@ -43,6 +47,8 @@ export type ApplyResult =
 export interface ApplyOptions {
   /** Extra work to commit atomically with the action row (e.g. flipping `drafts.status`). */
   readonly alsoInTransaction?: (tx: DbTx) => Promise<void>;
+  /** Who submitted this action. Absent means the clock acted (a `TIMER_EXPIRE`, never a person). */
+  readonly actor?: { readonly id: string };
 }
 
 export type CommitResult =
@@ -107,7 +113,7 @@ export async function latestActionSequence(db: Db | DbTx, draftId: string): Prom
  * helpers (`load`, `commitDraftState`) instead of recursing into `applyAction` or
  * `commitDraftResults`.
  */
-export function createDraftStore({ db, publish, clock, onPublishError }: DraftStoreDeps): DraftStore {
+export function createDraftStore({ db, publish, clock, onPublishError, audit = getAuditLogger() }: DraftStoreDeps): DraftStore {
   const cache = new Map<string, DraftState>();
   const mutex = createKeyedMutex();
 
@@ -200,10 +206,23 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
               action,
               timestamp: new Date(action.timestamp),
             });
+            // The audit append rides the draft's existing FOR UPDATE on `drafts`, and the chain
+            // anchor is taken after it — the fixed lock order (ruling 3). Both this and the
+            // action row commit together or neither does.
+            const picked = auditEventsForPicks(state, result.state, options?.actor?.id ?? null);
+            await audit.recordAll(tx, picked);
             if (options?.alsoInTransaction !== undefined) await options.alsoInTransaction(tx);
             // A completed draft becomes a season in the same transaction that completed it.
             if (result.state.phase === "complete" && state.phase !== "complete") {
-              await commitDraftState(tx, result.state);
+              const counts = await commitDraftState(tx, result.state);
+              await audit.record(tx, {
+                eventType: "draft_completed",
+                actorId: null,
+                actorType: "system",
+                leagueId: result.state.config.leagueId,
+                payload: { draftId, picks: counts.picks, teams: counts.teams },
+                occurredAt: action.timestamp,
+              });
             }
             return { ok: true, state: result.state };
           });

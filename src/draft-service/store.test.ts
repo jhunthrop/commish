@@ -2,9 +2,10 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions } from "@/db/schema";
+import { auditEvents, draftActions } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
-import { createDraftStore, isSequenceConflict, type PublishFn } from "./store";
+import { currentDeadline } from "@/draft-engine";
+import { createDraftStore, isSequenceConflict, type DraftStore, type PublishFn } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
 const db = createTestDb();
@@ -91,6 +92,19 @@ const pick = (teamId: string, playerId: string): DraftAction => ({ v: 1, type: "
 
 async function actionRows(draftId: string) {
   return db.select().from(draftActions).where(eq(draftActions.draftId, draftId)).orderBy(asc(draftActions.sequence));
+}
+
+/** Runs the draft to completion on the clock alone — every pick this produces is `auto: true`. */
+async function runFullDraft(store: DraftStore, draftId: string): Promise<void> {
+  for (let i = 0; i < 100; i++) {
+    const state = await store.getDraftState(draftId);
+    if (state === null || state.phase === "complete") return;
+    const result = await store.applyAction(draftId, {
+      v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state) ?? clock.now(),
+    });
+    if (!result.ok) throw new Error(result.reason);
+  }
+  throw new Error("draft did not finish");
 }
 
 beforeEach(async () => {
@@ -353,5 +367,41 @@ describe("isSequenceConflict", () => {
 
   it("finds the fields whether they sit on the error directly or one .cause down", () => {
     expect(isSequenceConflict({ code: "23505", constraint_name: "draft_actions_draft_sequence_idx" })).toBe(true);
+  });
+});
+
+describe("draft store — audit", () => {
+  it("records every pick on the league's chain, in the transaction that accepted it", async () => {
+    const { draftId, leagueId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const result = await store.applyAction(draftId, pick(teamIds[0]!, "qb1"), { actor: { id: "user_alice" } });
+    expect(result.ok).toBe(true);
+
+    const rows = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ chainScope: leagueId, actorId: "user_alice", sequence: expect.any(Number) });
+  });
+
+  it("records draft_completed in the same transaction that turns the draft into a season", async () => {
+    const { draftId, leagueId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    await runFullDraft(store, draftId);
+
+    const [completed] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_completed"));
+    expect(completed).toMatchObject({ chainScope: leagueId, actorType: "system", actorId: null });
+    expect(completed!.payload).toMatchObject({ draftId, picks: expect.any(Number), teams: expect.any(Number) });
+  });
+
+  it("records nothing for a rejected action", async () => {
+    const { draftId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    // Not this team's turn — rejected by the reducer before the action row (or any audit
+    // event) is ever written.
+    const result = await store.applyAction(draftId, pick(teamIds[1]!, "qb1"), { actor: { id: "user_alice" } });
+    expect(result.ok).toBe(false);
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"))).toHaveLength(0);
   });
 });

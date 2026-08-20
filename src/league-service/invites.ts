@@ -90,7 +90,7 @@ export async function createInvite(
  * violation of THAT index means they are already a member, which is a success, not an error.
  */
 export async function acceptInvite(
-  { db, clock, newId }: LeagueWriteDeps,
+  { db, clock, newId, audit }: LeagueWriteDeps,
   input: AcceptInviteInput,
 ): Promise<AcceptInviteResult> {
   try {
@@ -119,7 +119,7 @@ export async function acceptInvite(
 
       const outcome = await joinLeagueInTx(
         tx,
-        { leagueId: invite.leagueId, userId: input.userId, teamName: input.teamName, newId },
+        { leagueId: invite.leagueId, userId: input.userId, teamName: input.teamName, newId, via: "invite", occurredAt: clock.now(), audit },
         invitePrecondition,
       );
       // A league the invite points at but that no longer exists reads as an invalid invite,
