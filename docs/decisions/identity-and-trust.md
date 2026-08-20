@@ -334,6 +334,26 @@ front of it to serve it back, both of which the Phase 2 overview assigns to Plan
 ("Step 16's voice messages need the same object store plus the CDN in front of it"). Neither exists
 in this codebase today, so neither `chat.voice` nor a voice composer is built here.
 
+## The unauthenticated rate limiters key on X-Forwarded-For, and when that stops being fine
+
+Four routes this phase rate-limits without a session to key on (`/api/public/leagues`,
+`GET /api/reviews`, `GET /api/invites/[code]`, and the `/reviews` page's SSR read) key their
+counters on the `X-Forwarded-For` header. That header is client-controlled until a trusted
+proxy sets it, which means today, running directly on localhost, the limiter is an honest
+speed bump and not a defense: a caller who forges the header gets a fresh bucket. That is
+acceptable for now because everything behind all four consumers is public-by-design — the
+limiter protects cost and noise, not data — and because the correct key is a deployment
+decision: behind Fly's proxy (Plan D) the platform overwrites the header and it becomes
+trustworthy.
+
+LAUNCH-BLOCKING, recorded here so Plan D cannot miss it: before the first deployed release,
+(1) confirm the platform's proxy semantics and key on the platform-verified client IP, and
+(2) move these counters into the Redis this app already runs (the in-memory limiter is
+per-instance, so N instances multiply every ceiling by N — the same class of arithmetic the
+stats budget ledger solved with a shared Redis counter). Neither is code this phase can
+finish, both are one step each at deploy time, and the pairing matters: fixing the key
+without sharing the counter still leaves the ceiling instance-multiplied.
+
 ## Status
 
 Task 3's rows above are satisfied, and the full identity/trust surface area this plan set out to
