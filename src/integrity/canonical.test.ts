@@ -16,6 +16,11 @@ describe("canonicalSerialize", () => {
     expect(canonicalSerialize([3, 1, 2])).toBe("[3,1,2]");
   });
 
+  it("serializes both booleans", () => {
+    expect(canonicalSerialize(true)).toBe("true");
+    expect(canonicalSerialize(false)).toBe("false");
+  });
+
   it("emits no whitespace and no trailing separators", () => {
     expect(canonicalSerialize({ a: [], b: {} })).toBe('{"a":[],"b":{}}');
   });
@@ -39,6 +44,11 @@ describe("canonicalSerialize", () => {
       [new Set(), "a Set"],
       [() => 1, "a function"],
       [Symbol("s"), "a symbol"],
+      // Not `Object.prototype` (the encoder's only accepted object shape) and not a Date/Map/Set
+      // either — the describe() fallback that names anything else "not canonical JSON".
+      [Object.create(null), "not canonical JSON"],       // no prototype at all
+      [new (class Foo {})(), "not canonical JSON"],      // a class instance, not a plain object
+      [new Uint8Array([1, 2, 3]), "not canonical JSON"], // a typed array, not Array.isArray
       ["null byte: \u0000", "a NUL character"],       // Postgres cannot store it in jsonb or text
     ];
     for (const [value, fragment] of cases) {
@@ -48,6 +58,10 @@ describe("canonicalSerialize", () => {
 
   it("names the path of the offending value, however deep", () => {
     expect(() => canonicalSerialize({ a: { b: [0, { c: Number.NaN }] } } as never)).toThrow(/a\.b\[1\]\.c/);
+  });
+
+  it("names the value itself when it is the offender at the top level, not a field of it", () => {
+    expect(() => canonicalSerialize(undefined as never)).toThrow(/^Audit payload cannot be hashed: the value is undefined\.$/);
   });
 
   it("refuses a cycle rather than overflowing the stack", () => {

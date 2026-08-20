@@ -34,6 +34,19 @@ describe("normalizeInstant", () => {
   it("refuses a string that is not an instant, rather than hashing Invalid Date", () => {
     expect(() => normalizeInstant("last tuesday")).toThrow(/not a valid instant/);
   });
+
+  it("refuses a calendar-invalid date rather than silently rolling it forward", () => {
+    // The JS `Date` constructor rolls 2026-02-30 forward into 2026-03-02 rather than rejecting
+    // it (2026 is not a leap year, so February has 28 days). Hashing that silent roll-forward
+    // would store a timestamp the caller never stated — ruling 25 exists to prevent exactly this.
+    expect(() => normalizeInstant("2026-02-30T00:00:00.000Z")).toThrow(/not a valid instant/);
+  });
+
+  it("accepts a genuine leap day", () => {
+    // 2028 IS a leap year (divisible by 4, not by 100), so February 29th is a real calendar date
+    // and must round-trip unchanged rather than being caught by the same guard as 2026-02-30.
+    expect(normalizeInstant("2028-02-29T00:00:00.000Z")).toBe("2028-02-29T00:00:00.000Z");
+  });
 });
 
 describe("computeEventHash", () => {
@@ -61,8 +74,15 @@ describe("computeEventHash", () => {
   it("changes when any hashed field changes", () => {
     const base = linkEvent(input(), { headSequence: 0, headHash: GENESIS_HASH }, "evt_1");
     for (const mutated of [
+      // Every field HashableEvent carries, so this test's claim ("any hashed field") is complete
+      // rather than a subset a future field could silently fall outside of.
       { ...base, actorId: "user_mallory" },
+      { ...base, actorType: "system" as const },
+      { ...base, chainScope: "league_2" },
+      { ...base, eventId: "evt_2" },
       { ...base, eventType: "member_joined" as const },
+      { ...base, hashVersion: 2 },
+      { ...base, leagueId: "league_2" },
       { ...base, occurredAt: "2026-08-20T17:00:00.001Z" },
       { ...base, payload: { name: "Sunday Money", teamCount: 13 } },
       { ...base, previousEventHash: GENESIS_HASH.replace("3", "4") },

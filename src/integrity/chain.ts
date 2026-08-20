@@ -24,15 +24,46 @@ export function scopeFor(leagueId: string | null): string {
 }
 
 /**
+ * The RFC 3339 / ISO-8601 instant shapes this system accepts: a date, a time, optional
+ * fractional seconds, and either `Z` or a numeric offset. Anything else — "last tuesday", a bare
+ * date, a duration — is rejected before any calendar arithmetic runs.
+ */
+const INSTANT_PATTERN = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+
+/**
  * The instant, spelled the one way a `timestamptz` read back from Postgres spells it: UTC, three
  * fractional digits, `Z`. The hash is taken over this, so a caller passing `+02:00` or
  * microseconds produces a row that still verifies. Without it, verification would fail on a row
  * nobody could explain, weeks after the write.
+ *
+ * `Date.parse` alone is not enough: it silently rolls a calendar-invalid date forward (2026-02-30
+ * becomes 2026-03-02) instead of rejecting it, which would hash a timestamp that differs from
+ * what the caller actually stated — the exact failure ruling 25 exists to prevent. This function
+ * re-derives the year/month/day/hour/minute/second the caller literally wrote and checks they
+ * round-trip through `Date.UTC` unchanged; a date that overflows in that round trip (a 30th of
+ * February, a 24th hour) never comes back out the same, so it throws instead of silently hashing
+ * the rolled-forward instant.
  */
 export function normalizeInstant(iso: string): string {
-  const millis = Date.parse(iso);
-  if (Number.isNaN(millis)) throw new Error(`Audit event time "${iso}" is not a valid instant.`);
-  return new Date(millis).toISOString();
+  const match = INSTANT_PATTERN.exec(iso);
+  if (!match) throw new Error(`Audit event time "${iso}" is not a valid instant.`);
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  const roundTripped = new Date(Date.UTC(year, month - 1, day, hour, minute, second));
+  const isCalendarValid =
+    roundTripped.getUTCFullYear() === year &&
+    roundTripped.getUTCMonth() === month - 1 &&
+    roundTripped.getUTCDate() === day &&
+    roundTripped.getUTCHours() === hour &&
+    roundTripped.getUTCMinutes() === minute &&
+    roundTripped.getUTCSeconds() === second;
+  if (!isCalendarValid) throw new Error(`Audit event time "${iso}" is not a valid instant.`);
+  return new Date(Date.parse(iso)).toISOString();
 }
 
 export function computeEventHash(event: HashableEvent): string {
