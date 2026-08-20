@@ -2,6 +2,16 @@ import { describe, it, expect } from "vitest";
 import { REMOVAL_REASON_VALUES, REVIEW_CONFIG, removalPhraseFor, removalSentenceFor } from "./config";
 
 describe("removal reason vocabulary", () => {
+  it("keeps the shipped vocabulary byte for byte after the move to @/moderation, because members have already read it", () => {
+    // `src/moderation/removal.test.ts` owns the grep tripwire that makes a second literal list
+    // impossible; this is the matching regression pin on THIS module's own re-exported shape.
+    expect(REVIEW_CONFIG.reportReasons).toEqual([
+      { value: "spam", label: "Spam or fake", removalPhrase: "spam or fake content" },
+      { value: "abusive", label: "Abusive or harassing", removalPhrase: "abusive or harassing content" },
+      { value: "other", label: "Something else", removalPhrase: "breaking the review rules" },
+    ]);
+  });
+
   it("offers exactly the closed report set as removal reasons, in one list", () => {
     expect(REMOVAL_REASON_VALUES).toEqual(["spam", "abusive", "other"]);
     expect(REMOVAL_REASON_VALUES).toEqual(REVIEW_CONFIG.reportReasons.map((reason) => reason.value));

@@ -6,6 +6,7 @@ import type { Clock } from "@/domain/timing";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { decisionIsAvailable, RESOLUTION_DECISIONS, SUBJECT_OF, type FlagSubjectType, type FlagType, type ResolutionDecision } from "@/integrity/flags";
 import type { NoticeType } from "@/integrity/notices";
+import { removeReviewInTx } from "@/review-service/reviews";
 import { attachAuditEvent, notifyAffectedMember } from "./notify";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
 
@@ -299,21 +300,72 @@ async function alreadyResolvedOrMissing(tx: DbTx, flagId: string): Promise<Resol
 }
 
 /**
- * `content_removed`'s actual removal, dispatched by the flag's own `subjectType`. NEITHER
- * report-driven subject type is wired yet: Task 4 lands `review` by calling the existing
- * `removeReview` INSIDE `resolveFlag`'s own transaction, and Task 6 lands `chat_message` the same
- * way for `chat-service` — both by modifying this function, per the plan's own task list. So this
- * always throws today.
- *
- * A THROW, not a graceful `{ ok: false }`, is deliberate and load-bearing: by the time this runs,
- * `resolveFlag`'s stamp `UPDATE` has already applied inside this same transaction, and the ONLY
- * way to undo it is Postgres's own `ROLLBACK` on a rejected promise — the identical audit-fails-
- * the-tx discipline `raiseFlag` and `grantAdmin` already lean on for a failed `audit.record`. A
- * caller getting back a flag stamped "resolved: content_removed" with no removal performed and no
- * `flag_resolved` event to explain it would be exactly the hole in the record this whole plan
- * exists to close.
+ * The one case `removeSubject` below refuses to let `resolveFlag`'s transaction commit through:
+ * `removeReviewInTx` (and, from Task 6, its chat sibling) answers a graceful `{ ok: false }` for
+ * an ordinary, expected refusal — already removed, or a ghost id — and that refusal must roll
+ * `resolveFlag`'s WHOLE transaction back (the flag's own stamp `UPDATE` included), not just skip
+ * a step. Throwing is the only way to force that rollback from inside a `db.transaction`
+ * callback; this class is what lets `resolveFlag` tell that throw apart from every OTHER one
+ * (an unwired subject type, a failed audit append) that must keep propagating as a rejected
+ * promise rather than becoming a normal `{ ok: false }` result.
  */
-async function removeSubject(subjectType: string): Promise<never> {
+class ContentRemovalRefused extends Error {
+  constructor(
+    readonly status: number,
+    reason: string,
+  ) {
+    super(reason);
+  }
+}
+
+/**
+ * `content_removed`'s actual removal, dispatched by the flag's own `subjectType`. `review` is
+ * wired (Task 4): it calls `removeReviewInTx` (`@/review-service/reviews`) INSIDE `resolveFlag`'s
+ * own transaction, passing the operator as `removedByUserId` and the operator's note as the
+ * removal reason — `removeReviewInTx` already writes its own `review_removed` audit event and its
+ * own `review_removed` notice, and nothing about that path changes here, which is the whole
+ * reason Phase 2 built it as a stamp. `chat_message` stays unwired until Task 6 lands
+ * `chat-service`'s sibling the same way, by extending this function again.
+ *
+ * A refusal from `removeReviewInTx` (already removed, or a ghost id) is re-thrown as
+ * `ContentRemovalRefused` rather than returned — see that class's own docblock — so `resolveFlag`
+ * rolls its stamp back and answers a normal `{ ok: false }` instead of committing a flag stamped
+ * "resolved: content_removed" for a removal that never landed.
+ *
+ * An UNWIRED subject type (`chat_message` today) still throws a plain `Error`, unchanged from
+ * before this task: by the time this runs, `resolveFlag`'s stamp `UPDATE` has already applied
+ * inside this same transaction, and the ONLY way to undo it is Postgres's own `ROLLBACK` on a
+ * rejected promise — the identical audit-fails-the-tx discipline `raiseFlag` and `grantAdmin`
+ * already lean on for a failed `audit.record`. A caller getting back a flag stamped "resolved:
+ * content_removed" with no removal performed and no `flag_resolved` event to explain it would be
+ * exactly the hole in the record this whole plan exists to close.
+ */
+async function removeSubject(
+  tx: DbTx,
+  subjectType: FlagSubjectType,
+  opts: {
+    readonly subjectId: string;
+    readonly flagId: string;
+    readonly operatorUserId: string;
+    readonly reason: string;
+    readonly clock: Clock;
+    readonly audit: AuditLogger;
+    readonly notify: typeof notifyAffectedMember;
+  },
+): Promise<void> {
+  if (subjectType === "review") {
+    const result = await removeReviewInTx(tx, {
+      reviewId: opts.subjectId,
+      removedByUserId: opts.operatorUserId,
+      reason: opts.reason,
+      clock: opts.clock,
+      audit: opts.audit,
+      notify: opts.notify,
+      flagId: opts.flagId,
+    });
+    if (!result.ok) throw new ContentRemovalRefused(409, result.reason);
+    return;
+  }
   throw new Error(`resolveFlag: content_removed has no remover wired for subject type "${subjectType}" yet (Tasks 4 and 6 land these).`);
 }
 
@@ -401,40 +453,57 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
   const notify = input.notify ?? notifyAffectedMember;
   const now = new Date(clock.now());
 
-  return db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(integrityFlags)
-      .set({ resolvedAt: now, resolvedByUserId: input.operatorUserId, resolution: input.decision, resolutionNote: input.note })
-      .where(and(eq(integrityFlags.id, input.flagId), isNull(integrityFlags.resolvedAt)))
-      .returning();
-    if (row === undefined) return alreadyResolvedOrMissing(tx, input.flagId);
+  try {
+    return await db.transaction(async (tx) => {
+      const [row] = await tx
+        .update(integrityFlags)
+        .set({ resolvedAt: now, resolvedByUserId: input.operatorUserId, resolution: input.decision, resolutionNote: input.note })
+        .where(and(eq(integrityFlags.id, input.flagId), isNull(integrityFlags.resolvedAt)))
+        .returning();
+      if (row === undefined) return alreadyResolvedOrMissing(tx, input.flagId);
 
-    // content_removed performs the removal INSIDE this transaction, so a decision and its
-    // consequence cannot come apart. Tasks 4 and 6 supply the two removers; see `removeSubject`.
-    if (input.decision === "content_removed") await removeSubject(row.subjectType);
+      // content_removed performs the removal INSIDE this transaction, so a decision and its
+      // consequence cannot come apart. Tasks 4 and 6 supply the two removers; see `removeSubject`.
+      // An ORDINARY refusal (already removed, a ghost id) throws `ContentRemovalRefused`, caught
+      // below and turned into this function's own `{ ok: false }` — see that class's docblock.
+      if (input.decision === "content_removed") {
+        await removeSubject(tx, row.subjectType as FlagSubjectType, {
+          subjectId: row.subjectId,
+          flagId: row.id,
+          operatorUserId: input.operatorUserId,
+          reason: input.note,
+          clock,
+          audit,
+          notify,
+        });
+      }
 
-    const noticeType = NOTICE_FOR_DECISION[input.decision];
-    const notice =
-      noticeType === "operator_warning"
-        ? await notify(tx, {
-            leagueId: row.leagueId,
-            userId: await affectedMemberFor(tx, row.subjectType as FlagSubjectType, row.subjectId),
-            noticeType,
-            context: { leagueName: await leagueNameForFlag(tx, row.leagueId), note: input.note },
-            occurredAt: clock.now(),
-            auditEventId: null,
-          })
-        : null;
+      const noticeType = NOTICE_FOR_DECISION[input.decision];
+      const notice =
+        noticeType === "operator_warning"
+          ? await notify(tx, {
+              leagueId: row.leagueId,
+              userId: await affectedMemberFor(tx, row.subjectType as FlagSubjectType, row.subjectId),
+              noticeType,
+              context: { leagueName: await leagueNameForFlag(tx, row.leagueId), note: input.note },
+              occurredAt: clock.now(),
+              auditEventId: null,
+            })
+          : null;
 
-    const event = await audit.record(tx, {
-      eventType: "flag_resolved",
-      actorId: input.operatorUserId,
-      actorType: "user",
-      leagueId: null, // platform chain — ruling 1
-      payload: { flagId: row.id, flagType: row.flagType, decision: input.decision, subjectType: row.subjectType, subjectId: row.subjectId, leagueId: row.leagueId },
-      occurredAt: clock.now(),
+      const event = await audit.record(tx, {
+        eventType: "flag_resolved",
+        actorId: input.operatorUserId,
+        actorType: "user",
+        leagueId: null, // platform chain — ruling 1
+        payload: { flagId: row.id, flagType: row.flagType, decision: input.decision, subjectType: row.subjectType, subjectId: row.subjectId, leagueId: row.leagueId },
+        occurredAt: clock.now(),
+      });
+      if (notice !== null) await attachAuditEvent(tx, notice, event.eventId);
+      return { ok: true, flagId: row.id, decision: input.decision };
     });
-    if (notice !== null) await attachAuditEvent(tx, notice, event.eventId);
-    return { ok: true, flagId: row.id, decision: input.decision };
-  });
+  } catch (err: unknown) {
+    if (err instanceof ContentRemovalRefused) return { ok: false, status: err.status, reason: err.message };
+    throw err;
+  }
 }

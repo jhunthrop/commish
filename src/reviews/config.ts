@@ -1,3 +1,6 @@
+import { MODERATION_CONFIG } from "@/moderation/config";
+import { REMOVAL_REASON_VALUES as MODERATION_REMOVAL_REASON_VALUES } from "@/moderation/removal";
+
 /**
  * Every tunable the public review feed has. Nothing in `src/reviews/**`, `src/review-service/**`
  * or `src/account-room/components/review-*` may inline one of these — see `validateReviewDraft`,
@@ -11,20 +14,15 @@ export const REVIEW_CONFIG = {
   /** Reviews per feed page. `listReviews` always paginates — there is no unbounded read. */
   pageSize: 20,
   /**
-   * The complete, closed report-reason set — a fixed vocabulary rather than free text, so the
-   * operator script's stdout and any future Phase 3 queue read the same small enum forever.
-   *
-   * `label` is what a REPORTER picks from; `removalPhrase` is what the removed AUTHOR reads in
-   * "Your review was removed for ___." Two phrasings of one vocabulary, kept side by side for
-   * the same reason `EXPERIENCE_TIER_LABEL` sits beside its enum: the alternative is two lists
-   * that drift. `scripts/remove-review.ts` accepts only these `value`s, so an operator can no
-   * longer type free text into a sentence a user reads.
+   * The complete, closed report-reason set — `MODERATION_CONFIG.reasons` (`@/moderation/config`),
+   * not a second copy of it. Founder decision #2's default is "mirror `reviews`' existing closed
+   * set exactly; one vocabulary, two record types", and a review report and a Task 6 chat report
+   * pick from the SAME three reasons — so as of this task the one list lives in `src/moderation`,
+   * pure and browser-safe, and this field is a re-export of it (ruling 21). Every existing
+   * consumer (`reportReviewSchema`'s `z.enum`, `ReviewComposer`, `scripts/remove-review.ts`) reads
+   * `REVIEW_CONFIG.reportReasons` exactly as it always has; only where the words are DEFINED moved.
    */
-  reportReasons: [
-    { value: "spam", label: "Spam or fake", removalPhrase: "spam or fake content" },
-    { value: "abusive", label: "Abusive or harassing", removalPhrase: "abusive or harassing content" },
-    { value: "other", label: "Something else", removalPhrase: "breaking the review rules" },
-  ],
+  reportReasons: MODERATION_CONFIG.reasons,
   /**
    * A cap on `scripts/remove-review.ts`'s `--reason`, mirroring `body.maxLength` above — defense
    * in depth alongside the closed `reportReasons` enum `--reason` is already validated against.
@@ -45,26 +43,19 @@ export const REVIEW_CONFIG = {
 
 export type ReportReasonValue = (typeof REVIEW_CONFIG.reportReasons)[number]["value"];
 
-/** Every reason an operator may remove a review for. `scripts/remove-review.ts` validates against this. */
-export const REMOVAL_REASON_VALUES: readonly string[] = REVIEW_CONFIG.reportReasons.map((reason) => reason.value);
+/**
+ * Every reason an operator may remove a review for. `scripts/remove-review.ts` validates against
+ * this. Re-exported from `@/moderation/removal`, but WIDENED back to `readonly string[]` here
+ * (the moderation original is narrowed to the closed union — see that module's own docblock):
+ * the script's own `.includes(reason)` check compares against a bare CLI string, which the narrow
+ * element type would refuse to accept as an argument at all.
+ */
+export const REMOVAL_REASON_VALUES: readonly string[] = MODERATION_REMOVAL_REASON_VALUES;
 
 /**
- * The sentence fragment a removed author reads. A stored value outside the closed set falls back
- * to the generic phrase rather than being printed raw: rows written before the operator script
- * constrained `--reason`, or by hand in SQL, must not put an operator's private wording into a
- * sentence on the author's own profile.
+ * `removalPhraseFor`/`removalSentenceFor` are re-exported from `@/moderation/removal` unchanged —
+ * the point of a re-export here is that the diff at every consumer (`ReviewComposer`,
+ * `scripts/remove-review.ts`, `@/integrity-service/notify`) is zero, which is what makes this a
+ * de-duplication rather than a refactor.
  */
-export function removalPhraseFor(storedReason: string | null): string {
-  return REVIEW_CONFIG.reportReasons.find((reason) => reason.value === storedReason)?.removalPhrase ?? "breaking the review rules";
-}
-
-/**
- * The whole sentence, in ONE place. `ReviewComposer` renders it on the author's own profile and
- * `scripts/remove-review.ts` prints it in the operator's confirmation preview, and those two had
- * drifted into two string literals that only happened to agree. An operator preview that promises
- * different words from the ones the author reads is worse than no preview: it is a wrong answer
- * to the only question the preview exists to answer.
- */
-export function removalSentenceFor(storedReason: string | null): string {
-  return `Your review was removed for ${removalPhraseFor(storedReason)}. It can't be edited.`;
-}
+export { removalPhraseFor, removalSentenceFor } from "@/moderation/removal";

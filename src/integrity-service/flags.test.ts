@@ -431,6 +431,50 @@ describe("resolveFlag", () => {
     return db.select().from(auditEvents).where(and(eq(auditEvents.chainScope, scope), eq(auditEvents.eventType, eventType)));
   }
 
+  /**
+   * An OPEN `review_report` flag naming a specific `reviewId`, so `content_removed`'s review
+   * branch has a real row to remove — unlike `openFlag` above, which mints its own subject id.
+   * `alreadyRemoved` seeds the review already stamped removed, putting `removeReviewInTx`'s own
+   * no-re-stamp `WHERE` in the zero-rows branch `resolveFlag` must roll its whole stamp back for.
+   */
+  async function reportedReview(opts: { readonly reviewId: string; readonly authorUserId?: string; readonly alreadyRemoved?: boolean }): Promise<{ readonly id: string }> {
+    const author = opts.authorUserId ?? `u_review_author_${opts.reviewId}`;
+    await ensureUser(author);
+    await db
+      .insert(reviews)
+      .values({ id: opts.reviewId, userId: author, rating: 3, body: `review body ${opts.reviewId}`, createdAt: new Date(NOW), updatedAt: new Date(NOW) })
+      .onConflictDoNothing();
+    if (opts.alreadyRemoved === true) {
+      await db.update(reviews).set({ removedAt: new Date(NOW), removedByUserId: author, removalReason: "spam" }).where(eq(reviews.id, opts.reviewId));
+    }
+
+    flagSeq += 1;
+    const flagId = `flag_resolve_${flagSeq}`;
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "review_report",
+        subjectId: opts.reviewId,
+        leagueId: null,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: NOW,
+        newId: () => flagId,
+        audit: logger,
+      }),
+    );
+    return { id: flagId };
+  }
+
+  async function isRemoved(reviewId: string): Promise<boolean> {
+    const [row] = await db.select({ removedAt: reviews.removedAt }).from(reviews).where(eq(reviews.id, reviewId));
+    return row?.removedAt != null;
+  }
+
+  async function isOpen(flagId: string): Promise<boolean> {
+    const [row] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, flagId));
+    return row !== undefined && row.resolvedAt === null;
+  }
+
   it("records a decision, stamps the flag once, and writes the audit event that IS the record", async () => {
     await ensureUser("u_op");
     const flag = await openFlag({ flagType: "review_report" });
@@ -575,6 +619,34 @@ describe("resolveFlag", () => {
 
     const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
     expect(row!.resolvedAt).toBeNull();
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  it("removes the review and resolves the flag in one transaction, or neither — Task 4's review branch", async () => {
+    await ensureUser("u_op");
+    const flag = await reportedReview({ reviewId: "r_1", authorUserId: "u_author" });
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op" });
+    expect(result).toEqual({ ok: true, flagId: flag.id, decision: "content_removed" });
+
+    expect(await isRemoved("r_1")).toBe(true);
+    const [notice] = await noticesFor("u_author");
+    expect(notice!.noticeType).toBe("review_removed");
+
+    // The removal's own audit event carries the flag id that triggered it, and the flag's own
+    // resolution event names the same flag — two records, one traceable decision.
+    const [removalEvent] = await auditEventsOn("platform", "review_removed");
+    expect(removalEvent!.payload).toMatchObject({ reviewId: "r_1", flagId: flag.id });
+  });
+
+  it("leaves the flag open when the removal itself fails — already removed a minute earlier", async () => {
+    await ensureUser("u_op");
+    // Already removed by the script a minute earlier: removeReviewInTx's own WHERE matches zero rows.
+    const flag = await reportedReview({ reviewId: "r_2", authorUserId: "u_author2", alreadyRemoved: true });
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op" });
+    expect(result.ok).toBe(false);
+    expect(await isOpen(flag.id)).toBe(true);
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
   });
 

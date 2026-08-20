@@ -94,19 +94,25 @@ const SERVER_ONLY_MODULE_GROUPS = [
 
 /**
  * NOT on the list above, deliberately: `@/identity` (`src/identity/**`) joins `@/chat`
- * (`src/chat/**`), `@/matchmaking` (`src/matchmaking/**`), `@/help` (`src/help/**`) and
- * `@/reviews` (`src/reviews/**`) in the browser-safe exempt set — pure, I/O-free code with no
- * server module behind it, so client code may value-import it directly. `src/chat-room/**`
- * reaches `parseAvatarRef` indirectly through `Avatar` (`src/components/ui/avatar.tsx`) rather
- * than importing `@/identity` itself, but the omission here is what keeps that path legal.
- * `@/help` is reached the same indirect way today — every room directory renders `InfoTip`
- * (`src/components/ui/info-tip.tsx`), which is the only thing that value-imports
- * `@/help/glossary` — but the omission is what would keep a future direct `GLOSSARY` lookup from
- * a room component legal too, exactly like the other three. `@/reviews` IS reached directly:
- * `ReviewComposer` (`src/account-room/components/review-composer.tsx`) value-imports
- * `validateReviewDraft` for its live character count, the same rule `submitReviewSchema`
- * (`@/review-service/schemas`) enforces server-side. See docs/conventions.md's directory map for
- * the same note on `@/chat` and `@/matchmaking`.
+ * (`src/chat/**`), `@/matchmaking` (`src/matchmaking/**`), `@/help` (`src/help/**`),
+ * `@/reviews` (`src/reviews/**`) and `@/moderation` (`src/moderation/**`) in the browser-safe
+ * exempt set — pure, I/O-free code with no server module behind it, so client code may
+ * value-import it directly. `src/chat-room/**` reaches `parseAvatarRef` indirectly through
+ * `Avatar` (`src/components/ui/avatar.tsx`) rather than importing `@/identity` itself, but the
+ * omission here is what keeps that path legal. `@/help` is reached the same indirect way today —
+ * every room directory renders `InfoTip` (`src/components/ui/info-tip.tsx`), which is the only
+ * thing that value-imports `@/help/glossary` — but the omission is what would keep a future
+ * direct `GLOSSARY` lookup from a room component legal too, exactly like the other four.
+ * `@/reviews` IS reached directly: `ReviewComposer` (`src/account-room/components/
+ * review-composer.tsx`) value-imports `validateReviewDraft` for its live character count, the
+ * same rule `submitReviewSchema` (`@/review-service/schemas`) enforces server-side. `@/moderation`
+ * is reached directly too: `ReviewComposer` and `ReviewFeed`'s report dialog read
+ * `REVIEW_CONFIG.reportReasons` (`@/reviews/config`'s own re-export of `MODERATION_CONFIG.reasons`
+ * — ruling 21), and Task 6's chat report dialog (`src/chat-room/**`) needs the same labels as
+ * values directly from `@/moderation`. `@/integrity`/`@/integrity-service` are on the BLOCKED list
+ * above precisely because neither half of that pair is browser-safe the way `@/moderation` is —
+ * two directories, two boundaries. See docs/conventions.md's directory map for the same note on
+ * `@/chat` and `@/matchmaking`.
  */
 
 /**

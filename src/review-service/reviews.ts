@@ -1,8 +1,9 @@
 import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db, DbTx } from "@/db/client";
 import { reviewReports, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { raiseFlag } from "@/integrity-service/flags";
 import { attachAuditEvent, notifyAffectedMember } from "@/integrity-service/notify";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { formatReviewCursor, type ReviewCursor } from "@/reviews/cursor";
@@ -212,26 +213,57 @@ export interface ReportReviewInput {
   readonly reporterUserId: string;
   readonly reason: string;
   readonly clock?: Clock;
+  /** Injected so a test can control the raised flag's own id. `crypto.randomUUID` at the edge. */
+  readonly newId?: () => string;
+  /** Defaults to the process-wide logger (`getAuditLogger()`). */
+  readonly audit?: AuditLogger;
 }
 
 export type ReportReviewResult = { readonly ok: true } | { readonly ok: false; readonly status: number; readonly reason: string };
 
 /**
  * In-product moderation SIGNAL, not moderation ACTION (ruling 18: no admin role exists to act on
- * it in this phase). Idempotent by primary key: `review_reports`' primary key is
- * `(review_id, reporter_user_id)`, so `ON CONFLICT DO NOTHING` makes reporting the same review
- * twice the SAME report rather than a duplicate row or a 409 — the caller's second click is not
- * an error, it is confirmation of the first.
+ * it in this phase) — but as of this task it is also the queue's first consumer's own trigger:
+ * every report raises (or confirms) a `review_report` flag in `integrity_flags`, the thing an
+ * operator actually reads. `review_reports` stays the insert-only signal it always was; the flag
+ * is the decision, and the queue derives the count from `review_reports` at read time rather than
+ * storing one (ruling 5) — that is why `evidence` below is `{}` rather than a copy of `reason`.
+ *
+ * Idempotent by primary key: `review_reports`' primary key is `(review_id, reporter_user_id)`, so
+ * `ON CONFLICT DO NOTHING` makes reporting the same review twice the SAME report rather than a
+ * duplicate row or a 409 — the caller's second click is not an error, it is confirmation of the
+ * first. `raiseFlag` is idempotent on the open-subject index the same way (a second reporter's
+ * report — or the SAME reporter's second click — confirms the open flag rather than duplicating
+ * it), so however many people report the same review, exactly one open flag exists for it.
+ *
+ * The report row and the flag commit together, or neither does: a report that produced no queue
+ * entry is exactly the silence this residual exists to end (ruling 12 — a report is a signal INTO
+ * system logic; a member never aims a flag directly).
  */
 export async function reportReview(db: Db, input: ReportReviewInput): Promise<ReportReviewResult> {
   const [review] = await db.select({ id: reviews.id }).from(reviews).where(eq(reviews.id, input.reviewId));
   if (review === undefined) return { ok: false, status: 404, reason: "That review is no longer here." };
 
   const clock = input.clock ?? systemClock;
-  await db
-    .insert(reviewReports)
-    .values({ reviewId: input.reviewId, reporterUserId: input.reporterUserId, reason: input.reason, createdAt: new Date(clock.now()) })
-    .onConflictDoNothing();
+  const newId = input.newId ?? (() => crypto.randomUUID());
+  const audit = input.audit ?? getAuditLogger();
+
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(reviewReports)
+      .values({ reviewId: input.reviewId, reporterUserId: input.reporterUserId, reason: input.reason, createdAt: new Date(clock.now()) })
+      .onConflictDoNothing();
+    await raiseFlag(tx, {
+      flagType: "review_report",
+      subjectId: input.reviewId,
+      leagueId: null,
+      evidence: {},
+      raisedByUserId: input.reporterUserId,
+      occurredAt: clock.now(),
+      newId,
+      audit,
+    });
+  });
   return { ok: true };
 }
 
@@ -244,6 +276,14 @@ export interface RemoveReviewInput {
   readonly audit?: AuditLogger;
   /** Defaults to the real `notifyAffectedMember`. Injectable so a test can force its failure. */
   readonly notify?: typeof notifyAffectedMember;
+  /**
+   * The flag this removal resolves, when it was reached through `resolveFlag`'s `content_removed`
+   * decision (`@/integrity-service/flags`) rather than run directly from the operator script.
+   * `undefined` on the script's own door — it resolves no flag — and stamped on the
+   * `review_removed` audit event's payload otherwise, so that record traces back to the flag that
+   * triggered it without a second lookup.
+   */
+  readonly flagId?: string;
 }
 
 export interface RemovalRecord {
@@ -260,9 +300,17 @@ export type RemoveReviewResult =
 
 /**
  * Removal is a STAMP, never a delete (ruling 18, `reviews`' own docblock in `@/db/schema`): the
- * row keeps its author, its text, who removed it and why. The one and only writer of this
- * function is the operator script (`scripts/remove-review.ts`) — there is no admin UI and no
- * staff role calling it, by design.
+ * row keeps its author, its text, who removed it and why. TWO doors call this now: the operator
+ * script (`scripts/remove-review.ts`, via `removeReview` below) and `resolveFlag`'s
+ * `content_removed` decision (`@/integrity-service/flags`, via this function directly) — there is
+ * still no admin UI and no staff role beyond those two, by design.
+ *
+ * `tx`, not `db`: this is the seam `removeReview` used to run as its own top-level
+ * `db.transaction`, extracted so `resolveFlag` can run it INSIDE its own transaction instead of a
+ * transaction-inside-a-transaction (a savepoint, with different failure semantics) — the same
+ * two-door shape `joinLeagueInTx` (`@/league-service/join.ts`) already uses for exactly this
+ * reason. `src/review-service` is a gated directory, so both doors — this function and
+ * `removeReview`'s thin wrapper below — are covered by the same test suite by construction.
  *
  * The no-re-stamp invariant is enforced HERE, in the `UPDATE`'s own `WHERE` clause
  * (`isNull(reviews.removedAt)`), not just in the script's pre-confirmation read — the same
@@ -271,12 +319,15 @@ export type RemoveReviewResult =
  * on the row lock: whichever commits first wins, and the second's `UPDATE` matches zero rows
  * because Postgres re-evaluates `removed_at IS NULL` against the now-committed row before it can
  * match — so a second operator can never silently overwrite the first one's reason and timestamp.
+ * Reached through `resolveFlag`, that "zero rows" outcome (already removed, or a ghost id) is a
+ * refusal `resolveFlag` propagates as its own `{ ok: false }` and rolls its whole transaction back
+ * with — the flag stays open rather than being stamped "resolved: content_removed" for a removal
+ * that never actually landed.
  *
  * Records `review_removed` on the PLATFORM chain, INSIDE the same transaction as the stamp, and
  * only on the branch that actually landed one — a re-stamp attempt that the `WHERE` clause
  * refuses is not a removal and must record nothing, the same "judged by this write's own
- * returned rows" rule the stamp itself uses. The whole function runs inside one transaction now
- * (it used to be a single bare `UPDATE`) so the stamp and its audit event commit together.
+ * returned rows" rule the stamp itself uses.
  *
  * Task 7's second real sender: the `--reason` this script has always taken has been "author-
  * facing copy" since Phase 2 with nowhere for the author to read it. `notifyAffectedMember` joins
@@ -289,12 +340,12 @@ export type RemoveReviewResult =
  * the author's next inbox load is the honest delivery.
  *
  * `REVIEW_CONFIG.removalReason.maxLength` is enforced HERE, not only in the script's own
- * `parseArgs` — this function, not the CLI, is the actual boundary a future caller (an admin UI,
- * a different script) would hit, and `reason` is stored as given and rendered, through the
- * mapper, on a member's own notice. Checked before the transaction opens, same "fail fast, no partial write"
- * shape as the two lookup failures below.
+ * `parseArgs` — this function, not the CLI, is the actual boundary any caller (the script, or
+ * `resolveFlag`'s operator-supplied note) would hit, and `reason` is stored as given and
+ * rendered, through the mapper, on a member's own notice. Checked first, before any write, same
+ * "fail fast, no partial write" shape as the two lookup failures below.
  */
-export async function removeReview(db: Db, input: RemoveReviewInput): Promise<RemoveReviewResult> {
+export async function removeReviewInTx(tx: DbTx, input: RemoveReviewInput): Promise<RemoveReviewResult> {
   if (input.reason.length > REVIEW_CONFIG.removalReason.maxLength) {
     return { ok: false, reason: `--reason must be ${REVIEW_CONFIG.removalReason.maxLength} characters or fewer.` };
   }
@@ -304,54 +355,61 @@ export async function removeReview(db: Db, input: RemoveReviewInput): Promise<Re
   const notify = input.notify ?? notifyAffectedMember;
   const now = new Date(clock.now());
 
-  return db.transaction(async (tx) => {
-    const [row] = await tx
-      .update(reviews)
-      .set({ removedAt: now, removedByUserId: input.removedByUserId, removalReason: input.reason })
-      .where(and(eq(reviews.id, input.reviewId), isNull(reviews.removedAt)))
-      .returning({ id: reviews.id, userId: reviews.userId, removedByUserId: reviews.removedByUserId, removalReason: reviews.removalReason, removedAt: reviews.removedAt });
+  const [row] = await tx
+    .update(reviews)
+    .set({ removedAt: now, removedByUserId: input.removedByUserId, removalReason: input.reason })
+    .where(and(eq(reviews.id, input.reviewId), isNull(reviews.removedAt)))
+    .returning({ id: reviews.id, userId: reviews.userId, removedByUserId: reviews.removedByUserId, removalReason: reviews.removalReason, removedAt: reviews.removedAt });
 
-    if (row !== undefined && row.removedAt !== null && row.removedByUserId !== null && row.removalReason !== null) {
-      // The notice FIRST, the anchor LAST (ruling 3, as restated in `audit-logger.ts`): this
-      // insert takes an implicit `FOR KEY SHARE` on the author's `users` row, and a lock taken
-      // after the anchor is a lock taken in the wrong order whether or not anything competes for
-      // it today. `attachAuditEvent` then stamps the event id in a statement that touches only
-      // `member_notices` and only a column with no foreign key on it.
-      const notice = await notify(tx, {
-        leagueId: null,
+  if (row !== undefined && row.removedAt !== null && row.removedByUserId !== null && row.removalReason !== null) {
+    // The notice FIRST, the anchor LAST (ruling 3, as restated in `audit-logger.ts`): this
+    // insert takes an implicit `FOR KEY SHARE` on the author's `users` row, and a lock taken
+    // after the anchor is a lock taken in the wrong order whether or not anything competes for
+    // it today. `attachAuditEvent` then stamps the event id in a statement that touches only
+    // `member_notices` and only a column with no foreign key on it.
+    const notice = await notify(tx, {
+      leagueId: null,
+      userId: row.userId,
+      noticeType: "review_removed",
+      context: { reason: row.removalReason },
+      occurredAt: clock.now(),
+      auditEventId: null,
+    });
+    const event = await audit.record(tx, {
+      eventType: "review_removed",
+      actorId: row.removedByUserId,
+      actorType: "user",
+      leagueId: null,
+      payload: { reviewId: row.id, authorUserId: row.userId, reason: row.removalReason, flagId: input.flagId ?? null },
+      occurredAt: clock.now(),
+    });
+    await attachAuditEvent(tx, notice, event.eventId);
+    return {
+      ok: true,
+      record: {
+        reviewId: row.id,
         userId: row.userId,
-        noticeType: "review_removed",
-        context: { reason: row.removalReason },
-        occurredAt: clock.now(),
-        auditEventId: null,
-      });
-      const event = await audit.record(tx, {
-        eventType: "review_removed",
-        actorId: row.removedByUserId,
-        actorType: "user",
-        leagueId: null,
-        payload: { reviewId: row.id, authorUserId: row.userId, reason: row.removalReason },
-        occurredAt: clock.now(),
-      });
-      await attachAuditEvent(tx, notice, event.eventId);
-      return {
-        ok: true,
-        record: {
-          reviewId: row.id,
-          userId: row.userId,
-          removedByUserId: row.removedByUserId,
-          reason: row.removalReason,
-          removedAt: row.removedAt.toISOString(),
-        },
-      };
-    }
+        removedByUserId: row.removedByUserId,
+        reason: row.removalReason,
+        removedAt: row.removedAt.toISOString(),
+      },
+    };
+  }
 
-    // The UPDATE matched nothing — either no review has this id, or it's already removed. A
-    // second SELECT (still inside this transaction, so it costs nothing when the write
-    // succeeds) tells the two apart for a message that actually helps the operator running the
-    // script.
-    const [existing] = await tx.select({ removedAt: reviews.removedAt }).from(reviews).where(eq(reviews.id, input.reviewId));
-    if (existing === undefined) return { ok: false, reason: `No review with id "${input.reviewId}".` };
-    return { ok: false, reason: `Review "${input.reviewId}" is already removed.` };
-  });
+  // The UPDATE matched nothing — either no review has this id, or it's already removed. A
+  // second SELECT (still inside this transaction, so it costs nothing when the write
+  // succeeds) tells the two apart for a message that actually helps whichever door called this.
+  const [existing] = await tx.select({ removedAt: reviews.removedAt }).from(reviews).where(eq(reviews.id, input.reviewId));
+  if (existing === undefined) return { ok: false, reason: `No review with id "${input.reviewId}".` };
+  return { ok: false, reason: `Review "${input.reviewId}" is already removed.` };
+}
+
+/**
+ * The operator script's own door (`scripts/remove-review.ts`): opens its own transaction and runs
+ * `removeReviewInTx` inside it, exactly the way it always worked before the seam above split out
+ * — behavior-neutral for this caller by construction. `resolveFlag` is the other door, and calls
+ * `removeReviewInTx` directly, inside its OWN transaction, instead of this wrapper.
+ */
+export async function removeReview(db: Db, input: RemoveReviewInput): Promise<RemoveReviewResult> {
+  return db.transaction((tx) => removeReviewInTx(tx, input));
 }
