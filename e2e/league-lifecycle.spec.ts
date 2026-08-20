@@ -19,6 +19,10 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // --- Create, accepting every default except the size ------------------------------------
   await managerA.goto("/app");
   await expect(managerA.getByRole("heading", { name: "Your leagues" })).toBeVisible();
+  // Manager A already has the seeded season league (`global-setup.ts`), so `firstRun` is null
+  // and the create form is collapsed behind Task 5's disclosure rather than sitting on the page
+  // by default — open it by name instead of assuming the form is already visible.
+  await managerA.getByText("Start or join another league").click();
   await managerA.getByLabel("League name").fill(leagueName);
   await managerA.getByText(/Advanced settings/).click();
   // The smallest supported team count (src/league-room/components/create-league-form.tsx's
@@ -59,6 +63,17 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   await managerB.goto(`/app/drafts/${draftId}`);
   await expect(managerA.getByLabel("Player pool")).toBeVisible();
   await expect(managerB.getByLabel("Player pool")).toBeVisible();
+
+  // `RoomTour` (`@/draft-room/components/room-tour.tsx`) shows once, the first time a manager
+  // EVER opens a draft room, and covers the board behind a modal until dismissed — unrelated to
+  // this task's own fork, but it blocks the "Draft" click below the same way any other manager
+  // hitting a fresh room for the first time would see it. Dismiss it for whichever of the two
+  // stable e2e identities has never opened one before; a manager past their first room sees
+  // nothing here, so this is a no-op for them.
+  for (const manager of [managerA, managerB]) {
+    const gotIt = manager.getByRole("button", { name: "Got it" });
+    if ((await gotIt.count()) > 0) await gotIt.click();
+  }
 
   // Whoever is on the clock drafts the top available player. The pick button only exists on
   // the page whose turn it is, which is itself the assertion that the room knows whose turn

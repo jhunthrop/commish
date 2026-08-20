@@ -3,6 +3,7 @@ import type { DraftFormat, TeamCard } from "@/domain/league";
 import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { TradeFlag, TradeVerdict } from "@/ai-advisor/valuation";
+import type { FirstRunPlan } from "@/identity";
 import type { NextAction, StandingsRow, WeekStatus } from "@/league";
 
 /**
@@ -107,6 +108,13 @@ export interface HomeLeagueCard extends LeagueSummary {
 
 export interface HomeBody {
   readonly leagues: readonly HomeLeagueCard[];
+  /**
+   * The zero-leagues fork (`firstRunPlan`, `@/identity`), or `null` once the caller has at
+   * least one league. Computed by the ROUTE, not `crossLeagueHome` (`@/league-service/home.ts`):
+   * the plan needs the caller's preferences, and the service only ever takes a db and a user id.
+   * `HomeBoard` reads this field, not `leagues.length`, to decide which empty treatment to show.
+   */
+  readonly firstRun: FirstRunPlan | null;
 }
 
 export interface LeagueHomeBody {

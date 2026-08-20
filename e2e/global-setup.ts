@@ -12,8 +12,9 @@ import { mintLabSession, SESSION_COOKIE_NAME } from "../scripts/lib/lab-session"
 export const AUTH_DIR = resolve(process.cwd(), "e2e/.auth");
 export const MANAGER_A_STATE = resolve(AUTH_DIR, "manager-a.json");
 export const MANAGER_B_STATE = resolve(AUTH_DIR, "manager-b.json");
+export const MANAGER_ZERO_STATE = resolve(AUTH_DIR, "manager-zero.json");
 
-// Stable, not secret: two fixed WorkOS TEST-directory identities, minted once and reused on
+// Stable, not secret: fixed WorkOS TEST-directory identities, minted once and reused on
 // every rerun (`mintLabSession`'s mint-if-absent path). A fresh random identity per run used to
 // be minted here, which collided with the seed's OWN first-claim-sticks rule
 // (`src/data/seed/dev-users.ts`'s `preserveRealTeamOwner`): run 1 claims the seeded season
@@ -24,6 +25,12 @@ export const MANAGER_B_STATE = resolve(AUTH_DIR, "manager-b.json");
 // stable identity makes every run's claim id the SAME as the one that stuck on run 1.
 const MANAGER_A_EMAIL = "e2e-manager-a@commish-lab.test";
 const MANAGER_B_EMAIL = "e2e-manager-b@commish-lab.test";
+// A third stable identity, warmed the same way as A and B (below) but never handed to the seed
+// script (`DEV_SEED_CLAIM_USER_ID` names manager A only) and never joined to anything by any
+// spec — `e2e/onboarding.spec.ts` only reads the fork and follows a link, it never creates or
+// joins a league. That keeps this identity at zero leagues run over run, which is the one thing
+// `onboarding.spec.ts` needs and neither `managerA` nor `managerB` can offer once seeded.
+const MANAGER_ZERO_EMAIL = "e2e-manager-zero@commish-lab.test";
 const MANAGER_PASSWORD = "E2e-Manager-Lab-Password-1!";
 
 function storageState(baseURL: string, cookie: string): string {
@@ -186,19 +193,21 @@ async function tickUntilLiveWeekReached(): Promise<void> {
 export default async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL = config.projects[0]?.use.baseURL ?? "http://localhost:3100";
 
-  const [a, b] = await Promise.all([
+  const [a, b, zero] = await Promise.all([
     mintLabSession({ email: MANAGER_A_EMAIL, password: MANAGER_PASSWORD }),
     mintLabSession({ email: MANAGER_B_EMAIL, password: MANAGER_PASSWORD }),
+    mintLabSession({ email: MANAGER_ZERO_EMAIL, password: MANAGER_PASSWORD }),
   ]);
 
   mkdirSync(AUTH_DIR, { recursive: true });
   // Bearer credentials on disk: same 0600 treatment the mint script gives its own output.
   writeFileSync(MANAGER_A_STATE, storageState(baseURL, a.cookie), { mode: 0o600 });
   writeFileSync(MANAGER_B_STATE, storageState(baseURL, b.cookie), { mode: 0o600 });
+  writeFileSync(MANAGER_ZERO_STATE, storageState(baseURL, zero.cookie), { mode: 0o600 });
 
   const browser = await chromium.launch();
   try {
-    for (const state of [MANAGER_A_STATE, MANAGER_B_STATE]) {
+    for (const state of [MANAGER_A_STATE, MANAGER_B_STATE, MANAGER_ZERO_STATE]) {
       const context = await browser.newContext({ storageState: state, baseURL });
       const page = await context.newPage();
       const response = await page.goto("/app", { waitUntil: "domcontentloaded" });

@@ -6,5 +6,7 @@ export type { AvatarPreset, AvatarPresetKey, AvatarRef, AvatarTone } from "./ava
 export { EXPERIENCE_TIER_LABEL, IDENTITY_CONFIG } from "./config";
 export { defaultPreferences, isDraftTourDismissed } from "./preferences";
 export type { HelpLevel, PreferenceState } from "./preferences";
+export { firstRunPlan } from "./first-run";
+export type { FirstRunPath, FirstRunPathKey, FirstRunPlan } from "./first-run";
 export { NOTIFICATION_CATALOG, channelStatus, deliverableChannels } from "./notifications";
 export type { NotificationChannel, NotificationTopic } from "./notifications";

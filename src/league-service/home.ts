@@ -43,8 +43,17 @@ function cachedPoints(scores: readonly { readonly teamId: string; readonly point
  * week is `in_progress` — never one `GET` per league. A cache miss (including "never written",
  * which is every non-live week) simply leaves the matchup's own Postgres score in place, so the
  * numbers are always correct whether or not the cache has anything to say.
+ *
+ * Returns `HomeBody` minus `firstRun`, on purpose: the first-run fork (`firstRunPlan`,
+ * `@/identity`) needs the caller's preferences, and this function's signature is deliberately
+ * just a db and a user id. Both callers (`AppHome` and `/api/home`) compute `firstRun` themselves
+ * and spread it onto this result before it reaches the wire.
  */
-export async function crossLeagueHome(db: Db, userId: string, deps: CrossLeagueHomeDeps = DEFAULT_DEPS): Promise<HomeBody> {
+export async function crossLeagueHome(
+  db: Db,
+  userId: string,
+  deps: CrossLeagueHomeDeps = DEFAULT_DEPS,
+): Promise<Omit<HomeBody, "firstRun">> {
   const { leagueRows, teamRows, draftRows, myTeamByLeague } = await myLeaguesOverview(db, userId);
   if (leagueRows.length === 0) return { leagues: [] };
   const ids = leagueRows.map((league) => league.id);
