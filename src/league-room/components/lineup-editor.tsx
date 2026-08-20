@@ -7,6 +7,7 @@ import { Button, InfoTip, Select, SlotChip } from "@/components/ui";
 import type { HelpLevel } from "@/identity/preferences";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatWeek } from "../lib/format";
+import { term } from "@/help/glossary";
 
 const slotKey = (slot: LineupSlotView): string => `${slot.slot}:${slot.slotIndex}`;
 
@@ -69,7 +70,7 @@ export function LineupEditor({
             </li>
           ))}
         </ul>
-        {hasFlexSlot ? <p className="text-xs text-text-muted">FLEX can be any RB, WR, or TE.</p> : null}
+        {hasFlexSlot ? <p className="text-xs text-text-muted">{term("flex").short}</p> : null}
       </section>
     );
   }
@@ -129,7 +130,7 @@ export function LineupEditor({
       </div>
       {/* Persona review (FIX 4): a caption near the slot list, not a tip on every FLEX chip —
           there is only ever one FLEX slot, so one sentence explains it once. */}
-      {hasFlexSlot ? <p className="text-xs text-text-muted">FLEX can be any RB, WR, or TE.</p> : null}
+      {hasFlexSlot ? <p className="text-xs text-text-muted">{term("flex").short}</p> : null}
       <h3 className="flex items-center gap-1 text-sm font-medium text-text-muted">
         Bench
         <InfoTip term="bench" helpLevel={helpLevel} />

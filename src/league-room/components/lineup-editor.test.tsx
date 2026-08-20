@@ -6,6 +6,7 @@ import { inBothThemes } from "@/components/ui/test-utils";
 import type { LineupBody } from "../contract";
 import { LINEUP, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LineupEditor } from "./lineup-editor";
+import { term } from "@/help/glossary";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 
 /** FIX 4: `LINEUP` carries no FLEX starter, so the caption's own branch needs a fixture that has one. */
@@ -53,18 +54,18 @@ describe("LineupEditor", () => {
   // sentence, since there is only ever one FLEX slot to explain.
   it("captions FLEX near the slot list when the roster has one, and says nothing when it doesn't", () => {
     const { rerender } = renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} />, fixtureLeagueDeps().deps);
-    expect(screen.queryByText("FLEX can be any RB, WR, or TE.")).not.toBeInTheDocument();
+    expect(screen.queryByText(term("flex").short)).not.toBeInTheDocument();
     rerender(
       <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
         <LineupEditor leagueId="l1" lineup={LINEUP_WITH_FLEX} totalWeeks={14} />
       </LeagueRoomDepsProvider>,
     );
-    expect(screen.getByText("FLEX can be any RB, WR, or TE.")).toBeInTheDocument();
+    expect(screen.getByText(term("flex").short)).toBeInTheDocument();
   });
 
   it("also captions FLEX on the locked, read-only slot list", () => {
     renderInLeague(<LineupEditor leagueId="l1" lineup={{ ...LINEUP_WITH_FLEX, locked: true }} totalWeeks={14} />, fixtureLeagueDeps().deps);
-    expect(screen.getByText("FLEX can be any RB, WR, or TE.")).toBeInTheDocument();
+    expect(screen.getByText(term("flex").short)).toBeInTheDocument();
   });
 
   // Persona review (veteran, FIX 5): the whole-week lock is coarse and nothing said so before
