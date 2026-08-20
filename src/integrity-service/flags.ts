@@ -16,6 +16,9 @@ import {
   type QueueRow,
   type ReporterView,
 } from "@/integrity/queue-view";
+import { removeChatMessageInTx } from "@/chat-service/moderation";
+import { getPublisher } from "@/lib/realtime/publisher";
+import type { PublishFn } from "@/lib/realtime/publish";
 import { removeReviewInTx } from "@/review-service/reviews";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { attachAuditEvent, notifyAffectedMember } from "./notify";
@@ -240,6 +243,14 @@ export interface ResolveFlagInput {
   readonly audit?: AuditLogger;
   /** Defaults to the real `notifyAffectedMember`. Injectable so a test can force its failure. */
   readonly notify?: typeof notifyAffectedMember;
+  /**
+   * Defaults to the real publisher. Threaded through to `removeChatMessageInTx` on a
+   * `content_removed` decision against a `chat_message` subject — the ONLY decision this input
+   * ever reaches a realtime publish from, mirroring `PostMessageInput.publish`'s own required-DI
+   * shape rather than `audit`/`notify`'s optional one, because a test asserting the swallow needs
+   * to inject a recorder the same way `chat.test.ts` already does.
+   */
+  readonly publish?: PublishFn;
 }
 
 export type ResolveFlagResult =
@@ -330,26 +341,27 @@ class ContentRemovalRefused extends Error {
 }
 
 /**
- * `content_removed`'s actual removal, dispatched by the flag's own `subjectType`. `review` is
- * wired (Task 4): it calls `removeReviewInTx` (`@/review-service/reviews`) INSIDE `resolveFlag`'s
- * own transaction, passing the operator as `removedByUserId` and the operator's note as the
- * removal reason — `removeReviewInTx` already writes its own `review_removed` audit event and its
- * own `review_removed` notice, and nothing about that path changes here, which is the whole
- * reason Phase 2 built it as a stamp. `chat_message` is the one subject type still unwired —
- * Task 6 lands `chat-service`'s sibling the same way, by extending this function again.
+ * `content_removed`'s actual removal, dispatched by the flag's own `subjectType`. `review` was
+ * wired first (Task 4): it calls `removeReviewInTx` (`@/review-service/reviews`) INSIDE
+ * `resolveFlag`'s own transaction, passing the operator as `removedByUserId` and the operator's
+ * note as the removal reason. `chat_message` (Task 6) calls `removeChatMessageInTx`
+ * (`@/chat-service/moderation`) the identical way. Both removers already write their own audit
+ * event and their own notice, and nothing about either path changes here, which is the whole
+ * reason both are built as a stamp.
  *
- * A refusal from `removeReviewInTx` (already removed, or a ghost id) is re-thrown as
+ * A refusal from either remover (already removed, or a ghost id) is re-thrown as
  * `ContentRemovalRefused` rather than returned — see that class's own docblock — so `resolveFlag`
  * rolls its stamp back and answers a normal `{ ok: false }` instead of committing a flag stamped
  * "resolved: content_removed" for a removal that never landed.
  *
- * An UNWIRED subject type (`chat_message` today) still throws a plain `Error`, unchanged from
- * before this task: by the time this runs, `resolveFlag`'s stamp `UPDATE` has already applied
- * inside this same transaction, and the ONLY way to undo it is Postgres's own `ROLLBACK` on a
- * rejected promise — the identical audit-fails-the-tx discipline `raiseFlag` and `grantAdmin`
- * already lean on for a failed `audit.record`. A caller getting back a flag stamped "resolved:
- * content_removed" with no removal performed and no `flag_resolved` event to explain it would be
- * exactly the hole in the record this whole plan exists to close.
+ * `account_pair`/`trade` still throw a plain `Error`, unwired by design (neither this plan nor
+ * Plan C's `trade_reversed` removes content for those subject types): by the time this runs,
+ * `resolveFlag`'s stamp `UPDATE` has already applied inside this same transaction, and the ONLY
+ * way to undo it is Postgres's own `ROLLBACK` on a rejected promise — the identical audit-fails-
+ * the-tx discipline `raiseFlag` and `grantAdmin` already lean on for a failed `audit.record`. A
+ * caller getting back a flag stamped "resolved: content_removed" with no removal performed and
+ * no `flag_resolved` event to explain it would be exactly the hole in the record this whole plan
+ * exists to close.
  */
 async function removeSubject(
   tx: DbTx,
@@ -362,6 +374,7 @@ async function removeSubject(
     readonly clock: Clock;
     readonly audit: AuditLogger;
     readonly notify: typeof notifyAffectedMember;
+    readonly publish: PublishFn;
   },
 ): Promise<void> {
   if (subjectType === "review") {
@@ -377,7 +390,21 @@ async function removeSubject(
     if (!result.ok) throw new ContentRemovalRefused(409, result.reason);
     return;
   }
-  throw new Error(`resolveFlag: content_removed has no remover wired for subject type "${subjectType}" yet (Task 6 lands it).`);
+  if (subjectType === "chat_message") {
+    const result = await removeChatMessageInTx(tx, {
+      messageId: opts.subjectId,
+      removedByUserId: opts.operatorUserId,
+      reason: opts.reason,
+      clock: opts.clock,
+      audit: opts.audit,
+      notify: opts.notify,
+      publish: opts.publish,
+      flagId: opts.flagId,
+    });
+    if (!result.ok) throw new ContentRemovalRefused(409, result.reason);
+    return;
+  }
+  throw new Error(`resolveFlag: content_removed has no remover wired for subject type "${subjectType}".`);
 }
 
 /**
@@ -476,6 +503,7 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
   const clock = input.clock ?? systemClock;
   const audit = input.audit ?? getAuditLogger();
   const notify = input.notify ?? notifyAffectedMember;
+  const publish = input.publish ?? ((event) => getPublisher().publish(event));
   const now = new Date(clock.now());
 
   try {
@@ -500,6 +528,7 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
           clock,
           audit,
           notify,
+          publish,
         });
       }
 

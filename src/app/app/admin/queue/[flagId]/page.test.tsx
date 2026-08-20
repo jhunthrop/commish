@@ -88,10 +88,35 @@ describe("AdminFlagDetailPage — the read", () => {
     );
   });
 
-  it("offers no content-removal decision for a chat message — Task 6 hasn't wired the remover yet", async () => {
+  it("offers content removal for a chat message too — Task 6's chat branch is wired", async () => {
     vi.mocked(flagDetail).mockResolvedValue({
       ...OPEN_REVIEW_DETAIL,
-      subject: { kind: "chat_message", messageId: "5", body: "trash talk", authorName: "Bob" },
+      leagueId: "l1",
+      subject: { kind: "chat_message" as const, messageId: "5", body: "trash talk", authorName: "Bob" },
+    });
+    await renderPage();
+
+    expect(await screen.findByRole("radio", { name: "No action" })).toBeInTheDocument();
+    expect(screen.getByRole("radio", { name: "Remove the content" })).toBeInTheDocument();
+  });
+
+  it("previews the chat notice, not the review one, when removing a chat message", async () => {
+    vi.mocked(flagDetail).mockResolvedValue({
+      ...OPEN_REVIEW_DETAIL,
+      leagueId: "l1",
+      subject: { kind: "chat_message" as const, messageId: "5", body: "trash talk", authorName: "Bob" },
+    });
+    await renderPage();
+
+    screen.getByRole("radio", { name: "Remove the content" }).click();
+    expect(await screen.findByText("We removed one of your messages")).toBeInTheDocument();
+    expect(screen.queryByText("We removed your review")).not.toBeInTheDocument();
+  });
+
+  it("offers no content-removal decision for an account pair — no remover exists for it", async () => {
+    vi.mocked(flagDetail).mockResolvedValue({
+      ...OPEN_REVIEW_DETAIL,
+      subject: { kind: "account_pair" as const, userIds: ["u_a", "u_b"] as const, names: ["Alex", "Sam"] as const },
     });
     await renderPage();
 

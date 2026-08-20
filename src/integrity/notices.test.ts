@@ -54,11 +54,20 @@ describe("NOTICE_TEMPLATES", () => {
       "Somebody reported something you posted in Sunday Money. An operator read it, decided to leave your post up, and wrote you this note. There is no reply to this message.",
     );
     expect(warned.body).not.toContain("Keep the trash talk");
+
+    // The chat sibling of `review_removed`, mirroring it field for field: the reason is
+    // deliberately absent from `body` here too — it renders as its own blockquote (`quoteFor`).
+    const chatRemoved = renderNotice("chat_message_removed", NOTICE_SAMPLES.chat_message_removed);
+    expect(chatRemoved.title).toBe("We removed one of your messages");
+    expect(chatRemoved.body).toBe(
+      "An operator removed a message you posted in Sunday Money. Your leaguemates can see that the message went and who posted it, and they can no longer read it. We keep your words on file exactly as you wrote them.",
+    );
+    expect(chatRemoved.body).not.toContain("off topic");
   });
 
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
-    expect([...TYPES].sort()).toEqual(["admin_granted", "draft_auto_picked", "operator_warning", "review_removed"]);
+    expect([...TYPES].sort()).toEqual(["admin_granted", "chat_message_removed", "draft_auto_picked", "operator_warning", "review_removed"]);
   });
 });

@@ -66,11 +66,16 @@ function SubjectCard({ subject }: { readonly subject: FlagSubjectView }) {
  * importing `@/integrity` (the client boundary, `eslint.config.mjs`). `note`/`reason` are never
  * interpolated into either template's body (`notices.ts`'s own templates), so the placeholder
  * passed here is never rendered — only `leagueName` matters, and it is real.
+ *
+ * `content_removed`'s preview is subject-aware (Task 6): a `chat_message` subject's removal
+ * sends `chat_message_removed`, not `review_removed` — two different sentences, and showing the
+ * wrong one would preview a notice the member is never actually sent.
  */
-function noticePreviewsFor(leagueName: string): Readonly<Record<"warned_user" | "content_removed", DecisionPreview>> {
+function noticePreviewsFor(leagueName: string, subjectKind: FlagSubjectView["kind"]): Readonly<Record<"warned_user" | "content_removed", DecisionPreview>> {
   return {
     warned_user: renderNotice("operator_warning", { leagueName, note: "" }),
-    content_removed: renderNotice("review_removed", { reason: "" }),
+    content_removed:
+      subjectKind === "chat_message" ? renderNotice("chat_message_removed", { leagueName, reason: "" }) : renderNotice("review_removed", { reason: "" }),
   };
 }
 
@@ -97,12 +102,13 @@ function ResolutionSummary({ resolution }: { readonly resolution: FlagResolution
 }
 
 /**
- * `content_removed` is wired ONLY for a `review` subject today (`resolveFlag`'s own
- * `removeSubject` — Task 6 lands the chat sibling). Filtered out here rather than left for the
- * service to refuse, so an operator is never offered a decision that would 500 on submit.
+ * `content_removed` is wired for `review` and `chat_message` subjects (`resolveFlag`'s own
+ * `removeSubject` — Task 6 landed the chat sibling). Filtered out for every OTHER subject type
+ * here rather than left for the service to refuse, so an operator is never offered a decision
+ * that would 500 on submit.
  */
 function decisionsFor(decisions: readonly ResolutionDecision[], subject: FlagSubjectView): readonly ResolutionDecision[] {
-  return decisions.filter((decision) => decision !== "content_removed" || subject.kind === "review");
+  return decisions.filter((decision) => decision !== "content_removed" || subject.kind === "review" || subject.kind === "chat_message");
 }
 
 /**
@@ -119,7 +125,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
     if (detail === null) notFound();
 
     const leagueName = detail.leagueId === null ? "your league" : await leagueNameFor(getDb(), detail.leagueId);
-    const previews = noticePreviewsFor(leagueName);
+    const previews = noticePreviewsFor(leagueName, detail.subject.kind);
     const decisions = decisionsFor(detail.decisions, detail.subject);
     const evidenceEntries = Object.entries(detail.evidence);
 

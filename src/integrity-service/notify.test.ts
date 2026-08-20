@@ -245,6 +245,28 @@ describe("quoteFor", () => {
     }
   });
 
+  /** The chat sibling of the test above — the SAME mapper, applied through the SAME branch. */
+  it("renders the AUTHOR-FACING PHRASE for a chat_message_removed notice too, never the token", () => {
+    for (const reason of REMOVAL_REASON_VALUES) {
+      const notice: MemberNotice = {
+        id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "chat_message_removed",
+        title: "We removed one of your messages", body: "...", context: { leagueName: "Sunday Money", reason },
+        auditEventId: "evt_1", createdAt: NOW, readAt: null,
+      };
+      expect(quoteFor(notice)).toBe(removalPhraseFor(reason));
+      expect(quoteFor(notice)).not.toBe(reason);
+    }
+  });
+
+  it("is null for a chat_message_removed notice whose context reason is not a string", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "chat_message_removed",
+      title: "We removed one of your messages", body: "…", context: { leagueName: "Sunday Money" },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBeNull();
+  });
+
   it("falls back to the generic phrase for a stored value from outside that vocabulary", () => {
     // Rows written by hand in SQL, or before the script constrained `--reason`. The mapper's own
     // docblock has always said a stored value must not be printed raw; this is that rule holding.

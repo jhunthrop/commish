@@ -54,6 +54,17 @@ export interface NoticeContexts {
     readonly leagueName: string;
     readonly note: string;
   };
+  /**
+   * `removeChatMessageInTx`'s (`@/chat-service/moderation`) own notice, mirroring `review_removed`
+   * field for field: `reason` is one of the SAME closed tokens (`MODERATION_CONFIG.reasons`), not
+   * free text, mapped to a phrase at render (`quoteFor` -> `removalPhraseFor`) rather than printed
+   * raw. `leagueName` is carried because a chat removal, unlike a review's, always has a real
+   * league — the message stood in one league's own conversation.
+   */
+  readonly chat_message_removed: {
+    readonly leagueName: string;
+    readonly reason: string;
+  };
 }
 
 export type NoticeType = keyof NoticeContexts;
@@ -92,6 +103,15 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
     title: "An operator left you a note",
     body: `Somebody reported something you posted in ${leagueName}. An operator read it, decided to leave your post up, and wrote you this note. There is no reply to this message.`,
   }),
+  // `reason` is stored on the row (`context.reason`) but deliberately unused HERE, the same
+  // reason `review_removed`'s own `reason` is: its author-facing phrase travels as its own field
+  // on the wire (`quoteFor`), rendered as a distinct blockquote. Unlike a removed review, the
+  // room itself already shows that the message went (`RemovedMessage`, `@/chat-room/components`)
+  // — this notice tells the author what the room can see, not something new to them.
+  chat_message_removed: ({ leagueName }) => ({
+    title: "We removed one of your messages",
+    body: `An operator removed a message you posted in ${leagueName}. Your leaguemates can see that the message went and who posted it, and they can no longer read it. We keep your words on file exactly as you wrote them.`,
+  }),
 };
 
 /** One neutral context per type, so the denylist and em-dash checks have something to render. */
@@ -100,6 +120,7 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   review_removed: { reason: "off topic" },
   admin_granted: { grantedByUserId: "bootstrap" },
   operator_warning: { leagueName: "Sunday Money", note: "Keep the trash talk about the teams." },
+  chat_message_removed: { leagueName: "Sunday Money", reason: "off topic" },
 };
 
 export function renderNotice<T extends NoticeType>(type: T, context: NoticeContexts[T]): RenderedNotice {

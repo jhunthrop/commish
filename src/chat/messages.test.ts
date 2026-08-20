@@ -13,6 +13,7 @@ function message(id: string, overrides: Partial<ChatMessageView> = {}): ChatMess
     createdAt: "2026-08-18T12:00:00.000Z",
     reactions: [],
     gif: null,
+    removal: null,
     ...overrides,
   };
 }
@@ -39,6 +40,16 @@ describe("mergeMessages", () => {
     const held = [message("1", { reactions: [{ emoji: "🔥", userId: "u2" }] })];
     const merged = mergeMessages(held, [message("1", { reactions: [{ emoji: "🔥", userId: "u2" }] })]);
     expect(merged[0]?.reactions).toHaveLength(1);
+  });
+
+  it("never un-removes a message when an older copy of it arrives late", () => {
+    // The hazard: the composer's optimistic path and the SSE fold both write into the same held
+    // list, so a REDELIVERED (or simply late) frame for an already-removed message can carry
+    // `removal: null` — the copy of the message as it stood before the operator's stamp. Taking
+    // that frame at face value would silently un-remove a message on screen.
+    const held = [message("7", { removal: { at: "2026-08-20T00:00:00.000Z", phrase: "spam or fake content" } })];
+    const merged = mergeMessages(held, [message("7", { removal: null })]);
+    expect(merged[0]?.removal).not.toBeNull();
   });
 
   it("drops the oldest messages once the held buffer is full", () => {
@@ -71,6 +82,12 @@ describe("unionMessages", () => {
     const held = [message("1", { reactions: [{ emoji: "🔥", userId: "u2" }] })];
     const united = unionMessages(held, [message("1", { reactions: [] })]);
     expect(united[0]?.reactions).toEqual([{ emoji: "🔥", userId: "u2" }]);
+  });
+
+  it("never un-removes a message when an older copy of it arrives late", () => {
+    const held = [message("1", { removal: { at: "2026-08-20T00:00:00.000Z", phrase: "abusive or harassing content" } })];
+    const united = unionMessages(held, [message("1", { removal: null })]);
+    expect(united[0]?.removal).not.toBeNull();
   });
 });
 

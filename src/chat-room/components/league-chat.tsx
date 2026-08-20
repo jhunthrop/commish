@@ -43,6 +43,7 @@ export function LeagueChat({ leagueId }: { readonly leagueId: string }) {
         ) : null}
       </header>
       <MessageList
+        leagueId={leagueId}
         messages={chat.messages}
         meUserId={chat.meUserId}
         hasMore={chat.hasMore}

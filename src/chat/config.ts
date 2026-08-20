@@ -1,3 +1,5 @@
+import { MODERATION_CONFIG } from "@/moderation/config";
+
 /**
  * Every tunable league chat has. No component, service or route may inline one of these.
  *
@@ -42,6 +44,14 @@ export const CHAT_CONFIG = {
     /** The alt text becomes the message body (`ChatComposer`), so it is capped by the same rule. */
     maxAltLength: MAX_BODY_LENGTH,
   },
+  /**
+   * The closed report-reason set a chat report picks from — `MODERATION_CONFIG.reasons`
+   * (`@/moderation/config`), not a second copy of it. Founder decision #2's default is "mirror
+   * `reviews`' existing closed set exactly; one vocabulary, two record types", so this is a
+   * re-export, the same "diff at every consumer is zero" discipline `REVIEW_CONFIG.reportReasons`
+   * already established (`@/reviews/config`).
+   */
+  reportReasons: MODERATION_CONFIG.reasons,
 } as const;
 
 export type ReactionEmoji = (typeof CHAT_CONFIG.reactions)[number];
@@ -50,3 +60,5 @@ export type ReactionEmoji = (typeof CHAT_CONFIG.reactions)[number];
 export function isReactionEmoji(value: string): value is ReactionEmoji {
   return (CHAT_CONFIG.reactions as readonly string[]).includes(value);
 }
+
+export type ChatReportReasonValue = (typeof CHAT_CONFIG.reportReasons)[number]["value"];

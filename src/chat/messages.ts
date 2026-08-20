@@ -43,6 +43,16 @@ export function unionMessages(
     byId.set(message.id, {
       ...message,
       reactions: dedupeReactions(existing === undefined ? message.reactions : [...existing.reactions, ...message.reactions]),
+      // STICKY, not last-write-wins: removal is a stamp that only ever moves one direction
+      // (null -> set, never back — the no-re-stamp guard lives in `removeChatMessageInTx`'s own
+      // `UPDATE ... WHERE`), so once ANY frame folded here has seen the removal, it must survive
+      // every later fold no matter what order frames arrive in. The composer's optimistic echo
+      // and the SSE fold both write into this same held list, and an older copy of the message
+      // (posted before the removal, redelivered after it) carries `removal: null` — taking it at
+      // face value would silently un-remove a message on screen. `existing?.removal` wins over
+      // `message.removal` whenever it is non-null; the two can never disagree once both are
+      // non-null, because a message has exactly one removal.
+      removal: existing?.removal ?? message.removal,
     });
   }
   // Ids are a bigserial, so a numeric compare IS chronological order — no timestamp tie to break.

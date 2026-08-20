@@ -1,12 +1,19 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
-import type { ChatGif, ChatMessageView, ChatReactionView } from "@/chat/contract";
+import type { ChatGif, ChatMessageRemoval, ChatMessageView, ChatReactionView } from "@/chat/contract";
 import { CHAT_CONFIG } from "@/chat/config";
 import type { Db } from "@/db/client";
 import { chatMessages, chatReactions, teams, users } from "@/db/schema";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
+import { removalPhraseFor } from "@/moderation/removal";
 
-interface MessageRow {
+/**
+ * Exported (Task 6): `@/chat-service/moderation`'s `removeChatMessageInTx` builds one of these
+ * from its own author/team lookup so it can hand the SAME `toView` below the row it needs to
+ * publish a removal exactly the way `postMessage` publishes a new message — one mapper, not two
+ * that could drift on which columns decide `removal`.
+ */
+export interface MessageRow {
   readonly id: number;
   readonly authorUserId: string;
   readonly authorName: string;
@@ -19,9 +26,12 @@ interface MessageRow {
   readonly gifAlt: string | null;
   readonly gifWidth: number | null;
   readonly gifHeight: number | null;
+  /** Both null for a message that stands. See `ChatMessageView.removal`'s own docblock. */
+  readonly removedAt: Date | null;
+  readonly removalReason: string | null;
 }
 
-/** Null unless every one of the five columns is populated — `kind` alone is not trusted over the columns actually being there. */
+/** Null unless every one of the five columns is populated — `kind` alone is not trusted over the columns actually being there. Also null once the message is removed — see `toView` below. */
 function toGifView(row: MessageRow): ChatGif | null {
   if (row.kind !== "gif" || row.gifUrl === null || row.gifPreviewUrl === null || row.gifAlt === null || row.gifWidth === null || row.gifHeight === null) {
     return null;
@@ -29,16 +39,31 @@ function toGifView(row: MessageRow): ChatGif | null {
   return { url: row.gifUrl, previewUrl: row.gifPreviewUrl, alt: row.gifAlt, width: row.gifWidth, height: row.gifHeight };
 }
 
-function toView(row: MessageRow, reactions: readonly ChatReactionView[]): ChatMessageView {
+function toRemoval(row: MessageRow): ChatMessageRemoval | null {
+  return row.removedAt === null ? null : { at: row.removedAt.toISOString(), phrase: removalPhraseFor(row.removalReason) };
+}
+
+/**
+ * Exported (Task 6) for `removeChatMessageInTx`'s own reuse — one row-to-wire mapping, shared by
+ * every writer of a `ChatMessageView` (a new message, a page read, a removal), so `body`/`gif`
+ * being withheld once `removal !== null` is a rule enforced in exactly one place.
+ */
+export function toView(row: MessageRow, reactions: readonly ChatReactionView[]): ChatMessageView {
+  const removal = toRemoval(row);
   return {
     id: String(row.id),
     authorUserId: row.authorUserId,
     authorName: row.authorName,
     authorAvatarUrl: row.authorAvatarUrl,
-    body: row.body,
+    // The wire does not carry a removed message's words (ChatMessageView.removal's own
+    // docblock) — the row itself keeps them, exactly as `reviews` preserves a removed review's
+    // body. `RemovedMessage` renders `removal.phrase` instead; nothing reads `body` once
+    // `removal !== null`.
+    body: removal === null ? row.body : "",
     createdAt: row.createdAt.toISOString(),
     reactions,
-    gif: toGifView(row),
+    gif: removal === null ? toGifView(row) : null,
+    removal,
   };
 }
 
@@ -61,8 +86,12 @@ const defaultOnPublishError: PublishErrorSink = (error, event) => {
  * The error sink defaults to `console.error` (today's only production behavior) but is
  * injectable, mirroring the draft store's `onPublishError` — so a caller (or a test) can
  * observe the swallow without spying on the global console.
+ *
+ * Exported (Task 6): `@/chat-service/moderation`'s `removeChatMessageInTx` reuses this exact
+ * swallow rather than a second copy of it — a removal frame's publish failure must be exactly as
+ * silent as a new message's.
  */
-async function publishQuietly(
+export async function publishQuietly(
   publish: PublishFn,
   input: Parameters<PublishFn>[0],
   onPublishError: PublishErrorSink = defaultOnPublishError,
@@ -143,6 +172,9 @@ export async function postMessage(db: Db, input: PostMessageInput): Promise<Chat
       gifAlt: input.gif?.alt ?? null,
       gifWidth: input.gif?.width ?? null,
       gifHeight: input.gif?.height ?? null,
+      // A message this call just created has never been removed.
+      removedAt: null,
+      removalReason: null,
     },
     [],
   );
@@ -189,6 +221,8 @@ export async function listMessages(db: Db, input: ListMessagesInput): Promise<Ch
       gifAlt: chatMessages.gifAlt,
       gifWidth: chatMessages.gifWidth,
       gifHeight: chatMessages.gifHeight,
+      removedAt: chatMessages.removedAt,
+      removalReason: chatMessages.removalReason,
     })
     .from(chatMessages)
     .innerJoin(users, eq(users.id, chatMessages.authorUserId))

@@ -22,6 +22,13 @@ export const MODERATION_CONFIG = {
     { value: "abusive", label: "Abusive or harassing", removalPhrase: "abusive or harassing content" },
     { value: "other", label: "Something else", removalPhrase: "breaking the review rules" },
   ],
+  /**
+   * `POST /api/leagues/[leagueId]/chat/[messageId]/report`'s ceiling — keyed per user id, an
+   * authenticated write. Mirrors `REVIEW_CONFIG.reportRateLimit` exactly (same numbers, same
+   * shape): a chat report and a review report are the same act — a signal into `raiseFlag`, not
+   * a second thing with its own budget to reason about separately.
+   */
+  chatReportRateLimit: { maxRequests: 20, windowMs: 60_000 },
 } as const;
 
 export type ModerationReasonValue = (typeof MODERATION_CONFIG.reasons)[number]["value"];

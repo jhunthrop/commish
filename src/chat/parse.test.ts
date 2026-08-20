@@ -13,9 +13,12 @@ const MESSAGE = {
       createdAt: "2026-08-18T12:00:00.000Z",
       reactions: [{ emoji: "🔥", userId: "u2" }],
       gif: null,
+      removal: null,
     },
   },
 };
+
+const REMOVAL = { at: "2026-08-20T00:00:00.000Z", phrase: "spam or fake content" };
 
 const GIF = { url: "https://media.giphy.com/g.gif", previewUrl: "https://media.giphy.com/g-preview.gif", alt: "Touchdown", width: 480, height: 270 };
 
@@ -69,7 +72,7 @@ describe("parseChatFrame", () => {
       createdAt: MESSAGE.payload.message.createdAt,
     };
     const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: messageWithoutReactions } }));
-    expect(frame).toEqual({ kind: "message", message: { ...messageWithoutReactions, reactions: [], gif: null } });
+    expect(frame).toEqual({ kind: "message", message: { ...messageWithoutReactions, reactions: [], gif: null, removal: null } });
   });
 
   it("parses a well-formed gif field", () => {
@@ -111,6 +114,32 @@ describe("parseChatFrame", () => {
       JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, gif: { ...GIF, width: "480" } } } }),
     );
     expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+  });
+
+  it("parses a well-formed removal field", () => {
+    const withRemoval = { ...MESSAGE.payload.message, removal: REMOVAL };
+    const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: withRemoval } }));
+    expect(frame).toEqual({ kind: "message", message: withRemoval });
+  });
+
+  it("treats a missing removal field as no removal", () => {
+    const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: MESSAGE.payload.message } }));
+    expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+  });
+
+  it("drops a removal field that isn't an object, rather than failing the whole message", () => {
+    const frame = parseChatFrame(
+      JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, removal: "not an object" } } }),
+    );
+    expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+  });
+
+  it("drops a removal field missing either of its required properties", () => {
+    const incompleteRemovals = [{ phrase: REMOVAL.phrase }, { at: REMOVAL.at }];
+    for (const removal of incompleteRemovals) {
+      const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, removal } } }));
+      expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+    }
   });
 
   it("returns null when the reaction payload isn't an object", () => {

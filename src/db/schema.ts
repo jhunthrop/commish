@@ -464,6 +464,15 @@ export const statWeeks = pgTable("stat_weeks", {
  * `id` is a bigserial because it is also the page cursor — a monotonic integer orders the
  * history with no timestamp tie to break, and `(league_id, id)` makes one page an index range
  * scan rather than a sort of the whole league's history.
+ *
+ * Removal is a stamp, never a delete (Task 6, mirroring `reviews`' own convention exactly): the
+ * row keeps its author, its body, who removed it and why. It DIVERGES from `reviews` at the
+ * read, not at the write — a removed review vanishes from its feed, but a removed message
+ * renders IN PLACE (ruling 18): a conversation with a hole in it is a conversation everybody
+ * misreads, and the members who saw it before it went already know it existed. `removed_by_
+ * user_id` is deliberately NOT in the covering index below and not on `ChatMessageView` — which
+ * operator removed a message is an operator fact, not a member-facing one, and the fewer columns
+ * in a covering index the longer it stays chosen.
  */
 export const chatMessages = pgTable(
   "chat_messages",
@@ -487,15 +496,43 @@ export const chatMessages = pgTable(
     gifWidth: integer("gif_width"),
     gifHeight: integer("gif_height"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Additive, all nullable (0024_chat_moderation.sql) — the removal stamp. A GIF needs no
+    // second code path: a GIF is one `chat_messages` row (ruling 17), so this stamp covers it by
+    // construction.
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedByUserId: text("removed_by_user_id").references(() => users.id),
+    removalReason: text("removal_reason"),
   },
-  // The physical index also carries `INCLUDE (body)` — added by hand in
-  // `drizzle/0018_chat_messages_covering_index.sql` because drizzle-orm's `index()` builder has
-  // no `.include()` API to express it here. See that migration's own comment: widening this row
-  // (0017's gif_* columns) tipped the planner off `chat_messages_league_id_idx` for a paginated
-  // read and onto a much more expensive `chat_messages_pkey` scan-and-discard, which this
-  // covering index (an Index-Only Scan once vacuumed) undoes. A future migration that drops and
-  // recreates this index from THIS definition must re-add `INCLUDE (body)` by hand, the same way.
+  // The physical index also carries `INCLUDE (body, removed_at, removal_reason)` — added by hand
+  // in `drizzle/0018_chat_messages_covering_index.sql` (originally `INCLUDE (body)`) and widened
+  // again in `drizzle/0024_chat_moderation.sql`, because drizzle-orm's `index()` builder has no
+  // `.include()` API to express it here. `src/db/index-plans.test.ts` reads the physical index
+  // definition back out of `pg_indexes` rather than trusting this file to still describe it. A
+  // future migration that drops and recreates this index from THIS definition must re-add the
+  // full `INCLUDE` list by hand, the same way — `removed_by_user_id` is deliberately excluded
+  // (see this table's own docblock).
   (t) => [index("chat_messages_league_id_idx").on(t.leagueId, t.id)],
+);
+
+/**
+ * A report is in-product moderation SIGNAL, not moderation ACTION (ruling 12: a member never
+ * aims a flag directly). One row per reporter per message — the primary key is the pair, copying
+ * `review_reports` exactly, so reporting twice is a no-op upsert (`onConflictDoNothing`) rather
+ * than a duplicate or an error: reporting the same message again is the same report, not a
+ * second one. A GIF needs no second report table either, for the identical reason the removal
+ * stamp above needs no second column set: a GIF is one `chat_messages` row.
+ */
+export const chatMessageReports = pgTable(
+  "chat_message_reports",
+  {
+    messageId: bigint("message_id", { mode: "number" })
+      .notNull()
+      .references(() => chatMessages.id, { onDelete: "cascade" }),
+    reporterUserId: text("reporter_user_id").notNull().references(() => users.id),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.messageId, t.reporterUserId] })],
 );
 
 /**

@@ -228,7 +228,7 @@ export async function listNotices(db: Db, userId: string): Promise<NoticesPage> 
  * caller that skips it, reads clean anyway.
  */
 export function quoteFor(notice: MemberNotice): string | null {
-  if (notice.noticeType === "review_removed") {
+  if (notice.noticeType === "review_removed" || notice.noticeType === "chat_message_removed") {
     const reason = notice.context.reason;
     return typeof reason === "string" ? removalPhraseFor(reason) : null;
   }

@@ -471,6 +471,11 @@ describe("resolveFlag", () => {
     return row?.removedAt != null;
   }
 
+  async function isMessageRemoved(messageId: string): Promise<boolean> {
+    const [row] = await db.select({ removedAt: chatMessages.removedAt }).from(chatMessages).where(eq(chatMessages.id, Number(messageId)));
+    return row?.removedAt != null;
+  }
+
   async function isOpen(flagId: string): Promise<boolean> {
     const [row] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, flagId));
     return row !== undefined && row.resolvedAt === null;
@@ -610,17 +615,62 @@ describe("resolveFlag", () => {
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
   });
 
-  it("refuses content_removed today — no remover is wired yet, and the stamp rolls back with it", async () => {
+  it("refuses content_removed for a subject type nothing removes content for — account_pair has no remover", async () => {
     await ensureUser("u_op");
-    const flag = await openFlag({ flagType: "chat_report", subjectAuthor: "u_member3", leagueId: "lg_cr" });
+    const flag = await openFlag({ flagType: "multi_account", subjectAuthor: "u_pair_cr" });
 
     await expect(
       resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op" }),
-    ).rejects.toThrow('resolveFlag: content_removed has no remover wired for subject type "chat_message" yet (Task 6 lands it).');
+    ).rejects.toThrow('resolveFlag: content_removed has no remover wired for subject type "account_pair".');
 
     const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
     expect(row!.resolvedAt).toBeNull();
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  it("removes the chat message and resolves the flag in one transaction, or neither — Task 6's chat branch", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "chat_report", subjectAuthor: "u_chat_author", leagueId: "lg_chat_cr" });
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op" });
+    expect(result).toEqual({ ok: true, flagId: flag.id, decision: "content_removed" });
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(await isMessageRemoved(row!.subjectId)).toBe(true);
+    const [notice] = await noticesFor("u_chat_author");
+    expect(notice!.noticeType).toBe("chat_message_removed");
+    expect(notice!.leagueId).toBe("lg_chat_cr");
+
+    // The removal's own audit event is `admin_action` on the PLATFORM chain (ruling 1) — never a
+    // league-scoped event, even though the message itself lived in a league.
+    const [removalEvent] = await auditEventsOn("platform", "admin_action");
+    expect(removalEvent!.payload).toMatchObject({ action: "chat_message_removed", messageId: row!.subjectId, leagueId: "lg_chat_cr", flagId: flag.id });
+  });
+
+  it("leaves the flag open when the chat removal itself fails — already removed a minute earlier", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "chat_report", subjectAuthor: "u_chat_author2", leagueId: "lg_chat_cr2" });
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    await db.update(chatMessages).set({ removedAt: new Date(NOW), removedByUserId: "u_op", removalReason: "spam" }).where(eq(chatMessages.id, Number(row!.subjectId)));
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op" });
+    expect(result.ok).toBe(false);
+    expect(await isOpen(flag.id)).toBe(true);
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  it("refuses a content_removed note past the shared removal-reason cap for a chat message too", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "chat_report", subjectAuthor: "u_chat_author3", leagueId: "lg_chat_cr3" });
+    const tooLong = "x".repeat(REVIEW_CONFIG.removalReason.maxLength + 1);
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: tooLong, operatorUserId: "u_op" });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: `Notes on a removal are limited to ${REVIEW_CONFIG.removalReason.maxLength} characters.`,
+    });
+    expect(await isOpen(flag.id)).toBe(true);
   });
 
   it("removes the review and resolves the flag in one transaction, or neither — Task 4's review branch", async () => {

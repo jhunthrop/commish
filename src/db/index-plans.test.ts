@@ -1,6 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import type { Db } from "./client";
 import { createTestDb, truncateAll } from "./test-db";
 import { chatMessages, draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
 import { explainPlan, indexScanNode, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
@@ -118,6 +119,21 @@ async function seedCorpus(): Promise<void> {
   await db.execute(sql`VACUUM (ANALYZE) chat_messages`);
 }
 
+/**
+ * The chat page's own read, exactly as `listMessages` (`@/chat-service/chat.ts`) makes it —
+ * every column `chat_messages_league_id_idx`'s `INCLUDE` list carries, widened for Task 6's
+ * removal stamp, and nothing more. Exported as a builder, mirroring `feedQuery`/`pendingFlagQuery`,
+ * so both the Seq-Scan guard and the Index-Only-Scan pin below measure the identical statement.
+ */
+function chatPageQuery(db: Db) {
+  return db
+    .select({ id: chatMessages.id, body: chatMessages.body, removedAt: chatMessages.removedAt, removalReason: chatMessages.removalReason })
+    .from(chatMessages)
+    .where(eq(chatMessages.leagueId, "lg7"))
+    .orderBy(asc(chatMessages.id))
+    .limit(50);
+}
+
 describe("hot read paths use indexes", () => {
   beforeAll(async () => {
     await truncateAll(db);
@@ -150,13 +166,7 @@ describe("hot read paths use indexes", () => {
   });
 
   it("a chat page is an index range scan, not a scan of the whole league's history", async () => {
-    const query = db
-      .select({ id: chatMessages.id, body: chatMessages.body })
-      .from(chatMessages)
-      .where(eq(chatMessages.leagueId, "lg7"))
-      .orderBy(asc(chatMessages.id))
-      .limit(50);
-    const plan = await explainPlan(db, query);
+    const plan = await explainPlan(db, chatPageQuery(db));
     expect(sequentiallyScannedRelations(plan)).not.toContain("chat_messages");
     // Not enough on its own: dropping `chat_messages_league_id_idx` still avoids a Seq Scan by
     // falling back to an Index Scan on the primary key, filtering out every other league's rows
@@ -166,6 +176,20 @@ describe("hot read paths use indexes", () => {
     const usedIndex = indexScanNode(plan, "chat_messages_league_id_idx");
     expect(usedIndex).toBeDefined();
     expect(usedIndex?.["Rows Removed by Filter"] ?? 0).toBe(0);
+  });
+
+  /**
+   * The 0018 lesson, re-run BEFORE this migration's own risk (three more nullable columns
+   * widening `chat_messages`, the same shape 0017's six tipped the planner off with) has a
+   * chance to bite silently. `chatPageQuery` below selects exactly what `ChatMessageView` now
+   * needs (`removed_at`, `removal_reason` alongside `body`) — the widened SELECT list a real
+   * chat page read makes now that removal renders in place — so this is the actual read the
+   * covering index has to serve, not the pre-Task-6 two-column stand-in.
+   */
+  it("still chooses an Index-Only Scan for a league's chat page over the 20,000-row corpus", async () => {
+    const usedIndex = indexScanNode(await explainPlan(db, chatPageQuery(db)), "chat_messages_league_id_idx");
+    expect(usedIndex).toBeDefined();
+    expect(usedIndex?.["Node Type"]).toBe("Index Only Scan");
   });
 
   it("a draft's action log replays by index", async () => {
@@ -233,20 +257,28 @@ describe("hot read paths use indexes", () => {
  * `schema.ts`'s `index()` builder has no API to express — the covering column is real on disk,
  * but invisible to `drizzle-kit generate`'s diffing. Reproduced by hand before this test existed:
  * changing `chat_messages_league_id_idx`'s `.on(...)` column list in `schema.ts` and re-running
- * `db:generate` silently produces a migration that DROPs and recreates the index WITHOUT
- * `INCLUDE (body)` — drizzle has no record it was ever there, so nothing about that regenerated
+ * `db:generate` silently produces a migration that DROPs and recreates the index WITHOUT its
+ * `INCLUDE` list — drizzle has no record it was ever there, so nothing about that regenerated
  * migration looks wrong on its own. The comment on the index definition documents the hazard for
  * a human reader; this is what fails the BUILD instead of only a review, the moment the physical
  * index on the actual database stops matching what "a chat page is an index range scan" above
  * relies on to answer as an Index-Only Scan.
+ *
+ * Widened by `drizzle/0024_chat_moderation.sql` (Task 6) from `INCLUDE (body)` to
+ * `INCLUDE (body, removed_at, removal_reason)` — three more nullable columns on `chat_messages`,
+ * the same shape 0017's six were, so this test is re-measured BEFORE that migration lands rather
+ * than trusted to still pass by resemblance to the pre-Task-6 assertion. `removed_by_user_id` is
+ * deliberately absent from the list (see `chat_messages`' own docblock in `src/db/schema.ts`):
+ * which operator removed a message is an operator fact, not a member-facing one, and the fewer
+ * columns in a covering index the longer it stays chosen.
  */
 describe("chat_messages_league_id_idx stays a covering index", () => {
-  it("carries INCLUDE (body) on the real database", async () => {
-    const rows = (await db.execute(
-      sql`SELECT indexdef FROM pg_indexes WHERE indexname = 'chat_messages_league_id_idx'`,
-    )) as unknown as { readonly indexdef: string }[];
+  it("keeps chat_messages_league_id_idx covering after this migration too", async () => {
+    const rows = await db.execute<{ indexname: string; indexdef: string }>(
+      sql`SELECT indexname, indexdef FROM pg_indexes WHERE indexname = 'chat_messages_league_id_idx'`,
+    );
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.indexdef).toContain("INCLUDE (body)");
+    expect(rows[0]!.indexdef).toContain("INCLUDE (body, removed_at, removal_reason)");
   });
 });
 

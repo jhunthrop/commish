@@ -13,6 +13,7 @@ export function chatMessage(id: string, overrides: Partial<ChatMessageView> = {}
     createdAt: "2026-08-18T12:00:00.000Z",
     reactions: [],
     gif: null,
+    removal: null,
     ...overrides,
   };
 }
