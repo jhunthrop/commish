@@ -71,6 +71,56 @@ describe("computeEventHash", () => {
     ).toBe("8be562573461ecdf41a002e65a8096536f813d05c0a779a0bef462575ce1ccfd");
   });
 
+  /**
+   * THE ADVERSARIAL VECTOR. The one above is degenerate, and its inputs hid it: both objects it
+   * hashes are ALREADY alphabetical by accident (`{name, teamCount}`, and `computeEventHash`'s own
+   * eleven-field literal is sorted as written), everything in it is ASCII, and every number is a
+   * small integer. Deleting `.sort()` from `canonical.ts` outright, escaping non-ASCII as
+   * `\uXXXX`, and swapping the number formatter for `JSON.stringify` all leave it GREEN.
+   *
+   * Every input here is chosen to be load-bearing:
+   *
+   *  - the payload's keys are written OUT OF ORDER in the source, so sorting is what produces the
+   *    bytes and deleting the sort changes the digest;
+   *  - `"Ω"` sorts AFTER `"zeta"` by UTF-16 code unit, which a locale-aware comparator would not
+   *    agree with;
+   *  - `"ü"` and `"ω"` pass through unescaped, so a `\uXXXX` escaper changes the digest;
+   *  - `12.5` pins the number spelling, and `-0` pins that it hashes identically to `0`
+   *    (`String(-0) === "0"`) — correct behavior, but nothing anywhere asserted it before;
+   *  - an empty object, an empty array, an unsorted array (order is preserved, never sorted) and
+   *    a nested object cover the container cases the other vector never reaches.
+   *
+   * COMPUTED INDEPENDENTLY, not copied from a run of this code: the digest below was produced by a
+   * from-scratch implementation of the documented canonical form in another language, written
+   * against the spec rather than ported from `canonical.ts`, and only then compared. A vector
+   * pinned by running the implementation it is meant to police pins nothing.
+   */
+  it("matches a second, adversarial vector whose canonicalization is load-bearing", () => {
+    expect(
+      computeEventHash({
+        eventId: "evt_adversarial",
+        chainScope: "league_1",
+        sequence: 1,
+        eventType: "league_created",
+        actorId: "user_alice",
+        actorType: "user",
+        leagueId: "league_1",
+        // Deliberately unsorted in source. Do not tidy: the disorder is the test.
+        payload: { zeta: -0, alpha: [3, 1, 2], nested: { yankee: "ü", alpha: null }, price: 12.5, "\u03a9": "\u03c9", empty: {}, list: [] },
+        occurredAt: AT,
+        previousEventHash: GENESIS_HASH,
+        hashVersion: INTEGRITY_CONFIG.chain.hashVersion,
+      }),
+    ).toBe("42e8d85f292035c4693929386cc3ff6c00cbf0dd2f28affae1390bdb7344f311");
+  });
+
+  it("hashes -0 and 0 identically, which is correct and was until now unstated", () => {
+    const base = { eventId: "e", chainScope: "s", sequence: 1, eventType: "league_created" as const, actorId: null, actorType: "system" as const, leagueId: null, occurredAt: AT, previousEventHash: GENESIS_HASH, hashVersion: INTEGRITY_CONFIG.chain.hashVersion };
+    expect(computeEventHash({ ...base, payload: { delta: -0 } })).toBe(computeEventHash({ ...base, payload: { delta: 0 } }));
+    // And a float is not the same as its truncation, so the number formatter is not lossy.
+    expect(computeEventHash({ ...base, payload: { delta: 12.5 } })).not.toBe(computeEventHash({ ...base, payload: { delta: 12 } }));
+  });
+
   it("changes when any hashed field changes", () => {
     const base = linkEvent(input(), { headSequence: 0, headHash: GENESIS_HASH }, "evt_1");
     for (const mutated of [

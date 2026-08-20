@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { AUDIT_EVENT_TYPES, type AuditEventType } from "@/domain/audit";
 
@@ -25,6 +25,11 @@ const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "p
   trade_proposed: "plan-c",
   trade_accepted: "plan-c",
   trade_rejected: "plan-c",
+  // Plan B owns the vocabulary and the dispute queue this writes into, and lands the first
+  // publisher. Plan C ALSO raises one, from `TradeFairnessFlagService` on `TRADE_ACCEPTED`
+  // (`docs/superpowers/plans/2026-08-20-phase3-overview.md`) — into Plan B's existing queue, not
+  // a second one. Whichever lands first moves this entry to "plan-a" territory; the other is then
+  // a second call site, not a second owner.
   flag_raised: "plan-b",
   flag_resolved: "plan-b",
   admin_action: "plan-b",
@@ -36,16 +41,28 @@ interface SourceFile {
 }
 
 /**
- * Every `.ts`/`.tsx` file under `dir`, RECURSIVELY, non-test — the same shape as
- * `advisory-only.test.ts`'s `sourceFiles` (`@/ai-advisor/advisory-only.test.ts`). Test files are
- * excluded because a type "published" only inside a `*.test.ts` is not published — the grep
- * below is what tells a real writer apart from a lone assertion pinning the string.
+ * Files this scan must not read as production, whatever their extension.
+ *
+ * `*.test.ts` was the only exclusion, which let about twenty-two TEST-SUPPORT files count as
+ * evidence of production publishing — `src/integrity-service/test-support.ts` among them, whose
+ * own docblock reads "Test-only: nothing under `src/**` outside a `*.test.ts` may import this".
+ * Both halves of this file's claim were exposed by that: a Plan C seed helper naming a reserved
+ * type would fail the reserved check for the wrong reason, and a Plan A fixture would satisfy the
+ * publisher check without a real publisher existing anywhere.
+ */
+const NOT_PRODUCTION = [/\.test\.tsx?$/, /(?:^|[.-])test-support\.tsx?$/, /(?:^|[.-])test-fixtures\.tsx?$/, /(?:^|[.-])test-db\.tsx?$/, /(?:^|[.-])test-utils\.tsx?$/];
+
+/**
+ * Every `.ts`/`.tsx` file under `dir`, RECURSIVELY, production only — the same shape as
+ * `advisory-only.test.ts`'s `sourceFiles` (`@/ai-advisor/advisory-only.test.ts`). Test and
+ * test-support files are excluded because a type "published" only by a fixture is not published:
+ * the grep below is what tells a real writer apart from a lone assertion pinning the string.
  */
 function walk(dir: string): readonly SourceFile[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
     const full = join(dir, entry.name);
     if (entry.isDirectory()) return walk(full);
-    if (!/\.tsx?$/.test(entry.name) || /\.test\.tsx?$/.test(entry.name)) return [];
+    if (!/\.tsx?$/.test(entry.name) || NOT_PRODUCTION.some((pattern) => pattern.test(entry.name))) return [];
     return [{ path: full, text: readFileSync(full, "utf8") }];
   });
 }
@@ -77,10 +94,31 @@ describe("the audit vocabulary", () => {
     }
   });
 
-  it("has NO publisher yet for a reserved type, which is the point of reserving it", () => {
-    // If this fails, a later plan landed its publisher here and this table needs updating —
-    // the same shape `score.update` had while it sat reserved through Phase 1.
-    expect(Object.values(OWNER).filter((owner) => owner !== "plan-a").length).toBe(7);
+  it("reserves every type Plan A does not publish, and reserves nothing it does", () => {
+    // The count this used to assert was a hardcoded 7 compared against the table two lines above,
+    // which could only ever fail when somebody edited that table by hand — a test named for a
+    // property about PUBLISHERS that asserted nothing about publishers. Derived instead: the
+    // reserved set is exactly the vocabulary minus the types Plan A owns, so Plan B landing
+    // `flag_raised` moves one name across and needs no number edited anywhere.
+    const planA = (Object.keys(OWNER) as readonly AuditEventType[]).filter((type) => OWNER[type] === "plan-a");
+    const reserved = (Object.keys(OWNER) as readonly AuditEventType[]).filter((type) => OWNER[type] !== "plan-a");
+    expect([...planA, ...reserved].sort()).toEqual([...AUDIT_EVENT_TYPES].sort());
+    expect(reserved.filter((type) => planA.includes(type))).toEqual([]);
+    expect(reserved.length).toBe(AUDIT_EVENT_TYPES.length - planA.length);
+  });
+
+  it("reads no test-support file as production evidence, in either direction", async () => {
+    // The exclusion above, asserted rather than trusted: this file's whole claim rests on the
+    // scan seeing production and only production.
+    const scanned = await readAllSource("src", "scripts");
+    expect(scanned.length).toBeGreaterThan(0);
+    for (const file of scanned) {
+      expect(file.path).not.toMatch(/test-support|test-fixtures|test-db|test-utils|\.test\./);
+    }
+    // And the exclusion is not vacuous: these files really are there, and really do sit under a
+    // directory the scan walks.
+    expect(existsSync(join(process.cwd(), "src/integrity-service/test-support.ts"))).toBe(true);
+    expect(existsSync(join(process.cwd(), "src/db/test-db.ts"))).toBe(true);
   });
 
   it("has NO publisher anywhere in this repo for a type reserved to another plan", async () => {

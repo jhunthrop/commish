@@ -158,6 +158,26 @@ describe("the same-transaction contract", () => {
 });
 
 describe("concurrency", () => {
+  /**
+   * Waits until Postgres reports somebody genuinely BLOCKED on a lock, or gives up.
+   *
+   * Both tests below used to gate on `setTimeout(..., 100)`, which is a hope rather than a gate:
+   * on a loaded machine the racer might not have reached the lock yet, and the pair would go
+   * green having exercised no contention at all. `pg_stat_activity.wait_event_type = 'Lock'` is
+   * the database's own statement that the contention this test is named for actually happened.
+   */
+  async function waitForBlockedBackend(timeoutMs = 5_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const rows = await db.execute<{ count: string }>(
+        sql`SELECT count(*) AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()`,
+      );
+      if (Number(rows[0]?.count ?? 0) > 0) return true;
+      if (Date.now() > deadline) return false;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+
   it("serializes two appends to the SAME chain into a gapless, linked run", async () => {
     // Both transactions are in flight before either commits: `held` opens, appends, and waits;
     // `racer` blocks on the anchor row until `held` commits, then reads the new head.
@@ -174,8 +194,13 @@ describe("concurrency", () => {
       return logger.record(tx, input({ eventType: "member_joined" }));
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    release();
+    try {
+      // The contention is ASSERTED, not assumed: without this the test could pass by luck on a
+      // loaded machine, having serialized two appends that never actually met.
+      expect(await waitForBlockedBackend()).toBe(true);
+    } finally {
+      release();
+    }
     const [first, second] = await Promise.all([held, racer]);
 
     expect([first.sequence, second.sequence].sort()).toEqual([1, 2]);
@@ -183,9 +208,23 @@ describe("concurrency", () => {
     expect(rows[1]!.previousEventHash).toBe(rows[0]!.eventHash);
   });
 
-  it("does NOT let one league's append block another league's, which is why the chain is per league", async () => {
-    // The matched pair for the ruling. Same setup as above, different scope, and a statement
-    // timeout short enough that blocking would fail the test rather than slow it.
+  /**
+   * The matched pair for the ruling, TIGHTENED to actually mean what its docblock claims.
+   *
+   * As first written, a *table-wide* `SELECT ... FOR UPDATE` with no `WHERE` did not redden it:
+   * `held`'s `league_1` anchor row was created inside `held`'s own open transaction, so it was
+   * invisible to `elsewhere`'s read-committed snapshot, and `FOR UPDATE` cannot lock a row it
+   * cannot see. The pair caught a lock funnelled through a shared key, not a lock broadened
+   * against uncommitted neighbours — which is most of what "broadened" means.
+   *
+   * The fix is one committed append per chain BEFORE the race. Now `league_1`'s anchor row is
+   * visible to everyone, `held` locks that committed row, and any lock broader than one row
+   * blocks `elsewhere` on it and blows the 2s statement timeout.
+   */
+  it("does NOT let one league's append block another league's, even against a committed neighbour", async () => {
+    await db.transaction((tx) => logger.record(tx, input({ leagueId: "league_1" })));
+    await db.transaction((tx) => logger.record(tx, input({ leagueId: "league_2" })));
+
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => (release = resolve));
     const held = db.transaction(async (tx) => {
@@ -193,15 +232,21 @@ describe("concurrency", () => {
       await gate;
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    const elsewhere = await other.transaction(async (tx) => {
-      await tx.execute(sql`SET LOCAL statement_timeout = '2s'`);
-      return logger.record(tx, input({ leagueId: "league_2" }));
-    });
-    expect(elsewhere).toMatchObject({ chainScope: "league_2", sequence: 1 });
-
-    release();
-    await held;
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const elsewhere = await other.transaction(async (tx) => {
+        await tx.execute(sql`SET LOCAL statement_timeout = '2s'`);
+        return logger.record(tx, input({ leagueId: "league_2" }));
+      });
+      expect(elsewhere).toMatchObject({ chainScope: "league_2", sequence: 2 });
+    } finally {
+      // In a `finally`, because the failure path is exactly when this matters: a rejection here
+      // used to leak `held` still holding the anchor lock, and one genuine 2.1s failure cascaded
+      // into two unrelated 30-second timeouts elsewhere in this file. A real regression must
+      // present as one clean failure, not a confusing three-test hang.
+      release();
+      await held;
+    }
   });
 });
 

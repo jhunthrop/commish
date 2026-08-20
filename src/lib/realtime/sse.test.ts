@@ -136,3 +136,27 @@ describe("createUserEventStream — shares the same connection ceiling as the le
     expect(refused.status).toBe(429);
   });
 });
+
+/**
+ * MEDIUM-4. The cap is a number nobody re-derived when the arithmetic under it changed: a league
+ * tab used to cost one connection and now costs two, because `NoticeInbox` mounts in `AppHeader`
+ * on every signed-in page and opens its own per-user stream (correctly sharing this same
+ * ceiling). At 8, that silently became a four-tab budget with no headroom at all. Pinned here so
+ * a plan that adds a third stream type has to move the number and say why, rather than halving
+ * everybody's tab budget by accident.
+ */
+describe("the connection cap and the per-tab cost are one arithmetic", () => {
+  it("is exactly four league tabs plus a reconnect's worth of headroom", () => {
+    // 4 x 2 = 8 for the honest case (a room, a TV board, a spare tab, one more), + 2 for the
+    // connection a network blip left behind and the server has not reaped yet.
+    expect(REALTIME_CONFIG.maxStreamsPerUser).toBe(4 * REALTIME_CONFIG.streamsPerLeagueTab + 2);
+    // And the budget really is four tabs, not the two the old 8 had quietly become.
+    expect(Math.floor(REALTIME_CONFIG.maxStreamsPerUser / REALTIME_CONFIG.streamsPerLeagueTab)).toBeGreaterThanOrEqual(4);
+  });
+
+  it("counts a league page as exactly the league stream plus the header's notice stream", () => {
+    // If a third mounted stream type appears, this is the assertion that has to be edited, and
+    // editing it is the moment `maxStreamsPerUser` gets reconsidered.
+    expect(REALTIME_CONFIG.streamsPerLeagueTab).toBe(2);
+  });
+});

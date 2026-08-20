@@ -101,12 +101,17 @@ function renderMemberJoined(event: AuditEvent, names: ActivityNames): Rendered {
  * `playerId`, `round` and `pickNumber` are required: without all three there is no honest
  * sentence to render, and the alternative ("undefined drafted undefined") is worse than no row.
  *
- * Which sentence renders is decided by `actorId`, never by the payload's own `auto` flag: a pick
- * the clock made always carries `actorId: null` (`auditEventsForPicks`, `src/draft-service/
- * audit.ts`), and a contested auction pick the clock closes is still attributed to its winning
- * team's owner rather than left actor-less — so `actorId === null` and "the clock did it" are the
- * same fact told two ways, and trusting the one already enforced upstream is simpler than trusting
- * an untyped payload field to agree with it.
+ * Which sentence renders is decided by `actorType`, never by the payload's own `auto` flag and
+ * never by whether `actorId` happens to be null.
+ *
+ * `actorType` is the DERIVED field: `auditEventsForPicks` (`src/draft-service/audit.ts`) sets it
+ * from `pick.auto` and nothing else, so it is the writer's own statement of who acted. `actorId`
+ * is not the same fact. Its expression ends `?? null`, and that fallback is a row the writer
+ * admits it can emit: a contested auction pick whose owner lookup misses (the team row is gone)
+ * carries `actorType: "user"` with `actorId: null`. Branching on the id would render the CLOCK
+ * headline for that row, contradicting the audit event's own statement that a person made the
+ * pick. `names.member(null)` already has an answer for an unresolvable actor ("A former member"),
+ * which is the honest sentence there.
  */
 function renderDraftPick(event: AuditEvent, names: ActivityNames): Rendered | null {
   const { payload, actorId } = event;
@@ -119,7 +124,7 @@ function renderDraftPick(event: AuditEvent, names: ActivityNames): Rendered | nu
   const price = num(payload, "price");
   const detail = `Round ${round}, pick ${pickNumber}.${price === undefined ? "" : ` Won for $${price}.`}`;
 
-  if (actorId !== null) {
+  if (event.actorType !== "system") {
     return { icon: "check", headline: `${names.member(actorId)} drafted ${playerName}.`, detail };
   }
 
@@ -157,6 +162,19 @@ function renderLineupChange(event: AuditEvent): Rendered | null {
  * string, or it does not appear at all. No renderer here interprets `action` codes it was not
  * written for — that would be exactly the kind of guess `ACTIVITY_VISIBILITY`'s doc comment warns
  * against, just moved one level down.
+ *
+ * SO IT RENDERS NOTHING TODAY, AND THAT IS THE POINT — not an oversight, and worth stating plainly
+ * because the shape looks like one. The only `system_action` publisher that exists writes
+ * `{ action, scopes, checkedAt }` (`scripts/verify-audit-chain.ts`'s `recordDetection`), with no
+ * `summary`, so this returns `null` for it. It should: that event says a chain failed
+ * verification, and ruling 8 is explicit that telling a league its record may have been tampered
+ * with, before a human has read the output, is the accusatory failure mode this phase spends a
+ * denylist preventing. What happens next is a decision for the operator reading that output, not
+ * a row in a member's feed.
+ *
+ * A Plan D author reading this: the renderer is INERT until something writes `summary`, and
+ * writing `summary` is how you opt an action into a member-visible sentence you have chosen the
+ * words for. `activity-view.test.ts` pins the real verifier payload rendering as nothing.
  */
 function renderSystemAction(event: AuditEvent): Rendered | null {
   const summary = str(event.payload, "summary");

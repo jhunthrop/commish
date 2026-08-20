@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { AUDIT_EVENT_TYPES, type AuditEvent, type AuditEventType, type JsonObject } from "@/domain/audit";
 import { ACTIVITY_VISIBILITY, activityRowFor, type ActivityVisibility } from "./activity-view";
+import { copyViolations } from "./copy-rules";
 
 const names = {
   member: (id: string | null) => (id === "user_alice" ? "Alice" : id === "user_bob" ? "Bob" : "A former member"),
@@ -41,21 +42,49 @@ const pickPayload: JsonObject = {
   auto: false,
 };
 
-/** One renderable sample per type this plan publishes, INCLUDING both `draft_pick` shapes (human
- *  and clock-made) — the em-dash sweep runs over every sentence this module can actually produce. */
-const EVERY_RENDERABLE_SAMPLE: readonly AuditEvent[] = [
-  event(
-    "league_created",
-    { name: "Sunday Money", format: "redraft", teamCount: 10, stakeTier: "money", isPublicMatchmade: false, experienceTier: "beginner", scoringPreset: "standard" },
-    "user_alice",
-  ),
-  event("member_joined", { teamId: "team_1", via: "invite" }, "user_bob"),
-  event("draft_pick", pickPayload, "user_alice"),
-  event("draft_pick", { ...pickPayload, auto: true }, null),
-  event("draft_completed", { draftId: "d", picks: 120, teams: 10 }, null),
-  event("lineup_change", { teamId: "team_2", weekNumber: 3, starters: [] }, "user_bob"),
-  event("system_action", { action: "lineup_auto_set", summary: "Bob's week 4 lineup was set automatically." }, null),
-];
+/**
+ * A sample payload for every type this plan renders, keyed by type so the SET is derived rather
+ * than listed. `EVERY_RENDERABLE_SAMPLE` below turns it into the sweep's input by reading
+ * `ACTIVITY_VISIBILITY`, which means a type a later plan flips to `"everyone"` is swept the day
+ * it flips, and one flipped without a sample here fails loudly instead of silently going
+ * unswept. That is the property the old hardcoded seven-element array did not have.
+ */
+const SAMPLE_PAYLOADS: Readonly<Record<AuditEventType, readonly { readonly payload: JsonObject; readonly actorId: string | null }[]>> = {
+  league_created: [
+    {
+      payload: { name: "Sunday Money", format: "redraft", teamCount: 10, stakeTier: "money", isPublicMatchmade: false, experienceTier: "beginner", scoringPreset: "standard" },
+      actorId: "user_alice",
+    },
+  ],
+  member_joined: [{ payload: { teamId: "team_1", via: "invite" }, actorId: "user_bob" }],
+  // BOTH `draft_pick` shapes: the one a person submitted and the one the clock made. They are two
+  // different sentences out of one renderer, so one sample would sweep half of it.
+  draft_pick: [
+    { payload: pickPayload, actorId: "user_alice" },
+    { payload: { ...pickPayload, auto: true }, actorId: null },
+  ],
+  draft_completed: [{ payload: { draftId: "d", picks: 120, teams: 10 }, actorId: null }],
+  lineup_change: [{ payload: { teamId: "team_2", weekNumber: 3, starters: [] }, actorId: "user_bob" }],
+  system_action: [{ payload: { action: "lineup_auto_set", summary: "We set Bob's week 4 lineup for him." }, actorId: null }],
+  // Hidden today. A sample is still declared for each so that flipping one to `"everyone"` needs
+  // no second edit here and cannot land unswept; the `Record` over the full union is what forces
+  // a new vocabulary entry to be considered at all.
+  roster_move: [{ payload: {}, actorId: "user_bob" }],
+  trade_proposed: [{ payload: {}, actorId: "user_bob" }],
+  trade_accepted: [{ payload: {}, actorId: "user_bob" }],
+  trade_rejected: [{ payload: {}, actorId: "user_bob" }],
+  flag_raised: [{ payload: {}, actorId: null }],
+  flag_resolved: [{ payload: {}, actorId: null }],
+  admin_action: [{ payload: {}, actorId: null }],
+  session_started: [{ payload: {}, actorId: "user_bob" }],
+  profile_updated: [{ payload: {}, actorId: "user_bob" }],
+  review_removed: [{ payload: {}, actorId: "user_bob" }],
+};
+
+/** Every sentence this module can actually produce, derived from the visibility table itself. */
+const EVERY_RENDERABLE_SAMPLE: readonly AuditEvent[] = (Object.keys(ACTIVITY_VISIBILITY) as readonly AuditEventType[])
+  .filter((type) => ACTIVITY_VISIBILITY[type] !== "hidden")
+  .flatMap((type) => SAMPLE_PAYLOADS[type].map((sample) => event(type, sample.payload, sample.actorId)));
 
 describe("ACTIVITY_VISIBILITY", () => {
   it("decides every event type in the vocabulary", () => {
@@ -124,19 +153,60 @@ describe("activityRowFor", () => {
   });
 
   it("renders a system action from its own summary, which is the contract Plan D writes against", () => {
-    expect(activityRowFor(event("system_action", { action: "lineup_auto_set", summary: "Bob's week 4 lineup was set automatically." }, null), viewer, names)).toMatchObject({
+    expect(activityRowFor(event("system_action", { action: "lineup_auto_set", summary: "We set Bob's week 4 lineup for him." }, null), viewer, names)).toMatchObject({
       icon: "alert-triangle",
-      headline: "Bob's week 4 lineup was set automatically.",
+      headline: "We set Bob's week 4 lineup for him.",
     });
     // No summary, no row. A system action that cannot explain itself does not get a feed entry.
     expect(activityRowFor(event("system_action", { action: "lineup_auto_set" }, null), viewer, names)).toBeNull();
   });
 
-  it("uses no em-dash in any headline or detail it can produce", () => {
+  /**
+   * MEDIUM-1. The only `system_action` publisher that exists writes THIS shape, and it has no
+   * `summary`, so the renderer returns null for it. That is correct and deliberate: the event
+   * says a chain failed verification, and ruling 8 forbids telling a league its record may have
+   * been tampered with before a human has read the output. Pinned with the REAL payload, copied
+   * from `scripts/verify-audit-chain.ts`'s `recordDetection`, so a Plan D author reading the
+   * ledgered residual finds the property asserted rather than assumed.
+   */
+  it("renders nothing for the verifier's own failure event, which is the only system_action written today", () => {
+    const real: JsonObject = { action: "chain_verification_failed", scopes: ["platform"], checkedAt: "2026-08-20T17:00:00.000Z" };
+    expect(activityRowFor(event("system_action", real, null), viewer, names)).toBeNull();
+  });
+
+  /**
+   * MEDIUM-2. `auditEventsForPicks`' `actorId` expression ends `?? null`, and that fallback is a
+   * row it admits it can emit: a contested auction pick whose owner lookup misses. The row says
+   * `actorType: "user"` — a person made this pick — and branching on the id rendered the CLOCK
+   * sentence for it, which contradicts the event's own statement. `actorType` is the derived,
+   * writer-controlled field, and it is what decides the sentence now.
+   */
+  it("keeps the human sentence for a user-attributed pick whose actor id could not be resolved", () => {
+    const orphaned: AuditEvent = { ...event("draft_pick", pickPayload, null), actorType: "user" };
+    expect(activityRowFor(orphaned, viewer, names)).toMatchObject({
+      icon: "check",
+      headline: "A former member drafted Bijan Robinson.",
+    });
+  });
+
+  /**
+   * The SAME rulebook the notice templates are swept against (`copyViolations`, `./copy-rules`),
+   * over a sample set derived from `ACTIVITY_VISIBILITY`. Both surfaces are read by the same
+   * member on the same page; this used to be the dash rule alone while notices got three.
+   */
+  it("breaks none of the house copy rules, in any sentence it can produce", () => {
+    expect(EVERY_RENDERABLE_SAMPLE.length).toBeGreaterThan(0);
     for (const sample of EVERY_RENDERABLE_SAMPLE) {
-      const row = activityRowFor(sample, viewer, names);
-      expect(`${row?.headline ?? ""} ${row?.detail ?? ""}`).not.toMatch(/[—–]/);
+      const row = activityRowFor(sample, { userId: sample.actorId ?? viewer.userId }, names);
+      expect(row).not.toBeNull();
+      expect(copyViolations(`${row?.headline ?? ""} ${row?.detail ?? ""}`)).toEqual([]);
     }
+  });
+
+  it("sweeps every non-hidden type, so a type flipped visible cannot land unswept", () => {
+    const swept = new Set(EVERY_RENDERABLE_SAMPLE.map((sample) => sample.eventType));
+    const visible = (Object.keys(ACTIVITY_VISIBILITY) as readonly AuditEventType[]).filter((type) => ACTIVITY_VISIBILITY[type] !== "hidden");
+    expect([...swept].sort()).toEqual([...visible].sort());
   });
 });
 

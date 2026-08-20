@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { INTEGRITY_CONFIG } from "./config";
+import { copyViolations } from "./copy-rules";
 import { NOTICE_SAMPLES, NOTICE_TEMPLATES, renderNotice, type NoticeType } from "./notices";
 
 const TYPES = Object.keys(NOTICE_TEMPLATES) as readonly NoticeType[];
@@ -13,37 +13,19 @@ describe("NOTICE_TEMPLATES", () => {
     }
   });
 
-  it("never accuses the member of anything", () => {
-    // The spec's denylist check. It runs over OUR words, rendered with a neutral sample context:
-    // the one place member-visible text comes from outside this file is the operator's own
-    // removal reason, which is quoted verbatim on purpose (the same call `removalPhraseFor`
-    // already made in Phase 2) and must not be silently filtered.
+  /**
+   * ONE RULEBOOK, applied here and to the activity feed's headlines by the same function. It used
+   * to be two: notice templates got the accusatory, passive and dash sweeps, and activity
+   * headlines got the dash sweep alone. `copyViolations` (`./copy-rules`) is the single
+   * implementation; `activity-view.test.ts` runs the identical loop over its own surface.
+   *
+   * `TYPES` is derived from `NOTICE_TEMPLATES`, so a template Plans B, C or D add is swept the
+   * day it lands, and a type with no `NOTICE_SAMPLES` entry does not compile.
+   */
+  it("breaks none of the house copy rules, for any type this product can send", () => {
     for (const type of TYPES) {
       const { title, body } = renderNotice(type, NOTICE_SAMPLES[type]);
-      const text = `${title} ${body}`.toLowerCase();
-      for (const term of INTEGRITY_CONFIG.notices.accusatoryTerms) {
-        expect(text).not.toContain(term);
-      }
-    }
-  });
-
-  it("uses no em-dash, because this file is nothing but user-facing copy", () => {
-    for (const type of TYPES) {
-      const { title, body } = renderNotice(type, NOTICE_SAMPLES[type]);
-      expect(`${title} ${body}`).not.toMatch(/[—–]/);
-    }
-  });
-
-  // Fix round 1, FIX 6: the founder's active-voice rule, beside the em-dash and denylist
-  // sweeps above so a future template that slips back into "was made"/"was removed"/"is kept"
-  // fails mechanically rather than waiting for a reviewer to reread the copy.
-  it("never uses a passive construction — the platform names itself as the one who acted", () => {
-    for (const type of TYPES) {
-      const { title, body } = renderNotice(type, NOTICE_SAMPLES[type]);
-      const text = `${title} ${body}`.toLowerCase();
-      for (const phrase of INTEGRITY_CONFIG.notices.passiveConstructions) {
-        expect(text).not.toContain(phrase);
-      }
+      expect(copyViolations(`${title} ${body}`)).toEqual([]);
     }
   });
 
