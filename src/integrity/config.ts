@@ -78,4 +78,15 @@ export const INTEGRITY_CONFIG = {
      */
     rateLimit: { maxRequests: 30, windowMs: 60_000 },
   },
+  moderation: {
+    /**
+     * `resolveFlag`'s cap on an operator's own words (`Task 3`). The same order of magnitude as
+     * `REVIEW_CONFIG.removalReason.maxLength` (200), widened because a resolution note is free
+     * prose an operator writes to explain a real decision — not a short pick from a fixed reason
+     * list — and it is quoted to the member VERBATIM (`operator_warning`'s blockquote), so it
+     * needs room to actually explain something. Enforced in `resolveFlag` itself, the same "the
+     * service is the real boundary, not only the schema" discipline `removeReview` uses.
+     */
+    noteMaxLength: 500,
+  },
 } as const;

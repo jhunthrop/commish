@@ -1,11 +1,15 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import type { DbTx } from "@/db/client";
-import { auditEvents, integrityFlags, leagues, memberNotices, users } from "@/db/schema";
+import type { Db, DbTx } from "@/db/client";
+import { auditEvents, chatMessages, integrityFlags, leagues, memberNotices, reviews, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
+import type { AuditEventType } from "@/domain/audit";
+import { copyViolations } from "@/integrity/copy-rules";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
+import type { FlagType } from "@/integrity/flags";
 import { createAuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
-import { BOOTSTRAP_ACTOR, grantAdmin, raiseFlag } from "./flags";
+import { BOOTSTRAP_ACTOR, grantAdmin, raiseFlag, resolveFlag } from "./flags";
 
 const db = createTestDb();
 const NOW = "2026-08-20T18:00:00.000Z";
@@ -347,5 +351,359 @@ describe("raiseFlag", () => {
         audit: logger,
       }),
     ).rejects.toThrow("raiseFlag conflicted on an open flag for chat_message:msg_ghost that is no longer there.");
+  });
+});
+
+describe("resolveFlag", () => {
+  let flagSeq = 0;
+
+  beforeEach(() => {
+    flagSeq = 0;
+  });
+
+  async function ensureUser(id: string): Promise<void> {
+    await db.insert(users).values({ id, email: `${id}@test.local`, displayName: id }).onConflictDoNothing();
+  }
+
+  async function ensureLeague(id: string, commissionerUserId: string): Promise<void> {
+    await ensureUser(commissionerUserId);
+    await db.insert(leagues).values({ id, name: id, format: "snake", teamCount: 10, commissionerUserId }).onConflictDoNothing();
+  }
+
+  interface OpenFlagOptions {
+    readonly flagType: FlagType;
+    readonly subjectAuthor?: string;
+    readonly leagueId?: string;
+  }
+
+  /**
+   * Raises a real, OPEN flag whose subject is a real row — a chat message or a review — so
+   * `resolveFlag`'s member lookup (`affectedMemberFor`) has something real to find rather than a
+   * bare id nothing backs. `multi_account` and `trade_fairness` get a bare subject id instead,
+   * since neither has a content row this plan's decisions ever remove or notice the author of.
+   */
+  async function openFlag(opts: OpenFlagOptions): Promise<{ readonly id: string }> {
+    flagSeq += 1;
+    const author = opts.subjectAuthor ?? `u_subject_${flagSeq}`;
+    await ensureUser(author);
+
+    let subjectId: string;
+    let leagueId: string | null = null;
+    if (opts.flagType === "review_report") {
+      subjectId = `review_${flagSeq}`;
+      await db.insert(reviews).values({ id: subjectId, userId: author, rating: 4, body: `review body ${flagSeq}`, createdAt: new Date(NOW), updatedAt: new Date(NOW) });
+    } else if (opts.flagType === "chat_report") {
+      leagueId = opts.leagueId ?? `lg_auto_${flagSeq}`;
+      await ensureLeague(leagueId, author);
+      const [message] = await db.insert(chatMessages).values({ leagueId, authorUserId: author, body: `message ${flagSeq}` }).returning({ id: chatMessages.id });
+      subjectId = String(message!.id);
+    } else if (opts.flagType === "multi_account") {
+      subjectId = `${author}_pair_${flagSeq}`;
+      if (opts.leagueId !== undefined) {
+        leagueId = opts.leagueId;
+        await ensureLeague(leagueId, author);
+      }
+    } else {
+      subjectId = `trade_${flagSeq}`;
+    }
+
+    const flagId = `flag_resolve_${flagSeq}`;
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: opts.flagType,
+        subjectId,
+        leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: NOW,
+        newId: () => flagId,
+        audit: logger,
+      }),
+    );
+    return { id: flagId };
+  }
+
+  async function noticesFor(userId: string) {
+    return db.select().from(memberNotices).where(eq(memberNotices.userId, userId));
+  }
+
+  async function auditEventsOn(scope: string, eventType: AuditEventType) {
+    return db.select().from(auditEvents).where(and(eq(auditEvents.chainScope, scope), eq(auditEvents.eventType, eventType)));
+  }
+
+  it("records a decision, stamps the flag once, and writes the audit event that IS the record", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "review_report" });
+
+    const result = await resolveFlag(db, {
+      flagId: flag.id,
+      decision: "no_action",
+      note: "Two reports, both from the same league, review reads as a real opinion.",
+      operatorUserId: "u_op",
+    });
+    expect(result.ok).toBe(true);
+
+    const events = await auditEventsOn("platform", "flag_resolved");
+    expect(events).toHaveLength(1);
+    expect(events[0]!.payload).toMatchObject({ flagId: flag.id, decision: "no_action" });
+    expect(events[0]!.actorId).toBe("u_op");
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row).toMatchObject({ resolvedByUserId: "u_op", resolution: "no_action", resolutionNote: "Two reports, both from the same league, review reads as a real opinion." });
+    expect(row!.resolvedAt).not.toBeNull();
+  });
+
+  it("refuses a second decision on the same flag, and says which one already stands", async () => {
+    await ensureUser("u_op");
+    await ensureUser("u_two");
+    const flag = await openFlag({ flagType: "review_report" });
+
+    await resolveFlag(db, { flagId: flag.id, decision: "no_action", note: "n", operatorUserId: "u_op" });
+    const second = await resolveFlag(db, { flagId: flag.id, decision: "warned_user", note: "n", operatorUserId: "u_two" });
+
+    expect(second).toEqual({ ok: false, status: 409, reason: 'That flag was already resolved as "no action". A different decision is a new flag, not an edit.' });
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(1);
+  });
+
+  it("serializes two operators resolving at the same instant, and exactly one wins", async () => {
+    // The guard is in the UPDATE's own WHERE. A prior read would let both pass it.
+    await ensureUser("u_op1");
+    await ensureUser("u_op2");
+    const flag = await openFlag({ flagType: "chat_report", subjectAuthor: "u_member_race", leagueId: "lg_race" });
+
+    const [a, b] = await Promise.all([
+      resolveFlag(db, { flagId: flag.id, decision: "no_action", note: "n", operatorUserId: "u_op1" }),
+      resolveFlag(db, { flagId: flag.id, decision: "warned_user", note: "n", operatorUserId: "u_op2" }),
+    ]);
+    expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1);
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(1);
+  });
+
+  it("refuses a decision no plan in this phase owns", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "review_report" });
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "trade_reversed", note: "n", operatorUserId: "u_op" });
+    expect(result).toEqual({ ok: false, status: 400, reason: "This product can't reverse a trade yet." });
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  it("tells the member in the operator's own words when the decision is a warning", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "chat_report", subjectAuthor: "u_member", leagueId: "lg_1" });
+
+    await resolveFlag(db, { flagId: flag.id, decision: "warned_user", note: "Keep the trash talk about the teams.", operatorUserId: "u_op" });
+
+    const [notice] = await noticesFor("u_member");
+    expect(notice!.noticeType).toBe("operator_warning");
+    expect(notice!.context).toMatchObject({ note: "Keep the trash talk about the teams." });
+    expect(copyViolations(`${notice!.title} ${notice!.body}`)).toEqual([]);
+    expect(notice!.auditEventId).not.toBeNull();
+  });
+
+  it("tells NOBODY when the decision is no_action", async () => {
+    // Ruling 6, and the one deliberate exception to this plan's own rule that every operator
+    // action notices the affected member. An investigation that closed with nothing happening is
+    // not an event in that member's life, and "we looked into you and found nothing" is precisely
+    // the accusation INTEGRITY_CONFIG.notices.accusatoryTerms exists to keep out of this product.
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "multi_account", subjectAuthor: "u_member2" });
+
+    await resolveFlag(db, { flagId: flag.id, decision: "no_action", note: "Roommates. Same wifi, different drafts.", operatorUserId: "u_op" });
+
+    expect(await noticesFor("u_member2")).toEqual([]);
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(1); // the record still exists
+  });
+
+  it("refuses a note past the length cap, before opening a transaction", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "review_report" });
+    const tooLong = "x".repeat(INTEGRITY_CONFIG.moderation.noteMaxLength + 1);
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "no_action", note: tooLong, operatorUserId: "u_op" });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: `Keep the note to ${INTEGRITY_CONFIG.moderation.noteMaxLength} characters or fewer. The member reads it.`,
+    });
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row!.resolvedAt).toBeNull();
+  });
+
+  it("refuses a flagId that doesn't exist, distinctly from an already-resolved one", async () => {
+    await ensureUser("u_op");
+    const result = await resolveFlag(db, { flagId: "flag_ghost", decision: "no_action", note: "n", operatorUserId: "u_op" });
+    expect(result).toEqual({ ok: false, status: 404, reason: 'No flag with id "flag_ghost".' });
+  });
+
+  it("notices a review's own author, falling back to a generic league name for a leagueless flag", async () => {
+    // Reviews are platform-scoped (no league), so this is also the leagueId === null branch of
+    // the notice's own leagueName lookup — a combination no caller exercises today, but the
+    // notice-composing code must not crash if an operator ever picks it.
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "review_report", subjectAuthor: "u_reviewer" });
+
+    await resolveFlag(db, { flagId: flag.id, decision: "warned_user", note: "Keep it about the platform, not other members.", operatorUserId: "u_op" });
+
+    const [notice] = await noticesFor("u_reviewer");
+    expect(notice!.noticeType).toBe("operator_warning");
+    expect(notice!.leagueId).toBeNull();
+    expect(notice!.context).toMatchObject({ leagueName: "your league", note: "Keep it about the platform, not other members." });
+  });
+
+  it("throws rather than guess who to notice for a subject with no single affected member", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "multi_account", subjectAuthor: "u_pair_a" });
+
+    await expect(
+      resolveFlag(db, { flagId: flag.id, decision: "warned_user", note: "n", operatorUserId: "u_op" }),
+    ).rejects.toThrow('resolveFlag: "account_pair" has no single affected member to notice.');
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row!.resolvedAt).toBeNull(); // the throw rolled the stamp back with it
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  it("refuses content_removed today — no remover is wired yet, and the stamp rolls back with it", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "chat_report", subjectAuthor: "u_member3", leagueId: "lg_cr" });
+
+    await expect(
+      resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op" }),
+    ).rejects.toThrow('resolveFlag: content_removed has no remover wired for subject type "chat_message" yet (Tasks 4 and 6 land these).');
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row!.resolvedAt).toBeNull();
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  it("rolls back the stamp when the audit append fails — ruling 4, the same guard every prior site holds", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "review_report" });
+    const brokenAudit = { ...logger, record: async () => { throw new Error("audit append failed"); } };
+
+    await expect(
+      resolveFlag(db, { flagId: flag.id, decision: "no_action", note: "n", operatorUserId: "u_op", audit: brokenAudit }),
+    ).rejects.toThrow("audit append failed");
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row!.resolvedAt).toBeNull();
+  });
+
+  it("rolls back the stamp and the notice when the notice write fails — the notice-before-anchor lock order still commits atomically", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "chat_report", subjectAuthor: "u_member4", leagueId: "lg_notify_fail" });
+    const brokenNotify: typeof notifyAffectedMember = async () => {
+      throw new Error("notice write failed");
+    };
+
+    await expect(
+      resolveFlag(db, { flagId: flag.id, decision: "warned_user", note: "n", operatorUserId: "u_op", notify: brokenNotify }),
+    ).rejects.toThrow("notice write failed");
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row!.resolvedAt).toBeNull();
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  /**
+   * `alreadyResolvedOrMissing`'s impossible-state guard. Real Postgres cannot reach it: `resolution`
+   * is set atomically with `resolved_at` in the same statement, so a resolved row always carries a
+   * recognizable decision. A stub `Db`/`DbTx` pair is the only way to put the code in the state it
+   * defends against — same shape as `raiseFlag`'s `existingOpenFlagFor` guard above.
+   */
+  it("refuses to invent a decision label when a resolved flag's own resolution is unrecognizable", async () => {
+    const stubTx = {
+      update: () => ({ set: () => ({ where: () => ({ returning: async () => [] }) }) }),
+      select: () => ({ from: () => ({ where: async () => [{ resolution: "not_a_real_decision" }] }) }),
+    } as unknown as DbTx;
+    const stubDb = { transaction: (fn: (tx: DbTx) => Promise<unknown>) => fn(stubTx) } as unknown as Db;
+
+    await expect(
+      resolveFlag(stubDb, { flagId: "flag_ghost", decision: "no_action", note: "n", operatorUserId: "u_op" }),
+    ).rejects.toThrow('resolveFlag: flag "flag_ghost" is resolved with no recognizable decision recorded — this should be impossible.');
+  });
+
+  /**
+   * `affectedMemberFor`'s and `leagueNameForFlag`'s own impossible-state guards. Neither `reviews`
+   * nor `chat_messages` carries a foreign key back from `integrity_flags.subject_id` (it is plain
+   * text, not a reference — see the schema's own docblock), so a stamped flag whose subject row is
+   * gone is not provably impossible the way an already-resolved flag with no decision is. Real
+   * callers never hit this (nothing in this product hard-deletes a review or a chat message), but
+   * the lookup must not crash confusingly if one ever does — proved here with a stub `Db`/`DbTx`
+   * pair, same discipline as the guard immediately above.
+   */
+  function stubbedResolveRow(overrides: Partial<Record<string, unknown>>): Record<string, unknown> {
+    return {
+      id: "flag_stub",
+      flagType: "chat_report",
+      subjectType: "chat_message",
+      subjectId: "999",
+      leagueId: null,
+      resolvedAt: new Date(NOW),
+      resolvedByUserId: "u_op",
+      resolution: "warned_user",
+      resolutionNote: "n",
+      ...overrides,
+    };
+  }
+
+  /** A `DbTx` stub whose stamp `UPDATE` always "succeeds", and whose `SELECT`s answer by table. */
+  function stubTxFor(row: Record<string, unknown>, answers: { readonly reviewAuthor?: string; readonly chatAuthor?: string; readonly leagueName?: string }): DbTx {
+    return {
+      update: () => ({ set: () => ({ where: () => ({ returning: async () => [row] }) }) }),
+      select: () => ({
+        from: (table: unknown) => ({
+          where: async () => {
+            if (table === reviews) return answers.reviewAuthor === undefined ? [] : [{ userId: answers.reviewAuthor }];
+            if (table === chatMessages) return answers.chatAuthor === undefined ? [] : [{ authorUserId: answers.chatAuthor }];
+            if (table === leagues) return answers.leagueName === undefined ? [] : [{ name: answers.leagueName }];
+            return [];
+          },
+        }),
+      }),
+    } as unknown as DbTx;
+  }
+
+  function stubDbFor(tx: DbTx): Db {
+    return { transaction: (fn: (tx: DbTx) => Promise<unknown>) => fn(tx) } as unknown as Db;
+  }
+
+  it("throws rather than notice a ghost when a review named as a flag's subject is somehow gone", async () => {
+    const row = stubbedResolveRow({ flagType: "review_report", subjectType: "review", subjectId: "review_ghost" });
+    const stubDb = stubDbFor(stubTxFor(row, {}));
+
+    await expect(
+      resolveFlag(stubDb, { flagId: "flag_stub", decision: "warned_user", note: "n", operatorUserId: "u_op" }),
+    ).rejects.toThrow('resolveFlag: no review "review_ghost" for a flag that named it as the subject.');
+  });
+
+  it("throws rather than notice a ghost when a chat message named as a flag's subject is somehow gone", async () => {
+    const row = stubbedResolveRow({ subjectId: "999" });
+    const stubDb = stubDbFor(stubTxFor(row, {}));
+
+    await expect(
+      resolveFlag(stubDb, { flagId: "flag_stub", decision: "warned_user", note: "n", operatorUserId: "u_op" }),
+    ).rejects.toThrow('resolveFlag: no chat message "999" for a flag that named it as the subject.');
+  });
+
+  it("falls back to the leagueId itself when a flag's own league row is somehow gone", async () => {
+    // No FK is missing here — `integrity_flags.league_id` really does reference `leagues` — but
+    // the fallback exists for the same "must not crash" reason as the two tests above, so it is
+    // proved the same way. `notify` is stubbed to CAPTURE the composed context and then stop
+    // execution before it (or the real `audit.record` after it) would need a fuller stub tx.
+    let capturedLeagueName: unknown;
+    const spyNotify: typeof notifyAffectedMember = async (_tx, input) => {
+      capturedLeagueName = (input.context as { readonly leagueName?: unknown }).leagueName;
+      throw new Error("test probe stop");
+    };
+    const row = stubbedResolveRow({ leagueId: "lg_ghost" });
+    const stubDb = stubDbFor(stubTxFor(row, { chatAuthor: "u_member" }));
+
+    await expect(
+      resolveFlag(stubDb, { flagId: "flag_stub", decision: "warned_user", note: "n", operatorUserId: "u_op", notify: spyNotify }),
+    ).rejects.toThrow("test probe stop");
+    expect(capturedLeagueName).toBe("lg_ghost");
   });
 });

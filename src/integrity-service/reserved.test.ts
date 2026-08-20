@@ -32,8 +32,10 @@ const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "p
   // not a second one. Moved to "plan-a" territory the same way `admin_action` was in Task 1 — the
   // value marks PUBLISHED, not "written by Plan A" specifically.
   flag_raised: "plan-a",
-  // Task 3 resolves what Task 2 raises and lands `flag_resolved`'s first (and only) publisher.
-  flag_resolved: "plan-b",
+  // Task 3 resolves what Task 2 raises and lands `flag_resolved`'s first (and only) publisher:
+  // `resolveFlag` (`src/integrity-service/flags.ts`). Moved to "plan-a" territory the same way
+  // `flag_raised` was in Task 2 — the value marks PUBLISHED, not "written by Plan A" specifically.
+  flag_resolved: "plan-a",
   // Task 1 lands the first (and, per ruling 15, the ONLY) publisher: `grantAdmin`
   // (`src/integrity-service/flags.ts`), called exclusively from `scripts/grant-admin.ts` and from
   // the seed's own bootstrap grant. Moved to "plan-a" territory the same way this comment block

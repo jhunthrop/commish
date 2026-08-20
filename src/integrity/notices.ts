@@ -41,6 +41,19 @@ export interface NoticeContexts {
   readonly admin_granted: {
     readonly grantedByUserId: string;
   };
+  /**
+   * `resolveFlag`'s `warned_user` decision (Task 3): a report stays up, but the operator leaves
+   * the author their own words. `note` is free text, the operator's own — NOT bound by this
+   * file's denylist (that rulebook binds PLATFORM copy, the templates below; a quote is not the
+   * platform's voice) — bound instead by `INTEGRITY_CONFIG.moderation.noteMaxLength`, the same
+   * "the service enforces its own boundary" discipline `REVIEW_CONFIG.removalReason.maxLength`
+   * uses. `leagueName` is carried separately so the template can say WHERE without the operator
+   * having to.
+   */
+  readonly operator_warning: {
+    readonly leagueName: string;
+    readonly note: string;
+  };
 }
 
 export type NoticeType = keyof NoticeContexts;
@@ -70,6 +83,15 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
     title: "You can now use the operator tools",
     body: "Someone with database access turned on operator access for your account. You can open the dispute queue from your account menu. Every decision you record there carries your name and cannot be taken back.",
   }),
+  // `note` is stored on the row (`context.note`) but deliberately unused HERE, for the same
+  // reason `review_removed`'s `reason` is: the operator's own words travel as their own field on
+  // the wire (`quoteFor`), rendered as a distinct blockquote rather than folded into this
+  // sentence. The last sentence is founder decision #4, stated rather than implied: there is no
+  // appeal path, and a notice that stays silent about that invites a member to go looking for one.
+  operator_warning: ({ leagueName }) => ({
+    title: "An operator left you a note",
+    body: `Somebody reported something you posted in ${leagueName}. An operator read it, decided to leave your post up, and wrote you this note. There is no reply to this message.`,
+  }),
 };
 
 /** One neutral context per type, so the denylist and em-dash checks have something to render. */
@@ -77,6 +99,7 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   draft_auto_picked: { leagueName: "Sunday Money", pickNumber: 24, playerName: "Bijan Robinson", position: "RB" },
   review_removed: { reason: "off topic" },
   admin_granted: { grantedByUserId: "bootstrap" },
+  operator_warning: { leagueName: "Sunday Money", note: "Keep the trash talk about the teams." },
 };
 
 export function renderNotice<T extends NoticeType>(type: T, context: NoticeContexts[T]): RenderedNotice {

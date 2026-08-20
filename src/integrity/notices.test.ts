@@ -45,11 +45,20 @@ describe("NOTICE_TEMPLATES", () => {
     expect(granted.body).toBe(
       "Someone with database access turned on operator access for your account. You can open the dispute queue from your account menu. Every decision you record there carries your name and cannot be taken back.",
     );
+
+    // The operator's own `note` is deliberately absent from `body` here — it renders as its own
+    // blockquote (`quoteFor`), not folded into the platform's sentence.
+    const warned = renderNotice("operator_warning", NOTICE_SAMPLES.operator_warning);
+    expect(warned.title).toBe("An operator left you a note");
+    expect(warned.body).toBe(
+      "Somebody reported something you posted in Sunday Money. An operator read it, decided to leave your post up, and wrote you this note. There is no reply to this message.",
+    );
+    expect(warned.body).not.toContain("Keep the trash talk");
   });
 
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
-    expect([...TYPES].sort()).toEqual(["admin_granted", "draft_auto_picked", "review_removed"]);
+    expect([...TYPES].sort()).toEqual(["admin_granted", "draft_auto_picked", "operator_warning", "review_removed"]);
   });
 });

@@ -211,11 +211,22 @@ export async function listNotices(db: Db, userId: string): Promise<NoticesPage> 
  * row read back from Postgres) reads as no quote at all — the same discipline `activityRowFor`'s
  * payload readers use. Exported so the route and the page share one definition rather than two
  * copies agreeing by coincidence.
+ *
+ * `operator_warning` (Task 3) is the second quoting type: `context.note` is the operator's OWN
+ * words, not a stored token to map through a phrase table — it renders VERBATIM, which is the
+ * whole reason `resolveFlag` bounds its length instead of its vocabulary. Same narrowing
+ * discipline as `reason` above: a row whose `note` is missing or not a string reads as no quote.
  */
 export function quoteFor(notice: MemberNotice): string | null {
-  if (notice.noticeType !== "review_removed") return null;
-  const reason = notice.context.reason;
-  return typeof reason === "string" ? removalPhraseFor(reason) : null;
+  if (notice.noticeType === "review_removed") {
+    const reason = notice.context.reason;
+    return typeof reason === "string" ? removalPhraseFor(reason) : null;
+  }
+  if (notice.noticeType === "operator_warning") {
+    const note = notice.context.note;
+    return typeof note === "string" ? note : null;
+  }
+  return null;
 }
 
 export interface MarkNoticesReadInput {

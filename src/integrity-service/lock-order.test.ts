@@ -1,12 +1,12 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, leagues, memberNotices, users } from "@/db/schema";
+import { auditChains, chatMessages, leagues, memberNotices, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { joinLeagueInTx } from "@/league-service/join";
-import { raiseFlag } from "./flags";
+import { raiseFlag, resolveFlag } from "./flags";
 import type { DraftPoolEntry } from "@/domain/draft";
 import { players } from "@/db/schema";
 
@@ -36,6 +36,7 @@ import { players } from "@/db/schema";
 const joinDb = createTestDb();
 const pickDb = createTestDb();
 const flagDb = createTestDb();
+const resolveDb = createTestDb();
 
 /**
  * Waits until some backend on this database is genuinely blocked on a lock.
@@ -270,5 +271,97 @@ describe("raiseFlag's insert order", () => {
     // The platform chain holds only the flag — proof the two really did land on separate chains.
     const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
     expect(platformAnchor!.headSequence).toBe(1);
+  });
+});
+
+/**
+ * Task 3's own transaction in this proof. `resolveFlag`'s `warned_user` branch inserts a member
+ * notice BEFORE its anchor, exactly like `raiseFlag`'s insert above and `grantAdmin`'s grant
+ * branch — the same implicit `leagues FOR KEY SHARE` a concurrent join might be holding
+ * `FOR UPDATE`. This drives a real join and a real flag RESOLUTION (on a real chat message, with
+ * a real author to notice) against the SAME league on two connections, with the join parked
+ * exactly where the cycle used to sit, and asserts no deadlock plus the correct chain split: the
+ * league chain holds only the join, the platform chain holds the setup's `flag_raised` and this
+ * transaction's own `flag_resolved`.
+ */
+describe("resolveFlag's notice order", () => {
+  it("lets a join and a flag resolution in the same league run concurrently without deadlocking", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_commish_resolve", email: "commish_resolve@test.local", displayName: "Commish" },
+      { id: "user_joiner_resolve", email: "joiner_resolve@test.local", displayName: "Joiner" },
+      { id: "u_member_resolve", email: "member_resolve@test.local", displayName: "Member" },
+      { id: "u_op_resolve", email: "op_resolve@test.local", displayName: "Operator" },
+    ]);
+    await joinDb.insert(leagues).values({
+      id: "league_resolve_lock",
+      name: "League Resolve Lock",
+      format: "snake",
+      teamCount: 2,
+      commissionerUserId: "u_commish_resolve",
+    });
+    const [message] = await joinDb
+      .insert(chatMessages)
+      .values({ leagueId: "league_resolve_lock", authorUserId: "u_member_resolve", body: "hello" })
+      .returning({ id: chatMessages.id });
+    const flag = await joinDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "chat_report",
+        subjectId: String(message!.id),
+        leagueId: "league_resolve_lock",
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => "flag_resolve_lock_1",
+      }),
+    );
+
+    let holdsLeagueLock: () => void = () => {};
+    const leagueLocked = new Promise<void>((resolve) => (holdsLeagueLock = resolve));
+    let releaseJoin: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseJoin = resolve));
+
+    // T_join: parked right after `leagues[X] FOR UPDATE`, exactly as in the pairs above.
+    const joining = joinDb.transaction((tx) =>
+      joinLeagueInTx(
+        tx,
+        { leagueId: "league_resolve_lock", userId: "user_joiner_resolve", newId: () => "team_joiner_resolve", via: "public_browse", occurredAt: clock.now() },
+        async () => {
+          holdsLeagueLock();
+          await parked;
+          return null;
+        },
+      ),
+    );
+    await leagueLocked;
+
+    // T_resolve: the real resolveFlag, `warned_user` branch, on its own connection, reaching for
+    // the SAME league row through its notice insert.
+    const resolving = resolveFlag(resolveDb, {
+      flagId: flag.id,
+      decision: "warned_user",
+      note: "Keep the trash talk about the teams.",
+      operatorUserId: "u_op_resolve",
+    });
+
+    // T_resolve has to have genuinely blocked on `leagues[X]` before T_join is let go, or
+    // releasing T_join proves nothing about the two ever contending at all.
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseJoin();
+
+    const joined = await joining;
+    const resolved = await resolving;
+    expect(joined).toMatchObject({ ok: true, alreadyMember: false });
+    expect(resolved.ok).toBe(true);
+
+    // The league chain holds only the join's `member_joined` — `flag_resolved` never reaches it.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "league_resolve_lock"));
+    expect(leagueAnchor!.headSequence).toBe(1);
+    // The platform chain holds the setup's `flag_raised` AND this transaction's `flag_resolved`.
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(2);
+
+    // And the notice resolveFlag wrote before the anchor still names the event minted after it.
+    const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_member_resolve"));
+    expect(notice?.auditEventId).not.toBeNull();
   });
 });

@@ -268,4 +268,24 @@ describe("quoteFor", () => {
   it("is null for any other notice type", async () => {
     expect(quoteFor(await seedOneNotice())).toBeNull();
   });
+
+  it("renders the operator's own note VERBATIM for operator_warning, not through a mapper", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "operator_warning",
+      title: "An operator left you a note", body: "...",
+      context: { leagueName: "Sunday Money", note: "Keep the trash talk about the teams." },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBe("Keep the trash talk about the teams.");
+  });
+
+  it("is null for an operator_warning notice whose context note is not a string", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "operator_warning",
+      title: "An operator left you a note", body: "...",
+      context: { leagueName: "Sunday Money" },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBeNull();
+  });
 });
