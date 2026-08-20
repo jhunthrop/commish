@@ -7,6 +7,7 @@ import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { decisionIsAvailable, RESOLUTION_DECISIONS, SUBJECT_OF, type FlagSubjectType, type FlagType, type ResolutionDecision } from "@/integrity/flags";
 import type { NoticeType } from "@/integrity/notices";
 import { removeReviewInTx } from "@/review-service/reviews";
+import { REVIEW_CONFIG } from "@/reviews/config";
 import { attachAuditEvent, notifyAffectedMember } from "./notify";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
 
@@ -324,8 +325,8 @@ class ContentRemovalRefused extends Error {
  * own transaction, passing the operator as `removedByUserId` and the operator's note as the
  * removal reason — `removeReviewInTx` already writes its own `review_removed` audit event and its
  * own `review_removed` notice, and nothing about that path changes here, which is the whole
- * reason Phase 2 built it as a stamp. `chat_message` stays unwired until Task 6 lands
- * `chat-service`'s sibling the same way, by extending this function again.
+ * reason Phase 2 built it as a stamp. `chat_message` is the one subject type still unwired —
+ * Task 6 lands `chat-service`'s sibling the same way, by extending this function again.
  *
  * A refusal from `removeReviewInTx` (already removed, or a ghost id) is re-thrown as
  * `ContentRemovalRefused` rather than returned — see that class's own docblock — so `resolveFlag`
@@ -366,7 +367,7 @@ async function removeSubject(
     if (!result.ok) throw new ContentRemovalRefused(409, result.reason);
     return;
   }
-  throw new Error(`resolveFlag: content_removed has no remover wired for subject type "${subjectType}" yet (Tasks 4 and 6 land these).`);
+  throw new Error(`resolveFlag: content_removed has no remover wired for subject type "${subjectType}" yet (Task 6 lands it).`);
 }
 
 /**
@@ -422,9 +423,11 @@ async function leagueNameForFlag(tx: DbTx, leagueId: string | null): Promise<str
  * than silently overwriting the first.
  *
  * ONCE: refuses outright (before any write) a decision no plan in this phase owns
- * (`decisionIsAvailable`), and refuses a note past `INTEGRITY_CONFIG.moderation.noteMaxLength` —
- * both checked before the transaction opens, the same "fail fast, no partial write" shape
- * `removeReview`'s own reason-length check uses.
+ * (`decisionIsAvailable`), a `content_removed` note past `REVIEW_CONFIG.removalReason.maxLength`
+ * (the tighter removal-reason cap, checked first since it is the one the note is ACTUALLY bound
+ * by on that branch), and a note past `INTEGRITY_CONFIG.moderation.noteMaxLength` otherwise — all
+ * three checked before the transaction opens, the same "fail fast, no partial write" shape
+ * `removeReviewInTx`'s own reason-length check uses.
  *
  * THE AUDIT EVENT IS THE RECORD: `flag_resolved`, on the PLATFORM chain (ruling 1, never the
  * league's — a record about a person under review is not the league's business), inside the SAME
@@ -443,6 +446,18 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
     // this message alongside it — the same obligation `DECISION_OWNER`'s own docblock places on
     // that commit.
     return { ok: false, status: 400, reason: "This product can't reverse a trade yet." };
+  }
+  // `content_removed`'s note becomes a REMOVAL REASON (`removeSubject` passes it straight through
+  // as `removeReviewInTx`'s `reason`), not an `operator_warning` notice body — so it is bound by
+  // `REVIEW_CONFIG.removalReason.maxLength` (200), the tighter cap `removeReviewInTx` itself
+  // enforces, not the looser `INTEGRITY_CONFIG.moderation.noteMaxLength` (500) below. Checked HERE,
+  // with PRODUCT copy, before any write: without this, a 201-500 char note passed the general cap
+  // just below, reached `removeReviewInTx` inside the transaction, and surfaced the CLI-flavored
+  // `"--reason must be … characters or fewer."` — written for `scripts/remove-review.ts`'s
+  // operator, not for whatever calls `resolveFlag`. That script's own door is untouched: it still
+  // calls `removeReviewInTx` directly and still gets that exact message.
+  if (input.decision === "content_removed" && input.note.length > REVIEW_CONFIG.removalReason.maxLength) {
+    return { ok: false, status: 400, reason: `Notes on a removal are limited to ${REVIEW_CONFIG.removalReason.maxLength} characters.` };
   }
   if (input.note.length > INTEGRITY_CONFIG.moderation.noteMaxLength) {
     return { ok: false, status: 400, reason: `Keep the note to ${INTEGRITY_CONFIG.moderation.noteMaxLength} characters or fewer. The member reads it.` };

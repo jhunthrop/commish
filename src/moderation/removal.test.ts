@@ -57,8 +57,10 @@ describe("the removal vocabulary's one home", () => {
   });
 
   it("narrows REMOVAL_REASON_VALUES from string to the closed union", () => {
-    // The shipped array is typed `readonly string[]`, which widens and lets a typo past the
-    // compiler at every call site. `isRemovalReason` is the guard the script and the route both use.
+    // `@/reviews/config`'s re-exported array is deliberately widened back to `readonly string[]`
+    // (so `scripts/remove-review.ts`'s own `.includes` check keeps compiling unchanged) — THIS
+    // one stays narrow, and `isRemovalReason` is the guard a future caller narrows a bare string
+    // back down with, rather than re-deriving the same `.includes` check by hand.
     expect(isRemovalReason("spam")).toBe(true);
     expect(isRemovalReason("Spam")).toBe(false);
     expect(isRemovalReason("harassment")).toBe(false);

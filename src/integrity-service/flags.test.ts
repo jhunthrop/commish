@@ -7,7 +7,8 @@ import type { AuditEventType } from "@/domain/audit";
 import { copyViolations } from "@/integrity/copy-rules";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import type { FlagType } from "@/integrity/flags";
-import { createAuditLogger } from "./audit-logger";
+import { REVIEW_CONFIG } from "@/reviews/config";
+import { createAuditLogger, type AuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
 import { BOOTSTRAP_ACTOR, grantAdmin, raiseFlag, resolveFlag } from "./flags";
 
@@ -615,7 +616,7 @@ describe("resolveFlag", () => {
 
     await expect(
       resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op" }),
-    ).rejects.toThrow('resolveFlag: content_removed has no remover wired for subject type "chat_message" yet (Tasks 4 and 6 land these).');
+    ).rejects.toThrow('resolveFlag: content_removed has no remover wired for subject type "chat_message" yet (Task 6 lands it).');
 
     const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
     expect(row!.resolvedAt).toBeNull();
@@ -647,6 +648,58 @@ describe("resolveFlag", () => {
     const result = await resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op" });
     expect(result.ok).toBe(false);
     expect(await isOpen(flag.id)).toBe(true);
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  it("refuses a content_removed note past the review's own removal-reason cap, with PRODUCT copy, before any write", async () => {
+    // Fix round 1, FIX 1: `resolveFlag`'s note is bound by `INTEGRITY_CONFIG.moderation.
+    // noteMaxLength` (500) in general, but on the `content_removed` branch it becomes a REMOVAL
+    // REASON — `removeReviewInTx`'s own tighter `REVIEW_CONFIG.removalReason.maxLength` (200) is
+    // what it is actually bound by. A 201-char note must be refused HERE, with product copy, not
+    // reach `removeReviewInTx` and surface that function's CLI-flavored message.
+    await ensureUser("u_op");
+    const flag = await reportedReview({ reviewId: "r_3", authorUserId: "u_author3" });
+    const tooLong = "x".repeat(REVIEW_CONFIG.removalReason.maxLength + 1);
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: tooLong, operatorUserId: "u_op" });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: `Notes on a removal are limited to ${REVIEW_CONFIG.removalReason.maxLength} characters.`,
+    });
+
+    // Refused before the transaction even opens: neither the flag nor the review moved at all.
+    expect(await isOpen(flag.id)).toBe(true);
+    expect(await isRemoved("r_3")).toBe(false);
+    // The script's OWN door is untouched and still answers with its CLI-flavored message — see
+    // `reviews.test.ts`'s "refuses a reason longer than REVIEW_CONFIG.removalReason.maxLength,
+    // before any write", which calls `removeReview` directly and is unmodified by this fix.
+  });
+
+  it("rolls back the review's removal too when the flag_resolved audit write fails after it lands", async () => {
+    // Fix round 1, FIX 2: the removal (review_removed, the FIRST audit append) can succeed while
+    // the SECOND append (flag_resolved, the anchor) fails — both still happen inside `resolveFlag`'s
+    // one transaction, so the removal must roll back WITH the stamp, not stay committed.
+    await ensureUser("u_op");
+    const flag = await reportedReview({ reviewId: "r_4", authorUserId: "u_author4" });
+
+    let calls = 0;
+    const audit: AuditLogger = {
+      ...logger,
+      record: async (tx, event) => {
+        calls += 1;
+        if (calls === 2) throw new Error("audit append failed");
+        return logger.record(tx, event);
+      },
+    };
+
+    await expect(
+      resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op", audit }),
+    ).rejects.toThrow("audit append failed");
+
+    expect(await isRemoved("r_4")).toBe(false);
+    expect(await isOpen(flag.id)).toBe(true);
+    expect(await auditEventsOn("platform", "review_removed")).toHaveLength(0);
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
   });
 

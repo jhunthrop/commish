@@ -9,12 +9,18 @@ import { MODERATION_CONFIG, type ModerationReasonValue } from "./config";
 export const REMOVAL_REASON_VALUES: readonly ModerationReasonValue[] = MODERATION_CONFIG.reasons.map((reason) => reason.value);
 
 /**
- * The typo-proof gate. `REMOVAL_REASON_VALUES.includes(x)` cannot be called with a bare `string`
- * once the array's own element type is the closed union — TypeScript refuses the comparison
- * outright — so this is a type PREDICATE, not just a boolean: a caller that checks it first gets
- * `ModerationReasonValue` back from an unnarrowed `string`, at the type level as well as at
- * runtime. `scripts/remove-review.ts` and the report route both use this rather than each
- * re-deriving the same `.includes` check against a widened array.
+ * The typo-proof gate for a caller holding a bare `string`. `REMOVAL_REASON_VALUES.includes(x)`
+ * cannot be called with one directly once the array's own element type is the closed union —
+ * TypeScript refuses the comparison outright — so this is a type PREDICATE, not just a boolean: a
+ * caller that checks it first gets `ModerationReasonValue` back from an unnarrowed `string`, at
+ * the type level as well as at runtime.
+ *
+ * No production caller reaches for this yet. `scripts/remove-review.ts` still validates against
+ * `@/reviews/config`'s re-exported `REMOVAL_REASON_VALUES` — deliberately WIDENED back to
+ * `readonly string[]` there so that script's existing `.includes(reason)` check keeps compiling
+ * unchanged (ruling 21's "diff at every consumer is zero"; see that module's own docblock). This
+ * function is the narrow door for whatever calls next instead — Task 6's chat report surface, or a
+ * future rewrite of the script itself — to use rather than re-deriving the same check by hand.
  */
 export function isRemovalReason(value: string): value is ModerationReasonValue {
   return (REMOVAL_REASON_VALUES as readonly string[]).includes(value);
