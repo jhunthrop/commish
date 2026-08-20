@@ -1,10 +1,11 @@
 import { eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditEvents, memberNotices, users } from "@/db/schema";
+import type { DbTx } from "@/db/client";
+import { auditEvents, integrityFlags, leagues, memberNotices, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { createAuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
-import { BOOTSTRAP_ACTOR, grantAdmin } from "./flags";
+import { BOOTSTRAP_ACTOR, grantAdmin, raiseFlag } from "./flags";
 
 const db = createTestDb();
 const NOW = "2026-08-20T18:00:00.000Z";
@@ -15,6 +16,10 @@ const at = (iso: string) => ({ now: () => iso });
 
 async function seedUser(id: string, isAdmin = false): Promise<void> {
   await db.insert(users).values({ id, email: `${id}@test.local`, displayName: id, isAdmin });
+}
+
+async function seedLeague(id: string, commissionerUserId: string): Promise<void> {
+  await db.insert(leagues).values({ id, name: id, format: "snake", teamCount: 10, commissionerUserId });
 }
 
 beforeEach(async () => {
@@ -179,5 +184,143 @@ describe("grantAdmin — revoking", () => {
     await seedUser("u_target");
     const result = await grantAdmin(db, { userId: "u_target", grant: false, grantedBy: BOOTSTRAP_ACTOR, clock: at(NOW), audit: logger });
     expect(result).toEqual({ ok: false, reason: '"u_target" is not a user, or already has that setting.' });
+  });
+});
+
+describe("raiseFlag", () => {
+  let flagCounter = 0;
+  const newFlagId = (): string => `flag_${(flagCounter += 1)}`;
+
+  beforeEach(() => {
+    flagCounter = 0;
+  });
+
+  it("raises a new flag and records flag_raised on the platform chain with a system actor", async () => {
+    await seedUser("u_commish");
+    await seedLeague("league_x", "u_commish");
+
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "multi_account",
+        subjectId: "u1_u2",
+        leagueId: "league_x",
+        evidence: { sharedSignals: ["device_id"] },
+        raisedByUserId: null,
+        occurredAt: NOW,
+        newId: newFlagId,
+        audit: logger,
+      }),
+    );
+    expect(flag).toEqual({
+      id: "flag_1",
+      flagType: "multi_account",
+      subjectType: "account_pair",
+      subjectId: "u1_u2",
+      leagueId: "league_x",
+      evidence: { sharedSignals: ["device_id"] },
+      raisedAt: NOW,
+    });
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, "flag_1"));
+    expect(row).toMatchObject({ subjectType: "account_pair", subjectId: "u1_u2", leagueId: "league_x", resolvedAt: null });
+
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "flag_raised"));
+    expect(event).toMatchObject({ chainScope: "platform", leagueId: null, actorId: null, actorType: "system" });
+    expect(event!.payload).toEqual({ flagId: "flag_1", flagType: "multi_account", subjectType: "account_pair", leagueId: "league_x" });
+  });
+
+  it("records a user actor when a reporter, not a sweep, raised the flag", async () => {
+    await seedUser("u_reporter");
+
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "chat_report",
+        subjectId: "msg_1",
+        leagueId: null,
+        evidence: { reason: "spam" },
+        raisedByUserId: "u_reporter",
+        occurredAt: NOW,
+        newId: newFlagId,
+        audit: logger,
+      }),
+    );
+
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "flag_raised"));
+    expect(event).toMatchObject({ actorId: "u_reporter", actorType: "user", leagueId: null });
+  });
+
+  it("returns the open flag and writes no second event when the same subject is reported twice", async () => {
+    await seedUser("u_reporter_a");
+    await seedUser("u_reporter_b");
+
+    const input = (raisedByUserId: string) => ({
+      flagType: "chat_report" as const,
+      subjectId: "msg_dup",
+      leagueId: null,
+      evidence: { reason: "spam" },
+      raisedByUserId,
+      occurredAt: NOW,
+      newId: newFlagId,
+      audit: logger,
+    });
+
+    const first = await db.transaction((tx) => raiseFlag(tx, input("u_reporter_a")));
+    const second = await db.transaction((tx) => raiseFlag(tx, input("u_reporter_b")));
+
+    expect(second).toEqual(first);
+    expect(await db.select().from(integrityFlags)).toHaveLength(1);
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "flag_raised"))).toHaveLength(1);
+  });
+
+  it("raises a NEW flag for a subject whose previous flag was resolved", async () => {
+    await seedUser("u_reporter");
+
+    const input = {
+      flagType: "chat_report" as const,
+      subjectId: "msg_reraised",
+      leagueId: null,
+      evidence: { reason: "spam" },
+      raisedByUserId: "u_reporter",
+      occurredAt: NOW,
+      newId: newFlagId,
+      audit: logger,
+    };
+
+    const first = await db.transaction((tx) => raiseFlag(tx, input));
+    // Task 3 owns resolveFlag; this stamps the column directly to put the row in the state the
+    // partial unique index (WHERE resolved_at IS NULL) treats as answered and out of the way.
+    await db.update(integrityFlags).set({ resolvedAt: new Date(NOW) }).where(eq(integrityFlags.id, first.id));
+
+    const second = await db.transaction((tx) => raiseFlag(tx, input));
+
+    expect(second.id).not.toBe(first.id);
+    expect(await db.select().from(integrityFlags)).toHaveLength(2);
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "flag_raised"))).toHaveLength(2);
+  });
+
+  /**
+   * `existingOpenFlagFor`'s impossible-state guard. Real Postgres cannot reach it: the conflict
+   * that routes `raiseFlag` here is proof an open row exists for this subject. A stub `DbTx` is
+   * the only way to put the code in the state it defends against — same shape as
+   * `AuditLogger.record`'s `lockAnchor` guard in `audit-logger.test.ts`.
+   */
+  it("refuses to invent a flag when the conflicting row is somehow not there on read-back", async () => {
+    const stub = {
+      insert: () => ({ values: () => ({ onConflictDoNothing: () => ({ returning: async () => [] }) }) }),
+      select: () => ({ from: () => ({ where: async () => [] }) }),
+    } as unknown as DbTx;
+
+    await expect(
+      raiseFlag(stub, {
+        flagType: "chat_report",
+        subjectId: "msg_ghost",
+        leagueId: null,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: NOW,
+        newId: newFlagId,
+        audit: logger,
+      }),
+    ).rejects.toThrow("raiseFlag conflicted on an open flag for chat_message:msg_ghost that is no longer there.");
   });
 });

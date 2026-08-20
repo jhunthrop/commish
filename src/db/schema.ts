@@ -704,3 +704,52 @@ export const memberNotices = pgTable(
     index("member_notices_user_created_idx").on(t.userId, t.createdAt),
   ],
 );
+
+/**
+ * One row per open question a human has to answer. ONE table for every detector rather than one
+ * per detector (ruling 28): the queue read, the detail view and the resolution are one workflow,
+ * and three copies of it is how three of them drift.
+ *
+ * The row carries what was true WHEN IT WAS RAISED and nothing else. A review's report count is
+ * derived at read time from `review_reports`, because a report count per review is bounded and
+ * `docs/decisions/data-layer-hardening.md` says to derive over a bounded set and roll up only
+ * over an unbounded one (ruling 5). `evidence` is for facts a later read cannot recover: the
+ * similarity scores that crossed the threshold, computed against session data that will have
+ * moved on by the time an operator looks.
+ *
+ * Resolution is a STAMP with the no-re-stamp guard in the UPDATE's own WHERE, exactly as `reviews`
+ * removal is (ruling 4). The immutable record of the decision is the `flag_resolved` audit event;
+ * this row is the queue's index into it.
+ */
+export const integrityFlags = pgTable(
+  "integrity_flags",
+  {
+    id: text("id").primaryKey(),
+    flagType: text("flag_type").notNull(),
+    subjectType: text("subject_type").notNull(),
+    /** The reviewed thing. For `account_pair`, the two user ids joined low-id-first so the pair is canonical. */
+    subjectId: text("subject_id").notNull(),
+    /** Where it happened. NOT a chain scope: this row is not an audit event (ruling 1). */
+    leagueId: text("league_id").references(() => leagues.id, { onDelete: "cascade" }),
+    evidence: jsonb("evidence").$type<JsonObject>().notNull(),
+    raisedAt: timestamp("raised_at", { withTimezone: true }).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedByUserId: text("resolved_by_user_id").references(() => users.id),
+    resolution: text("resolution"),
+    resolutionNote: text("resolution_note"),
+  },
+  (t) => [
+    /**
+     * At most one OPEN flag per subject. A second report of the same message, or a second sweep
+     * finding the same pair, is confirmation rather than a duplicate — the same property
+     * `review_reports`' composite primary key already gives one reporter, lifted to the subject.
+     * Partial on `resolved_at IS NULL` so a resolved flag never blocks a later one about the same
+     * subject: content reported again after a `no_action` is a new question, not the old one.
+     */
+    uniqueIndex("integrity_flags_open_subject_idx")
+      .on(t.subjectType, t.subjectId)
+      .where(sql`${t.resolvedAt} is null`),
+    /** The queue's only ordering: oldest first, open only (ruling 30). */
+    index("integrity_flags_queue_idx").on(t.raisedAt).where(sql`${t.resolvedAt} is null`),
+  ],
+);

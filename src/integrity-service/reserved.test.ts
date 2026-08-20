@@ -25,12 +25,14 @@ const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "p
   trade_proposed: "plan-c",
   trade_accepted: "plan-c",
   trade_rejected: "plan-c",
-  // Plan B owns the vocabulary and the dispute queue this writes into, and lands the first
-  // publisher. Plan C ALSO raises one, from `TradeFairnessFlagService` on `TRADE_ACCEPTED`
-  // (`docs/superpowers/plans/2026-08-20-phase3-overview.md`) — into Plan B's existing queue, not
-  // a second one. Whichever lands first moves this entry to "plan-a" territory; the other is then
-  // a second call site, not a second owner.
-  flag_raised: "plan-b",
+  // Task 2 lands the first publisher: `raiseFlag` (`src/integrity-service/flags.ts`), called from
+  // system paths only (ruling 12) — Tasks 4, 6 and 9 are its three callers, and Plan C's
+  // `TradeFairnessFlagService` on `TRADE_ACCEPTED`
+  // (`docs/superpowers/plans/2026-08-20-phase3-overview.md`) is the fourth, into this same queue,
+  // not a second one. Moved to "plan-a" territory the same way `admin_action` was in Task 1 — the
+  // value marks PUBLISHED, not "written by Plan A" specifically.
+  flag_raised: "plan-a",
+  // Task 3 resolves what Task 2 raises and lands `flag_resolved`'s first (and only) publisher.
   flag_resolved: "plan-b",
   // Task 1 lands the first (and, per ruling 15, the ONLY) publisher: `grantAdmin`
   // (`src/integrity-service/flags.ts`), called exclusively from `scripts/grant-admin.ts` and from

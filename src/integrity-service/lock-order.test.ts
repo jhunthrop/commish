@@ -6,6 +6,7 @@ import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { joinLeagueInTx } from "@/league-service/join";
+import { raiseFlag } from "./flags";
 import type { DraftPoolEntry } from "@/domain/draft";
 import { players } from "@/db/schema";
 
@@ -34,6 +35,7 @@ import { players } from "@/db/schema";
  */
 const joinDb = createTestDb();
 const pickDb = createTestDb();
+const flagDb = createTestDb();
 
 /**
  * Waits until some backend on this database is genuinely blocked on a lock.
@@ -188,5 +190,85 @@ describe("the audit anchor is the last lock, FK locks included", () => {
       const [a, b] = run % 2 === 0 ? [join, pick] : [pick, join];
       await expect(Promise.all([a, b])).resolves.toBeDefined();
     }
+  });
+});
+
+/**
+ * Plan B's first transaction in this proof. `raiseFlag`'s insert into `integrity_flags` carries a
+ * foreign key to `leagues`, so it takes the same `FOR KEY SHARE` on the league row that
+ * `member_notices`' insert does — and, like every other write in this file, it must take that
+ * lock BEFORE it reaches an audit anchor, never after.
+ *
+ * `raiseFlag`'s own anchor is the PLATFORM chain, never the league's (ruling 1) — a different row
+ * from the one `joinLeagueInTx` locks (`audit_chains[leagueId]`). So unlike the join/autopick
+ * pair above, there is no shared anchor row for the wrong order to cycle on: this test's job is
+ * to hold that separation to real concurrent load rather than to trust the reasoning. It drives a
+ * join and a flag-raise against the SAME league on two connections, with the join parked exactly
+ * where `joinLeagueInTx`'s own docblock says the cycle used to sit, and asserts both the absence
+ * of a deadlock/hang AND that the two events really did land on two different chains — proof that
+ * `raiseFlag` touching `leagues` costs nothing to a concurrent join, in either direction.
+ */
+describe("raiseFlag's insert order", () => {
+  it("lets a join and a flag raise in the same league run concurrently without deadlocking", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_commish_flag", email: "commish_flag@test.local", displayName: "Commish" },
+      { id: "user_joiner_flag", email: "joiner_flag@test.local", displayName: "Joiner" },
+    ]);
+    await joinDb.insert(leagues).values({
+      id: "league_flag_lock",
+      name: "League Flag Lock",
+      format: "snake",
+      teamCount: 2,
+      commissionerUserId: "u_commish_flag",
+    });
+
+    let holdsLeagueLock: () => void = () => {};
+    const leagueLocked = new Promise<void>((resolve) => (holdsLeagueLock = resolve));
+    let releaseJoin: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseJoin = resolve));
+
+    // T_join: parked right after `leagues[X] FOR UPDATE`, exactly as in the pair above.
+    const joining = joinDb.transaction((tx) =>
+      joinLeagueInTx(
+        tx,
+        { leagueId: "league_flag_lock", userId: "user_joiner_flag", newId: () => "team_joiner_flag", via: "public_browse", occurredAt: clock.now() },
+        async () => {
+          holdsLeagueLock();
+          await parked;
+          return null;
+        },
+      ),
+    );
+    await leagueLocked;
+
+    // T_flag: the real raiseFlag, on its own connection, reaching for the SAME league row.
+    const raising = flagDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "multi_account",
+        subjectId: "u_flag_1_u_flag_2",
+        leagueId: "league_flag_lock",
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => "flag_lock_1",
+      }),
+    );
+
+    // T_flag has to have genuinely blocked on `leagues[X]` before T_join is let go, or releasing
+    // T_join proves nothing about the two ever contending at all.
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseJoin();
+
+    const joined = await joining;
+    const flagged = await raising;
+    expect(joined).toMatchObject({ ok: true, alreadyMember: false });
+    expect(flagged.id).toBe("flag_lock_1");
+
+    // The league chain holds only the join's `member_joined` — `flag_raised` never reaches it.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "league_flag_lock"));
+    expect(leagueAnchor!.headSequence).toBe(1);
+    // The platform chain holds only the flag — proof the two really did land on separate chains.
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(1);
   });
 });

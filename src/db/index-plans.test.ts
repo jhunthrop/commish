@@ -306,3 +306,23 @@ describe("audit_event_type stays in sync with AUDIT_EVENT_TYPES", () => {
     expect(rows.map((row) => row.enumlabel)).toEqual([...AUDIT_EVENT_TYPES]);
   });
 });
+
+/**
+ * `integrity_flags`'s two indexes, read back out of the catalog rather than trusted from the
+ * Drizzle definition — the same reason `audit_events`'s composite pair is proven this way above.
+ * The partial predicate in particular is the property the whole table exists to make cheap: a
+ * second report of an already-open subject must stay a fast lookup rather than a scan, and
+ * `WHERE (resolved_at IS NULL)` on disk is what makes that true.
+ */
+describe("integrity_flags carries its open-subject and queue indexes", () => {
+  it("carries the partial unique index and the partial queue index, both scoped to open flags", async () => {
+    const rows = await db.execute<{ indexname: string; indexdef: string }>(
+      sql`SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'integrity_flags'`,
+    );
+    const byName = new Map(rows.map((row) => [row.indexname, row.indexdef]));
+    expect(byName.get("integrity_flags_open_subject_idx")).toMatch(/UNIQUE.*\(subject_type, subject_id\)/);
+    expect(byName.get("integrity_flags_open_subject_idx")).toContain("WHERE (resolved_at IS NULL)");
+    expect(byName.get("integrity_flags_queue_idx")).toMatch(/\(raised_at\)/);
+    expect(byName.get("integrity_flags_queue_idx")).toContain("WHERE (resolved_at IS NULL)");
+  });
+});
