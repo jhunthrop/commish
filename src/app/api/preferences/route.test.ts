@@ -15,7 +15,9 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
+import { IDENTITY_CONFIG } from "@/identity";
 import { PATCH } from "./route";
+import { resetPreferencesRateLimit } from "./_shared";
 
 const db = createTestDb();
 
@@ -37,6 +39,7 @@ function patch(body: unknown): Request {
 beforeEach(async () => {
   await truncateAll(db);
   vi.mocked(getCurrentUser).mockReset();
+  resetPreferencesRateLimit();
 });
 
 afterAll(async () => {
@@ -79,6 +82,35 @@ describe("PATCH /api/preferences", () => {
     const response = await PATCH(patch({ helpLevel: "standard" }));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, data: { helpLevel: "standard", draftTourDismissedAt: null } });
+  });
+
+  it("answers 429 once the caller is past the rate-limit threshold", async () => {
+    await db.insert(users).values({ id: "u1", email: "u1@test.local", displayName: "u1" });
+    signedInAs("u1");
+    for (let i = 0; i < IDENTITY_CONFIG.preferencesRateLimit.maxRequests; i += 1) {
+      expect((await PATCH(patch({ helpLevel: "standard" }))).status).toBe(200);
+    }
+    const limited = await PATCH(patch({ helpLevel: "standard" }));
+    expect(limited.status).toBe(429);
+    expect(await limited.json()).toEqual({
+      ok: false,
+      error: "You've changed that a lot in a short time. Give it a minute and try again.",
+    });
+  });
+
+  it("keys that ceiling per caller: a DIFFERENT user spends its own budget", async () => {
+    await db.insert(users).values([
+      { id: "u1", email: "u1@test.local", displayName: "u1" },
+      { id: "u2", email: "u2@test.local", displayName: "u2" },
+    ]);
+    signedInAs("u1");
+    for (let i = 0; i < IDENTITY_CONFIG.preferencesRateLimit.maxRequests; i += 1) {
+      await PATCH(patch({ helpLevel: "standard" }));
+    }
+    expect((await PATCH(patch({ helpLevel: "standard" }))).status).toBe(429);
+
+    signedInAs("u2");
+    expect((await PATCH(patch({ helpLevel: "standard" }))).status).toBe(200);
   });
 
   it("succeeds for a caller who has never had preferences seeded — seeding from their own tier, then applying the write", async () => {

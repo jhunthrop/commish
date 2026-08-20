@@ -4,23 +4,32 @@ import { updatePreferences, type UpdatePreferencesParams } from "@/identity-serv
 import { updatePreferencesSchema } from "@/identity-service/schemas";
 import { ok, parseJson } from "@/lib/api/respond";
 import { withCurrentUser } from "@/app/api/leagues/_shared";
+import { preferencesRateLimited } from "./_shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * Writes the caller's own preferences: a help level and/or the draft-room tour's dismissal.
- * The draft-room tour (`RoomTour`) is this route's one caller today — the write is
- * fire-and-forget from the client, and a rejection here must never keep a manager out of a
- * live draft (see `RoomTour`'s own docblock).
+ * Two callers today — the draft-room tour (`RoomTour`), whose write is deliberately
+ * fire-and-forget because a rejection here must never keep a manager out of a live draft (see
+ * its own docblock), and the profile's "How much help" control (`HelpLevelForm`), which states
+ * a refusal rather than swallowing it.
  *
- * `updatePreferences` requires the row to already exist (`readPreferences` seeds it), which is
- * true by construction here: every surface that renders a control backed by this route has
- * already read preferences server-side first (the draft room page calls `readPreferences`
- * before it ever renders `RoomTour`).
+ * `updatePreferences` is SELF-SUFFICIENT: it seeds the row from the caller's own
+ * `experienceTier` when none exists, so a bare PATCH from a user who has never opened a surface
+ * that reads preferences first succeeds rather than 500s. (The docblock here used to claim the
+ * opposite; Task 4's own fix round made it self-sufficient and this line was never updated.)
+ *
+ * Rate-limited per user (`preferencesRateLimited`), sibling parity with `PATCH /api/profile`:
+ * both are authenticated per-user writes, and this one opens a three-statement transaction
+ * per call.
  */
 export async function PATCH(request: Request) {
   return withCurrentUser(request, async (userId, req) => {
+    const limited = preferencesRateLimited(userId);
+    if (limited !== null) return limited;
+
     const parsed = await parseJson(req, updatePreferencesSchema);
     if (!parsed.ok) return parsed.response;
 

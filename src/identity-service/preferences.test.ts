@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { Db } from "@/db/client";
 import { users, userPreferences } from "@/db/schema";
@@ -42,6 +42,34 @@ describe("readPreferences", () => {
 
     const rows = await db.select().from(userPreferences).where(eq(userPreferences.userId, "u1"));
     expect(rows).toHaveLength(1);
+  });
+
+  it("issues NO write on a second read — the steady state is read-only", async () => {
+    // `GET /api/home` calls this, and `HomeBoard` polls that route every 30 seconds, so an
+    // unconditional seed meant every open tab took a RowExclusiveLock on `user_preferences`
+    // twice a minute forever, for a row that already existed.
+    await seedUser(db, "u1");
+    await readPreferences(db, { id: "u1", experienceTier: "beginner" });
+
+    const insert = vi.spyOn(db, "insert");
+    try {
+      const prefs = await readPreferences(db, { id: "u1", experienceTier: "beginner" });
+      expect(prefs.helpLevel).toBe("guided");
+      expect(insert).not.toHaveBeenCalled();
+    } finally {
+      insert.mockRestore();
+    }
+  });
+
+  it("still writes on the FIRST read, which is what makes the case above meaningful", async () => {
+    await seedUser(db, "u1");
+    const insert = vi.spyOn(db, "insert");
+    try {
+      await readPreferences(db, { id: "u1", experienceTier: "beginner" });
+      expect(insert).toHaveBeenCalledTimes(1);
+    } finally {
+      insert.mockRestore();
+    }
   });
 
   it("does not double-insert when two first reads race for the same user", async () => {

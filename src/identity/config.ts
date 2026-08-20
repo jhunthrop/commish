@@ -16,6 +16,14 @@ export const IDENTITY_CONFIG = {
   },
   /** `PATCH /api/profile`'s ceiling — keyed per user id, see `profileRateLimited`. */
   profileRateLimit: { maxRequests: 10, windowMs: 60_000 },
+  /**
+   * `PATCH /api/preferences`'s ceiling — keyed per user id, sibling parity with the profile
+   * write above. Both are authenticated per-user writes and this one opens a three-statement
+   * transaction per call, so it is the LESS defensible of the two to leave unlimited. Roomier
+   * than the profile's, because the draft-room tour's fire-and-forget dismissal shares this
+   * route with the help-level control and a manager should never hit a ceiling by playing.
+   */
+  preferencesRateLimit: { maxRequests: 30, windowMs: 60_000 },
 } as const;
 
 /**

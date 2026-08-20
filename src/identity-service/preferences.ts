@@ -64,12 +64,22 @@ export async function applyTierDefaultHelpLevel(tx: DbTx, userId: string, experi
 /**
  * The caller's own preferences, seeding the row on first read rather than at sign-up
  * (`userPreferences`'s own docblock in `@/db/schema`).
+ *
+ * READ FIRST, seed only on a miss. This used to run `seedIfMissing` unconditionally, which made
+ * every read a write: `GET /api/home` calls it, `HomeBoard` polls that route every 30 seconds,
+ * so every open tab took a `RowExclusiveLock` on `user_preferences` twice a minute forever, for
+ * a row that already existed. The steady state is now a plain `SELECT`. The seed path still uses
+ * `INSERT ... ON CONFLICT DO NOTHING`, so the read-then-insert below is not a race: two
+ * concurrent first touches still both end up seeing the one row that won.
  */
 export async function readPreferences(db: Db, user: { readonly id: string; readonly experienceTier: ExperienceTier }): Promise<PreferenceState> {
+  const [existing] = await db.select().from(userPreferences).where(eq(userPreferences.userId, user.id));
+  if (existing !== undefined) return toPreferenceState(existing);
+
   await seedIfMissing(db, user.id, user.experienceTier);
-  const [row] = await db.select().from(userPreferences).where(eq(userPreferences.userId, user.id));
-  if (row === undefined) throw new Error(`No preferences row for user ${user.id} after seeding.`);
-  return toPreferenceState(row);
+  const [seeded] = await db.select().from(userPreferences).where(eq(userPreferences.userId, user.id));
+  if (seeded === undefined) throw new Error(`No preferences row for user ${user.id} after seeding.`);
+  return toPreferenceState(seeded);
 }
 
 /**
