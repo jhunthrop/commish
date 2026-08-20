@@ -3,7 +3,7 @@
 // client room code may value-import it directly.
 export { AVATAR_PRESETS, avatarRefValue, parseAvatarRef, presetByKey } from "./avatars";
 export type { AvatarPreset, AvatarPresetKey, AvatarRef, AvatarTone } from "./avatars";
-export { EXPERIENCE_TIER_LABEL, IDENTITY_CONFIG } from "./config";
+export { EXPERIENCE_TIER_LABEL, HELP_LEVEL_LABEL, IDENTITY_CONFIG } from "./config";
 export { defaultPreferences, isDraftTourDismissed } from "./preferences";
 export type { HelpLevel, PreferenceState } from "./preferences";
 export { firstRunPathOrder, firstRunPlan } from "./first-run";

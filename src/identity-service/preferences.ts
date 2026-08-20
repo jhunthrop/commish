@@ -42,6 +42,26 @@ async function seedIfMissing(db: Db | DbTx, userId: string, experienceTier: Expe
 }
 
 /**
+ * Re-derives `helpLevel` from a NEWLY CHOSEN `experienceTier` — the coarse knob moving the fine
+ * one. Called by `updateProfile` inside its own transaction (hence `DbTx`, and hence `now`
+ * passed in rather than read here: the clock is evaluated before the transaction opens, the
+ * PgBouncer transaction-mode discipline this codebase holds everywhere).
+ *
+ * Seeded once and never re-derived is what pinned every user to `guided` forever: `users`
+ * defaults `experience_tier` to `beginner`, so every account seeded `guided` and nothing in
+ * production ever wrote the column again. The tier is the coarse control and the profile's
+ * explicit "How much help" the fine one; both are visible on one page and LAST WRITE WINS, so
+ * an explicit choice stands until the tier changes again, and vice versa.
+ */
+export async function applyTierDefaultHelpLevel(tx: DbTx, userId: string, experienceTier: ExperienceTier, now: Date): Promise<void> {
+  await seedIfMissing(tx, userId, experienceTier);
+  await tx
+    .update(userPreferences)
+    .set({ helpLevel: defaultPreferences({ experienceTier }).helpLevel, updatedAt: now })
+    .where(eq(userPreferences.userId, userId));
+}
+
+/**
  * The caller's own preferences, seeding the row on first read rather than at sign-up
  * (`userPreferences`'s own docblock in `@/db/schema`).
  */

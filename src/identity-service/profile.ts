@@ -1,9 +1,13 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db, DbTx } from "@/db/client";
 import { users } from "@/db/schema";
+import type { Clock } from "@/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { avatarRefValue, parseAvatarRef, presetByKey, type AvatarPresetKey } from "@/identity";
 import type { ProfileBody } from "@/account-room/contract";
+import { applyTierDefaultHelpLevel } from "./preferences";
+
+const systemClock: Clock = { now: () => new Date().toISOString() };
 
 /**
  * What `updateProfile` actually accepts. Deliberately NOT `UpdateProfileInput`
@@ -76,8 +80,13 @@ export async function readProfile(db: Db, userId: string): Promise<ProfileBody |
  * the honest answer anyway. A PATCH that names no writable field at all changes nothing and
  * reads the row back (`updateProfileSchema`'s `refine` already refuses the empty body at the
  * boundary; this is what keeps the service itself from handing Drizzle an empty `SET`).
+ *
+ * A TIER CHANGE ALSO RE-DERIVES `helpLevel`, in the same transaction
+ * (`applyTierDefaultHelpLevel`, whose docblock carries the reasoning). The tier is the coarse
+ * help control and the profile's explicit "How much help" is the fine one; both are on the same
+ * page and last write wins.
  */
-export async function updateProfile(db: Db, input: UpdateProfileParams): Promise<ProfileBody> {
+export async function updateProfile(db: Db, input: UpdateProfileParams, clock: Clock = systemClock): Promise<ProfileBody> {
   if (input.avatarPreset !== null && input.avatarPreset !== undefined && presetByKey(input.avatarPreset) === undefined) {
     throw new Error(`Unknown avatar preset: ${input.avatarPreset}`);
   }
@@ -92,7 +101,21 @@ export async function updateProfile(db: Db, input: UpdateProfileParams): Promise
     return profile;
   }
 
-  const [row] = await db.update(users).set(changes).where(eq(users.id, input.userId)).returning();
-  if (row === undefined) throw new Error(`No user row for id ${input.userId}.`);
+  const tier = input.experienceTier;
+  if (tier === undefined) return writeUserRow(db, input.userId, changes);
+
+  // Evaluated BEFORE the transaction opens — no clock read, and no other work, inside it.
+  const now = new Date(clock.now());
+  return db.transaction(async (tx) => {
+    const profile = await writeUserRow(tx, input.userId, changes);
+    await applyTierDefaultHelpLevel(tx, input.userId, tier, now);
+    return profile;
+  });
+}
+
+/** The `users` write itself, shared by the plain path and the tier-change transaction. */
+async function writeUserRow(db: Db | DbTx, userId: string, changes: Partial<ProfileRow>): Promise<ProfileBody> {
+  const [row] = await db.update(users).set(changes).where(eq(users.id, userId)).returning();
+  if (row === undefined) throw new Error(`No user row for id ${userId}.`);
   return toProfileBody(row);
 }

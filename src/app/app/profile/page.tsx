@@ -5,8 +5,10 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
 import { AppHeader } from "@/components/app-shell/app-header";
 import { readProfile } from "@/identity-service/profile";
+import { readPreferences } from "@/identity-service/preferences";
 import { myReview } from "@/review-service/reviews";
 import { ProfileForm } from "@/account-room/components/profile-form";
+import { HelpLevelForm } from "@/account-room/components/help-level-form";
 import { NotificationSummary } from "@/account-room/components/notification-summary";
 import { ReviewComposer } from "@/account-room/components/review-composer";
 
@@ -21,7 +23,11 @@ export const dynamic = "force-dynamic";
  */
 export default async function ProfilePage() {
   const user = await requireCurrentUser();
-  const [profile, review] = await Promise.all([readProfile(getDb(), user.id), myReview(getDb(), user.id)]);
+  const [profile, review, preferences] = await Promise.all([
+    readProfile(getDb(), user.id),
+    myReview(getDb(), user.id),
+    readPreferences(getDb(), user),
+  ]);
   if (profile === null) notFound();
 
   return (
@@ -30,6 +36,18 @@ export default async function ProfilePage() {
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
         <PageTitle>Your profile</PageTitle>
         <ProfileForm profile={profile} />
+        <section className="flex flex-col gap-4" aria-labelledby="preferences-heading">
+          <div className="flex flex-col gap-1">
+            <h2 id="preferences-heading" className="text-lg font-semibold text-text-primary">
+              Preferences
+            </h2>
+            <p className="text-sm text-text-muted">
+              Your experience above sets this for you. Change it here any time, and changing your
+              experience sets it again.
+            </p>
+          </div>
+          <HelpLevelForm helpLevel={preferences.helpLevel} />
+        </section>
         <NotificationSummary />
         <section className="flex flex-col gap-4" aria-labelledby="review-heading">
           <div className="flex flex-col gap-1">

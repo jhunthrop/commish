@@ -29,3 +29,13 @@ export const EXPERIENCE_TIER_LABEL: Readonly<Record<string, string>> = {
   beginner: "New to fantasy",
   experienced: "Played before",
 };
+
+/**
+ * The one copy vocabulary for `helpLevel`, the same way `EXPERIENCE_TIER_LABEL` is for the tier.
+ * Plain words for what the setting does, not the stored enum: nobody picks "guided" off a menu,
+ * they pick more help or fewer words.
+ */
+export const HELP_LEVEL_LABEL: Readonly<Record<string, string>> = {
+  guided: "More help",
+  standard: "The basics",
+};

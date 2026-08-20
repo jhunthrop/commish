@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { Db } from "@/db/client";
-import { users } from "@/db/schema";
+import { userPreferences, users } from "@/db/schema";
 import { syncUserFromWorkOS } from "@/lib/auth/user-sync";
+import { readPreferences, updatePreferences } from "./preferences";
 import { readProfile, updateProfile } from "./profile";
 
 const db = createTestDb();
@@ -84,6 +86,42 @@ describe("updateProfile / readProfile", () => {
     await seedUser(db, { id: "u1", displayName: "Ada Lovelace" });
     const unchanged = await updateProfile(db, { userId: "u1", avatarPreset: null });
     expect(unchanged).toEqual({ displayName: "Ada Lovelace", experienceTier: "beginner", avatarPreset: null, avatar: null });
+  });
+
+  // H3: `helpLevel` was seeded once from `experienceTier` and never re-derived, and no
+  // production path ever PATCHed it, so every account (all of which sync as `beginner`) sat on
+  // `guided` forever. The tier is the coarse control, the profile's explicit "How much help" the
+  // fine one, and last write wins. This drives the whole sequence in order.
+  it("re-derives helpLevel when the tier changes, and an explicit choice sticks until the next tier change", async () => {
+    await seedUser(db, { id: "u1" }); // beginner by column default
+    expect((await readPreferences(db, { id: "u1", experienceTier: "beginner" })).helpLevel).toBe("guided");
+
+    // 1. The explicit control wins over the seeded default.
+    await updatePreferences(db, { userId: "u1", helpLevel: "standard" }, fixedClock);
+    expect((await readPreferences(db, { id: "u1", experienceTier: "beginner" })).helpLevel).toBe("standard");
+
+    // 2. Saving the profile WITHOUT touching the tier leaves that explicit choice alone —
+    //    the sparse PATCH carries no `experienceTier`, so there is nothing to re-derive from.
+    await updateProfile(db, { userId: "u1", displayName: "Ada Lovelace" }, fixedClock);
+    expect((await readPreferences(db, { id: "u1", experienceTier: "beginner" })).helpLevel).toBe("standard");
+
+    // 3. Changing the tier re-derives it: "experienced" defaults to standard, already the value.
+    //    Going back to "beginner" is the visible half — guided returns.
+    await updateProfile(db, { userId: "u1", experienceTier: "experienced" }, fixedClock);
+    expect((await readPreferences(db, { id: "u1", experienceTier: "experienced" })).helpLevel).toBe("standard");
+    await updateProfile(db, { userId: "u1", experienceTier: "beginner" }, fixedClock);
+    expect((await readPreferences(db, { id: "u1", experienceTier: "beginner" })).helpLevel).toBe("guided");
+
+    // 4. And the explicit control still wins after that.
+    await updatePreferences(db, { userId: "u1", helpLevel: "standard" }, fixedClock);
+    expect((await readPreferences(db, { id: "u1", experienceTier: "beginner" })).helpLevel).toBe("standard");
+  });
+
+  it("re-derives helpLevel for a user who has never had a preferences row", async () => {
+    await seedUser(db, { id: "u1" });
+    await updateProfile(db, { userId: "u1", experienceTier: "experienced" }, fixedClock);
+    const [row] = await db.select().from(userPreferences).where(eq(userPreferences.userId, "u1"));
+    expect(row?.helpLevel).toBe("standard");
   });
 
   it("a later WorkOS sign-in does not clobber what the user chose", async () => {
