@@ -46,14 +46,23 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // One long UNBROKEN token, which is the exact min-content stressor the fix is about — and
     // deliberately not containing the words "League name", which would collide with the create
     // form's own field label through a card's "Invite managers for <name>" accessible name.
-    const leagueName = `Mobile360UnbrokenOverlongIdentifier${Date.now()}`;
+    // Deterministic, not per-run: a fresh league every run would accumulate one public row per
+    // run until the newest sorts off /browse's 48-cap page and this spec reddens for an
+    // unrelated reason (the same self-inflicted-flake class the lifecycle spec already cost an
+    // investigation). Reuse-if-exists, the stable-identity pattern global-setup established.
+    const leagueName = "Mobile360UnbrokenOverlongIdentifierFixture";
     await page.goto("/app");
     await expect(page.getByRole("heading", { name: "Your leagues" })).toBeVisible();
-    await page.getByText("Start or join another league").click();
-    await page.getByLabel("League name", { exact: true }).fill(leagueName);
-    await page.getByText(/Advanced settings/).click();
-    await page.getByLabel("Who can join").selectOption("public");
-    await page.getByRole("button", { name: "Create league" }).click();
+    const existing = page.getByRole("link", { name: leagueName, exact: true });
+    if ((await existing.count()) === 0) {
+      await page.getByText("Start or join another league").click();
+      await page.getByLabel("League name", { exact: true }).fill(leagueName);
+      await page.getByText(/Advanced settings/).click();
+      await page.getByLabel("Who can join").selectOption("public");
+      await page.getByRole("button", { name: "Create league" }).click();
+    } else {
+      await existing.click();
+    }
 
     // --- A league home: terms panel and members panel, the two Task 3/8 surfaces ----------
     await expect(page.getByRole("heading", { name: leagueName })).toBeVisible();
