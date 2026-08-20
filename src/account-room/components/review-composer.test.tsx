@@ -74,7 +74,9 @@ describe("ReviewComposer", () => {
       fixture.deps,
     );
 
-    expect(screen.getByText("Your review was removed for spam. It can't be edited.")).toBeInTheDocument();
+    // The STORED value is the closed vocabulary's `"spam"`; what the author reads is its
+    // `removalPhrase`, so the sentence is a sentence.
+    expect(screen.getByText("Your review was removed for spam or fake content. It can't be edited.")).toBeInTheDocument();
     // No editable form anywhere: the server refuses this author's write (`submitReview`'s
     // `setWhere`), so offering a textarea and a Save button would be a promise it will break.
     expect(screen.queryByLabelText("Your review")).not.toBeInTheDocument();

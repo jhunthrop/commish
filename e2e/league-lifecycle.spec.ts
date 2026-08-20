@@ -34,7 +34,10 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // and the create form is collapsed behind Task 5's disclosure rather than sitting on the page
   // by default — open it by name instead of assuming the form is already visible.
   await managerA.getByText("Start or join another league").click();
-  await managerA.getByLabel("League name").fill(leagueName);
+  // `exact`: a league card's action link is named "Invite managers for <league name>", so the
+  // default substring match collides with any existing league whose own name contains the words
+  // this field is labelled with.
+  await managerA.getByLabel("League name", { exact: true }).fill(leagueName);
   await managerA.getByText(/Advanced settings/).click();
   // The smallest supported team count (src/league-room/components/create-league-form.tsx's
   // TEAM_COUNTS is [8, 10, 12, 14, 16] — there is no 4-team league).
@@ -66,7 +69,9 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // the league page only after `POST /api/invites/[code]/accept` succeeds, so the url is the
   // first thing that actually depends on the write — and manager A's reload below races the same
   // write.
-  await expect(managerB).toHaveURL(/\/app\/leagues\/[0-9a-f-]+$/);
+  // The league id is already in scope from the create step above, so this names the league
+  // manager B was supposed to land in rather than accepting any league-shaped url.
+  await expect(managerB).toHaveURL(new RegExp(`/app/leagues/${leagueId}$`));
   await expect(managerB.getByRole("heading", { name: leagueName })).toBeVisible();
 
   await managerA.reload();

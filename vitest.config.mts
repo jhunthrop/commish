@@ -38,7 +38,19 @@ const COVERAGE_GATED_DIRS = [
   "src/identity-service",
   "src/review-service",
 ] as const;
-const coverageInclude = COVERAGE_GATED_DIRS.map((dir) => `${dir}/**`);
+/**
+ * The two service directories' `schemas.ts` files are named explicitly alongside the `**` glob
+ * that already matches them. Redundant on purpose: those files are the Zod BOUNDARY every
+ * request meets (`updateProfileSchema`'s sparse refine, `listReviewsQuerySchema`'s cursor
+ * transform, `submitReviewSchema`'s superRefine), they are the half of the service layer a
+ * reader is most likely to assume is "just declarations" and exclude, and naming them here means
+ * narrowing either directory's glob later cannot silently drop them out of the gate.
+ */
+const coverageInclude = [
+  ...COVERAGE_GATED_DIRS.map((dir) => `${dir}/**`),
+  "src/identity-service/schemas.ts",
+  "src/review-service/schemas.ts",
+];
 
 export default defineConfig({
   plugins: [tsconfigPaths(), react()],

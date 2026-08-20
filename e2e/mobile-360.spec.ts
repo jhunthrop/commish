@@ -37,16 +37,25 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
   const page = await context.newPage();
 
   try {
-    // --- The home board -------------------------------------------------------------------
+    // --- Create the league whose NAME is the test input -------------------------------------
+    // The defect this spec caught was a grid item's min-content width pushing its track wider
+    // than the container, and only a long unbroken name does that. So the league is created
+    // FIRST and every card assertion below runs with it present: asserting `/app` fits before
+    // anything long exists on it would pass on a fresh database while proving nothing. Public,
+    // so `/browse`'s grid — the other half of the same fix — carries the same long name.
+    // One long UNBROKEN token, which is the exact min-content stressor the fix is about — and
+    // deliberately not containing the words "League name", which would collide with the create
+    // form's own field label through a card's "Invite managers for <name>" accessible name.
+    const leagueName = `Mobile360UnbrokenOverlongIdentifier${Date.now()}`;
     await page.goto("/app");
     await expect(page.getByRole("heading", { name: "Your leagues" })).toBeVisible();
-    await expectNoHorizontalScroll(page, "/app");
+    await page.getByText("Start or join another league").click();
+    await page.getByLabel("League name", { exact: true }).fill(leagueName);
+    await page.getByText(/Advanced settings/).click();
+    await page.getByLabel("Who can join").selectOption("public");
+    await page.getByRole("button", { name: "Create league" }).click();
 
     // --- A league home: terms panel and members panel, the two Task 3/8 surfaces ----------
-    await page.getByText("Start or join another league").click();
-    const leagueName = `Mobile 360 ${Date.now()}`;
-    await page.getByLabel("League name").fill(leagueName);
-    await page.getByRole("button", { name: "Create league" }).click();
     await expect(page.getByRole("heading", { name: leagueName })).toBeVisible();
     await expect(page.getByRole("list", { name: "Managers" })).toBeVisible();
     await expectNoHorizontalScroll(page, "a league home");
@@ -61,6 +70,19 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // The decision this page exists for has to be on screen, not off the right edge.
     await expect(page.getByRole("button", { name: `Join ${leagueName}` })).toBeVisible();
     await expectNoHorizontalScroll(page, "the invite preview");
+
+    // --- The home board, NOW carrying that name in its card grid ---------------------------
+    await page.goto("/app");
+    // `exact`: the card's action link is named "Invite managers for <league name>", which the
+    // default substring match also picks up.
+    await expect(page.getByRole("link", { name: leagueName, exact: true })).toBeVisible();
+    await expectNoHorizontalScroll(page, "/app");
+
+    // --- The public browse grid, the second consumer of the same `min-w-0` fix -------------
+    await page.goto("/browse");
+    await expect(page.getByRole("heading", { name: "Open leagues" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: leagueName })).toBeVisible();
+    await expectNoHorizontalScroll(page, "/browse");
 
     // --- The public review feed -----------------------------------------------------------
     await page.goto("/reviews");

@@ -4,7 +4,7 @@ import { useId, useState } from "react";
 import Link from "next/link";
 import { Button, Textarea } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import { REVIEW_CONFIG } from "@/reviews/config";
+import { REVIEW_CONFIG, removalPhraseFor } from "@/reviews/config";
 import { validateReviewDraft } from "@/reviews/validate";
 import type { MyReviewState, ReviewView } from "@/reviews/contract";
 import { useAccountRoomDeps } from "../hooks/deps";
@@ -29,7 +29,7 @@ export interface ReviewComposerProps {
 function RemovedNotice({ reason }: { readonly reason: string }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-elevated p-4">
-      <p className="text-sm font-medium text-text-primary">{`Your review was removed for ${reason}. It can't be edited.`}</p>
+      <p className="text-sm font-medium text-text-primary">{`Your review was removed for ${removalPhraseFor(reason)}. It can't be edited.`}</p>
       <p className="text-sm text-text-muted">
         Everything you wrote is kept on record, and it no longer appears in public.{" "}
         <Link href="/reviews" className="font-medium text-accent underline">

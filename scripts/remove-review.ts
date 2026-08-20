@@ -9,13 +9,16 @@
 // isn't a signed-up user's own id fails fast with a Postgres constraint violation rather than
 // being silently accepted as free text.
 //
-// `--reason` IS SHOWN TO THE AUTHOR, verbatim: `myReview` reports the removed state and
-// `ReviewComposer` renders "Your review was removed for <reason>. It can't be edited." Write a
-// short phrase the author should read ("spam", "abusive language"), never an internal note.
+// `--reason` IS SHOWN TO THE AUTHOR: `myReview` reports the removed state and `ReviewComposer`
+// renders "Your review was removed for <phrase>. It can't be edited." It is therefore NOT free
+// text — it must be one of `REVIEW_CONFIG.reportReasons`' values, the same closed vocabulary a
+// reporter picks from, and the author reads that value's `removalPhrase`. An operator cannot
+// type an internal note into a sentence a user reads.
 import { createInterface } from "node:readline/promises";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { reviews, users } from "@/db/schema";
+import { REMOVAL_REASON_VALUES, removalPhraseFor } from "@/reviews/config";
 import { removeReview } from "@/review-service/reviews";
 
 interface Args {
@@ -24,7 +27,7 @@ interface Args {
   readonly by: string;
 }
 
-const USAGE = 'Usage: npm run reviews:remove -- --id <reviewId> --reason "<reason>" --by <operatorUserId>';
+const USAGE = `Usage: npm run reviews:remove -- --id <reviewId> --reason <${REMOVAL_REASON_VALUES.join("|")}> --by <operatorUserId>`;
 
 function parseArgs(argv: readonly string[]): Args {
   const flags = new Map<string, string>();
@@ -42,6 +45,9 @@ function parseArgs(argv: readonly string[]): Args {
   const by = flags.get("by");
   if (id === undefined || reason === undefined || by === undefined) {
     throw new Error(`--id, --reason and --by are all required.\n${USAGE}`);
+  }
+  if (!REMOVAL_REASON_VALUES.includes(reason)) {
+    throw new Error(`--reason must be one of: ${REMOVAL_REASON_VALUES.join(", ")}. The author reads it.\n${USAGE}`);
   }
   return { id, reason, by };
 }
@@ -86,7 +92,8 @@ async function main(): Promise<void> {
   console.log(`  author: ${row.authorName}`);
   console.log(`  rating: ${row.rating}`);
   console.log(`  body:   ${row.body}`);
-  console.log(`  reason: ${args.reason}   (the author will read this)`);
+  console.log(`  reason: ${args.reason}`);
+  console.log(`  the author will read: "Your review was removed for ${removalPhraseFor(args.reason)}. It can't be edited."`);
   console.log(`  by:     ${args.by}`);
 
   const proceed = await confirm("Remove this review?");
