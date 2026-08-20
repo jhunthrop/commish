@@ -69,6 +69,32 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expect(page.getByRole("list", { name: "Managers" })).toBeVisible();
     await expectNoHorizontalScroll(page, "a league home");
 
+    // --- Task 10: the league activity page, whose one seeded row (the league's own creation)
+    // carries the long unbroken name this spec exists to stress the headline wrap with -------
+    const leagueId = new URL(page.url()).pathname.split("/").pop()!;
+    await page.goto(`/app/leagues/${leagueId}/activity`);
+    await expect(page.getByRole("heading", { name: "League activity" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "the league activity page");
+
+    // --- Task 10: the header's notice inbox, full-width at 360px rather than a floating card
+    // the viewport would clip -------------------------------------------------------------
+    // Click-and-verify, retried: a server-rendered trigger is visible and "stable" before React
+    // attaches its click handler (the same pre-hydration hazard `league-lifecycle.spec.ts`
+    // documents for the draft room's Draft button), so a click that lands too early is a silent
+    // no-op. Retrying the click until the panel actually opens proves the click was real.
+    await expect(async () => {
+      await page.getByRole("button", { name: /^Notices/ }).click();
+      await expect(page.getByRole("region", { name: "Notices" })).toBeVisible({ timeout: 3_000 });
+    }).toPass({ timeout: 15_000 });
+    await expectNoHorizontalScroll(page, "the league activity page with the notice inbox open");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("region", { name: "Notices" })).toBeHidden();
+
+    // Back to the league home — every step below assumes it, and this page detoured to the
+    // activity page and back rather than staying on it throughout.
+    await page.goto(`/app/leagues/${leagueId}`);
+    await expect(page.getByRole("heading", { name: leagueName })).toBeVisible();
+
     // --- The invite preview, the surface an invitee actually lands on ---------------------
     await page.getByRole("button", { name: "Create invite link" }).click();
     const invitePath = await page.getByLabel("Invite link").inputValue();

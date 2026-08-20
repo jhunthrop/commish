@@ -169,4 +169,12 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   await watcher.getByLabel("Message").press("Enter");
   const pickerLog = picker.getByRole("log", { name: "Messages" });
   await expect(pickerLog.getByText(shout)).toBeVisible({ timeout: 20_000 });
+
+  // --- And the pick reaches the member-visible activity feed too ---------------------------
+  // Task 10's whole spine, end to end, in a browser: a real pick, through AuditLogger, into
+  // the chain, out through the allowlist (Task 9), onto a page a member can read. The same
+  // authenticated session that made the pick reads it back.
+  await picker.goto(`/app/leagues/${leagueId}/activity`);
+  await expect(picker.getByRole("heading", { name: "League activity" })).toBeVisible();
+  await expect(picker.getByRole("listitem").filter({ hasText: "drafted" }).first()).toBeVisible();
 });
