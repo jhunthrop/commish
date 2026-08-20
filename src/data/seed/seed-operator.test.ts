@@ -74,9 +74,17 @@ function walk(dir: string, exclude: RegExp): readonly string[] {
 /**
  * Every production file (`.ts`/`.tsx`, not matching `exclude`) under the given repo-root-relative
  * `dirs` whose text matches `pattern` — the source-scan idiom `reserved.test.ts` established for
- * "found by grep rather than by memory", applied here to prove ruling 15's negative: nobody
- * outside the two files below can ever write `users.is_admin`, and nobody outside three call
- * sites can ever reach the one function that does.
+ * "found by grep rather than by memory", applied here as a DRIFT TRIPWIRE for ruling 15: it
+ * catches an accidental second writer of `users.isAdmin` written in the idiomatic spellings this
+ * codebase actually uses (a Drizzle `.set({ isAdmin: … })`/column definition, or a raw
+ * `is_admin` in hand-written SQL). It is NOT a proof against a deliberately obfuscated write — a
+ * computed property key (`.set({ [col]: true })`) or an ORM call built from a dynamically
+ * assembled column name would slip past every regex below, the same way a `victoryOK` filter
+ * cannot catch every mine sweep — and closing that gap is what `code-reviewer` and the merge
+ * review are for, not a static scan. What this DOES buy: the same accidental-drift class every
+ * other source-scan test in this codebase catches (`reserved.test.ts`'s "found by grep rather
+ * than by memory"), which is the failure mode a second contributor actually produces by adding an
+ * ordinary write somewhere convenient, not by trying to evade a test.
  */
 function grepSourceTree(pattern: RegExp, { dirs, exclude }: GrepOptions): readonly string[] {
   return dirs
@@ -86,12 +94,22 @@ function grepSourceTree(pattern: RegExp, { dirs, exclude }: GrepOptions): readon
     .sort();
 }
 
-describe("ruling 15 — no in-product way to grant operator access", () => {
-  it("gives an ordinary account no way to become an operator through the product", () => {
-    // Every writer of users.is_admin, found by grep rather than by memory: the column's own
-    // definition, and the one UPDATE that ever sets it.
+describe("ruling 15 — no in-product way to grant operator access (a drift tripwire, not a proof — see grepSourceTree's docblock)", () => {
+  it("gives an ordinary account no way to become an operator through the product's idiomatic write shapes", () => {
+    // Every writer of users.isAdmin (the TS/Drizzle spelling), found by grep rather than by
+    // memory: the column's own definition, and the one UPDATE that ever sets it.
     const writers = grepSourceTree(/\bisAdmin\s*:/, { dirs: ["src", "scripts"], exclude: /\.test\.tsx?$/ });
     expect(writers).toEqual(["src/db/schema.ts", "src/integrity-service/flags.ts"]);
+
+    // The same claim, in the RAW COLUMN spelling (`is_admin`) rather than the TS property name —
+    // this is what catches a hand-written `sql\`UPDATE users SET is_admin = …\`` that never types
+    // `isAdmin:` at all and so slips the scan above. `schema.ts` is excluded because it is the
+    // one legitimate place the raw column name is declared (`boolean("is_admin")`); every other
+    // production file that needs to TALK ABOUT the column does so via the TS property name
+    // (`users.isAdmin`) in its own prose, which is what keeps this scan meaningful instead of
+    // permanently red.
+    const columnWriters = grepSourceTree(/\bis_admin\b/, { dirs: ["src", "scripts"], exclude: /\.test\.tsx?$|^schema\.ts$/ });
+    expect(columnWriters).toEqual([]);
 
     // …and the only callers of grantAdmin are the script, the seed's own bootstrap grant, and
     // the function's own declaration.

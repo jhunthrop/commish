@@ -31,9 +31,10 @@ export interface GrantAdminInput {
 export type GrantAdminResult = { readonly ok: true; readonly userId: string; readonly isAdmin: boolean } | { readonly ok: false; readonly reason: string };
 
 /**
- * Grant or revoke operator access. The ONLY writer of `users.is_admin` — `scripts/grant-admin.ts`
- * is the only caller, by ruling 15's design, and the source-scan proof in
- * `src/data/seed/index.test.ts` holds that to be true rather than trusting it.
+ * Grant or revoke operator access. The ONLY writer of `users.isAdmin` — `scripts/grant-admin.ts`
+ * is the only caller, by ruling 15's design, and the source-scan tripwire in
+ * `src/data/seed/seed-operator.test.ts` catches an accidental second writer in its idiomatic
+ * spelling (rather than trusting that no one adds one).
  *
  * `--by bootstrap` is legal exactly once per database and is CHECKED, not trusted: the statement
  * below refuses it if any admin already exists. After that, an existing operator's id is

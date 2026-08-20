@@ -10,7 +10,7 @@ import { DEV_SEED } from "./config";
  * npm run dev` lands a working dispute queue with no manual step.
  *
  * Not mock data (founder rule): this calls `grantAdmin`, the one real writer of
- * `users.is_admin`, so a real audit event and a real notice land — exactly what a grant through
+ * `users.isAdmin`, so a real audit event and a real notice land — exactly what a grant through
  * `scripts/grant-admin.ts` would produce. `--by bootstrap`, because a fresh database has no
  * operator yet to name; on a database that already has one (a reseed, or a developer who ran
  * `scripts/grant-admin.ts` by hand first), `grantAdmin`'s own bootstrap check refuses this call

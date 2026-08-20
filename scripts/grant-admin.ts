@@ -1,4 +1,4 @@
-// The ONLY door `users.is_admin` opens through (ruling 15): there is deliberately no in-product
+// The ONLY door `users.isAdmin` opens through (ruling 15): there is deliberately no in-product
 // grant path, so this script IS the operator surface's own bootstrap. It runs against the
 // database host, never through a session — a privilege escalation bug therefore has to be a bug
 // in Postgres access control rather than a bug in this codebase.
