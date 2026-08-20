@@ -2,13 +2,17 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { Db } from "@/db/client";
-import { userPreferences, users } from "@/db/schema";
+import { auditEvents, userPreferences, users } from "@/db/schema";
+import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { syncUserFromWorkOS } from "@/lib/auth/user-sync";
 import { readPreferences, updatePreferences } from "./preferences";
 import { readProfile, updateProfile } from "./profile";
 
 const db = createTestDb();
 const fixedClock = { now: () => "2026-08-19T12:00:00.000Z" };
+
+let counter = 0;
+const logger = createAuditLogger({ newId: () => `evt_${(counter += 1)}` });
 
 /** Module-private: the minimal `users` row every case here starts from. */
 async function seedUser(
@@ -25,6 +29,7 @@ async function seedUser(
 
 beforeEach(async () => {
   await truncateAll(db);
+  counter = 0;
 });
 
 afterAll(async () => {
@@ -133,6 +138,29 @@ describe("updateProfile / readProfile", () => {
     // reads the row back. Neither may report success for a profile nobody has.
     await expect(updateProfile(db, { userId: "nobody", displayName: "Ada" }, fixedClock)).rejects.toThrow(/No user row for id nobody/);
     await expect(updateProfile(db, { userId: "nobody", avatarPreset: null }, fixedClock)).rejects.toThrow(/No user row for id nobody/);
+  });
+
+  it("records what changed, and never the old or new display name's contents beyond the field list", async () => {
+    await seedUser(db, { id: "u1", displayName: "Ada Lovelace" });
+    await updateProfile(db, { userId: "u1", displayName: "Ada B." }, fixedClock, { audit: logger });
+
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "profile_updated"));
+    expect(event).toMatchObject({ chainScope: "platform", leagueId: null, actorId: "u1", actorType: "user" });
+    expect(event!.payload).toEqual({ fields: ["displayName"] });
+  });
+
+  it("records every field a multi-field PATCH actually touched, in canonical order", async () => {
+    await seedUser(db, { id: "u1" });
+    await updateProfile(db, { userId: "u1", displayName: "Ada", experienceTier: "experienced", avatarPreset: "shield" }, fixedClock, { audit: logger });
+
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "profile_updated"));
+    expect(event!.payload).toEqual({ fields: ["displayName", "experienceTier", "avatarPreset"] });
+  });
+
+  it("records nothing for a PATCH that changes nothing", async () => {
+    await seedUser(db, { id: "u1" });
+    await updateProfile(db, { userId: "u1", avatarPreset: null }, fixedClock, { audit: logger });
+    expect(await db.select().from(auditEvents)).toHaveLength(0);
   });
 
   it("a later WorkOS sign-in does not clobber what the user chose", async () => {

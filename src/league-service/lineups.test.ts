@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { lineupSlots, statWeeks } from "@/db/schema";
+import { auditEvents, lineupSlots, statWeeks } from "@/db/schema";
 import type { WeekStatus } from "@/league";
+import { createAuditLogger } from "@/integrity-service/audit-logger";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
 import { getLineup, isWeekLocked, lineupView, setLineup, type SetLineupInput } from "./lineups";
 import { SLOTS, twoTeamLeague, validSwap } from "./test-support";
@@ -13,19 +14,23 @@ function recordingScoreCache(): Pick<ScoreCache, "invalidate"> & { invalidate: R
 }
 
 const db = createTestDb();
+const clock = { now: () => "2026-08-20T17:00:00.000Z" };
+let counter = 0;
+const logger = createAuditLogger({ newId: () => `evt_${(counter += 1)}` });
 
 /** Writes (or overwrites) one week's `stat_weeks` row — the lock tests' only way to move a week off `scheduled`. */
 async function setWeekStatus(week: number, status: WeekStatus): Promise<void> {
   await db.insert(statWeeks).values({ week, status }).onConflictDoUpdate({ target: statWeeks.week, set: { status } });
 }
 
-/** A legal lineup swap for the named week, on the caller's own team in `league`. */
+/** A legal lineup swap for the named week, on the caller's own team in `league` — always the commissioner, "u1" (`twoTeamLeague`). */
 function validLineupInput(league: { readonly leagueId: string; readonly teamId: string }, weekNumber: number): SetLineupInput {
-  return { leagueId: league.leagueId, teamId: league.teamId, weekNumber, slots: validSwap };
+  return { leagueId: league.leagueId, teamId: league.teamId, weekNumber, slots: validSwap, userId: "u1" };
 }
 
 beforeEach(async () => {
   await truncateAll(db);
+  counter = 0;
 });
 
 afterAll(async () => {
@@ -35,7 +40,7 @@ afterAll(async () => {
 describe("setLineup", () => {
   it("saves a legal lineup for a week and reads it back", async () => {
     const league = await twoTeamLeague(db);
-    const result = await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, slots: validSwap });
+    const result = await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, slots: validSwap, userId: "u1" });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.lineup.starters.map((s) => s.playerId)).toEqual(["qb2", "rb1"]);
@@ -50,8 +55,8 @@ describe("setLineup", () => {
 
   it("replaces the previous save rather than accumulating rows", async () => {
     const league = await twoTeamLeague(db);
-    await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, slots: validSwap });
-    await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, slots: validSwap });
+    await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, slots: validSwap, userId: "u1" });
+    await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, slots: validSwap, userId: "u1" });
     const rows = await db.select().from(lineupSlots).where(and(eq(lineupSlots.teamId, league.teamId), eq(lineupSlots.weekNumber, 1)));
     expect(rows).toHaveLength(4);
   });
@@ -59,7 +64,7 @@ describe("setLineup", () => {
   it("rejects a player in the wrong slot with validateLineup's own reason", async () => {
     const league = await twoTeamLeague(db);
     const result = await setLineup(db, {
-      leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1,
+      leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, userId: "u1",
       slots: [
         { slot: "QB", slotIndex: 0, playerId: "rb1" },
         { slot: "RB", slotIndex: 0, playerId: "qb1" },
@@ -73,7 +78,7 @@ describe("setLineup", () => {
   it("rejects an empty starting slot", async () => {
     const league = await twoTeamLeague(db);
     const result = await setLineup(db, {
-      leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1,
+      leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, userId: "u1",
       slots: [
         { slot: "QB", slotIndex: 0, playerId: null },
         { slot: "RB", slotIndex: 0, playerId: "rb1" },
@@ -86,14 +91,14 @@ describe("setLineup", () => {
     const league = await twoTeamLeague(db);
     expect(
       await setLineup(db, {
-        leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1,
+        leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, userId: "u1",
         slots: [{ slot: "QB", slotIndex: 0, playerId: "qb1" }, { slot: "RB", slotIndex: 0, playerId: "rb_other" }],
       }),
     ).toEqual({ ok: false, status: 422, reason: "One of those players isn't on your team." });
 
     expect(
       await setLineup(db, {
-        leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1,
+        leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, userId: "u1",
         slots: [{ slot: "QB", slotIndex: 0, playerId: "qb1" }, { slot: "RB", slotIndex: 0, playerId: "rb1" }, { slot: "BENCH", slotIndex: 0, playerId: "rb1" }],
       }),
     ).toEqual({ ok: false, status: 422, reason: "You can only start a player in one spot." });
@@ -155,7 +160,7 @@ describe("setLineup", () => {
       await flipped;
     });
 
-    const saving = setLineup(db, validLineupInput(league, 2));
+    const saving = setLineup(db, validLineupInput(league, 2), undefined, { audit: logger, clock });
     // Long enough for `setLineup` to clear its up-front check and reach the locking read.
     await new Promise((resolve) => setTimeout(resolve, 150));
     release();
@@ -164,19 +169,51 @@ describe("setLineup", () => {
     expect(await saving).toMatchObject({ ok: false, status: 409 });
     const saved = await db.select().from(lineupSlots).where(eq(lineupSlots.teamId, league.teamId));
     expect(saved.filter((row) => row.weekNumber === 2)).toHaveLength(0);
+    // `setLineup` checks the lock twice; the second check is inside the transaction. An audit
+    // event written before that check would record a lineup change that never happened.
+    // (Filtered to `lineup_change`: `twoTeamLeague` itself writes a `league_created` event via
+    // the process-wide logger when it calls `createLeague`, so the table is never actually empty.)
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "lineup_change"))).toHaveLength(0);
+  });
+
+  it("records nothing when the week is locked up front and the write is refused", async () => {
+    const league = await twoTeamLeague(db, { weeks: 10 });
+    await setWeekStatus(3, "in_progress");
+    const result = await setLineup(db, validLineupInput(league, 3), undefined, { audit: logger, clock });
+    expect(result.ok).toBe(false);
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "lineup_change"))).toHaveLength(0);
+  });
+
+  it("records the lineup change inside the same transaction that holds the week's share lock", async () => {
+    const league = await twoTeamLeague(db);
+    const result = await setLineup(db, validLineupInput(league, 1), undefined, { audit: logger, clock });
+    expect(result.ok).toBe(true);
+
+    const rows = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "lineup_change"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ chainScope: league.leagueId, actorId: "u1", actorType: "user", leagueId: league.leagueId });
+    expect(rows[0]!.payload).toEqual({
+      teamId: league.teamId,
+      weekNumber: 1,
+      starters: [
+        { slot: "QB", slotIndex: 0, playerId: "qb2" },
+        { slot: "RB", slotIndex: 0, playerId: "rb1" },
+      ],
+    });
+    expect(rows[0]!.occurredAt.toISOString()).toBe(clock.now());
   });
 
   it("refuses a week the league doesn't have", async () => {
     const league = await twoTeamLeague(db);
     expect(
-      await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 9, slots: validSwap }),
+      await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 9, slots: validSwap, userId: "u1" }),
     ).toEqual({ ok: false, status: 404, reason: "That week isn't part of this league's season." });
   });
 
   it("invalidates the score cache for this league and week after a successful save", async () => {
     const league = await twoTeamLeague(db);
     const cache = recordingScoreCache();
-    const result = await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, slots: validSwap }, cache);
+    const result = await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, slots: validSwap, userId: "u1" }, cache);
     expect(result.ok).toBe(true);
     expect(cache.invalidate).toHaveBeenCalledTimes(1);
     expect(cache.invalidate).toHaveBeenCalledWith(league.leagueId, 1);
@@ -188,7 +225,7 @@ describe("setLineup", () => {
     const result = await setLineup(
       db,
       {
-        leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1,
+        leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, userId: "u1",
         slots: [
           { slot: "QB", slotIndex: 0, playerId: null },
           { slot: "RB", slotIndex: 0, playerId: "rb1" },

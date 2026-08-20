@@ -1,15 +1,20 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { users } from "@/db/schema";
+import { auditEvents, users } from "@/db/schema";
+import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { syncUserFromWorkOS, displayNameFrom } from "./user-sync";
 
 const db = createTestDb();
 const T0 = "2026-08-17T12:00:00.000Z";
 const T1 = "2026-08-18T12:00:00.000Z";
 
+let counter = 0;
+const logger = createAuditLogger({ newId: () => `evt_${(counter += 1)}` });
+
 beforeEach(async () => {
   await truncateAll(db);
+  counter = 0;
 });
 
 afterAll(async () => {
@@ -66,5 +71,39 @@ describe("syncUserFromWorkOS", () => {
     const profile = await syncUserFromWorkOS({ db, clock: { now: () => T0 } }, workosUser);
     expect(profile.id).toBe("user_01HXYZ");
     expect(profile.displayName).toBe("Jane Doe");
+  });
+
+  it("records a session_started on the platform chain for every sign-in", async () => {
+    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, audit: logger }, workosUser);
+    await syncUserFromWorkOS({ db, clock: { now: () => T1 }, audit: logger }, workosUser);
+
+    const rows = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "session_started")).orderBy(auditEvents.sequence);
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ chainScope: "platform", leagueId: null, actorId: "user_01HXYZ", actorType: "user" });
+    expect(rows[0]!.payload).toEqual({ via: "callback", firstSignIn: true });
+    expect(rows[1]!.payload).toEqual({ via: "callback", firstSignIn: false });
+  });
+
+  it("carries no IP and no device signal, deliberately", async () => {
+    // Ruling 20. All four existing IP reads key on X-Forwarded-For, which their own docblock
+    // calls caller-controlled and rotatable — a multi-account flag keyed on a forgeable header
+    // lets an attacker manufacture suspicion against someone else's account, strictly worse than
+    // a bypassed rate limiter. Plan B adds the signals, with the IP weight at zero.
+    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, audit: logger }, workosUser);
+    const [row] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "session_started"));
+    expect(Object.keys(row!.payload).sort()).toEqual(["firstSignIn", "via"]);
+  });
+
+  it("loses the audit event when the upsert's own transaction rolls back", async () => {
+    // The same-transaction contract at a real call site: the upsert and its audit event share
+    // one transaction, so a failure inside the audit append (an unhashable payload) fails the
+    // upsert too, rather than leaving a sign-in recorded nowhere.
+    await expect(
+      syncUserFromWorkOS(
+        { db, clock: { now: () => T0 }, audit: { ...logger, record: async () => { throw new Error("audit append failed"); } } },
+        workosUser,
+      ),
+    ).rejects.toThrow("audit append failed");
+    expect(await db.select().from(users)).toHaveLength(0);
   });
 });

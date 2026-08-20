@@ -2,6 +2,7 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { reviewReports, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { formatReviewCursor, type ReviewCursor } from "@/reviews/cursor";
 import type { MyReviewState, ReviewView, ReviewsPage } from "@/reviews/contract";
@@ -229,6 +230,8 @@ export interface RemoveReviewInput {
   readonly removedByUserId: string;
   readonly reason: string;
   readonly clock?: Clock;
+  /** Defaults to the process-wide logger (`getAuditLogger()`). */
+  readonly audit?: AuditLogger;
 }
 
 export interface RemovalRecord {
@@ -256,33 +259,52 @@ export type RemoveReviewResult =
  * on the row lock: whichever commits first wins, and the second's `UPDATE` matches zero rows
  * because Postgres re-evaluates `removed_at IS NULL` against the now-committed row before it can
  * match — so a second operator can never silently overwrite the first one's reason and timestamp.
+ *
+ * Records `review_removed` on the PLATFORM chain, INSIDE the same transaction as the stamp, and
+ * only on the branch that actually landed one — a re-stamp attempt that the `WHERE` clause
+ * refuses is not a removal and must record nothing, the same "judged by this write's own
+ * returned rows" rule the stamp itself uses. The whole function runs inside one transaction now
+ * (it used to be a single bare `UPDATE`) so the stamp and its audit event commit together.
  */
 export async function removeReview(db: Db, input: RemoveReviewInput): Promise<RemoveReviewResult> {
   const clock = input.clock ?? systemClock;
+  const audit = input.audit ?? getAuditLogger();
   const now = new Date(clock.now());
-  const [row] = await db
-    .update(reviews)
-    .set({ removedAt: now, removedByUserId: input.removedByUserId, removalReason: input.reason })
-    .where(and(eq(reviews.id, input.reviewId), isNull(reviews.removedAt)))
-    .returning({ id: reviews.id, userId: reviews.userId, removedByUserId: reviews.removedByUserId, removalReason: reviews.removalReason, removedAt: reviews.removedAt });
 
-  if (row !== undefined && row.removedAt !== null && row.removedByUserId !== null && row.removalReason !== null) {
-    return {
-      ok: true,
-      record: {
-        reviewId: row.id,
-        userId: row.userId,
-        removedByUserId: row.removedByUserId,
-        reason: row.removalReason,
-        removedAt: row.removedAt.toISOString(),
-      },
-    };
-  }
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(reviews)
+      .set({ removedAt: now, removedByUserId: input.removedByUserId, removalReason: input.reason })
+      .where(and(eq(reviews.id, input.reviewId), isNull(reviews.removedAt)))
+      .returning({ id: reviews.id, userId: reviews.userId, removedByUserId: reviews.removedByUserId, removalReason: reviews.removalReason, removedAt: reviews.removedAt });
 
-  // The UPDATE matched nothing — either no review has this id, or it's already removed. A
-  // second SELECT (outside the write, so it costs nothing when the write succeeds) tells the
-  // two apart for a message that actually helps the operator running the script.
-  const [existing] = await db.select({ removedAt: reviews.removedAt }).from(reviews).where(eq(reviews.id, input.reviewId));
-  if (existing === undefined) return { ok: false, reason: `No review with id "${input.reviewId}".` };
-  return { ok: false, reason: `Review "${input.reviewId}" is already removed.` };
+    if (row !== undefined && row.removedAt !== null && row.removedByUserId !== null && row.removalReason !== null) {
+      await audit.record(tx, {
+        eventType: "review_removed",
+        actorId: row.removedByUserId,
+        actorType: "user",
+        leagueId: null,
+        payload: { reviewId: row.id, authorUserId: row.userId, reason: row.removalReason },
+        occurredAt: clock.now(),
+      });
+      return {
+        ok: true,
+        record: {
+          reviewId: row.id,
+          userId: row.userId,
+          removedByUserId: row.removedByUserId,
+          reason: row.removalReason,
+          removedAt: row.removedAt.toISOString(),
+        },
+      };
+    }
+
+    // The UPDATE matched nothing — either no review has this id, or it's already removed. A
+    // second SELECT (still inside this transaction, so it costs nothing when the write
+    // succeeds) tells the two apart for a message that actually helps the operator running the
+    // script.
+    const [existing] = await tx.select({ removedAt: reviews.removedAt }).from(reviews).where(eq(reviews.id, input.reviewId));
+    if (existing === undefined) return { ok: false, reason: `No review with id "${input.reviewId}".` };
+    return { ok: false, reason: `Review "${input.reviewId}" is already removed.` };
+  });
 }

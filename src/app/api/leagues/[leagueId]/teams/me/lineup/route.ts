@@ -38,6 +38,7 @@ export async function PUT(request: Request, context: LeagueRouteContext) {
       teamId: actor.teamId,
       weekNumber: parsed.value.weekNumber,
       slots: parsed.value.slots,
+      userId: actor.userId,
     });
     if (!result.ok) return fail(result.reason, result.status);
     return ok<LineupBody>(result.lineup);

@@ -54,6 +54,7 @@ describe("features built on fixtures, run against a real drafted league", () => 
       slots: before
         .filter((slot) => slot.slot !== "BENCH")
         .map((slot) => ({ slot: slot.slot, slotIndex: slot.slotIndex, playerId: slot.playerId })),
+      userId: league.userIds[0]!,
     });
     expect(result.ok).toBe(true);
   });

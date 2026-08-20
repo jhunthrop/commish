@@ -3,8 +3,9 @@ import { eq, getTableName, is, Table } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { Db } from "@/db/client";
 import * as schema from "@/db/schema";
-import { reviews, users } from "@/db/schema";
+import { auditEvents, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
+import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { parseReviewCursor } from "@/reviews/cursor";
 import { feedQuery, listReviews, myReview, removeReview, reportReview, submitReview } from "./reviews";
@@ -12,6 +13,9 @@ import { feedQuery, listReviews, myReview, removeReview, reportReview, submitRev
 const db = createTestDb();
 
 const at = (iso: string): Clock => ({ now: () => iso });
+
+let counter = 0;
+const logger = createAuditLogger({ newId: () => `evt_${(counter += 1)}` });
 
 const LONG_ENOUGH = "This league runs itself. Draft night was smooth and scoring settled fast.";
 const BRUTAL = "The commissioner vanished mid-season and nobody ever settled the standings.";
@@ -38,6 +42,7 @@ async function seedUser(id: string): Promise<void> {
 
 beforeEach(async () => {
   await truncateAll(db);
+  counter = 0;
 });
 
 afterAll(async () => {
@@ -381,5 +386,26 @@ describe("removeReview", () => {
     const [row] = await db.select().from(reviews).where(eq(reviews.id, "r1"));
     expect(row).toMatchObject({ removedByUserId: "operator", removalReason: "spam" });
     expect(row?.removedAt?.toISOString()).toBe("2026-08-04T00:00:00.000Z");
+  });
+
+  it("records the removal on the platform chain, and only when the stamp actually landed", async () => {
+    await seedUser("user_bob");
+    await seedUser("user_operator");
+    await seedUser("user_other");
+    await submitReview(db, { userId: "user_bob", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "rev_1" });
+
+    await removeReview(db, { reviewId: "rev_1", removedByUserId: "user_operator", reason: "abuse", clock: at("2026-08-04T00:00:00Z"), audit: logger });
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "review_removed"));
+    expect(event).toMatchObject({ chainScope: "platform", leagueId: null, actorId: "user_operator", actorType: "user" });
+    expect(event!.payload).toEqual({ reviewId: "rev_1", authorUserId: "user_bob", reason: "abuse" });
+
+    // The no-re-stamp invariant means a second removal changes nothing, so it must record nothing.
+    await removeReview(db, { reviewId: "rev_1", removedByUserId: "user_other", reason: "spam", clock: at("2026-08-05T00:00:00Z"), audit: logger });
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "review_removed"))).toHaveLength(1);
+  });
+
+  it("records nothing when there is no review to remove", async () => {
+    await removeReview(db, { reviewId: "missing", removedByUserId: "operator", reason: "spam", audit: logger });
+    expect(await db.select().from(auditEvents)).toHaveLength(0);
   });
 });
