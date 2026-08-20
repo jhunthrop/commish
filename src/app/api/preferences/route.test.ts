@@ -81,10 +81,18 @@ describe("PATCH /api/preferences", () => {
     expect(await response.json()).toEqual({ ok: true, data: { helpLevel: "standard", draftTourDismissedAt: null } });
   });
 
-  it("answers 500 rather than crashing when the caller never had preferences seeded", async () => {
-    await db.insert(users).values({ id: "u1", email: "u1@test.local", displayName: "u1" });
+  it("succeeds for a caller who has never had preferences seeded — seeding from their own tier, then applying the write", async () => {
+    // A bare PATCH must work for any authenticated user, not only one who happened to visit a
+    // page that calls readPreferences first.
+    await db.insert(users).values({ id: "u1", email: "u1@test.local", displayName: "u1", experienceTier: "experienced" });
     signedInAs("u1");
+
     const response = await PATCH(patch({ dismissDraftTour: true }));
-    expect(response.status).toBe(500);
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { readonly ok: true; readonly data: { readonly helpLevel: string; readonly draftTourDismissedAt: string | null } };
+    // The seeded default came from the user's own experienceTier ("experienced" -> "standard"),
+    // not the column's floor default ("guided") — and the patched field landed too.
+    expect(body.data.helpLevel).toBe("standard");
+    expect(body.data.draftTourDismissedAt).not.toBeNull();
   });
 });

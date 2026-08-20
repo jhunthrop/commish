@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
-import { userPreferences } from "@/db/schema";
+import type { Db, DbTx } from "@/db/client";
+import { userPreferences, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { defaultPreferences, type HelpLevel, type PreferenceState } from "@/identity";
@@ -26,18 +26,27 @@ function toPreferenceState(row: PreferencesRow): PreferenceState {
 }
 
 /**
- * The caller's own preferences, seeding the row on first read rather than at sign-up
- * (`userPreferences`'s own docblock in `@/db/schema`). `onConflictDoNothing` then a separate
- * select — not a single `INSERT ... RETURNING` — so two concurrent first reads for the same
- * user race safely under the connection pooler: whichever insert loses the race does nothing,
- * and both reads then see the one row that won.
+ * Inserts the row if it's missing, seeded from `defaultPreferences({ experienceTier })` — the
+ * one seeding idiom, shared by `readPreferences` and `updatePreferences` so there is exactly
+ * one place that decides what a brand-new row looks like. `onConflictDoNothing`, not a plain
+ * `INSERT ... RETURNING`: two concurrent first touches for the same user (a read and a write, or
+ * two writes) race safely, because whichever insert loses the race does nothing and both callers
+ * go on to see the one row that won.
  */
-export async function readPreferences(db: Db, user: { readonly id: string; readonly experienceTier: ExperienceTier }): Promise<PreferenceState> {
-  const seed = defaultPreferences(user);
+async function seedIfMissing(db: Db | DbTx, userId: string, experienceTier: ExperienceTier): Promise<void> {
+  const seed = defaultPreferences({ experienceTier });
   await db
     .insert(userPreferences)
-    .values({ userId: user.id, helpLevel: seed.helpLevel })
+    .values({ userId, helpLevel: seed.helpLevel })
     .onConflictDoNothing({ target: userPreferences.userId });
+}
+
+/**
+ * The caller's own preferences, seeding the row on first read rather than at sign-up
+ * (`userPreferences`'s own docblock in `@/db/schema`).
+ */
+export async function readPreferences(db: Db, user: { readonly id: string; readonly experienceTier: ExperienceTier }): Promise<PreferenceState> {
+  await seedIfMissing(db, user.id, user.experienceTier);
   const [row] = await db.select().from(userPreferences).where(eq(userPreferences.userId, user.id));
   if (row === undefined) throw new Error(`No preferences row for user ${user.id} after seeding.`);
   return toPreferenceState(row);
@@ -45,21 +54,31 @@ export async function readPreferences(db: Db, user: { readonly id: string; reado
 
 /**
  * Writes `helpLevel` and/or stamps `draftTourDismissedAt` from `clock`, never `Date.now()`
- * directly (`@/domain/timing`'s `Clock` convention). Requires the row to already exist —
- * `readPreferences` is what seeds it — so a write before any read fails loudly rather than
- * silently seeding the wrong default (a write path doesn't know the caller's `experienceTier`).
+ * directly (`@/domain/timing`'s `Clock` convention).
+ *
+ * Self-sufficient: a bare `PATCH /api/preferences` from a user who has never opened anything
+ * that calls `readPreferences` first must still succeed, not 500. So this looks up the caller's
+ * own `experienceTier`, seeds the row if it's missing (the same `seedIfMissing` idiom
+ * `readPreferences` uses), and applies the write — all inside one transaction, so a concurrent
+ * caller never observes the seed without the write or the write without the seed.
  */
 export async function updatePreferences(db: Db, input: UpdatePreferencesParams, clock: Clock = systemClock): Promise<PreferenceState> {
   const now = new Date(clock.now());
-  const [row] = await db
-    .update(userPreferences)
-    .set({
-      helpLevel: input.helpLevel,
-      draftTourDismissedAt: input.dismissDraftTour === true ? now : undefined,
-      updatedAt: now,
-    })
-    .where(eq(userPreferences.userId, input.userId))
-    .returning();
-  if (row === undefined) throw new Error(`No preferences row for user ${input.userId}. Read preferences before writing them.`);
-  return toPreferenceState(row);
+  return db.transaction(async (tx) => {
+    const [user] = await tx.select({ experienceTier: users.experienceTier }).from(users).where(eq(users.id, input.userId));
+    if (user === undefined) throw new Error(`No user row for id ${input.userId}.`);
+    await seedIfMissing(tx, input.userId, user.experienceTier);
+
+    const [row] = await tx
+      .update(userPreferences)
+      .set({
+        helpLevel: input.helpLevel,
+        draftTourDismissedAt: input.dismissDraftTour === true ? now : undefined,
+        updatedAt: now,
+      })
+      .where(eq(userPreferences.userId, input.userId))
+      .returning();
+    if (row === undefined) throw new Error(`No preferences row for user ${input.userId} after seeding.`);
+    return toPreferenceState(row);
+  });
 }

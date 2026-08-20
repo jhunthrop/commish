@@ -70,8 +70,24 @@ describe("updatePreferences", () => {
     expect(prefs).toEqual({ helpLevel: "standard", draftTourDismissedAt: "2026-08-19T12:00:00.000Z" });
   });
 
-  it("throws rather than silently seeding the wrong default when no row exists yet", async () => {
-    await seedUser(db, "u1");
-    await expect(updatePreferences(db, { userId: "u1", helpLevel: "standard" }, fixedClock)).rejects.toThrow();
+  it("seeds the row from the user's own tier and applies the write, when no row exists yet", async () => {
+    // A bare PATCH from a user who has never opened anything that calls `readPreferences`
+    // first must still succeed — this is the seed-then-update path, not a 500.
+    await seedUser(db, "u1"); // beginner by column default
+    const prefs = await updatePreferences(db, { userId: "u1", dismissDraftTour: true }, fixedClock);
+    expect(prefs).toEqual({ helpLevel: "guided", draftTourDismissedAt: "2026-08-19T12:00:00.000Z" });
+
+    const rows = await db.select().from(userPreferences).where(eq(userPreferences.userId, "u1"));
+    expect(rows).toHaveLength(1);
+  });
+
+  it("seeds standard help for an experienced manager who writes before ever reading", async () => {
+    await db.insert(users).values({ id: "u1", email: "u1@example.com", displayName: "u1", experienceTier: "experienced" });
+    const prefs = await updatePreferences(db, { userId: "u1", dismissDraftTour: true }, fixedClock);
+    expect(prefs.helpLevel).toBe("standard");
+  });
+
+  it("throws rather than silently proceeding when the user row itself doesn't exist", async () => {
+    await expect(updatePreferences(db, { userId: "nobody", helpLevel: "standard" }, fixedClock)).rejects.toThrow();
   });
 });
