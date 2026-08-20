@@ -148,6 +148,13 @@
       "when": 1787229408220,
       "tag": "0020_member_notices",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1787242830158,
+      "tag": "0021_audit_checkpoint_append_only",
+      "breakpoints": true
     }
   ]
 }

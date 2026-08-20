@@ -274,6 +274,20 @@ describe("audit_events carries its indexes and its append-only triggers", () => 
     `);
     expect(rows.map((row) => row.tgname).sort()).toEqual(["audit_events_no_delete", "audit_events_no_update"]);
   });
+
+  /**
+   * `audit_chain_checkpoints`' own pair (`drizzle/0021_audit_checkpoint_append_only.sql`), pinned
+   * the same way and for a sharper reason: this table is the THIRD account the verifier reconciles
+   * against, and it is the only account that survives an adversary who deletes the tail of
+   * `audit_events` and rewinds `audit_chains` to match. A migration that recreates the table and
+   * forgets these triggers reopens that exact hole, silently.
+   */
+  it("carries the checkpoint table's forward-only triggers, which are what make it a detector", async () => {
+    const rows = await db.execute<{ tgname: string }>(sql`
+      SELECT tgname FROM pg_trigger WHERE tgrelid = 'audit_chain_checkpoints'::regclass AND NOT tgisinternal
+    `);
+    expect(rows.map((row) => row.tgname).sort()).toEqual(["audit_chain_checkpoints_forward_only", "audit_chain_checkpoints_no_delete"]);
+  });
 });
 
 /**

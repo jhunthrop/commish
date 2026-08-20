@@ -106,8 +106,24 @@ export function linkEvent(input: AuditEventInput, anchor: ChainAnchor, eventId: 
  * service-level verifier when the row a checkpoint claims to have verified no longer hashes to
  * what the checkpoint recorded. It lives in this union so there is one vocabulary for "how the
  * chain is broken" rather than two.
+ *
+ * `anchor_mismatch` is the same kind of finding one table over, and it is the one DELETION is
+ * visible through. Walking rows can only ever see the rows that are still there: a walk that
+ * finds three events and stops has no way, from the events alone, to tell a chain that holds
+ * three from a chain whose fourth and fifth were deleted. `audit_chains` is the chain's own
+ * sworn statement about how many events it has and what the last one hashed to, written in the
+ * same transaction as every append, so holding the walk TO that statement is what turns a
+ * silent deletion into an accusation. Emitted by `verifyChainIntegrity`/`verifyFullChainIntegrity`
+ * when the anchor and the walk disagree, or when a checkpoint has frozen a count the anchor has
+ * since fallen behind.
  */
-export type ChainBreakReason = "sequence_gap" | "link_mismatch" | "hash_mismatch" | "version_mismatch" | "checkpoint_mismatch";
+export type ChainBreakReason =
+  | "sequence_gap"
+  | "link_mismatch"
+  | "hash_mismatch"
+  | "version_mismatch"
+  | "checkpoint_mismatch"
+  | "anchor_mismatch";
 
 export interface ChainBreak {
   readonly reason: ChainBreakReason;

@@ -37,9 +37,62 @@ async function page(db: Db, scope: string, after: number, batchSize: number): Pr
 }
 
 /**
- * Walks forward from `from` to the end of the chain, one page at a time, and advances the
- * checkpoint on success. Never advances it on failure: every later run re-detects the same break
- * rather than stepping over it, which is what makes a break something a human eventually sees.
+ * What `audit_chains` SWEARS this scope holds: how many events, and what the last one hashed to.
+ *
+ * A scope with no anchor row at all reads as the genesis anchor, which is the honest reading of
+ * "nothing has ever been appended here" — and it makes "no anchor row but rows exist" (an anchor
+ * somebody deleted) a mismatch rather than a special case, because zero is not what the walk
+ * will have found.
+ */
+async function swornAnchor(db: Db, scope: string): Promise<ChainAnchor> {
+  const [row] = await db.select().from(auditChains).where(eq(auditChains.scope, scope));
+  if (row === undefined) return { headSequence: 0, headHash: GENESIS_HASH };
+  return { headSequence: row.headSequence, headHash: row.headHash };
+}
+
+/**
+ * The accusation, with BOTH numbers in it. An operator reading a broken chain needs to know
+ * which of the two accounts is short and by how much, because "the anchor says five and the rows
+ * say three" and "the anchor says three and the rows say five" are different incidents.
+ *
+ * The divergence point is the first sequence the two accounts stop agreeing about: one past the
+ * shorter of the two when they differ in LENGTH, and the head sequence itself when they agree on
+ * the count but not on the hash (nothing after it is in dispute; that one row is).
+ */
+function anchorMismatch(scope: string, sworn: ChainAnchor, walked: ChainAnchor): ChainVerificationResult {
+  const firstBrokenSequence =
+    sworn.headSequence === walked.headSequence ? sworn.headSequence : Math.min(sworn.headSequence, walked.headSequence) + 1;
+  return {
+    valid: false,
+    scope,
+    firstBrokenEventId: `audit_chains claims ${sworn.headSequence} event(s) ending ${sworn.headHash}; the walk found ${walked.headSequence} ending ${walked.headHash}`,
+    firstBrokenSequence,
+    reason: "anchor_mismatch",
+  };
+}
+
+/**
+ * Walks forward from `from` to the end of the chain, one page at a time, reconciles what it found
+ * against the chain's own anchor, and advances the checkpoint on success. Never advances it on
+ * failure: every later run re-detects the same break rather than stepping over it, which is what
+ * makes a break something a human eventually sees.
+ *
+ * THE RECONCILIATION IS THE POINT, and it is why deletion is visible at all. Three checks, in
+ * order:
+ *
+ *  1. the walk's terminus against `audit_chains` — a truncated tail, a rewound anchor, an anchor
+ *     nobody updated, and a chain whose every row is gone all land here;
+ *  2. the frozen checkpoint against `audit_chains` — the one case check 1 cannot see, because an
+ *     adversary who deletes the tail AND rewinds the anchor to match leaves two accounts that
+ *     agree with each other. The checkpoint is a THIRD account, frozen earlier, and a checkpoint
+ *     that verified more events than the anchor now claims is an anchor rewind stated in the
+ *     chain's own records;
+ *  3. only then is a new checkpoint frozen. A walk that ends in an accusation must never move the
+ *     checkpoint forward, for the same reason a broken run must not.
+ *
+ * `verifiedThrough: 0` with `valid: true` is legal ONLY when the anchor agrees there is nothing
+ * here. Writing a checkpoint for such a scope would violate `audit_chain_checkpoints`'s FK to
+ * `audit_chains` — and there is nothing to checkpoint yet regardless.
  */
 async function walk(db: Db, scope: string, from: ChainAnchor, options: VerifyOptions): Promise<ChainVerificationResult> {
   const batchSize = options.batchSize ?? INTEGRITY_CONFIG.verification.batchSize;
@@ -57,11 +110,22 @@ async function walk(db: Db, scope: string, from: ChainAnchor, options: VerifyOpt
     if (events.length < batchSize) break;
   }
 
-  // A scope nobody has ever appended to (no `audit_chains` row exists at all) walks from genesis
-  // and finds nothing, so `anchor` is still exactly the genesis anchor it started from. Writing a
-  // checkpoint for it would violate `audit_chain_checkpoints`'s FK to `audit_chains` — and there
-  // is nothing to checkpoint yet regardless. `verifyChainIntegrity`'s "empty chain" case and a
-  // `--scope` the caller mistyped both end here without touching the database.
+  const sworn = await swornAnchor(db, scope);
+  if (sworn.headSequence !== anchor.headSequence || sworn.headHash !== anchor.headHash) {
+    return anchorMismatch(scope, sworn, anchor);
+  }
+
+  const [frozen] = await db.select().from(auditChainCheckpoints).where(eq(auditChainCheckpoints.scope, scope));
+  if (frozen !== undefined && frozen.verifiedThroughSequence > sworn.headSequence) {
+    return {
+      valid: false,
+      scope,
+      firstBrokenEventId: `audit_chain_checkpoints froze ${frozen.verifiedThroughSequence} verified event(s); audit_chains now claims only ${sworn.headSequence}`,
+      firstBrokenSequence: sworn.headSequence + 1,
+      reason: "anchor_mismatch",
+    };
+  }
+
   if (anchor.headSequence === 0) return { valid: true, scope, verifiedThrough: 0, hashed };
 
   await db
@@ -118,6 +182,14 @@ export async function verifyChainIntegrity(db: Db, scope: string, options: Verif
  * The safety net: from genesis, every time, whatever the checkpoint says. Never on a request
  * path — `scripts/verify-audit-chain.ts` is its only caller today, and
  * `INTEGRITY_CONFIG.verification.fullVerifyIntervalHours` is the cadence a scheduler gets.
+ *
+ * It ignores the checkpoint as a STARTING POINT — that is what makes it the safety net for a
+ * tamper behind the checkpoint — but it still reads the frozen checkpoint at the end, as
+ * `walk`'s second reconciliation. That is not a contradiction: starting from a checkpoint would
+ * make the full walk trust it, while cross-checking it against the anchor makes the full walk
+ * hold BOTH stored summaries to the rows. Before that reconciliation existed, this function was
+ * strictly WEAKER than the incremental walk against a deleted chain, which is the exact
+ * inversion a safety net must never have.
  */
 export async function verifyFullChainIntegrity(db: Db, scope: string, options: VerifyOptions = {}): Promise<ChainVerificationResult> {
   return walk(db, scope, { headSequence: 0, headHash: GENESIS_HASH }, options);

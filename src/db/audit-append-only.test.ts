@@ -89,3 +89,55 @@ describe("audit_events is append-only at the database", () => {
     expect(row?.head_sequence).toBe(2);
   });
 });
+
+/**
+ * The checkpoint's own guard (migration `0021`). Not the same rule as `audit_events`': this table
+ * is verification's own state and the verifier legitimately advances it on every clean walk, so
+ * the guard is FORWARD-ONLY rather than append-only.
+ *
+ * It matters because the checkpoint is the third account the verifier reconciles. An adversary who
+ * erases the tail of `audit_events` and rewinds `audit_chains` to match leaves the rows and the
+ * anchor agreeing with each other; the frozen checkpoint is the only record left that says how
+ * many events were verified before. A detector that can be deleted is not a detector, and one that
+ * can be rewound is worse than none, because it looks like agreement.
+ */
+describe("audit_chain_checkpoints only ever moves forward", () => {
+  beforeEach(async () => {
+    await truncateAll(db);
+    await db.execute(sql`INSERT INTO audit_chains (scope, head_sequence, head_hash) VALUES ('platform', 5, 'cafebabe')`);
+    await db.execute(sql`
+      INSERT INTO audit_chain_checkpoints (scope, verified_through_sequence, verified_through_hash)
+      VALUES ('platform', 5, 'cafebabe')
+    `);
+  });
+
+  it("refuses a DELETE, because a detector an adversary can remove is not one", async () => {
+    await expectRejectionMatching(db.execute(sql`DELETE FROM audit_chain_checkpoints`), /is a detector, not scratch space/);
+    const [row] = await db.execute<{ count: string }>(sql`SELECT count(*) AS count FROM audit_chain_checkpoints`);
+    expect(row?.count).toBe("1");
+  });
+
+  it("refuses an UPDATE that rewinds the frozen sequence, which is how the cross-check would be neutralized", async () => {
+    await expectRejectionMatching(
+      db.execute(sql`UPDATE audit_chain_checkpoints SET verified_through_sequence = 1 WHERE scope = 'platform'`),
+      /only moves forward: 1 is behind the frozen 5/,
+    );
+  });
+
+  it("refuses an UPDATE that moves a checkpoint onto a different chain", async () => {
+    await db.execute(sql`INSERT INTO audit_chains (scope, head_sequence, head_hash) VALUES ('league_1', 0, 'deadbeef')`);
+    await expectRejectionMatching(
+      db.execute(sql`UPDATE audit_chain_checkpoints SET scope = 'league_1' WHERE scope = 'platform'`),
+      /may not be moved/,
+    );
+  });
+
+  it("permits the forward freeze the verifier itself makes, and the standing-still re-freeze", async () => {
+    await db.execute(sql`UPDATE audit_chain_checkpoints SET verified_through_sequence = 5, verified_at = now() WHERE scope = 'platform'`);
+    await db.execute(sql`UPDATE audit_chain_checkpoints SET verified_through_sequence = 9, verified_through_hash = 'f00d' WHERE scope = 'platform'`);
+    const [row] = await db.execute<{ verified_through_sequence: number }>(
+      sql`SELECT verified_through_sequence FROM audit_chain_checkpoints WHERE scope = 'platform'`,
+    );
+    expect(row?.verified_through_sequence).toBe(9);
+  });
+});

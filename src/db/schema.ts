@@ -607,8 +607,12 @@ export const auditEvents = pgTable(
  * This IS the rollup `docs/decisions/data-layer-hardening.md` requires. `head_sequence` is the
  * count of events in the chain and `head_hash` is the link the next one attaches to, both
  * advanced in the SAME transaction as the append they summarize — never after it, never in a
- * job. `audit_events` remains the reconciliation source: this row can be rebuilt from it, and
- * `verifyFullChainIntegrity` is the function that does exactly that.
+ * job. `audit_events` remains the reconciliation source: `verifyChainIntegrity` and
+ * `verifyFullChainIntegrity` both re-derive this row's two values by walking the events and
+ * REFUSE the chain when what they derive disagrees with what is stored here (`anchor_mismatch`).
+ * That reconciliation is the only reason deletion is detectable at all: the rows that are gone
+ * leave no trace in the rows that remain, and this row is the chain's own sworn statement about
+ * how many there should be.
  *
  * There is deliberately no separate `event_count` column: `head_sequence` already is it, and a
  * second copy of one number is a second thing that can disagree.
@@ -627,6 +631,14 @@ export const auditChains = pgTable("audit_chains", {
  * append is waiting for, so a chain walk would block every write to that league for its whole
  * duration. Two tables cost one more row and buy the property that the verifier and the writer
  * never contend at all.
+ *
+ * FORWARD-ONLY, enforced by triggers (migration `0021`), because this row is a DETECTOR and a
+ * detector an adversary can quietly delete or rewind is not one. It is the third account of how
+ * many events a chain holds, and the only one that survives an adversary who deletes the tail of
+ * `audit_events` and rewinds `audit_chains` to match: a checkpoint that froze five verified
+ * events while the anchor now claims three is the rewind, stated in the chain's own records.
+ * DELETE is refused outright; UPDATE is refused unless it moves `verified_through_sequence`
+ * forward or leaves it where it is, which is every write the verifier itself ever makes.
  */
 export const auditChainCheckpoints = pgTable("audit_chain_checkpoints", {
   scope: text("scope").primaryKey().references(() => auditChains.scope),
