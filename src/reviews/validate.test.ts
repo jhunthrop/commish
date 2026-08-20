@@ -32,6 +32,27 @@ describe("validateReviewDraft", () => {
     });
   });
 
+  // Both trim cases below are written so the PADDING is what decides the outcome. The two that
+  // used to carry these names exercised trimming only on the accept side, with bodies long
+  // enough to pass either way — so deleting `.trim()` and rating the raw length passed all eight
+  // tests in this file. These are the two that cannot.
+  it("refuses a body whose whitespace is the only thing carrying it over the floor", () => {
+    const oneShort = "x".repeat(REVIEW_CONFIG.body.minLength - 1);
+    const padded = `   ${oneShort}   `; // raw length is over the floor; trimmed length is not.
+    expect(padded.length).toBeGreaterThanOrEqual(REVIEW_CONFIG.body.minLength);
+    expect(validateReviewDraft({ rating: 4, body: padded })).toEqual({
+      ok: false,
+      message: `Say a little more, at least ${REVIEW_CONFIG.body.minLength} characters.`,
+    });
+  });
+
+  it("accepts a body whose whitespace is the only thing carrying it over the ceiling", () => {
+    const atCeiling = "x".repeat(REVIEW_CONFIG.body.maxLength);
+    const padded = `  ${atCeiling}  `; // raw length is over the ceiling; trimmed length is exactly it.
+    expect(padded.length).toBeGreaterThan(REVIEW_CONFIG.body.maxLength);
+    expect(validateReviewDraft({ rating: 4, body: padded })).toEqual({ ok: true });
+  });
+
   it("rejects a body longer than the ceiling", () => {
     const result = validateReviewDraft({ rating: 5, body: "x".repeat(REVIEW_CONFIG.body.maxLength + 1) });
     expect(result).toEqual({
