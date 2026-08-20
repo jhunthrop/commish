@@ -52,7 +52,7 @@ export default async function AppHome() {
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
         <PageTitle>Your leagues</PageTitle>
         <HomeBoard initial={home} />
-        {firstRun === null ? <StartOrJoinDisclosure /> : null}
+        {firstRun === null ? <StartOrJoinDisclosure experienceTier={user.experienceTier} /> : null}
       </main>
     </>
   );

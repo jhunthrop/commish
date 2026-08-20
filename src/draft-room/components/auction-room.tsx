@@ -6,7 +6,7 @@ import type { Player } from "@/domain/player";
 import type { ClientDraftAction } from "@/draft-engine";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";
-import { playerName } from "../lib/lookups";
+import { actionLabelFor, playerName } from "../lib/lookups";
 import { BidControls } from "./bid-controls";
 import { BudgetTable } from "./budget-table";
 import { NominateModal } from "./nominate-modal";
@@ -35,7 +35,7 @@ export function AuctionRoom({ room, playersById, onAct, aside }: AuctionRoomProp
         view={view}
         playersById={playersById}
         canAct={canNominate}
-        actionLabel="Nominate"
+        actionLabel={actionLabelFor(view.format)}
         onAct={setNominating}
         {...queueHandlers}
         poolFooter={<BudgetTable view={view} teams={room.teams} myTeamId={room.myTeamId} />}

@@ -5,6 +5,7 @@ import type { Player } from "@/domain/player";
 import type { ClientDraftAction } from "@/draft-engine";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";
+import { actionLabelFor } from "../lib/lookups";
 import { RoomShell } from "./room-shell";
 
 export interface SnakeRoomProps {
@@ -28,7 +29,7 @@ export function SnakeRoom({ room, playersById, onAct, aside }: SnakeRoomProps) {
       view={view}
       playersById={playersById}
       canAct={canAct}
-      actionLabel="Draft"
+      actionLabel={actionLabelFor(view.format)}
       onAct={draft}
       {...queueHandlers}
       aside={aside}

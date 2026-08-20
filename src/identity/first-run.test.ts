@@ -1,5 +1,24 @@
 import { describe, expect, it } from "vitest";
-import { firstRunPlan } from "./first-run";
+import { firstRunPathOrder, firstRunPlan } from "./first-run";
+
+describe("firstRunPathOrder", () => {
+  // `StartOrJoinDisclosure` (@/league-room/components/start-or-join-disclosure.tsx) reuses this
+  // exact function to order the returning-manager disclosure — these two cases are the contract
+  // that second consumer depends on, tested directly rather than only through `firstRunPlan`.
+  it("puts browse and join ahead of create for a beginner", () => {
+    expect(firstRunPathOrder("beginner")).toEqual(["browse", "join", "create"]);
+  });
+
+  it("puts create first for an experienced manager", () => {
+    expect(firstRunPathOrder("experienced")).toEqual(["create", "join", "browse"]);
+  });
+
+  it("always returns the same three keys, whichever order", () => {
+    for (const tier of ["beginner", "experienced"] as const) {
+      expect(new Set(firstRunPathOrder(tier))).toEqual(new Set(["create", "join", "browse"]));
+    }
+  });
+});
 
 describe("firstRunPlan", () => {
   it("orders the paths by what this manager most likely needs", () => {

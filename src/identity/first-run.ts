@@ -51,6 +51,18 @@ const BEGINNER_ORDER: readonly FirstRunPathKey[] = ["browse", "join", "create"];
 const EXPERIENCED_ORDER: readonly FirstRunPathKey[] = ["create", "join", "browse"];
 
 /**
+ * The ONE rule behind every ordered rendering of create/join/browse, first-run or not:
+ * `firstRunPlan` (below) uses it for a zero-leagues manager, and `StartOrJoinDisclosure`
+ * (`@/league-room/components/start-or-join-disclosure.tsx`) reuses this exact function for a
+ * returning manager's collapsed "start or join another league" — an experienced manager reaching
+ * for that disclosure is usually reaching for Create, same as the fork itself says, so the two
+ * surfaces order the same way rather than each encoding its own opinion.
+ */
+export function firstRunPathOrder(experienceTier: ExperienceTier): readonly FirstRunPathKey[] {
+  return experienceTier === "experienced" ? EXPERIENCED_ORDER : BEGINNER_ORDER;
+}
+
+/**
  * The first-run fork: which of create/join/browse a brand-new manager sees first, and whether
  * the plain-language explainer runs above them. Pure and total over its whole input space —
  * `ExperienceTier` and `HelpLevel` are both two-value unions, so the two checks below already
@@ -66,11 +78,9 @@ export function firstRunPlan(input: {
 }): FirstRunPlan | null {
   if (input.leagueCount > 0) return null;
 
-  const order = input.experienceTier === "experienced" ? EXPERIENCED_ORDER : BEGINNER_ORDER;
-
   return {
     headline: "Pick how you want to get started.",
-    paths: order.map((key) => PATH_COPY[key]),
+    paths: firstRunPathOrder(input.experienceTier).map((key) => PATH_COPY[key]),
     showsExplainer: input.helpLevel === "guided",
   };
 }

@@ -6,7 +6,7 @@ import { Button, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import { useDraftRoom } from "../hooks/use-draft-room";
 import { useDraftRoomDeps } from "../hooks/deps";
-import { playersById as buildPlayersById } from "../lib/lookups";
+import { actionLabelFor, playersById as buildPlayersById } from "../lib/lookups";
 import { RoomTour } from "./room-tour";
 import { SnakeRoom } from "./snake-room";
 import { AuctionRoom } from "./auction-room";
@@ -107,7 +107,7 @@ export function DraftRoom({ draftId, dismissedAt }: DraftRoomProps) {
 
   return (
     <>
-      <RoomTour dismissedAt={dismissedAt} onDismiss={dismissTour} />
+      <RoomTour dismissedAt={dismissedAt} onDismiss={dismissTour} actionLabel={actionLabelFor(room.view.format)} />
       {room.view.format === "auction" ? (
         <AuctionRoom room={room} playersById={playersById} onAct={act} aside={chat} />
       ) : (
