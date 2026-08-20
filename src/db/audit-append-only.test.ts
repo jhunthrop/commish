@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "./test-db";
+import { unwrapCauseChain } from "./errors";
 import { GENESIS_HASH } from "@/integrity/chain";
 
 const db = createTestDb();
@@ -8,13 +9,15 @@ const db = createTestDb();
 /**
  * `db.execute` throws drizzle-orm's `DrizzleQueryError`, whose own `.message` is just the SQL
  * text it was trying to run — the driver's real error (the trigger's `RAISE EXCEPTION` text, or
- * the violated constraint's name) sits one level down on `.cause` (empirically confirmed the
- * same way `src/db/errors.ts`'s `driverErrorField` documents its own unwrap). Joining the whole
- * chain is what lets a test assert against what postgres actually said, not drizzle's wrapper.
+ * the violated constraint's name) sits one level down on `.cause`. `unwrapCauseChain`
+ * (`src/db/errors.ts`) is the one place that walk is written; this joins every `.message` found
+ * along it, so a test can assert against what postgres actually said, not drizzle's wrapper.
  */
 function causeChainMessage(error: unknown): string {
-  if (!(error instanceof Error)) return String(error);
-  return error.cause instanceof Error ? `${error.message}: ${causeChainMessage(error.cause)}` : error.message;
+  const messages = unwrapCauseChain(error)
+    .filter((link): link is Error => link instanceof Error)
+    .map((link) => link.message);
+  return messages.length > 0 ? messages.join(": ") : String(error);
 }
 
 /** `.rejects.toThrow(pattern)` only ever looks at the top `.message` — see `causeChainMessage`. */

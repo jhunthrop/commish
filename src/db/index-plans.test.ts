@@ -6,6 +6,7 @@ import { chatMessages, draftActions, lineupSlots, matchups, rosterSlots, teams }
 import { explainPlan, indexScanNode, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
 import { browseQuery } from "@/league-service/browse";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
+import { AUDIT_EVENT_TYPES } from "@/domain/audit";
 
 const db = createTestDb();
 
@@ -272,5 +273,22 @@ describe("audit_events carries its indexes and its append-only triggers", () => 
       SELECT tgname FROM pg_trigger WHERE tgrelid = 'audit_events'::regclass AND NOT tgisinternal
     `);
     expect(rows.map((row) => row.tgname).sort()).toEqual(["audit_events_no_delete", "audit_events_no_update"]);
+  });
+});
+
+/**
+ * Nothing else in this repo pins `audit_event_type`'s labels to `AUDIT_EVENT_TYPES`:
+ * `drizzle-kit check` (which WOULD catch a schema.ts change with no matching migration) isn't
+ * wired to any script here, and `pgEnum("audit_event_type", AUDIT_EVENT_TYPES)` in `schema.ts`
+ * only constrains what a FUTURE `db:generate` would emit — it says nothing about what the
+ * migration already applied to a real database actually created. A 17th entry added to
+ * `AUDIT_EVENT_TYPES` without a matching migration reddens nothing without this test.
+ */
+describe("audit_event_type stays in sync with AUDIT_EVENT_TYPES", () => {
+  it("carries exactly the domain vocabulary, in the same order", async () => {
+    const rows = await db.execute<{ enumlabel: string }>(sql`
+      SELECT enumlabel FROM pg_enum WHERE enumtypid = 'audit_event_type'::regtype ORDER BY enumsortorder
+    `);
+    expect(rows.map((row) => row.enumlabel)).toEqual([...AUDIT_EVENT_TYPES]);
   });
 });
