@@ -4,7 +4,7 @@ import { auditChains, auditEvents, leagues, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { AuditEventInput } from "@/domain/audit";
 import { GENESIS_HASH, computeEventHash } from "@/integrity/chain";
-import { createAuditLogger } from "./audit-logger";
+import { createAuditLogger, getAuditLogger } from "./audit-logger";
 
 const db = createTestDb();
 /** A SECOND pool, so a test can hold one transaction open and race another against it. */
@@ -201,5 +201,14 @@ describe("concurrency", () => {
 
     release();
     await held;
+  });
+});
+
+describe("getAuditLogger", () => {
+  it("memoizes one process-wide logger that can actually record", async () => {
+    const first = getAuditLogger();
+    expect(getAuditLogger()).toBe(first);
+    const event = await db.transaction((tx) => first.record(tx, input()));
+    expect(event).toMatchObject({ chainScope: "league_1", sequence: 1 });
   });
 });

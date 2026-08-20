@@ -12,7 +12,15 @@ import type { Db } from "@/db/client";
  * nothing under `src/**` outside a `*.test.ts` may import this.
  */
 export async function tamperWithAuditEvent(db: Db, eventId: string, patch: Readonly<Record<string, unknown>>): Promise<void> {
-  const assignments = Object.entries(patch).map(([column, value]) => sql`${sql.identifier(column)} = ${value}`);
+  // `payload` is jsonb: postgres-js binds a plain JS object as its jsonb OID directly, which the
+  // wire protocol rejects (it wants a string to parse, not an object to serialize). Every other
+  // column here is a scalar, which binds fine as-is — only an object/array patch value needs the
+  // stringify-then-cast around it.
+  const assignments = Object.entries(patch).map(([column, value]) =>
+    value !== null && typeof value === "object"
+      ? sql`${sql.identifier(column)} = ${JSON.stringify(value)}::jsonb`
+      : sql`${sql.identifier(column)} = ${value}`,
+  );
   await db.execute(sql`ALTER TABLE audit_events DISABLE TRIGGER USER`);
   try {
     await db.execute(sql`UPDATE audit_events SET ${sql.join(assignments, sql`, `)} WHERE event_id = ${eventId}`);
