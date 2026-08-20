@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { Badge, Card, EmptyState, EYEBROW } from "@/components/ui";
+import { Badge, Card, EmptyState, EYEBROW, InfoTip } from "@/components/ui";
+import type { DraftFormat } from "@/domain/league";
+import type { TermKey } from "@/help/glossary";
 import { EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
@@ -7,6 +9,19 @@ import { stakeTierLabel } from "@/matchmaking/filter";
 import { JoinPublicLeagueButton } from "./join-public-league-button";
 
 const FORMAT_LABEL: Readonly<Record<string, string>> = { snake: "Snake", auction: "Auction" };
+const FORMAT_TERM: Readonly<Record<DraftFormat, TermKey>> = { snake: "snake-draft", auction: "auction-draft" };
+
+/**
+ * `scoringLabel` is a derived string (`describeScoring`, `@/scoring`), not a `TermKey` — it can
+ * read "Standard" or "Custom", neither of which is jargon the glossary defines. Only the three
+ * labels that ARE jargon (PPR, Half PPR, PPR with a TE premium) get an `InfoTip`; the other two
+ * are already plain English and adding a trigger to them would explain nothing.
+ */
+const SCORING_LABEL_TERM: Readonly<Record<string, TermKey>> = {
+  PPR: "ppr",
+  "Half PPR": "half-ppr",
+  "PPR, TE premium": "te-premium",
+};
 
 /**
  * "6 of 8 joined" answers "how full is it"; a visitor's actual decision is "is there room for
@@ -71,8 +86,20 @@ export function PublicLeagueList({
                 </h3>
                 <Badge tone="neutral">{stakeTierLabel(league.stakeTier)}</Badge>
               </div>
-              <p className={EYEBROW}>
-                {`${FORMAT_LABEL[league.format] ?? league.format} · ${EXPERIENCE_TIER_LABEL[league.experienceTier] ?? league.experienceTier}`}
+              <p className={`${EYEBROW} flex flex-wrap items-center gap-x-1 gap-y-1`}>
+                <span className="inline-flex items-center gap-1">
+                  {FORMAT_LABEL[league.format] ?? league.format}
+                  <InfoTip term={FORMAT_TERM[league.format]} />
+                </span>
+                <span>·</span>
+                <span>{EXPERIENCE_TIER_LABEL[league.experienceTier] ?? league.experienceTier}</span>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1">
+                  {league.scoringLabel}
+                  {SCORING_LABEL_TERM[league.scoringLabel] === undefined ? null : (
+                    <InfoTip term={SCORING_LABEL_TERM[league.scoringLabel]!} />
+                  )}
+                </span>
               </p>
               <p className="text-sm text-text-muted">
                 {`${league.filledTeams} of ${league.teamCount} joined`}

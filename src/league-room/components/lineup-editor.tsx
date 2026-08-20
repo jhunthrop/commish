@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
-import { Button, Select, SlotChip } from "@/components/ui";
+import { Button, InfoTip, Select, SlotChip } from "@/components/ui";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatWeek } from "../lib/format";
 
@@ -97,7 +97,10 @@ export function LineupEditor({
           first kickoff, not each player at their own — and nothing said so before this. A
           manager who plans to swap a Monday-night player after watching Sunday's early games
           needs to know that plan won't work before they're locked out of trying it. */}
-      <p className="text-sm text-text-muted">Lineups lock for the whole week when its first game kicks off.</p>
+      <p className="flex items-center gap-1 text-sm text-text-muted">
+        Lineups lock for the whole week when its first game kicks off.
+        <InfoTip term="lineup-lock" />
+      </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {lineup.starters.map((slot) => (
           <Select

@@ -31,6 +31,17 @@ describe("PublicLeagueList", () => {
     expect(fixture.calls).toEqual([]);
   });
 
+  it("shows the scoring label beside the format, each with its own InfoTip", () => {
+    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />);
+    expect(screen.getByText("Standard")).toBeInTheDocument();
+    expect(screen.getByText("PPR")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What is an auction draft?" })).toBeInTheDocument();
+    // "Standard" is plain English, not jargon — no InfoTip on it.
+    expect(screen.queryByRole("button", { name: "What is Standard?" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What is PPR?" })).toBeInTheDocument();
+  });
+
   it("gives a signed-in visitor a join button per league", () => {
     renderInLeague(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />, fixtureLeagueDeps().deps);
     expect(screen.getByRole("button", { name: "Join Rookie Snake Room" })).toBeInTheDocument();

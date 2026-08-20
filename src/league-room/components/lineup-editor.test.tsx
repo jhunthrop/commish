@@ -29,6 +29,7 @@ describe("LineupEditor", () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: LINEUP });
     renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} />, fixture.deps);
     expect(screen.getByText("Lineups lock for the whole week when its first game kicks off.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What is a lineup lock?" })).toBeInTheDocument();
   });
 
   it("saves the starting slots it was given and reports success", async () => {

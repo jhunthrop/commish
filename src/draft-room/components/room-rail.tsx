@@ -3,7 +3,8 @@
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Avatar, Badge, EYEBROW } from "@/components/ui";
+import { Avatar, Badge, EYEBROW, InfoTip } from "@/components/ui";
+import type { TermKey } from "@/help/glossary";
 import { formatClockLength, formatTightening } from "../state/format";
 import { playerName, teamName, teamsById } from "../lib/lookups";
 import type { ConnectionStatus } from "../hooks/use-draft-room";
@@ -28,6 +29,11 @@ export interface RoomRailProps {
 const FORMAT_LABEL: Readonly<Record<DraftStateView["format"], string>> = {
   snake: "Snake draft",
   auction: "Auction draft",
+};
+
+const FORMAT_TERM: Readonly<Record<DraftStateView["format"], TermKey>> = {
+  snake: "snake-draft",
+  auction: "auction-draft",
 };
 
 const LEAGUE_TEXT: Readonly<Record<RoomRailVariant, string>> = {
@@ -178,7 +184,11 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
       className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2 lg:h-20 lg:flex-nowrap ${MODE_SKIN[mode]}`}
     >
       <h1 className={`font-display font-bold leading-display text-text-primary ${LEAGUE_TEXT[variant]}`}>{leagueName}</h1>
-      <Badge tone="neutral">{FORMAT_LABEL[view.format]}</Badge>
+      <span className="inline-flex items-center gap-1">
+        <Badge tone="neutral">{FORMAT_LABEL[view.format]}</Badge>
+        {/* The TV variant is a shared, unattended display — no control on it is ever clickable. */}
+        {variant === "room" ? <InfoTip term={FORMAT_TERM[view.format]} /> : null}
+      </span>
       {turnWhere === null ? null : (
         <span data-testid="turn-label" className="font-display text-sm font-semibold uppercase tracking-wide text-text-muted">
           {turnWhere}
@@ -197,8 +207,13 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                 <Avatar name={turn.team.ownerDisplayName} avatar={turn.team.ownerAvatarUrl} size="sm" />
               )}
               <div className="flex min-w-0 flex-col">
-                <span className={`${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
+                <span className={`inline-flex items-center gap-1 ${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
                   {turn.label}
+                  {/* An auction's "Live bid"/"Nominating" states aren't the on-the-clock rule
+                      this term defines, so the tip only joins the snake-format turn label. The
+                      TV variant drops it too — a shared, unattended display has no clickable
+                      controls at all. */}
+                  {view.format === "auction" || variant !== "room" ? null : <InfoTip term="on-the-clock" />}
                 </span>
                 <span className="truncate font-display text-display-sm font-bold leading-display text-text-primary">{turn.subject}</span>
               </div>

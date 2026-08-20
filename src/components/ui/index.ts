@@ -19,4 +19,5 @@ export { Modal } from "./modal";
 export { ToastProvider, useToast } from "./toast";
 export { Table, type TableColumn } from "./table";
 export { Celebration } from "./celebration";
+export { InfoTip } from "./info-tip";
 export { EYEBROW } from "./config";

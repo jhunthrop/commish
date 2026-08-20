@@ -2,7 +2,10 @@ import type { ReactNode } from "react";
 
 export interface TableColumn<T> {
   readonly key: string;
-  readonly header: string;
+  /** Almost always a plain string; a `ReactNode` is only for a header that needs its own
+   *  interactive element (e.g. an `InfoTip` beside "Record") — never a substitute for `caption`,
+   *  which stays the table's one required accessible name. */
+  readonly header: ReactNode;
   readonly cell: (row: T) => ReactNode;
   /** Right-aligns and tabular-numbers the column. */
   readonly numeric?: boolean;

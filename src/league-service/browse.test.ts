@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, leagues, teams, users } from "@/db/schema";
+import { drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
+import { STANDARD_SCORING, type ScoringSettings } from "@/domain/scoring";
 import { EMPTY_BROWSE_FILTER, hasOpenSeat, matchesBrowseFilter } from "@/matchmaking/filter";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
@@ -21,6 +23,8 @@ interface SeedLeague {
   readonly draftStatus?: "scheduled" | "in_progress" | "complete";
   /** Defaults to the row's own `defaultNow()`. Set explicitly to pin ordering in a test. */
   readonly createdAt?: Date;
+  /** Defaults to `STANDARD_SCORING` — every real league has a scoring_settings row. */
+  readonly scoring?: Omit<ScoringSettings, "leagueId">;
 }
 
 async function seed(league: SeedLeague): Promise<void> {
@@ -43,6 +47,7 @@ async function seed(league: SeedLeague): Promise<void> {
     kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
     auctionBudget: league.format === "auction" ? 200 : null,
   });
+  await db.insert(scoringSettings).values({ leagueId: league.id, ...(league.scoring ?? STANDARD_SCORING) });
   for (let i = 0; i < league.filled; i++) {
     const userId = `${league.id}_u${i}`;
     await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: `Manager ${i}` });
@@ -90,6 +95,7 @@ async function seedPublicLeague(
     stakeTier: overrides.stakeTier,
     teamCount: overrides.teamCount,
     filledTeams: overrides.filledTeams,
+    scoringLabel: "Standard",
   };
 }
 
@@ -110,7 +116,7 @@ describe("listPublicLeagues", () => {
     });
     const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
     expect(rows).toEqual([
-      { id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 8 },
+      { id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 8, scoringLabel: "Standard" },
     ]);
   });
 
@@ -125,6 +131,40 @@ describe("listPublicLeagues", () => {
     expect(JSON.stringify(row)).not.toContain("owner");
     expect(JSON.stringify(row)).not.toContain("Commissioner Casey");
     expect(JSON.stringify(row)).not.toContain("open_draft");
+  });
+
+  it("derives the scoring label from the league's own weights, never a stored preset name", async () => {
+    // `scoring_settings` never stores a preset name — this is the deliberate disclosure
+    // (PublicLeagueSummary's docblock): a DERIVED label, never the fifteen raw weights.
+    await seed({
+      id: "ppr", name: "PPR Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      scoring: { ...STANDARD_SCORING, pointsPerReception: 1 },
+    });
+    await seed({
+      id: "custom", name: "House Rules", format: "snake", experienceTier: "experienced",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      scoring: { ...STANDARD_SCORING, pointsPerPassingTouchdown: 6 },
+    });
+    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const byId = new Map(rows.map((row) => [row.id, row.scoringLabel]));
+    expect(byId.get("ppr")).toBe("PPR");
+    expect(byId.get("custom")).toBe("Custom");
+    // Never the raw weights, never a stored preset column — only the derived label.
+    expect(JSON.stringify(rows)).not.toContain("pointsPerReception");
+    expect(JSON.stringify(rows)).not.toContain("pointsPerPassingTouchdown");
+  });
+
+  it("labels a league honestly even if a scoring_settings row were somehow missing", async () => {
+    // Never true in production (createLeague writes both rows in one transaction), but
+    // listPublicLeagues must not throw, and must not silently mislabel, on a join miss.
+    await seed({
+      id: "no_scoring", name: "Edge Case Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    await db.delete(scoringSettings).where(eq(scoringSettings.leagueId, "no_scoring"));
+    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(rows[0]?.scoringLabel).toBe("Custom");
   });
 
   it("never lists a private league, whatever it is filtered by", async () => {

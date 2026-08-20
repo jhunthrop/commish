@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeFantasyPoints,
+  describeScoring,
   roundPoints,
   scoreLineup,
   SCORING_PRESETS,
@@ -39,5 +40,9 @@ describe("scoring barrel exports", () => {
     expect(roundPoints(0.1 + 0.2)).toBe(0.3);
     expect(roundPoints(12.345)).toBe(12.35);
     expect(roundPoints(-1.005)).toBe(-1);
+  });
+
+  it("re-exports the scoring label deriver browse cards use", () => {
+    expect(describeScoring(STANDARD_SCORING)).toBe("Standard");
   });
 });

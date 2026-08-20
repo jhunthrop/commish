@@ -70,12 +70,15 @@ const SERVER_ONLY_MODULE_GROUPS = [
 
 /**
  * NOT on the list above, deliberately: `@/identity` (`src/identity/**`) joins `@/chat`
- * (`src/chat/**`) and `@/matchmaking` (`src/matchmaking/**`) in the browser-safe exempt set —
- * pure, I/O-free code with no server module behind it, so client code may value-import it
- * directly. `src/chat-room/**` reaches `parseAvatarRef` indirectly through `Avatar`
- * (`src/components/ui/avatar.tsx`) rather than importing `@/identity` itself, but the omission
- * here is what keeps that path legal. See docs/conventions.md's directory map for the same note
- * on `@/chat` and `@/matchmaking`.
+ * (`src/chat/**`), `@/matchmaking` (`src/matchmaking/**`) and `@/help` (`src/help/**`) in the
+ * browser-safe exempt set — pure, I/O-free code with no server module behind it, so client code
+ * may value-import it directly. `src/chat-room/**` reaches `parseAvatarRef` indirectly through
+ * `Avatar` (`src/components/ui/avatar.tsx`) rather than importing `@/identity` itself, but the
+ * omission here is what keeps that path legal. `@/help` is reached the same indirect way today —
+ * every room directory renders `InfoTip` (`src/components/ui/info-tip.tsx`), which is the only
+ * thing that value-imports `@/help/glossary` — but the omission is what would keep a future
+ * direct `GLOSSARY` lookup from a room component legal too, exactly like the other three. See
+ * docs/conventions.md's directory map for the same note on `@/chat` and `@/matchmaking`.
  */
 
 /**

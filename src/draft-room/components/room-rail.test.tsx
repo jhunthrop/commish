@@ -59,6 +59,24 @@ describe("RoomRail", () => {
     expect(screen.getByText("Picks shorten to 10 minutes in 2h 14m")).toBeInTheDocument();
   });
 
+  it("carries an InfoTip on the format name and on the on-the-clock label", () => {
+    render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
+    expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What is on the clock?" })).toBeInTheDocument();
+  });
+
+  it("drops the on-the-clock InfoTip during a live auction lot — that state isn't the rule the term defines", () => {
+    const lotView: DraftStateView = {
+      ...AUCTION_VIEW,
+      onClockTeamId: null,
+      deadlineAt: new Date(Date.now() + 45_000).toISOString(),
+      auction: { minBid: 1, nominatingTeamId: null, lot: { playerId: "qb1", highBid: 12, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
+    };
+    render(<RoomRail {...props} view={lotView} myTeamId="t1" />);
+    expect(screen.getByRole("button", { name: "What is an auction draft?" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "What is on the clock?" })).not.toBeInTheDocument();
+  });
+
   // Step 15's audit: the rail named whose turn it was but never showed a face. `Avatar` falls
   // back to initials with no `ownerAvatarUrl` on the fixture team, so Bay Bandits' owner (Dana
   // Whitfield) shows as "DW" beside the name while she is on the clock.
@@ -168,6 +186,8 @@ describe("RoomRail", () => {
     // Nobody is "you" on a TV in the corner of a room: no team chip, and no my-turn heat.
     expect(screen.queryByText(/Your team/)).toBeNull();
     expect(screen.getByText("On the clock")).toBeInTheDocument();
+    // A shared, unattended display has no clickable control at all, InfoTip included.
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "watching");
   });
 });

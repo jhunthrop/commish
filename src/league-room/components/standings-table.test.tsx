@@ -23,6 +23,11 @@ describe("StandingsTable", () => {
     expect(screen.getByText("AR")).toBeInTheDocument();
   });
 
+  it("carries an InfoTip on the Record column header", () => {
+    render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
+    expect(screen.getByRole("button", { name: "What is a record?" })).toBeInTheDocument();
+  });
+
   it("marks the clinched teams and the caller's own row", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
     expect(screen.getByText("Clinched")).toBeInTheDocument();

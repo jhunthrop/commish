@@ -62,6 +62,10 @@ src/
                           the app's ONE unauthenticated league read. NO I/O. 100% coverage.
                           Browser-safe, so src/league-room/** value-imports it directly, the
                           same way src/chat-room/** value-imports @/chat.
+  help/                   The ONE glossary registry (GLOSSARY, term()) and its HELP_CONFIG
+                          tunables. NO I/O. Browser-safe for the same reason as @/chat and
+                          @/matchmaking; InfoTip (src/components/ui/info-tip.tsx) is what
+                          actually value-imports it.
   integration/            Cross-module proofs: a real draft, run through the real store, into
                           real standings, chat, advisor and browse reads. Test-only.
   chat/                   Pure chat fold + wire contract + CHAT_CONFIG. NO I/O. 100% coverage.
@@ -204,6 +208,13 @@ browser-safe rule code (`normalizeBrowseFilter`, `matchesBrowseFilter`, `stakeTi
 lives in `src/league-service/browse.ts`, which the existing `@/league-service` ban already
 covers. There is no `@/matchmaking-service`, because a second service directory for one query
 would be a boundary to maintain rather than a boundary to enforce.
+
+`src/help/**` joins the same exempt set for the same reason: `GLOSSARY`/`term()`
+(`src/help/glossary.ts`) and `HELP_CONFIG` (`src/help/config.ts`) are pure, I/O-free lookup
+code with no server module behind them. Every room directory reaches it indirectly today,
+through `InfoTip` (`src/components/ui/info-tip.tsx`) — the one component that value-imports
+`@/help/glossary` — but the exemption is what would keep a future direct `GLOSSARY` import from
+a room component legal too.
 
 A second, simpler layering rule sits beside this one: nothing under `src/**` may import from
 `scripts/**` or `e2e/**`. Build tooling and the browser suite may depend on source; source may
