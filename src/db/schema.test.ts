@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
-import { users, leagues, teams, scoringSettings, leagueInvites, lineupSlots, statWeeks } from "./schema";
+import { users, leagues, teams, scoringSettings, leagueInvites, lineupSlots, statWeeks, userPreferences } from "./schema";
 import { PPR_SCORING } from "@/domain/scoring";
 
 const db = createTestDb();
@@ -160,5 +160,37 @@ describe("stat_weeks", () => {
     expect(final).toMatchObject({ status: "final", version: 5, gamesTotal: 16, gamesFinal: 16 });
 
     await expect(db.insert(statWeeks).values({ week: 1 })).rejects.toThrow();
+  });
+});
+
+describe("user_preferences", () => {
+  it("defaults to guided help and an undismissed tour, one row per user", async () => {
+    await db.insert(users).values({ id: "u1", email: "u1@example.com", displayName: "u1" });
+    await db.insert(userPreferences).values({ userId: "u1" });
+
+    const [row] = await db.select().from(userPreferences).where(eq(userPreferences.userId, "u1"));
+    expect(row).toMatchObject({ userId: "u1", helpLevel: "guided", draftTourDismissedAt: null });
+
+    await expect(db.insert(userPreferences).values({ userId: "u1" })).rejects.toThrow();
+  });
+
+  it("round-trips the standard help level and a dismissal timestamp", async () => {
+    await db.insert(users).values({ id: "u2", email: "u2@example.com", displayName: "u2" });
+    await db.insert(userPreferences).values({
+      userId: "u2",
+      helpLevel: "standard",
+      draftTourDismissedAt: new Date("2026-08-19T00:00:00.000Z"),
+    });
+
+    const [row] = await db.select().from(userPreferences).where(eq(userPreferences.userId, "u2"));
+    expect(row?.helpLevel).toBe("standard");
+    expect(row?.draftTourDismissedAt?.toISOString()).toBe("2026-08-19T00:00:00.000Z");
+  });
+
+  it("drops the preferences row when the user goes away", async () => {
+    await db.insert(users).values({ id: "u3", email: "u3@example.com", displayName: "u3" });
+    await db.insert(userPreferences).values({ userId: "u3" });
+    await db.delete(users).where(eq(users.id, "u3"));
+    expect(await db.select().from(userPreferences).where(eq(userPreferences.userId, "u3"))).toEqual([]);
   });
 });

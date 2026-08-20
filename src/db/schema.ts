@@ -21,6 +21,7 @@ export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
 export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress", "complete"]);
 export const playerPositionEnum = pgEnum("player_position", ["QB", "RB", "WR", "TE", "K", "DEF"]);
 export const weekStatusEnum = pgEnum("week_status", ["scheduled", "in_progress", "final"]);
+export const helpLevelEnum = pgEnum("help_level", ["guided", "standard"]);
 
 // Identity (credentials, sessions, MFA, OAuth) is owned by WorkOS AuthKit. This table is
 // the app's own profile row for a WorkOS user — `id` IS the WorkOS user id — holding the
@@ -39,6 +40,24 @@ export const users = pgTable(
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
+
+/**
+ * One row per user, holding only the preferences this product actually reads. It is created
+ * lazily on first read rather than at sign-up, seeded from `defaultPreferences`, so a user who
+ * never opens a setting still gets the right default and there is no backfill to write.
+ *
+ * There is deliberately NO notification-channel column here. The catalog in
+ * `src/identity/notifications.ts` describes what the product tells you about; email delivery is
+ * Plan D's, and a stored preference for a channel with no sender is a switch wired to nothing.
+ * The day the sender exists, this table gains the column and the surface gains the toggles.
+ */
+export const userPreferences = pgTable("user_preferences", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  helpLevel: helpLevelEnum("help_level").notNull().default("guided"),
+  /** Null until the tour is dismissed. A timestamp, not a boolean, so "when" survives for Phase 3. */
+  draftTourDismissedAt: timestamp("draft_tour_dismissed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const leagues = pgTable(
   "leagues",

@@ -36,7 +36,7 @@ export async function truncateAll(db: Db): Promise<void> {
       player_stat_lines, players, stat_weeks,
       matchups, weeks, draft_picks, draft_nudges, draft_actions, drafts,
       lineup_slots, roster_slots, league_invites,
-      scoring_settings, teams, leagues, users
+      scoring_settings, teams, leagues, user_preferences, users
     RESTART IDENTITY CASCADE
   `);
   // `rankedPlayers` (src/draft-service/pool.ts) memoizes per league id across calls — safe in

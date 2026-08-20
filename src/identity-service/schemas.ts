@@ -15,3 +15,15 @@ export const updateProfileSchema = z.object({
 });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
+
+/**
+ * Both fields optional: a caller sends whichever one it's changing (the draft-room tour sends
+ * only `dismissDraftTour`; a future help-level control would send only `helpLevel`), and
+ * `updatePreferences` leaves the other column alone.
+ */
+export const updatePreferencesSchema = z.object({
+  helpLevel: z.enum(["guided", "standard"]).optional(),
+  dismissDraftTour: z.boolean().optional(),
+});
+
+export type UpdatePreferencesInput = z.infer<typeof updatePreferencesSchema>;

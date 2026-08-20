@@ -5,6 +5,7 @@ import { PageTitle } from "@/components/ui";
 import { AppHeader } from "@/components/app-shell/app-header";
 import { readProfile } from "@/identity-service/profile";
 import { ProfileForm } from "@/account-room/components/profile-form";
+import { NotificationSummary } from "@/account-room/components/notification-summary";
 
 export const dynamic = "force-dynamic";
 
@@ -26,6 +27,7 @@ export default async function ProfilePage() {
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
         <PageTitle>Your profile</PageTitle>
         <ProfileForm profile={profile} />
+        <NotificationSummary />
       </main>
     </>
   );

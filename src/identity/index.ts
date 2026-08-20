@@ -4,3 +4,7 @@
 export { AVATAR_PRESETS, avatarRefValue, parseAvatarRef, presetByKey } from "./avatars";
 export type { AvatarPreset, AvatarPresetKey, AvatarRef, AvatarTone } from "./avatars";
 export { EXPERIENCE_TIER_LABEL, IDENTITY_CONFIG } from "./config";
+export { defaultPreferences, isDraftTourDismissed } from "./preferences";
+export type { HelpLevel, PreferenceState } from "./preferences";
+export { NOTIFICATION_CATALOG, channelStatus, deliverableChannels } from "./notifications";
+export type { NotificationChannel, NotificationTopic } from "./notifications";
