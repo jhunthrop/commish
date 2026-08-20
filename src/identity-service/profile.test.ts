@@ -124,6 +124,17 @@ describe("updateProfile / readProfile", () => {
     expect(row?.helpLevel).toBe("standard");
   });
 
+  it("reads null rather than throwing for a user row that does not exist", async () => {
+    expect(await readProfile(db, "nobody")).toBeNull();
+  });
+
+  it("fails loudly rather than silently succeeding when the user row does not exist", async () => {
+    // Both shapes of the write: the one that reaches an UPDATE, and the no-op one that only
+    // reads the row back. Neither may report success for a profile nobody has.
+    await expect(updateProfile(db, { userId: "nobody", displayName: "Ada" }, fixedClock)).rejects.toThrow(/No user row for id nobody/);
+    await expect(updateProfile(db, { userId: "nobody", avatarPreset: null }, fixedClock)).rejects.toThrow(/No user row for id nobody/);
+  });
+
   it("a later WorkOS sign-in does not clobber what the user chose", async () => {
     // user-sync.ts has always CLAIMED this. Nothing could test it before, because nothing could
     // edit. Now something can, so the claim gets an assertion.

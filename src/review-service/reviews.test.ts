@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq, getTableName, is, Table } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
+import type { Db } from "@/db/client";
 import * as schema from "@/db/schema";
 import { reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
@@ -197,6 +198,95 @@ describe("submitReview", () => {
   });
 });
 
+/**
+ * `submitReview`'s last guard. Real Postgres cannot reach it: the upsert returns no row only
+ * when the conflict fired AND `setWhere` was false, which means a row exists with a non-null
+ * `removed_at` — the 409 above. The guard is there so a future change to that statement fails
+ * LOUDLY rather than reporting a review that was never written, and a stub `Db` is the only way
+ * to put the code in the state it defends against.
+ */
+describe("submitReview — the impossible-state guard", () => {
+  const stubWith = (existingRows: readonly unknown[], written: readonly unknown[] = []): Db =>
+    ({
+      insert: () => ({ values: () => ({ onConflictDoUpdate: () => ({ returning: async () => written }) }) }),
+      select: () => ({ from: () => ({ where: async () => existingRows }) }),
+    }) as unknown as Db;
+
+  it("throws when the upsert writes nothing and there is no removed row to explain it", async () => {
+    await expect(submitReview(stubWith([]), { userId: "u1", rating: 4, body: LONG_ENOUGH })).rejects.toThrow(
+      "submitReview: no row returned for user u1.",
+    );
+  });
+
+  it("throws when the upsert writes nothing and the existing row is not removed either", async () => {
+    await expect(submitReview(stubWith([{ removedAt: null }]), { userId: "u1", rating: 4, body: LONG_ENOUGH })).rejects.toThrow(
+      "submitReview: no row returned for user u1.",
+    );
+  });
+
+  it("names an author it cannot find rather than rendering a blank byline", async () => {
+    // A `users` row vanishing between the write and the author read is FK-impossible today. The
+    // fallback exists so the review still renders as somebody's, not as nobody's.
+    const row = {
+      id: "r1",
+      rating: 4,
+      body: LONG_ENOUGH,
+      createdAt: new Date("2026-08-01T00:00:00Z"),
+      updatedAt: new Date("2026-08-01T00:00:00Z"),
+    };
+    const result = await submitReview(stubWith([], [row]), { userId: "u1", rating: 4, body: LONG_ENOUGH });
+    expect(result).toMatchObject({ ok: true, review: { authorName: "A manager", authorAvatar: null } });
+  });
+});
+
+/**
+ * `listReviews` reads the feed and its display-only ratings in two round trips, so a review can
+ * disappear between them — `reviews.user_id` cascades on user deletion, which is a real, if
+ * rare, way for the second read to come back short. The rating renders as absent rather than as
+ * a number nobody chose. A stub `Db` is what lets the two reads disagree on purpose.
+ */
+describe("listReviews — a rating that vanishes between the two round trips", () => {
+  it("renders the review with no rating rather than inventing one", async () => {
+    const feedRow = {
+      id: "r1",
+      body: LONG_ENOUGH,
+      createdAt: new Date("2026-08-01T00:00:00Z"),
+      updatedAt: new Date("2026-08-01T00:00:00Z"),
+      authorName: "Ada Lovelace",
+      authorAvatar: null,
+    };
+    const responses: readonly (readonly unknown[])[] = [[feedRow], []];
+    const calls = { made: 0 };
+    const chain = (rows: readonly unknown[]): unknown => {
+      const self: Record<string, unknown> = {
+        then: (resolve: (value: readonly unknown[]) => unknown) => resolve(rows),
+      };
+      for (const method of ["from", "innerJoin", "where", "orderBy", "limit"]) self[method] = () => self;
+      return self;
+    };
+    const stub = {
+      select: () => {
+        const rows = responses[calls.made] ?? [];
+        calls.made += 1;
+        return chain(rows);
+      },
+    } as unknown as Db;
+
+    const page = await listReviews(stub, {});
+    expect(page.reviews).toEqual([
+      {
+        id: "r1",
+        rating: null,
+        body: LONG_ENOUGH,
+        createdAt: "2026-08-01T00:00:00.000Z",
+        updatedAt: "2026-08-01T00:00:00.000Z",
+        authorName: "Ada Lovelace",
+        authorAvatar: null,
+      },
+    ]);
+  });
+});
+
 describe("myReview", () => {
   it("reports none before a user has ever written one, and the live review after", async () => {
     await seedUser("u1");
@@ -212,6 +302,21 @@ describe("myReview", () => {
     await removeReview(db, { reviewId: "r1", removedByUserId: "operator", reason: "spam", clock: at("2026-08-04T00:00:00Z") });
 
     expect(await myReview(db, "u1")).toEqual({ state: "removed", reason: "spam", removedAt: "2026-08-04T00:00:00.000Z" });
+  });
+
+  it("still explains a removal whose reason column is somehow empty", async () => {
+    // `removed_at` and `removal_reason` are independently nullable columns; `removeReview` always
+    // writes all three together, but nothing at the database level says it must. The author gets
+    // a sentence either way rather than "removed for null".
+    await seedUser("u1");
+    await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
+    await db.update(reviews).set({ removedAt: new Date("2026-08-04T00:00:00Z") }).where(eq(reviews.id, "r1"));
+
+    expect(await myReview(db, "u1")).toEqual({
+      state: "removed",
+      reason: "breaking the review rules",
+      removedAt: "2026-08-04T00:00:00.000Z",
+    });
   });
 });
 

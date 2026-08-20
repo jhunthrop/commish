@@ -4,6 +4,14 @@ import tsconfigPaths from "vite-tsconfig-paths";
 
 /**
  * Directories with a 100% coverage gate (mirrored in `coverage.thresholds` below).
+ *
+ * The first twelve are PURE directories. `src/identity-service` and `src/review-service` are
+ * not: they are Postgres-backed, and they are here because the final whole-branch review found
+ * that every one of its HIGH findings lived in the service layer, which no gate measured. A few
+ * guards in those files are unreachable through real Postgres (a seeded row missing after an
+ * `ON CONFLICT DO NOTHING`, an author vanishing behind a foreign key); those are covered by
+ * narrow stub-`Db` tests that put the code in the state it defends against, never by lowering a
+ * threshold or ignoring a line.
  * `coverage.include` protects LOGIC files that nothing imports: without it, a real file no
  * test ever pulls in wouldn't be instrumented at all, and a 100% threshold checked only
  * against instrumented files can't fail on work that's silently missing coverage. It does
@@ -27,6 +35,8 @@ const COVERAGE_GATED_DIRS = [
   "src/help",
   "src/reviews",
   "src/gifs",
+  "src/identity-service",
+  "src/review-service",
 ] as const;
 const coverageInclude = COVERAGE_GATED_DIRS.map((dir) => `${dir}/**`);
 
@@ -119,6 +129,23 @@ export default defineConfig({
           statements: 100,
         },
         "src/gifs/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        // Gates 13 and 14. The twelve above cover PURE directories only, and the final review's
+        // finding was that all five of its HIGHs lived in the service layer — "twelve gates,
+        // 100%, all four metrics" was a true and strong statement about somewhere the defects
+        // were not. These two directories own the review feed's write path and the identity
+        // write path, and they are measured at the same bar as everything else.
+        "src/identity-service/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        "src/review-service/**": {
           branches: 100,
           functions: 100,
           lines: 100,

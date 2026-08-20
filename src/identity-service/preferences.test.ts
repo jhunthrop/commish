@@ -119,3 +119,35 @@ describe("updatePreferences", () => {
     await expect(updatePreferences(db, { userId: "nobody", helpLevel: "standard" }, fixedClock)).rejects.toThrow();
   });
 });
+
+/**
+ * The two "after seeding" guards. Real Postgres cannot reach either: `seedIfMissing` is
+ * `INSERT ... ON CONFLICT DO NOTHING` against a foreign key, so it either leaves a row behind or
+ * raises. The guards exist so a future refactor that breaks that invariant fails LOUDLY instead
+ * of returning a preference state assembled from nothing, and a guard nothing exercises is a
+ * guard nobody knows still works. A stub `Db` is the only way to put the code in the state it
+ * defends against.
+ */
+describe("readPreferences / updatePreferences — the impossible-state guards", () => {
+  const noRows = { from: () => ({ where: async () => [] }) };
+  const seedNoop = { values: () => ({ onConflictDoNothing: async () => undefined }) };
+
+  it("refuses to invent a preference state when the seeded row is somehow not there on read", async () => {
+    const stub = { select: () => noRows, insert: () => seedNoop } as unknown as Db;
+    await expect(readPreferences(stub, { id: "u1", experienceTier: "beginner" })).rejects.toThrow(
+      "No preferences row for user u1 after seeding.",
+    );
+  });
+
+  it("refuses to invent a preference state when the write updates nothing", async () => {
+    const tx = {
+      select: () => ({ from: () => ({ where: async () => [{ experienceTier: "beginner" }] }) }),
+      insert: () => seedNoop,
+      update: () => ({ set: () => ({ where: () => ({ returning: async () => [] }) }) }),
+    };
+    const stub = { transaction: (run: (t: unknown) => Promise<unknown>) => run(tx) } as unknown as Db;
+    await expect(updatePreferences(stub, { userId: "u1", helpLevel: "standard" }, fixedClock)).rejects.toThrow(
+      "No preferences row for user u1 after seeding.",
+    );
+  });
+});
