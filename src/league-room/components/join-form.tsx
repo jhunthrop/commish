@@ -95,6 +95,13 @@ export function JoinForm({ code, helpLevel }: { readonly code: string; readonly 
 
   return (
     <div className="flex flex-col gap-3">
+      {/* First-timer persona review, fix round 1: nothing anywhere in the invite flow said what
+          JOINING MEANS. Lives here, not in `LeagueTermsPanel` — that component also renders
+          post-join inside the league itself (Task 8), where this sentence would be stale and
+          confusing (you already ARE in the draft and season). */}
+      <p className="text-sm text-text-muted">
+        {"Joining puts you in the draft and the season that follows. You'll set a lineup every week."}
+      </p>
       <LeagueTermsPanel terms={preview.terms} helpLevel={helpLevel} />
       <Button onClick={() => void join()} loading={submitting} disabled={submitting}>
         {`Join ${preview.terms.name}`}

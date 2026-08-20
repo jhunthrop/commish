@@ -176,6 +176,22 @@ describe("LeagueHome", () => {
     );
   });
 
+  // First-timer persona review, fix round 1: the "joining puts you in the draft..." sentence
+  // belongs to the INVITE flow only (`JoinForm`) — it must never render post-join, where a
+  // member reading their own league is already in the draft and the season, and the line would
+  // be stale rather than informative.
+  it("never shows the invite flow's 'joining means' sentence once you're already in the league", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(
+      screen.queryByText("Joining puts you in the draft and the season that follows. You'll set a lineup every week."),
+    ).not.toBeInTheDocument();
+  });
+
   // Step 15's audit: a league had no members list at all. It renders for every member, not
   // just the commissioner — the invite panel below it stays commissioner-only, but knowing who
   // is in the league is not a commissioner-only fact.

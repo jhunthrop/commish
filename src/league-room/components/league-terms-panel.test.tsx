@@ -56,4 +56,13 @@ describe("LeagueTermsPanel", () => {
     render(<LeagueTermsPanel terms={TERMS} helpLevel="guided" />);
     expect(screen.getAllByText(/snake back and forth/).length).toBeGreaterThan(0);
   });
+
+  // Veteran persona review, fix round 1: this is a real-money decision, so the money fact
+  // (Stake) reads right after Format — before Size, Scoring or Roster — rather than buried
+  // second-to-last.
+  it("puts Stake right after Format — the money fact a real-money decision reads first", () => {
+    render(<LeagueTermsPanel terms={TERMS} />);
+    const labels = screen.getAllByRole("term").map((node) => node.textContent);
+    expect(labels).toEqual(["Format", "Stake", "Size", "Scoring", "Roster", "Commissioner"]);
+  });
 });

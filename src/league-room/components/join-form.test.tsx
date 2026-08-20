@@ -44,6 +44,17 @@ describe("JoinForm", () => {
     expect(fixture.calls.every((call) => call === "GET /api/invites/SUNDAY12")).toBe(true);
   });
 
+  // First-timer persona review, fix round 1: nothing anywhere in the invite flow said what
+  // JOINING MEANS. Lives in JoinForm, not the shared `LeagueTermsPanel` — see the sibling
+  // assertion in `league-home.test.tsx` that this sentence does NOT appear post-join.
+  it("says what joining means before asking anyone to do it", async () => {
+    const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });
+    renderInLeague(<JoinForm code="SUNDAY12" />, fixture.deps);
+    expect(
+      await screen.findByText("Joining puts you in the draft and the season that follows. You'll set a lineup every week."),
+    ).toBeInTheDocument();
+  });
+
   it("shows a loading skeleton before the preview resolves", () => {
     const fixture = fixtureLeagueDeps(undefined, { deferred: true });
     renderInLeague(<JoinForm code="SUNDAY12" />, fixture.deps);

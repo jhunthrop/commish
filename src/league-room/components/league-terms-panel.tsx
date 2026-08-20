@@ -42,6 +42,16 @@ export function LeagueTermsPanel({ terms, helpLevel }: { readonly terms: LeagueT
             <InfoTip term={FORMAT_TERM[terms.format]} helpLevel={helpLevel} />
           </dd>
         </div>
+        {/* Veteran persona review, fix round 1: the money fact is what a real-money decision
+            reads first — Stake moves to position 2, right after Format, label and disclosure
+            kept tightly paired. */}
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <dt className={`${EYEBROW} text-text-muted`}>Stake</dt>
+          <dd className="flex flex-col gap-1 text-text-primary">
+            <span>{terms.stakeLabel}</span>
+            <span className="text-sm text-text-muted">{terms.stakeDisclosure}</span>
+          </dd>
+        </div>
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Size</dt>
           <dd className="text-text-primary">{`${terms.filledTeams} of ${terms.teamCount} managers`}</dd>
@@ -58,13 +68,6 @@ export function LeagueTermsPanel({ terms, helpLevel }: { readonly terms: LeagueT
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Roster</dt>
           <dd className="text-text-primary">{terms.rosterLine}</dd>
-        </div>
-        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-          <dt className={`${EYEBROW} text-text-muted`}>Stake</dt>
-          <dd className="flex flex-col gap-1 text-text-primary">
-            <span>{terms.stakeLabel}</span>
-            <span className="text-sm text-text-muted">{terms.stakeDisclosure}</span>
-          </dd>
         </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Commissioner</dt>
