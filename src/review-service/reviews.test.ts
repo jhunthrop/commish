@@ -408,4 +408,18 @@ describe("removeReview", () => {
     await removeReview(db, { reviewId: "missing", removedByUserId: "operator", reason: "spam", audit: logger });
     expect(await db.select().from(auditEvents)).toHaveLength(0);
   });
+
+  it("rolls back the removal stamp when the audit append fails — ruling 4, the opposite of publishing", async () => {
+    await seedUser("u1");
+    await seedUser("operator");
+    await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
+
+    const brokenAudit = { ...logger, record: async () => { throw new Error("audit append failed"); } };
+    await expect(
+      removeReview(db, { reviewId: "r1", removedByUserId: "operator", reason: "spam", clock: at("2026-08-04T00:00:00Z"), audit: brokenAudit }),
+    ).rejects.toThrow("audit append failed");
+
+    const [row] = await db.select().from(reviews).where(eq(reviews.id, "r1"));
+    expect(row?.removedAt).toBeNull();
+  });
 });

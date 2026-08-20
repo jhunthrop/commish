@@ -203,6 +203,15 @@ describe("setLineup", () => {
     expect(rows[0]!.occurredAt.toISOString()).toBe(clock.now());
   });
 
+  it("rolls back the lineup write when the audit append fails — ruling 4, the opposite of publishing", async () => {
+    const league = await twoTeamLeague(db);
+    const brokenAudit = { ...logger, record: async () => { throw new Error("audit append failed"); } };
+    await expect(setLineup(db, validLineupInput(league, 1), undefined, { audit: brokenAudit, clock })).rejects.toThrow("audit append failed");
+
+    const saved = await db.select().from(lineupSlots).where(eq(lineupSlots.teamId, league.teamId));
+    expect(saved.filter((row) => row.weekNumber === 1)).toHaveLength(0);
+  });
+
   it("refuses a week the league doesn't have", async () => {
     const league = await twoTeamLeague(db);
     expect(

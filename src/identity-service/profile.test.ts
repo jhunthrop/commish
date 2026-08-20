@@ -163,6 +163,13 @@ describe("updateProfile / readProfile", () => {
     expect(await db.select().from(auditEvents)).toHaveLength(0);
   });
 
+  it("rolls back the profile write when the audit append fails — ruling 4, the opposite of publishing", async () => {
+    await seedUser(db, { id: "u1", displayName: "Ada Lovelace" });
+    const brokenAudit = { ...logger, record: async () => { throw new Error("audit append failed"); } };
+    await expect(updateProfile(db, { userId: "u1", displayName: "Ada B." }, fixedClock, { audit: brokenAudit })).rejects.toThrow("audit append failed");
+    expect(await readProfile(db, "u1")).toMatchObject({ displayName: "Ada Lovelace" });
+  });
+
   it("a later WorkOS sign-in does not clobber what the user chose", async () => {
     // user-sync.ts has always CLAIMED this. Nothing could test it before, because nothing could
     // edit. Now something can, so the claim gets an assertion.
