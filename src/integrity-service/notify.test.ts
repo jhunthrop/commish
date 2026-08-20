@@ -279,6 +279,30 @@ describe("quoteFor", () => {
     expect(quoteFor(notice)).toBe("Keep the trash talk about the teams.");
   });
 
+  /**
+   * Operators are trusted with what they choose to SAY, not with what a bidi override or a
+   * zero-width character would make a reader's browser DO with it — the same HIGH-2 belt
+   * `notifyAffectedMember`'s own composed `title`/`body` gets, applied here because `context.note`
+   * is stored unstripped (it is provenance) and this is the one place it is ever rendered.
+   */
+  it("strips characters a reader cannot see out of the operator's note at render time", () => {
+    const rtlOverride = String.fromCharCode(0x202e);
+    const zeroWidth = String.fromCharCode(0x200b);
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "operator_warning",
+      title: "An operator left you a note", body: "...",
+      context: { leagueName: "Sunday Money", note: `${rtlOverride}Keep the trash${zeroWidth} talk about the teams.` },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    const quoted = quoteFor(notice);
+    expect(quoted).toBe("Keep the trash talk about the teams.");
+    expect(quoted).not.toContain(rtlOverride);
+    expect(quoted).not.toContain(zeroWidth);
+    // `context` itself keeps what it was rendered FROM, untouched — the strip is at render, not at
+    // the write, the same provenance-vs-copy split `notifyAffectedMember`'s own docblock draws.
+    expect(notice.context.note).toBe(`${rtlOverride}Keep the trash${zeroWidth} talk about the teams.`);
+  });
+
   it("is null for an operator_warning notice whose context note is not a string", () => {
     const notice: MemberNotice = {
       id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "operator_warning",

@@ -216,6 +216,16 @@ export async function listNotices(db: Db, userId: string): Promise<NoticesPage> 
  * words, not a stored token to map through a phrase table — it renders VERBATIM, which is the
  * whole reason `resolveFlag` bounds its length instead of its vocabulary. Same narrowing
  * discipline as `reason` above: a row whose `note` is missing or not a string reads as no quote.
+ *
+ * `stripHiddenCharacters` runs on it too, same as the composed title/body above — operators are
+ * trusted with what they choose to SAY, not with what a bidi override or a zero-width character
+ * would make a reader's browser DO with it. `resolveFlag` writes `context.note` unstripped (it is
+ * provenance, the same "keeps what it was rendered FROM" rule `notifyAffectedMember`'s own
+ * `context` follows), so this is the one place that quote is ever rendered — the strip belongs
+ * HERE, at render, not at the write, for the same reason `notifyAffectedMember` strips `title`/
+ * `body` at compose time rather than trusting every future caller to have done it upstream. A
+ * note already written clean costs nothing extra; one written before this landed, or by a future
+ * caller that skips it, reads clean anyway.
  */
 export function quoteFor(notice: MemberNotice): string | null {
   if (notice.noticeType === "review_removed") {
@@ -224,7 +234,7 @@ export function quoteFor(notice: MemberNotice): string | null {
   }
   if (notice.noticeType === "operator_warning") {
     const note = notice.context.note;
-    return typeof note === "string" ? note : null;
+    return typeof note === "string" ? stripHiddenCharacters(note) : null;
   }
   return null;
 }
