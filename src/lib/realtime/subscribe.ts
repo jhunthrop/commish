@@ -4,7 +4,12 @@ import type { RealtimeEvent, RealtimeEventType } from "./events";
 
 interface SubscribeInput {
   readonly redis: Redis;
-  readonly leagueId: string;
+  /**
+   * The Redis Stream key to read — a league's broadcast (`REALTIME_CONFIG.leagueStreamKey`) or
+   * one user's own stream (`REALTIME_CONFIG.userStreamKey`). Resolved by the caller, not here:
+   * this iterator has no opinion about which key format a given event type belongs on.
+   */
+  readonly streamKey: string;
   /**
    * Resume cursor. "$" = only events published from now on (fresh connection);
    * a stream entry id = replay everything after it (a reconnecting client's Last-Event-ID).
@@ -38,13 +43,16 @@ function toEvent(id: string, fields: readonly string[]): RealtimeEvent | null {
 }
 
 /**
- * The one real-time delivery mechanism: an async iterator of events for a league,
+ * The one real-time delivery mechanism: an async iterator of events for a stream key,
  * read with plain XREAD BLOCK from a per-connection cursor.
  *
  * Deliberately NOT a consumer group. XREADGROUP partitions each entry to exactly one
  * consumer in the group; a draft room needs every viewer to see every pick. XREAD gives
  * every subscriber its own independent cursor over the same stream — true broadcast —
- * with no group bookkeeping to leak.
+ * with no group bookkeeping to leak. Broadcast semantics are exactly right for a league
+ * stream (every member should see every pick) and equally right for a user stream (every
+ * one of that user's own open tabs should see every notice) — the same mechanism serves
+ * both because nothing about it assumes there is only one legitimate reader.
  */
 const ABORTED = Symbol("aborted");
 
@@ -59,14 +67,13 @@ function abortPromise(signal: AbortSignal): Promise<typeof ABORTED> {
   });
 }
 
-export async function* subscribe({ redis, leagueId, afterId = "$", signal }: SubscribeInput): AsyncGenerator<RealtimeEvent> {
-  const key = REALTIME_CONFIG.leagueStreamKey(leagueId);
+export async function* subscribe({ redis, streamKey, afterId = "$", signal }: SubscribeInput): AsyncGenerator<RealtimeEvent> {
   const aborted = abortPromise(signal);
   let cursor = afterId;
   while (!signal.aborted) {
     // Race the blocking read against abort so a disconnected client releases immediately,
     // rather than only after the current BLOCK window (up to blockMs) expires.
-    const read = redis.xread("BLOCK", REALTIME_CONFIG.blockMs, "STREAMS", key, cursor) as Promise<XReadReply>;
+    const read = redis.xread("BLOCK", REALTIME_CONFIG.blockMs, "STREAMS", streamKey, cursor) as Promise<XReadReply>;
     const outcome = await Promise.race([read, aborted]);
     if (outcome === ABORTED) return;
     if (outcome === null) continue;

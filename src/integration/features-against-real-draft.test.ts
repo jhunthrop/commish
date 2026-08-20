@@ -54,6 +54,7 @@ describe("features built on fixtures, run against a real drafted league", () => 
       slots: before
         .filter((slot) => slot.slot !== "BENCH")
         .map((slot) => ({ slot: slot.slot, slotIndex: slot.slotIndex, playerId: slot.playerId })),
+      userId: league.userIds[0]!,
     });
     expect(result.ok).toBe(true);
   });
@@ -128,7 +129,7 @@ describe("features built on fixtures, run against a real drafted league", () => 
     // And the join door agrees: a stranger posting this league's real id is refused because its
     // draft already started, not silently seated into a league mid-season.
     const result = await joinPublicLeague(
-      { db, newId: () => "browse_newcomer_team" },
+      { db, newId: () => "browse_newcomer_team", clock: { now: () => new Date().toISOString() } },
       { leagueId: league.leagueId, userId: "browse_newcomer" },
     );
     expect(result).toEqual({ ok: false, status: 409, reason: DRAFT_ALREADY_STARTED });

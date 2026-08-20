@@ -4,6 +4,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { players } from "@/db/schema";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { bestAvailableFor, currentDeadline, teamOnClock, type DraftState } from "@/draft-engine";
+import { deliverNotice } from "@/integrity-service/notify";
 import { createPublisher } from "@/lib/realtime/publish";
 import { subscribe } from "@/lib/realtime/subscribe";
 import { REALTIME_CONFIG } from "@/lib/realtime/config";
@@ -16,7 +17,15 @@ const db = createTestDb();
 const control = new Redis(REDIS_URL);
 const clock = { now: () => "2026-09-01T00:00:00.000Z" };
 const publisher = createPublisher({ redis: new Redis(REDIS_URL), clock });
-const store = () => createDraftStore({ db, publish: (input) => publisher.publish(input), clock });
+const store = () =>
+  createDraftStore({
+    db,
+    publish: (input) => publisher.publish(input),
+    clock,
+    // Task 8: real per-user delivery over the SAME real Redis connection the rest of this file
+    // already uses, so the "two SSE clients" proof below is genuine end to end, not a fake.
+    deliverNotice: (notice) => deliverNotice(notice, (input) => publisher.publishToUser(input)),
+  });
 
 const AUCTION_SLOTS: readonly RosterSlotConfig[] = [
   { slot: "QB", count: 1, eligiblePositions: ["QB"] },
@@ -52,7 +61,7 @@ async function watchUntilComplete(leagueId: string, signal: AbortSignal, watcher
   const seen: RealtimeEvent[] = [];
   const redis = new Redis(REDIS_URL);
   try {
-    for await (const event of subscribe({ redis, leagueId, afterId: "$", signal })) {
+    for await (const event of subscribe({ redis, streamKey: REALTIME_CONFIG.leagueStreamKey(leagueId), afterId: "$", signal })) {
       watcher.ready = true;
       if ((event.payload as { probe?: boolean } | null)?.probe === true) continue;
       seen.push(event);
@@ -215,4 +224,93 @@ describe("two SSE clients watching a live auction draft", () => {
       );
     }
   }, 60_000);
+});
+
+/** A generic reader for any stream key — the league one or a user's own — until aborted. */
+async function readFrames(streamKey: string, signal: AbortSignal, watcher: Watcher): Promise<RealtimeEvent[]> {
+  const seen: RealtimeEvent[] = [];
+  const redis = new Redis(REDIS_URL);
+  try {
+    for await (const event of subscribe({ redis, streamKey, afterId: "$", signal })) {
+      watcher.ready = true;
+      seen.push(event);
+    }
+  } finally {
+    redis.disconnect();
+  }
+  return seen;
+}
+
+/** Same deterministic-readiness idea as `waitUntilSubscribersReady`, generalized to any key. */
+async function waitUntilFramesReady(
+  probes: readonly { readonly watcher: Watcher; readonly send: () => Promise<unknown> }[],
+  timeoutMs = 5_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (probes.some(({ watcher }) => !watcher.ready)) {
+    if (Date.now() > deadline) throw new Error("Timed out waiting for stream subscribers to register.");
+    await Promise.all(probes.map(({ send }) => send()));
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+}
+
+describe("an autopicked notice, watched by two SSE clients — the manager's own and the league's", () => {
+  it("reaches only the picked-for manager's own stream, with no copy, and never the league's", async () => {
+    const fixture = await seedDraftFixture(db, {
+      draftId: "draft_sse_notice", leagueId: "league_sse_notice", format: "snake", teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+    await insertPlayers(6);
+    await control.del(REALTIME_CONFIG.leagueStreamKey(fixture.leagueId));
+
+    const draft = store();
+    const started = await draft.startDraft(fixture.draftId);
+    if (!started.ok) throw new Error(started.reason);
+    const onClock = teamOnClock(started.state);
+    if (onClock === null) throw new Error("nobody on the clock");
+    const pickedForUserId = fixture.userIds[fixture.teamIds.indexOf(onClock)]!;
+    const leaguemateUserId = fixture.userIds.find((id) => id !== pickedForUserId)!;
+    await control.del(REALTIME_CONFIG.userStreamKey(pickedForUserId), REALTIME_CONFIG.userStreamKey(leaguemateUserId));
+
+    const ac = new AbortController();
+    const leagueWatcher: Watcher = { ready: false };
+    const mineWatcher: Watcher = { ready: false };
+    const leaguemateWatcher: Watcher = { ready: false };
+    const leagueFrames = readFrames(REALTIME_CONFIG.leagueStreamKey(fixture.leagueId), ac.signal, leagueWatcher);
+    const mineFrames = readFrames(REALTIME_CONFIG.userStreamKey(pickedForUserId), ac.signal, mineWatcher);
+    const leaguemateFrames = readFrames(REALTIME_CONFIG.userStreamKey(leaguemateUserId), ac.signal, leaguemateWatcher);
+
+    await waitUntilFramesReady([
+      { watcher: leagueWatcher, send: () => publisher.publish({ leagueId: fixture.leagueId, type: "chat.message", payload: { probe: true } }) },
+      { watcher: mineWatcher, send: () => publisher.publishToUser({ userId: pickedForUserId, leagueId: fixture.leagueId, type: "chat.message", payload: { probe: true } }) },
+      { watcher: leaguemateWatcher, send: () => publisher.publishToUser({ userId: leaguemateUserId, leagueId: fixture.leagueId, type: "chat.message", payload: { probe: true } }) },
+    ]);
+
+    // The ticker's own mechanism: the clock ran out, so this autopicks for whoever is on it.
+    const result = await draft.applyAction(fixture.draftId, {
+      v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(started.state) ?? clock.now(),
+    });
+    if (!result.ok) throw new Error(result.reason);
+
+    // Give the pick's public frame and the notice's private frame both a moment to arrive.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    ac.abort();
+    const [leagueSeen, mineSeen, leaguemateSeen] = await Promise.all([leagueFrames, mineFrames, leaguemateFrames]);
+
+    const real = (frames: readonly RealtimeEvent[]) => frames.filter((e) => (e.payload as { probe?: boolean } | null)?.probe !== true);
+
+    // The pick is public — the league sees it.
+    expect(real(leagueSeen).some((e) => e.type === "draft.pick")).toBe(true);
+    // The notice is not — it never rides the league broadcast, ruling 13's guard.
+    expect(real(leagueSeen).some((e) => e.type === "notice.created")).toBe(false);
+
+    // Only the picked-for manager's own stream carries it, content-free.
+    const notice = real(mineSeen).find((e) => e.type === "notice.created");
+    expect(notice).toBeDefined();
+    expect(Object.keys(notice!.payload as object).sort()).toEqual(["noticeId", "noticeType"]);
+    expect((notice!.payload as { noticeType: string }).noticeType).toBe("draft_auto_picked");
+
+    // A leaguemate's own stream never sees it either — this is per-user, not per-league.
+    expect(real(leaguemateSeen).some((e) => e.type === "notice.created")).toBe(false);
+  }, 15_000);
 });

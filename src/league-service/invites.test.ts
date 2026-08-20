@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { leagueInvites, teams, users } from "@/db/schema";
+import { auditEvents, leagueInvites, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { LEAGUE_CONFIG } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { createLeague } from "./creation";
@@ -22,6 +23,9 @@ const newId = () => `id_${++nextId}`;
 const writeDeps = () => ({ db, clock, newId });
 /** Fixed randomness makes the minted code reproducible. */
 const inviteDeps = () => ({ db, clock, random: () => 0.5 });
+
+let auditCounter = 0;
+const logger = createAuditLogger({ newId: () => `evt_${(auditCounter += 1)}` });
 
 /**
  * A `Db` whose `transaction(...)` rejects with the given error but whose reads still hit the
@@ -61,6 +65,7 @@ beforeEach(async () => {
   await truncateAll(db);
   nowIso = "2026-08-17T12:00:00.000Z";
   nextId = 0;
+  auditCounter = 0;
 });
 
 afterAll(async () => {
@@ -307,6 +312,19 @@ describe("acceptInvite", () => {
     } finally {
       consoleSpy.mockRestore();
     }
+  });
+
+  it("records member_joined when an invite is accepted, on the same chain and with the same shape", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const outcome = await acceptInvite({ db, clock, newId, audit: logger }, { code: invite.code, userId: "u2" });
+    if (!outcome.ok) throw new Error(outcome.reason);
+
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "member_joined"));
+    expect(event).toMatchObject({ actorId: "u2", actorType: "user", leagueId: created.leagueId });
+    expect(event!.payload).toEqual({ teamId: outcome.teamId, via: "invite" });
   });
 });
 

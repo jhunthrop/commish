@@ -21,7 +21,8 @@ export type TermKey =
   | "lineup-lock"
   | "stake-tier"
   | "matchup"
-  | "standings-record";
+  | "standings-record"
+  | "queue";
 
 export interface GlossaryTerm {
   readonly key: TermKey;
@@ -128,6 +129,13 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     short: "Wins, losses, and ties so far this season.",
     detail:
       "A record shows how many weeks a team has won, lost, and tied so far this season, written as wins-losses or wins-losses-ties. Standings rank every team in the league by that record first.",
+  },
+  queue: {
+    key: "queue",
+    term: "your draft queue",
+    short: "The list of players you ranked to auto-draft if you're away when it's your pick.",
+    detail:
+      "Your draft queue is the ranked list of players you'd want if you can't pick in person. If the clock runs out on your turn, the room drafts the highest-ranked player still available from your queue instead of skipping you.",
   },
 };
 

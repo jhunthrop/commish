@@ -1,12 +1,26 @@
 import { z } from "zod";
+import { isPrintableDisplayName } from "@/identity/display-name";
 import { LEAGUE_CONFIG } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 
+/**
+ * Both names a member chooses: the league's and their team's.
+ *
+ * The printable guard is the same one the profile PATCH uses, and it is here for a sharper reason
+ * than "a name renders on a page". A league name is interpolated into copy the PLATFORM writes in
+ * its own voice — the autopick notice's "The clock ran out on pick 24 in <league>" — and ruling 12
+ * stores that rendered sentence verbatim and never re-renders it. A `U+202E` planted in a league
+ * name would therefore reverse the platform's own words in every affected member's inbox for the
+ * life of the row, and no later fix to this schema could repair the rows already written, because
+ * repairing stored copy is what ruling 12 forbids. React's escaping is no help: a bidi override is
+ * legitimate text, not markup.
+ */
 const name = z
   .string()
   .trim()
   .min(1, { message: "Please enter a name." })
-  .max(LEAGUE_CONFIG.maxNameLength, { message: `Please keep this to ${LEAGUE_CONFIG.maxNameLength} characters or fewer.` });
+  .max(LEAGUE_CONFIG.maxNameLength, { message: `Please keep this to ${LEAGUE_CONFIG.maxNameLength} characters or fewer.` })
+  .refine(isPrintableDisplayName, { message: "Please use only characters people can see." });
 
 /**
  * Every field except the name has a default, because the spec's exit criterion is that a

@@ -20,7 +20,7 @@ export async function POST(request: Request, context: RouteContext) {
     if (!parsed.ok) return parsed.response;
 
     const action = toDraftAction(parsed.value, actor.teamId, new Date().toISOString());
-    const result = await getDraftStore().applyAction(actor.draftId, action);
+    const result = await getDraftStore().applyAction(actor.draftId, action, { actor: { id: actor.userId } });
     if (!result.ok) return fail(result.reason, 409);
 
     return ok({ draft: draftStateView(result.state) });

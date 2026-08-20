@@ -28,7 +28,7 @@ function isHomeBody(value: unknown): value is HomeBody {
  *
  * This is deliberately not a second real-time transport. Redis Streams over SSE remains the
  * one mechanism, and it is where the per-league live surface lives (`useLiveScores`): a manager
- * in ten leagues cannot hold ten SSE connections (`REALTIME_CONFIG.maxStreamsPerUser` is 8, and
+ * in ten leagues cannot hold ten SSE connections (`REALTIME_CONFIG.maxStreamsPerUser` is 10, and a league tab costs two of them, and
  * each one pins a Redis socket and an fd server-side), so this view reads a cached summary on an
  * interval instead, and every card links into the league page where the real stream is.
  *

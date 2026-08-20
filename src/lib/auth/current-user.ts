@@ -36,7 +36,11 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
           avatarUrl: profile.avatarUrl,
           createdAt: profile.createdAt.toISOString(),
         }
-      : await syncUserFromWorkOS({ db, clock: systemClock }, wu);
+      : // The lazy backfill: a valid AuthKit session whose local row is missing (a database
+        // restore, a row deleted by hand, a first request that raced the callback). It is a
+        // sign-in event either way — the person did just present a session — but it is NOT the
+        // callback, and the audit row says which (`SessionEntry`).
+        await syncUserFromWorkOS({ db, clock: systemClock, via: "session_backfill" }, wu);
 
   return { ...local, email: wu.email };
 }

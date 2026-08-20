@@ -18,7 +18,8 @@ import { createInterface } from "node:readline/promises";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { reviews, users } from "@/db/schema";
-import { REMOVAL_REASON_VALUES, removalPhraseFor } from "@/reviews/config";
+import { renderNotice } from "@/integrity/notices";
+import { REVIEW_CONFIG, REMOVAL_REASON_VALUES, removalPhraseFor, removalSentenceFor } from "@/reviews/config";
 import { removeReview } from "@/review-service/reviews";
 
 interface Args {
@@ -48,6 +49,13 @@ function parseArgs(argv: readonly string[]): Args {
   }
   if (!REMOVAL_REASON_VALUES.includes(reason)) {
     throw new Error(`--reason must be one of: ${REMOVAL_REASON_VALUES.join(", ")}. The author reads it.\n${USAGE}`);
+  }
+  // Unreachable through the enum check above today — every `REMOVAL_REASON_VALUES` entry is
+  // well under this cap — but `removeReview` enforces the SAME limit as its own boundary
+  // (`REVIEW_CONFIG.removalReason.maxLength`'s own docblock explains why), so the script checks
+  // it too rather than letting a future looser `--reason` surface only as a service rejection.
+  if (reason.length > REVIEW_CONFIG.removalReason.maxLength) {
+    throw new Error(`--reason must be ${REVIEW_CONFIG.removalReason.maxLength} characters or fewer.\n${USAGE}`);
   }
   return { id, reason, by };
 }
@@ -93,8 +101,20 @@ async function main(): Promise<void> {
   console.log(`  rating: ${row.rating}`);
   console.log(`  body:   ${row.body}`);
   console.log(`  reason: ${args.reason}`);
-  console.log(`  the author will read: "Your review was removed for ${removalPhraseFor(args.reason)}. It can't be edited."`);
   console.log(`  by:     ${args.by}`);
+  // EXACTLY what the author will read, composed through the same functions that write it. Both
+  // surfaces are shown because there are two: the profile sentence `ReviewComposer` renders, and
+  // the inbox notice `removeReview` stores. Every line below comes from a shared function
+  // (`removalSentenceFor`, `renderNotice`, `removalPhraseFor` — the last being what `quoteFor`
+  // returns for the stored row), so this preview cannot drift from the delivery the way a hand
+  // written copy of the sentence did. `notify.test.ts` holds the two to each other.
+  console.log("  the author will read, on their profile:");
+  console.log(`    ${removalSentenceFor(args.reason)}`);
+  const notice = renderNotice("review_removed", { reason: args.reason });
+  console.log("  and in their notice inbox:");
+  console.log(`    ${notice.title}`);
+  console.log(`    ${notice.body}`);
+  console.log(`    "${removalPhraseFor(args.reason)}"`);
 
   const proceed = await confirm("Remove this review?");
   if (!proceed) {

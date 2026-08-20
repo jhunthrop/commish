@@ -61,9 +61,16 @@ export function LeagueHome({
       <section className="flex flex-col gap-2" aria-label={`${formatWeek(home.currentWeek)} matchup`}>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h2 className="text-lg font-medium text-text-primary">{formatWeek(home.currentWeek)}</h2>
-          <Link className="text-sm text-accent underline" href={`/app/leagues/${home.leagueId}/matchups/${home.currentWeek}`}>
-            All matchups
-          </Link>
+          <div className="flex flex-wrap items-center gap-3">
+            <Link className="text-sm text-accent underline" href={`/app/leagues/${home.leagueId}/matchups/${home.currentWeek}`}>
+              All matchups
+            </Link>
+            {/* Task 10: the member-visible history this league's own home page had no way to
+                reach before — reachable from where a member already is, not by typing a url. */}
+            <Link className="text-sm text-accent underline" href={`/app/leagues/${home.leagueId}/activity`}>
+              League activity
+            </Link>
+          </div>
         </div>
         {home.myMatchup === null ? (
           <p className="text-text-muted">You have no matchup this week.</p>

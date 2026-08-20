@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { REMOVAL_REASON_VALUES, REVIEW_CONFIG, removalPhraseFor } from "./config";
+import { REMOVAL_REASON_VALUES, REVIEW_CONFIG, removalPhraseFor, removalSentenceFor } from "./config";
 
 describe("removal reason vocabulary", () => {
   it("offers exactly the closed report set as removal reasons, in one list", () => {
@@ -10,8 +10,12 @@ describe("removal reason vocabulary", () => {
   it("reads as a sentence when the author is told why", () => {
     // The copy runs "Your review was removed for ___. It can't be edited." — a reporter's own
     // label ("Spam or fake") does not fit that slot, which is why there are two phrasings.
+    // `removalSentenceFor` is the ONE place that sentence exists: `ReviewComposer` renders it and
+    // `scripts/remove-review.ts` previews it, and they had drifted into two literals that only
+    // happened to agree.
     for (const reason of REVIEW_CONFIG.reportReasons) {
-      expect(`Your review was removed for ${removalPhraseFor(reason.value)}.`).toMatch(/^Your review was removed for [a-z].*\.$/);
+      expect(removalSentenceFor(reason.value)).toMatch(/^Your review was removed for [a-z].*\. It can't be edited\.$/);
+      expect(removalSentenceFor(reason.value)).toContain(removalPhraseFor(reason.value));
     }
     expect(removalPhraseFor("spam")).toBe("spam or fake content");
     expect(removalPhraseFor("other")).toBe("breaking the review rules");
@@ -22,5 +26,9 @@ describe("removal reason vocabulary", () => {
     // operator's private wording must not reach a sentence on the author's own profile.
     expect(removalPhraseFor("internal note: see ticket 4821")).toBe("breaking the review rules");
     expect(removalPhraseFor("")).toBe("breaking the review rules");
+    // And an ABSENT one, which is what `myReview` now reports for a row whose `removal_reason`
+    // column is empty — the mapper owns that fallback so the contract can keep carrying a token.
+    expect(removalPhraseFor(null)).toBe("breaking the review rules");
+    expect(removalSentenceFor(null)).toBe("Your review was removed for breaking the review rules. It can't be edited.");
   });
 });

@@ -23,11 +23,33 @@
  * did not receive an answer to, and the hidden-character half is the part that is unambiguously
  * a defect, so it is the part that gets fixed.
  */
-const HIDDEN_CHARACTERS = new RegExp(
-  "[\\u0000-\\u001F\\u007F-\\u009F\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u2066-\\u2069\\uFEFF]",
-);
+const HIDDEN_CHARACTER_CLASS = "[\\u0000-\\u001F\\u007F-\\u009F\\u200B-\\u200F\\u202A-\\u202E\\u2060-\\u2064\\u2066-\\u2069\\uFEFF]";
+const HIDDEN_CHARACTERS = new RegExp(HIDDEN_CHARACTER_CLASS);
 
 /** Whether a display name is made only of characters a reader can actually see. */
 export function isPrintableDisplayName(value: string): boolean {
   return !HIDDEN_CHARACTERS.test(value);
+}
+
+/**
+ * The same rule as a filter rather than a verdict, for the two places refusing the input is not
+ * an option.
+ *
+ * A BOUNDARY should refuse — `isPrintableDisplayName` above, wired to every schema where a person
+ * types a name — because refusing is honest and the person can fix it. Two places cannot refuse:
+ *
+ *  - a name that arrives from the identity provider at sign-up, where the alternative to
+ *    accepting it is refusing somebody a sign-in over a character they may not know is there;
+ *  - the composition of a notice, which interpolates names read back OUT of Postgres. Rows
+ *    written before the boundary guards existed are still there, and ruling 12 freezes the
+ *    rendered copy forever, so a bidi override that reaches `member_notices.body` reverses the
+ *    platform's own sentence in somebody's inbox for the life of the row. There is no later fix:
+ *    repairing stored copy is exactly what ruling 12 forbids.
+ *
+ * Stripping, not replacing: every character in the class is invisible or a reordering directive,
+ * so removing one changes nothing a reader could see, which makes this the rare sanitizer that
+ * cannot corrupt what it cleans.
+ */
+export function stripHiddenCharacters(value: string): string {
+  return value.replace(new RegExp(HIDDEN_CHARACTER_CLASS, "gu"), "");
 }

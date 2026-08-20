@@ -2,6 +2,8 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { reviewReports, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { attachAuditEvent, notifyAffectedMember } from "@/integrity-service/notify";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { formatReviewCursor, type ReviewCursor } from "@/reviews/cursor";
 import type { MyReviewState, ReviewView, ReviewsPage } from "@/reviews/contract";
@@ -191,7 +193,16 @@ export async function myReview(db: Db, userId: string): Promise<MyReviewState> {
 
   if (row === undefined) return { state: "none" };
   if (row.removedAt !== null) {
-    return { state: "removed", reason: row.removalReason ?? "breaking the review rules", removedAt: row.removedAt.toISOString() };
+    // `null`, not a display phrase. `reason` on this contract is the STORED TOKEN
+    // (`REVIEW_CONFIG.reportReasons`' values), and the fallback here was
+    // "breaking the review rules" — which is a rendered PHRASE, not a token, so a
+    // `removal_reason` column that is somehow empty produced a value no consumer could map and
+    // that `removalPhraseFor` would then feed back through its own unrecognized-value fallback to
+    // arrive at the same sentence by accident. Two different types under one field name is how a
+    // future consumer that switches on the token gets a string that matches no case. The absent
+    // value is absent; `ReviewComposer` renders `removalSentenceFor(null-ish)` through the same
+    // mapper and lands on the generic phrase deliberately rather than coincidentally.
+    return { state: "removed", reason: row.removalReason, removedAt: row.removedAt.toISOString() };
   }
   return { state: "live", review: toView(row, row.rating) };
 }
@@ -229,6 +240,10 @@ export interface RemoveReviewInput {
   readonly removedByUserId: string;
   readonly reason: string;
   readonly clock?: Clock;
+  /** Defaults to the process-wide logger (`getAuditLogger()`). */
+  readonly audit?: AuditLogger;
+  /** Defaults to the real `notifyAffectedMember`. Injectable so a test can force its failure. */
+  readonly notify?: typeof notifyAffectedMember;
 }
 
 export interface RemovalRecord {
@@ -256,33 +271,87 @@ export type RemoveReviewResult =
  * on the row lock: whichever commits first wins, and the second's `UPDATE` matches zero rows
  * because Postgres re-evaluates `removed_at IS NULL` against the now-committed row before it can
  * match — so a second operator can never silently overwrite the first one's reason and timestamp.
+ *
+ * Records `review_removed` on the PLATFORM chain, INSIDE the same transaction as the stamp, and
+ * only on the branch that actually landed one — a re-stamp attempt that the `WHERE` clause
+ * refuses is not a removal and must record nothing, the same "judged by this write's own
+ * returned rows" rule the stamp itself uses. The whole function runs inside one transaction now
+ * (it used to be a single bare `UPDATE`) so the stamp and its audit event commit together.
+ *
+ * Task 7's second real sender: the `--reason` this script has always taken has been "author-
+ * facing copy" since Phase 2 with nowhere for the author to read it. `notifyAffectedMember` joins
+ * the same transaction as the stamp and the audit event. What the author reads is not the
+ * stored `--reason` but the phrase it maps to (`removalPhraseFor`, applied at every render by
+ * `quoteFor`): the reason has been one of three platform-authored tokens since the script closed
+ * it to `REVIEW_CONFIG.reportReasons`, and "other" is not a sentence to show a person under the
+ * words "We removed your review". The durable row is this task's whole delivery; a live nudge is
+ * moot here regardless (a removal has no league, and ruling 13 sends no frame for one anyway) —
+ * the author's next inbox load is the honest delivery.
+ *
+ * `REVIEW_CONFIG.removalReason.maxLength` is enforced HERE, not only in the script's own
+ * `parseArgs` — this function, not the CLI, is the actual boundary a future caller (an admin UI,
+ * a different script) would hit, and `reason` is stored as given and rendered, through the
+ * mapper, on a member's own notice. Checked before the transaction opens, same "fail fast, no partial write"
+ * shape as the two lookup failures below.
  */
 export async function removeReview(db: Db, input: RemoveReviewInput): Promise<RemoveReviewResult> {
-  const clock = input.clock ?? systemClock;
-  const now = new Date(clock.now());
-  const [row] = await db
-    .update(reviews)
-    .set({ removedAt: now, removedByUserId: input.removedByUserId, removalReason: input.reason })
-    .where(and(eq(reviews.id, input.reviewId), isNull(reviews.removedAt)))
-    .returning({ id: reviews.id, userId: reviews.userId, removedByUserId: reviews.removedByUserId, removalReason: reviews.removalReason, removedAt: reviews.removedAt });
-
-  if (row !== undefined && row.removedAt !== null && row.removedByUserId !== null && row.removalReason !== null) {
-    return {
-      ok: true,
-      record: {
-        reviewId: row.id,
-        userId: row.userId,
-        removedByUserId: row.removedByUserId,
-        reason: row.removalReason,
-        removedAt: row.removedAt.toISOString(),
-      },
-    };
+  if (input.reason.length > REVIEW_CONFIG.removalReason.maxLength) {
+    return { ok: false, reason: `--reason must be ${REVIEW_CONFIG.removalReason.maxLength} characters or fewer.` };
   }
 
-  // The UPDATE matched nothing — either no review has this id, or it's already removed. A
-  // second SELECT (outside the write, so it costs nothing when the write succeeds) tells the
-  // two apart for a message that actually helps the operator running the script.
-  const [existing] = await db.select({ removedAt: reviews.removedAt }).from(reviews).where(eq(reviews.id, input.reviewId));
-  if (existing === undefined) return { ok: false, reason: `No review with id "${input.reviewId}".` };
-  return { ok: false, reason: `Review "${input.reviewId}" is already removed.` };
+  const clock = input.clock ?? systemClock;
+  const audit = input.audit ?? getAuditLogger();
+  const notify = input.notify ?? notifyAffectedMember;
+  const now = new Date(clock.now());
+
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(reviews)
+      .set({ removedAt: now, removedByUserId: input.removedByUserId, removalReason: input.reason })
+      .where(and(eq(reviews.id, input.reviewId), isNull(reviews.removedAt)))
+      .returning({ id: reviews.id, userId: reviews.userId, removedByUserId: reviews.removedByUserId, removalReason: reviews.removalReason, removedAt: reviews.removedAt });
+
+    if (row !== undefined && row.removedAt !== null && row.removedByUserId !== null && row.removalReason !== null) {
+      // The notice FIRST, the anchor LAST (ruling 3, as restated in `audit-logger.ts`): this
+      // insert takes an implicit `FOR KEY SHARE` on the author's `users` row, and a lock taken
+      // after the anchor is a lock taken in the wrong order whether or not anything competes for
+      // it today. `attachAuditEvent` then stamps the event id in a statement that touches only
+      // `member_notices` and only a column with no foreign key on it.
+      const notice = await notify(tx, {
+        leagueId: null,
+        userId: row.userId,
+        noticeType: "review_removed",
+        context: { reason: row.removalReason },
+        occurredAt: clock.now(),
+        auditEventId: null,
+      });
+      const event = await audit.record(tx, {
+        eventType: "review_removed",
+        actorId: row.removedByUserId,
+        actorType: "user",
+        leagueId: null,
+        payload: { reviewId: row.id, authorUserId: row.userId, reason: row.removalReason },
+        occurredAt: clock.now(),
+      });
+      await attachAuditEvent(tx, notice, event.eventId);
+      return {
+        ok: true,
+        record: {
+          reviewId: row.id,
+          userId: row.userId,
+          removedByUserId: row.removedByUserId,
+          reason: row.removalReason,
+          removedAt: row.removedAt.toISOString(),
+        },
+      };
+    }
+
+    // The UPDATE matched nothing — either no review has this id, or it's already removed. A
+    // second SELECT (still inside this transaction, so it costs nothing when the write
+    // succeeds) tells the two apart for a message that actually helps the operator running the
+    // script.
+    const [existing] = await tx.select({ removedAt: reviews.removedAt }).from(reviews).where(eq(reviews.id, input.reviewId));
+    if (existing === undefined) return { ok: false, reason: `No review with id "${input.reviewId}".` };
+    return { ok: false, reason: `Review "${input.reviewId}" is already removed.` };
+  });
 }

@@ -42,14 +42,20 @@ export interface ReviewsPage {
  * The caller's own review, in the three states the product actually has. `removed` is the one
  * the feed's `ReviewView` deliberately cannot express: a removed review is absent from the
  * public feed, but its AUTHOR still has to be told what happened to it, or they edit into a
- * silent shadow-ban. `reason` is the operator's own removal reason — the author sees the same
- * sentence the operator wrote, which is why `scripts/remove-review.ts` says so before it asks
- * for confirmation.
+ * silent shadow-ban.
+ *
+ * `reason` is the STORED TOKEN — one of `REVIEW_CONFIG.reportReasons`' values — and it is
+ * NULLABLE, because `removed_at` and `removal_reason` are independently nullable columns and a
+ * row with the first and not the second is reachable. It is deliberately not a sentence: every
+ * surface maps it through `removalPhraseFor`/`removalSentenceFor` at render, both of which have
+ * their own answer for a value outside the closed set, so the mapping happens once in one place
+ * rather than a phrase being smuggled into a field typed as a token. `scripts/remove-review.ts`
+ * previews the mapped result before it asks for confirmation, for exactly that reason.
  */
 export type MyReviewState =
   | { readonly state: "none" }
   | { readonly state: "live"; readonly review: ReviewView }
-  | { readonly state: "removed"; readonly reason: string; readonly removedAt: string };
+  | { readonly state: "removed"; readonly reason: string | null; readonly removedAt: string };
 
 /** `GET /api/reviews`'s response body. */
 export type ReviewsListBody = ReviewsPage;

@@ -31,6 +31,12 @@ export const NOTIFICATION_CATALOG: readonly NotificationTopic[] = [
   { key: "draft-start", title: "Your draft is starting", detail: "While you're in the league.", events: ["draft.status"] },
   { key: "scores", title: "Your scores are moving", detail: "On your league page and your home page, while games are being played.", events: ["score.update"] },
   { key: "chat", title: "Your league is talking", detail: "In the league's chat.", events: ["chat.message", "chat.reaction"] },
+  {
+    key: "platform-actions",
+    title: "When the platform acts on your league",
+    detail: "In the app, in your notices and on your league's activity page.",
+    events: ["notice.created"],
+  },
 ];
 
 /**

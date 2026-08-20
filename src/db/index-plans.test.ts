@@ -6,6 +6,7 @@ import { chatMessages, draftActions, lineupSlots, matchups, rosterSlots, teams }
 import { explainPlan, indexScanNode, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
 import { browseQuery } from "@/league-service/browse";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
+import { AUDIT_EVENT_TYPES } from "@/domain/audit";
 
 const db = createTestDb();
 
@@ -246,5 +247,62 @@ describe("chat_messages_league_id_idx stays a covering index", () => {
     )) as unknown as { readonly indexdef: string }[];
     expect(rows).toHaveLength(1);
     expect(rows[0]!.indexdef).toContain("INCLUDE (body)");
+  });
+});
+
+/**
+ * `audit_events`'s indexes and triggers, read back out of the catalog rather than trusted from
+ * the SQL: the same reason `chat_messages_league_id_idx` is proven this way above. The triggers
+ * in particular are hand-written (`drizzle/0019_audit_spine.sql`'s note) and invisible to
+ * `drizzle-kit generate`'s diffing — a future migration that recreates this table and forgets
+ * them fails HERE, in the build, rather than silently reopening the table to UPDATE and DELETE.
+ */
+describe("audit_events carries its indexes and its append-only triggers", () => {
+  it("carries both composite indexes the scaling review named, plus the sequence backstop", async () => {
+    const rows = await db.execute<{ indexname: string; indexdef: string }>(
+      sql`SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'audit_events'`,
+    );
+    const byName = new Map(rows.map((row) => [row.indexname, row.indexdef]));
+    expect(byName.get("audit_events_scope_sequence_idx")).toMatch(/UNIQUE.*\(chain_scope, sequence\)/);
+    expect(byName.get("audit_events_league_occurred_idx")).toMatch(/\(league_id, occurred_at\)/);
+    expect(byName.get("audit_events_actor_type_occurred_idx")).toMatch(/\(actor_id, event_type, occurred_at\)/);
+  });
+
+  it("carries the append-only triggers, so a migration that recreates the table cannot drop them", async () => {
+    const rows = await db.execute<{ tgname: string }>(sql`
+      SELECT tgname FROM pg_trigger WHERE tgrelid = 'audit_events'::regclass AND NOT tgisinternal
+    `);
+    expect(rows.map((row) => row.tgname).sort()).toEqual(["audit_events_no_delete", "audit_events_no_update"]);
+  });
+
+  /**
+   * `audit_chain_checkpoints`' own pair (`drizzle/0021_audit_checkpoint_append_only.sql`), pinned
+   * the same way and for a sharper reason: this table is the THIRD account the verifier reconciles
+   * against, and it is the only account that survives an adversary who deletes the tail of
+   * `audit_events` and rewinds `audit_chains` to match. A migration that recreates the table and
+   * forgets these triggers reopens that exact hole, silently.
+   */
+  it("carries the checkpoint table's forward-only triggers, which are what make it a detector", async () => {
+    const rows = await db.execute<{ tgname: string }>(sql`
+      SELECT tgname FROM pg_trigger WHERE tgrelid = 'audit_chain_checkpoints'::regclass AND NOT tgisinternal
+    `);
+    expect(rows.map((row) => row.tgname).sort()).toEqual(["audit_chain_checkpoints_forward_only", "audit_chain_checkpoints_no_delete"]);
+  });
+});
+
+/**
+ * Nothing else in this repo pins `audit_event_type`'s labels to `AUDIT_EVENT_TYPES`:
+ * `drizzle-kit check` (which WOULD catch a schema.ts change with no matching migration) isn't
+ * wired to any script here, and `pgEnum("audit_event_type", AUDIT_EVENT_TYPES)` in `schema.ts`
+ * only constrains what a FUTURE `db:generate` would emit — it says nothing about what the
+ * migration already applied to a real database actually created. A 17th entry added to
+ * `AUDIT_EVENT_TYPES` without a matching migration reddens nothing without this test.
+ */
+describe("audit_event_type stays in sync with AUDIT_EVENT_TYPES", () => {
+  it("carries exactly the domain vocabulary, in the same order", async () => {
+    const rows = await db.execute<{ enumlabel: string }>(sql`
+      SELECT enumlabel FROM pg_enum WHERE enumtypid = 'audit_event_type'::regtype ORDER BY enumsortorder
+    `);
+    expect(rows.map((row) => row.enumlabel)).toEqual([...AUDIT_EVENT_TYPES]);
   });
 });

@@ -4,6 +4,8 @@ import { leagues, lineupSlots, matchups, players, rosterSlots, statWeeks } from 
 import { validateLineup } from "@/domain/roster-eligibility";
 import { BENCH_SLOT } from "@/domain/roster";
 import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/roster";
+import type { Clock } from "@/domain/timing";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { benchOf, defaultLineup, isLineupLocked, startersOf, type WeekStatus } from "@/league";
 import { excludedSetFor } from "@/db/upsert";
 import type { LineupBody, LineupSlotView } from "@/league-room/contract";
@@ -13,6 +15,8 @@ import type { ScoreCache } from "@/stats-pipeline/score-cache";
 const NOOP_SCORE_CACHE: Pick<ScoreCache, "invalidate"> = {
   invalidate: async () => {},
 };
+
+const systemClock: Clock = { now: () => new Date().toISOString() };
 
 /**
  * Awaits the eviction and swallows its failure, with a log — the middle ground between `void`
@@ -81,6 +85,8 @@ export interface SetLineupInput {
   readonly teamId: string;
   readonly weekNumber: number;
   readonly slots: readonly LineupSlotInput[];
+  /** Whose save this is, for the `lineup_change` audit event. The route reads this from the session, never from the body. */
+  readonly userId: string;
 }
 
 export type SetLineupResult =
@@ -138,12 +144,22 @@ export async function isWeekLocked(db: Db, weekNumber: number): Promise<boolean>
  * slightly-late eviction is one stale read; the failure mode of an early one (evicting before
  * the write is durable) is a cache that says a lineup changed when the write that would have
  * changed it never actually landed.
+ *
+ * `deps.audit` records `lineup_change` on the league's own chain, INSIDE the write transaction
+ * and after the in-transaction lock re-check — never before it, and never outside it. An event
+ * written before that re-check would record a lineup change that the lock then refused; one
+ * written outside the transaction could commit for a write that then rolled back. Both default
+ * to the process-wide collaborators (`getAuditLogger()`, a real clock) the same way every other
+ * writer here defaults its own.
  */
 export async function setLineup(
   db: Db,
   input: SetLineupInput,
   cache: Pick<ScoreCache, "invalidate"> = NOOP_SCORE_CACHE,
+  deps: { readonly audit?: AuditLogger; readonly clock?: Clock } = {},
 ): Promise<SetLineupResult> {
+  const audit = deps.audit ?? getAuditLogger();
+  const clock = deps.clock ?? systemClock;
   const [league] = await db.select({ rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId));
   if (league === undefined) return { ok: false, status: 404, reason: "That league doesn't exist." };
 
@@ -197,6 +213,20 @@ export async function setLineup(
         target: [lineupSlots.teamId, lineupSlots.weekNumber, lineupSlots.slot, lineupSlots.slotIndex],
         set: excludedSetFor(lineupSlots, ["teamId", "weekNumber", "slot", "slotIndex"]),
       });
+    await audit.record(tx, {
+      eventType: "lineup_change",
+      actorId: input.userId,
+      actorType: "user",
+      leagueId: input.leagueId,
+      payload: {
+        teamId: input.teamId,
+        weekNumber: input.weekNumber,
+        // The starters as they were saved, ids only. Names are resolved when the feed is read,
+        // from the tables that own them — see ruling 16.
+        starters: startersOf(lineup).map((slot) => ({ slot: slot.slot, slotIndex: slot.slotIndex, playerId: slot.playerId })),
+      },
+      occurredAt: clock.now(),
+    });
     return false;
   });
   if (locked) return { ok: false, status: 409, reason: `Week ${input.weekNumber} has started, so its lineup can't change.` };

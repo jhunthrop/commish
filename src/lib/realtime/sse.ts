@@ -47,13 +47,13 @@ export function resumeCursor(lastEventId: string | null, now: number): string {
 }
 
 /**
- * Builds a Server-Sent Events response for a league's stream. Used by the SSE route
- * handler; native clients consume the identical wire format over URLSession/OkHttp.
- *
- * Resume: reads the standard Last-Event-ID header (sent automatically by EventSource on
- * reconnect) and replays everything after it. A fresh connection starts at "$" (live only).
+ * The shared SSE builder both `createLeagueEventStream` and `createUserEventStream` go
+ * through — one connection ceiling (`openPerUser`/`maxStreamsPerUser`), one keepalive
+ * cadence, one resume rule, one Redis connection lifecycle, regardless of which stream key
+ * the caller resolved. A notices tab is a Redis socket and an fd like any other, so it
+ * correctly counts against the same per-user ceiling a league room's tabs do.
  */
-export function createLeagueEventStream(request: Request, leagueId: string, userId: string): Response {
+function createEventStream(request: Request, userId: string, streamKey: string): Response {
   const open = openPerUser.get(userId) ?? 0;
   if (open >= REALTIME_CONFIG.maxStreamsPerUser) {
     return fail("You have too many live connections open. Close a tab and try again.", 429);
@@ -87,7 +87,7 @@ export function createLeagueEventStream(request: Request, leagueId: string, user
             controller.abort();
           }
         }, REALTIME_CONFIG.keepaliveMs);
-        for await (const event of subscribe({ redis, leagueId, afterId, signal: controller.signal })) {
+        for await (const event of subscribe({ redis, streamKey, afterId, signal: controller.signal })) {
           sink.enqueue(frame(event));
         }
       } catch (error: unknown) {
@@ -116,4 +116,26 @@ export function createLeagueEventStream(request: Request, leagueId: string, user
       "x-accel-buffering": "no",
     },
   });
+}
+
+/**
+ * Builds a Server-Sent Events response for a league's stream. Used by the SSE route
+ * handler; native clients consume the identical wire format over URLSession/OkHttp.
+ *
+ * Resume: reads the standard Last-Event-ID header (sent automatically by EventSource on
+ * reconnect) and replays everything after it. A fresh connection starts at "$" (live only).
+ */
+export function createLeagueEventStream(request: Request, leagueId: string, userId: string): Response {
+  return createEventStream(request, userId, REALTIME_CONFIG.leagueStreamKey(leagueId));
+}
+
+/**
+ * Builds a Server-Sent Events response for ONE USER's own stream — the second key format
+ * (`REALTIME_CONFIG.userStreamKey`), used today for `notice.created`. Same resume rule, same
+ * connection ceiling as `createLeagueEventStream`: `GET /api/notices/stream` calls this with
+ * the caller's own id, and there is no route anywhere that takes a user id from a request —
+ * see `src/app/api/notices/stream/route.ts`.
+ */
+export function createUserEventStream(request: Request, userId: string): Response {
+  return createEventStream(request, userId, REALTIME_CONFIG.userStreamKey(userId));
 }

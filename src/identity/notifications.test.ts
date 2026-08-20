@@ -11,6 +11,11 @@ describe("NOTIFICATION_CATALOG", () => {
     }
   });
 
+  it("names the user-targeted event, now that one exists", () => {
+    const topic = NOTIFICATION_CATALOG.find((entry) => entry.key === "platform-actions");
+    expect(topic?.events).toEqual(["notice.created"]);
+  });
+
   it("gives every topic a key, a title and a detail", () => {
     for (const topic of NOTIFICATION_CATALOG) {
       expect(topic.key.length).toBeGreaterThan(0);

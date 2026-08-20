@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
+import { AUDIT_EVENT_TYPES, type JsonObject } from "@/domain/audit";
 
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
 export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
@@ -22,6 +23,13 @@ export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress
 export const playerPositionEnum = pgEnum("player_position", ["QB", "RB", "WR", "TE", "K", "DEF"]);
 export const weekStatusEnum = pgEnum("week_status", ["scheduled", "in_progress", "final"]);
 export const helpLevelEnum = pgEnum("help_level", ["guided", "standard"]);
+/**
+ * The vocabulary is fixed by the spec and declared in full today (`@/domain/audit`): no later
+ * plan adds a value, so no later migration ever runs `ALTER TYPE … ADD VALUE`. Contrast
+ * `member_notices.notice_type` (Task 7), which every later plan extends and is therefore `text`.
+ */
+export const auditEventTypeEnum = pgEnum("audit_event_type", AUDIT_EVENT_TYPES);
+export const auditActorTypeEnum = pgEnum("audit_actor_type", ["user", "system"]);
 /**
  * A GIF is a `chat.message`, not a second event type (ruling 17): this is the ONE thing that
  * distinguishes the two rows shapes rather than inferring it from `gif_url` being non-null, so a
@@ -503,8 +511,10 @@ export const chatReactions = pgTable(
  *
  * Removal is a stamp, never a delete. A removed review keeps its author, its text, who removed it
  * and why, because the alternative is that a product with an unfiltered review feed can make a
- * review disappear leaving nothing behind. Phase 3 owns the real audit log; this row is the
- * interim record it will read, not a second system it will have to reconcile.
+ * review disappear leaving nothing behind. `audit_events` below (Phase 3, Plan A) is the real
+ * audit log; `removeReview` records a `review_removed` event there in the same transaction as
+ * this stamp, and this row stays the interim record the review feed itself reads, not a second
+ * system to reconcile against the chain.
  */
 export const reviews = pgTable(
   "reviews",
@@ -541,4 +551,143 @@ export const reviewReports = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.reviewId, t.reporterUserId] })],
+);
+
+/**
+ * THE audit log. Append-only in three independent ways, because one of them being wrong is the
+ * whole failure mode: `AuditLogger` exposes no update or delete (Task 3), the database rejects
+ * UPDATE and DELETE with a trigger even from a raw client (`0019`), and every row carries the
+ * hash of the row before it so an edit that got past both is still detectable (Task 4).
+ *
+ * NO FOREIGN KEYS, deliberately, and this is the one table in the schema where that is true.
+ * `leagues` cascades to nine tables; a cascade is a DELETE, so an FK to `leagues` would either be
+ * rejected by the append-only trigger (making a league undeletable) or, without the trigger,
+ * would let deleting a league silently delete the record of what happened in it. The audit trail
+ * of a deleted league is exactly the audit trail you want to still have. `actor_id` is the same
+ * argument for `users`. Referential integrity here is the hash chain's job, not the planner's.
+ *
+ * `chain_scope` is the league id, or `INTEGRITY_CONFIG.chain.platformScope` for an event with no
+ * league. One chain per scope: see `docs/decisions/audit-and-integrity.md` for the contention
+ * math that ruled against a single global chain.
+ */
+export const auditEvents = pgTable(
+  "audit_events",
+  {
+    eventId: text("event_id").primaryKey(),
+    chainScope: text("chain_scope").notNull(),
+    sequence: integer("sequence").notNull(),
+    eventType: auditEventTypeEnum("event_type").notNull(),
+    actorId: text("actor_id"),
+    actorType: auditActorTypeEnum("actor_type").notNull(),
+    leagueId: text("league_id"),
+    payload: jsonb("payload").$type<JsonObject>().notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    previousEventHash: text("previous_event_hash").notNull(),
+    eventHash: text("event_hash").notNull(),
+    hashVersion: integer("hash_version").notNull(),
+  },
+  (t) => [
+    /**
+     * The `draft_actions_draft_sequence_idx` pattern, for the same reason: the anchor row lock
+     * is what serializes appends, and this is the database's own backstop if that lock is ever
+     * wrong. A bug then costs a rejected append, never a forked chain. It is also the index the
+     * verifier and the activity feed both read by, since both walk one scope in sequence order.
+     */
+    uniqueIndex("audit_events_scope_sequence_idx").on(t.chainScope, t.sequence),
+    /** The scaling review's first composite (C5): the per-league, time-ranged read. */
+    index("audit_events_league_occurred_idx").on(t.leagueId, t.occurredAt),
+    /** The scaling review's second: Plan B's per-actor, per-type behavioral read. */
+    index("audit_events_actor_type_occurred_idx").on(t.actorId, t.eventType, t.occurredAt),
+  ],
+);
+
+/**
+ * One row per chain: its head, and the lock every append to that chain takes.
+ *
+ * This IS the rollup `docs/decisions/data-layer-hardening.md` requires. `head_sequence` is the
+ * count of events in the chain and `head_hash` is the link the next one attaches to, both
+ * advanced in the SAME transaction as the append they summarize — never after it, never in a
+ * job. `audit_events` remains the reconciliation source: `verifyChainIntegrity` and
+ * `verifyFullChainIntegrity` both re-derive this row's two values by walking the events and
+ * REFUSE the chain when what they derive disagrees with what is stored here (`anchor_mismatch`).
+ * That reconciliation is the only reason deletion is detectable at all: the rows that are gone
+ * leave no trace in the rows that remain, and this row is the chain's own sworn statement about
+ * how many there should be.
+ *
+ * There is deliberately no separate `event_count` column: `head_sequence` already is it, and a
+ * second copy of one number is a second thing that can disagree.
+ */
+export const auditChains = pgTable("audit_chains", {
+  scope: text("scope").primaryKey(),
+  headSequence: integer("head_sequence").notNull().default(0),
+  headHash: text("head_hash").notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * Verification's own state, in its OWN table rather than as columns on `audit_chains`.
+ *
+ * If the checkpoint lived on the anchor row, advancing it would take a row lock on the row every
+ * append is waiting for, so a chain walk would block every write to that league for its whole
+ * duration. Two tables cost one more row and buy the property that the verifier and the writer
+ * never contend at all.
+ *
+ * FORWARD-ONLY, enforced by triggers (migration `0021`), because this row is a DETECTOR and a
+ * detector an adversary can quietly delete or rewind is not one. It is the third account of how
+ * many events a chain holds, and the only one that survives an adversary who deletes the tail of
+ * `audit_events` and rewinds `audit_chains` to match: a checkpoint that froze five verified
+ * events while the anchor now claims three is the rewind, stated in the chain's own records.
+ * DELETE is refused outright; UPDATE is refused unless it moves `verified_through_sequence`
+ * forward or leaves it where it is, which is every write the verifier itself ever makes.
+ */
+export const auditChainCheckpoints = pgTable("audit_chain_checkpoints", {
+  scope: text("scope").primaryKey().references(() => auditChains.scope),
+  verifiedThroughSequence: integer("verified_through_sequence").notNull().default(0),
+  verifiedThroughHash: text("verified_through_hash").notNull(),
+  verifiedAt: timestamp("verified_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+/**
+ * What the platform told one member it did, and when they read it.
+ *
+ * The row stores the RENDERED copy, not only the type and the context (ruling 12). What a person
+ * was told is a historical fact: if a template is reworded next month, the notice they already
+ * read must not silently become different words. `context` is kept beside it so a later reader
+ * can see what it was rendered from, which is also what makes a template change auditable.
+ *
+ * `league_id` is nullable, because not every automated action happens inside a league: a review
+ * removal does not. Unlike `audit_events` this table DOES carry foreign keys with cascade: it is
+ * a delivery record, not the record, and a deleted user's undelivered notices are noise.
+ *
+ * `notice_type` is TEXT and not a pg enum, unlike `audit_event_type`. The audit vocabulary is
+ * fixed and fully declared today; notice types are added by Plans B, C and D, and `ALTER TYPE …
+ * ADD VALUE` inside drizzle-kit's transaction-wrapped migration is a trap (the new value cannot
+ * be used in the same transaction). `NoticeType` plus `NOTICE_TEMPLATES` is the vocabulary, and
+ * `notify.test.ts` asserts every stored value is one of its keys.
+ */
+export const memberNotices = pgTable(
+  "member_notices",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    leagueId: text("league_id").references(() => leagues.id, { onDelete: "cascade" }),
+    noticeType: text("notice_type").notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    context: jsonb("context").$type<JsonObject>().notNull(),
+    /** The audit event this notice explains. No FK, for the same reason `audit_events` has none. */
+    auditEventId: text("audit_event_id"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (t) => [
+    /**
+     * The inbox's only ordering. `(user_id, created_at)` and not a partial index on unread: the
+     * inbox reads a member's most recent notices whether or not they are read, and the unread
+     * count is a `count(*)` over that same bounded page rather than a rollup — the balance-as-
+     * rollup convention's own threshold (derive over a bounded set, roll up over an unbounded
+     * one), and a member's recent notices are bounded by `INTEGRITY_CONFIG.notices.inboxSize`.
+     */
+    index("member_notices_user_created_idx").on(t.userId, t.createdAt),
+  ],
 );

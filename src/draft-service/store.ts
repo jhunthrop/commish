@@ -1,7 +1,7 @@
 import { asc, eq, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
-import { draftActions, drafts, teams } from "@/db/schema";
+import { draftActions, drafts, leagues, players, teams } from "@/db/schema";
 import { DRAFT_ACTION_VERSION, type DraftAction } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import {
@@ -13,8 +13,11 @@ import {
   replayDraft,
   type DraftState,
 } from "@/draft-engine";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
+import { auditEventsForPicks, ownerIdsForContestedPicks } from "./audit";
 import { commitDraftState } from "./commit";
 import { createKeyedMutex } from "./mutex";
 import { draftOrderFor } from "./order";
@@ -34,6 +37,15 @@ export interface DraftStoreDeps {
   readonly clock: Clock;
   /** Optional sink for publish failures — mirrors `PublisherDeps.onError`. Defaults to a no-op. */
   readonly onPublishError?: (error: unknown, event: PublishFailureEvent) => void;
+  /** Defaults to the process-wide logger (`getAuditLogger()`). */
+  readonly audit?: AuditLogger;
+  /**
+   * Best-effort LIVE delivery for an autopick notice, called after the commit — mirrors
+   * `broadcast`. Defaults to the real `deliverNotice` (`@/integrity-service/notify`), which
+   * itself defaults to the process-wide publisher; injectable so `store.test.ts` never needs a
+   * live Redis connection to exercise the transaction/rollback behavior around it.
+   */
+  readonly deliverNotice?: (notice: MemberNotice) => Promise<void>;
 }
 
 export type ApplyResult =
@@ -41,8 +53,17 @@ export type ApplyResult =
   | { readonly ok: false; readonly reason: string };
 
 export interface ApplyOptions {
-  /** Extra work to commit atomically with the action row (e.g. flipping `drafts.status`). */
+  /**
+   * Extra work to commit atomically with the action row (e.g. flipping `drafts.status`).
+   *
+   * Runs BEFORE the chain anchor is locked, deliberately: a caller-supplied callback may take any
+   * lock at all, and ruling 3 makes the anchor the last lock a transaction takes. Running it
+   * after the append would put an unknown lock on the far side of the anchor and reopen exactly
+   * the cycle `src/integrity-service/lock-order.test.ts` exists to keep closed.
+   */
   readonly alsoInTransaction?: (tx: DbTx) => Promise<void>;
+  /** Who submitted this action. Absent means the clock acted (a `TIMER_EXPIRE`, never a person). */
+  readonly actor?: { readonly id: string };
 }
 
 export type CommitResult =
@@ -93,6 +114,33 @@ export async function latestActionSequence(db: Db | DbTx, draftId: string): Prom
 }
 
 /**
+ * The one query Task 7's autopick notice needs: the picked-for team's owner and the league's own
+ * name, joined against the specific player the clock drafted. One row, only on the autopick path
+ * (`auditEventsForPicks` only ever attributes ONE new pick to `actorType: "system"` per accepted
+ * `TIMER_EXPIRE` — see its own docblock), so this never runs per-pick in a batch.
+ *
+ * Returns `undefined` only for a team/league/player combination that cannot exist through
+ * ordinary use: `pick.teamId` and its league come from `drafts`/`teams` FKs this same transaction
+ * already trusts, and `pick.playerId` came out of THIS draft's own snapshotted pool
+ * (`buildDraftPool`, itself sourced from `players`). Guarded rather than asserted, because unlike
+ * a pure lookup this is a database round trip — and a lookup failure here must never turn an
+ * already-decided pick into a rolled-back transaction over a notification nicety.
+ */
+async function autopickNoticeContext(
+  tx: DbTx,
+  teamId: string,
+  playerId: string,
+): Promise<{ readonly userId: string; readonly leagueName: string; readonly playerName: string } | undefined> {
+  const [row] = await tx
+    .select({ userId: teams.userId, leagueName: leagues.name, playerName: players.name })
+    .from(teams)
+    .innerJoin(leagues, eq(leagues.id, teams.leagueId))
+    .innerJoin(players, eq(players.id, playerId))
+    .where(eq(teams.id, teamId));
+  return row;
+}
+
+/**
  * The durable draft session store.
  *
  * The `draft_actions` log is the source of truth; `cache` is only a materialization of it,
@@ -107,7 +155,14 @@ export async function latestActionSequence(db: Db | DbTx, draftId: string): Prom
  * helpers (`load`, `commitDraftState`) instead of recursing into `applyAction` or
  * `commitDraftResults`.
  */
-export function createDraftStore({ db, publish, clock, onPublishError }: DraftStoreDeps): DraftStore {
+export function createDraftStore({
+  db,
+  publish,
+  clock,
+  onPublishError,
+  audit = getAuditLogger(),
+  deliverNotice: deliver = deliverNotice,
+}: DraftStoreDeps): DraftStore {
   const cache = new Map<string, DraftState>();
   const mutex = createKeyedMutex();
 
@@ -156,8 +211,12 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
       return mutex.run(draftId, async (): Promise<ApplyResult> => {
         // `previous` is captured out of the transaction so `broadcast` (which must run AFTER
         // the commit, because publishing is best-effort and must never fail a committed write)
-        // still has the before-state to diff against.
+        // still has the before-state to diff against. `createdNotices` is the same idea for
+        // `deliverNotice`: the durable rows below are written and returned INSIDE the
+        // transaction, but their live frames must only go out once that transaction has
+        // actually committed — see `deliverNotice`'s own docblock.
         let previous: DraftState | null = null;
+        const createdNotices: MemberNotice[] = [];
 
         try {
           const outcome = await db.transaction(async (tx): Promise<ApplyResult> => {
@@ -200,10 +259,87 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
               action,
               timestamp: new Date(action.timestamp),
             });
+            // The audit append rides the draft's existing FOR UPDATE on `drafts`, and the chain
+            // anchor is taken after it — the fixed lock order (ruling 3). Both this and the
+            // action row commit together or neither does.
+            //
+            // EVERYTHING THAT TAKES A LOCK RUNS FIRST, and that is not a stylistic preference: a
+            // `member_notices` insert takes an implicit `FOR KEY SHARE` on `leagues`, and
+            // `commitDraftState` takes the same on `leagues`/`teams`/`players`. Held AFTER the
+            // anchor, those are the second half of a real deadlock cycle against
+            // `joinLeagueInTx`, which holds `leagues FOR UPDATE` (`join.ts`) and then waits for
+            // the same anchor. So the order below is: business rows, then caller-supplied work,
+            // then the commit-to-season, then the append, and only a `member_notices`-only
+            // UPDATE after it (`attachAuditEvent`, which takes no lock outside that table).
+            // `src/integrity-service/lock-order.test.ts` drives both transactions against a real
+            // Postgres and proves the cycle is gone.
+            const submittedActorId = options?.actor?.id ?? null;
+            // A contested auction lot the clock closes (`TIMER_EXPIRE`, no submitting actor, but
+            // `auto: false` — a real bidding war happened) needs its winner's identity resolved
+            // from the team they play, not left unattributed. This plain read runs before the
+            // anchor lock (ruling 3) and takes no lock of its own.
+            const contestedWinners = submittedActorId === null
+              ? result.state.picks.slice(state.picks.length).filter((p) => !p.auto).map((p) => p.teamId)
+              : [];
+            const ownerOf = await ownerIdsForContestedPicks(tx, contestedWinners);
+            const picked = auditEventsForPicks(state, result.state, submittedActorId, ownerOf);
+
+            // Task 7's first real sender: the manager whose pick the clock made for them is told
+            // nothing today, and this is that telling. `picked` and the new picks slice are built
+            // from the SAME diff (`next.picks.slice(previous.picks.length)`), so index `i` names
+            // the same pick in both — and `pickIndexOfNotice` carries that index forward so the
+            // event minted below can be matched back to the notice that explains it. The durable
+            // `member_notices` row IS the delivery (the inbox reads it — `listNotices`); each
+            // notice is also pushed to `createdNotices` so `deliverNotice` can push a best-effort
+            // LIVE frame for it AFTER this transaction commits — see the comment beside
+            // `createdNotices` above.
+            const newPicks = result.state.picks.slice(state.picks.length);
+            const positionOf = new Map(result.state.pool.map((entry) => [entry.playerId, entry.position]));
+            const pending: { readonly notice: MemberNotice; readonly pickIndex: number }[] = [];
+            for (let i = 0; i < picked.length; i += 1) {
+              if (picked[i]!.actorType !== "system") continue;
+              const newPick = newPicks[i]!;
+              const context = await autopickNoticeContext(tx, newPick.teamId, newPick.playerId);
+              const position = positionOf.get(newPick.playerId);
+              if (context === undefined || position === undefined) continue;
+              const notice = await notifyAffectedMember(tx, {
+                leagueId: result.state.config.leagueId,
+                userId: context.userId,
+                noticeType: "draft_auto_picked",
+                context: { leagueName: context.leagueName, pickNumber: newPick.pickNumber, playerName: context.playerName, position },
+                // The PICK's own timestamp, which is also what `auditEventsForPicks` stamps its
+                // event with — the same instant, read from the same place, before either row
+                // exists. Reading it back off the minted event would mean minting the event first.
+                occurredAt: picked[i]!.occurredAt,
+                auditEventId: null,
+              });
+              pending.push({ notice, pickIndex: i });
+            }
+
             if (options?.alsoInTransaction !== undefined) await options.alsoInTransaction(tx);
             // A completed draft becomes a season in the same transaction that completed it.
-            if (result.state.phase === "complete" && state.phase !== "complete") {
-              await commitDraftState(tx, result.state);
+            // `commitDraftState` writes `draft_picks`/`roster_slots` and the schedule, every one
+            // of which takes an FK lock on `leagues`/`teams`/`players` — so it runs here, before
+            // the anchor, not after it.
+            const counts =
+              result.state.phase === "complete" && state.phase !== "complete" ? await commitDraftState(tx, result.state) : null;
+
+            // THE ANCHOR, LAST. Nothing below takes a lock on any table another audited
+            // transaction locks first.
+            const pickedEvents = await audit.recordAll(tx, picked);
+            if (counts !== null) {
+              await audit.record(tx, {
+                eventType: "draft_completed",
+                actorId: null,
+                actorType: "system",
+                leagueId: result.state.config.leagueId,
+                payload: { draftId, picks: counts.picks, teams: counts.teams },
+                occurredAt: action.timestamp,
+              });
+            }
+
+            for (const { notice, pickIndex } of pending) {
+              createdNotices.push(await attachAuditEvent(tx, notice, pickedEvents[pickIndex]!.eventId));
             }
             return { ok: true, state: result.state };
           });
@@ -218,6 +354,16 @@ export function createDraftStore({ db, publish, clock, onPublishError }: DraftSt
 
           cache.set(draftId, outcome.state);
           if (previous !== null) await broadcast(previous, outcome.state, action);
+          // Best-effort, after the commit, beside `broadcast` — the inverse of `notifyAffectedMember`'s
+          // own discipline: the durable row above already failed the transaction if it had to;
+          // this frame never fails anything, because the write it announces already landed.
+          for (const notice of createdNotices) {
+            try {
+              await deliver(notice);
+            } catch (error: unknown) {
+              onPublishError?.(error, { type: "notice.created", leagueId: notice.leagueId ?? "" });
+            }
+          }
           return outcome;
         } catch (error: unknown) {
           // Our view of the log is provably stale — drop it so the next read replays.

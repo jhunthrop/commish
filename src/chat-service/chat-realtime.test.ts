@@ -47,7 +47,7 @@ async function collect(leagueId: string, count: number, signal: AbortSignal): Pr
   const out: RealtimeEvent[] = [];
   const redis = new Redis(REDIS_URL);
   try {
-    for await (const event of subscribe({ redis, leagueId, afterId: "$", signal })) {
+    for await (const event of subscribe({ redis, streamKey: REALTIME_CONFIG.leagueStreamKey(leagueId), afterId: "$", signal })) {
       out.push(event);
       if (out.length >= count) break;
     }
@@ -135,7 +135,7 @@ describe("two users in the same league", () => {
 
     const redis = new Redis(REDIS_URL);
     const replayed: RealtimeEvent[] = [];
-    for await (const event of subscribe({ redis, leagueId: "l1", afterId: firstId[0]![0], signal: ac.signal })) {
+    for await (const event of subscribe({ redis, streamKey: REALTIME_CONFIG.leagueStreamKey("l1"), afterId: firstId[0]![0], signal: ac.signal })) {
       replayed.push(event);
       break;
     }

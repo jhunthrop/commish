@@ -12,6 +12,7 @@ const control = new Redis(REDIS_URL);
 const publisher = createPublisher({ redis: new Redis(REDIS_URL), clock });
 
 const LEAGUE = "league_rt_test";
+const noticePayload = { noticeId: "notice_1", noticeType: "draft_auto_picked" };
 
 async function collect(
   opts: { leagueId: string; afterId?: string; signal: AbortSignal },
@@ -20,7 +21,7 @@ async function collect(
   const out: RealtimeEvent[] = [];
   const redis = new Redis(REDIS_URL);
   try {
-    for await (const ev of subscribe({ redis, ...opts })) {
+    for await (const ev of subscribe({ redis, streamKey: REALTIME_CONFIG.leagueStreamKey(opts.leagueId), afterId: opts.afterId, signal: opts.signal })) {
       out.push(ev);
       if (out.length >= count) break;
     }
@@ -30,12 +31,41 @@ async function collect(
   return out;
 }
 
+/**
+ * One read of a stream key, or `null` if it holds nothing yet. Used by the per-user-key tests
+ * below to assert a frame landed on exactly one key and nowhere else, without the caller
+ * having to know the wire field layout `toEvent` (private to `subscribe.ts`) parses.
+ */
+async function readOnce(streamKey: string): Promise<RealtimeEvent | null> {
+  const len = await control.xlen(streamKey);
+  if (len === 0) return null;
+  const redis = new Redis(REDIS_URL);
+  const ac = new AbortController();
+  try {
+    for await (const ev of subscribe({ redis, streamKey, afterId: "0", signal: ac.signal })) {
+      return ev;
+    }
+    return null;
+  } finally {
+    ac.abort();
+    redis.disconnect();
+  }
+}
+
 beforeEach(async () => {
-  await control.del(REALTIME_CONFIG.leagueStreamKey(LEAGUE));
+  await control.del(
+    REALTIME_CONFIG.leagueStreamKey(LEAGUE),
+    REALTIME_CONFIG.userStreamKey("user_bob"),
+    REALTIME_CONFIG.userStreamKey("user_alice"),
+  );
 });
 
 afterAll(async () => {
-  await control.del(REALTIME_CONFIG.leagueStreamKey(LEAGUE));
+  await control.del(
+    REALTIME_CONFIG.leagueStreamKey(LEAGUE),
+    REALTIME_CONFIG.userStreamKey("user_bob"),
+    REALTIME_CONFIG.userStreamKey("user_alice"),
+  );
   control.disconnect();
   publisher.close();
 });
@@ -58,6 +88,26 @@ describe("publishEvent", () => {
     const id = await dead.publish({ leagueId: LEAGUE, type: "chat.message", payload: {} });
     expect(id).toBeNull();
     dead.close();
+  });
+});
+
+describe("publishToUser (per-user stream key — ruling 13)", () => {
+  it("delivers a user-targeted frame to that user's stream and nowhere else", async () => {
+    await publisher.publishToUser({ userId: "user_bob", leagueId: LEAGUE, type: "notice.created", payload: noticePayload });
+
+    const mine = await readOnce(REALTIME_CONFIG.userStreamKey("user_bob"));
+    expect(mine).toMatchObject({ type: "notice.created", payload: { noticeId: "notice_1" } });
+    expect(await readOnce(REALTIME_CONFIG.leagueStreamKey(LEAGUE))).toBeNull();
+    expect(await readOnce(REALTIME_CONFIG.userStreamKey("user_alice"))).toBeNull();
+  });
+
+  it("carries no notice copy on the wire", async () => {
+    // The stream is retained and readable by anything holding the key; the words a member is
+    // told live behind an authenticated read of their own row. This asserts the payload's whole
+    // shape, so adding `title` later fails here rather than shipping.
+    await publisher.publishToUser({ userId: "user_bob", leagueId: LEAGUE, type: "notice.created", payload: noticePayload });
+    const frame = await readOnce(REALTIME_CONFIG.userStreamKey("user_bob"));
+    expect(Object.keys(frame!.payload as object).sort()).toEqual(["noticeId", "noticeType"]);
   });
 });
 

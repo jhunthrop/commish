@@ -7,6 +7,9 @@ import type { JoinBody } from "@/league-room/contract";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/** The outermost edge is the only place a wall clock is allowed. */
+const systemClock = { now: () => new Date().toISOString() };
+
 interface RouteContext {
   readonly params: Promise<{ readonly leagueId: string }>;
 }
@@ -26,7 +29,7 @@ export async function POST(request: Request, { params }: RouteContext) {
   return withCurrentUser(request, async (userId) => {
     const { leagueId } = await params;
     const result = await joinPublicLeague(
-      { db: getDb(), newId: () => crypto.randomUUID() },
+      { db: getDb(), newId: () => crypto.randomUUID(), clock: systemClock },
       { leagueId, userId },
     );
     if (!result.ok) return fail(result.reason, result.status);

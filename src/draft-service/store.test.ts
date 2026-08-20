@@ -2,9 +2,11 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions } from "@/db/schema";
+import { auditEvents, draftActions, memberNotices, players } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
-import { createDraftStore, isSequenceConflict, type PublishFn } from "./store";
+import { currentDeadline } from "@/draft-engine";
+import type { MemberNotice } from "@/integrity-service/notify";
+import { createDraftStore, isSequenceConflict, type ApplyResult, type DraftStore, type DraftStoreDeps, type PublishFn } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
 const db = createTestDb();
@@ -20,14 +22,39 @@ const POOL: readonly DraftPoolEntry[] = [
   { playerId: "wr2", position: "WR" },
 ];
 
+/** Real names for `POOL`, so the notice-copy assertions below have something to match against. */
+const PLAYER_NAMES: Readonly<Record<string, string>> = {
+  qb1: "Quincy Bishop", rb1: "Reggie Barnes", wr1: "Wesley Reed",
+  qb2: "Quentin Boyd", rb2: "Riley Banks", wr2: "Wyatt Ross",
+};
+
 let published: { type: string; leagueId: string; payload: unknown }[] = [];
 const publish: PublishFn = async (input) => {
   published.push({ type: input.type, leagueId: input.leagueId, payload: input.payload });
   return "1-0";
 };
 
-function newStore(publishFn: PublishFn = publish) {
-  return createDraftStore({ db, publish: publishFn, clock });
+/**
+ * A fake for the store's injected `deliverNotice`, so this file's tests exercise the real
+ * post-commit wiring (Task 8) without ever needing a live Redis connection — the real per-user
+ * frame's actual delivery is proven against real Redis in `draft-realtime.test.ts` instead.
+ */
+let deliveredNotices: MemberNotice[] = [];
+const deliverNoticeFake = async (notice: MemberNotice): Promise<void> => {
+  deliveredNotices.push(notice);
+};
+
+function newStore(
+  publishFn: PublishFn = publish,
+  overrides: { deliverNotice?: (notice: MemberNotice) => Promise<void>; onPublishError?: DraftStoreDeps["onPublishError"] } = {},
+) {
+  return createDraftStore({
+    db,
+    publish: publishFn,
+    clock,
+    deliverNotice: overrides.deliverNotice ?? deliverNoticeFake,
+    onPublishError: overrides.onPublishError,
+  });
 }
 
 /**
@@ -84,18 +111,60 @@ async function fixture() {
   });
 }
 
+async function auctionFixture() {
+  return seedDraftFixture(db, {
+    draftId: "draft_auction",
+    leagueId: "league_auction",
+    format: "auction",
+    teamCount: 2,
+    slotConfig: SPRINT_ROSTER_SLOTS,
+    kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+    auctionBudget: 50,
+  });
+}
+
 const start = (teamIds: readonly string[]): DraftAction => ({
   v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: teamIds, pool: POOL,
 });
 const pick = (teamId: string, playerId: string): DraftAction => ({ v: 1, type: "MAKE_PICK", timestamp: T, teamId, playerId });
+const nominate = (teamId: string, playerId: string, openingBid: number): DraftAction => ({
+  v: 1, type: "NOMINATE", timestamp: T, teamId, playerId, openingBid,
+});
+const bid = (teamId: string, amount: number): DraftAction => ({ v: 1, type: "BID", timestamp: T, teamId, amount });
+
+/** The clock's own expiry, at whatever deadline the current state actually set — never a fixed
+ *  timestamp, since `admitTimerExpire` rejects an expiry submitted before the real deadline. */
+async function expireOnTheClock(store: DraftStore, draftId: string): Promise<ApplyResult> {
+  const state = await store.getDraftState(draftId);
+  return store.applyAction(draftId, { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state!) ?? clock.now() });
+}
 
 async function actionRows(draftId: string) {
   return db.select().from(draftActions).where(eq(draftActions.draftId, draftId)).orderBy(asc(draftActions.sequence));
 }
 
+/** Runs the draft to completion on the clock alone — every pick this produces is `auto: true`. */
+async function runFullDraft(store: DraftStore, draftId: string): Promise<void> {
+  for (let i = 0; i < 100; i++) {
+    const state = await store.getDraftState(draftId);
+    if (state === null || state.phase === "complete") return;
+    const result = await store.applyAction(draftId, {
+      v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state) ?? clock.now(),
+    });
+    if (!result.ok) throw new Error(result.reason);
+  }
+  throw new Error("draft did not finish");
+}
+
 beforeEach(async () => {
   await truncateAll(db);
   published = [];
+  deliveredNotices = [];
+  // The `players` row every POOL entry needs for `autopickNoticeContext`'s join. Absent, the
+  // autopick notice path skips itself rather than fail an already-decided pick over it (see
+  // `store.ts`) — most tests above never look at `member_notices` and are unaffected either way;
+  // seeding here lets the "draft store — notices" tests below assert the real thing.
+  await db.insert(players).values(POOL.map((entry) => ({ id: entry.playerId, name: PLAYER_NAMES[entry.playerId]!, position: entry.position, nflTeam: "FA" })));
 });
 
 afterAll(async () => {
@@ -353,5 +422,213 @@ describe("isSequenceConflict", () => {
 
   it("finds the fields whether they sit on the error directly or one .cause down", () => {
     expect(isSequenceConflict({ code: "23505", constraint_name: "draft_actions_draft_sequence_idx" })).toBe(true);
+  });
+});
+
+describe("draft store — audit", () => {
+  it("records every pick on the league's chain, in the transaction that accepted it", async () => {
+    const { draftId, leagueId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const result = await store.applyAction(draftId, pick(teamIds[0]!, "qb1"), { actor: { id: "user_alice" } });
+    expect(result.ok).toBe(true);
+
+    const rows = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    expect(rows).toHaveLength(1);
+    // Snake manual pick, unchanged by the auction-attribution fix: the submitting actor is
+    // trusted directly, no team-owner lookup involved.
+    expect(rows[0]).toMatchObject({ chainScope: leagueId, actorId: "user_alice", actorType: "user", sequence: expect.any(Number) });
+  });
+
+  it("records draft_completed in the same transaction that turns the draft into a season", async () => {
+    const { draftId, leagueId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    await runFullDraft(store, draftId);
+
+    const [completed] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_completed"));
+    expect(completed).toMatchObject({ chainScope: leagueId, actorType: "system", actorId: null });
+    expect(completed!.payload).toMatchObject({ draftId, picks: expect.any(Number), teams: expect.any(Number) });
+
+    // Snake auto path, unchanged by the auction-attribution fix: every pick this full run made
+    // came from TIMER_EXPIRE with `auto: true`, so every one is system-attributed — the
+    // auction-only owner lookup never fires here.
+    const picks = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    expect(picks.length).toBeGreaterThan(0);
+    for (const p of picks) expect(p).toMatchObject({ actorType: "system", actorId: null });
+  });
+
+  it("records nothing for a rejected action", async () => {
+    const { draftId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    // Not this team's turn — rejected by the reducer before the action row (or any audit
+    // event) is ever written.
+    const result = await store.applyAction(draftId, pick(teamIds[1]!, "qb1"), { actor: { id: "user_alice" } });
+    expect(result.ok).toBe(false);
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"))).toHaveLength(0);
+  });
+});
+
+describe("draft store — audit — auction attribution", () => {
+  it("attributes a contested lot the clock closes to the winning bidder, not to no one", async () => {
+    // Reproduces the reviewer's finding: team 1 nominates, team 2 outbids, and the CLOCK closes
+    // the lot (TIMER_EXPIRE, submitted with no actor — the only way an auction pick is ever
+    // awarded). The winner is team 2's owner, even though team 2 never submitted the closing
+    // action itself.
+    const { draftId, leagueId, teamIds, userIds } = await auctionFixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    await store.applyAction(draftId, nominate(teamIds[0]!, "qb1", 1), { actor: { id: userIds[0]! } });
+    await store.applyAction(draftId, bid(teamIds[1]!, 2), { actor: { id: userIds[1]! } });
+    const closed = await expireOnTheClock(store, draftId);
+    expect(closed.ok).toBe(true);
+
+    const [row] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    expect(row).toMatchObject({ chainScope: leagueId, actorId: userIds[1], actorType: "user" });
+    expect(row!.payload).toMatchObject({ teamId: teamIds[1], playerId: "qb1", auto: false, price: 2 });
+  });
+
+  it("still attributes an unopposed floor award to the platform, not to the auto-nominated team's owner", async () => {
+    // Nobody nominates, so the clock auto-nominates team 1's best player at the floor bid; nobody
+    // outbids, so the clock closes it unopposed. `auto: true` end to end — system-attributed,
+    // exactly like a snake auto-pick, and the owner lookup never fires.
+    const { draftId, leagueId, teamIds } = await auctionFixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const opened = await expireOnTheClock(store, draftId); // auto-nominates, opens the lot
+    expect(opened.ok).toBe(true);
+    const closed = await expireOnTheClock(store, draftId); // nobody bid — closes it unopposed
+    expect(closed.ok).toBe(true);
+
+    const [row] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    expect(row).toMatchObject({ chainScope: leagueId, actorId: null, actorType: "system" });
+    expect(row!.payload).toMatchObject({ teamId: teamIds[0], auto: true });
+  });
+});
+
+describe("draft store — notices", () => {
+  it("notifies the manager whose pick the clock made for them, in the same transaction — and rides no league-stream frame", async () => {
+    const { draftId, leagueId, teamIds, userIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const result = await expireOnTheClock(store, draftId);
+    expect(result.ok).toBe(true);
+
+    const [pickEvent] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    const payload = pickEvent!.payload as unknown as { teamId: string; playerId: string; pickNumber: number };
+    const pickerIndex = teamIds.indexOf(payload.teamId);
+
+    const [notice] = await db.select().from(memberNotices);
+    expect(notice).toMatchObject({
+      userId: userIds[pickerIndex],
+      leagueId,
+      noticeType: "draft_auto_picked",
+      title: "We made your pick for you",
+      auditEventId: pickEvent!.eventId,
+      readAt: null,
+    });
+    expect(notice!.body).toBe(
+      `The clock ran out on pick ${payload.pickNumber} in league_1, so we used your queue and drafted ${PLAYER_NAMES[payload.playerId]} (${payload.playerId.startsWith("qb") ? "QB" : payload.playerId.startsWith("rb") ? "RB" : "WR"}). Set your queue before your next draft so this doesn't happen again.`,
+    );
+
+    // Ruling 13's guard: a private notice may not ride the league broadcast (every subscriber in
+    // the room gets every frame — see `subscribe.ts`). The durable row above IS the delivery of
+    // record; nothing on the league stream should even hint that a notice was created.
+    expect(published.some((e) => e.type === "notice.created")).toBe(false);
+    expect(published.some((e) => JSON.stringify(e.payload).includes(userIds[pickerIndex]!))).toBe(false);
+
+    // Task 8's per-user delivery: `deliverNotice` is called AFTER the commit, beside `broadcast`,
+    // with the exact durable row just asserted above — proven here through the injected fake
+    // (see `deliverNoticeFake`); the real per-user Redis frame is proven end to end, against real
+    // Redis, in `draft-realtime.test.ts`.
+    expect(deliveredNotices).toEqual([expect.objectContaining({ id: notice!.id, userId: userIds[pickerIndex], leagueId, noticeType: "draft_auto_picked" })]);
+  });
+
+  it("writes no notice for a pick a person submitted directly, and rides no league-stream frame either way", async () => {
+    const { draftId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    await store.applyAction(draftId, pick(teamIds[0]!, "qb1"), { actor: { id: "user_alice" } });
+
+    expect(await db.select().from(memberNotices)).toHaveLength(0);
+    expect(published.some((e) => e.type === "notice.created")).toBe(false);
+    expect(deliveredNotices).toHaveLength(0);
+  });
+
+  it("skips the notice, without failing the pick, when the join finds no row (e.g. an unseeded player)", async () => {
+    const { draftId, teamIds } = await fixture();
+    // Undo this file's own beforeEach seeding, reproducing the gap `autopickNoticeContext`
+    // guards — this must never turn an already-decided pick into a rolled-back transaction.
+    await db.delete(players);
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const result = await expireOnTheClock(store, draftId);
+
+    expect(result.ok).toBe(true);
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"))).toHaveLength(1);
+    expect(await db.select().from(memberNotices)).toHaveLength(0);
+    expect(deliveredNotices).toHaveLength(0);
+  });
+
+  it("never delivers a live frame for a notice whose transaction did not commit", async () => {
+    // `alsoInTransaction` runs INSIDE the same transaction as the pick, the audit events and any
+    // notice — throwing there rolls back everything, including the durable notice row. Proves
+    // `deliverNotice` is called from OUTSIDE the transaction, driven off `createdNotices` (a
+    // plain array built as rows are returned), and never fires for a notice that was rolled back
+    // with the write it explains.
+    const { draftId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const state = await store.getDraftState(draftId);
+    await expect(
+      store.applyAction(
+        draftId,
+        { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state!) ?? clock.now() },
+        { alsoInTransaction: async () => { throw new Error("boom"); } },
+      ),
+    ).rejects.toThrow("boom");
+
+    expect(await db.select().from(memberNotices)).toHaveLength(0);
+    expect(deliveredNotices).toHaveLength(0);
+  });
+
+  it("a deliverNotice failure never fails, and never rolls back, an already-committed pick", async () => {
+    // The inverse of `notifyAffectedMember`'s own discipline, pinned as a regression guard: the
+    // durable row and the pick are ALREADY COMMITTED by the time `deliver` runs (it's called
+    // strictly after `db.transaction` resolves — see the code right above `createdNotices`'s
+    // loop), so a rejecting `deliverNotice` must be swallowed exactly like a Redis outage in
+    // `broadcast`, reported through the same `onPublishError` sink, and never surface as a
+    // rejection of `applyAction` or undo anything already written.
+    const publishFailures: { type: string; leagueId: string }[] = [];
+    const throwingDeliverNotice = async (): Promise<void> => {
+      throw new Error("Redis is unreachable");
+    };
+    const { draftId, leagueId, teamIds, userIds } = await fixture();
+    const store = newStore(publish, {
+      deliverNotice: throwingDeliverNotice,
+      onPublishError: (_error, event) => publishFailures.push({ type: event.type, leagueId: event.leagueId }),
+    });
+    await store.applyAction(draftId, start(teamIds));
+
+    const result = await expireOnTheClock(store, draftId);
+
+    // No throw escaped `applyAction`, and the pick is genuinely accepted — not merely
+    // "didn't throw": ok:true is the store's own verdict that this action was admitted.
+    expect(result.ok).toBe(true);
+
+    const [pickEvent] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    expect(pickEvent).toBeDefined();
+    const payload = pickEvent!.payload as unknown as { teamId: string };
+    const pickerIndex = teamIds.indexOf(payload.teamId);
+
+    // The durable notice row landed — it was written and committed BEFORE `deliver` ever ran,
+    // so a delivery failure has no way to touch it.
+    const [notice] = await db.select().from(memberNotices);
+    expect(notice).toMatchObject({ userId: userIds[pickerIndex], leagueId, noticeType: "draft_auto_picked" });
+
+    // The failure was reported through the existing sink, not swallowed silently, and not
+    // thrown back at the caller.
+    expect(publishFailures).toEqual([{ type: "notice.created", leagueId }]);
   });
 });

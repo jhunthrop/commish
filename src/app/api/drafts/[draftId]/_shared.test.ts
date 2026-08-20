@@ -17,7 +17,7 @@ import { resolveDraftActor } from "@/draft-service";
 import { withDraftActor } from "./_shared";
 
 const params = Promise.resolve({ draftId: "draft_1" });
-const actor = { draftId: "draft_1", leagueId: "league_1", teamId: "team_1", isCommissioner: false };
+const actor = { draftId: "draft_1", leagueId: "league_1", userId: "u1", teamId: "team_1", isCommissioner: false };
 
 beforeEach(() => {
   vi.mocked(getCurrentUser).mockReset();

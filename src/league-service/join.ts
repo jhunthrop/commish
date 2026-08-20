@@ -2,6 +2,8 @@ import { and, eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
 import { drafts, leagues, teams, users } from "@/db/schema";
+import type { Clock } from "@/domain/timing";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { hasOpenSeat } from "@/matchmaking/filter";
 
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
@@ -28,6 +30,11 @@ export interface JoinLeagueInput {
   readonly userId: string;
   readonly teamName?: string;
   readonly newId: () => string;
+  /** Which door this seat was taken through — recorded on the `member_joined` audit event. */
+  readonly via: "invite" | "public_browse";
+  readonly occurredAt: string;
+  /** Defaults to the process-wide logger (`getAuditLogger()`). */
+  readonly audit?: AuditLogger;
 }
 
 /**
@@ -93,6 +100,17 @@ export async function joinLeagueInTx(
     userId: input.userId,
     name: input.teamName ?? profile?.displayName ?? "New team",
   });
+  // Inside the same transaction, after the seat exists and before the caller sees it. Placed
+  // here rather than in `acceptInvite` and `joinPublicLeague` separately for exactly the reason
+  // the capacity check lives here: two copies of one rule are two places it can disagree.
+  await (input.audit ?? getAuditLogger()).record(tx, {
+    eventType: "member_joined",
+    actorId: input.userId,
+    actorType: "user",
+    leagueId: league.id,
+    payload: { teamId, via: input.via },
+    occurredAt: input.occurredAt,
+  });
   return { ok: true, leagueId: league.id, teamId, alreadyMember: false };
 }
 
@@ -134,11 +152,13 @@ export interface JoinPublicLeagueInput {
  * seating somebody, never in how a seat is counted or taken.
  */
 export async function joinPublicLeague(
-  { db, newId }: { readonly db: Db; readonly newId: () => string },
+  { db, newId, clock, audit }: { readonly db: Db; readonly newId: () => string; readonly clock: Clock; readonly audit?: AuditLogger },
   input: JoinPublicLeagueInput,
 ): Promise<JoinLeagueOutcome> {
   try {
-    const outcome = await db.transaction((tx) => joinLeagueInTx(tx, { ...input, newId }, publicJoinPrecondition));
+    const outcome = await db.transaction((tx) =>
+      joinLeagueInTx(tx, { ...input, newId, via: "public_browse", occurredAt: clock.now(), audit }, publicJoinPrecondition),
+    );
     // `joinLeagueInTx` itself answers LEAGUE_MISSING (404) before `publicJoinPrecondition` ever
     // runs — remap it to the SAME shape the precondition answers a real-but-private league
     // with, so a caller cannot tell "no such league" apart from "a league that exists but isn't

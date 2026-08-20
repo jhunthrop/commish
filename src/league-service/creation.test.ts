@@ -1,18 +1,38 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
+import { auditEvents, drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
+import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { LEAGUE_CONFIG } from "@/league";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
-import { createLeague } from "./creation";
+import { createLeague, type CreateLeagueInput } from "./creation";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-17T12:00:00.000Z" };
 let nextId = 0;
 const newId = () => `id_${++nextId}`;
 const deps = (cache?: Pick<ReferenceCache, "invalidateScoringSettings">) => ({ db, clock, newId, cache });
+
+let counter = 0;
+const logger = createAuditLogger({ newId: () => `evt_${(counter += 1)}` });
+
+function validInput(): CreateLeagueInput {
+  return {
+    name: "Sunday Money",
+    format: "snake",
+    teamCount: LEAGUE_CONFIG.defaults.teamCount,
+    scoringPreset: "ppr",
+    auctionBudget: null,
+    rosterSlots: STANDARD_ROSTER_SLOTS,
+    commissionerUserId: "u1",
+    teamName: "Dana's Team",
+    experienceTier: "beginner",
+    stakeTier: 0,
+    isPublicMatchmade: false,
+  };
+}
 
 /** A recording stand-in for the injected reference cache, so a test can assert exactly what was invalidated. */
 function recordingReferenceCache(): Pick<ReferenceCache, "invalidateScoringSettings"> & { invalidateScoringSettings: ReturnType<typeof vi.fn> } {
@@ -22,6 +42,7 @@ function recordingReferenceCache(): Pick<ReferenceCache, "invalidateScoringSetti
 beforeEach(async () => {
   await truncateAll(db);
   nextId = 0;
+  counter = 0;
   await db.insert(users).values({ id: "u1", email: "u1@test.local", displayName: "Dana Whitfield" });
 });
 
@@ -161,5 +182,41 @@ describe("createLeague", () => {
 
     const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
     expect(league).toMatchObject({ isPublicMatchmade: false, stakeTier: 0, experienceTier: "beginner" });
+  });
+
+  it("records the league's own creation as the first event on its chain", async () => {
+    const result = await createLeague({ db, clock, newId, audit: logger }, validInput());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const rows = await db.select().from(auditEvents).where(eq(auditEvents.chainScope, result.leagueId));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      eventType: "league_created",
+      sequence: 1,
+      actorId: validInput().commissionerUserId,
+      actorType: "user",
+      leagueId: result.leagueId,
+    });
+    expect(rows[0]!.payload).toEqual({
+      name: "Sunday Money", format: "snake", teamCount: 12, stakeTier: 0,
+      isPublicMatchmade: false, experienceTier: "beginner", scoringPreset: "ppr",
+    });
+    expect(rows[0]!.occurredAt.toISOString()).toBe(clock.now());
+  });
+
+  it("leaves no audit event behind when the league write fails", async () => {
+    // The same-transaction contract, proved at a real call site and not only in the logger's own
+    // test: `createLeague` already wraps everything in one transaction, and the audit append is
+    // inside it, so a duplicate-id failure loses both halves together.
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      await createLeague({ db, clock, newId: () => "fixed_id", audit: logger }, validInput());
+      const second = await createLeague({ db, clock, newId: () => "fixed_id", audit: logger }, validInput());
+      expect(second.ok).toBe(false);
+      expect(await db.select().from(auditEvents)).toHaveLength(1);
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 });

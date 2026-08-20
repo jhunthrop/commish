@@ -81,6 +81,15 @@ const SERVER_ONLY_MODULE_GROUPS = [
   // `GifResult` as a TYPE ONLY (`import type`, still allowed below); the actual search goes
   // through `GET /api/gifs/search` over the wire, the same as every other client-room read.
   "@/gifs",
+  // `@/integrity` reads `node:crypto` (chain.ts) and is imported by Postgres-backed callers;
+  // `@/integrity-service` is Postgres-backed outright. Unlike `@/identity`, `@/chat`,
+  // `@/matchmaking`, `@/help` and `@/reviews`, NEITHER half is browser-safe, so both are blocked
+  // rather than one being exempt. Client code needs neither: a notice carries the copy it
+  // delivered (ruling 12) and an activity row arrives already rendered, so the browser renders
+  // strings the server decided. `import type` stays allowed, which is how `NoticeView` and
+  // `ActivityRow` reach `src/account-room/**` and `src/league-room/**`.
+  "@/integrity",
+  "@/integrity-service",
 ];
 
 /**

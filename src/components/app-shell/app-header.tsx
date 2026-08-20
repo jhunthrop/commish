@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
+import { NoticeInbox } from "@/account-room/components/notice-inbox";
 
 export interface AppHeaderProps {
   /** The signed-in user's display name, server-derived by the page. */
@@ -15,6 +16,11 @@ export interface AppHeaderProps {
  *
  * The name is a link to `/app/profile` — the one write path this product has to who a user is
  * (Task 2) — carrying the user's own `Avatar` so the way in is legible, not just clickable.
+ *
+ * `NoticeInbox` (Task 10) sits left of the profile link: a `"use client"` component this
+ * Server Component renders directly, with no prop of its own — `AppHeaderProps` gains nothing
+ * for it, since it fetches its own data over `GET /api/notices` rather than the page threading
+ * it through. Every signed-in page gets it for free by rendering `AppHeader`.
  */
 export function AppHeader({ displayName, avatar }: AppHeaderProps) {
   return (
@@ -27,6 +33,7 @@ export function AppHeader({ displayName, avatar }: AppHeaderProps) {
           Commish
         </Link>
         <div className="flex items-center gap-3">
+          <NoticeInbox />
           <Link
             href="/app/profile"
             className="flex items-center gap-2 rounded-md text-sm text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"

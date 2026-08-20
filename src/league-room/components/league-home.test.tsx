@@ -27,6 +27,22 @@ describe("LeagueHome", () => {
     });
   });
 
+  // Task 10: reachable from where a member already is, beside the existing matchup link,
+  // rather than only by typing the url directly.
+  it("links to the league's activity feed beside the matchups link", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByRole("link", { name: "League activity" })).toHaveAttribute("href", `/app/leagues/${HOME.leagueId}/activity`);
+    expect(screen.getByRole("link", { name: "All matchups" })).toHaveAttribute(
+      "href",
+      `/app/leagues/${HOME.leagueId}/matchups/${HOME.currentWeek}`,
+    );
+  });
+
   // Task 9 e2e regression: `league-lifecycle.spec.ts` asserts on `getByRole("heading", { name:
   // leagueName })` with no level filter, and the terms panel's OWN `h2` — before this fix —
   // carried that exact same text as the page's `h1`, so the query resolved two elements and

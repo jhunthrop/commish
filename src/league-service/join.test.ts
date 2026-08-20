@@ -1,13 +1,18 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, leagues, teams, users } from "@/db/schema";
+import { auditEvents, drafts, leagues, teams, users } from "@/db/schema";
+import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { DRAFT_ALREADY_STARTED, joinPublicLeague, LEAGUE_FULL, NOT_PUBLIC } from "./join";
 
 const db = createTestDb();
+const clock = { now: () => "2026-08-20T17:00:00.000Z" };
 let nextId = 0;
 const newId = () => `team_${++nextId}`;
-const deps = () => ({ db, newId });
+const deps = () => ({ db, newId, clock });
+
+let counter = 0;
+const logger = createAuditLogger({ newId: () => `evt_${(counter += 1)}` });
 
 async function seedLeague(over: {
   readonly id?: string;
@@ -46,6 +51,7 @@ async function seedLeague(over: {
 beforeEach(async () => {
   await truncateAll(db);
   nextId = 0;
+  counter = 0;
   await db.insert(users).values([
     { id: "owner", email: "owner@test.local", displayName: "Commissioner Casey" },
     { id: "joiner", email: "joiner@test.local", displayName: "Robin Vale" },
@@ -131,5 +137,25 @@ describe("joinPublicLeague", () => {
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(results.filter((r) => !r.ok)).toEqual([{ ok: false, status: 409, reason: LEAGUE_FULL }]);
     expect(await db.select().from(teams).where(eq(teams.leagueId, leagueId))).toHaveLength(4);
+  });
+
+  it("records member_joined when a public join seats someone", async () => {
+    const leagueId = await seedLeague();
+    const outcome = await joinPublicLeague({ db, newId, clock, audit: logger }, { leagueId, userId: "joiner" });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) return;
+
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "member_joined"));
+    expect(event).toMatchObject({ actorId: "joiner", actorType: "user", leagueId });
+    expect(event!.payload).toEqual({ teamId: outcome.teamId, via: "public_browse" });
+  });
+
+  it("records nothing when an already-seated member arrives again", async () => {
+    // `joinLeagueInTx` treats re-arrival as a free success. An audit event per page reload would
+    // be noise in every member's activity feed and a lie about what happened.
+    const leagueId = await seedLeague();
+    await joinPublicLeague({ db, newId, clock, audit: logger }, { leagueId, userId: "joiner" });
+    await joinPublicLeague({ db, newId, clock, audit: logger }, { leagueId, userId: "joiner" });
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "member_joined"))).toHaveLength(1);
   });
 });

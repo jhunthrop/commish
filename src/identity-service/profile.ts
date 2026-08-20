@@ -4,6 +4,7 @@ import { users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { avatarRefValue, parseAvatarRef, presetByKey, type AvatarPresetKey } from "@/identity";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import type { ProfileBody } from "@/account-room/contract";
 import { applyTierDefaultHelpLevel } from "./preferences";
 
@@ -85,8 +86,23 @@ export async function readProfile(db: Db, userId: string): Promise<ProfileBody |
  * (`applyTierDefaultHelpLevel`, whose docblock carries the reasoning). The tier is the coarse
  * help control and the profile's explicit "How much help" is the fine one; both are on the same
  * page and last write wins.
+ *
+ * `deps.audit` records `profile_updated` on the PLATFORM chain — payload is the FIELD NAMES
+ * that changed (`UpdateProfileParams`'s own keys: `"displayName"`, `"experienceTier"`,
+ * `"avatarPreset"`), never their values. A display name is Plan C-sensitive, PII-adjacent
+ * content that an audit row has no business holding; the fact that it changed is what this
+ * product's trust surface needs, not what it changed to. Every write here — the sparse no-op
+ * above and the two shapes below — now runs inside ONE transaction, so the audit event commits
+ * with the row it describes or not at all (ruling 4); the previous plain-`db.update` path for a
+ * non-tier change is folded into the same transaction rather than kept as a second, un-audited
+ * shape.
  */
-export async function updateProfile(db: Db, input: UpdateProfileParams, clock: Clock = systemClock): Promise<ProfileBody> {
+export async function updateProfile(
+  db: Db,
+  input: UpdateProfileParams,
+  clock: Clock = systemClock,
+  { audit = getAuditLogger() }: { readonly audit?: AuditLogger } = {},
+): Promise<ProfileBody> {
   if (input.avatarPreset !== null && input.avatarPreset !== undefined && presetByKey(input.avatarPreset) === undefined) {
     throw new Error(`Unknown avatar preset: ${input.avatarPreset}`);
   }
@@ -101,14 +117,31 @@ export async function updateProfile(db: Db, input: UpdateProfileParams, clock: C
     return profile;
   }
 
-  const tier = input.experienceTier;
-  if (tier === undefined) return writeUserRow(db, input.userId, changes);
+  // The canonical field-name order, filtered to what THIS caller actually sent — never the
+  // storage-column names `changes` uses (`avatarUrl` there is `avatarPreset` here).
+  const fields = (
+    [
+      input.displayName !== undefined ? "displayName" : null,
+      input.experienceTier !== undefined ? "experienceTier" : null,
+      input.avatarPreset !== undefined ? "avatarPreset" : null,
+    ] as const
+  ).filter((field): field is "displayName" | "experienceTier" | "avatarPreset" => field !== null);
 
+  const tier = input.experienceTier;
   // Evaluated BEFORE the transaction opens — no clock read, and no other work, inside it.
   const now = new Date(clock.now());
+
   return db.transaction(async (tx) => {
     const profile = await writeUserRow(tx, input.userId, changes);
-    await applyTierDefaultHelpLevel(tx, input.userId, tier, now);
+    if (tier !== undefined) await applyTierDefaultHelpLevel(tx, input.userId, tier, now);
+    await audit.record(tx, {
+      eventType: "profile_updated",
+      actorId: input.userId,
+      actorType: "user",
+      leagueId: null,
+      payload: { fields },
+      occurredAt: clock.now(),
+    });
     return profile;
   });
 }
