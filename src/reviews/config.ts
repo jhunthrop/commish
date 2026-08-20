@@ -31,8 +31,8 @@ export const REVIEW_CONFIG = {
    * `removeReview` (`@/review-service/reviews.ts`) is the operator's ONLY door today, but it
    * enforces this itself rather than trusting the script's own enum check to be the sole gate: a
    * future caller of the service directly (an admin UI, a different script) must not be able to
-   * hand an unbounded string to `notifyAffectedMember`, which stores it and quotes it verbatim
-   * on a member's own notice.
+   * hand an unbounded string to `notifyAffectedMember`, which stores it on a member's own
+   * notice and renders it, through `removalPhraseFor`, in a blockquote they read.
    */
   removalReason: { maxLength: 200 },
   /** `POST /api/reviews`'s ceiling — keyed per user id, an authenticated write. */
@@ -56,4 +56,15 @@ export const REMOVAL_REASON_VALUES: readonly string[] = REVIEW_CONFIG.reportReas
  */
 export function removalPhraseFor(storedReason: string): string {
   return REVIEW_CONFIG.reportReasons.find((reason) => reason.value === storedReason)?.removalPhrase ?? "breaking the review rules";
+}
+
+/**
+ * The whole sentence, in ONE place. `ReviewComposer` renders it on the author's own profile and
+ * `scripts/remove-review.ts` prints it in the operator's confirmation preview, and those two had
+ * drifted into two string literals that only happened to agree. An operator preview that promises
+ * different words from the ones the author reads is worse than no preview: it is a wrong answer
+ * to the only question the preview exists to answer.
+ */
+export function removalSentenceFor(storedReason: string): string {
+  return `Your review was removed for ${removalPhraseFor(storedReason)}. It can't be edited.`;
 }

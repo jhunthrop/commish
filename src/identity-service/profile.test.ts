@@ -175,7 +175,7 @@ describe("updateProfile / readProfile", () => {
     // edit. Now something can, so the claim gets an assertion.
     await seedUser(db, { id: "u1" });
     await updateProfile(db, { userId: "u1", displayName: "Ada Lovelace", experienceTier: "experienced", avatarPreset: "flame" });
-    await syncUserFromWorkOS({ db, clock: fixedClock }, {
+    await syncUserFromWorkOS({ db, clock: fixedClock, via: "callback" }, {
       id: "u1", email: "ada@example.com", firstName: "A", lastName: "L", profilePictureUrl: "https://workoscdn.com/new.png",
     });
     expect(await readProfile(db, "u1")).toMatchObject({ displayName: "Ada Lovelace", experienceTier: "experienced", avatar: "preset:flame" });

@@ -5,6 +5,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import type { AuditEventInput } from "@/domain/audit";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { NOTICE_TEMPLATES } from "@/integrity/notices";
+import { REMOVAL_REASON_VALUES, removalPhraseFor } from "@/reviews/config";
 import type { PublishToUserFn } from "@/lib/realtime/publish";
 import { createAuditLogger } from "./audit-logger";
 import { deliverNotice, listNotices, markNoticesRead, notifyAffectedMember, quoteFor, type MemberNotice, type NotifyInput } from "./notify";
@@ -116,6 +117,40 @@ describe("notifyAffectedMember", () => {
   it("only ever stores a type the template registry knows", async () => {
     expect(Object.keys(NOTICE_TEMPLATES)).toContain((await seedOneNotice()).noticeType);
   });
+
+  /**
+   * HIGH-2's belt. The braces are the boundary schemas, which now refuse a league or team name
+   * carrying a bidi override, so nothing written from today forward reaches here dirty. This is
+   * for what is ALREADY in Postgres: ruling 12 freezes the copy composed here and never
+   * re-renders it, so a `U+202E` that reached `body` would reverse the platform's own sentence in
+   * a member's inbox for the life of the row, and repairing that row is what ruling 12 forbids.
+   */
+  it("strips characters a reader cannot see out of the copy it freezes, wherever the name came from", async () => {
+    const rtlOverride = String.fromCharCode(0x202e);
+    const zeroWidth = String.fromCharCode(0x200b);
+    const notice = await db.transaction(async (tx) => {
+      const event = await logger.record(tx, autoPickEvent());
+      return notifyAffectedMember(
+        tx,
+        {
+          ...autoPickNotice(),
+          context: { leagueName: `${rtlOverride}Sunday Money`, pickNumber: 24, playerName: `Bijan${zeroWidth} Robinson`, position: "RB" },
+          auditEventId: event.eventId,
+        },
+        { newId: () => "notice_1" },
+      );
+    });
+
+    const [row] = await db.select().from(memberNotices);
+    expect(row!.body).toContain("in Sunday Money");
+    expect(row!.body).toContain("Bijan Robinson");
+    expect(row!.body).not.toContain(rtlOverride);
+    expect(row!.body).not.toContain(zeroWidth);
+    expect(notice.body).toBe(row!.body);
+    // `context` keeps what it was rendered FROM, untouched: it is provenance, not copy, and a
+    // sanitized copy of the input would make a template change unauditable.
+    expect(row!.context).toMatchObject({ leagueName: `${rtlOverride}Sunday Money` });
+  });
 });
 
 describe("deliverNotice — ruling 13's live half", () => {
@@ -197,13 +232,28 @@ describe("listNotices and markNoticesRead", () => {
 });
 
 describe("quoteFor", () => {
-  it("quotes review_removed's operator-supplied reason", () => {
+  /** HIGH-3: the blockquote used to print the stored enum, so an author's inbox read "other". */
+  it("renders the AUTHOR-FACING PHRASE for every reason in the closed vocabulary, never the token", () => {
+    for (const reason of REMOVAL_REASON_VALUES) {
+      const notice: MemberNotice = {
+        id: "notice_1", userId: "user_bob", leagueId: null, noticeType: "review_removed",
+        title: "We removed your review", body: "...", context: { reason },
+        auditEventId: "evt_1", createdAt: NOW, readAt: null,
+      };
+      expect(quoteFor(notice)).toBe(removalPhraseFor(reason));
+      expect(quoteFor(notice)).not.toBe(reason);
+    }
+  });
+
+  it("falls back to the generic phrase for a stored value from outside that vocabulary", () => {
+    // Rows written by hand in SQL, or before the script constrained `--reason`. The mapper's own
+    // docblock has always said a stored value must not be printed raw; this is that rule holding.
     const notice: MemberNotice = {
       id: "notice_1", userId: "user_bob", leagueId: null, noticeType: "review_removed",
-      title: "Your review was removed", body: "…", context: { reason: "off topic" },
+      title: "We removed your review", body: "...", context: { reason: "internal note: ticket 4821" },
       auditEventId: "evt_1", createdAt: NOW, readAt: null,
     };
-    expect(quoteFor(notice)).toBe("off topic");
+    expect(quoteFor(notice)).toBe("breaking the review rules");
   });
 
   it("is null for a review_removed notice whose context reason is not a string", () => {

@@ -30,23 +30,46 @@ import { GENESIS_HASH, linkEvent, scopeFor, type ChainAnchor } from "@/integrity
  * about a thousand leagues drafting at once on a Sunday evening. Per-league chains reduce
  * contention to contention that already exists: a draft is already single-writer per draft, and
  * twelve managers setting lineups on a Sunday morning at ~15ms each is not a queue. The matched
- * concurrency test pair below is the proof — same scope serializes into a gapless linked run,
- * different scopes never block each other at all.
+ * concurrency test pair in `audit-logger.test.ts` is the proof — same scope serializes into a
+ * gapless linked run, different scopes never block each other at all. Both halves are held to
+ * what they claim: the same-scope test waits on `pg_stat_activity` for a genuinely blocked
+ * backend rather than on a hopeful `setTimeout`, and the different-scope test races against a
+ * COMMITTED neighbour anchor, so a lock broadened past one row blocks on a row it can actually
+ * see and blows the test's statement timeout. Verified by mutation, in both directions.
  *
  * The platform chain stays a single row only because every platform-chain append is a short
  * transaction by construction (a sign-in at 20/s against a ~2ms transaction is 4% utilization of
  * one row). If a later plan ever wants to append a platform event from inside a long
  * transaction, that is the moment to shard the platform chain — not before.
  *
- * LOCK ORDER (ruling 3, the global rule): the audit anchor is ALWAYS THE LAST LOCK a transaction
- * takes, no exceptions, and a transaction appends to AT MOST ONE chain (`recordAll` throws if a
- * batch spans chains — see below). `applyAction` (`src/draft-service/store.ts`) holds `drafts
- * FOR UPDATE` first; `setLineup` holds `stat_weeks FOR SHARE` first; `joinLeagueInTx` holds
- * `league_invites` then `leagues` first. Every one of them reaches this row afterwards, and
- * nothing reaches any of them from here, so no lock-ordering cycle exists anywhere in the
- * codebase. Because a transaction touches at most one anchor, and the anchor is always taken
- * last, two transactions can never take two anchor locks in opposite orders — the audit spine
- * cannot itself be the cause of a deadlock.
+ * LOCK ORDER (ruling 3, the global rule, AS RESTATED): the audit anchor is ALWAYS THE LAST LOCK a
+ * transaction takes, no exceptions — and "lock" INCLUDES AN IMPLICIT FOREIGN-KEY LOCK. Postgres
+ * takes `FOR KEY SHARE` on the REFERENCED row when a statement inserts or updates a referencing
+ * one, and `FOR KEY SHARE` conflicts with `FOR UPDATE`. An `INSERT INTO member_notices` is
+ * therefore a lock on `leagues` and on `users`, and `commitDraftState`'s inserts are locks on
+ * `leagues`, `teams` and `players`.
+ *
+ * That sentence is the whole finding. The rule used to read "no non-anchor lock after the anchor"
+ * and three transactions honored it while inserting FK-carrying rows afterwards, because an
+ * implicit FK lock does not look like a lock. It produced a REAL cycle: `joinLeagueInTx` held
+ * `leagues[X] FOR UPDATE` and waited for `audit_chains[X]`, while the draft-pick transaction held
+ * `audit_chains[X]` and waited for `leagues[X] FOR KEY SHARE` through its `member_notices`
+ * insert. Postgres broke it after `deadlock_timeout` by killing a pick or a join that the user
+ * did nothing to deserve.
+ *
+ * So: `applyAction` (`src/draft-service/store.ts`) holds `drafts FOR UPDATE` first and does every
+ * notice insert, every caller-supplied write and the whole season commit BEFORE it reaches this
+ * row; `setLineup` holds `stat_weeks FOR SHARE` first; `joinLeagueInTx` holds `league_invites`
+ * then `leagues` first; `removeReview` writes its notice before appending. Every one of them
+ * reaches this row afterwards, and nothing reaches any of them from here — so no lock-ordering
+ * cycle exists anywhere in the codebase. Because a transaction touches at most one anchor, and
+ * the anchor is always taken last, two transactions can never take two anchor locks in opposite
+ * orders. `src/integrity-service/lock-order.test.ts` drives the two transactions that used to
+ * deadlock against a real Postgres and holds that claim to it.
+ *
+ * The one statement any caller may run after the anchor is
+ * `attachAuditEvent` (`notify.ts`), and only because it updates `member_notices.audit_event_id`,
+ * a column with no foreign key, which makes Postgres re-check nothing and lock nothing.
  *
  * FAILURE MODE (ruling 4, the opposite of publishing): an audit append failure FAILS the
  * caller's business transaction. No catch, no best-effort, no fallback path. `docs/
@@ -74,10 +97,13 @@ export interface AuditLogger {
  * survives, and the `SELECT … FOR UPDATE` that follows is what serializes the two writers onto
  * it — the second blocks on the lock rather than racing the first for who reads first.
  *
- * LOCK ORDER (ruling 3): this is always the LAST lock a transaction takes, and a transaction
- * appends to at most one chain. `applyAction` holds `drafts`, `setLineup` holds `stat_weeks`,
+ * LOCK ORDER (ruling 3): this is always the LAST lock a transaction takes, a transaction appends
+ * to at most one chain, and "lock" includes the implicit `FOR KEY SHARE` an INSERT takes on every
+ * row it references. `applyAction` holds `drafts`, `setLineup` holds `stat_weeks`,
  * `joinLeagueInTx` holds `league_invites` then `leagues` — every one of them reaches this row
- * afterwards and nothing reaches any of them from here, so no cycle exists.
+ * afterwards, with every FK-taking write of its own already done, and nothing reaches any of them
+ * from here, so no cycle exists. See the interface docblock above for the cycle this rule was
+ * rewritten to close.
  */
 async function lockAnchor(tx: DbTx, scope: string): Promise<ChainAnchor> {
   await tx.insert(auditChains).values({ scope, headHash: GENESIS_HASH }).onConflictDoNothing();

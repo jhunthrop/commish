@@ -29,10 +29,14 @@ export interface NoticeView {
   readonly title: string;
   readonly body: string;
   /**
-   * The ONE exception to "context stays server-side": an operator's own words, quoted verbatim
-   * (`review_removed`'s `context.reason`), split out so the renderer can lay it out as a
-   * distinct blockquote rather than inline it inside `body`'s own sentence — a quotation reads
-   * as one when it looks like one. `null` for every notice type with nothing to quote.
+   * The ONE exception to "context stays server-side": the author-facing PHRASE that
+   * `review_removed`'s stored `context.reason` maps to (`quoteFor` -> `removalPhraseFor`), split
+   * out so the renderer can lay it out as a distinct blockquote rather than inline it inside
+   * `body`'s own sentence — a quotation reads as one when it looks like one. Never the stored
+   * value itself: since `scripts/remove-review.ts` constrained `--reason`, that value is one of
+   * three platform-authored tokens (`spam`, `abusive`, `other`), and printing it put the word
+   * "other" in quotation marks under "We removed your review". `null` for every notice type with
+   * nothing to quote.
    */
   readonly quote: string | null;
   /** `null` for a league-less notice (e.g. a review removal) — see `NoticeContexts`'s own docblock. */

@@ -6,8 +6,9 @@ import * as schema from "@/db/schema";
 import { auditEvents, memberNotices, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
-import { notifyAffectedMember } from "@/integrity-service/notify";
-import { REVIEW_CONFIG } from "@/reviews/config";
+import { notifyAffectedMember, quoteFor, type MemberNotice } from "@/integrity-service/notify";
+import { renderNotice } from "@/integrity/notices";
+import { REMOVAL_REASON_VALUES, REVIEW_CONFIG, removalPhraseFor, removalSentenceFor } from "@/reviews/config";
 import { parseReviewCursor } from "@/reviews/cursor";
 import { feedQuery, listReviews, myReview, removeReview, reportReview, submitReview } from "./reviews";
 
@@ -439,12 +440,12 @@ describe("removeReview", () => {
 });
 
 describe("removeReview — notices", () => {
-  it("writes the notice the removed review's author can read, quoting the operator's reason verbatim", async () => {
+  it("writes the notice the removed review's author can read, and names the event minted after it", async () => {
     await seedUser("user_bob");
     await seedUser("user_operator");
     await submitReview(db, { userId: "user_bob", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "rev_1" });
 
-    await removeReview(db, { reviewId: "rev_1", removedByUserId: "user_operator", reason: "off topic", clock: at("2026-08-04T00:00:00Z"), audit: logger });
+    await removeReview(db, { reviewId: "rev_1", removedByUserId: "user_operator", reason: "other", clock: at("2026-08-04T00:00:00Z"), audit: logger });
 
     const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "review_removed"));
     const [notice] = await db.select().from(memberNotices);
@@ -453,14 +454,51 @@ describe("removeReview — notices", () => {
       leagueId: null,
       noticeType: "review_removed",
       title: "We removed your review",
+      // The notice row is now written BEFORE the append (ruling 3: its insert takes an FK lock on
+      // `users`, and the anchor is the last lock), then stamped with the event id by
+      // `attachAuditEvent`. This assertion is what proves the second statement actually ran.
       auditEventId: event!.eventId,
       readAt: null,
     });
-    // The operator's reason is stored on `context` and quoted verbatim there — Task 10's fix
-    // round pulled it OUT of this sentence (`quoteFor`, `@/integrity-service/notify`) so the
-    // reader sees it as a distinct quotation, not folded into the platform's own voice.
+    // The reason is stored on `context` as the token it is, and MAPPED at render — see `quoteFor`.
     expect(notice!.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it.");
-    expect(notice!.context).toEqual({ reason: "off topic" });
+    expect(notice!.context).toEqual({ reason: "other" });
+  });
+
+  /**
+   * HIGH-3: the blockquote used to render the stored enum, so a removed author's inbox read
+   * "We removed your review" / "other". Three things in this codebase disagreed with that, and
+   * the operator's confirmation preview promised a fourth thing again.
+   *
+   * This holds the two ends together: what `scripts/remove-review.ts` prints in its preview and
+   * what a member actually reads come out of the SAME functions, for every value in the closed
+   * vocabulary. The script's preview is those functions; that is the point of extracting them.
+   */
+  it("shows the operator exactly the words the author reads, for every removal reason", async () => {
+    for (const reason of REMOVAL_REASON_VALUES) {
+      await truncateAll(db);
+      await seedUser("author");
+      await seedUser("operator");
+      await submitReview(db, { userId: "author", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "rev_1" });
+      await removeReview(db, { reviewId: "rev_1", removedByUserId: "operator", reason, clock: at("2026-08-04T00:00:00Z"), audit: logger });
+
+      const [row] = await db.select().from(memberNotices);
+      const stored: MemberNotice = {
+        id: row!.id, userId: row!.userId, leagueId: row!.leagueId, noticeType: "review_removed",
+        title: row!.title, body: row!.body, context: row!.context, auditEventId: row!.auditEventId,
+        createdAt: row!.createdAt.toISOString(), readAt: null,
+      };
+
+      // The script's preview lines, built the one way the script builds them.
+      const preview = renderNotice("review_removed", { reason });
+      expect(stored.title).toBe(preview.title);
+      expect(stored.body).toBe(preview.body);
+      expect(quoteFor(stored)).toBe(removalPhraseFor(reason));
+
+      // And the raw token never reaches the reader on its own.
+      expect(quoteFor(stored)).not.toBe(reason);
+      expect(removalSentenceFor(reason)).toContain(removalPhraseFor(reason));
+    }
   });
 
   it("writes no notice when there is nothing to remove", async () => {

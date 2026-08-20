@@ -2,8 +2,10 @@ import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { memberNotices } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
+import { stripHiddenCharacters } from "@/identity/display-name";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { renderNotice, type NoticeContexts, type NoticeType } from "@/integrity/notices";
+import { removalPhraseFor } from "@/reviews/config";
 import type { PublishToUserFn } from "@/lib/realtime/publish";
 import { getPublisher } from "@/lib/realtime/publisher";
 
@@ -27,8 +29,17 @@ export interface NotifyInput<T extends NoticeType> {
   readonly noticeType: T;
   readonly context: NoticeContexts[T];
   readonly occurredAt: string;
-  /** The audit event this notice explains. No FK — see `member_notices`' own docblock. */
-  readonly auditEventId: string;
+  /**
+   * The audit event this notice explains. No FK — see `member_notices`' own docblock.
+   *
+   * `null` means "not known yet", and it exists for one reason: ruling 3's lock order. Inserting
+   * this row takes an implicit `FOR KEY SHARE` on `users` and `leagues` (Postgres locks the
+   * REFERENCED row on an FK check), so the insert has to happen BEFORE the chain anchor lock,
+   * which is before the append that mints the event id. The caller stamps it afterwards with
+   * `attachAuditEvent` below. See `audit-logger.ts`'s LOCK ORDER note for what goes wrong
+   * otherwise.
+   */
+  readonly auditEventId: string | null;
 }
 
 function rowToNotice(row: typeof memberNotices.$inferSelect): MemberNotice {
@@ -64,13 +75,25 @@ function rowToNotice(row: typeof memberNotices.$inferSelect): MemberNotice {
  * A caller that cannot resolve who to notify (an owner lookup that finds no row) never reaches
  * this function at all — see `src/draft-service/store.ts` — so there is no "notify nobody" branch
  * here to get wrong.
+ *
+ * LOCK ORDER (ruling 3, as restated): this INSERT takes an implicit `FOR KEY SHARE` on the
+ * `users` and `leagues` rows it references, which is a lock, and `leagues` is a row
+ * `joinLeagueInTx` takes `FOR UPDATE` before it appends. So this call belongs BEFORE the chain
+ * anchor, never after it — pass `auditEventId: null` and stamp it with `attachAuditEvent` once
+ * the append has run. Both of this function's callers do exactly that.
  */
 export async function notifyAffectedMember<T extends NoticeType>(
   tx: DbTx,
   input: NotifyInput<T>,
   deps: { readonly newId: () => string } = { newId: () => crypto.randomUUID() },
 ): Promise<MemberNotice> {
-  const rendered = renderNotice(input.noticeType, input.context);
+  // Composed, then stripped of anything a reader cannot see. The boundary schemas refuse a
+  // league or team name carrying a bidi override, so nothing written from today forward can reach
+  // here dirty — but this row freezes its copy forever (ruling 12) and the values interpolated
+  // into it are read back out of Postgres, including rows written before those schemas had the
+  // guard. A belt, over a brace that only covers what comes next. See `stripHiddenCharacters`.
+  const composed = renderNotice(input.noticeType, input.context);
+  const rendered = { title: stripHiddenCharacters(composed.title), body: stripHiddenCharacters(composed.body) };
   const id = deps.newId();
   const createdAt = new Date(input.occurredAt);
   const context = input.context as unknown as JsonObject;
@@ -100,6 +123,22 @@ export async function notifyAffectedMember<T extends NoticeType>(
     createdAt: createdAt.toISOString(),
     readAt: null,
   };
+}
+
+/**
+ * Stamps the audit event id onto a notice that had to be written before the append that produced
+ * it. Same transaction, always — a notice that names no event after the commit is a delivery
+ * record with no record behind it.
+ *
+ * THE ONE THING THIS STATEMENT MUST NOT DO is take a lock outside `member_notices`, because it
+ * runs AFTER the chain anchor and ruling 3 makes the anchor the last lock. It does not: Postgres
+ * re-checks a foreign key, and so locks the referenced row, only when the referencing column's
+ * value actually changes, and this sets `audit_event_id` alone — which carries no foreign key at
+ * all (see `member_notices`' own docblock for why). `user_id` and `league_id` are untouched.
+ */
+export async function attachAuditEvent(tx: DbTx, notice: MemberNotice, auditEventId: string): Promise<MemberNotice> {
+  await tx.update(memberNotices).set({ auditEventId }).where(eq(memberNotices.id, notice.id));
+  return { ...notice, auditEventId };
 }
 
 /**
@@ -153,20 +192,30 @@ export async function listNotices(db: Db, userId: string): Promise<NoticesPage> 
 }
 
 /**
- * `review_removed`'s `context.reason` — an operator's own words, quoted verbatim — split out
- * of `context` for the ONE thing that renders it as its own field rather than folded into
- * `body`'s sentence: a distinct blockquote, both on `GET /api/notices` (`NoticeView.quote`) and
- * the league activity page's own "What the platform did" band. `context` is a `JsonObject`, so
- * this narrows rather than trusts: a row whose `reason` is missing or not a string (impossible
- * through `NoticeContexts`' own type today, not impossible against a row read back from
- * Postgres) reads as no quote at all — the same discipline `activityRowFor`'s payload readers
- * use. Exported so the route and the page share one definition rather than two copies agreeing
- * by coincidence.
+ * `review_removed`'s reason, as the AUTHOR-FACING PHRASE, split out of `context` for the ONE
+ * thing that renders it as its own field rather than folded into `body`'s sentence: a distinct
+ * blockquote, both on `GET /api/notices` (`NoticeView.quote`) and the league activity page's own
+ * "What the platform did" band.
+ *
+ * MAPPED, never printed raw. `context.reason` is one of `REVIEW_CONFIG.reportReasons`' three
+ * values — `spam`, `abusive`, `other` — validated at `scripts/remove-review.ts` and bounded again
+ * in `removeReview`. Printing the token put **"other"** inside quotation marks under the heading
+ * "We removed your review", which is the single most emotionally loaded string this product
+ * emits, said in the voice of a database column. `removalPhraseFor` is the same mapper
+ * `ReviewComposer` already renders the same stored value through, and its own docblock has always
+ * said a stored value "must not be printed raw"; this is the surface that was not obeying it.
+ * The fallback in that mapper is what covers a value from outside the closed set.
+ *
+ * `context` is a `JsonObject`, so this narrows rather than trusts: a row whose `reason` is missing
+ * or not a string (impossible through `NoticeContexts`' own type today, not impossible against a
+ * row read back from Postgres) reads as no quote at all — the same discipline `activityRowFor`'s
+ * payload readers use. Exported so the route and the page share one definition rather than two
+ * copies agreeing by coincidence.
  */
 export function quoteFor(notice: MemberNotice): string | null {
   if (notice.noticeType !== "review_removed") return null;
   const reason = notice.context.reason;
-  return typeof reason === "string" ? reason : null;
+  return typeof reason === "string" ? removalPhraseFor(reason) : null;
 }
 
 export interface MarkNoticesReadInput {

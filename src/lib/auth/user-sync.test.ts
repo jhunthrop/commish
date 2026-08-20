@@ -43,7 +43,7 @@ describe("syncUserFromWorkOS", () => {
   };
 
   it("creates the local profile row on first sign-in, keyed by the WorkOS id", async () => {
-    await syncUserFromWorkOS({ db, clock: { now: () => T0 } }, workosUser);
+    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, via: "callback" }, workosUser);
     const [row] = await db.select().from(users).where(eq(users.id, "user_01HXYZ"));
     expect(row?.email).toBe("jane@example.com");
     expect(row?.displayName).toBe("Jane Doe");
@@ -53,10 +53,10 @@ describe("syncUserFromWorkOS", () => {
   });
 
   it("is idempotent — a second sign-in updates lastSeenAt/email but preserves createdAt and app-owned fields", async () => {
-    await syncUserFromWorkOS({ db, clock: { now: () => T0 } }, workosUser);
+    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, via: "callback" }, workosUser);
     await db.update(users).set({ experienceTier: "experienced", displayName: "The Commish" }).where(eq(users.id, "user_01HXYZ"));
 
-    await syncUserFromWorkOS({ db, clock: { now: () => T1 } }, { ...workosUser, email: "jane.new@example.com" });
+    await syncUserFromWorkOS({ db, clock: { now: () => T1 }, via: "callback" }, { ...workosUser, email: "jane.new@example.com" });
 
     const [row] = await db.select().from(users).where(eq(users.id, "user_01HXYZ"));
     expect(row?.email).toBe("jane.new@example.com");
@@ -68,14 +68,14 @@ describe("syncUserFromWorkOS", () => {
   });
 
   it("returns the local profile", async () => {
-    const profile = await syncUserFromWorkOS({ db, clock: { now: () => T0 } }, workosUser);
+    const profile = await syncUserFromWorkOS({ db, clock: { now: () => T0 }, via: "callback" }, workosUser);
     expect(profile.id).toBe("user_01HXYZ");
     expect(profile.displayName).toBe("Jane Doe");
   });
 
   it("records a session_started on the platform chain for every sign-in", async () => {
-    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, audit: logger }, workosUser);
-    await syncUserFromWorkOS({ db, clock: { now: () => T1 }, audit: logger }, workosUser);
+    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, via: "callback", audit: logger }, workosUser);
+    await syncUserFromWorkOS({ db, clock: { now: () => T1 }, via: "callback", audit: logger }, workosUser);
 
     const rows = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "session_started")).orderBy(auditEvents.sequence);
     expect(rows).toHaveLength(2);
@@ -89,7 +89,7 @@ describe("syncUserFromWorkOS", () => {
     // calls caller-controlled and rotatable — a multi-account flag keyed on a forgeable header
     // lets an attacker manufacture suspicion against someone else's account, strictly worse than
     // a bypassed rate limiter. Plan B adds the signals, with the IP weight at zero.
-    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, audit: logger }, workosUser);
+    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, via: "callback", audit: logger }, workosUser);
     const [row] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "session_started"));
     expect(Object.keys(row!.payload).sort()).toEqual(["firstSignIn", "via"]);
   });
@@ -100,10 +100,29 @@ describe("syncUserFromWorkOS", () => {
     // upsert too, rather than leaving a sign-in recorded nowhere.
     await expect(
       syncUserFromWorkOS(
-        { db, clock: { now: () => T0 }, audit: { ...logger, record: async () => { throw new Error("audit append failed"); } } },
+        { db, clock: { now: () => T0 }, via: "callback", audit: { ...logger, record: async () => { throw new Error("audit append failed"); } } },
         workosUser,
       ),
     ).rejects.toThrow("audit append failed");
     expect(await db.select().from(users)).toHaveLength(0);
+  });
+});
+
+describe("session_started.via names the door it actually came through (MEDIUM-5)", () => {
+  const workosUser = { id: "user_01HXYZ", email: "jane@example.com", firstName: "Jane", lastName: "Doe" };
+
+  it("records the backfill path as a backfill, not as a callback it was not", async () => {
+    // `getCurrentUser` calls this for a valid session whose local row is missing. It used to
+    // write the literal `"callback"`, which is a false statement in an append-only record that
+    // nothing may ever repair.
+    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, via: "session_backfill", audit: logger }, workosUser);
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "session_started"));
+    expect(event!.payload).toMatchObject({ via: "session_backfill", firstSignIn: true });
+  });
+
+  it("still records the callback path as the callback", async () => {
+    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, via: "callback", audit: logger }, workosUser);
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "session_started"));
+    expect(event!.payload).toMatchObject({ via: "callback" });
   });
 });

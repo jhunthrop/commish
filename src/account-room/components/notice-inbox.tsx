@@ -13,16 +13,18 @@ function formatNoticeDate(iso: string): string {
 function NoticeRow({ notice }: { readonly notice: NoticeView }) {
   return (
     <li className="flex flex-col gap-1 border-b border-border py-3 last:border-b-0">
-      <p className="font-medium text-text-primary">{notice.title}</p>
-      <p className="text-sm text-text-muted">
+      <p className="break-words font-medium text-text-primary">{notice.title}</p>
+      <p className="break-words text-sm text-text-muted">
         {notice.body}
         {notice.noticeType === "draft_auto_picked" ? <InfoTip term="queue" className="ml-1" /> : null}
       </p>
-      {/* `quote` is the ONE wire field split out of a notice's stored `context` — an operator's
-          own words, laid out as a real quotation rather than folded into `body`'s own sentence
-          (fix round 1, FIX 7). */}
+      {/* `quote` is the ONE wire field split out of a notice's stored `context`: the
+          AUTHOR-FACING PHRASE the stored reason maps to (`quoteFor` -> `removalPhraseFor`),
+          never the stored token itself, laid out as a real quotation rather than folded into
+          `body`'s own sentence (fix round 1, FIX 7). `break-words` because a notice body carries
+          user content (a league name, a player name) that has no space in it to wrap at. */}
       {notice.quote === null ? null : (
-        <blockquote className="border-l-2 border-border pl-3 text-sm italic text-text-muted">{`"${notice.quote}"`}</blockquote>
+        <blockquote className="break-words border-l-2 border-border pl-3 text-sm italic text-text-muted">{`"${notice.quote}"`}</blockquote>
       )}
       <time dateTime={notice.createdAt} className="text-xs text-text-muted">
         {formatNoticeDate(notice.createdAt)}

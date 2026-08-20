@@ -12,6 +12,6 @@ const systemClock = { now: () => new Date().toISOString() };
 export const GET = handleAuth({
   returnPathname: "/app",
   onSuccess: async ({ user }) => {
-    await syncUserFromWorkOS({ db: getDb(), clock: systemClock }, user);
+    await syncUserFromWorkOS({ db: getDb(), clock: systemClock, via: "callback" }, user);
   },
 });

@@ -19,7 +19,15 @@ export interface NoticeContexts {
     readonly position: string;
   };
   readonly review_removed: {
-    /** The operator's OWN words, quoted verbatim. Never paraphrased and never filtered. */
+    /**
+     * WHICH of three platform-authored reasons the operator picked: `spam`, `abusive` or
+     * `other` (`REVIEW_CONFIG.reportReasons`, enforced by `scripts/remove-review.ts` and again
+     * by `removeReview`). NOT free text, and not the operator's own prose — it stopped being
+     * either the day `--reason` was closed to that vocabulary. Stored as the token, because the
+     * token is the honest provenance; MAPPED to a sentence fragment a person can read at every
+     * render (`quoteFor` -> `removalPhraseFor`), because a stored value must never be printed
+     * raw to the author.
+     */
     readonly reason: string;
   };
 }
@@ -38,10 +46,11 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
     title: "We made your pick for you",
     body: `The clock ran out on pick ${pickNumber} in ${leagueName}, so we used your queue and drafted ${playerName} (${position}). Set your queue before your next draft so this doesn't happen again.`,
   }),
-  // `reason` is stored on the row (`context.reason`) but deliberately unused HERE: it is quoted
-  // verbatim as its own field on the wire (`NoticeView.quote`, `GET /api/notices`'s own
-  // `quoteFor`), rendered as a distinct blockquote rather than folded into this sentence — a
-  // quotation embedded in a paragraph reads as this product's own voice, not a quote.
+  // `reason` is stored on the row (`context.reason`) but deliberately unused HERE: its
+  // author-facing phrase travels as its own field on the wire (`NoticeView.quote`, `GET
+  // /api/notices`'s own `quoteFor`), rendered as a distinct blockquote rather than folded into
+  // this sentence — a quotation embedded in a paragraph reads as this product's own voice, not
+  // a quote.
   review_removed: () => ({
     title: "We removed your review",
     body: "An operator removed your review. We keep your review on file exactly as you wrote it.",

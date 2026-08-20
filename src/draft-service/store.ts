@@ -14,7 +14,7 @@ import {
   type DraftState,
 } from "@/draft-engine";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
-import { deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
+import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { auditEventsForPicks, ownerIdsForContestedPicks } from "./audit";
@@ -53,7 +53,14 @@ export type ApplyResult =
   | { readonly ok: false; readonly reason: string };
 
 export interface ApplyOptions {
-  /** Extra work to commit atomically with the action row (e.g. flipping `drafts.status`). */
+  /**
+   * Extra work to commit atomically with the action row (e.g. flipping `drafts.status`).
+   *
+   * Runs BEFORE the chain anchor is locked, deliberately: a caller-supplied callback may take any
+   * lock at all, and ruling 3 makes the anchor the last lock a transaction takes. Running it
+   * after the append would put an unknown lock on the far side of the anchor and reopen exactly
+   * the cycle `src/integrity-service/lock-order.test.ts` exists to keep closed.
+   */
   readonly alsoInTransaction?: (tx: DbTx) => Promise<void>;
   /** Who submitted this action. Absent means the clock acted (a `TIMER_EXPIRE`, never a person). */
   readonly actor?: { readonly id: string };
@@ -255,6 +262,17 @@ export function createDraftStore({
             // The audit append rides the draft's existing FOR UPDATE on `drafts`, and the chain
             // anchor is taken after it — the fixed lock order (ruling 3). Both this and the
             // action row commit together or neither does.
+            //
+            // EVERYTHING THAT TAKES A LOCK RUNS FIRST, and that is not a stylistic preference: a
+            // `member_notices` insert takes an implicit `FOR KEY SHARE` on `leagues`, and
+            // `commitDraftState` takes the same on `leagues`/`teams`/`players`. Held AFTER the
+            // anchor, those are the second half of a real deadlock cycle against
+            // `joinLeagueInTx`, which holds `leagues FOR UPDATE` (`join.ts`) and then waits for
+            // the same anchor. So the order below is: business rows, then caller-supplied work,
+            // then the commit-to-season, then the append, and only a `member_notices`-only
+            // UPDATE after it (`attachAuditEvent`, which takes no lock outside that table).
+            // `src/integrity-service/lock-order.test.ts` drives both transactions against a real
+            // Postgres and proves the cycle is gone.
             const submittedActorId = options?.actor?.id ?? null;
             // A contested auction lot the clock closes (`TIMER_EXPIRE`, no submitting actor, but
             // `auto: false` — a real bidding war happened) needs its winner's identity resolved
@@ -265,21 +283,22 @@ export function createDraftStore({
               : [];
             const ownerOf = await ownerIdsForContestedPicks(tx, contestedWinners);
             const picked = auditEventsForPicks(state, result.state, submittedActorId, ownerOf);
-            const pickedEvents = await audit.recordAll(tx, picked);
 
             // Task 7's first real sender: the manager whose pick the clock made for them is told
-            // nothing today, and this is that telling. `picked`/`pickedEvents`/the new picks
-            // slice are all built from the SAME diff (`next.picks.slice(previous.picks.length)`),
-            // so index `i` names the same pick in all three. The durable `member_notices` row IS
-            // the delivery (the inbox reads it — `listNotices`); each notice created here is also
-            // pushed to `createdNotices` so `deliverNotice` can push a best-effort LIVE frame for
-            // it AFTER this transaction commits — see the comment beside `createdNotices` above.
+            // nothing today, and this is that telling. `picked` and the new picks slice are built
+            // from the SAME diff (`next.picks.slice(previous.picks.length)`), so index `i` names
+            // the same pick in both — and `pickIndexOfNotice` carries that index forward so the
+            // event minted below can be matched back to the notice that explains it. The durable
+            // `member_notices` row IS the delivery (the inbox reads it — `listNotices`); each
+            // notice is also pushed to `createdNotices` so `deliverNotice` can push a best-effort
+            // LIVE frame for it AFTER this transaction commits — see the comment beside
+            // `createdNotices` above.
             const newPicks = result.state.picks.slice(state.picks.length);
             const positionOf = new Map(result.state.pool.map((entry) => [entry.playerId, entry.position]));
+            const pending: { readonly notice: MemberNotice; readonly pickIndex: number }[] = [];
             for (let i = 0; i < picked.length; i += 1) {
               if (picked[i]!.actorType !== "system") continue;
               const newPick = newPicks[i]!;
-              const event = pickedEvents[i]!;
               const context = await autopickNoticeContext(tx, newPick.teamId, newPick.playerId);
               const position = positionOf.get(newPick.playerId);
               if (context === undefined || position === undefined) continue;
@@ -288,16 +307,27 @@ export function createDraftStore({
                 userId: context.userId,
                 noticeType: "draft_auto_picked",
                 context: { leagueName: context.leagueName, pickNumber: newPick.pickNumber, playerName: context.playerName, position },
-                occurredAt: event.occurredAt,
-                auditEventId: event.eventId,
+                // The PICK's own timestamp, which is also what `auditEventsForPicks` stamps its
+                // event with — the same instant, read from the same place, before either row
+                // exists. Reading it back off the minted event would mean minting the event first.
+                occurredAt: picked[i]!.occurredAt,
+                auditEventId: null,
               });
-              createdNotices.push(notice);
+              pending.push({ notice, pickIndex: i });
             }
 
             if (options?.alsoInTransaction !== undefined) await options.alsoInTransaction(tx);
             // A completed draft becomes a season in the same transaction that completed it.
-            if (result.state.phase === "complete" && state.phase !== "complete") {
-              const counts = await commitDraftState(tx, result.state);
+            // `commitDraftState` writes `draft_picks`/`roster_slots` and the schedule, every one
+            // of which takes an FK lock on `leagues`/`teams`/`players` — so it runs here, before
+            // the anchor, not after it.
+            const counts =
+              result.state.phase === "complete" && state.phase !== "complete" ? await commitDraftState(tx, result.state) : null;
+
+            // THE ANCHOR, LAST. Nothing below takes a lock on any table another audited
+            // transaction locks first.
+            const pickedEvents = await audit.recordAll(tx, picked);
+            if (counts !== null) {
               await audit.record(tx, {
                 eventType: "draft_completed",
                 actorId: null,
@@ -306,6 +336,10 @@ export function createDraftStore({
                 payload: { draftId, picks: counts.picks, teams: counts.teams },
                 occurredAt: action.timestamp,
               });
+            }
+
+            for (const { notice, pickIndex } of pending) {
+              createdNotices.push(await attachAuditEvent(tx, notice, pickedEvents[pickIndex]!.eventId));
             }
             return { ok: true, state: result.state };
           });

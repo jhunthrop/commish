@@ -81,15 +81,16 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
                 const quote = quoteFor(notice);
                 return (
                   <li key={notice.id} className="flex flex-col gap-1 border-b border-border py-3 last:border-b-0">
-                    <p className="font-medium text-text-primary">{notice.title}</p>
-                    <p className="text-sm text-text-muted">
+                    <p className="break-words font-medium text-text-primary">{notice.title}</p>
+                    <p className="break-words text-sm text-text-muted">
                       {notice.body}
                       {notice.noticeType === "draft_auto_picked" ? <InfoTip term="queue" className="ml-1" /> : null}
                     </p>
-                    {/* Fix round 1, FIX 7: an operator's own words, laid out as a real
-                        quotation rather than folded into `body`'s own sentence. */}
+                    {/* Fix round 1, FIX 7, as corrected: the author-facing PHRASE the stored
+                        reason maps to (`quoteFor`), laid out as a real quotation rather than
+                        folded into `body`'s own sentence. Never the stored token. */}
                     {quote === null ? null : (
-                      <blockquote className="border-l-2 border-border pl-3 text-sm italic text-text-muted">{`"${quote}"`}</blockquote>
+                      <blockquote className="break-words border-l-2 border-border pl-3 text-sm italic text-text-muted">{`"${quote}"`}</blockquote>
                     )}
                   </li>
                 );

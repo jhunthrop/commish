@@ -3,6 +3,7 @@ import type { Db } from "@/db/client";
 import { users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { User } from "@/domain/user";
+import { stripHiddenCharacters } from "@/identity/display-name";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 
 /** The subset of the WorkOS User object this module needs — kept narrow so it's easy to fake in tests. */
@@ -14,17 +15,40 @@ export interface WorkOSUserLike {
   readonly profilePictureUrl?: string | null;
 }
 
+/**
+ * Which door this sync came through, recorded on the `session_started` event.
+ *
+ * A PARAMETER, not a literal, and that is the whole point. It used to be the hardcoded string
+ * `"callback"`, which is true of one of the two callers and false of the other: `getCurrentUser`
+ * calls this as a lazy backfill for a session whose local row is missing, which is not the
+ * AuthKit callback and does not happen at sign-in time. A field that is constant carries no
+ * information; a field that is constant AND wrong on one path is worse than an absent one,
+ * because the record is append-only and nothing may ever repair it.
+ */
+export type SessionEntry = "callback" | "session_backfill";
+
 interface Deps {
   readonly db: Db;
   readonly clock: Clock;
+  /** Which caller this is. See `SessionEntry`. */
+  readonly via: SessionEntry;
   /** Defaults to the process-wide logger (`getAuditLogger()`), the same way every other writer here defaults its collaborators. */
   readonly audit?: AuditLogger;
 }
 
+/**
+ * The name a new account starts with, taken from the identity provider.
+ *
+ * STRIPPED, not refused. Every other door a display name comes through is a person typing into a
+ * form, where `isPrintableDisplayName` refuses and the person fixes it. This one is a sign-in: the
+ * value arrives from WorkOS with the session, the person may not know a zero-width joiner is in
+ * their provider profile at all, and refusing here would refuse them the product. Removing an
+ * invisible character changes nothing they could see. See `stripHiddenCharacters`' own docblock.
+ */
 export function displayNameFrom(u: Pick<WorkOSUserLike, "firstName" | "lastName" | "email">): string {
   const parts = [u.firstName, u.lastName].filter((p): p is string => typeof p === "string" && p.trim().length > 0);
-  if (parts.length > 0) return parts.join(" ");
-  return u.email.split("@")[0] ?? u.email;
+  if (parts.length > 0) return stripHiddenCharacters(parts.join(" "));
+  return stripHiddenCharacters(u.email.split("@")[0] ?? u.email);
 }
 
 type UserRow = Pick<typeof users.$inferSelect, "id" | "displayName" | "experienceTier" | "avatarUrl" | "createdAt">;
@@ -58,7 +82,7 @@ function toUser(row: UserRow): User {
  * someone else's account, which is worse than the bypassed rate limiter it would be defending
  * against. Plan B adds real device/IP signals, with the IP weight at zero.
  */
-export async function syncUserFromWorkOS({ db, clock, audit = getAuditLogger() }: Deps, wu: WorkOSUserLike): Promise<User> {
+export async function syncUserFromWorkOS({ db, clock, via, audit = getAuditLogger() }: Deps, wu: WorkOSUserLike): Promise<User> {
   const now = new Date(clock.now());
   return db.transaction(async (tx) => {
     const [row] = await tx
@@ -96,7 +120,7 @@ export async function syncUserFromWorkOS({ db, clock, audit = getAuditLogger() }
       actorId: row.id,
       actorType: "user",
       leagueId: null,
-      payload: { via: "callback", firstSignIn: row.firstSignIn },
+      payload: { via, firstSignIn: row.firstSignIn },
       occurredAt: clock.now(),
     });
 

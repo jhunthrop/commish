@@ -3,7 +3,7 @@ import type { Db } from "@/db/client";
 import { reviewReports, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
-import { notifyAffectedMember } from "@/integrity-service/notify";
+import { attachAuditEvent, notifyAffectedMember } from "@/integrity-service/notify";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { formatReviewCursor, type ReviewCursor } from "@/reviews/cursor";
 import type { MyReviewState, ReviewView, ReviewsPage } from "@/reviews/contract";
@@ -271,15 +271,18 @@ export type RemoveReviewResult =
  *
  * Task 7's second real sender: the `--reason` this script has always taken has been "author-
  * facing copy" since Phase 2 with nowhere for the author to read it. `notifyAffectedMember` joins
- * the same transaction as the stamp and the audit event — the operator's own words, quoted
- * verbatim, never paraphrased. The durable row is this task's whole delivery; a live nudge is
+ * the same transaction as the stamp and the audit event. What the author reads is not the
+ * stored `--reason` but the phrase it maps to (`removalPhraseFor`, applied at every render by
+ * `quoteFor`): the reason has been one of three platform-authored tokens since the script closed
+ * it to `REVIEW_CONFIG.reportReasons`, and "other" is not a sentence to show a person under the
+ * words "We removed your review". The durable row is this task's whole delivery; a live nudge is
  * moot here regardless (a removal has no league, and ruling 13 sends no frame for one anyway) —
  * the author's next inbox load is the honest delivery.
  *
  * `REVIEW_CONFIG.removalReason.maxLength` is enforced HERE, not only in the script's own
  * `parseArgs` — this function, not the CLI, is the actual boundary a future caller (an admin UI,
- * a different script) would hit, and `reason` is stored verbatim and quoted verbatim on a
- * member's own notice. Checked before the transaction opens, same "fail fast, no partial write"
+ * a different script) would hit, and `reason` is stored as given and rendered, through the
+ * mapper, on a member's own notice. Checked before the transaction opens, same "fail fast, no partial write"
  * shape as the two lookup failures below.
  */
 export async function removeReview(db: Db, input: RemoveReviewInput): Promise<RemoveReviewResult> {
@@ -300,6 +303,19 @@ export async function removeReview(db: Db, input: RemoveReviewInput): Promise<Re
       .returning({ id: reviews.id, userId: reviews.userId, removedByUserId: reviews.removedByUserId, removalReason: reviews.removalReason, removedAt: reviews.removedAt });
 
     if (row !== undefined && row.removedAt !== null && row.removedByUserId !== null && row.removalReason !== null) {
+      // The notice FIRST, the anchor LAST (ruling 3, as restated in `audit-logger.ts`): this
+      // insert takes an implicit `FOR KEY SHARE` on the author's `users` row, and a lock taken
+      // after the anchor is a lock taken in the wrong order whether or not anything competes for
+      // it today. `attachAuditEvent` then stamps the event id in a statement that touches only
+      // `member_notices` and only a column with no foreign key on it.
+      const notice = await notify(tx, {
+        leagueId: null,
+        userId: row.userId,
+        noticeType: "review_removed",
+        context: { reason: row.removalReason },
+        occurredAt: clock.now(),
+        auditEventId: null,
+      });
       const event = await audit.record(tx, {
         eventType: "review_removed",
         actorId: row.removedByUserId,
@@ -308,14 +324,7 @@ export async function removeReview(db: Db, input: RemoveReviewInput): Promise<Re
         payload: { reviewId: row.id, authorUserId: row.userId, reason: row.removalReason },
         occurredAt: clock.now(),
       });
-      await notify(tx, {
-        leagueId: null,
-        userId: row.userId,
-        noticeType: "review_removed",
-        context: { reason: row.removalReason },
-        occurredAt: clock.now(),
-        auditEventId: event.eventId,
-      });
+      await attachAuditEvent(tx, notice, event.eventId);
       return {
         ok: true,
         record: {

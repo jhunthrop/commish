@@ -24,12 +24,16 @@ function ActivityRowItem({ row }: { readonly row: ActivityRow }) {
   return (
     <li className="flex items-start gap-3 border-b border-border py-4 last:border-b-0">
       <Icon name={row.icon} size={20} className="mt-0.5 shrink-0 text-text-muted" />
-      <div className="flex flex-col gap-0.5">
-        <p className="text-md text-text-primary">
+      {/* `min-w-0` on the flex item plus `break-words` on the text: a headline carries user
+          content (a league name, a manager's name, a team name) that can be one long unbroken
+          run with nowhere to wrap, and a flex item will not shrink below its min-content width
+          without this. Same pair, same reason, as `HomeLeagueCard`'s heading. */}
+      <div className="flex min-w-0 flex-col gap-0.5">
+        <p className="text-md break-words text-text-primary">
           {row.headline}
           {isQueueAutopick ? <InfoTip term="queue" className="ml-1" /> : null}
         </p>
-        {row.detail === null ? null : <p className="text-sm text-text-muted">{row.detail}</p>}
+        {row.detail === null ? null : <p className="break-words text-sm text-text-muted">{row.detail}</p>}
         <time dateTime={row.occurredAt} className="text-xs text-text-muted">
           {formatOccurredAt(row.occurredAt)}
         </time>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { isPrintableDisplayName } from "./display-name";
+import { isPrintableDisplayName, stripHiddenCharacters } from "./display-name";
 
 /** Built from code points so this file, too, contains no invisible characters. */
 const ch = (code: number): string => String.fromCharCode(code);
@@ -39,5 +39,35 @@ describe("isPrintableDisplayName", () => {
 
   it("leaves an ordinary space alone — the ban is on the invisible, not the empty", () => {
     expect(isPrintableDisplayName("Ada Lovelace Jr")).toBe(true);
+  });
+});
+
+describe("stripHiddenCharacters", () => {
+  it("returns an ordinary name completely untouched, in any script", () => {
+    for (const name of ["Ada Lovelace", "Renée O'Brien-Smith", "山田 太郎", "Иван", "محمد", "Coach 🏈"]) {
+      expect(stripHiddenCharacters(name)).toBe(name);
+    }
+  });
+
+  it("removes every character the printable rule refuses, and only those", () => {
+    expect(stripHiddenCharacters(`Ada${ch(0x00)}Lovelace`)).toBe("AdaLovelace");
+    expect(stripHiddenCharacters(`${ch(0x202e)}Sunday Money`)).toBe("Sunday Money");
+    expect(stripHiddenCharacters(`Commish${ch(0x200b)} Support`)).toBe("Commish Support");
+    expect(stripHiddenCharacters(`${ch(0xfeff)}Ada${ch(0x2060)}Lovelace${ch(0x2069)}`)).toBe("AdaLovelace");
+  });
+
+  it("removes EVERY occurrence, not just the first — the regex is global", () => {
+    // A one-shot regex would leave the second override in place, which for a bidi control is the
+    // whole attack: the pair is what reverses a run of text rather than the single opener.
+    const doubled = `${ch(0x202e)}Sunday${ch(0x202e)} Money${ch(0x202e)}`;
+    expect(stripHiddenCharacters(doubled)).toBe("Sunday Money");
+  });
+
+  it("leaves behind a string the printable rule then accepts, which is the contract", () => {
+    // The two functions are one rule stated twice; a value that survives the strip must pass the
+    // check, or the boundary and the belt would disagree about what "printable" means.
+    for (const hostile of [`${ch(0x202e)}abc`, `a${ch(0x0a)}b`, `${ch(0x200d)}${ch(0xfeff)}x`]) {
+      expect(isPrintableDisplayName(stripHiddenCharacters(hostile))).toBe(true);
+    }
   });
 });
