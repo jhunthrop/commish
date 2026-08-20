@@ -35,6 +35,30 @@ const FALLBACK_MEMBER = "A former member";
 const FALLBACK_PLAYER = "A player who is no longer listed";
 const FALLBACK_TEAM = "A team that's no longer in the league";
 
+interface NameRow {
+  readonly id: string;
+  readonly name: string;
+}
+
+/**
+ * Turns the three batched lookups' results into the `ActivityNames` a page's rows render
+ * through. Exported and pure — decoupled from the query above — so the null-actor branch of
+ * `member` (the shape a future system-attributed renderer, e.g. a `system_action` template that
+ * names who it acted on, would call it with) is directly testable without first routing a real
+ * event through `listLeagueActivity`; today's renderers never pass `member` a null id, but the
+ * `ActivityNames` interface's own signature commits to handling one.
+ */
+export function buildActivityNames(memberRows: readonly NameRow[], playerRows: readonly NameRow[], teamRows: readonly NameRow[]): ActivityNames {
+  const memberNameById = new Map(memberRows.map((row) => [row.id, row.name]));
+  const playerNameById = new Map(playerRows.map((row) => [row.id, row.name]));
+  const teamNameById = new Map(teamRows.map((row) => [row.id, row.name]));
+  return {
+    member: (userId) => (userId === null ? FALLBACK_MEMBER : (memberNameById.get(userId) ?? FALLBACK_MEMBER)),
+    player: (playerId) => playerNameById.get(playerId) ?? FALLBACK_PLAYER,
+    team: (teamId) => teamNameById.get(teamId) ?? FALLBACK_TEAM,
+  };
+}
+
 /** The distinct, non-null values of one string payload field across a page of events — the input
  *  every batched name lookup below needs, and nothing more (never a per-row query). */
 function distinctPayloadValues(events: readonly AuditEvent[], key: string): readonly string[] {
@@ -75,20 +99,12 @@ export async function listLeagueActivity(db: Db, { leagueId, viewerUserId, befor
   const teamIds = distinctPayloadValues(events, "teamId");
 
   const [memberRows, playerRows, teamRows] = await Promise.all([
-    actorIds.length === 0 ? [] : db.select({ id: users.id, displayName: users.displayName }).from(users).where(inArray(users.id, actorIds)),
+    actorIds.length === 0 ? [] : db.select({ id: users.id, name: users.displayName }).from(users).where(inArray(users.id, actorIds)),
     playerIds.length === 0 ? [] : db.select({ id: players.id, name: players.name }).from(players).where(inArray(players.id, playerIds)),
     teamIds.length === 0 ? [] : db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, teamIds)),
   ]);
 
-  const memberNameById = new Map(memberRows.map((row) => [row.id, row.displayName]));
-  const playerNameById = new Map(playerRows.map((row) => [row.id, row.name]));
-  const teamNameById = new Map(teamRows.map((row) => [row.id, row.name]));
-
-  const names: ActivityNames = {
-    member: (userId) => (userId === null ? FALLBACK_MEMBER : (memberNameById.get(userId) ?? FALLBACK_MEMBER)),
-    player: (playerId) => playerNameById.get(playerId) ?? FALLBACK_PLAYER,
-    team: (teamId) => teamNameById.get(teamId) ?? FALLBACK_TEAM,
-  };
+  const names = buildActivityNames(memberRows, playerRows, teamRows);
 
   const visibleRows: ActivityRow[] = [];
   for (const activityEvent of events) {

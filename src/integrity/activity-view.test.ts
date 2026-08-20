@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { AUDIT_EVENT_TYPES, type AuditEvent, type AuditEventType, type JsonObject } from "@/domain/audit";
-import { ACTIVITY_VISIBILITY, activityRowFor } from "./activity-view";
+import { ACTIVITY_VISIBILITY, activityRowFor, type ActivityVisibility } from "./activity-view";
 
 const names = {
   member: (id: string | null) => (id === "user_alice" ? "Alice" : id === "user_bob" ? "Bob" : "A former member"),
@@ -137,5 +137,70 @@ describe("activityRowFor", () => {
       const row = activityRowFor(sample, viewer, names);
       expect(`${row?.headline ?? ""} ${row?.detail ?? ""}`).not.toMatch(/[—–]/);
     }
+  });
+});
+
+describe("activityRowFor — deny paths", () => {
+  it("denies a type nobody assigned a value to, the same as an explicitly hidden one", () => {
+    // A cast, not a real member of AuditEventType: this is the shape a future migration's type
+    // would take in a process that hasn't reloaded the union yet. `ACTIVITY_VISIBILITY[type]`
+    // reads back `undefined` for it, and `undefined` must deny exactly like `"hidden"` does.
+    const fabricated = "future_event_type" as unknown as AuditEventType;
+    expect(activityRowFor(event(fabricated, {}, null), viewer, names)).toBeNull();
+  });
+
+  it("denies a type its own renderer switch does not handle, even if ACTIVITY_VISIBILITY were somehow made to call it visible", () => {
+    // The second, redundant layer the module's docblock argues for: a rolling deploy where
+    // ACTIVITY_VISIBILITY has already been updated for a new type but this process's renderer
+    // switch has not caught up. That gap cannot be constructed through the public API alone (the
+    // first deny path above already closes it before the switch is ever reached), so this test
+    // pokes the exported map directly — legal because `Readonly<...>` is a compile-time
+    // annotation, not `Object.freeze` — to prove the switch's own `default` genuinely denies
+    // rather than throwing or rendering a guess.
+    const mutable = ACTIVITY_VISIBILITY as unknown as Record<string, ActivityVisibility>;
+    const fabricated = "future_event_type" as unknown as AuditEventType;
+    mutable[fabricated] = "everyone";
+    try {
+      expect(activityRowFor(event(fabricated, {}, null), viewer, names)).toBeNull();
+    } finally {
+      delete mutable[fabricated];
+    }
+  });
+
+  it("denies a league_created event with no name to put in the headline", () => {
+    expect(activityRowFor(event("league_created", { teamCount: 10 }, "user_alice"), viewer, names)).toBeNull();
+  });
+
+  it("omits the team-count detail, without denying the row, when league_created carries no team count", () => {
+    expect(activityRowFor(event("league_created", { name: "Sunday Money" }, "user_alice"), viewer, names)).toMatchObject({ detail: null });
+  });
+
+  it("denies a draft_pick missing only the round", () => {
+    expect(activityRowFor(event("draft_pick", { playerId: "player_1", pickNumber: 24 }, "user_alice"), viewer, names)).toBeNull();
+  });
+
+  it("denies a draft_pick missing only the pick number", () => {
+    expect(activityRowFor(event("draft_pick", { playerId: "player_1", round: 2 }, "user_alice"), viewer, names)).toBeNull();
+  });
+
+  it("denies a clock-made draft_pick with no team to attribute it to", () => {
+    // playerId/round/pickNumber are all present; only the system-attribution path's own required
+    // field (teamId) is missing, so this exercises a different branch than the "no actor" test above.
+    expect(activityRowFor(event("draft_pick", { playerId: "player_1", round: 2, pickNumber: 24 }, null), viewer, names)).toBeNull();
+  });
+
+  it("omits the count detail, without denying the row, when draft_completed carries no counts", () => {
+    expect(activityRowFor(event("draft_completed", { draftId: "d" }, null), viewer, names)).toMatchObject({
+      headline: "The draft is complete.",
+      detail: null,
+    });
+  });
+
+  it("omits the count detail when draft_completed has a pick count but no team count", () => {
+    expect(activityRowFor(event("draft_completed", { draftId: "d", picks: 120 }, null), viewer, names)).toMatchObject({ detail: null });
+  });
+
+  it("denies a lineup_change with no week number, even for the manager who made it", () => {
+    expect(activityRowFor(event("lineup_change", { teamId: "team_2", starters: [] }, "user_bob"), viewer, names)).toBeNull();
   });
 });
