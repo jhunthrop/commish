@@ -60,13 +60,15 @@ describe("ProfileForm", () => {
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
   });
 
-  it("saves avatarPreset: null over the wire when no preset has ever been chosen, and still succeeds", async () => {
-    // Mirrors identity-service/profile.test.ts's "leaves the WorkOS-supplied picture in place
-    // until a preset is chosen" — but proven through ProfileForm's actual PATCH body, not just
-    // the service call, since the decline-preserves-WorkOS-picture contract only holds end to
-    // end if the form sends `null` rather than, say, omitting the field or sending a stale key.
+  it("sends ONLY the changed field, so a stale tab cannot resurrect the others", async () => {
+    // H4's client half. `updateProfile` has no version guard, so whatever this body carries is
+    // written — a full-row body from a tab that loaded before someone else's rename puts the old
+    // name back. Renaming here must produce a body with `displayName` and NOTHING else; the
+    // decline-preserves-the-WorkOS-picture contract now holds by OMITTING `avatarPreset`
+    // (`updateProfile` treats absent and null identically, see its SPARSE note) rather than by
+    // sending a null the service has to interpret.
     const bodies: unknown[] = [];
-    const fixture = fixtureAccountDeps({ ok: true, data: PROFILE });
+    const fixture = fixtureAccountDeps({ ok: true, data: { ...PROFILE, displayName: "Ada B." } });
     fixture.deps = {
       ...fixture.deps,
       fetchJson: async (url, init) => {
@@ -78,12 +80,45 @@ describe("ProfileForm", () => {
     fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Ada B." } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(bodies).toHaveLength(1));
-    expect(bodies[0]).toEqual({
-      url: "/api/profile",
-      body: { displayName: "Ada B.", experienceTier: "beginner", avatarPreset: null },
-    });
+    expect(bodies[0]).toEqual({ url: "/api/profile", body: { displayName: "Ada B." } });
     await waitFor(() => expect(refresh).toHaveBeenCalled());
     expect(await screen.findByText("Saved.")).toBeInTheDocument();
+  });
+
+  it("sends only avatarPreset for an avatar-only save", async () => {
+    const bodies: unknown[] = [];
+    const fixture = fixtureAccountDeps({ ok: true, data: { ...PROFILE, avatarPreset: "shield", avatar: "preset:shield" } });
+    fixture.deps = {
+      ...fixture.deps,
+      fetchJson: async (url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return { json: async () => fixture.response } as unknown as Response;
+      },
+    };
+    renderInAccount(<ProfileForm profile={PROFILE} />, fixture.deps);
+    fireEvent.click(screen.getByRole("radio", { name: "Shield" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(bodies).toEqual([{ avatarPreset: "shield" }]));
+  });
+
+  it("re-baselines after a save, so a second Save sends nothing and asks for nothing", async () => {
+    const bodies: unknown[] = [];
+    const fixture = fixtureAccountDeps({ ok: true, data: { ...PROFILE, displayName: "Ada B." } });
+    fixture.deps = {
+      ...fixture.deps,
+      fetchJson: async (_url, init) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return { json: async () => fixture.response } as unknown as Response;
+      },
+    };
+    renderInAccount(<ProfileForm profile={PROFILE} />, fixture.deps);
+    fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Ada B." } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    expect(await screen.findByText("Nothing changed yet.")).toBeInTheDocument();
+    expect(bodies).toHaveLength(1);
   });
 
   it("shows the server's reason without losing what was typed", async () => {
@@ -99,6 +134,8 @@ describe("ProfileForm", () => {
     const fixture = fixtureAccountDeps();
     fixture.deps = { ...fixture.deps, fetchJson: () => new Promise(() => {}) };
     renderInAccount(<ProfileForm profile={PROFILE} />, fixture.deps);
+    // Something has to be dirty for a request to exist at all — a clean form sends nothing.
+    fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Ada B." } });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Save" })).toBeDisabled());
   });

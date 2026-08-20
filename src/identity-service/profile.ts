@@ -16,9 +16,12 @@ import type { ProfileBody } from "@/account-room/contract";
  */
 export interface UpdateProfileParams {
   readonly userId: string;
-  readonly displayName: string;
-  readonly experienceTier: ExperienceTier;
-  readonly avatarPreset: AvatarPresetKey | null;
+  /** Omit to leave the stored name alone — see `updateProfile`'s SPARSE note. */
+  readonly displayName?: string;
+  /** Omit to leave the stored tier alone. */
+  readonly experienceTier?: ExperienceTier;
+  /** A preset key to choose one; `null` or omitted both leave `avatar_url` alone. */
+  readonly avatarPreset?: AvatarPresetKey | null;
 }
 
 type ProfileRow = Pick<typeof users.$inferSelect, "displayName" | "experienceTier" | "avatarUrl">;
@@ -64,20 +67,32 @@ export async function readProfile(db: Db, userId: string): Promise<ProfileBody |
  * matters for a caller that defeats the type system on purpose (a `@ts-expect-error`, or plain
  * JS), the same case `profile.test.ts`'s "never lets a profile write set an arbitrary avatar
  * value" case exercises: it fails loudly rather than silently writing whatever slipped through.
+ *
+ * SPARSE: this writes only the fields the caller actually sent. There is no version column and
+ * no `updated_at` precondition on `users`, so a full-row write from a tab that loaded before
+ * somebody else's change resurrects every field it is holding — the resurrection vector
+ * `syncUserFromWorkOS` was wrongly suspected of. Sending only what changed removes the vector
+ * for every pair of writers except two tabs editing the SAME field, where last write wins is
+ * the honest answer anyway. A PATCH that names no writable field at all changes nothing and
+ * reads the row back (`updateProfileSchema`'s `refine` already refuses the empty body at the
+ * boundary; this is what keeps the service itself from handing Drizzle an empty `SET`).
  */
 export async function updateProfile(db: Db, input: UpdateProfileParams): Promise<ProfileBody> {
-  if (input.avatarPreset !== null && presetByKey(input.avatarPreset) === undefined) {
+  if (input.avatarPreset !== null && input.avatarPreset !== undefined && presetByKey(input.avatarPreset) === undefined) {
     throw new Error(`Unknown avatar preset: ${input.avatarPreset}`);
   }
-  const [row] = await db
-    .update(users)
-    .set({
-      displayName: input.displayName,
-      experienceTier: input.experienceTier,
-      avatarUrl: input.avatarPreset === null ? undefined : avatarRefValue(input.avatarPreset),
-    })
-    .where(eq(users.id, input.userId))
-    .returning();
+  const changes = {
+    displayName: input.displayName,
+    experienceTier: input.experienceTier,
+    avatarUrl: input.avatarPreset === null || input.avatarPreset === undefined ? undefined : avatarRefValue(input.avatarPreset),
+  };
+  if (Object.values(changes).every((value) => value === undefined)) {
+    const profile = await readProfile(db, input.userId);
+    if (profile === null) throw new Error(`No user row for id ${input.userId}.`);
+    return profile;
+  }
+
+  const [row] = await db.update(users).set(changes).where(eq(users.id, input.userId)).returning();
   if (row === undefined) throw new Error(`No user row for id ${input.userId}.`);
   return toProfileBody(row);
 }

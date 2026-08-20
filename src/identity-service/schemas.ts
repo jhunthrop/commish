@@ -3,16 +3,31 @@ import { AVATAR_PRESETS, IDENTITY_CONFIG } from "@/identity";
 
 const PRESET_KEYS = AVATAR_PRESETS.map((preset) => preset.key) as [string, ...string[]];
 
-export const updateProfileSchema = z.object({
-  displayName: z
-    .string()
-    .trim()
-    .min(IDENTITY_CONFIG.displayName.minLength, "Your name needs at least 2 characters.")
-    .max(IDENTITY_CONFIG.displayName.maxLength, "Your name can be at most 40 characters."),
-  experienceTier: z.enum(["beginner", "experienced"]),
-  /** A preset KEY or null. Never a URL: see `updateProfile`'s docblock. */
-  avatarPreset: z.enum(PRESET_KEYS).nullable(),
-});
+/**
+ * SPARSE: every field optional, at least one required. A profile PATCH says what CHANGED, not
+ * what the form happened to be holding — a tab left open before someone renamed themselves in
+ * another tab used to resurrect the old `displayName` and `experienceTier` on its next Save,
+ * because `updateProfile` is a blind `UPDATE ... SET` with no version guard. Omitting a field is
+ * how a caller declines to touch it, and `ProfileForm` sends only its dirty fields.
+ *
+ * The `refine` is what keeps "sparse" from meaning "empty": a PATCH that asks for nothing is a
+ * 400 naming the fields, not a silent success.
+ */
+export const updateProfileSchema = z
+  .object({
+    displayName: z
+      .string()
+      .trim()
+      .min(IDENTITY_CONFIG.displayName.minLength, "Your name needs at least 2 characters.")
+      .max(IDENTITY_CONFIG.displayName.maxLength, "Your name can be at most 40 characters.")
+      .optional(),
+    experienceTier: z.enum(["beginner", "experienced"]).optional(),
+    /** A preset KEY or null. Never a URL: see `updateProfile`'s docblock. */
+    avatarPreset: z.enum(PRESET_KEYS).nullable().optional(),
+  })
+  .refine((value) => Object.values(value).some((field) => field !== undefined), {
+    message: "Send at least one of displayName, experienceTier or avatarPreset.",
+  });
 
 export type UpdateProfileInput = z.infer<typeof updateProfileSchema>;
 

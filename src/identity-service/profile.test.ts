@@ -56,6 +56,36 @@ describe("updateProfile / readProfile", () => {
     expect(saved.avatar).toBe("https://workoscdn.com/u/abc.png");
   });
 
+  // H4, the real resurrection vector: two tabs, both loaded before either saved. Tab A renames
+  // the user; tab B — which still holds the OLD name in its React state — saves an avatar. Under
+  // the old full-row PATCH, tab B's body carried the stale `displayName` and `experienceTier` and
+  // put both back. The sparse body carries neither, so tab A's rename survives.
+  it("an avatar-only save from a stale tab leaves a concurrently-changed display name intact", async () => {
+    await seedUser(db, { id: "u1", displayName: "Ada Lovelace" });
+
+    // Both tabs load. (Their shared starting point: the row seeded above.)
+    // Tab A saves a rename and a tier change.
+    await updateProfile(db, { userId: "u1", displayName: "Ada Byron", experienceTier: "experienced" });
+
+    // Tab B, still holding "Ada Lovelace"/"beginner" in its own state, saves ONLY its avatar —
+    // which is exactly what `ProfileForm`'s `dirtyFields` now puts on the wire.
+    const afterStaleSave = await updateProfile(db, { userId: "u1", avatarPreset: "shield" });
+
+    expect(afterStaleSave).toEqual({
+      displayName: "Ada Byron",
+      experienceTier: "experienced",
+      avatarPreset: "shield",
+      avatar: "preset:shield",
+    });
+    expect(await readProfile(db, "u1")).toEqual(afterStaleSave);
+  });
+
+  it("changes nothing and reads the row back when the caller names no writable field", async () => {
+    await seedUser(db, { id: "u1", displayName: "Ada Lovelace" });
+    const unchanged = await updateProfile(db, { userId: "u1", avatarPreset: null });
+    expect(unchanged).toEqual({ displayName: "Ada Lovelace", experienceTier: "beginner", avatarPreset: null, avatar: null });
+  });
+
   it("a later WorkOS sign-in does not clobber what the user chose", async () => {
     // user-sync.ts has always CLAIMED this. Nothing could test it before, because nothing could
     // edit. Now something can, so the claim gets an assertion.

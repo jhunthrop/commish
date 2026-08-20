@@ -14,6 +14,10 @@ export const dynamic = "force-dynamic";
  * The first write path this product has to who a signed-in user is. Rate-limited per user
  * (`profileRateLimited`) because it is authenticated, the same reasoning `advisorRateLimited`
  * uses — the user themselves is the right blast-radius unit, not their IP.
+ *
+ * SPARSE: the body says what CHANGED. Every field is optional and at least one is required
+ * (`updateProfileSchema`), and an absent field is forwarded as `undefined`, which
+ * `updateProfile` drops from the `SET` entirely rather than writing a stale value back.
  */
 export async function PATCH(request: Request) {
   return withCurrentUser(request, async (userId, req) => {
@@ -31,7 +35,7 @@ export async function PATCH(request: Request) {
       // (`PRESET_KEYS`, `@/identity-service/schemas`), but its Zod-inferred type widens to plain
       // `string` — see `UpdateProfileParams`'s own docblock in `@/identity-service/profile` for
       // why that widening exists and why this narrowing cast is the one place it gets undone.
-      avatarPreset: parsed.value.avatarPreset as AvatarPresetKey | null,
+      avatarPreset: parsed.value.avatarPreset as AvatarPresetKey | null | undefined,
     };
     const profile = await updateProfile(getDb(), params);
     return ok<ProfileBody>(profile);

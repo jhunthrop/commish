@@ -91,4 +91,25 @@ describe("PATCH /api/profile", () => {
       data: { displayName: "Ada Lovelace", experienceTier: "experienced", avatarPreset: "shield", avatar: "preset:shield" },
     });
   });
+
+  it("answers 400 for a body that asks for nothing", async () => {
+    await db.insert(users).values({ id: "u1", email: "u1@test.local", displayName: "u1" });
+    signedInAs("u1");
+    const response = await PATCH(patch({}));
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { readonly ok: false; readonly error: string };
+    expect(body.error).toContain("Send at least one of displayName, experienceTier or avatarPreset.");
+  });
+
+  it("writes only the field a sparse body names and leaves the rest of the row alone", async () => {
+    await db.insert(users).values({ id: "u1", email: "u1@test.local", displayName: "u1" });
+    signedInAs("u1");
+    await PATCH(patch(VALID_BODY));
+
+    const response = await PATCH(patch({ avatarPreset: "flame" }));
+    expect(await response.json()).toEqual({
+      ok: true,
+      data: { displayName: "Ada Lovelace", experienceTier: "experienced", avatarPreset: "flame", avatar: "preset:flame" },
+    });
+  });
 });
