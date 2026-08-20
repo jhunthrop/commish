@@ -202,7 +202,13 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
             {detail.resolution !== null ? (
               <ResolutionSummary resolution={detail.resolution} />
             ) : (
-              <ResolutionForm flagId={detail.flagId} decisions={decisions} noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength} previews={previews} />
+              <ResolutionForm
+                flagId={detail.flagId}
+                decisions={decisions}
+                noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength}
+                previews={previews}
+                isChatSubject={detail.subject.kind === "chat_message"}
+              />
             )}
           </Card>
         </main>

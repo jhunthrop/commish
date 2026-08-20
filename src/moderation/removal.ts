@@ -27,13 +27,25 @@ export function isRemovalReason(value: string): value is ModerationReasonValue {
 }
 
 /**
- * The sentence fragment a removed author reads. A stored value outside the closed set falls back
- * to the generic phrase rather than being printed raw: rows written before the operator script
- * constrained `--reason`, or by hand in SQL, must not put an operator's private wording into a
- * sentence on a member's own profile.
+ * The sentence fragment a removed review's author reads. A stored value outside the closed set
+ * falls back to the generic phrase rather than being printed raw: rows written before the
+ * operator script constrained `--reason`, or by hand in SQL, must not put an operator's private
+ * wording into a sentence on a member's own profile.
  */
 export function removalPhraseFor(storedReason: string | null): string {
   return MODERATION_CONFIG.reasons.find((reason) => reason.value === storedReason)?.removalPhrase ?? "breaking the review rules";
+}
+
+/**
+ * `removalPhraseFor`'s exact twin, reading `chatRemovalPhrase` instead — what a removed CHAT
+ * message's author (and, from Task 6, the operator's own preview of that notice) reads. Fix
+ * round 1: `removalPhraseFor`'s generic fallback ("breaking the review rules") was leaking into
+ * chat's own removal notice and, before the same round's other fix, the room-visible tombstone —
+ * reviews-domain copy in a chat surface. Every caller that renders a `chat_message_removed`
+ * reason (or previews one before it's sent) calls this, never `removalPhraseFor`.
+ */
+export function chatRemovalPhraseFor(storedReason: string | null): string {
+  return MODERATION_CONFIG.reasons.find((reason) => reason.value === storedReason)?.chatRemovalPhrase ?? "breaking the chat rules";
 }
 
 /**

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { CHAT_CONFIG } from "@/chat/config";
-import { removalPhraseFor } from "@/moderation/removal";
+import { chatRemovalPhraseFor } from "@/moderation/removal";
 import type { Db } from "@/db/client";
 import { chatMessages, chatReactions, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
@@ -172,7 +172,7 @@ describe("listMessages", () => {
       expect(message!.gif).toBeNull();
       expect(message!.authorUserId).toBe("u1");
       expect(message!.authorName).toBe("Bay Bandits");
-      expect(message!.removal).toEqual({ at: "2026-08-20T00:00:00.000Z", phrase: removalPhraseFor("spam") });
+      expect(message!.removal).toEqual({ at: "2026-08-20T00:00:00.000Z", phrase: chatRemovalPhraseFor("spam") });
     });
 
     it("withholds a removed GIF message's url too — the stamp covers it by construction", async () => {

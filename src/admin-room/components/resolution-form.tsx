@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
-import { removalPhraseFor } from "@/moderation/removal";
+import { chatRemovalPhraseFor, removalPhraseFor } from "@/moderation/removal";
 import { Button, Textarea } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { ResolutionDecision } from "@/integrity/flags";
@@ -36,6 +36,15 @@ export interface ResolutionFormProps {
    *  boundary via props, not via import" shape `previews` already uses. */
   readonly noteMaxLength: number;
   readonly previews: Readonly<Partial<Record<ResolutionDecision, DecisionPreview>>>;
+  /**
+   * Fix round 1: which mapper `ContentRemovedPreview` runs the operator's note through — `chat_
+   * message_removed` and `review_removed` fall back to two DIFFERENT generic phrases ("breaking
+   * the chat rules" vs "breaking the review rules"), so previewing the wrong one would show the
+   * operator words the member will never actually read. A plain boolean, not the subject's own
+   * type, because a function prop cannot cross the Server-to-Client boundary this form is handed
+   * across (`@/integrity`'s `FlagSubjectView` stays a page-only import).
+   */
+  readonly isChatSubject: boolean;
 }
 
 /**
@@ -67,15 +76,17 @@ function NoActionPreview() {
 }
 
 /**
- * The exact words a `content_removed` decision sends. `removalPhraseFor` (`@/moderation/removal`)
- * is the same mapper `notify.ts`'s own `quoteFor` runs the stored reason through at render — an
- * operator's own free-text note is NOT one of the three platform-authored tokens that mapper
- * recognizes, so it falls back to the generic phrase every time. Shown here rather than hidden,
- * because an operator who thinks their words are about to be quoted verbatim is about to be
- * surprised by the real notice, and this is the moment to say so.
+ * The exact words a `content_removed` decision sends. `removalPhraseFor`/`chatRemovalPhraseFor`
+ * (`@/moderation/removal`) are the same two mappers `notify.ts`'s own `quoteFor` runs the stored
+ * reason through at render, picked by `isChatSubject` — an operator's own free-text note is NOT
+ * one of the three platform-authored tokens either mapper recognizes, so it falls back to the
+ * generic phrase every time, and the two domains' generic phrases differ (fix round 1). Shown
+ * here rather than hidden, because an operator who thinks their words are about to be quoted
+ * verbatim is about to be surprised by the real notice, and this is the moment to say so.
  */
-function ContentRemovedPreview({ preview, note }: { readonly preview: DecisionPreview; readonly note: string }) {
-  const phrase = removalPhraseFor(note.length === 0 ? null : note);
+function ContentRemovedPreview({ preview, note, isChatSubject }: { readonly preview: DecisionPreview; readonly note: string; readonly isChatSubject: boolean }) {
+  const reason = note.length === 0 ? null : note;
+  const phrase = isChatSubject ? chatRemovalPhraseFor(reason) : removalPhraseFor(reason);
   return (
     <div className="flex flex-col gap-2">
       <p className="text-sm font-medium text-text-primary">{preview.title}</p>
@@ -112,7 +123,7 @@ function WarnedUserPreview({ preview, note }: { readonly preview: DecisionPrevie
  * resolved) reads as an error, same as any other failure, because a second decision on the same
  * flag is a new flag, not a correction to this one (`resolveFlag`'s own docblock).
  */
-export function ResolutionForm({ flagId, decisions, noteMaxLength, previews }: ResolutionFormProps) {
+export function ResolutionForm({ flagId, decisions, noteMaxLength, previews, isChatSubject }: ResolutionFormProps) {
   const { fetchJson } = useAdminRoomDeps();
   const router = useRouter();
   const legendId = useId();
@@ -194,7 +205,7 @@ export function ResolutionForm({ flagId, decisions, noteMaxLength, previews }: R
         {decision === "no_action" ? (
           <NoActionPreview />
         ) : decision === "content_removed" && preview != null ? (
-          <ContentRemovedPreview preview={preview} note={note} />
+          <ContentRemovedPreview preview={preview} note={note} isChatSubject={isChatSubject} />
         ) : decision === "warned_user" && preview != null ? (
           <WarnedUserPreview preview={preview} note={note} />
         ) : (

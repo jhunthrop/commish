@@ -27,11 +27,22 @@ export interface ChatGif {
  * Null for a message that stands. Populated for one that an operator removed, and the message
  * still renders: a removed review vanishes from its feed, but a conversation with a hole in it is
  * a conversation everybody misreads, and the members who saw it already know it existed (ruling
- * 18). `phrase` is `removalPhraseFor(reason)` (`@/moderation/removal`) resolved SERVER-SIDE, so
- * the closed vocabulary reaches the browser as words rather than as a token the client would have
- * to map — the mapping lives in `src/moderation/**` and every consumer calls it there, not one
- * each. There is no `removedByUserId` here: which operator removed a message is an operator fact,
- * not a member-facing one (see `chat_messages`' own docblock in `src/db/schema.ts`).
+ * 18). `phrase` is `chatRemovalPhraseFor(reason)` (`@/moderation/removal`) resolved SERVER-SIDE,
+ * the chat-domain twin of `removalPhraseFor` reviews' own surfaces use (fix round 1: the shared
+ * mapper's generic fallback was reviews-domain copy, "breaking the review rules", leaking into
+ * chat).
+ *
+ * Fix round 1 (review adjudication, HIGH): `phrase` is carried on this type but deliberately
+ * NEVER RENDERED to the room — `RemovedMessage` (`@/chat-room/components/removed-message.tsx`)
+ * states only the neutral fact, "A message was removed." The reason reaches the author alone,
+ * through the notice's own private `quoteFor` blockquote, the identical private-disclosure shape
+ * `review_removed` already used. It stays on this type because the sticky-removal fold
+ * (`@/chat/messages.ts`) needs a non-null `removal` object to detect a stale, pre-removal frame,
+ * and a future author-facing surface reading their OWN removed message (none exists today) would
+ * need it too — but no shipped surface reads `.phrase` from a fetched/live `ChatMessageView`.
+ *
+ * There is no `removedByUserId` here: which operator removed a message is an operator fact, not
+ * a member-facing one (see `chat_messages`' own docblock in `src/db/schema.ts`).
  */
 export interface ChatMessageRemoval {
   readonly at: string;

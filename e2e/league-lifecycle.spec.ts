@@ -234,12 +234,24 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   await managerA.goto(`/app/leagues/${leagueId}`);
   await expect(operatorLog.getByText("A message was removed.")).toBeVisible({ timeout: 20_000 });
   await expect(operatorLog.getByText(reportable)).toHaveCount(0);
+  // Fix round 1 (review adjudication, HIGH): the room sees ONLY the neutral fact — never the
+  // removal reason. The operator's note above ("spam") maps to the closed vocabulary's own
+  // "spam or fake content" phrase (`chatRemovalPhraseFor`); that phrase must not appear anywhere
+  // in the room, even though the SAME phrase reaches the author privately, through their own
+  // notice, asserted below. Inverted assertion, the same shape the notice-privacy guards use.
+  await expect(operatorLog.getByText("spam or fake content")).toHaveCount(0);
 
-  // --- And the author's own inbox carries the notice ----------------------------------------
+  // --- And the author's own inbox carries the notice, WITH the reason, privately -----------
   await managerB.goto(`/app/leagues/${leagueId}`);
   await expect(async () => {
     await managerB.getByRole("button", { name: /^Notices/ }).click();
     await expect(managerB.getByRole("region", { name: "Notices" })).toBeVisible({ timeout: 3_000 });
   }).toPass({ timeout: 15_000 });
   await expect(managerB.getByText("We removed one of your messages").first()).toBeVisible();
+  // Founder decision #4 (fix round 1, panel HIGH): the notice says there is no appeal.
+  await expect(managerB.getByText("There is no reply to this message.").first()).toBeVisible();
+  // The private channel: the SAME phrase the room was never shown reaches the author here,
+  // through their own notice's blockquote (`quoteFor`) — confirming the reason moved, not
+  // vanished.
+  await expect(managerB.getByText(/spam or fake content/).first()).toBeVisible();
 });

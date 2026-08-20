@@ -114,9 +114,15 @@ describe("MessageList", () => {
       );
     });
 
-    it("states the reason in the closed vocabulary's own phrase, never a raw token", () => {
+    /**
+     * Fix round 1 (review adjudication, HIGH): the room sees only the neutral fact, never the
+     * removal reason — reviews' own precedent (private-notice-only) mirrored, not broadcast.
+     * Inverted from the original assertion, which asserted the phrase WAS visible; that was the
+     * finding.
+     */
+    it("never renders the removal reason to the room, even though the message carries it", () => {
       render(<MessageList leagueId="l1" messages={REMOVED} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
-      expect(screen.getByText(/spam or fake content/)).toBeInTheDocument();
+      expect(screen.queryByText(/spam or fake content/)).not.toBeInTheDocument();
     });
 
     it("offers no reactions on a removed message", () => {

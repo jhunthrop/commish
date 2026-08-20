@@ -517,7 +517,7 @@ describe("removeReview — notices", () => {
       readAt: null,
     });
     // The reason is stored on `context` as the token it is, and MAPPED at render — see `quoteFor`.
-    expect(notice!.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it.");
+    expect(notice!.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message.");
     expect(notice!.context).toEqual({ reason: "other" });
   });
 

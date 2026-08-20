@@ -5,7 +5,7 @@ import type { Db } from "@/db/client";
 import { chatMessages, chatReactions, teams, users } from "@/db/schema";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
-import { removalPhraseFor } from "@/moderation/removal";
+import { chatRemovalPhraseFor } from "@/moderation/removal";
 
 /**
  * Exported (Task 6): `@/chat-service/moderation`'s `removeChatMessageInTx` builds one of these
@@ -40,7 +40,7 @@ function toGifView(row: MessageRow): ChatGif | null {
 }
 
 function toRemoval(row: MessageRow): ChatMessageRemoval | null {
-  return row.removedAt === null ? null : { at: row.removedAt.toISOString(), phrase: removalPhraseFor(row.removalReason) };
+  return row.removedAt === null ? null : { at: row.removedAt.toISOString(), phrase: chatRemovalPhraseFor(row.removalReason) };
 }
 
 /**

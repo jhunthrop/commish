@@ -19,7 +19,7 @@ const PREVIEWS: Readonly<Record<"warned_user" | "content_removed", DecisionPrevi
   },
   content_removed: {
     title: "We removed your review",
-    body: "An operator removed your review. We keep your review on file exactly as you wrote it.",
+    body: "An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message.",
   },
 };
 
@@ -28,7 +28,7 @@ describe("ResolutionForm", () => {
     const fixture = fixtureAdminDeps();
     await inBothThemes(
       <AdminRoomDepsProvider deps={fixture.deps}>
-        <ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user"]} noteMaxLength={500} previews={PREVIEWS} />
+        <ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />
       </AdminRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByText(/will not be told/)).toBeInTheDocument();
@@ -39,7 +39,7 @@ describe("ResolutionForm", () => {
 
   it("previews the operator's own words verbatim for warned_user, live as they type", async () => {
     const fixture = fixtureAdminDeps();
-    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user"]} noteMaxLength={500} previews={PREVIEWS} />, fixture.deps);
+    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />, fixture.deps);
 
     fireEvent.click(screen.getByRole("radio", { name: "Warn the member" }));
     fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "Keep it civil." } });
@@ -50,7 +50,7 @@ describe("ResolutionForm", () => {
 
   it("previews the generic removal phrase for content_removed, not the operator's own words", async () => {
     const fixture = fixtureAdminDeps();
-    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["content_removed"]} noteMaxLength={500} previews={PREVIEWS} />, fixture.deps);
+    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["content_removed"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />, fixture.deps);
 
     fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "This is spam, obviously." } });
 
@@ -58,9 +58,27 @@ describe("ResolutionForm", () => {
     expect(screen.queryByText('"This is spam, obviously."')).not.toBeInTheDocument();
   });
 
+  /**
+   * Fix round 1 (review HIGH): the preview must show the phrase the CHAT author will actually
+   * read, not reviews' own copy — the two domains' generic fallback differs deliberately
+   * (`chatRemovalPhraseFor`, `@/moderation/removal`).
+   */
+  it("previews the CHAT-domain generic removal phrase for content_removed when the subject is a chat message", async () => {
+    const fixture = fixtureAdminDeps();
+    renderInAdmin(
+      <ResolutionForm flagId="flag_1" decisions={["content_removed"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject />,
+      fixture.deps,
+    );
+
+    fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "This is spam, obviously." } });
+
+    expect(screen.getByText('"breaking the chat rules"')).toBeInTheDocument();
+    expect(screen.queryByText('"breaking the review rules"')).not.toBeInTheDocument();
+  });
+
   it("submits the chosen decision and note, and shows the recorded state — no retry, no edit", async () => {
     const fixture = fixtureAdminDeps({ ok: true, data: { flagId: "flag_1", decision: "no_action" } });
-    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["no_action"]} noteMaxLength={500} previews={PREVIEWS} />, fixture.deps);
+    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["no_action"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />, fixture.deps);
 
     fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "Looked into it." } });
     fireEvent.click(screen.getByRole("button", { name: "Submit decision" }));
@@ -72,7 +90,7 @@ describe("ResolutionForm", () => {
 
   it("switches the note counter's cap with the decision — 200 for content_removed (REVIEW_CONFIG.removalReason.maxLength), 500 otherwise (fix round 1, FIX 4)", () => {
     const fixture = fixtureAdminDeps();
-    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["warned_user", "content_removed"]} noteMaxLength={500} previews={PREVIEWS} />, fixture.deps);
+    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["warned_user", "content_removed"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />, fixture.deps);
 
     // `warned_user` is `decisions[0]`, the form's default selection — the general 500 cap.
     expect(screen.getByText("500 characters left")).toBeInTheDocument();
@@ -87,7 +105,7 @@ describe("ResolutionForm", () => {
 
   it("re-derives the counter's cap from the switched decision even with text already typed", () => {
     const fixture = fixtureAdminDeps();
-    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["warned_user", "content_removed"]} noteMaxLength={500} previews={PREVIEWS} />, fixture.deps);
+    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["warned_user", "content_removed"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />, fixture.deps);
 
     fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "x".repeat(210) } });
     expect(screen.getByText("290 characters left")).toBeInTheDocument();
@@ -100,7 +118,7 @@ describe("ResolutionForm", () => {
   it("walks the primary resolve flow keyboard-only: choose a decision, write a note, submit (fix round 1, FIX 6)", async () => {
     const user = userEvent.setup();
     const fixture = fixtureAdminDeps({ ok: true, data: { flagId: "flag_1", decision: "warned_user" } });
-    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user"]} noteMaxLength={500} previews={PREVIEWS} />, fixture.deps);
+    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />, fixture.deps);
 
     // Tab lands on the checked (default-selected) radio — native roving-tabindex, one stop for
     // the whole group — then the arrow key, not a second Tab, moves within it and changes the
@@ -128,7 +146,7 @@ describe("ResolutionForm", () => {
 
   it("states the failure and lets the operator try again, without pretending it worked", async () => {
     const fixture = fixtureAdminDeps({ ok: false, error: "That flag was already resolved as \"no action\"." });
-    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["no_action"]} noteMaxLength={500} previews={PREVIEWS} />, fixture.deps);
+    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["no_action"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />, fixture.deps);
 
     fireEvent.click(screen.getByRole("button", { name: "Submit decision" }));
 

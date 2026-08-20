@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
-import { auditEvents, chatMessages, integrityFlags, leagues, reviewReports, reviews, users } from "@/db/schema";
+import { auditEvents, chatMessageReports, chatMessages, integrityFlags, leagues, reviewReports, reviews, users } from "@/db/schema";
 import type { AuditEvent, JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
@@ -739,18 +739,38 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
   return { kind: "trade", tradeId: subjectId };
 }
 
-/** Only `review_report` flags have reporters today: `review_reports` is the one insert-only
- *  signal table this plan reads back (ruling 5). Every other subject type answers empty — a
- *  platform detector or a future report table names its own reporters when it lands. */
+/**
+ * `review_report` and `chat_report` flags have reporters — `review_reports` and
+ * `chat_message_reports` are this plan's two insert-only signal tables (ruling 5). Every other
+ * subject type answers empty — a platform detector or a future report table names its own
+ * reporters when it lands.
+ *
+ * Fix round 1 (review HIGH): the `chat_report` branch was missing entirely — `chat_message_
+ * reports` was populated by `reportMessage` from the first commit but never read back here, so
+ * every chat flag's detail view showed zero reporters no matter how many people reported it.
+ * Shaped exactly like the review branch: reporters itemized individually, in report order, never
+ * aggregated into a count or a verdict — the operator reads who and why, not a tally.
+ */
 async function reportersFor(db: Db, subjectType: FlagSubjectType, subjectId: string): Promise<readonly ReporterView[]> {
-  if (subjectType !== "review") return [];
-  const rows = await db
-    .select({ userId: reviewReports.reporterUserId, name: users.displayName, reason: reviewReports.reason, reportedAt: reviewReports.createdAt })
-    .from(reviewReports)
-    .innerJoin(users, eq(users.id, reviewReports.reporterUserId))
-    .where(eq(reviewReports.reviewId, subjectId))
-    .orderBy(asc(reviewReports.createdAt));
-  return rows.map((row) => ({ userId: row.userId, name: row.name, reason: row.reason, reportedAt: row.reportedAt.toISOString() }));
+  if (subjectType === "review") {
+    const rows = await db
+      .select({ userId: reviewReports.reporterUserId, name: users.displayName, reason: reviewReports.reason, reportedAt: reviewReports.createdAt })
+      .from(reviewReports)
+      .innerJoin(users, eq(users.id, reviewReports.reporterUserId))
+      .where(eq(reviewReports.reviewId, subjectId))
+      .orderBy(asc(reviewReports.createdAt));
+    return rows.map((row) => ({ userId: row.userId, name: row.name, reason: row.reason, reportedAt: row.reportedAt.toISOString() }));
+  }
+  if (subjectType === "chat_message") {
+    const rows = await db
+      .select({ userId: chatMessageReports.reporterUserId, name: users.displayName, reason: chatMessageReports.reason, reportedAt: chatMessageReports.createdAt })
+      .from(chatMessageReports)
+      .innerJoin(users, eq(users.id, chatMessageReports.reporterUserId))
+      .where(eq(chatMessageReports.messageId, Number(subjectId)))
+      .orderBy(asc(chatMessageReports.createdAt));
+    return rows.map((row) => ({ userId: row.userId, name: row.name, reason: row.reason, reportedAt: row.reportedAt.toISOString() }));
+  }
+  return [];
 }
 
 /**

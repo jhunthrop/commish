@@ -85,10 +85,12 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   // author-facing phrase travels as its own field on the wire (`NoticeView.quote`, `GET
   // /api/notices`'s own `quoteFor`), rendered as a distinct blockquote rather than folded into
   // this sentence — a quotation embedded in a paragraph reads as this product's own voice, not
-  // a quote.
+  // a quote. Fix round 1 (panel HIGH): the last sentence is founder decision #4, the same one
+  // `operator_warning` already states — there is no appeal path, and a notice that stays silent
+  // about that invites a removed author to go looking for a reply channel that does not exist.
   review_removed: () => ({
     title: "We removed your review",
-    body: "An operator removed your review. We keep your review on file exactly as you wrote it.",
+    body: "An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message.",
   }),
   admin_granted: () => ({
     title: "You can now use the operator tools",
@@ -107,10 +109,12 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   // reason `review_removed`'s own `reason` is: its author-facing phrase travels as its own field
   // on the wire (`quoteFor`), rendered as a distinct blockquote. Unlike a removed review, the
   // room itself already shows that the message went (`RemovedMessage`, `@/chat-room/components`)
-  // — this notice tells the author what the room can see, not something new to them.
+  // — this notice tells the author what the room can see, not something new to them. Fix round 1
+  // (panel HIGH): the last sentence is the same founder decision #4 `operator_warning` and (this
+  // round) `review_removed` both state — there is no appeal path.
   chat_message_removed: ({ leagueName }) => ({
     title: "We removed one of your messages",
-    body: `An operator removed a message you posted in ${leagueName}. Your leaguemates can see that the message went and who posted it, and they can no longer read it. We keep your words on file exactly as you wrote them.`,
+    body: `An operator removed a message you posted in ${leagueName}. Your leaguemates can see that the message went and who posted it, and they can no longer read it. We keep your words on file exactly as you wrote them. There is no reply to this message.`,
   }),
 };
 

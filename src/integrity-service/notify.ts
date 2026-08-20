@@ -6,6 +6,7 @@ import { stripHiddenCharacters } from "@/identity/display-name";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { renderNotice, type NoticeContexts, type NoticeType } from "@/integrity/notices";
 import { removalPhraseFor } from "@/reviews/config";
+import { chatRemovalPhraseFor } from "@/moderation/removal";
 import type { PublishToUserFn } from "@/lib/realtime/publish";
 import { getPublisher } from "@/lib/realtime/publisher";
 
@@ -212,6 +213,12 @@ export async function listNotices(db: Db, userId: string): Promise<NoticesPage> 
  * payload readers use. Exported so the route and the page share one definition rather than two
  * copies agreeing by coincidence.
  *
+ * `chat_message_removed` (Task 6) reads the SAME `context.reason` shape but maps it through
+ * `chatRemovalPhraseFor` (`@/moderation/removal`) instead — the chat-domain twin, whose generic
+ * fallback is "breaking the chat rules" rather than reviews' "breaking the review rules" (fix
+ * round 1, review HIGH: the two notice types must never share one mapper, or a chat removal's
+ * catch-all reason reads in reviews' own words).
+ *
  * `operator_warning` (Task 3) is the second quoting type: `context.note` is the operator's OWN
  * words, not a stored token to map through a phrase table — it renders VERBATIM, which is the
  * whole reason `resolveFlag` bounds its length instead of its vocabulary. Same narrowing
@@ -228,9 +235,13 @@ export async function listNotices(db: Db, userId: string): Promise<NoticesPage> 
  * caller that skips it, reads clean anyway.
  */
 export function quoteFor(notice: MemberNotice): string | null {
-  if (notice.noticeType === "review_removed" || notice.noticeType === "chat_message_removed") {
+  if (notice.noticeType === "review_removed") {
     const reason = notice.context.reason;
     return typeof reason === "string" ? removalPhraseFor(reason) : null;
+  }
+  if (notice.noticeType === "chat_message_removed") {
+    const reason = notice.context.reason;
+    return typeof reason === "string" ? chatRemovalPhraseFor(reason) : null;
   }
   if (notice.noticeType === "operator_warning") {
     const note = notice.context.note;

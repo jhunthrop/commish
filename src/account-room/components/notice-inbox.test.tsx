@@ -130,7 +130,7 @@ describe("NoticeInbox", () => {
   // Fix round 1, FIX 7: an operator's own words render as a distinct blockquote, not folded
   // into the body's own sentence.
   it("renders a review-removal notice's quoted reason as its own blockquote", async () => {
-    const removal: NoticeView = { ...UNREAD, id: "n5", noticeType: "review_removed", title: "We removed your review", body: "An operator removed your review. We keep your review on file exactly as you wrote it.", quote: "off topic" };
+    const removal: NoticeView = { ...UNREAD, id: "n5", noticeType: "review_removed", title: "We removed your review", body: "An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message.", quote: "off topic" };
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [removal], unreadCount: 0 } });
     renderInAccount(<NoticeInbox />, fixture.deps);
     fireEvent.click(await screen.findByRole("button", { name: "Notices" }));

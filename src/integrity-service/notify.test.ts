@@ -6,6 +6,7 @@ import type { AuditEventInput } from "@/domain/audit";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { NOTICE_TEMPLATES } from "@/integrity/notices";
 import { REMOVAL_REASON_VALUES, removalPhraseFor } from "@/reviews/config";
+import { chatRemovalPhraseFor } from "@/moderation/removal";
 import type { PublishToUserFn } from "@/lib/realtime/publish";
 import { createAuditLogger } from "./audit-logger";
 import { deliverNotice, listNotices, markNoticesRead, notifyAffectedMember, quoteFor, type MemberNotice, type NotifyInput } from "./notify";
@@ -245,17 +246,31 @@ describe("quoteFor", () => {
     }
   });
 
-  /** The chat sibling of the test above — the SAME mapper, applied through the SAME branch. */
-  it("renders the AUTHOR-FACING PHRASE for a chat_message_removed notice too, never the token", () => {
+  /**
+   * The chat sibling of the test above — the SAME branch shape, but through `chatRemovalPhraseFor`
+   * (fix round 1), NOT `removalPhraseFor`: the two domains' generic fallback differs.
+   */
+  it("renders the AUTHOR-FACING PHRASE for a chat_message_removed notice too, through chat's OWN mapper, never the token", () => {
     for (const reason of REMOVAL_REASON_VALUES) {
       const notice: MemberNotice = {
         id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "chat_message_removed",
         title: "We removed one of your messages", body: "...", context: { leagueName: "Sunday Money", reason },
         auditEventId: "evt_1", createdAt: NOW, readAt: null,
       };
-      expect(quoteFor(notice)).toBe(removalPhraseFor(reason));
+      expect(quoteFor(notice)).toBe(chatRemovalPhraseFor(reason));
       expect(quoteFor(notice)).not.toBe(reason);
     }
+  });
+
+  /** Direct regression guard (fix round 1): "other" used to render reviews' own catch-all phrase. */
+  it("never renders reviews' own catch-all phrase for a chat_message_removed notice", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "chat_message_removed",
+      title: "We removed one of your messages", body: "...", context: { leagueName: "Sunday Money", reason: "other" },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBe("breaking the chat rules");
+    expect(quoteFor(notice)).not.toBe("breaking the review rules");
   });
 
   it("is null for a chat_message_removed notice whose context reason is not a string", () => {

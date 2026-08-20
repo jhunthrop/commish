@@ -38,7 +38,9 @@ describe("NOTICE_TEMPLATES", () => {
 
     const removed = renderNotice("review_removed", NOTICE_SAMPLES.review_removed);
     expect(removed.title).toBe("We removed your review");
-    expect(removed.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it.");
+    // Fix round 1 (panel HIGH): states there is no appeal, the same founder decision #4
+    // `operator_warning` already stated and this notice was missing.
+    expect(removed.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message.");
 
     const granted = renderNotice("admin_granted", NOTICE_SAMPLES.admin_granted);
     expect(granted.title).toBe("You can now use the operator tools");
@@ -59,8 +61,9 @@ describe("NOTICE_TEMPLATES", () => {
     // deliberately absent from `body` here too — it renders as its own blockquote (`quoteFor`).
     const chatRemoved = renderNotice("chat_message_removed", NOTICE_SAMPLES.chat_message_removed);
     expect(chatRemoved.title).toBe("We removed one of your messages");
+    // Fix round 1 (panel HIGH): same no-appeal sentence as `review_removed` now states.
     expect(chatRemoved.body).toBe(
-      "An operator removed a message you posted in Sunday Money. Your leaguemates can see that the message went and who posted it, and they can no longer read it. We keep your words on file exactly as you wrote them.",
+      "An operator removed a message you posted in Sunday Money. Your leaguemates can see that the message went and who posted it, and they can no longer read it. We keep your words on file exactly as you wrote them. There is no reply to this message.",
     );
     expect(chatRemoved.body).not.toContain("off topic");
   });

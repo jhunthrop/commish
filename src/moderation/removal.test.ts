@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { describe, it, expect } from "vitest";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { MODERATION_CONFIG } from "./config";
-import { REMOVAL_REASON_VALUES, isRemovalReason, removalPhraseFor, removalSentenceFor } from "./removal";
+import { REMOVAL_REASON_VALUES, chatRemovalPhraseFor, isRemovalReason, removalPhraseFor, removalSentenceFor } from "./removal";
 
 interface GrepOptions {
   readonly dirs: readonly string[];
@@ -46,10 +46,13 @@ describe("the removal vocabulary's one home", () => {
   });
 
   it("keeps reviews' shipped vocabulary byte for byte, because members have already read it", () => {
+    // `removalPhrase` (reviews' own reading) is unchanged from what shipped before fix round 1.
+    // `chatRemovalPhrase` (fix round 1) is the new, chat-domain sibling field — present on every
+    // entry, but reviews' own `removalPhraseFor` never reads it.
     expect(REVIEW_CONFIG.reportReasons).toEqual([
-      { value: "spam", label: "Spam or fake", removalPhrase: "spam or fake content" },
-      { value: "abusive", label: "Abusive or harassing", removalPhrase: "abusive or harassing content" },
-      { value: "other", label: "Something else", removalPhrase: "breaking the review rules" },
+      { value: "spam", label: "Spam or fake", removalPhrase: "spam or fake content", chatRemovalPhrase: "spam or fake content" },
+      { value: "abusive", label: "Abusive or harassing", removalPhrase: "abusive or harassing content", chatRemovalPhrase: "abusive or harassing content" },
+      { value: "other", label: "Something else", removalPhrase: "breaking the review rules", chatRemovalPhrase: "breaking the chat rules" },
     ]);
     // Round-trips the re-export: `REVIEW_CONFIG.reportReasons` IS `MODERATION_CONFIG.reasons`,
     // not a second array that happens to match it today.
@@ -73,5 +76,21 @@ describe("the removal vocabulary's one home", () => {
     expect(removalPhraseFor("not-a-real-reason")).toBe("breaking the review rules");
     expect(removalPhraseFor(null)).toBe("breaking the review rules");
     expect(removalSentenceFor("spam")).toBe("Your review was removed for spam or fake content. It can't be edited.");
+  });
+
+  /**
+   * Fix round 1 (review HIGH): `removalPhraseFor`'s generic fallback ("breaking the review
+   * rules") was leaking into chat's own removal notice and, before the same round's other fix,
+   * the room-visible tombstone. `chatRemovalPhraseFor` is the chat-domain twin: identical for the
+   * two content-neutral reasons, different for the catch-all one.
+   */
+  it("renders a chat-domain fallback for the catch-all reason, and the same content-neutral phrases everywhere else", () => {
+    expect(chatRemovalPhraseFor("spam")).toBe("spam or fake content");
+    expect(chatRemovalPhraseFor("abusive")).toBe("abusive or harassing content");
+    expect(chatRemovalPhraseFor("other")).toBe("breaking the chat rules");
+    expect(chatRemovalPhraseFor("not-a-real-reason")).toBe("breaking the chat rules");
+    expect(chatRemovalPhraseFor(null)).toBe("breaking the chat rules");
+    // Never reviews' own words, for a reason that maps to the catch-all in either domain.
+    expect(chatRemovalPhraseFor("other")).not.toBe(removalPhraseFor("other"));
   });
 });

@@ -6,7 +6,7 @@ import type { Clock } from "@/domain/timing";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { quoteFor, type MemberNotice } from "@/integrity-service/notify";
 import { REVIEW_CONFIG } from "@/reviews/config";
-import { removalPhraseFor } from "@/moderation/removal";
+import { chatRemovalPhraseFor } from "@/moderation/removal";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import { postMessage } from "./chat";
@@ -127,7 +127,7 @@ describe("removeChatMessageInTx", () => {
     const payload = bus.sent[0]?.payload as { readonly message: { readonly body: string; readonly gif: unknown; readonly removal: unknown } };
     expect(payload.message.body).toBe("");
     expect(payload.message.gif).toBeNull();
-    expect(payload.message.removal).toEqual({ at: "2026-08-04T00:00:00.000Z", phrase: removalPhraseFor("spam") });
+    expect(payload.message.removal).toEqual({ at: "2026-08-04T00:00:00.000Z", phrase: chatRemovalPhraseFor("spam") });
   });
 
   it("refuses a message id that doesn't exist", async () => {
@@ -197,12 +197,12 @@ describe("removeChatMessageInTx", () => {
         readAt: null,
       });
       expect(notice!.body).toBe(
-        "An operator removed a message you posted in Sunday Money. Your leaguemates can see that the message went and who posted it, and they can no longer read it. We keep your words on file exactly as you wrote them.",
+        "An operator removed a message you posted in Sunday Money. Your leaguemates can see that the message went and who posted it, and they can no longer read it. We keep your words on file exactly as you wrote them. There is no reply to this message.",
       );
       expect(notice!.context).toEqual({ leagueName: "Sunday Money", reason: "other" });
     });
 
-    it("maps the reason through the SAME phrase every other removal surface renders, for every value in the closed vocabulary", async () => {
+    it("maps the reason through chat's OWN phrase mapper, for every value in the closed vocabulary — never reviews' own words", async () => {
       for (const reason of ["spam", "abusive", "other"]) {
         await truncateAll(db);
         await chatLeagueFixture(db);
@@ -216,9 +216,28 @@ describe("removeChatMessageInTx", () => {
           title: row!.title, body: row!.body, context: row!.context, auditEventId: row!.auditEventId,
           createdAt: row!.createdAt.toISOString(), readAt: null,
         };
-        expect(quoteFor(stored)).toBe(removalPhraseFor(reason));
+        expect(quoteFor(stored)).toBe(chatRemovalPhraseFor(reason));
         expect(quoteFor(stored)).not.toBe(reason);
       }
+    });
+
+    /**
+     * Fix round 1 (review HIGH, direct regression guard): the "other" reason used to render
+     * reviews' own catch-all phrase, "breaking the review rules", in a CHAT notice — a
+     * reviews-domain sentence in a chat surface. This is the exact case that broke.
+     */
+    it("never renders reviews' own catch-all phrase in a chat removal notice", async () => {
+      const messageId = await postAndGetId("u1");
+      await remove({ messageId, removedByUserId: "u2", reason: "other", clock: at("2026-08-04T00:00:00Z"), audit: logger });
+
+      const [row] = await db.select().from(memberNotices);
+      const stored: MemberNotice = {
+        id: row!.id, userId: row!.userId, leagueId: row!.leagueId, noticeType: "chat_message_removed",
+        title: row!.title, body: row!.body, context: row!.context, auditEventId: row!.auditEventId,
+        createdAt: row!.createdAt.toISOString(), readAt: null,
+      };
+      expect(quoteFor(stored)).toBe("breaking the chat rules");
+      expect(quoteFor(stored)).not.toBe("breaking the review rules");
     });
 
     it("writes no notice when there is nothing to remove", async () => {

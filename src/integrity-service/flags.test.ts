@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db, DbTx } from "@/db/client";
-import { auditEvents, chatMessages, integrityFlags, leagues, memberNotices, reviewReports, reviews, users } from "@/db/schema";
+import { auditEvents, chatMessageReports, chatMessages, integrityFlags, leagues, memberNotices, reviewReports, reviews, users } from "@/db/schema";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import type { AuditEventType, JsonObject } from "@/domain/audit";
 import { copyViolations } from "@/integrity/copy-rules";
@@ -1149,6 +1149,51 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
     );
     const ghostDetail = await flagDetail(db, ghost.id);
     expect(ghostDetail!.subject).toEqual({ kind: "chat_message", messageId: "999999", body: null, authorName: "A former member" });
+  });
+
+  /**
+   * Fix round 1 (review HIGH): `reportersFor` never had a `chat_message` branch —
+   * `chat_message_reports` was populated correctly by `reportMessage` from Task 6's first
+   * commit, but the operator queue's detail view showed zero reporters for every chat flag no
+   * matter how many people reported it. Mirrors "assembles the subject, the reporters and the
+   * trail" above, itemized (never aggregated into a count), in report order — the same shape
+   * `review_report`'s own branch already had.
+   */
+  it("reads a chat_report flag's reporters, itemized in report order — the sibling of the review branch", async () => {
+    await seedUser("u_chat_reporters_author");
+    await seedUser("u_chat_reporter_a");
+    await seedUser("u_chat_reporter_b");
+    await seedLeague("lg_chat_reporters", "u_chat_reporters_author");
+    const [message] = await db
+      .insert(chatMessages)
+      .values({ leagueId: "lg_chat_reporters", authorUserId: "u_chat_reporters_author", body: "trash talk" })
+      .returning({ id: chatMessages.id });
+    const messageId = String(message!.id);
+
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "chat_report",
+        subjectId: messageId,
+        leagueId: null,
+        evidence: {},
+        raisedByUserId: "u_chat_reporter_a",
+        occurredAt: "2026-08-01T00:00:00.000Z",
+        newId: () => "detail_flag_chat_reporters",
+        audit: logger,
+      }),
+    );
+    await db.insert(chatMessageReports).values([
+      { messageId: message!.id, reporterUserId: "u_chat_reporter_a", reason: "spam", createdAt: new Date("2026-08-01T00:00:01.000Z") },
+      { messageId: message!.id, reporterUserId: "u_chat_reporter_b", reason: "abusive", createdAt: new Date("2026-08-01T00:00:02.000Z") },
+    ]);
+
+    const counted = countingDb(db);
+    const detail = await flagDetail(counted.db, flag.id);
+    expect(counted.selectCount()).toBeLessThanOrEqual(5);
+    expect(detail!.reporters).toEqual([
+      { userId: "u_chat_reporter_a", name: "u_chat_reporter_a", reason: "spam", reportedAt: "2026-08-01T00:00:01.000Z" },
+      { userId: "u_chat_reporter_b", name: "u_chat_reporter_b", reason: "abusive", reportedAt: "2026-08-01T00:00:02.000Z" },
+    ]);
   });
 
   it("reads a trade_fairness flag's subject as a bare trade id — no remover, no reporter, this plan does not raise it yet", async () => {

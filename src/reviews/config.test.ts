@@ -5,10 +5,12 @@ describe("removal reason vocabulary", () => {
   it("keeps the shipped vocabulary byte for byte after the move to @/moderation, because members have already read it", () => {
     // `src/moderation/removal.test.ts` owns the grep tripwire that makes a second literal list
     // impossible; this is the matching regression pin on THIS module's own re-exported shape.
+    // `chatRemovalPhrase` (fix round 1) rides along on every entry now — reviews' own reading
+    // (`removalPhraseFor`) never touches it, only chat's (`chatRemovalPhraseFor`) does.
     expect(REVIEW_CONFIG.reportReasons).toEqual([
-      { value: "spam", label: "Spam or fake", removalPhrase: "spam or fake content" },
-      { value: "abusive", label: "Abusive or harassing", removalPhrase: "abusive or harassing content" },
-      { value: "other", label: "Something else", removalPhrase: "breaking the review rules" },
+      { value: "spam", label: "Spam or fake", removalPhrase: "spam or fake content", chatRemovalPhrase: "spam or fake content" },
+      { value: "abusive", label: "Abusive or harassing", removalPhrase: "abusive or harassing content", chatRemovalPhrase: "abusive or harassing content" },
+      { value: "other", label: "Something else", removalPhrase: "breaking the review rules", chatRemovalPhrase: "breaking the chat rules" },
     ]);
   });
 
