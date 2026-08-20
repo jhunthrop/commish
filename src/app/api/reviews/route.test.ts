@@ -109,8 +109,18 @@ describe("GET /api/reviews", () => {
     expect(response.status).toBe(400);
   });
 
-  it("accepts a well-formed ISO datetime before cursor", async () => {
+  // A cursor is a timestamp AND a row id (`@/reviews/cursor`). A bare timestamp — including one
+  // this feed handed out before the id joined the sort key — is refused rather than silently
+  // paging with a non-unique key.
+  it("answers 400 for a bare-timestamp cursor with no row id", async () => {
     const response = await GET(get(`?before=${encodeURIComponent("2026-08-19T00:00:00.000Z")}`));
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { readonly ok: false; readonly error: string };
+    expect(body.error).toContain("before");
+  });
+
+  it("accepts a well-formed compound cursor", async () => {
+    const response = await GET(get(`?before=${encodeURIComponent("2026-08-19T00:00:00.000Z|r1")}`));
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ ok: true, data: { reviews: [], hasMore: false, nextBefore: null } });
   });

@@ -53,6 +53,21 @@ describe("ReviewFeed", () => {
     expect(screen.getByText(REVIEW_B.body)).toBeInTheDocument();
   });
 
+  // L3: `listReviews` used to render a rating lookup that missed as `?? 0`, which the label
+  // turned into "0 out of 5, rated" — a number no author could have chosen, since the scale
+  // starts at 1, on the page whose promise is that it shows what people actually said.
+  it("renders a review with no rating as having none, never as zero out of five", () => {
+    const unrated: ReviewsPage = { reviews: [{ ...REVIEW_A, rating: null }], hasMore: false, nextBefore: null };
+    renderInAccount(<ReviewFeed initialPage={unrated} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
+
+    expect(screen.queryByText(/out of 5/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/0 out of 5/)).not.toBeInTheDocument();
+    // Everything else about the review still renders — the rating is absent, not the review.
+    expect(screen.getByText(REVIEW_A.body)).toBeInTheDocument();
+    expect(screen.getByText("Grace Hopper")).toBeInTheDocument();
+    expect(document.querySelectorAll("time")).toHaveLength(1);
+  });
+
   it("renders each review's date as a screen-reader-friendly <time> element", () => {
     renderInAccount(<ReviewFeed initialPage={PAGE} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
     const times = document.querySelectorAll("time");

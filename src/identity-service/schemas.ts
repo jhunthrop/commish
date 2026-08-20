@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { AVATAR_PRESETS, IDENTITY_CONFIG } from "@/identity";
+import { AVATAR_PRESETS, IDENTITY_CONFIG, isPrintableDisplayName } from "@/identity";
 
 const PRESET_KEYS = AVATAR_PRESETS.map((preset) => preset.key) as [string, ...string[]];
 
@@ -20,6 +20,10 @@ export const updateProfileSchema = z
       .trim()
       .min(IDENTITY_CONFIG.displayName.minLength, "Your name needs at least 2 characters.")
       .max(IDENTITY_CONFIG.displayName.maxLength, "Your name can be at most 40 characters.")
+      // Length was the only rule, and a display name renders under `authorName` on the
+      // unauthenticated `/reviews` page — see `isPrintableDisplayName`'s own docblock for what
+      // this does and does not defend against.
+      .refine(isPrintableDisplayName, "Your name can only use characters people can see.")
       .optional(),
     experienceTier: z.enum(["beginner", "experienced"]).optional(),
     /** A preset KEY or null. Never a URL: see `updateProfile`'s docblock. */

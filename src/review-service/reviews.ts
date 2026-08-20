@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { reviewReports, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { REVIEW_CONFIG } from "@/reviews/config";
+import { formatReviewCursor, type ReviewCursor } from "@/reviews/cursor";
 import type { MyReviewState, ReviewView, ReviewsPage } from "@/reviews/contract";
 
 const systemClock: Clock = { now: () => new Date().toISOString() };
@@ -16,7 +17,7 @@ interface FeedRow {
   readonly authorAvatar: string | null;
 }
 
-function toView(row: FeedRow, rating: number): ReviewView {
+function toView(row: FeedRow, rating: number | null): ReviewView {
   return {
     id: row.id,
     rating,
@@ -29,8 +30,12 @@ function toView(row: FeedRow, rating: number): ReviewView {
 }
 
 export interface ListReviewsInput {
-  /** An ISO `createdAt` cursor — the page returned is the newest reviews strictly older than it. */
-  readonly before?: string;
+  /**
+   * The page returned is the newest reviews strictly older than this cursor, where "older" is
+   * `(created_at, id)` and not `created_at` alone — see `@/reviews/cursor` for why the id is
+   * part of the sort key rather than a tie a strict `<` silently drops.
+   */
+  readonly before?: ReviewCursor;
 }
 
 /**
@@ -55,7 +60,13 @@ export interface ListReviewsInput {
  * filtered": the column simply is not here to filter on.
  */
 export function feedQuery(db: Db, input: ListReviewsInput) {
-  const cursor = input.before === undefined ? undefined : lt(reviews.createdAt, new Date(input.before));
+  // `(created_at, id) < (cursor.created_at, cursor.id)` — a row-value comparison, so the
+  // boundary is decided by the same total ordering the ORDER BY below uses. A plain
+  // `created_at < cursor` dropped any row sharing the boundary's millisecond.
+  const cursor =
+    input.before === undefined
+      ? undefined
+      : sql`(${reviews.createdAt}, ${reviews.id}) < (${input.before.createdAt}::timestamptz, ${input.before.id})`;
   return db
     .select({
       id: reviews.id,
@@ -68,7 +79,7 @@ export function feedQuery(db: Db, input: ListReviewsInput) {
     .from(reviews)
     .innerJoin(users, eq(users.id, reviews.userId))
     .where(cursor === undefined ? isNull(reviews.removedAt) : and(isNull(reviews.removedAt), cursor))
-    .orderBy(desc(reviews.createdAt))
+    .orderBy(desc(reviews.createdAt), desc(reviews.id))
     .limit(REVIEW_CONFIG.pageSize + 1);
 }
 
@@ -91,9 +102,9 @@ export async function listReviews(db: Db, input: ListReviewsInput): Promise<Revi
   const ratings = await ratingsFor(db, page.map((row) => row.id));
   const last = page[page.length - 1];
   return {
-    reviews: page.map((row) => toView(row, ratings.get(row.id) ?? 0)),
+    reviews: page.map((row) => toView(row, ratings.get(row.id) ?? null)),
     hasMore,
-    nextBefore: hasMore && last !== undefined ? last.createdAt.toISOString() : null,
+    nextBefore: hasMore && last !== undefined ? formatReviewCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) : null,
   };
 }
 

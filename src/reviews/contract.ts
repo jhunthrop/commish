@@ -11,7 +11,13 @@
  */
 export interface ReviewView {
   readonly id: string;
-  readonly rating: number;
+  /**
+   * `null` when the display-only rating lookup missed between `listReviews`' two round trips.
+   * The feed renders no rating at all in that case: "0 out of 5, rated" is a number the author
+   * never chose (the scale starts at 1), on the page whose promise is that it shows what people
+   * actually said.
+   */
+  readonly rating: number | null;
   readonly body: string;
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -23,7 +29,8 @@ export interface ReviewView {
 /**
  * One page of the feed, newest-first. `nextBefore` is `null` once there is nothing older left —
  * pass it straight back as `before` for the next page, same cursor idiom as `ChatPage`
- * (`@/chat/contract`) and `listMessages`.
+ * (`@/chat/contract`) and `listMessages`. Opaque to the client: it carries a timestamp AND a
+ * row id, because a timestamp alone is not unique (see `@/reviews/cursor`).
  */
 export interface ReviewsPage {
   readonly reviews: readonly ReviewView[];

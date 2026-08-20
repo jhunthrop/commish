@@ -15,8 +15,14 @@ const RATING_WORD: Readonly<Record<number, string>> = {
   5: "excellent",
 };
 
-function ratingLabel(rating: number): string {
-  return `${rating} out of 5, ${RATING_WORD[rating] ?? "rated"}`;
+/**
+ * `null` renders NOTHING, not "0 out of 5". The scale starts at 1, so zero is a rating no author
+ * could have chosen — it only ever came from a lookup that missed between `listReviews`' two
+ * round trips, and printing it puts words in a reviewer's mouth on the one page whose promise is
+ * that it shows what people actually said. The date still renders; only the rating is absent.
+ */
+function ratingLabel(rating: number | null): string | null {
+  return rating === null ? null : `${rating} out of 5, ${RATING_WORD[rating] ?? "rated"}`;
 }
 
 /** Absolute date, same idiom as `InvitePanel`'s expiry line (`new Date(...).toLocaleDateString()`). */
@@ -101,6 +107,7 @@ function ReportControl({ reviewId }: { readonly reviewId: string }) {
 }
 
 function ReviewRow({ review }: { readonly review: ReviewView }) {
+  const rating = ratingLabel(review.rating);
   return (
     <li className="flex flex-col gap-2 border-b border-border py-4 last:border-b-0">
       <div className="flex items-center gap-3">
@@ -108,8 +115,12 @@ function ReviewRow({ review }: { readonly review: ReviewView }) {
         <div className="flex flex-col">
           <span className="font-medium text-text-primary">{review.authorName}</span>
           <span className="text-sm text-text-muted">
-            {ratingLabel(review.rating)}
-            {" · "}
+            {rating === null ? null : (
+              <>
+                {rating}
+                {" · "}
+              </>
+            )}
             <time dateTime={review.createdAt}>{formatReviewDate(review.createdAt)}</time>
           </span>
         </div>

@@ -92,6 +92,17 @@ describe("PATCH /api/profile", () => {
     });
   });
 
+  it("answers 400 for a display name carrying hidden characters", async () => {
+    await db.insert(users).values({ id: "u1", email: "u1@test.local", displayName: "u1" });
+    signedInAs("u1");
+    // A right-to-left override in front of a reversed name: renders as something other than the
+    // characters it is made of, under `authorName` on the unauthenticated /reviews page.
+    const response = await PATCH(patch({ displayName: `${String.fromCharCode(0x202e)}troppuS hsimmoC` }));
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { readonly ok: false; readonly error: string };
+    expect(body.error).toContain("Your name can only use characters people can see.");
+  });
+
   it("answers 400 for a body that asks for nothing", async () => {
     await db.insert(users).values({ id: "u1", email: "u1@test.local", displayName: "u1" });
     signedInAs("u1");

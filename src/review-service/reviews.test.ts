@@ -4,6 +4,8 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import * as schema from "@/db/schema";
 import { reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
+import { REVIEW_CONFIG } from "@/reviews/config";
+import { parseReviewCursor } from "@/reviews/cursor";
 import { feedQuery, listReviews, myReview, removeReview, reportReview, submitReview } from "./reviews";
 
 const db = createTestDb();
@@ -127,8 +129,34 @@ describe("listReviews / feedQuery — the curation proof", () => {
     const first = await listReviews(db, {});
     expect(first.reviews.map((r) => r.id)).toEqual(["r-new", "r-old"]);
 
-    const second = await listReviews(db, { before: first.reviews[0]!.createdAt });
+    const second = await listReviews(db, { before: { createdAt: first.reviews[0]!.createdAt, id: first.reviews[0]!.id } });
     expect(second.reviews.map((r) => r.id)).toEqual(["r-old"]);
+  });
+
+  // L4: `created_at` is millisecond-precision and not unique, and the feed used to page with a
+  // strict `created_at <` — so a row sharing the boundary row's millisecond silently dropped out
+  // of the page after it, on the feed whose whole selling point is that nothing is missing from
+  // it. One review per page boundary, every review stamped at the SAME instant.
+  it("loses nothing across a page boundary when every review shares one millisecond", async () => {
+    const SAME_MS = "2026-08-01T00:00:00.000Z";
+    const total = REVIEW_CONFIG.pageSize + 1;
+    for (let i = 0; i < total; i += 1) {
+      const suffix = String(i).padStart(2, "0");
+      await seedUser(`u${suffix}`);
+      await submitReview(db, { userId: `u${suffix}`, rating: 3, body: LONG_ENOUGH, clock: at(SAME_MS), newId: () => `r${suffix}` });
+    }
+
+    // Page through using only the cursor the feed itself hands back.
+    const first = await listReviews(db, {});
+    expect(first.hasMore).toBe(true);
+    expect(first.nextBefore).not.toBeNull();
+    // The cursor carries the boundary ROW, not just its timestamp.
+    expect(first.nextBefore).toContain("|");
+
+    const second = await listReviews(db, { before: parseReviewCursor(first.nextBefore ?? "") ?? undefined });
+    const seen = [...first.reviews, ...second.reviews].map((review) => review.id);
+    expect(new Set(seen).size).toBe(total);
+    expect(second.hasMore).toBe(false);
   });
 });
 

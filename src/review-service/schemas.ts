@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { validateReviewDraft } from "@/reviews/validate";
+import { parseReviewCursor } from "@/reviews/cursor";
 
 /**
  * `rating`/`body` are type-checked here; the substantive rule (range, length) is
@@ -16,13 +17,28 @@ export const submitReviewSchema = z.object({ rating: z.number(), body: z.string(
 export type SubmitReviewInput = z.infer<typeof submitReviewSchema>;
 
 /**
- * `GET /api/reviews`'s one query param. `z.iso.datetime()` is the same shape every `before`
- * cursor this app ever hands back (`ReviewsPage.nextBefore`, always a `Date#toISOString()`
- * output), so a well-formed cursor always round-trips and a hand-edited or garbage one is a 400
- * naming the field — never an uncaught `RangeError` from `new Date(garbage).toISOString()` deep
- * inside `feedQuery`, which is what reached this boundary unvalidated before.
+ * `GET /api/reviews`'s one query param, validated AND parsed here: the handler receives a
+ * `ReviewCursor`, never a raw string, so nothing hand-edited or garbage reaches
+ * `new Date(...)` deep inside `feedQuery` — the uncaught `RangeError` this boundary was added
+ * to prevent. A malformed cursor is a 400 naming the field.
+ *
+ * The cursor carries a timestamp AND a row id (`@/reviews/cursor`). A bare-timestamp value —
+ * including one this feed handed out before the id joined the sort key — is rejected rather
+ * than silently paging with a non-unique key.
  */
-export const listReviewsQuerySchema = z.object({ before: z.iso.datetime().optional() });
+export const listReviewsQuerySchema = z.object({
+  before: z
+    .string()
+    .transform((raw, ctx) => {
+      const cursor = parseReviewCursor(raw);
+      if (cursor === null) {
+        ctx.addIssue({ code: "custom", message: "That isn't a place we can load from." });
+        return z.NEVER;
+      }
+      return cursor;
+    })
+    .optional(),
+});
 
 export type ListReviewsQuery = z.infer<typeof listReviewsQuerySchema>;
 
