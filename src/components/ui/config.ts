@@ -8,6 +8,16 @@ export const UI_CONFIG = {
     /** Oldest toasts beyond this are dropped so the stack can never cover the page. */
     maxVisible: 3,
   },
+  infoTip: {
+    /**
+     * WCAG 2.2 SC 2.5.8 (Target Size, Minimum — Level AA): a pointer target must be at least
+     * 24x24 CSS pixels on each axis, even when the visible glyph inside stays smaller. `InfoTip`
+     * applies this as the trigger's `min-width`/`min-height`, not a Tailwind size class — a
+     * dynamic `h-[${…}px]` string is invisible to Tailwind's static class scanner and would
+     * silently ship no rule at all, so the number has to reach the DOM as an inline style.
+     */
+    minTargetPx: 24,
+  },
 } as const;
 
 /**

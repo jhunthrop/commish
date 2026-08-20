@@ -5,6 +5,7 @@ import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { Avatar, Badge, EYEBROW, InfoTip } from "@/components/ui";
 import type { TermKey } from "@/help/glossary";
+import type { HelpLevel } from "@/identity/preferences";
 import { formatClockLength, formatTightening } from "../state/format";
 import { playerName, teamName, teamsById } from "../lib/lookups";
 import type { ConnectionStatus } from "../hooks/use-draft-room";
@@ -24,6 +25,10 @@ export interface RoomRailProps {
   readonly connection: ConnectionStatus;
   /** `tv` drops the personal chrome — no team chip, no my-turn heat. */
   readonly variant?: RoomRailVariant;
+  /** The signed-in caller's preference, forwarded from `DraftRoomPage`. Omitted only by tests
+   *  that don't care about this branch — `InfoTip` itself defaults to the click-only, non-inline
+   *  behavior when it's absent. */
+  readonly helpLevel?: HelpLevel;
 }
 
 const FORMAT_LABEL: Readonly<Record<DraftStateView["format"], string>> = {
@@ -163,7 +168,7 @@ function StaticState({ headline, detail }: { readonly headline: string; readonly
  * It is a fixed-height band by construction (`lg:h-20`): the stage below it gets every
  * remaining pixel, and nothing in the room reflows when the turn changes.
  */
-export function RoomRail({ leagueName, view, teams, myTeamId, playersById, connection, variant = "room" }: RoomRailProps) {
+export function RoomRail({ leagueName, view, teams, myTeamId, playersById, connection, variant = "room", helpLevel }: RoomRailProps) {
   // The TV board is nobody's team: `personalId` is what every personal affordance reads, so
   // dropping the chrome for that variant is one assignment rather than a flag per element.
   const personalId = variant === "room" ? myTeamId : null;
@@ -187,7 +192,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
       <span className="inline-flex items-center gap-1">
         <Badge tone="neutral">{FORMAT_LABEL[view.format]}</Badge>
         {/* The TV variant is a shared, unattended display — no control on it is ever clickable. */}
-        {variant === "room" ? <InfoTip term={FORMAT_TERM[view.format]} /> : null}
+        {variant === "room" ? <InfoTip term={FORMAT_TERM[view.format]} helpLevel={helpLevel} /> : null}
       </span>
       {turnWhere === null ? null : (
         <span data-testid="turn-label" className="font-display text-sm font-semibold uppercase tracking-wide text-text-muted">
@@ -213,7 +218,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                       this term defines, so the tip only joins the snake-format turn label. The
                       TV variant drops it too — a shared, unattended display has no clickable
                       controls at all. */}
-                  {view.format === "auction" || variant !== "room" ? null : <InfoTip term="on-the-clock" />}
+                  {view.format === "auction" || variant !== "room" ? null : <InfoTip term="on-the-clock" helpLevel={helpLevel} />}
                 </span>
                 <span className="truncate font-display text-display-sm font-bold leading-display text-text-primary">{turn.subject}</span>
               </div>

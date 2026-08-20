@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { LeagueHomeBody, LineupBody } from "../contract";
 import { Card, PageTitle } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
+import type { HelpLevel } from "@/identity/preferences";
 import { formatWeek } from "../lib/format";
 import { AdvisorPanel } from "./advisor-panel";
 import { InvitePanel } from "./invite-panel";
@@ -17,7 +18,17 @@ import { StandingsTable } from "./standings-table";
  * `locked`) arrives already computed by `src/league/**` on the server. Keeping the
  * composition here rather than inside `page.tsx` is what makes it testable.
  */
-export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; readonly lineup: LineupBody | null }) {
+export function LeagueHome({
+  home,
+  lineup,
+  helpLevel,
+}: {
+  readonly home: LeagueHomeBody;
+  readonly lineup: LineupBody | null;
+  /** Forwarded from `LeaguePage`. Omitted only by tests that don't care about this branch —
+   *  `InfoTip` itself defaults to the click-only, non-inline behavior when it's absent. */
+  readonly helpLevel?: HelpLevel;
+}) {
   const clinched = home.standings.some((row) => row.teamId === home.myTeamId && row.clinched);
   const drafted = home.draftStatus === "complete";
   const draftLive = home.draftStatus === "in_progress";
@@ -67,7 +78,7 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
         ) : null}
       </section>
 
-      <StandingsTable rows={home.standings} myTeamId={home.myTeamId} />
+      <StandingsTable rows={home.standings} myTeamId={home.myTeamId} helpLevel={helpLevel} />
 
       {/*
         Unlike the draft room's `aside` band, this section sits in ordinary document flow, so
@@ -79,7 +90,9 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
         <LeagueChat leagueId={home.leagueId} />
       </div>
 
-      {lineup === null ? null : <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} />}
+      {lineup === null ? null : (
+        <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} helpLevel={helpLevel} />
+      )}
 
       {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
 

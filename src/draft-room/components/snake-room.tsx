@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import type { Player } from "@/domain/player";
 import type { ClientDraftAction } from "@/draft-engine";
+import type { HelpLevel } from "@/identity/preferences";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";
 import { actionLabelFor } from "../lib/lookups";
@@ -14,9 +15,11 @@ export interface SnakeRoomProps {
   readonly onAct: (action: ClientDraftAction) => void;
   /** The social band down the right edge (league chat), or nothing. Built by `DraftRoom`. */
   readonly aside?: ReactNode;
+  /** Forwarded to `RoomShell`/`RoomRail`. See `RoomRailProps.helpLevel`. */
+  readonly helpLevel?: HelpLevel;
 }
 
-export function SnakeRoom({ room, playersById, onAct, aside }: SnakeRoomProps) {
+export function SnakeRoom({ room, playersById, onAct, aside, helpLevel }: SnakeRoomProps) {
   const view = room.view!;
   // Affordance only — the server decides. `onClockTeamId` is the engine's answer, not ours.
   const canAct = view.phase === "in_progress" && room.myTeamId !== null && view.onClockTeamId === room.myTeamId;
@@ -33,6 +36,7 @@ export function SnakeRoom({ room, playersById, onAct, aside }: SnakeRoomProps) {
       onAct={draft}
       {...queueHandlers}
       aside={aside}
+      helpLevel={helpLevel}
     />
   );
 }

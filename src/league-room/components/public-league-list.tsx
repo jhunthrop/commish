@@ -3,6 +3,7 @@ import { Badge, Card, EmptyState, EYEBROW, InfoTip } from "@/components/ui";
 import type { DraftFormat } from "@/domain/league";
 import type { TermKey } from "@/help/glossary";
 import { EXPERIENCE_TIER_LABEL } from "@/identity/config";
+import type { HelpLevel } from "@/identity/preferences";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
@@ -12,15 +13,26 @@ const FORMAT_LABEL: Readonly<Record<string, string>> = { snake: "Snake", auction
 const FORMAT_TERM: Readonly<Record<DraftFormat, TermKey>> = { snake: "snake-draft", auction: "auction-draft" };
 
 /**
- * `scoringLabel` is a derived string (`describeScoring`, `@/scoring`), not a `TermKey` — it can
- * read "Standard" or "Custom", neither of which is jargon the glossary defines. Only the three
- * labels that ARE jargon (PPR, Half PPR, PPR with a TE premium) get an `InfoTip`; the other two
- * are already plain English and adding a trigger to them would explain nothing.
+ * `/browse` is the app's one unauthenticated surface (`getCurrentUser()` returning null is the
+ * expected case, not an error — see `app/browse/page.tsx`'s own docblock). There is no signed-in
+ * caller's `helpLevel` to read on the common path, and a stranger deciding whether to join is
+ * exactly who benefits most from more explanation, not less — so every `InfoTip` here opens
+ * `guided`, unconditionally, rather than defaulting quiet the way an authenticated room does.
+ */
+const BROWSE_HELP_LEVEL: HelpLevel = "guided";
+
+/**
+ * `scoringLabel` is a derived string (`describeScoring`, `@/scoring`), not a `TermKey`. Every
+ * label it can produce gets an `InfoTip` except "Standard" — that one is already plain English,
+ * and a trigger on it would explain nothing. "Custom" reads as bare and slightly alarming
+ * without one (does the league not have real scoring rules at all?), so it maps to
+ * `custom-scoring`, same as the three shipped-preset labels map to their own term.
  */
 const SCORING_LABEL_TERM: Readonly<Record<string, TermKey>> = {
   PPR: "ppr",
   "Half PPR": "half-ppr",
   "PPR, TE premium": "te-premium",
+  Custom: "custom-scoring",
 };
 
 /**
@@ -89,7 +101,7 @@ export function PublicLeagueList({
               <p className={`${EYEBROW} flex flex-wrap items-center gap-x-1 gap-y-1`}>
                 <span className="inline-flex items-center gap-1">
                   {FORMAT_LABEL[league.format] ?? league.format}
-                  <InfoTip term={FORMAT_TERM[league.format]} />
+                  <InfoTip term={FORMAT_TERM[league.format]} helpLevel={BROWSE_HELP_LEVEL} />
                 </span>
                 <span>·</span>
                 <span>{EXPERIENCE_TIER_LABEL[league.experienceTier] ?? league.experienceTier}</span>
@@ -97,7 +109,7 @@ export function PublicLeagueList({
                 <span className="inline-flex items-center gap-1">
                   {league.scoringLabel}
                   {SCORING_LABEL_TERM[league.scoringLabel] === undefined ? null : (
-                    <InfoTip term={SCORING_LABEL_TERM[league.scoringLabel]!} />
+                    <InfoTip term={SCORING_LABEL_TERM[league.scoringLabel]!} helpLevel={BROWSE_HELP_LEVEL} />
                   )}
                 </span>
               </p>

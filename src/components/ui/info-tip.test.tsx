@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { GLOSSARY } from "@/help/glossary";
+import { UI_CONFIG } from "./config";
 import { inBothThemes } from "./test-utils";
 import { InfoTip } from "./info-tip";
 
@@ -42,6 +43,16 @@ describe("InfoTip", () => {
     render(<InfoTip term="ppr" helpLevel="guided" />);
     expect(screen.getByText(GLOSSARY.ppr.short)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "What is PPR?" })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  // Controller promotion (WCAG 2.2 SC 2.5.8, AA): a pointer target must be at least 24x24 CSS
+  // pixels, even though the visible glyph inside stays small.
+  it("meets the WCAG 2.2 AA minimum pointer target size, hit area not glyph", () => {
+    render(<InfoTip term="ppr" />);
+    const trigger = screen.getByRole("button", { name: "What is PPR?" });
+    expect(trigger.style.minWidth).toBe(`${UI_CONFIG.infoTip.minTargetPx}px`);
+    expect(trigger.style.minHeight).toBe(`${UI_CONFIG.infoTip.minTargetPx}px`);
+    expect(UI_CONFIG.infoTip.minTargetPx).toBeGreaterThanOrEqual(24);
   });
 
   it("renders in both themes with no axe violations, closed and open", async () => {

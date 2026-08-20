@@ -3,6 +3,7 @@
 import { useEffect, useId, useState } from "react";
 import type { HelpLevel } from "@/identity/preferences";
 import { term as glossaryTerm, type TermKey } from "@/help/glossary";
+import { UI_CONFIG } from "./config";
 import { Icon } from "./icon";
 
 export interface InfoTipProps {
@@ -49,7 +50,11 @@ export function InfoTip({ term, className, helpLevel }: InfoTipProps) {
         aria-controls={noteId}
         aria-label={`What is ${entry.term}?`}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
-        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        // WCAG 2.2 SC 2.5.8 (AA): the hit area is at least `UI_CONFIG.infoTip.minTargetPx`
+        // square, even though the visible glyph (14px) stays small — see that constant's own
+        // docblock for why this is an inline style, not a Tailwind size class.
+        style={{ minWidth: UI_CONFIG.infoTip.minTargetPx, minHeight: UI_CONFIG.infoTip.minTargetPx }}
+        className="inline-flex shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <Icon name="info" size={14} />
       </button>

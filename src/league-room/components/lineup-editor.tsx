@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LineupBody, LineupSlotView } from "../contract";
 import { Button, InfoTip, Select, SlotChip } from "@/components/ui";
+import type { HelpLevel } from "@/identity/preferences";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { formatWeek } from "../lib/format";
 
@@ -21,12 +22,16 @@ export function LineupEditor({
   leagueId,
   lineup,
   totalWeeks,
+  helpLevel,
 }: {
   readonly leagueId: string;
   readonly lineup: LineupBody;
   /** The season's last week number. Names the reopening condition in the locked message —
    *  "next week" only means something if there is one. */
   readonly totalWeeks: number;
+  /** Forwarded from `LeagueHome`. Omitted only by tests that don't care about this branch —
+   *  `InfoTip` itself defaults to the click-only, non-inline behavior when it's absent. */
+  readonly helpLevel?: HelpLevel;
 }) {
   const { fetchJson } = useLeagueRoomDeps();
   const [assignments, setAssignments] = useState<Readonly<Record<string, string | null>>>(
@@ -37,6 +42,10 @@ export function LineupEditor({
   const [submitting, setSubmitting] = useState(false);
 
   const everyone = useMemo(() => [...lineup.starters, ...lineup.bench].filter((slot) => slot.playerId !== null), [lineup]);
+  // A per-league override could drop FLEX from the roster entirely — the caption only prints
+  // when the slot it explains is actually on the page, same reasoning as GLOSSARY omitting
+  // `waiver` for a feature the product doesn't have.
+  const hasFlexSlot = lineup.starters.some((slot) => slot.slot === "FLEX");
 
   if (lineup.locked) {
     // Persona review (first-timer, FIX 4): stating the situation without naming what happens
@@ -60,6 +69,7 @@ export function LineupEditor({
             </li>
           ))}
         </ul>
+        {hasFlexSlot ? <p className="text-xs text-text-muted">FLEX can be any RB, WR, or TE.</p> : null}
       </section>
     );
   }
@@ -99,7 +109,7 @@ export function LineupEditor({
           needs to know that plan won't work before they're locked out of trying it. */}
       <p className="flex items-center gap-1 text-sm text-text-muted">
         Lineups lock for the whole week when its first game kicks off.
-        <InfoTip term="lineup-lock" />
+        <InfoTip term="lineup-lock" helpLevel={helpLevel} />
       </p>
       <div className="grid gap-2 sm:grid-cols-2">
         {lineup.starters.map((slot) => (
@@ -117,7 +127,13 @@ export function LineupEditor({
           />
         ))}
       </div>
-      <h3 className="text-sm font-medium text-text-muted">Bench</h3>
+      {/* Persona review (FIX 4): a caption near the slot list, not a tip on every FLEX chip —
+          there is only ever one FLEX slot, so one sentence explains it once. */}
+      {hasFlexSlot ? <p className="text-xs text-text-muted">FLEX can be any RB, WR, or TE.</p> : null}
+      <h3 className="flex items-center gap-1 text-sm font-medium text-text-muted">
+        Bench
+        <InfoTip term="bench" helpLevel={helpLevel} />
+      </h3>
       <p className="text-sm text-text-muted">
         {lineup.bench.map((slot) => slot.playerName).filter((name) => name !== null).join(", ") || "Nobody on the bench."}
       </p>

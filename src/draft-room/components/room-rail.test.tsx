@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
+import { GLOSSARY } from "@/help/glossary";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { AUCTION_VIEW, LEAGUE_NAME, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
 import { RoomRail } from "./room-rail";
@@ -63,6 +64,19 @@ describe("RoomRail", () => {
     render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
     expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "What is on the clock?" })).toBeInTheDocument();
+  });
+
+  // FIX 1 (HIGH): helpLevel must actually reach a wired InfoTip, not just be accepted and
+  // dropped — a guided caller sees the short line without clicking; a standard caller (or the
+  // default, when it's omitted) only gets the click-to-reveal trigger.
+  it("threads helpLevel into its InfoTips: guided shows the short line inline, standard doesn't", () => {
+    const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
+    expect(screen.queryByText(GLOSSARY["on-the-clock"].short)).not.toBeInTheDocument();
+    rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" helpLevel="standard" />);
+    expect(screen.queryByText(GLOSSARY["on-the-clock"].short)).not.toBeInTheDocument();
+    rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" helpLevel="guided" />);
+    expect(screen.getByText(GLOSSARY["on-the-clock"].short)).toBeInTheDocument();
+    expect(screen.getByText(GLOSSARY["snake-draft"].short)).toBeInTheDocument();
   });
 
   it("drops the on-the-clock InfoTip during a live auction lot — that state isn't the rule the term defines", () => {

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import { GLOSSARY } from "@/help/glossary";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { ALL_CLINCHED_STANDINGS, STANDINGS } from "../test-fixtures";
 import { StandingsTable } from "./standings-table";
@@ -26,6 +27,18 @@ describe("StandingsTable", () => {
   it("carries an InfoTip on the Record column header", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
     expect(screen.getByRole("button", { name: "What is a record?" })).toBeInTheDocument();
+  });
+
+  // FIX 1 (HIGH): helpLevel must actually reach a wired InfoTip, not just be accepted and
+  // dropped — a guided caller sees the short line without clicking; a standard caller (or one
+  // this prop is simply omitted for, the default) only gets the click-to-reveal trigger.
+  it("threads helpLevel into its InfoTip: guided shows the short line inline, standard doesn't", () => {
+    const { rerender } = render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
+    expect(screen.queryByText(GLOSSARY["standings-record"].short)).not.toBeInTheDocument();
+    rerender(<StandingsTable rows={STANDINGS} myTeamId="t1" helpLevel="standard" />);
+    expect(screen.queryByText(GLOSSARY["standings-record"].short)).not.toBeInTheDocument();
+    rerender(<StandingsTable rows={STANDINGS} myTeamId="t1" helpLevel="guided" />);
+    expect(screen.getByText(GLOSSARY["standings-record"].short)).toBeInTheDocument();
   });
 
   it("marks the clinched teams and the caller's own row", () => {

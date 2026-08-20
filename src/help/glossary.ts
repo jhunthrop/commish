@@ -14,6 +14,7 @@ export type TermKey =
   | "ppr"
   | "half-ppr"
   | "te-premium"
+  | "custom-scoring"
   | "flex"
   | "bench"
   | "on-the-clock"
@@ -63,14 +64,21 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     term: "Half PPR",
     short: "Half a point for every reception, on top of yards and touchdowns.",
     detail:
-      "Half PPR works like PPR, but a reception is worth half a point instead of a full point. It still rewards catches, just without swinging scores toward pass catchers as hard as full PPR does.",
+      "Half PPR pays half a point for every catch, on top of yards and touchdowns, rather than a full point per catch. It still rewards catches, just not as heavily as a league that pays a full point for every one.",
   },
   "te-premium": {
     key: "te-premium",
     term: "TE premium",
     short: "Tight ends earn extra points per catch, on top of PPR.",
     detail:
-      "TE premium adds an extra bonus for every catch a tight end makes, on top of a league's normal PPR points. Tight ends usually catch less than receivers, so the bonus keeps them worth drafting.",
+      "TE premium adds an extra bonus for every catch a tight end makes, on top of the point every catch already earns in this league. Tight ends usually catch less than receivers, so the bonus keeps them worth drafting.",
+  },
+  "custom-scoring": {
+    key: "custom-scoring",
+    term: "custom scoring",
+    short: "The commissioner changed at least one scoring rule from the standard presets.",
+    detail:
+      "This league's point values don't match Standard, PPR, Half PPR, or PPR with a TE premium exactly, because its commissioner adjusted at least one of them. It is not a lower-quality league, just a hand-tuned one.",
   },
   flex: {
     key: "flex",

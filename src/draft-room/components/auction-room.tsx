@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import type { Player } from "@/domain/player";
 import type { ClientDraftAction } from "@/draft-engine";
+import type { HelpLevel } from "@/identity/preferences";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { useQueueHandlers } from "../hooks/use-queue-handlers";
 import { actionLabelFor, playerName } from "../lib/lookups";
@@ -18,9 +19,11 @@ export interface AuctionRoomProps {
   readonly onAct: (action: ClientDraftAction) => void;
   /** The social band down the right edge (league chat), or nothing. Built by `DraftRoom`. */
   readonly aside?: ReactNode;
+  /** Forwarded to `RoomShell`/`RoomRail`. See `RoomRailProps.helpLevel`. */
+  readonly helpLevel?: HelpLevel;
 }
 
-export function AuctionRoom({ room, playersById, onAct, aside }: AuctionRoomProps) {
+export function AuctionRoom({ room, playersById, onAct, aside, helpLevel }: AuctionRoomProps) {
   const view = room.view!;
   const [nominating, setNominating] = useState<string | null>(null);
   // Affordance only. `onClockTeamId` is the engine's nominator, and it is null while a lot is live.
@@ -45,6 +48,7 @@ export function AuctionRoom({ room, playersById, onAct, aside }: AuctionRoomProp
           ) : null
         }
         aside={aside}
+        helpLevel={helpLevel}
       />
       {/* `view.minBid` is only null before an auction has started (`draftStateView`,
           `src/draft-engine/selectors.ts`) — the modal itself only ever opens once `canNominate`
