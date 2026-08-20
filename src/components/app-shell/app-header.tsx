@@ -31,6 +31,15 @@ export interface AppHeaderProps {
  * The queue link (Task 5) renders ONLY for `isAdmin`, and links to `/app/admin/queue` — itself
  * gated by `withAdmin` (ruling 14, 404 not 403), so this is a convenience for an operator who
  * already has access, never the access control itself. An ordinary member never sees it.
+ *
+ * ICON-ONLY, matching `NoticeInbox`'s own trigger (`Icon` plus `aria-label`, no visible text
+ * node) rather than a new narrow-viewport breakpoint: this header already has exactly one
+ * pattern for "a header control with no room for a label" and a second one, invented here, was
+ * the actual 360px regression (fix round 1, FIX 1) — five controls at full width (wordmark,
+ * queue, notices, profile, sign out) overflowed a 360px viewport by 30px and clipped sign-out
+ * off the right edge. Icon-only at every width removes that width unconditionally rather than
+ * only below a breakpoint, so it cannot regress the same way if a sixth control ever joins this
+ * row.
  */
 export function AppHeader({ displayName, avatar, isAdmin }: AppHeaderProps) {
   return (
@@ -46,10 +55,10 @@ export function AppHeader({ displayName, avatar, isAdmin }: AppHeaderProps) {
           {!isAdmin ? null : (
             <Link
               href="/app/admin/queue"
-              className="flex items-center gap-1.5 rounded-md text-sm text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              aria-label="Queue"
+              className="flex items-center justify-center rounded-md p-2 text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              <Icon name="shield" size={18} />
-              Queue
+              <Icon name="shield" size={20} />
             </Link>
           )}
           <NoticeInbox />

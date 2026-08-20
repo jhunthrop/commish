@@ -4,7 +4,7 @@ import { flagDetail } from "@/integrity-service/flags";
 import { leagueNameFor } from "@/draft-service/teams";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { renderNotice } from "@/integrity/notices";
-import type { FlagSubjectView } from "@/integrity/queue-view";
+import { DECISION_PHRASE, type FlagResolutionView, type FlagSubjectView } from "@/integrity/queue-view";
 import type { ResolutionDecision } from "@/integrity/flags";
 import { AppHeader } from "@/components/app-shell/app-header";
 import { Card, PageTitle } from "@/components/ui";
@@ -72,6 +72,28 @@ function noticePreviewsFor(leagueName: string): Readonly<Record<"warned_user" | 
     warned_user: renderNotice("operator_warning", { leagueName, note: "" }),
     content_removed: renderNotice("review_removed", { reason: "" }),
   };
+}
+
+/**
+ * What an operator sees once a flag is ALREADY resolved — fix round 1, FIX 5. Replaces the old
+ * bare "This flag is already resolved." sentence, which said a decision existed but nothing
+ * about what it was, who made it, or when: an operator revisiting a flag (their own `router.
+ * refresh()` after submitting, or a second operator checking the queue later) could not answer
+ * "what happened here" without leaving this page for the trail's own headline further down.
+ * `DECISION_PHRASE` (`@/integrity/queue-view`) is the SAME wording the trail already uses for
+ * this decision — one phrase, read from one place, not a second copy that could drift from it.
+ */
+function ResolutionSummary({ resolution }: { readonly resolution: FlagResolutionView }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm text-text-primary">
+        <span className="font-medium">{resolution.resolvedByName}</span> {DECISION_PHRASE[resolution.decision]} on {formatWhen(resolution.resolvedAt)}.
+      </p>
+      {resolution.note.length === 0 ? null : (
+        <blockquote className="border-l-2 border-border pl-3 text-sm italic text-text-muted">{`"${resolution.note}"`}</blockquote>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -171,8 +193,8 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
 
           <Card>
             <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
-            {decisions.length === 0 ? (
-              <p className="text-sm text-text-muted">This flag is already resolved.</p>
+            {detail.resolution !== null ? (
+              <ResolutionSummary resolution={detail.resolution} />
             ) : (
               <ResolutionForm flagId={detail.flagId} decisions={decisions} noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength} previews={previews} />
             )}

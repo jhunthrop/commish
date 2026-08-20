@@ -6,7 +6,16 @@ import type { Clock } from "@/domain/timing";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { decisionIsAvailable, RESOLUTION_DECISIONS, SUBJECT_OF, type FlagSubjectType, type FlagType, type ResolutionDecision } from "@/integrity/flags";
 import type { NoticeType } from "@/integrity/notices";
-import { flagDetailFor, flagTrailRowFor, queueRowFor, type FlagDetail, type FlagSubjectView, type QueueRow, type ReporterView } from "@/integrity/queue-view";
+import {
+  flagDetailFor,
+  flagTrailRowFor,
+  queueRowFor,
+  type FlagCursor,
+  type FlagDetail,
+  type FlagSubjectView,
+  type QueueRow,
+  type ReporterView,
+} from "@/integrity/queue-view";
 import { removeReviewInTx } from "@/review-service/reviews";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { attachAuditEvent, notifyAffectedMember } from "./notify";
@@ -530,10 +539,7 @@ function toEvent(row: typeof auditEvents.$inferSelect): AuditEvent {
   return { ...row, occurredAt: row.occurredAt.toISOString() };
 }
 
-export interface FlagCursor {
-  readonly raisedAt: string;
-  readonly id: string;
-}
+export type { FlagCursor };
 
 export interface ListPendingFlagsInput {
   readonly limit?: number;
@@ -751,10 +757,31 @@ async function trailFor(db: Db, flagId: string, leagueId: string | null, subject
 }
 
 /**
+ * The resolving operator's own display name — fix round 1, FIX 5: the detail page needs to say
+ * WHO decided, not just render a bare "already resolved" sentence. A single query, run only
+ * when a flag actually IS resolved (`flagDetail`'s own caller already knows `resolvedByUserId`
+ * is non-null by the time this is called).
+ *
+ * No fallback, unlike `subjectFor`/`aboutFor`'s "a former member": `integrity_flags.
+ * resolved_by_user_id` carries a REAL foreign key onto `users.id` (`references(() => users.id)`,
+ * no `onDelete`, so Postgres refuses either write — the flag's own stamp `UPDATE`, or a later
+ * `DELETE FROM users` — the moment the other would leave this column dangling). A missing row
+ * here is not a rare edge case to degrade gracefully from; it is a constraint violation that
+ * would already have stopped the write that tried to produce it. `row!.name` says that plainly
+ * rather than writing a fallback branch no test could ever legitimately reach.
+ */
+async function resolverNameFor(db: Db, resolvedByUserId: string): Promise<string> {
+  const [row] = await db.select({ name: users.displayName }).from(users).where(eq(users.id, resolvedByUserId));
+  return row!.name;
+}
+
+/**
  * The detail read: one flag, its subject, its reporters and its relevant audit trail — bounded
- * at exactly FIVE queries regardless of how much history either chain holds: the flag row
- * itself, `subjectFor` (one), `reportersFor` (one), and `trailFor`'s own two. `flags.test.ts`
- * asserts this with `countingDb`.
+ * at exactly FIVE queries for an OPEN flag regardless of how much history either chain holds:
+ * the flag row itself, `subjectFor` (one), `reportersFor` (one), and `trailFor`'s own two. A
+ * RESOLVED flag costs one query more (`resolverNameFor`, sequenced after the batch since it
+ * only runs once `resolution` is known non-null) — six total. `flags.test.ts` asserts both
+ * bounds with `countingDb`.
  *
  * Returns `null` for a flag id that names nothing — the route (`GET`-equivalent Server Component
  * per Task 5's brief) turns that into `notFound()`, never a 403 or a 500.
@@ -785,6 +812,7 @@ export async function flagDetail(db: Db, flagId: string): Promise<FlagDetail | n
           note: flagRow.resolutionNote,
           resolvedAt: flagRow.resolvedAt.toISOString(),
           resolvedByUserId: flagRow.resolvedByUserId,
+          resolvedByName: await resolverNameFor(db, flagRow.resolvedByUserId),
         };
 
   return flagDetailFor(

@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { AdminRoomDepsProvider } from "../hooks/deps";
@@ -67,6 +68,62 @@ describe("ResolutionForm", () => {
     await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Decision recorded."));
     expect(fixture.calls).toEqual(["POST /api/admin/flags/flag_1/resolve"]);
     expect(refresh).toHaveBeenCalled();
+  });
+
+  it("switches the note counter's cap with the decision — 200 for content_removed (REVIEW_CONFIG.removalReason.maxLength), 500 otherwise (fix round 1, FIX 4)", () => {
+    const fixture = fixtureAdminDeps();
+    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["warned_user", "content_removed"]} noteMaxLength={500} previews={PREVIEWS} />, fixture.deps);
+
+    // `warned_user` is `decisions[0]`, the form's default selection — the general 500 cap.
+    expect(screen.getByText("500 characters left")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Remove the content" }));
+    expect(screen.getByText("200 characters left")).toBeInTheDocument();
+    expect(screen.queryByText("500 characters left")).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Warn the member" }));
+    expect(screen.getByText("500 characters left")).toBeInTheDocument();
+  });
+
+  it("re-derives the counter's cap from the switched decision even with text already typed", () => {
+    const fixture = fixtureAdminDeps();
+    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["warned_user", "content_removed"]} noteMaxLength={500} previews={PREVIEWS} />, fixture.deps);
+
+    fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "x".repeat(210) } });
+    expect(screen.getByText("290 characters left")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("radio", { name: "Remove the content" }));
+    // 210 typed characters past a 200 cap: over the limit, not a negative "characters left".
+    expect(screen.getByText("10 over the limit")).toBeInTheDocument();
+  });
+
+  it("walks the primary resolve flow keyboard-only: choose a decision, write a note, submit (fix round 1, FIX 6)", async () => {
+    const user = userEvent.setup();
+    const fixture = fixtureAdminDeps({ ok: true, data: { flagId: "flag_1", decision: "warned_user" } });
+    renderInAdmin(<ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user"]} noteMaxLength={500} previews={PREVIEWS} />, fixture.deps);
+
+    // Tab lands on the checked (default-selected) radio — native roving-tabindex, one stop for
+    // the whole group — then the arrow key, not a second Tab, moves within it and changes the
+    // selection, exactly how a keyboard-only operator drives a native radiogroup.
+    await user.tab();
+    expect(screen.getByRole("radio", { name: "No action" })).toHaveFocus();
+    await user.keyboard("{ArrowDown}");
+    expect(screen.getByRole("radio", { name: "Warn the member" })).toHaveFocus();
+    expect(screen.getByRole("radio", { name: "Warn the member" })).toBeChecked();
+
+    // Out of the radio group, into the note field, typed with no pointer at all.
+    await user.tab();
+    expect(screen.getByLabelText("Your note")).toHaveFocus();
+    await user.keyboard("Keep it civil.");
+    expect(screen.getByText('"Keep it civil."')).toBeInTheDocument();
+
+    // Tab to Submit and activate it with Enter — no click anywhere in this test.
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Submit decision" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Decision recorded."));
+    expect(fixture.calls).toEqual(["POST /api/admin/flags/flag_1/resolve"]);
   });
 
   it("states the failure and lets the operator try again, without pretending it worked", async () => {

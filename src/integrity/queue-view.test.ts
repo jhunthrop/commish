@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AuditEvent, AuditEventType, JsonObject } from "@/domain/audit";
 import { ACTIVITY_VISIBILITY, activityRowFor } from "./activity-view";
-import { flagDetailFor, flagTrailRowFor, queueRowFor, type FlagSubjectView } from "./queue-view";
+import { flagDetailFor, flagTrailRowFor, formatFlagCursor, parseFlagCursor, queueRowFor, type FlagSubjectView } from "./queue-view";
 
 const names = {
   member: (id: string | null) => (id === "u_reporter" ? "Reporter" : "A former member"),
@@ -74,7 +74,7 @@ describe("flagDetailFor — the operator's field set, proved against the member'
   });
 
   it("offers no decision at all once a flag is already resolved — a second attempt is a new flag, not an edit", () => {
-    const resolved = { ...flag, resolution: { decision: "no_action" as const, note: "n", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op" } };
+    const resolved = { ...flag, resolution: { decision: "no_action" as const, note: "n", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op", resolvedByName: "Op" } };
     const detail = flagDetailFor(resolved, subject, [], []);
     expect(detail.decisions).toEqual([]);
     expect(detail.resolution).toEqual(resolved.resolution);
@@ -131,5 +131,32 @@ describe("flagTrailRowFor", () => {
     expect(flagTrailRowFor(event("admin_action", { action: "admin_granted", subjectUserId: "u1" }))).toBeNull();
     expect(flagTrailRowFor(event("league_created", { name: "x" }))).toBeNull();
     expect(flagTrailRowFor(event("session_started", {}))).toBeNull();
+  });
+});
+
+describe("formatFlagCursor / parseFlagCursor — the queue's pagination cursor (fix round 1, FIX 3)", () => {
+  it("round-trips a real cursor", () => {
+    const cursor = { raisedAt: "2026-08-01T00:00:00.000Z", id: "flag_1" };
+    expect(parseFlagCursor(formatFlagCursor(cursor))).toEqual(cursor);
+  });
+
+  it("refuses a string with no separator at all", () => {
+    expect(parseFlagCursor("not-a-real-cursor")).toBeNull();
+  });
+
+  it("refuses a string whose separator is the very first character", () => {
+    expect(parseFlagCursor("|flag_1")).toBeNull();
+  });
+
+  it("refuses a cursor with an empty id", () => {
+    expect(parseFlagCursor("2026-08-01T00:00:00.000Z|")).toBeNull();
+  });
+
+  it("refuses a raisedAt that isn't ISO-instant shaped", () => {
+    expect(parseFlagCursor("2026-08-01|flag_1")).toBeNull();
+  });
+
+  it("refuses a raisedAt that is ISO-instant SHAPED but not a real date", () => {
+    expect(parseFlagCursor("2026-13-40T25:99:99.999Z|flag_1")).toBeNull();
   });
 });

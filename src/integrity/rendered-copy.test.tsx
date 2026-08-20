@@ -191,7 +191,7 @@ describe("the admin queue page says nothing that breaks the house copy rules", (
     for (const rows of [[], [QUEUE_ROW]]) {
       vi.mocked(listPendingFlags).mockResolvedValue({ rows, nextBefore: null });
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
-      const page = await AdminQueuePage();
+      const page = await AdminQueuePage({ searchParams: Promise.resolve({}) });
       const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
       await screen.findByText("Dispute queue");
       expectClean(container, QUEUE_ROW.question, QUEUE_ROW.about);
@@ -212,7 +212,7 @@ describe("the admin flag detail page says nothing that breaks the house copy rul
 
     for (const detail of [
       FLAG_DETAIL,
-      { ...FLAG_DETAIL, resolution: { decision: "no_action" as const, note: "n", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op" }, decisions: [] },
+      { ...FLAG_DETAIL, resolution: { decision: "no_action" as const, note: "n", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op", resolvedByName: "Op Erator" }, decisions: [] },
       { ...FLAG_DETAIL, reporters: [], trail: [] },
     ]) {
       vi.mocked(flagDetail).mockResolvedValue(detail);

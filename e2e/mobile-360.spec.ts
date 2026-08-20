@@ -136,10 +136,13 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expectNoHorizontalScroll(page, "/app/profile");
 
     // --- Task 5: the operator's dispute queue -----------------------------------------------
-    // Manager A IS the operator in this environment: `global-setup.ts` seeds with
-    // `DEV_SEED_CLAIM_USER_ID=a.userId`, and `seedOperator` grants that same account operator
-    // access as part of the ordinary dev seed pipeline — an operator triaging on a phone at
-    // 11pm is the realistic case this spec exists to check, not an exotic second identity to
+    // Manager A IS the operator in this environment, DETERMINISTICALLY: `global-setup.ts`'s
+    // `ensureE2eOperator` grants it through the real `grantAdmin` writer, idempotently and
+    // regardless of who (if anyone) already holds the database's one bootstrap slot — fix round
+    // 1, FIX 2's own finding was that the seed pipeline's own attempt (`seedOperator`) can lose
+    // that race silently on a shared, reused database, which is exactly what made this section
+    // read as passing while never actually reaching the queue. An operator triaging on a phone
+    // at 11pm is the realistic case this spec exists to check, not an exotic second identity to
     // mint. The queue reads empty here (nothing in the seeded fixture or the other specs raises
     // a flag), which is itself the state an operator sees most, per the page's own docblock —
     // the empty state's own link back to the manager's leagues is the control this spec proves

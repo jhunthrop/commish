@@ -998,8 +998,48 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
     expect(detail!.decisions).toEqual(["no_action", "warned_user", "content_removed"]);
 
     await resolveFlag(db, { flagId: flag.id, decision: "no_action", note: "n", operatorUserId: "u_detail_op", audit: logger });
-    const afterResolve = await flagDetail(db, flag.id);
+
+    const resolvedCounted = countingDb(db);
+    const afterResolve = await flagDetail(resolvedCounted.db, flag.id);
+    // Fix round 1, FIX 5: one query more than the open-flag bound above — `resolverNameFor`,
+    // run only once `resolution` is known non-null.
+    expect(resolvedCounted.selectCount()).toBeLessThanOrEqual(6);
     expect(afterResolve!.trail.map((r) => r.headline)).toEqual(["This flag was opened.", "An operator closed this flag with no action."]);
+    expect(afterResolve!.decisions).toEqual([]);
+    expect(afterResolve!.resolution).toEqual({
+      decision: "no_action",
+      note: "n",
+      resolvedAt: expect.any(String),
+      resolvedByUserId: "u_detail_op",
+      resolvedByName: "u_detail_op",
+    });
+  });
+
+  it("cannot ever stamp a flag resolved by an operator id that names nobody — the foreign key refuses it, which is why resolverNameFor needs no fallback", async () => {
+    await seedUser("u_ghost_op_author");
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "review_report",
+        subjectId: "review_that_does_not_exist_for_ghost_op",
+        leagueId: null,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: "2026-08-01T00:00:00.000Z",
+        newId: () => "detail_flag_ghost_op",
+        audit: logger,
+      }),
+    );
+    // `integrity_flags.resolved_by_user_id` carries a real FK onto `users.id` — Postgres itself
+    // is the proof `flags.ts`'s `resolverNameFor` leans on: this write cannot land, so
+    // `flagDetail`'s resolution summary never needs a "the operator is gone" fallback.
+    // `code: "23503"` is Postgres's own SQLSTATE for a foreign key violation; Drizzle wraps the
+    // real `PostgresError` (which carries `code`/`constraint_name`) as this rejection's `.cause`.
+    await expect(
+      db
+        .update(integrityFlags)
+        .set({ resolvedAt: new Date(NOW), resolvedByUserId: "u_ghost_operator_id", resolution: "no_action", resolutionNote: "n" })
+        .where(eq(integrityFlags.id, flag.id)),
+    ).rejects.toMatchObject({ cause: { code: "23503", constraint_name: "integrity_flags_resolved_by_user_id_users_id_fk" } });
   });
 
   it("falls back honestly when the subject row is gone", async () => {

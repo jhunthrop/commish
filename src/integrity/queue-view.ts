@@ -33,12 +33,21 @@ export interface FlagDetail {
   readonly decisions: readonly ResolutionDecision[]; // only those decisionIsAvailable() allows, and only while open
 }
 
-/** The decision already recorded, for a flag `flagDetail` finds already resolved. */
+/**
+ * The decision already recorded, for a flag `flagDetail` finds already resolved — fix round 1,
+ * FIX 5: the detail page used to render a bare "This flag is already resolved." sentence with no
+ * way for an operator to see what happened, or who decided it, without leaving the page for the
+ * trail's own headline. `resolvedByName` is resolved at read time (ruling 5) rather than making a
+ * caller resolve `resolvedByUserId` a second time — `resolvedByUserId` stays on the shape too,
+ * for the same "keep the id alongside the derived name" provenance discipline `ReporterView`
+ * already follows.
+ */
 export interface FlagResolutionView {
   readonly decision: ResolutionDecision;
   readonly note: string;
   readonly resolvedAt: string;
   readonly resolvedByUserId: string;
+  readonly resolvedByName: string;
 }
 
 /**
@@ -161,10 +170,16 @@ function payloadStr(payload: JsonObject, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
-/** The phrase an operator reads for each decision, in the trail. Exhaustive over every declared
- *  `ResolutionDecision` for the same "cannot silently fall through" reason `resolveFlag`'s own
- *  `DECISION_LABEL` is. */
-const TRAIL_DECISION_PHRASE: Readonly<Record<ResolutionDecision, string>> = {
+/**
+ * The verb phrase an operator reads for each decision — "closed this flag with no action",
+ * "sent the member a warning". Exhaustive over every declared `ResolutionDecision` for the same
+ * "cannot silently fall through" reason `resolveFlag`'s own `DECISION_LABEL` is. Exported (fix
+ * round 1, FIX 5): the trail (`flagTrailRowFor`, below) and the detail page's own already-
+ * resolved summary both read the same decision as the same words — "an operator {phrase}" in the
+ * trail, "{name} {phrase} on {date}" in the resolution summary — so there is exactly one place
+ * that phrasing is decided, not two copies that could drift.
+ */
+export const DECISION_PHRASE: Readonly<Record<ResolutionDecision, string>> = {
   no_action: "closed this flag with no action",
   warned_user: "sent the member a warning",
   content_removed: "removed the reported content",
@@ -193,7 +208,7 @@ export function flagTrailRowFor(event: AuditEvent): ActivityRow | null {
   }
   if (event.eventType === "flag_resolved") {
     const decision = payloadStr(event.payload, "decision");
-    const phrase = decision !== undefined && isResolutionDecision(decision) ? TRAIL_DECISION_PHRASE[decision] : "resolved this flag";
+    const phrase = decision !== undefined && isResolutionDecision(decision) ? DECISION_PHRASE[decision] : "resolved this flag";
     return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "check", headline: `An operator ${phrase}.`, detail: null };
   }
   if (event.eventType === "review_removed") {
@@ -203,4 +218,42 @@ export function flagTrailRowFor(event: AuditEvent): ActivityRow | null {
     return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "users", headline: "This account joined the league.", detail: null };
   }
   return null;
+}
+
+/**
+ * The queue's own pagination cursor — a timestamp AND the id of the row it belongs to, the same
+ * two-field shape `ReviewCursor` (`@/reviews/cursor`) uses and for the identical reason: `raised_
+ * at` alone is not unique (two flags can be raised in the same millisecond), so `pendingFlagQuery`
+ * orders and pages by `(raised_at, id)` as a total ordering, and the cursor has to carry both
+ * halves of it or the boundary could silently drop a row. Defined here, not in `@/integrity-
+ * service/flags` (the query's own home), because it is wire vocabulary a page's `searchParams`
+ * decodes — pure, no I/O, same reasoning that keeps `ReviewCursor` out of `@/review-service`.
+ */
+export interface FlagCursor {
+  readonly raisedAt: string;
+  readonly id: string;
+}
+
+const CURSOR_SEPARATOR = "|";
+const ISO_INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+
+/** The opaque `?before=` value `listPendingFlags`' own `nextBefore` hands a page. */
+export function formatFlagCursor(cursor: FlagCursor): string {
+  return `${cursor.raisedAt}${CURSOR_SEPARATOR}${cursor.id}`;
+}
+
+/**
+ * The parsed cursor, or `null` for anything the queue did not itself hand out — a hand-edited
+ * query string or garbage. The page turns `null` into "no cursor" (the newest, i.e. oldest-first
+ * FIRST, page) rather than passing it through to the query — the same "untrusted query param,
+ * fails closed to no-cursor" discipline the league activity page's own `parseBefore` uses.
+ */
+export function parseFlagCursor(raw: string): FlagCursor | null {
+  const separatorAt = raw.indexOf(CURSOR_SEPARATOR);
+  if (separatorAt <= 0) return null;
+
+  const raisedAt = raw.slice(0, separatorAt);
+  const id = raw.slice(separatorAt + 1);
+  if (id === "" || !ISO_INSTANT.test(raisedAt) || Number.isNaN(Date.parse(raisedAt))) return null;
+  return { raisedAt, id };
 }

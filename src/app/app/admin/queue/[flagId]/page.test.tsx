@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { axe } from "vitest-axe";
+import { inBothThemes } from "@/components/ui/test-utils";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 
@@ -67,17 +69,23 @@ describe("AdminFlagDetailPage — the gate and the non-oracle 404", () => {
 });
 
 describe("AdminFlagDetailPage — the read", () => {
-  it("renders the subject, reporters, trail and a decision form for an open flag", async () => {
+  it("renders the subject, reporters, trail and a decision form for an open flag, in both themes, axe-clean", async () => {
     vi.mocked(flagDetail).mockResolvedValue(OPEN_REVIEW_DETAIL);
-    await renderPage();
-
-    expect(await screen.findByText("Great season overall.")).toBeInTheDocument();
-    expect(screen.getByText("By Ada")).toBeInTheDocument();
-    expect(screen.getByText(/reported .spam. on/)).toBeInTheDocument();
-    expect(screen.getByText("This flag was opened.")).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "No action" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Warn the member" })).toBeInTheDocument();
-    expect(screen.getByRole("radio", { name: "Remove the content" })).toBeInTheDocument();
+    const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+    const page = await callPage();
+    await inBothThemes(
+      <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+      async ({ container }) => {
+        expect(await screen.findByText("Great season overall.")).toBeInTheDocument();
+        expect(screen.getByText("By Ada")).toBeInTheDocument();
+        expect(screen.getByText(/reported .spam. on/)).toBeInTheDocument();
+        expect(screen.getByText("This flag was opened.")).toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: "No action" })).toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: "Warn the member" })).toBeInTheDocument();
+        expect(screen.getByRole("radio", { name: "Remove the content" })).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
   });
 
   it("offers no content-removal decision for a chat message — Task 6 hasn't wired the remover yet", async () => {
@@ -91,16 +99,43 @@ describe("AdminFlagDetailPage — the read", () => {
     expect(screen.queryByRole("radio", { name: "Remove the content" })).not.toBeInTheDocument();
   });
 
-  it("shows no decision form once a flag is already resolved", async () => {
+  it("renders the resolution — decision, note, who, and when — once a flag is already resolved, instead of a bare sentence, in both themes, axe-clean (fix round 1, FIX 5)", async () => {
     vi.mocked(flagDetail).mockResolvedValue({
       ...OPEN_REVIEW_DETAIL,
-      resolution: { decision: "no_action", note: "n", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op" },
+      resolution: {
+        decision: "warned_user",
+        note: "Please keep it civil in chat.",
+        resolvedAt: "2026-08-02T00:00:00.000Z",
+        resolvedByUserId: "u_op",
+        resolvedByName: "Ada Operator",
+      },
+      decisions: [],
+    });
+    const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+    const page = await callPage();
+    await inBothThemes(
+      <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+      async ({ container }) => {
+        expect(await screen.findByText("Ada Operator", { exact: false })).toBeInTheDocument();
+        expect(screen.getByText(/sent the member a warning/)).toBeInTheDocument();
+        expect(screen.getByText('"Please keep it civil in chat."')).toBeInTheDocument();
+        expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+        expect(screen.queryByText("This flag is already resolved.")).not.toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+  });
+
+  it("renders no blockquote for a resolution with an empty note", async () => {
+    vi.mocked(flagDetail).mockResolvedValue({
+      ...OPEN_REVIEW_DETAIL,
+      resolution: { decision: "no_action", note: "", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op", resolvedByName: "Ada Operator" },
       decisions: [],
     });
     await renderPage();
 
-    expect(await screen.findByText("This flag is already resolved.")).toBeInTheDocument();
-    expect(screen.queryByRole("radio")).not.toBeInTheDocument();
+    expect(await screen.findByText(/closed this flag with no action/)).toBeInTheDocument();
+    expect(document.querySelector("blockquote")).toBeNull();
   });
 
   it("names the empty states honestly when there is nothing to show", async () => {

@@ -139,4 +139,22 @@ describe("POST /api/admin/flags/[flagId]/resolve", () => {
     const response = await post(flagId, { decision: "no_action", note: "x".repeat(1000) });
     expect(response.status).toBe(400);
   });
+
+  it("answers 400 with PRODUCT copy for a content_removed note past 200 chars, driven through the real route (fix round 1, FIX 6)", async () => {
+    // 201 chars: past `REVIEW_CONFIG.removalReason.maxLength` (200) but well under the general
+    // `INTEGRITY_CONFIG.moderation.noteMaxLength` (500) `resolveFlagSchema` itself enforces at
+    // the boundary — so this note passes `parseJson` and is refused by `resolveFlag`'s own
+    // tighter, content_removed-specific check, and the client's counter (`ResolutionForm`'s
+    // `maxLengthFor`) is what should have warned an operator before they ever got here.
+    await db.insert(users).values({ id: "u_op", email: "u_op@test.local", displayName: "u_op", isAdmin: true });
+    signedInAs("u_op");
+    const { flagId } = await openReviewFlag("resolve4");
+
+    const response = await post(flagId, { decision: "content_removed", note: "x".repeat(201) });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toEqual({ ok: false, error: "Notes on a removal are limited to 200 characters." });
+
+    const [row] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, flagId));
+    expect(row?.resolvedAt).toBeNull();
+  });
 });

@@ -3,8 +3,9 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium, type FullConfig } from "@playwright/test";
 import { eq } from "drizzle-orm";
-import { createDb } from "../src/db/client";
-import { statWeeks } from "../src/db/schema";
+import { createDb, type Db } from "../src/db/client";
+import { statWeeks, users } from "../src/db/schema";
+import { BOOTSTRAP_ACTOR, grantAdmin } from "../src/integrity-service/flags";
 import { LEAGUE_CONFIG } from "../src/league";
 import { createRedisConnection } from "../src/lib/realtime/redis";
 import { mintLabSession, SESSION_COOKIE_NAME } from "../scripts/lib/lab-session";
@@ -179,6 +180,47 @@ async function tickUntilLiveWeekReached(): Promise<void> {
 }
 
 /**
+ * Makes manager A the operator, deterministically, on a database this suite does not control the
+ * history of. `src/data/seed/index.ts`'s own `seedOperator` already tries this (`DEV_SEED_CLAIM_
+ * USER_ID=a.userId`, run as part of the seed step below) — fix round 1, FIX 2's own finding is
+ * that it can silently lose: `grantAdmin`'s bootstrap check is legal exactly once per database
+ * (ruling 15), and a SHARED dev database that was ever seeded once before without a claim id (or
+ * seeded by a different developer, or reseeded after `scripts/grant-admin.ts` was run by hand)
+ * already has `dev_user_01` or someone else holding that one bootstrap slot — `seedOperator`'s own
+ * call then answers `{ ok: false, reason: "This database already has an operator…" }`, silently,
+ * and manager A is never admin. `e2e/mobile-360.spec.ts`'s queue assertions then either 404 (if
+ * they check for that) or — the actual failure mode found in review — pass VACUOUSLY, because
+ * nothing upstream noticed the grant never landed.
+ *
+ * This is the fix: read whether manager A is ALREADY an operator (the common case on a reused
+ * database, after this function's own first run) and return immediately if so — zero writes on
+ * every rerun but the first. Otherwise, find ANY existing operator and grant THROUGH them
+ * (`grantAdmin`'s ordinary, non-bootstrap door — the same one `scripts/grant-admin.ts` uses for
+ * every grant after the first), falling back to `BOOTSTRAP_ACTOR` only when the database
+ * genuinely has no operator yet. Never a direct `UPDATE users SET is_admin` — `grantAdmin` is
+ * still the ONLY writer of that column (ruling 15, `seed-operator.test.ts`'s own drift tripwire),
+ * and this function calls it exactly the way the interactive script would if a human ran it with
+ * `--by <the first admin's id>`.
+ *
+ * Throws (rather than swallowing) if `grantAdmin` still refuses — a concurrent grant/revoke
+ * racing this setup is the only way that could happen, and a loud failure here is better than a
+ * mobile spec silently skipping its own operator assertions a second time.
+ */
+async function ensureE2eOperator(db: Db, targetUserId: string): Promise<void> {
+  const [target] = await db.select({ isAdmin: users.isAdmin }).from(users).where(eq(users.id, targetUserId));
+  if (target?.isAdmin === true) return;
+
+  const [existingAdmin] = await db.select({ id: users.id }).from(users).where(eq(users.isAdmin, true)).limit(1);
+  const grantedBy = existingAdmin?.id ?? BOOTSTRAP_ACTOR;
+
+  const result = await grantAdmin(db, { userId: targetUserId, grant: true, grantedBy });
+  if (!result.ok) {
+    throw new Error(`[e2e] could not make ${targetUserId} the operator (granting through "${grantedBy}"): ${result.reason}`);
+  }
+  console.log(`[e2e] granted operator access to ${targetUserId} (through "${grantedBy}")`);
+}
+
+/**
  * Two real managers, one seeded season, its live week ticked into progress, no bypass.
  *
  * The order matters and each step earns its place:
@@ -238,6 +280,16 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     ["dotenv", "-e", ".env.local", "-v", `DEV_SEED_CLAIM_USER_ID=${a.userId}`, "--", "tsx", "src/data/seed/index.ts"],
     { stdio: "inherit", cwd: resolve(AUTH_DIR, "../..") },
   );
+
+  // 3.5. **Make manager A the operator, for real** — the seed step above already tried
+  // (`seedOperator`), and this is what makes it deterministic on a shared database where that
+  // attempt can silently lose (see `ensureE2eOperator`'s own docblock, fix round 1 FIX 2).
+  const operatorDb = createDb();
+  try {
+    await ensureE2eOperator(operatorDb, a.userId);
+  } finally {
+    await operatorDb.$client.end();
+  }
 
   await resetIngestionRedisState();
   await tickUntilLiveWeekReached();

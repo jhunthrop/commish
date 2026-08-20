@@ -6,6 +6,7 @@ import { removalPhraseFor } from "@/moderation/removal";
 import { Button, Textarea } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { ResolutionDecision } from "@/integrity/flags";
+import { REVIEW_CONFIG } from "@/reviews/config";
 import { useAdminRoomDeps } from "../hooks/deps";
 
 const DECISION_LABEL: Readonly<Record<ResolutionDecision, string>> = {
@@ -28,8 +29,29 @@ export interface ResolutionFormProps {
   /** Already narrowed to what this product can carry out AND what this subject's own removal
    *  path supports — the page's own decision, not this form's. */
   readonly decisions: readonly ResolutionDecision[];
+  /** `INTEGRITY_CONFIG.moderation.noteMaxLength` (500) — every decision's cap EXCEPT
+   *  `content_removed`'s (`maxLengthFor`, below). Passed as a prop, never imported directly:
+   *  `@/integrity` is blocked for room code (the client boundary, `eslint.config.mjs`), so the
+   *  page (which CAN import it) hands the number down as plain data — the same "cross the
+   *  boundary via props, not via import" shape `previews` already uses. */
   readonly noteMaxLength: number;
   readonly previews: Readonly<Partial<Record<ResolutionDecision, DecisionPreview>>>;
+}
+
+/**
+ * The note's real cap for the CHOSEN decision — fix round 1, FIX 4: the counter used to always
+ * show `noteMaxLength` (500) regardless of which decision was selected, so an operator writing a
+ * 300-character `content_removed` note saw "200 characters left" nowhere and then hit a 400 on
+ * submit that the form gave no warning about. `resolveFlag`'s own tighter check
+ * (`src/integrity-service/flags.ts`) reads `REVIEW_CONFIG.removalReason.maxLength` for exactly
+ * this decision, for exactly this reason (a `content_removed` note becomes `removeReviewInTx`'s
+ * removal REASON, not an `operator_warning` notice body) — importing the SAME constant here,
+ * rather than a second `200` this file would own, is what keeps the counter and the server cap
+ * from ever being able to disagree again. `@/reviews` is the browser-safe half of that pair
+ * (unlike `@/review-service`, which is blocked), so this is a direct, legal import, not a prop.
+ */
+function maxLengthFor(decision: ResolutionDecision | null, noteMaxLength: number): number {
+  return decision === "content_removed" ? REVIEW_CONFIG.removalReason.maxLength : noteMaxLength;
 }
 
 /**
@@ -163,8 +185,8 @@ export function ResolutionForm({ flagId, decisions, noteMaxLength, previews }: R
         label="Your note"
         value={note}
         onChange={(event) => setNote(event.target.value)}
-        maxLength={noteMaxLength}
-        hint="Your own words. Kept on the record either way."
+        maxLength={maxLengthFor(decision, noteMaxLength)}
+        hint={decision === "content_removed" ? "Your own words. The member reads a general reason instead — see below." : "Your own words. Kept on the record either way."}
       />
 
       <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-elevated p-3" aria-label="What the member will see">
