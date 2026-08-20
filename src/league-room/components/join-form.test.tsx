@@ -55,6 +55,17 @@ describe("JoinForm", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the same terms with a sign-in call to action when nobody is signed in", async () => {
+    const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });
+    renderInLeague(<JoinForm code="SUNDAY12" signedIn={false} />, fixture.deps);
+
+    // The terms themselves are identical — an account changes the ACTION, never the facts.
+    expect(await screen.findByRole("heading", { name: "Sunday Money" })).toBeInTheDocument();
+    expect(screen.getByText(TERMS.rosterLine)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Sign in to join Sunday Money" })).toHaveAttribute("href", "/sign-in");
+    expect(screen.queryByRole("button", { name: /^Join/ })).not.toBeInTheDocument();
+  });
+
   it("shows a loading skeleton before the preview resolves", () => {
     const fixture = fixtureLeagueDeps(undefined, { deferred: true });
     renderInLeague(<JoinForm code="SUNDAY12" />, fixture.deps);

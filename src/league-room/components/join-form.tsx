@@ -23,8 +23,21 @@ type PreviewState =
  * The preview fetch and the accept POST are two separate requests: a dead or expired code fails
  * the FIRST one, and there is nothing left to render but the same refusal `acceptInvite` would
  * have given anyway — no button, no code, no dead end, just a way back to `/app`.
+ *
+ * `signedIn` is the `PublicLeagueList` idiom: the terms are the same for everybody, and the only
+ * thing an account changes is whether the action is "Join <league>" or "Sign in to join". The
+ * preview fetch itself needs no session — that is the whole point of the route being
+ * unauthenticated (see its own docblock and `middleware.ts`'s exemption).
  */
-export function JoinForm({ code, helpLevel }: { readonly code: string; readonly helpLevel?: HelpLevel }) {
+export function JoinForm({
+  code,
+  helpLevel,
+  signedIn = true,
+}: {
+  readonly code: string;
+  readonly helpLevel?: HelpLevel;
+  readonly signedIn?: boolean;
+}) {
   const { fetchJson } = useLeagueRoomDeps();
   const router = useRouter();
   const [preview, setPreview] = useState<PreviewState>({ status: "loading" });
@@ -103,9 +116,19 @@ export function JoinForm({ code, helpLevel }: { readonly code: string; readonly 
         {"Joining puts you in the draft and the season that follows. You'll set a lineup every week."}
       </p>
       <LeagueTermsPanel terms={preview.terms} helpLevel={helpLevel} />
-      <Button onClick={() => void join()} loading={submitting} disabled={submitting}>
-        {`Join ${preview.terms.name}`}
-      </Button>
+      {signedIn ? (
+        <Button onClick={() => void join()} loading={submitting} disabled={submitting}>
+          {`Join ${preview.terms.name}`}
+        </Button>
+      ) : (
+        <Link
+          href="/sign-in"
+          aria-label={`Sign in to join ${preview.terms.name}`}
+          className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+        >
+          Sign in to join
+        </Link>
+      )}
       {error === null ? null : (
         <p role="alert" className="text-sm text-negative">
           {error}

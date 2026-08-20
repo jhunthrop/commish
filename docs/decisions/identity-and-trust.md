@@ -103,6 +103,16 @@ offer, and the person deciding whether to accept it has standing a browsing stra
 they are being asked to hand this specific person their entry fee. Naming the host on the
 invitation is the trust surface working as intended, not a leak.
 
+**The "before holding an account" premise is shipped, not aspirational.** It was not, at first:
+the route's only consumer was `JoinForm`, which rendered exclusively from a `requireCurrentUser()`
+page behind `middleware.ts`'s `/app` redirect, so no signed-out visitor could reach the preview
+this whole exception exists for. `/app/join/<code>` is now the one exemption in that redirect —
+anchored at both ends, one path segment wide, GET only (`middleware.ts`'s own docblock) — and the
+page renders the terms signed out with "Sign in to join" in place of the join button, the same
+idiom `/browse` uses. A signed-out visitor seeds no preferences row and sees `guided` help, for
+the same reason `/browse` does. The exception is now earned by the product, and
+`src/middleware.test.ts` is what keeps the exemption from widening.
+
 The non-oracle discipline (plan ruling 22): a wrong, expired, or exhausted code returns only
 `{ ok: false, reason }`, and the failing paths never read a league row, so a probe cannot
 distinguish a league that exists from one that never did by shape, and not meaningfully by
