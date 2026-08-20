@@ -5,7 +5,7 @@
 // barrel, or `read.ts`'s import of `@/draft-service/teams` with it) is reached by importing
 // the owning submodule directly.
 export { createLeague } from "./creation";
-export { createInvite, acceptInvite } from "./invites";
+export { createInvite, acceptInvite, invitePreview } from "./invites";
 export { listLeaguesForUser, leagueHome, matchupWeek } from "./read";
 export { crossLeagueHome } from "./home";
 export { setLineup, lineupView } from "./lineups";

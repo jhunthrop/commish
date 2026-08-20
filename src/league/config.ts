@@ -32,6 +32,14 @@ export const LEAGUE_CONFIG = {
     maxUses: 32,
     /** Attempts to find an unused code before giving up with a plain-language error. */
     maxCodeAttempts: 5,
+    /**
+     * `GET /api/invites/[code]`'s per-IP ceiling. Same shape and same rationale as
+     * `MATCHMAKING_CONFIG.browseRateLimit`: the preview is reachable by anyone holding the link,
+     * with no session required, so it is keyed on the forwarded-for header rather than a caller
+     * id — see that constant's own docblock, and `src/app/api/public/leagues/_shared.ts`, for
+     * exactly what a per-IP ceiling does and does not guarantee.
+     */
+    previewRateLimit: { maxRequests: 60, windowMs: 60_000 },
   },
   /**
    * The spec's exit criterion, made testable: signed in → created, invitable league in a

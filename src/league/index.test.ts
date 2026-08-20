@@ -3,7 +3,7 @@ import * as league from "./index";
 
 describe("the league barrel", () => {
   it("exports every public entry point", () => {
-    for (const name of ["LEAGUE_CONFIG", "generateSchedule", "currentWeekNumber", "computeStandings", "clinchedTeamIds", "defaultLineup", "setSlotPlayer", "startersOf", "benchOf", "generateInviteCode"]) {
+    for (const name of ["LEAGUE_CONFIG", "generateSchedule", "currentWeekNumber", "computeStandings", "clinchedTeamIds", "defaultLineup", "setSlotPlayer", "startersOf", "benchOf", "generateInviteCode", "leagueTerms"]) {
       expect(league).toHaveProperty(name);
     }
   });

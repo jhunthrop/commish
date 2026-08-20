@@ -2,6 +2,8 @@ import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import type { LeagueTerms } from "@/league";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { JoinForm } from "./join-form";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
@@ -13,32 +15,78 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
+const TERMS: LeagueTerms = {
+  name: "Sunday Money",
+  format: "snake",
+  teamCount: 12,
+  filledTeams: 8,
+  scoringLabel: "PPR",
+  rosterLine: "1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 K, 1 DEF, 6 bench",
+  stakeLabel: "Friendly",
+  stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
+  commissionerName: "Alex Rivera",
+  commissionerAvatar: null,
+};
+
 describe("JoinForm", () => {
-  it("shows the code it is about to accept, in both themes, axe-clean", async () => {
-    const fixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "l1", teamId: "t2", alreadyMember: false } });
+  it("names the league before asking anyone to join it, in both themes, axe-clean", async () => {
+    const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });
     await inBothThemes(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <JoinForm code="SUNDAY12" />
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
-        expect(screen.getByText("SUNDAY12")).toBeInTheDocument();
-        expect(screen.getByRole("button", { name: "Join this league" })).toBeInTheDocument();
+        expect(await screen.findByRole("heading", { name: "Sunday Money" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "Join Sunday Money" })).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );
+    expect(fixture.calls.every((call) => call === "GET /api/invites/SUNDAY12")).toBe(true);
+  });
+
+  it("shows a loading skeleton before the preview resolves", () => {
+    const fixture = fixtureLeagueDeps(undefined, { deferred: true });
+    renderInLeague(<JoinForm code="SUNDAY12" />, fixture.deps);
+    expect(screen.getByText("Loading…")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
   it("accepts the invite and reports where to go next", async () => {
-    const fixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "l1", teamId: "t2", alreadyMember: false } });
+    const fixture = fixtureLeagueDeps(undefined, { deferred: true });
     renderInLeague(<JoinForm code="SUNDAY12" />, fixture.deps);
-    fireEvent.click(screen.getByRole("button", { name: "Join this league" }));
-    await waitFor(() => expect(fixture.calls).toEqual(["POST /api/invites/SUNDAY12/accept"]));
+    await fixture.settle(0, { ok: true, data: TERMS });
+
+    const button = await screen.findByRole("button", { name: "Join Sunday Money" });
+    fireEvent.click(button);
+    await waitFor(() => expect(fixture.pending()).toBe(1));
+    await fixture.settle(1, { ok: true, data: { leagueId: "l1", teamId: "t2", alreadyMember: false } });
+
+    await waitFor(() =>
+      expect(fixture.calls).toEqual(["GET /api/invites/SUNDAY12", "POST /api/invites/SUNDAY12/accept"]),
+    );
   });
 
-  it("shows an actionable reason for a dead link", async () => {
-    const fixture = fixtureLeagueDeps({ ok: false, error: "That invite link has expired. Ask your commissioner for a new one." });
+  it("offers a way back to Commish, never a dead end, when the code itself is invalid", async () => {
+    const fixture = fixtureLeagueDeps({
+      ok: false,
+      error: "That invite link isn't valid. Ask your commissioner for a new one.",
+    });
+    renderInLeague(<JoinForm code="NOPE9999" />, fixture.deps);
+    expect(await screen.findByText("Ask your commissioner for a new one.", { exact: false })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Join/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to Commish" })).toHaveAttribute("href", "/app");
+  });
+
+  it("shows an actionable reason for a dead link at accept time", async () => {
+    const fixture = fixtureLeagueDeps(undefined, { deferred: true });
     renderInLeague(<JoinForm code="SUNDAY12" />, fixture.deps);
-    fireEvent.click(screen.getByRole("button", { name: "Join this league" }));
+    await fixture.settle(0, { ok: true, data: TERMS });
+
+    const button = await screen.findByRole("button", { name: "Join Sunday Money" });
+    fireEvent.click(button);
+    await waitFor(() => expect(fixture.pending()).toBe(1));
+    await fixture.settle(1, { ok: false, error: "That invite link has expired. Ask your commissioner for a new one." });
+
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("Ask your commissioner for a new one."));
   });
 });

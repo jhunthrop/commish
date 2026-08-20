@@ -4,7 +4,7 @@ import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { TradeFlag, TradeVerdict } from "@/ai-advisor/valuation";
 import type { FirstRunPlan } from "@/identity";
-import type { NextAction, StandingsRow, WeekStatus } from "@/league";
+import type { LeagueTerms, NextAction, StandingsRow, WeekStatus } from "@/league";
 
 /**
  * TYPES ONLY, no runtime code. Imported by the `/api/leagues/**` routes as their return shape
@@ -45,6 +45,15 @@ export interface JoinBody {
   readonly teamId: string;
   readonly alreadyMember: boolean;
 }
+
+/**
+ * `GET /api/invites/[code]`'s success payload — one `LeagueTerms` (`@/league/terms`), the exact
+ * shape `LeagueTermsPanel` renders here on the invite page AND, unchanged, inside the league
+ * itself (Task 8). Re-exported under its own name rather than left as a bare `LeagueTerms`
+ * import at call sites, so this contract's own docblock convention (every route's wire shape
+ * has a name ending in `Body`) holds for this route too.
+ */
+export type InvitePreviewBody = LeagueTerms;
 
 /** One row of the standings table, ready to render: the pure math plus what the page shows. */
 export interface TeamStandingsRow extends StandingsRow {

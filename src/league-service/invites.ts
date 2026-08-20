@@ -1,16 +1,26 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
-import { leagueInvites, teams } from "@/db/schema";
+import { leagueInvites, leagues, scoringSettings, teams, users } from "@/db/schema";
+import { PPR_SCORING } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
-import { generateInviteCode, LEAGUE_CONFIG } from "@/league";
+import { generateInviteCode, leagueTerms, LEAGUE_CONFIG, type LeagueTerms } from "@/league";
 import { MS_PER_DAY } from "./config";
 import type { LeagueWriteDeps } from "./creation";
 import { joinLeagueInTx, type JoinLeagueOutcome, type JoinPrecondition } from "./join";
 
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
 const TEAM_MEMBERSHIP_UNIQUE_INDEX = "teams_league_user_idx";
+
+/**
+ * The three plain-language refusals a dead or invalid invite code can answer with — named here
+ * once so `acceptInvite`'s precondition and the read-only `invitePreview` below say EXACTLY the
+ * same sentence for the same failure, rather than two hand-typed copies that could quietly
+ * diverge.
+ */
 const INVALID = "That invite link isn't valid. Ask your commissioner for a new one.";
+const EXPIRED = "That invite link has expired. Ask your commissioner for a new one.";
+const EXHAUSTED = "That invite link has already been used up. Ask your commissioner for a new one.";
 
 export interface InviteDeps {
   readonly db: Db;
@@ -99,14 +109,10 @@ export async function acceptInvite(
        */
       const invitePrecondition: JoinPrecondition = async () => {
         if (Date.parse(clock.now()) >= invite.expiresAt.getTime()) {
-          return { ok: false, status: 410, reason: "That invite link has expired. Ask your commissioner for a new one." };
+          return { ok: false, status: 410, reason: EXPIRED };
         }
         if (invite.uses >= invite.maxUses) {
-          return {
-            ok: false,
-            status: 410,
-            reason: "That invite link has already been used up. Ask your commissioner for a new one.",
-          };
+          return { ok: false, status: 410, reason: EXHAUSTED };
         }
         return null;
       };
@@ -143,4 +149,62 @@ export async function acceptInvite(
     console.error("[league] accept invite failed", { league: "redacted-code" }, error);
     return { ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." };
   }
+}
+
+export type InvitePreviewResult = { readonly ok: true; readonly terms: LeagueTerms } | { readonly ok: false; readonly reason: string };
+
+/**
+ * Read-only counterpart to `acceptInvite`: the SAME three validity checks (exists, not expired,
+ * uses remaining), answered with the SAME constants above, so a dead link reads identically
+ * here and at accept time — but this function never writes anything, and never takes a lock,
+ * because previewing an invite is not spending it.
+ *
+ * An invalid code returns the refusal and NOTHING else: no league id, no name, not even whether
+ * the code was well-formed. A preview endpoint that leaked a league's name for any guessed code
+ * would be an enumeration oracle over every private league in the product, and the one thing
+ * that makes that impossible is that every failing branch below returns before a single league
+ * row is read.
+ *
+ * A valid code discloses the league's terms to WHOEVER holds it, no membership check beyond
+ * that — exactly like `acceptInvite` itself, the code is the capability. This is a read, not a
+ * write, so it deliberately does not run inside `acceptInvite`'s transaction or its row locks.
+ */
+export async function invitePreview(db: Db, code: string): Promise<InvitePreviewResult> {
+  const [invite] = await db.select().from(leagueInvites).where(eq(leagueInvites.code, code));
+  if (invite === undefined) return { ok: false, reason: INVALID };
+  if (Date.now() >= invite.expiresAt.getTime()) return { ok: false, reason: EXPIRED };
+  if (invite.uses >= invite.maxUses) return { ok: false, reason: EXHAUSTED };
+
+  const [league] = await db.select().from(leagues).where(eq(leagues.id, invite.leagueId));
+  // The league an otherwise-valid invite points at is gone — same collapse `acceptInvite` makes
+  // (`joinLeagueInTx`'s LEAGUE_MISSING remapped to INVALID above): a stranger holding the link
+  // is never told "a real league existed here", only that the link itself doesn't work.
+  if (league === undefined) return { ok: false, reason: INVALID };
+
+  const [commissioner] = await db.select({ displayName: users.displayName, avatarUrl: users.avatarUrl }).from(users).where(
+    eq(users.id, league.commissionerUserId),
+  );
+  const [weights] = await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, league.id));
+  const filledTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, league.id));
+
+  return {
+    ok: true,
+    terms: leagueTerms({
+      name: league.name,
+      format: league.format,
+      teamCount: league.teamCount,
+      filledTeams: filledTeams.length,
+      // `scoring_settings` is written in the same transaction as `leagues` (`createLeague`), so
+      // a missing row here never happens in production — the PPR fallback mirrors `matchupWeek`'s
+      // own defensive default (`read.ts`) rather than inventing a second convention for the same
+      // never-true case.
+      scoring: weights ?? PPR_SCORING,
+      rosterSlots: league.rosterSlots,
+      stakeTier: league.stakeTier,
+      commissioner: {
+        displayName: commissioner?.displayName ?? "Commissioner",
+        avatarUrl: commissioner?.avatarUrl ?? null,
+      },
+    }),
+  };
 }
