@@ -1,5 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
+import type { DbTx } from "@/db/client";
 import { auditChains, auditEvents, leagues, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { AuditEventInput } from "@/domain/audit";
@@ -201,6 +202,25 @@ describe("concurrency", () => {
 
     release();
     await held;
+  });
+});
+
+/**
+ * `lockAnchor`'s "the row vanished between insert and lock" guard. Real Postgres cannot reach
+ * it: `INSERT ... ON CONFLICT DO NOTHING` either commits the row or finds it already committed,
+ * so the `SELECT ... FOR UPDATE` immediately after always finds something. The guard exists so a
+ * future refactor that breaks that invariant fails LOUDLY instead of returning an undefined
+ * anchor, and a guard nothing exercises is a guard nobody knows still works. A stub `DbTx` is the
+ * only way to put the code in the state it defends against — same shape as
+ * `src/identity-service/preferences.test.ts`'s "impossible-state guards".
+ */
+describe("AuditLogger.record — the impossible-state guard", () => {
+  it("refuses to invent a chain anchor when the row is somehow not there after insert", async () => {
+    const stub = {
+      insert: () => ({ values: () => ({ onConflictDoNothing: async () => undefined }) }),
+      select: () => ({ from: () => ({ where: () => ({ for: async () => [] }) }) }),
+    } as unknown as DbTx;
+    await expect(logger.record(stub, input())).rejects.toThrow('Audit chain "league_1" vanished between insert and lock.');
   });
 });
 

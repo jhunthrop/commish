@@ -23,6 +23,10 @@ npm run lint              # lint
 npm run typecheck         # type-check with no emit
 npm run build             # production build — part of the verification gate for every step
 npm start                 # run the production build (after npm run build)
+npm run audit:verify      # walk every audit chain incrementally from its checkpoint; add --full
+                          # for a from-genesis walk of every chain. Exits non-zero and names the
+                          # scope/sequence/event/reason on a broken chain — see
+                          # docs/decisions/audit-and-integrity.md
 npm run e2e:install       # one-time: download the Playwright browser
 npm run e2e               # browser end-to-end suite (needs a build + a WorkOS test key)
 npm run e2e:ui            # same suite, in Playwright's interactive UI mode

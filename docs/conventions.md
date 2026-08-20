@@ -123,11 +123,27 @@ src/
                           committed fixtures — mirrors stats/tank01/ exactly). Consumed by
                           GET /api/gifs/search and by the chat route's GET, which sets
                           ChatPageBody.gifSearchEnabled from createGifProvider() !== null.
+  integrity/              Pure audit rules: the hash chain (chain.ts — linkEvent, verifyLinkedRun,
+                          computeEventHash, normalizeInstant), the canonical rejecting encoder
+                          (canonical.ts), the member-visible activity allowlist + renderers
+                          (activity-view.ts), the notice copy registry (notices.ts —
+                          NOTICE_TEMPLATES, distinct from identity/notifications.ts's topic
+                          catalog) and INTEGRITY_CONFIG. NO I/O. 100% coverage. See
+                          docs/decisions/audit-and-integrity.md.
+  integrity-service/      Audit read/write service over Postgres: AuditLogger (record/recordAll,
+                          the one way anything writes an audit event), verifyChainIntegrity/
+                          verifyFullChainIntegrity, notifyAffectedMember/deliverNotice/
+                          listNotices/markNoticesRead, and listLeagueActivity (the member-visible
+                          feed's read side). Consumed by src/draft-service/**, src/league-service/**,
+                          src/review-service/**, src/identity-service/**, src/lib/auth/**,
+                          src/app/** and scripts/verify-audit-chain.ts. See
+                          docs/decisions/audit-and-integrity.md.
   db/                     schema.ts (Drizzle, pg-core: users, leagues, teams, league_invites,
                           scoring_settings, roster_slots, lineup_slots, drafts, draft_actions,
                           draft_nudges, draft_picks, weeks, matchups, players,
-                          player_stat_lines, chat_messages, chat_reactions), client.ts
-                          (createDb/getDb), test-db.ts
+                          player_stat_lines, chat_messages, chat_reactions, reviews,
+                          review_reports, audit_events, audit_chains, audit_chain_checkpoints,
+                          member_notices), client.ts (createDb/getDb), test-db.ts
   lib/
     env.ts                envOr/envOrUndefined — the ONE place an optional env var is read with a
                           fallback. `.env.example` ships some vars as empty lines and dotenv reads
@@ -173,10 +189,10 @@ Anything time-dependent takes a `Clock` (`src/domain/timing.ts`) and calls `cloc
 - Env: `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD` (≥32 chars), `NEXT_PUBLIC_WORKOS_REDIRECT_URI`. Dashboard: Redirect URI `…/callback`, sign-in endpoint `…/sign-in`.
 
 ### Real-time — one mechanism
-- **Writes are plain HTTP.** Validate → persist to Postgres → then `getPublisher().publish(...)`. Postgres is authoritative; publishing is best-effort and must never fail the write.
-- **Delivery is Redis Streams over SSE.** Stream key `league:<id>:events`. Read with plain `XREAD BLOCK` from a per-connection cursor. **Never `XREADGROUP`** — consumer groups partition entries across consumers; a draft room needs every viewer to see every pick.
+- **Writes are plain HTTP.** Validate → persist to Postgres → then `getPublisher().publish(...)`. Postgres is authoritative; publishing is best-effort and must never fail the write. `AuditLogger`'s append and `notifyAffectedMember`'s notice row are the one deliberate exception to "publishing is best-effort" — see `docs/decisions/audit-and-integrity.md`'s write-ordering ruling: both are inside the caller's business transaction and fail it, and only the Redis frame after that stays best-effort.
+- **Delivery is Redis Streams over SSE, on ONE of two key formats.** A league's broadcast is `league:<id>:events`, read by everyone in the room. One user's own events are `user:<id>:events` (`REALTIME_CONFIG.userStreamKey`) — the second key format this product has, and the only one used today, for `notice.created`: a notice about one member ("we removed your review") must never be readable by their leaguemates, so it never rides the league broadcast, not even as a content-free frame (an early version of this did, and leaked which member got a notice to every league subscriber — fixed before it shipped, see the decision doc). Both keys are read with the SAME mechanism — plain `XREAD BLOCK` from a per-connection cursor, the standard `Last-Event-ID` resume, the same publisher. **Never `XREADGROUP`** — consumer groups partition entries across consumers; a draft room needs every viewer to see every pick, and a user's own stream needs every one of their own open tabs to see every notice.
 - **Resume** is via the standard `Last-Event-ID` header (the SSE `id:` is the stream entry id). Full-state refetch is the fallback only when a gap outlasts stream retention.
-- **Event types** are enumerated once in `src/lib/realtime/events.ts` (`draft.*`, `chat.*`, `score.update`). Add there, nowhere else. `chat.message`/`chat.reaction` are published by `src/chat-service/chat.ts` and consumed by `useLeagueChat` (`docs/chat.md`); `score.update` is published by the stats-ingestion worker (`src/stats-pipeline/worker.ts`) once per league per tick that changed a player's stats or finalized a week — see `docs/decisions/live-scoring-pipeline.md`. It stayed reserved and unpublished through Phase 1; Plan B is what turns it on.
+- **Event types** are enumerated once in `src/lib/realtime/events.ts` (`draft.*`, `chat.*`, `score.update`, `notice.created`). Add there, nowhere else. `chat.message`/`chat.reaction` are published by `src/chat-service/chat.ts` and consumed by `useLeagueChat` (`docs/chat.md`); `score.update` is published by the stats-ingestion worker (`src/stats-pipeline/worker.ts`) once per league per tick that changed a player's stats or finalized a week — see `docs/decisions/live-scoring-pipeline.md`. It stayed reserved and unpublished through Phase 1; Plan B is what turns it on. `notice.created` is published by `deliverNotice` (`@/integrity-service/notify`) on the recipient's own user stream, after the transaction that wrote the durable `member_notices` row commits; the frame carries `{ noticeId, noticeType }` only, never the rendered words — `GET /api/notices` is where those come from. See `docs/decisions/audit-and-integrity.md`'s notice-primitive section.
 - **Draft events** (`draft.pick`, `draft.nominate`, `draft.bid`, `draft.timer_expire`, `draft.status`, `draft.queue`, `draft.nudge`) ride the **league** stream — there is no per-draft stream. Their payload contracts live in `docs/draft-engine.md`. `draft.nudge` is the one exception to "derived from the action log": it is published directly by the nudge scheduler on the ticker's own schedule, not by `draftEventsFor`. See `docs/draft-moderator.md`.
 - **On the browser side there are two consumers:** `useDraftRoom` (`src/draft-room/hooks/`) and
   `useLeagueChat` (`src/chat-room/hooks/`), both built on the SAME native `EventSource` for a
@@ -214,9 +230,10 @@ client components that render the draft room, the league room, the chat surface 
 surface respectively. Each talks to its service layer ONLY over the wire (`GET`/`POST
 /api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`, `GET /api/leagues/[leagueId]/events`,
 `GET /api/gifs/search`, `PATCH /api/profile`, `GET`/`PATCH /api/preferences`,
-`GET`/`POST /api/reviews/**`) — never by importing `@/draft-engine`,
+`GET`/`POST /api/reviews/**`, `GET /api/notices`, `POST /api/notices/read`,
+`GET /api/notices/stream`) — never by importing `@/draft-engine`,
 `@/draft-service`, `@/league`, `@/league-service`, `@/chat-service`, `@/ai-advisor`,
-`@/review-service`, `@/db`,
+`@/review-service`, `@/db`, `@/integrity`, `@/integrity-service`,
 `@/lib/realtime`, `@/lib/auth`, `@/lib/leagues`, `@/lib/llm`, `@/lib/api/respond`, `@/data/seed`,
 `@/stats-pipeline`, `@/stats` or `@/gifs` as VALUES.
 An ESLint `@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`'s
@@ -267,6 +284,16 @@ manager watches tick down while they type can never be a different number than t
 server accepts. `@/review-service` is the Postgres half and is on the blocked list above, reached
 only over the wire from `src/account-room/**`, same as every other service module.
 
+`src/integrity/**` and `src/integrity-service/**` join the BLOCKED list instead — unlike
+`@/chat`, `@/matchmaking`, `@/identity`, `@/help` and `@/reviews`, neither half of the audit spine
+is exempt, because neither half is actually browser-safe: `src/integrity/**` is pure but reads
+`node:crypto` (`chain.ts`'s `createHash`), which has no browser polyfill in this stack, and
+`src/integrity-service/**` is Postgres-backed outright. Client code needs neither as a value —
+`ActivityRow` (`@/integrity/activity-view`) and `NoticeView` (`@/account-room/contract`) reach
+`src/league-room/**`/`src/account-room/**` only as `import type`, because a notice carries the copy
+it delivered and an activity row arrives from the service layer already rendered. See
+`docs/decisions/audit-and-integrity.md`.
+
 A second, simpler layering rule sits beside this one: nothing under `src/**` may import from
 `scripts/**` or `e2e/**`. Build tooling and the browser suite may depend on source; source may
 not depend on either. Enforced by its own `no-restricted-imports` block in `eslint.config.mjs`.
@@ -293,7 +320,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**` and `src/gifs/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — twelve gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**` and `src/integrity-service/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — sixteen gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
 - **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 

@@ -5,13 +5,18 @@ import tsconfigPaths from "vite-tsconfig-paths";
 /**
  * Directories with a 100% coverage gate (mirrored in `coverage.thresholds` below).
  *
- * The first twelve are PURE directories. `src/identity-service` and `src/review-service` are
- * not: they are Postgres-backed, and they are here because the final whole-branch review found
- * that every one of its HIGH findings lived in the service layer, which no gate measured. A few
- * guards in those files are unreachable through real Postgres (a seeded row missing after an
- * `ON CONFLICT DO NOTHING`, an author vanishing behind a foreign key); those are covered by
- * narrow stub-`Db` tests that put the code in the state it defends against, never by lowering a
- * threshold or ignoring a line.
+ * The first twelve are PURE directories. `src/identity-service`, `src/review-service`,
+ * `src/integrity` and `src/integrity-service` are not: they are Postgres-backed (except
+ * `src/integrity`, which is pure but joins the SAME reasoning below rather than the pure-twelve's),
+ * and they are here because the final whole-branch review found that every one of its HIGH
+ * findings lived in the service layer, which no gate measured. `src/integrity` and
+ * `src/integrity-service` are a strictly stronger case than gates 13 and 14: they are the write
+ * path for the audit record this whole phase exists to make trustworthy, and a gate that measures
+ * everywhere except the write path measures the wrong place. A few guards in the service-layer
+ * files are unreachable through real Postgres (a seeded row missing after an `ON CONFLICT DO
+ * NOTHING`, an author vanishing behind a foreign key, `lockAnchor`'s "the row vanished between
+ * insert and lock"); those are covered by narrow stub-`Db`/`DbTx` tests that put the code in the
+ * state it defends against, never by lowering a threshold or ignoring a line.
  * `coverage.include` protects LOGIC files that nothing imports: without it, a real file no
  * test ever pulls in wouldn't be instrumented at all, and a 100% threshold checked only
  * against instrumented files can't fail on work that's silently missing coverage. It does
@@ -37,19 +42,23 @@ const COVERAGE_GATED_DIRS = [
   "src/gifs",
   "src/identity-service",
   "src/review-service",
+  "src/integrity",
+  "src/integrity-service",
 ] as const;
 /**
- * The two service directories' `schemas.ts` files are named explicitly alongside the `**` glob
+ * The three service directories' `schemas.ts` files are named explicitly alongside the `**` glob
  * that already matches them. Redundant on purpose: those files are the Zod BOUNDARY every
  * request meets (`updateProfileSchema`'s sparse refine, `listReviewsQuerySchema`'s cursor
- * transform, `submitReviewSchema`'s superRefine), they are the half of the service layer a
- * reader is most likely to assume is "just declarations" and exclude, and naming them here means
- * narrowing either directory's glob later cannot silently drop them out of the gate.
+ * transform, `submitReviewSchema`'s superRefine, `markNoticesReadSchema`'s at-least-one-id
+ * refine), they are the half of the service layer a reader is most likely to assume is "just
+ * declarations" and exclude, and naming them here means narrowing any one directory's glob later
+ * cannot silently drop them out of the gate.
  */
 const coverageInclude = [
   ...COVERAGE_GATED_DIRS.map((dir) => `${dir}/**`),
   "src/identity-service/schemas.ts",
   "src/review-service/schemas.ts",
+  "src/integrity-service/schemas.ts",
 ];
 
 export default defineConfig({
@@ -158,6 +167,23 @@ export default defineConfig({
           statements: 100,
         },
         "src/review-service/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        // Gates 15 and 16. `src/integrity` is pure and gates for the same reason every pure
+        // directory does; `src/integrity-service` is Postgres-backed and gates for the reason
+        // gates 13 and 14 do, and more so — this pair is the write path for the audit record this
+        // whole phase exists to make trustworthy, and a gate that measures everywhere except the
+        // write path measures the wrong place.
+        "src/integrity/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        "src/integrity-service/**": {
           branches: 100,
           functions: 100,
           lines: 100,

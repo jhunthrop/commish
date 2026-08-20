@@ -7,7 +7,7 @@ import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { NOTICE_TEMPLATES } from "@/integrity/notices";
 import type { PublishToUserFn } from "@/lib/realtime/publish";
 import { createAuditLogger } from "./audit-logger";
-import { deliverNotice, listNotices, markNoticesRead, notifyAffectedMember, type MemberNotice, type NotifyInput } from "./notify";
+import { deliverNotice, listNotices, markNoticesRead, notifyAffectedMember, quoteFor, type MemberNotice, type NotifyInput } from "./notify";
 
 const db = createTestDb();
 const NOW = "2026-08-20T18:00:00.000Z";
@@ -185,5 +185,37 @@ describe("listNotices and markNoticesRead", () => {
     await seedNotices("user_bob", 1);
     await markNoticesRead(db, { userId: "user_bob", noticeIds: ["notice_1"], readAt: NOW });
     expect(await markNoticesRead(db, { userId: "user_bob", noticeIds: ["notice_1"], readAt: LATER })).toBe(0);
+  });
+
+  it("is a no-op for an empty id list, without touching the database", async () => {
+    // The same "a caller sending nothing is a no-op, not a query" shape `recordAll`'s empty-batch
+    // guard uses. Asserted by NOT seeding anything: a query issued against an empty table would
+    // still return 0, so the only way to tell "skipped" from "queried and matched nothing" is to
+    // leave nothing there to match.
+    expect(await markNoticesRead(db, { userId: "user_bob", noticeIds: [], readAt: NOW })).toBe(0);
+  });
+});
+
+describe("quoteFor", () => {
+  it("quotes review_removed's operator-supplied reason", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: null, noticeType: "review_removed",
+      title: "Your review was removed", body: "…", context: { reason: "off topic" },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBe("off topic");
+  });
+
+  it("is null for a review_removed notice whose context reason is not a string", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: null, noticeType: "review_removed",
+      title: "Your review was removed", body: "…", context: {},
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBeNull();
+  });
+
+  it("is null for any other notice type", async () => {
+    expect(quoteFor(await seedOneNotice())).toBeNull();
   });
 });

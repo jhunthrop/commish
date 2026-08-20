@@ -511,8 +511,10 @@ export const chatReactions = pgTable(
  *
  * Removal is a stamp, never a delete. A removed review keeps its author, its text, who removed it
  * and why, because the alternative is that a product with an unfiltered review feed can make a
- * review disappear leaving nothing behind. Phase 3 owns the real audit log; this row is the
- * interim record it will read, not a second system it will have to reconcile.
+ * review disappear leaving nothing behind. `audit_events` below (Phase 3, Plan A) is the real
+ * audit log; `removeReview` records a `review_removed` event there in the same transaction as
+ * this stamp, and this row stays the interim record the review feed itself reads, not a second
+ * system to reconcile against the chain.
  */
 export const reviews = pgTable(
   "reviews",
