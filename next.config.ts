@@ -1,6 +1,37 @@
 import type { NextConfig } from "next";
 
 /**
+ * The cross-origin destinations this app's own forms are allowed to reach, and there are two of
+ * them because signing out is a THREE-hop redirect chain, not one.
+ *
+ * `AppHeader`'s Sign out control is a real `<form action="/sign-out" method="post">`, and
+ * `signOut()` (`@workos-inc/authkit-nextjs`) answers it with a redirect. Chromium enforces
+ * `form-action` across the WHOLE chain, not just the first hop, so a bare `form-action 'self'`
+ * blocked it: the local sealed cookie cleared, the IdP session survived, and the next sign-in
+ * silently resumed the old identity. A sign-out that does not sign you out.
+ *
+ * The chain, observed rather than assumed (`e2e/season.spec.ts` walks it):
+ *
+ *   1. `POST /sign-out`                       — 'self'
+ *   2. `https://api.workos.com/.../logout`    — WORKOS_API_ORIGIN, `DEFAULT_HOSTNAME` in
+ *                                               `@workos-inc/node`, which nothing here overrides
+ *   3. `https://<tenant>.authkit.app/api/logout` — WORKOS_AUTHKIT_DOMAIN, the hosted AuthKit
+ *                                               domain, per-environment and therefore a wildcard
+ *   4. back to this app's own home            — 'self' again
+ *
+ * Allowing only the second of those was the first fix and was still not enough; the third hop is
+ * where it kept failing. A deployment that puts AuthKit on a CUSTOM domain has to add that
+ * domain here too.
+ *
+ * NOT allowlisted, deliberately: `https://error.workos.com`. Hop 3 lands there instead of hop 4
+ * when a WorkOS environment has no app homepage URL configured — a dashboard misconfiguration,
+ * not a destination this product ever means to send anyone to, and encoding it here would make
+ * the policy quietly bless one.
+ */
+const WORKOS_API_ORIGIN = "https://api.workos.com";
+const WORKOS_AUTHKIT_DOMAIN = "https://*.authkit.app";
+
+/**
  * The Content-Security-Policy this app serves on every response.
  *
  * `img-src 'self' https: data:` is the control this branch actually needed: it introduced three
@@ -20,23 +51,46 @@ import type { NextConfig } from "next";
  * everything else in the list, and the product has no `dangerouslySetInnerHTML` anywhere and no
  * XSS sink the whole-branch review could find. A nonce-based `script-src` is Plan D's.
  *
+ * `'unsafe-eval'` is added in DEVELOPMENT ONLY. `headers()` applies to `next dev` too, and the
+ * dev server's webpack `eval-source-map` devtool serves every module wrapped in `eval()`, which
+ * a production-shaped `script-src` refuses — the page boots to a blank screen and a wall of CSP
+ * violations. Scoping it to `NODE_ENV === "development"` is the standard Next.js shape for this
+ * and keeps the shipped policy free of it; `next build` never sets that value.
+ *
  * `style-src 'unsafe-inline'` covers Tailwind v4's injected style element and React's inline
  * `style` attributes. `connect-src 'self'` is what the SSE stream and every API call need, and
  * nothing else. `frame-ancestors 'none'` (plus the legacy `X-Frame-Options` below for browsers
- * that predate it) is what stops this app being framed for clickjacking on a real-money product.
+ * that predate it) is what stops this app being framed for clickjacking.
  */
-const CONTENT_SECURITY_POLICY = [
-  "default-src 'self'",
-  "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' https: data:",
-  "font-src 'self' data:",
-  "connect-src 'self'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "frame-ancestors 'none'",
-].join("; ");
+export function contentSecurityPolicy(nodeEnv: string | undefined = process.env.NODE_ENV): string {
+  const developmentOnlyScriptSources = nodeEnv === "development" ? " 'unsafe-eval'" : "";
+  return [
+    "default-src 'self'",
+    `script-src 'self' 'unsafe-inline'${developmentOnlyScriptSources}`,
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' https: data:",
+    "font-src 'self' data:",
+    "connect-src 'self'",
+    "object-src 'none'",
+    "base-uri 'self'",
+    `form-action 'self' ${WORKOS_API_ORIGIN} ${WORKOS_AUTHKIT_DOMAIN}`,
+    "frame-ancestors 'none'",
+  ].join("; ");
+}
+
+/**
+ * Every security header, in one exported list so `next.config.test.ts` can assert on exactly
+ * what `headers()` returns rather than on a hand-copied lookalike that could drift. A weakened
+ * policy has to redden that test.
+ */
+export function securityHeaders(nodeEnv?: string): readonly { readonly key: string; readonly value: string }[] {
+  return [
+    { key: "Content-Security-Policy", value: contentSecurityPolicy(nodeEnv) },
+    { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+    { key: "X-Content-Type-Options", value: "nosniff" },
+    { key: "X-Frame-Options", value: "DENY" },
+  ];
+}
 
 const nextConfig: NextConfig = {
   // The dev overlay bubble sits exactly where the draft room's dock puts its
@@ -55,17 +109,7 @@ const nextConfig: NextConfig = {
    * url travels to whatever host `users.avatar_url` names.
    */
   async headers() {
-    return [
-      {
-        source: "/:path*",
-        headers: [
-          { key: "Content-Security-Policy", value: CONTENT_SECURITY_POLICY },
-          { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-          { key: "X-Content-Type-Options", value: "nosniff" },
-          { key: "X-Frame-Options", value: "DENY" },
-        ],
-      },
-    ];
+    return [{ source: "/:path*", headers: [...securityHeaders()] }];
   },
 };
 

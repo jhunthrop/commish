@@ -79,6 +79,54 @@ test("a signed-in manager can browse open leagues and join one", async ({ manage
   await expect(managerB.getByRole("heading", { level: 1 })).toBeVisible();
 });
 
+/**
+ * The coverage hole that let a broken sign-out ship. `AppHeader`'s Sign out is a real form POST,
+ * and `signOut()` answers it with a redirect to WorkOS's hosted logout endpoint before WorkOS
+ * redirects back to `/`. Chromium enforces `form-action` across that WHOLE chain, so a CSP
+ * naming only `'self'` blocked the middle hop: the local sealed cookie cleared, the IdP session
+ * survived, and the next sign-in silently resumed the old identity. Every other spec in this
+ * suite signs IN through a cookie `global-setup` mints directly, so not one of them ever
+ * exercised the way out.
+ *
+ * `managerSignOut` is a dedicated identity for exactly this: signing out revokes the session
+ * server-side, and doing that to manager A, B or zero would break whichever specs happen to run
+ * after this one.
+ */
+test("a manager signs out, and the redirect chain reaches WorkOS rather than being refused", async ({ managerSignOut }) => {
+  // Every navigation the click causes, recorded before it happens. This is the assertion: a
+  // `form-action` missing either WorkOS origin aborts the chain AT that hop, so the host simply
+  // never appears here. Asserting the hops is stronger than asserting the absence of a console
+  // error, because Chromium's violation message names the ORIGINAL form url and not the hop it
+  // actually refused — it cannot tell you which origin is missing.
+  const navigations: string[] = [];
+  managerSignOut.on("request", (request) => {
+    if (request.isNavigationRequest()) navigations.push(new URL(request.url()).host);
+  });
+
+  await managerSignOut.goto("/app");
+  await expect(managerSignOut.getByRole("heading", { name: "Your leagues" })).toBeVisible();
+
+  await managerSignOut.getByRole("button", { name: "Sign out" }).click();
+
+  // Hop 2 and hop 3 of the chain `next.config.ts` documents. Under the old `form-action 'self'`
+  // neither was ever reached; under `'self' https://api.workos.com` alone, only the first was.
+  await expect
+    .poll(() => navigations.includes("api.workos.com"), { message: "the sign-out POST never reached WorkOS's logout endpoint" })
+    .toBe(true);
+  await expect
+    .poll(() => navigations.some((host) => host.endsWith(".authkit.app")), {
+      message: "the WorkOS logout redirect to the hosted AuthKit domain was refused",
+    })
+    .toBe(true);
+
+  // Where hop 4 LANDS is a WorkOS dashboard setting (the app's homepage url), not this app's
+  // code, so this deliberately asserts the state instead of the destination: the session is
+  // gone, and the product offers the way back in rather than a signed-in chrome.
+  await managerSignOut.goto("/browse");
+  await expect(managerSignOut.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
+  await expect(managerSignOut.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+});
+
 test("a signed-OUT visitor can browse but is asked to sign in before joining", async ({ browser }) => {
   const context = await browser.newContext();
   const page = await context.newPage();

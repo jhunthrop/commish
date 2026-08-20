@@ -1,6 +1,6 @@
 import { test as base, type Page } from "@playwright/test";
 import { DEV_SEED } from "../../src/data/seed/config";
-import { MANAGER_A_STATE, MANAGER_B_STATE, MANAGER_ZERO_STATE } from "../global-setup";
+import { MANAGER_A_STATE, MANAGER_B_STATE, MANAGER_SIGNOUT_STATE, MANAGER_ZERO_STATE } from "../global-setup";
 
 /**
  * Two signed-in managers in two INDEPENDENT browser contexts — separate cookie jars, separate
@@ -13,8 +13,12 @@ import { MANAGER_A_STATE, MANAGER_B_STATE, MANAGER_ZERO_STATE } from "../global-
  * leagues run over run, which is what `onboarding.spec.ts` needs to see Task 5's first-run fork
  * for real, rather than mocking `experienceTier`/`helpLevel`/league count the way the unit
  * suite does.
+ *
+ * `managerSignOut` is a fourth, whose whole job is to be signed out. Signing out revokes the
+ * WorkOS session server-side, so using any of the three above would silently invalidate a
+ * session the rest of the run is holding — see `global-setup.ts`'s own note.
  */
-export const test = base.extend<{ managerA: Page; managerB: Page; managerZero: Page }>({
+export const test = base.extend<{ managerA: Page; managerB: Page; managerZero: Page; managerSignOut: Page }>({
   managerA: async ({ browser }, use) => {
     const context = await browser.newContext({ storageState: MANAGER_A_STATE });
     const page = await context.newPage();
@@ -29,6 +33,12 @@ export const test = base.extend<{ managerA: Page; managerB: Page; managerZero: P
   },
   managerZero: async ({ browser }, use) => {
     const context = await browser.newContext({ storageState: MANAGER_ZERO_STATE });
+    const page = await context.newPage();
+    await use(page);
+    await context.close();
+  },
+  managerSignOut: async ({ browser }, use) => {
+    const context = await browser.newContext({ storageState: MANAGER_SIGNOUT_STATE });
     const page = await context.newPage();
     await use(page);
     await context.close();
