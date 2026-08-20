@@ -3,7 +3,9 @@
 import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
-import { Badge, EYEBROW } from "@/components/ui";
+import { Avatar, Badge, EYEBROW, InfoTip } from "@/components/ui";
+import type { TermKey } from "@/help/glossary";
+import type { HelpLevel } from "@/identity/preferences";
 import { formatClockLength, formatTightening } from "../state/format";
 import { playerName, teamName, teamsById } from "../lib/lookups";
 import type { ConnectionStatus } from "../hooks/use-draft-room";
@@ -23,11 +25,20 @@ export interface RoomRailProps {
   readonly connection: ConnectionStatus;
   /** `tv` drops the personal chrome — no team chip, no my-turn heat. */
   readonly variant?: RoomRailVariant;
+  /** The signed-in caller's preference, forwarded from `DraftRoomPage`. Omitted only by tests
+   *  that don't care about this branch — `InfoTip` itself defaults to the click-only, non-inline
+   *  behavior when it's absent. */
+  readonly helpLevel?: HelpLevel;
 }
 
 const FORMAT_LABEL: Readonly<Record<DraftStateView["format"], string>> = {
   snake: "Snake draft",
   auction: "Auction draft",
+};
+
+const FORMAT_TERM: Readonly<Record<DraftStateView["format"], TermKey>> = {
+  snake: "snake-draft",
+  auction: "auction-draft",
 };
 
 const LEAGUE_TEXT: Readonly<Record<RoomRailVariant, string>> = {
@@ -54,6 +65,9 @@ interface TurnSummary {
   /** The same fact as a sentence, for screen readers, since the digits are `aria-hidden`. */
   readonly sentence: string;
   readonly mine: boolean;
+  /** The team `subject` names, for the face beside it — `null` when the subject is a PLAYER
+   *  (a live bid) rather than a team, since a face belongs next to the person it names. */
+  readonly team: TeamCard | null;
 }
 
 /**
@@ -100,6 +114,7 @@ function turnSummary(
       subject: `${name} · $${lot.highBid}`,
       sentence: `Bidding is open on ${name}. High bid $${lot.highBid} by ${bidder}.`,
       mine: false,
+      team: null,
     };
   }
 
@@ -107,13 +122,25 @@ function turnSummary(
     const nominatorId = view.auction?.nominatingTeamId ?? null;
     const who = nominatorId === null ? "Nobody" : teamName(byId, nominatorId, "Someone");
     const mine = nominatorId !== null && nominatorId === myTeamId;
-    return { label: mine ? "You're nominating" : "Nominating", subject: who, sentence: `${who} is nominating.`, mine };
+    return {
+      label: mine ? "You're nominating" : "Nominating",
+      subject: who,
+      sentence: `${who} is nominating.`,
+      mine,
+      team: nominatorId === null ? null : (byId.get(nominatorId) ?? null),
+    };
   }
 
   const who = view.onClockTeamId === null ? "Nobody" : teamName(byId, view.onClockTeamId, "Someone");
   const mine = view.onClockTeamId !== null && view.onClockTeamId === myTeamId;
   const clockLength = view.clockSeconds === null ? "" : ` This round's pick clock is ${formatClockLength(view.clockSeconds)}.`;
-  return { label: mine ? "You're on the clock" : "On the clock", subject: who, sentence: `${who} is on the clock.${clockLength}`, mine };
+  return {
+    label: mine ? "You're on the clock" : "On the clock",
+    subject: who,
+    sentence: `${who} is on the clock.${clockLength}`,
+    mine,
+    team: view.onClockTeamId === null ? null : (byId.get(view.onClockTeamId) ?? null),
+  };
 }
 
 function modeOf(view: DraftStateView, turn: TurnSummary): RoomMode {
@@ -141,7 +168,7 @@ function StaticState({ headline, detail }: { readonly headline: string; readonly
  * It is a fixed-height band by construction (`lg:h-20`): the stage below it gets every
  * remaining pixel, and nothing in the room reflows when the turn changes.
  */
-export function RoomRail({ leagueName, view, teams, myTeamId, playersById, connection, variant = "room" }: RoomRailProps) {
+export function RoomRail({ leagueName, view, teams, myTeamId, playersById, connection, variant = "room", helpLevel }: RoomRailProps) {
   // The TV board is nobody's team: `personalId` is what every personal affordance reads, so
   // dropping the chrome for that variant is one assignment rather than a flag per element.
   const personalId = variant === "room" ? myTeamId : null;
@@ -162,7 +189,11 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
       className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2 lg:h-20 lg:flex-nowrap ${MODE_SKIN[mode]}`}
     >
       <h1 className={`font-display font-bold leading-display text-text-primary ${LEAGUE_TEXT[variant]}`}>{leagueName}</h1>
-      <Badge tone="neutral">{FORMAT_LABEL[view.format]}</Badge>
+      <span className="inline-flex items-center gap-1">
+        <Badge tone="neutral">{FORMAT_LABEL[view.format]}</Badge>
+        {/* The TV variant is a shared, unattended display — no control on it is ever clickable. */}
+        {variant === "room" ? <InfoTip term={FORMAT_TERM[view.format]} helpLevel={helpLevel} /> : null}
+      </span>
       {turnWhere === null ? null : (
         <span data-testid="turn-label" className="font-display text-sm font-semibold uppercase tracking-wide text-text-muted">
           {turnWhere}
@@ -176,11 +207,21 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
           <StaticState headline="Draft complete" detail="Every roster is final." />
         ) : (
           <>
-            <div className="flex min-w-0 flex-col">
-              <span className={`${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
-                {turn.label}
-              </span>
-              <span className="truncate font-display text-display-sm font-bold leading-display text-text-primary">{turn.subject}</span>
+            <div className="flex min-w-0 items-center gap-2">
+              {turn.team === null ? null : (
+                <Avatar name={turn.team.ownerDisplayName} avatar={turn.team.ownerAvatarUrl} size="sm" />
+              )}
+              <div className="flex min-w-0 flex-col">
+                <span className={`inline-flex items-center gap-1 ${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
+                  {turn.label}
+                  {/* An auction's "Live bid"/"Nominating" states aren't the on-the-clock rule
+                      this term defines, so the tip only joins the snake-format turn label. The
+                      TV variant drops it too — a shared, unattended display has no clickable
+                      controls at all. */}
+                  {view.format === "auction" || variant !== "room" ? null : <InfoTip term="on-the-clock" helpLevel={helpLevel} />}
+                </span>
+                <span className="truncate font-display text-display-sm font-bold leading-display text-text-primary">{turn.subject}</span>
+              </div>
             </div>
             <div className="flex flex-col items-end">
               {remainingMs === null ? null : <Countdown remainingMs={remainingMs} size="lg" tone={turn.mine ? "hot" : "default"} data-testid="countdown" />}

@@ -10,8 +10,21 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   readonly loading?: boolean;
 }
 
+// `min-w-0` + `overflow-wrap: anywhere`: a button's label is often USER CONTENT — "Join <league
+// name>" — and a single unbroken name otherwise widens the button past its container and scrolls
+// the whole page sideways at 360px.
+//
+// `anywhere`, NOT Tailwind's `break-words` (`overflow-wrap: break-word`), and the difference is
+// the entire fix: `break-word` wraps text visually but is explicitly ignored when computing
+// min-content width, so the button's anonymous flex item — which has no class to put `min-w-0`
+// on — kept sizing itself to the unbroken word and overflowed anyway. `anywhere` is the one
+// value that both wraps and shrinks min-content. It still only breaks a word that would not
+// otherwise fit, so ordinary short labels are untouched.
+//
+// In the primitive, so every button that renders a name is safe by construction rather than one
+// call site at a time.
 const BASE =
-  "inline-flex items-center justify-center gap-2 rounded-md font-medium transition-colors " +
+  "inline-flex min-w-0 items-center justify-center gap-2 [overflow-wrap:anywhere] rounded-md font-medium transition-colors " +
   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface " +
   "disabled:opacity-60 disabled:cursor-not-allowed";
 
@@ -23,9 +36,9 @@ const VARIANT: Readonly<Record<ButtonVariant, string>> = {
 };
 
 const SIZE: Readonly<Record<ButtonSize, string>> = {
-  sm: "h-8 px-3 text-sm",
-  md: "h-10 px-4 text-md",
-  lg: "h-12 px-6 text-lg",
+  sm: "min-h-8 px-3 text-sm",
+  md: "min-h-10 px-4 text-md",
+  lg: "min-h-12 px-6 text-lg",
 };
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(

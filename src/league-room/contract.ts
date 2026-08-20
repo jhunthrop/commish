@@ -3,7 +3,8 @@ import type { DraftFormat, TeamCard } from "@/domain/league";
 import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { TradeFlag, TradeVerdict } from "@/ai-advisor/valuation";
-import type { NextAction, StandingsRow, WeekStatus } from "@/league";
+import type { FirstRunPlan } from "@/identity";
+import type { LeagueTerms, NextAction, StandingsRow, WeekStatus } from "@/league";
 
 /**
  * TYPES ONLY, no runtime code. Imported by the `/api/leagues/**` routes as their return shape
@@ -45,11 +46,35 @@ export interface JoinBody {
   readonly alreadyMember: boolean;
 }
 
+/**
+ * `GET /api/invites/[code]`'s success payload — one `LeagueTerms` (`@/league/terms`), the exact
+ * shape `LeagueTermsPanel` renders here on the invite page AND, unchanged, inside the league
+ * itself (Task 8). Re-exported under its own name rather than left as a bare `LeagueTerms`
+ * import at call sites, so this contract's own docblock convention (every route's wire shape
+ * has a name ending in `Body`) holds for this route too.
+ */
+export type InvitePreviewBody = LeagueTerms;
+
 /** One row of the standings table, ready to render: the pure math plus what the page shows. */
 export interface TeamStandingsRow extends StandingsRow {
   readonly teamName: string;
   /** Can no longer be caught for a playoff spot. Computed server-side, never in React. */
   readonly clinched: boolean;
+  readonly ownerDisplayName: string;
+  /** The owner's STORED avatar ref, not a URL — same contract as `TeamCard.ownerAvatarUrl`. */
+  readonly ownerAvatar: string | null;
+}
+
+/**
+ * One league member as the members panel (`LeagueMembersPanel`) renders it: `TeamCard` plus
+ * the one raw fact needed to find the commissioner among peers. `ownerUserId` is never shown —
+ * it is only ever compared against `LeagueHomeBody.commissionerUserId` to mark the single row
+ * that runs the league. That comparison, and the display name and face it sits beside, are
+ * fair game inside a league by design: the public-browse contract (Task 6) is the one place
+ * commissioner identity stays hidden, and this panel is members-only.
+ */
+export interface LeagueMemberCard extends TeamCard {
+  readonly ownerUserId: string;
 }
 
 export interface MatchupSummary {
@@ -92,6 +117,13 @@ export interface HomeLeagueCard extends LeagueSummary {
 
 export interface HomeBody {
   readonly leagues: readonly HomeLeagueCard[];
+  /**
+   * The zero-leagues fork (`firstRunPlan`, `@/identity`), or `null` once the caller has at
+   * least one league. Computed by the ROUTE, not `crossLeagueHome` (`@/league-service/home.ts`):
+   * the plan needs the caller's preferences, and the service only ever takes a db and a user id.
+   * `HomeBoard` reads this field, not `leagues.length`, to decide which empty treatment to show.
+   */
+  readonly firstRun: FirstRunPlan | null;
 }
 
 export interface LeagueHomeBody {
@@ -101,9 +133,19 @@ export interface LeagueHomeBody {
   readonly teamCount: number;
   readonly rosterSlots: readonly RosterSlotConfig[];
   readonly isCommissioner: boolean;
+  /** The commissioner's raw user id — never rendered on its own, only handed to
+   *  `LeagueMembersPanel` so it can mark the one member who runs the league. */
+  readonly commissionerUserId: string;
   readonly myTeamId: string | null;
-  readonly teams: readonly TeamCard[];
+  readonly teams: readonly LeagueMemberCard[];
   readonly standings: readonly TeamStandingsRow[];
+  /**
+   * The SAME `LeagueTerms` the invite preview renders (`InvitePreviewBody`, above), assembled by
+   * the SAME pure `leagueTerms` — every member sees this, not just the commissioner: the terms
+   * are what everybody in the league is playing under, and gating them on `isCommissioner` would
+   * make the surface pointless.
+   */
+  readonly terms: LeagueTerms;
   readonly currentWeek: number;
   readonly totalWeeks: number;
   readonly myMatchup: MatchupSummary | null;

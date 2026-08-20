@@ -17,6 +17,7 @@ const league = (over: Partial<PublicLeagueSummary> = {}): PublicLeagueSummary =>
   stakeTier: 0,
   teamCount: 12,
   filledTeams: 8,
+  scoringLabel: "Standard",
   ...over,
 });
 

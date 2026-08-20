@@ -13,10 +13,13 @@ vi.mock("@/lib/auth/current-user", () => ({
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, users } from "@/db/schema";
+import { LEAGUE_CONFIG } from "@/league";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { GET as listLeagues, POST as postLeague } from "@/app/api/leagues/route";
 import { POST as postInvite } from "@/app/api/leagues/[leagueId]/invites/route";
 import { POST as postAccept } from "@/app/api/invites/[code]/accept/route";
+import { GET as getInvitePreview } from "@/app/api/invites/[code]/route";
+import { resetInvitePreviewRateLimit } from "@/app/api/invites/[code]/_shared";
 import { POST as postPublicJoin } from "@/app/api/public/leagues/[leagueId]/join/route";
 
 const db = createTestDb();
@@ -36,6 +39,7 @@ beforeEach(async () => {
   await truncateAll(db);
   vi.mocked(getCurrentUser).mockReset();
   vi.mocked(requireCurrentUser).mockReset();
+  resetInvitePreviewRateLimit();
   await db.insert(users).values([
     { id: "u1", email: "u1@test.local", displayName: "Manager u1" },
     { id: "u2", email: "u2@test.local", displayName: "Manager u2" },
@@ -180,6 +184,62 @@ describe("invites", () => {
     });
     expect(response.status).toBe(404);
     expect(await response.json()).toEqual({ ok: false, error: "That league doesn't exist." });
+  });
+});
+
+describe("GET /api/invites/[code]", () => {
+  it("names what an invite is agreeing to, with no session required", async () => {
+    const created = await createDefaultLeague("u1");
+    signedInAs("u1");
+    const invite = (await (await postInvite(post(`http://test/api/leagues/${created.leagueId}/invites`, {}), {
+      params: Promise.resolve({ leagueId: created.leagueId }),
+    })).json()).data as { code: string };
+
+    // No signed-in caller at all — this route answers a stranger holding the link.
+    signedInAs(null);
+    const response = await getInvitePreview(new Request(`http://test/api/invites/${invite.code}`), {
+      params: Promise.resolve({ code: invite.code }),
+    });
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    expect(body.ok).toBe(true);
+    expect(body.data).toMatchObject({
+      name: "Sunday Money",
+      format: "snake",
+      teamCount: 12,
+      filledTeams: 1,
+      scoringLabel: "PPR",
+      commissionerName: "Manager u1",
+    });
+  });
+
+  it("answers 404 with the same refusal accept gives, leaking nothing about any real league", async () => {
+    const created = await createDefaultLeague("u1");
+    signedInAs(null);
+    const response = await getInvitePreview(new Request("http://test/api/invites/NOSUCH12"), {
+      params: Promise.resolve({ code: "NOSUCH12" }),
+    });
+    expect(response.status).toBe(404);
+    const body = await response.json();
+    expect(body).toEqual({ ok: false, error: "That invite link isn't valid. Ask your commissioner for a new one." });
+    expect(JSON.stringify(body)).not.toContain(created.leagueId);
+  });
+
+  it("refuses a caller looping the endpoint past the per-IP ceiling, before the query ever runs", async () => {
+    const request = () =>
+      new Request("http://test/api/invites/NOSUCH12", { headers: { "x-forwarded-for": "203.0.113.9" } });
+    for (let i = 0; i < LEAGUE_CONFIG.invite.previewRateLimit.maxRequests; i += 1) {
+      expect((await getInvitePreview(request(), { params: Promise.resolve({ code: "NOSUCH12" }) })).status).toBe(404);
+    }
+    const limited = await getInvitePreview(request(), { params: Promise.resolve({ code: "NOSUCH12" }) });
+    expect(limited.status).toBe(429);
+
+    // A DIFFERENT caller (a different forwarded-for) spends its own budget, not this one's.
+    const other = await getInvitePreview(
+      new Request("http://test/api/invites/NOSUCH12", { headers: { "x-forwarded-for": "203.0.113.99" } }),
+      { params: Promise.resolve({ code: "NOSUCH12" }) },
+    );
+    expect(other.status).toBe(404);
   });
 });
 

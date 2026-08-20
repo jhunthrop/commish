@@ -5,9 +5,12 @@
  * keyboard-reachable menu, and one thing to render — an open emoji picker is a moderation
  * surface and an i18n surface that this phase has no answer for.
  */
+/** Referenced twice below — the GIF's alt text IS a message body, so it is capped by the same number. */
+const MAX_BODY_LENGTH = 500;
+
 export const CHAT_CONFIG = {
   /** Longest message body accepted, in characters (after trimming). */
-  maxBodyLength: 500,
+  maxBodyLength: MAX_BODY_LENGTH,
   /** Messages per history page. Every read is paginated — no unbounded chat query exists. */
   pageSize: 50,
   /** The complete reaction set. */
@@ -18,6 +21,27 @@ export const CHAT_CONFIG = {
    * history may hold more than this, by design.
    */
   maxHeldMessages: 500,
+  /**
+   * The dimension bounds a GIF message must fall within, checked server-side
+   * (`chat-service/schemas.ts`'s `chatGifSchema`) because the client sends back a search
+   * result's own reported dimensions and a client-reported number is client-controlled input.
+   * The ceiling is generous — real Giphy renditions top out well under it — and exists to reject
+   * a garbage or adversarial value, not to constrain a real one.
+   */
+  gif: {
+    minDimensionPx: 1,
+    maxDimensionPx: 4096,
+    /**
+     * Length ceilings on the three STRINGS a GIF message carries. Every one of them is
+     * client-reported, and without a cap a league member can write unbounded text into
+     * `chat_messages` — the dimensions were bounded from the start and the strings were not.
+     * 2048 is the practical URL ceiling every browser and CDN already assumes; a real Giphy
+     * rendition url runs well under 200 characters.
+     */
+    maxUrlLength: 2048,
+    /** The alt text becomes the message body (`ChatComposer`), so it is capped by the same rule. */
+    maxAltLength: MAX_BODY_LENGTH,
+  },
 } as const;
 
 export type ReactionEmoji = (typeof CHAT_CONFIG.reactions)[number];

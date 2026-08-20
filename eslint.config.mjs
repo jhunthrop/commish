@@ -49,6 +49,15 @@ const SERVER_ONLY_MODULE_GROUPS = [
   // legitimately value-imports.
   "@/chat-service",
   "@/ai-advisor",
+  // Postgres-backed (`review-service/reviews.ts`). `@/reviews` (pure config/contract/validate,
+  // no I/O) is the browser-safe half — see the `@/identity`/`@/chat`/`@/matchmaking`/`@/help`
+  // note below — and stays off this list on purpose so `ReviewComposer`'s live character count
+  // can value-import `validateReviewDraft` directly.
+  "@/review-service",
+  // Postgres-backed (`identity-service/profile.ts`, `preferences.ts`) — the same one-hop
+  // shape as `@/chat-service`. The browser-safe pure half is `@/identity` (presets, refs,
+  // first-run, notifications), which stays legitimately value-importable.
+  "@/identity-service",
   "@/db",
   "@/lib/realtime",
   "@/lib/auth",
@@ -66,7 +75,30 @@ const SERVER_ONLY_MODULE_GROUPS = [
   // and was the one-hop way around its ban. `aliasOrRelative` anchors on the full segment, so
   // this cannot accidentally catch `@/stats-pipeline` (or any other `@/stats-…` sibling).
   "@/stats",
+  // The GIF provider seam: `registry.ts` reads GIF_PROVIDER/GIPHY_API_KEY and `giphy/client.ts`
+  // holds the key and issues the upstream fetch — exactly as server-only as `@/stats`, and for
+  // the same one-hop-around-the-ban reason. `src/chat-room/components/gif-picker.tsx` reaches
+  // `GifResult` as a TYPE ONLY (`import type`, still allowed below); the actual search goes
+  // through `GET /api/gifs/search` over the wire, the same as every other client-room read.
+  "@/gifs",
 ];
+
+/**
+ * NOT on the list above, deliberately: `@/identity` (`src/identity/**`) joins `@/chat`
+ * (`src/chat/**`), `@/matchmaking` (`src/matchmaking/**`), `@/help` (`src/help/**`) and
+ * `@/reviews` (`src/reviews/**`) in the browser-safe exempt set — pure, I/O-free code with no
+ * server module behind it, so client code may value-import it directly. `src/chat-room/**`
+ * reaches `parseAvatarRef` indirectly through `Avatar` (`src/components/ui/avatar.tsx`) rather
+ * than importing `@/identity` itself, but the omission here is what keeps that path legal.
+ * `@/help` is reached the same indirect way today — every room directory renders `InfoTip`
+ * (`src/components/ui/info-tip.tsx`), which is the only thing that value-imports
+ * `@/help/glossary` — but the omission is what would keep a future direct `GLOSSARY` lookup from
+ * a room component legal too, exactly like the other three. `@/reviews` IS reached directly:
+ * `ReviewComposer` (`src/account-room/components/review-composer.tsx`) value-imports
+ * `validateReviewDraft` for its live character count, the same rule `submitReviewSchema`
+ * (`@/review-service/schemas`) enforces server-side. See docs/conventions.md's directory map for
+ * the same note on `@/chat` and `@/matchmaking`.
+ */
 
 /**
  * One regex per module matching either spelling: `@/<module>` (optionally with a subpath) or
@@ -149,14 +181,14 @@ const eslintConfig = [
     },
   },
   {
-    // Scoped to src/draft-room/** and src/league-room/** ONLY, not src/app/**/*.tsx: files
-    // under src/app are Next.js Server Components (page.tsx, layout.tsx, route.ts) that are
-    // allowed — and in this codebase's existing route handlers, expected — to import
-    // @/draft-engine/@/draft-service/@/league/@/league-service directly (see
-    // docs/conventions.md, "Client boundary"). A page can't be told apart from a client
-    // component by its filename alone, so the only globs that can't misfire are the three
+    // Scoped to src/draft-room/**, src/league-room/**, src/chat-room/** and src/account-room/**
+    // ONLY, not src/app/**/*.tsx: files under src/app are Next.js Server Components (page.tsx,
+    // layout.tsx, route.ts) that are allowed — and in this codebase's existing route handlers,
+    // expected — to import @/draft-engine/@/draft-service/@/league/@/league-service directly
+    // (see docs/conventions.md, "Client boundary"). A page can't be told apart from a client
+    // component by its filename alone, so the only globs that can't misfire are the four
     // directories that are BROWSER code by construction: everything under src/draft-room/**,
-    // src/league-room/** and src/chat-room/**.
+    // src/league-room/**, src/chat-room/** and src/account-room/** (Task 2's profile surface).
     //
     // This block also carries SRC_ROOT_ESCAPE_PATTERNS (below), not just the client-boundary
     // patterns: ESLint flat config merges same-named rules across matching configs by shallow
@@ -166,9 +198,14 @@ const eslintConfig = [
     // exactly how a temp `@/db` import under `src/draft-room/**` stopped being flagged when the
     // source-root-escape rule below was first added as its own same-glob block. The
     // source-root-escape block after this one scopes itself to everywhere in `src/**` EXCEPT
-    // these three directories for the same reason, so every file is covered by exactly one
+    // these four directories for the same reason, so every file is covered by exactly one
     // `no-restricted-imports` config for this rule.
-    files: ["src/draft-room/**/*.{ts,tsx}", "src/league-room/**/*.{ts,tsx}", "src/chat-room/**/*.{ts,tsx}"],
+    files: [
+      "src/draft-room/**/*.{ts,tsx}",
+      "src/league-room/**/*.{ts,tsx}",
+      "src/chat-room/**/*.{ts,tsx}",
+      "src/account-room/**/*.{ts,tsx}",
+    ],
     plugins: { "@typescript-eslint": tseslint },
     rules: {
       "@typescript-eslint/no-restricted-imports": [
@@ -178,7 +215,7 @@ const eslintConfig = [
             ...SERVER_ONLY_MODULE_GROUPS.map((group) => ({
               regex: aliasOrRelative(group),
               allowTypeImports: true,
-              message: "Client room code (draft-room/league-room/chat-room) must go through the HTTP/SSE boundary (API routes), not import server-only modules as values. `import type` is fine.",
+              message: "Client room code (draft-room/league-room/chat-room/account-room) must go through the HTTP/SSE boundary (API routes), not import server-only modules as values. `import type` is fine.",
             })),
             ...SRC_ROOT_ESCAPE_PATTERNS,
           ],
@@ -195,13 +232,13 @@ const eslintConfig = [
     // rule is what stops the next one. There is no `@/` spelling to ban because the alias only
     // maps into `src`, so a relative escape is the only reachable form.
     //
-    // `ignores` excludes the three client-room directories: they already carry
+    // `ignores` excludes the four client-room directories: they already carry
     // SRC_ROOT_ESCAPE_PATTERNS via the block above, merged into the same
     // `@typescript-eslint/no-restricted-imports` invocation as the client-boundary patterns —
     // see the comment there for why a second, separately-scoped block targeting the same rule
     // for those files would silently replace rather than extend it.
     files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/draft-room/**", "src/league-room/**", "src/chat-room/**"],
+    ignores: ["src/draft-room/**", "src/league-room/**", "src/chat-room/**", "src/account-room/**"],
     plugins: { "@typescript-eslint": tseslint },
     rules: {
       "@typescript-eslint/no-restricted-imports": ["error", { patterns: SRC_ROOT_ESCAPE_PATTERNS }],

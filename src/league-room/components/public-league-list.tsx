@@ -1,12 +1,39 @@
 import Link from "next/link";
-import { Badge, Card, EmptyState, EYEBROW } from "@/components/ui";
+import { Badge, Card, EmptyState, EYEBROW, InfoTip } from "@/components/ui";
+import type { DraftFormat } from "@/domain/league";
+import type { TermKey } from "@/help/glossary";
+import { EXPERIENCE_TIER_LABEL } from "@/identity/config";
+import type { HelpLevel } from "@/identity/preferences";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
 import { JoinPublicLeagueButton } from "./join-public-league-button";
 
 const FORMAT_LABEL: Readonly<Record<string, string>> = { snake: "Snake", auction: "Auction" };
-const TIER_LABEL: Readonly<Record<string, string>> = { beginner: "New to fantasy", experienced: "Played before" };
+const FORMAT_TERM: Readonly<Record<DraftFormat, TermKey>> = { snake: "snake-draft", auction: "auction-draft" };
+
+/**
+ * `/browse` is the app's one unauthenticated surface (`getCurrentUser()` returning null is the
+ * expected case, not an error — see `app/browse/page.tsx`'s own docblock). There is no signed-in
+ * caller's `helpLevel` to read on the common path, and a stranger deciding whether to join is
+ * exactly who benefits most from more explanation, not less — so every `InfoTip` here opens
+ * `guided`, unconditionally, rather than defaulting quiet the way an authenticated room does.
+ */
+const BROWSE_HELP_LEVEL: HelpLevel = "guided";
+
+/**
+ * `scoringLabel` is a derived string (`describeScoring`, `@/scoring`), not a `TermKey`. Every
+ * label it can produce gets an `InfoTip` except "Standard" — that one is already plain English,
+ * and a trigger on it would explain nothing. "Custom" reads as bare and slightly alarming
+ * without one (does the league not have real scoring rules at all?), so it maps to
+ * `custom-scoring`, same as the three shipped-preset labels map to their own term.
+ */
+const SCORING_LABEL_TERM: Readonly<Record<string, TermKey>> = {
+  PPR: "ppr",
+  "Half PPR": "half-ppr",
+  "PPR, TE premium": "te-premium",
+  Custom: "custom-scoring",
+};
 
 /**
  * "6 of 8 joined" answers "how full is it"; a visitor's actual decision is "is there room for
@@ -61,18 +88,33 @@ export function PublicLeagueList({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* `min-w-0`: see `HomeBoard`'s identical grid — a grid item's default `min-width: auto`
+          otherwise lets a long league name widen the item past its column at 360px. */}
       <ul className="grid gap-3 sm:grid-cols-2">
         {leagues.map((league) => (
-          <li key={league.id}>
+          <li key={league.id} className="min-w-0">
             <Card as="article" className="flex h-full flex-col gap-3">
               <div className="flex items-start justify-between gap-2">
-                <h3 className="font-display text-2xl font-bold uppercase leading-display text-text-primary">
+                {/* `min-w-0 break-words`: see `HomeLeagueCard`'s identical heading. */}
+                <h3 className="min-w-0 break-words font-display text-2xl font-bold uppercase leading-display text-text-primary">
                   {league.name}
                 </h3>
                 <Badge tone="neutral">{stakeTierLabel(league.stakeTier)}</Badge>
               </div>
-              <p className={EYEBROW}>
-                {`${FORMAT_LABEL[league.format] ?? league.format} · ${TIER_LABEL[league.experienceTier] ?? league.experienceTier}`}
+              <p className={`${EYEBROW} flex flex-wrap items-center gap-x-1 gap-y-1`}>
+                <span className="inline-flex items-center gap-1">
+                  {FORMAT_LABEL[league.format] ?? league.format}
+                  <InfoTip term={FORMAT_TERM[league.format]} helpLevel={BROWSE_HELP_LEVEL} />
+                </span>
+                <span>·</span>
+                <span>{EXPERIENCE_TIER_LABEL[league.experienceTier] ?? league.experienceTier}</span>
+                <span>·</span>
+                <span className="inline-flex items-center gap-1">
+                  {league.scoringLabel}
+                  {SCORING_LABEL_TERM[league.scoringLabel] === undefined ? null : (
+                    <InfoTip term={SCORING_LABEL_TERM[league.scoringLabel]!} helpLevel={BROWSE_HELP_LEVEL} />
+                  )}
+                </span>
               </p>
               <p className="text-sm text-text-muted">
                 {`${league.filledTeams} of ${league.teamCount} joined`}
@@ -86,7 +128,7 @@ export function PublicLeagueList({
                   <Link
                     href="/sign-in"
                     aria-label={`Sign in to join ${league.name}`}
-                    className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                    className="inline-flex h-10 min-w-0 items-center justify-center [overflow-wrap:anywhere] rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   >
                     Sign in to join
                   </Link>

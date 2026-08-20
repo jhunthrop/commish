@@ -12,10 +12,17 @@ import type { ExperienceTier } from "@/domain/user";
  *
  * Deliberately absent, and each for a reason: the commissioner's identity and any team or
  * owner name (a stranger has no business learning who plays here), the invite code (a
- * membership capability), the draft id (a gated room), and standings, rosters, chat and
- * scoring settings (all member-only reads today, and there is no reason browse should be the
- * hole in that). A stranger gets what they need to CHOOSE a league and nothing about the
- * people already in it.
+ * membership capability), the draft id (a gated room), and standings, rosters and chat (all
+ * member-only reads today, and there is no reason browse should be the hole in that).
+ *
+ * `scoringLabel` is the one deliberate exception to "scoring settings stay member-only": it is
+ * a DERIVED label (`describeScoring`, `@/scoring`), never the fifteen raw weights, and it is a
+ * property of the league being advertised, not of any person in it. A manager cannot evaluate
+ * whether to join a league without knowing how it scores, so withholding it would not be
+ * privacy, it would just be a worse card. See `browse.ts`'s docblock and the commit that added
+ * this field for the fuller reasoning.
+ *
+ * A stranger gets what they need to CHOOSE a league and nothing about the people already in it.
  */
 export interface PublicLeagueSummary {
   readonly id: string;
@@ -26,6 +33,8 @@ export interface PublicLeagueSummary {
   readonly stakeTier: number;
   readonly teamCount: number;
   readonly filledTeams: number;
+  /** Derived from the league's scoring weights (`describeScoring`) — never the raw weights. */
+  readonly scoringLabel: string;
 }
 
 /** A normalized browse filter: every field is a concrete value or the "any" sentinel. */

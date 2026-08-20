@@ -64,7 +64,7 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
             the same thing twice on one screen is what made the old room feel confusing. What
             this panel adds is the FACE — the owner's portrait, readable across a room. */}
         <section data-testid="spotlight" className="flex shrink-0 items-center gap-4 rounded-lg border border-border bg-surface-elevated p-6 shadow-card">
-          {onClock === null ? null : <Avatar name={onClock.ownerDisplayName} src={onClock.ownerAvatarUrl} size="lg" />}
+          {onClock === null ? null : <Avatar name={onClock.ownerDisplayName} avatar={onClock.ownerAvatarUrl} size="lg" />}
           <div>
             <p className="font-display text-sm uppercase tracking-wide text-text-muted">Now picking</p>
             <p className="font-display text-display-lg font-bold leading-display text-text-primary">{onClock?.name ?? "Nobody"}</p>

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
@@ -25,6 +25,23 @@ describe("LeagueHome", () => {
       expect(screen.getByRole("button", { name: "Save lineup" })).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+
+  // Task 9 e2e regression: `league-lifecycle.spec.ts` asserts on `getByRole("heading", { name:
+  // leagueName })` with no level filter, and the terms panel's OWN `h2` — before this fix —
+  // carried that exact same text as the page's `h1`, so the query resolved two elements and
+  // failed with a Playwright strict-mode violation. Pinned here at the unit level too: only the
+  // page's own `h1` may answer a heading query for the league's name.
+  it("names the league in exactly one heading, not two", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getAllByRole("heading", { name: HOME.name })).toHaveLength(1);
+    // The terms panel still shows the name — just not as a second heading.
+    expect(screen.getByRole("region", { name: "League terms" })).toHaveTextContent(HOME.name);
   });
 
   it("shows the commissioner's tools only to the commissioner", () => {
@@ -158,5 +175,54 @@ describe("LeagueHome", () => {
       fixtureLeagueDeps().deps,
     );
     expect(screen.getByRole("region", { name: "Lineup advisor" })).toBeInTheDocument();
+  });
+
+  // Task 8: trust is not a one-time disclosure. The same `LeagueTermsPanel` the invite preview
+  // renders shows up here too, fed by `home.terms` rather than a second fetch, and for every
+  // member — gating it on `isCommissioner` would make the surface pointless, since the terms are
+  // what everybody in the league is playing under.
+  it("shows the league terms panel, fed from the home body, for every viewer", async () => {
+    await inBothThemes(
+      wrap({ ...HOME, isCommissioner: false }),
+      async ({ container }) => {
+        const panel = screen.getByRole("region", { name: "League terms" });
+        expect(within(panel).getByText(HOME.terms.rosterLine)).toBeInTheDocument();
+        expect(within(panel).getByText(HOME.terms.commissionerName)).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+  });
+
+  // First-timer persona review, fix round 1: the "joining puts you in the draft..." sentence
+  // belongs to the INVITE flow only (`JoinForm`) — it must never render post-join, where a
+  // member reading their own league is already in the draft and the season, and the line would
+  // be stale rather than informative.
+  it("never shows the invite flow's 'joining means' sentence once you're already in the league", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(
+      screen.queryByText("Joining puts you in the draft and the season that follows. You'll set a lineup every week."),
+    ).not.toBeInTheDocument();
+  });
+
+  // Step 15's audit: a league had no members list at all. It renders for every member, not
+  // just the commissioner — the invite panel below it stays commissioner-only, but knowing who
+  // is in the league is not a commissioner-only fact.
+  it("shows the league's members list, naming the commissioner, for every viewer", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, isCommissioner: false }} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    const list = screen.getByRole("list", { name: "Managers" });
+    // "Commissioner" is now ambiguous at the page level: the terms panel's own label reads the
+    // same word. Scoped to the members list, this is still the commissioner BADGE.
+    expect(within(list).getByText("Commissioner")).toBeInTheDocument();
+    expect(screen.getByText("9 seats still open")).toBeInTheDocument();
   });
 });

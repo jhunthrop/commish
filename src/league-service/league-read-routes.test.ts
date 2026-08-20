@@ -19,7 +19,7 @@ vi.mock("@/league-service/browse", async (importOriginal) => {
 
 import { eq } from "drizzle-orm";
 import Redis from "ioredis";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
 import type { Player } from "@/domain/player";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
@@ -34,7 +34,7 @@ import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import { finalizeWeek } from "@/stats-pipeline/finalize";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
-import { leagueHome, matchupWeek } from "./read";
+import { BASELINE_LEAGUE_HOME_QUERIES, leagueHome, matchupWeek } from "./read";
 import { writeSchedule } from "./schedule";
 
 const db = createTestDb();
@@ -130,10 +130,66 @@ describe("GET /api/leagues/[leagueId]", () => {
     expect(body).toMatchObject({
       leagueId: created.leagueId, name: "Sunday Money", isCommissioner: true,
       myTeamId: created.teamId, draftId: created.draftId, draftStatus: "scheduled",
-      currentWeek: 1, myMatchup: null,
+      currentWeek: 1, myMatchup: null, commissionerUserId: "u1",
     });
     expect(body.standings).toHaveLength(1);
     expect(body.rosterSlots.length).toBeGreaterThan(0);
+  });
+
+  // Step 15's audit: standings and the members list both need the owner, not just the team —
+  // and both must carry it without a second query duplicating what `listTeamCards` already read.
+  it("carries the owner's name and face through to both the members list and the standings row", async () => {
+    const created = await createDefaultLeague("u1");
+    await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
+    signedInAs("u1");
+    const body = (await (await getLeague(leagueRequest(created.leagueId), {
+      params: Promise.resolve({ leagueId: created.leagueId }),
+    })).json()).data;
+
+    const mine = body.teams.find((team: { id: string }) => team.id === created.teamId);
+    expect(mine).toMatchObject({ ownerUserId: "u1", ownerDisplayName: "Manager u1" });
+    const other = body.teams.find((team: { id: string }) => team.id === "team_2");
+    expect(other).toMatchObject({ ownerUserId: "u2", ownerDisplayName: "Manager u2" });
+
+    const standingsRow = body.standings.find((row: { teamId: string }) => row.teamId === created.teamId);
+    expect(standingsRow).toMatchObject({ ownerDisplayName: "Manager u1" });
+    expect(standingsRow.ownerAvatar).toBeNull();
+  });
+
+  it("costs the same bounded number of queries whether or not the standings and members list carry the owner", async () => {
+    const created = await createDefaultLeague("u1");
+    await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
+
+    const counting = countingDb(db);
+    const home = await leagueHome(counting.db, created.leagueId, "u1");
+    expect(home?.teams).toHaveLength(2);
+    expect(home?.standings).toHaveLength(2);
+    // `BASELINE_LEAGUE_HOME_QUERIES` (`./read`) — the same bound whichever league is asked, and
+    // `leagueStandings` no longer runs a second `teams` query of its own for names.
+    expect(counting.selectCount()).toBeLessThanOrEqual(BASELINE_LEAGUE_HOME_QUERIES);
+  });
+
+  // Task 8: the terms panel that renders on the invite page also renders inside the league, fed
+  // by this same read — gating it on `isCommissioner` would make the surface pointless, since
+  // the terms are what everybody in the league is playing under, not a commissioner-only fact.
+  it("gives every member the league's terms, not just the commissioner", async () => {
+    const created = await createDefaultLeague("u1");
+    await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
+
+    const asMember = await leagueHome(db, created.leagueId, "u2");
+    expect(asMember!.terms.scoringLabel).toBe("PPR");
+    expect(asMember!.terms.commissionerName).toBe("Manager u1");
+    expect(asMember!.isCommissioner).toBe(false);
+  });
+
+  // The terms are assembled from rows `leagueHome` already holds — the league, its scoring
+  // settings and its teams — not fetched a second time the way a naive "reuse `invitePreview`"
+  // implementation would.
+  it("costs no extra round trip beyond the terms' own scoring-settings read", async () => {
+    const created = await createDefaultLeague("u1");
+    const counting = countingDb(db);
+    await leagueHome(counting.db, created.leagueId, "u1");
+    expect(counting.selectCount()).toBe(BASELINE_LEAGUE_HOME_QUERIES);
   });
 
   it("answers 404 for a league that doesn't exist", async () => {

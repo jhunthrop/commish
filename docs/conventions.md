@@ -62,6 +62,33 @@ src/
                           the app's ONE unauthenticated league read. NO I/O. 100% coverage.
                           Browser-safe, so src/league-room/** value-imports it directly, the
                           same way src/chat-room/** value-imports @/chat.
+  identity/               Pure identity rules: AvatarRef parsing over the three ref cases
+                          (avatars.ts, eight code presets — no upload, no object store),
+                          HelpLevel + the two-field PreferenceState (preferences.ts), the
+                          first-run path fork (first-run.ts) and the notification catalog +
+                          deliverableChannels() (notifications.ts). NO I/O. 100% coverage.
+  identity-service/       Profile read/write service over Postgres: updateProfile (the one
+                          write path for displayName/experienceTier/avatarUrl, PATCH
+                          /api/profile) and the user_preferences seed-then-write pair
+                          (GET/PATCH /api/preferences).
+  help/                   The ONE glossary registry (GLOSSARY, term()) and its HELP_CONFIG
+                          tunables. NO I/O. Browser-safe for the same reason as @/chat and
+                          @/matchmaking; InfoTip (src/components/ui/info-tip.tsx) is what
+                          actually value-imports it.
+  reviews/                Pure review-feed rules: ReviewView/ReviewsPage (contract.ts),
+                          REVIEW_CONFIG and validateReviewDraft, the SAME rule the Zod
+                          boundary and the composer's live character count both enforce. NO
+                          I/O. 100% coverage.
+  review-service/         Review read/write service over Postgres: listReviews (the
+                          rating-never-SELECTed feed query), submitReview (insert-or-edit on
+                          the userId unique index), reportReview and removeReview (the
+                          no-re-stamp removal write). Consumed by /api/reviews/** and by
+                          scripts/remove-review.ts.
+  account-room/           The browser half of the profile/account surface: the profile form,
+                          the avatar picker, the notification summary and the review composer
+                          + feed. Reaches @/identity-service and @/review-service only over
+                          the wire; value-imports @/reviews directly (pure, browser-safe) for
+                          the composer's live character count. See "Client boundary" below.
   integration/            Cross-module proofs: a real draft, run through the real store, into
                           real standings, chat, advisor and browse reads. Test-only.
   chat/                   Pure chat fold + wire contract + CHAT_CONFIG. NO I/O. 100% coverage.
@@ -89,6 +116,13 @@ src/
                           delta-diff snapshot, the affected-roster resolver, persistTick, the
                           score/reference caches and the worker loop itself. 100% coverage. See
                           docs/decisions/live-scoring-pipeline.md.
+  gifs/                   The GIF seam. provider.ts (GifResult/GifProvider + GifSearchBody),
+                          config.ts + registry.ts (GIF_PROVIDER selection, "none" → null,
+                          fail-fast on an unknown name), test-support.ts (the contract every
+                          implementation passes) and giphy/ (the real adapter, tested against
+                          committed fixtures — mirrors stats/tank01/ exactly). Consumed by
+                          GET /api/gifs/search and by the chat route's GET, which sets
+                          ChatPageBody.gifSearchEnabled from createGifProvider() !== null.
   db/                     schema.ts (Drizzle, pg-core: users, leagues, teams, league_invites,
                           scoring_settings, roster_slots, lineup_slots, drafts, draft_actions,
                           draft_nudges, draft_picks, weeks, matchups, players,
@@ -174,22 +208,26 @@ Postgres through a transaction pooler. The in-process mutex in `src/draft-servic
 remains as an intra-process fast path, not as the safety mechanism.
 
 ### Client boundary
-Everything under `src/draft-room/**`, `src/league-room/**` and `src/chat-room/**` is BROWSER
-code — the pure state reducer/formatters, the hooks, and the client components that render the
-draft room, the league room and the chat surface respectively. Each talks to its service layer
-ONLY over the wire (`GET`/`POST /api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`,
-`GET /api/leagues/[leagueId]/events`) — never by importing `@/draft-engine`, `@/draft-service`,
-`@/league`, `@/league-service`, `@/chat-service`, `@/ai-advisor`, `@/db`, `@/lib/realtime`,
-`@/lib/auth`, `@/lib/leagues`, `@/lib/llm`, `@/lib/api/respond`, `@/data/seed` or
-`@/stats-pipeline` as VALUES. An ESLint
-`@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`,
-scoped to `src/draft-room/**/*.{ts,tsx}`, `src/league-room/**/*.{ts,tsx}` and
-`src/chat-room/**/*.{ts,tsx}` only) enforces this — matched against a relative-path spelling of
+Everything under `src/draft-room/**`, `src/league-room/**`, `src/chat-room/**` and
+`src/account-room/**` is BROWSER code — the pure state reducer/formatters, the hooks, and the
+client components that render the draft room, the league room, the chat surface and the profile
+surface respectively. Each talks to its service layer ONLY over the wire (`GET`/`POST
+/api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`, `GET /api/leagues/[leagueId]/events`,
+`GET /api/gifs/search`, `PATCH /api/profile`, `GET`/`PATCH /api/preferences`,
+`GET`/`POST /api/reviews/**`) — never by importing `@/draft-engine`,
+`@/draft-service`, `@/league`, `@/league-service`, `@/chat-service`, `@/ai-advisor`,
+`@/review-service`, `@/db`,
+`@/lib/realtime`, `@/lib/auth`, `@/lib/leagues`, `@/lib/llm`, `@/lib/api/respond`, `@/data/seed`,
+`@/stats-pipeline`, `@/stats` or `@/gifs` as VALUES.
+An ESLint `@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`'s
+`SERVER_ONLY_MODULE_GROUPS`, scoped to `src/draft-room/**/*.{ts,tsx}`,
+`src/league-room/**/*.{ts,tsx}`, `src/chat-room/**/*.{ts,tsx}` and
+`src/account-room/**/*.{ts,tsx}` only) enforces this — matched against a relative-path spelling of
 the same module too (`../../draft-engine`), not just the `@/` alias. `import type` stays
 allowed, since sharing a TYPE (e.g. `DraftStateView`, `LeagueSummary`, `ChatMessageView`,
-`ApiEnvelope`, or `ScoreUpdatePayload`/`TeamScore` from `@/stats-pipeline/contract`, which
-`useLiveScores` — `src/league-room/hooks/use-live-scores.ts` — imports that way) costs nothing
-at runtime and is how the client and server sides of the wire stay in sync.
+`ProfileBody`, `ApiEnvelope`, or `ScoreUpdatePayload`/`TeamScore` from `@/stats-pipeline/contract`,
+which `useLiveScores` — `src/league-room/hooks/use-live-scores.ts` — imports that way) costs
+nothing at runtime and is how the client and server sides of the wire stay in sync.
 
 `src/chat/**` is deliberately **not** in that blocked list: unlike `draft-engine`/`league`, it is
 pure, I/O-free, browser-safe fold code (`mergeMessages`, `applyReaction`, `CHAT_CONFIG`), so
@@ -204,6 +242,31 @@ lives in `src/league-service/browse.ts`, which the existing `@/league-service` b
 covers. There is no `@/matchmaking-service`, because a second service directory for one query
 would be a boundary to maintain rather than a boundary to enforce.
 
+`src/identity/**` joins the same exempt set for the same reason: `parseAvatarRef`/`AVATAR_PRESETS`
+(`src/identity/avatars.ts`), `HelpLevel`/`defaultPreferences` (`src/identity/preferences.ts`),
+`firstRunPlan` (`src/identity/first-run.ts`) and `NOTIFICATION_CATALOG`/`deliverableChannels()`
+(`src/identity/notifications.ts`) are pure, I/O-free rule code with no server module behind them.
+`Avatar` (`src/components/ui/avatar.tsx`) is what actually value-imports `parseAvatarRef` today —
+every room directory reaches it indirectly through that primitive, the same indirect path
+`src/help/**` documents below — but the exemption is what keeps a future direct `firstRunPlan` or
+`NOTIFICATION_CATALOG` import from `src/account-room/**` legal too.
+
+`src/help/**` joins the same exempt set for the same reason: `GLOSSARY`/`term()`
+(`src/help/glossary.ts`) and `HELP_CONFIG` (`src/help/config.ts`) are pure, I/O-free lookup
+code with no server module behind them. Every room directory reaches it indirectly today,
+through `InfoTip` (`src/components/ui/info-tip.tsx`) — the one component that value-imports
+`@/help/glossary` — but the exemption is what would keep a future direct `GLOSSARY` import from
+a room component legal too.
+
+`src/reviews/**` joins the exempt set for the same reason and is reached DIRECTLY rather than
+indirectly: `REVIEW_CONFIG`, `ReviewView`/`ReviewsPage` and `validateReviewDraft` are pure,
+I/O-free rule code, and `ReviewComposer` (`src/account-room/components/review-composer.tsx`)
+value-imports `validateReviewDraft` for its live remaining-character count — the SAME rule
+`submitReviewSchema` (`@/review-service/schemas`) enforces at the API boundary, so the number a
+manager watches tick down while they type can never be a different number than the one the
+server accepts. `@/review-service` is the Postgres half and is on the blocked list above, reached
+only over the wire from `src/account-room/**`, same as every other service module.
+
 A second, simpler layering rule sits beside this one: nothing under `src/**` may import from
 `scripts/**` or `e2e/**`. Build tooling and the browser suite may depend on source; source may
 not depend on either. Enforced by its own `no-restricted-imports` block in `eslint.config.mjs`.
@@ -216,7 +279,8 @@ directly; that is the idiomatic Next.js pattern, not a boundary violation. A pag
 told apart from a client component by its filename alone, so a glob covering `src/app/**`
 would either miss real client code elsewhere or wrongly flag a legitimate server import. Any
 client interactivity a page needs is a `"use client"` component imported FROM
-`src/draft-room/**`, `src/league-room/**` or `src/chat-room/**`, not inlined into the page file.
+`src/draft-room/**`, `src/league-room/**`, `src/chat-room/**` or `src/account-room/**`, not
+inlined into the page file.
 See `docs/draft-room.md` for the draft room's full fetch → SSE → apply → gap → refetch contract.
 
 ### API responses
@@ -229,7 +293,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**` and `src/stats-pipeline/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — eight gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**` and `src/gifs/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — twelve gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
 - **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 

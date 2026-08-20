@@ -21,6 +21,13 @@ export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
 export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress", "complete"]);
 export const playerPositionEnum = pgEnum("player_position", ["QB", "RB", "WR", "TE", "K", "DEF"]);
 export const weekStatusEnum = pgEnum("week_status", ["scheduled", "in_progress", "final"]);
+export const helpLevelEnum = pgEnum("help_level", ["guided", "standard"]);
+/**
+ * A GIF is a `chat.message`, not a second event type (ruling 17): this is the ONE thing that
+ * distinguishes the two rows shapes rather than inferring it from `gif_url` being non-null, so a
+ * row can never be ambiguous mid-migration or under a future third kind.
+ */
+export const chatMessageKindEnum = pgEnum("chat_message_kind", ["text", "gif"]);
 
 // Identity (credentials, sessions, MFA, OAuth) is owned by WorkOS AuthKit. This table is
 // the app's own profile row for a WorkOS user — `id` IS the WorkOS user id — holding the
@@ -39,6 +46,24 @@ export const users = pgTable(
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
+
+/**
+ * One row per user, holding only the preferences this product actually reads. It is created
+ * lazily on first read rather than at sign-up, seeded from `defaultPreferences`, so a user who
+ * never opens a setting still gets the right default and there is no backfill to write.
+ *
+ * There is deliberately NO notification-channel column here. The catalog in
+ * `src/identity/notifications.ts` describes what the product tells you about; email delivery is
+ * Plan D's, and a stored preference for a channel with no sender is a switch wired to nothing.
+ * The day the sender exists, this table gains the column and the surface gains the toggles.
+ */
+export const userPreferences = pgTable("user_preferences", {
+  userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  helpLevel: helpLevelEnum("help_level").notNull().default("guided"),
+  /** Null until the tour is dismissed. A timestamp, not a boolean, so "when" survives for Phase 3. */
+  draftTourDismissedAt: timestamp("draft_tour_dismissed_at", { withTimezone: true }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
 
 export const leagues = pgTable(
   "leagues",
@@ -430,8 +455,25 @@ export const chatMessages = pgTable(
       .notNull()
       .references(() => users.id),
     body: text("body").notNull(),
+    // Additive, all nullable (0017_chat_message_gifs.sql) — explicit columns rather than a jsonb
+    // blob, because the shape is fixed and small and a blob is unvalidatable at the database.
+    // `kind` alone says which shape a row is; the gif_* columns are populated together or not at
+    // all (chat-service/chat.ts's postMessage writes both in one insert).
+    kind: chatMessageKindEnum("kind").notNull().default("text"),
+    gifUrl: text("gif_url"),
+    gifPreviewUrl: text("gif_preview_url"),
+    gifAlt: text("gif_alt"),
+    gifWidth: integer("gif_width"),
+    gifHeight: integer("gif_height"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
+  // The physical index also carries `INCLUDE (body)` — added by hand in
+  // `drizzle/0018_chat_messages_covering_index.sql` because drizzle-orm's `index()` builder has
+  // no `.include()` API to express it here. See that migration's own comment: widening this row
+  // (0017's gif_* columns) tipped the planner off `chat_messages_league_id_idx` for a paginated
+  // read and onto a much more expensive `chat_messages_pkey` scan-and-discard, which this
+  // covering index (an Index-Only Scan once vacuumed) undoes. A future migration that drops and
+  // recreates this index from THIS definition must re-add `INCLUDE (body)` by hand, the same way.
   (t) => [index("chat_messages_league_id_idx").on(t.leagueId, t.id)],
 );
 
@@ -453,4 +495,50 @@ export const chatReactions = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [primaryKey({ columns: [t.messageId, t.userId, t.emoji] })],
+);
+
+/**
+ * One review per person, edited rather than duplicated: `user_id` is UNIQUE, so "I already wrote
+ * one" is a database fact and not a count the service has to get right.
+ *
+ * Removal is a stamp, never a delete. A removed review keeps its author, its text, who removed it
+ * and why, because the alternative is that a product with an unfiltered review feed can make a
+ * review disappear leaving nothing behind. Phase 3 owns the real audit log; this row is the
+ * interim record it will read, not a second system it will have to reconcile.
+ */
+export const reviews = pgTable(
+  "reviews",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    rating: integer("rating").notNull(),
+    body: text("body").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedByUserId: text("removed_by_user_id").references(() => users.id),
+    removalReason: text("removal_reason"),
+  },
+  (t) => [
+    uniqueIndex("reviews_user_idx").on(t.userId),
+    /** The feed's only ordering. Partial on visibility, because the feed never reads removed rows. */
+    index("reviews_feed_idx").on(t.createdAt).where(sql`${t.removedAt} is null`),
+  ],
+);
+
+/**
+ * A report is in-product moderation SIGNAL, not moderation ACTION (ruling 18: no admin role
+ * exists to act on it in this phase). One row per reporter per review — the primary key is the
+ * pair, so reporting twice is a no-op upsert (`onConflictDoNothing`) rather than a duplicate or
+ * an error: reporting the same review again is the same report, not a second one.
+ */
+export const reviewReports = pgTable(
+  "review_reports",
+  {
+    reviewId: text("review_id").notNull().references(() => reviews.id, { onDelete: "cascade" }),
+    reporterUserId: text("reporter_user_id").notNull().references(() => users.id),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.reviewId, t.reporterUserId] })],
 );

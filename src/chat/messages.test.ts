@@ -12,6 +12,7 @@ function message(id: string, overrides: Partial<ChatMessageView> = {}): ChatMess
     body: `message ${id}`,
     createdAt: "2026-08-18T12:00:00.000Z",
     reactions: [],
+    gif: null,
     ...overrides,
   };
 }

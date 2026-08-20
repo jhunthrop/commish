@@ -1,6 +1,7 @@
 import { chatCursorSchema, listMessages, postMessage, postMessageSchema } from "@/chat-service";
 import type { ChatPageBody, PostChatBody } from "@/chat/contract";
 import { getDb } from "@/db/client";
+import { createGifProvider } from "@/gifs/registry";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { getPublisher } from "@/lib/realtime/publisher";
 import { withLeagueMemberActor, type LeagueRouteContext } from "@/app/api/leagues/_shared";
@@ -25,6 +26,9 @@ export async function GET(request: Request, context: LeagueRouteContext) {
       meUserId: actor.userId,
       messages: page.messages,
       hasMore: page.hasMore,
+      // No request made — createGifProvider() only reads env and builds an adapter object. See
+      // ChatPageBody.gifSearchEnabled's docblock: this is the ONE place availability is decided.
+      gifSearchEnabled: createGifProvider() !== null,
     });
   });
 }
@@ -42,6 +46,7 @@ export async function POST(request: Request, context: LeagueRouteContext) {
       leagueId: actor.leagueId,
       userId: actor.userId,
       body: parsed.value.body,
+      gif: parsed.value.gif,
       publish: (input) => getPublisher().publish(input),
     });
     return ok<PostChatBody>({ message }, { status: 201 });

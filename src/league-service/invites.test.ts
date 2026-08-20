@@ -5,8 +5,14 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { leagueInvites, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { LEAGUE_CONFIG } from "@/league";
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { createLeague } from "./creation";
-import { acceptInvite, createInvite } from "./invites";
+import { acceptInvite, createInvite, invitePreview } from "./invites";
+import { leagueHome } from "./read";
+
+/** `league()` below always mints this name — the one string every `invitePreview` leak
+ *  assertion checks for absence. */
+const SEEDED_LEAGUE_NAME = "Sunday Money";
 
 const db = createTestDb();
 let nowIso = "2026-08-17T12:00:00.000Z";
@@ -301,5 +307,91 @@ describe("acceptInvite", () => {
     } finally {
       consoleSpy.mockRestore();
     }
+  });
+});
+
+describe("invitePreview", () => {
+  it("tells you nothing about a league when the code is not valid", async () => {
+    const result = await invitePreview(db, "NOPE99");
+    expect(result).toEqual({ ok: false, reason: "That invite link isn't valid. Ask your commissioner for a new one." });
+    expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
+  });
+
+  it("answers the exact terms a member of the league would see", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await invitePreview(db, invite.code);
+    expect(result).toEqual({
+      ok: true,
+      terms: {
+        name: SEEDED_LEAGUE_NAME,
+        format: "snake",
+        teamCount: 4,
+        filledTeams: 1,
+        scoringLabel: "PPR",
+        rosterLine: "1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 K, 1 DEF, 6 bench",
+        stakeLabel: "Free",
+        stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
+        commissionerName: "Manager 1",
+        commissionerAvatar: null,
+      },
+    });
+  });
+
+  // Task 8: the whole reason `leagueTerms` is one pure function is that a prospect reading the
+  // invite and a member reading the league home can never be told two different things about the
+  // league they are both looking at. This proves it against the SAME league, not just against
+  // two separately-hand-typed expectations that could quietly drift from each other.
+  it("hands a prospect the exact same terms a member of the league sees", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const preview = await invitePreview(db, invite.code);
+    if (!preview.ok) throw new Error(preview.reason);
+    const home = await leagueHome(db, created.leagueId, "u1");
+
+    expect(home!.terms).toEqual(preview.terms);
+  });
+
+  it("counts every seated team, not just the commissioner's", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+    await acceptInvite(writeDeps(), { code: invite.code, userId: "u2" });
+
+    const result = await invitePreview(db, invite.code);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.terms.filledTeams).toBe(2);
+  });
+
+  it("refuses an expired code with the same reason acceptInvite gives, and no league fields", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+    // `invitePreview` takes no injected clock (its own signature is just `(db, code)`), so
+    // unlike `acceptInvite`'s tests this one moves the INVITE's `expiresAt` into the past
+    // relative to the real wall clock, rather than moving a fake `now` forward.
+    await db.update(leagueInvites).set({ expiresAt: new Date(Date.now() - 1000) }).where(eq(leagueInvites.code, invite.code));
+
+    const result = await invitePreview(db, invite.code);
+    expect(result).toEqual({ ok: false, reason: "That invite link has expired. Ask your commissioner for a new one." });
+    expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
+  });
+
+  it("refuses an exhausted code with the same reason acceptInvite gives, and no league fields", async () => {
+    const created = await league();
+    const once = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1", maxUses: 1 });
+    if (!once.ok) throw new Error(once.reason);
+    await acceptInvite(writeDeps(), { code: once.code, userId: "u2" });
+
+    const result = await invitePreview(db, once.code);
+    expect(result).toEqual({
+      ok: false,
+      reason: "That invite link has already been used up. Ask your commissioner for a new one.",
+    });
+    expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
   });
 });

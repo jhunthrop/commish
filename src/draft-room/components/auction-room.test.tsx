@@ -25,7 +25,7 @@ function mountAuction(view = AUCTION_VIEW) {
   const rendered = renderInRoom(
     <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
       <ToastProvider>
-        <DraftRoom draftId="d1" />
+        <DraftRoom draftId="d1" dismissedAt="2026-01-01T00:00:00.000Z" />
       </ToastProvider>
     </ChatRoomDepsProvider>,
     fixture.deps,
@@ -62,7 +62,7 @@ function mountAuctionWithQueue(over: Partial<Pick<FixtureDeps, "queue" | "queueR
   renderInRoom(
     <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
       <ToastProvider>
-        <DraftRoom draftId="d1" />
+        <DraftRoom draftId="d1" dismissedAt="2026-01-01T00:00:00.000Z" />
       </ToastProvider>
     </ChatRoomDepsProvider>,
     capture.deps,
@@ -80,7 +80,7 @@ describe("AuctionRoom", () => {
       <DraftRoomDepsProvider deps={fixture.deps}>
         <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
           <ToastProvider>
-            <DraftRoom draftId="d1" />
+            <DraftRoom draftId="d1" dismissedAt="2026-01-01T00:00:00.000Z" />
           </ToastProvider>
         </ChatRoomDepsProvider>
       </DraftRoomDepsProvider>,

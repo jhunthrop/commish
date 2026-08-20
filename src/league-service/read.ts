@@ -4,9 +4,10 @@ import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, t
 import type { DraftStatus } from "@/domain/draft";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import { listTeamCards } from "@/draft-service/teams";
-import { benchOf, LEAGUE_CONFIG, seasonProgress, startersOf, type WeekStatus } from "@/league";
+import { benchOf, LEAGUE_CONFIG, leagueTerms, seasonProgress, startersOf, type WeekStatus } from "@/league";
 import type {
   LeagueHomeBody,
+  LeagueMemberCard,
   LeagueSummary,
   MatchupDetail,
   MatchupLineupEntry,
@@ -105,6 +106,15 @@ export function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyM
 }
 
 /**
+ * Every read `leagueHome` runs, whichever league is asked: `leagues`, `matchups`, `teams`
+ * (plain), `drafts`, `scoring_settings`, `stat_weeks` (`weekStatusFor`), the one team+owner
+ * join (`listTeamCards`), and `leagueStandings`'s own `matchups` read — eight, bounded
+ * regardless of team count. Pinned here, not just in the test, so a future caller who adds a
+ * ninth read trips the same assertion `invitePreview`'s neighboring test would if it grew one.
+ */
+export const BASELINE_LEAGUE_HOME_QUERIES = 8;
+
+/**
  * Everything the league home page renders, assembled once on the server. `listTeamCards` is
  * imported from `@/draft-service/teams` rather than re-implemented — it is already the one
  * "team + owner's public profile" query in this codebase, and a second would drift.
@@ -116,15 +126,53 @@ export async function leagueHome(db: Db, leagueId: string, userId: string): Prom
   const matchupRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
   const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
   const [draft] = await db.select({ id: drafts.id, status: drafts.status }).from(drafts).where(eq(drafts.leagueId, leagueId));
+  // `leagueTerms`'s one input this function did not already hold — every other field it needs
+  // (`league`'s own columns, `teamRows`/`teamCards` for filled count and the commissioner's
+  // name) rides rows this function reads anyway. Falls back to `PPR_SCORING` for the same
+  // never-true "row missing" case `matchupWeek` and `invitePreview` both guard defensively.
+  const [weights] = await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, leagueId));
 
   const { totalWeeks, currentWeek } = seasonProgress(matchupRows, LEAGUE_CONFIG.regularSeasonWeeks);
   const myTeamId = teamRows.find((row) => row.userId === userId)?.id ?? null;
   const nameById = new Map(teamRows.map((row) => [row.id, row.name]));
+  // `teamRows` above is the one place this function already knows each team's OWNER, not just
+  // its owner's public profile — `listTeamCards` below never selects `userId` at all, on
+  // purpose (it feeds the draft room too, and a team's owner id has no business on that wire).
+  // Reusing this map rather than adding a second query is what keeps `listTeamCards` untouched.
+  const ownerUserIdByTeamId = new Map(teamRows.map((row) => [row.id, row.userId]));
 
   const mine = matchupRows.find(
     (row) => row.weekNumber === currentWeek && (row.homeTeamId === myTeamId || row.awayTeamId === myTeamId),
   );
   const weekStatus = await weekStatusFor(db, currentWeek);
+
+  // The one "team + owner's public profile" query, read once and shared: `listTeamCards`
+  // enriches both `teams` (for the members panel) and `standings` (for the face beside each
+  // row), so a page that already paid for this join never pays for it twice.
+  const teamCards = await listTeamCards(db, leagueId);
+  const members: readonly LeagueMemberCard[] = teamCards.map((card) => ({
+    ...card,
+    ownerUserId: ownerUserIdByTeamId.get(card.id) ?? card.id,
+  }));
+
+  // The commissioner has a team in every league (`createLeague` gives them one in the same
+  // transaction it writes the league itself), so their card is already sitting in `teamCards`
+  // above — no query beyond the one that already ran for the members panel.
+  const commissionerTeamId = teamRows.find((row) => row.userId === league.commissionerUserId)?.id;
+  const commissionerCard = teamCards.find((card) => card.id === commissionerTeamId);
+  const terms = leagueTerms({
+    name: league.name,
+    format: league.format,
+    teamCount: league.teamCount,
+    filledTeams: teamCards.length,
+    scoring: weights ?? PPR_SCORING,
+    rosterSlots: league.rosterSlots,
+    stakeTier: league.stakeTier,
+    commissioner: {
+      displayName: commissionerCard?.ownerDisplayName ?? "Commissioner",
+      avatarUrl: commissionerCard?.ownerAvatarUrl ?? null,
+    },
+  });
 
   return {
     leagueId,
@@ -133,9 +181,11 @@ export async function leagueHome(db: Db, leagueId: string, userId: string): Prom
     teamCount: league.teamCount,
     rosterSlots: league.rosterSlots,
     isCommissioner: league.commissionerUserId === userId,
+    commissionerUserId: league.commissionerUserId,
     myTeamId,
-    teams: await listTeamCards(db, leagueId),
-    standings: await leagueStandings(db, leagueId),
+    teams: members,
+    standings: await leagueStandings(db, leagueId, teamCards),
+    terms,
     currentWeek,
     totalWeeks,
     myMatchup: mine === undefined ? null : toSummary(mine, nameById, weekStatus),

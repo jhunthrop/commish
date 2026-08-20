@@ -1,8 +1,9 @@
-import { and, asc, eq, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues, teams } from "@/db/schema";
+import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
+import { describeScoring, type ScoringRules } from "@/scoring";
 
 /**
  * The disclosure allowlist, in one place. Exported so the tests and the route assert against
@@ -16,6 +17,7 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "stakeTier",
   "teamCount",
   "filledTeams",
+  "scoringLabel",
 ];
 
 /**
@@ -85,6 +87,57 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
     .limit(MATCHMAKING_CONFIG.maxResults);
 }
 
+/**
+ * Every raw scoring weight, keyed by league id — never returned to a caller. `listPublicLeagues`
+ * reduces each row straight to `describeScoring`'s derived label before this function's result
+ * ever leaves this module, so the fifteen weights themselves stay exactly as member-only as they
+ * were before this task; only the label they describe is new to the public wire.
+ *
+ * A SEPARATE query rather than a third join on `browseQuery`: that query is already a `GROUP BY
+ * leagues.id` aggregate (the fill count), and joining a one-row-per-league table into it would
+ * mean either widening the `GROUP BY` to every scoring column or wrapping each in `max()` for no
+ * reason — `scoring_settings.league_id` is that table's primary key, so a batched `IN` lookup
+ * against the page `browseQuery` already narrowed to `maxResults` rows is one extra, trivially
+ * indexed query, not a second scan of `leagues`.
+ */
+async function scoringWeightsByLeagueId(db: Db, leagueIds: readonly string[]): Promise<ReadonlyMap<string, ScoringRules>> {
+  if (leagueIds.length === 0) return new Map();
+  const rows = await db
+    .select({
+      leagueId: scoringSettings.leagueId,
+      pointsPerPassingYard: scoringSettings.pointsPerPassingYard,
+      pointsPerPassingTouchdown: scoringSettings.pointsPerPassingTouchdown,
+      pointsPerInterception: scoringSettings.pointsPerInterception,
+      pointsPerRushingYard: scoringSettings.pointsPerRushingYard,
+      pointsPerRushingTouchdown: scoringSettings.pointsPerRushingTouchdown,
+      pointsPerReceivingYard: scoringSettings.pointsPerReceivingYard,
+      pointsPerReceivingTouchdown: scoringSettings.pointsPerReceivingTouchdown,
+      pointsPerReception: scoringSettings.pointsPerReception,
+      pointsPerFumbleLost: scoringSettings.pointsPerFumbleLost,
+      teReceptionBonus: scoringSettings.teReceptionBonus,
+      pointsPerFieldGoal: scoringSettings.pointsPerFieldGoal,
+      pointsPerExtraPoint: scoringSettings.pointsPerExtraPoint,
+      pointsPerSack: scoringSettings.pointsPerSack,
+      pointsPerDefensiveInterception: scoringSettings.pointsPerDefensiveInterception,
+      pointsPerDefensiveTouchdown: scoringSettings.pointsPerDefensiveTouchdown,
+    })
+    .from(scoringSettings)
+    .where(inArray(scoringSettings.leagueId, [...leagueIds]));
+  return new Map(rows.map(({ leagueId, ...weights }) => [leagueId, weights]));
+}
+
+/**
+ * `scoringLabel` is a deliberate disclosure — see `PublicLeagueSummary`'s docblock — and it is
+ * derived HERE, once, from the league's weights, never passed through as the fifteen raw
+ * numbers. A league somehow missing its `scoring_settings` row (never true in production —
+ * `createLeague` writes both in one transaction) reads "Custom" rather than throwing: a browse
+ * card is not the place to surface a data-integrity bug to a stranger.
+ */
 export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<readonly PublicLeagueSummary[]> {
-  return browseQuery(db, filter);
+  const rows = await browseQuery(db, filter);
+  const weightsByLeagueId = await scoringWeightsByLeagueId(db, rows.map((row) => row.id));
+  return rows.map((row) => {
+    const weights = weightsByLeagueId.get(row.id);
+    return { ...row, scoringLabel: weights === undefined ? "Custom" : describeScoring(weights) };
+  });
 }

@@ -2,9 +2,12 @@ import Link from "next/link";
 import type { LeagueHomeBody, LineupBody } from "../contract";
 import { Card, PageTitle } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
+import type { HelpLevel } from "@/identity/preferences";
 import { formatWeek } from "../lib/format";
 import { AdvisorPanel } from "./advisor-panel";
 import { InvitePanel } from "./invite-panel";
+import { LeagueMembersPanel } from "./league-members-panel";
+import { LeagueTermsPanel } from "./league-terms-panel";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupScoreboard } from "./matchup-scoreboard";
@@ -16,7 +19,17 @@ import { StandingsTable } from "./standings-table";
  * `locked`) arrives already computed by `src/league/**` on the server. Keeping the
  * composition here rather than inside `page.tsx` is what makes it testable.
  */
-export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; readonly lineup: LineupBody | null }) {
+export function LeagueHome({
+  home,
+  lineup,
+  helpLevel,
+}: {
+  readonly home: LeagueHomeBody;
+  readonly lineup: LineupBody | null;
+  /** Forwarded from `LeaguePage`. Omitted only by tests that don't care about this branch —
+   *  `InfoTip` itself defaults to the click-only, non-inline behavior when it's absent. */
+  readonly helpLevel?: HelpLevel;
+}) {
   const clinched = home.standings.some((row) => row.teamId === home.myTeamId && row.clinched);
   const drafted = home.draftStatus === "complete";
   const draftLive = home.draftStatus === "in_progress";
@@ -66,7 +79,7 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
         ) : null}
       </section>
 
-      <StandingsTable rows={home.standings} myTeamId={home.myTeamId} />
+      <StandingsTable rows={home.standings} myTeamId={home.myTeamId} helpLevel={helpLevel} />
 
       {/*
         Unlike the draft room's `aside` band, this section sits in ordinary document flow, so
@@ -78,9 +91,32 @@ export function LeagueHome({ home, lineup }: { readonly home: LeagueHomeBody; re
         <LeagueChat leagueId={home.leagueId} />
       </div>
 
-      {lineup === null ? null : <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} />}
+      {lineup === null ? null : (
+        <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} helpLevel={helpLevel} />
+      )}
 
       {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
+
+      {/*
+        The terms panel, the members panel and the invite panel sit here, in that order, as
+        siblings in ordinary document flow rather than inside a layout that claims the space
+        between them: "how this league works" (Task 8, the SAME `LeagueTermsPanel` the invite
+        preview renders, fed by `home.terms` rather than a second fetch), the commissioner's
+        "who is missing" question (the members panel), and their "invite someone" answer (the
+        panel below) read together without any one of them owning the section. Every member sees
+        the terms panel — it is not gated on `isCommissioner` — because the terms are what
+        everybody in the league is playing under, not a commissioner-only fact.
+
+        `titleAs="p"`: this page's own `PageTitle` above already renders `home.name` (the same
+        string as `home.terms.name`) as its `h1`. Left at the panel's default `h2`, that is a
+        second heading with the identical accessible name — a real e2e regression Task 9 caught
+        (`league-lifecycle.spec.ts`, strict-mode ambiguity on `getByRole("heading", { name })`),
+        not just a cosmetic one: a screen reader's headings list would carry the league's name
+        twice for one fact. See `LeagueTermsPanel`'s own docblock.
+      */}
+      <LeagueTermsPanel terms={home.terms} helpLevel={helpLevel} titleAs="p" />
+
+      <LeagueMembersPanel teams={home.teams} teamCount={home.teamCount} commissionerUserId={home.commissionerUserId} myTeamId={home.myTeamId} />
 
       {home.isCommissioner ? <InvitePanel leagueId={home.leagueId} /> : null}
     </main>

@@ -56,7 +56,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           </div>
         </header>
       ) : (
-        <AppHeader displayName={user.displayName} />
+        <AppHeader displayName={user.displayName} avatar={user.avatarUrl} />
       )}
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
         <PageTitle>Open leagues</PageTitle>

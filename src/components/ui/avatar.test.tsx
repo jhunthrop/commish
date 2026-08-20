@@ -25,16 +25,32 @@ describe("Avatar", () => {
     expect(screen.getByText("?")).toBeInTheDocument();
   });
 
-  it("renders the image when a src is given, with an empty alt while decorative", () => {
-    const { container } = render(<Avatar name="Dana Whitfield" src="/a.png" />);
+  it("renders the image when a remote https avatar ref is given, with an empty alt while decorative", () => {
+    const { container } = render(<Avatar name="Dana Whitfield" avatar="https://workoscdn.com/u/a.png" />);
     const img = container.querySelector("img");
-    expect(img).toHaveAttribute("src", "/a.png");
+    expect(img).toHaveAttribute("src", "https://workoscdn.com/u/a.png");
     expect(img).toHaveAttribute("alt", "");
   });
 
   it("becomes an accessible image when labelled", async () => {
-    const { container } = render(<Avatar name="Dana Whitfield" label="Dana Whitfield" src="/a.png" />);
+    const { container } = render(
+      <Avatar name="Dana Whitfield" label="Dana Whitfield" avatar="https://workoscdn.com/u/a.png" />,
+    );
     expect(screen.getByRole("img", { name: "Dana Whitfield" })).toBeInTheDocument();
     expect(await axe(container)).toHaveNoViolations();
+  });
+
+  it("renders a chosen preset as an icon, both themes, no axe violations", async () => {
+    await inBothThemes(<Avatar name="Ada Lovelace" avatar="preset:shield" label="Ada Lovelace" />, async ({ container }) => {
+      expect(screen.getByRole("img", { name: "Ada Lovelace" })).toBeInTheDocument();
+      expect(container.querySelector("svg")).not.toBeNull();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("falls back to initials rather than an image for a value it will not render", () => {
+    render(<Avatar name="Ada Lovelace" avatar="javascript:alert(1)" />);
+    expect(screen.getByText("AL")).toBeInTheDocument();
+    expect(document.querySelector("img")).toBeNull();
   });
 });

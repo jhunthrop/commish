@@ -66,6 +66,77 @@ database yet — but whoever runs these against a live table with real traffic s
 INDEX CONCURRENTLY` for `0011` and `0013` and a batched backfill for `0012` instead of running
 the checked-in SQL verbatim.
 
+Same note for `0016` (Plan C's `reviews_user_idx`, a plain `CREATE UNIQUE INDEX`, and
+`reviews_feed_idx`, a plain partial `CREATE INDEX` on `created_at` filtered to un-removed rows —
+the feed's only ordering, see `feedQuery` in `src/review-service/reviews.ts`), each taking a
+`SHARE` lock blocking writes to `reviews` while it builds. Safe today for the same reason as the
+others: no production database yet, and the table starts empty. `CREATE INDEX CONCURRENTLY`
+against a live `reviews` table with real traffic, same as above.
+
+### `0018`'s covering-index swap needs an out-of-band runbook, and here it is
+
+`drizzle/0018_chat_messages_covering_index.sql` does a plain `DROP INDEX` + `CREATE INDEX` on
+`chat_messages` to widen `chat_messages_league_id_idx` with `INCLUDE (body)`. That is a harder
+case than `0011`/`0013`, on the table the migration's own comment calls unbounded: the `DROP`
+takes `ACCESS EXCLUSIVE` and the `CREATE` holds `SHARE` for the whole build, so every chat insert
+in the product blocks for the duration. It is also NOT fixable by adding `CONCURRENTLY` to the
+file — `drizzle-kit migrate` wraps each migration in `BEGIN`/`COMMIT`, and Postgres forbids a
+concurrent index build inside a transaction.
+
+Docs-only today, for the same reason as every note above: there is no production database, and
+`chat_messages` is empty on a fresh deploy, where the in-transaction swap costs nothing. The
+runbook below is what to run INSTEAD, the first time this migration would meet a grown
+`chat_messages`.
+
+Build the replacement beside the old one, swap the names, then drop the old one — all outside any
+transaction, and against the direct Postgres port, never through PgBouncer (`CREATE INDEX
+CONCURRENTLY` holds session state across statements, which transaction pooling does not preserve):
+
+```sql
+-- 1. Build the new covering index under its own temporary name. Minutes to hours on a large
+--    table; takes no lock that blocks reads or writes. Set a lock_timeout so the brief
+--    ACCESS SHARE UPDATE EXCLUSIVE acquisition cannot queue behind a long transaction and
+--    block every writer behind itself.
+SET lock_timeout = '5s';
+CREATE INDEX CONCURRENTLY chat_messages_league_id_idx_new
+  ON chat_messages USING btree (league_id, id) INCLUDE (body);
+
+-- 2. Verify it built. A CONCURRENTLY build that fails leaves an INVALID index behind, which the
+--    planner ignores and which must be dropped before retrying step 1.
+SELECT indisvalid FROM pg_class c JOIN pg_index i ON i.indexrelid = c.oid
+  WHERE c.relname = 'chat_messages_league_id_idx_new';
+-- If false: DROP INDEX CONCURRENTLY chat_messages_league_id_idx_new; then start over at step 1.
+
+-- 3. Swap the names. Two catalog-only renames, ACCESS EXCLUSIVE but instantaneous.
+BEGIN;
+ALTER INDEX chat_messages_league_id_idx RENAME TO chat_messages_league_id_idx_old;
+ALTER INDEX chat_messages_league_id_idx_new RENAME TO chat_messages_league_id_idx;
+COMMIT;
+
+-- 4. Drop the old one, also without blocking.
+DROP INDEX CONCURRENTLY chat_messages_league_id_idx_old;
+```
+
+Then mark `0018` applied without running it, so the migration chain stays contiguous and
+`drizzle-kit migrate` does not re-run the blocking version on the next deploy. Drizzle records
+applied migrations in `drizzle.__drizzle_migrations` by the file's own hash and `created_at`,
+which are the two values `drizzle/meta/_journal.json` already carries for `0018`:
+
+```sql
+-- hash: `shasum -a 256 drizzle/0018_chat_messages_covering_index.sql` — re-derive it rather than
+-- trusting this literal if the file has changed since this note was written.
+-- created_at: the "when" value for tag 0018 in drizzle/meta/_journal.json.
+INSERT INTO drizzle.__drizzle_migrations (hash, created_at)
+VALUES ('197e769618adf7c2a9d10ed2c0a3c703ec7f8b24dce4fbe33f091b00dde1029a', 1787203998432);
+```
+
+Both values were verified against a real migrated database: the recorded `hash` is the sha256 of
+the migration file's own bytes, and `created_at` equals the journal's `when` exactly.
+
+`src/db/index-plans.test.ts`'s `pg_indexes` assertion is what proves the end state matches, and it
+reads `indexdef` back from the catalog rather than trusting any of the SQL above — run the suite
+against the migrated database as the last step.
+
 ## The balance-as-rollup convention
 
 **Rule.** Any running total in this product is maintained as a **rollup row, updated in the same

@@ -45,7 +45,16 @@ mock stat dataset; `npm run stats:tank01:record` re-records the Tank01 fixtures
 `npm run stats:ingest` runs the live-scoring ingestion worker for exactly one tick and exits,
 printing what it found and what it cost against the monthly request budget — the way to see the
 pipeline work without waiting on `STATS_INGESTION_CONFIG.pollIntervalMs` (thirty minutes), and
-what to run first against a real `TANK01_API_KEY`; `npm run infra:down` stops the local stack.
+what to run first against a real `TANK01_API_KEY`; `npm run reviews:remove` is the review feed's
+one moderation action, an operator-run script (`scripts/remove-review.ts`, no admin UI or staff
+role exists) that stamps a review's `removedAt`/`removedByUserId`/`removalReason` rather than
+deleting the row, refusing a review that is already removed; `npm run infra:down` stops the local
+stack.
+
+Chat's "Add a GIF" button reads `GIF_PROVIDER` (default `none`, no button rendered, chat stays
+text-and-emoji) and, when set to `giphy`, `GIPHY_API_KEY` (developers.giphy.com) — see
+`.env.example`. Same fail-fast contract as `STATS_PROVIDER`: an unrecognized `GIF_PROVIDER` value
+never falls back to `none`, it throws and names the valid choices.
 
 The whole suite also runs through PgBouncer in transaction pooling mode as an explicit release
 gate, rather than as the everyday default (a pooler in the path would slow down every one of the

@@ -4,17 +4,33 @@ import { useMemo, useState } from "react";
 import type { ClientDraftAction } from "@/draft-engine";
 import { Button, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
+import type { HelpLevel } from "@/identity/preferences";
 import { useDraftRoom } from "../hooks/use-draft-room";
-import { playersById as buildPlayersById } from "../lib/lookups";
+import { useDraftRoomDeps } from "../hooks/deps";
+import { actionLabelFor, playersById as buildPlayersById } from "../lib/lookups";
+import { RoomTour } from "./room-tour";
 import { SnakeRoom } from "./snake-room";
 import { AuctionRoom } from "./auction-room";
+
+export interface DraftRoomProps {
+  readonly draftId: string;
+  /**
+   * The signed-in caller's preference row, read server-side by `DraftRoomPage`
+   * (`readPreferences`) before this component ever mounts — no client-side fetch sits on the
+   * room's critical path just to decide whether to show `RoomTour`.
+   */
+  readonly dismissedAt: string | null;
+  /** Same read, forwarded to `RoomRail`'s `InfoTip`s via `SnakeRoom`/`AuctionRoom`/`RoomShell`. */
+  readonly helpLevel?: HelpLevel;
+}
 
 /**
  * The client entry point. Owns the three page-level states (loading / error / ready) and the
  * one place a rejected action becomes a toast — components below never talk to the server.
  */
-export function DraftRoom({ draftId }: { readonly draftId: string }) {
+export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
   const room = useDraftRoom(draftId);
+  const deps = useDraftRoomDeps();
   const { show } = useToast();
   const playersById = useMemo(() => buildPlayersById(room.players), [room.players]);
   const [chatOpen, setChatOpen] = useState(true);
@@ -23,6 +39,21 @@ export function DraftRoom({ draftId }: { readonly draftId: string }) {
     void room.submit(action).then((outcome) => {
       if (!outcome.ok) show({ message: outcome.reason, tone: "error" });
     });
+  };
+
+  /**
+   * Fire-and-forget, by design: `RoomTour` closes on click no matter what this promise does,
+   * and swallows even a synchronous throw from it. A failed preference write must never be the
+   * thing standing between a manager and a live draft — see `RoomTour`'s own docblock.
+   */
+  const dismissTour = (): void => {
+    void deps
+      .fetchJson("/api/preferences", {
+        method: "PATCH",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ dismissDraftTour: true }),
+      })
+      .catch(() => {});
   };
 
   // Loading and error are the only two states that are a PAGE rather than a room, so they are
@@ -77,9 +108,14 @@ export function DraftRoom({ draftId }: { readonly draftId: string }) {
     </div>
   );
 
-  return room.view.format === "auction" ? (
-    <AuctionRoom room={room} playersById={playersById} onAct={act} aside={chat} />
-  ) : (
-    <SnakeRoom room={room} playersById={playersById} onAct={act} aside={chat} />
+  return (
+    <>
+      <RoomTour dismissedAt={dismissedAt} onDismiss={dismissTour} actionLabel={actionLabelFor(room.view.format)} />
+      {room.view.format === "auction" ? (
+        <AuctionRoom room={room} playersById={playersById} onAct={act} aside={chat} helpLevel={helpLevel} />
+      ) : (
+        <SnakeRoom room={room} playersById={playersById} onAct={act} aside={chat} helpLevel={helpLevel} />
+      )}
+    </>
   );
 }

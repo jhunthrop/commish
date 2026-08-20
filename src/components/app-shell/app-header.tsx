@@ -1,16 +1,22 @@
 import Link from "next/link";
+import { Avatar } from "@/components/ui/avatar";
 
 export interface AppHeaderProps {
   /** The signed-in user's display name, server-derived by the page. */
   readonly displayName: string;
+  /** The signed-in user's STORED avatar ref (`users.avatar_url`), server-derived by the page. */
+  readonly avatar: string | null;
 }
 
 /**
  * The one signed-in page shell: wordmark home link, the user, and the way out. Every page
  * under `/app` renders this except the draft room, whose full-height `RoomRail` IS its
  * header — two chromes stacked would break the room's no-page-scroll contract.
+ *
+ * The name is a link to `/app/profile` — the one write path this product has to who a user is
+ * (Task 2) — carrying the user's own `Avatar` so the way in is legible, not just clickable.
  */
-export function AppHeader({ displayName }: AppHeaderProps) {
+export function AppHeader({ displayName, avatar }: AppHeaderProps) {
   return (
     <header className="border-b border-border bg-surface">
       <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-3">
@@ -21,7 +27,13 @@ export function AppHeader({ displayName }: AppHeaderProps) {
           Commish
         </Link>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-text-muted">{displayName}</span>
+          <Link
+            href="/app/profile"
+            className="flex items-center gap-2 rounded-md text-sm text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
+            <Avatar name={displayName} avatar={avatar} size="sm" />
+            {displayName}
+          </Link>
           <form action="/sign-out" method="post">
             <button
               type="submit"

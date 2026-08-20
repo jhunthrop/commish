@@ -1,15 +1,21 @@
 import { z } from "zod";
 import { getPublisher } from "@/lib/realtime/publisher";
+import { REALTIME_EVENT_TYPES } from "@/lib/realtime/events";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 
 /**
  * Development-only: lets a test harness publish an arbitrary event to a league stream
- * so the SSE endpoint can be verified end-to-end before any real feature publishes.
+ * so the SSE endpoint can be checked end-to-end before any real feature publishes.
  * Hard-disabled outside development.
+ *
+ * The type enum reads `REALTIME_EVENT_TYPES` (`@/lib/realtime/events`) rather than restating
+ * the taxonomy by hand, which is what ruling 21's single-source docblock asks for and what a
+ * hand copy had already drifted from: it was missing `draft.queue` and `draft.nudge`, so the
+ * dev harness could not publish two event types the product does publish.
  */
 const Body = z.object({
   leagueId: z.string().min(1),
-  type: z.enum(["draft.pick", "draft.nominate", "draft.bid", "draft.timer_expire", "draft.status", "chat.message", "chat.reaction", "score.update"]),
+  type: z.enum(REALTIME_EVENT_TYPES),
   payload: z.unknown(),
 });
 

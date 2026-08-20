@@ -31,6 +31,14 @@ beforeEach(async () => {
   await chatLeagueFixture(db);
 });
 
+const TOUCHDOWN_GIF = {
+  url: "https://media.giphy.com/media/abc123/giphy.gif",
+  previewUrl: "https://media.giphy.com/media/abc123/200.gif",
+  alt: "Touchdown Dance GIF",
+  width: 480,
+  height: 270,
+};
+
 describe("postMessage", () => {
   it("speaks as the author's TEAM in this league, and publishes chat.message", async () => {
     const bus = recorder();
@@ -41,7 +49,28 @@ describe("postMessage", () => {
     // Team identity, not legal identity (persona review): u1 owns Bay Bandits in l1.
     expect(message.authorName).toBe("Bay Bandits");
     expect(message.reactions).toEqual([]);
+    expect(message.gif).toBeNull();
     expect(bus.sent).toEqual([{ type: "chat.message", leagueId: "l1", payload: { message } }]);
+  });
+
+  it("writes a GIF and its body in one insert, and folds it straight back as the message's gif — ruling 17, no second event type", async () => {
+    const bus = recorder();
+    const message = await postMessage(db, {
+      leagueId: "l1",
+      userId: "u1",
+      body: TOUCHDOWN_GIF.alt,
+      gif: TOUCHDOWN_GIF,
+      publish: bus.publish,
+    });
+
+    expect(message.gif).toEqual(TOUCHDOWN_GIF);
+    expect(message.body).toBe(TOUCHDOWN_GIF.alt);
+    expect(bus.sent).toEqual([{ type: "chat.message", leagueId: "l1", payload: { message } }]);
+
+    // Survives a reload identically — a GIF message is read back the same shape it was written.
+    const page = await listMessages(db, { leagueId: "l1" });
+    expect(page.messages).toHaveLength(1);
+    expect(page.messages[0]?.gif).toEqual(TOUCHDOWN_GIF);
   });
 
   it("falls back to the display name for an author with no team here (a teamless commissioner)", async () => {

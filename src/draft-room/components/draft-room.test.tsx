@@ -9,11 +9,14 @@ import { fixtureDeps, renderInRoom } from "../test-fixtures";
 import { DraftRoomDepsProvider } from "../hooks/deps";
 import { DraftRoom } from "./draft-room";
 
-function mount(fixture = fixtureDeps()) {
+/** Already dismissed, so `RoomTour` stays out of the way of every case that isn't testing it. */
+const TOUR_DISMISSED = "2026-01-01T00:00:00.000Z";
+
+function mount(fixture = fixtureDeps(), dismissedAt: string | null = TOUR_DISMISSED) {
   const rendered = renderInRoom(
     <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
       <ToastProvider>
-        <DraftRoom draftId="d1" />
+        <DraftRoom draftId="d1" dismissedAt={dismissedAt} />
       </ToastProvider>
     </ChatRoomDepsProvider>,
     fixture.deps,
@@ -28,7 +31,7 @@ describe("DraftRoom", () => {
       <DraftRoomDepsProvider deps={fixture.deps}>
         <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
           <ToastProvider>
-            <DraftRoom draftId="d1" />
+            <DraftRoom draftId="d1" dismissedAt={TOUR_DISMISSED} />
           </ToastProvider>
         </ChatRoomDepsProvider>
       </DraftRoomDepsProvider>,
@@ -67,7 +70,7 @@ describe("DraftRoom", () => {
     renderInRoom(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <ToastProvider>
-          <DraftRoom draftId="d1" />
+          <DraftRoom draftId="d1" dismissedAt={TOUR_DISMISSED} />
         </ToastProvider>
       </ChatRoomDepsProvider>,
       fixture.deps,
@@ -107,5 +110,28 @@ describe("DraftRoom", () => {
     await waitFor(() => expect(fixture.sources).toHaveLength(1));
     act(() => fixture.sources[0]!.emit("error"));
     expect(await screen.findByText("Reconnecting…")).toBeInTheDocument();
+  });
+
+  it("shows the room tour once, before it has ever been dismissed", async () => {
+    mount(fixtureDeps(), null);
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "How this room works" })).toBeInTheDocument());
+  });
+
+  it("PATCHes the dismissal and closes the tour without blocking the room", async () => {
+    const { fixture } = mount(fixtureDeps(), null);
+    await waitFor(() => expect(screen.getByRole("dialog", { name: "How this room works" })).toBeInTheDocument());
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Got it" }));
+    });
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(fixture.calls).toContain("PATCH /api/preferences");
+    // The rest of the room is unaffected — the tour never sat between a manager and the board.
+    expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument();
+  });
+
+  it("never shows the tour once it has already been dismissed", async () => {
+    mount();
+    await waitFor(() => expect(screen.getByRole("list", { name: /available players/i })).toBeInTheDocument());
+    expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

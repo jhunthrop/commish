@@ -50,7 +50,12 @@ export function LeagueChat({ leagueId }: { readonly leagueId: string }) {
         onLoadEarlier={() => void chat.loadEarlier()}
         onReact={(messageId, emoji) => void chat.react(messageId, emoji)}
       />
-      <ChatComposer sending={chat.sending} onSend={chat.send} />
+      <ChatComposer
+        sending={chat.sending}
+        onSend={chat.send}
+        gifSearchEnabled={chat.gifSearchEnabled}
+        onSearchGifs={chat.searchGifs}
+      />
     </Card>
   );
 }

@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/ui";
 import type { HomeBody } from "../contract";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useLeagueRoomDeps } from "../hooks/deps";
+import { FirstRunPanel } from "./first-run-panel";
 import { HomeLeagueCard } from "./home-league-card";
 
 function someWeekInProgress(body: HomeBody): boolean {
@@ -69,6 +70,11 @@ export function HomeBoard({ initial }: { readonly initial: HomeBody }) {
   }, [deps]);
 
   if (body.leagues.length === 0) {
+    if (body.firstRun !== null) return <FirstRunPanel plan={body.firstRun} />;
+    // Defensive only: `firstRunPlan` (@/identity/first-run.ts) returns `null` exactly when
+    // `leagueCount > 0`, so a caller that computed `firstRun` from the same league count this
+    // board renders can never reach this branch. It stays as a fail-safe rather than an assumed
+    // invariant, since nothing in `HomeBody`'s own type ties the two fields together.
     return (
       <EmptyState
         title="No leagues yet"
@@ -83,10 +89,14 @@ export function HomeBoard({ initial }: { readonly initial: HomeBody }) {
     );
   }
 
+  // `min-w-0` on the grid ITEM below, not on the track: a grid item's default `min-width: auto`
+  // lets its min-content width push the item — and with it the whole single-column track — wider
+  // than the container, which is how one long league name made this page scroll sideways at
+  // 360px. `HomeLeagueCard`'s heading carries the matching `min-w-0 break-words`.
   return (
     <ul className="grid gap-3 sm:grid-cols-2">
       {body.leagues.map((league) => (
-        <li key={league.id}>
+        <li key={league.id} className="min-w-0">
           <HomeLeagueCard league={league} />
         </li>
       ))}

@@ -1,6 +1,27 @@
-import { AlertTriangle, Check, ChevronRight, Clock, Inbox, RefreshCw, Search, Trophy, Users, X, type LucideIcon } from "lucide-react";
+import {
+  AlertTriangle,
+  Anchor,
+  Check,
+  ChevronRight,
+  Clock,
+  Clover,
+  Crown,
+  Flame,
+  Inbox,
+  Info,
+  RefreshCw,
+  Rocket,
+  Search,
+  Shield,
+  Trophy,
+  Users,
+  X,
+  Zap,
+  type LucideIcon,
+} from "lucide-react";
 
-const ICONS = {
+/** `src/identity/avatars.ts` and other pure modules import `IconName` (type-only) from here. */
+export const ICONS = {
   trophy: Trophy,
   users: Users,
   clock: Clock,
@@ -11,6 +32,18 @@ const ICONS = {
   x: X,
   "chevron-right": ChevronRight,
   search: Search,
+  // `InfoTip`'s trigger glyph — the one place a definition is one click away.
+  info: Info,
+  // Avatar presets (src/identity/avatars.ts) — our vocabulary, not lucide's: `bolt` maps to
+  // lucide's `Zap` because the map's keys are the product's names for these glyphs, which is
+  // the whole point of having a map instead of importing lucide-react everywhere.
+  shield: Shield,
+  flame: Flame,
+  anchor: Anchor,
+  rocket: Rocket,
+  crown: Crown,
+  bolt: Zap,
+  clover: Clover,
 } as const satisfies Readonly<Record<string, LucideIcon>>;
 
 export type IconName = keyof typeof ICONS;

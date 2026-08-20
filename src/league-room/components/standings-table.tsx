@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from "react";
 import type { TeamStandingsRow } from "../contract";
-import { Badge, Button, EmptyState, Table, type TableColumn } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, InfoTip, Table, type TableColumn } from "@/components/ui";
+import type { HelpLevel } from "@/identity/preferences";
 import { formatPoints, formatRecord } from "../lib/format";
 
 type SortKey = "rank" | "pointsFor" | "pointsAgainst";
@@ -23,9 +24,12 @@ const ORDER_BY: Readonly<Record<SortKey, (row: TeamStandingsRow) => number>> = {
 export interface StandingsTableProps {
   readonly rows: readonly TeamStandingsRow[];
   readonly myTeamId: string | null;
+  /** Forwarded from `LeagueHome`. Omitted only by tests that don't care about this branch —
+   *  `InfoTip` itself defaults to the click-only, non-inline behavior when it's absent. */
+  readonly helpLevel?: HelpLevel;
 }
 
-export function StandingsTable({ rows, myTeamId }: StandingsTableProps) {
+export function StandingsTable({ rows, myTeamId, helpLevel }: StandingsTableProps) {
   const [sort, setSort] = useState<SortKey>("rank");
   const ordered = useMemo(() => [...rows].sort((a, b) => ORDER_BY[sort](b) - ORDER_BY[sort](a)), [rows, sort]);
 
@@ -46,13 +50,23 @@ export function StandingsTable({ rows, myTeamId }: StandingsTableProps) {
       key: "team",
       header: "Team",
       cell: (row) => (
-        <span className="flex items-center gap-2">
-          {row.teamName}
+        <span className="flex min-w-0 items-center gap-2">
+          <Avatar name={row.ownerDisplayName} avatar={row.ownerAvatar} size="sm" />
+          <span className="truncate">{row.teamName}</span>
           {showClinchBadges && row.clinched ? <Badge tone="positive">Clinched</Badge> : null}
         </span>
       ),
     },
-    { key: "record", header: "Record", cell: (row) => formatRecord(row) },
+    {
+      key: "record",
+      header: (
+        <span className="inline-flex items-center gap-1">
+          Record
+          <InfoTip term="standings-record" helpLevel={helpLevel} />
+        </span>
+      ),
+      cell: (row) => formatRecord(row),
+    },
     { key: "pointsFor", header: "Points for", cell: (row) => formatPoints(row.pointsFor), numeric: true },
     { key: "pointsAgainst", header: "Points against", cell: (row) => formatPoints(row.pointsAgainst), numeric: true, hideOnNarrow: true },
   ];

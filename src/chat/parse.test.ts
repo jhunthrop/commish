@@ -12,9 +12,12 @@ const MESSAGE = {
       body: "wheels up",
       createdAt: "2026-08-18T12:00:00.000Z",
       reactions: [{ emoji: "🔥", userId: "u2" }],
+      gif: null,
     },
   },
 };
+
+const GIF = { url: "https://media.giphy.com/g.gif", previewUrl: "https://media.giphy.com/g-preview.gif", alt: "Touchdown", width: 480, height: 270 };
 
 const REACTION = {
   type: "chat.reaction",
@@ -66,7 +69,48 @@ describe("parseChatFrame", () => {
       createdAt: MESSAGE.payload.message.createdAt,
     };
     const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: messageWithoutReactions } }));
-    expect(frame).toEqual({ kind: "message", message: { ...messageWithoutReactions, reactions: [] } });
+    expect(frame).toEqual({ kind: "message", message: { ...messageWithoutReactions, reactions: [], gif: null } });
+  });
+
+  it("parses a well-formed gif field", () => {
+    const withGif = { ...MESSAGE.payload.message, gif: GIF };
+    const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: withGif } }));
+    expect(frame).toEqual({ kind: "message", message: withGif });
+  });
+
+  it("treats a missing gif field as no gif", () => {
+    const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: MESSAGE.payload.message } }));
+    expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+  });
+
+  it("drops a gif field that isn't an object, rather than failing the whole message", () => {
+    const frame = parseChatFrame(
+      JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, gif: "not an object" } } }),
+    );
+    expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+  });
+
+  it("drops a gif field missing any one of its required properties", () => {
+    const incompleteGifs = [
+      { previewUrl: GIF.previewUrl, alt: GIF.alt, width: GIF.width, height: GIF.height },
+      { url: GIF.url, alt: GIF.alt, width: GIF.width, height: GIF.height },
+      { url: GIF.url, previewUrl: GIF.previewUrl, width: GIF.width, height: GIF.height },
+      { url: GIF.url, previewUrl: GIF.previewUrl, alt: GIF.alt, height: GIF.height },
+      { url: GIF.url, previewUrl: GIF.previewUrl, alt: GIF.alt, width: GIF.width },
+    ];
+    for (const gif of incompleteGifs) {
+      const frame = parseChatFrame(
+        JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, gif } } }),
+      );
+      expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+    }
+  });
+
+  it("drops a gif field whose dimensions are not finite numbers", () => {
+    const frame = parseChatFrame(
+      JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, gif: { ...GIF, width: "480" } } } }),
+    );
+    expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
   });
 
   it("returns null when the reaction payload isn't an object", () => {
