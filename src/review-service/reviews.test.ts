@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, getTableName, is, Table } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
+import * as schema from "@/db/schema";
 import { reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { feedQuery, listReviews, myReview, removeReview, reportReview, submitReview } from "./reviews";
@@ -13,6 +14,20 @@ const LONG_ENOUGH = "This league runs itself. Draft night was smooth and scoring
 const BRUTAL = "The commissioner vanished mid-season and nobody ever settled the standings.";
 const REVISED = "Updating my review: they came back and made it right. Genuinely impressed now.";
 const SPAM = "Click here for free V-bucks, best fantasy site ever, link in bio!!!";
+
+/** Every table this schema declares, so "which of them does this SQL name" is a closed question. */
+const ALL_TABLE_NAMES: readonly string[] = Object.values(schema)
+  .filter((value) => is(value, Table))
+  .map((table) => getTableName(table as Table));
+
+/**
+ * The tables a rendered statement actually references. Drizzle quotes every identifier, so
+ * `"reviews"` matches the table and never `review_reports`, and a qualifier (`"users"."id"`)
+ * counts the same as a `FROM` — which is what we want: any appearance at all is a reference.
+ */
+function tablesIn(sql: string): readonly string[] {
+  return ALL_TABLE_NAMES.filter((name) => sql.includes(`"${name}"`)).sort();
+}
 
 async function seedUser(id: string): Promise<void> {
   await db.insert(users).values({ id, email: `${id}@test.local`, displayName: id });
@@ -43,6 +58,31 @@ describe("listReviews / feedQuery — the curation proof", () => {
     // feature exists to not have.
     const { sql: text } = feedQuery(db, {}).toSQL();
     expect(text).not.toMatch(/rating/i);
+  });
+
+  it("touches EXACTLY two tables — the reviews and their authors, and nothing else", () => {
+    // The rating regex above locks a TOKEN; this locks the PROPERTY. A `notExists(reviewReports…)`
+    // filter — hiding every review anyone reported, reachable today because
+    // `POST /api/reviews/[reviewId]/report` is an unmoderated write open to any signed-in account
+    // — contains no "rating" anywhere and passed every other assertion in this file. It cannot
+    // pass this one: it names a third table. Neither can a join to `leagues`, `teams`, or
+    // anything else a future curation lever would have to reach for.
+    expect(tablesIn(feedQuery(db, {}).toSQL().sql)).toEqual(["reviews", "users"]);
+  });
+
+  it("keeps a reported review in the feed, in the same place — reports are signal, not a lever", async () => {
+    // The behavioral half of the assertion above: reporting is available to any signed-in
+    // account, so if it moved or hid anything, curation would be a click away.
+    await seedUser("u1");
+    await seedUser("u2");
+    await submitReview(db, { userId: "u1", rating: 1, body: BRUTAL, clock: at("2026-08-01T00:00:00Z"), newId: () => "r-reported" });
+    await submitReview(db, { userId: "u2", rating: 5, body: LONG_ENOUGH, clock: at("2026-08-02T00:00:00Z"), newId: () => "r-clean" });
+    const before = (await listReviews(db, {})).reviews.map((r) => r.id);
+    expect(before).toEqual(["r-clean", "r-reported"]);
+
+    await reportReview(db, { reviewId: "r-reported", reporterUserId: "u2", reason: "spam", clock: at("2026-08-03T00:00:00Z") });
+
+    expect((await listReviews(db, {})).reviews.map((r) => r.id)).toEqual(before);
   });
 
   it("edits the existing review rather than adding a second", async () => {

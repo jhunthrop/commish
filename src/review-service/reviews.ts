@@ -39,6 +39,14 @@ export interface ListReviewsInput {
  * in the feed query at all" can inspect `feedQuery(db, {}).toSQL()` directly rather than a
  * hand-copied lookalike that could drift into asserting something production no longer runs.
  *
+ * THE GUARANTEE, stated honestly: feed membership and order are independent of rating AND OF
+ * REPORTS. The second half is not decoration — `POST /api/reviews/[reviewId]/report` is an
+ * unmoderated write open to any signed-in account, so a `notExists(reviewReports…)` filter added
+ * here would be a working curation lever built out of a signal this product deliberately treats
+ * as advisory. It also contains no "rating" token and would have slipped past a test that only
+ * greps for one, which is why `reviews.test.ts` asserts the TABLE SET this query touches
+ * (`{reviews, users}`, exactly) rather than the absence of a word.
+ *
  * `rating` is not in this SELECT list at all — not filtered out, never fetched. Ordering,
  * filtering (`removed_at IS NULL`, the only narrowing this query ever applies) and pagination
  * all happen with zero knowledge that a rating column exists. `listReviews` attaches the number
