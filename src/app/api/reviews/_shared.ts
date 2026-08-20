@@ -18,15 +18,25 @@ const submitRequests = createRateLimiter(REVIEW_CONFIG.submitRateLimit);
 /** `POST /api/reviews/[reviewId]/report`'s ceiling — keyed per user id. */
 const reportRequests = createRateLimiter(REVIEW_CONFIG.reportRateLimit);
 
-function clientKey(request: Request): string {
-  const forwardedFor = request.headers.get("x-forwarded-for");
+function clientKey(forwardedFor: string | null): string {
   const first = forwardedFor?.split(",")[0]?.trim();
   return first !== undefined && first !== "" ? first : "unknown";
 }
 
+/**
+ * Whether this caller is inside the browse ceiling, spending a request if so. Takes the header
+ * VALUE rather than a `Request`, because the `/reviews` SSR page has no `Request` object — it
+ * reads `headers()` — and it must spend from the SAME bucket as `GET /api/reviews` or the
+ * documented defense for this product's unauthenticated reads is bypassed by choosing the other
+ * door. One page render and one API call are one request each, which is the point.
+ */
+export function browseAllowed(forwardedFor: string | null): boolean {
+  return browseRequests.allow(clientKey(forwardedFor));
+}
+
 /** The 429 `GET /api/reviews` answers with, or `null` when the caller is inside the ceiling. */
 export function browseRateLimited(request: Request): Response | null {
-  if (browseRequests.allow(clientKey(request))) return null;
+  if (browseAllowed(request.headers.get("x-forwarded-for"))) return null;
   return fail("Too many requests. Please try again in a minute.", 429);
 }
 
