@@ -72,4 +72,14 @@ describe("ActivityFeed", () => {
     expect(await axe(container)).toHaveNoViolations();
     expect(screen.getAllByRole("listitem")).toHaveLength(rows.length);
   });
+
+  // Fix round 1, FIX 4: the first-timer's question — "clock" is the icon ONLY the
+  // clock-ran-out-so-we-drafted-from-your-queue branch uses (`renderDraftPick`,
+  // `src/integrity/activity-view.ts`), so it is the one reliable signal for wiring the glossary
+  // term in without re-parsing the headline string.
+  it("offers the queue glossary term beside a clock-icon row, and not beside a human pick", () => {
+    const auto: ActivityRow = { ...NEWEST, eventId: "e3", icon: "clock", headline: "The clock ran out, so Bay Bandits drafted Bijan Robinson from their queue." };
+    render(<ActivityFeed rows={[auto, NEWEST]} leagueId="league_1" nextBefore={null} />);
+    expect(screen.getAllByRole("button", { name: "What is your draft queue?" })).toHaveLength(1);
+  });
 });

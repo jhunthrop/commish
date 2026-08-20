@@ -25,6 +25,16 @@ export const REVIEW_CONFIG = {
     { value: "abusive", label: "Abusive or harassing", removalPhrase: "abusive or harassing content" },
     { value: "other", label: "Something else", removalPhrase: "breaking the review rules" },
   ],
+  /**
+   * A cap on `scripts/remove-review.ts`'s `--reason`, mirroring `body.maxLength` above — defense
+   * in depth alongside the closed `reportReasons` enum `--reason` is already validated against.
+   * `removeReview` (`@/review-service/reviews.ts`) is the operator's ONLY door today, but it
+   * enforces this itself rather than trusting the script's own enum check to be the sole gate: a
+   * future caller of the service directly (an admin UI, a different script) must not be able to
+   * hand an unbounded string to `notifyAffectedMember`, which stores it and quotes it verbatim
+   * on a member's own notice.
+   */
+  removalReason: { maxLength: 200 },
   /** `POST /api/reviews`'s ceiling — keyed per user id, an authenticated write. */
   submitRateLimit: { maxRequests: 5, windowMs: 60_000 },
   /** `GET /api/reviews`'s ceiling — keyed per IP, this product's second unauthenticated read. */

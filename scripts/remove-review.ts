@@ -18,7 +18,7 @@ import { createInterface } from "node:readline/promises";
 import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { reviews, users } from "@/db/schema";
-import { REMOVAL_REASON_VALUES, removalPhraseFor } from "@/reviews/config";
+import { REVIEW_CONFIG, REMOVAL_REASON_VALUES, removalPhraseFor } from "@/reviews/config";
 import { removeReview } from "@/review-service/reviews";
 
 interface Args {
@@ -48,6 +48,13 @@ function parseArgs(argv: readonly string[]): Args {
   }
   if (!REMOVAL_REASON_VALUES.includes(reason)) {
     throw new Error(`--reason must be one of: ${REMOVAL_REASON_VALUES.join(", ")}. The author reads it.\n${USAGE}`);
+  }
+  // Unreachable through the enum check above today — every `REMOVAL_REASON_VALUES` entry is
+  // well under this cap — but `removeReview` enforces the SAME limit as its own boundary
+  // (`REVIEW_CONFIG.removalReason.maxLength`'s own docblock explains why), so the script checks
+  // it too rather than letting a future looser `--reason` surface only as a service rejection.
+  if (reason.length > REVIEW_CONFIG.removalReason.maxLength) {
+    throw new Error(`--reason must be ${REVIEW_CONFIG.removalReason.maxLength} characters or fewer.\n${USAGE}`);
   }
   return { id, reason, by };
 }

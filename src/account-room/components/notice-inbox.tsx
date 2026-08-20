@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useId, useRef, useState } from "react";
-import { Badge, ErrorState } from "@/components/ui";
+import { Badge, ErrorState, InfoTip } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import type { NoticeView } from "../contract";
 import { useNotices } from "../hooks/use-notices";
@@ -14,7 +14,16 @@ function NoticeRow({ notice }: { readonly notice: NoticeView }) {
   return (
     <li className="flex flex-col gap-1 border-b border-border py-3 last:border-b-0">
       <p className="font-medium text-text-primary">{notice.title}</p>
-      <p className="text-sm text-text-muted">{notice.body}</p>
+      <p className="text-sm text-text-muted">
+        {notice.body}
+        {notice.noticeType === "draft_auto_picked" ? <InfoTip term="queue" className="ml-1" /> : null}
+      </p>
+      {/* `quote` is the ONE wire field split out of a notice's stored `context` — an operator's
+          own words, laid out as a real quotation rather than folded into `body`'s own sentence
+          (fix round 1, FIX 7). */}
+      {notice.quote === null ? null : (
+        <blockquote className="border-l-2 border-border pl-3 text-sm italic text-text-muted">{`"${notice.quote}"`}</blockquote>
+      )}
       <time dateTime={notice.createdAt} className="text-xs text-text-muted">
         {formatNoticeDate(notice.createdAt)}
       </time>
@@ -44,6 +53,15 @@ export function NoticeInbox() {
   const panelId = useId();
   const triggerRef = useRef<HTMLButtonElement | null>(null);
 
+  // The sibling-ref idiom `HomeBoard`'s `bodyRef` uses (`src/league-room/components/
+  // home-board.tsx`): updated during RENDER, not inside an effect, so the mark-read effect
+  // below can read today's `notices`/`markRead` without listing them as dependencies — refs
+  // are not reactive, so this needs no exhaustive-deps escape hatch.
+  const noticesRef = useRef(notices);
+  noticesRef.current = notices;
+  const markReadRef = useRef(markRead);
+  markReadRef.current = markRead;
+
   const close = useCallback((): void => {
     setOpen(false);
     triggerRef.current?.focus();
@@ -64,9 +82,8 @@ export function NoticeInbox() {
   // A reopen with nothing new since the last open finds no unread ids left and sends nothing.
   useEffect(() => {
     if (!open || status !== "ready") return;
-    const unreadIds = notices.filter((notice) => notice.readAt === null).map((notice) => notice.id);
-    if (unreadIds.length > 0) void markRead(unreadIds);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const unreadIds = noticesRef.current.filter((notice) => notice.readAt === null).map((notice) => notice.id);
+    if (unreadIds.length > 0) void markReadRef.current(unreadIds);
   }, [open, status]);
 
   return (

@@ -12,6 +12,7 @@ const UNREAD: NoticeView = {
   noticeType: "draft_auto_picked",
   title: "We drafted for you",
   body: "The clock ran out on pick 24, so we used your queue and drafted Bijan Robinson (RB).",
+  quote: null,
   leagueId: "l1",
   createdAt: "2026-08-18T20:00:00.000Z",
   readAt: null,
@@ -111,5 +112,32 @@ describe("NoticeInbox", () => {
     fixture.response = { ok: true, data: ONE_UNREAD };
     fireEvent.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findByText(UNREAD.title)).toBeInTheDocument();
+  });
+
+  // Fix round 1, FIX 4: the first-timer's question — does "drafted from their queue" explain
+  // autopick to someone who has never seen one? An `InfoTip` beside the notice body is the
+  // answer for the ONE notice type this applies to.
+  it("offers the queue glossary term beside an autopick notice, and not beside any other type", async () => {
+    const removal: NoticeView = { ...UNREAD, id: "n5", noticeType: "review_removed", title: "We removed your review", quote: "off topic" };
+    const fixture = fixtureAccountDeps({ ok: true, data: { notices: [UNREAD, removal], unreadCount: 0 } });
+    renderInAccount(<NoticeInbox />, fixture.deps);
+    fireEvent.click(await screen.findByRole("button", { name: "Notices" }));
+
+    expect(await screen.findByRole("button", { name: "What is your draft queue?" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "What is your draft queue?" })).toHaveLength(1);
+  });
+
+  // Fix round 1, FIX 7: an operator's own words render as a distinct blockquote, not folded
+  // into the body's own sentence.
+  it("renders a review-removal notice's quoted reason as its own blockquote", async () => {
+    const removal: NoticeView = { ...UNREAD, id: "n5", noticeType: "review_removed", title: "We removed your review", body: "An operator removed your review. We keep your review on file exactly as you wrote it.", quote: "off topic" };
+    const fixture = fixtureAccountDeps({ ok: true, data: { notices: [removal], unreadCount: 0 } });
+    renderInAccount(<NoticeInbox />, fixture.deps);
+    fireEvent.click(await screen.findByRole("button", { name: "Notices" }));
+
+    const quote = await screen.findByText('"off topic"');
+    expect(quote.tagName).toBe("BLOCKQUOTE");
+    // The body's own sentence no longer inlines the words this blockquote already shows.
+    expect(screen.getByText(removal.body)).not.toHaveTextContent("off topic");
   });
 });

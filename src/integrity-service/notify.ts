@@ -152,6 +152,23 @@ export async function listNotices(db: Db, userId: string): Promise<NoticesPage> 
   return { notices, unreadCount: notices.filter((notice) => notice.readAt === null).length };
 }
 
+/**
+ * `review_removed`'s `context.reason` — an operator's own words, quoted verbatim — split out
+ * of `context` for the ONE thing that renders it as its own field rather than folded into
+ * `body`'s sentence: a distinct blockquote, both on `GET /api/notices` (`NoticeView.quote`) and
+ * the league activity page's own "What the platform did" band. `context` is a `JsonObject`, so
+ * this narrows rather than trusts: a row whose `reason` is missing or not a string (impossible
+ * through `NoticeContexts`' own type today, not impossible against a row read back from
+ * Postgres) reads as no quote at all — the same discipline `activityRowFor`'s payload readers
+ * use. Exported so the route and the page share one definition rather than two copies agreeing
+ * by coincidence.
+ */
+export function quoteFor(notice: MemberNotice): string | null {
+  if (notice.noticeType !== "review_removed") return null;
+  const reason = notice.context.reason;
+  return typeof reason === "string" ? reason : null;
+}
+
 export interface MarkNoticesReadInput {
   readonly userId: string;
   readonly noticeIds: readonly string[];

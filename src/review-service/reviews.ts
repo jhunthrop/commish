@@ -275,8 +275,18 @@ export type RemoveReviewResult =
  * verbatim, never paraphrased. The durable row is this task's whole delivery; a live nudge is
  * moot here regardless (a removal has no league, and ruling 13 sends no frame for one anyway) —
  * the author's next inbox load is the honest delivery.
+ *
+ * `REVIEW_CONFIG.removalReason.maxLength` is enforced HERE, not only in the script's own
+ * `parseArgs` — this function, not the CLI, is the actual boundary a future caller (an admin UI,
+ * a different script) would hit, and `reason` is stored verbatim and quoted verbatim on a
+ * member's own notice. Checked before the transaction opens, same "fail fast, no partial write"
+ * shape as the two lookup failures below.
  */
 export async function removeReview(db: Db, input: RemoveReviewInput): Promise<RemoveReviewResult> {
+  if (input.reason.length > REVIEW_CONFIG.removalReason.maxLength) {
+    return { ok: false, reason: `--reason must be ${REVIEW_CONFIG.removalReason.maxLength} characters or fewer.` };
+  }
+
   const clock = input.clock ?? systemClock;
   const audit = input.audit ?? getAuditLogger();
   const notify = input.notify ?? notifyAffectedMember;

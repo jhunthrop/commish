@@ -28,6 +28,13 @@ export interface NoticeView {
   readonly noticeType: string;
   readonly title: string;
   readonly body: string;
+  /**
+   * The ONE exception to "context stays server-side": an operator's own words, quoted verbatim
+   * (`review_removed`'s `context.reason`), split out so the renderer can lay it out as a
+   * distinct blockquote rather than inline it inside `body`'s own sentence — a quotation reads
+   * as one when it looks like one. `null` for every notice type with nothing to quote.
+   */
+  readonly quote: string | null;
   /** `null` for a league-less notice (e.g. a review removal) — see `NoticeContexts`'s own docblock. */
   readonly leagueId: string | null;
   readonly createdAt: string;

@@ -54,6 +54,14 @@ export const INTEGRITY_CONFIG = {
      */
     accusatoryTerms: ["violation", "violated", "suspected", "abuse", "cheating", "broke the rules", "illegal", "penalty", "offense"],
     /**
+     * Passive constructions the founder rule (active voice) bans a notice from using — "was
+     * made", "was removed", "is kept" all hide who did the thing, and the answer is always "we
+     * did". Mechanical, same shape as `accusatoryTerms` above and enforced the same way
+     * (`notices.test.ts`): a rule about copy is only real if something checks the copy, and a
+     * denylist is the version of that check a review alone cannot regress.
+     */
+    passiveConstructions: ["was made", "was removed", "is kept", "was kept", "were made", "were removed"],
+    /**
      * `GET /api/notices` and `POST /api/notices/read`'s shared ceiling — sibling parity with
      * `advisorRateLimited`'s "one budget across both routes" (`src/app/api/leagues/[leagueId]/
      * advisor/_shared.ts`): both spend the same scarce resource, a Postgres round trip for this

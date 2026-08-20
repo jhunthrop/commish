@@ -4,8 +4,8 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { resolveLeagueMembership } from "@/lib/leagues/membership";
 import { leagueNameFor } from "@/draft-service/teams";
 import { listLeagueActivity } from "@/integrity-service/activity";
-import { listNotices } from "@/integrity-service/notify";
-import { PageTitle } from "@/components/ui";
+import { listNotices, quoteFor } from "@/integrity-service/notify";
+import { InfoTip, PageTitle } from "@/components/ui";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
 import { AppHeader } from "@/components/app-shell/app-header";
 
@@ -77,15 +77,31 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
           <section className="flex flex-col gap-2" aria-label="What the platform did">
             <h2 className="text-lg font-medium text-text-primary">What the platform did</h2>
             <ul className="flex flex-col">
-              {leagueNotices.map((notice) => (
-                <li key={notice.id} className="flex flex-col gap-1 border-b border-border py-3 last:border-b-0">
-                  <p className="font-medium text-text-primary">{notice.title}</p>
-                  <p className="text-sm text-text-muted">{notice.body}</p>
-                </li>
-              ))}
+              {leagueNotices.map((notice) => {
+                const quote = quoteFor(notice);
+                return (
+                  <li key={notice.id} className="flex flex-col gap-1 border-b border-border py-3 last:border-b-0">
+                    <p className="font-medium text-text-primary">{notice.title}</p>
+                    <p className="text-sm text-text-muted">
+                      {notice.body}
+                      {notice.noticeType === "draft_auto_picked" ? <InfoTip term="queue" className="ml-1" /> : null}
+                    </p>
+                    {/* Fix round 1, FIX 7: an operator's own words, laid out as a real
+                        quotation rather than folded into `body`'s own sentence. */}
+                    {quote === null ? null : (
+                      <blockquote className="border-l-2 border-border pl-3 text-sm italic text-text-muted">{`"${quote}"`}</blockquote>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           </section>
         )}
+
+        {/* Fix round 1, FIX 5: the persona panel's high-stakes-veteran question, answered
+            plainly rather than left implicit in `lineup_change` simply never appearing here for
+            anyone but its own actor. */}
+        <p className="text-sm text-text-muted">Lineup changes appear only in your own history. Nobody else in this league can see them.</p>
 
         <ActivityFeed rows={activity.rows} leagueId={leagueId} nextBefore={activity.nextBefore} />
       </main>

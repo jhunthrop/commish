@@ -1,6 +1,6 @@
 import { getDb } from "@/db/client";
 import type { MemberNotice } from "@/integrity-service/notify";
-import { listNotices } from "@/integrity-service/notify";
+import { listNotices, quoteFor } from "@/integrity-service/notify";
 import { ok } from "@/lib/api/respond";
 import { withCurrentUser } from "@/app/api/leagues/_shared";
 import type { NoticesBody, NoticeView } from "@/account-room/contract";
@@ -11,7 +11,8 @@ export const dynamic = "force-dynamic";
 
 /**
  * The wire shape, narrowed from the durable row — see `NoticeView`'s own docblock for what is
- * deliberately left off (`context`, `auditEventId`).
+ * deliberately left off (`context`, `auditEventId`) and for `quote`, the one field pulled back
+ * out of `context` via the shared `quoteFor` (`@/integrity-service/notify`).
  */
 function toNoticeView(notice: MemberNotice): NoticeView {
   return {
@@ -19,6 +20,7 @@ function toNoticeView(notice: MemberNotice): NoticeView {
     noticeType: notice.noticeType,
     title: notice.title,
     body: notice.body,
+    quote: quoteFor(notice),
     leagueId: notice.leagueId,
     createdAt: notice.createdAt,
     readAt: notice.readAt,

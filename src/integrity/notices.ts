@@ -35,12 +35,16 @@ type NoticeTemplate<T extends NoticeType> = (context: NoticeContexts[T]) => Rend
 
 export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> } = {
   draft_auto_picked: ({ leagueName, pickNumber, playerName, position }) => ({
-    title: "Your pick was made automatically",
-    body: `The clock ran out on pick ${pickNumber} in ${leagueName}, so we used your queue and drafted ${playerName} (${position}).`,
+    title: "We made your pick for you",
+    body: `The clock ran out on pick ${pickNumber} in ${leagueName}, so we used your queue and drafted ${playerName} (${position}). Set your queue before your next draft so this doesn't happen again.`,
   }),
-  review_removed: ({ reason }) => ({
-    title: "Your review was removed",
-    body: `An operator removed your review. The reason they gave was: "${reason}". Your review is kept on file exactly as you wrote it.`,
+  // `reason` is stored on the row (`context.reason`) but deliberately unused HERE: it is quoted
+  // verbatim as its own field on the wire (`NoticeView.quote`, `GET /api/notices`'s own
+  // `quoteFor`), rendered as a distinct blockquote rather than folded into this sentence — a
+  // quotation embedded in a paragraph reads as this product's own voice, not a quote.
+  review_removed: () => ({
+    title: "We removed your review",
+    body: "An operator removed your review. We keep your review on file exactly as you wrote it.",
   }),
 };
 

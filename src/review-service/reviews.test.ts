@@ -369,6 +369,19 @@ describe("removeReview", () => {
     expect(result).toEqual({ ok: false, reason: 'No review with id "missing".' });
   });
 
+  // Fix round 1, FIX 7: defense in depth alongside the script's own closed-enum `--reason` gate
+  // — this function, not the CLI, is the boundary a future direct caller would actually hit.
+  // Checked before any write, and before the review-id lookup even runs (a too-long reason is
+  // wrong regardless of which review it names).
+  it("refuses a reason longer than REVIEW_CONFIG.removalReason.maxLength, before any write", async () => {
+    const tooLong = "x".repeat(REVIEW_CONFIG.removalReason.maxLength + 1);
+    const result = await removeReview(db, { reviewId: "missing", removedByUserId: "operator", reason: tooLong });
+    expect(result).toEqual({
+      ok: false,
+      reason: `--reason must be ${REVIEW_CONFIG.removalReason.maxLength} characters or fewer.`,
+    });
+  });
+
   it("refuses to re-stamp an already-removed review — the no-re-stamp invariant, enforced here and not just in the script", async () => {
     await seedUser("u1");
     await seedUser("operator");
@@ -439,13 +452,14 @@ describe("removeReview — notices", () => {
       userId: "user_bob",
       leagueId: null,
       noticeType: "review_removed",
-      title: "Your review was removed",
+      title: "We removed your review",
       auditEventId: event!.eventId,
       readAt: null,
     });
-    expect(notice!.body).toBe(
-      'An operator removed your review. The reason they gave was: "off topic". Your review is kept on file exactly as you wrote it.',
-    );
+    // The operator's reason is stored on `context` and quoted verbatim there — Task 10's fix
+    // round pulled it OUT of this sentence (`quoteFor`, `@/integrity-service/notify`) so the
+    // reader sees it as a distinct quotation, not folded into the platform's own voice.
+    expect(notice!.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it.");
     expect(notice!.context).toEqual({ reason: "off topic" });
   });
 

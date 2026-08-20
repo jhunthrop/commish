@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ActivityRow } from "@/integrity/activity-view";
-import { EmptyState } from "@/components/ui";
+import { EmptyState, InfoTip } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 
 export interface ActivityFeedProps {
@@ -17,11 +17,18 @@ function formatOccurredAt(iso: string): string {
 }
 
 function ActivityRowItem({ row }: { readonly row: ActivityRow }) {
+  // `"clock"` is the icon ONLY `renderDraftPick`'s clock-ran-out branch uses
+  // (`src/integrity/activity-view.ts`) — the one headline that says "from their queue" to a
+  // reader who may never have seen an autopick before.
+  const isQueueAutopick = row.icon === "clock";
   return (
     <li className="flex items-start gap-3 border-b border-border py-4 last:border-b-0">
       <Icon name={row.icon} size={20} className="mt-0.5 shrink-0 text-text-muted" />
       <div className="flex flex-col gap-0.5">
-        <p className="text-md text-text-primary">{row.headline}</p>
+        <p className="text-md text-text-primary">
+          {row.headline}
+          {isQueueAutopick ? <InfoTip term="queue" className="ml-1" /> : null}
+        </p>
         {row.detail === null ? null : <p className="text-sm text-text-muted">{row.detail}</p>}
         <time dateTime={row.occurredAt} className="text-xs text-text-muted">
           {formatOccurredAt(row.occurredAt)}

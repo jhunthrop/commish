@@ -97,7 +97,7 @@ describe("notifyAffectedMember", () => {
     const [row] = await db.select().from(memberNotices);
     expect(row).toMatchObject({
       id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "draft_auto_picked",
-      title: "Your pick was made automatically", auditEventId: expect.any(String), readAt: null,
+      title: "We made your pick for you", auditEventId: expect.any(String), readAt: null,
     });
     expect(row!.body).toContain("Bijan Robinson");
     expect(row!.context).toEqual(notice.context);

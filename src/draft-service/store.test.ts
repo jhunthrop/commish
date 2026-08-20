@@ -524,12 +524,12 @@ describe("draft store — notices", () => {
       userId: userIds[pickerIndex],
       leagueId,
       noticeType: "draft_auto_picked",
-      title: "Your pick was made automatically",
+      title: "We made your pick for you",
       auditEventId: pickEvent!.eventId,
       readAt: null,
     });
     expect(notice!.body).toBe(
-      `The clock ran out on pick ${payload.pickNumber} in league_1, so we used your queue and drafted ${PLAYER_NAMES[payload.playerId]} (${payload.playerId.startsWith("qb") ? "QB" : payload.playerId.startsWith("rb") ? "RB" : "WR"}).`,
+      `The clock ran out on pick ${payload.pickNumber} in league_1, so we used your queue and drafted ${PLAYER_NAMES[payload.playerId]} (${payload.playerId.startsWith("qb") ? "QB" : payload.playerId.startsWith("rb") ? "RB" : "WR"}). Set your queue before your next draft so this doesn't happen again.`,
     );
 
     // Ruling 13's guard: a private notice may not ride the league broadcast (every subscriber in

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { NoticesBody, NoticeView } from "../contract";
 import { useAccountRoomDeps } from "./deps";
@@ -35,26 +35,44 @@ const CONNECTION_FAILED_MESSAGE = "We couldn't reach the server. Check your conn
  * no `error` handling here, deliberately: reconnect is the browser's own, and a connection that
  * never opens simply never nudges — the mount fetch and `markRead` both still work over plain
  * HTTP regardless of whether the stream ever connects at all.
+ *
+ * THREE things write `notices`, uncoordinated: the mount fetch, the `open`-triggered refetch,
+ * and the `notice.created`-triggered refetch — plus `markRead`'s own optimistic local update.
+ * `generationRef`, the same idiom `useLeagueChat`'s `refreshGeneration` and `useLiveScores`'s
+ * `versionRef`/`refreshGeneration` pair use, is ONE counter bumped by every one of those four
+ * writes, generalized here to cover a refetch racing `markRead` too, not just two refetches
+ * racing each other: a slow `refetch` snapshots the counter before its request goes out, and
+ * refuses to apply its response if the counter has moved by the time it resolves. Without this,
+ * a mount fetch that happens to still be in flight when the reader opens the panel and marks a
+ * notice read would apply LAST and revert that notice back to unread — and because
+ * `NoticeInbox`'s own mark-read effect keys off `[open, status]`, a later close/reopen would
+ * then see it "unread" again and send a duplicate `POST /api/notices/read` for the same id.
  */
 export function useNotices(): UseNoticesResult {
   const deps = useAccountRoomDeps();
   const [notices, setNotices] = useState<readonly NoticeView[]>([]);
   const [status, setStatus] = useState<NoticesStatus>("loading");
   const [error, setError] = useState<string | null>(null);
+  const generationRef = useRef(0);
 
   const refetch = useCallback(async (): Promise<void> => {
+    const generationBeforeRequest = generationRef.current;
     try {
       const response = await deps.fetchJson("/api/notices");
       const envelope = (await response.json()) as ApiEnvelope<NoticesBody>;
+      if (generationRef.current !== generationBeforeRequest) return; // a newer write already won
       if (!envelope.ok) {
         setStatus("error");
         setError(envelope.error);
         return;
       }
+      generationRef.current += 1;
       setNotices(envelope.data.notices);
       setStatus("ready");
       setError(null);
     } catch {
+      if (generationRef.current !== generationBeforeRequest) return;
+      generationRef.current += 1;
       setStatus("error");
       setError(CONNECTION_FAILED_MESSAGE);
     }
@@ -90,6 +108,10 @@ export function useNotices(): UseNoticesResult {
         // than a local state that quietly disagrees with what the server actually holds.
         return;
       }
+      // This LOCAL write wins against any refetch already in flight — bumping the generation
+      // here, before applying it, is what makes a slower `refetch` that started earlier refuse
+      // to apply its now-stale snapshot on top of this optimistic read.
+      generationRef.current += 1;
       const readAt = new Date().toISOString();
       const idSet = new Set(noticeIds);
       setNotices((current) => current.map((notice) => (idSet.has(notice.id) && notice.readAt === null ? { ...notice, readAt } : notice)));

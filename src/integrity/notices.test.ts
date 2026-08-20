@@ -34,18 +34,29 @@ describe("NOTICE_TEMPLATES", () => {
     }
   });
 
+  // Fix round 1, FIX 6: the founder's active-voice rule, beside the em-dash and denylist
+  // sweeps above so a future template that slips back into "was made"/"was removed"/"is kept"
+  // fails mechanically rather than waiting for a reviewer to reread the copy.
+  it("never uses a passive construction — the platform names itself as the one who acted", () => {
+    for (const type of TYPES) {
+      const { title, body } = renderNotice(type, NOTICE_SAMPLES[type]);
+      const text = `${title} ${body}`.toLowerCase();
+      for (const phrase of INTEGRITY_CONFIG.notices.passiveConstructions) {
+        expect(text).not.toContain(phrase);
+      }
+    }
+  });
+
   it("says what happened and what it means, in the second person, without jargon", () => {
     const autoPick = renderNotice("draft_auto_picked", NOTICE_SAMPLES.draft_auto_picked);
-    expect(autoPick.title).toBe("Your pick was made automatically");
+    expect(autoPick.title).toBe("We made your pick for you");
     expect(autoPick.body).toBe(
-      "The clock ran out on pick 24 in Sunday Money, so we used your queue and drafted Bijan Robinson (RB).",
+      "The clock ran out on pick 24 in Sunday Money, so we used your queue and drafted Bijan Robinson (RB). Set your queue before your next draft so this doesn't happen again.",
     );
 
     const removed = renderNotice("review_removed", NOTICE_SAMPLES.review_removed);
-    expect(removed.title).toBe("Your review was removed");
-    expect(removed.body).toBe(
-      'An operator removed your review. The reason they gave was: "off topic". Your review is kept on file exactly as you wrote it.',
-    );
+    expect(removed.title).toBe("We removed your review");
+    expect(removed.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it.");
   });
 
   it("fails the type checker rather than the reader when a type has no template", () => {
