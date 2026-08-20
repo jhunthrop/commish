@@ -487,7 +487,7 @@ describe("draft store — audit — auction attribution", () => {
 });
 
 describe("draft store — notices", () => {
-  it("notifies the manager whose pick the clock made for them, in the same transaction, and pushes a live frame", async () => {
+  it("notifies the manager whose pick the clock made for them, in the same transaction — and rides no league-stream frame", async () => {
     const { draftId, leagueId, teamIds, userIds } = await fixture();
     const store = newStore();
     await store.applyAction(draftId, start(teamIds));
@@ -511,15 +511,15 @@ describe("draft store — notices", () => {
       `The clock ran out on pick ${payload.pickNumber} in league_1, so we used your queue and drafted ${PLAYER_NAMES[payload.playerId]} (${payload.playerId.startsWith("qb") ? "QB" : payload.playerId.startsWith("rb") ? "RB" : "WR"}).`,
     );
 
-    // The same live frame `broadcast` already uses, after the same commit — no separate
-    // per-user channel, just the league stream with the target `userId` in the payload.
-    const frame = published.find((e) => e.type === "notice.created");
-    expect(frame).toBeDefined();
-    expect(frame!.leagueId).toBe(leagueId);
-    expect(frame!.payload).toMatchObject({ userId: userIds[pickerIndex], noticeType: "draft_auto_picked" });
+    // Ruling 13's guard: a private notice may not ride the league broadcast (every subscriber in
+    // the room gets every frame — see `subscribe.ts`). The durable row above IS this task's
+    // delivery; a live frame on a per-user key is Task 8's job, not this transaction's, and
+    // nothing on the league stream should even hint that a notice was created.
+    expect(published.some((e) => e.type === "notice.created")).toBe(false);
+    expect(published.some((e) => JSON.stringify(e.payload).includes(userIds[pickerIndex]!))).toBe(false);
   });
 
-  it("writes no notice for a pick a person submitted directly", async () => {
+  it("writes no notice for a pick a person submitted directly, and rides no league-stream frame either way", async () => {
     const { draftId, teamIds } = await fixture();
     const store = newStore();
     await store.applyAction(draftId, start(teamIds));

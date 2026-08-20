@@ -272,8 +272,9 @@ export type RemoveReviewResult =
  * Task 7's second real sender: the `--reason` this script has always taken has been "author-
  * facing copy" since Phase 2 with nowhere for the author to read it. `notifyAffectedMember` joins
  * the same transaction as the stamp and the audit event — the operator's own words, quoted
- * verbatim, never paraphrased. No `deliverNotice` call here: a removal has no league (ruling 13),
- * so there is no room to nudge and the author's next inbox load is the honest delivery.
+ * verbatim, never paraphrased. The durable row is this task's whole delivery; a live nudge is
+ * moot here regardless (a removal has no league, and ruling 13 sends no frame for one anyway) —
+ * the author's next inbox load is the honest delivery.
  */
 export async function removeReview(db: Db, input: RemoveReviewInput): Promise<RemoveReviewResult> {
   const clock = input.clock ?? systemClock;

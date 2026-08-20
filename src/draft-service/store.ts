@@ -14,7 +14,7 @@ import {
   type DraftState,
 } from "@/draft-engine";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
-import { deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
+import { notifyAffectedMember } from "@/integrity-service/notify";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { auditEventsForPicks, ownerIdsForContestedPicks } from "./audit";
@@ -190,12 +190,8 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
       return mutex.run(draftId, async (): Promise<ApplyResult> => {
         // `previous` is captured out of the transaction so `broadcast` (which must run AFTER
         // the commit, because publishing is best-effort and must never fail a committed write)
-        // still has the before-state to diff against. `pendingNotices` is the same idea for
-        // `deliverNotice` — the durable row commits INSIDE the transaction (ruling 4's inverse-
-        // publish discipline), but the Redis frame that nudges an open room is best-effort AFTER
-        // it, exactly like `broadcast`.
+        // still has the before-state to diff against.
         let previous: DraftState | null = null;
-        let pendingNotices: readonly MemberNotice[] = [];
 
         try {
           const outcome = await db.transaction(async (tx): Promise<ApplyResult> => {
@@ -256,10 +252,11 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
             // Task 7's first real sender: the manager whose pick the clock made for them is told
             // nothing today, and this is that telling. `picked`/`pickedEvents`/the new picks
             // slice are all built from the SAME diff (`next.picks.slice(previous.picks.length)`),
-            // so index `i` names the same pick in all three.
+            // so index `i` names the same pick in all three. The durable `member_notices` row IS
+            // this task's delivery (the inbox reads it — `listNotices`); a best-effort LIVE frame
+            // on a per-user stream key is Task 8's job, not this transaction's.
             const newPicks = result.state.picks.slice(state.picks.length);
             const positionOf = new Map(result.state.pool.map((entry) => [entry.playerId, entry.position]));
-            const notices: MemberNotice[] = [];
             for (let i = 0; i < picked.length; i += 1) {
               if (picked[i]!.actorType !== "system") continue;
               const newPick = newPicks[i]!;
@@ -267,18 +264,15 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
               const context = await autopickNoticeContext(tx, newPick.teamId, newPick.playerId);
               const position = positionOf.get(newPick.playerId);
               if (context === undefined || position === undefined) continue;
-              notices.push(
-                await notifyAffectedMember(tx, {
-                  leagueId: result.state.config.leagueId,
-                  userId: context.userId,
-                  noticeType: "draft_auto_picked",
-                  context: { leagueName: context.leagueName, pickNumber: newPick.pickNumber, playerName: context.playerName, position },
-                  occurredAt: event.occurredAt,
-                  auditEventId: event.eventId,
-                }),
-              );
+              await notifyAffectedMember(tx, {
+                leagueId: result.state.config.leagueId,
+                userId: context.userId,
+                noticeType: "draft_auto_picked",
+                context: { leagueName: context.leagueName, pickNumber: newPick.pickNumber, playerName: context.playerName, position },
+                occurredAt: event.occurredAt,
+                auditEventId: event.eventId,
+              });
             }
-            pendingNotices = notices;
 
             if (options?.alsoInTransaction !== undefined) await options.alsoInTransaction(tx);
             // A completed draft becomes a season in the same transaction that completed it.
@@ -306,7 +300,6 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
 
           cache.set(draftId, outcome.state);
           if (previous !== null) await broadcast(previous, outcome.state, action);
-          for (const notice of pendingNotices) await deliverNotice(notice, publish);
           return outcome;
         } catch (error: unknown) {
           // Our view of the log is provably stale — drop it so the next read replays.

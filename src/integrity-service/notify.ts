@@ -4,8 +4,6 @@ import { memberNotices } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { renderNotice, type NoticeContexts, type NoticeType } from "@/integrity/notices";
-import type { PublishFn } from "@/lib/realtime/publish";
-import { getPublisher } from "@/lib/realtime/publisher";
 
 /** One row of `member_notices`, exactly as it is stored. */
 export interface MemberNotice {
@@ -56,8 +54,10 @@ function rowToNotice(row: typeof memberNotices.$inferSelect): MemberNotice {
  * positional call is a swap waiting to happen at a call site nobody re-reads.
  *
  * It writes INSIDE the caller's transaction, exactly like the audit append: a notice about a
- * write that then rolled back is a lie told to a member. The Redis frame is the only best-effort
- * half, and it is `deliverNotice`, called after the commit.
+ * write that then rolled back is a lie told to a member. The durable row IS this task's delivery
+ * — the inbox reads it on next load (`listNotices` below). A best-effort LIVE frame, on a
+ * per-user stream key with no copy in the payload (ruling 13), is Task 8's job: it generalizes
+ * `subscribe` to take a stream key rather than a league id, which does not exist yet.
  *
  * A caller that cannot resolve who to notify (an owner lookup that finds no row) never reaches
  * this function at all — see `src/draft-service/store.ts` — so there is no "notify nobody" branch
@@ -98,32 +98,6 @@ export async function notifyAffectedMember<T extends NoticeType>(
     createdAt: createdAt.toISOString(),
     readAt: null,
   };
-}
-
-/**
- * Best-effort live delivery, after the commit. Publishing failure is never surfaced: the durable
- * row is already written and the inbox reads it on the next page load, which is precisely the
- * "Postgres is authoritative, publishing is best-effort" rule this codebase already runs on
- * (`createPublisher` itself never throws — it catches and returns null — so there is nothing here
- * to catch).
- *
- * A notice with no league is not published at all (ruling 13): the frame exists to nudge a page
- * that is open RIGHT NOW about something happening in a league the reader is looking at, and a
- * review removal is not that. It reaches them on their next load, which is honest and is what
- * the inbox is for.
- *
- * `publish` defaults to the process-wide publisher, exactly like `deliverNotice`'s callers who
- * take no stance of their own — `src/draft-service/store.ts` instead passes its OWN injected
- * `publish`, the same one `broadcast` uses, so a notice frame and a draft frame are one spy in
- * a test rather than two.
- */
-export async function deliverNotice(notice: MemberNotice, publish: PublishFn = (input) => getPublisher().publish(input)): Promise<void> {
-  if (notice.leagueId === null) return;
-  await publish({
-    leagueId: notice.leagueId,
-    type: "notice.created",
-    payload: { id: notice.id, userId: notice.userId, noticeType: notice.noticeType, title: notice.title, body: notice.body },
-  });
 }
 
 export interface NoticesPage {
