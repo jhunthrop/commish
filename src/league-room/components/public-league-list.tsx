@@ -88,12 +88,15 @@ export function PublicLeagueList({
 
   return (
     <div className="flex flex-col gap-3">
+      {/* `min-w-0`: see `HomeBoard`'s identical grid — a grid item's default `min-width: auto`
+          otherwise lets a long league name widen the item past its column at 360px. */}
       <ul className="grid gap-3 sm:grid-cols-2">
         {leagues.map((league) => (
-          <li key={league.id}>
+          <li key={league.id} className="min-w-0">
             <Card as="article" className="flex h-full flex-col gap-3">
               <div className="flex items-start justify-between gap-2">
-                <h3 className="font-display text-2xl font-bold uppercase leading-display text-text-primary">
+                {/* `min-w-0 break-words`: see `HomeLeagueCard`'s identical heading. */}
+                <h3 className="min-w-0 break-words font-display text-2xl font-bold uppercase leading-display text-text-primary">
                   {league.name}
                 </h3>
                 <Badge tone="neutral">{stakeTierLabel(league.stakeTier)}</Badge>

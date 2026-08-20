@@ -89,10 +89,14 @@ export function HomeBoard({ initial }: { readonly initial: HomeBody }) {
     );
   }
 
+  // `min-w-0` on the grid ITEM below, not on the track: a grid item's default `min-width: auto`
+  // lets its min-content width push the item — and with it the whole single-column track — wider
+  // than the container, which is how one long league name made this page scroll sideways at
+  // 360px. `HomeLeagueCard`'s heading carries the matching `min-w-0 break-words`.
   return (
     <ul className="grid gap-3 sm:grid-cols-2">
       {body.leagues.map((league) => (
-        <li key={league.id}>
+        <li key={league.id} className="min-w-0">
           <HomeLeagueCard league={league} />
         </li>
       ))}

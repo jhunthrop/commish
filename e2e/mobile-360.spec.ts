@@ -73,7 +73,9 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expect(page.getByLabel("Display name")).toBeVisible();
     await expect(page.getByRole("radiogroup", { name: "Avatar" })).toBeVisible();
     await expect(page.getByLabel("How much help")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
+    // `exact`: the review composer below this form has its own "Save changes" button, and
+    // manager A has already left a review by the time the onboarding spec has run once.
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page, "/app/profile");
   } finally {
     await context.close();

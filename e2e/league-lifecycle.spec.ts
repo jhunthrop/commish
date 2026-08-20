@@ -60,6 +60,13 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // "Join this league" this spec was still asserting on — a latent mismatch that predates Task 8
   // and only surfaced once the heading fix above let the test reach this far.
   await managerB.getByRole("button", { name: `Join ${leagueName}` }).click();
+  // Wait for the NAVIGATION, not the heading: `LeagueTermsPanel` already renders the league name
+  // as a heading on the invite preview itself, so `toBeVisible()` on it was satisfied the instant
+  // the button was clicked and proved nothing about whether the join landed. `JoinForm` pushes to
+  // the league page only after `POST /api/invites/[code]/accept` succeeds, so the url is the
+  // first thing that actually depends on the write — and manager A's reload below races the same
+  // write.
+  await expect(managerB).toHaveURL(/\/app\/leagues\/[0-9a-f-]+$/);
   await expect(managerB.getByRole("heading", { name: leagueName })).toBeVisible();
 
   await managerA.reload();
