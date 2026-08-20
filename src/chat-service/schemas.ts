@@ -1,12 +1,27 @@
 import { z } from "zod";
 import { CHAT_CONFIG, isReactionEmoji } from "@/chat/config";
 
+/**
+ * A GIF the CLIENT chose and is sending back — a client-reported URL and a client-reported
+ * dimension are client-controlled input, so both are validated here rather than trusted.
+ * `https://` is required because the message list embeds this URL directly in an `<img>`; an
+ * `http://` (or `javascript:`, `data:`, …) source is refused outright rather than sanitized.
+ */
+export const chatGifSchema = z.object({
+  url: z.url().refine((value) => value.startsWith("https://"), { message: "That GIF's link isn't secure." }),
+  previewUrl: z.url().refine((value) => value.startsWith("https://"), { message: "That GIF's preview link isn't secure." }),
+  alt: z.string().trim().min(1, { message: "That GIF is missing its description." }),
+  width: z.number().int().min(CHAT_CONFIG.gif.minDimensionPx).max(CHAT_CONFIG.gif.maxDimensionPx),
+  height: z.number().int().min(CHAT_CONFIG.gif.minDimensionPx).max(CHAT_CONFIG.gif.maxDimensionPx),
+});
+
 export const postMessageSchema = z.object({
   body: z
     .string()
     .trim()
     .min(1, { message: "Type a message first." })
     .max(CHAT_CONFIG.maxBodyLength, { message: `Please keep this to ${CHAT_CONFIG.maxBodyLength} characters or fewer.` }),
+  gif: chatGifSchema.optional(),
 });
 
 /**

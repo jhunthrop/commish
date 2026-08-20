@@ -52,6 +52,37 @@ describe("useLeagueChat", () => {
     expect(result.current.messages).toHaveLength(2);
   });
 
+  it("carries gifSearchEnabled straight through from the page body", async () => {
+    const fixture = fixtureChatDeps({ ...CHAT_PAGE, gifSearchEnabled: true });
+    const { result } = renderHook(() => useLeagueChat("l1"), { wrapper: wrapper(fixture.deps) });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+    expect(result.current.gifSearchEnabled).toBe(true);
+  });
+
+  it("searches GIFs through their own route and returns the results", async () => {
+    const fixture = fixtureChatDeps();
+    const { result } = renderHook(() => useLeagueChat("l1"), { wrapper: wrapper(fixture.deps) });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    const TOUCHDOWN = { id: "1", url: "https://g.gif", previewUrl: "https://g-preview.gif", alt: "Touchdown", width: 480, height: 270 };
+    fixture.response = { ok: true, data: { results: [TOUCHDOWN] } };
+    let results: unknown;
+    await act(async () => {
+      results = await result.current.searchGifs("touchdown");
+    });
+    expect(results).toEqual([TOUCHDOWN]);
+    expect(fixture.calls).toContain("GET /api/gifs/search?q=touchdown");
+  });
+
+  it("rejects with the server's reason when a GIF search fails", async () => {
+    const fixture = fixtureChatDeps();
+    const { result } = renderHook(() => useLeagueChat("l1"), { wrapper: wrapper(fixture.deps) });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    fixture.response = { ok: false, error: "GIF search isn't available." };
+    await expect(result.current.searchGifs("touchdown")).rejects.toThrow("GIF search isn't available.");
+  });
+
   it("sends a message and folds the server's own copy back", async () => {
     const fixture = fixtureChatDeps();
     const { result } = renderHook(() => useLeagueChat("l1"), { wrapper: wrapper(fixture.deps) });
@@ -63,6 +94,30 @@ describe("useLeagueChat", () => {
     });
     expect(result.current.messages[2]?.body).toBe("sent");
     expect(fixture.calls).toEqual(["GET /api/leagues/l1/chat", "POST /api/leagues/l1/chat"]);
+  });
+
+  it("sends a gif alongside the body, forwarded on the wire as-is", async () => {
+    const GIF = { url: "https://g.gif", previewUrl: "https://g-preview.gif", alt: "Touchdown", width: 480, height: 270 };
+    let capturedBody: unknown;
+    const deps: ChatRoomDeps = {
+      fetchJson: async (requestUrl, init) => {
+        const method = init?.method ?? "GET";
+        if (method === "POST") {
+          capturedBody = JSON.parse(String(init?.body));
+          return { json: async () => ({ ok: true, data: { message: chatMessage("3", { body: GIF.alt, gif: GIF }) } }) } as unknown as Response;
+        }
+        return { json: async () => ({ ok: true, data: CHAT_PAGE }) } as unknown as Response;
+      },
+      openEventSource: () => ({ addEventListener: () => {}, close: () => {} }),
+    };
+    const { result } = renderHook(() => useLeagueChat("l1"), { wrapper: wrapper(deps) });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    await act(async () => {
+      await result.current.send(GIF.alt, GIF);
+    });
+    expect(capturedBody).toEqual({ body: GIF.alt, gif: GIF });
+    expect(result.current.messages[2]?.gif).toEqual(GIF);
   });
 
   it("surfaces the server's reason when a send is rejected", async () => {

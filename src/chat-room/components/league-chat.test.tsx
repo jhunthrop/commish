@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { act, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "../hooks/deps";
-import { chatMessage, fixtureChatDeps, renderInChat } from "../test-fixtures";
+import { CHAT_PAGE, TOUCHDOWN_GIF, chatMessage, fixtureChatDeps, renderInChat } from "../test-fixtures";
 import { LeagueChat } from "./league-chat";
 
 describe("LeagueChat", () => {
@@ -50,6 +51,32 @@ describe("LeagueChat", () => {
     act(() => fixture.fire("error"));
     await waitFor(() => expect(screen.getByText("Reconnecting…")).toBeInTheDocument());
     expect(screen.getByText("wheels up")).toBeInTheDocument();
+  });
+
+  it("offers no GIF control when the seam is unconfigured", async () => {
+    const fixture = fixtureChatDeps({ ...CHAT_PAGE, gifSearchEnabled: false });
+    renderChat(fixture);
+    await waitFor(() => expect(screen.getByText("wheels up")).toBeInTheDocument());
+    expect(screen.queryByRole("button", { name: "Add a GIF" })).not.toBeInTheDocument();
+  });
+
+  it("searches, sends and shows a chosen GIF end to end — compose, log and its alt text agree", async () => {
+    const fixture = fixtureChatDeps({ ...CHAT_PAGE, gifSearchEnabled: true });
+    renderChat(fixture);
+    await waitFor(() => expect(screen.getByText("wheels up")).toBeInTheDocument());
+
+    await userEvent.click(screen.getByRole("button", { name: "Add a GIF" }));
+    fixture.response = { ok: true, data: { results: [TOUCHDOWN_GIF] } };
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search GIFs" }), "touchdown");
+    await screen.findByRole("button", { name: TOUCHDOWN_GIF.alt });
+
+    fixture.response = {
+      ok: true,
+      data: { message: chatMessage("3", { authorUserId: "u1", body: TOUCHDOWN_GIF.alt, gif: TOUCHDOWN_GIF }) },
+    };
+    await userEvent.click(screen.getByRole("button", { name: TOUCHDOWN_GIF.alt }));
+
+    expect(await screen.findByRole("img", { name: TOUCHDOWN_GIF.alt })).toBeInTheDocument();
   });
 });
 

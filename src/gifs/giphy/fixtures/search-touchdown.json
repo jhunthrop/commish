@@ -1,0 +1,60 @@
+{
+  "data": [
+    {
+      "id": "l0MYt5jPR6QX5pnqM",
+      "title": "Touchdown Dance GIF by NFL",
+      "rating": "g",
+      "images": {
+        "original": { "url": "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/giphy.gif", "width": "480", "height": "270" },
+        "fixed_height": { "url": "https://media.giphy.com/media/l0MYt5jPR6QX5pnqM/200.gif", "width": "356", "height": "200" }
+      }
+    },
+    {
+      "id": "3o7abKhOpu0NwenH3O",
+      "title": "",
+      "rating": "g",
+      "images": {
+        "original": { "url": "https://media.giphy.com/media/3o7abKhOpu0NwenH3O/giphy.gif", "width": "500", "height": "281" },
+        "fixed_height": { "url": "https://media.giphy.com/media/3o7abKhOpu0NwenH3O/200.gif", "width": "356", "height": "200" }
+      }
+    },
+    {
+      "id": "xT9IgG50Fb7Mi0prBC",
+      "title": "Football Spike GIF",
+      "rating": "pg",
+      "images": {
+        "original": { "url": "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif", "width": "480", "height": "270" },
+        "fixed_height": { "url": "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/200.gif", "width": "356", "height": "200" }
+      }
+    },
+    {
+      "id": "l3q2K5jinAlChoCLS",
+      "title": "End Zone Celebration GIF",
+      "rating": "g",
+      "images": {
+        "original": { "url": "https://media.giphy.com/media/l3q2K5jinAlChoCLS/giphy.gif", "width": "480", "height": "360" },
+        "fixed_height": { "url": "https://media.giphy.com/media/l3q2K5jinAlChoCLS/200.gif", "width": "267", "height": "200" }
+      }
+    },
+    {
+      "id": "d2Z9QYzA2aidiWn6",
+      "title": "Six Points GIF",
+      "rating": "g",
+      "images": {
+        "original": { "url": "https://media.giphy.com/media/d2Z9QYzA2aidiWn6/giphy.gif", "width": "500", "height": "500" },
+        "fixed_height": { "url": "https://media.giphy.com/media/d2Z9QYzA2aidiWn6/200.gif", "width": "200", "height": "200" }
+      }
+    },
+    {
+      "id": "xUPGcguWZHRC2HyBRS",
+      "title": "First Down Dance GIF",
+      "rating": "pg",
+      "images": {
+        "original": { "url": "https://media.giphy.com/media/xUPGcguWZHRC2HyBRS/giphy.gif", "width": "480", "height": "270" },
+        "fixed_height": { "url": "https://media.giphy.com/media/xUPGcguWZHRC2HyBRS/200.gif", "width": "356", "height": "200" }
+      }
+    }
+  ],
+  "pagination": { "total_count": 4213, "count": 6, "offset": 0 },
+  "meta": { "status": 200, "msg": "OK", "response_id": "6f2f6b1e8c0a4d1e9b2a3c4d5e6f7a8b" }
+}

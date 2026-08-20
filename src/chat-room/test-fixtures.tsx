@@ -12,15 +12,26 @@ export function chatMessage(id: string, overrides: Partial<ChatMessageView> = {}
     body: `message ${id}`,
     createdAt: "2026-08-18T12:00:00.000Z",
     reactions: [],
+    gif: null,
     ...overrides,
   };
 }
+
+export const TOUCHDOWN_GIF = {
+  id: "abc123",
+  url: "https://media.giphy.com/media/abc123/giphy.gif",
+  previewUrl: "https://media.giphy.com/media/abc123/200.gif",
+  alt: "Touchdown Dance GIF",
+  width: 480,
+  height: 270,
+};
 
 export const CHAT_PAGE: ChatPageBody = {
   leagueId: "l1",
   meUserId: "u1",
   messages: [chatMessage("1", { body: "wheels up" }), chatMessage("2", { authorUserId: "u1", authorName: "Alex Rivera", body: "let's go" })],
   hasMore: false,
+  gifSearchEnabled: false,
 };
 
 interface FixtureChatDeps {

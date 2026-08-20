@@ -10,6 +10,19 @@ export interface ChatReactionView {
   readonly userId: string;
 }
 
+/**
+ * A GIF attached to a message. No `id` here — that is a `GifResult`'s (`@/gifs/provider`)
+ * search-time identity, not a durable property of the message; `chat_messages` stores exactly
+ * these five fields (`0017_chat_message_gifs.sql`) because the shape is fixed and small.
+ */
+export interface ChatGif {
+  readonly url: string;
+  readonly previewUrl: string;
+  readonly alt: string;
+  readonly width: number;
+  readonly height: number;
+}
+
 export interface ChatMessageView {
   /** The `chat_messages.id` bigserial, as a string. Monotonic, so it is also the page cursor. */
   readonly id: string;
@@ -19,6 +32,12 @@ export interface ChatMessageView {
   readonly body: string;
   readonly createdAt: string;
   readonly reactions: readonly ChatReactionView[];
+  /**
+   * Null for an ordinary text message. A GIF is a `chat.message` like any other (ruling 17 — no
+   * separate `chat.gif` event, no second publish path, no second client fold) with this one field
+   * populated alongside `body`, which carries the GIF's alt text as a text fallback.
+   */
+  readonly gif: ChatGif | null;
 }
 
 export interface ChatPageBody {
@@ -29,6 +48,12 @@ export interface ChatPageBody {
   readonly messages: readonly ChatMessageView[];
   /** True when an older page exists behind `messages[0]`. */
   readonly hasMore: boolean;
+  /**
+   * `createGifProvider() !== null` (`@/gifs/registry`), computed server-side once per page load.
+   * `ChatComposer` renders its "Add a GIF" button only when this is true — no dead button, no
+   * probe of `GET /api/gifs/search` just to find out whether it exists.
+   */
+  readonly gifSearchEnabled: boolean;
 }
 
 /** `chat.message` payload. */

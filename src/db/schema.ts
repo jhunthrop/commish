@@ -22,6 +22,12 @@ export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress
 export const playerPositionEnum = pgEnum("player_position", ["QB", "RB", "WR", "TE", "K", "DEF"]);
 export const weekStatusEnum = pgEnum("week_status", ["scheduled", "in_progress", "final"]);
 export const helpLevelEnum = pgEnum("help_level", ["guided", "standard"]);
+/**
+ * A GIF is a `chat.message`, not a second event type (ruling 17): this is the ONE thing that
+ * distinguishes the two rows shapes rather than inferring it from `gif_url` being non-null, so a
+ * row can never be ambiguous mid-migration or under a future third kind.
+ */
+export const chatMessageKindEnum = pgEnum("chat_message_kind", ["text", "gif"]);
 
 // Identity (credentials, sessions, MFA, OAuth) is owned by WorkOS AuthKit. This table is
 // the app's own profile row for a WorkOS user — `id` IS the WorkOS user id — holding the
@@ -449,8 +455,25 @@ export const chatMessages = pgTable(
       .notNull()
       .references(() => users.id),
     body: text("body").notNull(),
+    // Additive, all nullable (0017_chat_message_gifs.sql) — explicit columns rather than a jsonb
+    // blob, because the shape is fixed and small and a blob is unvalidatable at the database.
+    // `kind` alone says which shape a row is; the gif_* columns are populated together or not at
+    // all (chat-service/chat.ts's postMessage writes both in one insert).
+    kind: chatMessageKindEnum("kind").notNull().default("text"),
+    gifUrl: text("gif_url"),
+    gifPreviewUrl: text("gif_preview_url"),
+    gifAlt: text("gif_alt"),
+    gifWidth: integer("gif_width"),
+    gifHeight: integer("gif_height"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
+  // The physical index also carries `INCLUDE (body)` — added by hand in
+  // `drizzle/0018_chat_messages_covering_index.sql` because drizzle-orm's `index()` builder has
+  // no `.include()` API to express it here. See that migration's own comment: widening this row
+  // (0017's gif_* columns) tipped the planner off `chat_messages_league_id_idx` for a paginated
+  // read and onto a much more expensive `chat_messages_pkey` scan-and-discard, which this
+  // covering index (an Index-Only Scan once vacuumed) undoes. A future migration that drops and
+  // recreates this index from THIS definition must re-add `INCLUDE (body)` by hand, the same way.
   (t) => [index("chat_messages_league_id_idx").on(t.leagueId, t.id)],
 );
 

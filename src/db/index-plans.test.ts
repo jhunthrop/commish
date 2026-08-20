@@ -105,7 +105,16 @@ async function seedCorpus(): Promise<void> {
   `);
   // Without ANALYZE the planner works from empty-table statistics and will choose a sequential
   // scan for everything, which would make this whole suite a false negative.
-  await db.execute(sql`ANALYZE users, leagues, drafts, teams, chat_messages, roster_slots, lineup_slots, matchups`);
+  await db.execute(sql`ANALYZE users, leagues, drafts, teams, roster_slots, lineup_slots, matchups`);
+  // chat_messages gets a VACUUM too, not only ANALYZE: `chat_messages_league_id_idx` is a
+  // covering index (`INCLUDE (body)`, `drizzle/0018_chat_messages_covering_index.sql`), and an
+  // Index-Only Scan only skips its heap fetch for pages the VISIBILITY MAP already marks
+  // all-visible — a fact ANALYZE's statistics don't carry. Real production gets this from
+  // autovacuum running on a busy, insert-only table; a freshly-seeded test corpus has to ask for
+  // it explicitly, or the planner (correctly, given what it can see) treats the Index-Only Scan
+  // as no cheaper than a plain one and picks `chat_messages_pkey` instead — a scan-and-discard
+  // whose ratio gets worse as chat volume grows, exactly what the next test below pins against.
+  await db.execute(sql`VACUUM (ANALYZE) chat_messages`);
 }
 
 describe("hot read paths use indexes", () => {

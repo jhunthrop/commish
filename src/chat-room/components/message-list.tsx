@@ -58,7 +58,27 @@ export function MessageList({ messages, meUserId, hasMore, loadingEarlier, onLoa
                   </span>
                   <span className="font-mono text-xs tabular-nums text-text-muted">{formatChatTime(message.createdAt)}</span>
                 </p>
-                <p className="break-words text-text-primary">{message.body}</p>
+                {message.gif === null ? (
+                  <p className="break-words text-text-primary">{message.body}</p>
+                ) : (
+                  // The body carries the GIF's alt text as a plain-text fallback (see
+                  // `chat-service/chat.ts`'s postMessage), but a sighted reader with the image
+                  // showing does not need to read it twice — the <img>'s own `alt` is what a
+                  // screen reader announces, both here and if the image never loads.
+                  //
+                  // A remote Giphy CDN url: next/image would need every third-party rendition
+                  // host allowlisted for a domain this app doesn't control, and width/height are
+                  // already fixed server-side, so there is no layout-shift benefit it adds here.
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={message.gif.url}
+                    alt={message.gif.alt}
+                    width={message.gif.width}
+                    height={message.gif.height}
+                    loading="lazy"
+                    className="h-auto max-h-64 w-auto max-w-full rounded-md"
+                  />
+                )}
                 <ReactionBar
                   messageId={message.id}
                   reactions={message.reactions}

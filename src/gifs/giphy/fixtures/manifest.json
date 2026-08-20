@@ -1,0 +1,13 @@
+{
+  "provenance": "authored-from-published-response-shapes",
+  "recordedAt": null,
+  "note": "Bodies are the FULL {data, pagination, meta} response Giphy's /v1/gifs/search returns, byte-shaped as published: every rendition's width/height a string, meta.status carrying the real result of the search rather than the HTTP status alone. Written from Giphy's published API docs and response schema, NOT recorded from the live API, because a GIPHY_API_KEY does not exist yet. A future `npm run gifs:giphy:record` (mirroring `npm run stats:tank01:record`) would rewrite these files from the live API and flip provenance to recorded-from-live-api. The adapter's tests must pass unchanged across that flip; if they do not, the fixtures were wrong and the flip is what caught it.",
+  "entries": [
+    {
+      "file": "search-touchdown.json",
+      "query": "touchdown",
+      "trimmed": true,
+      "trimmedNote": "Six results rather than a full page. One entry (3o7abKhOpu0NwenH3O) carries an empty title on purpose, proving the adapter synthesizes alt text from the search query rather than shipping an empty accessible name for a real upstream shape, not only a synthetic one in map.test.ts."
+    }
+  ]
+}

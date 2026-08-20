@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ChatMessageView, ChatPageBody, PostChatBody, ReactionBody } from "@/chat/contract";
+import type { ChatGif, ChatMessageView, ChatPageBody, PostChatBody, ReactionBody } from "@/chat/contract";
 import { applyReaction, mergeMessages, unionMessages } from "@/chat/messages";
 import { parseChatFrame } from "@/chat/parse";
+import type { GifResult, GifSearchBody } from "@/gifs/provider";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { useChatRoomDeps } from "./deps";
 
@@ -25,13 +26,17 @@ interface LeagueChatState {
   readonly loadingEarlier: boolean;
   readonly sending: boolean;
   readonly connection: ChatConnection;
+  /** `ChatPageBody.gifSearchEnabled`, carried straight through — see that field's own docblock. */
+  readonly gifSearchEnabled: boolean;
 }
 
 export interface LeagueChat extends LeagueChatState {
-  readonly send: (body: string) => Promise<SendOutcome>;
+  readonly send: (body: string, gif?: ChatGif) => Promise<SendOutcome>;
   readonly react: (messageId: string, emoji: string) => Promise<SendOutcome>;
   readonly loadEarlier: () => Promise<void>;
   readonly refresh: () => Promise<void>;
+  /** Throws on failure — `GifPicker` (via `ChatComposer`) is the one caller and shows its own error banner from the rejection. */
+  readonly searchGifs: (query: string) => Promise<readonly GifResult[]>;
 }
 
 const INITIAL: LeagueChatState = {
@@ -43,6 +48,7 @@ const INITIAL: LeagueChatState = {
   loadingEarlier: false,
   sending: false,
   connection: "connecting",
+  gifSearchEnabled: false,
 };
 
 /**
@@ -124,6 +130,7 @@ export function useLeagueChat(leagueId: string): LeagueChat {
         meUserId: body.data.meUserId,
         // A later page's `hasMore` never un-says an earlier "there is more behind you".
         hasMore: prev.status === "loading" ? body.data.hasMore : prev.hasMore,
+        gifSearchEnabled: body.data.gifSearchEnabled,
       }));
     } catch {
       if (isStale()) return;
@@ -168,13 +175,13 @@ export function useLeagueChat(leagueId: string): LeagueChat {
   }, [deps, leagueId, refresh, write]);
 
   const send = useCallback(
-    async (body: string): Promise<SendOutcome> => {
+    async (body: string, gif?: ChatGif): Promise<SendOutcome> => {
       setState((prev) => ({ ...prev, sending: true }));
       try {
         const response = await deps.fetchJson(`/api/leagues/${leagueId}/chat`, {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ body }),
+          body: JSON.stringify({ body, gif }),
         });
         const envelope = (await response.json()) as ApiEnvelope<PostChatBody>;
         if (!envelope.ok) return { ok: false, reason: envelope.error };
@@ -251,5 +258,15 @@ export function useLeagueChat(leagueId: string): LeagueChat {
     }
   }, [deps, leagueId]);
 
-  return { ...state, send, react, loadEarlier, refresh };
+  const searchGifs = useCallback(
+    async (query: string): Promise<readonly GifResult[]> => {
+      const response = await deps.fetchJson(`/api/gifs/search?q=${encodeURIComponent(query)}`);
+      const envelope = (await response.json()) as ApiEnvelope<GifSearchBody>;
+      if (!envelope.ok) throw new Error(envelope.error);
+      return envelope.data.results;
+    },
+    [deps],
+  );
+
+  return { ...state, send, react, loadEarlier, refresh, searchGifs };
 }

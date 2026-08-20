@@ -1,4 +1,4 @@
-import type { ChatMessageView, ChatReactionPayload, ChatReactionView } from "./contract";
+import type { ChatGif, ChatMessageView, ChatReactionPayload, ChatReactionView } from "./contract";
 
 export type ChatFrame =
   | { readonly kind: "message"; readonly message: ChatMessageView }
@@ -10,6 +10,23 @@ function asRecord(value: unknown): Readonly<Record<string, unknown>> | null {
 
 function asString(value: unknown): string | null {
   return typeof value === "string" ? value : null;
+}
+
+function asFiniteNumber(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+/** A malformed or absent `gif` field is treated as no GIF, never a fatal parse — the message's text still stands on its own. */
+function toGif(value: unknown): ChatGif | null {
+  const record = asRecord(value);
+  if (record === null) return null;
+  const url = asString(record.url);
+  const previewUrl = asString(record.previewUrl);
+  const alt = asString(record.alt);
+  const width = asFiniteNumber(record.width);
+  const height = asFiniteNumber(record.height);
+  if (url === null || previewUrl === null || alt === null || width === null || height === null) return null;
+  return { url, previewUrl, alt, width, height };
 }
 
 function toReactions(value: unknown): readonly ChatReactionView[] {
@@ -40,6 +57,7 @@ function toMessage(value: unknown): ChatMessageView | null {
     body,
     createdAt,
     reactions: toReactions(record.reactions),
+    gif: toGif(record.gif),
   };
 }
 

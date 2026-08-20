@@ -71,6 +71,12 @@ const SERVER_ONLY_MODULE_GROUPS = [
   // and was the one-hop way around its ban. `aliasOrRelative` anchors on the full segment, so
   // this cannot accidentally catch `@/stats-pipeline` (or any other `@/stats-…` sibling).
   "@/stats",
+  // The GIF provider seam: `registry.ts` reads GIF_PROVIDER/GIPHY_API_KEY and `giphy/client.ts`
+  // holds the key and issues the upstream fetch — exactly as server-only as `@/stats`, and for
+  // the same one-hop-around-the-ban reason. `src/chat-room/components/gif-picker.tsx` reaches
+  // `GifResult` as a TYPE ONLY (`import type`, still allowed below); the actual search goes
+  // through `GET /api/gifs/search` over the wire, the same as every other client-room read.
+  "@/gifs",
 ];
 
 /**

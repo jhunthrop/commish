@@ -18,6 +18,17 @@ export const CHAT_CONFIG = {
    * history may hold more than this, by design.
    */
   maxHeldMessages: 500,
+  /**
+   * The dimension bounds a GIF message must fall within, checked server-side
+   * (`chat-service/schemas.ts`'s `chatGifSchema`) because the client sends back a search
+   * result's own reported dimensions and a client-reported number is client-controlled input.
+   * The ceiling is generous — real Giphy renditions top out well under it — and exists to reject
+   * a garbage or adversarial value, not to constrain a real one.
+   */
+  gif: {
+    minDimensionPx: 1,
+    maxDimensionPx: 4096,
+  },
 } as const;
 
 export type ReactionEmoji = (typeof CHAT_CONFIG.reactions)[number];

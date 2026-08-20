@@ -93,6 +93,13 @@ src/
                           delta-diff snapshot, the affected-roster resolver, persistTick, the
                           score/reference caches and the worker loop itself. 100% coverage. See
                           docs/decisions/live-scoring-pipeline.md.
+  gifs/                   The GIF seam. provider.ts (GifResult/GifProvider + GifSearchBody),
+                          config.ts + registry.ts (GIF_PROVIDER selection, "none" → null,
+                          fail-fast on an unknown name), test-support.ts (the contract every
+                          implementation passes) and giphy/ (the real adapter, tested against
+                          committed fixtures — mirrors stats/tank01/ exactly). Consumed by
+                          GET /api/gifs/search and by the chat route's GET, which sets
+                          ChatPageBody.gifSearchEnabled from createGifProvider() !== null.
   db/                     schema.ts (Drizzle, pg-core: users, leagues, teams, league_invites,
                           scoring_settings, roster_slots, lineup_slots, drafts, draft_actions,
                           draft_nudges, draft_picks, weeks, matchups, players,
@@ -183,9 +190,10 @@ Everything under `src/draft-room/**`, `src/league-room/**`, `src/chat-room/**` a
 client components that render the draft room, the league room, the chat surface and the profile
 surface respectively. Each talks to its service layer ONLY over the wire (`GET`/`POST
 /api/drafts/[draftId]*`, `GET`/`POST /api/leagues/**`, `GET /api/leagues/[leagueId]/events`,
-`PATCH /api/profile`) — never by importing `@/draft-engine`, `@/draft-service`, `@/league`,
-`@/league-service`, `@/chat-service`, `@/ai-advisor`, `@/db`, `@/lib/realtime`, `@/lib/auth`,
-`@/lib/leagues`, `@/lib/llm`, `@/lib/api/respond`, `@/data/seed` or `@/stats-pipeline` as VALUES.
+`GET /api/gifs/search`, `PATCH /api/profile`) — never by importing `@/draft-engine`,
+`@/draft-service`, `@/league`, `@/league-service`, `@/chat-service`, `@/ai-advisor`, `@/db`,
+`@/lib/realtime`, `@/lib/auth`, `@/lib/leagues`, `@/lib/llm`, `@/lib/api/respond`, `@/data/seed`,
+`@/stats-pipeline` or `@/gifs` as VALUES.
 An ESLint `@typescript-eslint/no-restricted-imports` rule (`eslint.config.mjs`'s
 `SERVER_ONLY_MODULE_GROUPS`, scoped to `src/draft-room/**/*.{ts,tsx}`,
 `src/league-room/**/*.{ts,tsx}`, `src/chat-room/**/*.{ts,tsx}` and

@@ -53,7 +53,9 @@ describe("GET /api/leagues/[leagueId]/chat", () => {
 
   it("returns an empty history with the caller's own id, and never a dead end", async () => {
     const body = (await (await GET(new Request(url), leagueContext)).json()) as ApiEnvelope<ChatPageBody>;
-    expect(body).toEqual({ ok: true, data: { leagueId: "l1", meUserId: "u1", messages: [], hasMore: false } });
+    // gifSearchEnabled is false here because GIF_PROVIDER is unset in the test environment — the
+    // unconfigured-degrade default (`gifs/registry.test.ts` owns proving the registry itself).
+    expect(body).toEqual({ ok: true, data: { leagueId: "l1", meUserId: "u1", messages: [], hasMore: false, gifSearchEnabled: false } });
   });
 
   it("rejects a cursor that isn't a message id", async () => {
@@ -101,6 +103,32 @@ describe("POST /api/leagues/[leagueId]/chat", () => {
     expect(body.ok).toBe(false);
     if (body.ok) return;
     expect(body.error).toContain("body");
+  });
+
+  const TOUCHDOWN_GIF = {
+    url: "https://media.giphy.com/media/abc123/giphy.gif",
+    previewUrl: "https://media.giphy.com/media/abc123/200.gif",
+    alt: "Touchdown Dance GIF",
+    width: 480,
+    height: 270,
+  };
+
+  it("stores a GIF sent alongside the body, and returns it on the posted message", async () => {
+    const response = await POST(post({ body: TOUCHDOWN_GIF.alt, gif: TOUCHDOWN_GIF }), leagueContext);
+    const body = (await response.json()) as ApiEnvelope<PostChatBody>;
+    expect(body.ok).toBe(true);
+    if (!body.ok) return;
+    expect(body.data.message.gif).toEqual(TOUCHDOWN_GIF);
+  });
+
+  it("refuses a GIF whose url isn't https — a client-chosen url is client-controlled input", async () => {
+    const response = await POST(post({ body: "look", gif: { ...TOUCHDOWN_GIF, url: "http://media.giphy.com/g.gif" } }), leagueContext);
+    expect(response.status).toBe(400);
+  });
+
+  it("refuses a GIF whose dimensions are outside the configured bounds", async () => {
+    const response = await POST(post({ body: "look", gif: { ...TOUCHDOWN_GIF, width: 0 } }), leagueContext);
+    expect(response.status).toBe(400);
   });
 });
 

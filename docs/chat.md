@@ -57,7 +57,7 @@ Payload contracts (`src/chat/contract.ts`):
 ```ts
 /** `chat.message` payload. */
 interface ChatMessagePayload {
-  readonly message: ChatMessageView; // id, authorUserId, authorName, authorAvatarUrl, body, createdAt, reactions
+  readonly message: ChatMessageView; // id, authorUserId, authorName, authorAvatarUrl, body, createdAt, reactions, gif
 }
 
 /** `chat.reaction` payload. Carries the actor so the client fold is idempotent under replay. */
@@ -95,6 +95,31 @@ resync still fires. See the module's own docblock for why no `Last-Event-ID` han
 the manager itself — one browser-owned cursor is safe to share because both folds are already
 idempotent under replay (`mergeMessages`/`applyReaction` are set-shaped; `applyDraftEvent`
 answers a gap with `outcome: "resync"`).
+
+## GIFs — a `chat.message`, not a second event type
+
+A GIF is not `chat.gif`. Ruling 17 (binding, and deliberately at odds with an earlier spec draft):
+the message row and the `chat.message` payload both grow five nullable columns/fields
+(`kind`, `gif.url`, `gif.previewUrl`, `gif.alt`, `gif.width`, `gif.height` —
+`drizzle/0017_chat_message_gifs.sql`) instead of a second event type existing beside the first.
+One publish path (`postMessage`), one client fold (`mergeMessages`/`applyReaction`, unchanged) —
+a second event type would mean two of each for one underlying row, which is how two renderings of
+the same thing drift. `body` still carries the GIF's alt text as a plain-text fallback, so a
+client that never fetches the image (or a screen reader reading the raw frame) still gets words.
+
+The seam lives at `src/gifs/` (`docs/conventions.md`'s directory map), consumed two ways:
+
+- `GET /api/gifs/search?q=` — searches the configured provider. 404s cleanly with **no** provider
+  configured (`GIF_PROVIDER=none`, the default) rather than a 200 with an empty result set.
+- `ChatPageBody.gifSearchEnabled` — `createGifProvider() !== null`, computed once per chat page
+  load by the same `GET /api/leagues/[leagueId]/chat` route above. `ChatComposer` renders its
+  "Add a GIF" button only when this is true; there is no separate availability probe and no dead
+  button pointing at a route that would 404.
+
+`chat-service/schemas.ts`'s `chatGifSchema` validates a posted `gif` server-side — `url` and
+`previewUrl` must be `https://`, and both dimensions must fall inside `CHAT_CONFIG.gif`'s bounds —
+because the client sends back a search result's own reported fields, and a client-reported URL is
+client-controlled input regardless of which provider produced it.
 
 ## Pagination
 
@@ -154,7 +179,7 @@ a manager with a team in the league, or the commissioner; a signed-in stranger g
 | Route | Who | Notes |
 |---|---|---|
 | `GET /api/leagues/[leagueId]/chat` | a manager with a team in the league, or the commissioner | `?before=<messageId>`. One page of `CHAT_CONFIG.pageSize` messages, oldest first, with `hasMore`. There is no unpaginated read. |
-| `POST /api/leagues/[leagueId]/chat` | same | Body: `{ body }`. The author is the session's user (`actor.userId`); no body field can change it. |
+| `POST /api/leagues/[leagueId]/chat` | same | Body: `{ body, gif? }`. The author is the session's user (`actor.userId`); no body field can change it. |
 | `POST /api/leagues/[leagueId]/chat/[messageId]/reactions` | same | Body: `{ emoji }` from `CHAT_CONFIG.reactions`. One verb toggles both directions. |
 
 ## Known follow-ups

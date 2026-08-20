@@ -1,5 +1,5 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
-import type { ChatMessageView, ChatReactionView } from "@/chat/contract";
+import type { ChatGif, ChatMessageView, ChatReactionView } from "@/chat/contract";
 import { CHAT_CONFIG } from "@/chat/config";
 import type { Db } from "@/db/client";
 import { chatMessages, chatReactions, teams, users } from "@/db/schema";
@@ -13,6 +13,20 @@ interface MessageRow {
   readonly authorAvatarUrl: string | null;
   readonly body: string;
   readonly createdAt: Date;
+  readonly kind: "text" | "gif";
+  readonly gifUrl: string | null;
+  readonly gifPreviewUrl: string | null;
+  readonly gifAlt: string | null;
+  readonly gifWidth: number | null;
+  readonly gifHeight: number | null;
+}
+
+/** Null unless every one of the five columns is populated — `kind` alone is not trusted over the columns actually being there. */
+function toGifView(row: MessageRow): ChatGif | null {
+  if (row.kind !== "gif" || row.gifUrl === null || row.gifPreviewUrl === null || row.gifAlt === null || row.gifWidth === null || row.gifHeight === null) {
+    return null;
+  }
+  return { url: row.gifUrl, previewUrl: row.gifPreviewUrl, alt: row.gifAlt, width: row.gifWidth, height: row.gifHeight };
 }
 
 function toView(row: MessageRow, reactions: readonly ChatReactionView[]): ChatMessageView {
@@ -24,6 +38,7 @@ function toView(row: MessageRow, reactions: readonly ChatReactionView[]): ChatMe
     body: row.body,
     createdAt: row.createdAt.toISOString(),
     reactions,
+    gif: toGifView(row),
   };
 }
 
@@ -79,6 +94,8 @@ export interface PostMessageInput {
   readonly userId: string;
   readonly body: string;
   readonly publish: PublishFn;
+  /** Present exactly when this message is a GIF — `postMessage` writes both `body` and this in one insert. See ruling 17: a GIF is a `chat.message`, never a second event type. */
+  readonly gif?: ChatGif;
   /** Defaults to logging via `console.error`. Override in tests to assert the swallow. */
   readonly onPublishError?: PublishErrorSink;
 }
@@ -99,7 +116,17 @@ export async function postMessage(db: Db, input: PostMessageInput): Promise<Chat
 
   const [row] = await db
     .insert(chatMessages)
-    .values({ leagueId: input.leagueId, authorUserId: input.userId, body: input.body })
+    .values({
+      leagueId: input.leagueId,
+      authorUserId: input.userId,
+      body: input.body,
+      kind: input.gif === undefined ? "text" : "gif",
+      gifUrl: input.gif?.url ?? null,
+      gifPreviewUrl: input.gif?.previewUrl ?? null,
+      gifAlt: input.gif?.alt ?? null,
+      gifWidth: input.gif?.width ?? null,
+      gifHeight: input.gif?.height ?? null,
+    })
     .returning({ id: chatMessages.id, createdAt: chatMessages.createdAt });
 
   const message = toView(
@@ -110,6 +137,12 @@ export async function postMessage(db: Db, input: PostMessageInput): Promise<Chat
       authorAvatarUrl: author?.avatarUrl ?? null,
       body: input.body,
       createdAt: row!.createdAt,
+      kind: input.gif === undefined ? "text" : "gif",
+      gifUrl: input.gif?.url ?? null,
+      gifPreviewUrl: input.gif?.previewUrl ?? null,
+      gifAlt: input.gif?.alt ?? null,
+      gifWidth: input.gif?.width ?? null,
+      gifHeight: input.gif?.height ?? null,
     },
     [],
   );
@@ -150,6 +183,12 @@ export async function listMessages(db: Db, input: ListMessagesInput): Promise<Ch
       authorAvatarUrl: users.avatarUrl,
       body: chatMessages.body,
       createdAt: chatMessages.createdAt,
+      kind: chatMessages.kind,
+      gifUrl: chatMessages.gifUrl,
+      gifPreviewUrl: chatMessages.gifPreviewUrl,
+      gifAlt: chatMessages.gifAlt,
+      gifWidth: chatMessages.gifWidth,
+      gifHeight: chatMessages.gifHeight,
     })
     .from(chatMessages)
     .innerJoin(users, eq(users.id, chatMessages.authorUserId))
