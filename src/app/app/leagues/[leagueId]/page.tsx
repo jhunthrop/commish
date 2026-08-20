@@ -20,8 +20,13 @@ interface PageProps {
  *
  * Reads preferences server-side (`readPreferences`, the same seed-on-first-read call the draft
  * room page makes) and forwards `helpLevel` into `LeagueHome`, so a `guided` caller's
- * `InfoTip`s (the standings Record column, the lineup lock warning, the Bench heading) open
- * inline from this page's very first render.
+ * `InfoTip`s (the standings Record column, the lineup lock warning, the Bench heading, and now
+ * the terms panel's format/scoring definitions — Task 8) open inline from this page's very
+ * first render.
+ *
+ * `leagueHome` (`@/league-service`) is also where the terms panel's data comes from: `home.terms`
+ * rides the same read this page already made, so every member sees the league's format, scoring
+ * and commissioner without this page issuing a second request for them.
  */
 export default async function LeaguePage({ params }: PageProps) {
   const user = await requireCurrentUser();

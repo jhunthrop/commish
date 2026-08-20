@@ -7,6 +7,7 @@ import { formatWeek } from "../lib/format";
 import { AdvisorPanel } from "./advisor-panel";
 import { InvitePanel } from "./invite-panel";
 import { LeagueMembersPanel } from "./league-members-panel";
+import { LeagueTermsPanel } from "./league-terms-panel";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupScoreboard } from "./matchup-scoreboard";
@@ -97,13 +98,17 @@ export function LeagueHome({
       {home.myTeamId === null ? null : <AdvisorPanel leagueId={home.leagueId} weekNumber={home.currentWeek} />}
 
       {/*
-        The members panel and the invite panel sit here, in that order, as siblings in ordinary
-        document flow rather than inside a layout that claims the space between them: the
-        commissioner's "who is missing" question (the panel above) and their "invite someone"
-        answer (the panel below) read together without either one owning the section. A future
-        panel — the league-terms panel this same spot is expected to grow — composes the same
-        way, as one more sibling, not as a change to how these two are laid out.
+        The terms panel, the members panel and the invite panel sit here, in that order, as
+        siblings in ordinary document flow rather than inside a layout that claims the space
+        between them: "how this league works" (Task 8, the SAME `LeagueTermsPanel` the invite
+        preview renders, fed by `home.terms` rather than a second fetch), the commissioner's
+        "who is missing" question (the members panel), and their "invite someone" answer (the
+        panel below) read together without any one of them owning the section. Every member sees
+        the terms panel — it is not gated on `isCommissioner` — because the terms are what
+        everybody in the league is playing under, not a commissioner-only fact.
       */}
+      <LeagueTermsPanel terms={home.terms} helpLevel={helpLevel} />
+
       <LeagueMembersPanel teams={home.teams} teamCount={home.teamCount} commissionerUserId={home.commissionerUserId} myTeamId={home.myTeamId} />
 
       {home.isCommissioner ? <InvitePanel leagueId={home.leagueId} /> : null}

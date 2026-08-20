@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
@@ -160,6 +160,22 @@ describe("LeagueHome", () => {
     expect(screen.getByRole("region", { name: "Lineup advisor" })).toBeInTheDocument();
   });
 
+  // Task 8: trust is not a one-time disclosure. The same `LeagueTermsPanel` the invite preview
+  // renders shows up here too, fed by `home.terms` rather than a second fetch, and for every
+  // member — gating it on `isCommissioner` would make the surface pointless, since the terms are
+  // what everybody in the league is playing under.
+  it("shows the league terms panel, fed from the home body, for every viewer", async () => {
+    await inBothThemes(
+      wrap({ ...HOME, isCommissioner: false }),
+      async ({ container }) => {
+        const panel = screen.getByRole("region", { name: "League terms" });
+        expect(within(panel).getByText(HOME.terms.rosterLine)).toBeInTheDocument();
+        expect(within(panel).getByText(HOME.terms.commissionerName)).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+  });
+
   // Step 15's audit: a league had no members list at all. It renders for every member, not
   // just the commissioner — the invite panel below it stays commissioner-only, but knowing who
   // is in the league is not a commissioner-only fact.
@@ -170,8 +186,10 @@ describe("LeagueHome", () => {
       </ChatRoomDepsProvider>,
       fixtureLeagueDeps().deps,
     );
-    expect(screen.getByRole("list", { name: "Managers" })).toBeInTheDocument();
-    expect(screen.getByText("Commissioner")).toBeInTheDocument();
+    const list = screen.getByRole("list", { name: "Managers" });
+    // "Commissioner" is now ambiguous at the page level: the terms panel's own label reads the
+    // same word. Scoped to the members list, this is still the commissioner BADGE.
+    expect(within(list).getByText("Commissioner")).toBeInTheDocument();
     expect(screen.getByText("9 seats still open")).toBeInTheDocument();
   });
 });

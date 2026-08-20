@@ -64,6 +64,33 @@ could drift apart.
   existing `teams` row and returns it with `alreadyMember: true`; it costs the invite no use
   and mutates nothing.
 
+## League terms
+
+Trust is not a one-time disclosure. `leagueTerms` (`src/league/terms.ts`) is the ONE pure function
+that turns a league's raw facts — its format, size, scoring weights, roster shape, stake tier and
+commissioner — into the `LeagueTerms` a human reads, and it has exactly two callers: `invitePreview`
+(`src/league-service/invites.ts`), read by a signed-out prospect before they join, and `leagueHome`
+(`src/league-service/read.ts`), read by every member after they have. Both callers render the SAME
+`LeagueTermsPanel` (`src/league-room/components/league-terms-panel.tsx`) with the result, so a
+prospect deciding whether to join and a member already inside can never be told two different
+things about the league they are both looking at — `invites.test.ts` asserts this directly, against
+the same seeded league, rather than trusting two independently hand-typed expectations to agree.
+
+`leagueHome` assembles its `LeagueTerms` from rows the read already touches for everything else on
+the page — the `leagues` row, `teamRows`/`teamCards` for the filled-team count, and `teamRows` again
+to find the commissioner's own team (`createLeague` seats them in one in the same transaction that
+creates the league, so this lookup never misses in practice). The one row it did not already hold
+is `scoring_settings`, so `leagueHome` now reads it too — `BASELINE_LEAGUE_HOME_QUERIES` (`src/
+league-service/read.ts`) pins the resulting bound (eight queries, regardless of team count) so a
+later change that grows it further trips a test rather than going unnoticed.
+
+The terms panel is never gated on `isCommissioner`: the terms are what everybody in the league is
+playing under, not a commissioner-only fact, and `league-read-routes.test.ts` asserts a non-
+commissioner member gets the real scoring label and commissioner name back, not a stripped-down
+view. On `LeagueHome` (`src/league-room/components/league-home.tsx`) the panel sits as one more
+sibling alongside the members panel and the (commissioner-only) invite panel, in ordinary document
+flow — not inside a layout that claims the space between them.
+
 ## The schedule
 
 `generateSchedule` (`src/league/schedule.ts`) is the circle method: team 0 stays fixed while
@@ -230,8 +257,9 @@ retired was the other). Every response is the same envelope
 |---|---|---|
 | `GET /api/leagues` | any signed-in user | Every league the caller fields a team in, oldest first, with fill count and draft status. |
 | `POST /api/leagues` | any signed-in user | Body: `{ name, format?, teamCount?, scoringPreset?, auctionBudget?, teamName?, visibility?, stakeTier?, experienceTier? }` — only `name` is required. Creates the league, the caller's team and a scheduled draft in one transaction. `visibility: "public"` (default `"invite_only"`) is what sets `is_public_matchmade` and makes the league eligible for `GET /api/public/leagues`; `stakeTier` (0-3, default 0) and `experienceTier` are the cosmetic/matching fields a public listing shows. |
-| `GET /api/leagues/[leagueId]` | a manager with a team in the league, or the commissioner | `leagueHome`: standings, this week's matchup, the roster shape and the draft's status, in one payload. |
+| `GET /api/leagues/[leagueId]` | a manager with a team in the league, or the commissioner | `leagueHome`: standings, this week's matchup, the roster shape, the draft's status and the league's terms (`LeagueTerms` — see "League terms" above), in one payload, for every member. |
 | `POST /api/leagues/[leagueId]/invites` | commissioner only | Body: `{ maxUses? }`. Mints a code; randomness is `crypto.getRandomValues`-backed, never `Math.random`, since a code is a membership capability. |
+| `GET /api/invites/[code]` | **anyone holding the code, signed in or not** | `invitePreview`: the same `LeagueTerms` `leagueHome` carries, for whoever holds the code — the code itself is the capability. An invalid, expired or exhausted code returns only the refusal, never a league name, so this cannot be used to enumerate private leagues. |
 | `POST /api/invites/[code]/accept` | any signed-in user | Body: `{ teamName? }`. Joins the caller to the invite's league. Re-accepting your own invite is a 200, not an error. |
 | `GET /api/leagues/[leagueId]/matchups/[week]` | a manager with a team in the league, or the commissioner | Both sides' full lineups and every starter's per-player points for that week. |
 | `GET /api/leagues/[leagueId]/teams/me/lineup` | a manager with a team in the league | `?week=N`. The caller's OWN lineup, never `teams/[teamId]/lineup` — there is no path or body shape in which a manager can read or set somebody else's. |

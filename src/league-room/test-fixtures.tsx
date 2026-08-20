@@ -1,6 +1,8 @@
 import type { ReactElement } from "react";
 import { render, type RenderResult } from "@testing-library/react";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import type { LeagueTerms } from "@/league";
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import type { LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "./hooks/deps";
@@ -74,6 +76,24 @@ const TEAMS: readonly LeagueMemberCard[] = [
   { id: "t3", name: "Comet Crew", ownerDisplayName: "Sam Patel", ownerAvatarUrl: null, ownerUserId: "u3" },
 ];
 
+/** What `leagueTerms` (`@/league`) would assemble for this exact league — built here by hand
+ *  rather than by calling the real function, since `src/league-room/**` may not value-import
+ *  `@/league` at all (see "The client boundary", `docs/league.md`); only its type is imported
+ *  above. The values mirror `HOME`'s own fields (`t1`'s owner, `u1`, is the commissioner) so a
+ *  test comparing this fixture against a rendered `LeagueTermsPanel` sees consistent facts. */
+export const TERMS: LeagueTerms = {
+  name: "Sunday Money",
+  format: "snake",
+  teamCount: 12,
+  filledTeams: TEAMS.length,
+  scoringLabel: "PPR",
+  rosterLine: "1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 K, 1 DEF, 6 bench",
+  stakeLabel: "Friendly",
+  stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
+  commissionerName: "Alex Rivera",
+  commissionerAvatar: null,
+};
+
 /** Everything `LeagueHome` needs: a commissioner, mid-season, drafted, `t1` up this week. */
 export const HOME: LeagueHomeBody = {
   leagueId: "l1",
@@ -86,6 +106,7 @@ export const HOME: LeagueHomeBody = {
   myTeamId: "t1",
   teams: TEAMS,
   standings: STANDINGS,
+  terms: TERMS,
   currentWeek: 3,
   totalWeeks: 14,
   myMatchup: WON,

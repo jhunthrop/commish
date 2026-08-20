@@ -34,7 +34,7 @@ import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import { finalizeWeek } from "@/stats-pipeline/finalize";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
-import { leagueHome, matchupWeek } from "./read";
+import { BASELINE_LEAGUE_HOME_QUERIES, leagueHome, matchupWeek } from "./read";
 import { writeSchedule } from "./schedule";
 
 const db = createTestDb();
@@ -164,10 +164,32 @@ describe("GET /api/leagues/[leagueId]", () => {
     const home = await leagueHome(counting.db, created.leagueId, "u1");
     expect(home?.teams).toHaveLength(2);
     expect(home?.standings).toHaveLength(2);
-    // leagues, matchups, teams (plain), drafts, stat_weeks, the one team+owner join
-    // (`listTeamCards`), and `leagueStandings`'s own matchups read: seven, whichever league is
-    // asked, and `leagueStandings` no longer runs a second `teams` query of its own for names.
-    expect(counting.selectCount()).toBeLessThanOrEqual(7);
+    // `BASELINE_LEAGUE_HOME_QUERIES` (`./read`) — the same bound whichever league is asked, and
+    // `leagueStandings` no longer runs a second `teams` query of its own for names.
+    expect(counting.selectCount()).toBeLessThanOrEqual(BASELINE_LEAGUE_HOME_QUERIES);
+  });
+
+  // Task 8: the terms panel that renders on the invite page also renders inside the league, fed
+  // by this same read — gating it on `isCommissioner` would make the surface pointless, since
+  // the terms are what everybody in the league is playing under, not a commissioner-only fact.
+  it("gives every member the league's terms, not just the commissioner", async () => {
+    const created = await createDefaultLeague("u1");
+    await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
+
+    const asMember = await leagueHome(db, created.leagueId, "u2");
+    expect(asMember!.terms.scoringLabel).toBe("PPR");
+    expect(asMember!.terms.commissionerName).toBe("Manager u1");
+    expect(asMember!.isCommissioner).toBe(false);
+  });
+
+  // The terms are assembled from rows `leagueHome` already holds — the league, its scoring
+  // settings and its teams — not fetched a second time the way a naive "reuse `invitePreview`"
+  // implementation would.
+  it("costs no extra round trip beyond the terms' own scoring-settings read", async () => {
+    const created = await createDefaultLeague("u1");
+    const counting = countingDb(db);
+    await leagueHome(counting.db, created.leagueId, "u1");
+    expect(counting.selectCount()).toBe(BASELINE_LEAGUE_HOME_QUERIES);
   });
 
   it("answers 404 for a league that doesn't exist", async () => {

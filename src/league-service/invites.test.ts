@@ -8,6 +8,7 @@ import { LEAGUE_CONFIG } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { createLeague } from "./creation";
 import { acceptInvite, createInvite, invitePreview } from "./invites";
+import { leagueHome } from "./read";
 
 /** `league()` below always mints this name — the one string every `invitePreview` leak
  *  assertion checks for absence. */
@@ -337,6 +338,22 @@ describe("invitePreview", () => {
         commissionerAvatar: null,
       },
     });
+  });
+
+  // Task 8: the whole reason `leagueTerms` is one pure function is that a prospect reading the
+  // invite and a member reading the league home can never be told two different things about the
+  // league they are both looking at. This proves it against the SAME league, not just against
+  // two separately-hand-typed expectations that could quietly drift from each other.
+  it("hands a prospect the exact same terms a member of the league sees", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const preview = await invitePreview(db, invite.code);
+    if (!preview.ok) throw new Error(preview.reason);
+    const home = await leagueHome(db, created.leagueId, "u1");
+
+    expect(home!.terms).toEqual(preview.terms);
   });
 
   it("counts every seated team, not just the commissioner's", async () => {

@@ -139,6 +139,13 @@ export interface LeagueHomeBody {
   readonly myTeamId: string | null;
   readonly teams: readonly LeagueMemberCard[];
   readonly standings: readonly TeamStandingsRow[];
+  /**
+   * The SAME `LeagueTerms` the invite preview renders (`InvitePreviewBody`, above), assembled by
+   * the SAME pure `leagueTerms` — every member sees this, not just the commissioner: the terms
+   * are what everybody in the league is playing under, and gating them on `isCommissioner` would
+   * make the surface pointless.
+   */
+  readonly terms: LeagueTerms;
   readonly currentWeek: number;
   readonly totalWeeks: number;
   readonly myMatchup: MatchupSummary | null;
