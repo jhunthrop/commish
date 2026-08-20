@@ -10,11 +10,11 @@ import { AppHeader } from "./app-header";
 // data through `useAccountRoomDeps()`. Every case below wraps `AppHeader` in
 // `AccountRoomDepsProvider` with a fixture so no case ever reaches the real `fetch` — the same
 // no-module-mocks, no-real-network discipline every other account-room test already follows.
-function renderHeader(displayName: string, avatar: string | null) {
+function renderHeader(displayName: string, avatar: string | null, isAdmin = false) {
   const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
   return render(
     <AccountRoomDepsProvider deps={fixture.deps}>
-      <AppHeader displayName={displayName} avatar={avatar} />
+      <AppHeader displayName={displayName} avatar={avatar} isAdmin={isAdmin} />
     </AccountRoomDepsProvider>,
   );
 }
@@ -24,7 +24,7 @@ describe("AppHeader", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     await inBothThemes(
       <AccountRoomDepsProvider deps={fixture.deps}>
-        <AppHeader displayName="Ada Lovelace" avatar="preset:shield" />
+        <AppHeader displayName="Ada Lovelace" avatar="preset:shield" isAdmin={false} />
       </AccountRoomDepsProvider>,
       async ({ container }) => {
         const link = screen.getByRole("link", { name: /Ada Lovelace/ });
@@ -54,5 +54,23 @@ describe("AppHeader", () => {
     // DOM order IS visual order here — both are plain flow siblings in the same flex row, no
     // `order-*` utility on either.
     expect(inbox.compareDocumentPosition(profile) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows no queue link to an ordinary member — the queue is operator-only (Task 5)", () => {
+    renderHeader("Ada Lovelace", null, false);
+    expect(screen.queryByRole("link", { name: /Queue/ })).not.toBeInTheDocument();
+  });
+
+  it("links an operator to the dispute queue, in both themes, axe-clean", async () => {
+    const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+    await inBothThemes(
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <AppHeader displayName="Ada Lovelace" avatar={null} isAdmin={true} />
+      </AccountRoomDepsProvider>,
+      async ({ container }) => {
+        expect(screen.getByRole("link", { name: /Queue/ })).toHaveAttribute("href", "/app/admin/queue");
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
   });
 });

@@ -88,5 +88,15 @@ export const INTEGRITY_CONFIG = {
      * service is the real boundary, not only the schema" discipline `removeReview` uses.
      */
     noteMaxLength: 500,
+    /** `POST /api/admin/flags/[flagId]/resolve`'s ceiling — keyed per operator id, an
+     *  authenticated write with an irreversible consequence (Task 5). */
+    resolveRateLimit: { maxRequests: 30, windowMs: 60_000 },
+  },
+  /** The queue's own read model (Task 5): `listPendingFlags`. */
+  queue: {
+    pageSize: 20,
+    /** The league chain's own contribution to an account-pair flag's trail — bounded, the same
+     *  "derive over a bounded set" discipline `INTEGRITY_CONFIG.notices.inboxSize` uses. */
+    trailLimit: 20,
   },
 } as const;

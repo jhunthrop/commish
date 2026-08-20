@@ -1,16 +1,16 @@
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db, DbTx } from "@/db/client";
-import { auditEvents, chatMessages, integrityFlags, leagues, memberNotices, reviews, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
-import type { AuditEventType } from "@/domain/audit";
+import { auditEvents, chatMessages, integrityFlags, leagues, memberNotices, reviewReports, reviews, users } from "@/db/schema";
+import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
+import type { AuditEventType, JsonObject } from "@/domain/audit";
 import { copyViolations } from "@/integrity/copy-rules";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import type { FlagType } from "@/integrity/flags";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { createAuditLogger, type AuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
-import { BOOTSTRAP_ACTOR, grantAdmin, raiseFlag, resolveFlag } from "./flags";
+import { BOOTSTRAP_ACTOR, flagDetail, grantAdmin, listPendingFlags, pendingFlagQuery, raiseFlag, resolveFlag } from "./flags";
 
 const db = createTestDb();
 const NOW = "2026-08-20T18:00:00.000Z";
@@ -830,5 +830,319 @@ describe("resolveFlag", () => {
       resolveFlag(stubDb, { flagId: "flag_stub", decision: "warned_user", note: "n", operatorUserId: "u_op", notify: spyNotify }),
     ).rejects.toThrow("test probe stop");
     expect(capturedLeagueName).toBe("lg_ghost");
+  });
+});
+
+describe("pendingFlagQuery / listPendingFlags — the queue's own read model", () => {
+  const ALL_TABLE_NAMES = ["integrity_flags", "reviews", "chat_messages", "users", "audit_events", "review_reports", "leagues"] as const;
+  function tablesIn(sqlText: string): readonly string[] {
+    return ALL_TABLE_NAMES.filter((name) => sqlText.includes(`"${name}"`)).sort();
+  }
+
+  async function raiseTestFlag(opts: {
+    readonly id: string;
+    readonly flagType: FlagType;
+    readonly subjectId: string;
+    readonly leagueId?: string | null;
+    readonly occurredAt: string;
+    readonly evidence?: JsonObject;
+    readonly raisedByUserId?: string | null;
+  }) {
+    return db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: opts.flagType,
+        subjectId: opts.subjectId,
+        leagueId: opts.leagueId ?? null,
+        evidence: opts.evidence ?? {},
+        raisedByUserId: opts.raisedByUserId ?? null,
+        occurredAt: opts.occurredAt,
+        newId: () => opts.id,
+        audit: logger,
+      }),
+    );
+  }
+
+  it("touches only integrity_flags — evidence and the resolution note are never fetched to leak", () => {
+    expect(tablesIn(pendingFlagQuery(db, {}).toSQL().sql)).toEqual(["integrity_flags"]);
+  });
+
+  it("lists open flags oldest first with no severity sort, and never a resolved one", async () => {
+    await seedUser("u_author1");
+    await seedUser("u_author2");
+    await seedUser("u_author3");
+    await seedUser("u_op");
+    await db.insert(reviews).values([
+      { id: "queue_r_old", userId: "u_author1", rating: 3, body: "old", createdAt: new Date(NOW), updatedAt: new Date(NOW) },
+      { id: "queue_r_new", userId: "u_author2", rating: 3, body: "new", createdAt: new Date(NOW), updatedAt: new Date(NOW) },
+      { id: "queue_r_done", userId: "u_author3", rating: 3, body: "already handled", createdAt: new Date(NOW), updatedAt: new Date(NOW) },
+    ]);
+
+    await raiseTestFlag({ id: "queue_flag_old", flagType: "review_report", subjectId: "queue_r_old", occurredAt: "2026-08-01T00:00:00.000Z" });
+    await raiseTestFlag({ id: "queue_flag_new", flagType: "review_report", subjectId: "queue_r_new", occurredAt: "2026-08-02T00:00:00.000Z" });
+    const done = await raiseTestFlag({ id: "queue_flag_done", flagType: "review_report", subjectId: "queue_r_done", occurredAt: "2026-08-03T00:00:00.000Z" });
+    await resolveFlag(db, { flagId: done.id, decision: "no_action", note: "n", operatorUserId: "u_op", audit: logger });
+
+    const page = await listPendingFlags(db, {});
+    expect(page.rows.map((r) => r.flagId)).toEqual(["queue_flag_old", "queue_flag_new"]);
+    expect(page.rows[0]).toMatchObject({ question: "A member reported a review", about: "A review by u_author1" });
+    expect(page.nextBefore).toBeNull();
+  });
+
+  it("pages with a cursor, holding oldest-first order across the boundary", async () => {
+    await seedUser("u_page_author1");
+    await seedUser("u_page_author2");
+    await db.insert(reviews).values([
+      { id: "queue_page_r1", userId: "u_page_author1", rating: 3, body: "a", createdAt: new Date(NOW), updatedAt: new Date(NOW) },
+      { id: "queue_page_r2", userId: "u_page_author2", rating: 3, body: "b", createdAt: new Date(NOW), updatedAt: new Date(NOW) },
+    ]);
+    await raiseTestFlag({ id: "queue_page_flag1", flagType: "review_report", subjectId: "queue_page_r1", occurredAt: "2026-08-01T00:00:00.000Z" });
+    await raiseTestFlag({ id: "queue_page_flag2", flagType: "review_report", subjectId: "queue_page_r2", occurredAt: "2026-08-02T00:00:00.000Z" });
+
+    const first = await listPendingFlags(db, { limit: 1 });
+    expect(first.rows.map((r) => r.flagId)).toEqual(["queue_page_flag1"]);
+    expect(first.nextBefore).not.toBeNull();
+
+    const second = await listPendingFlags(db, { limit: 1, before: first.nextBefore! });
+    expect(second.rows.map((r) => r.flagId)).toEqual(["queue_page_flag2"]);
+    expect(second.nextBefore).toBeNull();
+  });
+
+  it("describes an account-pair flag by both accounts' names, batched rather than per-row", async () => {
+    await seedUser("u_pair_a");
+    await seedUser("u_pair_b");
+    await raiseTestFlag({ id: "queue_pair_flag", flagType: "multi_account", subjectId: "u_pair_a,u_pair_b", occurredAt: "2026-08-01T00:00:00.000Z", evidence: { device: 0.9 } });
+
+    const page = await listPendingFlags(db, {});
+    expect(page.rows[0]).toMatchObject({ question: "The platform flagged two accounts that may be the same person", about: "u_pair_a and u_pair_b" });
+  });
+
+  it("describes a chat_report flag by the message's author, batched the same way a review's is", async () => {
+    await seedUser("u_chat_author");
+    await seedUser("u_chat_commish");
+    await seedLeague("lg_queue_chat", "u_chat_commish");
+    const [message] = await db.insert(chatMessages).values({ leagueId: "lg_queue_chat", authorUserId: "u_chat_author", body: "trash talk" }).returning({ id: chatMessages.id });
+    await raiseTestFlag({ id: "queue_chat_flag", flagType: "chat_report", subjectId: String(message!.id), leagueId: "lg_queue_chat", occurredAt: "2026-08-01T00:00:00.000Z" });
+
+    const page = await listPendingFlags(db, {});
+    expect(page.rows[0]).toMatchObject({ question: "A member reported a message", about: "A message from u_chat_author" });
+  });
+
+  it("names a review's author honestly even when the review itself is somehow gone", async () => {
+    await raiseTestFlag({ id: "queue_ghost_review_flag", flagType: "review_report", subjectId: "review_that_does_not_exist_in_queue", occurredAt: "2026-08-01T00:00:00.000Z" });
+
+    const page = await listPendingFlags(db, {});
+    expect(page.rows[0]).toMatchObject({ about: "A review by a former member" });
+  });
+
+  it("names a message's author honestly even when the message itself is somehow gone", async () => {
+    await raiseTestFlag({ id: "queue_ghost_chat_flag", flagType: "chat_report", subjectId: "999999", occurredAt: "2026-08-01T00:00:00.000Z" });
+
+    const page = await listPendingFlags(db, {});
+    expect(page.rows[0]).toMatchObject({ about: "A message from a former member" });
+  });
+
+  it("names an account pair honestly when it is malformed (no comma) or names accounts that don't resolve", async () => {
+    await raiseTestFlag({ id: "queue_lone_pair_flag", flagType: "multi_account", subjectId: "u_lone_only", occurredAt: "2026-08-01T00:00:00.000Z" });
+    await raiseTestFlag({ id: "queue_ghost_pair_flag", flagType: "multi_account", subjectId: "u_ghost_1,u_ghost_2", occurredAt: "2026-08-02T00:00:00.000Z" });
+
+    const page = await listPendingFlags(db, {});
+    const lone = page.rows.find((r) => r.flagId === "queue_lone_pair_flag");
+    const ghost = page.rows.find((r) => r.flagId === "queue_ghost_pair_flag");
+    expect(lone?.about).toBe("A former member and a former member");
+    expect(ghost?.about).toBe("A former member and a former member");
+  });
+
+  it("describes a trade_fairness flag by its bare subject id — this plan never raises one, but the queue still names it honestly", async () => {
+    await raiseTestFlag({ id: "queue_trade_flag", flagType: "trade_fairness", subjectId: "trade_9", occurredAt: "2026-08-01T00:00:00.000Z" });
+
+    const page = await listPendingFlags(db, {});
+    expect(page.rows[0]).toMatchObject({ question: "The platform flagged a trade for a fairness review", about: "A trade (trade_9)" });
+  });
+});
+
+describe("flagDetail — bounded, and the trail includes what happened to this flag", () => {
+  it("returns null for a flag id that names nothing", async () => {
+    expect(await flagDetail(db, "flag_does_not_exist")).toBeNull();
+  });
+
+  it("assembles the subject, the reporters and the trail, in a bounded number of queries", async () => {
+    await seedUser("u_detail_author");
+    await seedUser("u_detail_reporter");
+    await seedUser("u_detail_op");
+    await db.insert(reviews).values({ id: "detail_r1", userId: "u_detail_author", rating: 2, body: "meh", createdAt: new Date(NOW), updatedAt: new Date(NOW) });
+
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "review_report",
+        subjectId: "detail_r1",
+        leagueId: null,
+        evidence: { note: "auto-flagged" },
+        raisedByUserId: "u_detail_reporter",
+        occurredAt: "2026-08-01T00:00:00.000Z",
+        newId: () => "detail_flag_1",
+        audit: logger,
+      }),
+    );
+    await db.insert(reviewReports).values({ reviewId: "detail_r1", reporterUserId: "u_detail_reporter", reason: "spam", createdAt: new Date("2026-08-01T00:00:01.000Z") });
+
+    const counted = countingDb(db);
+    const detail = await flagDetail(counted.db, flag.id);
+    expect(counted.selectCount()).toBeLessThanOrEqual(5);
+
+    expect(detail).not.toBeNull();
+    expect(detail!.flagId).toBe("detail_flag_1");
+    expect(detail!.evidence).toEqual({ note: "auto-flagged" });
+    expect(detail!.subject).toEqual({ kind: "review", reviewId: "detail_r1", body: "meh", authorName: "u_detail_author" });
+    expect(detail!.reporters).toEqual([{ userId: "u_detail_reporter", name: "u_detail_reporter", reason: "spam", reportedAt: "2026-08-01T00:00:01.000Z" }]);
+    expect(detail!.trail.map((r) => r.headline)).toEqual(["This flag was opened."]);
+    expect(detail!.decisions).toEqual(["no_action", "warned_user", "content_removed"]);
+
+    await resolveFlag(db, { flagId: flag.id, decision: "no_action", note: "n", operatorUserId: "u_detail_op", audit: logger });
+    const afterResolve = await flagDetail(db, flag.id);
+    expect(afterResolve!.trail.map((r) => r.headline)).toEqual(["This flag was opened.", "An operator closed this flag with no action."]);
+  });
+
+  it("falls back honestly when the subject row is gone", async () => {
+    await seedUser("u_ghost_reporter");
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "review_report",
+        subjectId: "review_that_does_not_exist",
+        leagueId: null,
+        evidence: {},
+        raisedByUserId: "u_ghost_reporter",
+        occurredAt: "2026-08-01T00:00:00.000Z",
+        newId: () => "detail_flag_ghost",
+        audit: logger,
+      }),
+    );
+
+    const detail = await flagDetail(db, flag.id);
+    expect(detail!.subject).toEqual({ kind: "review", reviewId: "review_that_does_not_exist", body: "This review is no longer here.", authorName: "A former member" });
+  });
+
+  it("reads a chat_report flag's subject, found and gone", async () => {
+    await seedUser("u_chat_detail_author");
+    await seedUser("u_chat_commish");
+    await seedLeague("lg_chat_detail", "u_chat_commish");
+    const [message] = await db
+      .insert(chatMessages)
+      .values({ leagueId: "lg_chat_detail", authorUserId: "u_chat_detail_author", body: "trash talk" })
+      .returning({ id: chatMessages.id });
+
+    const found = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "chat_report",
+        subjectId: String(message!.id),
+        leagueId: "lg_chat_detail",
+        evidence: {},
+        raisedByUserId: "u_chat_detail_author",
+        occurredAt: "2026-08-01T00:00:00.000Z",
+        newId: () => "detail_flag_chat",
+        audit: logger,
+      }),
+    );
+    const foundDetail = await flagDetail(db, found.id);
+    expect(foundDetail!.subject).toEqual({ kind: "chat_message", messageId: String(message!.id), body: "trash talk", authorName: "u_chat_detail_author" });
+
+    const ghost = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "chat_report",
+        subjectId: "999999",
+        leagueId: "lg_chat_detail",
+        evidence: {},
+        raisedByUserId: "u_chat_detail_author",
+        occurredAt: "2026-08-01T00:00:01.000Z",
+        newId: () => "detail_flag_chat_ghost",
+        audit: logger,
+      }),
+    );
+    const ghostDetail = await flagDetail(db, ghost.id);
+    expect(ghostDetail!.subject).toEqual({ kind: "chat_message", messageId: "999999", body: null, authorName: "A former member" });
+  });
+
+  it("reads a trade_fairness flag's subject as a bare trade id — no remover, no reporter, this plan does not raise it yet", async () => {
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_fairness",
+        subjectId: "trade_1",
+        leagueId: null,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: "2026-08-01T00:00:00.000Z",
+        newId: () => "detail_flag_trade",
+        audit: logger,
+      }),
+    );
+    const detail = await flagDetail(db, flag.id);
+    expect(detail!.subject).toEqual({ kind: "trade", tradeId: "trade_1" });
+    expect(detail!.reporters).toEqual([]);
+  });
+
+  it("pulls the league chain's own events for an account-pair flag's subject, alongside the platform chain by flag id", async () => {
+    await seedUser("u_commish_detail");
+    await seedLeague("lg_detail_pair", "u_commish_detail");
+    await seedUser("u_pair_detail_a");
+    await seedUser("u_pair_detail_b");
+    await db.transaction((tx) => logger.record(tx, { eventType: "member_joined", actorId: "u_pair_detail_a", actorType: "user", leagueId: "lg_detail_pair", payload: {}, occurredAt: "2026-08-01T00:00:00.000Z" }));
+    await db.transaction((tx) => logger.record(tx, { eventType: "member_joined", actorId: "u_pair_detail_b", actorType: "user", leagueId: "lg_detail_pair", payload: {}, occurredAt: "2026-08-01T00:00:01.000Z" }));
+
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "multi_account",
+        subjectId: "u_pair_detail_a,u_pair_detail_b",
+        leagueId: "lg_detail_pair",
+        evidence: { device: 0.9 },
+        raisedByUserId: null,
+        occurredAt: "2026-08-02T00:00:00.000Z",
+        newId: () => "detail_flag_pair",
+        audit: logger,
+      }),
+    );
+
+    const detail = await flagDetail(db, flag.id);
+    expect(detail!.subject).toEqual({ kind: "account_pair", userIds: ["u_pair_detail_a", "u_pair_detail_b"], names: ["u_pair_detail_a", "u_pair_detail_b"] });
+    expect(detail!.trail.map((r) => r.headline)).toEqual(["This account joined the league.", "This account joined the league.", "This flag was opened."]);
+    // No reporters for a platform-detected pair — nothing in this plan raises a report for one.
+    expect(detail!.reporters).toEqual([]);
+  });
+
+  it("reads a malformed account-pair subject (no comma) honestly — one real id, one blank", async () => {
+    await seedUser("u_lone_detail");
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "multi_account",
+        subjectId: "u_lone_detail",
+        leagueId: null,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: "2026-08-01T00:00:00.000Z",
+        newId: () => "detail_flag_lone_pair",
+        audit: logger,
+      }),
+    );
+
+    const detail = await flagDetail(db, flag.id);
+    expect(detail!.subject).toEqual({ kind: "account_pair", userIds: ["u_lone_detail", ""], names: ["u_lone_detail", "A former member"] });
+  });
+
+  it("skips the league-chain trail query for an account-pair flag whose subject id names nobody at all", async () => {
+    await seedUser("u_blank_pair_commish");
+    await seedLeague("lg_blank_pair", "u_blank_pair_commish");
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "multi_account",
+        subjectId: "",
+        leagueId: "lg_blank_pair",
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: "2026-08-01T00:00:00.000Z",
+        newId: () => "detail_flag_blank_pair",
+        audit: logger,
+      }),
+    );
+
+    const detail = await flagDetail(db, flag.id);
+    expect(detail!.trail.map((r) => r.headline)).toEqual(["This flag was opened."]);
   });
 });

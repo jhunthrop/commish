@@ -134,6 +134,21 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // manager A has already left a review by the time the onboarding spec has run once.
     await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page, "/app/profile");
+
+    // --- Task 5: the operator's dispute queue -----------------------------------------------
+    // Manager A IS the operator in this environment: `global-setup.ts` seeds with
+    // `DEV_SEED_CLAIM_USER_ID=a.userId`, and `seedOperator` grants that same account operator
+    // access as part of the ordinary dev seed pipeline — an operator triaging on a phone at
+    // 11pm is the realistic case this spec exists to check, not an exotic second identity to
+    // mint. The queue reads empty here (nothing in the seeded fixture or the other specs raises
+    // a flag), which is itself the state an operator sees most, per the page's own docblock —
+    // the empty state's own link back to the manager's leagues is the control this spec proves
+    // is reachable rather than pushed off the 360px edge.
+    await page.goto("/app/admin/queue");
+    await expect(page.getByRole("heading", { name: "Dispute queue" })).toBeVisible();
+    await expect(page.getByText("The queue is clear.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to your leagues" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "the dispute queue");
   } finally {
     await context.close();
   }

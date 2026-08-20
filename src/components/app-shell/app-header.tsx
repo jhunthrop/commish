@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
+import { Icon } from "@/components/ui/icon";
 import { NoticeInbox } from "@/account-room/components/notice-inbox";
 
 export interface AppHeaderProps {
@@ -7,6 +8,11 @@ export interface AppHeaderProps {
   readonly displayName: string;
   /** The signed-in user's STORED avatar ref (`users.avatar_url`), server-derived by the page. */
   readonly avatar: string | null;
+  /** `users.isAdmin`, server-derived by the page — every caller already holds a `CurrentUser`
+   *  with this on it, so this is required rather than defaulted: a page rendering `AppHeader`
+   *  makes an explicit choice about the queue link rather than silently getting "false" from a
+   *  page nobody updated (Task 5). */
+  readonly isAdmin: boolean;
 }
 
 /**
@@ -21,8 +27,12 @@ export interface AppHeaderProps {
  * Server Component renders directly, with no prop of its own — `AppHeaderProps` gains nothing
  * for it, since it fetches its own data over `GET /api/notices` rather than the page threading
  * it through. Every signed-in page gets it for free by rendering `AppHeader`.
+ *
+ * The queue link (Task 5) renders ONLY for `isAdmin`, and links to `/app/admin/queue` — itself
+ * gated by `withAdmin` (ruling 14, 404 not 403), so this is a convenience for an operator who
+ * already has access, never the access control itself. An ordinary member never sees it.
  */
-export function AppHeader({ displayName, avatar }: AppHeaderProps) {
+export function AppHeader({ displayName, avatar, isAdmin }: AppHeaderProps) {
   return (
     <header className="border-b border-border bg-surface">
       <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-3">
@@ -33,6 +43,15 @@ export function AppHeader({ displayName, avatar }: AppHeaderProps) {
           Commish
         </Link>
         <div className="flex items-center gap-3">
+          {!isAdmin ? null : (
+            <Link
+              href="/app/admin/queue"
+              className="flex items-center gap-1.5 rounded-md text-sm text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <Icon name="shield" size={18} />
+              Queue
+            </Link>
+          )}
           <NoticeInbox />
           <Link
             href="/app/profile"

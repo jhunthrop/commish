@@ -196,14 +196,15 @@ const eslintConfig = [
     },
   },
   {
-    // Scoped to src/draft-room/**, src/league-room/**, src/chat-room/** and src/account-room/**
-    // ONLY, not src/app/**/*.tsx: files under src/app are Next.js Server Components (page.tsx,
-    // layout.tsx, route.ts) that are allowed — and in this codebase's existing route handlers,
-    // expected — to import @/draft-engine/@/draft-service/@/league/@/league-service directly
-    // (see docs/conventions.md, "Client boundary"). A page can't be told apart from a client
-    // component by its filename alone, so the only globs that can't misfire are the four
-    // directories that are BROWSER code by construction: everything under src/draft-room/**,
-    // src/league-room/**, src/chat-room/** and src/account-room/** (Task 2's profile surface).
+    // Scoped to src/draft-room/**, src/league-room/**, src/chat-room/**, src/account-room/** and
+    // src/admin-room/** ONLY, not src/app/**/*.tsx: files under src/app are Next.js Server
+    // Components (page.tsx, layout.tsx, route.ts) that are allowed — and in this codebase's
+    // existing route handlers, expected — to import @/draft-engine/@/draft-service/@/league/
+    // @/league-service directly (see docs/conventions.md, "Client boundary"). A page can't be
+    // told apart from a client component by its filename alone, so the only globs that can't
+    // misfire are the five directories that are BROWSER code by construction: everything under
+    // src/draft-room/**, src/league-room/**, src/chat-room/**, src/account-room/** (Task 2's
+    // profile surface) and src/admin-room/** (Task 5's operator surface).
     //
     // This block also carries SRC_ROOT_ESCAPE_PATTERNS (below), not just the client-boundary
     // patterns: ESLint flat config merges same-named rules across matching configs by shallow
@@ -213,13 +214,18 @@ const eslintConfig = [
     // exactly how a temp `@/db` import under `src/draft-room/**` stopped being flagged when the
     // source-root-escape rule below was first added as its own same-glob block. The
     // source-root-escape block after this one scopes itself to everywhere in `src/**` EXCEPT
-    // these four directories for the same reason, so every file is covered by exactly one
+    // these five directories for the same reason, so every file is covered by exactly one
     // `no-restricted-imports` config for this rule.
     files: [
       "src/draft-room/**/*.{ts,tsx}",
       "src/league-room/**/*.{ts,tsx}",
       "src/chat-room/**/*.{ts,tsx}",
       "src/account-room/**/*.{ts,tsx}",
+      // Task 5's operator surface: `src/admin-room/**` (the resolution form's live preview and
+      // its `fetch()` to `POST /api/admin/flags/[flagId]/resolve`) joins the other four rooms as
+      // browser code by construction, so it gets the same client boundary rather than a separate
+      // one.
+      "src/admin-room/**/*.{ts,tsx}",
     ],
     plugins: { "@typescript-eslint": tseslint },
     rules: {
@@ -230,7 +236,7 @@ const eslintConfig = [
             ...SERVER_ONLY_MODULE_GROUPS.map((group) => ({
               regex: aliasOrRelative(group),
               allowTypeImports: true,
-              message: "Client room code (draft-room/league-room/chat-room/account-room) must go through the HTTP/SSE boundary (API routes), not import server-only modules as values. `import type` is fine.",
+              message: "Client room code (draft-room/league-room/chat-room/account-room/admin-room) must go through the HTTP/SSE boundary (API routes), not import server-only modules as values. `import type` is fine.",
             })),
             ...SRC_ROOT_ESCAPE_PATTERNS,
           ],
@@ -247,13 +253,13 @@ const eslintConfig = [
     // rule is what stops the next one. There is no `@/` spelling to ban because the alias only
     // maps into `src`, so a relative escape is the only reachable form.
     //
-    // `ignores` excludes the four client-room directories: they already carry
+    // `ignores` excludes the five client-room directories: they already carry
     // SRC_ROOT_ESCAPE_PATTERNS via the block above, merged into the same
     // `@typescript-eslint/no-restricted-imports` invocation as the client-boundary patterns —
     // see the comment there for why a second, separately-scoped block targeting the same rule
     // for those files would silently replace rather than extend it.
     files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/draft-room/**", "src/league-room/**", "src/chat-room/**", "src/account-room/**"],
+    ignores: ["src/draft-room/**", "src/league-room/**", "src/chat-room/**", "src/account-room/**", "src/admin-room/**"],
     plugins: { "@typescript-eslint": tseslint },
     rules: {
       "@typescript-eslint/no-restricted-imports": ["error", { patterns: SRC_ROOT_ESCAPE_PATTERNS }],

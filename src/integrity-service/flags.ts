@@ -1,11 +1,12 @@
-import { and, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
-import { chatMessages, integrityFlags, leagues, reviews, users } from "@/db/schema";
-import type { JsonObject } from "@/domain/audit";
+import { auditEvents, chatMessages, integrityFlags, leagues, reviewReports, reviews, users } from "@/db/schema";
+import type { AuditEvent, JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { decisionIsAvailable, RESOLUTION_DECISIONS, SUBJECT_OF, type FlagSubjectType, type FlagType, type ResolutionDecision } from "@/integrity/flags";
 import type { NoticeType } from "@/integrity/notices";
+import { flagDetailFor, flagTrailRowFor, queueRowFor, type FlagDetail, type FlagSubjectView, type QueueRow, type ReporterView } from "@/integrity/queue-view";
 import { removeReviewInTx } from "@/review-service/reviews";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { attachAuditEvent, notifyAffectedMember } from "./notify";
@@ -521,4 +522,275 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
     if (err instanceof ContentRemovalRefused) return { ok: false, status: err.status, reason: err.message };
     throw err;
   }
+}
+
+/** A stored row, as `flagTrailRowFor` wants it — the same three-field spread `activity.ts`'s own
+ *  `toEvent` uses, kept local for the same reason: not worth a cross-module dependency. */
+function toEvent(row: typeof auditEvents.$inferSelect): AuditEvent {
+  return { ...row, occurredAt: row.occurredAt.toISOString() };
+}
+
+export interface FlagCursor {
+  readonly raisedAt: string;
+  readonly id: string;
+}
+
+export interface ListPendingFlagsInput {
+  readonly limit?: number;
+  /** A cursor from a previous page's `nextBefore` — named to match `feedQuery`'s own `before`
+   *  even though this queue reads OLDEST first (ruling 30): it names "continue from here", not a
+   *  direction, and giving it a second name for one query would be a second vocabulary to keep
+   *  in step with `feedQuery`'s for no reader benefit. */
+  readonly before?: FlagCursor;
+}
+
+export interface PendingFlagsPage {
+  readonly rows: readonly QueueRow[];
+  readonly nextBefore: FlagCursor | null;
+}
+
+/**
+ * The queue's own query — exported as a builder, mirroring `feedQuery` (`@/review-service/
+ * reviews`) and `browseQuery` (`@/league-service/browse`), so `flags.test.ts` can assert the
+ * TABLE SET this query touches (`tablesIn`, the same helper `reviews.test.ts` established)
+ * rather than a hand-copied lookalike. `evidence` and `resolution_note` are not in the SELECT
+ * list at all — not filtered out for the queue row, never fetched — the same "a stronger claim
+ * than 'no field leaked'" discipline `feedQuery`'s own docblock states for `rating`.
+ *
+ * Open-only (`resolved_at IS NULL`) and oldest-first (`raised_at ASC`), served by
+ * `integrity_flags_queue_idx`: NO severity sort (ruling 30) — a severity ordering over a
+ * heuristic score is the platform quietly telling an operator which accusations to believe.
+ */
+export function pendingFlagQuery(db: Db, input: ListPendingFlagsInput) {
+  const pageSize = input.limit ?? INTEGRITY_CONFIG.queue.pageSize;
+  const cursor =
+    input.before === undefined
+      ? undefined
+      : sql`(${integrityFlags.raisedAt}, ${integrityFlags.id}) > (${input.before.raisedAt}::timestamptz, ${input.before.id})`;
+  return db
+    .select({
+      id: integrityFlags.id,
+      flagType: integrityFlags.flagType,
+      subjectType: integrityFlags.subjectType,
+      subjectId: integrityFlags.subjectId,
+      raisedAt: integrityFlags.raisedAt,
+    })
+    .from(integrityFlags)
+    .where(cursor === undefined ? isNull(integrityFlags.resolvedAt) : and(isNull(integrityFlags.resolvedAt), cursor))
+    .orderBy(asc(integrityFlags.raisedAt), asc(integrityFlags.id))
+    .limit(pageSize + 1);
+}
+
+type PendingFlagRow = Awaited<ReturnType<typeof pendingFlagQuery>>[number];
+
+/**
+ * Who or what each row in `rows` is about, batched by subject type rather than one query per
+ * row — the same N+1 `listLeagueActivity`'s batched name lookups avoid. However many rows the
+ * page holds, this costs at most three queries: the distinct reported reviews, the distinct
+ * reported messages, and the distinct account-pair user ids named across the page.
+ */
+async function aboutFor(db: Db, rows: readonly PendingFlagRow[]): Promise<ReadonlyMap<string, string>> {
+  const reviewIds = [...new Set(rows.filter((r) => r.subjectType === "review").map((r) => r.subjectId))];
+  const chatIds = [...new Set(rows.filter((r) => r.subjectType === "chat_message").map((r) => r.subjectId))];
+  const pairUserIds = [...new Set(rows.filter((r) => r.subjectType === "account_pair").flatMap((r) => r.subjectId.split(",")))];
+
+  const [reviewRows, chatRows, pairRows] = await Promise.all([
+    reviewIds.length === 0
+      ? []
+      : db.select({ id: reviews.id, authorName: users.displayName }).from(reviews).innerJoin(users, eq(users.id, reviews.userId)).where(inArray(reviews.id, reviewIds)),
+    chatIds.length === 0
+      ? []
+      : db
+          .select({ id: chatMessages.id, authorName: users.displayName })
+          .from(chatMessages)
+          .innerJoin(users, eq(users.id, chatMessages.authorUserId))
+          .where(inArray(chatMessages.id, chatIds.map(Number))),
+    pairUserIds.length === 0 ? [] : db.select({ id: users.id, name: users.displayName }).from(users).where(inArray(users.id, pairUserIds)),
+  ]);
+
+  const reviewAuthor = new Map(reviewRows.map((r) => [r.id, r.authorName]));
+  const chatAuthor = new Map(chatRows.map((r) => [String(r.id), r.authorName]));
+  const pairName = new Map(pairRows.map((r) => [r.id, r.name]));
+
+  const about = new Map<string, string>();
+  for (const row of rows) {
+    if (row.subjectType === "review") about.set(row.id, `A review by ${reviewAuthor.get(row.subjectId) ?? "a former member"}`);
+    else if (row.subjectType === "chat_message") about.set(row.id, `A message from ${chatAuthor.get(row.subjectId) ?? "a former member"}`);
+    else if (row.subjectType === "account_pair") {
+      // `subjectId.split(",")` on a non-empty string always yields a first element (`a` is a
+      // real `string`, never `undefined`, no matter what TypeScript's own destructuring type
+      // claims without `noUncheckedIndexedAccess`) — only the SECOND element is genuinely
+      // optional, for a malformed pair with no comma at all. `b ?? ""` is the guard that fact
+      // actually needs; a matching guard on `a` would be dead code defending against a state
+      // `.split(",")` cannot produce.
+      const [a, b] = row.subjectId.split(",");
+      about.set(row.id, `${pairName.get(a) ?? "A former member"} and ${pairName.get(b ?? "") ?? "a former member"}`);
+    } else about.set(row.id, `A trade (${row.subjectId})`);
+  }
+  return about;
+}
+
+/**
+ * The operator's queue: open flags, oldest first, no severity sort (ruling 30). Exactly TWO
+ * queries regardless of the page's contents — `pendingFlagQuery` itself, and `aboutFor`'s single
+ * `Promise.all` of at most three batched lookups (which itself costs 0-3 round trips, never one
+ * per row) — the same "batched, not per-row" discipline `listLeagueActivity` established.
+ */
+export async function listPendingFlags(db: Db, input: ListPendingFlagsInput = {}): Promise<PendingFlagsPage> {
+  const pageSize = input.limit ?? INTEGRITY_CONFIG.queue.pageSize;
+  const rows = await pendingFlagQuery(db, input);
+  const hasMore = rows.length > pageSize;
+  const page = hasMore ? rows.slice(0, pageSize) : rows;
+  const about = await aboutFor(db, page);
+
+  return {
+    // `about.get(row.id)!`: `aboutFor`'s own loop is exhaustive over every `FlagSubjectType`
+    // (`review`/`chat_message`/`account_pair`/else-`trade`), so it sets an entry for every row
+    // in `page` — a fallback here would defend against a state `aboutFor` cannot produce.
+    rows: page.map((row) =>
+      queueRowFor({
+        flagId: row.id,
+        flagType: row.flagType as FlagType,
+        raisedAt: row.raisedAt.toISOString(),
+        about: about.get(row.id)!,
+      }),
+    ),
+    nextBefore: hasMore
+      ? (() => {
+          const last = page[page.length - 1]!;
+          return { raisedAt: last.raisedAt.toISOString(), id: last.id };
+        })()
+      : null,
+  };
+}
+
+const FALLBACK_SUBJECT_MEMBER = "A former member";
+
+/** The reported content, or the account pair, as an operator needs to see it — one query per
+ *  subject type, dispatched by `flagDetail`'s own single lookup of the flag row. */
+async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: string): Promise<FlagSubjectView> {
+  if (subjectType === "review") {
+    const [row] = await db
+      .select({ body: reviews.body, authorName: users.displayName })
+      .from(reviews)
+      .innerJoin(users, eq(users.id, reviews.userId))
+      .where(eq(reviews.id, subjectId));
+    return row === undefined
+      ? { kind: "review", reviewId: subjectId, body: "This review is no longer here.", authorName: FALLBACK_SUBJECT_MEMBER }
+      : { kind: "review", reviewId: subjectId, body: row.body, authorName: row.authorName };
+  }
+  if (subjectType === "chat_message") {
+    const [row] = await db
+      .select({ body: chatMessages.body, authorName: users.displayName })
+      .from(chatMessages)
+      .innerJoin(users, eq(users.id, chatMessages.authorUserId))
+      .where(eq(chatMessages.id, Number(subjectId)));
+    return row === undefined
+      ? { kind: "chat_message", messageId: subjectId, body: null, authorName: FALLBACK_SUBJECT_MEMBER }
+      : { kind: "chat_message", messageId: subjectId, body: row.body, authorName: row.authorName };
+  }
+  if (subjectType === "account_pair") {
+    // `idA` is always a real `string` — `subjectId.split(",")` on a non-empty string always
+    // yields a first element, whatever TypeScript's own destructuring type claims without
+    // `noUncheckedIndexedAccess`. Only `idB` is genuinely optional (a malformed pair with no
+    // comma at all), so `ids` always holds at least `idA` and the ternary `aboutFor`'s sibling
+    // block used to need here would be dead code defending against a state this can't produce.
+    const [idA, idB] = subjectId.split(",");
+    const ids = idB === undefined ? [idA] : [idA, idB];
+    const rows = await db.select({ id: users.id, name: users.displayName }).from(users).where(inArray(users.id, ids));
+    const nameOf = (id: string | undefined) => rows.find((r) => r.id === id)?.name ?? FALLBACK_SUBJECT_MEMBER;
+    return { kind: "account_pair", userIds: [idA, idB ?? ""], names: [nameOf(idA), nameOf(idB)] };
+  }
+  return { kind: "trade", tradeId: subjectId };
+}
+
+/** Only `review_report` flags have reporters today: `review_reports` is the one insert-only
+ *  signal table this plan reads back (ruling 5). Every other subject type answers empty — a
+ *  platform detector or a future report table names its own reporters when it lands. */
+async function reportersFor(db: Db, subjectType: FlagSubjectType, subjectId: string): Promise<readonly ReporterView[]> {
+  if (subjectType !== "review") return [];
+  const rows = await db
+    .select({ userId: reviewReports.reporterUserId, name: users.displayName, reason: reviewReports.reason, reportedAt: reviewReports.createdAt })
+    .from(reviewReports)
+    .innerJoin(users, eq(users.id, reviewReports.reporterUserId))
+    .where(eq(reviewReports.reviewId, subjectId))
+    .orderBy(asc(reviewReports.createdAt));
+  return rows.map((row) => ({ userId: row.userId, name: row.name, reason: row.reason, reportedAt: row.reportedAt.toISOString() }));
+}
+
+/**
+ * The relevant audit trail: the PLATFORM chain's events about this flag by id (`flag_raised`,
+ * `flag_resolved`, and `review_removed` when `content_removed` reached it — all three carry
+ * `payload.flagId`), plus, where the subject has a league (an `account_pair` flag, the only
+ * subject type this plan raises WITH a `leagueId` — ruling 1, `review_report`/`chat_report` flags
+ * carry `leagueId: null`), that league's own chain events for the two accounts named — context
+ * for an investigation the platform chain alone cannot supply. Bounded at exactly two queries,
+ * the second skipped outright when there is no league to ask.
+ */
+async function trailFor(db: Db, flagId: string, leagueId: string | null, subjectType: FlagSubjectType, subjectId: string): Promise<readonly AuditEvent[]> {
+  const platformRows = await db
+    .select()
+    .from(auditEvents)
+    .where(and(eq(auditEvents.chainScope, INTEGRITY_CONFIG.chain.platformScope), sql`${auditEvents.payload} ->> 'flagId' = ${flagId}`))
+    .orderBy(asc(auditEvents.occurredAt));
+
+  if (leagueId === null || subjectType !== "account_pair") return platformRows.map(toEvent);
+
+  const actorIds = subjectId.split(",").filter((id) => id.length > 0);
+  const leagueRows =
+    actorIds.length === 0
+      ? []
+      : await db
+          .select()
+          .from(auditEvents)
+          .where(and(eq(auditEvents.chainScope, leagueId), inArray(auditEvents.actorId, actorIds)))
+          .orderBy(asc(auditEvents.occurredAt))
+          .limit(INTEGRITY_CONFIG.queue.trailLimit);
+
+  return [...platformRows.map(toEvent), ...leagueRows.map(toEvent)].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+}
+
+/**
+ * The detail read: one flag, its subject, its reporters and its relevant audit trail — bounded
+ * at exactly FIVE queries regardless of how much history either chain holds: the flag row
+ * itself, `subjectFor` (one), `reportersFor` (one), and `trailFor`'s own two. `flags.test.ts`
+ * asserts this with `countingDb`.
+ *
+ * Returns `null` for a flag id that names nothing — the route (`GET`-equivalent Server Component
+ * per Task 5's brief) turns that into `notFound()`, never a 403 or a 500.
+ */
+export async function flagDetail(db: Db, flagId: string): Promise<FlagDetail | null> {
+  const [flagRow] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flagId));
+  if (flagRow === undefined) return null;
+
+  const subjectType = flagRow.subjectType as FlagSubjectType;
+  const [subject, reporters, trailEvents] = await Promise.all([
+    subjectFor(db, subjectType, flagRow.subjectId),
+    reportersFor(db, subjectType, flagRow.subjectId),
+    trailFor(db, flagRow.id, flagRow.leagueId, subjectType, flagRow.subjectId),
+  ]);
+
+  const trail = trailEvents.map(flagTrailRowFor).filter((row): row is NonNullable<typeof row> => row !== null);
+
+  // `resolveFlag`'s stamp UPDATE sets `resolved_at`, `resolved_by_user_id`, `resolution` and
+  // `resolution_note` together, in the one statement — a row where the first three are non-null
+  // but `resolution_note` is somehow still null cannot come from that write, so it is folded
+  // into the same "not resolved" guard rather than given its own fallback (`?? ""`) to defend a
+  // state this table's one writer cannot produce.
+  const resolution =
+    flagRow.resolvedAt === null || flagRow.resolvedByUserId === null || flagRow.resolution === null || flagRow.resolutionNote === null
+      ? null
+      : {
+          decision: flagRow.resolution as ResolutionDecision,
+          note: flagRow.resolutionNote,
+          resolvedAt: flagRow.resolvedAt.toISOString(),
+          resolvedByUserId: flagRow.resolvedByUserId,
+        };
+
+  return flagDetailFor(
+    { id: flagRow.id, flagType: flagRow.flagType as FlagType, raisedAt: flagRow.raisedAt.toISOString(), leagueId: flagRow.leagueId, evidence: flagRow.evidence, resolution },
+    subject,
+    reporters,
+    trail,
+  );
 }

@@ -104,12 +104,20 @@ describe("NoticeInbox says nothing that breaks the house copy rules", () => {
  * the persona panel's FIX-5 privacy statement, which is the single most carefully worded string on
  * the surface and was covered by no sweep at all.
  */
-vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
+vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn(), requireAdmin: vi.fn() }));
 vi.mock("@/lib/leagues/membership", () => ({ resolveLeagueMembership: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/draft-service/teams", () => ({ leagueNameFor: vi.fn() }));
 vi.mock("@/integrity-service/activity", () => ({ listLeagueActivity: vi.fn() }));
 vi.mock("@/integrity-service/notify", () => ({ listNotices: vi.fn(), quoteFor: vi.fn(() => null) }));
+vi.mock("@/integrity-service/flags", () => ({ listPendingFlags: vi.fn(), flagDetail: vi.fn() }));
+// `ResolutionForm` (Task 5, `src/admin-room/components/resolution-form.tsx`) calls `useRouter()`
+// for its post-submit `router.refresh()` — `notFound()` needs no request context (a plain
+// synchronous throw), so it stays real; `useRouter()` is the one export this file mocks.
+vi.mock("next/navigation", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/navigation")>();
+  return { ...actual, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) };
+});
 
 describe("the league activity page says nothing that breaks the house copy rules", () => {
   it("is clean with and without a platform-action band", async () => {
@@ -145,6 +153,74 @@ describe("the league activity page says nothing that breaks the house copy rules
       const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
       await screen.findByText("League activity");
       expectClean(container, NOTICE.title, NOTICE.body, ROW.headline, ROW.detail ?? "");
+      unmount();
+    }
+  });
+});
+
+const QUEUE_ROW = { flagId: "flag_1", icon: "alert-triangle" as const, question: "A member reported a review", about: "A review by Ada Lovelace", raisedAt: "2026-08-01T00:00:00.000Z" };
+
+const FLAG_DETAIL = {
+  flagId: "flag_1",
+  flagType: "review_report" as const,
+  raisedAt: "2026-08-01T00:00:00.000Z",
+  leagueId: null,
+  subject: { kind: "review" as const, reviewId: "r1", body: "Great season overall.", authorName: "Ada Lovelace" },
+  evidence: {},
+  reporters: [{ userId: "u_reporter", name: "Reporter Rita", reason: "spam", reportedAt: "2026-08-01T00:00:01.000Z" }],
+  trail: [ROW],
+  resolution: null,
+  decisions: ["no_action", "warned_user", "content_removed"] as const,
+};
+
+const OPERATOR = { id: "u_op", email: "u_op@test.local", displayName: "Op Erator", experienceTier: "beginner" as const, avatarUrl: null, createdAt: "2026-08-01T00:00:00.000Z", isAdmin: true };
+
+/**
+ * Task 5's operator surface — added as its own `describe` block, per this file's own point.
+ * `withAdmin`'s Server Component overload is exercised for real (only `requireAdmin` is mocked),
+ * so this also proves the gate itself renders clean copy, not just the read below it.
+ */
+describe("the admin queue page says nothing that breaks the house copy rules", () => {
+  it("is clean empty and clean populated", async () => {
+    const { requireAdmin } = await import("@/lib/auth/current-user");
+    const { listPendingFlags } = await import("@/integrity-service/flags");
+    const { default: AdminQueuePage } = await import("@/app/app/admin/queue/page");
+
+    vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
+
+    for (const rows of [[], [QUEUE_ROW]]) {
+      vi.mocked(listPendingFlags).mockResolvedValue({ rows, nextBefore: null });
+      const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+      const page = await AdminQueuePage();
+      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      await screen.findByText("Dispute queue");
+      expectClean(container, QUEUE_ROW.question, QUEUE_ROW.about);
+      unmount();
+    }
+  });
+});
+
+describe("the admin flag detail page says nothing that breaks the house copy rules", () => {
+  it("is clean open, resolved, and with every panel empty", async () => {
+    const { requireAdmin } = await import("@/lib/auth/current-user");
+    const { flagDetail } = await import("@/integrity-service/flags");
+    const { leagueNameFor } = await import("@/draft-service/teams");
+    const { default: AdminFlagDetailPage } = await import("@/app/app/admin/queue/[flagId]/page");
+
+    vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
+    vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
+
+    for (const detail of [
+      FLAG_DETAIL,
+      { ...FLAG_DETAIL, resolution: { decision: "no_action" as const, note: "n", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op" }, decisions: [] },
+      { ...FLAG_DETAIL, reporters: [], trail: [] },
+    ]) {
+      vi.mocked(flagDetail).mockResolvedValue(detail);
+      const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+      const page = await AdminFlagDetailPage({ params: Promise.resolve({ flagId: "flag_1" }) });
+      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      await screen.findByText("Flag detail");
+      expectClean(container, detail.subject.kind === "review" ? detail.subject.body : "", ROW.headline, ROW.detail ?? "");
       unmount();
     }
   });

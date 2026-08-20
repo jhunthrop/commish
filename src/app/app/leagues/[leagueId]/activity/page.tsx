@@ -66,7 +66,7 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
 
   return (
     <>
-      <AppHeader displayName={user.displayName} avatar={user.avatarUrl} />
+      <AppHeader displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
         <header className="flex flex-col gap-1">
           <PageTitle>League activity</PageTitle>
