@@ -16,7 +16,7 @@ import {
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
-import { auditEventsForPicks } from "./audit";
+import { auditEventsForPicks, ownerIdsForContestedPicks } from "./audit";
 import { commitDraftState } from "./commit";
 import { createKeyedMutex } from "./mutex";
 import { draftOrderFor } from "./order";
@@ -209,7 +209,16 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
             // The audit append rides the draft's existing FOR UPDATE on `drafts`, and the chain
             // anchor is taken after it — the fixed lock order (ruling 3). Both this and the
             // action row commit together or neither does.
-            const picked = auditEventsForPicks(state, result.state, options?.actor?.id ?? null);
+            const submittedActorId = options?.actor?.id ?? null;
+            // A contested auction lot the clock closes (`TIMER_EXPIRE`, no submitting actor, but
+            // `auto: false` — a real bidding war happened) needs its winner's identity resolved
+            // from the team they play, not left unattributed. This plain read runs before the
+            // anchor lock (ruling 3) and takes no lock of its own.
+            const contestedWinners = submittedActorId === null
+              ? result.state.picks.slice(state.picks.length).filter((p) => !p.auto).map((p) => p.teamId)
+              : [];
+            const ownerOf = await ownerIdsForContestedPicks(tx, contestedWinners);
+            const picked = auditEventsForPicks(state, result.state, submittedActorId, ownerOf);
             await audit.recordAll(tx, picked);
             if (options?.alsoInTransaction !== undefined) await options.alsoInTransaction(tx);
             // A completed draft becomes a season in the same transaction that completed it.

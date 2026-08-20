@@ -78,4 +78,21 @@ describe("auditEventsForPicks", () => {
     // more than one; the audit trail is per pick, never per action.
     expect(auditEventsForPicks(stateWithPicks(2), stateWithPicks(4), "user_alice")).toHaveLength(2);
   });
+
+  it("resolves a contested pick with no submitting actor from its winning team's owner", () => {
+    // The only real-world shape this covers: `TIMER_EXPIRE` (no actor) closes an auction lot a
+    // human actually won (`auto: false`). `ownerOf` is looked up by the caller and handed in —
+    // this function stays pure, no I/O of its own.
+    const ownerOf = new Map([["team_3", "user_bob"]]);
+    const events = auditEventsForPicks(stateWithPicks(2), stateWithPicks(3), null, ownerOf);
+    expect(events[0]).toMatchObject({ actorId: "user_bob", actorType: "user" });
+  });
+
+  it("still attributes an unopposed auto award to the platform even with an owner map available", () => {
+    // `auto: true` short-circuits before `ownerOf` is ever consulted — the clock's own award,
+    // never quietly re-attributed to whoever happens to own the team.
+    const ownerOf = new Map([["team_3", "user_bob"]]);
+    const events = auditEventsForPicks(stateWithPicks(2), stateWithAutoPick(3), null, ownerOf);
+    expect(events[0]).toMatchObject({ actorType: "system", actorId: null });
+  });
 });

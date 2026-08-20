@@ -5,7 +5,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { auditEvents, draftActions } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
 import { currentDeadline } from "@/draft-engine";
-import { createDraftStore, isSequenceConflict, type DraftStore, type PublishFn } from "./store";
+import { createDraftStore, isSequenceConflict, type ApplyResult, type DraftStore, type PublishFn } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
 const db = createTestDb();
@@ -85,10 +85,33 @@ async function fixture() {
   });
 }
 
+async function auctionFixture() {
+  return seedDraftFixture(db, {
+    draftId: "draft_auction",
+    leagueId: "league_auction",
+    format: "auction",
+    teamCount: 2,
+    slotConfig: SPRINT_ROSTER_SLOTS,
+    kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+    auctionBudget: 50,
+  });
+}
+
 const start = (teamIds: readonly string[]): DraftAction => ({
   v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: teamIds, pool: POOL,
 });
 const pick = (teamId: string, playerId: string): DraftAction => ({ v: 1, type: "MAKE_PICK", timestamp: T, teamId, playerId });
+const nominate = (teamId: string, playerId: string, openingBid: number): DraftAction => ({
+  v: 1, type: "NOMINATE", timestamp: T, teamId, playerId, openingBid,
+});
+const bid = (teamId: string, amount: number): DraftAction => ({ v: 1, type: "BID", timestamp: T, teamId, amount });
+
+/** The clock's own expiry, at whatever deadline the current state actually set — never a fixed
+ *  timestamp, since `admitTimerExpire` rejects an expiry submitted before the real deadline. */
+async function expireOnTheClock(store: DraftStore, draftId: string): Promise<ApplyResult> {
+  const state = await store.getDraftState(draftId);
+  return store.applyAction(draftId, { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state!) ?? clock.now() });
+}
 
 async function actionRows(draftId: string) {
   return db.select().from(draftActions).where(eq(draftActions.draftId, draftId)).orderBy(asc(draftActions.sequence));
@@ -380,7 +403,9 @@ describe("draft store — audit", () => {
 
     const rows = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ chainScope: leagueId, actorId: "user_alice", sequence: expect.any(Number) });
+    // Snake manual pick, unchanged by the auction-attribution fix: the submitting actor is
+    // trusted directly, no team-owner lookup involved.
+    expect(rows[0]).toMatchObject({ chainScope: leagueId, actorId: "user_alice", actorType: "user", sequence: expect.any(Number) });
   });
 
   it("records draft_completed in the same transaction that turns the draft into a season", async () => {
@@ -392,6 +417,13 @@ describe("draft store — audit", () => {
     const [completed] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_completed"));
     expect(completed).toMatchObject({ chainScope: leagueId, actorType: "system", actorId: null });
     expect(completed!.payload).toMatchObject({ draftId, picks: expect.any(Number), teams: expect.any(Number) });
+
+    // Snake auto path, unchanged by the auction-attribution fix: every pick this full run made
+    // came from TIMER_EXPIRE with `auto: true`, so every one is system-attributed — the
+    // auction-only owner lookup never fires here.
+    const picks = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    expect(picks.length).toBeGreaterThan(0);
+    for (const p of picks) expect(p).toMatchObject({ actorType: "system", actorId: null });
   });
 
   it("records nothing for a rejected action", async () => {
@@ -403,5 +435,42 @@ describe("draft store — audit", () => {
     const result = await store.applyAction(draftId, pick(teamIds[1]!, "qb1"), { actor: { id: "user_alice" } });
     expect(result.ok).toBe(false);
     expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"))).toHaveLength(0);
+  });
+});
+
+describe("draft store — audit — auction attribution", () => {
+  it("attributes a contested lot the clock closes to the winning bidder, not to no one", async () => {
+    // Reproduces the reviewer's finding: team 1 nominates, team 2 outbids, and the CLOCK closes
+    // the lot (TIMER_EXPIRE, submitted with no actor — the only way an auction pick is ever
+    // awarded). The winner is team 2's owner, even though team 2 never submitted the closing
+    // action itself.
+    const { draftId, leagueId, teamIds, userIds } = await auctionFixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    await store.applyAction(draftId, nominate(teamIds[0]!, "qb1", 1), { actor: { id: userIds[0]! } });
+    await store.applyAction(draftId, bid(teamIds[1]!, 2), { actor: { id: userIds[1]! } });
+    const closed = await expireOnTheClock(store, draftId);
+    expect(closed.ok).toBe(true);
+
+    const [row] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    expect(row).toMatchObject({ chainScope: leagueId, actorId: userIds[1], actorType: "user" });
+    expect(row!.payload).toMatchObject({ teamId: teamIds[1], playerId: "qb1", auto: false, price: 2 });
+  });
+
+  it("still attributes an unopposed floor award to the platform, not to the auto-nominated team's owner", async () => {
+    // Nobody nominates, so the clock auto-nominates team 1's best player at the floor bid; nobody
+    // outbids, so the clock closes it unopposed. `auto: true` end to end — system-attributed,
+    // exactly like a snake auto-pick, and the owner lookup never fires.
+    const { draftId, leagueId, teamIds } = await auctionFixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const opened = await expireOnTheClock(store, draftId); // auto-nominates, opens the lot
+    expect(opened.ok).toBe(true);
+    const closed = await expireOnTheClock(store, draftId); // nobody bid — closes it unopposed
+    expect(closed.ok).toBe(true);
+
+    const [row] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"));
+    expect(row).toMatchObject({ chainScope: leagueId, actorId: null, actorType: "system" });
+    expect(row!.payload).toMatchObject({ teamId: teamIds[0], auto: true });
   });
 });
