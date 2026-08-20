@@ -83,6 +83,22 @@ describe("GET /api/gifs/search", () => {
     expect(body.error).toBe("You've searched for a lot of GIFs at once. Give it a minute and try again.");
   });
 
+  // The keying assertion, not just the ceiling. Rekeying `gifSearchRateLimited` from `userId` to
+  // a single global bucket passed all six cases in this file and a 63-test sweep beside it,
+  // because every one of them signs in as the same caller. Live consequence if that regressed:
+  // the first user to run 20 searches denies the feature to everybody.
+  // (`league-routes.test.ts`'s "a DIFFERENT caller spends its own budget" is the original.)
+  it("keys that ceiling per caller: a DIFFERENT user spends its own budget", async () => {
+    createGifProvider.mockReturnValue({ search: async () => [TOUCHDOWN] });
+    for (let i = 0; i < GIF_CONFIG.searchRateLimit.maxRequests; i += 1) {
+      await GET(new Request("http://localhost/api/gifs/search?q=touchdown"));
+    }
+    expect((await GET(new Request("http://localhost/api/gifs/search?q=touchdown"))).status).toBe(429);
+
+    currentUser.mockResolvedValue({ id: "u2" });
+    expect((await GET(new Request("http://localhost/api/gifs/search?q=touchdown"))).status).toBe(200);
+  });
+
   it("rate-limits before checking whether a provider is even configured", async () => {
     createGifProvider.mockReturnValue(null);
     for (let i = 0; i < GIF_CONFIG.searchRateLimit.maxRequests; i += 1) {

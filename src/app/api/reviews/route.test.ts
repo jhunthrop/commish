@@ -26,8 +26,11 @@ const signedInAs = (id: string | null) =>
       : { id, email: `${id}@test.local`, displayName: id, experienceTier: "beginner", avatarUrl: null, createdAt: "2026-09-01T00:00:00.000Z" },
   );
 
-function get(query = ""): Request {
-  return new Request(`http://test/api/reviews${query}`);
+function get(query = "", forwardedFor?: string): Request {
+  return new Request(
+    `http://test/api/reviews${query}`,
+    forwardedFor === undefined ? undefined : { headers: { "x-forwarded-for": forwardedFor } },
+  );
 }
 
 function post(body: unknown): Request {
@@ -76,6 +79,19 @@ describe("GET /api/reviews", () => {
     }
     const limited = await GET(get());
     expect(limited.status).toBe(429);
+  });
+
+  // The KEY, not just the ceiling. Rekeying this limiter to a single "GLOBAL" bucket passed all
+  // 15 route tests in this file, because none of them ever varied the caller — the docblock's own
+  // "per-IP" claim was untested at the wiring. This is Task 7's assertion
+  // (`league-routes.test.ts`: "a DIFFERENT caller spends its own budget"), which Task 9's copy of
+  // the limiter pattern dropped.
+  it("keys the browse ceiling per caller: a DIFFERENT IP spends its own budget", async () => {
+    for (let i = 0; i < REVIEW_CONFIG.browseRateLimit.maxRequests; i += 1) {
+      expect((await GET(get("", "203.0.113.9"))).status).toBe(200);
+    }
+    expect((await GET(get("", "203.0.113.9"))).status).toBe(429);
+    expect((await GET(get("", "198.51.100.4"))).status).toBe(200);
   });
 
   // FIX 1: a malformed `before` cursor used to reach `new Date(garbage).toISOString()` inside
@@ -160,5 +176,20 @@ describe("POST /api/reviews", () => {
     }
     const limited = await POST(post({ rating: 3, body: LONG_ENOUGH }));
     expect(limited.status).toBe(429);
+  });
+
+  it("keys the submit ceiling per caller: a DIFFERENT user spends its own budget", async () => {
+    await db.insert(users).values([
+      { id: "u1", email: "u1@test.local", displayName: "u1" },
+      { id: "u2", email: "u2@test.local", displayName: "u2" },
+    ]);
+    signedInAs("u1");
+    for (let i = 0; i < REVIEW_CONFIG.submitRateLimit.maxRequests; i += 1) {
+      await POST(post({ rating: 3, body: LONG_ENOUGH }));
+    }
+    expect((await POST(post({ rating: 3, body: LONG_ENOUGH }))).status).toBe(429);
+
+    signedInAs("u2");
+    expect((await POST(post({ rating: 3, body: LONG_ENOUGH }))).status).toBe(200);
   });
 });
