@@ -4,8 +4,24 @@
 //      npm run audit:verify -- --scope <leagueId|platform>
 //
 // This is the real mechanism, not a placeholder: the full walk is the spec's scheduled offline
-// job, and a production scheduler (Phase 2 Plan D) runs exactly this on
-// INTEGRITY_CONFIG.verification.fullVerifyIntervalHours. Until there is one, an operator runs it.
+// job, and a production scheduler runs exactly this on
+// INTEGRITY_CONFIG.verification.fullVerifyIntervalHours. That scheduler is founder-gated deploy
+// infrastructure and it belongs to PHASE 2 PLAN D — spelled out in full because "Plan D" alone is
+// ambiguous across two phases and sends a reader looking in the wrong one.
+//
+// OPERATOR RUNBOOK, until Phase 2 Plan D lands. Run:
+//
+//     npm run audit:verify -- --full
+//
+// after any batch of new leagues is created, and on a recurring reminder no less often than
+// fullVerifyIntervalHours (24h). This is NOT the same requirement as the cadence, and the
+// difference is the one that matters: a chain is undetectably rewindable until its FIRST
+// verification freezes a checkpoint for it (docs/decisions/audit-and-integrity.md, section 9,
+// "The floor inside tier 1"). Every league creates a chain on its first append, so a product
+// signing up leagues continuously has a continuously refilling population of chains that no run
+// has ever touched. This command walks every chain in audit_chains, including ones never verified
+// before, so one run closes the floor for every chain that existed when it started. It exits
+// non-zero and names the scope, sequence, event and reason on any break.
 import { getDb } from "@/db/client";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
 import { verifyAllChains, verifyChainIntegrity, verifyFullChainIntegrity, type ChainVerificationResult } from "@/integrity-service/verify";

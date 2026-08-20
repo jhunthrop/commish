@@ -501,6 +501,49 @@ deletion, and the detection is entirely self-contained. What is NOT defended aga
 can both disable triggers and rewrite the two summary tables. Detecting *that* requires a witness
 outside the database, and this design deliberately has none.
 
+**The floor inside tier 1, and the operational requirement it creates.** §4's reconciliation is
+three accounts held against each other, and one of them has to have been written for it to say
+anything. So there is a floor, and it is worth being exact about where it sits:
+
+> **A tail deletion with the anchor rewound to match, on a chain that has NEVER been verified, is
+> undetectable.** Not "hard to detect" — undetectable. The surviving rows, an anchor that agrees
+> with them, and the absence of any checkpoint row are byte-for-byte identical to a chain that
+> honestly only ever had that many events. There is nothing left to disagree with. Check 1 passes
+> because the two accounts agree; check 2 has no third account to consult.
+
+**Detection therefore begins at a chain's FIRST verification**, not at its first append. The
+checkpoint frozen by that first run is the third account, and from that moment on the rewind is
+caught (§4, check 2) because a checkpoint that verified more events than the anchor now claims is
+the rewind stated in the chain's own records.
+
+**The requirement this creates is FIRST-VERIFICATION-PER-CHAIN, and it is not the 24-hour cadence.**
+`INTEGRITY_CONFIG.verification.fullVerifyIntervalHours` describes how often an already-protected
+chain is re-walked; it says nothing about how quickly a NEW chain becomes protected at all. Every
+league creates a new chain on its first append (`lockAnchor` provisions it), and that chain is
+**unprotected against this one attack from its first append until `audit:verify` touches it for the
+first time**. A product signing up leagues continuously therefore has a continuously refilling
+population of unprotected chains, and the number that matters is the *latency* from a chain's
+creation to its first verification, not the interval between later ones. A scheduled runner that
+walks every chain in `audit_chains` satisfies both, which is why the requirement is stated as
+coverage rather than as a second cadence.
+
+**Who owns the runner: Phase 2 Plan D.** The scheduled runner is founder-gated deploy
+infrastructure and it belongs to **Phase 2 Plan D**, not to any Phase 3 plan. Written out in full
+here because "Plan D" alone is ambiguous across two phases, and the same full name is now used in
+`scripts/verify-audit-chain.ts` and `src/integrity/config.ts` so a reader who arrives at either
+one is not sent looking in the wrong phase.
+
+**The interim control, until Phase 2 Plan D lands, is an operator runbook line:**
+
+> Run `npm run audit:verify -- --full` after any batch of new leagues is created, and on a
+> recurring operator reminder no less often than `fullVerifyIntervalHours` (24h). It walks every
+> chain in `audit_chains` including ones never verified before, so a single run closes the floor
+> for every chain that existed when it started. It exits non-zero and names the scope, sequence,
+> event and reason on any break.
+
+That line is duplicated into the script's own docblock deliberately: the operator who needs it is
+reading the script, not this document.
+
 **What would move the boundary, and what it costs.** Three upgrades, roughly in order of
 cost-to-benefit, named here as the **Phase 8 / deploy-hardening** decision they are rather than
 pretended into this phase:

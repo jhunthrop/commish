@@ -159,23 +159,44 @@ describe("the same-transaction contract", () => {
 
 describe("concurrency", () => {
   /**
-   * Waits until Postgres reports somebody genuinely BLOCKED on a lock, or gives up.
+   * Waits until Postgres reports THIS BACKEND genuinely blocked on a lock, or gives up.
    *
    * Both tests below used to gate on `setTimeout(..., 100)`, which is a hope rather than a gate:
    * on a loaded machine the racer might not have reached the lock yet, and the pair would go
    * green having exercised no contention at all. `pg_stat_activity.wait_event_type = 'Lock'` is
    * the database's own statement that the contention this test is named for actually happened.
+   *
+   * SCOPED TO A PID, not to the database. An unscoped count is satisfied by any blocked backend
+   * anywhere — another suite's connection, a leftover from a previous file — which would make
+   * this gate pass for the wrong reason and hand back the same "green having proven nothing" this
+   * helper exists to prevent. The racer reports its own `pg_backend_pid()` before it takes the
+   * lock, and only that pid counts.
    */
-  async function waitForBlockedBackend(timeoutMs = 5_000): Promise<boolean> {
+  async function waitForBlockedBackend(pid: number, timeoutMs = 5_000): Promise<boolean> {
     const deadline = Date.now() + timeoutMs;
     for (;;) {
       const rows = await db.execute<{ count: string }>(
-        sql`SELECT count(*) AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()`,
+        sql`SELECT count(*) AS count FROM pg_stat_activity WHERE pid = ${pid} AND wait_event_type = 'Lock'`,
       );
       if (Number(rows[0]?.count ?? 0) > 0) return true;
       if (Date.now() > deadline) return false;
       await new Promise((resolve) => setTimeout(resolve, 25));
     }
+  }
+
+  /**
+   * Resolves once the held transaction has actually taken the anchor lock.
+   *
+   * The different-scope test cannot wait on a BLOCKED backend, because with a correctly scoped
+   * lock nothing ever blocks — waiting for a block there would be waiting for the bug. So it
+   * waits on the holder instead: `logger.record` has returned inside the open transaction, which
+   * means the `SELECT ... FOR UPDATE` in `lockAnchor` has committed to holding that row for the
+   * rest of it. Deterministic, and no sleep either way.
+   */
+  function heldSignal(): { readonly taken: Promise<void>; readonly announce: () => void } {
+    let announce: () => void = () => {};
+    const taken = new Promise<void>((resolve) => (announce = resolve));
+    return { taken, announce: () => announce() };
   }
 
   it("serializes two appends to the SAME chain into a gapless, linked run", async () => {
@@ -189,15 +210,23 @@ describe("concurrency", () => {
       await gate;
       return first;
     });
+    const racerPid = heldSignal();
+    let pid = 0;
     const racer = other.transaction(async (tx) => {
       await tx.execute(sql`SET LOCAL statement_timeout = '5s'`);
+      // Reported BEFORE the blocking call, because after it there is nothing to report from.
+      const [row] = await tx.execute<{ pid: number }>(sql`SELECT pg_backend_pid() AS pid`);
+      pid = row!.pid;
+      racerPid.announce();
       return logger.record(tx, input({ eventType: "member_joined" }));
     });
 
     try {
-      // The contention is ASSERTED, not assumed: without this the test could pass by luck on a
-      // loaded machine, having serialized two appends that never actually met.
-      expect(await waitForBlockedBackend()).toBe(true);
+      // The contention is ASSERTED, not assumed, and asserted about the RACER specifically:
+      // without this the test could pass by luck on a loaded machine, having serialized two
+      // appends that never actually met.
+      await racerPid.taken;
+      expect(await waitForBlockedBackend(pid)).toBe(true);
     } finally {
       release();
     }
@@ -227,13 +256,18 @@ describe("concurrency", () => {
 
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => (release = resolve));
+    const holder = heldSignal();
     const held = db.transaction(async (tx) => {
       await logger.record(tx, input({ leagueId: "league_1" }));
+      holder.announce();
       await gate;
     });
 
     try {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // No sleep: the holder says when it holds the lock. A `setTimeout` here was the last
+      // hopeful gate in this file, and on a loaded machine it could let `elsewhere` run before
+      // `held` had taken anything, which is the test passing against no contention at all.
+      await holder.taken;
       const elsewhere = await other.transaction(async (tx) => {
         await tx.execute(sql`SET LOCAL statement_timeout = '2s'`);
         return logger.record(tx, input({ leagueId: "league_2" }));

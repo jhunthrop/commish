@@ -38,7 +38,15 @@ export const INTEGRITY_CONFIG = {
     /**
      * The spec's `AUDIT_FULL_VERIFY_INTERVAL_HOURS`. Nothing reads it today: the full walk is
      * invoked by `scripts/verify-audit-chain.ts`, run by hand. It is the number a production
-     * scheduler is configured with, and Plan D is the plan that has one.
+     * scheduler is configured with, and **Phase 2 Plan D** is the plan that has one — spelled out
+     * in full because "Plan D" alone is ambiguous across two phases.
+     *
+     * IT IS NOT THE WHOLE REQUIREMENT, and a reader who takes it for one will size the risk
+     * wrong. This is how often an ALREADY-PROTECTED chain is re-walked. A chain is undetectably
+     * rewindable until its FIRST verification freezes a checkpoint for it, so what actually
+     * matters for a new league is the latency from its first append to its first verification,
+     * not the interval between later ones. See `docs/decisions/audit-and-integrity.md` section 9,
+     * "The floor inside tier 1", and the operator runbook line in the script's own docblock.
      */
     fullVerifyIntervalHours: 24,
   },

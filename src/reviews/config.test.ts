@@ -26,5 +26,9 @@ describe("removal reason vocabulary", () => {
     // operator's private wording must not reach a sentence on the author's own profile.
     expect(removalPhraseFor("internal note: see ticket 4821")).toBe("breaking the review rules");
     expect(removalPhraseFor("")).toBe("breaking the review rules");
+    // And an ABSENT one, which is what `myReview` now reports for a row whose `removal_reason`
+    // column is empty — the mapper owns that fallback so the contract can keep carrying a token.
+    expect(removalPhraseFor(null)).toBe("breaking the review rules");
+    expect(removalSentenceFor(null)).toBe("Your review was removed for breaking the review rules. It can't be edited.");
   });
 });

@@ -203,6 +203,36 @@ describe("activityRowFor", () => {
     }
   });
 
+  /**
+   * NEW-2. Names and a league name reach a headline, and the rows they come from predate the
+   * boundary schemas that now refuse a hostile one. Milder than HIGH-2 because these sentences
+   * re-render on every read rather than being frozen by ruling 12 — a repaired row repairs the
+   * feed — but it is the same class, and the guard belongs on both surfaces or on neither.
+   */
+  it("strips characters a reader cannot see out of every name it interpolates", () => {
+    const rtl = String.fromCharCode(0x202e);
+    const zeroWidth = String.fromCharCode(0x200b);
+    const hostileNames = {
+      member: () => `${rtl}Ada Lovelace`,
+      player: () => `Bijan${zeroWidth} Robinson`,
+      team: () => `${rtl}Alice's team`,
+    };
+
+    const created = activityRowFor(event("league_created", { name: `${rtl}Sunday Money`, teamCount: 10 }, "user_alice"), viewer, hostileNames);
+    expect(created?.headline).toBe('Ada Lovelace created the league "Sunday Money".');
+
+    const human = activityRowFor(event("draft_pick", pickPayload, "user_alice"), viewer, hostileNames);
+    expect(human?.headline).toBe("Ada Lovelace drafted Bijan Robinson.");
+
+    const clock = activityRowFor(event("draft_pick", { ...pickPayload, auto: true }, null), viewer, hostileNames);
+    expect(clock?.headline).toBe("The clock ran out, so Alice's team drafted Bijan Robinson from their queue.");
+
+    // Belt and brace stated as one assertion: nothing invisible survives anywhere in the output.
+    for (const row of [created, human, clock]) {
+      expect(`${row?.headline ?? ""} ${row?.detail ?? ""}`).not.toMatch(/[\u202a-\u202e\u200b-\u200f\u2066-\u2069]/);
+    }
+  });
+
   it("sweeps every non-hidden type, so a type flipped visible cannot land unswept", () => {
     const swept = new Set(EVERY_RENDERABLE_SAMPLE.map((sample) => sample.eventType));
     const visible = (Object.keys(ACTIVITY_VISIBILITY) as readonly AuditEventType[]).filter((type) => ACTIVITY_VISIBILITY[type] !== "hidden");

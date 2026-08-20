@@ -54,7 +54,7 @@ export const REMOVAL_REASON_VALUES: readonly string[] = REVIEW_CONFIG.reportReas
  * constrained `--reason`, or by hand in SQL, must not put an operator's private wording into a
  * sentence on the author's own profile.
  */
-export function removalPhraseFor(storedReason: string): string {
+export function removalPhraseFor(storedReason: string | null): string {
   return REVIEW_CONFIG.reportReasons.find((reason) => reason.value === storedReason)?.removalPhrase ?? "breaking the review rules";
 }
 
@@ -65,6 +65,6 @@ export function removalPhraseFor(storedReason: string): string {
  * different words from the ones the author reads is worse than no preview: it is a wrong answer
  * to the only question the preview exists to answer.
  */
-export function removalSentenceFor(storedReason: string): string {
+export function removalSentenceFor(storedReason: string | null): string {
   return `Your review was removed for ${removalPhraseFor(storedReason)}. It can't be edited.`;
 }

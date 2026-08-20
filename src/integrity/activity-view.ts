@@ -1,5 +1,6 @@
 import type { IconName } from "@/components/ui/icon";
 import { type AuditEvent, type AuditEventType, type JsonObject } from "@/domain/audit";
+import { stripHiddenCharacters } from "@/identity/display-name";
 
 /**
  * Who may see an event type on the member-facing activity feed. `"everyone"` (any league member),
@@ -70,7 +71,29 @@ type Rendered = Omit<ActivityRow, "eventId" | "occurredAt">;
  */
 function str(payload: JsonObject, key: string): string | undefined {
   const value = payload[key];
-  return typeof value === "string" ? value : undefined;
+  // STRIPPED here rather than in each renderer, so a renderer a later plan writes inherits the
+  // guard instead of having to remember it. Same class as HIGH-2 and milder for the same reason
+  // ruling 12 made that one severe: these sentences are re-rendered on every read, so a bidi
+  // override in a league name reverses a headline only while the name is hostile rather than
+  // forever. Milder is not absent — the guard belongs on both surfaces or on neither.
+  return typeof value === "string" ? stripHiddenCharacters(value) : undefined;
+}
+
+/**
+ * The caller's name resolvers, with the same guard on everything they return.
+ *
+ * Wrapped ONCE, at the entry point, for the same reason `str` strips rather than each headline
+ * doing it: five interpolation sites today and one per renderer forever is a rule somebody
+ * eventually forgets, and the failure is silent. These strings come from `users.display_name`,
+ * `teams.name` and `players.name` read back out of Postgres — boundary schemas now refuse a
+ * hostile one going in, but rows written before those schemas had the guard are still there.
+ */
+function printableNames(names: ActivityNames): ActivityNames {
+  return {
+    member: (userId) => stripHiddenCharacters(names.member(userId)),
+    player: (playerId) => stripHiddenCharacters(names.player(playerId)),
+    team: (teamId) => stripHiddenCharacters(names.team(teamId)),
+  };
 }
 
 function num(payload: JsonObject, key: string): number | undefined {
@@ -225,7 +248,7 @@ export function activityRowFor(event: AuditEvent, viewer: { readonly userId: str
   if (visibility !== "everyone" && visibility !== "actor_only") return null;
   if (visibility === "actor_only" && event.actorId !== viewer.userId) return null;
 
-  const rendered = renderPayload(event, names);
+  const rendered = renderPayload(event, printableNames(names));
   if (rendered === null) return null;
   return { eventId: event.eventId, occurredAt: event.occurredAt, ...rendered };
 }

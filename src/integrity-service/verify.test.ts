@@ -313,12 +313,19 @@ describe("concurrency", () => {
 
     let release: () => void = () => {};
     const gate = new Promise<void>((resolve) => (release = resolve));
+    let announceHeld: () => void = () => {};
+    const anchorHeld = new Promise<void>((resolve) => (announceHeld = resolve));
     const held = other.transaction(async (tx) => {
       await logger.record(tx, input(4));
+      // The holder says when it holds, rather than the test guessing with a sleep: `record` has
+      // returned, so `lockAnchor`'s SELECT ... FOR UPDATE holds that row for the rest of this
+      // transaction. A `setTimeout` here could let the walk run before the lock existed, which is
+      // the test passing against no contention at all.
+      announceHeld();
       await gate;
     });
 
-    await new Promise((resolve) => setTimeout(resolve, 100));
+    await anchorHeld;
     const verifying = createTestDb();
     await verifying.execute(sql`SET statement_timeout = '2s'`);
     const result = await verifyChainIntegrity(verifying, "league_1");

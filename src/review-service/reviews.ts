@@ -193,7 +193,16 @@ export async function myReview(db: Db, userId: string): Promise<MyReviewState> {
 
   if (row === undefined) return { state: "none" };
   if (row.removedAt !== null) {
-    return { state: "removed", reason: row.removalReason ?? "breaking the review rules", removedAt: row.removedAt.toISOString() };
+    // `null`, not a display phrase. `reason` on this contract is the STORED TOKEN
+    // (`REVIEW_CONFIG.reportReasons`' values), and the fallback here was
+    // "breaking the review rules" — which is a rendered PHRASE, not a token, so a
+    // `removal_reason` column that is somehow empty produced a value no consumer could map and
+    // that `removalPhraseFor` would then feed back through its own unrecognized-value fallback to
+    // arrive at the same sentence by accident. Two different types under one field name is how a
+    // future consumer that switches on the token gets a string that matches no case. The absent
+    // value is absent; `ReviewComposer` renders `removalSentenceFor(null-ish)` through the same
+    // mapper and lands on the generic phrase deliberately rather than coincidentally.
+    return { state: "removed", reason: row.removalReason, removedAt: row.removedAt.toISOString() };
   }
   return { state: "live", review: toView(row, row.rating) };
 }

@@ -27,7 +27,7 @@ export interface ReviewComposerProps {
  * removed from is one link away, and the reason is named in words rather than in a code
  * (`removalSentenceFor`, the one definition this sentence has).
  */
-function RemovedNotice({ reason }: { readonly reason: string }) {
+function RemovedNotice({ reason }: { readonly reason: string | null }) {
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-elevated p-4">
       <p className="text-sm font-medium text-text-primary">{removalSentenceFor(reason)}</p>

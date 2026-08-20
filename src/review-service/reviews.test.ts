@@ -311,19 +311,25 @@ describe("myReview", () => {
     expect(await myReview(db, "u1")).toEqual({ state: "removed", reason: "spam", removedAt: "2026-08-04T00:00:00.000Z" });
   });
 
-  it("still explains a removal whose reason column is somehow empty", async () => {
+  it("reports an absent removal reason as absent, and still lands the author on a sentence", async () => {
     // `removed_at` and `removal_reason` are independently nullable columns; `removeReview` always
-    // writes all three together, but nothing at the database level says it must. The author gets
-    // a sentence either way rather than "removed for null".
+    // writes all three together, but nothing at the database level says it must.
+    //
+    // `reason` on this contract is the stored TOKEN, so an absent one reads as `null` rather than
+    // as "breaking the review rules" — that string is a rendered PHRASE, and standing it in here
+    // put two different types under one field name, where a future consumer switching on the
+    // token would get a string matching no case. The author still reads a sentence: the mapper
+    // owns the fallback, and it owns it in one place.
     await seedUser("u1");
     await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
     await db.update(reviews).set({ removedAt: new Date("2026-08-04T00:00:00Z") }).where(eq(reviews.id, "r1"));
 
     expect(await myReview(db, "u1")).toEqual({
       state: "removed",
-      reason: "breaking the review rules",
+      reason: null,
       removedAt: "2026-08-04T00:00:00.000Z",
     });
+    expect(removalSentenceFor(null)).toBe("Your review was removed for breaking the review rules. It can't be edited.");
   });
 });
 

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { auditChains, leagues, memberNotices, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
@@ -34,6 +34,28 @@ import { players } from "@/db/schema";
  */
 const joinDb = createTestDb();
 const pickDb = createTestDb();
+
+/**
+ * Waits until some backend on this database is genuinely blocked on a lock.
+ *
+ * Unscoped by necessity and safely so, unlike its sibling in `audit-logger.test.ts`: the
+ * transaction being waited on here is driven through the real `applyAction`, which owns its own
+ * connection out of `pickDb`'s pool, so there is no seam to read `pg_backend_pid()` from without
+ * reaching into the store. Vitest runs test FILES sequentially (`fileParallelism: false`), and
+ * the only two transactions in flight in this file are the two under test, so a blocked backend
+ * here is one of them by construction.
+ */
+async function waitForBlockedBackend(timeoutMs = 5_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  for (;;) {
+    const rows = await joinDb.execute<{ count: string }>(
+      sql`SELECT count(*) AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()`,
+    );
+    if (Number(rows[0]?.count ?? 0) > 0) return true;
+    if (Date.now() > deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, 25));
+  }
+}
 
 const clock = { now: () => "2026-09-01T00:00:00.000Z" };
 const POOL: readonly DraftPoolEntry[] = [
@@ -110,9 +132,12 @@ describe("the audit anchor is the last lock, FK locks included", () => {
     // `leagues FOR KEY SHARE`) BEFORE it reaches the anchor. It blocks here, behind T_join.
     const picking = store.applyAction(draftId, { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state!) ?? clock.now() });
 
-    // Long enough for T_pick to have reached whichever lock it is going to block on. In the old
-    // order it is holding the anchor by now, and releasing T_join is what completes the cycle.
-    await new Promise((resolve) => setTimeout(resolve, 400));
+    // T_pick has to have REACHED whichever lock it is going to block on before T_join is let go —
+    // in the old order it is holding the anchor by then, and releasing T_join is what completes
+    // the cycle. Asked of Postgres rather than guessed with a sleep: on a loaded machine a fixed
+    // wait can expire before T_pick has taken anything, and the test then proves nothing in
+    // either direction. `pg_stat_activity` reports a backend genuinely waiting on a Lock.
+    expect(await waitForBlockedBackend()).toBe(true);
     releaseJoin();
 
     const joined = await joining;

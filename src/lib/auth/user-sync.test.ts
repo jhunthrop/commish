@@ -31,6 +31,31 @@ describe("displayNameFrom", () => {
   it("falls back to the email local part when there is no name", () => {
     expect(displayNameFrom({ firstName: null, lastName: null, email: "jane.doe@example.com" })).toBe("jane.doe");
   });
+
+  /**
+   * LOW-5, made load-bearing. Every OTHER door a display name comes through is a person typing
+   * into a form, where `isPrintableDisplayName` refuses and they fix it. This one is a sign-in:
+   * the value arrives from WorkOS with the session, the person may not know a bidi override is in
+   * their provider profile, and refusing would refuse them the product. So it strips — and these
+   * assertions redden if the strip is removed, on BOTH branches, rather than describing it.
+   */
+  it("strips characters a reader cannot see out of a provider-supplied name, on every branch", () => {
+    const rtl = String.fromCharCode(0x202e);
+    const zeroWidth = String.fromCharCode(0x200b);
+    expect(displayNameFrom({ firstName: `${rtl}Jane`, lastName: `Doe${zeroWidth}`, email: "jane@example.com" })).toBe("Jane Doe");
+    expect(displayNameFrom({ firstName: null, lastName: null, email: `${rtl}jane.doe@example.com` })).toBe("jane.doe");
+  });
+
+  it("writes the STRIPPED name to users.display_name on a real sign-in", async () => {
+    // The end-to-end half: not just that the helper strips, but that the stripped value is what
+    // lands in the column every other surface reads a name from.
+    await syncUserFromWorkOS(
+      { db, clock: { now: () => T0 }, via: "callback", audit: logger },
+      { id: "user_hostile", email: "hostile@example.com", firstName: `${String.fromCharCode(0x202e)}Jane`, lastName: "Doe" },
+    );
+    const [row] = await db.select().from(users).where(eq(users.id, "user_hostile"));
+    expect(row?.displayName).toBe("Jane Doe");
+  });
 });
 
 describe("syncUserFromWorkOS", () => {
