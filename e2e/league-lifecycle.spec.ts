@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import { expect, test } from "./support/fixtures";
 
 /**
@@ -93,21 +94,20 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
 
   // Whoever is on the clock drafts the top available player. The pick button only exists on
   // the page whose turn it is, which is itself the assertion that the room knows whose turn
-  // it is. Wait for EITHER page to hydrate its Draft buttons before deciding which one that
-  // is: an instantaneous count() raced hydration and could pick the waiting-mode page, which
-  // then correctly never grows a Draft button, hanging the spec to its timeout.
+  // it is. Identify that page by the rail's "You're on the clock" marker, which only the true
+  // picker's page renders and only after hydration. Draft buttons are the WRONG discriminator:
+  // the server-rendered pool briefly shows them on the waiting page too, so both an
+  // instantaneous count() and a count-based poll could crown the waiting page, which then
+  // correctly loses its buttons on hydration and hangs the spec to its timeout.
+  const onClock = (page: Page) => page.getByText("You're on the clock").count();
   await expect
-    .poll(
-      async () =>
-        (await managerA.getByRole("button", { name: "Draft" }).count()) +
-        (await managerB.getByRole("button", { name: "Draft" }).count()),
-      { timeout: 30_000 },
-    )
+    .poll(async () => (await onClock(managerA)) + (await onClock(managerB)), { timeout: 30_000 })
     .toBeGreaterThan(0);
-  const picker = (await managerA.getByRole("button", { name: "Draft" }).count()) > 0 ? managerA : managerB;
+  const picker = (await onClock(managerA)) > 0 ? managerA : managerB;
   const watcher = picker === managerA ? managerB : managerA;
   // `span.font-display` alone also matches the position badge (e.g. "QB") next to the name —
   // `.truncate` is unique to the player-name span (see player-pool.tsx).
+  await picker.getByRole("button", { name: "Draft" }).first().waitFor({ timeout: 15_000 });
   const pickedName = await picker
     .getByRole("listitem")
     .filter({ has: picker.getByRole("button", { name: "Draft" }) })
@@ -123,7 +123,24 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   const watcherPool = watcher.getByRole("list", { name: "Available players, best first" });
   await expect(watcherPool.getByRole("listitem").filter({ hasText: pickedName })).toHaveCount(1);
 
-  await picker.getByRole("button", { name: "Draft" }).first().click();
+  // Click-and-verify, retried: a server-rendered Draft button is visible and "stable" before
+  // React attaches its handler, so a click that lands pre-hydration is a silent no-op (trace
+  // evidence: no POST ever left the page). The picker's OWN pool losing the row is the click's
+  // receipt — it folds locally from the action response, no SSE involved — so retrying until it
+  // moves proves the click was real without weakening the watcher-side SSE assertion below.
+  const pickerPool = picker.getByRole("list", { name: "Available players, best first" });
+  // The click targets pickedName's OWN row, not ".first()": between reading the name and
+  // clicking, the pool can reorder, and clicking a POSITION would then draft a different
+  // player, hand the turn to the other team, and leave every retry dead against a buttonless
+  // waiting-mode page.
+  await expect(async () => {
+    await pickerPool
+      .getByRole("listitem")
+      .filter({ hasText: pickedName })
+      .getByRole("button", { name: "Draft" })
+      .click();
+    await expect(pickerPool.getByRole("listitem").filter({ hasText: pickedName })).toHaveCount(0, { timeout: 3_000 });
+  }).toPass({ timeout: 30_000 });
 
   // THE assertion: the pick reached the other browser with no reload and no polling. The row
   // only leaves this list when `view.availablePlayerIds` changes (player-pool.tsx filters
