@@ -93,7 +93,17 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
 
   // Whoever is on the clock drafts the top available player. The pick button only exists on
   // the page whose turn it is, which is itself the assertion that the room knows whose turn
-  // it is.
+  // it is. Wait for EITHER page to hydrate its Draft buttons before deciding which one that
+  // is: an instantaneous count() raced hydration and could pick the waiting-mode page, which
+  // then correctly never grows a Draft button, hanging the spec to its timeout.
+  await expect
+    .poll(
+      async () =>
+        (await managerA.getByRole("button", { name: "Draft" }).count()) +
+        (await managerB.getByRole("button", { name: "Draft" }).count()),
+      { timeout: 30_000 },
+    )
+    .toBeGreaterThan(0);
   const picker = (await managerA.getByRole("button", { name: "Draft" }).count()) > 0 ? managerA : managerB;
   const watcher = picker === managerA ? managerB : managerA;
   // `span.font-display` alone also matches the position badge (e.g. "QB") next to the name —
