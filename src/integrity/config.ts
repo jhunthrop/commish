@@ -53,5 +53,13 @@ export const INTEGRITY_CONFIG = {
      * (Task 7), because a rule about copy is only real if something checks the copy.
      */
     accusatoryTerms: ["violation", "violated", "suspected", "abuse", "cheating", "broke the rules", "illegal", "penalty", "offense"],
+    /**
+     * `GET /api/notices` and `POST /api/notices/read`'s shared ceiling — sibling parity with
+     * `advisorRateLimited`'s "one budget across both routes" (`src/app/api/leagues/[leagueId]/
+     * advisor/_shared.ts`): both spend the same scarce resource, a Postgres round trip for this
+     * user's own notices, so splitting the ceiling per route would double what a single caller
+     * can spend for no product reason.
+     */
+    rateLimit: { maxRequests: 30, windowMs: 60_000 },
   },
 } as const;

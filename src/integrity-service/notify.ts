@@ -4,6 +4,8 @@ import { memberNotices } from "@/db/schema";
 import type { JsonObject } from "@/domain/audit";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { renderNotice, type NoticeContexts, type NoticeType } from "@/integrity/notices";
+import type { PublishToUserFn } from "@/lib/realtime/publish";
+import { getPublisher } from "@/lib/realtime/publisher";
 
 /** One row of `member_notices`, exactly as it is stored. */
 export interface MemberNotice {
@@ -54,10 +56,10 @@ function rowToNotice(row: typeof memberNotices.$inferSelect): MemberNotice {
  * positional call is a swap waiting to happen at a call site nobody re-reads.
  *
  * It writes INSIDE the caller's transaction, exactly like the audit append: a notice about a
- * write that then rolled back is a lie told to a member. The durable row IS this task's delivery
- * — the inbox reads it on next load (`listNotices` below). A best-effort LIVE frame, on a
- * per-user stream key with no copy in the payload (ruling 13), is Task 8's job: it generalizes
- * `subscribe` to take a stream key rather than a league id, which does not exist yet.
+ * write that then rolled back is a lie told to a member. The durable row IS the delivery — the
+ * inbox reads it on next load (`listNotices` below). The best-effort LIVE frame is a SEPARATE
+ * step, `deliverNotice` below, called by the caller only AFTER its transaction commits — the
+ * inverse of this function's own discipline: the row fails the transaction, the frame never does.
  *
  * A caller that cannot resolve who to notify (an owner lookup that finds no row) never reaches
  * this function at all — see `src/draft-service/store.ts` — so there is no "notify nobody" branch
@@ -98,6 +100,38 @@ export async function notifyAffectedMember<T extends NoticeType>(
     createdAt: createdAt.toISOString(),
     readAt: null,
   };
+}
+
+/**
+ * Best-effort LIVE delivery, called after the caller's transaction commits — never inside it.
+ * Publishing failure is never surfaced: the durable row is already written and the inbox reads
+ * it on the next page load, exactly the "Postgres is authoritative, publishing is best-effort"
+ * rule every other feature in this codebase already runs on (`createPublisher`'s own docblock).
+ *
+ * RULING 13, both halves: the frame rides `REALTIME_CONFIG.userStreamKey(notice.userId)` — a
+ * league broadcast is read by every member in the room, so even a content-free frame there would
+ * leak that THIS member got a notice, which for a held trade is most of the information — and it
+ * carries `{ noticeId, noticeType }` only, never the rendered `title`/`body`. The words come from
+ * an authenticated read of `GET /api/notices`, because a Redis stream is retained for
+ * `streamMaxLen` entries and readable by anything holding the key.
+ *
+ * A notice with no league is not published at all: the frame exists to nudge a page that is
+ * open RIGHT NOW about something happening in a league the reader is looking at, and a
+ * league-less notice (e.g. `review_removed`) has no such page. It reaches the reader on their
+ * next inbox load instead, which is honest and is what the inbox is for — so `removeReview`
+ * (`@/review-service/reviews.ts`) never calls this at all.
+ *
+ * `publish` defaults to the process-wide publisher's `publishToUser`, mirroring `getAuditLogger()`
+ * — injectable so a caller under test never needs a live Redis connection.
+ */
+export async function deliverNotice(notice: MemberNotice, publish: PublishToUserFn = getPublisher().publishToUser): Promise<void> {
+  if (notice.leagueId === null) return;
+  await publish({
+    userId: notice.userId,
+    leagueId: notice.leagueId,
+    type: "notice.created",
+    payload: { noticeId: notice.id, noticeType: notice.noticeType },
+  });
 }
 
 export interface NoticesPage {

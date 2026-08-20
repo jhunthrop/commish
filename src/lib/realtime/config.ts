@@ -2,6 +2,13 @@ export const REALTIME_CONFIG = {
   /** Redis Stream key for a league's event stream. */
   leagueStreamKey: (leagueId: string): string => `league:${leagueId}:events`,
   /**
+   * Redis Stream key for ONE USER's own events. The second key format in this product, and the
+   * reason it exists: every other event type is a league broadcast, and a notice about one
+   * member ("your trade is on hold for review") must not be readable by their leaguemates. Same
+   * mechanism, same XREAD, same Last-Event-ID resume, different key.
+   */
+  userStreamKey: (userId: string): string => `user:${userId}:events`,
+  /**
    * Approximate max entries retained per stream (XADD MAXLEN ~). Streams are a live/catch-up
    * channel, not the permanent record — Postgres is. Sized generously for a full live draft
    * plus a Sunday of scoring updates so a client backgrounded for a while can still catch up.

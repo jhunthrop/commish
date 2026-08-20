@@ -14,7 +14,7 @@ import {
   type DraftState,
 } from "@/draft-engine";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
-import { notifyAffectedMember } from "@/integrity-service/notify";
+import { deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { auditEventsForPicks, ownerIdsForContestedPicks } from "./audit";
@@ -39,6 +39,13 @@ export interface DraftStoreDeps {
   readonly onPublishError?: (error: unknown, event: PublishFailureEvent) => void;
   /** Defaults to the process-wide logger (`getAuditLogger()`). */
   readonly audit?: AuditLogger;
+  /**
+   * Best-effort LIVE delivery for an autopick notice, called after the commit — mirrors
+   * `broadcast`. Defaults to the real `deliverNotice` (`@/integrity-service/notify`), which
+   * itself defaults to the process-wide publisher; injectable so `store.test.ts` never needs a
+   * live Redis connection to exercise the transaction/rollback behavior around it.
+   */
+  readonly deliverNotice?: (notice: MemberNotice) => Promise<void>;
 }
 
 export type ApplyResult =
@@ -141,7 +148,14 @@ async function autopickNoticeContext(
  * helpers (`load`, `commitDraftState`) instead of recursing into `applyAction` or
  * `commitDraftResults`.
  */
-export function createDraftStore({ db, publish, clock, onPublishError, audit = getAuditLogger() }: DraftStoreDeps): DraftStore {
+export function createDraftStore({
+  db,
+  publish,
+  clock,
+  onPublishError,
+  audit = getAuditLogger(),
+  deliverNotice: deliver = deliverNotice,
+}: DraftStoreDeps): DraftStore {
   const cache = new Map<string, DraftState>();
   const mutex = createKeyedMutex();
 
@@ -190,8 +204,12 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
       return mutex.run(draftId, async (): Promise<ApplyResult> => {
         // `previous` is captured out of the transaction so `broadcast` (which must run AFTER
         // the commit, because publishing is best-effort and must never fail a committed write)
-        // still has the before-state to diff against.
+        // still has the before-state to diff against. `createdNotices` is the same idea for
+        // `deliverNotice`: the durable rows below are written and returned INSIDE the
+        // transaction, but their live frames must only go out once that transaction has
+        // actually committed — see `deliverNotice`'s own docblock.
         let previous: DraftState | null = null;
+        const createdNotices: MemberNotice[] = [];
 
         try {
           const outcome = await db.transaction(async (tx): Promise<ApplyResult> => {
@@ -253,8 +271,9 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
             // nothing today, and this is that telling. `picked`/`pickedEvents`/the new picks
             // slice are all built from the SAME diff (`next.picks.slice(previous.picks.length)`),
             // so index `i` names the same pick in all three. The durable `member_notices` row IS
-            // this task's delivery (the inbox reads it — `listNotices`); a best-effort LIVE frame
-            // on a per-user stream key is Task 8's job, not this transaction's.
+            // the delivery (the inbox reads it — `listNotices`); each notice created here is also
+            // pushed to `createdNotices` so `deliverNotice` can push a best-effort LIVE frame for
+            // it AFTER this transaction commits — see the comment beside `createdNotices` above.
             const newPicks = result.state.picks.slice(state.picks.length);
             const positionOf = new Map(result.state.pool.map((entry) => [entry.playerId, entry.position]));
             for (let i = 0; i < picked.length; i += 1) {
@@ -264,7 +283,7 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
               const context = await autopickNoticeContext(tx, newPick.teamId, newPick.playerId);
               const position = positionOf.get(newPick.playerId);
               if (context === undefined || position === undefined) continue;
-              await notifyAffectedMember(tx, {
+              const notice = await notifyAffectedMember(tx, {
                 leagueId: result.state.config.leagueId,
                 userId: context.userId,
                 noticeType: "draft_auto_picked",
@@ -272,6 +291,7 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
                 occurredAt: event.occurredAt,
                 auditEventId: event.eventId,
               });
+              createdNotices.push(notice);
             }
 
             if (options?.alsoInTransaction !== undefined) await options.alsoInTransaction(tx);
@@ -300,6 +320,16 @@ export function createDraftStore({ db, publish, clock, onPublishError, audit = g
 
           cache.set(draftId, outcome.state);
           if (previous !== null) await broadcast(previous, outcome.state, action);
+          // Best-effort, after the commit, beside `broadcast` — the inverse of `notifyAffectedMember`'s
+          // own discipline: the durable row above already failed the transaction if it had to;
+          // this frame never fails anything, because the write it announces already landed.
+          for (const notice of createdNotices) {
+            try {
+              await deliver(notice);
+            } catch (error: unknown) {
+              onPublishError?.(error, { type: "notice.created", leagueId: notice.leagueId ?? "" });
+            }
+          }
           return outcome;
         } catch (error: unknown) {
           // Our view of the log is provably stale — drop it so the next read replays.

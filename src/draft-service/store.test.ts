@@ -5,6 +5,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { auditEvents, draftActions, memberNotices, players } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
 import { currentDeadline } from "@/draft-engine";
+import type { MemberNotice } from "@/integrity-service/notify";
 import { createDraftStore, isSequenceConflict, type ApplyResult, type DraftStore, type PublishFn } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -33,8 +34,18 @@ const publish: PublishFn = async (input) => {
   return "1-0";
 };
 
+/**
+ * A fake for the store's injected `deliverNotice`, so this file's tests exercise the real
+ * post-commit wiring (Task 8) without ever needing a live Redis connection — the real per-user
+ * frame's actual delivery is proven against real Redis in `draft-realtime.test.ts` instead.
+ */
+let deliveredNotices: MemberNotice[] = [];
+const deliverNoticeFake = async (notice: MemberNotice): Promise<void> => {
+  deliveredNotices.push(notice);
+};
+
 function newStore(publishFn: PublishFn = publish) {
-  return createDraftStore({ db, publish: publishFn, clock });
+  return createDraftStore({ db, publish: publishFn, clock, deliverNotice: deliverNoticeFake });
 }
 
 /**
@@ -139,6 +150,7 @@ async function runFullDraft(store: DraftStore, draftId: string): Promise<void> {
 beforeEach(async () => {
   await truncateAll(db);
   published = [];
+  deliveredNotices = [];
   // The `players` row every POOL entry needs for `autopickNoticeContext`'s join. Absent, the
   // autopick notice path skips itself rather than fail an already-decided pick over it (see
   // `store.ts`) — most tests above never look at `member_notices` and are unaffected either way;
@@ -512,11 +524,16 @@ describe("draft store — notices", () => {
     );
 
     // Ruling 13's guard: a private notice may not ride the league broadcast (every subscriber in
-    // the room gets every frame — see `subscribe.ts`). The durable row above IS this task's
-    // delivery; a live frame on a per-user key is Task 8's job, not this transaction's, and
-    // nothing on the league stream should even hint that a notice was created.
+    // the room gets every frame — see `subscribe.ts`). The durable row above IS the delivery of
+    // record; nothing on the league stream should even hint that a notice was created.
     expect(published.some((e) => e.type === "notice.created")).toBe(false);
     expect(published.some((e) => JSON.stringify(e.payload).includes(userIds[pickerIndex]!))).toBe(false);
+
+    // Task 8's per-user delivery: `deliverNotice` is called AFTER the commit, beside `broadcast`,
+    // with the exact durable row just asserted above — proven here through the injected fake
+    // (see `deliverNoticeFake`); the real per-user Redis frame is proven end to end, against real
+    // Redis, in `draft-realtime.test.ts`.
+    expect(deliveredNotices).toEqual([expect.objectContaining({ id: notice!.id, userId: userIds[pickerIndex], leagueId, noticeType: "draft_auto_picked" })]);
   });
 
   it("writes no notice for a pick a person submitted directly, and rides no league-stream frame either way", async () => {
@@ -527,6 +544,7 @@ describe("draft store — notices", () => {
 
     expect(await db.select().from(memberNotices)).toHaveLength(0);
     expect(published.some((e) => e.type === "notice.created")).toBe(false);
+    expect(deliveredNotices).toHaveLength(0);
   });
 
   it("skips the notice, without failing the pick, when the join finds no row (e.g. an unseeded player)", async () => {
@@ -541,5 +559,28 @@ describe("draft store — notices", () => {
     expect(result.ok).toBe(true);
     expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "draft_pick"))).toHaveLength(1);
     expect(await db.select().from(memberNotices)).toHaveLength(0);
+    expect(deliveredNotices).toHaveLength(0);
+  });
+
+  it("never delivers a live frame for a notice whose transaction did not commit", async () => {
+    // `alsoInTransaction` runs INSIDE the same transaction as the pick, the audit events and any
+    // notice — throwing there rolls back everything, including the durable notice row. Proves
+    // `deliverNotice` is called from OUTSIDE the transaction, driven off `createdNotices` (a
+    // plain array built as rows are returned), and never fires for a notice that was rolled back
+    // with the write it explains.
+    const { draftId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const state = await store.getDraftState(draftId);
+    await expect(
+      store.applyAction(
+        draftId,
+        { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state!) ?? clock.now() },
+        { alsoInTransaction: async () => { throw new Error("boom"); } },
+      ),
+    ).rejects.toThrow("boom");
+
+    expect(await db.select().from(memberNotices)).toHaveLength(0);
+    expect(deliveredNotices).toHaveLength(0);
   });
 });

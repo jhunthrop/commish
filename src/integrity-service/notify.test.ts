@@ -5,8 +5,9 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import type { AuditEventInput } from "@/domain/audit";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { NOTICE_TEMPLATES } from "@/integrity/notices";
+import type { PublishToUserFn } from "@/lib/realtime/publish";
 import { createAuditLogger } from "./audit-logger";
-import { listNotices, markNoticesRead, notifyAffectedMember, type MemberNotice, type NotifyInput } from "./notify";
+import { deliverNotice, listNotices, markNoticesRead, notifyAffectedMember, type MemberNotice, type NotifyInput } from "./notify";
 
 const db = createTestDb();
 const NOW = "2026-08-20T18:00:00.000Z";
@@ -114,6 +115,44 @@ describe("notifyAffectedMember", () => {
 
   it("only ever stores a type the template registry knows", async () => {
     expect(Object.keys(NOTICE_TEMPLATES)).toContain((await seedOneNotice()).noticeType);
+  });
+});
+
+describe("deliverNotice — ruling 13's live half", () => {
+  function published(): { calls: Parameters<PublishToUserFn>[0][]; publish: PublishToUserFn } {
+    const calls: Parameters<PublishToUserFn>[0][] = [];
+    const publish: PublishToUserFn = async (input) => {
+      calls.push(input);
+      return "1-0";
+    };
+    return { calls, publish };
+  }
+
+  it("publishes a content-free frame to the notice's own user, addressed by its league", async () => {
+    const notice = await seedOneNotice();
+    const { calls, publish } = published();
+    await deliverNotice(notice, publish);
+    expect(calls).toEqual([
+      { userId: "user_bob", leagueId: "league_1", type: "notice.created", payload: { noticeId: notice.id, noticeType: "draft_auto_picked" } },
+    ]);
+  });
+
+  it("never publishes a notice with no league — the frame exists to nudge an open page, and a league-less notice has none", async () => {
+    const leagueLess: MemberNotice = {
+      id: "notice_review_removed",
+      userId: "user_bob",
+      leagueId: null,
+      noticeType: "review_removed",
+      title: "Your review was removed",
+      body: "…",
+      context: { reason: "off topic" },
+      auditEventId: "evt_1",
+      createdAt: NOW,
+      readAt: null,
+    };
+    const { calls, publish } = published();
+    await deliverNotice(leagueLess, publish);
+    expect(calls).toHaveLength(0);
   });
 });
 

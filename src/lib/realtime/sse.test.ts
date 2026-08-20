@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { REALTIME_CONFIG } from "./config";
-import { createLeagueEventStream, resumeCursor } from "./sse";
+import { createLeagueEventStream, createUserEventStream, resumeCursor } from "./sse";
 
 const NOW = Date.parse("2026-08-17T12:00:00.000Z");
 
@@ -93,5 +93,46 @@ describe("createLeagueEventStream — per-user connection ceiling", () => {
     controllers[0]!.abort();
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(open(userId).headers.get("content-type")).toBe("text/event-stream");
+  });
+});
+
+describe("createUserEventStream — shares the same connection ceiling as the league stream", () => {
+  const controllers: AbortController[] = [];
+
+  function openLeague(userId: string): Response {
+    const controller = new AbortController();
+    controllers.push(controller);
+    return createLeagueEventStream(new Request("http://localhost/x", { signal: controller.signal }), "league_sse_user_test", userId);
+  }
+
+  function openUser(userId: string): Response {
+    const controller = new AbortController();
+    controllers.push(controller);
+    return createUserEventStream(new Request("http://localhost/notices/stream", { signal: controller.signal }), userId);
+  }
+
+  beforeEach(() => {
+    vi.stubEnv("REDIS_URL", process.env.REDIS_URL ?? "redis://localhost:6379");
+  });
+
+  afterEach(async () => {
+    for (const controller of controllers) controller.abort();
+    controllers.length = 0;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    vi.unstubAllEnvs();
+  });
+
+  it("opens a live stream for the caller's own user id", async () => {
+    const response = openUser("user_sse_notices");
+    expect(response.headers.get("content-type")).toBe("text/event-stream");
+  });
+
+  it("counts a notices tab against the SAME per-user ceiling a league room's tabs use", async () => {
+    const userId = "user_sse_mixed";
+    openUser(userId);
+    for (let i = 1; i < REALTIME_CONFIG.maxStreamsPerUser; i++) openLeague(userId);
+    // One notices tab plus (ceiling - 1) league tabs exactly fills the shared ceiling.
+    const refused = openUser(userId);
+    expect(refused.status).toBe(429);
   });
 });

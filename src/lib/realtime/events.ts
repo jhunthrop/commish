@@ -26,6 +26,15 @@ export const REALTIME_EVENT_TYPES = [
   "chat.message",
   "chat.reaction",
   "score.update",
+  /**
+   * A member-facing integrity notice was created for them (`member_notices`). Delivered on a
+   * PER-USER stream key (`REALTIME_CONFIG.userStreamKey`), never the league broadcast — a
+   * private notice ("your trade is on hold for review") must not be readable by leaguemates,
+   * and even a content-free frame on the league stream would leak that a specific member got a
+   * specific kind of notice. The payload carries only `{ noticeId, noticeType }`; the words come
+   * from an authenticated read of `GET /api/notices`. See `src/integrity-service/notify.ts`.
+   */
+  "notice.created",
 ] as const;
 
 export type RealtimeEventType = (typeof REALTIME_EVENT_TYPES)[number];
