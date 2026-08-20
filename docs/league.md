@@ -91,6 +91,20 @@ view. On `LeagueHome` (`src/league-room/components/league-home.tsx`) the panel s
 sibling alongside the members panel and the (commissioner-only) invite panel, in ordinary document
 flow — not inside a layout that claims the space between them.
 
+## League members
+
+`LeagueMembersPanel` (`src/league-room/components/league-members-panel.tsx`) is the roster of who
+is in a league and who runs it, stated as a fact to every member who opens it rather than
+inferred from which controls a particular viewer happens to see — before this panel there was no
+members list at all, only names scattered across standings, chat and the invite panel, none of
+which said who the commissioner was. It renders `LeagueHomeBody`'s `teams` (each carrying its raw
+`ownerUserId`) against `commissionerUserId`, doing the comparison client-side rather than trusting
+a server-computed `isCommissioner` boolean — see `docs/decisions/identity-and-trust.md`'s ruling on
+why a raw id is the right shape for this members-only wire. An unfilled seat reports as "N seats
+still open" (from `teamCount`), never as an absent row, because a commissioner deciding whether to
+send another invite needs that distinction. See `docs/decisions/identity-and-trust.md` for the full
+audit of where identity renders across the product, including this panel.
+
 ## The schedule
 
 `generateSchedule` (`src/league/schedule.ts`) is the circle method: team 0 stays fixed while

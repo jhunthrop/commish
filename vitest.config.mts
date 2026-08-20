@@ -23,6 +23,10 @@ const COVERAGE_GATED_DIRS = [
   "src/matchmaking",
   "src/stats",
   "src/stats-pipeline",
+  "src/identity",
+  "src/help",
+  "src/reviews",
+  "src/gifs",
 ] as const;
 const coverageInclude = COVERAGE_GATED_DIRS.map((dir) => `${dir}/**`);
 
@@ -91,6 +95,30 @@ export default defineConfig({
           statements: 100,
         },
         "src/stats-pipeline/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        "src/identity/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        "src/help/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        "src/reviews/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        "src/gifs/**": {
           branches: 100,
           functions: 100,
           lines: 100,

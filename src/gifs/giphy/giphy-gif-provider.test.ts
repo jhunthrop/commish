@@ -78,6 +78,15 @@ describe("GiphyGifProvider", () => {
     await expect(subject.search("touchdown", 5)).rejects.toMatchObject({ kind: "malformed" });
   });
 
+  it("succeeds on a 200 response that carries no meta object at all", async () => {
+    // Giphy's documented shape always includes meta, but this client's own read of it
+    // (`typeof envelope.meta === "object"`) is defensive rather than assumed — a response
+    // missing meta entirely must still be read as a plain success, not fail to parse it.
+    const noMeta: typeof globalThis.fetch = async () => new Response(JSON.stringify({ data: [] }), { status: 200 });
+    const subject = createGiphyGifProvider({ apiKey: "test-key", fetch: noMeta });
+    await expect(subject.search("touchdown", 5)).resolves.toEqual([]);
+  });
+
   it("treats an HTTP 200 carrying a meta.status error as a failure, not as an empty search", async () => {
     // The single most dangerous upstream behavior: a refused request can answer 200 with an
     // empty data array and the real failure code buried in meta.status, which a status-only
