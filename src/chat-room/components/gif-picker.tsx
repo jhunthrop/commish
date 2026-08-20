@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Input, Modal } from "@/components/ui";
 import type { GifResult } from "@/gifs/provider";
+import { CHAT_ROOM_CONFIG } from "../config";
 
 const SEARCH_ERROR = "We couldn't search GIFs. Check your connection and try again.";
 
 export interface GifPickerProps {
   readonly open: boolean;
   readonly onClose: () => void;
-  /** One request per call — see `GifProvider`'s docblock (`@/gifs/provider`). This component does not debounce on the seam's behalf. */
+  /** One request per debounced pause — see `GifProvider`'s docblock (`@/gifs/provider`) on why this component, not the seam, owns pacing. */
   readonly search: (query: string) => Promise<readonly GifResult[]>;
   readonly onPick: (gif: GifResult) => void;
 }
@@ -23,6 +24,13 @@ export interface GifPickerProps {
  * text `message-list.tsx` gives the `<img>` once it is sent — a keyboard or screen-reader user
  * picking "Touchdown Dance GIF" and later seeing "Touchdown Dance GIF" land in the log is one
  * name, not a preview name and a different sent name.
+ *
+ * Two guards on the search, together: `CHAT_ROOM_CONFIG.gifSearchDebounceMs` collapses a burst of
+ * keystrokes into one request after the user pauses, and `searchGeneration` is what protects
+ * against the class of bug a debounce alone does NOT — two different debounced requests both
+ * ending up in flight (type, pause, keep typing before the first response lands, pause again) and
+ * racing each other on the way back. Mirrors `useLeagueChat`'s `refreshGeneration` guard exactly:
+ * a monotonic id per request, and a response applied only if it is still the newest one.
  */
 export function GifPicker({ open, onClose, search, onPick }: GifPickerProps) {
   const [query, setQuery] = useState("");
@@ -30,10 +38,40 @@ export function GifPicker({ open, onClose, search, onPick }: GifPickerProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const searchGeneration = useRef(0);
+  const debounceTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  useEffect(
+    () => () => {
+      if (debounceTimer.current !== undefined) clearTimeout(debounceTimer.current);
+    },
+    [],
+  );
+
   const runSearch = async (value: string): Promise<void> => {
+    searchGeneration.current += 1;
+    const generation = searchGeneration.current;
+    try {
+      const found = await search(value);
+      if (generation !== searchGeneration.current) return; // a newer search has since started
+      setResults(found);
+    } catch {
+      if (generation !== searchGeneration.current) return;
+      setResults([]);
+      setError(SEARCH_ERROR);
+    } finally {
+      if (generation === searchGeneration.current) setLoading(false);
+    }
+  };
+
+  const onQueryChange = (value: string): void => {
     setQuery(value);
+    if (debounceTimer.current !== undefined) clearTimeout(debounceTimer.current);
     const trimmed = value.trim();
     if (trimmed === "") {
+      // Invalidates any search still debouncing or already in flight, so its eventual response
+      // cannot land after the box has been emptied back out.
+      searchGeneration.current += 1;
       setResults([]);
       setError(null);
       setLoading(false);
@@ -41,14 +79,9 @@ export function GifPicker({ open, onClose, search, onPick }: GifPickerProps) {
     }
     setLoading(true);
     setError(null);
-    try {
-      setResults(await search(value));
-    } catch {
-      setResults([]);
-      setError(SEARCH_ERROR);
-    } finally {
-      setLoading(false);
-    }
+    debounceTimer.current = setTimeout(() => {
+      void runSearch(value);
+    }, CHAT_ROOM_CONFIG.gifSearchDebounceMs);
   };
 
   const showEmptyState = !loading && error === null && query.trim() !== "" && results.length === 0;
@@ -62,7 +95,7 @@ export function GifPicker({ open, onClose, search, onPick }: GifPickerProps) {
           type="search"
           autoComplete="off"
           value={query}
-          onChange={(event) => void runSearch(event.target.value)}
+          onChange={(event) => onQueryChange(event.target.value)}
         />
         {error === null ? null : (
           <p role="alert" className="text-sm text-negative">
@@ -70,7 +103,9 @@ export function GifPicker({ open, onClose, search, onPick }: GifPickerProps) {
           </p>
         )}
         {showEmptyState ? <p className="text-sm text-text-muted">No GIFs found. Try another search.</p> : null}
-        <ul className="grid grid-cols-3 gap-2">
+        {/* Capped and independently scrollable — not a Modal-wide change — so a full grid of
+            results can never push the dialog's own Close control off a small screen. */}
+        <ul className="grid max-h-64 grid-cols-3 gap-2 overflow-y-auto">
           {results.map((gif) => (
             <li key={gif.id}>
               <button

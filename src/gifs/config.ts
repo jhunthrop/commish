@@ -22,6 +22,14 @@ export const GIF_CONFIG = {
   },
   /** How many results `GET /api/gifs/search` asks a provider for. A picker grid, not an infinite feed. */
   searchResultLimit: 12,
+  /**
+   * `GET /api/gifs/search`'s ceiling — keyed per user id, same shape as `ADVISOR_CONFIG.
+   * maxRequestsPerWindow` (`src/domain/advisor.ts`) and for the same reason: this protects a
+   * budget that costs real money once a key exists, not just server load. `GifPicker`'s debounce
+   * (`CHAT_ROOM_CONFIG.gifSearchDebounceMs`) already collapses a burst of keystrokes to one
+   * request per pause, so this is a ceiling on distinct searches, not on typing speed.
+   */
+  searchRateLimit: { maxRequests: 20, windowMs: 60_000 },
 } as const;
 
 export type GifProviderName = (typeof GIF_CONFIG.providers)[number];

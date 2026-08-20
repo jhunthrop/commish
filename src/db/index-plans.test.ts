@@ -225,3 +225,26 @@ describe("hot read paths use indexes", () => {
     expect(planUsesSeqScanOn(plan, "roster_slots")).toBe(false);
   });
 });
+
+/**
+ * A STRUCTURAL guard, independent of `seedCorpus`/the planner: `chat_messages_league_id_idx`
+ * physically carries `INCLUDE (body)` (`drizzle/0018_chat_messages_covering_index.sql`), which
+ * `schema.ts`'s `index()` builder has no API to express — the covering column is real on disk,
+ * but invisible to `drizzle-kit generate`'s diffing. Reproduced by hand before this test existed:
+ * changing `chat_messages_league_id_idx`'s `.on(...)` column list in `schema.ts` and re-running
+ * `db:generate` silently produces a migration that DROPs and recreates the index WITHOUT
+ * `INCLUDE (body)` — drizzle has no record it was ever there, so nothing about that regenerated
+ * migration looks wrong on its own. The comment on the index definition documents the hazard for
+ * a human reader; this is what fails the BUILD instead of only a review, the moment the physical
+ * index on the actual database stops matching what "a chat page is an index range scan" above
+ * relies on to answer as an Index-Only Scan.
+ */
+describe("chat_messages_league_id_idx stays a covering index", () => {
+  it("carries INCLUDE (body) on the real database", async () => {
+    const rows = (await db.execute(
+      sql`SELECT indexdef FROM pg_indexes WHERE indexname = 'chat_messages_league_id_idx'`,
+    )) as unknown as { readonly indexdef: string }[];
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.indexdef).toContain("INCLUDE (body)");
+  });
+});

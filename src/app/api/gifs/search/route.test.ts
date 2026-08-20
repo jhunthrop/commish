@@ -1,6 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import { GIF_CONFIG } from "@/gifs/config";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { GifProvider, GifSearchBody } from "@/gifs/provider";
+import { resetGifSearchRateLimit } from "../_shared";
 
 const currentUser = vi.fn<() => Promise<{ readonly id: string } | null>>();
 const createGifProvider = vi.fn<() => GifProvider | null>();
@@ -22,6 +24,7 @@ const { GET } = await import("./route");
 beforeEach(() => {
   currentUser.mockResolvedValue({ id: "u1" });
   createGifProvider.mockReset();
+  resetGifSearchRateLimit();
 });
 
 const TOUCHDOWN = {
@@ -64,5 +67,28 @@ describe("GET /api/gifs/search", () => {
     const response = await GET(new Request("http://localhost/api/gifs/search"));
     expect(response.status).toBe(200);
     expect(search).toHaveBeenCalledWith("", expect.any(Number));
+  });
+
+  it("answers 429 once the caller is past the rate-limit threshold, protecting a paid-per-call quota", async () => {
+    createGifProvider.mockReturnValue({ search: async () => [TOUCHDOWN] });
+    for (let i = 0; i < GIF_CONFIG.searchRateLimit.maxRequests; i += 1) {
+      const response = await GET(new Request("http://localhost/api/gifs/search?q=touchdown"));
+      expect(response.status).toBe(200);
+    }
+    const limited = await GET(new Request("http://localhost/api/gifs/search?q=touchdown"));
+    expect(limited.status).toBe(429);
+    const body = (await limited.json()) as ApiEnvelope<never>;
+    expect(body.ok).toBe(false);
+    if (body.ok) return;
+    expect(body.error).toBe("You've searched for a lot of GIFs at once. Give it a minute and try again.");
+  });
+
+  it("rate-limits before checking whether a provider is even configured", async () => {
+    createGifProvider.mockReturnValue(null);
+    for (let i = 0; i < GIF_CONFIG.searchRateLimit.maxRequests; i += 1) {
+      await GET(new Request("http://localhost/api/gifs/search?q=touchdown"));
+    }
+    const limited = await GET(new Request("http://localhost/api/gifs/search?q=touchdown"));
+    expect(limited.status).toBe(429);
   });
 });
