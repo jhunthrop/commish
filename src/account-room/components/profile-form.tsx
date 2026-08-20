@@ -79,6 +79,7 @@ export function ProfileForm({ profile }: { readonly profile: ProfileBody }) {
 
       <Select
         label="Experience"
+        hint="We use this to match you to leagues and to show you the right amount of help."
         options={TIER_OPTIONS}
         value={experienceTier}
         onChange={(event) => {

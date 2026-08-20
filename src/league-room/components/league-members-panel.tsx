@@ -32,7 +32,7 @@ export function LeagueMembersPanel({ teams, commissionerUserId, myTeamId, teamCo
       {teams.length === 0 ? (
         <EmptyState
           title="Nobody's here yet"
-          description="Once managers join this league, they'll show up here — commissioner included."
+          description="Once managers join this league, they'll show up here, including the commissioner."
           icon="users"
           action={<Button disabled>Waiting for managers to join</Button>}
         />

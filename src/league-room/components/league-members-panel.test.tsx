@@ -61,4 +61,18 @@ describe("LeagueMembersPanel", () => {
       },
     );
   });
+
+  // House style: no em-dashes in user-facing copy (`src/matchmaking/filter.test.ts`,
+  // `src/data/seed/seed-public-leagues.test.ts` assert the same on a single string each). This
+  // component renders several strings — the empty state's description among them — so the
+  // sweep runs over the FULL rendered text of both states rather than pinning one string.
+  it("never renders an em-dash, in the filled state or the empty state", () => {
+    const { container: filled } = render(
+      <LeagueMembersPanel teams={THREE_TEAMS} teamCount={6} commissionerUserId="u1" myTeamId="t2" />,
+    );
+    expect(filled.textContent).not.toContain("—");
+
+    const { container: empty } = render(<LeagueMembersPanel teams={[]} commissionerUserId="u1" myTeamId={null} />);
+    expect(empty.textContent).not.toContain("—");
+  });
 });

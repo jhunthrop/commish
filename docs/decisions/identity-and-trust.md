@@ -61,6 +61,31 @@ read the SAME rows rather than each re-querying `teams`/`users`. `leagueStanding
 (`src/league-service/results.ts`) took its own `teams` query out entirely in favor of the rows its
 caller already had, which is a net reduction in `leagueHome`'s query count, not merely a wash.
 
+## Ruling: `ownerUserId` on the members wire, not a server-computed `isCommissioner` boolean
+
+`LeagueMemberCard` (`src/league-room/contract.ts`) carries each member's raw `ownerUserId`
+alongside `LeagueHomeBody.commissionerUserId`, and `LeagueMembersPanel` does the
+`team.ownerUserId === commissionerUserId` comparison itself, client-side.
+
+The alternative considered was narrower: have `leagueHome` compute an `isCommissioner: boolean`
+per member server-side and never put a raw user id on the wire at all — the more conservative
+shape for a DTO that, per `TeamCard`'s own docblock, promises "no secrets, nothing a leaguemate
+should not see." That shape was rejected for two reasons. First, it doesn't fit the panel's own
+required signature — `LeagueMembersPanel({ teams, commissionerUserId, myTeamId })` — which this
+task's brief specified verbatim; a component that takes `commissionerUserId` needs something on
+each row to compare it against. Second, there is already a precedent for a raw user id on a
+members-only wire: `ChatMessageView.authorUserId` (`src/chat-room/contract.ts`) has been on the
+league chat's payload since Phase 1, read by `MessageList` to decide whose message is "mine." An
+opaque WorkOS id string is not the kind of secret the DTO promise is about — it identifies a
+person only to someone who already has the roster of names sitting right next to it, which is
+exactly what this panel already reveals.
+
+The boundary this ruling depends on: `ownerUserId` reaches this wire ONLY through
+`LeagueHomeBody`, the members-only league-home payload. It is not on `TeamCard` itself (the type
+`listTeamCards`, the draft room, and the TV board all still use), so nothing outside a league a
+user has already joined ever sees a member's raw id. Task 6's public-browse contract, which stays
+commissioner-blind by design, is unaffected — it never touches `LeagueHomeBody` at all.
+
 ## Status
 
 Task 3's rows above are satisfied. `LeagueMembersPanel`'s persona-panel pass (this task's Step 5)

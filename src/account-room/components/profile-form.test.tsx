@@ -37,6 +37,17 @@ describe("ProfileForm", () => {
     expect(screen.getByRole("option", { name: "Played before" })).toBeInTheDocument();
   });
 
+  // Persona review (first-timer, FIX 2): the experience question landed with no explanation of
+  // why the product is asking. The hint is deliberately conservative — help-level behavior
+  // driven by this field arrives later in this plan — but a first-timer should never wonder
+  // why they're being asked at all.
+  it("explains why the product asks for experience level", () => {
+    renderInAccount(<ProfileForm profile={PROFILE} />, fixtureAccountDeps().deps);
+    expect(
+      screen.getByText("We use this to match you to leagues and to show you the right amount of help."),
+    ).toBeInTheDocument();
+  });
+
   it("saves the edited name, tier and avatar, and refreshes the page", async () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { ...PROFILE, displayName: "Ada Byron", avatarPreset: "shield", avatar: "preset:shield" } });
     renderInAccount(<ProfileForm profile={PROFILE} />, fixture.deps);
