@@ -86,6 +86,28 @@ The boundary this ruling depends on: `ownerUserId` reaches this wire ONLY throug
 user has already joined ever sees a member's raw id. Task 6's public-browse contract, which stays
 commissioner-blind by design, is unaffected — it never touches `LeagueHomeBody` at all.
 
+## The invite preview is unauthenticated, and what that discloses (Task 7)
+
+`GET /api/invites/[code]` answers without a session. The invite code itself is the credential:
+codes are 8 characters over a 31-symbol alphabet from a CSPRNG, roughly 40 bits, and have been
+the sole thing standing between a stranger and league MEMBERSHIP via `acceptInvite` since
+Phase 1. A preview that reveals less than the join it precedes cannot be the weak point of the
+pair. The IP rate limiter on the route is a speed bump against enumeration, not the defense;
+the code space is.
+
+What a code holder sees before holding an account: the league's name, format, size and open
+seats, scoring label, stake tier with the standard disclosure, and the commissioner's display
+name. The commissioner's name is the deliberate part. The public `/browse` contract stays
+commissioner-blind by design (the Task 3 entry above), but an invite is a personally-sent
+offer, and the person deciding whether to accept it has standing a browsing stranger lacks:
+they are being asked to hand this specific person their entry fee. Naming the host on the
+invitation is the trust surface working as intended, not a leak.
+
+The non-oracle discipline (plan ruling 22): a wrong, expired, or exhausted code returns only
+`{ ok: false, reason }`, and the failing paths never read a league row, so a probe cannot
+distinguish a league that exists from one that never did by shape, and not meaningfully by
+timing. This is asserted by `invitePreview`'s tests, not just described here.
+
 ## Status
 
 Task 3's rows above are satisfied. `LeagueMembersPanel`'s persona-panel pass (this task's Step 5)
