@@ -275,7 +275,7 @@ room.** `chatRemovalPhraseFor`/`removalPhraseFor` (`src/moderation/removal.ts`) 
 `ModerationReasonValue` to a human sentence fragment, and that mapped phrase is exactly what a
 removed message's or review's *author* reads in their private notice's blockquote (`quoteFor`,
 `src/integrity-service/notify.ts`). It is **not** what the room sees: a removed chat message's
-tombstone renders only *"A message was removed."* — see §8 for why that split between the author's
+tombstone renders only *"We removed this message."* — see §8 for why that split between the author's
 notice and the room's own view is deliberate rather than an inconsistency.
 
 ## 7. The multi-account detector
@@ -406,16 +406,24 @@ hole is a conversation everybody misreads, on top of handing the author a deniab
 see straight through. So the chat row keeps its shape: the author and avatar stay (attribution is
 not the thing being removed), the words do not (`ChatMessageView.removal`'s body is withheld on the
 wire entirely, not merely hidden by the client), and `RemovedMessage` (`src/chat-room/components/`)
-renders exactly one neutral sentence: *"A message was removed."*
+renders exactly one neutral sentence: *"We removed this message."* Active voice with the platform
+as the named actor, because the house copy rulebook (`src/integrity/copy-rules.ts`) bans the
+passive construction the first draft of that sentence used, and the room is written in the same
+voice as the notices that rulebook governs.
 
 **The reason renders in the closed vocabulary's own phrase — but only in the author's own notice,
-not the room.** An earlier reading of ruling 18 would have the room itself render the mapped
-phrase (`chatRemovalPhraseFor`) beside the tombstone. That is not what shipped: a fix-round
-adjudication moved the phrase to the author's private `chat_message_removed` notice exclusively.
-`removal.phrase` still travels on the wire in `ChatMessageView.removal` — `mergeMessages`' own
-sticky-removal fold (`src/chat/messages.ts`) needs it *present* to detect a stale, pre-removal frame
-arriving after the removal already landed — but `RemovedMessage` takes it as a required prop and
-deliberately does not render it. The reasoning: a reason broadcast to a whole room, permanently, in
+and it never reaches the room at all.** An earlier reading of ruling 18 would have the room itself
+render the mapped phrase (`chatRemovalPhraseFor`) beside the tombstone. That is not what shipped: a
+fix-round adjudication moved the phrase to the author's private `chat_message_removed` notice
+exclusively. That first fix left `removal.phrase` *on the wire*, unrendered — and the final
+whole-branch review's HIGH 1 was that unrendered is not unsent: `ChatMessageView` reaches every
+member of the room, in the page payload and in every live `chat.message` SSE frame, so any member
+could read a leaguemate's removal reason out of devtools or off the stream. `ChatMessageRemoval` is
+now `{ at }` and nothing else — the sticky-removal fold (`src/chat/messages.ts`) only ever needed
+the object to be non-null, never its contents — so re-leaking the reason does not compile, and the
+wire-level guards in `src/chat-service/chat.test.ts` and `src/chat-service/moderation.test.ts`
+assert on the serialized payload and on a reconstructed SSE frame rather than on a render. The
+reasoning: a reason broadcast to a whole room, permanently, in
 a real-money league, is a public accusation, and it runs against the same minimal-disclosure norm
 that makes `no_action` tell nobody (§6). The fact that a message went is what preserves the
 conversation's shape (ruling 18's whole purpose); the reason does not have to ride along to do

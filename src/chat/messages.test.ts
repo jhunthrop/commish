@@ -47,7 +47,7 @@ describe("mergeMessages", () => {
     // list, so a REDELIVERED (or simply late) frame for an already-removed message can carry
     // `removal: null` — the copy of the message as it stood before the operator's stamp. Taking
     // that frame at face value would silently un-remove a message on screen.
-    const held = [message("7", { removal: { at: "2026-08-20T00:00:00.000Z", phrase: "spam or fake content" } })];
+    const held = [message("7", { removal: { at: "2026-08-20T00:00:00.000Z" } })];
     const merged = mergeMessages(held, [message("7", { removal: null })]);
     expect(merged[0]?.removal).not.toBeNull();
   });
@@ -85,7 +85,7 @@ describe("unionMessages", () => {
   });
 
   it("never un-removes a message when an older copy of it arrives late", () => {
-    const held = [message("1", { removal: { at: "2026-08-20T00:00:00.000Z", phrase: "abusive or harassing content" } })];
+    const held = [message("1", { removal: { at: "2026-08-20T00:00:00.000Z" } })];
     const united = unionMessages(held, [message("1", { removal: null })]);
     expect(united[0]?.removal).not.toBeNull();
   });

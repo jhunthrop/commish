@@ -209,7 +209,6 @@ export async function removeChatMessageInTx(tx: DbTx, input: RemoveChatMessageIn
       gifWidth: null,
       gifHeight: null,
       removedAt: row.removedAt,
-      removalReason: row.removalReason,
     };
     const message: ChatMessageView = toView(removedRow, []);
     await publishQuietly(publish, { leagueId: row.leagueId, type: "chat.message", payload: { message } }, input.onPublishError);

@@ -238,14 +238,18 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // --- The room shows the tombstone in place, not a hole (ruling 18) -----------------------
   // Back to the league page, not a reload of the admin detail page it just submitted from.
   await managerA.goto(`/app/leagues/${leagueId}`);
-  await expect(operatorLog.getByText("A message was removed.")).toBeVisible({ timeout: 20_000 });
+  await expect(operatorLog.getByText("We removed this message.")).toBeVisible({ timeout: 20_000 });
   await expect(operatorLog.getByText(reportable)).toHaveCount(0);
-  // Fix round 1 (review adjudication, HIGH): the room sees ONLY the neutral fact — never the
-  // removal reason. The operator's note above ("spam") maps to the closed vocabulary's own
-  // "spam or fake content" phrase (`chatRemovalPhraseFor`); that phrase must not appear anywhere
-  // in the room, even though the SAME phrase reaches the author privately, through their own
-  // notice, asserted below. Inverted assertion, the same shape the notice-privacy guards use.
+  // The room sees ONLY the neutral fact — never the removal reason. The operator's note above
+  // ("spam") maps to the closed vocabulary's own "spam or fake content" phrase
+  // (`chatRemovalPhraseFor`); that phrase must not appear anywhere in the room, even though the
+  // SAME phrase reaches the author privately, through their own notice, asserted below.
   await expect(operatorLog.getByText("spam or fake content")).toHaveCount(0);
+  // Final review, HIGH 1: the reason is not merely unrendered, it is not SENT. Assert on the
+  // page's own serialized chat payload — the bytes this browser actually received — because the
+  // leak this replaced was invisible to every render-level assertion above.
+  const chatPayload = await managerA.evaluate(() => document.documentElement.outerHTML);
+  expect(chatPayload).not.toContain("spam or fake content");
 
   // --- And the author's own inbox carries the notice, WITH the reason, privately -----------
   await managerB.goto(`/app/leagues/${leagueId}`);

@@ -7,6 +7,7 @@ import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { quoteFor, type MemberNotice } from "@/integrity-service/notify";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { chatRemovalPhraseFor } from "@/moderation/removal";
+import { REASON_FRAGMENTS } from "@/moderation/test-support";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import { postMessage } from "./chat";
@@ -32,6 +33,17 @@ function recorder() {
 }
 
 const noopPublish = async () => null;
+
+/**
+ * The exact bytes an open `EventSource` receives for one published frame — `src/lib/realtime/
+ * sse.ts`'s own `frame()`, reproduced over a recorded publish. The wire-privacy guards below
+ * assert on THIS, not on a field of a parsed object: the leak they exist to catch (final review,
+ * HIGH 1) was invisible at the render level and visible in exactly this string.
+ */
+function sseFrameFor(published: Published): string {
+  const event = { id: "1-0", type: published.type, leagueId: published.leagueId, payload: published.payload, timestamp: "2026-08-04T00:00:00.000Z" };
+  return `id: ${event.id}\nevent: ${event.type}\ndata: ${JSON.stringify(event)}\n\n`;
+}
 
 beforeEach(async () => {
   await truncateAll(db);
@@ -127,7 +139,33 @@ describe("removeChatMessageInTx", () => {
     const payload = bus.sent[0]?.payload as { readonly message: { readonly body: string; readonly gif: unknown; readonly removal: unknown } };
     expect(payload.message.body).toBe("");
     expect(payload.message.gif).toBeNull();
-    expect(payload.message.removal).toEqual({ at: "2026-08-04T00:00:00.000Z", phrase: chatRemovalPhraseFor("spam") });
+    expect(payload.message.removal).toEqual({ at: "2026-08-04T00:00:00.000Z" });
+  });
+
+  /**
+   * THE WIRE-LEVEL GUARD for the live half (final review, HIGH 1). `removal.phrase` used to ride
+   * on this frame, broadcast to the whole league's stream — unrendered, but readable off the SSE
+   * connection by any member. Asserted on the serialized frame itself, for every reason in the
+   * closed vocabulary, because that string is where the disclosure actually happened.
+   */
+  it("broadcasts no removal reason on the live frame, in any form, for any reason in the vocabulary", async () => {
+    for (const reason of ["spam", "abusive", "other"]) {
+      await truncateAll(db);
+      await chatLeagueFixture(db);
+      counter = 0;
+      const messageId = await postAndGetId("u1", "the words the room keeps");
+      const bus = recorder();
+
+      await remove({ messageId, removedByUserId: "u1", reason, clock: at("2026-08-04T00:00:00Z"), publish: bus.publish, audit: logger });
+
+      const frame = sseFrameFor(bus.sent[0]!);
+      for (const fragment of REASON_FRAGMENTS) {
+        expect(frame).not.toContain(fragment);
+      }
+      // ...and the author's private notice still carries it, so the reason was not simply lost.
+      const [notice] = await db.select().from(memberNotices);
+      expect(notice!.context).toEqual({ leagueName: "Sunday Money", reason });
+    }
   });
 
   it("refuses a message id that doesn't exist", async () => {

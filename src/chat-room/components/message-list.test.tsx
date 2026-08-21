@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
+import { REASON_FRAGMENTS } from "@/moderation/test-support";
 import { chatMessage, TOUCHDOWN_GIF } from "../test-fixtures";
 import { formatChatTime } from "../lib/format";
 import { MessageList } from "./message-list";
@@ -90,7 +91,7 @@ describe("MessageList", () => {
     });
 
     it("never offers Report on an already-removed message", () => {
-      const removed = [chatMessage("9", { authorUserId: "u2", removal: { at: "2026-08-20T00:00:00.000Z", phrase: "spam or fake content" } })];
+      const removed = [chatMessage("9", { authorUserId: "u2", removal: { at: "2026-08-20T00:00:00.000Z" } })];
       render(<MessageList leagueId="l1" messages={removed} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
       expect(screen.queryByRole("button", { name: "Report" })).not.toBeInTheDocument();
     });
@@ -98,7 +99,7 @@ describe("MessageList", () => {
 
   describe("a removed message", () => {
     const REMOVED = [
-      chatMessage("9", { authorUserId: "u2", authorName: "Jordan Lee", body: "should never render", removal: { at: "2026-08-20T00:00:00.000Z", phrase: "spam or fake content" } }),
+      chatMessage("9", { authorUserId: "u2", authorName: "Jordan Lee", body: "should never render", removal: { at: "2026-08-20T00:00:00.000Z" } }),
     ];
 
     it("renders in place — the author and avatar stay, the words do not", async () => {
@@ -106,7 +107,7 @@ describe("MessageList", () => {
         <MessageList leagueId="l1" messages={REMOVED} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />,
         async ({ container }) => {
           expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
-          expect(screen.getByText(/A message was removed\./)).toBeInTheDocument();
+          expect(screen.getByText(/We removed this message\./)).toBeInTheDocument();
           expect(screen.queryByText("should never render")).not.toBeInTheDocument();
           expect(screen.getAllByRole("listitem")).toHaveLength(1);
           expect(await axe(container)).toHaveNoViolations();
@@ -115,14 +116,16 @@ describe("MessageList", () => {
     });
 
     /**
-     * Fix round 1 (review adjudication, HIGH): the room sees only the neutral fact, never the
-     * removal reason — reviews' own precedent (private-notice-only) mirrored, not broadcast.
-     * Inverted from the original assertion, which asserted the phrase WAS visible; that was the
-     * finding.
+     * The room sees only the neutral fact, never the removal reason — reviews' own precedent
+     * (private-notice-only) mirrored, not broadcast. Final review, HIGH 1: the message no longer
+     * CARRIES the reason at all, so this asserts over the whole closed vocabulary rather than
+     * over the one phrase a fixture happened to set.
      */
-    it("never renders the removal reason to the room, even though the message carries it", () => {
-      render(<MessageList leagueId="l1" messages={REMOVED} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
-      expect(screen.queryByText(/spam or fake content/)).not.toBeInTheDocument();
+    it("never renders any removal reason to the room", () => {
+      const { container } = render(<MessageList leagueId="l1" messages={REMOVED} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
+      for (const fragment of REASON_FRAGMENTS) {
+        expect(container.textContent).not.toContain(fragment);
+      }
     });
 
     it("offers no reactions on a removed message", () => {

@@ -5,7 +5,6 @@ import type { Db } from "@/db/client";
 import { chatMessages, chatReactions, teams, users } from "@/db/schema";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
-import { chatRemovalPhraseFor } from "@/moderation/removal";
 
 /**
  * Exported (Task 6): `@/chat-service/moderation`'s `removeChatMessageInTx` builds one of these
@@ -26,9 +25,13 @@ export interface MessageRow {
   readonly gifAlt: string | null;
   readonly gifWidth: number | null;
   readonly gifHeight: number | null;
-  /** Both null for a message that stands. See `ChatMessageView.removal`'s own docblock. */
+  /**
+   * Null for a message that stands. There is deliberately NO `removalReason` on this row shape:
+   * the reason never becomes part of a `ChatMessageView`, so the one mapper that builds the wire
+   * view is never handed it in the first place (final review, HIGH 1). `removeChatMessageInTx`
+   * reads the reason straight off its own `UPDATE ... RETURNING` for the author's private notice.
+   */
   readonly removedAt: Date | null;
-  readonly removalReason: string | null;
 }
 
 /** Null unless every one of the five columns is populated — `kind` alone is not trusted over the columns actually being there. Also null once the message is removed — see `toView` below. */
@@ -39,8 +42,13 @@ function toGifView(row: MessageRow): ChatGif | null {
   return { url: row.gifUrl, previewUrl: row.gifPreviewUrl, alt: row.gifAlt, width: row.gifWidth, height: row.gifHeight };
 }
 
+/**
+ * `at` and nothing else — see `ChatMessageRemoval`'s own docblock. This object reaches every
+ * member of the room, so a reason on it would be a public accusation; the reason reaches the
+ * author alone, through their private `chat_message_removed` notice.
+ */
 function toRemoval(row: MessageRow): ChatMessageRemoval | null {
-  return row.removedAt === null ? null : { at: row.removedAt.toISOString(), phrase: chatRemovalPhraseFor(row.removalReason) };
+  return row.removedAt === null ? null : { at: row.removedAt.toISOString() };
 }
 
 /**
@@ -57,8 +65,8 @@ export function toView(row: MessageRow, reactions: readonly ChatReactionView[]):
     authorAvatarUrl: row.authorAvatarUrl,
     // The wire does not carry a removed message's words (ChatMessageView.removal's own
     // docblock) — the row itself keeps them, exactly as `reviews` preserves a removed review's
-    // body. `RemovedMessage` renders `removal.phrase` instead; nothing reads `body` once
-    // `removal !== null`.
+    // body. `RemovedMessage` renders its own neutral tombstone sentence instead; nothing reads
+    // `body` once `removal !== null`.
     body: removal === null ? row.body : "",
     createdAt: row.createdAt.toISOString(),
     reactions,
@@ -174,7 +182,6 @@ export async function postMessage(db: Db, input: PostMessageInput): Promise<Chat
       gifHeight: input.gif?.height ?? null,
       // A message this call just created has never been removed.
       removedAt: null,
-      removalReason: null,
     },
     [],
   );
@@ -222,7 +229,6 @@ export async function listMessages(db: Db, input: ListMessagesInput): Promise<Ch
       gifWidth: chatMessages.gifWidth,
       gifHeight: chatMessages.gifHeight,
       removedAt: chatMessages.removedAt,
-      removalReason: chatMessages.removalReason,
     })
     .from(chatMessages)
     .innerJoin(users, eq(users.id, chatMessages.authorUserId))

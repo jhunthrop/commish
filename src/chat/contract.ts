@@ -27,26 +27,27 @@ export interface ChatGif {
  * Null for a message that stands. Populated for one that an operator removed, and the message
  * still renders: a removed review vanishes from its feed, but a conversation with a hole in it is
  * a conversation everybody misreads, and the members who saw it already know it existed (ruling
- * 18). `phrase` is `chatRemovalPhraseFor(reason)` (`@/moderation/removal`) resolved SERVER-SIDE,
- * the chat-domain twin of `removalPhraseFor` reviews' own surfaces use (fix round 1: the shared
- * mapper's generic fallback was reviews-domain copy, "breaking the review rules", leaking into
- * chat).
+ * 18).
  *
- * Fix round 1 (review adjudication, HIGH): `phrase` is carried on this type but deliberately
- * NEVER RENDERED to the room — `RemovedMessage` (`@/chat-room/components/removed-message.tsx`)
- * states only the neutral fact, "A message was removed." The reason reaches the author alone,
- * through the notice's own private `quoteFor` blockquote, the identical private-disclosure shape
- * `review_removed` already used. It stays on this type because the sticky-removal fold
- * (`@/chat/messages.ts`) needs a non-null `removal` object to detect a stale, pre-removal frame,
- * and a future author-facing surface reading their OWN removed message (none exists today) would
- * need it too — but no shipped surface reads `.phrase` from a fetched/live `ChatMessageView`.
+ * `at` IS THE WHOLE TYPE, and that is the privacy rule expressed as a type. Final review, HIGH 1:
+ * this interface used to carry a `phrase` field (`chatRemovalPhraseFor(reason)`) that no
+ * room-visible surface rendered — but unrendered is not unsent. Every member of the room receives
+ * this object, in the initial page payload and in every live `chat.message` SSE frame, so a
+ * reason on it is readable out of devtools or off the stream by anyone in the league: a permanent
+ * public accusation about a leaguemate, in a real-money product, which is exactly what ruling 6's
+ * minimal-disclosure norm exists to prevent. The field is gone rather than merely unread, so
+ * re-leaking it does not compile.
+ *
+ * The reason reaches the AUTHOR alone, through the private `chat_message_removed` notice's
+ * `quoteFor` blockquote (`@/integrity-service/notify`) — the identical private-disclosure shape
+ * `review_removed` already used. The sticky-removal fold (`@/chat/messages.ts`) keys on
+ * `removal !== null` and never read `.phrase`, so nothing needed it.
  *
  * There is no `removedByUserId` here: which operator removed a message is an operator fact, not
  * a member-facing one (see `chat_messages`' own docblock in `src/db/schema.ts`).
  */
 export interface ChatMessageRemoval {
   readonly at: string;
-  readonly phrase: string;
 }
 
 export interface ChatMessageView {
@@ -57,8 +58,9 @@ export interface ChatMessageView {
   readonly authorAvatarUrl: string | null;
   /**
    * `""` for a removed message — the row keeps the author's words exactly as written (the same
-   * stamp-never-delete discipline `reviews` uses), but the wire does not carry them. `RemovedMessage`
-   * renders `removal.phrase` instead of this field; nothing reads `body` when `removal !== null`.
+   * stamp-never-delete discipline `reviews` uses), but the wire does not carry them.
+   * `RemovedMessage` renders its own neutral tombstone sentence instead of this field; nothing
+   * reads `body` when `removal !== null`.
    */
   readonly body: string;
   readonly createdAt: string;

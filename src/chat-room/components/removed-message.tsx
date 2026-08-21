@@ -4,6 +4,11 @@ import { Avatar } from "@/components/ui";
 export interface RemovedMessageProps {
   readonly authorName: string;
   readonly authorAvatarUrl: string | null;
+  /**
+   * `{ at }` and nothing else — the room-bound removal type carries no reason (final review,
+   * HIGH 1). Still a required prop rather than a boolean so a caller cannot render a tombstone
+   * for a message that was never removed.
+   */
   readonly removal: ChatMessageRemoval;
 }
 
@@ -17,17 +22,23 @@ export interface RemovedMessageProps {
  * posted it would only invite guessing. The words themselves never render — `body` is not on the
  * wire for a removed message at all (`ChatMessageView.removal`'s own docblock).
  *
- * Fix round 1 (review adjudication): the room sees ONLY the neutral fact — "A message was
- * removed." — never the reason. `removal.phrase` still travels on the wire (the sticky-removal
- * fold in `@/chat/messages` needs it present to detect a stale, pre-removal frame), and this
- * component still takes it as a required prop so a future caller cannot pass a bare boolean by
- * mistake, but it is deliberately NOT rendered here. Reviews' own precedent is the same shape: a
- * removed review's reason reaches only its author, through `quoteFor`'s private notice
- * blockquote (`chat_message_removed`'s own template does the identical thing for chat). A reason
- * broadcast to the whole room, permanently, in a real-money league is a public accusation this
- * codebase's own minimal-disclosure norm (ruling 6: `no_action` tells nobody, on purpose) argues
- * against — the fact that a message went is what preserves the conversation's shape (ruling 18's
- * whole purpose); the reason does not need to ride along to do that.
+ * The room reads ONE neutral sentence and never the reason. Final review, HIGH 1: the reason no
+ * longer travels to the room at all — `ChatMessageRemoval` is `{ at }`, so there is nothing here
+ * to leak even by accident. Reviews' own precedent is the same shape: a removed review's reason
+ * reaches only its author, through `quoteFor`'s private notice blockquote
+ * (`chat_message_removed`'s own template does the identical thing for chat). A reason broadcast
+ * to the whole room, permanently, in a real-money league is a public accusation this codebase's
+ * own minimal-disclosure norm (ruling 6: `no_action` tells nobody, on purpose) argues against —
+ * the fact that a message went is what preserves the conversation's shape (ruling 18's whole
+ * purpose); the reason does not need to ride along to do that.
+ *
+ * The sentence names the platform as the actor (final review, MEDIUM 5). The sentence that
+ * shipped first was passive and is literally on `INTEGRITY_CONFIG.notices.passiveConstructions` —
+ * the house copy rulebook (`@/integrity/copy-rules`) bans it, and this surface is written in the
+ * same voice as the notices that rulebook was built for. It is swept there rather than here,
+ * because a client room may not import a server module even in a test (`eslint.config.mjs`'s
+ * client-boundary rule): `src/integrity/copy-rules.source.test.ts` reads this file's own string
+ * literals off disk. Active voice, same disclosure, same length class.
  */
 export function RemovedMessage({ authorName, authorAvatarUrl }: RemovedMessageProps) {
   return (
@@ -35,7 +46,7 @@ export function RemovedMessage({ authorName, authorAvatarUrl }: RemovedMessagePr
       <Avatar name={authorName} avatar={authorAvatarUrl} />
       <div className="flex min-w-0 flex-1 flex-col gap-1">
         <p className="font-display font-semibold text-text-primary">{authorName}</p>
-        <p className="italic text-text-muted">A message was removed.</p>
+        <p className="italic text-text-muted">We removed this message.</p>
       </div>
     </div>
   );

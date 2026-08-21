@@ -18,7 +18,7 @@ const MESSAGE = {
   },
 };
 
-const REMOVAL = { at: "2026-08-20T00:00:00.000Z", phrase: "spam or fake content" };
+const REMOVAL = { at: "2026-08-20T00:00:00.000Z" };
 
 const GIF = { url: "https://media.giphy.com/g.gif", previewUrl: "https://media.giphy.com/g-preview.gif", alt: "Touchdown", width: 480, height: 270 };
 
@@ -134,12 +134,26 @@ describe("parseChatFrame", () => {
     expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
   });
 
-  it("drops a removal field missing either of its required properties", () => {
-    const incompleteRemovals = [{ phrase: REMOVAL.phrase }, { at: REMOVAL.at }];
-    for (const removal of incompleteRemovals) {
-      const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, removal } } }));
-      expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
-    }
+  it("drops a removal field with no `at` — the only property a real removal has", () => {
+    const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, removal: { at: 7 } } } }));
+    expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+  });
+
+  /**
+   * Final review, HIGH 1: the removal reason is off the wire, and this parser is the client-side
+   * half of keeping it off. A frame that carried one anyway — a regressed server, a replayed old
+   * Redis entry from before the fix, anything — has it dropped here rather than folded into
+   * client state where a later render could reach it.
+   */
+  it("keeps only `at` off a removal, dropping any reason a frame carries", () => {
+    const frame = parseChatFrame(
+      JSON.stringify({
+        type: "chat.message",
+        payload: { message: { ...MESSAGE.payload.message, removal: { ...REMOVAL, phrase: "spam or fake content", reason: "spam" } } },
+      }),
+    );
+    expect(frame).toEqual({ kind: "message", message: { ...MESSAGE.payload.message, removal: REMOVAL } });
+    expect(JSON.stringify(frame)).not.toContain("spam");
   });
 
   it("returns null when the reaction payload isn't an object", () => {

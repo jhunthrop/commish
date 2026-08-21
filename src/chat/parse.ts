@@ -31,15 +31,16 @@ function toGif(value: unknown): ChatGif | null {
 
 /**
  * A malformed or absent `removal` field is treated as "not removed" — the message still renders
- * with its body — never a fatal parse. `at`/`phrase` are both required together: a removal with
- * only one of them present did not come from a real `ChatMessageRemoval` and is not trusted.
+ * with its body — never a fatal parse. `at` is the whole type (`ChatMessageRemoval`), and it is
+ * required: a removal object without it did not come from a real one and is not trusted. Any
+ * OTHER key on the frame is dropped here rather than passed through, so a server that regressed
+ * and re-attached a reason still could not put it into client state.
  */
 function toRemoval(value: unknown): ChatMessageRemoval | null {
   const record = asRecord(value);
   if (record === null) return null;
   const at = asString(record.at);
-  const phrase = asString(record.phrase);
-  return at === null || phrase === null ? null : { at, phrase };
+  return at === null ? null : { at };
 }
 
 function toReactions(value: unknown): readonly ChatReactionView[] {
