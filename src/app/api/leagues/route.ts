@@ -41,7 +41,7 @@ export async function POST(request: Request) {
         isPublicMatchmade: parsed.value.visibility === "public",
       },
     );
-    if (!result.ok) return fail(result.reason, 500);
+    if (!result.ok) return fail(result.reason, result.status);
     return ok<CreateLeagueBody>(
       { leagueId: result.leagueId, teamId: result.teamId, draftId: result.draftId },
       { status: 201 },

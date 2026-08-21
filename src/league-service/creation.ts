@@ -9,6 +9,7 @@ import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logg
 import { LEAGUE_CONFIG } from "@/league";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { MS_PER_DAY } from "./config";
+import { ENFORCEMENT_REFUSALS, tierJoinPrecondition } from "./enforcement";
 
 /** No Redis connection needed: every existing caller of `createLeague` keeps working untouched. */
 const NOOP_REFERENCE_CACHE: Pick<ReferenceCache, "invalidateScoringSettings"> = {
@@ -52,7 +53,7 @@ export interface CreateLeagueInput {
 
 export type CreateLeagueResult =
   | { readonly ok: true; readonly leagueId: string; readonly teamId: string; readonly draftId: string }
-  | { readonly ok: false; readonly reason: string };
+  | { readonly ok: false; readonly status: number; readonly reason: string };
 
 /**
  * A league is never half-created: the league row, its scoring settings, the commissioner's own
@@ -62,11 +63,27 @@ export type CreateLeagueResult =
  *
  * The draft is scheduled `LEAGUE_CONFIG.defaults.draftDaysFromCreation` out so the
  * auto-tightening clock starts in a slow tier rather than at the 60-second floor.
+ *
+ * THE CREATION-SIDE GATE (Task 3, ruling 6). `publicJoinPrecondition` (`@/league-service/join`)
+ * never runs for a league's OWN creator — a creator does not join their own league through the
+ * public door, so the join gate alone leaves the exact hole the segregation exists to prevent: a
+ * veteran declares their own public league `beginner` and simply waits for it to fill. This reads
+ * the SAME `tierJoinPrecondition` (`@/league-service/enforcement`) the join gate reads, against
+ * the fields THIS request is asking to create rather than a row already in `leagues` — the one
+ * predicate, asked before either league exists, the other before a caller may enter one.
+ *
+ * NO-WRITE-BEFORE-COMMITTED-REFUSAL: this check runs BEFORE `db.transaction(...)` is ever opened,
+ * not inside it and rolled back — a refused creation writes nothing, ever, not even inside a
+ * transaction nobody sees commit.
  */
 export async function createLeague(
   { db, clock, newId, cache = NOOP_REFERENCE_CACHE, audit = getAuditLogger() }: LeagueWriteDeps,
   input: CreateLeagueInput,
 ): Promise<CreateLeagueResult> {
+  if (await tierJoinPrecondition(db, { isPublicMatchmade: input.isPublicMatchmade, experienceTier: input.experienceTier }, input.commissionerUserId)) {
+    return { ok: false, status: 409, reason: ENFORCEMENT_REFUSALS.create };
+  }
+
   const leagueId = newId();
   const teamId = newId();
   const draftId = newId();
@@ -115,7 +132,7 @@ export async function createLeague(
   } catch (error: unknown) {
     // Plain language out, real detail into the logs — never raw driver text to a user.
     console.error("[league] create failed", { commissionerUserId: input.commissionerUserId }, error);
-    return { ok: false, reason: "We couldn't create that league. Please try again." };
+    return { ok: false, status: 500, reason: "We couldn't create that league. Please try again." };
   }
 
   // After the transaction commits, never inside it — the same reason `setLineup` invalidates

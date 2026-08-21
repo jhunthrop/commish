@@ -134,4 +134,5 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
     gaveBackSummary: "Justin Jefferson",
     note: "Two accounts, one household, and this trade is why we looked.",
   },
+  tier_blocked_join: { leagueName: "Rookie Snake Room" },
 };

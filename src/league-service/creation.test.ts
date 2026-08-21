@@ -5,7 +5,9 @@ import { auditEvents, drafts, leagues, scoringSettings, teams, users } from "@/d
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { LEAGUE_CONFIG } from "@/league";
+import { ENFORCEMENT_REFUSALS } from "./enforcement";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { createLeague, type CreateLeagueInput } from "./creation";
 
@@ -37,6 +39,24 @@ function validInput(): CreateLeagueInput {
 /** A recording stand-in for the injected reference cache, so a test can assert exactly what was invalidated. */
 function recordingReferenceCache(): Pick<ReferenceCache, "invalidateScoringSettings"> & { invalidateScoringSettings: ReturnType<typeof vi.fn> } {
   return { invalidateScoringSettings: vi.fn(async () => {}) };
+}
+
+/** Gives `userId` `count` OTHER completed leagues — matches `@/league-service`'s own suites
+ *  (`browse.test.ts`, `join.test.ts`, `enforcement.test.ts`), each with its own identical copy. */
+async function giveCompletedSeasons(userId: string, count: number): Promise<void> {
+  await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: userId }).onConflictDoNothing();
+  for (let i = 0; i < count; i++) {
+    const leagueId = `${userId}_history_${i}`;
+    await db.insert(leagues).values({
+      id: leagueId,
+      name: leagueId,
+      format: "snake",
+      teamCount: 1,
+      commissionerUserId: userId,
+      seasonCompletedAt: new Date("2025-01-01T00:00:00.000Z"),
+    });
+    await db.insert(teams).values({ id: `${leagueId}_team`, leagueId, userId, name: "Team" });
+  }
 }
 
 beforeEach(async () => {
@@ -105,7 +125,7 @@ describe("createLeague", () => {
         rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "nobody", teamName: "Ghost",
         experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
       });
-      expect(result).toEqual({ ok: false, reason: "We couldn't create that league. Please try again." });
+      expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't create that league. Please try again." });
       expect(await db.select().from(leagues)).toEqual([]);
       expect(consoleSpy).toHaveBeenCalled();
     } finally {
@@ -242,5 +262,82 @@ describe("createLeague", () => {
     } finally {
       consoleSpy.mockRestore();
     }
+  });
+
+  describe("the creation-side hole (Task 3, ruling 6)", () => {
+    it("refuses to let a veteran create a public league declared for beginners", async () => {
+      // The gate Step 6 does not contain. A creator never passes through `publicJoinPrecondition`,
+      // so without this a veteran can build the exact league the segregation exists to keep them
+      // out of and then wait for it to fill.
+      await giveCompletedSeasons("u_vet", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+      const result = await createLeague(deps(), {
+        ...validInput(),
+        commissionerUserId: "u_vet",
+        isPublicMatchmade: true,
+        experienceTier: "beginner",
+      });
+      expect(result).toEqual({ ok: false, status: 409, reason: ENFORCEMENT_REFUSALS.create });
+    });
+
+    it("lets the same veteran create the same league privately, or publicly for everyone", async () => {
+      await giveCompletedSeasons("u_vet2", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+      const privateResult = await createLeague(deps(), {
+        ...validInput(),
+        commissionerUserId: "u_vet2",
+        isPublicMatchmade: false,
+        experienceTier: "beginner",
+      });
+      expect(privateResult).toMatchObject({ ok: true });
+
+      const publicExperienced = await createLeague(deps(), {
+        ...validInput(),
+        commissionerUserId: "u_vet2",
+        isPublicMatchmade: true,
+        experienceTier: "experienced",
+      });
+      expect(publicExperienced).toMatchObject({ ok: true });
+    });
+
+    it("does not gate a newcomer creating the identical public, beginner-declared league", async () => {
+      const result = await createLeague(deps(), {
+        ...validInput(),
+        commissionerUserId: "u1",
+        isPublicMatchmade: true,
+        experienceTier: "beginner",
+      });
+      expect(result).toMatchObject({ ok: true });
+    });
+
+    it("writes nothing when a creation is refused — no league row, no team, no audit event", async () => {
+      await giveCompletedSeasons("u_vet3", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+      const before = await db.select().from(leagues);
+      const result = await createLeague({ db, clock, newId, audit: logger }, {
+        ...validInput(),
+        commissionerUserId: "u_vet3",
+        isPublicMatchmade: true,
+        experienceTier: "beginner",
+      });
+      expect(result.ok).toBe(false);
+      expect(await db.select().from(leagues)).toEqual(before);
+      expect(await db.select().from(auditEvents)).toEqual([]);
+    });
+
+    it("lets segregation off through the same rollback switch the join gate reads", async () => {
+      await giveCompletedSeasons("u_vet4", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+      const config = INTEGRITY_CONFIG.participation as { enforceTierSegregation: boolean };
+      const original = config.enforceTierSegregation;
+      config.enforceTierSegregation = false;
+      try {
+        const result = await createLeague(deps(), {
+          ...validInput(),
+          commissionerUserId: "u_vet4",
+          isPublicMatchmade: true,
+          experienceTier: "beginner",
+        });
+        expect(result).toMatchObject({ ok: true });
+      } finally {
+        config.enforceTierSegregation = original;
+      }
+    });
   });
 });

@@ -124,6 +124,17 @@ describe("NOTICE_TEMPLATES", () => {
     expect(reversed.body).toContain("There is no reply to this message.");
   });
 
+  it("says what happened when a join is refused for tier segregation, verbatim (Task 3)", () => {
+    const blocked = renderNotice("tier_blocked_join", NOTICE_SAMPLES.tier_blocked_join);
+    expect(blocked.title).toBe("That league is reserved for newer players");
+    expect(blocked.body).toBe(
+      "You asked to join Rookie Snake Room, which keeps its seats for players who are new to Commish so everyone starts on a level footing. Plenty of leagues are open to everyone, and the browse page lists the ones with seats left right now.",
+    );
+    // Not a sanction — nothing about this member's own conduct, and no "no reply" line: there is
+    // nothing to appeal, only a rule about the league they asked to join.
+    expect(blocked.body).not.toContain("There is no reply to this message.");
+  });
+
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
@@ -134,6 +145,7 @@ describe("NOTICE_TEMPLATES", () => {
       "operator_warning",
       "review_removed",
       "stat_week_corrected",
+      "tier_blocked_join",
       "trade_executed",
       "trade_proposed",
       "trade_rejected",

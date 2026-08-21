@@ -51,6 +51,21 @@ describe("PublicLeagueList", () => {
     // one interactive child (`JoinPublicLeagueButton`) owns its own request and its own test.
   });
 
+  it("tells a visitor a beginner-tier card is reserved for newer players, with somewhere else to go", () => {
+    // `PUBLIC_LEAGUES` has exactly one beginner-tier card (`p1`) and one experienced-tier card
+    // (`p2`) — proactive, not reactive: this renders on the card itself, before anyone presses
+    // Join, so a veteran self-selects away rather than discovering the gate only after a refusal.
+    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />);
+    expect(screen.getByText(/Reserved for players newer to Commish/)).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "Browse leagues open to everyone" });
+    expect(link).toHaveAttribute("href", "/browse?experienceTier=experienced");
+  });
+
+  it("says nothing extra on an experienced-tier card", () => {
+    render(<PublicLeagueList leagues={[PUBLIC_LEAGUES[1]!]} signedIn />);
+    expect(screen.queryByText(/Reserved for players newer to Commish/)).not.toBeInTheDocument();
+  });
+
   it("shows the scoring label beside the format, each with its own InfoTip", () => {
     render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />);
     expect(screen.getByText("Standard")).toBeInTheDocument();

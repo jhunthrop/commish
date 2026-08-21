@@ -26,6 +26,10 @@ describe("SYSTEM_ACTION_SUMMARY_ALLOWED", () => {
     expect(SYSTEM_ACTION_SUMMARY_ALLOWED.trade_held_for_review).toBe(false);
   });
 
+  it("denies tier_blocked_join — nobody in the league is told a stranger was turned away at the door", () => {
+    expect(SYSTEM_ACTION_SUMMARY_ALLOWED.tier_blocked_join).toBe(false);
+  });
+
   it("is a real Record over the whole union, so a code added later without an entry does not compile", () => {
     // Compile-time proof, made visible in the suite: every SystemActionCode indexes into the
     // table without a cast. The runtime assertion above is what actually fails if a value ever

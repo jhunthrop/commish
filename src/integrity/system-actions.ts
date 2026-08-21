@@ -4,7 +4,13 @@
  * exhaustiveness test below does exactly that) without a hand-maintained union falling out of
  * step with its own list.
  */
-export const SYSTEM_ACTION_CODES = ["stat_week_corrected", "chain_verification_failed", "lineup_auto_set", "trade_held_for_review"] as const;
+export const SYSTEM_ACTION_CODES = [
+  "stat_week_corrected",
+  "chain_verification_failed",
+  "lineup_auto_set",
+  "trade_held_for_review",
+  "tier_blocked_join",
+] as const;
 
 export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
 
@@ -32,10 +38,18 @@ export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
  *    applies at least as hard to a system-authored sentence describing one manager's lineup, and
  *    broadcasting the lapse publicly while manual changes stay private would be worse than either.
  *    What Plan D needs is an actor-scoped path, which is a new visibility, not a new summary.
+ *  - `tier_blocked_join` is DENIED. This code's own event is platform-scoped (`leagueId: null`,
+ *    `recordTierBlockedJoin` in `@/league-service/join`) and carries no `summary` at all, so it is
+ *    denied on both grounds today — but it is entered here explicitly, deny-by-default rather than
+ *    left absent, for the same reason `trade_held_for_review` is: a code missing from this table
+ *    entirely reads as an oversight the day someone adds a `summary` to its payload, not a decision.
+ *    Nobody in the league needs to know a stranger was turned away at the door, and telling them
+ *    would publish that stranger's inexperience to twelve people who never met them.
  */
 export const SYSTEM_ACTION_SUMMARY_ALLOWED: Readonly<Record<SystemActionCode, boolean>> = {
   stat_week_corrected: true,
   chain_verification_failed: false,
   lineup_auto_set: false,
   trade_held_for_review: false,
+  tier_blocked_join: false,
 };

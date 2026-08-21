@@ -179,6 +179,20 @@ export interface NoticeContexts {
     readonly gaveBackSummary: string;
     readonly note: string;
   };
+  /**
+   * `recordTierBlockedJoin`'s own notice (`@/league-service/join`, Task 3) — the join-side half of
+   * the enforcement predicate in `@/league-service/enforcement`. Sent to the member who was turned
+   * away, and to nobody else: `SYSTEM_ACTION_VISIBILITY`'s (`@/integrity/system-actions`) entry for
+   * `tier_blocked_join` is `hidden`, because nobody else in the league needs to know a stranger was
+   * refused at the door, and telling them would publish a stranger's inexperience to twelve people
+   * who never met them. `leagueName` is the only context this notice carries — no mention of WHY
+   * the account was refused (no completed-season count, no tier label): the no-oracle discipline
+   * that keeps a private league's existence unconfirmed applies here too, one level down — this
+   * notice explains what happened, not a scorecard of the account that triggered it.
+   */
+  readonly tier_blocked_join: {
+    readonly leagueName: string;
+  };
 }
 
 /**
@@ -292,6 +306,15 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   trade_reversed: ({ leagueName, counterpartyTeamName, gotBackSummary, gaveBackSummary }) => ({
     title: "An operator reversed your trade",
     body: `An operator reversed the trade you and ${counterpartyTeamName} completed in ${leagueName}. You have ${gotBackSummary} again, and ${counterpartyTeamName} has ${gaveBackSummary}. Scores from weeks you have already played stay as they were. There is no reply to this message.`,
+  }),
+  // No "no reply to this message" line: this is not a sanction and there is nothing about the
+  // member's own conduct to appeal — it explains a rule about the LEAGUE, not a decision about
+  // the person. Deliberately does not name the account's own completed-season count or tier: the
+  // no-oracle discipline that keeps a private league's existence unconfirmed to a stranger applies
+  // here too, one level down — the notice says what happened, not a scorecard of why.
+  tier_blocked_join: ({ leagueName }) => ({
+    title: "That league is reserved for newer players",
+    body: `You asked to join ${leagueName}, which keeps its seats for players who are new to Commish so everyone starts on a level footing. Plenty of leagues are open to everyone, and the browse page lists the ones with seats left right now.`,
   }),
 };
 

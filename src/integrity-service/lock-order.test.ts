@@ -5,7 +5,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
-import { joinLeagueInTx } from "@/league-service/join";
+import { joinLeagueInTx, recordTierBlockedJoin } from "@/league-service/join";
 import { writeSchedule } from "@/league-service/schedule";
 import { seasonCurrentWeek } from "@/league-service/test-support";
 import { acceptTrade, proposeTrade, rejectTrade } from "@/league-service/trades";
@@ -1716,5 +1716,59 @@ describe("toggleReaction's reaction insert", () => {
     // ever cycle on the two rows above — which is the whole reason it is safe, proved rather than
     // asserted.
     expect(await joinDb.select().from(auditChains)).toEqual([]);
+  });
+});
+
+/**
+ * Task 3's own transaction, and the last one this file adds. `recordTierBlockedJoin`
+ * (`@/league-service/join`) writes a `member_notices` row carrying a foreign key to `leagues` —
+ * the SAME implicit `FOR KEY SHARE` every notice-writing transaction in this file already takes —
+ * BEFORE it reaches the platform chain's own anchor, exactly like `raiseFlag`'s and `grantAdmin`'s
+ * own shape above. It runs in a WHOLLY SEPARATE transaction from the join it explains, always
+ * AFTER that join's own transaction has already rolled back (`join.ts`'s own docblock), so the
+ * question this proof answers is narrower than "does it deadlock against the join that triggered
+ * it" (that join is long gone by the time this runs in production) and exactly the one the brief
+ * asks for: does this write cycle against ANY OTHER concurrent join to the SAME league, the
+ * ordinary case of one visitor being refused while somebody else is mid-join next to them.
+ *
+ * Driven against a parked `joinLeagueInTx` holding `leagues[X] FOR UPDATE`, the same rendezvous
+ * every pair above uses: `recordTierBlockedJoin` blocks behind it (a real, observed block — Postgres
+ * genuinely holds this connection on the row, not a skipped-past read), and completes the moment
+ * the hold releases, on the PLATFORM chain, never the league's own — proof that the block's own
+ * write costs a concurrent join nothing but an ordinary row-lock wait, never a cycle.
+ */
+describe("recordTierBlockedJoin's notice order", () => {
+  it("blocks behind a concurrent join holding the SAME league row, and completes on the platform chain once it releases", async () => {
+    await seedLeagueWith("lg_tier_block_lock", ["u_tb_commish", "u_tb_joiner", "u_tb_blocked"]);
+
+    const join = parkedJoin("lg_tier_block_lock", "u_tb_joiner", "team_tb_joiner");
+    await join.leagueLocked;
+
+    // T_block: the real `recordTierBlockedJoin`, on its own connection, reaching for the SAME
+    // league row through its notice insert (`leagues` FOR KEY SHARE) before it reaches the
+    // platform anchor.
+    const blocking = recordTierBlockedJoin(resolveDb, {
+      leagueId: "lg_tier_block_lock",
+      userId: "u_tb_blocked",
+      occurredAt: clock.now(),
+    });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    await expect(blocking).resolves.toBeUndefined();
+
+    // The league chain holds only the join's own `member_joined` — the tier block never reaches it.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_tier_block_lock"));
+    expect(leagueAnchor!.headSequence).toBe(1);
+    // The platform chain holds only the block's own `system_action` — proof the two really did
+    // land on separate chains despite reaching for the same league row on the way there.
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(1);
+
+    const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_tb_blocked"));
+    expect(notice).toMatchObject({ leagueId: "lg_tier_block_lock", noticeType: "tier_blocked_join" });
+    expect(notice?.auditEventId).not.toBeNull();
   });
 });

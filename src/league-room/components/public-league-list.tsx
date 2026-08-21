@@ -143,6 +143,16 @@ export function PublicLeagueList({
                   <Icon name={COMPOSITION_ICON[compositionCategory]} size={16} />
                   {TIER_COMPOSITION_LABEL[compositionCategory]}
                 </p>
+                {league.experienceTier === "beginner" ? (
+                  <p className="text-sm text-text-muted">
+                    Reserved for players newer to Commish so everyone starts even. Played here
+                    before?{" "}
+                    <Link href="/browse?experienceTier=experienced" className="font-medium text-accent underline">
+                      Browse leagues open to everyone
+                    </Link>
+                    .
+                  </p>
+                ) : null}
                 <div className="mt-auto">
                   {signedIn ? (
                     <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} />
