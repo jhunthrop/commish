@@ -99,4 +99,35 @@ export const INTEGRITY_CONFIG = {
      *  "derive over a bounded set" discipline `INTEGRITY_CONFIG.notices.inboxSize` uses. */
     trailLimit: 20,
   },
+  /**
+   * Task 7 seeds this with only what `session_signals` needs to exist; Task 8 adds the rest
+   * (`flagThreshold`, `weights.device`, `weights.behavioral`, and the remaining `signals` caps
+   * the three heuristics read) as fields on this SAME object, never a second one.
+   */
+  multiAccount: {
+    /**
+     * THE IP WEIGHT IS ZERO AND STAYS ZERO. This is a release gate, not a tuning choice: every
+     * address this product can see today comes from `X-Forwarded-For`, which is caller-
+     * controlled until a trusted proxy overwrites it. A rate limiter keyed on a forgeable header
+     * loses a speed bump. A MULTI-ACCOUNT FLAG keyed on one lets an attacker manufacture
+     * suspicion against somebody else's account — and the flag names a PAIR, so the manufactured
+     * suspicion lands on a real person who did nothing.
+     *
+     * Flipping it needs two things together, and `session_signals.ip_source` is why the second
+     * is mechanical: (1) Fly's proxy overwriting the header (Phase 2 Plan D), and (2) the
+     * heuristic counting only rows stamped `platform_verified`.
+     */
+    weights: { ip: 0 },
+    signals: {
+      /**
+       * A `User-Agent` is caller-controlled and unbounded — storing one unbounded string per
+       * sign-in is a growth question this config answers with a number instead of inheriting.
+       * Real UA strings top out well under this; anything past it is padding, not signal.
+       */
+      maxUserAgentLength: 512,
+      /** Real `Accept-Language` headers are a short list of tags and weights (`"en-US,en;q=0.9"`)
+       *  — an order of magnitude under this, so the cap only ever bites a caller-supplied outlier. */
+      maxAcceptLanguageLength: 128,
+    },
+  },
 } as const;

@@ -790,3 +790,36 @@ export const integrityFlags = pgTable(
     index("integrity_flags_queue_idx").on(t.raisedAt).where(sql`${t.resolvedAt} is null`),
   ],
 );
+
+/**
+ * What the server observed about the client at a sign-in. NOT an audit event, on purpose
+ * (ruling 7): `audit_events` refuses UPDATE and DELETE and carries no foreign keys, which is
+ * right for a record of what happened and wrong for a person's device and network. This table
+ * cascades from `users`, so deleting an account erases them.
+ *
+ * NO CLIENT BEACON FEEDS THIS (ruling 9). Three server-observed values: the User-Agent and
+ * Accept-Language headers, and a hash of the request address. Screen dimensions and a timezone
+ * would need a browser round trip reporting numbers the browser chooses, which is a new surface
+ * for a signal already ruled untrustworthy alone.
+ *
+ * `ip_source` is the release gate in a column. `INTEGRITY_CONFIG.multiAccount.weights.ip` is 0
+ * and stays 0 until Fly's proxy overwrites X-Forwarded-For (Phase 2 Plan D); this column is what
+ * lets the heuristic then use only the rows written after that, rather than trusting a history
+ * any caller could have written (ruling 8).
+ */
+export const sessionSignals = pgTable(
+  "session_signals",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    userAgent: text("user_agent"),
+    acceptLanguage: text("accept_language"),
+    /** sha256(salt + address). Correlation needs equality; it never needs the address. */
+    ipHash: text("ip_hash"),
+    ipSource: text("ip_source").notNull(),
+  },
+  (t) => [index("session_signals_user_occurred_idx").on(t.userId, t.occurredAt)],
+);

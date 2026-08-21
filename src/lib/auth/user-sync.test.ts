@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, users } from "@/db/schema";
+import { auditEvents, sessionSignals, users } from "@/db/schema";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { syncUserFromWorkOS, displayNameFrom } from "./user-sync";
 
@@ -149,5 +149,28 @@ describe("session_started.via names the door it actually came through (MEDIUM-5)
     await syncUserFromWorkOS({ db, clock: { now: () => T0 }, via: "callback", audit: logger }, workosUser);
     const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "session_started"));
     expect(event!.payload).toMatchObject({ via: "callback" });
+  });
+});
+
+describe("Deps.signals — Task 7's device/IP capture, threaded rather than read here", () => {
+  const workosUser = { id: "user_signals", email: "signals@example.com", firstName: "Sig", lastName: "Nals" };
+
+  it("passes the callback's observed headers straight through to session_signals", async () => {
+    await syncUserFromWorkOS(
+      { db, clock: { now: () => T0 }, via: "callback", audit: logger, signals: { userAgent: "TestAgent/1.0", acceptLanguage: "en-US", clientIp: "203.0.113.9" } },
+      workosUser,
+    );
+    const [row] = await db.select().from(sessionSignals).where(eq(sessionSignals.userId, "user_signals"));
+    expect(row).toMatchObject({ userAgent: "TestAgent/1.0", acceptLanguage: "en-US" });
+    expect(row?.ipHash).toHaveLength(64);
+  });
+
+  it("stores an all-null signal, not a skipped one, when the caller has none to give", async () => {
+    // The session_backfill door (`getCurrentUser`) never passes `signals` at all — this is the
+    // exact same shape as omitting it, proving the default really is "observed nothing" rather
+    // than "wrote no row".
+    await syncUserFromWorkOS({ db, clock: { now: () => T0 }, via: "callback", audit: logger }, workosUser);
+    const [row] = await db.select().from(sessionSignals).where(eq(sessionSignals.userId, "user_signals"));
+    expect(row).toMatchObject({ userAgent: null, acceptLanguage: null, ipHash: null });
   });
 });

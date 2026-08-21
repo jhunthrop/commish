@@ -5,6 +5,7 @@ import type { Clock } from "@/domain/timing";
 import type { User } from "@/domain/user";
 import { stripHiddenCharacters } from "@/identity/display-name";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { recordSessionSignals } from "@/integrity-service/session-signals";
 
 /** The subset of the WorkOS User object this module needs — kept narrow so it's easy to fake in tests. */
 export interface WorkOSUserLike {
@@ -27,6 +28,21 @@ export interface WorkOSUserLike {
  */
 export type SessionEntry = "callback" | "session_backfill";
 
+/**
+ * What `/callback` observed about this request's `User-Agent`, `Accept-Language` and address —
+ * Task 7's device/IP signals (ruling 9: no client beacon, server-observed only). Every field is
+ * independently nullable: a header the caller never saw is a signal not observed, not an error.
+ */
+export interface SessionSignalHeaders {
+  readonly userAgent: string | null;
+  readonly acceptLanguage: string | null;
+  readonly clientIp: string | null;
+}
+
+/** Every field absent — the `session_backfill` caller (`getCurrentUser`) has no request headers
+ *  to offer, and a test that omits `signals` entirely means exactly the same thing. */
+const NO_SIGNALS: SessionSignalHeaders = { userAgent: null, acceptLanguage: null, clientIp: null };
+
 interface Deps {
   readonly db: Db;
   readonly clock: Clock;
@@ -34,6 +50,14 @@ interface Deps {
   readonly via: SessionEntry;
   /** Defaults to the process-wide logger (`getAuditLogger()`), the same way every other writer here defaults its collaborators. */
   readonly audit?: AuditLogger;
+  /**
+   * Passed through from the door this sync came in, rather than read here via `next/headers` —
+   * this file has no business knowing it is inside a request (Task 7's own brief says so in
+   * those words). Defaults to `NO_SIGNALS`: `getCurrentUser`'s lazy backfill call has none to
+   * give, and "a signal you did not observe is not an error" holds here exactly as it does
+   * inside `recordSessionSignals` itself.
+   */
+  readonly signals?: SessionSignalHeaders;
 }
 
 /**
@@ -76,13 +100,24 @@ function toUser(row: UserRow): User {
  * second query — the standard Postgres way to tell an insert from an update inside an
  * `ON CONFLICT` return.
  *
- * Carries NO IP and NO device signal (ruling 20). All four existing IP reads in this codebase key
- * on `X-Forwarded-For`, which their own docblocks call caller-controlled and rotatable — a
- * multi-account flag built on a forgeable header lets an attacker manufacture suspicion against
- * someone else's account, which is worse than the bypassed rate limiter it would be defending
- * against. Plan B adds real device/IP signals, with the IP weight at zero.
+ * The AUDIT EVENT carries NO IP and NO device signal (ruling 20 / ruling 7). All four pre-Plan-B
+ * IP reads in this codebase key on `X-Forwarded-For`, which their own docblocks call caller-
+ * controlled and rotatable — a multi-account flag built on a forgeable header lets an attacker
+ * manufacture suspicion against someone else's account, which is worse than the bypassed rate
+ * limiter it would be defending against. Task 7 adds the real device/IP signals Plan B needs, but
+ * they land in `session_signals` (a mutable, cascading table `recordSessionSignals` writes
+ * below), never in this append-only, foreign-key-free payload.
+ *
+ * `recordSessionSignals` joins the SAME transaction, BEFORE the anchor (lock order, ruling 3 —
+ * its insert carries an implicit `FOR KEY SHARE` on `users` through its foreign key, exactly like
+ * `member_notices`' insert). It runs on every call, `session_backfill` included: `signals`
+ * defaults to `NO_SIGNALS` when the caller has none to give, which stores an all-null row rather
+ * than skipping the write — "a signal you did not observe is not an error" applies here too.
  */
-export async function syncUserFromWorkOS({ db, clock, via, audit = getAuditLogger() }: Deps, wu: WorkOSUserLike): Promise<User> {
+export async function syncUserFromWorkOS(
+  { db, clock, via, audit = getAuditLogger(), signals = NO_SIGNALS }: Deps,
+  wu: WorkOSUserLike,
+): Promise<User> {
   const now = new Date(clock.now());
   return db.transaction(async (tx) => {
     const [row] = await tx
@@ -114,6 +149,14 @@ export async function syncUserFromWorkOS({ db, clock, via, audit = getAuditLogge
         firstSignIn: sql<boolean>`(xmax = 0)`,
       });
     if (row === undefined) throw new Error("User upsert returned no row.");
+
+    await recordSessionSignals(tx, {
+      userId: row.id,
+      occurredAt: clock.now(),
+      userAgent: signals.userAgent,
+      acceptLanguage: signals.acceptLanguage,
+      clientIp: signals.clientIp,
+    });
 
     await audit.record(tx, {
       eventType: "session_started",

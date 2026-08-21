@@ -11,6 +11,17 @@ afterEach(() => {
   cleanup();
 });
 
+// `npm test` is plain `vitest run` — nothing here loads `.env.local` the way `next dev`/`next
+// build` do or `dotenv -e .env.local --` does for the scripts that need it. `TEST_DATABASE_URL`
+// gets away with this because `createTestDb` (`src/db/test-db.ts`) reads it through `envOr` with
+// a hardcoded fallback matching docker-compose's defaults. `SESSION_SIGNAL_SALT`
+// (`src/integrity-service/session-signals.ts`) intentionally has NO such fallback in production
+// code — a salt that silently defaults to a constant is a salt that does nothing — so the
+// equivalent fallback lives here instead, set once for the whole suite rather than duplicated
+// into every test file that exercises `recordSessionSignals`/`syncUserFromWorkOS`. `??=` leaves a
+// real value from the environment untouched if one is ever exported before the run.
+process.env.SESSION_SIGNAL_SALT ??= "vitest-suite-session-signal-salt-not-for-any-real-use";
+
 // vitest-axe@0.1.0's own "vitest-axe/extend-expect" entry point ships an empty
 // dist/extend-expect.js (a broken build published to npm — verified against the
 // registry tarball, not an install artifact of this machine) and its .d.ts targets

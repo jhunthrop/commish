@@ -1,11 +1,12 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, chatMessages, leagues, memberNotices, users } from "@/db/schema";
+import { auditChains, chatMessages, leagues, memberNotices, sessionSignals, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { joinLeagueInTx } from "@/league-service/join";
+import { syncUserFromWorkOS } from "@/lib/auth/user-sync";
 import { raiseFlag, resolveFlag } from "./flags";
 import type { DraftPoolEntry } from "@/domain/draft";
 import { players } from "@/db/schema";
@@ -363,5 +364,58 @@ describe("resolveFlag's notice order", () => {
     // And the notice resolveFlag wrote before the anchor still names the event minted after it.
     const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_member_resolve"));
     expect(notice?.auditEventId).not.toBeNull();
+  });
+});
+
+/**
+ * Task 7's own transaction in this proof. `recordSessionSignals`' insert into `session_signals`
+ * carries a foreign key to `users`, so it takes the same implicit `FOR KEY SHARE` on that row
+ * `member_notices`' and `integrity_flags`' inserts take on `leagues` above — and `syncUserFromWorkOS`
+ * runs it BEFORE the `session_started` append, never after, exactly like every sibling in this file.
+ *
+ * Unlike `leagues` (which `joinLeagueInTx` already locks `FOR UPDATE`), no real caller in this
+ * codebase takes a `users` row `FOR UPDATE` today, so there is no existing second transaction to
+ * race against for a genuine two-resource cycle. This drives the real `syncUserFromWorkOS`
+ * against a `users` row a BYSTANDER transaction holds `FOR UPDATE` — standing in for that missing
+ * caller — to prove the dependency is real (the sign-in genuinely blocks on the held row rather
+ * than skipping past it) and that releasing the hold lets both finish with no deadlock, the
+ * session-signals row it wrote, and the `session_started` event that follows it.
+ */
+describe("recordSessionSignals' insert order", () => {
+  it("blocks behind a concurrent hold on the SAME user row and completes without deadlocking once it releases", async () => {
+    await joinDb.insert(users).values({ id: "u_signal_lock", email: "signal_lock@test.local", displayName: "Signal" });
+
+    let holdsUserLock: () => void = () => {};
+    const userLocked = new Promise<void>((resolve) => (holdsUserLock = resolve));
+    let releaseHold: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseHold = resolve));
+
+    // The bystander: holds an exclusive lock on the exact row `recordSessionSignals`' foreign
+    // key is about to reach for, then parks until released.
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM users WHERE id = ${"u_signal_lock"} FOR UPDATE`);
+      holdsUserLock();
+      await parked;
+    });
+    await userLocked;
+
+    // T_sync: the real syncUserFromWorkOS, on its own connection, signing the SAME user back in.
+    // Its user upsert and `recordSessionSignals`' FK-taking insert both reach for `users[u_signal_
+    // lock]` and must block here, behind the bystander's hold, before either can reach the anchor.
+    const signingIn = syncUserFromWorkOS(
+      { db: pickDb, clock, via: "callback" },
+      { id: "u_signal_lock", email: "signal_lock@test.local", firstName: "Signal", lastName: null },
+    );
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseHold();
+
+    await expect(holding).resolves.toBeUndefined();
+    await expect(signingIn).resolves.toBeDefined();
+
+    const [signal] = await joinDb.select().from(sessionSignals).where(eq(sessionSignals.userId, "u_signal_lock"));
+    expect(signal).toBeDefined();
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(1); // the sign-in's own session_started, and nothing else
   });
 });
