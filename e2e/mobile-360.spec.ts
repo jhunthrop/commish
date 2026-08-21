@@ -155,6 +155,15 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expect(queueRows).toHaveCount(1);
     await expect(queueRows.getByText("The platform flagged two accounts that may be the same person")).toBeVisible();
     await expectNoHorizontalScroll(page, "the dispute queue");
+
+    // --- Task 5: one flag's own detail page — the admin field set, raw scores included,
+    // opposite the member feed's (ruling 16) ------------------------------------------------
+    // The flagId is read off this row's own link rather than hardcoded: the seed is
+    // deterministic, but its id is not this spec's to know in advance, and deriving it here is
+    // what keeps this route check honest against whatever the queue actually shows.
+    await queueRows.getByRole("link").click();
+    await expect(page.getByRole("heading", { name: "Flag detail" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "a flag's detail page");
   } finally {
     await context.close();
   }
