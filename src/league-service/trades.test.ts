@@ -13,6 +13,7 @@ import { notifyAffectedMember } from "@/integrity-service/notify";
 import { raiseTradeFairnessFlag, sweepUnflaggedTrades } from "@/integrity-service/trade-fairness";
 import type { TradeAsset } from "@/trades/assets";
 import { TRADE_CONFIG } from "@/trades/config";
+import { seasonCurrentWeek } from "./test-support";
 import { applyTradeInTx } from "./trade-transfer";
 import {
   acceptTrade,
@@ -423,7 +424,6 @@ async function proposeInput(
   readonly leagueId: string;
   readonly userId: string;
   readonly counterpartyTeamId: string;
-  readonly weekNumber: number;
   readonly proposerAssets: readonly TradeAsset[];
   readonly counterpartyAssets: readonly TradeAsset[];
   readonly note: string | null;
@@ -441,7 +441,6 @@ async function proposeInput(
     leagueId: "lg_1",
     userId: proposerUserId,
     counterpartyTeamId,
-    weekNumber: 1,
     proposerAssets: give.map(playerAsset),
     counterpartyAssets: receive.map(playerAsset),
     note: opts.note ?? null,
@@ -542,6 +541,19 @@ describe("proposeTrade", () => {
     expect(result).toMatchObject({ ok: true });
     const [row] = await db.select().from(tradeProposals);
     expect(row!.proposerTeamId).toBe("team_a");
+  });
+
+  /** Final review, CRITICAL 1: the same rule, one field over. There is no `weekNumber` input
+   *  either — the service derives the league's own current week (`currentWeekOf`, `./schedule`)
+   *  and stores THAT, so the valuation basis is never something a caller chose. */
+  it("derives the valuation week from the league's own schedule, with no input field to name one", async () => {
+    const input = await proposeInput(db, { as: "u_alice" });
+    expect(Object.keys(input)).not.toContain("weekNumber");
+    await seasonCurrentWeek(db, { leagueId: "lg_1", homeTeamId: "team_a", awayTeamId: "team_b", week: 3 });
+
+    expect(await proposeTrade(db, input)).toMatchObject({ ok: true });
+    const [row] = await db.select().from(tradeProposals);
+    expect(row!.weekNumber).toBe(3);
   });
 
   it("refuses an offer naming a player the proposer does not own", async () => {
@@ -716,7 +728,6 @@ describe("proposeTrade", () => {
       leagueId: "lg_1",
       userId: "u_alice",
       counterpartyTeamId: "team_b",
-      weekNumber: 1,
       proposerAssets: [playerAsset("p_rb_a")],
       counterpartyAssets: [playerAsset("p_rb_b")],
       note: null,
@@ -1052,6 +1063,15 @@ describe("acceptTrade", () => {
     return { id };
   }
 
+  /** `seasonCurrentWeek` (`./test-support`) bound to this fixture's own two teams. Final review,
+   *  CRITICAL 1: `acceptTrade` derives the week it values, locks and evicts at from the league's
+   *  own schedule now, so a test that wants a particular week seeds the season that has it.
+   *  `openAcceptTrade`'s own `weekNumber` option still writes the row's PROPOSE-time value; it no
+   *  longer decides anything about the acceptance. */
+  async function leagueSeasonThrough(db: Db, week: number): Promise<void> {
+    await seasonCurrentWeek(db, { leagueId: "lg_1", homeTeamId: "team_a", awayTeamId: "team_b", week });
+  }
+
   async function acceptAs(userId: string, tradeId: string, extra: Partial<Parameters<typeof acceptTrade>[1]> = {}) {
     return acceptTrade(db, { tradeId, leagueId: "lg_1", userId, clock: fixedClock(NOW), deliver: deliverNoticeFake, ...extra });
   }
@@ -1272,6 +1292,7 @@ describe("acceptTrade", () => {
     // The same rule `setLineup` enforces, read the same way: a week is locked once it has
     // STARTED, not once it has been scored.
     await lockWeek(db, 4);
+    await leagueSeasonThrough(db, 4);
     const trade = await openAcceptTrade(db, { weekNumber: 4 });
     const result = await acceptAs("u_bob", trade.id);
     expect(result).toEqual({ ok: false, status: 409, reason: "Week 4 has started, so rosters can't change until it ends." });
@@ -1290,6 +1311,7 @@ describe("acceptTrade", () => {
     // the transaction open (uncommitted) — the same rendezvous `trade-transfer.test.ts`'s own
     // `materializeLockedLineupsInTx` FOR SHARE proof uses, since under READ COMMITTED a plain
     // unlocked SELECT would NOT block on this and would read the stale pre-flip value instead.
+    await leagueSeasonThrough(db, 4);
     const trade = await openAcceptTrade(db, { weekNumber: 4 });
     // An EXISTING row, not a fresh insert: a `SELECT … FOR SHARE` against a row `flip` is still
     // inserting (never committed, so not yet visible) would not block at all under READ
@@ -1329,8 +1351,12 @@ describe("acceptTrade", () => {
     expect(await auditEventsOn(db, "platform", "trade_accepted")).toHaveLength(0);
   });
 
-  it("evicts the cached score for the trade's own week after the transaction commits, never inside it", async () => {
-    const trade = await openAcceptTrade(db, { weekNumber: 4 });
+  /** Final review, CRITICAL 1: the eviction key is the DERIVED current week — the only week whose
+   *  scores this trade can have moved — never the week the stored row happens to name. The row
+   *  below names week 8; the league is living in week 4. */
+  it("evicts the cached score for the league's CURRENT week after the transaction commits, never inside it", async () => {
+    await leagueSeasonThrough(db, 4);
+    const trade = await openAcceptTrade(db, { weekNumber: 8 });
     const calls: { readonly leagueId: string; readonly week: number }[] = [];
     const cache = {
       invalidate: async (leagueId: string, week: number) => {
@@ -1388,6 +1414,7 @@ describe("acceptTrade", () => {
 
   it("raises exactly one trade_fairness flag, in its own transaction after commit, for a lopsided trade", async () => {
     await seedLopsidedStatLines(db);
+    await leagueSeasonThrough(db, 4);
     const trade = await openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 4 });
 
     const result = await acceptAs("u_bob", trade.id);
@@ -1413,6 +1440,7 @@ describe("acceptTrade", () => {
 
   it("flags a lopsided trade and never touches either account — the flag-only contract, at the outcome", async () => {
     await seedLopsidedStatLines(db);
+    await leagueSeasonThrough(db, 4);
     const trade = await openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 4 });
 
     await acceptAs("u_bob", trade.id);
@@ -1429,6 +1457,7 @@ describe("acceptTrade", () => {
 
   it("never fails a trade because the after-commit flag write failed", async () => {
     await seedLopsidedStatLines(db);
+    await leagueSeasonThrough(db, 4);
     const trade = await openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 4 });
 
     const errors: unknown[] = [];
@@ -1453,6 +1482,7 @@ describe("acceptTrade", () => {
 
   it("lets npm run trades:sweep catch a trade whose after-commit flag write never landed", async () => {
     await seedLopsidedStatLines(db);
+    await leagueSeasonThrough(db, 4);
     const trade = await openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 4 });
 
     await acceptAs("u_bob", trade.id, { raiseFairnessFlag: throwingFairnessRaiser });
@@ -1464,5 +1494,63 @@ describe("acceptTrade", () => {
     const flags = await openFlags(db);
     expect(flags).toHaveLength(1);
     expect(flags[0]).toMatchObject({ subjectType: "trade", subjectId: trade.id });
+  });
+
+  // -------------------------------------------------------------------------------------------
+  // FINAL REVIEW, CRITICAL 1 — the collusion-evasion hole, turned into regression tests.
+  //
+  // The reviewer proved this live: a lopsided package named a FUTURE, still-in-season week (8 in
+  // a league living in week 4), which gave `assembleAdvisorContext` an empty trend window, valued
+  // both sides at zero, produced `gap: 0`, and walked past `trade_fairness` entirely — and
+  // `trades:sweep`, the documented operator remedy, re-derived at the same frozen week and
+  // reported "checked 1, raised 0". It also read `stat_weeks` at the named week rather than the
+  // live one, and evicted the wrong cache key.
+  //
+  // The rows below are inserted DIRECTLY carrying `weekNumber: 8`, because the wire can no longer
+  // carry one at all (`trade-schemas.test.ts` holds that half) — a row in exactly the state the
+  // exploit produced, proving the acceptance ignores it.
+  // -------------------------------------------------------------------------------------------
+
+  it("values a trade at the DERIVED current week and flags it, however far out the stored row's week is", async () => {
+    await seedLopsidedStatLines(db);
+    await leagueSeasonThrough(db, 4);
+    const trade = await openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 8 });
+
+    const result = await acceptAs("u_bob", trade.id);
+    // The exploit's own signature was `{ givingValue: 0, receivingValue: 0, verdict: "even" }`.
+    expect(result).toMatchObject({ ok: true, fairness: { flagWorthy: true } });
+    if (result.ok) expect(result.fairness.gap).toBeGreaterThan(0);
+    expect(await openFlags(db)).toHaveLength(1);
+    // And the row now records the week it actually happened in, not the week it claimed.
+    expect((await tradeRow(db, trade.id)).weekNumber).toBe(4);
+  });
+
+  it("lets the sweep re-derive at the RECORDED accept week, so the safety net no longer inherits the evasion", async () => {
+    await seedLopsidedStatLines(db);
+    await leagueSeasonThrough(db, 4);
+    const trade = await openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 8 });
+
+    // The after-commit write fails, which is the only state the sweep exists for.
+    await acceptAs("u_bob", trade.id, { raiseFairnessFlag: throwingFairnessRaiser });
+    expect(await openFlags(db)).toEqual([]);
+
+    const swept = await sweepUnflaggedTrades(db, { leagueId: "lg_1" });
+    expect(swept).toEqual({ tradesChecked: 1, flagsRaised: 1 });
+    expect(await openFlags(db)).toHaveLength(1);
+  });
+
+  it("refuses on the LIVE week even when the stored row names a week that has not started", async () => {
+    // Exploit B: the honest week-4 accept was correctly refused while week 4 was in progress, and
+    // the identical package naming week 8 moved both rosters mid-week anyway.
+    await leagueSeasonThrough(db, 4);
+    await lockWeek(db, 4);
+    const trade = await openAcceptTrade(db, { weekNumber: 8 });
+
+    const result = await acceptAs("u_bob", trade.id);
+    expect(result).toEqual({ ok: false, status: 409, reason: "Week 4 has started, so rosters can't change until it ends." });
+    await expectNoAcceptanceTookPlace(db, trade.id, [
+      { playerId: "p_rb1", teamId: "team_a" },
+      { playerId: "p_wr1", teamId: "team_b" },
+    ]);
   });
 });

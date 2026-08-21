@@ -46,7 +46,6 @@ describe("useTrades", () => {
     const outcome = await act(() =>
       result.current.propose({
         counterpartyTeamId: "them",
-        weekNumber: 5,
         proposerAssets: [{ kind: "player", playerId: "p1" }],
         counterpartyAssets: [{ kind: "player", playerId: "p2" }],
         note: null,
@@ -80,7 +79,7 @@ describe("useTrades", () => {
 
     fixture.response = { ok: false, error: "You can't trade with your own team." };
     await act(() =>
-      result.current.propose({ counterpartyTeamId: "me", weekNumber: 5, proposerAssets: [{ kind: "player", playerId: "p1" }], counterpartyAssets: [{ kind: "player", playerId: "p2" }], note: null }),
+      result.current.propose({ counterpartyTeamId: "me", proposerAssets: [{ kind: "player", playerId: "p1" }], counterpartyAssets: [{ kind: "player", playerId: "p2" }], note: null }),
     );
 
     expect(fixture.calls).toEqual(["GET /api/leagues/l1/trades", "POST /api/leagues/l1/trades"]);

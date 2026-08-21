@@ -91,7 +91,6 @@ async function seedAcceptedTrade(opts: { readonly flagId: string; readonly weekN
     leagueId: created.leagueId,
     userId: userA,
     counterpartyTeamId: teamB,
-    weekNumber: 1,
     proposerAssets: [{ kind: "player", playerId: `p_rb1_${suffix}` }],
     counterpartyAssets: [{ kind: "player", playerId: `p_wr1_${suffix}` }],
     note: null,
@@ -166,7 +165,6 @@ describe("reverseTradeInTx", () => {
       leagueId: fx.leagueId,
       userId: fx.userB,
       counterpartyTeamId: teamC,
-      weekNumber: 1,
       proposerAssets: [{ kind: "player", playerId: `p_rb1_${fx.flagId}` }], // Bob now owns this, from the first trade
       counterpartyAssets: [{ kind: "player", playerId: "p_carol_1" }],
       note: null,

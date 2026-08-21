@@ -19,9 +19,10 @@ const systemClock: Clock = { now: () => new Date().toISOString() };
 
 export interface EvaluateTradeInput {
   readonly leagueId: string;
-  /** The week this trade is valued at — `trade_proposals.weekNumber`, unchanged since propose
-   *  time. Read-only here: this function moves nothing, so there is no "as of when" question
-   *  beyond which week's roster/scoring context to price the two sides against. */
+  /** The week this trade is valued at — `acceptTrade`'s own SERVER-DERIVED current week (final
+   *  review, CRITICAL 1), the same value it stamps onto `trade_proposals.weekNumber` in the same
+   *  transaction. Read-only here: this function moves nothing, so there is no "as of when"
+   *  question beyond which week's roster/scoring context to price the two sides against. */
   readonly weekNumber: number;
   readonly proposerTeamId: string;
   readonly counterpartyTeamId: string;
@@ -280,6 +281,12 @@ interface ReDerivedTradeValue {
  * sweep time — ORDINARILY on the other side of this very trade, unless a later trade moved one of
  * them again — so this reads the UNION of both teams' CURRENT rosters, at the trade's own
  * `weekNumber`, rather than trusting either team alone the way the pre-execute read could.
+ *
+ * THAT `weekNumber` IS THE ACCEPT-TIME WEEK (final review, CRITICAL 1): `acceptTrade` re-stamps
+ * the row with the week it derived at the moment of the yes, so this sweep re-prices the trade at
+ * the week it actually happened in. Before that fix the field was whatever the proposing client
+ * had named, and this "safety net" re-derived at the same evaded week — a sweep that looked at a
+ * rigged trade and passed it.
  *
  * GHOST-PLAYER DISCIPLINE, LEDGERED: `valuePlayers` silently drops an id neither roster in the
  * union answers for (a player waived out of the pool, or moved on again by a later trade this

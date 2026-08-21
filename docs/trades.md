@@ -25,7 +25,7 @@ a real negotiation between two named managers).
 | Route | Who | Notes |
 |---|---|---|
 | `GET /api/leagues/[leagueId]/trades` | a manager with a team in the league | Three bands: `inbox` (offers to answer), `outbox` (offers sent), `history` (the league's executed trades plus the caller's own dead offers). |
-| `POST /api/leagues/[leagueId]/trades` | same | Body: `{ counterpartyTeamId, weekNumber, proposerAssets, counterpartyAssets, note }`. The proposing team is resolved from the session, never from the body — there is no `proposerTeamId` field to spoof. Returns the new offer's id and the proposer's own private, advisory `tradeBalance` read. |
+| `POST /api/leagues/[leagueId]/trades` | same | Body: `{ counterpartyTeamId, proposerAssets, counterpartyAssets, note }`, and nothing else — the schema is strict, so an unknown key is a 400. The proposing team is resolved from the session and the valuation week from the league's own schedule; neither is a field a body could name. Returns the new offer's id and the proposer's own private, advisory `tradeBalance` read. |
 | `POST /api/leagues/[leagueId]/trades/[tradeId]` | the trade's counterparty (`accept`/`reject`), or the proposer (`withdraw`) | Body: `{ action: "accept" \| "reject" \| "withdraw" }`. `accept` runs the whole execution transaction. |
 
 ## The lifecycle statuses, and which are terminal
@@ -88,6 +88,14 @@ exists) would hold trades nobody flagged.
    event on the LEAGUE chain, a `trade_proposed` notice to the counterparty (hidden from the
    league's activity feed — a bid discloses what a manager thinks his own players are worth), and
    the proposer's own private `tradeBalance` verdict, shown to nobody else.
+
+   **The week is the server's, never the caller's.** Both sides are priced at the league's current
+   week — `currentWeekOf` (`src/league-service/schedule.ts`), which reads the league's `matchups`
+   and asks `seasonProgress`, the same one definition `leagueHome` shows the member. The wire has
+   no `weekNumber` field and the schema refuses a body carrying one. The week is the collusion
+   detector's own valuation basis: a package priced far enough ahead gets an empty trend window,
+   values every player at zero, and reads as perfectly even, so letting the party being detected
+   name it would have been a switch to turn the detector off.
 2. **Analyze.** The verdict from step 1 is advisory only, computed once at propose time for the
    proposer's own eyes. The recipient's own read happens lazily, on interaction, inside the trade
    inbox — the identical `tradeBalance` function, run again over the current offer, never stored
@@ -97,7 +105,10 @@ exists) would hold trades nobody flagged.
    share one implementation (`settleProposal`): a guarded `UPDATE` stamps the terminal status,
    fires the matching notice (`trade_rejected` or `trade_withdrawn` — one audit event type,
    `trade_rejected`, with `payload.outcome` naming which, because `AUDIT_EVENT_TYPES` is a frozen
-   pg enum). Accept (`acceptTrade`) is the wide transaction: re-checks the week isn't locked,
+   pg enum). Accept (`acceptTrade`) is the wide transaction: re-derives the league's current week
+   and re-checks that it isn't locked (a 72-hour offer can straddle a week boundary, so the
+   accept-time week is the one that governs the valuation, the lock and the cache eviction, and it
+   is re-stamped onto the row so the sweep re-derives at the week the trade actually happened in),
    locks both teams' rows in canonical sorted-by-id order, re-checks ownership against the
    CURRENT roster (not the roster at propose time), computes the fairness evaluation, freezes
    every already-locked week's actual lineup for both teams (`materializeLockedLineupsInTx` —

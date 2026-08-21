@@ -7,6 +7,7 @@ import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { joinLeagueInTx } from "@/league-service/join";
 import { writeSchedule } from "@/league-service/schedule";
+import { seasonCurrentWeek } from "@/league-service/test-support";
 import { acceptTrade, proposeTrade, rejectTrade } from "@/league-service/trades";
 import { reverseTradeInTx } from "@/league-service/trade-reversal";
 import type { StatLine } from "@/domain/player";
@@ -710,7 +711,6 @@ describe("proposeTrade's insert order", () => {
       leagueId: "lg_propose_lock",
       userId: "u_propose_alice",
       counterpartyTeamId: "team_propose_bob",
-      weekNumber: 1,
       proposerAssets: [{ kind: "player", playerId: "p_propose_a" }],
       counterpartyAssets: [{ kind: "player", playerId: "p_propose_b" }],
       note: null,
@@ -807,6 +807,11 @@ describe("acceptTrade's week lock", () => {
     // An EXISTING row, matching `persistTick`'s own upsert shape — a `SELECT … FOR SHARE` against
     // a row still being INSERTED (never committed, so not yet visible) would not block at all.
     await joinDb.insert(statWeeks).values({ week: 4, status: "scheduled" });
+    // Week 4 is this LEAGUE's current week, seeded as a real season (weeks 1-3 scored). Since the
+    // final review's CRITICAL 1, `acceptTrade` locks the week it DERIVES, never the week the
+    // proposal names — so a fixture that wants the accept to block on `stat_weeks[4]` has to be a
+    // league whose current week genuinely is 4.
+    await seasonCurrentWeek(joinDb, { leagueId: "lg_accept_week_lock", homeTeamId: "team_aw_alice", awayTeamId: "team_aw_bob", week: 4 });
     const proposedAt = new Date(clock.now());
     const expiresAt = new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000);
     await joinDb.insert(tradeProposals).values({
@@ -1068,7 +1073,6 @@ describe("reverseTradeInTx's week lock", () => {
       leagueId: "lg_rv_wk",
       userId: "u_rv_wk_alice",
       counterpartyTeamId: "team_rv_wk_bob",
-      weekNumber: 1,
       proposerAssets: [{ kind: "player", playerId: "p_rv_wk_a" }],
       counterpartyAssets: [{ kind: "player", playerId: "p_rv_wk_b" }],
       note: null,
@@ -1152,7 +1156,6 @@ describe("reverseTradeInTx's team-lock order — racing a fresh accept between t
       leagueId: "lg_rv_tl",
       userId: "u_rv_tl_alice",
       counterpartyTeamId: "team_rv_tl_bob",
-      weekNumber: 1,
       proposerAssets: [{ kind: "player", playerId: "p_rv_tl_1" }],
       counterpartyAssets: [{ kind: "player", playerId: "p_rv_tl_2" }],
       note: null,
@@ -1180,7 +1183,6 @@ describe("reverseTradeInTx's team-lock order — racing a fresh accept between t
       leagueId: "lg_rv_tl",
       userId: "u_rv_tl_bob",
       counterpartyTeamId: "team_rv_tl_alice",
-      weekNumber: 1,
       proposerAssets: [{ kind: "player", playerId: "p_rv_tl_3" }],
       counterpartyAssets: [{ kind: "player", playerId: "p_rv_tl_4" }],
       note: null,

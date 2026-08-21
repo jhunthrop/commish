@@ -19,6 +19,7 @@ import { isBalancedProposal } from "@/domain/trade";
 import { nextStatusFor, type TradeStatus } from "@/trades/lifecycle";
 import type { TradeProposalView, TradeSideView, TradesPageBody } from "@/trades/contract";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
+import { currentWeekOf } from "./schedule";
 import { applyTradeInTx, plannedTransfer, TransferRefusedError, type FilledRosterSlot, type TransferAsset } from "./trade-transfer";
 
 /**
@@ -32,7 +33,8 @@ export interface TradeProposal {
   readonly leagueId: string;
   readonly proposerTeamId: string;
   readonly counterpartyTeamId: string;
-  /** The week the proposal was VALUED at — see `tradeProposals.weekNumber`'s own docblock. */
+  /** The week this proposal is VALUED at, always server-derived — see `tradeProposals
+   *  .weekNumber`'s own docblock. */
   readonly weekNumber: number;
   readonly proposerAssets: readonly TradeAsset[];
   readonly counterpartyAssets: readonly TradeAsset[];
@@ -211,7 +213,6 @@ export interface ProposeTradeInput {
    *  docblock for why there is no `proposerTeamId` field to spoof. */
   readonly userId: string;
   readonly counterpartyTeamId: string;
-  readonly weekNumber: number;
   readonly proposerAssets: readonly TradeAsset[];
   readonly counterpartyAssets: readonly TradeAsset[];
   readonly note: string | null;
@@ -246,6 +247,14 @@ export type ProposeTradeResult =
  * after-acceptance detector, which runs its own valuation independently at a different moment
  * for a different audience.
  *
+ * THE WEEK IS DERIVED, NEVER SUPPLIED (final review, CRITICAL 1). `currentWeekOf` (`./schedule`)
+ * answers it from this league's own `matchups`, the same definition `leagueHome` puts in front of
+ * the member. A caller who could name the week could pick one whose trend window is empty, value
+ * both sides at zero, and walk a grotesque package straight past `trade_fairness` — so the week
+ * belongs to the server for exactly the reason `proposerTeamId` already does. The value stored
+ * here is the offer's valuation basis while it sits open; `acceptTrade` re-derives at the moment
+ * of the yes and re-stamps the row, because a 72-hour offer can straddle a week boundary.
+ *
  * LOCK ORDER (ruling 3). Business rows first: the proposal row itself. Then the notice, which
  * takes `FOR KEY SHARE` on `users` and `leagues`. Then the anchor. Then `attachAuditEvent`. Then
  * commit, then `deliverNotice` outside the transaction entirely. Nothing here touches
@@ -269,12 +278,15 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
     return { ok: false, status: 422, reason: "You can't trade with your own team." };
   }
 
+  // THE WEEK, DERIVED — see this function's own docblock. One read, one definition.
+  const weekNumber = await currentWeekOf(db, input.leagueId);
+
   const proposerAssetIds = assetPlayerIds(input.proposerAssets);
   const counterpartyAssetIds = assetPlayerIds(input.counterpartyAssets);
   if (
     !isBalancedProposal({
       leagueId: input.leagueId,
-      weekNumber: input.weekNumber,
+      weekNumber,
       from: { teamId: proposerTeamId, playerIds: proposerAssetIds },
       to: { teamId: input.counterpartyTeamId, playerIds: counterpartyAssetIds },
     })
@@ -283,8 +295,8 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
   }
 
   const [mine, theirs] = await Promise.all([
-    assembleAdvisorContext(db, { leagueId: input.leagueId, teamId: proposerTeamId, weekNumber: input.weekNumber }),
-    assembleAdvisorContext(db, { leagueId: input.leagueId, teamId: input.counterpartyTeamId, weekNumber: input.weekNumber }),
+    assembleAdvisorContext(db, { leagueId: input.leagueId, teamId: proposerTeamId, weekNumber }),
+    assembleAdvisorContext(db, { leagueId: input.leagueId, teamId: input.counterpartyTeamId, weekNumber }),
   ]);
   // `mine` cannot be null through real Postgres: `proposerTeamId` was just read out of `teams`
   // scoped to this same `leagueId`, so `assembleAdvisorContext`'s own team-in-league check always
@@ -380,7 +392,7 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
           leagueId: input.leagueId,
           proposerTeamId,
           counterpartyTeamId: input.counterpartyTeamId,
-          weekNumber: input.weekNumber,
+          weekNumber,
           proposerAssets: input.proposerAssets,
           counterpartyAssets: input.counterpartyAssets,
           fingerprint,
@@ -737,8 +749,8 @@ export type AcceptTradeResult =
  * Refuses, in order: no such offer for the caller's own team as the COUNTERPARTY, or one already
  * settled, or one that has since expired (404/409, `refusalFor`'s own diagnosis, reused as-is —
  * the counterparty is the authorized role for both `reject` and `accept`, so the two share one
- * implementation rather than a second copy of the same three messages); the week this offer was
- * valued at has since started (409, the week lock below); a named player has since left the
+ * implementation rather than a second copy of the same three messages); the league's current week
+ * has already started (409, the week lock below); a named player has since left the
  * roster it was named from (409, the ownership re-check below); the package would leave either
  * roster illegal once cleared and refilled (409, `applyTradeInTx`'s own `TransferRefusedError`,
  * caught outside the transaction and passed through verbatim).
@@ -754,11 +766,13 @@ export type AcceptTradeResult =
  *      `accepted` with nothing actually moved. The guarded UPDATE is now the LAST write before
  *      the transfer, never the first statement, so every refusal above it is genuinely free.)
  *   2. `stat_weeks[weekNumber] FOR SHARE` — matching `setLineup`'s own re-check exactly, on the
- *      week THIS TRADE concerns (the plain read's own `weekNumber`, the field the row already
- *      carries so a re-read months later can still explain the trade). `persistTick` flips a
- *      week's status in its own transaction with no coordination; this lock is what makes the
- *      two agree, and it is taken before any write in this transaction, matching `setLineup`'s
- *      own position at the very top of ITS transaction.
+ *      week DERIVED HERE by `currentWeekOf` (`./schedule`), never the week the proposal carries
+ *      (final review, CRITICAL 1: the week is the fairness detector's own valuation basis, so it
+ *      is the server's to derive at the moment of the yes; `currentWeekOf` reads through `tx`, so
+ *      the derivation and the lock cannot disagree). `persistTick` flips a week's status in its
+ *      own transaction with no coordination; this lock is what makes the two agree, and it is
+ *      taken before any write in this transaction, matching `setLineup`'s own position at the
+ *      very top of ITS transaction.
  *   3. BOTH teams' rows, `FOR UPDATE`, in CANONICAL SORTED-BY-ID order — never proposer-first.
  *      Two concurrent accepts on MIRROR trades (each side the proposer of one) would deadlock
  *      under proposer-first ordering; sorted-id ordering is deadlock-free against both a
@@ -846,11 +860,16 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
         return { ok: false as const, status: 404, reason: "We couldn't find that offer." };
       }
 
-      // STEP 2 — the week lock, matching `setLineup`'s own re-check exactly: taken before any
-      // write in this transaction, on the week THIS TRADE concerns.
-      const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, existing.weekNumber)).for("share");
+      // STEP 2 — THE WEEK, DERIVED AT THE MOMENT OF THE YES (final review, CRITICAL 1), then
+      // locked. Never `existing.weekNumber`: a 72-hour offer can straddle a week boundary, and
+      // the week that governs an execution is the one the league is actually living in when the
+      // rosters move — which is also the only week whose scores this trade can change, and the
+      // only lock that coordinates with `persistTick` flipping the LIVE week. `currentWeekOf`
+      // runs on `tx`, so the answer is the one this transaction will act on.
+      const weekNumber = await currentWeekOf(tx, input.leagueId);
+      const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, weekNumber)).for("share");
       if (isLineupLocked(week?.status ?? "scheduled")) {
-        return { ok: false as const, status: 409, reason: `Week ${existing.weekNumber} has started, so rosters can't change until it ends.` };
+        return { ok: false as const, status: 409, reason: `Week ${weekNumber} has started, so rosters can't change until it ends.` };
       }
 
       // STEP 3 — both teams' rows, `FOR UPDATE`, in CANONICAL SORTED-BY-ID order — never
@@ -888,7 +907,13 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
       // `applyTradeInTx`'s own `TransferRefusedError`, caught outside the transaction below.
       const [row] = await tx
         .update(tradeProposals)
-        .set({ status: "accepted", settledAt: new Date(now), settledByUserId: input.userId })
+        // `weekNumber` is RE-STAMPED to the accept-time week, not left at the propose-time one
+        // (final review, CRITICAL 1): the row records the week this trade actually happened in,
+        // which is what `sweepUnflaggedTrades` re-derives its own valuation at long afterward
+        // (`reDeriveAcceptedTradeValue`, `@/integrity-service/trade-fairness`). A trade proposed
+        // on Sunday and accepted on Tuesday is a Tuesday trade. Not a foreign-key column, so this
+        // still takes no lock beyond the ones step 5's own docblock already enumerates.
+        .set({ status: "accepted", settledAt: new Date(now), settledByUserId: input.userId, weekNumber })
         .where(
           and(
             eq(tradeProposals.id, input.tradeId),
@@ -912,10 +937,11 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
       const league = leagueRow!;
 
       // THE SEAM, computed from the rosters a moment before they move — see this function's own
-      // docblock and `evaluateTradeBeforeExecute`'s.
+      // docblock and `evaluateTradeBeforeExecute`'s. Valued at the DERIVED accept-time week (the
+      // same one just stamped onto `row`), never at a week the proposal was allowed to name.
       const fairness = await evaluateTradeBeforeExecute(tx, {
         leagueId: input.leagueId,
-        weekNumber: row.weekNumber,
+        weekNumber,
         proposerTeamId: row.proposerTeamId,
         counterpartyTeamId: row.counterpartyTeamId,
         proposerAssetIds: giveIds,
@@ -1057,7 +1083,7 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
         tradeId: row.id,
         supersededCount: supersededRows.length,
         fairness,
-        weekNumber: row.weekNumber,
+        weekNumber,
         notices: [proposerNotice, counterpartyNotice, ...supersededNotices],
       };
     });

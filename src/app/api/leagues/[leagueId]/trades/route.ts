@@ -32,7 +32,9 @@ type ProposeTradeResponseBody = Extract<ProposeTradeResult, { readonly ok: true 
  * The proposing team is `actor.teamId`, resolved from the session by `withLeagueMemberActor` —
  * `proposeTrade` re-derives it itself from `actor.userId` (the service is the real boundary, not
  * only the route), but there is no field in `proposeTradeSchema` a body could spoof it through
- * either way. The request names only the COUNTERPARTY team and the assets.
+ * either way. The WEEK is the same kind of value and gets the same treatment (final review,
+ * CRITICAL 1): `proposeTrade` derives it from the league's own schedule, and the schema refuses a
+ * body that tries to name one. The request names only the COUNTERPARTY team and the assets.
  */
 export async function POST(request: Request, context: LeagueRouteContext) {
   return withLeagueMemberActor(request, context, async (actor, req) => {
@@ -47,7 +49,6 @@ export async function POST(request: Request, context: LeagueRouteContext) {
       leagueId: actor.leagueId,
       userId: actor.userId,
       counterpartyTeamId: parsed.value.counterpartyTeamId,
-      weekNumber: parsed.value.weekNumber,
       proposerAssets: parsed.value.proposerAssets,
       counterpartyAssets: parsed.value.counterpartyAssets,
       note: parsed.value.note,

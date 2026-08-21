@@ -132,7 +132,6 @@ export function TradeComposer({ context, onAssess, onPropose, onDone, onCancel }
     setError(null);
     const result = await onPropose({
       counterpartyTeamId,
-      weekNumber: context.weekNumber,
       proposerAssets: give.map((playerId) => ({ kind: "player" as const, playerId })),
       counterpartyAssets: receive.map((playerId) => ({ kind: "player" as const, playerId })),
       note: note.trim() === "" ? null : note.trim(),

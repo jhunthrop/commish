@@ -12,6 +12,7 @@ import type { FlagType } from "@/integrity/flags";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { listLeagueActivity } from "./activity";
 import { createLeague } from "@/league-service/creation";
+import { seasonCurrentWeek } from "@/league-service/test-support";
 import { acceptTrade, proposeTrade } from "@/league-service/trades";
 import { createAuditLogger, type AuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
@@ -966,7 +967,6 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
       leagueId: created.leagueId,
       userId: userA,
       counterpartyTeamId: teamB,
-      weekNumber: 1,
       proposerAssets: [{ kind: "player", playerId: `p_tr_rb_${suffix}` }],
       counterpartyAssets: [{ kind: "player", playerId: `p_tr_wr_${suffix}` }],
       note: null,
@@ -1090,7 +1090,6 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
       leagueId: fx.leagueId,
       userId: fx.userB,
       counterpartyTeamId: teamC,
-      weekNumber: 1,
       proposerAssets: [{ kind: "player", playerId: "p_tr_rb_moved" }],
       counterpartyAssets: [{ kind: "player", playerId: "p_tr_carol_1" }],
       note: null,
@@ -1132,7 +1131,6 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
       leagueId: fx.leagueId,
       userId: fx.userB,
       counterpartyTeamId: teamC,
-      weekNumber: 1,
       proposerAssets: [{ kind: "player", playerId: "p_tr_rb_preview" }],
       counterpartyAssets: [{ kind: "player", playerId: "p_tr_carol_preview_1" }],
       note: null,
@@ -1920,6 +1918,11 @@ describe("the trade branch's operator trail, end to end (Task 6)", () => {
       { teamId: teamB, slot: "RB", slotIndex: 0, playerId: "p_trail_scrub" },
     ]);
     await db.insert(playerStatLines).values([1, 2, 3].map((week) => ({ playerId: "p_trail_star", week, rushingYards: 300, rushingTouchdowns: 5 })));
+    // Weeks 1-3 scored, week 4 live: `acceptTrade` derives the week it values at from the league's
+    // own schedule (final review, CRITICAL 1), and it is that week's trend window (`ADVISOR_CONFIG
+    // .trendWeeks` weeks before it) which makes `p_trail_star`'s monster line price this trade
+    // grotesquely lopsided at all.
+    await seasonCurrentWeek(db, { leagueId: created.leagueId, homeTeamId: created.teamId, awayTeamId: teamB, week: 4 });
     return { leagueId: created.leagueId, teamA: created.teamId, teamB };
   }
 
@@ -1930,7 +1933,6 @@ describe("the trade branch's operator trail, end to end (Task 6)", () => {
       leagueId: league.leagueId,
       userId: "u_trail_alice",
       counterpartyTeamId: league.teamB,
-      weekNumber: 4,
       proposerAssets: [{ kind: "player", playerId: "p_trail_star" }],
       counterpartyAssets: [{ kind: "player", playerId: "p_trail_scrub" }],
       note: null,
@@ -2002,7 +2004,6 @@ describe("the trade branch's operator trail, end to end (Task 6)", () => {
       leagueId: league.leagueId,
       userId: "u_trail_alice",
       counterpartyTeamId: league.teamB,
-      weekNumber: 4,
       proposerAssets: [{ kind: "player", playerId: "p_trail_star" }],
       counterpartyAssets: [{ kind: "player", playerId: "p_trail_scrub" }],
       note: null,

@@ -5,7 +5,6 @@ import { proposeTradeSchema, tradeDecisionSchema } from "./trade-schemas";
 function validBody(overrides: Partial<Record<string, unknown>> = {}) {
   return {
     counterpartyTeamId: "team_b",
-    weekNumber: 3,
     proposerAssets: [{ kind: "player", playerId: "p_rb1" }],
     counterpartyAssets: [{ kind: "player", playerId: "p_wr1" }],
     note: null,
@@ -28,10 +27,23 @@ describe("proposeTradeSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("refuses a non-positive week", () => {
-    expect(proposeTradeSchema.safeParse(validBody({ weekNumber: 0 })).success).toBe(false);
-    expect(proposeTradeSchema.safeParse(validBody({ weekNumber: -1 })).success).toBe(false);
-    expect(proposeTradeSchema.safeParse(validBody({ weekNumber: 1.5 })).success).toBe(false);
+  /**
+   * FINAL REVIEW, CRITICAL 1 — the regression guard on the collusion-evasion hole. The week a
+   * trade is valued at was a caller-supplied field, and a package priced at a far-enough-out week
+   * values every player at zero (an empty trend window), so the party being detected could switch
+   * `trade_fairness` off by naming one. The field is gone and the schema is strict: a body that
+   * names a week is REFUSED, never silently stripped, so a client still sending the old shape is
+   * told rather than quietly misled about what priced its trade.
+   */
+  it("refuses a body that names a week at all — the week is never the caller's", () => {
+    expect(Object.keys(proposeTradeSchema.shape)).not.toContain("weekNumber");
+    for (const weekNumber of [4, 8, 999, 0, -1, 1.5]) {
+      expect(proposeTradeSchema.safeParse(validBody({ weekNumber })).success).toBe(false);
+    }
+  });
+
+  it("refuses any other unknown key, for the same reason", () => {
+    expect(proposeTradeSchema.safeParse(validBody({ proposerTeamId: "team_a" })).success).toBe(false);
   });
 
   it("refuses an empty proposer side", () => {

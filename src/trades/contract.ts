@@ -26,8 +26,10 @@ export interface TradeSideView {
 export interface TradeProposalView {
   readonly id: string;
   readonly leagueId: string;
-  /** The week the proposal was valued at — kept so a re-read months later can still explain the
-   *  verdict a manager saw. */
+  /** The week this proposal is valued at — the league's current week when it was proposed, and
+   *  re-stamped to the league's current week at the moment it is accepted (final review,
+   *  CRITICAL 1). Kept so a re-read months later, and `sweepUnflaggedTrades`' own re-derivation,
+   *  can still price the trade at the week it actually happened in. Never a caller's to name. */
   readonly weekNumber: number;
   readonly status: TradeStatus;
   readonly proposedAt: string;
@@ -57,10 +59,11 @@ export interface TradesPageBody {
   readonly history: readonly TradeProposalView[];
 }
 
-/** `POST /api/leagues/[leagueId]/trades`'s body. */
+/** `POST /api/leagues/[leagueId]/trades`'s body. No `weekNumber` and no `proposerTeamId`: both
+ *  are the server's to derive, never the caller's to name — see `proposeTradeSchema`'s own
+ *  docblock (`@/league-service/trade-schemas`), which refuses either as an unknown key. */
 export interface ProposeTradeBody {
   readonly counterpartyTeamId: string;
-  readonly weekNumber: number;
   readonly proposerAssets: readonly TradeAsset[];
   readonly counterpartyAssets: readonly TradeAsset[];
   readonly note: string | null;

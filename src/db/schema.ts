@@ -864,9 +864,16 @@ export const tradeProposals = pgTable(
     leagueId: text("league_id").notNull().references(() => leagues.id, { onDelete: "cascade" }),
     proposerTeamId: text("proposer_team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
     counterpartyTeamId: text("counterparty_team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
-    /** The week the proposal was VALUED at. Kept so a re-read months later can explain the
-     *  verdict a manager saw, the same "what was true when it was raised" discipline
-     *  `integrity_flags.evidence` follows. */
+    /**
+     * The week this proposal is VALUED at. ALWAYS SERVER-DERIVED, never a caller's to name (final
+     * review, CRITICAL 1): `currentWeekOf` (`@/league-service/schedule`) answers it from the
+     * league's own `matchups`, at propose time, and `acceptTrade` RE-STAMPS it to the current week
+     * at the moment of the yes — a 72-hour offer can straddle a week boundary, and the week that
+     * governs an execution is the one the rosters actually moved in. So an accepted row names the
+     * week the trade happened in, which is what `sweepUnflaggedTrades` re-derives its own
+     * valuation at. Kept so a re-read months later can explain the verdict a manager saw, the same
+     * "what was true when it was raised" discipline `integrity_flags.evidence` follows.
+     */
     weekNumber: integer("week_number").notNull(),
     proposerAssets: jsonb("proposer_assets").$type<readonly TradeAsset[]>().notNull(),
     counterpartyAssets: jsonb("counterparty_assets").$type<readonly TradeAsset[]>().notNull(),

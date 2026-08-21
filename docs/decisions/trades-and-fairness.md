@@ -87,6 +87,33 @@ named, because every adjacent pair guards a real property an inversion would bre
 
 ## 3. The proposal's shape
 
+**The valuation week is derived, never supplied.** `weekNumber` was a caller-supplied field on
+`proposeTradeSchema` until the plan's final whole-branch review proved live what that costs. The
+week a trade is priced at IS the collusion detector's basis: `assembleAdvisorContext`'s trend
+window is `[weekNumber - ADVISOR_CONFIG.trendWeeks, weekNumber)`, so a package named at a week far
+enough ahead reads an EMPTY window, values every player at `averagePoints: 0`, produces `gap: 0`,
+and can never cross `fairnessFlagThreshold`. Week 8 in a league living in week 4 is a real,
+in-season, `scheduled` week — no nonsense value was needed — and the same field also decided which
+`stat_weeks` row the live-week lock read and which key the score cache evicted. Worse, the
+documented remedy inherited the evasion: `reDeriveAcceptedTradeValue` re-derived at the same frozen
+week, so `npm run trades:sweep` looked at a rigged trade and passed it.
+
+The ruling: the week is NEVER the caller's to name, for exactly the reason `proposerTeamId` never
+was. It is gone from the wire entirely — `proposeTradeSchema` is a `z.strictObject`, so a body
+carrying one is REFUSED rather than silently stripped — and the server derives it from
+`currentWeekOf` (`src/league-service/schedule.ts`), which reads the league's own `matchups` and
+asks `seasonProgress` (`src/league/schedule.ts`), the one definition of "the current week" in this
+codebase. Deriving is what the fix turns on, not bounding: a membership check against the league's
+season, the shape `setLineup` uses for its own week argument, would have passed week 8 cleanly.
+
+**Propose-time and accept-time can differ, and accept-time governs.** An offer lives for
+`proposalTtlHours` (72), which straddles a week boundary. `proposeTrade` stores the week it derived
+so the offer's advisory verdict is explicable while it sits open; `acceptTrade` re-derives inside
+its own transaction and that value governs all four consumers — the valuation, the `stat_weeks`
+lock, the cache eviction, and the row's own `week_number`, re-stamped in the guarded `UPDATE`. So an
+accepted row names the week the rosters actually moved in, which is what makes the sweep's
+re-derivation at that row's week the right question rather than a repeat of the evaded one.
+
 **The fingerprint.** `proposalFingerprint` (`src/league-service/trades.ts`) hashes the league id,
 the ORDERED team pair, and both asset lists SORTED by player id — sha256 over
 `canonicalSerialize`'s rejecting encoder, the same encoder the audit chain itself uses, because key
@@ -344,6 +371,14 @@ flag when the gap crosses a threshold; who is behind either team is a question f
 reading the flag, informed by whatever else the queue already surfaces (join dates, device
 signals, the same evidence `operators-and-moderation.md` §11 already documents for the
 multi-account detector).
+
+**The detector's own inputs are therefore part of the threat model.** The one thing a colluding
+pair must not be able to do is choose the terms the detector measures them on. That is why the
+valuation week is derived server-side and refused on the wire (§3): it was the single input that,
+supplied by the party being detected, switched detection off entirely with a legal in-season
+value and no compensating control anywhere. The general rule this generalizes to, stated for the
+next detector: any input that determines what a detector MEASURES belongs to the server, on the
+same footing as `teamId`, and a bounds check on such an input is not a substitute for owning it.
 
 **What this plan does NOT add:** no account action of any kind is reachable from a trade flag —
 `src/integrity/flag-only.test.ts` covers `src/integrity-service/trade-fairness.ts` the same way it

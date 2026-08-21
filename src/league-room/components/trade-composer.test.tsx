@@ -97,13 +97,16 @@ describe("TradeComposer", () => {
     await waitFor(() =>
       expect(onPropose).toHaveBeenCalledWith({
         counterpartyTeamId: "them",
-        weekNumber: 5,
         proposerAssets: [{ kind: "player", playerId: "p1" }],
         counterpartyAssets: [{ kind: "player", playerId: "p2" }],
         note: "Rebuilding TE",
       }),
     );
     expect(Object.keys(onPropose.mock.calls[0]![0] as object)).not.toContain("proposerTeamId");
+    // Final review, CRITICAL 1: nor the week. The composer still SHOWS the current week (it is
+    // what it prices the live assessment at), but it no longer tells the server which week to
+    // value the real offer at — the server derives that itself.
+    expect(Object.keys(onPropose.mock.calls[0]![0] as object)).not.toContain("weekNumber");
   });
 
   it("shows the sender's own advisory read once more after sending, then hands off on Done", async () => {

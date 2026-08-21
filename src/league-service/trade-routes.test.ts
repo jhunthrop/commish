@@ -111,7 +111,6 @@ function postDecision(leagueId: string, tradeId: string, body: unknown) {
 
 const validProposeBody = {
   counterpartyTeamId: "team_b",
-  weekNumber: 1,
   proposerAssets: [{ kind: "player", playerId: "p_rb_a" }],
   counterpartyAssets: [{ kind: "player", playerId: "p_rb_b" }],
   note: null,
@@ -172,9 +171,20 @@ describe("POST /api/leagues/[leagueId]/trades", () => {
   it("answers 400 naming the field for a malformed body", async () => {
     await seedRouteLeague();
     signedInAs("u_alice");
-    const response = await post("lg_1", { ...validProposeBody, weekNumber: 0 });
+    const response = await post("lg_1", { ...validProposeBody, counterpartyTeamId: "" });
     expect(response.status).toBe(400);
-    expect((await response.json()).error).toContain("weekNumber");
+    expect((await response.json()).error).toContain("counterpartyTeamId");
+  });
+
+  /** Final review, CRITICAL 1, at the route rather than only at the schema: the boundary itself
+   *  refuses a body that names the valuation week, so no client can reach `proposeTrade` with
+   *  one. Nothing is written. */
+  it("answers 400 for a body that names a week, and writes nothing", async () => {
+    await seedRouteLeague();
+    signedInAs("u_alice");
+    const response = await post("lg_1", { ...validProposeBody, weekNumber: 8 });
+    expect(response.status).toBe(400);
+    expect(await db.select().from(tradeProposals)).toEqual([]);
   });
 
   it("proposes a trade and answers 201 with the new offer's id and the proposer's own verdict", async () => {
@@ -199,7 +209,7 @@ describe("POST /api/leagues/[leagueId]/trades", () => {
     await seedRouteLeague();
     signedInAs("u_alice");
     for (let i = 0; i < TRADE_CONFIG.rateLimit.maxRequests; i += 1) {
-      await post("lg_1", { ...validProposeBody, weekNumber: 0 }); // malformed on purpose: cheap, never writes
+      await post("lg_1", { ...validProposeBody, counterpartyTeamId: "" }); // malformed on purpose: cheap, never writes
     }
     const response = await post("lg_1", validProposeBody);
     expect(response.status).toBe(429);

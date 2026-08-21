@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { assembleAdvisorContext } from "@/ai-advisor/context";
 import type { Db } from "@/db/client";
-import { drafts, integrityFlags, leagues, rosterSlots, scoringSettings, teams, tradeProposals } from "@/db/schema";
+import { drafts, integrityFlags, leagues, matchups, rosterSlots, scoringSettings, teams, tradeProposals } from "@/db/schema";
 import { ADVISOR_CONFIG } from "@/domain/advisor";
 import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotType } from "@/domain/roster";
@@ -40,6 +40,12 @@ const TEAM_OWNER_INDICES = [4, 5, 6, 7] as const;
  * what gives `evaluateTradeBeforeExecute`'s own trend window (`ADVISOR_CONFIG.trendWeeks` weeks
  * immediately before) real numbers to value players from, rather than the all-zero average a
  * truly untouched week would price everyone at.
+ *
+ * The trades themselves no longer NAME this week — `proposeTrade`/`acceptTrade` derive it (final
+ * review, CRITICAL 1). This constant is now what this fixture writes into the league's own
+ * schedule (the single unscored matchup below), so `currentWeekOf` answers exactly this number
+ * for this league, plus the week `benchRosterFor` prices candidate packages at so the band search
+ * and the real detector agree.
  */
 const WEEK_NUMBER = LEAGUE_CONFIG.maxWeeks;
 
@@ -273,6 +279,18 @@ export async function seedTrades(db: Db, clock: Clock, claimUserId?: string, dep
     .values({ id: DRAFT_ID, leagueId: LEAGUE_ID, format: "snake", status: "complete", kickoffAt: new Date(clock.now()), auctionBudget: null })
     .onConflictDoNothing({ target: drafts.id });
 
+  // ONE unscored matchup at `WEEK_NUMBER`, the same anchor `e2e/global-setup.ts`'s own trades
+  // league writes and for the same reason: `currentWeekOf` (`@/league-service/schedule`) is what
+  // `proposeTrade`/`acceptTrade` derive their week from now (final review, CRITICAL 1), and a
+  // schedule-less league answers week 1 — which, on a dev database the ingestion worker has
+  // ticked, is long since `final` and would refuse every trade this fixture wants to accept.
+  // Home vs away, never both directions: `matchups`' own primary key is `(league_id, week_number,
+  // home_team_id)`.
+  await db
+    .insert(matchups)
+    .values({ leagueId: LEAGUE_ID, weekNumber: WEEK_NUMBER, homeTeamId: teamIds[0]!, awayTeamId: teamIds[1]! })
+    .onConflictDoNothing();
+
   await dealRostersIfAbsent(db, teamIds);
 
   let tradesAccepted = 0;
@@ -321,7 +339,6 @@ export async function seedTrades(db: Db, clock: Clock, claimUserId?: string, dep
       leagueId: LEAGUE_ID,
       userId: userIdByTeamId.get(giveTeamId)!,
       counterpartyTeamId: getTeamId,
-      weekNumber: WEEK_NUMBER,
       proposerAssets: pick.give.map((player) => ({ kind: "player" as const, playerId: player.playerId })),
       counterpartyAssets: pick.get.map((player) => ({ kind: "player" as const, playerId: player.playerId })),
       note: fixture.note,

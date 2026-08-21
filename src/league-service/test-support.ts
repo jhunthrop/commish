@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import type { RosterSlotConfig } from "@/domain/roster";
 import type { ScoringPresetName } from "@/domain/scoring";
-import { drafts, lineupSlots, players, playerStatLines, rosterSlots, statWeeks, teams, users } from "@/db/schema";
+import { drafts, lineupSlots, matchups, players, playerStatLines, rosterSlots, statWeeks, teams, users } from "@/db/schema";
 import { createLeague } from "./creation";
 import { writeSchedule } from "./schedule";
 
@@ -53,6 +53,36 @@ export async function twoTeamLeague(db: Db, { weeks = 2 }: { readonly weeks?: nu
   ]);
   await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, "team_2"], weeks }));
   return created;
+}
+
+/**
+ * Makes `currentWeekOf` (`./schedule`) answer `week` for this league: every earlier week already
+ * scored, `week` itself still unscored. That is `currentWeekNumber`'s own definition
+ * (`@/league/schedule`) expressed as the fixture which produces it.
+ *
+ * Exists because of the final review's CRITICAL 1: `proposeTrade` and `acceptTrade` DERIVE the
+ * week they value, lock and evict at from the league's own schedule now — a caller cannot name
+ * one — so a test that needs a particular week seeds the season that has it. One row per week is
+ * enough: `matchups`' own primary key is `(league_id, week_number, home_team_id)`, and
+ * `seasonProgress` reads nothing but the week numbers and the two scores.
+ */
+export async function seasonCurrentWeek(
+  db: Db,
+  input: { readonly leagueId: string; readonly homeTeamId: string; readonly awayTeamId: string; readonly week: number },
+): Promise<void> {
+  await db
+    .insert(matchups)
+    .values(
+      Array.from({ length: input.week }, (_, index) => ({
+        leagueId: input.leagueId,
+        weekNumber: index + 1,
+        homeTeamId: input.homeTeamId,
+        awayTeamId: input.awayTeamId,
+        homeScore: index + 1 < input.week ? 100 : null,
+        awayScore: index + 1 < input.week ? 90 : null,
+      })),
+    )
+    .onConflictDoNothing();
 }
 
 /** Swaps the starting QB/RB for their bench counterparts — the one "legal edit" both files exercise. */
