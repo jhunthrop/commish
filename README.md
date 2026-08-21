@@ -29,6 +29,21 @@ npm run audit:verify      # walk every audit chain incrementally from its checkp
                           # is how deletion is detected at all. Exits non-zero and names the
                           # scope/sequence/event/reason on a broken chain — see
                           # docs/decisions/audit-and-integrity.md
+npm run admin:grant       # grant or revoke operator (dispute-queue) access — the ONLY door
+                          # users.is_admin opens through, run against the database host, never
+                          # through a session: npm run admin:grant -- --user <userId> --by
+                          # <granterUserIdOrBootstrap> [--revoke]. See
+                          # docs/decisions/operators-and-moderation.md §1.
+npm run integrity:sweep   # the multi-account detector's manual re-run for one league:
+                          # npm run integrity:sweep -- --league <leagueId>. The join-time trigger
+                          # (accepting an invite, joining a public league) already runs this after
+                          # every new seat fills; this is for a league whose signals moved since,
+                          # or whose trigger failed. See docs/decisions/operators-and-moderation.md §7.
+npm run stats:correct     # re-read and re-settle a week that has already gone final — the operator
+                          # path around the ingestion worker's own three-day correction window:
+                          # npm run stats:correct -- --week <n> --by <operatorUserId>. Reserves
+                          # against the same monthly request budget the worker draws from and
+                          # fails closed on a denial. See docs/decisions/operators-and-moderation.md §10.
 npm run e2e:install       # one-time: download the Playwright browser
 npm run e2e               # browser end-to-end suite (needs a build + a WorkOS test key)
 npm run e2e:ui            # same suite, in Playwright's interactive UI mode
@@ -79,6 +94,15 @@ fully generated, and every week is already scored, so standings, matchup pages a
 playoff spot all have real data to show the moment you sign in. Re-running the seed is safe —
 every seeder upserts rather than duplicating. Set `DEV_SEED_CLAIM_USER_ID` to your own signed-in
 user id first to take over team 1 and the commissioner's chair in all three leagues.
+
+The seed also grants **operator (dispute-queue) access** to that same account — team 1's owner,
+`DEV_SEED_CLAIM_USER_ID` if you set it, else the seed's first placeholder user — through the real
+`grantAdmin` writer, exactly what running `npm run admin:grant` by hand would produce (a real
+`admin_action` audit event, a real notice, never a mock row). `npm run seed && npm run dev` lands
+signed in as an operator with a working `/app/admin/queue` and no manual grant step. The detector
+also runs for real during the seed, so the queue starts with real flags raised by the real sweep
+rather than decorative rows — see `docs/decisions/operators-and-moderation.md` for the role and the
+queue in full.
 
 The seeders create placeholder users and mass-upsert every player, so they refuse to run unless
 `ALLOW_DESTRUCTIVE_SEED=1` is set **and** `DATABASE_URL` names a loopback host — put both in

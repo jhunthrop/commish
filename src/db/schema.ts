@@ -587,10 +587,12 @@ export const reviews = pgTable(
 );
 
 /**
- * A report is in-product moderation SIGNAL, not moderation ACTION (ruling 18: no admin role
- * exists to act on it in this phase). One row per reporter per review — the primary key is the
- * pair, so reporting twice is a no-op upsert (`onConflictDoNothing`) rather than a duplicate or
- * an error: reporting the same review again is the same report, not a second one.
+ * A report is in-product moderation SIGNAL, not moderation ACTION (Phase 2 ruling 18) — a member
+ * never acts on their own report; it raises (or confirms) a `review_report` flag in
+ * `integrity_flags` for an operator to act on instead (Phase 3 Plan B,
+ * `docs/decisions/operators-and-moderation.md` §3). One row per reporter per review — the primary
+ * key is the pair, so reporting twice is a no-op upsert (`onConflictDoNothing`) rather than a
+ * duplicate or an error: reporting the same review again is the same report, not a second one.
  */
 export const reviewReports = pgTable(
   "review_reports",

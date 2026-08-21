@@ -13,9 +13,11 @@ interface RouteContext {
 }
 
 /**
- * The in-product half of ruling 18: reporting is the only lever a signed-in reader has, and it
- * is a SIGNAL, not an action — there is no admin role behind this route to act on it, only
- * `scripts/remove-review.ts`, run by a human operator who reads the report table directly.
+ * The in-product half of Phase 2 ruling 18: reporting is the only lever a signed-in reader has,
+ * and it is a SIGNAL, not an action — this route never acts on it directly. `reportReview` raises
+ * (or confirms) a `review_report` flag for an operator to triage from the dispute queue
+ * (Phase 3 Plan B, `docs/decisions/operators-and-moderation.md` §3), the same queue
+ * `scripts/remove-review.ts` remains a standalone door into.
  *
  * Idempotent by primary key (`reportReview`'s own docblock): a second report from the same
  * reader for the same review answers 200, not 409 — it's the same report.
