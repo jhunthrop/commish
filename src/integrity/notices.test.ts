@@ -142,6 +142,7 @@ describe("NOTICE_TEMPLATES", () => {
       "admin_granted",
       "chat_message_removed",
       "draft_auto_picked",
+      "lineup_auto_set",
       "operator_warning",
       "review_removed",
       "stat_week_corrected",
@@ -179,5 +180,31 @@ describe("NOTICE_TEMPLATES", () => {
   it("is informational, not a sanction, so it states no appeal path the way removal notices do", () => {
     const notice = renderNotice("stat_week_corrected", NOTICE_SAMPLES.stat_week_corrected);
     expect(notice.body).not.toContain("There is no reply to this message.");
+  });
+
+  /**
+   * Task 4, Step 6: says what happened and which week it copied, ends on what the manager
+   * controls, and never uses the word "missed" — the failure mode a sentence opening with what
+   * somebody failed to do would be, even where the denylist itself would pass either word.
+   */
+  it("says what happened when a lineup is auto-set, verbatim, with no changed-players clause", () => {
+    const notice = renderNotice("lineup_auto_set", NOTICE_SAMPLES.lineup_auto_set);
+    expect(notice.title).toBe("We set your week 4 lineup for you");
+    expect(notice.body).toBe(
+      "Week 4 kicked off in Sunday Money before you set a lineup, so we started the same team you started in week 3. You can set your own lineup any week before kickoff, and we will leave it alone when you do.",
+    );
+    expect(notice.body).not.toContain("missed");
+    expect(notice.body).not.toContain("There is no reply to this message.");
+  });
+
+  it("folds a non-empty changedPlayers clause into the sentence right after the carried-from week, still copy-clean", () => {
+    const withOneChange = renderNotice("lineup_auto_set", {
+      ...NOTICE_SAMPLES.lineup_auto_set,
+      changedPlayers: " Christian McCaffrey is no longer on your roster, so we filled that spot from your bench.",
+    });
+    expect(withOneChange.body).toBe(
+      "Week 4 kicked off in Sunday Money before you set a lineup, so we started the same team you started in week 3. Christian McCaffrey is no longer on your roster, so we filled that spot from your bench. You can set your own lineup any week before kickoff, and we will leave it alone when you do.",
+    );
+    expect(copyViolations(`${withOneChange.title} ${withOneChange.body}`)).toEqual([]);
   });
 });

@@ -135,4 +135,5 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
     note: "Two accounts, one household, and this trade is why we looked.",
   },
   tier_blocked_join: { leagueName: "Rookie Snake Room" },
+  lineup_auto_set: { leagueName: "Sunday Money", week: 4, carriedFrom: 3, changedPlayers: "" },
 };

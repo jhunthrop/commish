@@ -44,3 +44,22 @@ export function startersOf(lineup: readonly RosterSlot[]): readonly RosterSlot[]
 export function benchOf(lineup: readonly RosterSlot[]): readonly RosterSlot[] {
   return lineup.filter((entry) => entry.slot === BENCH_SLOT);
 }
+
+/**
+ * The BENCH, derived rather than chosen: exactly "everyone this team owns who isn't starting",
+ * truncated to the league's configured bench size and laid out into slot indexes in a stable
+ * (sorted-id) order. Shared by every writer that assigns starters and needs the rest of the
+ * roster to fall in behind them — `setLineup` (`@/league-service/lineups`, a client-submitted
+ * starting five) and `plannedAutoLineup` (`@/league-service/auto-lineup`, the missed-deadline
+ * strategy's own starters) both call this rather than each re-deriving the same rule, which is
+ * the "no second slot policy" this codebase holds every lineup writer to.
+ */
+export function deriveBenchSlots(
+  owned: ReadonlySet<string>,
+  startingIds: ReadonlySet<string>,
+  slotConfig: readonly RosterSlotConfig[],
+): readonly RosterSlot[] {
+  const benchConfig = slotConfig.find((config) => config.slot === BENCH_SLOT);
+  const benched = [...owned].filter((id) => !startingIds.has(id)).sort();
+  return benched.slice(0, benchConfig?.count ?? 0).map((playerId, slotIndex) => ({ slot: BENCH_SLOT, slotIndex, playerId }));
+}

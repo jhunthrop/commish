@@ -5,12 +5,15 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
+import { autoSetLineupsForWeek } from "@/league-service/auto-lineup";
 import { joinLeagueInTx, recordTierBlockedJoin } from "@/league-service/join";
+import { setLineup } from "@/league-service/lineups";
 import { writeSchedule } from "@/league-service/schedule";
 import { seasonCurrentWeek } from "@/league-service/test-support";
 import { acceptTrade, proposeTrade, rejectTrade } from "@/league-service/trades";
 import { reverseTradeInTx } from "@/league-service/trade-reversal";
 import type { StatLine } from "@/domain/player";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { correctSettledWeek } from "@/stats-pipeline/correction";
 import { finalizeWeek } from "@/stats-pipeline/finalize";
 import { fakeStatsProvider } from "@/stats-pipeline/test-support";
@@ -1770,5 +1773,174 @@ describe("recordTierBlockedJoin's notice order", () => {
     const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_tb_blocked"));
     expect(notice).toMatchObject({ leagueId: "lg_tier_block_lock", noticeType: "tier_blocked_join" });
     expect(notice?.auditEventId).not.toBeNull();
+  });
+});
+
+/**
+ * PHASE 3 PLAN D, TASK 4's own transaction (Step 7): `autoSetLineupInTx`
+ * (`@/league-service/auto-lineup`) takes `stat_weeks[week] FOR SHARE` FIRST, matching `setLineup`
+ * and `acceptTrade` — all THREE roster-adjacent writers in the same position — but doing the
+ * opposite job it does there: this writer REQUIRES the week to be locked, so it is the one whose
+ * own read can genuinely block behind a concurrent WRITE to that row (the ingestion worker's own
+ * `persistTick`, matched here by a real transaction taking the identical row-exclusive lock
+ * `persistTick`'s own upsert would).
+ */
+describe("autoSetLineupInTx's week lock", () => {
+  it("blocks a concurrent run behind a real stat-week write, and proceeds once it sees the flip", async () => {
+    const leagueId = "lg_auto_week_lock";
+    await seedLeagueWith(leagueId, ["u_aw_commish", "u_aw_alice"]);
+    await joinDb.update(leagues).set({ isPublicMatchmade: true }).where(eq(leagues.id, leagueId));
+    await joinDb.insert(teams).values([
+      { id: "team_aw_commish", leagueId, userId: "u_aw_commish", name: "Commish" },
+      { id: "team_aw_alice", leagueId, userId: "u_aw_alice", name: "Alice" },
+    ]);
+    await joinDb.transaction((tx) => writeSchedule(tx, { leagueId, teamIds: ["team_aw_commish", "team_aw_alice"], weeks: 4 }));
+    // An EXISTING row, matching `persistTick`'s own upsert shape — a `SELECT … FOR SHARE` against
+    // a row still being INSERTED (never committed, so not yet visible) would not block at all.
+    await joinDb.insert(statWeeks).values({ week: 4, status: "scheduled" });
+
+    let releaseFlip: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseFlip = resolve));
+    const flipping = joinDb.transaction(async (tx) => {
+      await tx.update(statWeeks).set({ status: "in_progress" }).where(eq(statWeeks.week, 4));
+      await released;
+    });
+
+    // T_autoset: the real `autoSetLineupsForWeek`, on its own connection, reaching for the SAME
+    // week row through `autoSetLineupInTx`'s own FOR SHARE re-check.
+    const settingLineups = autoSetLineupsForWeek(pickDb, { weekNumber: 4, occurredAt: clock.now() });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFlip();
+    await flipping;
+
+    const outcome = await settingLineups;
+    expect(outcome.leaguesFailed).toEqual([]);
+    // Blocked on the WEEK, never on the anchor: neither team has a previous week's saved lineup
+    // (their first week touched), so nothing is notified and no `system_action` is ever written —
+    // the anchor is never even created.
+    expect(outcome.teamsSet).toBe(2);
+    const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, leagueId));
+    expect(anchor).toBeUndefined();
+  });
+});
+
+/**
+ * Step 7's second proof: a real `setLineup` and a real `autoSetLineupsForWeek` in the SAME
+ * league, overlapping in time, reaching for the SAME chain anchor from two different teams —
+ * proving they QUEUE on it rather than cycle. `setLineup` is parked with the SAME technique
+ * `notify.ts`'s own docblock describes for `attachAuditEvent`: paused AFTER its real
+ * `audit.record` call returns (the anchor row is `FOR UPDATE`, held by the still-open
+ * transaction) and BEFORE the transaction commits, via an injected `AuditLogger` whose `record`
+ * delegates to the real one and then waits — `setLineup`'s own dependency-injection seam, the
+ * same one `lineups.test.ts` already uses to force an audit failure.
+ *
+ * DELIBERATELY TWO DIFFERENT WEEKS. Alice's parked save targets week 3, which is untouched by
+ * `stat_weeks` and so reads as `"scheduled"` — `setLineup` REFUSES a locked week outright, so a
+ * save aimed at the SAME locked week 4 `autoSetLineupInTx` requires would never reach its own
+ * `audit.record` call at all, and the two writers could never contend for anything. Alice's row
+ * for week 4 is created and COMMITTED in a setup step BEFORE the concurrent phase instead, so
+ * `autoSetLineupInTx`'s own per-team existence check excludes her from its week-4 run entirely —
+ * the two writers never touch the same `lineup_slots` row, which is what makes this a proof about
+ * the ANCHOR (the one thing they still share: one league, one chain) and not an accidental proof
+ * about something else.
+ */
+describe("autoSetLineupInTx's team-lock order — a parked setLineup queues rather than cycles with it", () => {
+  it("lets a manual save and an auto-set run in the same league both complete without deadlocking", async () => {
+    const leagueId = "lg_auto_team_lock";
+    await seedLeagueWith(leagueId, ["u_at_commish", "u_at_alice", "u_at_carol"]);
+    await joinDb
+      .update(leagues)
+      .set({ isPublicMatchmade: true, rosterSlots: SPRINT_ROSTER_SLOTS })
+      .where(eq(leagues.id, leagueId));
+    await joinDb.insert(teams).values([
+      { id: "team_at_alice", leagueId, userId: "u_at_alice", name: "Alice" },
+      { id: "team_at_carol", leagueId, userId: "u_at_carol", name: "Carol" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_at_alice_qb", name: "Alice QB", position: "QB", nflTeam: "KC" },
+      { id: "p_at_alice_rb", name: "Alice RB", position: "RB", nflTeam: "KC" },
+      { id: "p_at_alice_wr", name: "Alice WR", position: "WR", nflTeam: "KC" },
+      { id: "p_at_carol_qb", name: "Carol QB", position: "QB", nflTeam: "SF" },
+      { id: "p_at_carol_rb", name: "Carol RB", position: "RB", nflTeam: "SF" },
+      { id: "p_at_carol_wr", name: "Carol WR", position: "WR", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_at_alice", slot: "QB", slotIndex: 0, playerId: "p_at_alice_qb" },
+      { teamId: "team_at_alice", slot: "RB", slotIndex: 0, playerId: "p_at_alice_rb" },
+      { teamId: "team_at_alice", slot: "WR", slotIndex: 0, playerId: "p_at_alice_wr" },
+      { teamId: "team_at_carol", slot: "QB", slotIndex: 0, playerId: "p_at_carol_qb" },
+      { teamId: "team_at_carol", slot: "RB", slotIndex: 0, playerId: "p_at_carol_rb" },
+      { teamId: "team_at_carol", slot: "WR", slotIndex: 0, playerId: "p_at_carol_wr" },
+    ]);
+    await joinDb.transaction((tx) => writeSchedule(tx, { leagueId, teamIds: ["team_at_alice", "team_at_carol"], weeks: 4 }));
+
+    const aliceStarters = [
+      { slot: "QB" as const, slotIndex: 0, playerId: "p_at_alice_qb" },
+      { slot: "RB" as const, slotIndex: 0, playerId: "p_at_alice_rb" },
+      { slot: "WR" as const, slotIndex: 0, playerId: "p_at_alice_wr" },
+    ];
+    // Carol's WEEK 3 save is what gives her a `previousLineup` to carry forward — without it the
+    // auto-set materializes her roster silently and never reaches for the anchor at all.
+    await setLineup(joinDb, { leagueId, teamId: "team_at_carol", weekNumber: 3, slots: [
+      { slot: "QB", slotIndex: 0, playerId: "p_at_carol_qb" },
+      { slot: "RB", slotIndex: 0, playerId: "p_at_carol_rb" },
+      { slot: "WR", slotIndex: 0, playerId: "p_at_carol_wr" },
+    ], userId: "u_at_carol" });
+    // Alice's week 4 row, created and COMMITTED before the concurrent phase, and before week 4
+    // locks — see this `describe` block's own docblock for why this is what keeps the race honest.
+    await setLineup(joinDb, { leagueId, teamId: "team_at_alice", weekNumber: 4, slots: aliceStarters, userId: "u_at_alice" });
+    // NOW week 4 locks — after both setup saves, which `setLineup` would otherwise refuse.
+    await joinDb.insert(statWeeks).values({ week: 4, status: "in_progress" });
+
+    const realAudit = getAuditLogger();
+    let holdsAnchor: () => void = () => {};
+    const anchorHeld = new Promise<void>((resolve) => (holdsAnchor = resolve));
+    let releaseSave: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseSave = resolve));
+    const pausingAudit: AuditLogger = {
+      record: async (tx, input) => {
+        const event = await realAudit.record(tx, input);
+        holdsAnchor();
+        await parked;
+        return event;
+      },
+      recordAll: (tx, inputs) => realAudit.recordAll(tx, inputs),
+    };
+
+    // T_save: alice's FIRST save of week 3 (still `"scheduled"`, so `setLineup` accepts it),
+    // parked right after its own `lineup_change` event mints — the anchor row is `FOR UPDATE` for
+    // as long as this transaction stays open.
+    const saving = setLineup(
+      joinDb,
+      { leagueId, teamId: "team_at_alice", weekNumber: 3, slots: aliceStarters, userId: "u_at_alice" },
+      undefined,
+      { audit: pausingAudit, clock },
+    );
+    await anchorHeld;
+
+    // T_autoset: the real `autoSetLineupsForWeek`, on its own connection, processing ONLY carol
+    // at week 4 (alice already has a committed week-4 row) and reaching for the SAME chain's
+    // anchor through her own `system_action`.
+    const settingLineups = autoSetLineupsForWeek(pickDb, { weekNumber: 4, occurredAt: clock.now() });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseSave();
+
+    const saved = await saving;
+    expect(saved.ok).toBe(true);
+    const outcome = await settingLineups;
+    expect(outcome.leaguesFailed).toEqual([]);
+    expect(outcome.teamsSet).toBe(1); // carol only — alice was left entirely alone at week 4
+
+    // Both landed on the SAME chain: carol's week-3 save, alice's week-4 save, alice's parked
+    // week-3 save, and carol's own `lineup_auto_set` system_action — four events, one batch, no
+    // cycle.
+    const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, leagueId));
+    expect(anchor!.headSequence).toBe(4);
+
+    const [carolNotice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_at_carol"));
+    expect(carolNotice).toMatchObject({ leagueId, noticeType: "lineup_auto_set" });
+    expect(carolNotice?.auditEventId).not.toBeNull();
   });
 });

@@ -1445,6 +1445,74 @@ describe("createIngestionWorker", () => {
     expect(onOutcome).toHaveBeenCalledWith(expect.objectContaining({ week: 1, reason: expect.stringMatching(/budget is spent/) }));
     expect(await redis.exists(STATS_INGESTION_CONFIG.keys.correctionSweep(1, "2026-09-15"))).toBe(0);
   });
+
+  /**
+   * Task 4's watch-item: the auto-set trigger, driven off the worker's own transition rather than
+   * exercised through `autoSetLineupsForWeek`'s own suite (`@/league-service/auto-lineup.test.ts`)
+   * — this file's job is proving WHEN it fires, not what it does once it does.
+   */
+  describe("the auto-set lineup trigger", () => {
+    function recordingAutoSet() {
+      const calls: { readonly weekNumber: number; readonly occurredAt: string }[] = [];
+      const fn: typeof import("@/league-service/auto-lineup").autoSetLineupsForWeek = async (_db, input) => {
+        calls.push({ weekNumber: input.weekNumber, occurredAt: input.occurredAt });
+        return { week: input.weekNumber, teamsSet: 0, leaguesFailed: [] };
+      };
+      return { fn, calls };
+    }
+
+    it("fires once, on the tick that moves the week out of scheduled, and not on the ticks after it", async () => {
+      const script: FakeStatsProviderScript = {
+        games: { 1: [{ gameId: "g_trigger", week: 1, status: "in_progress", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
+      };
+      const provider = fakeStatsProvider(script);
+      const { fn: autoSet, calls } = recordingAutoSet();
+      const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, autoSet });
+
+      await worker.tick(); // week 1 flips scheduled -> in_progress
+      await worker.tick(); // and stays there
+
+      expect(calls).toEqual([{ weekNumber: 1, occurredAt: now }]);
+    });
+
+    it("never fires while a week's games stay scheduled — there is no transition to observe", async () => {
+      const script: FakeStatsProviderScript = {
+        games: { 1: [{ gameId: "g_still_scheduled", week: 1, status: "scheduled", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
+      };
+      const provider = fakeStatsProvider(script);
+      const { fn: autoSet, calls } = recordingAutoSet();
+      const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, autoSet });
+
+      await worker.tick();
+      await worker.tick();
+
+      expect(calls).toEqual([]);
+    });
+
+    it("never fails the tick when the auto-set trigger itself throws, and reports it rather than losing the week's own outcome", async () => {
+      const script: FakeStatsProviderScript = {
+        games: { 1: [{ gameId: "g_autoset_throws", week: 1, status: "in_progress", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
+      };
+      const provider = fakeStatsProvider(script);
+      const autoSet = vi.fn(async () => {
+        throw new Error("simulated auto-set failure");
+      });
+      const onOutcome = vi.fn();
+      const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, autoSet, onOutcome });
+
+      const outcomes = await worker.tick();
+
+      expect(autoSet).toHaveBeenCalledTimes(1);
+      // The week's OWN outcome still reports applied — a broken auto-set must never fail the tick
+      // that just settled real scores.
+      expect(outcomes.some((outcome) => outcome.week === 1 && outcome.applied === true)).toBe(true);
+      const [week] = await db.select().from(statWeeks).where(eq(statWeeks.week, 1));
+      expect(week).toMatchObject({ status: "in_progress" });
+      expect(onOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({ week: 1, applied: false, reason: expect.stringContaining("auto-set") }),
+      );
+    });
+  });
 });
 
 describe("examinationWindow", () => {

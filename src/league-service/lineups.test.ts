@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, lineupSlots, rosterSlots, statWeeks } from "@/db/schema";
+import { auditEvents, leagues, lineupSlots, rosterSlots, statWeeks, teams, users } from "@/db/schema";
 import type { WeekStatus } from "@/league";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
@@ -223,6 +223,31 @@ describe("setLineup", () => {
     expect(
       await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 9, slots: validSwap, userId: "u1" }),
     ).toEqual({ ok: false, status: 404, reason: "That week isn't part of this league's season." });
+  });
+
+  /**
+   * `docs/decisions/audit-and-integrity.md`'s residual, closed: a team id from ANOTHER league,
+   * driven through `setLineup` for THIS league's id, used to reach the roster/validation work
+   * unchecked — safe only because the route derives both ids from the session actor rather than
+   * from the request body. Task 4 (Step 5) is the next team-scoped writer, and adds the assertion
+   * the residual asked for rather than copying the omission.
+   */
+  it("refuses a team that belongs to a different league", async () => {
+    const league = await twoTeamLeague(db);
+    await db.insert(users).values({ id: "u_other", email: "u_other@test.local", displayName: "Other" });
+    await db.insert(leagues).values({ id: "league_other", name: "Other League", format: "snake", teamCount: 1, commissionerUserId: "u_other" });
+    await db.insert(teams).values({ id: "team_other", leagueId: "league_other", userId: "u_other", name: "Other Team" });
+
+    expect(
+      await setLineup(db, { leagueId: league.leagueId, teamId: "team_other", weekNumber: 1, slots: validSwap, userId: "u1" }),
+    ).toEqual({ ok: false, status: 404, reason: "That team isn't part of this league." });
+  });
+
+  it("refuses a team id that doesn't exist at all", async () => {
+    const league = await twoTeamLeague(db);
+    expect(
+      await setLineup(db, { leagueId: league.leagueId, teamId: "team_nope", weekNumber: 1, slots: validSwap, userId: "u1" }),
+    ).toEqual({ ok: false, status: 404, reason: "That team isn't part of this league." });
   });
 
   it("invalidates the score cache for this league and week after a successful save", async () => {

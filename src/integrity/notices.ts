@@ -193,6 +193,27 @@ export interface NoticeContexts {
   readonly tier_blocked_join: {
     readonly leagueName: string;
   };
+  /**
+   * `autoSetLineupInTx`'s own notice (`@/league-service/auto-lineup`, Task 4) — the personal half
+   * of the `lineup_auto_set` `system_action` the same write appends (`SYSTEM_ACTION_VISIBILITY`
+   * is `"subject_only"` for it, `@/integrity/system-actions`), sent only to the manager whose
+   * lineup was set. `carriedFrom` is the week whose saved choice was copied forward
+   * (`MISSED_DEADLINE_LINEUP_STRATEGY`'s `repeat_previous_week`, the only strategy this plan
+   * declares) — always a real earlier week, because the one week with no earlier week to copy
+   * (a league's first) is a materialization of the roster's own default rather than a copy of a
+   * choice, and that case sends no notice at all (nothing was carried forward to report).
+   *
+   * `changedPlayers` is a rendered clause from a FIXED set (nothing changed; one player named;
+   * several named), produced by `changedPlayersClauseFor` — never free text, so `notices.test.ts`
+   * sweeps every sentence this notice can produce rather than one sample of it, the discipline
+   * `correctionOutcome` established in Plan B.
+   */
+  readonly lineup_auto_set: {
+    readonly leagueName: string;
+    readonly week: number;
+    readonly carriedFrom: number;
+    readonly changedPlayers: string;
+  };
 }
 
 /**
@@ -315,6 +336,17 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   tier_blocked_join: ({ leagueName }) => ({
     title: "That league is reserved for newer players",
     body: `You asked to join ${leagueName}, which keeps its seats for players who are new to Commish so everyone starts on a level footing. Plenty of leagues are open to everyone, and the browse page lists the ones with seats left right now.`,
+  }),
+  // Three properties, each deliberate (Task 4, Step 6). It says what the platform did and which
+  // week it copied, so the manager can check it. It ends with the thing they control, because a
+  // notice about something they did not choose should close on something they can. And it never
+  // uses the word "missed": a sentence that opens with what somebody failed to do is the failure
+  // mode `INTEGRITY_CONFIG.notices.accusatoryTerms` exists to approximate, even where the
+  // denylist itself would pass either word. No "no reply to this message" line: this is not a
+  // sanction, and there is nothing about the member's own conduct to appeal.
+  lineup_auto_set: ({ leagueName, week, carriedFrom, changedPlayers }) => ({
+    title: `We set your week ${week} lineup for you`,
+    body: `Week ${week} kicked off in ${leagueName} before you set a lineup, so we started the same team you started in week ${carriedFrom}.${changedPlayers} You can set your own lineup any week before kickoff, and we will leave it alone when you do.`,
   }),
 };
 
