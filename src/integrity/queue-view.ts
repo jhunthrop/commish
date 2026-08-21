@@ -58,10 +58,25 @@ export interface FlagResolutionView {
  * the same "a former member" discipline `activity-view.ts`'s `buildActivityNames` uses.
  */
 export type FlagSubjectView =
-  | { readonly kind: "review"; readonly reviewId: string; readonly body: string; readonly authorName: string }
-  | { readonly kind: "chat_message"; readonly messageId: string; readonly body: string | null; readonly authorName: string }
+  | { readonly kind: "review"; readonly reviewId: string; readonly body: string; readonly authorName: string; readonly removedAt: string | null }
+  | { readonly kind: "chat_message"; readonly messageId: string; readonly body: string | null; readonly authorName: string; readonly removedAt: string | null }
   | { readonly kind: "account_pair"; readonly userIds: readonly [string, string]; readonly names: readonly [string, string] }
   | { readonly kind: "trade"; readonly tradeId: string };
+
+/**
+ * Whether this subject's content is ALREADY gone — non-null `removed_at` on the row behind it.
+ *
+ * Final review, MEDIUM 8: a member can report a tombstoned message (`reportMessage` checks
+ * existence and league, never `removed_at IS NULL`, and the open-subject unique index only
+ * dedupes OPEN flags — both correct: a fresh report of already-removed content is a real
+ * question, and the operator may still want to warn). The detail page was then offering
+ * `content_removed` on it, which `removeChatMessageInTx`'s no-re-stamp guard refuses with a 409
+ * and a full rollback, leaving the flag permanently unresolvable by the decision the UI offered.
+ * The page reads this to show the removed state and to withhold that one decision.
+ */
+export function subjectIsRemoved(subject: FlagSubjectView): boolean {
+  return (subject.kind === "review" || subject.kind === "chat_message") && subject.removedAt !== null;
+}
 
 /** One reporter's own account of it — who, why, and when. Derived at read time from
  *  `review_reports` (ruling 5): this row is never stored on the flag itself. */

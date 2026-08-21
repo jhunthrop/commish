@@ -474,6 +474,26 @@ two different boundaries: `integrity` is the server-only machinery that decides 
 records it; `moderation` is the vocabulary of what may be removed and why, needed on both sides of
 the wire.
 
+**Reporting content that is already removed, and what the operator is then offered.** Neither
+`reportMessage` nor `reportReview` checks `removed_at IS NULL`, and the open-subject unique index
+dedupes only OPEN flags — so a member can report a tombstone, and a fresh flag opens on it. Both
+of those are deliberate: a report on content that is already gone is a real question (the author
+may still deserve a warning), and auto-resolving it would answer that question on the operator's
+behalf. What the queue detail page does instead is offer only the decisions that can actually
+succeed: `no_action` and `warned_user`, with `content_removed` withheld and the card saying why
+(*"We already removed this content. You can still close this flag or warn the member."*). The
+operator still reads the words — a removed row keeps its body forever, and only the member-facing
+wire withholds it — because they cannot judge whether to warn without them. `resolveFlag`'s own
+409 stays underneath as the backstop for a direct POST.
+
+**`content_removed` is refused before the transaction opens for a subject it cannot remove.**
+`CONTENT_REMOVAL_WIRED_FOR` (`src/integrity/flags.ts`) is the one table naming which subject types
+have a remover, read by three consumers rather than re-derived by each: the queue detail page
+(which decisions to offer), `resolveFlag` (which to refuse, in product copy, before any write) and
+`removeSubject` (the throw that backstops both). Before this, a direct POST of `content_removed`
+against an `account_pair` flag reached `removeSubject`'s unwired branch and became a 500 —
+admin-only and fail-safe, since the transaction rolled back, but a crash is not a refusal.
+
 ## 9. The `renderSystemAction` gate, closed
 
 **The re-review Plan A required.** Plan A's own residuals section named the hazard explicitly:

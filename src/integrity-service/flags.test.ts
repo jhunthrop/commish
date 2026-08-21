@@ -218,6 +218,9 @@ describe("resolveFlag", () => {
     readonly flagType: FlagType;
     readonly subjectAuthor?: string;
     readonly leagueId?: string;
+    /** Reuse an EXISTING subject row rather than creating a fresh one — the "a member reports the
+     *  same content again after it was removed" case (final review, MEDIUM 8). */
+    readonly subjectId?: string;
   }
 
   /**
@@ -239,8 +242,12 @@ describe("resolveFlag", () => {
     } else if (opts.flagType === "chat_report") {
       leagueId = opts.leagueId ?? `lg_auto_${flagSeq}`;
       await ensureLeague(leagueId, author);
-      const [message] = await db.insert(chatMessages).values({ leagueId, authorUserId: author, body: `message ${flagSeq}` }).returning({ id: chatMessages.id });
-      subjectId = String(message!.id);
+      if (opts.subjectId !== undefined) {
+        subjectId = opts.subjectId;
+      } else {
+        const [message] = await db.insert(chatMessages).values({ leagueId, authorUserId: author, body: `message ${flagSeq}` }).returning({ id: chatMessages.id });
+        subjectId = String(message!.id);
+      }
     } else if (opts.flagType === "multi_account") {
       subjectId = `${author}_pair_${flagSeq}`;
       if (opts.leagueId !== undefined) {
@@ -458,17 +465,47 @@ describe("resolveFlag", () => {
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
   });
 
-  it("refuses content_removed for a subject type nothing removes content for — account_pair has no remover", async () => {
+  /**
+   * Final review, LOW 13. This used to be a `rejects.toThrow` on a plain `Error`, which
+   * `withAdmin` turned into a 500: admin-only and fail-safe, since the transaction rolled back —
+   * but a crash is not a refusal, and `decisionsFor` at the page level was the only thing
+   * preventing it. The boundary now says no in the product's own words, BEFORE any write.
+   */
+  it("refuses content_removed for a subject type nothing removes content for, cleanly and before any write", async () => {
     await ensureUser("u_op");
     const flag = await openFlag({ flagType: "multi_account", subjectAuthor: "u_pair_cr" });
 
-    await expect(
-      resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op" }),
-    ).rejects.toThrow('resolveFlag: content_removed has no remover wired for subject type "account_pair".');
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op" });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: "There is no content to remove on this flag. Close it with no action, or warn the member.",
+    });
 
     const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
     expect(row!.resolvedAt).toBeNull();
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  /** The unresolvable-flag half of MEDIUM 8, at the service level: `resolveFlag`'s refusal is the
+   *  BACKSTOP the queue page's withheld decision sits in front of, and it still holds. */
+  it("still refuses content_removed on content that is already removed, and rolls the stamp back with it", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "chat_report", subjectAuthor: "u_chat_twice", leagueId: "lg_chat_twice" });
+
+    const first = await resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_op" });
+    expect(first.ok).toBe(true);
+
+    // A member reports the tombstone; a FRESH flag opens on the same subject, which the
+    // open-subject unique index permits because the first one is resolved.
+    const [firstRow] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    const reopened = await openFlag({ flagType: "chat_report", subjectAuthor: "u_chat_twice", leagueId: "lg_chat_twice", subjectId: firstRow!.subjectId });
+
+    const second = await resolveFlag(db, { flagId: reopened.id, decision: "content_removed", note: "spam again", operatorUserId: "u_op" });
+    expect(second).toEqual({ ok: false, status: 409, reason: `Message "${firstRow!.subjectId}" is already removed.` });
+
+    const [reopenedRow] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, reopened.id));
+    expect(reopenedRow!.resolvedAt).toBeNull();
   });
 
   it("removes the chat message and resolves the flag in one transaction, or neither — Task 6's chat branch", async () => {
@@ -885,7 +922,7 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
     expect(detail).not.toBeNull();
     expect(detail!.flagId).toBe("detail_flag_1");
     expect(detail!.evidence).toEqual({ note: "auto-flagged" });
-    expect(detail!.subject).toEqual({ kind: "review", reviewId: "detail_r1", body: "meh", authorName: "u_detail_author" });
+    expect(detail!.subject).toEqual({ kind: "review", reviewId: "detail_r1", body: "meh", authorName: "u_detail_author", removedAt: null });
     expect(detail!.reporters).toEqual([{ userId: "u_detail_reporter", name: "u_detail_reporter", reason: "spam", reportedAt: "2026-08-01T00:00:01.000Z" }]);
     expect(detail!.trail.map((r) => r.headline)).toEqual(["This flag was opened."]);
     expect(detail!.decisions).toEqual(["no_action", "warned_user", "content_removed"]);
@@ -951,7 +988,7 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
     );
 
     const detail = await flagDetail(db, flag.id);
-    expect(detail!.subject).toEqual({ kind: "review", reviewId: "review_that_does_not_exist", body: "This review is no longer here.", authorName: "A former member" });
+    expect(detail!.subject).toEqual({ kind: "review", reviewId: "review_that_does_not_exist", body: "This review is no longer here.", authorName: "A former member", removedAt: null });
   });
 
   it("reads a chat_report flag's subject, found and gone", async () => {
@@ -976,7 +1013,7 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
       }),
     );
     const foundDetail = await flagDetail(db, found.id);
-    expect(foundDetail!.subject).toEqual({ kind: "chat_message", messageId: String(message!.id), body: "trash talk", authorName: "u_chat_detail_author" });
+    expect(foundDetail!.subject).toEqual({ kind: "chat_message", messageId: String(message!.id), body: "trash talk", authorName: "u_chat_detail_author", removedAt: null });
 
     const ghost = await db.transaction((tx) =>
       raiseFlag(tx, {
@@ -991,7 +1028,7 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
       }),
     );
     const ghostDetail = await flagDetail(db, ghost.id);
-    expect(ghostDetail!.subject).toEqual({ kind: "chat_message", messageId: "999999", body: null, authorName: "A former member" });
+    expect(ghostDetail!.subject).toEqual({ kind: "chat_message", messageId: "999999", body: null, authorName: "A former member", removedAt: null });
   });
 
   /**

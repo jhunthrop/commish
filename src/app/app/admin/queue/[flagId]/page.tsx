@@ -4,8 +4,8 @@ import { flagDetail } from "@/integrity-service/flags";
 import { leagueNameFor } from "@/draft-service/teams";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { renderNotice } from "@/integrity/notices";
-import { DECISION_PHRASE, type FlagResolutionView, type FlagSubjectView } from "@/integrity/queue-view";
-import type { ResolutionDecision } from "@/integrity/flags";
+import { DECISION_PHRASE, subjectIsRemoved, type FlagResolutionView, type FlagSubjectView } from "@/integrity/queue-view";
+import { contentRemovalIsWiredFor, type ResolutionDecision } from "@/integrity/flags";
 import { AppHeader } from "@/components/app-shell/app-header";
 import { Card, PageTitle } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
@@ -22,6 +22,21 @@ function formatWhen(iso: string): string {
   return new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
 }
 
+/**
+ * States, in the operator's own words, that this content is ALREADY gone (final review, MEDIUM
+ * 8). It is the reason `decisionsFor` withholds `content_removed` below, so an operator who
+ * notices one decision missing has the answer on the same card rather than in a 409.
+ *
+ * The operator still sees the words. That is deliberate and it is the whole point of a fresh
+ * report on removed content: the question in front of them is whether to warn the author, and
+ * they cannot answer it without reading what was written. A removed row keeps its body forever
+ * (the stamp-never-delete discipline `reviews` and `chat_messages` share); only the MEMBER-facing
+ * wire withholds it.
+ */
+function AlreadyRemovedNote() {
+  return <p className="mt-2 text-sm text-text-muted">We already removed this content. You can still close this flag or warn the member.</p>;
+}
+
 function SubjectCard({ subject }: { readonly subject: FlagSubjectView }) {
   if (subject.kind === "review") {
     return (
@@ -29,6 +44,7 @@ function SubjectCard({ subject }: { readonly subject: FlagSubjectView }) {
         <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Reported review</p>
         <p className="mt-1 text-sm text-text-muted">By {subject.authorName}</p>
         <p className="mt-2 break-words text-sm text-text-primary">{subject.body}</p>
+        {subjectIsRemoved(subject) ? <AlreadyRemovedNote /> : null}
       </Card>
     );
   }
@@ -38,6 +54,7 @@ function SubjectCard({ subject }: { readonly subject: FlagSubjectView }) {
         <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Reported message</p>
         <p className="mt-1 text-sm text-text-muted">From {subject.authorName}</p>
         <p className="mt-2 break-words text-sm text-text-primary">{subject.body ?? "This message is no longer here."}</p>
+        {subjectIsRemoved(subject) ? <AlreadyRemovedNote /> : null}
       </Card>
     );
   }
@@ -102,13 +119,23 @@ function ResolutionSummary({ resolution }: { readonly resolution: FlagResolution
 }
 
 /**
- * `content_removed` is wired for `review` and `chat_message` subjects (`resolveFlag`'s own
- * `removeSubject` — Task 6 landed the chat sibling). Filtered out for every OTHER subject type
- * here rather than left for the service to refuse, so an operator is never offered a decision
- * that would 500 on submit.
+ * `content_removed` is offered only when it can actually succeed. Two ways it cannot, and both
+ * are filtered here rather than left for the service to refuse — this page's standing promise is
+ * that an operator is never offered a decision that fails on submit:
+ *
+ *  1. The subject type has no remover wired (`contentRemovalIsWiredFor`, `@/integrity/flags` —
+ *     one table, read by this page, by `resolveFlag`'s pre-transaction check and by
+ *     `removeSubject`'s backstop, rather than three copies of the same list).
+ *  2. The content is ALREADY removed (final review, MEDIUM 8). A member can report a tombstoned
+ *     message, which opens a fresh flag on it; `removeChatMessageInTx`'s no-re-stamp guard then
+ *     refuses with a 409 and a full rollback, leaving the flag permanently unresolvable by the
+ *     decision this page had offered. The flag is NOT auto-resolved — a fresh report on removed
+ *     content is a real question, and `warned_user` is a real answer to it.
  */
 function decisionsFor(decisions: readonly ResolutionDecision[], subject: FlagSubjectView): readonly ResolutionDecision[] {
-  return decisions.filter((decision) => decision !== "content_removed" || subject.kind === "review" || subject.kind === "chat_message");
+  return decisions.filter(
+    (decision) => decision !== "content_removed" || (contentRemovalIsWiredFor(subject.kind) && !subjectIsRemoved(subject)),
+  );
 }
 
 /**

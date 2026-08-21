@@ -165,7 +165,7 @@ const FLAG_DETAIL = {
   flagType: "review_report" as const,
   raisedAt: "2026-08-01T00:00:00.000Z",
   leagueId: null,
-  subject: { kind: "review" as const, reviewId: "r1", body: "Great season overall.", authorName: "Ada Lovelace" },
+  subject: { kind: "review" as const, reviewId: "r1", body: "Great season overall.", authorName: "Ada Lovelace", removedAt: null },
   evidence: {},
   reporters: [{ userId: "u_reporter", name: "Reporter Rita", reason: "spam", reportedAt: "2026-08-01T00:00:01.000Z" }],
   trail: [ROW],

@@ -66,3 +66,30 @@ export const DECISION_OWNER: Readonly<Record<ResolutionDecision, "plan-b" | "pla
 export function decisionIsAvailable(decision: ResolutionDecision): boolean {
   return DECISION_OWNER[decision] === "plan-b";
 }
+
+/**
+ * Which subject types `content_removed` actually has a remover wired for. Exhaustive: a new
+ * subject type declared without an entry here will not compile, so "does this decision work on
+ * this subject?" is answered in ONE place rather than by three consumers each re-deriving it —
+ * the queue detail page (which decisions to offer), `resolveFlag` (which to refuse before it
+ * writes) and `removeSubject` (the backstop that throws).
+ *
+ * Final review, LOW 13: `resolveFlagSchema` accepted `content_removed` for any flag, and a direct
+ * POST against an `account_pair` flag reached `removeSubject`'s unwired branch, threw a plain
+ * `Error`, and became a 500. Admin-only and fail-safe (the transaction rolled back), but a 500 is
+ * not a refusal — it is a crash that happened to be harmless, and the boundary should say no in
+ * the product's own words.
+ */
+export const CONTENT_REMOVAL_WIRED_FOR: Readonly<Record<FlagSubjectType, boolean>> = {
+  review: true,
+  chat_message: true,
+  /** Two accounts, not a piece of content. `warned_user` is not wired for it either — a pair
+   *  flag names two people and a warning names one. */
+  account_pair: false,
+  /** RESERVED for Plan C, alongside `trade_reversed`, which is the decision a trade takes. */
+  trade: false,
+};
+
+export function contentRemovalIsWiredFor(subjectType: FlagSubjectType): boolean {
+  return CONTENT_REMOVAL_WIRED_FOR[subjectType];
+}

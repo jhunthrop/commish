@@ -31,7 +31,7 @@ const OPEN_REVIEW_DETAIL = {
   flagType: "review_report" as const,
   raisedAt: "2026-08-01T00:00:00.000Z",
   leagueId: null,
-  subject: { kind: "review" as const, reviewId: "r1", body: "Great season overall.", authorName: "Ada" },
+  subject: { kind: "review" as const, reviewId: "r1", body: "Great season overall.", authorName: "Ada", removedAt: null },
   evidence: {},
   reporters: [{ userId: "u_reporter", name: "Reporter", reason: "spam", reportedAt: "2026-08-01T00:00:01.000Z" }],
   trail: [{ eventId: "evt_1", occurredAt: "2026-08-01T00:00:00.000Z", icon: "alert-triangle" as const, headline: "This flag was opened.", detail: null }],
@@ -92,7 +92,7 @@ describe("AdminFlagDetailPage — the read", () => {
     vi.mocked(flagDetail).mockResolvedValue({
       ...OPEN_REVIEW_DETAIL,
       leagueId: "l1",
-      subject: { kind: "chat_message" as const, messageId: "5", body: "trash talk", authorName: "Bob" },
+      subject: { kind: "chat_message" as const, messageId: "5", body: "trash talk", authorName: "Bob", removedAt: null },
     });
     await renderPage();
 
@@ -104,13 +104,61 @@ describe("AdminFlagDetailPage — the read", () => {
     vi.mocked(flagDetail).mockResolvedValue({
       ...OPEN_REVIEW_DETAIL,
       leagueId: "l1",
-      subject: { kind: "chat_message" as const, messageId: "5", body: "trash talk", authorName: "Bob" },
+      subject: { kind: "chat_message" as const, messageId: "5", body: "trash talk", authorName: "Bob", removedAt: null },
     });
     await renderPage();
 
     screen.getByRole("radio", { name: "Remove the content" }).click();
     expect(await screen.findByText("We removed one of your messages")).toBeInTheDocument();
     expect(screen.queryByText("We removed your review")).not.toBeInTheDocument();
+  });
+
+  /**
+   * Final review, MEDIUM 8. `reportMessage`/`reportReview` check existence and league, never
+   * `removed_at IS NULL`, and the open-subject unique index only dedupes OPEN flags — so a member
+   * CAN report a tombstoned message and open a fresh flag on it. Both of those are correct: a
+   * fresh report on removed content is a real question and `warned_user` is a real answer to it,
+   * so the flag is not auto-resolved. What was wrong is that this page then offered
+   * `content_removed`, which `removeChatMessageInTx`'s no-re-stamp guard refuses with a 409 and a
+   * full rollback, leaving the flag permanently unresolvable by the decision the page offered.
+   */
+  it("withholds content removal for a message that is already removed, and says so on the card", async () => {
+    vi.mocked(flagDetail).mockResolvedValue({
+      ...OPEN_REVIEW_DETAIL,
+      leagueId: "l1",
+      subject: { kind: "chat_message" as const, messageId: "5", body: "trash talk", authorName: "Bob", removedAt: "2026-08-02T00:00:00.000Z" },
+    });
+    await renderPage();
+
+    expect(await screen.findByRole("radio", { name: "No action" })).toBeInTheDocument();
+    // The two decisions that still work are still offered — an operator may absolutely warn the
+    // author of content that is already gone.
+    expect(screen.getByRole("radio", { name: "Warn the member" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Remove the content" })).not.toBeInTheDocument();
+    expect(screen.getByText(/We already removed this content/)).toBeInTheDocument();
+    // And the words are still readable, because the operator cannot judge whether to warn without
+    // them. A removed row keeps its body; only the member-facing wire withholds it.
+    expect(screen.getByText("trash talk")).toBeInTheDocument();
+  });
+
+  it("withholds content removal for a review that is already removed too", async () => {
+    vi.mocked(flagDetail).mockResolvedValue({
+      ...OPEN_REVIEW_DETAIL,
+      subject: { ...OPEN_REVIEW_DETAIL.subject, removedAt: "2026-08-02T00:00:00.000Z" },
+    });
+    await renderPage();
+
+    expect(await screen.findByRole("radio", { name: "No action" })).toBeInTheDocument();
+    expect(screen.queryByRole("radio", { name: "Remove the content" })).not.toBeInTheDocument();
+    expect(screen.getByText(/We already removed this content/)).toBeInTheDocument();
+  });
+
+  it("says nothing about a removal on content that still stands", async () => {
+    vi.mocked(flagDetail).mockResolvedValue(OPEN_REVIEW_DETAIL);
+    await renderPage();
+
+    expect(await screen.findByRole("radio", { name: "Remove the content" })).toBeInTheDocument();
+    expect(screen.queryByText(/We already removed this content/)).not.toBeInTheDocument();
   });
 
   it("offers no content-removal decision for an account pair — no remover exists for it", async () => {

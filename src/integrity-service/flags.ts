@@ -4,7 +4,7 @@ import { auditEvents, chatMessageReports, chatMessages, integrityFlags, leagues,
 import type { AuditEvent, JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import { decisionIsAvailable, RESOLUTION_DECISIONS, SUBJECT_OF, type FlagSubjectType, type FlagType, type ResolutionDecision } from "@/integrity/flags";
+import { contentRemovalIsWiredFor, decisionIsAvailable, RESOLUTION_DECISIONS, SUBJECT_OF, type FlagSubjectType, type FlagType, type ResolutionDecision } from "@/integrity/flags";
 import type { NoticeType } from "@/integrity/notices";
 import {
   flagDetailFor,
@@ -328,6 +328,9 @@ async function removeSubject(
     if (!result.ok) throw new ContentRemovalRefused(409, result.reason);
     return;
   }
+  // Unreachable through `resolveFlag`, which refuses this before the transaction opens
+  // (`contentRemovalIsWiredFor`, above). Kept as the backstop for a future direct caller, and for
+  // a subject type somebody adds to `CONTENT_REMOVAL_WIRED_FOR` before wiring its remover here.
   throw new Error(`resolveFlag: content_removed has no remover wired for subject type "${subjectType}".`);
 }
 
@@ -422,6 +425,19 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
   }
   if (input.note.length > INTEGRITY_CONFIG.moderation.noteMaxLength) {
     return { ok: false, status: 400, reason: `Keep the note to ${INTEGRITY_CONFIG.moderation.noteMaxLength} characters or fewer. The member reads it.` };
+  }
+  // SUBJECT-AWARE, and before the transaction opens (final review, LOW 13). `content_removed`
+  // only has a remover for the two content subject types; against an `account_pair` flag it used
+  // to reach `removeSubject`'s unwired branch, throw a plain `Error`, and surface as a 500. The
+  // rollback made that fail-safe rather than dangerous, but a crash is not a refusal — the
+  // boundary says no here, in product copy, and `removeSubject`'s throw stays as the backstop for
+  // a subject type somebody wires halfway. One read, on this branch only; the page filters the
+  // decision out of the UI already (`decisionsFor`), so only a direct POST ever reaches this.
+  if (input.decision === "content_removed") {
+    const [flag] = await db.select({ subjectType: integrityFlags.subjectType }).from(integrityFlags).where(eq(integrityFlags.id, input.flagId));
+    if (flag !== undefined && !contentRemovalIsWiredFor(flag.subjectType as FlagSubjectType)) {
+      return { ok: false, status: 400, reason: "There is no content to remove on this flag. Close it with no action, or warn the member." };
+    }
   }
 
   const clock = input.clock ?? systemClock;
@@ -630,23 +646,23 @@ const FALLBACK_SUBJECT_MEMBER = "A former member";
 async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: string): Promise<FlagSubjectView> {
   if (subjectType === "review") {
     const [row] = await db
-      .select({ body: reviews.body, authorName: users.displayName })
+      .select({ body: reviews.body, authorName: users.displayName, removedAt: reviews.removedAt })
       .from(reviews)
       .innerJoin(users, eq(users.id, reviews.userId))
       .where(eq(reviews.id, subjectId));
     return row === undefined
-      ? { kind: "review", reviewId: subjectId, body: "This review is no longer here.", authorName: FALLBACK_SUBJECT_MEMBER }
-      : { kind: "review", reviewId: subjectId, body: row.body, authorName: row.authorName };
+      ? { kind: "review", reviewId: subjectId, body: "This review is no longer here.", authorName: FALLBACK_SUBJECT_MEMBER, removedAt: null }
+      : { kind: "review", reviewId: subjectId, body: row.body, authorName: row.authorName, removedAt: row.removedAt?.toISOString() ?? null };
   }
   if (subjectType === "chat_message") {
     const [row] = await db
-      .select({ body: chatMessages.body, authorName: users.displayName })
+      .select({ body: chatMessages.body, authorName: users.displayName, removedAt: chatMessages.removedAt })
       .from(chatMessages)
       .innerJoin(users, eq(users.id, chatMessages.authorUserId))
       .where(eq(chatMessages.id, Number(subjectId)));
     return row === undefined
-      ? { kind: "chat_message", messageId: subjectId, body: null, authorName: FALLBACK_SUBJECT_MEMBER }
-      : { kind: "chat_message", messageId: subjectId, body: row.body, authorName: row.authorName };
+      ? { kind: "chat_message", messageId: subjectId, body: null, authorName: FALLBACK_SUBJECT_MEMBER, removedAt: null }
+      : { kind: "chat_message", messageId: subjectId, body: row.body, authorName: row.authorName, removedAt: row.removedAt?.toISOString() ?? null };
   }
   if (subjectType === "account_pair") {
     // `idA` is always a real `string` — `subjectId.split(PAIR_ID_SEPARATOR)` on a non-empty

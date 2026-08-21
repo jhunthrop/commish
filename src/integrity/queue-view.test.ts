@@ -33,7 +33,7 @@ function flagRaisedEvent(overrides: Partial<{ readonly evidence: JsonObject }> =
 }
 
 const flag = { id: "flag_1", flagType: "review_report" as const, raisedAt: "2026-08-01T00:00:00.000Z", leagueId: null, evidence: { device: 0.94, behavioral: 0.81 }, resolution: null };
-const subject: FlagSubjectView = { kind: "review", reviewId: "r1", body: "Great season overall.", authorName: "Ada" };
+const subject: FlagSubjectView = { kind: "review", reviewId: "r1", body: "Great season overall.", authorName: "Ada", removedAt: null };
 
 describe("queueRowFor", () => {
   it("never carries evidence, and names what kind of question this is in plain words", () => {
