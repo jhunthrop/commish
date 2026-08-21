@@ -69,6 +69,22 @@ describe("NOTICE_TEMPLATES", () => {
     expect(chatRemoved.body).not.toContain("off topic");
   });
 
+  it("says what happened for each of the three trade notices, verbatim", () => {
+    const proposed = renderNotice("trade_proposed", NOTICE_SAMPLES.trade_proposed);
+    expect(proposed.title).toBe("Bay Bandits sent you a trade offer");
+    expect(proposed.body).toBe(
+      "In Sunday Money, Bay Bandits offers you Bijan Robinson for Justin Jefferson. Open the trade page to see both sides valued, then accept or decline. The offer stands for three days.",
+    );
+
+    const rejected = renderNotice("trade_rejected", NOTICE_SAMPLES.trade_rejected);
+    expect(rejected.title).toBe("Your trade offer got a no");
+    expect(rejected.body).toBe("Iron Owls declined the offer you sent in Sunday Money. You can put together a different package any time.");
+
+    const withdrawn = renderNotice("trade_withdrawn", NOTICE_SAMPLES.trade_withdrawn);
+    expect(withdrawn.title).toBe("A trade offer came off the table");
+    expect(withdrawn.body).toBe("Bay Bandits took back the offer they sent you in Sunday Money. Nothing on your roster changed.");
+  });
+
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
@@ -79,6 +95,9 @@ describe("NOTICE_TEMPLATES", () => {
       "operator_warning",
       "review_removed",
       "stat_week_corrected",
+      "trade_proposed",
+      "trade_rejected",
+      "trade_withdrawn",
     ]);
   });
 

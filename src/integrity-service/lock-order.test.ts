@@ -1,12 +1,13 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, chatMessages, drafts, leagues, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, users } from "@/db/schema";
+import { auditChains, chatMessages, drafts, leagues, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { joinLeagueInTx } from "@/league-service/join";
 import { writeSchedule } from "@/league-service/schedule";
+import { rejectTrade } from "@/league-service/trades";
 import type { StatLine } from "@/domain/player";
 import { correctSettledWeek } from "@/stats-pipeline/correction";
 import { finalizeWeek } from "@/stats-pipeline/finalize";
@@ -663,6 +664,64 @@ describe("grantAdmin's notice order", () => {
     const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
     expect(platformAnchor!.headSequence).toBe(1);
     const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_grant_subject"));
+    expect(notice?.auditEventId).not.toBeNull();
+  });
+});
+
+/**
+ * Plan C's own first transaction in this proof (Task 3). `rejectTrade`'s notice insert reaches
+ * for `leagues FOR KEY SHARE` before its anchor, exactly like every writer above — so this drives
+ * a real join and a real trade rejection against the SAME league on two connections, with the
+ * join parked exactly where the cycle used to sit, and asserts no deadlock plus the correct
+ * chain: `trade_rejected` lands on the LEAGUE chain beside the join's own `member_joined`
+ * (ruling 1: a trade is league content, even though its `ACTIVITY_VISIBILITY` is `"hidden"` —
+ * the two are independent on purpose), never the platform chain a flag or an admin action would
+ * use.
+ */
+describe("rejectTrade's notice order", () => {
+  it("lets a join and a trade rejection in the same league run concurrently without deadlocking", async () => {
+    await seedLeagueWith("lg_trade_lock", ["u_trade_commish", "u_trade_alice", "u_trade_bob", "u_trade_joiner"]);
+    await joinDb.insert(teams).values([
+      { id: "team_trade_alice", leagueId: "lg_trade_lock", userId: "u_trade_alice", name: "Alice's Team" },
+      { id: "team_trade_bob", leagueId: "lg_trade_lock", userId: "u_trade_bob", name: "Bob's Team" },
+    ]);
+    const proposedAt = new Date(clock.now());
+    const expiresAt = new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000);
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_lock_1",
+      leagueId: "lg_trade_lock",
+      proposerTeamId: "team_trade_alice",
+      counterpartyTeamId: "team_trade_bob",
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_lock_1" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_lock_2" }],
+      fingerprint: "fp_trade_lock_1",
+      note: null,
+      status: "open",
+      proposedAt,
+      expiresAt,
+    });
+
+    const join = parkedJoin("lg_trade_lock", "u_trade_joiner", "team_trade_joiner");
+    await join.leagueLocked;
+
+    // T_reject: the real rejectTrade, on its own connection, reaching for the SAME league row
+    // through its notice insert (leagues FOR KEY SHARE) before it reaches the league anchor.
+    const rejecting = rejectTrade(resolveDb, { tradeId: "trade_lock_1", userId: "u_trade_bob", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await rejecting).toMatchObject({ ok: true });
+
+    // Both transactions really did land on the SAME league chain: the join's member_joined and
+    // the rejection's trade_rejected.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_trade_lock"));
+    expect(leagueAnchor!.headSequence).toBe(2);
+
+    // And the notice rejectTrade wrote before the anchor still names the event minted after it.
+    const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_trade_alice"));
     expect(notice?.auditEventId).not.toBeNull();
   });
 });

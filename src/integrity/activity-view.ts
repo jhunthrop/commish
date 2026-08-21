@@ -30,9 +30,17 @@ export const ACTIVITY_VISIBILITY: Readonly<Record<AuditEventType, ActivityVisibi
   system_action: "everyone",
   lineup_change: "actor_only",
   roster_move: "hidden", // Plan C decides, with its payload
-  trade_proposed: "hidden", // Plan C
+  /**
+   * A proposal is a private negotiation between two managers. A feed announcing "Alice offered
+   * Bob her running back" would broadcast a bid before either party agreed to anything, which is
+   * the same competitive leak that made `lineup_change` `actor_only` (ruling 15) — and worse,
+   * because a bid discloses what a manager thinks his own players are worth. Both parties are
+   * told directly, by notice. Nobody else is.
+   */
+  trade_proposed: "hidden",
   trade_accepted: "hidden", // Plan C
-  trade_rejected: "hidden", // Plan C
+  /** Same, and more so: a refusal is nobody's business but the two people in it. */
+  trade_rejected: "hidden",
   flag_raised: "hidden", // Plan B: investigatory, admin-only by the spec's own allowlist
   flag_resolved: "hidden", // Plan B
   admin_action: "hidden", // Plan B

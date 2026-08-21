@@ -85,6 +85,45 @@ export interface NoticeContexts {
     readonly points: number;
     readonly outcome: StatWeekCorrectionOutcome;
   };
+  /**
+   * `proposeTrade`'s own notice (`@/league-service/trades`), sent to the counterparty ONLY —
+   * `ACTIVITY_VISIBILITY.trade_proposed` is `"hidden"` (ruling 12), so this notice is the entire
+   * way the counterparty ever learns an offer exists. `giveSummary`/`getSummary` are pre-rendered
+   * English (`Intl.ListFormat`), not raw asset arrays, for the same reason `pickNumber`/
+   * `playerName` arrive pre-resolved on `draft_auto_picked`: a template composes a sentence, it
+   * does not re-derive one from a payload shape.
+   */
+  readonly trade_proposed: {
+    readonly leagueName: string;
+    readonly proposerTeamName: string;
+    readonly giveSummary: string;
+    readonly getSummary: string;
+    /** The proposer's own optional note, capped at `TRADE_CONFIG.noteMaxLength`. Unused by the
+     *  TEMPLATE below (which composes the platform's own sentence) but read by `quoteFor`
+     *  (`@/integrity-service/notify`) as the counterparty's own bounded blockquote — the same
+     *  split `operator_warning`'s `note` and `review_removed`'s `reason` both keep. */
+    readonly note: string | null;
+  };
+  /**
+   * `rejectTrade`'s notice, sent to the PROPOSER — the counterparty said no. `ACTIVITY_VISIBILITY
+   * .trade_rejected` is `"hidden"`, and more so than a proposal: a refusal is nobody's business
+   * but the two people in it.
+   */
+  readonly trade_rejected: {
+    readonly leagueName: string;
+    readonly counterpartyTeamName: string;
+  };
+  /**
+   * `withdrawTrade`'s notice, sent to the COUNTERPARTY — the proposer took the offer back.
+   * `trade_withdrawn` is a NOTICE type only: `AUDIT_EVENT_TYPES` is frozen (`@/domain/audit`'s
+   * own docblock), so the audit event both this and `trade_rejected` come from is spelled
+   * `trade_rejected` with `payload.outcome` distinguishing the two — the honest spelling, not a
+   * second event type this vocabulary was never going to grow.
+   */
+  readonly trade_withdrawn: {
+    readonly leagueName: string;
+    readonly proposerTeamName: string;
+  };
 }
 
 /**
@@ -154,6 +193,18 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   stat_week_corrected: ({ leagueName, week, points, outcome }) => ({
     title: `We corrected your week ${week} score`,
     body: `Our stats provider revised its numbers for week ${week}, so we recomputed ${leagueName}. Your team now has ${points} points, and ${outcome}.`,
+  }),
+  trade_proposed: ({ leagueName, proposerTeamName, giveSummary, getSummary }) => ({
+    title: `${proposerTeamName} sent you a trade offer`,
+    body: `In ${leagueName}, ${proposerTeamName} offers you ${giveSummary} for ${getSummary}. Open the trade page to see both sides valued, then accept or decline. The offer stands for three days.`,
+  }),
+  trade_rejected: ({ leagueName, counterpartyTeamName }) => ({
+    title: "Your trade offer got a no",
+    body: `${counterpartyTeamName} declined the offer you sent in ${leagueName}. You can put together a different package any time.`,
+  }),
+  trade_withdrawn: ({ leagueName, proposerTeamName }) => ({
+    title: "A trade offer came off the table",
+    body: `${proposerTeamName} took back the offer they sent you in ${leagueName}. Nothing on your roster changed.`,
   }),
 };
 

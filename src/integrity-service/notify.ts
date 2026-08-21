@@ -224,6 +224,13 @@ export async function listNotices(db: Db, userId: string): Promise<NoticesPage> 
  * whole reason `resolveFlag` bounds its length instead of its vocabulary. Same narrowing
  * discipline as `reason` above: a row whose `note` is missing or not a string reads as no quote.
  *
+ * `trade_proposed` (Plan C, Task 3) is the third quoting type, and the second consumer of a
+ * branch Plan A shipped unreachable: `context.note` here is the PROPOSER's own words (the
+ * optional note `proposeTrade` carries, capped at `TRADE_CONFIG.noteMaxLength`), rendered as its
+ * own bounded blockquote for the same reason an operator's note is — a manager's own sentence
+ * belongs in a quote, not folded into the middle of the platform's own sentence. A proposal with
+ * no note reads as no quote at all, the same narrowing every branch above uses.
+ *
  * `stripHiddenCharacters` runs on it too, same as the composed title/body above — operators are
  * trusted with what they choose to SAY, not with what a bidi override or a zero-width character
  * would make a reader's browser DO with it. `resolveFlag` writes `context.note` unstripped (it is
@@ -243,7 +250,7 @@ export function quoteFor(notice: MemberNotice): string | null {
     const reason = notice.context.reason;
     return typeof reason === "string" ? chatRemovalPhraseFor(reason) : null;
   }
-  if (notice.noticeType === "operator_warning") {
+  if (notice.noticeType === "operator_warning" || notice.noticeType === "trade_proposed") {
     const note = notice.context.note;
     return typeof note === "string" ? stripHiddenCharacters(note) : null;
   }

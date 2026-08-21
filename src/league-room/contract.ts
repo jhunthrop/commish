@@ -2,7 +2,7 @@ import type { DraftStatus } from "@/domain/draft";
 import type { DraftFormat, TeamCard } from "@/domain/league";
 import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
-import type { TradeFlag, TradeVerdict } from "@/ai-advisor/valuation";
+import type { TradeFlag, TradeVerdict } from "@/trades/fairness";
 import type { FirstRunPlan } from "@/identity";
 import type { LeagueTerms, NextAction, StandingsRow, WeekStatus } from "@/league";
 

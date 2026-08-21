@@ -349,4 +349,29 @@ describe("quoteFor", () => {
     };
     expect(quoteFor(notice)).toBeNull();
   });
+
+  /**
+   * The second consumer of the branch Plan A shipped unreachable and Plan B first exercised
+   * (`operator_warning`, above). `context.note` here is the PROPOSER's own words, not the
+   * platform's — same VERBATIM rendering, same reason.
+   */
+  it("renders the proposer's own note VERBATIM for trade_proposed", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "trade_proposed",
+      title: "Bay Bandits sent you a trade offer", body: "...",
+      context: { leagueName: "Sunday Money", proposerTeamName: "Bay Bandits", giveSummary: "a Bell Cow", getSummary: "a Deep Threat", note: "one more year of this and I'm out" },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBe("one more year of this and I'm out");
+  });
+
+  it("is null for a trade_proposed notice with no note", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "trade_proposed",
+      title: "Bay Bandits sent you a trade offer", body: "...",
+      context: { leagueName: "Sunday Money", proposerTeamName: "Bay Bandits", giveSummary: "a Bell Cow", getSummary: "a Deep Threat", note: null },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBeNull();
+  });
 });
