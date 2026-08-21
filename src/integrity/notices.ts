@@ -157,16 +157,6 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   }),
 };
 
-/** One neutral context per type, so the denylist and em-dash checks have something to render. */
-export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } = {
-  draft_auto_picked: { leagueName: "Sunday Money", pickNumber: 24, playerName: "Bijan Robinson", position: "RB" },
-  review_removed: { reason: "off topic" },
-  admin_granted: { grantedByUserId: "bootstrap" },
-  operator_warning: { leagueName: "Sunday Money", note: "Keep the trash talk about the teams." },
-  chat_message_removed: { leagueName: "Sunday Money", reason: "off topic" },
-  stat_week_corrected: { leagueName: "Sunday Money", week: 3, points: 84.2, outcome: "that turns your matchup into a win" },
-};
-
 export function renderNotice<T extends NoticeType>(type: T, context: NoticeContexts[T]): RenderedNotice {
   return NOTICE_TEMPLATES[type](context);
 }

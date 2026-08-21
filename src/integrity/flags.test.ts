@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
   DECISION_OWNER,
-  FLAG_STATUSES,
   FLAG_SUBJECT_TYPES,
   FLAG_TYPES,
   RESOLUTION_DECISIONS,
@@ -48,7 +47,4 @@ describe("the flag vocabulary", () => {
     expect(Object.keys(SUBJECT_OF).sort()).toEqual([...FLAG_TYPES].sort());
   });
 
-  it("names the two states a reader derives from resolved_at, and nothing else", () => {
-    expect(FLAG_STATUSES).toEqual(["open", "resolved"]);
-  });
 });

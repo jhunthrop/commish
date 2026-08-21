@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { copyViolations } from "./copy-rules";
-import { NOTICE_SAMPLES, NOTICE_TEMPLATES, renderNotice, type NoticeType, type StatWeekCorrectionOutcome } from "./notices";
+import { NOTICE_TEMPLATES, renderNotice, type NoticeType, type StatWeekCorrectionOutcome } from "./notices";
+import { NOTICE_SAMPLES } from "./test-support";
 
 const TYPES = Object.keys(NOTICE_TEMPLATES) as readonly NoticeType[];
 

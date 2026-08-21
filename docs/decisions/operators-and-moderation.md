@@ -625,6 +625,45 @@ carries; it cannot mint a second one, or a third, because the grant is not reach
 application at all — the highest-privilege mutation in this product requires shell access to the
 database host, which is a materially different bar than any session-hijack vector reaches.
 
+**The device signal is two forgeable headers at weight 0.6, and a flag can be aimed.** Recorded
+here, and NOT re-weighted, because re-weighting would be treating a documentation gap as a
+detection one. `signatureOf` (`src/integrity-service/multi-account.ts`) is
+`` `${userAgent}|${acceptLanguage}` `` — stored verbatim, truncated, never hashed — and both
+strings are entirely caller-supplied. With `weights.device = 0.6` and `flagThreshold = 0.75`, a
+pair needs `device >= 0.583` to be flaggable at all, and at `device = 1.0` it needs only
+`behavioral >= 0.375`, which is median pick gaps within 37.5 seconds of each other.
+
+Two halves, and only one was already written down:
+
+- The FALSE-POSITIVE half is documented and accepted: two ordinary single-device mobile members
+  with identical UA and `en-US` collide at `device = 1.0` with no effort at all, and
+  `multi-account.test.ts` says so in three named tests ("known false positives, which are CORRECT
+  behavior and not defects"). A flag is a question for a human, and an operator resolves it
+  `no_action` in ten seconds with nobody ever told they were looked at (§6).
+- The DELIBERATE-MANUFACTURE half was not, and this paragraph is it. An attacker who knows a
+  victim's exact `User-Agent` and `Accept-Language` and shares a league with them can set both
+  headers to match and pace their own picks to the victim's, and manufacture a `multi_account`
+  flag naming that victim.
+
+**Why documenting is the right answer rather than hashing.** Hashing the signature with
+`SESSION_SIGNAL_SALT` adds nothing against this attacker: they are not replaying a stolen hash,
+they are re-sending a self-reported string, and the hash of a forged string is the hash of the
+victim's string by construction. What the manufactured flag actually buys is bounded and small: it
+is a FLAG, never an action — `src/integrity/flag-only.test.ts` proves no code path reachable from
+the detector can suspend, ban or restrict anything — read by a human beside the pair's join dates
+and every signal that fed the score, and resolved by that human. The cost of the attack is an
+operator's time and a platform-chain record; the cost to the victim is that a person looked, and
+`no_action` tells nobody (§6).
+
+**The real hardening is a verified signal, and its gate is already open.** The IP signal is pinned
+at weight zero for exactly this reason and flips on when two things land together: Fly's proxy
+overwriting `X-Forwarded-For` (Phase 2 Plan D) and `ipCorrelation` counting only rows stamped
+`platform_verified`, which it already does. A platform-VERIFIED signal is the category that cannot
+be aimed, and any future verified device signal joins the weighting on the same terms. Until then
+the honest position is that the detector's strongest input is self-reported, an operator reading a
+`multi_account` flag is told so on the queue view itself (`src/integrity/queue-view.ts`'s own
+docblock), and the flag-only contract is what bounds the damage.
+
 **What would move this boundary.** Everything Plan A's §9 already names — a periodically published
 head, an HMAC key held outside Postgres, off-box WAL archival — moves the tier-2 boundary, and moves
 it for every write in this product including this plan's, without this plan doing anything further.

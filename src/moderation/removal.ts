@@ -3,28 +3,15 @@ import { MODERATION_CONFIG, type ModerationReasonValue } from "./config";
 /**
  * Every reason a report or a removal may name — narrowed to the closed union, unlike the array
  * `src/reviews/config.ts` shipped before this module existed (`readonly string[]`, an explicit
- * widening annotation that let a typo past the compiler at every call site). `isRemovalReason`
- * below is the guard a caller holding a bare `string` needs to narrow back down to this type.
+ * widening annotation that let a typo past the compiler at every call site).
+ *
+ * There was an `isRemovalReason` type predicate beside this, written as "the narrow door for
+ * whatever calls next". Nothing ever called it, and the final review named it as inert residue
+ * (LOW 14): a guard with no caller is a guess about a future consumer, and re-adding one is three
+ * lines on the commit that first needs it. `scripts/remove-review.ts` validates against
+ * `@/reviews/config`'s deliberately widened re-export of this array (ruling 21) and is unaffected.
  */
 export const REMOVAL_REASON_VALUES: readonly ModerationReasonValue[] = MODERATION_CONFIG.reasons.map((reason) => reason.value);
-
-/**
- * The typo-proof gate for a caller holding a bare `string`. `REMOVAL_REASON_VALUES.includes(x)`
- * cannot be called with one directly once the array's own element type is the closed union —
- * TypeScript refuses the comparison outright — so this is a type PREDICATE, not just a boolean: a
- * caller that checks it first gets `ModerationReasonValue` back from an unnarrowed `string`, at
- * the type level as well as at runtime.
- *
- * No production caller reaches for this yet. `scripts/remove-review.ts` still validates against
- * `@/reviews/config`'s re-exported `REMOVAL_REASON_VALUES` — deliberately WIDENED back to
- * `readonly string[]` there so that script's existing `.includes(reason)` check keeps compiling
- * unchanged (ruling 21's "diff at every consumer is zero"; see that module's own docblock). This
- * function is the narrow door for whatever calls next instead — Task 6's chat report surface, or a
- * future rewrite of the script itself — to use rather than re-deriving the same check by hand.
- */
-export function isRemovalReason(value: string): value is ModerationReasonValue {
-  return (REMOVAL_REASON_VALUES as readonly string[]).includes(value);
-}
 
 /**
  * The sentence fragment a removed review's author reads. A stored value outside the closed set

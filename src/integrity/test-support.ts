@@ -1,8 +1,11 @@
 import { existsSync, readdirSync } from "node:fs";
 import { join } from "node:path";
+import type { NoticeContexts, NoticeType } from "./notices";
 
 /**
- * Source-scan support for the copy sweeps. Test-only — no production module imports this.
+ * TEST-ONLY support for this directory's copy sweeps. Nothing in production imports it, which is
+ * the point: `NOTICE_SAMPLES` at the bottom used to live in `notices.ts` beside the real
+ * templates, and test input in a production module is what the final review named it (LOW 14).
  *
  * `rendered-copy.test.tsx` sweeps what a person SEES, which is the stronger check and the one to
  * prefer. It has two structural blind spots the final whole-branch review found the hard way: it
@@ -96,3 +99,22 @@ export function consoleCopyIn(source: string): readonly string[] {
   const calls = [...renderableSource(source).matchAll(/console\.(?:log|error|warn|info)\(([\s\S]*?)\);/g)].map((match) => match[1]!);
   return meaningful(calls.flatMap(literalsIn));
 }
+
+/**
+ * One neutral context per notice type, so `notices.test.ts`'s registry-derived copy sweep has
+ * something to render every template with.
+ *
+ * It lives HERE rather than in `notices.ts` beside the templates (final review, LOW 14: test
+ * input in a production module). The property that made it worth having is unchanged by the move
+ * — the mapped type `{ [T in NoticeType]: NoticeContexts[T] }` is exhaustive, so a new notice
+ * type without a sample here does not compile, and the sweep therefore covers every template on
+ * the commit that adds one.
+ */
+export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } = {
+  draft_auto_picked: { leagueName: "Sunday Money", pickNumber: 24, playerName: "Bijan Robinson", position: "RB" },
+  review_removed: { reason: "off topic" },
+  admin_granted: { grantedByUserId: "bootstrap" },
+  operator_warning: { leagueName: "Sunday Money", note: "Keep the trash talk about the teams." },
+  chat_message_removed: { leagueName: "Sunday Money", reason: "off topic" },
+  stat_week_corrected: { leagueName: "Sunday Money", week: 3, points: 84.2, outcome: "that turns your matchup into a win" },
+};

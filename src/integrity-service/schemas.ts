@@ -15,8 +15,12 @@ import { decisionIsAvailable, RESOLUTION_DECISIONS } from "@/integrity/flags";
 export const markNoticesReadSchema = z.object({
   noticeIds: z.array(z.string()).min(1, "Send at least one notice id."),
 });
+// No `z.infer` alias here, deliberately (final review, LOW 14). The one this file used to export
+// was named `MarkNoticesReadInput` and NAME-COLLIDED with `markNoticesRead`'s real input type in
+// `@/integrity-service/notify` — two different shapes under one name, neither imported by
+// anything. The route reads `parsed.value` directly, which is typed by the schema itself.
 
-export type MarkNoticesReadInput = z.infer<typeof markNoticesReadSchema>;
+
 
 /**
  * `POST /api/admin/flags/[flagId]/resolve`'s body (Task 5's route). `flagId` is not a field here:
@@ -40,5 +44,5 @@ export const resolveFlagSchema = z.object({
     .string()
     .max(INTEGRITY_CONFIG.moderation.noteMaxLength, `Keep the note to ${INTEGRITY_CONFIG.moderation.noteMaxLength} characters or fewer. The member reads it.`),
 });
-
-export type ResolveFlagBody = z.infer<typeof resolveFlagSchema>;
+// Likewise no `ResolveFlagBody` alias: the route hands `parsed.value.decision`/`parsed.value.note`
+// straight to `resolveFlag`, whose own `ResolveFlagInput` is the type that matters.

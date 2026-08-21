@@ -30,14 +30,6 @@ export const SUBJECT_OF: Readonly<Record<FlagType, FlagSubjectType>> = {
   trade_fairness: "trade",
 };
 
-/**
- * Open, waiting on an operator, or resolved with a decision recorded. Derived at read time from
- * `resolved_at` (ruling 5) — there is no `status` column, so this vocabulary names the two values
- * a reader computes rather than one this file stores.
- */
-export const FLAG_STATUSES = ["open", "resolved"] as const;
-export type FlagStatus = (typeof FLAG_STATUSES)[number];
-
 export const RESOLUTION_DECISIONS = [
   /** The operator looked and nothing needs to happen. Notices nobody, on purpose (ruling 6). */
   "no_action",

@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { describe, it, expect } from "vitest";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { MODERATION_CONFIG } from "./config";
-import { REMOVAL_REASON_VALUES, chatRemovalPhraseFor, isRemovalReason, removalPhraseFor, removalSentenceFor } from "./removal";
+import { REMOVAL_REASON_VALUES, chatRemovalPhraseFor, removalPhraseFor, removalSentenceFor } from "./removal";
 
 interface GrepOptions {
   readonly dirs: readonly string[];
@@ -59,14 +59,10 @@ describe("the removal vocabulary's one home", () => {
     expect(REVIEW_CONFIG.reportReasons).toBe(MODERATION_CONFIG.reasons);
   });
 
-  it("narrows REMOVAL_REASON_VALUES from string to the closed union", () => {
+  it("keeps REMOVAL_REASON_VALUES narrowed to the closed union", () => {
     // `@/reviews/config`'s re-exported array is deliberately widened back to `readonly string[]`
     // (so `scripts/remove-review.ts`'s own `.includes` check keeps compiling unchanged) — THIS
-    // one stays narrow, and `isRemovalReason` is the guard a future caller narrows a bare string
-    // back down with, rather than re-deriving the same `.includes` check by hand.
-    expect(isRemovalReason("spam")).toBe(true);
-    expect(isRemovalReason("Spam")).toBe(false);
-    expect(isRemovalReason("harassment")).toBe(false);
+    // one stays narrow, which is the whole reason the two exports are not the same binding.
     expect(REMOVAL_REASON_VALUES).toEqual(["spam", "abusive", "other"]);
   });
 

@@ -13,6 +13,14 @@ import type { ActivityRow } from "@/integrity/activity-view";
  * carry them: `flag_raised` is platform-chain-scoped, so `listLeagueActivity` never reads it at
  * all, and `ACTIVITY_VISIBILITY.flag_raised` is `hidden` besides. Two independent reasons, because
  * one of them is a one-line change away from being wrong.
+ *
+ * A NOTE FOR WHOEVER RENDERS `evidence` (final review, MEDIUM 9): the `device` score is derived
+ * from two SELF-REPORTED headers (`User-Agent` and `Accept-Language`), so a high one is evidence
+ * that two accounts SAID the same thing about themselves, not that the platform observed the same
+ * device. It can be aimed: an attacker who knows a victim's exact headers and shares a league with
+ * them can manufacture a pair flag naming that victim. That is why this is a flag and never an
+ * action, and why an operator reads it beside the join dates and the other signals rather than as
+ * a verdict. See `operators-and-moderation.md` §11.
  */
 export interface FlagDetail {
   readonly flagId: string;
