@@ -65,7 +65,39 @@ export interface NoticeContexts {
     readonly leagueName: string;
     readonly reason: string;
   };
+  /**
+   * `correctSettledWeek`'s (`@/stats-pipeline/correction`) own notice — Task 10's residual, and
+   * the first notice a fully AUTOMATED action sends rather than an operator's own decision. Sent
+   * only to a manager whose TEAM's points actually moved as a result of the correction; a manager
+   * whose roster the revision never touched hears nothing, because a notice about no change would
+   * be noise, not news.
+   *
+   * `outcome` is one of three FIXED clauses (`StatWeekCorrectionOutcome`), resolved by the caller
+   * from the team's before/after result — never free text, so the copy sweep covers every
+   * sentence this notice can produce rather than one sample of it. This is the twin of the
+   * league-wide `system_action` summary the same correction writes (`SYSTEM_ACTION_SUMMARY_ALLOWED`
+   * allows exactly this action, `@/integrity/system-actions`): composed from the same template so
+   * the impersonal, league-wide sentence and this personal one can never say different things.
+   */
+  readonly stat_week_corrected: {
+    readonly leagueName: string;
+    readonly week: number;
+    readonly points: number;
+    readonly outcome: StatWeekCorrectionOutcome;
+  };
 }
+
+/**
+ * The three, and only three, sentences `stat_week_corrected`'s `outcome` clause may say — resolved
+ * by the caller from a team's before/after matchup result, never free text. A closed union rather
+ * than a string is what lets `notices.test.ts` sweep every sentence this notice can actually
+ * produce (`NOTICE_SAMPLES` carries one; a dedicated test iterates all three) instead of trusting
+ * one sample to represent all of them.
+ */
+export type StatWeekCorrectionOutcome =
+  | "your matchup result stays the same"
+  | "that turns your matchup into a win"
+  | "that turns your matchup into a loss";
 
 export type NoticeType = keyof NoticeContexts;
 
@@ -116,6 +148,13 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
     title: "We removed one of your messages",
     body: `An operator removed a message you posted in ${leagueName}. Your leaguemates can see that the message went and who posted it, and they can no longer read it. We keep your words on file exactly as you wrote them. There is no reply to this message.`,
   }),
+  // No "no reply to this message" line, unlike the three removal/warning templates above: this is
+  // informational, not a sanction, and there is nothing to appeal. `outcome` is the closed
+  // three-clause union (`StatWeekCorrectionOutcome`), never a free string.
+  stat_week_corrected: ({ leagueName, week, points, outcome }) => ({
+    title: `We corrected your week ${week} score`,
+    body: `Our stats provider revised its numbers for week ${week}, so we recomputed ${leagueName}. Your team now has ${points} points, and ${outcome}.`,
+  }),
 };
 
 /** One neutral context per type, so the denylist and em-dash checks have something to render. */
@@ -125,6 +164,7 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   admin_granted: { grantedByUserId: "bootstrap" },
   operator_warning: { leagueName: "Sunday Money", note: "Keep the trash talk about the teams." },
   chat_message_removed: { leagueName: "Sunday Money", reason: "off topic" },
+  stat_week_corrected: { leagueName: "Sunday Money", week: 3, points: 84.2, outcome: "that turns your matchup into a win" },
 };
 
 export function renderNotice<T extends NoticeType>(type: T, context: NoticeContexts[T]): RenderedNotice {

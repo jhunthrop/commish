@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { copyViolations } from "./copy-rules";
-import { NOTICE_SAMPLES, NOTICE_TEMPLATES, renderNotice, type NoticeType } from "./notices";
+import { NOTICE_SAMPLES, NOTICE_TEMPLATES, renderNotice, type NoticeType, type StatWeekCorrectionOutcome } from "./notices";
 
 const TYPES = Object.keys(NOTICE_TEMPLATES) as readonly NoticeType[];
 
@@ -71,6 +71,39 @@ describe("NOTICE_TEMPLATES", () => {
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
-    expect([...TYPES].sort()).toEqual(["admin_granted", "chat_message_removed", "draft_auto_picked", "operator_warning", "review_removed"]);
+    expect([...TYPES].sort()).toEqual([
+      "admin_granted",
+      "chat_message_removed",
+      "draft_auto_picked",
+      "operator_warning",
+      "review_removed",
+      "stat_week_corrected",
+    ]);
+  });
+
+  /**
+   * Task 10's own requirement: `outcome` is a closed three-clause union, never a free string, so
+   * this notice's copy sweep covers every sentence it can actually produce rather than the one
+   * sample `NOTICE_SAMPLES` carries.
+   */
+  it("says what happened for every one of the three fixed outcome clauses, all copy-clean", () => {
+    const outcomes: readonly StatWeekCorrectionOutcome[] = [
+      "your matchup result stays the same",
+      "that turns your matchup into a win",
+      "that turns your matchup into a loss",
+    ];
+    for (const outcome of outcomes) {
+      const notice = renderNotice("stat_week_corrected", { leagueName: "Sunday Money", week: 3, points: 84.2, outcome });
+      expect(notice.title).toBe("We corrected your week 3 score");
+      expect(notice.body).toBe(
+        `Our stats provider revised its numbers for week 3, so we recomputed Sunday Money. Your team now has 84.2 points, and ${outcome}.`,
+      );
+      expect(copyViolations(`${notice.title} ${notice.body}`)).toEqual([]);
+    }
+  });
+
+  it("is informational, not a sanction, so it states no appeal path the way removal notices do", () => {
+    const notice = renderNotice("stat_week_corrected", NOTICE_SAMPLES.stat_week_corrected);
+    expect(notice.body).not.toContain("There is no reply to this message.");
   });
 });

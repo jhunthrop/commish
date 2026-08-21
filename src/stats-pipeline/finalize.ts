@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import type { Db, ReadonlyDb } from "@/db/client";
+import type { Db, DbTx, ReadonlyDb } from "@/db/client";
 import { drafts, leagues, matchups, players, playerStatLines, scoringSettings } from "@/db/schema";
 import type { Position, StatLine } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
@@ -118,6 +118,17 @@ export async function scoreTeamsForWeek(
  * `cache` is injected with a no-op default. When a real cache is supplied, this league/week's
  * cached live scores are dropped AFTER the settlement commits: they were computed from a week in
  * progress, and the numbers that stand now live in `matchups`.
+ *
+ * TWO DOORS, the same shape `joinLeagueInTx`/`joinLeague` (`@/league-service/join.ts`) and Task 4's
+ * `removeReviewInTx`/`removeReview` (`@/review-service/reviews.ts`) already use: `finalizeWeekInTx`
+ * below is the whole guarded write, taking the caller's OWN `tx`, and this function is the one-door
+ * wrapper that opens a fresh transaction and invalidates the cache once it commits. The seam exists
+ * for `correctSettledWeek` (`./correction`): a correction's audit event and its notices have to
+ * commit with the same re-settlement or not at all — Plan A's write-ordering rule (ruling 3) is not
+ * negotiable, and a nested `db.transaction` is a savepoint with different failure semantics, not
+ * the same transaction. `src/stats-pipeline` is gated at 100%, so both doors are covered by
+ * construction: this wrapper's own tests exercise `finalizeWeekInTx` on every path already, and
+ * `correction.test.ts` exercises it again through its own caller.
  */
 export async function finalizeWeek(
   db: Db,
@@ -125,14 +136,24 @@ export async function finalizeWeek(
   weekNumber: number,
   cache: Pick<ScoreCache, "invalidate"> = NOOP_SCORE_CACHE,
 ): Promise<FinalizeResult> {
-  const [league] = await db.select({ rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, leagueId));
+  const result = await db.transaction((tx) => finalizeWeekInTx(tx, leagueId, weekNumber));
+  if (result.ok) await cache.invalidate(leagueId, weekNumber);
+  return result;
+}
+
+/**
+ * The guarded write itself, inside the caller's OWN transaction — see `finalizeWeek`'s docblock
+ * above for why this is split out and who the second door is. Every guard and every write that
+ * used to live inside `finalizeWeek`'s `db.transaction` callback lives here unchanged; nothing
+ * about the scoring, the ordering or the guard sequence is different for either caller.
+ */
+export async function finalizeWeekInTx(tx: DbTx, leagueId: string, weekNumber: number): Promise<FinalizeResult> {
+  const [league] = await tx.select({ rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, leagueId));
   if (league === undefined) return { ok: false, status: 404, reason: "That league doesn't exist." };
 
   // Guard order is "does this thing exist" before "is it allowed", so a week the league does not
-  // have answers 404 whatever the state of its draft. The check is one indexed existence probe
-  // rather than the week's rows, which are read inside the transaction below where they are also
-  // locked and ordered.
-  const [exists] = await db
+  // have answers 404 whatever the state of its draft.
+  const [exists] = await tx
     .select({ weekNumber: matchups.weekNumber })
     .from(matchups)
     .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)))
@@ -141,32 +162,25 @@ export async function finalizeWeek(
 
   // A league that has not drafted has no rosters, so every team would score zero and the
   // standings would show a season of phantom losses. An undrafted league is not behind on
-  // scoring, it has not started. Read outside the transaction on purpose: it takes no lock on
-  // `drafts`, which is what keeps this function a leaf in the codebase's lock order.
-  const [draft] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, leagueId));
+  // scoring, it has not started.
+  const [draft] = await tx.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, leagueId));
   if (draft?.status !== "complete") return { ok: false, status: 409, reason: "That league hasn't finished its draft yet." };
 
-  // One transaction for the whole week: a half-scored week is not a result, it's a bug in
-  // progress — `computeStandings` deliberately ignores a matchup with only one score.
-  const matchupsScored = await db.transaction(async (tx) => {
-    const week = await tx
-      .select()
-      .from(matchups)
-      .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)))
-      .orderBy(asc(matchups.homeTeamId));
+  const week = await tx
+    .select()
+    .from(matchups)
+    .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)))
+    .orderBy(asc(matchups.homeTeamId));
 
-    const teamIds = [...new Set(week.flatMap((row) => [row.homeTeamId, row.awayTeamId]))];
-    const scores = await scoreTeamsForWeek(tx, leagueId, weekNumber, teamIds);
+  const teamIds = [...new Set(week.flatMap((row) => [row.homeTeamId, row.awayTeamId]))];
+  const scores = await scoreTeamsForWeek(tx, leagueId, weekNumber, teamIds);
 
-    for (const row of week) {
-      await tx
-        .update(matchups)
-        .set({ homeScore: requireScore(scores, row.homeTeamId), awayScore: requireScore(scores, row.awayTeamId) })
-        .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber), eq(matchups.homeTeamId, row.homeTeamId)));
-    }
-    return week.length;
-  });
+  for (const row of week) {
+    await tx
+      .update(matchups)
+      .set({ homeScore: requireScore(scores, row.homeTeamId), awayScore: requireScore(scores, row.awayTeamId) })
+      .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber), eq(matchups.homeTeamId, row.homeTeamId)));
+  }
 
-  await cache.invalidate(leagueId, weekNumber);
-  return { ok: true, weekNumber, matchupsScored };
+  return { ok: true, weekNumber, matchupsScored: week.length };
 }

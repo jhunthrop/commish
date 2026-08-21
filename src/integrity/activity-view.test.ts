@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AUDIT_EVENT_TYPES, type AuditEvent, type AuditEventType, type JsonObject } from "@/domain/audit";
 import { ACTIVITY_VISIBILITY, activityRowFor, type ActivityVisibility } from "./activity-view";
 import { copyViolations } from "./copy-rules";
+import { SYSTEM_ACTION_SUMMARY_ALLOWED } from "./system-actions";
 
 const names = {
   member: (id: string | null) => (id === "user_alice" ? "Alice" : id === "user_bob" ? "Bob" : "A former member"),
@@ -27,6 +28,20 @@ function event(eventType: AuditEventType, payload: JsonObject, actorId: string |
     eventHash: "hash1",
     hashVersion: 1,
   };
+}
+
+/** A `system_action` event, actorless (the platform, never a person) unless a test overrides it. */
+function systemActionEvent(payload: JsonObject): AuditEvent {
+  return event("system_action", payload, null);
+}
+
+/**
+ * The real payload `scripts/verify-audit-chain.ts`'s `recordDetection` writes — copied rather
+ * than paraphrased, so a Plan D author reading this file finds the actual shape the gate has to
+ * keep denying, not a stand-in for it.
+ */
+function chainVerificationFailedEvent(): AuditEvent {
+  return systemActionEvent({ action: "chain_verification_failed", scopes: ["platform"], checkedAt: "2026-08-20T17:00:00.000Z" });
 }
 
 const pickPayload: JsonObject = {
@@ -65,7 +80,19 @@ const SAMPLE_PAYLOADS: Readonly<Record<AuditEventType, readonly { readonly paylo
   ],
   draft_completed: [{ payload: { draftId: "d", picks: 120, teams: 10 }, actorId: null }],
   lineup_change: [{ payload: { teamId: "team_2", weekNumber: 3, starters: [] }, actorId: "user_bob" }],
-  system_action: [{ payload: { action: "lineup_auto_set", summary: "We set Bob's week 4 lineup for him." }, actorId: null }],
+  // The only action code SYSTEM_ACTION_SUMMARY_ALLOWED currently allows a summary for — see
+  // ./system-actions. A sample using a denied code (e.g. lineup_auto_set) would render null and
+  // fail the "breaks none of the house copy rules" sweep below, which is the point: this sample
+  // set is swept for what actually renders, not for what the type union merely contains.
+  system_action: [
+    {
+      payload: {
+        action: "stat_week_corrected",
+        summary: "We corrected week 4 scores after our stats provider revised its numbers. Standings now match the update.",
+      },
+      actorId: null,
+    },
+  ],
   // Hidden today. A sample is still declared for each so that flipping one to `"everyone"` needs
   // no second edit here and cannot land unswept; the `Record` over the full union is what forces
   // a new vocabulary entry to be considered at all.
@@ -153,12 +180,14 @@ describe("activityRowFor", () => {
   });
 
   it("renders a system action from its own summary, which is the contract Plan D writes against", () => {
-    expect(activityRowFor(event("system_action", { action: "lineup_auto_set", summary: "We set Bob's week 4 lineup for him." }, null), viewer, names)).toMatchObject({
+    const summary = "We corrected week 4 scores after our stats provider revised its numbers. Standings now match the update.";
+    expect(activityRowFor(systemActionEvent({ action: "stat_week_corrected", summary }), viewer, names)).toMatchObject({
       icon: "alert-triangle",
-      headline: "We set Bob's week 4 lineup for him.",
+      headline: summary,
     });
-    // No summary, no row. A system action that cannot explain itself does not get a feed entry.
-    expect(activityRowFor(event("system_action", { action: "lineup_auto_set" }, null), viewer, names)).toBeNull();
+    // No summary, no row. A system action that cannot explain itself does not get a feed entry,
+    // even for an action code the allowlist has signed off on.
+    expect(activityRowFor(systemActionEvent({ action: "stat_week_corrected" }), viewer, names)).toBeNull();
   });
 
   /**
@@ -170,8 +199,7 @@ describe("activityRowFor", () => {
    * ledgered residual finds the property asserted rather than assumed.
    */
   it("renders nothing for the verifier's own failure event, which is the only system_action written today", () => {
-    const real: JsonObject = { action: "chain_verification_failed", scopes: ["platform"], checkedAt: "2026-08-20T17:00:00.000Z" };
-    expect(activityRowFor(event("system_action", real, null), viewer, names)).toBeNull();
+    expect(activityRowFor(chainVerificationFailedEvent(), viewer, names)).toBeNull();
   });
 
   /**
@@ -237,6 +265,30 @@ describe("activityRowFor", () => {
     const swept = new Set(EVERY_RENDERABLE_SAMPLE.map((sample) => sample.eventType));
     const visible = (Object.keys(ACTIVITY_VISIBILITY) as readonly AuditEventType[]).filter((type) => ACTIVITY_VISIBILITY[type] !== "hidden");
     expect([...swept].sort()).toEqual([...visible].sort());
+  });
+});
+
+/**
+ * Task 10's re-review, pinned. `SYSTEM_ACTION_SUMMARY_ALLOWED` (`./system-actions`) is the third
+ * deny-by-default dimension this gate closure adds, and these three states are what it has to
+ * hold to: an action nobody signed off (even carrying a summary), an action code this process has
+ * never heard of, and the verifier's own real event, unchanged. Deleting the guard in
+ * `renderSystemAction` reddens every one of these rather than nothing — that is the mutation
+ * proof the brief asks for.
+ */
+describe("renderSystemAction — the summary allowlist gate", () => {
+  it("renders nothing for an action nobody signed off, even when it carries a summary", () => {
+    const denied = systemActionEvent({ action: "lineup_auto_set", summary: "We set Alice's lineup." });
+    expect(SYSTEM_ACTION_SUMMARY_ALLOWED.lineup_auto_set).toBe(false); // the precondition this test is actually about
+    expect(activityRowFor(denied, viewer, names)).toBeNull();
+  });
+
+  it("renders nothing for an action code it has never heard of", () => {
+    expect(activityRowFor(systemActionEvent({ action: "whatever", summary: "hi" }), viewer, names)).toBeNull();
+  });
+
+  it("still renders nothing for the verifier's own event, which is Plan A's ruling 8 unchanged", () => {
+    expect(activityRowFor(chainVerificationFailedEvent(), viewer, names)).toBeNull();
   });
 });
 
