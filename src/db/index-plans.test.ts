@@ -347,6 +347,41 @@ describe("hot read paths use indexes", () => {
     );
     expect(planUsesSeqScanOn(plan, "roster_slots")).toBe(false);
   });
+
+  /**
+   * Phase 3 Plan C Task 4's own read: `materializeLockedLineupsInTx`
+   * (`@/league-service/trade-transfer`) asks this exact question — teamId + weekNumber — once per
+   * locked week, per team, before ever deriving a fallback lineup to freeze. Both columns lead
+   * `lineup_slots`' own primary key, so this rides it rather than needing a new index.
+   */
+  it("checks whether a team already saved a lineup for one week by index, not by scanning every lineup row", async () => {
+    const plan = await explainPlan(
+      db,
+      db
+        .select({ teamId: lineupSlots.teamId })
+        .from(lineupSlots)
+        .where(and(eq(lineupSlots.teamId, "tm1_1"), eq(lineupSlots.weekNumber, 1)))
+        .limit(1),
+    );
+    expect(planUsesSeqScanOn(plan, "lineup_slots")).toBe(false);
+  });
+
+  /**
+   * `applyTradeInTx`'s own read: both teams' current rosters, fresh, inside the transaction that
+   * is about to move a player between them — never trusted from propose time. `team_id` leads
+   * `roster_slots`' own primary key, so an `IN` over two team ids is still an index lookup, not a
+   * scan of every roster row in the product.
+   */
+  it("reads both trading teams' current rosters by index, not by scanning every roster row", async () => {
+    const plan = await explainPlan(
+      db,
+      db
+        .select({ teamId: rosterSlots.teamId, slot: rosterSlots.slot, slotIndex: rosterSlots.slotIndex, playerId: rosterSlots.playerId })
+        .from(rosterSlots)
+        .where(inArray(rosterSlots.teamId, ["tm1_1", "tm1_2"])),
+    );
+    expect(planUsesSeqScanOn(plan, "roster_slots")).toBe(false);
+  });
 });
 
 /**

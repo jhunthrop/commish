@@ -6,8 +6,6 @@ import { isUniqueViolation } from "@/db/errors";
 import { leagues, teams, tradeProposals } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { Position } from "@/domain/player";
-import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
-import { assignSlot } from "@/draft-engine";
 import { canonicalSerialize } from "@/integrity/canonical";
 import type { NoticeContexts } from "@/integrity/notices";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
@@ -18,6 +16,7 @@ import { TRADE_CONFIG } from "@/trades/config";
 import { isBalancedProposal } from "@/domain/trade";
 import { nextStatusFor, type TradeStatus } from "@/trades/lifecycle";
 import type { TradeProposalView, TradeSideView, TradesPageBody } from "@/trades/contract";
+import { plannedTransfer, type FilledRosterSlot, type TransferAsset } from "./trade-transfer";
 
 /**
  * `trade_proposals`, ISO-stringed at the boundary — the same "`Date` only inside Drizzle"
@@ -161,44 +160,18 @@ function playersById(players: readonly ValuedPlayer[]): Readonly<Record<string, 
   return Object.fromEntries(players.map((player) => [player.playerId, player]));
 }
 
-/** Contains "no room" on purpose — `task-3-brief.md`'s own test greps for exactly that phrase. */
-const NO_ROOM_REASON = "There's no room on that roster for one of the players you're asking for.";
-
 /**
- * Whether ONE team's roster has a legal home for everything it is about to receive, once
- * everything it is sending away is gone first — the same "clear both sides before you fill
- * either" order Task 4's `plannedTransfer` formalizes later, run here as a preview so a manager
- * never wastes a yes on an offer the product would refuse at accept time anyway (Task 4 owns the
- * transfer itself; this is advisory only and touches no roster).
- *
- * Reuses `assignSlot` (`@/draft-engine`) — the one function that already decides where a player
- * lands — rather than a second placement policy.
+ * Whether the package leaves BOTH rosters legal once cleared and refilled, previewed at propose
+ * time so a manager never wastes a yes on an offer the product would refuse at accept time
+ * anyway. This is Task 4's `plannedTransfer` (`./trade-transfer`) — the one clear-then-place
+ * implementation in the codebase, reused rather than restated: this used to be a local
+ * `checkRoom` stopgap (a Task 3 carry), and that second copy is gone now that `plannedTransfer`
+ * exists to subsume it. Advisory only and touches no roster; Task 5's `acceptTrade` calls
+ * `applyTradeInTx`, which runs this same planner again against the roster as it stands at
+ * accept time, because rosters move in between.
  */
-/** A roster entry `checkRoom` actually ever sees: always filled. `assembleAdvisorContext`'s own
- *  roster read (`@/ai-advisor/context`) already drops every empty slot before this is built —
- *  see `myRoster`/`theirRoster` below — so `RosterSlot`'s general `playerId: string | null` is a
- *  wider type than anything this function is ever called with. */
-interface FilledRosterSlot {
-  readonly slot: RosterSlot["slot"];
-  readonly slotIndex: number;
-  readonly playerId: string;
-}
-
-function checkRoom(
-  currentRoster: readonly FilledRosterSlot[],
-  outgoingIds: readonly string[],
-  incomingIds: readonly string[],
-  incomingPositions: ReadonlyMap<string, Position>,
-  slotConfig: readonly RosterSlotConfig[],
-): string | null {
-  let remaining = currentRoster.filter((slot) => !outgoingIds.includes(slot.playerId));
-  for (const playerId of incomingIds) {
-    const position = incomingPositions.get(playerId)!;
-    const assignment = assignSlot({ position, roster: remaining, slotConfig });
-    if (!assignment.ok) return NO_ROOM_REASON;
-    remaining = [...remaining, { slot: assignment.slot, slotIndex: assignment.slotIndex, playerId }];
-  }
-  return null;
+function toTransferAssets(playerIds: readonly string[], positions: ReadonlyMap<string, Position>): readonly TransferAsset[] {
+  return playerIds.map((playerId) => ({ playerId, position: positions.get(playerId)! }));
 }
 
 export interface ProposeTradeInput {
@@ -234,7 +207,7 @@ export type ProposeTradeResult =
  * own (422); more open offers out than `TRADE_CONFIG.maxOpenProposalsPerTeam` allows (409,
  * counted inside the transaction so two near-simultaneous proposals can't both slip past a
  * pre-check); a package that would leave either roster illegal once cleared and refilled (422,
- * `checkRoom`, before anybody has to answer it); the identical open offer already out (409, the
+ * `plannedTransfer`, before anybody has to answer it); the identical open offer already out (409, the
  * partial unique fingerprint index).
  *
  * The verdict returned on success is `tradeBalance` run for the PROPOSER'S OWN eyes only —
@@ -311,10 +284,14 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
   const myPositions = new Map(myContext.me.players.map((p) => [p.playerId, p.position]));
   const theirPositions = new Map(theirs.me.players.map((p) => [p.playerId, p.position]));
 
-  const myRoomIssue = checkRoom(myRoster, proposerAssetIds, counterpartyAssetIds, theirPositions, slotConfig);
-  if (myRoomIssue !== null) return { ok: false, status: 422, reason: myRoomIssue };
-  const theirRoomIssue = checkRoom(theirRoster, counterpartyAssetIds, proposerAssetIds, myPositions, slotConfig);
-  if (theirRoomIssue !== null) return { ok: false, status: 422, reason: theirRoomIssue };
+  const plan = plannedTransfer({
+    slotConfig,
+    proposer: { teamId: proposerTeamId, roster: myRoster },
+    counterparty: { teamId: input.counterpartyTeamId, roster: theirRoster },
+    give: toTransferAssets(proposerAssetIds, myPositions),
+    get: toTransferAssets(counterpartyAssetIds, theirPositions),
+  });
+  if (!plan.ok) return { ok: false, status: 422, reason: plan.reason };
 
   const verdict = tradeBalance(valuePlayers(myContext.me, proposerAssetIds), valuePlayers(theirs.me, counterpartyAssetIds));
 
