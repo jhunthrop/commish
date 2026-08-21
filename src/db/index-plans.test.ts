@@ -350,6 +350,52 @@ describe("hot read paths use indexes", () => {
 });
 
 /**
+ * The single source of truth for what every `trade_proposals` index is supposed to look like on
+ * disk — read verbatim off `pg_indexes.indexdef` on a freshly migrated database, not hand-copied
+ * a second time from the migration SQL or the schema. Two things read this SAME map: the
+ * crash-safe healing `beforeAll` below (which restores any index that does not match before
+ * anything is measured) and `trade_proposals carries exactly the indexes it declares` further
+ * down (which asserts the catalog matches after every test in this file has had a chance to
+ * mutate it). One map, so "correct" cannot drift between what heals and what verifies.
+ */
+const EXPECTED_TRADE_PROPOSALS_INDEXDEFS: Readonly<Record<string, string>> = {
+  trade_proposals_open_fingerprint_idx:
+    "CREATE UNIQUE INDEX trade_proposals_open_fingerprint_idx ON public.trade_proposals USING btree (fingerprint) WHERE (status = 'open'::text)",
+  trade_proposals_inbox_idx:
+    "CREATE INDEX trade_proposals_inbox_idx ON public.trade_proposals USING btree (counterparty_team_id, proposed_at) WHERE (status = 'open'::text)",
+  trade_proposals_outbox_idx:
+    "CREATE INDEX trade_proposals_outbox_idx ON public.trade_proposals USING btree (proposer_team_id, proposed_at) WHERE (status = 'open'::text)",
+  trade_proposals_league_idx: "CREATE INDEX trade_proposals_league_idx ON public.trade_proposals USING btree (league_id, proposed_at)",
+};
+
+/**
+ * Crash-safety for the mutation-proof test below, which tears `trade_proposals_inbox_idx` down
+ * and rebuilds it by hand. That test's own `afterAll` covers a NORMAL finish (including an
+ * assertion failure — `afterAll` still runs), but the shared `postgres-test` container survives
+ * a hard crash between its `DROP INDEX` and that `afterAll` (an OOM kill, a `SIGKILL`, CI
+ * cancellation), and nothing else in the pipeline repairs it: `drizzle-kit migrate`
+ * (`db:migrate:test`) only applies migrations not yet recorded in `__drizzle_migrations`, and
+ * hand DDL against an already-applied migration is invisible to it. Left broken, every later run
+ * would silently measure the CORRUPTED index as its own baseline and the whole suite would pass
+ * for the wrong reason — the exact gap `afterAll` alone cannot close.
+ *
+ * So: before anything in this file is measured, read every `trade_proposals` index's actual
+ * definition back out of the catalog and restore any that does not match
+ * `EXPECTED_TRADE_PROPOSALS_INDEXDEFS` — a corrupted database is corrected, never trusted.
+ */
+async function healTradeProposalsIndexes(): Promise<void> {
+  const rows = await db.execute<{ indexname: string; indexdef: string }>(
+    sql`SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'trade_proposals'`,
+  );
+  const actual = new Map(rows.map((row) => [row.indexname, row.indexdef]));
+  for (const [name, expected] of Object.entries(EXPECTED_TRADE_PROPOSALS_INDEXDEFS)) {
+    if (actual.get(name) === expected) continue;
+    await db.execute(sql`DROP INDEX IF EXISTS ${sql.identifier(name)}`);
+    await db.execute(sql.raw(`${expected};`));
+  }
+}
+
+/**
  * `trade_proposals`' own corpus — the carried item from Plan B's final review made mechanical
  * (ruling 24). Plan B's own gate tests were found to have measured queries production never
  * makes, over a corpus where every league held 2% of the table; this corpus is shaped the way a
@@ -444,6 +490,10 @@ describe("trade proposals: inbox and outbox serve from their own partial indexes
   let baselineInboxCost = 0;
 
   beforeAll(async () => {
+    // Heals a crash-corrupted `trade_proposals_inbox_idx` FIRST, before anything is truncated,
+    // seeded or measured — see `healTradeProposalsIndexes`'s own docblock for why `afterAll`
+    // alone cannot be trusted to have run.
+    await healTradeProposalsIndexes();
     await truncateAll(db);
     await seedTradeCorpus();
   }, 120_000);
@@ -468,6 +518,24 @@ describe("trade proposals: inbox and outbox serve from their own partial indexes
     const plan = await explainPlan(db, tradesQuery(db, { leagueId: CORPUS_LEAGUE, teamId: CORPUS_TEAM, box: "outbox" }));
     expect(sequentiallyScannedRelations(plan)).not.toContain("trade_proposals");
     expect(indexScanNode(plan, "trade_proposals_outbox_idx")).toBeDefined();
+  });
+
+  /**
+   * History's shape is genuinely different from inbox/outbox, not a reuse of the same path: it
+   * has no `status = 'open'` predicate at all (history is a league's WHOLE settled record, not
+   * its open queue), so it cannot use either partial index and resolves through the non-partial
+   * `trade_proposals_league_idx` instead — measured, at this corpus's 132-row-per-league density
+   * (~0.5% of the 26,400-row table), as a Bitmap Index Scan on `league_id` feeding a `Sort` on
+   * `proposed_at`. The `Sort` is not a defect to chase away: the index's second key only
+   * pre-sorts a PLAIN Index Scan, and at this per-league row count the planner's own cost model
+   * prefers the bitmap path over walking the tree in order — the same tradeoff `signalsForUsers`
+   * above accepts for the same reason. What is asserted is the property the index actually owns:
+   * the league is found by seeking on `league_id`, never by scanning every row in the table.
+   */
+  it("serves history from the league index — not partial, because history is the settled record", async () => {
+    const plan = await explainPlan(db, tradesQuery(db, { leagueId: CORPUS_LEAGUE, teamId: CORPUS_TEAM, box: "history" }));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("trade_proposals");
+    expect(indexScanNode(plan, "trade_proposals_league_idx")).toBeDefined();
   });
 
   /**
@@ -594,5 +662,29 @@ describe("integrity_flags carries its open-subject and queue indexes", () => {
     // over page one and turned the keyset cursor into a Filter — see the plan assertions above.
     expect(byName.get("integrity_flags_queue_idx")).toMatch(/\(raised_at, id\)/);
     expect(byName.get("integrity_flags_queue_idx")).toContain("WHERE (resolved_at IS NULL)");
+  });
+});
+
+/**
+ * `trade_proposals`'s four indexes, read back out of the catalog against
+ * `EXPECTED_TRADE_PROPOSALS_INDEXDEFS` — the SAME source of truth `healTradeProposalsIndexes`
+ * restores from. Runs LAST among this file's `describe` blocks (source order is execution
+ * order here — `fileParallelism: false`), so it is also the closing half of the mutation-proof
+ * test's own proof: that test's `afterAll` already put the inbox index back, and this is what
+ * confirms the restoration actually landed correctly rather than merely running without
+ * throwing. A migration that recreated any of these four without its exact predicate, or a
+ * healing bug that "fixed" one into the wrong shape, reddens here even if every EXPLAIN
+ * assertion above happened to still find an index scan by name.
+ */
+describe("trade_proposals carries exactly the indexes it declares", () => {
+  it("matches EXPECTED_TRADE_PROPOSALS_INDEXDEFS on every index, byte for byte", async () => {
+    const rows = await db.execute<{ indexname: string; indexdef: string }>(
+      sql`SELECT indexname, indexdef FROM pg_indexes WHERE tablename = 'trade_proposals' AND indexname != 'trade_proposals_pkey'`,
+    );
+    const byName = new Map(rows.map((row) => [row.indexname, row.indexdef]));
+    expect([...byName.keys()].sort()).toEqual(Object.keys(EXPECTED_TRADE_PROPOSALS_INDEXDEFS).sort());
+    for (const [name, expected] of Object.entries(EXPECTED_TRADE_PROPOSALS_INDEXDEFS)) {
+      expect(byName.get(name)).toBe(expected);
+    }
   });
 });
