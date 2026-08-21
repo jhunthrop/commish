@@ -3,7 +3,7 @@ import { join, relative } from "node:path";
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { lineupSlots, rosterSlots, teams } from "@/db/schema";
+import { lineupSlots, rosterSlots, statWeeks, teams } from "@/db/schema";
 import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
 import { scoreTeamsForWeek } from "@/stats-pipeline/finalize";
 import { getLineup } from "./lineups";
@@ -105,6 +105,24 @@ describe("applyTradeInTx leaves an already-locked week's history alone", () => {
     const week4 = await getLineup(db, { teamId: league.teamA, weekNumber: 4, slotConfig: league.slotConfig });
     expect(week4.some((slot) => slot.playerId === "p_bench_wr")).toBe(true);
   });
+
+  it("leaves the frozen week byte-equal after a SECOND, unrelated trade between the same two teams", async () => {
+    // F2: the idempotency proof, driven through the trade path itself rather than a direct
+    // second call to `materializeLockedLineupsInTx` — a second trade between the same two teams
+    // is the real caller this property has to hold for. Week 3 is already frozen by the first
+    // trade; the second trade's own materialization pass must find the existing rows and write
+    // nothing new, not re-derive them from the roster the first trade already changed.
+    const league = await seasonThroughWeek(db, { week: 3, settled: true, lineupsSaved: false });
+    await db.transaction((tx) => applyTradeInTx(tx, tradeOf(league, { give: ["p_star_rb"], get: ["p_bench_wr"] })));
+    const afterFirstTrade = await db.select().from(lineupSlots).where(eq(lineupSlots.weekNumber, 3));
+
+    const secondTrade = await db.transaction((tx) => applyTradeInTx(tx, tradeOf(league, { give: ["p_wr_a"], get: [] })));
+
+    expect(secondTrade.materializedLineupRows).toBe(0);
+    const afterSecondTrade = await db.select().from(lineupSlots).where(eq(lineupSlots.weekNumber, 3));
+    expect(afterSecondTrade).toHaveLength(afterFirstTrade.length);
+    expect(afterSecondTrade).toEqual(afterFirstTrade);
+  });
 });
 
 function sortedBySlot(roster: readonly RosterSlot[]): readonly RosterSlot[] {
@@ -134,15 +152,67 @@ describe("materializeLockedLineupsInTx", () => {
     expect(rows).toHaveLength(10);
   });
 
-  it("is a no-op the second time it runs for the same already-materialized week", async () => {
+  it("is a no-op the second time it runs for the same already-materialized week, byte-equal", async () => {
     const league = await seasonThroughWeek(db, { week: 3, settled: true, lineupsSaved: false });
     await db.transaction((tx) =>
       materializeLockedLineupsInTx(tx, { leagueId: league.id, teamIds: [league.teamA, league.teamB], slotConfig: league.slotConfig }),
     );
+    const before = await db.select().from(lineupSlots).where(eq(lineupSlots.weekNumber, 3));
+
     const secondRun = await db.transaction((tx) =>
       materializeLockedLineupsInTx(tx, { leagueId: league.id, teamIds: [league.teamA, league.teamB], slotConfig: league.slotConfig }),
     );
+
     expect(secondRun).toBe(0);
+    const after = await db.select().from(lineupSlots).where(eq(lineupSlots.weekNumber, 3));
+    expect(after).toHaveLength(before.length);
+    expect(after).toEqual(before);
+  });
+});
+
+describe("materializeLockedLineupsInTx's stat_weeks read", () => {
+  it("takes FOR SHARE, matching setLineup: it blocks on a concurrent status flip rather than reading a stale snapshot", async () => {
+    // F1: the boundary-week race. `persistTick` (`@/stats-pipeline/persist`) upserts `stat_weeks`
+    // in its own transaction with no coordination, under the default READ COMMITTED isolation
+    // `setLineup`'s own re-check documents and closes with `FOR SHARE` — the same hole exists
+    // here: without the lock, a week flipping `scheduled` -> `in_progress` in a `persistTick`
+    // transaction that commits AFTER this function's read but BEFORE the trade's roster write
+    // would leave that week unmaterialized, and the roster move that follows would then
+    // retroactively change what that week's fallback derives for a week that had, by the time
+    // this transaction committed, already started.
+    //
+    // Driven for real, not simulated: a concurrent transaction updates the week's row and holds
+    // it open (uncommitted), mirroring `lineups.test.ts`'s own precedent test for the identical
+    // race class — the same deterministic promise-gate idiom, cheaper here than standing up
+    // `lock-order.test.ts`'s two-connection `pg_stat_activity` machinery for a single-row block,
+    // and just as real a proof: under READ COMMITTED, a plain (unlocked) SELECT does NOT block on
+    // an uncommitted concurrent UPDATE — it reads the last COMMITTED value immediately. So this
+    // test fails against an unlocked read (it would see the stale `scheduled` value and return 0)
+    // and passes only because `FOR SHARE` genuinely blocks until the flip commits.
+    const league = await seasonThroughWeek(db, { week: 5, settled: false, lineupsSaved: false });
+
+    let release: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const flip = db.transaction(async (tx) => {
+      await tx.update(statWeeks).set({ status: "in_progress" }).where(eq(statWeeks.week, 5));
+      await released;
+    });
+
+    const materializing = db.transaction((tx) =>
+      materializeLockedLineupsInTx(tx, { leagueId: league.id, teamIds: [league.teamA, league.teamB], slotConfig: league.slotConfig }),
+    );
+    // Long enough for `materializeLockedLineupsInTx` to clear its earlier work and reach the
+    // `FOR SHARE` read, so it is genuinely waiting on the held row when `release()` fires.
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    release();
+    await flip;
+
+    // Saw the POST-flip value, not the pre-flip "scheduled" snapshot: it materialized the week.
+    expect(await materializing).toBe(10);
+    const rows = await db.select().from(lineupSlots).where(eq(lineupSlots.weekNumber, 5));
+    expect(rows).toHaveLength(10);
   });
 });
 

@@ -181,12 +181,31 @@ interface LineupSlotWrite {
  * `stat_weeks` rows for the whole season, with an absent row reading `"scheduled"` (open), the
  * same rule `setLineup` uses. There is no second definition of "locked" in this codebase.
  *
+ * `FOR SHARE`, matching `setLineup`'s own re-check lock exactly (`@/league-service/lineups`,
+ * `setLineup`'s in-transaction week read): `persistTick` (`@/stats-pipeline/persist`) upserts
+ * `stat_weeks` in its own transaction with no coordination, under the default READ COMMITTED
+ * isolation `setLineup`'s docblock already documents the hole for. Without this lock, a boundary
+ * week could flip `scheduled` -> `in_progress` in a `persistTick` transaction that commits AFTER
+ * this read but BEFORE this transaction's roster write — this read would see the stale
+ * `scheduled` value, leave the week to the fallback, and the roster move that follows would then
+ * retroactively change what that week's `getLineup` fallback derives, for a week that had, by the
+ * time this transaction committed, already started. `FOR SHARE` blocks this read against
+ * `persistTick`'s uncommitted row and forces it to see whichever value actually wins the race,
+ * never a snapshot that predates it. Taken FIRST, ahead of every other read in this function and
+ * in `applyTradeInTx` (which calls this first, ahead of its own roster reads) — a business lock,
+ * before the transaction has taken anything else, matching `setLineup`'s own position and ruling
+ * 3's "business rows first" order.
+ *
  * Bounded by construction: at most `LEAGUE_CONFIG.regularSeasonWeeks` weeks times two teams
  * times the league's slot count, one INSERT, and only for weeks with no saved rows at all.
  */
 export async function materializeLockedLineupsInTx(tx: DbTx, input: MaterializeInput): Promise<number> {
   const weekNumbers = Array.from({ length: LEAGUE_CONFIG.regularSeasonWeeks }, (_, index) => index + 1);
-  const statRows = await tx.select({ week: statWeeks.week, status: statWeeks.status }).from(statWeeks).where(inArray(statWeeks.week, weekNumbers));
+  const statRows = await tx
+    .select({ week: statWeeks.week, status: statWeeks.status })
+    .from(statWeeks)
+    .where(inArray(statWeeks.week, weekNumbers))
+    .for("share");
   const statusByWeek = new Map(statRows.map((row) => [row.week, row.status]));
   const lockedWeeks = weekNumbers.filter((week) => isLineupLocked(statusByWeek.get(week) ?? "scheduled"));
 
