@@ -75,8 +75,36 @@ export const INTEGRITY_CONFIG = {
      * advisor/_shared.ts`): both spend the same scarce resource, a Postgres round trip for this
      * user's own notices, so splitting the ceiling per route would double what a single caller
      * can spend for no product reason.
+     *
+     * 120, AND THAT NUMBER IS A STOPGAP WITH ITS ARITHMETIC WRITTEN DOWN (final review, MEDIUM 6).
+     *
+     * THE REAL DEFECT IS ARCHITECTURAL AND BELONGS TO PLAN D: there is no shared
+     * `src/app/app/layout.tsx`, so every page renders `AppHeader` -> `NoticeInbox` -> `useNotices`
+     * in its OWN subtree and the hook REMOUNTS on every client-side navigation. Each mount costs
+     * TWO `GET /api/notices` — the mount fetch, and the SSE `open` refetch, because the stream is
+     * refcounted and `useNotices` is its only subscriber, so navigating away drops refs to zero,
+     * closes the connection, and the next page opens a fresh one that fires a fresh `open`. The
+     * fix is the shared layout (and/or suppressing the `open` refetch when it immediately follows
+     * a mount fetch); that changes the render tree of every page in the product, which is not a
+     * change to land at the final gate of a 22-commit branch. It is ledgered in the Phase 3
+     * overview's carried-items table, marked as the stopgap this is.
+     *
+     * THE ARITHMETIC, from the observed cost above:
+     *
+     *     2 requests per navigation
+     *   x 30 navigations per minute   (one every 2 seconds, sustained — click, render, look:
+     *                                  faster than any real member browses for a whole minute)
+     *   = 60 GETs per 60s window
+     *   + 30                          (the shared `POST /api/notices/read`, at most one per
+     *                                  navigation, when the bell is opened with unread notices)
+     *   = 90 requests per window
+     *
+     * 120 is that number with a third of the budget left over as headroom for a burst faster than
+     * sustained. The old ceiling of 30 was reachable in FIFTEEN navigations — ordinary engaged
+     * browsing — and a 429 renders an error state in place of the member's notices, which is the
+     * surface carrying trade offers, executed trades and operator reversals.
      */
-    rateLimit: { maxRequests: 30, windowMs: 60_000 },
+    rateLimit: { maxRequests: 120, windowMs: 60_000 },
   },
   moderation: {
     /**

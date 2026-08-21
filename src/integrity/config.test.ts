@@ -80,3 +80,37 @@ describe("INTEGRITY_CONFIG.trade", () => {
     expect(Number.isFinite(INTEGRITY_CONFIG.trade.sweepBatchSize)).toBe(true);
   });
 });
+
+/**
+ * FINAL REVIEW, MEDIUM 6. The notices ceiling is reachable by ORDINARY BROWSING, not by abuse:
+ * every page mounts `useNotices` in its own subtree (there is no shared app layout), and each
+ * mount costs TWO `GET /api/notices` — the mount fetch and the SSE `open` refetch. At the old 30
+ * that was fifteen navigations, and a 429 replaces the member's notices with an error state.
+ *
+ * The architectural fix is Plan D's (ledgered in the Phase 3 overview). This is the honest
+ * stopgap, and the point of pinning it here is that the NUMBER is derived rather than picked: the
+ * arithmetic lives in `config.ts`'s own docblock, and this test is what stops a later edit from
+ * quietly walking it back below what real navigation costs.
+ */
+describe("the notices ceiling is above what real navigation costs", () => {
+  /** What `useNotices` (`@/account-room/hooks/use-notices`) spends per client-side navigation:
+   *  the mount fetch, plus the refcounted stream's `open` refetch after it reopens. */
+  const REQUESTS_PER_NAVIGATION = 2;
+  /** One navigation every two seconds, sustained for the whole window — click, render, look.
+   *  Faster than any real member browses for a full minute. */
+  const NAVIGATION_INTERVAL_MS = 2_000;
+
+  it("lets a member navigate every two seconds for a whole window without a 429", () => {
+    const { maxRequests, windowMs } = INTEGRITY_CONFIG.notices.rateLimit;
+    const navigationsPerWindow = windowMs / NAVIGATION_INTERVAL_MS;
+    // Plus the shared `POST /api/notices/read`, at most one per navigation when the bell is
+    // opened with unread notices — the two routes spend one budget on purpose.
+    const worstCaseRequests = navigationsPerWindow * (REQUESTS_PER_NAVIGATION + 1);
+    expect(maxRequests).toBeGreaterThanOrEqual(worstCaseRequests);
+  });
+
+  it("keeps the ceiling finite and the window a real minute", () => {
+    expect(Number.isFinite(INTEGRITY_CONFIG.notices.rateLimit.maxRequests)).toBe(true);
+    expect(INTEGRITY_CONFIG.notices.rateLimit.windowMs).toBe(60_000);
+  });
+});
