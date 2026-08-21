@@ -16,7 +16,10 @@ import {
   type SignalWeights,
 } from "@/integrity/similarity";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
-import { raiseFlag } from "./flags";
+// From `./raise-flag` directly, not `./flags` (Task 7) — this detector only ever RAISES a flag,
+// never resolves one, and `./raise-flag` is the self-contained slice that keeps it that way; see
+// that module's own docblock.
+import { raiseFlag } from "./raise-flag";
 import { signalsForUsers, type SessionSignal } from "./session-signals";
 
 const systemClock: Clock = { now: () => new Date().toISOString() };

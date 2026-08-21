@@ -1,16 +1,24 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db, DbTx } from "@/db/client";
-import { auditEvents, chatMessageReports, chatMessages, integrityFlags, leagues, memberNotices, reviewReports, reviews, users } from "@/db/schema";
+import { auditEvents, chatMessageReports, chatMessages, drafts, integrityFlags, leagues, memberNotices, players, playerStatLines, reviewReports, reviews, rosterSlots, teams, tradeProposals, users } from "@/db/schema";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import type { AuditEventType, JsonObject } from "@/domain/audit";
 import { copyViolations } from "@/integrity/copy-rules";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import type { FlagType } from "@/integrity/flags";
 import { REVIEW_CONFIG } from "@/reviews/config";
+import { listLeagueActivity } from "./activity";
+import { createLeague } from "@/league-service/creation";
+import { currentWeekOf } from "@/league-service/schedule";
+import { seasonCurrentWeek } from "@/league-service/test-support";
+import { acceptTrade, proposeTrade } from "@/league-service/trades";
 import { createAuditLogger, type AuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
 import { flagDetail, listPendingFlags, pendingFlagQuery, raiseFlag, removeSubject, resolveFlag } from "./flags";
+import { raiseFlag as raiseFlagReExported } from "./raise-flag";
 
 const db = createTestDb();
 const NOW = "2026-08-20T18:00:00.000Z";
@@ -26,6 +34,35 @@ async function seedLeague(id: string, commissionerUserId: string): Promise<void>
   await db.insert(leagues).values({ id, name: id, format: "snake", teamCount: 10, commissionerUserId });
 }
 
+/** One ACCEPTED `trade_proposals` row, inserted directly — a real subject for `subjectFor`'s
+ *  trade branch (Task 6) to resolve, without needing a full propose/accept flow for tests that
+ *  only care about the row it reads back. */
+async function seedAcceptedTrade(opts: {
+  readonly id: string;
+  readonly leagueId: string;
+  readonly proposerTeamId: string;
+  readonly counterpartyTeamId: string;
+  readonly acceptedAt: string;
+}): Promise<void> {
+  const acceptedAt = new Date(opts.acceptedAt);
+  await db.insert(tradeProposals).values({
+    id: opts.id,
+    leagueId: opts.leagueId,
+    proposerTeamId: opts.proposerTeamId,
+    counterpartyTeamId: opts.counterpartyTeamId,
+    weekNumber: 4,
+    proposerAssets: [{ kind: "player", playerId: "p_gave" }],
+    counterpartyAssets: [{ kind: "player", playerId: "p_got" }],
+    fingerprint: `fp_${opts.id}`,
+    note: null,
+    status: "accepted",
+    proposedAt: acceptedAt,
+    expiresAt: new Date(acceptedAt.getTime() + 72 * 60 * 60 * 1000),
+    settledAt: acceptedAt,
+    settledByUserId: null,
+  });
+}
+
 beforeEach(async () => {
   await truncateAll(db);
   eventCounter = 0;
@@ -33,6 +70,23 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await truncateAll(db);
+});
+
+describe("one raiseFlag, one home (fix round 1, LOW — the raise-flag.ts move)", () => {
+  it("is the same function object trade-fairness.ts and multi-account.ts call, not a copy that could drift", () => {
+    // The same identity-pin idiom Task 1 established for `tradeBalance`'s move to `src/trades/
+    // fairness.ts` (`src/trades/fairness.test.ts`) — a re-export satisfies "it still works" even
+    // if a second implementation gets pasted in beside it later; only object identity proves this
+    // is a de-duplication, not a fork.
+    expect(raiseFlagReExported).toBe(raiseFlag);
+  });
+
+  it("leaves no second implementation behind in flags.ts", () => {
+    // A grep, not an import check — the same belt Task 1's own move test uses.
+    const source = readFileSync(join(process.cwd(), "src", "integrity-service", "flags.ts"), "utf8");
+    expect(source).not.toContain("onConflictDoNothing({ target: [integrityFlags.subjectType");
+    expect(source).not.toContain("function existingOpenFlagFor");
+  });
 });
 
 describe("raiseFlag", () => {
@@ -379,13 +433,23 @@ describe("resolveFlag", () => {
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(1);
   });
 
-  it("refuses a decision no plan in this phase owns", async () => {
+  it("refuses trade_reversed for a subject that isn't a trade, before any write (Task 7)", async () => {
+    // `trade_reversed` is real now — this is the subject-aware refusal that replaces the old
+    // blanket "not owned by this plan" message, mirroring `content_removed`'s own unwired-subject
+    // check just above.
     await ensureUser("u_op");
     const flag = await openFlag({ flagType: "review_report" });
 
     const result = await resolveFlag(db, { flagId: flag.id, decision: "trade_reversed", note: "n", operatorUserId: "u_op" });
-    expect(result).toEqual({ ok: false, status: 400, reason: "This product can't reverse a trade yet." });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: "There is no trade on this flag to reverse. Close it with no action, or warn the member.",
+    });
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row!.resolvedAt).toBeNull();
   });
 
   it("tells the member in the operator's own words when the decision is a warning", async () => {
@@ -429,6 +493,66 @@ describe("resolveFlag", () => {
 
     const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
     expect(row!.resolvedAt).toBeNull();
+  });
+
+  /**
+   * Fix round 2, F1 — THE ACCUSATORY-NOTE SEAM, one guard shared by every decision whose note
+   * reaches someone other than the operator who wrote it. `warned_user`'s own note quotes
+   * VERBATIM in the member's notice, so this is the most direct case.
+   */
+  it("refuses a warned_user note containing an accusatory term, before opening a transaction, naming the term", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "chat_report", subjectAuthor: "u_member_accusatory", leagueId: "lg_accusatory" });
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "warned_user", note: "This looks like cheating to me.", operatorUserId: "u_op" });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: 'Your note can\'t include "cheating". Describe what happened without naming what you suspect, then try again.',
+    });
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row!.resolvedAt).toBeNull();
+    expect(await noticesFor("u_member_accusatory")).toEqual([]);
+  });
+
+  it("refuses a content_removed note containing an accusatory term — the note becomes the permanent removal reason", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "review_report", subjectAuthor: "u_review_accusatory" });
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "Suspected of abuse in the league chat too.", operatorUserId: "u_op" });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: 'Your note can\'t include "suspected". Describe what happened without naming what you suspect, then try again.',
+    });
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row!.resolvedAt).toBeNull();
+  });
+
+  it("never guards no_action's own note — ruling 6 notices nobody, so there is no one to protect from it", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "review_report" });
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "no_action", note: "Looked into the cheating allegation, found nothing.", operatorUserId: "u_op" });
+    expect(result).toMatchObject({ ok: true, decision: "no_action" });
+  });
+
+  /**
+   * THE SWEEP: proves the guard reads `INTEGRITY_CONFIG.notices.accusatoryTerms` itself, not a
+   * hand-copied subset that could drift from it — every term the real config list declares must
+   * be caught, for every decision the guard actually covers.
+   */
+  it("catches every term in the REAL accusatoryTerms config list, for every guarded decision", async () => {
+    await ensureUser("u_op_sweep");
+    for (const term of INTEGRITY_CONFIG.notices.accusatoryTerms) {
+      for (const decision of ["warned_user", "content_removed", "trade_reversed"] as const) {
+        const flag = await openFlag({ flagType: "review_report" });
+        const result = await resolveFlag(db, { flagId: flag.id, decision, note: `This is a note about ${term} happening.`, operatorUserId: "u_op_sweep" });
+        expect(result).toMatchObject({ ok: false, status: 400, reason: expect.stringContaining(`"${term}"`) });
+      }
+    }
   });
 
   it("refuses a flagId that doesn't exist, distinctly from an already-resolved one", async () => {
@@ -787,6 +911,473 @@ describe("resolveFlag", () => {
   });
 });
 
+describe("resolveFlag's trade_reversed branch (Task 7)", () => {
+  const trClock = { now: () => "2026-08-25T00:00:00.000Z" };
+  const TR_SLOTS = [
+    { slot: "RB" as const, count: 1, eligiblePositions: ["RB" as const] },
+    { slot: "WR" as const, count: 1, eligiblePositions: ["WR" as const] },
+    { slot: "BENCH" as const, count: 1, eligiblePositions: ["RB" as const, "WR" as const] },
+  ];
+
+  /** A real accepted trade (Alice's RB for Bob's WR), plus a `trade_fairness` flag naming it. */
+  async function acceptedTradeWithFlag(suffix: string): Promise<{
+    readonly leagueId: string;
+    readonly teamA: string;
+    readonly teamB: string;
+    readonly userA: string;
+    readonly userB: string;
+    readonly tradeId: string;
+    readonly flagId: string;
+  }> {
+    const userA = `u_tr_alice_${suffix}`;
+    const userB = `u_tr_bob_${suffix}`;
+    await db.insert(users).values([
+      { id: userA, email: `${userA}@test.local`, displayName: "Alice" },
+      { id: userB, email: `${userB}@test.local`, displayName: "Bob" },
+    ]);
+    const created = await createLeague({ db, clock: trClock, newId: () => `lg_tr_${suffix}_${crypto.randomUUID()}` }, {
+      name: "Reversal Integration League",
+      format: "snake",
+      teamCount: 2,
+      scoringPreset: "ppr",
+      auctionBudget: null,
+      rosterSlots: TR_SLOTS,
+      commissionerUserId: userA,
+      teamName: "Team Alice",
+      experienceTier: "beginner",
+      stakeTier: 0,
+      isPublicMatchmade: false,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const teamB = `team_tr_bob_${suffix}`;
+    await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
+    await db
+      .insert(players)
+      .values([
+        { id: `p_tr_rb_${suffix}`, name: "Star RB", position: "RB", nflTeam: "KC" },
+        { id: `p_tr_wr_${suffix}`, name: "Bench WR", position: "WR", nflTeam: "SF" },
+      ])
+      .onConflictDoNothing();
+    await db.insert(rosterSlots).values([
+      { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: `p_tr_rb_${suffix}` },
+      { teamId: teamB, slot: "WR", slotIndex: 0, playerId: `p_tr_wr_${suffix}` },
+    ]);
+
+    const proposed = await proposeTrade(db, {
+      leagueId: created.leagueId,
+      userId: userA,
+      counterpartyTeamId: teamB,
+      proposerAssets: [{ kind: "player", playerId: `p_tr_rb_${suffix}` }],
+      counterpartyAssets: [{ kind: "player", playerId: `p_tr_wr_${suffix}` }],
+      note: null,
+      clock: trClock,
+      deliver: async () => {},
+    });
+    if (!proposed.ok) throw new Error(proposed.reason);
+    const accepted = await acceptTrade(db, { tradeId: proposed.tradeId, leagueId: created.leagueId, userId: userB, clock: trClock, deliver: async () => {} });
+    if (!accepted.ok) throw new Error(accepted.reason);
+
+    const flagId = `flag_tr_${suffix}`;
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_fairness",
+        subjectId: proposed.tradeId,
+        leagueId: created.leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: trClock.now(),
+        newId: () => flagId,
+        audit: logger,
+      }),
+    );
+
+    return { leagueId: created.leagueId, teamA: created.teamId, teamB, userA, userB, tradeId: proposed.tradeId, flagId };
+  }
+
+  async function isOpenFlag(flagId: string): Promise<boolean> {
+    const [row] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, flagId));
+    return row !== undefined && row.resolvedAt === null;
+  }
+
+  async function tradeRow(tradeId: string) {
+    const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, tradeId));
+    return row!;
+  }
+
+  async function auditEventsOn(scope: string, eventType: AuditEventType) {
+    return db.select().from(auditEvents).where(and(eq(auditEvents.chainScope, scope), eq(auditEvents.eventType, eventType)));
+  }
+
+  /** The resolving operator — a real `users` row, since `integrity_flags.resolved_by_user_id`
+   *  carries a real foreign key. */
+  async function ensureOperator(id: string): Promise<void> {
+    await db.insert(users).values({ id, email: `${id}@test.local`, displayName: id }).onConflictDoNothing();
+  }
+
+  /**
+   * Fix round 2, F1, on a REAL trade flag (the sweep in `resolveFlag`'s own describe block above
+   * proves the guard against every real config term, on a stand-in subject; this proves it fires
+   * BEFORE `reverseTradeInTx` ever opens a transaction for the one decision this whole task
+   * built). `trade_reversed`'s own notice quotes the note VERBATIM to both managers, which is
+   * exactly what Persona 3/4's panel finding named as the uncontrolled channel this guard closes.
+   */
+  it("refuses a trade_reversed note containing an accusatory term, before the reversal's own transaction ever opens", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("accusatory");
+
+    const result = await resolveFlag(db, {
+      flagId: fx.flagId,
+      decision: "trade_reversed",
+      note: "This trade looks like a violation of the collusion rules.",
+      operatorUserId: "u_op",
+      clock: trClock,
+    });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: 'Your note can\'t include "violation". Describe what happened without naming what you suspect, then try again.',
+    });
+
+    expect(await isOpenFlag(fx.flagId)).toBe(true);
+    const row = await tradeRow(fx.tradeId);
+    expect(row.reversedAt).toBeNull(); // the reversal never ran at all
+    expect(await auditEventsOn(fx.leagueId, "roster_move")).toHaveLength(1); // the original trade only
+  });
+
+  it("puts the reversal on the LEAGUE chain and the decision on the platform chain — the two-class sentence, driven", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("chain");
+    const result = await resolveFlag(db, {
+      flagId: fx.flagId,
+      decision: "trade_reversed",
+      note: "Two accounts, one household, and this trade is why we looked.",
+      operatorUserId: "u_op",
+      clock: trClock,
+    });
+    expect(result).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_reversed" });
+
+    // The league can SEE two rosters change back, so the roster_move is theirs: the trade, then
+    // the reversal — two rows, one chain.
+    expect(await auditEventsOn(fx.leagueId, "roster_move")).toHaveLength(2);
+    // The investigation that ordered it is not the league's business: one flag_resolved, on the
+    // platform chain, and NONE on the league's.
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(1);
+    expect(await auditEventsOn(fx.leagueId, "flag_resolved")).toHaveLength(0);
+
+    const row = await tradeRow(fx.tradeId);
+    expect(row.status).toBe("accepted");
+    expect(row.reversedAt).not.toBeNull();
+    expect(row.reversedByFlagId).toBe(fx.flagId);
+
+    // (The cache eviction this same commit adds has its own case below.)
+
+    // The moved-again read is skipped once the trade IS already reversed — `subjectIsAlreadyReversed`
+    // withholds the decision for that reason already, so the preview reads honestly `false`
+    // without spending a roster query on a question the page won't ask anyway.
+    const detail = await flagDetail(db, fx.flagId);
+    expect(detail!.subject).toMatchObject({ kind: "trade", reversedAt: expect.any(String), playersMovedAgain: false });
+  });
+
+  it("refuses when a traded player has since moved on, leaves the flag OPEN, and stamps nothing at all", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("moved");
+    // A third manager: Bob moves the player he got from Alice onward to Carol.
+    const userC = "u_tr_carol_moved";
+    await db.insert(users).values({ id: userC, email: `${userC}@test.local`, displayName: "Carol" });
+    const teamC = "team_tr_carol_moved";
+    await db.insert(teams).values({ id: teamC, leagueId: fx.leagueId, userId: userC, name: "Team Carol" });
+    await db.insert(players).values({ id: "p_tr_carol_1", name: "Carol's Player", position: "RB", nflTeam: "LAC" });
+    await db.insert(rosterSlots).values({ teamId: teamC, slot: "BENCH", slotIndex: 0, playerId: "p_tr_carol_1" });
+    const secondProposed = await proposeTrade(db, {
+      leagueId: fx.leagueId,
+      userId: fx.userB,
+      counterpartyTeamId: teamC,
+      proposerAssets: [{ kind: "player", playerId: "p_tr_rb_moved" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_tr_carol_1" }],
+      note: null,
+      clock: trClock,
+      deliver: async () => {},
+    });
+    if (!secondProposed.ok) throw new Error(secondProposed.reason);
+    const secondAccepted = await acceptTrade(db, { tradeId: secondProposed.tradeId, leagueId: fx.leagueId, userId: userC, clock: trClock, deliver: async () => {} });
+    expect(secondAccepted.ok).toBe(true);
+
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      reason: "One of these players has been traded again since. Undoing this trade would take a player off a third team, so it needs a different decision.",
+    });
+    expect(await isOpenFlag(fx.flagId)).toBe(true); // the question stays open
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  /**
+   * F3 (LOW, M8 discipline): the precomputed preview `flagDetail` gives the queue detail page —
+   * `false` before a traded player moves on, `true` after, using the SAME ownership check
+   * `reverseTradeInTx`'s own STEP 4 makes (`tradePlayersHaveMovedAgain`), so the two can never
+   * disagree about what "moved again" means.
+   */
+  it("previews playersMovedAgain honestly — false while the trade is still reversible, true once a player has moved on", async () => {
+    const fx = await acceptedTradeWithFlag("preview");
+    const before = await flagDetail(db, fx.flagId);
+    expect(before!.subject).toMatchObject({ kind: "trade", playersMovedAgain: false });
+
+    const userC = "u_tr_carol_preview";
+    await db.insert(users).values({ id: userC, email: `${userC}@test.local`, displayName: "Carol" });
+    const teamC = "team_tr_carol_preview";
+    await db.insert(teams).values({ id: teamC, leagueId: fx.leagueId, userId: userC, name: "Team Carol" });
+    await db.insert(players).values({ id: "p_tr_carol_preview_1", name: "Carol's Player", position: "RB", nflTeam: "LAC" });
+    await db.insert(rosterSlots).values({ teamId: teamC, slot: "BENCH", slotIndex: 0, playerId: "p_tr_carol_preview_1" });
+    const secondProposed = await proposeTrade(db, {
+      leagueId: fx.leagueId,
+      userId: fx.userB,
+      counterpartyTeamId: teamC,
+      proposerAssets: [{ kind: "player", playerId: "p_tr_rb_preview" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_tr_carol_preview_1" }],
+      note: null,
+      clock: trClock,
+      deliver: async () => {},
+    });
+    if (!secondProposed.ok) throw new Error(secondProposed.reason);
+    await acceptTrade(db, { tradeId: secondProposed.tradeId, leagueId: fx.leagueId, userId: userC, clock: trClock, deliver: async () => {} });
+
+    const after = await flagDetail(db, fx.flagId);
+    expect(after!.subject).toMatchObject({ kind: "trade", playersMovedAgain: true });
+    // The preview and the service's own refusal agree, because they run the identical check.
+    expect(after!.decisions).not.toContain("trade_reversed");
+  });
+
+  /**
+   * STATE 3 (fix round 1, F1's three-state discrimination): reversed via a DIFFERENT flag. Not
+   * the same flag retrying its own work (the healing test above, state 2) — a genuinely SECOND
+   * flag, opened by a fresh report after the first already reversed the trade, gets the ordinary
+   * double-reversal refusal, and its own attempt stays open (a different decision, or no_action,
+   * is what actually closes it).
+   */
+  it("refuses a second reversal of the same trade across two different flags, and the second flag stays open", async () => {
+    await ensureOperator("u_op");
+    await ensureOperator("u_op2");
+    const fx = await acceptedTradeWithFlag("twice");
+    const first = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
+    expect(first).toMatchObject({ ok: true });
+
+    // A second report on the same trade opens a NEW flag — the open-subject index only dedupes
+    // OPEN flags, and this one is already resolved.
+    const reReportedId = "flag_tr_twice_again";
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_fairness",
+        subjectId: fx.tradeId,
+        leagueId: fx.leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: trClock.now(),
+        newId: () => reReportedId,
+        audit: logger,
+      }),
+    );
+
+    const second = await resolveFlag(db, { flagId: reReportedId, decision: "trade_reversed", note: "n", operatorUserId: "u_op2", clock: trClock });
+    expect(second).toMatchObject({ ok: false, status: 409, reason: "This trade has already been reversed." });
+    expect(await isOpenFlag(reReportedId)).toBe(true); // still open — a different decision, or no_action, can close it
+  });
+
+  /**
+   * FINAL REVIEW, MEDIUM 4. `acceptTrade` evicts after commit, matching `setLineup` and
+   * `finalizeWeek` — the codebase's cache-invalidating writers. The reversal is the FOURTH roster
+   * mutator on the same path and evicted nothing, so an operator's reversal left
+   * `crossLeagueHome`'s cached scores stale until TTL. It even returned the `weekNumber` nobody
+   * consumed. Same scope as `acceptTrade`'s: the league's derived current week, post-commit.
+   */
+  it("evicts the score cache for the league's current week after the reversal commits", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("cache");
+    const calls: { readonly leagueId: string; readonly week: number }[] = [];
+    const cache = {
+      invalidate: async (leagueId: string, week: number) => {
+        calls.push({ leagueId, week });
+      },
+    };
+
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock, cache });
+    expect(result).toMatchObject({ ok: true });
+    expect(calls).toEqual([{ leagueId: fx.leagueId, week: await currentWeekOf(db, fx.leagueId) }]);
+  });
+
+  it("never fails a reversal that already committed because the cache eviction failed", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("cachefail");
+    const cache = {
+      invalidate: async () => {
+        throw new Error("redis is down");
+      },
+    };
+
+    const errors: unknown[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    let result: Awaited<ReturnType<typeof resolveFlag>>;
+    try {
+      result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock, cache });
+    } finally {
+      console.error = originalError;
+    }
+
+    // The rosters really moved back and the flag really closed — a stale cache key is one read
+    // bounded by its own TTL, never worth failing a resolution that already landed.
+    expect(result).toMatchObject({ ok: true, decision: "trade_reversed" });
+    expect((await tradeRow(fx.tradeId)).reversedAt).not.toBeNull();
+    expect(await isOpenFlag(fx.flagId)).toBe(false);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("[integrity-service] score cache invalidation failed after a trade reversal");
+  });
+
+  /** Every OTHER decision leaves the cache alone: nothing moved, so nothing is stale. */
+  it("evicts nothing for a decision that moves no roster", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("nocache");
+    const calls: unknown[] = [];
+    const cache = { invalidate: async () => void calls.push(1) };
+
+    await resolveFlag(db, { flagId: fx.flagId, decision: "no_action", note: "Looked, found nothing.", operatorUserId: "u_op", clock: trClock, cache });
+    expect(calls).toEqual([]);
+  });
+
+  it("tells BOTH managers, and the note travels as their own words", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("both");
+    await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "Two accounts, one household.", operatorUserId: "u_op", clock: trClock });
+
+    const aliceReversal = (await db.select().from(memberNotices).where(eq(memberNotices.userId, fx.userA))).find((n) => n.noticeType === "trade_reversed");
+    const bobReversal = (await db.select().from(memberNotices).where(eq(memberNotices.userId, fx.userB))).find((n) => n.noticeType === "trade_reversed");
+    expect(aliceReversal).toBeDefined();
+    expect(bobReversal).toBeDefined();
+  });
+
+  async function ownerTeamOf(playerId: string): Promise<string | null> {
+    const [row] = await db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(eq(rosterSlots.playerId, playerId));
+    return row?.teamId ?? null;
+  }
+
+  /**
+   * THE FAILURE INJECTION AND ITS HEALING (dispatch instruction, binding; fix round 1, HIGH).
+   * `reverseTradeInTx`'s own transaction commits FIRST; `resolveFlag`'s own (the platform-chain
+   * stamp) opens only after. An `audit` that lets a LEAGUE-scoped append through (the reversal
+   * succeeds and commits) but throws on a PLATFORM-scoped one (this function's own
+   * `flag_resolved`) proves that first half directly: the trade is genuinely reversed, the flag
+   * stays open, and nothing is silently swallowed — the failure propagates as a rejected promise.
+   * A RETRY of the identical decision, with a working `audit`, must then HEAL that partial state
+   * rather than getting stuck behind `reverseTradeInTx`'s own already-reversed guard: it recognizes
+   * the trade as this SAME flag's own completed work (`reversedByFlagId` already names it),
+   * skips the transfer (it already ran, exactly once), and lets `resolveFlag` reach its own stamp.
+   */
+  it("heals a stuck-open flag on retry after a partial resolveFlag failure — the reversal completes exactly once", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("heal");
+    const failingAudit: AuditLogger = {
+      record: async (tx, input) => {
+        if (input.leagueId === null) throw new Error("injected platform-chain failure");
+        return logger.record(tx, input);
+      },
+      recordAll: async (tx, inputs) => {
+        if (inputs.some((i) => i.leagueId === null)) throw new Error("injected platform-chain failure");
+        return logger.recordAll(tx, inputs);
+      },
+    };
+
+    // FIRST ATTEMPT: the reversal's own (earlier, separate) transaction commits; this function's
+    // own platform-chain stamp then fails.
+    await expect(
+      resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock, audit: failingAudit }),
+    ).rejects.toThrow("injected platform-chain failure");
+    expect(await isOpenFlag(fx.flagId)).toBe(true);
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+
+    // RETRY, with a working audit: heals rather than refuses.
+    const retry = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
+    expect(retry).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_reversed" });
+
+    // The flag is actually resolved now, not stuck.
+    expect(await isOpenFlag(fx.flagId)).toBe(false);
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(1);
+
+    // The trade is reversed exactly once — stamped by the FIRST attempt, untouched by the retry.
+    const row = await tradeRow(fx.tradeId);
+    expect(row.reversedAt).not.toBeNull();
+    expect(row.reversedByFlagId).toBe(fx.flagId);
+
+    // The rosters are correct — the retry never re-ran the transfer.
+    expect(await ownerTeamOf("p_tr_rb_heal")).toBe(fx.teamA);
+    expect(await ownerTeamOf("p_tr_wr_heal")).toBe(fx.teamB);
+
+    // Exactly ONE reversal roster_move exists on the league chain (plus the original trade's own),
+    // never two — the retry's skip-the-transfer branch never appends a second one.
+    const moves = await auditEventsOn(fx.leagueId, "roster_move");
+    expect(moves).toHaveLength(2); // the original trade, then the reversal — once each
+    const reversalMoves = moves.filter((m) => (m.payload as { readonly reason?: string }).reason === "trade_reversed");
+    expect(reversalMoves).toHaveLength(1);
+  });
+
+  /**
+   * `reverseTradeInTx`'s own `applyTradeInTx` re-check can throw `TransferRefusedError` for a
+   * genuine roster-space conflict (never for "already reversed" or "moved again", both of which
+   * `reverseTradeInTx` answers as a plain refusal) — `resolveFlag`'s own `catch` around the
+   * reversal's transaction is what converts that throw into a clean 409 rather than an uncaught
+   * rejection reaching the route. Bob's WR slot and its one BENCH slot (also WR-eligible) both get
+   * filled by unrelated players between accept and reversal, leaving no home for the WR the
+   * reversal would return to him.
+   */
+  it("converts a genuine roster-space TransferRefusedError into a clean 409, not an uncaught throw", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("noroom");
+    await db.insert(players).values([
+      { id: "p_tr_filler_wr", name: "Filler WR", position: "WR", nflTeam: "DAL" },
+      { id: "p_tr_filler_bench", name: "Filler Bench", position: "WR", nflTeam: "MIA" },
+    ]);
+    await db.update(rosterSlots).set({ playerId: "p_tr_filler_wr" }).where(and(eq(rosterSlots.teamId, fx.teamB), eq(rosterSlots.slot, "WR"), eq(rosterSlots.slotIndex, 0)));
+    await db.update(rosterSlots).set({ playerId: "p_tr_filler_bench" }).where(and(eq(rosterSlots.teamId, fx.teamB), eq(rosterSlots.slot, "BENCH"), eq(rosterSlots.slotIndex, 0)));
+
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
+    expect(result).toMatchObject({ ok: false, status: 409 });
+    expect(await isOpenFlag(fx.flagId)).toBe(true);
+    const row = await tradeRow(fx.tradeId);
+    expect(row.reversedAt).toBeNull(); // the whole reversal transaction rolled back
+  });
+
+  /**
+   * The `catch` block's OTHER branch: anything that isn't `TransferRefusedError` propagates as a
+   * rejected promise rather than becoming a graceful `{ ok: false }` — the identical discipline
+   * `acceptTrade`'s own `catch` around `applyTradeInTx` holds to. A throwing `notify`, injected
+   * into the reversal via `resolveFlag`'s own `input.notify` (threaded straight through to
+   * `reverseTradeInTx`), stands in for any unexpected failure inside that transaction.
+   */
+  it("rethrows anything that is NOT a TransferRefusedError from the reversal's own transaction", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("rethrow");
+    const throwingNotify: typeof notifyAffectedMember = async () => {
+      throw new Error("unexpected reversal-transaction failure");
+    };
+
+    await expect(
+      resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock, notify: throwingNotify }),
+    ).rejects.toThrow("unexpected reversal-transaction failure");
+
+    expect(await isOpenFlag(fx.flagId)).toBe(true);
+    const row = await tradeRow(fx.tradeId);
+    expect(row.reversedAt).toBeNull(); // the whole reversal transaction rolled back, not just the notice
+  });
+
+  it("falls through to the ordinary 404 for a flagId that names nothing at all, even for trade_reversed", async () => {
+    await ensureOperator("u_op");
+    const result = await resolveFlag(db, { flagId: "flag_tr_ghost", decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
+    expect(result).toEqual({ ok: false, status: 404, reason: 'No flag with id "flag_tr_ghost".' });
+  });
+});
+
 describe("pendingFlagQuery / listPendingFlags — the queue's own read model", () => {
   const ALL_TABLE_NAMES = ["integrity_flags", "reviews", "chat_messages", "users", "audit_events", "review_reports", "leagues"] as const;
   function tablesIn(sqlText: string): readonly string[] {
@@ -906,11 +1497,33 @@ describe("pendingFlagQuery / listPendingFlags — the queue's own read model", (
     expect(ghost?.about).toBe("A former member and a former member");
   });
 
-  it("describes a trade_fairness flag by its bare subject id — this plan never raises one, but the queue still names it honestly", async () => {
+  it("describes a trade_fairness flag by its bare subject id honestly when its trade row is gone", async () => {
     await raiseTestFlag({ id: "queue_trade_flag", flagType: "trade_fairness", subjectId: "trade_9", occurredAt: "2026-08-01T00:00:00.000Z" });
 
     const page = await listPendingFlags(db, {});
     expect(page.rows[0]).toMatchObject({ question: "The platform flagged a trade for a fairness review", about: "A trade (trade_9)" });
+  });
+
+  it("describes a trade_fairness flag by both teams' names once its trade row resolves — Task 6", async () => {
+    await seedUser("u_trade_about_a");
+    await seedUser("u_trade_about_b");
+    await seedLeague("lg_trade_about", "u_trade_about_a");
+    await db.insert(teams).values([
+      { id: "team_trade_about_a", leagueId: "lg_trade_about", userId: "u_trade_about_a", name: "Alpha Squad" },
+      { id: "team_trade_about_b", leagueId: "lg_trade_about", userId: "u_trade_about_b", name: "Beta Crew" },
+    ]);
+    await seedAcceptedTrade({
+      id: "trade_about_1",
+      leagueId: "lg_trade_about",
+      proposerTeamId: "team_trade_about_a",
+      counterpartyTeamId: "team_trade_about_b",
+      acceptedAt: NOW,
+    });
+    await raiseTestFlag({ id: "queue_trade_flag2", flagType: "trade_fairness", subjectId: "trade_about_1", leagueId: "lg_trade_about", occurredAt: "2026-08-01T00:00:00.000Z" });
+
+    const page = await listPendingFlags(db, {});
+    const row = page.rows.find((r) => r.flagId === "queue_trade_flag2");
+    expect(row).toMatchObject({ question: "The platform flagged a trade for a fairness review", about: "Alpha Squad and Beta Crew" });
   });
 });
 
@@ -1100,7 +1713,7 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
     ]);
   });
 
-  it("reads a trade_fairness flag's subject as a bare trade id — no remover, no reporter, this plan does not raise it yet", async () => {
+  it("reads a trade_fairness flag's subject honestly when its trade row is gone — no remover, no reporter", async () => {
     const flag = await db.transaction((tx) =>
       raiseFlag(tx, {
         flagType: "trade_fairness",
@@ -1114,8 +1727,147 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
       }),
     );
     const detail = await flagDetail(db, flag.id);
-    expect(detail!.subject).toEqual({ kind: "trade", tradeId: "trade_1" });
+    expect(detail!.subject).toEqual({
+      kind: "trade",
+      tradeId: "trade_1",
+      proposerTeamName: "A former team",
+      counterpartyTeamName: "A former team",
+      gave: [],
+      got: [],
+      acceptedAt: "",
+      reversedAt: null,
+      // Empty evidence predates basis tracking too — the honest "we don't know" sentence,
+      // Task 6 fix round 1 (review MEDIUM 1).
+      valuationBasis: "This flag predates valuation-basis tracking, so the method isn't recorded.",
+      // Empty evidence predates gap tracking too — fix round 2, F3's own honest fallback.
+      fairnessGapSummary: "This flag predates gap tracking, so the number isn't recorded.",
+      // No trade row at all — the moved-again read is skipped rather than asked of nothing.
+      playersMovedAgain: false,
+    });
     expect(detail!.reporters).toEqual([]);
+  });
+
+  it("reads a real trade_fairness flag's subject — both teams, both sides' assets straight from evidence, and when it was accepted", async () => {
+    await seedUser("u_trade_detail_a");
+    await seedUser("u_trade_detail_b");
+    await seedLeague("lg_trade_detail", "u_trade_detail_a");
+    await db.insert(teams).values([
+      { id: "team_trade_detail_a", leagueId: "lg_trade_detail", userId: "u_trade_detail_a", name: "Dynasty Alpha" },
+      { id: "team_trade_detail_b", leagueId: "lg_trade_detail", userId: "u_trade_detail_b", name: "Dynasty Beta" },
+    ]);
+    const acceptedAt = "2026-08-05T00:00:00.000Z";
+    await seedAcceptedTrade({
+      id: "trade_detail_real",
+      leagueId: "lg_trade_detail",
+      proposerTeamId: "team_trade_detail_a",
+      counterpartyTeamId: "team_trade_detail_b",
+      acceptedAt,
+    });
+
+    const evidence: JsonObject = {
+      verdict: "lopsided",
+      flags: ["value_gap_over_threshold"],
+      givingValue: 60,
+      receivingValue: 0,
+      gap: 60,
+      threshold: 20,
+      giving: [{ playerId: "p_gave", name: "Gave Guy", position: "RB", averagePoints: 60 }],
+      receiving: [{ playerId: "p_got", name: "Got Guy", position: "WR", averagePoints: 0 }],
+      basis: "sweep_rederivation",
+    };
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_fairness",
+        subjectId: "trade_detail_real",
+        leagueId: "lg_trade_detail",
+        evidence,
+        raisedByUserId: null,
+        occurredAt: "2026-08-06T00:00:00.000Z",
+        newId: () => "detail_flag_trade_real",
+        audit: logger,
+      }),
+    );
+
+    const detail = await flagDetail(db, flag.id);
+    expect(detail!.subject).toEqual({
+      kind: "trade",
+      tradeId: "trade_detail_real",
+      proposerTeamName: "Dynasty Alpha",
+      counterpartyTeamName: "Dynasty Beta",
+      gave: [{ playerId: "p_gave", name: "Gave Guy", position: "RB", averagePoints: 60 }],
+      got: [{ playerId: "p_got", name: "Got Guy", position: "WR", averagePoints: 0 }],
+      acceptedAt,
+      reversedAt: null,
+      // Fix round 1 (review MEDIUM 1): the operator-facing plain-language restatement of
+      // `evidence.basis`, computed by `subjectFor` rather than left for a future page to guess.
+      valuationBasis: "The fairness sweep valued this trade later, from the rosters as they stood when it ran.",
+      // Fix round 2, F3: the operator-facing plain-language restatement of `evidence.gap`/
+      // `.threshold` — the number that actually raised this flag.
+      fairnessGapSummary: "The two sides differ by 60 points per week, at or past the 20-point threshold that raised this flag.",
+      // Fix round 1 (LOW, M8 discipline): honestly `true` here — this fixture seeds the trade row
+      // directly (`seedAcceptedTrade`), never the real `roster_slots` rows `p_gave`/`p_got` would
+      // need to be found on either team, so the same read `reverseTradeInTx` would make finds
+      // neither player anywhere and reports the trade unreversible, exactly as it should for a
+      // trade this fixture never actually gave either team.
+      playersMovedAgain: true,
+    });
+    expect(detail!.reporters).toEqual([]);
+    // ADMIN-ONLY: the raw score lives in evidence, and never anywhere a member can reach it —
+    // proved generically by `flag_raised`'s own "hidden" visibility below.
+    expect(detail!.evidence).toEqual(evidence);
+  });
+
+  it("drops malformed entries from evidence's giving/receiving arrays rather than half-rendering them", async () => {
+    await seedUser("u_trade_malformed_a");
+    await seedUser("u_trade_malformed_b");
+    await seedLeague("lg_trade_malformed", "u_trade_malformed_a");
+    await db.insert(teams).values([
+      { id: "team_trade_malformed_a", leagueId: "lg_trade_malformed", userId: "u_trade_malformed_a", name: "Malformed A" },
+      { id: "team_trade_malformed_b", leagueId: "lg_trade_malformed", userId: "u_trade_malformed_b", name: "Malformed B" },
+    ]);
+    await seedAcceptedTrade({
+      id: "trade_malformed_1",
+      leagueId: "lg_trade_malformed",
+      proposerTeamId: "team_trade_malformed_a",
+      counterpartyTeamId: "team_trade_malformed_b",
+      acceptedAt: NOW,
+    });
+
+    const evidence: JsonObject = {
+      giving: [
+        "not an object",
+        null,
+        { name: "No Id", position: "RB", averagePoints: 5 },
+        { playerId: "p1", position: "RB", averagePoints: 5 }, // missing name
+        { playerId: "p1", name: "No Points", position: "RB" }, // missing averagePoints
+        { playerId: "p1", name: "No Position", averagePoints: 5 }, // no `position` field at all — reads as null
+      ],
+      receiving: "not an array",
+      // Fix round 2, F3: a string `gap` and a non-finite `threshold` both read the same honest
+      // "not recorded" way `numberFromEvidence` holds every malformed field to.
+      gap: "not a number",
+      threshold: Number.POSITIVE_INFINITY,
+    };
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_fairness",
+        subjectId: "trade_malformed_1",
+        leagueId: "lg_trade_malformed",
+        evidence,
+        raisedByUserId: null,
+        occurredAt: "2026-08-06T00:00:00.000Z",
+        newId: () => "detail_flag_trade_malformed",
+        audit: logger,
+      }),
+    );
+
+    const detail = await flagDetail(db, flag.id);
+    expect(detail!.subject).toMatchObject({
+      kind: "trade",
+      gave: [{ playerId: "p1", name: "No Position", position: null, averagePoints: 5 }],
+      got: [],
+      fairnessGapSummary: "This flag predates gap tracking, so the number isn't recorded.",
+    });
   });
 
   it("pulls the league chain's own events for an account-pair flag's subject, alongside the platform chain by flag id", async () => {
@@ -1183,5 +1935,156 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
 
     const detail = await flagDetail(db, flag.id);
     expect(detail!.trail.map((r) => r.headline)).toEqual(["This flag was opened."]);
+  });
+});
+
+/**
+ * Task 6's trade branch, end to end: a real `proposeTrade` → `acceptTrade` flow, so the trail's
+ * events carry real actor ids and a real `roster_move` payload rather than a hand-written fixture
+ * standing in for one. This is also the sharpest statement of ruling 1 available: the SAME
+ * afternoon produces one row the league reads (`trade_accepted`, on the league feed) and one row
+ * it cannot reach (`flag_raised`, platform-scoped) — and the difference is which chain each event
+ * landed on, not a filter applied at read time.
+ */
+describe("the trade branch's operator trail, end to end (Task 6)", () => {
+  const TRAIL_SLOTS = [
+    { slot: "RB" as const, count: 1, eligiblePositions: ["RB" as const] },
+    { slot: "BENCH" as const, count: 1, eligiblePositions: ["RB" as const] },
+  ];
+  const trailClock = { now: () => "2026-08-10T00:00:00.000Z" };
+
+  async function seedLopsidedTradeLeague(): Promise<{ readonly leagueId: string; readonly teamA: string; readonly teamB: string }> {
+    await db.insert(users).values([
+      { id: "u_trail_alice", email: "u_trail_alice@test.local", displayName: "Alice" },
+      { id: "u_trail_bob", email: "u_trail_bob@test.local", displayName: "Bob" },
+    ]);
+    const created = await createLeague({ db, clock: trailClock, newId: () => "lg_trail" }, {
+      name: "Trail League",
+      format: "snake",
+      teamCount: 2,
+      scoringPreset: "standard",
+      auctionBudget: null,
+      rosterSlots: TRAIL_SLOTS,
+      commissionerUserId: "u_trail_alice",
+      teamName: "Team Alice",
+      experienceTier: "beginner",
+      stakeTier: 0,
+      isPublicMatchmade: false,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const teamB = "team_trail_bob";
+    await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: "u_trail_bob", name: "Team Bob" });
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
+    await db.insert(players).values([
+      { id: "p_trail_star", name: "Trail Star", position: "RB", nflTeam: "KC" },
+      { id: "p_trail_scrub", name: "Trail Scrub", position: "RB", nflTeam: "SF" },
+    ]);
+    await db.insert(rosterSlots).values([
+      { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: "p_trail_star" },
+      { teamId: teamB, slot: "RB", slotIndex: 0, playerId: "p_trail_scrub" },
+    ]);
+    await db.insert(playerStatLines).values([1, 2, 3].map((week) => ({ playerId: "p_trail_star", week, rushingYards: 300, rushingTouchdowns: 5 })));
+    // Weeks 1-3 scored, week 4 live: `acceptTrade` derives the week it values at from the league's
+    // own schedule (final review, CRITICAL 1), and it is that week's trend window (`ADVISOR_CONFIG
+    // .trendWeeks` weeks before it) which makes `p_trail_star`'s monster line price this trade
+    // grotesquely lopsided at all.
+    await seasonCurrentWeek(db, { leagueId: created.leagueId, homeTeamId: created.teamId, awayTeamId: teamB, week: 4 });
+    return { leagueId: created.leagueId, teamA: created.teamId, teamB };
+  }
+
+  it("shows an operator the whole propose-to-accept sequence for the flagged trade", async () => {
+    const league = await seedLopsidedTradeLeague();
+
+    const proposed = await proposeTrade(db, {
+      leagueId: league.leagueId,
+      userId: "u_trail_alice",
+      counterpartyTeamId: league.teamB,
+      proposerAssets: [{ kind: "player", playerId: "p_trail_star" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_trail_scrub" }],
+      note: null,
+      clock: trailClock,
+      deliver: async () => {},
+    });
+    expect(proposed).toMatchObject({ ok: true });
+    if (!proposed.ok) return;
+
+    const accepted = await acceptTrade(db, { tradeId: proposed.tradeId, leagueId: league.leagueId, userId: "u_trail_bob", clock: trailClock, deliver: async () => {} });
+    expect(accepted).toMatchObject({ ok: true, fairness: { flagWorthy: true } });
+
+    const [flagRow] = await db.select().from(integrityFlags).where(eq(integrityFlags.subjectId, proposed.tradeId));
+    expect(flagRow).toBeDefined();
+
+    // Fix round 1 (review MEDIUM 2): `trailFor`'s own docblock claims "bounded at two queries
+    // for trade" — proved here, the same `countingDb` idiom the `chat_report` reporters test
+    // uses (`flags.test.ts`, "reads a chat_report flag's reporters..."), rather than left as
+    // prose only. The bound: the flag row itself (1), `subjectFor`'s trade branch (the trade row
+    // plus its two team names, 2, plus fix round 1's own `tradePlayersHaveMovedAgain` roster read,
+    // 1 more = 3), `reportersFor` (0 — the trade branch answers synchronously), and `trailFor`'s
+    // own claimed two (the trade's own league-chain rows, plus the batched actor-name lookup) = 6.
+    const counted = countingDb(db);
+    const detail = await flagDetail(counted.db, flagRow!.id);
+    expect(counted.selectCount()).toBeLessThanOrEqual(6);
+    expect(detail!.trail.map((row) => row.headline)).toEqual(["Alice offered this trade.", "Bob accepted it.", "Two players changed teams."]);
+  });
+
+  /**
+   * No REAL trade-lifecycle event is ever written with a null actor — `proposeTrade` and
+   * `acceptTrade` both stamp `actorId: input.userId`, always a real signed-in caller. Driven
+   * directly (`logger.record`, bypassing both services) the same "narrow test puts the code in a
+   * state production can't produce" discipline this file's other impossible-state guards use,
+   * so `trailActorName`'s own `null` branch is proved rather than merely written.
+   */
+  it("names a trade trail event's actor honestly if actorId is somehow null", async () => {
+    const league = await seedLopsidedTradeLeague();
+    await db.transaction((tx) =>
+      logger.record(tx, {
+        eventType: "trade_proposed",
+        actorId: null,
+        actorType: "system",
+        leagueId: league.leagueId,
+        payload: { tradeId: "trade_trail_null_actor", proposerTeamId: league.teamA, counterpartyTeamId: league.teamB },
+        occurredAt: "2026-08-10T00:00:00.000Z",
+      }),
+    );
+    const flag = await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_fairness",
+        subjectId: "trade_trail_null_actor",
+        leagueId: league.leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: "2026-08-11T00:00:00.000Z",
+        newId: () => "detail_flag_trail_null_actor",
+        audit: logger,
+      }),
+    );
+
+    const detail = await flagDetail(db, flag.id);
+    expect(detail!.trail.map((row) => row.headline)).toEqual(["A former member offered this trade."]);
+  });
+
+  it("shows a member of that league nothing about the flag at all — the allowlist proof, completed for the third flag type", async () => {
+    const league = await seedLopsidedTradeLeague();
+
+    const proposed = await proposeTrade(db, {
+      leagueId: league.leagueId,
+      userId: "u_trail_alice",
+      counterpartyTeamId: league.teamB,
+      proposerAssets: [{ kind: "player", playerId: "p_trail_star" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_trail_scrub" }],
+      note: null,
+      clock: trailClock,
+      deliver: async () => {},
+    });
+    expect(proposed).toMatchObject({ ok: true });
+    if (!proposed.ok) return;
+    await acceptTrade(db, { tradeId: proposed.tradeId, leagueId: league.leagueId, userId: "u_trail_bob", clock: trailClock, deliver: async () => {} });
+
+    const page = await listLeagueActivity(db, { leagueId: league.leagueId, viewerUserId: "u_trail_alice" });
+    // Not "the scores are filtered out" — `flag_raised` is on the platform chain and
+    // `listLeagueActivity` never reads it at all.
+    expect(JSON.stringify(page.rows)).not.toMatch(/fairness|lopsided|flag/i);
+    // …while the trade itself IS there, because a trade is league news and a flag is not.
+    expect(page.rows.some((row) => row.headline.includes("trade"))).toBe(true);
   });
 });

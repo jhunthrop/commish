@@ -43,6 +43,30 @@ describe("LeagueHome", () => {
     );
   });
 
+  // Task 8: reachable from where a member already is, beside the existing activity link — the
+  // badge count itself is `TradeInboxLink`'s own concern (`trade-inbox-link.test.tsx`); this
+  // test only pins that the league home actually renders it, for a viewer who has a team.
+  it("links to the league's trades page beside the activity link, for a viewer with a team", async () => {
+    const fixture = fixtureLeagueDeps({ ok: true, data: { leagueId: HOME.leagueId, meTeamId: HOME.myTeamId, inbox: [], outbox: [], history: [] } });
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixture.deps,
+    );
+    expect(await screen.findByRole("link", { name: /Trades/ })).toHaveAttribute("href", `/app/leagues/${HOME.leagueId}/trades`);
+  });
+
+  it("hides the trades link from a viewer with no team of their own, since the page itself would refuse them", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, myTeamId: null }} lineup={null} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByRole("link", { name: /Trades/ })).not.toBeInTheDocument();
+  });
+
   // Task 9 e2e regression: `league-lifecycle.spec.ts` asserts on `getByRole("heading", { name:
   // leagueName })` with no level filter, and the terms panel's OWN `h2` — before this fix —
   // carried that exact same text as the page's `h1`, so the query resolved two elements and

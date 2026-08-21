@@ -2,10 +2,16 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { chromium, type FullConfig } from "@playwright/test";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { assembleAdvisorContext } from "../src/ai-advisor/context";
 import { createDb, type Db } from "../src/db/client";
-import { statWeeks, users } from "../src/db/schema";
+import { drafts, leagues, matchups, rosterSlots, scoringSettings, statWeeks, teams, users } from "../src/db/schema";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotType } from "../src/domain/roster";
+import { PPR_SCORING } from "../src/domain/scoring";
+import { assignSlot, snakeTeamForPick, totalRosterSlots } from "../src/draft-engine";
+import { rankedPlayers } from "../src/draft-service/pool";
 import { BOOTSTRAP_ACTOR, grantAdmin } from "../src/integrity-service/grant-admin";
+import { INTEGRITY_CONFIG } from "../src/integrity/config";
 import { LEAGUE_CONFIG } from "../src/league";
 import { createRedisConnection } from "../src/lib/realtime/redis";
 import { mintLabSession, SESSION_COOKIE_NAME } from "../scripts/lib/lab-session";
@@ -13,6 +19,7 @@ import { mintLabSession, SESSION_COOKIE_NAME } from "../scripts/lib/lab-session"
 export const AUTH_DIR = resolve(process.cwd(), "e2e/.auth");
 export const MANAGER_A_STATE = resolve(AUTH_DIR, "manager-a.json");
 export const MANAGER_B_STATE = resolve(AUTH_DIR, "manager-b.json");
+export const MANAGER_C_STATE = resolve(AUTH_DIR, "manager-c.json");
 export const MANAGER_ZERO_STATE = resolve(AUTH_DIR, "manager-zero.json");
 export const MANAGER_SIGNOUT_STATE = resolve(AUTH_DIR, "manager-signout.json");
 
@@ -27,6 +34,12 @@ export const MANAGER_SIGNOUT_STATE = resolve(AUTH_DIR, "manager-signout.json");
 // stable identity makes every run's claim id the SAME as the one that stuck on run 1.
 const MANAGER_A_EMAIL = "e2e-manager-a@commish-lab.test";
 const MANAGER_B_EMAIL = "e2e-manager-b@commish-lab.test";
+// A third stable identity (Phase 3 Plan C, Task 9): `e2e/trades.spec.ts` needs a genuine
+// third team in its own seeded league — a member who never proposed or answered the trade —
+// to prove the league activity feed shows the trade to a bystander and shows them nothing
+// about the fairness flag it raises. Warmed and joined the identical way A and B are; never
+// handed to the seed script (only manager A claims a team through `DEV_SEED_CLAIM_USER_ID`).
+const MANAGER_C_EMAIL = "e2e-manager-c@commish-lab.test";
 // A third stable identity, warmed the same way as A and B (below) but never handed to the seed
 // script (`DEV_SEED_CLAIM_USER_ID` names manager A only) and never joined to anything by any
 // spec — `e2e/onboarding.spec.ts` only reads the fork and follows a link, it never creates or
@@ -220,6 +233,208 @@ async function ensureE2eOperator(db: Db, targetUserId: string): Promise<void> {
   console.log(`[e2e] granted operator access to ${targetUserId} (through "${grantedBy}")`);
 }
 
+// ---------------------------------------------------------------------------------------------
+// `e2e/trades.spec.ts`'s own league (Phase 3 Plan C, Task 9): the per-spec-seeding item the
+// binding context calls out by name, greenlit for THIS spec specifically rather than deferred to
+// the Plan-C backlog. A trade spec needs a league that has already drafted, with two managers
+// holding known players — bolting three more steps onto `league-lifecycle.spec.ts` would make
+// both specs slower and each one's failure ambiguous (that spec's own docblock already declined a
+// full draft for the identical reason). This seeds it directly, in the database, the same way
+// this file already seeds the season league's live week — scaffolding, not the tested surface;
+// the trade arc itself (Task 9's own e2e assertions) is driven entirely through the hydrated UI.
+// ---------------------------------------------------------------------------------------------
+
+export const E2E_TRADES_LEAGUE_ID = "e2e_trades_league";
+const E2E_TRADES_DRAFT_ID = "e2e_trades_draft";
+export const E2E_TRADES_TEAM_A_ID = "e2e_trades_team_a";
+export const E2E_TRADES_TEAM_B_ID = "e2e_trades_team_b";
+export const E2E_TRADES_TEAM_C_ID = "e2e_trades_team_c";
+/**
+ * `LEAGUE_CONFIG.maxWeeks` (18), the same choice `src/data/seed/seed-trades.ts` makes and for
+ * the identical reason (see that file's own docblock): `stat_weeks` is GLOBAL, and this file's
+ * own `tickUntilLiveWeekReached` walks the real ingestion worker forward on every run, which can
+ * push it past `regularSeasonWeeks` (14) over many accumulated runs against a long-lived dev
+ * database. The worker cannot walk past week 17 no matter how many times it runs — the committed
+ * mock dataset's own last week IS 17 — so `maxWeeks` (18) is safe forever, not just today.
+ */
+export const E2E_TRADES_WEEK_NUMBER = LEAGUE_CONFIG.maxWeeks;
+
+/** Which real players `e2e/trades.spec.ts` builds its offer around — WRITTEN here, never
+ *  guessed there. See `writeTradesFixture`'s own docblock for why. */
+export const E2E_TRADES_FIXTURE_STATE = resolve(AUTH_DIR, "trades-fixture.json");
+
+export interface TradesFixture {
+  /** Manager A's own names, in the order this spec should give them away. */
+  readonly giveNames: readonly string[];
+  /** Manager B's own names, in the order this spec should ask for them. */
+  readonly getNames: readonly string[];
+}
+
+/**
+ * Deal each team ONLY its nine starting slots (`STANDARD_ROSTER_SLOTS` minus `BENCH`) — the
+ * bench stays entirely empty, on purpose. Every roster this league ever carries therefore has six
+ * open slots that accept ANY position, so `e2e/trades.spec.ts` can build an offer around whichever
+ * players the draft actually dealt (never a name this file has to predict) and `plannedTransfer`'s
+ * real legality check always finds room for what comes back, on both sides, without this file
+ * needing to simulate it. A starting QB traded away for a division-mate's DEF/K pair prices
+ * lopsided enough to cross `INTEGRITY_CONFIG.trade.fairnessFlagThreshold` on the real scoring
+ * scale (PPR's own QB/K/DEF spread) without hand-picking specific player ids at all.
+ */
+const STARTER_ONLY_SLOTS = STANDARD_ROSTER_SLOTS.filter((slot) => slot.slot !== "BENCH");
+
+/**
+ * `dealRostersIfAbsent` (`src/data/seed/seed-trades.ts`)'s own discipline, inlined rather than
+ * imported: this file seeds a league keyed to REAL WorkOS ids only known at Playwright's own
+ * runtime, so it cannot reuse that module's dev-placeholder-user machinery — but the "walk a
+ * snake order over `rankedPlayers`, ask the engine's own `assignSlot` where each player fits"
+ * shape is identical, and re-running never re-deals a roster that already exists: a re-deal on a
+ * rerun would silently un-trade whatever a PRIOR run's own trade already moved (this league's
+ * trade is reversed by the end of a successful spec run, but a run that failed mid-arc must not
+ * have its fixture reset out from under a re-run's own assumptions either).
+ */
+async function ensureTradesLeague(db: Db, managerAUserId: string, managerBUserId: string, managerCUserId: string): Promise<void> {
+  const teamIds: readonly string[] = [E2E_TRADES_TEAM_A_ID, E2E_TRADES_TEAM_B_ID, E2E_TRADES_TEAM_C_ID];
+  const owners: readonly string[] = [managerAUserId, managerBUserId, managerCUserId];
+
+  await db
+    .insert(leagues)
+    .values({
+      id: E2E_TRADES_LEAGUE_ID,
+      name: "E2E Trades League",
+      format: "snake",
+      teamCount: teamIds.length,
+      commissionerUserId: managerAUserId,
+      rosterSlots: [...STANDARD_ROSTER_SLOTS],
+    })
+    .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: managerAUserId } });
+
+  await db.insert(scoringSettings).values({ leagueId: E2E_TRADES_LEAGUE_ID, ...PPR_SCORING }).onConflictDoNothing({ target: scoringSettings.leagueId });
+
+  await db
+    .insert(teams)
+    .values(teamIds.map((id, i) => ({ id, leagueId: E2E_TRADES_LEAGUE_ID, userId: owners[i], name: `E2E Trade Team ${i + 1}` })))
+    .onConflictDoUpdate({ target: teams.id, set: { userId: sql`excluded.user_id` } });
+
+  await db
+    .insert(drafts)
+    .values({ id: E2E_TRADES_DRAFT_ID, leagueId: E2E_TRADES_LEAGUE_ID, format: "snake", status: "complete", kickoffAt: new Date(), auctionBudget: null })
+    .onConflictDoNothing({ target: drafts.id });
+
+  // ONE unscored matchup is what makes `seasonProgress`/`currentWeekNumber` (`@/league/schedule`)
+  // answer `E2E_TRADES_WEEK_NUMBER` for THIS league's own "current week" — a schedule-less league
+  // defaults to week 1 (which, after `tickUntilLiveWeekReached` below, is globally `final`).
+  // Home vs away, never both directions: `matchups`' own primary key is
+  // `(league_id, week_number, home_team_id)`, so this row alone is enough for `leagueHome` and
+  // `matchupWeek` to both resolve teams A and B's rosters for the trade page.
+  await db
+    .insert(matchups)
+    .values({ leagueId: E2E_TRADES_LEAGUE_ID, weekNumber: E2E_TRADES_WEEK_NUMBER, homeTeamId: E2E_TRADES_TEAM_A_ID, awayTeamId: E2E_TRADES_TEAM_B_ID })
+    .onConflictDoNothing();
+
+  const [existingRoster] = await db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(eq(rosterSlots.teamId, E2E_TRADES_TEAM_A_ID)).limit(1);
+  if (existingRoster === undefined) {
+    const pool = await rankedPlayers(db, E2E_TRADES_LEAGUE_ID);
+    const taken = new Set<string>();
+    const rosters = new Map(teamIds.map((id) => [id, [] as { slot: RosterSlotType; slotIndex: number; playerId: string }[]]));
+    const totalPicks = teamIds.length * totalRosterSlots(STARTER_ONLY_SLOTS);
+
+    for (let pickNumber = 1; pickNumber <= totalPicks; pickNumber++) {
+      const teamId = snakeTeamForPick(teamIds, pickNumber);
+      const roster = rosters.get(teamId)!;
+      const sizeBefore = roster.length;
+      for (const player of pool) {
+        if (taken.has(player.id)) continue;
+        const assignment = assignSlot({ position: player.position, roster, slotConfig: STARTER_ONLY_SLOTS });
+        if (!assignment.ok) continue;
+        taken.add(player.id);
+        roster.push({ slot: assignment.slot, slotIndex: assignment.slotIndex, playerId: player.id });
+        break;
+      }
+      if (roster.length === sizeBefore) {
+        throw new Error(`[e2e] ensureTradesLeague: no eligible player left in the pool for pick ${pickNumber} (team ${teamId}).`);
+      }
+    }
+
+    const slotRows = [...rosters.entries()].flatMap(([teamId, slots]) => slots.map((slot) => ({ teamId, ...slot })));
+    await db.insert(rosterSlots).values(slotRows);
+  }
+
+  await writeTradesFixture(db);
+}
+
+interface StarterCandidate {
+  readonly teamId: string;
+  readonly playerId: string;
+  readonly name: string;
+  readonly averagePoints: number;
+}
+
+/** Every way to choose exactly `size` items from `items`, order-independent — the identical
+ *  combinatorial shape `bestBenchCombo` (`src/data/seed/seed-trades.ts`) already keeps, not
+ *  reinvented, just against these nine-player STARTER rosters instead of a six-player bench. */
+function combinationsOfSize<T>(items: readonly T[], size: number): readonly (readonly T[])[] {
+  if (size === 0) return [[]];
+  if (size > items.length) return [];
+  const [head, ...rest] = items;
+  const withHead = combinationsOfSize(rest, size - 1).map((combo) => [head!, ...combo]);
+  const withoutHead = combinationsOfSize(rest, size);
+  return [...withHead, ...withoutHead];
+}
+
+function sumPoints(players: readonly StarterCandidate[]): number {
+  return players.reduce((total, player) => total + player.averagePoints, 0);
+}
+
+/**
+ * Writes the ONE thing `e2e/trades.spec.ts` is not allowed to guess: which of manager A's real,
+ * just-dealt players to give, and which of manager B's to ask for, so the trade this spec
+ * proposes is grotesque enough to raise a real `trade_fairness` flag (Task 9's own binding
+ * context — a real flag from a real detector, never a decorative one). Computed here, against the
+ * real rosters this function just dealt, valued the exact way `evaluateTradeBeforeExecute` itself
+ * will value them a moment later (`assembleAdvisorContext`) — never a hand-typed pair of names
+ * that could drift the moment the committed dataset or the draft order changes. `prefer: "max"`
+ * (mirroring `seedTrades`' own grotesque fixture): the widest gap available, not merely the first
+ * one past the threshold, so a borderline roll of the snake draft can never leave this fixture
+ * sitting just under `INTEGRITY_CONFIG.trade.fairnessFlagThreshold`.
+ *
+ * Legal by construction, for the identical reason `STARTER_ONLY_SLOTS` leaves every bench slot
+ * empty: whatever count either side gives, the other's six wide-open bench slots always have
+ * room for it, so this never needs to simulate `plannedTransfer` to know the answer it writes is
+ * one the real route will actually accept.
+ */
+async function writeTradesFixture(db: Db): Promise<void> {
+  const [contextA, contextB] = await Promise.all([
+    assembleAdvisorContext(db, { leagueId: E2E_TRADES_LEAGUE_ID, teamId: E2E_TRADES_TEAM_A_ID, weekNumber: E2E_TRADES_WEEK_NUMBER }),
+    assembleAdvisorContext(db, { leagueId: E2E_TRADES_LEAGUE_ID, teamId: E2E_TRADES_TEAM_B_ID, weekNumber: E2E_TRADES_WEEK_NUMBER }),
+  ]);
+  if (contextA === null || contextB === null) {
+    throw new Error("[e2e] writeTradesFixture: manager A or B's team doesn't resolve in the trades league yet.");
+  }
+  const teamAPlayers: readonly StarterCandidate[] = contextA.me.players.map((p) => ({ teamId: E2E_TRADES_TEAM_A_ID, playerId: p.playerId, name: p.name, averagePoints: p.averagePoints }));
+  const teamBPlayers: readonly StarterCandidate[] = contextB.me.players.map((p) => ({ teamId: E2E_TRADES_TEAM_B_ID, playerId: p.playerId, name: p.name, averagePoints: p.averagePoints }));
+
+  let best: { readonly give: readonly StarterCandidate[]; readonly get: readonly StarterCandidate[]; readonly gap: number } | null = null;
+  const maxSize = Math.min(5, teamAPlayers.length, teamBPlayers.length);
+  for (let size = 1; size <= maxSize; size++) {
+    for (const give of combinationsOfSize(teamAPlayers, size)) {
+      const giveSum = sumPoints(give);
+      for (const get of combinationsOfSize(teamBPlayers, size)) {
+        const gap = Math.abs(giveSum - sumPoints(get));
+        if (gap < INTEGRITY_CONFIG.trade.fairnessFlagThreshold) continue;
+        if (best === null || gap > best.gap) best = { give, get, gap };
+      }
+    }
+  }
+  if (best === null) {
+    throw new Error("[e2e] writeTradesFixture: no combination of manager A and B's starters crosses the fairness threshold — the dealt rosters are too even.");
+  }
+
+  const fixture: TradesFixture = { giveNames: best.give.map((p) => p.name), getNames: best.get.map((p) => p.name) };
+  mkdirSync(AUTH_DIR, { recursive: true });
+  writeFileSync(E2E_TRADES_FIXTURE_STATE, JSON.stringify(fixture, null, 2), { mode: 0o600 });
+  console.log(`[e2e] trades fixture: give [${fixture.giveNames.join(", ")}] for [${fixture.getNames.join(", ")}], gap ${best.gap.toFixed(1)}`);
+}
+
 /**
  * Two real managers, one seeded season, its live week ticked into progress, no bypass.
  *
@@ -243,9 +458,10 @@ async function ensureE2eOperator(db: Db, targetUserId: string): Promise<void> {
 export default async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL = config.projects[0]?.use.baseURL ?? "http://localhost:3100";
 
-  const [a, b, zero, signOut] = await Promise.all([
+  const [a, b, c, zero, signOut] = await Promise.all([
     mintLabSession({ email: MANAGER_A_EMAIL, password: MANAGER_PASSWORD }),
     mintLabSession({ email: MANAGER_B_EMAIL, password: MANAGER_PASSWORD }),
+    mintLabSession({ email: MANAGER_C_EMAIL, password: MANAGER_PASSWORD }),
     mintLabSession({ email: MANAGER_ZERO_EMAIL, password: MANAGER_PASSWORD }),
     mintLabSession({ email: MANAGER_SIGNOUT_EMAIL, password: MANAGER_PASSWORD }),
   ]);
@@ -254,12 +470,13 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   // Bearer credentials on disk: same 0600 treatment the mint script gives its own output.
   writeFileSync(MANAGER_A_STATE, storageState(baseURL, a.cookie), { mode: 0o600 });
   writeFileSync(MANAGER_B_STATE, storageState(baseURL, b.cookie), { mode: 0o600 });
+  writeFileSync(MANAGER_C_STATE, storageState(baseURL, c.cookie), { mode: 0o600 });
   writeFileSync(MANAGER_ZERO_STATE, storageState(baseURL, zero.cookie), { mode: 0o600 });
   writeFileSync(MANAGER_SIGNOUT_STATE, storageState(baseURL, signOut.cookie), { mode: 0o600 });
 
   const browser = await chromium.launch();
   try {
-    for (const state of [MANAGER_A_STATE, MANAGER_B_STATE, MANAGER_ZERO_STATE, MANAGER_SIGNOUT_STATE]) {
+    for (const state of [MANAGER_A_STATE, MANAGER_B_STATE, MANAGER_C_STATE, MANAGER_ZERO_STATE, MANAGER_SIGNOUT_STATE]) {
       const context = await browser.newContext({ storageState: state, baseURL });
       const page = await context.newPage();
       const response = await page.goto("/app", { waitUntil: "domcontentloaded" });
@@ -287,6 +504,9 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   const operatorDb = createDb();
   try {
     await ensureE2eOperator(operatorDb, a.userId);
+    // Phase 3 Plan C, Task 9: `e2e/trades.spec.ts`'s own league, real WorkOS ids only known
+    // here, at Playwright's own runtime — see `ensureTradesLeague`'s own docblock.
+    await ensureTradesLeague(operatorDb, a.userId, b.userId, c.userId);
   } finally {
     await operatorDb.$client.end();
   }

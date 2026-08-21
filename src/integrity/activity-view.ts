@@ -29,10 +29,30 @@ export const ACTIVITY_VISIBILITY: Readonly<Record<AuditEventType, ActivityVisibi
   draft_completed: "everyone",
   system_action: "everyone",
   lineup_change: "actor_only",
-  roster_move: "hidden", // Plan C decides, with its payload
-  trade_proposed: "hidden", // Plan C
-  trade_accepted: "hidden", // Plan C
-  trade_rejected: "hidden", // Plan C
+  /**
+   * Task 5 (ruling 12): a roster change caused by a trade is exactly the kind of thing a league
+   * feed exists for, unlike the negotiation that led to it. `renderRosterMove` only ever renders
+   * for the two reasons this plan writes (`"trade"`, `"trade_reversed"`) — a `roster_move` this
+   * process doesn't recognize the reason for renders nothing, the same deny-by-default the rest
+   * of this module holds every payload to.
+   */
+  roster_move: "everyone",
+  /**
+   * A proposal is a private negotiation between two managers. A feed announcing "Alice offered
+   * Bob her running back" would broadcast a bid before either party agreed to anything, which is
+   * the same competitive leak that made `lineup_change` `actor_only` (ruling 15) — and worse,
+   * because a bid discloses what a manager thinks his own players are worth. Both parties are
+   * told directly, by notice. Nobody else is.
+   */
+  trade_proposed: "hidden",
+  /**
+   * Task 5 (ruling 12): the negotiation stays private, but the DEAL that resulted is public —
+   * "a trade the league can see half of is a rumour." `renderTradeAccepted` names both teams and
+   * both sides in full.
+   */
+  trade_accepted: "everyone",
+  /** Same, and more so: a refusal is nobody's business but the two people in it. */
+  trade_rejected: "hidden",
   flag_raised: "hidden", // Plan B: investigatory, admin-only by the spec's own allowlist
   flag_resolved: "hidden", // Plan B
   admin_action: "hidden", // Plan B
@@ -101,6 +121,21 @@ function num(payload: JsonObject, key: string): number | undefined {
   const value = payload[key];
   return typeof value === "number" ? value : undefined;
 }
+
+/** The array-shaped twin of `str`: a field that is missing, not an array, or an array holding
+ *  anything other than strings reads as `undefined` — the same "malformed payload renders
+ *  nothing" discipline `str`/`num` hold every other field to. Ids only, never printed raw: every
+ *  caller feeds this straight into `names.player`/`names.team`, which is where the visible text
+ *  (and `stripHiddenCharacters`, via `printableNames`) actually comes from. */
+function strArray(payload: JsonObject, key: string): readonly string[] | undefined {
+  const value = payload[key];
+  if (!Array.isArray(value)) return undefined;
+  return value.every((entry): entry is string => typeof entry === "string") ? value : undefined;
+}
+
+/** English, singular or joined naturally ("A", "A and B", "A, B, and C") — the same formatter
+ *  `summarizeAssets` (`@/league-service/trades`) uses for a notice, applied here to a headline. */
+const TRADE_ASSET_LIST_FORMAT = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
 
 function renderLeagueCreated(event: AuditEvent, names: ActivityNames): Rendered | null {
   const name = str(event.payload, "name");
@@ -207,6 +242,55 @@ function renderLineupChange(event: AuditEvent): Rendered | null {
  * denial states, and the mutation proof is that deleting this guard reddens a test rather than
  * nothing.
  */
+/**
+ * `acceptTrade`'s own event (`@/league-service/trades`, Task 5). "A trade the league can see
+ * half of is a rumour": both teams and both sides render in full, unlike the hidden negotiation
+ * that led here. `proposerAssetIds`/`counterpartyAssetIds` are ids, resolved to names through
+ * `names.player` exactly like `draft_pick`'s own `playerId` — this module never trusts a payload
+ * to carry display text.
+ */
+function renderTradeAccepted(event: AuditEvent, names: ActivityNames): Rendered | null {
+  const proposerTeamId = str(event.payload, "proposerTeamId");
+  const counterpartyTeamId = str(event.payload, "counterpartyTeamId");
+  const proposerAssetIds = strArray(event.payload, "proposerAssetIds");
+  const counterpartyAssetIds = strArray(event.payload, "counterpartyAssetIds");
+  if (proposerTeamId === undefined || counterpartyTeamId === undefined || proposerAssetIds === undefined || counterpartyAssetIds === undefined) {
+    return null;
+  }
+
+  const proposerTeamName = names.team(proposerTeamId);
+  const counterpartyTeamName = names.team(counterpartyTeamId);
+  const gave = TRADE_ASSET_LIST_FORMAT.format(proposerAssetIds.map((id) => names.player(id)));
+  const got = TRADE_ASSET_LIST_FORMAT.format(counterpartyAssetIds.map((id) => names.player(id)));
+  return {
+    icon: "check",
+    headline: `${proposerTeamName} and ${counterpartyTeamName} completed a trade.`,
+    detail: `${proposerTeamName} sent ${gave} and got ${got}.`,
+  };
+}
+
+/**
+ * The mechanical twin of `renderTradeAccepted`: this is the roster ledger entry, not the deal's
+ * own narrative. It renders only for the two reasons `@/league-service/trades` writes today
+ * (`"trade"`) and a later reversal will write (`"trade_reversed"`) — any other value, including
+ * one this process has never heard of, denies exactly like a missing field does. The two
+ * `roster_move` events a trade's whole lifecycle can ever produce (an acceptance, and later a
+ * reversal) share this ONE renderer rather than getting one each.
+ */
+function renderRosterMove(event: AuditEvent, names: ActivityNames): Rendered | null {
+  const reason = str(event.payload, "reason");
+  if (reason !== "trade" && reason !== "trade_reversed") return null;
+  const proposerTeamId = str(event.payload, "proposerTeamId");
+  const counterpartyTeamId = str(event.payload, "counterpartyTeamId");
+  if (proposerTeamId === undefined || counterpartyTeamId === undefined) return null;
+
+  const proposerTeamName = names.team(proposerTeamId);
+  const counterpartyTeamName = names.team(counterpartyTeamId);
+  return reason === "trade"
+    ? { icon: "refresh-cw", headline: `${proposerTeamName} and ${counterpartyTeamName} swapped rosters.`, detail: null }
+    : { icon: "refresh-cw", headline: `${proposerTeamName} and ${counterpartyTeamName}'s roster swap was reversed.`, detail: null };
+}
+
 function renderSystemAction(event: AuditEvent): Rendered | null {
   const action = str(event.payload, "action");
   const allowed = action !== undefined && (SYSTEM_ACTION_SUMMARY_ALLOWED as Readonly<Record<string, boolean | undefined>>)[action] === true;
@@ -235,6 +319,10 @@ function renderPayload(event: AuditEvent, names: ActivityNames): Rendered | null
       return renderDraftCompleted(event);
     case "lineup_change":
       return renderLineupChange(event);
+    case "roster_move":
+      return renderRosterMove(event, names);
+    case "trade_accepted":
+      return renderTradeAccepted(event, names);
     case "system_action":
       return renderSystemAction(event);
     default:

@@ -113,6 +113,24 @@ function WarnedUserPreview({ preview, note }: { readonly preview: DecisionPrevie
 }
 
 /**
+ * The exact words a `trade_reversed` decision sends — BOTH parties read it, and the note reaches
+ * them VERBATIM (`notify.ts`'s `quoteFor`), the identical shape `WarnedUserPreview` uses. Said
+ * here in plain words for the operator: a reversal names two people, not one.
+ */
+function TradeReversedPreview({ preview, note }: { readonly preview: DecisionPreview; readonly note: string }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-sm font-medium text-text-primary">{preview.title}</p>
+      <p className="text-sm text-text-muted">{preview.body}</p>
+      <blockquote className="border-l-2 border-border pl-3 text-sm italic text-text-muted">
+        {note.length === 0 ? "Your note will appear here, exactly as you write it." : `"${note}"`}
+      </blockquote>
+      <p className="text-xs text-text-muted">Both managers in this trade read the identical words. Neither is told which of them this review was about.</p>
+    </div>
+  );
+}
+
+/**
  * The decision form Task 5's brief asks for: it previews the exact notice a member will receive
  * BEFORE the decision is submitted — the same discipline `scripts/remove-review.ts` established
  * for a human operator, moved into the product. `no_action` previews silence (ruling 6);
@@ -208,6 +226,8 @@ export function ResolutionForm({ flagId, decisions, noteMaxLength, previews, isC
           <ContentRemovedPreview preview={preview} note={note} isChatSubject={isChatSubject} />
         ) : decision === "warned_user" && preview != null ? (
           <WarnedUserPreview preview={preview} note={note} />
+        ) : decision === "trade_reversed" && preview != null ? (
+          <TradeReversedPreview preview={preview} note={note} />
         ) : (
           <p className="text-sm text-text-muted">Choose a decision to preview what the member will see.</p>
         )}

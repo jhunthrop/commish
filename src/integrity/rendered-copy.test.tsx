@@ -6,6 +6,13 @@ import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 import type { NoticeView } from "@/account-room/contract";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
 import type { ActivityRow } from "@/integrity/activity-view";
+import type { TradeProposalView } from "@/trades/contract";
+import type { ValuedPlayer } from "@/trades/fairness";
+import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { fixtureLeagueDeps } from "@/league-room/test-fixtures";
+import { TradeCard } from "@/league-room/components/trade-card";
+import { TradeComposer } from "@/league-room/components/trade-composer";
+import type { TradeRoomContext } from "@/league-room/contract";
 import { copyViolations } from "./copy-rules";
 
 /**
@@ -210,10 +217,27 @@ describe("the admin flag detail page says nothing that breaks the house copy rul
     vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
     vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
 
+    const TRADE_SUBJECT = {
+      kind: "trade" as const,
+      tradeId: "trade_1",
+      proposerTeamName: "Bay Bandits",
+      counterpartyTeamName: "Iron Owls",
+      gave: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" as const, averagePoints: 22.4 }],
+      got: [{ playerId: "p2", name: "Justin Jefferson", position: "WR" as const, averagePoints: 18.1 }],
+      acceptedAt: "2026-08-10T00:00:00.000Z",
+      reversedAt: null,
+      valuationBasis: "The platform valued this trade the moment it was accepted.",
+      fairnessGapSummary: "The two sides differ by 4.3 points per week, at or past the 20-point threshold that raised this flag.",
+      playersMovedAgain: false,
+    };
+
     for (const detail of [
       FLAG_DETAIL,
       { ...FLAG_DETAIL, resolution: { decision: "no_action" as const, note: "n", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op", resolvedByName: "Op Erator" }, decisions: [] },
       { ...FLAG_DETAIL, reporters: [], trail: [] },
+      { ...FLAG_DETAIL, leagueId: "l1", flagType: "trade_fairness" as const, subject: TRADE_SUBJECT, decisions: ["no_action", "warned_user", "trade_reversed"] as const },
+      { ...FLAG_DETAIL, leagueId: "l1", flagType: "trade_fairness" as const, subject: { ...TRADE_SUBJECT, reversedAt: "2026-08-15T00:00:00.000Z" }, decisions: ["no_action", "warned_user"] as const },
+      { ...FLAG_DETAIL, leagueId: "l1", flagType: "trade_fairness" as const, subject: { ...TRADE_SUBJECT, playersMovedAgain: true }, decisions: ["no_action", "warned_user"] as const },
     ]) {
       vi.mocked(flagDetail).mockResolvedValue(detail);
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
@@ -241,8 +265,12 @@ describe("the resolution form says nothing that breaks the house copy rules, in 
   const PREVIEWS = {
     warned_user: { title: "An operator reviewed a report about you", body: "We looked at a report about something you posted in Sunday Money." },
     content_removed: { title: "We removed your review", body: "An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message." },
+    trade_reversed: {
+      title: "An operator reversed your trade",
+      body: "An operator reversed the trade you and Iron Owls completed in Sunday Money. You have Bijan Robinson again, and Iron Owls has Justin Jefferson. Scores from weeks you have already played stay as they were. There is no reply to this message.",
+    },
   } as const;
-  const DECISION_RADIOS = ["No action", "Warn the member", "Remove the content"] as const;
+  const DECISION_RADIOS = ["No action", "Warn the member", "Remove the content", "Reverse the trade"] as const;
 
   it.each(DECISION_RADIOS)("is clean on the %s branch, empty and with a note", async (radioLabel) => {
     const { AdminRoomDepsProvider } = await import("@/admin-room/hooks/deps");
@@ -252,17 +280,32 @@ describe("the resolution form says nothing that breaks the house copy rules, in 
     const fixture = fixtureAdminDeps();
     const { container } = render(
       <AdminRoomDepsProvider deps={fixture.deps}>
-        <ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user", "content_removed"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />
+        <ResolutionForm
+          flagId="flag_1"
+          decisions={["no_action", "warned_user", "content_removed", "trade_reversed"]}
+          noteMaxLength={500}
+          previews={PREVIEWS}
+          isChatSubject={false}
+        />
       </AdminRoomDepsProvider>,
     );
 
+    const allPreviewCopy = [
+      PREVIEWS.warned_user.title,
+      PREVIEWS.warned_user.body,
+      PREVIEWS.content_removed.title,
+      PREVIEWS.content_removed.body,
+      PREVIEWS.trade_reversed.title,
+      PREVIEWS.trade_reversed.body,
+    ];
+
     fireEvent.click(screen.getByRole("radio", { name: radioLabel }));
-    expectClean(container, PREVIEWS.warned_user.title, PREVIEWS.warned_user.body, PREVIEWS.content_removed.title, PREVIEWS.content_removed.body);
+    expectClean(container, ...allPreviewCopy);
 
     // And again once the operator has typed, since the previews swap their placeholder for the
     // note the moment there is one.
     fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "Keep it civil." } });
-    expectClean(container, PREVIEWS.warned_user.title, PREVIEWS.warned_user.body, PREVIEWS.content_removed.title, PREVIEWS.content_removed.body, '"Keep it civil."');
+    expectClean(container, ...allPreviewCopy, '"Keep it civil."');
   });
 
   it("is clean once a decision is recorded", async () => {
@@ -279,5 +322,124 @@ describe("the resolution form says nothing that breaks the house copy rules, in 
     fireEvent.click(screen.getByRole("button", { name: "Submit decision" }));
     await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
     expectClean(container);
+  });
+});
+
+/**
+ * Task 8. `TRADE_TEAM_COPY` below is the content this sweep subtracts before checking the rest —
+ * team names, player names, and the note a proposer typed — the same "everything else is house
+ * copy" discipline `expectClean`'s own callers use throughout this file. Every `TradeCard` status
+ * branch gets its own render (open/inbound, open/outbound, accepted, accepted+reversed, rejected,
+ * withdrawn, expired, superseded), plus the confirm dialog opened on the one status that has an
+ * Accept control — Plan B's final review found an em dash on a branch that never mounted, and a
+ * `Modal` opened only by a click is exactly that shape of gap.
+ */
+const TRADE_PLAYERS: Readonly<Record<string, ValuedPlayer>> = {
+  p1: { playerId: "p1", name: "Bijan Robinson", position: "RB", averagePoints: 18.2 },
+  p2: { playerId: "p2", name: "Puka Nacua", position: "WR", averagePoints: 15.4 },
+};
+
+/** Three days out from whenever this suite runs — see `trade-inbox.test.tsx`'s own note. An open
+ *  offer's controls and copy now depend on whether its expiry has passed (final review, HIGH 3),
+ *  so a fixed past date would silently turn every "open" state below into the expired one. The
+ *  expired states this sweep DOES need are written explicitly, with a past `expiresAt`. */
+const LIVE_EXPIRY = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+const PAST_EXPIRY = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+const TRADE_BASE: TradeProposalView = {
+  id: "trade_1",
+  leagueId: "league_1",
+  weekNumber: 5,
+  status: "open",
+  proposedAt: "2026-08-18T00:00:00.000Z",
+  expiresAt: LIVE_EXPIRY,
+  settledAt: null,
+  reversedAt: null,
+  note: null,
+  from: { teamId: "them", teamName: "Iron Owls", assets: [{ kind: "player", playerId: "p1" }] },
+  to: { teamId: "me", teamName: "Bay Bandits", assets: [{ kind: "player", playerId: "p2" }] },
+};
+
+const TRADE_CONTENT = ["Iron Owls", "Bay Bandits", "Bijan Robinson", "Puka Nacua"];
+
+describe("TradeCard says nothing that breaks the house copy rules, in every status", () => {
+  it("is clean across every status a stored proposal can hold", () => {
+    const states: readonly { readonly label: string; readonly trade: TradeProposalView; readonly meTeamId: string }[] = [
+      { label: "open, answerable", trade: TRADE_BASE, meTeamId: "me" },
+      { label: "open, waiting on a reply", trade: TRADE_BASE, meTeamId: "them" },
+      { label: "accepted", trade: { ...TRADE_BASE, status: "accepted", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
+      { label: "accepted, then reversed", trade: { ...TRADE_BASE, status: "accepted", settledAt: "2026-08-19T00:00:00.000Z", reversedAt: "2026-08-20T00:00:00.000Z" }, meTeamId: "me" },
+      { label: "rejected", trade: { ...TRADE_BASE, status: "rejected", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
+      { label: "withdrawn, by me", trade: { ...TRADE_BASE, status: "withdrawn", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "them" },
+      { label: "withdrawn, by them", trade: { ...TRADE_BASE, status: "withdrawn", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
+      { label: "expired", trade: { ...TRADE_BASE, status: "expired" }, meTeamId: "me" },
+      // Final review, HIGH 3: the two states a DERIVED expiry actually produces. Nothing writes
+      // `status = 'expired'`, so a dead offer reaches the card still `open` — and both parties'
+      // copy for that state is new, which makes it exactly the copy this sweep exists to check.
+      { label: "open, past its expiry, seen by the counterparty", trade: { ...TRADE_BASE, expiresAt: PAST_EXPIRY }, meTeamId: "me" },
+      { label: "open, past its expiry, seen by the proposer", trade: { ...TRADE_BASE, expiresAt: PAST_EXPIRY }, meTeamId: "them" },
+      { label: "superseded", trade: { ...TRADE_BASE, status: "superseded", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
+      { label: "with a note", trade: { ...TRADE_BASE, note: "Rebuilding my TE spot" }, meTeamId: "me" },
+    ];
+
+    for (const { trade, meTeamId } of states) {
+      const { container, unmount } = render(
+        <TradeCard trade={trade} meTeamId={meTeamId} playersById={TRADE_PLAYERS} assessmentStatus="ready" assessment={{ verdict: "lopsided", givingValue: 5, receivingValue: 40 }} />,
+      );
+      expectClean(container, ...TRADE_CONTENT, '"Rebuilding my TE spot"');
+      unmount();
+    }
+  });
+
+  it("is clean on the accept confirm dialog", () => {
+    const { container } = render(<TradeCard trade={TRADE_BASE} meTeamId="me" playersById={TRADE_PLAYERS} />);
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    expectClean(container, ...TRADE_CONTENT);
+  });
+
+  // Fix round 1, F4: three more interaction states this card can be in — idle (nobody has asked
+  // for a verdict yet), loading, and a failed fetch's own retry offer — none of them swept before
+  // the lazy-verdict fix existed.
+  it("is clean idle, loading, and on a failed verdict fetch", () => {
+    for (const status of ["idle", "loading", "error"] as const) {
+      const { container, unmount } = render(<TradeCard trade={TRADE_BASE} meTeamId="me" playersById={TRADE_PLAYERS} assessmentStatus={status} />);
+      expectClean(container, ...TRADE_CONTENT);
+      unmount();
+    }
+  });
+});
+
+const TRADE_CONTEXT: TradeRoomContext = {
+  weekNumber: 5,
+  myTeamId: "me",
+  counterparties: [{ teamId: "them", teamName: "Iron Owls" }],
+  rostersByTeamId: {
+    me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" }],
+    them: [{ playerId: "p2", name: "Puka Nacua", position: "WR" }],
+  },
+};
+
+describe("TradeComposer says nothing that breaks the house copy rules, with and without a note", () => {
+  it("is clean before a team is chosen, after players are picked, and with a note typed", async () => {
+    const onAssess = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { headline: "Close call.", reasoning: "Both sides give up similar weekly production.", degraded: false, verdict: "even", flags: [], givingValue: 18, receivingValue: 17.5 },
+    });
+    const { container } = render(
+      <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
+        <TradeComposer context={TRADE_CONTEXT} onAssess={onAssess} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />
+      </LeagueRoomDepsProvider>,
+    );
+    expectClean(container, ...TRADE_CONTENT);
+
+    fireEvent.change(screen.getByLabelText("Trade with"), { target: { value: "them" } });
+    fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
+    fireEvent.click(screen.getByLabelText(/Puka Nacua/));
+    await waitFor(() => expect(onAssess).toHaveBeenCalled());
+    await screen.findByText(/close to even/i);
+    expectClean(container, ...TRADE_CONTENT, "Close call.", "Both sides give up similar weekly production.");
+
+    fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Rebuilding my TE spot" } });
+    expectClean(container, ...TRADE_CONTENT, "Close call.", "Both sides give up similar weekly production.");
   });
 });

@@ -12,6 +12,7 @@ import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupScoreboard } from "./matchup-scoreboard";
 import { StandingsTable } from "./standings-table";
+import { TradeInboxLink } from "./trade-inbox-link";
 
 /**
  * The league's home screen. Deliberately NOT a client component: it composes, it does not
@@ -70,6 +71,10 @@ export function LeagueHome({
             <Link className="text-sm text-accent underline" href={`/app/leagues/${home.leagueId}/activity`}>
               League activity
             </Link>
+            {/* Task 8: trading requires a team of the caller's own, same as `/trades` itself
+                (`TradesPage`'s own `myTeamId === null` 404) — a viewer with no team here would
+                open a link the page immediately refuses. */}
+            {home.myTeamId === null ? null : <TradeInboxLink leagueId={home.leagueId} />}
           </div>
         </div>
         {home.myMatchup === null ? (

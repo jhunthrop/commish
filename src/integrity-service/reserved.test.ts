@@ -21,10 +21,23 @@ const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "p
   profile_updated: "plan-a",
   review_removed: "plan-a",
   system_action: "plan-a",
-  roster_move: "plan-c",
-  trade_proposed: "plan-c",
-  trade_accepted: "plan-c",
-  trade_rejected: "plan-c",
+  // Task 5 lands the first (and, per this plan, the only) publisher: `acceptTrade`
+  // (`src/league-service/trades.ts`), one `roster_move` event per accepted trade, batched
+  // alongside `trade_accepted` on the league chain. Moved to "plan-a" territory the same way
+  // `flag_raised`/`flag_resolved`/`admin_action` were — the value marks PUBLISHED, not "written
+  // by Plan A" specifically.
+  roster_move: "plan-a",
+  // Task 3 lands the first publishers: `proposeTrade` and `settleProposal` (the shared
+  // implementation behind `rejectTrade`/`withdrawTrade`), both in `src/league-service/trades.ts`.
+  // Moved to "plan-a" territory the same way `flag_raised`/`flag_resolved`/`admin_action` were —
+  // the value marks PUBLISHED, not "written by Plan A" specifically. Task 5 lands `trade_accepted`'s
+  // own publisher, `acceptTrade`: `settleProposal` writes `trade_rejected` for BOTH the reject and
+  // the withdraw outcome (`payload.outcome` tells them apart — `AUDIT_EVENT_TYPES` is frozen, so
+  // there is no `trade_withdrawn` event type to reserve), and acceptance is `acceptTrade`'s own
+  // event entirely.
+  trade_proposed: "plan-a",
+  trade_accepted: "plan-a",
+  trade_rejected: "plan-a",
   // Task 2 lands the first publisher: `raiseFlag` (`src/integrity-service/flags.ts`), called from
   // system paths only (ruling 12) — Tasks 4, 6 and 9 are its three callers, and Plan C's
   // `TradeFairnessFlagService` on `TRADE_ACCEPTED`

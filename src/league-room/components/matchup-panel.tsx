@@ -10,7 +10,9 @@ const COLUMNS: readonly TableColumn<MatchupSide["starters"][number]>[] = [
   {
     key: "position",
     header: "Pos",
-    cell: (row) => (row.position === null ? "—" : <PositionBadge position={row.position} size="sm" />),
+    // `null`, not a dash glyph: the Player column already says "Empty" for this same row, and a
+    // slot with no player has no position to show beside it.
+    cell: (row) => (row.position === null ? null : <PositionBadge position={row.position} size="sm" />),
     hideOnNarrow: true,
   },
   { key: "points", header: "Points", cell: (row) => formatPoints(row.points), numeric: true },

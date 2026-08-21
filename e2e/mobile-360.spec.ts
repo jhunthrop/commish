@@ -1,4 +1,4 @@
-import { expect, test } from "./support/fixtures";
+import { expect, SEEDED_SEASON_LEAGUE_ID, test } from "./support/fixtures";
 import { MANAGER_A_STATE } from "./global-setup";
 
 /**
@@ -135,6 +135,14 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page, "/app/profile");
 
+    // --- Task 9: the trades page, one of Plan C's own real-money surfaces -------------------
+    // Manager A already has a team in the seeded season league (`global-setup.ts`'s own claim),
+    // so this reuses that league rather than minting a third — the trades page fits at 360px
+    // whichever league it renders for, and this is the one already on hand.
+    await page.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/trades`);
+    await expect(page.getByRole("heading", { name: "Trades" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "the trades page");
+
     // --- Task 5: the operator's dispute queue -----------------------------------------------
     // Manager A IS the operator in this environment, DETERMINISTICALLY: `global-setup.ts`'s
     // `ensureE2eOperator` grants it through the real `grantAdmin` writer, idempotently and
@@ -146,24 +154,31 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // mint. The queue is NOT empty here — `npm run seed`'s own multi-account fixture
     // (`dev_league_integrity`) raises one real, permanently-open flag Task 9's detector found,
     // and `league-lifecycle.spec.ts` (which runs before this spec, alphabetically, under this
-    // suite's single worker) resolves its own — so exactly this one row remains. That is itself
-    // a realistic state an operator sees, and this spec proves a populated queue's own row is
-    // reachable rather than pushed off the 360px edge.
+    // suite's single worker) resolves its own — so exactly that one row remained before this
+    // task. Task 9's own seed (`seedTrades`, `dev_league_trades`) raises a SECOND real,
+    // permanently-open flag from a real, seeded-through-the-real-routes grotesque trade — two
+    // rows now, both real, neither decorative. `e2e/trades.spec.ts` runs its own trade AND
+    // resolves its own flag within its own test (alphabetically after this spec), so it never
+    // adds a third row here.
     await page.goto("/app/admin/queue");
     await expect(page.getByRole("heading", { name: "Dispute queue" })).toBeVisible();
     const queueRows = page.getByRole("list", { name: "Open flags" }).getByRole("listitem");
-    await expect(queueRows).toHaveCount(1);
+    await expect(queueRows).toHaveCount(2);
     await expect(queueRows.getByText("The platform flagged two accounts that may be the same person")).toBeVisible();
+    const tradeFlagRow = queueRows.filter({ hasText: "The platform flagged a trade for a fairness review" });
+    await expect(tradeFlagRow).toBeVisible();
     await expectNoHorizontalScroll(page, "the dispute queue");
 
-    // --- Task 5: one flag's own detail page — the admin field set, raw scores included,
-    // opposite the member feed's (ruling 16) ------------------------------------------------
+    // --- Task 5/9: one flag's own detail page — the admin field set, raw scores included,
+    // opposite the member feed's (ruling 16), and (Task 9) a TRADE flag's own detail page
+    // specifically, the one Plan C's operator arm actually reads most often now ---------------
     // The flagId is read off this row's own link rather than hardcoded: the seed is
     // deterministic, but its id is not this spec's to know in advance, and deriving it here is
     // what keeps this route check honest against whatever the queue actually shows.
-    await queueRows.getByRole("link").click();
+    await tradeFlagRow.getByRole("link").click();
     await expect(page.getByRole("heading", { name: "Flag detail" })).toBeVisible();
-    await expectNoHorizontalScroll(page, "a flag's detail page");
+    await expect(page.getByText("Trade", { exact: true })).toBeVisible();
+    await expectNoHorizontalScroll(page, "a trade flag's detail page");
   } finally {
     await context.close();
   }

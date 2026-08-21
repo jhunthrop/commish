@@ -30,7 +30,7 @@ import type { RaiseFlagInput } from "@/integrity-service/flags";
  * that one's SHAPE (the same four kinds of property, the same "collect every offender" style)
  * without touching it.
  */
-const INTEGRITY_DIRS = ["src/integrity", "src/integrity-service"];
+const INTEGRITY_DIRS = ["src/integrity", "src/integrity-service", "src/trades"];
 
 /** The one file this scan does not read as a potential offender: `grantAdmin`'s own module,
  *  which legitimately writes `isAdmin` — that IS the sanctioned account action, the opposite
@@ -208,7 +208,7 @@ function importClosureOf(entryFile: string): { readonly names: readonly string[]
 
 describe("the detector is flags-only", () => {
   it("has files to check, so the guard is never vacuous", () => {
-    expect(sourceFiles(INTEGRITY_DIRS).length).toBeGreaterThan(10);
+    expect(sourceFiles(INTEGRITY_DIRS).length).toBeGreaterThan(15);
   });
 
   it("contains no code path that takes an action against an account", () => {
@@ -234,6 +234,31 @@ describe("the detector is flags-only", () => {
     // F1c): is `grant-admin.ts` itself ever a file this walk opens, not merely whether the
     // string "grantAdmin" appears as an import specifier somewhere in it.
     expect(importClosureOf("src/integrity-service/multi-account.ts").modules).not.toContain(AUTHORITY_GRANTING_MODULE);
+  });
+
+  /**
+   * Task 6 fix round 1 (review LOW 3). The manual read in the task report claimed
+   * `trade-fairness.ts` only reaches `assembleAdvisorContext`/`valuePlayers` (`ReadonlyDb`-typed
+   * by construction), `assetPlayerIds`, the pure `trades/fairness` functions, `getAuditLogger`
+   * and `raiseFlag` — never a trade WRITE. This is that claim, checked structurally rather than
+   * trusted from a read, the same MODULE-PATH discipline (fix round 1, F1c) the `grantAdmin`
+   * proof above uses: is the mutating module ITSELF ever a file this walk opens, not merely
+   * whether an import specifier string happens to match.
+   *
+   * `applyTradeInTx` (the whole-slot-map roster transfer) lives in `trade-transfer.ts`;
+   * `acceptTrade` (the execution transaction that calls it) lives in `trades.ts`; `reverseTradeInTx`
+   * (Task 7's compensating transfer, the reversal's own module) lives in `trade-reversal.ts` and is
+   * named here now that it exists — the carry `trade-fairness.ts`'s own review (fix round 1, LOW 3)
+   * placed on whoever landed it. All three are named by path, not by export, for the identical
+   * reason `AUTHORITY_GRANTING_MODULE` is: a namespace import or a re-export under a different
+   * name cannot dodge a check on the file itself.
+   */
+  it("keeps every trade-mutating module unreachable from the fairness detector", () => {
+    const TRADE_MUTATION_MODULES = ["src/league-service/trade-transfer.ts", "src/league-service/trades.ts", "src/league-service/trade-reversal.ts"] as const;
+    const closure = importClosureOf("src/integrity-service/trade-fairness.ts").modules;
+    for (const mutationModule of TRADE_MUTATION_MODULES) {
+      expect(closure).not.toContain(mutationModule);
+    }
   });
 
   it("can only ever write a flag at pending, never at resolved", () => {

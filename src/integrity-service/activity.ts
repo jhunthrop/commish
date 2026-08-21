@@ -65,6 +65,17 @@ function distinctPayloadValues(events: readonly AuditEvent[], key: string): read
   return [...new Set(events.map((event) => payloadString(event.payload, key)).filter((value): value is string => value !== undefined))];
 }
 
+/** The distinct, non-null values of one string-ARRAY payload field across a page of events —
+ *  `trade_accepted`/`roster_move`'s own `proposerAssetIds`/`counterpartyAssetIds`, the one shape
+ *  `distinctPayloadValues` (a single string field) cannot read. */
+function distinctPayloadArrayValues(events: readonly AuditEvent[], key: string): readonly string[] {
+  const values = events.flatMap((event) => {
+    const value = event.payload[key];
+    return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+  });
+  return [...new Set(values)];
+}
+
 /**
  * The read side of the member-visible activity feed: one league's chain, newest first, run
  * through `activityRowFor` (`@/integrity/activity-view`) so a hidden type or a denied
@@ -95,8 +106,14 @@ export async function listLeagueActivity(db: Db, { leagueId, viewerUserId, befor
   const events = rows.map(toEvent);
 
   const actorIds = [...new Set(events.map((event) => event.actorId).filter((id): id is string => id !== null))];
-  const playerIds = distinctPayloadValues(events, "playerId");
-  const teamIds = distinctPayloadValues(events, "teamId");
+  // `trade_accepted` (`renderTradeAccepted`) and `roster_move`'s own trade reason
+  // (`renderRosterMove`) name their teams/players under `proposerTeamId`/`counterpartyTeamId`
+  // and `proposerAssetIds`/`counterpartyAssetIds` — never the bare `teamId`/`playerId` every
+  // OTHER renderer uses (`draft_pick`, `lineup_change`, …). Gathered here too, batched exactly
+  // like the other two, so a real trade in a real feed reads real names rather than falling back
+  // to "a team that's no longer in the league" for a team that plainly still is.
+  const playerIds = [...new Set([...distinctPayloadValues(events, "playerId"), ...distinctPayloadArrayValues(events, "proposerAssetIds"), ...distinctPayloadArrayValues(events, "counterpartyAssetIds")])];
+  const teamIds = [...new Set([...distinctPayloadValues(events, "teamId"), ...distinctPayloadValues(events, "proposerTeamId"), ...distinctPayloadValues(events, "counterpartyTeamId")])];
 
   const [memberRows, playerRows, teamRows] = await Promise.all([
     actorIds.length === 0 ? [] : db.select({ id: users.id, name: users.displayName }).from(users).where(inArray(users.id, actorIds)),

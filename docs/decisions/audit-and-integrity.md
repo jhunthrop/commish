@@ -288,9 +288,9 @@ a requirement, not a convenience.
 
 ## 5. The audited set
 
-**Eight writes are wired to `AuditLogger` in this plan; seven names are reserved with a named
-owner.** The eight are the writes an ordinary member's activity feed is actually made of, plus the
-platform chain's first traffic:
+**Eight writes were wired to `AuditLogger` in this plan; every one of the seven names this section
+used to describe as reserved is now published too**, by the two later plans named beside each.
+The table below is every `AuditLogger` publisher in this codebase today, not just Plan A's own:
 
 | Event | Where it is written |
 |---|---|
@@ -303,11 +303,16 @@ platform chain's first traffic:
 | `profile_updated` | `updateProfile`, on the platform chain |
 | `review_removed` | `removeReview`, on the platform chain |
 | `system_action` | Verification's own detection append (§4), on the platform chain |
+| `admin_action` | `grantAdmin` (Plan B) and `removeChatMessageInTx`'s moderation path (Plan B), on the platform chain |
+| `flag_raised` | `raiseFlag` (Plan B — every detector, including Plan C's trade-fairness sweep, calls through this one writer) |
+| `flag_resolved` | `resolveFlag` (Plan B), on the platform chain |
+| `roster_move` | `acceptTrade` and `reverseTradeInTx` (Plan C), on the league chain — one `roster_move` per accepted trade and one per operator reversal, `payload.reason` telling them apart (`docs/decisions/trades-and-fairness.md` §1) |
+| `trade_proposed` | `proposeTrade` (Plan C), on the league chain |
+| `trade_accepted` | `acceptTrade` (Plan C), on the league chain |
+| `trade_rejected` | `settleProposal` (Plan C), on the league chain — covers both a rejection and a withdrawal, `payload.outcome` naming which (`AUDIT_EVENT_TYPES` is a frozen pg enum, so a `trade_withdrawn` type does not exist) |
 
-The seven reserved names cannot be published yet because their subjects do not exist in this
-codebase: `roster_move`, `trade_proposed`, `trade_accepted`, `trade_rejected` (no trade exists —
-Plan C), `flag_raised`, `flag_resolved`, `admin_action` (no admin exists — Plan B).
-`src/integrity-service/reserved.test.ts` keeps this honest mechanically: `OWNER` is a
+Nothing is reserved-and-unpublished as of Phase 3 Plan C. `src/integrity-service/reserved.test.ts`
+keeps every future addition to this vocabulary honest the same way it kept these seven: `OWNER` is a
 `Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "plan-d">`, so adding a type to the
 vocabulary without assigning it a plan is a type error, not a review comment someone can miss; a
 grep-based test confirms every Plan-A-owned type has a real, non-test publisher somewhere in `src`

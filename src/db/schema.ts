@@ -16,6 +16,7 @@ import {
 import { sql } from "drizzle-orm";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { AUDIT_EVENT_TYPES, type JsonObject } from "@/domain/audit";
+import type { TradeAsset } from "@/trades/assets";
 
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
 export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
@@ -833,4 +834,76 @@ export const sessionSignals = pgTable(
   // GLOBALLY across every requested user, so a per-user `occurred_at` ordering cannot serve it
   // (`drizzle/0026_measured_index_shapes.sql` carries the measurement).
   (t) => [index("session_signals_user_occurred_idx").on(t.userId)],
+);
+
+/**
+ * One row per offer. The FIRST record in this product of two managers negotiating, and the
+ * first thing `roster_slots` has ever moved for other than a draft.
+ *
+ * `status` is a guarded one-way stamp, not a field a caller sets after reading it: every
+ * transition is an `UPDATE … WHERE id = $1 AND status = 'open'` and the branch that acts is
+ * chosen from `RETURNING`, which is the same discipline `reviews.removed_at`,
+ * `integrity_flags.resolved_at` and `toggleReaction` all use, and the reason two managers
+ * clicking at the same instant produce one decision rather than two.
+ *
+ * `reversed_at` is deliberately NOT a status. An operator undoing a trade does not un-happen the
+ * acceptance: `trade_accepted` is on the league chain and nothing may edit it, so a status that
+ * erased the acceptance would make this row and the chain disagree about the same afternoon.
+ *
+ * Assets are `jsonb` rather than a `trade_assets` child table. The set is bounded at
+ * `TRADE_CONFIG.maxAssetsPerSide` (5) per side, it is never queried by member (`assetPlayerIds`
+ * is applied in TypeScript over a bounded list), and it is a DISCRIMINATED UNION Phase 9 adds an
+ * arm to, which a normalized child table would model as a nullable column per arm. Derive over a
+ * bounded set — `docs/decisions/data-layer-hardening.md`, read the way it applies to shape rather
+ * than to totals.
+ */
+export const tradeProposals = pgTable(
+  "trade_proposals",
+  {
+    id: text("id").primaryKey(),
+    leagueId: text("league_id").notNull().references(() => leagues.id, { onDelete: "cascade" }),
+    proposerTeamId: text("proposer_team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
+    counterpartyTeamId: text("counterparty_team_id").notNull().references(() => teams.id, { onDelete: "cascade" }),
+    /**
+     * The week this proposal is VALUED at. ALWAYS SERVER-DERIVED, never a caller's to name (final
+     * review, CRITICAL 1): `currentWeekOf` (`@/league-service/schedule`) answers it from the
+     * league's own `matchups`, at propose time, and `acceptTrade` RE-STAMPS it to the current week
+     * at the moment of the yes — a 72-hour offer can straddle a week boundary, and the week that
+     * governs an execution is the one the rosters actually moved in. So an accepted row names the
+     * week the trade happened in, which is what `sweepUnflaggedTrades` re-derives its own
+     * valuation at. Kept so a re-read months later can explain the verdict a manager saw, the same
+     * "what was true when it was raised" discipline `integrity_flags.evidence` follows.
+     */
+    weekNumber: integer("week_number").notNull(),
+    proposerAssets: jsonb("proposer_assets").$type<readonly TradeAsset[]>().notNull(),
+    counterpartyAssets: jsonb("counterparty_assets").$type<readonly TradeAsset[]>().notNull(),
+    /** sha256 over the league, the ordered team pair and both sorted asset lists. The index below
+     *  is what makes "the same offer, twice" one question. */
+    fingerprint: text("fingerprint").notNull(),
+    note: text("note"),
+    status: text("status").notNull(),
+    proposedAt: timestamp("proposed_at", { withTimezone: true }).notNull(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    settledAt: timestamp("settled_at", { withTimezone: true }),
+    settledByUserId: text("settled_by_user_id").references(() => users.id),
+    reversedAt: timestamp("reversed_at", { withTimezone: true }),
+    /** The `integrity_flags.id` whose resolution ordered the reversal. No foreign key, matching
+     *  `member_notices.audit_event_id`'s own reasoning: this column is provenance, and a FK here
+     *  would take a lock on `integrity_flags` inside a transaction that already holds a chain
+     *  anchor. */
+    reversedByFlagId: text("reversed_by_flag_id"),
+  },
+  (t) => [
+    /** The same offer twice is one question; a different package to the same manager is two.
+     *  Partial on open, so a settled package may be offered again. */
+    uniqueIndex("trade_proposals_open_fingerprint_idx").on(t.fingerprint).where(sql`${t.status} = 'open'`),
+    /** The inbox read: "what has been offered to my team", newest first. Partial on open,
+     *  because the inbox is a to-do list and a settled offer is history. */
+    index("trade_proposals_inbox_idx").on(t.counterpartyTeamId, t.proposedAt).where(sql`${t.status} = 'open'`),
+    /** The outbox read, and the open-cap count. Same shape, other side. */
+    index("trade_proposals_outbox_idx").on(t.proposerTeamId, t.proposedAt).where(sql`${t.status} = 'open'`),
+    /** The league's trade history, and the supersede sweep's scan. NOT partial: history is the
+     *  settled rows. */
+    index("trade_proposals_league_idx").on(t.leagueId, t.proposedAt),
+  ],
 );

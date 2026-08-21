@@ -1,10 +1,11 @@
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
+import type { JsonObject } from "@/domain/audit";
 import { flagDetail } from "@/integrity-service/flags";
 import { leagueNameFor } from "@/draft-service/teams";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { renderNotice } from "@/integrity/notices";
-import { DECISION_PHRASE, subjectIsRemoved, type FlagResolutionView, type FlagSubjectView } from "@/integrity/queue-view";
+import { DECISION_PHRASE, subjectIsRemoved, type FlagResolutionView, type FlagSubjectView, type TradedPlayerView } from "@/integrity/queue-view";
 import { contentRemovalIsWiredFor, type ResolutionDecision } from "@/integrity/flags";
 import { AppHeader } from "@/components/app-shell/app-header";
 import { Card, PageTitle } from "@/components/ui";
@@ -68,12 +69,71 @@ function SubjectCard({ subject }: { readonly subject: FlagSubjectView }) {
       </Card>
     );
   }
+  return <TradeSubjectCard subject={subject} />;
+}
+
+/** One side's traded players, valued at the moment the detector priced them. */
+function TradedPlayerList({ label, players }: { readonly label: string; readonly players: readonly TradedPlayerView[] }) {
+  return (
+    <div>
+      <p className="text-xs text-text-muted">{label}</p>
+      {players.length === 0 ? (
+        <p className="mt-1 text-sm text-text-muted">Nothing named on this side.</p>
+      ) : (
+        <ul className="mt-1 flex flex-col gap-0.5">
+          {players.map((player) => (
+            <li key={player.playerId} className="text-sm text-text-primary">
+              {player.name}
+              {player.position === null ? "" : ` (${player.position})`}, {player.averagePoints.toFixed(1)} points per week
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/**
+ * The trade arm of `FlagSubjectView`, in full — both teams, both sides valued, when it was
+ * accepted, whether an operator already reversed it, how those values were priced
+ * (`valuationBasis`), and the number that actually raised this flag (`fairnessGapSummary`, fix
+ * round 2, F3). Task 6 shipped this arm with the queue detail page still rendering only
+ * `subject.tradeId` (its own review's LOW); this is the render Task 7 owes it, now that the flag
+ * this page most needs to explain in full is a trade one.
+ */
+function TradeSubjectCard({ subject }: { readonly subject: Extract<FlagSubjectView, { readonly kind: "trade" }> }) {
   return (
     <Card>
       <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Trade</p>
-      <p className="mt-2 text-sm text-text-primary">{subject.tradeId}</p>
+      <p className="mt-1 text-sm text-text-primary">
+        {subject.proposerTeamName} and {subject.counterpartyTeamName}
+      </p>
+      <p className="mt-1 text-xs text-text-muted">
+        Accepted {subject.acceptedAt.length === 0 ? "at an unknown time" : formatWhen(subject.acceptedAt)}. {subject.valuationBasis}
+      </p>
+      <p className="mt-1 text-xs text-text-muted">{subject.fairnessGapSummary}</p>
+      <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <TradedPlayerList label={`${subject.proposerTeamName} sent`} players={subject.gave} />
+        <TradedPlayerList label={`${subject.counterpartyTeamName} sent`} players={subject.got} />
+      </div>
+      {subject.reversedAt !== null ? (
+        <p className="mt-3 text-sm text-text-muted">An operator already reversed this trade, on {formatWhen(subject.reversedAt)}.</p>
+      ) : subject.playersMovedAgain ? (
+        <p className="mt-3 text-sm text-text-muted">
+          One of these players has been traded again since. This trade can no longer be put back automatically; close it with no action, or warn the
+          member instead.
+        </p>
+      ) : null}
     </Card>
   );
+}
+
+/** `subject.gave`/`.got`, joined into the plain list the trade_reversed preview interpolates —
+ *  no `Intl.ListFormat`/`describeAsset` machinery here (that lives in `@/league-service/trades`,
+ *  a boundary this Server Component has no reason to cross for a hint); a comma-joined list of
+ *  names reads fine for a preview an operator glances at before submitting. */
+function playerNames(players: readonly TradedPlayerView[]): string {
+  return players.length === 0 ? "nothing" : players.map((player) => player.name).join(", ");
 }
 
 /**
@@ -87,12 +147,29 @@ function SubjectCard({ subject }: { readonly subject: FlagSubjectView }) {
  * `content_removed`'s preview is subject-aware (Task 6): a `chat_message` subject's removal
  * sends `chat_message_removed`, not `review_removed` — two different sentences, and showing the
  * wrong one would preview a notice the member is never actually sent.
+ *
+ * `trade_reversed`'s preview (Task 7) is ALSO subject-aware, and unlike the two above it DOES
+ * interpolate real values into its body — `counterpartyTeamName`/`gotBackSummary`/
+ * `gaveBackSummary` are read straight off the flag's own trade subject, from the PROPOSER's own
+ * side, so the preview an operator reads before submitting says the real teams and the real
+ * players rather than a placeholder sentence. Only present when the subject actually is a trade.
  */
-function noticePreviewsFor(leagueName: string, subjectKind: FlagSubjectView["kind"]): Readonly<Record<"warned_user" | "content_removed", DecisionPreview>> {
-  return {
+function noticePreviewsFor(leagueName: string, subject: FlagSubjectView): Readonly<Partial<Record<"warned_user" | "content_removed" | "trade_reversed", DecisionPreview>>> {
+  const base = {
     warned_user: renderNotice("operator_warning", { leagueName, note: "" }),
     content_removed:
-      subjectKind === "chat_message" ? renderNotice("chat_message_removed", { leagueName, reason: "" }) : renderNotice("review_removed", { reason: "" }),
+      subject.kind === "chat_message" ? renderNotice("chat_message_removed", { leagueName, reason: "" }) : renderNotice("review_removed", { reason: "" }),
+  };
+  if (subject.kind !== "trade") return base;
+  return {
+    ...base,
+    trade_reversed: renderNotice("trade_reversed", {
+      leagueName,
+      counterpartyTeamName: subject.counterpartyTeamName,
+      gotBackSummary: playerNames(subject.gave),
+      gaveBackSummary: playerNames(subject.got),
+      note: "",
+    }),
   };
 }
 
@@ -139,6 +216,22 @@ function decisionsFor(decisions: readonly ResolutionDecision[], subject: FlagSub
 }
 
 /**
+ * Fix round 2, F4. For a trade subject, `evidence.giving`/`.receiving` are the SAME per-player
+ * arrays `TradeSubjectCard`'s own `TradedPlayerList`s already render as names, positions and
+ * points — the friendly version. Left in the raw Evidence `dl` below, they show up as an
+ * unreadable `break-all` JSON string competing for the same 360px width as the key label, for
+ * zero information the friendly card didn't already say better. Every OTHER evidence field
+ * (`verdict`, `flags`, `givingValue`, `receivingValue`, `gap`, `threshold`, `basis`) has no
+ * friendly-card twin and stays in the raw panel — this drops only the two duplicated keys, and
+ * only for a trade subject; every other flag type's evidence is untouched.
+ */
+function nonDuplicatedEvidenceEntries(evidence: JsonObject, subject: FlagSubjectView): readonly (readonly [string, unknown])[] {
+  const entries = Object.entries(evidence);
+  if (subject.kind !== "trade") return entries;
+  return entries.filter(([key]) => key !== "giving" && key !== "receiving");
+}
+
+/**
  * The detail page: `withAdmin`'s Server Component overload, then `flagDetail`, then render.
  * `flagDetail` returning `null` (a flag id that names nothing) is `notFound()` — the same
  * non-oracle discipline the gate itself holds to, so a guessed id and a real-but-inaccessible one
@@ -152,9 +245,9 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
     if (detail === null) notFound();
 
     const leagueName = detail.leagueId === null ? "your league" : await leagueNameFor(getDb(), detail.leagueId);
-    const previews = noticePreviewsFor(leagueName, detail.subject.kind);
+    const previews = noticePreviewsFor(leagueName, detail.subject);
     const decisions = decisionsFor(detail.decisions, detail.subject);
-    const evidenceEntries = Object.entries(detail.evidence);
+    const evidenceEntries = nonDuplicatedEvidenceEntries(detail.evidence, detail.subject);
 
     return (
       <>

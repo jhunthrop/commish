@@ -51,12 +51,18 @@ src/
   league/                 Pure league rules: schedule generation, standings, clinch, lineup
                           eligibility, invite codes, LEAGUE_CONFIG. NO I/O. 100% coverage.
   league-service/         League read/write service layer over Postgres: creation, invites,
-                          schedule, lineups, results/standings. Consumed directly by app/api/leagues/**
+                          schedule, lineups, results/standings, and trades (trades.ts —
+                          propose/withdraw/reject/accept, trade-transfer.ts — the roster move +
+                          locked-week materialization, trade-reversal.ts — the operator's
+                          compensating transfer). Consumed directly by app/api/leagues/**
                           route handlers and by app/**/*.tsx Server Components.
   league-room/            The browser half of the league: the create/join/invite client
-                          components (components/), the fetchJson deps seam (hooks/), and
-                          id→display-name formatting (lib/format.ts). Imports from
-                          league/league-service are TYPE-ONLY — no league rule runs in React.
+                          components and the trade surface (components/ — trade-composer.tsx,
+                          trade-inbox.tsx, trade-card.tsx, reusing AdvisorPanel's shape), the
+                          fetchJson deps seam (hooks/), and id→display-name formatting
+                          (lib/format.ts). Imports from league/league-service are TYPE-ONLY — no
+                          league rule runs in React; value-imports @/trades directly (pure,
+                          browser-safe) for TRADE_CONFIG, describeAsset and isExpired.
   matchmaking/            Pure public-matchmaking rules: the browse filter, the cosmetic stake
                           tiers, and PublicLeagueSummary, the field-by-field privacy boundary of
                           the app's ONE unauthenticated league read. NO I/O. 100% coverage.
@@ -99,10 +105,21 @@ src/
                           room. Value-imports @/chat directly (pure, browser-safe); reaches
                           @/chat-service only over the wire — same ESLint client boundary as
                           draft-room/league-room. See docs/chat.md.
-  ai-advisor/             The advisory layer: read-only league context assembly, the pure
-                          trade-fairness core (also the platform's collusion detector), and the
+  ai-advisor/             The advisory layer: read-only league context assembly and the
                           start/sit + trade advisors over src/lib/llm. Writes NOTHING — a legal
-                          constraint, enforced by advisory-only.test.ts. See docs/advisor.md.
+                          constraint, enforced by advisory-only.test.ts. `valuation.ts`
+                          re-exports src/trades/fairness.ts's tradeBalance identity-pinned
+                          (Phase 3 Plan C moved the fairness core out — see docs/advisor.md
+                          and docs/decisions/trades-and-fairness.md §2). See docs/advisor.md.
+  trades/                 Pure trade layer: TRADE_CONFIG, the lifecycle/status vocabulary
+                          (lifecycle.ts), the asset union + describeAsset (assets.ts), the wire
+                          contract (contract.ts), and tradeBalance — the platform's ONE
+                          trade-fairness / collusion function (fairness.ts), moved here from
+                          src/ai-advisor (Phase 3 Plan C). NO I/O, no clock. 100% coverage.
+                          Browser-safe: the seventh pure exempt directory, beside src/chat,
+                          src/matchmaking, src/identity, src/help, src/reviews and
+                          src/moderation. See docs/trades.md and
+                          docs/decisions/trades-and-fairness.md.
   scoring/                Pure fantasy-scoring engine: computeFantasyPoints/scoreLineup, every
                           preset (PPR/standard/K-DEF/TE-premium). NO I/O. 100% coverage.
   stats/                  The stats seam. provider.ts (the interface: listPlayers, listGames,
@@ -145,8 +162,11 @@ src/
                           listLeagueActivity (the member-visible feed's read side), grantAdmin
                           (grant-admin.ts, the ONLY writer of users.is_admin), raiseFlag/
                           resolveFlag/listPendingFlags/flagDetail (flags.ts, the dispute queue's
-                          own read/write seam) and sweepLeagueForMultiAccounts/canonicalPairId
-                          (multi-account.ts, the detector). Consumed by src/draft-service/**,
+                          own read/write seam), sweepLeagueForMultiAccounts/canonicalPairId
+                          (multi-account.ts, the detector) and evaluateTradeBeforeExecute/
+                          raiseTradeFairnessFlag/sweepUnflaggedTrades (trade-fairness.ts, the
+                          in-transaction score and the after-commit flag — Phase 3 Plan C, see
+                          docs/decisions/trades-and-fairness.md §6). Consumed by src/draft-service/**,
                           src/league-service/**, src/review-service/**, src/identity-service/**,
                           src/chat-service/**, src/lib/auth/**, src/app/** and
                           scripts/verify-audit-chain.ts, scripts/grant-admin.ts,
@@ -165,7 +185,8 @@ src/
                           draft_nudges, draft_picks, weeks, matchups, players,
                           player_stat_lines, chat_messages, chat_reactions, reviews,
                           review_reports, audit_events, audit_chains, audit_chain_checkpoints,
-                          member_notices), client.ts (createDb/getDb), test-db.ts
+                          member_notices, integrity_flags, trade_proposals), client.ts
+                          (createDb/getDb), test-db.ts
   lib/
     env.ts                envOr/envOrUndefined — the ONE place an optional env var is read with a
                           fallback. `.env.example` ships some vars as empty lines and dotenv reads
@@ -195,9 +216,12 @@ scripts/                  Operator-run CLIs, never imported by src/**: seed (npm
                           audit:verify (verify-audit-chain.ts), reviews:remove
                           (remove-review.ts), admin:grant (grant-admin.ts, the only door
                           users.is_admin opens through), integrity:sweep
-                          (sweep-multi-account.ts, the multi-account detector's manual re-run)
-                          and stats:correct (correct-stat-week.ts, the post-final settlement
-                          correction). See docs/decisions/operators-and-moderation.md.
+                          (sweep-multi-account.ts, the multi-account detector's manual re-run),
+                          stats:correct (correct-stat-week.ts, the post-final settlement
+                          correction) and trades:sweep (sweep-trade-fairness.ts, the
+                          trade-fairness detector's manual re-run — see
+                          docs/decisions/trades-and-fairness.md §6). See
+                          docs/decisions/operators-and-moderation.md.
 e2e/                      Playwright specs plus the sealed-session global setup (see README).
 plans/                    the phase blueprints
 ```
@@ -324,8 +348,22 @@ and `@/integrity` reads `node:crypto` and Postgres besides, so it could not be e
 vocabulary did live there. `integrity`/`moderation` is the same server-machinery-vs-vocabulary split
 `docs/decisions/operators-and-moderation.md` §8 names in full.
 
+`src/trades/**` joins the exempt set for the same reason (Phase 3 Plan C): `TRADE_CONFIG`, the
+lifecycle vocabulary, the asset union and `TradeProposalView` are pure, I/O-free rule code with no
+server module behind them. The real browser VALUE-imports are `TRADE_CONFIG.maxAssetsPerSide`
+(`trade-composer.tsx`) and `describeAsset`/`isExpired` (`trade-card.tsx`) — `TradeProposalView` is
+an `interface`, reached through `import type`, which needs no exemption. The value-imports are
+there for the same reason `ReviewComposer` value-imports `validateReviewDraft` — a client-side bound and a server-enforced
+one must read the identical number. It is deliberately **not** part of `@/ai-advisor`, which is
+blocked below same as `@/integrity`: `tradeBalance` moved OUT of the advisor directory specifically
+because that directory is on the blocked list (`docs/decisions/trades-and-fairness.md` §2), and it
+is deliberately **not** part of `@/domain` or `@/league-service` either — `src/domain/trade.ts`
+keeps the pure Phase 1 `TradeProposal`/`isBalancedProposal` shapes the advisor already consumed,
+and `src/league-service` stays on the blocked list below, reached only over the wire.
+
 `src/integrity/**` and `src/integrity-service/**` join the BLOCKED list instead — unlike
-`@/chat`, `@/matchmaking`, `@/identity`, `@/help`, `@/reviews` and `@/moderation`, neither half of the audit spine
+`@/chat`, `@/matchmaking`, `@/identity`, `@/help`, `@/reviews`, `@/moderation` and `@/trades`,
+neither half of the audit spine
 is exempt, because neither half is actually browser-safe: `src/integrity/**` is pure but reads
 `node:crypto` (`chain.ts`'s `createHash`), which has no browser polyfill in this stack, and
 `src/integrity-service/**` is Postgres-backed outright. Client code needs neither as a value —
@@ -360,7 +398,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**`, `src/integrity-service/**`, `src/league-service/**`, `src/draft-service/**` and `src/moderation/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — nineteen gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. `src/league-service` and `src/draft-service` (gates 17 and 18) are gated for the identical service-layer reason; `src/moderation` (gate 19) is pure and gates for the reason every pure directory does. See `docs/decisions/operators-and-moderation.md`. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**`, `src/integrity-service/**`, `src/league-service/**`, `src/draft-service/**`, `src/moderation/**` and `src/trades/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — twenty gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. `src/league-service` and `src/draft-service` (gates 17 and 18) are gated for the identical service-layer reason; `src/moderation` (gate 19) is pure and gates for the reason every pure directory does; `src/trades` (gate 20) is pure and holds the one fairness function the write path calls inside a transaction, moved out of the coverage-ungated `src/ai-advisor/**` for exactly that reason (`docs/decisions/trades-and-fairness.md` §2). See `docs/decisions/operators-and-moderation.md`. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
 - **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there. `playwright.config.ts` pins `workers: 1` and `fullyParallel: false`, so every run is one worker walking the suite in one deterministic, alphabetical file order — a real cross-spec ordering dependency, not a latent flake: `mobile-360.spec.ts`'s dispute-queue check depends on `league-lifecycle.spec.ts` having already run and resolved its own flag, sorting first only because its filename does. A spec relying on suite order names the file it depends on in its own comment, the way both of these do; running either spec in isolation (`npx playwright test mobile-360.spec.ts` alone) will not reproduce the count that spec asserts.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 

@@ -26,6 +26,7 @@
     "reviews:remove": "dotenv -e .env.local -- tsx scripts/remove-review.ts",
     "admin:grant": "dotenv -e .env.local -- tsx scripts/grant-admin.ts",
     "integrity:sweep": "dotenv -e .env.local -- tsx scripts/sweep-multi-account.ts",
+    "trades:sweep": "dotenv -e .env.local -- tsx scripts/sweep-trade-fairness.ts",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down",
     "e2e": "dotenv -e .env.local -- playwright test",

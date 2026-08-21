@@ -55,6 +55,11 @@ const COVERAGE_GATED_DIRS = [
   // pure directory does, and because it is the single home of the vocabulary that
   // decides what may be removed (ruling 21).
   "src/moderation",
+  // Gate 20 (Phase 3 Plan C, ruling 26). `src/trades` is pure, browser-safe and holds the one
+  // fairness function the write path calls inside a transaction — every other directory this
+  // plan writes into (`src/league-service`, `src/integrity-service`, `src/integrity`) was already
+  // gated one plan early, so this is the last piece of the plan's own logic to join.
+  "src/trades",
 ] as const;
 /**
  * The three service directories' `schemas.ts` files are named explicitly alongside the `**` glob
@@ -220,6 +225,16 @@ export default defineConfig({
         // directory does; it is the single home of the closed removal vocabulary
         // (ruling 21).
         "src/moderation/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        // Gate 20 (Phase 3 Plan C). Pure and gates for the same reason every pure directory
+        // does; it also holds `tradeBalance`, the single fairness function `acceptTrade` calls
+        // inside its own transaction, moved here from the coverage-ungated `src/ai-advisor/**`
+        // for exactly that reason — see `docs/decisions/trades-and-fairness.md` §2.
+        "src/trades/**": {
           branches: 100,
           functions: 100,
           lines: 100,

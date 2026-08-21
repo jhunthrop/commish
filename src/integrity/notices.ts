@@ -85,6 +85,100 @@ export interface NoticeContexts {
     readonly points: number;
     readonly outcome: StatWeekCorrectionOutcome;
   };
+  /**
+   * `proposeTrade`'s own notice (`@/league-service/trades`), sent to the counterparty ONLY —
+   * `ACTIVITY_VISIBILITY.trade_proposed` is `"hidden"` (ruling 12), so this notice is the entire
+   * way the counterparty ever learns an offer exists. `giveSummary`/`getSummary` are pre-rendered
+   * English (`Intl.ListFormat`), not raw asset arrays, for the same reason `pickNumber`/
+   * `playerName` arrive pre-resolved on `draft_auto_picked`: a template composes a sentence, it
+   * does not re-derive one from a payload shape.
+   */
+  readonly trade_proposed: {
+    readonly leagueName: string;
+    readonly proposerTeamName: string;
+    readonly giveSummary: string;
+    readonly getSummary: string;
+    /** The proposer's own optional note, capped at `TRADE_CONFIG.noteMaxLength`. Unused by the
+     *  TEMPLATE below (which composes the platform's own sentence) but read by `quoteFor`
+     *  (`@/integrity-service/notify`) as the counterparty's own bounded blockquote — the same
+     *  split `operator_warning`'s `note` and `review_removed`'s `reason` both keep. */
+    readonly note: string | null;
+  };
+  /**
+   * `rejectTrade`'s notice, sent to the PROPOSER — the counterparty said no. `ACTIVITY_VISIBILITY
+   * .trade_rejected` is `"hidden"`, and more so than a proposal: a refusal is nobody's business
+   * but the two people in it.
+   */
+  readonly trade_rejected: {
+    readonly leagueName: string;
+    readonly counterpartyTeamName: string;
+  };
+  /**
+   * `withdrawTrade`'s notice, sent to the COUNTERPARTY — the proposer took the offer back.
+   * `trade_withdrawn` is a NOTICE type only: `AUDIT_EVENT_TYPES` is frozen (`@/domain/audit`'s
+   * own docblock), so the audit event both this and `trade_rejected` come from is spelled
+   * `trade_rejected` with `payload.outcome` distinguishing the two — the honest spelling, not a
+   * second event type this vocabulary was never going to grow.
+   */
+  readonly trade_withdrawn: {
+    readonly leagueName: string;
+    readonly proposerTeamName: string;
+  };
+  /**
+   * `acceptTrade`'s own notice (`@/league-service/trades`), sent to BOTH parties — the one moment
+   * this product tells a member their roster just moved. `gaveSummary`/`getSummary` are pre-
+   * rendered from THIS recipient's own side of the deal, the same "a template composes a
+   * sentence, it does not re-derive one from a payload shape" discipline `trade_proposed` keeps —
+   * so the proposer's notice and the counterparty's notice are two calls with the two sides
+   * swapped, never one shared object.
+   */
+  readonly trade_executed: {
+    readonly leagueName: string;
+    readonly counterpartyTeamName: string;
+    readonly gaveSummary: string;
+    readonly gotSummary: string;
+  };
+  /**
+   * `acceptTrade`'s supersede sweep (Task 5): sent to BOTH parties of every OTHER open offer that
+   * named a player the accepted trade just moved. `ACTIVITY_VISIBILITY` has no entry for this —
+   * it is a notice type only, the same way `trade_withdrawn` is — because "superseded" is a fact
+   * about one dead offer, not league content. Deliberately NOT `trade_rejected`'s copy: nobody
+   * declined this offer, and a manager who reads a decline where there wasn't one draws a worse
+   * conclusion than the truth (`INTEGRITY_CONFIG.notices.accusatoryTerms`'s whole reason for
+   * existing).
+   *
+   * BOTH PARTIES, from the final review's LOW 9: this used to tell only the doomed PROPOSER. The
+   * counterparty had that offer sitting in their inbox awaiting an answer, and something changed
+   * under them — the card simply vanished on the next refetch, with no word. Every other
+   * two-party trade notice in this file (`trade_executed`, `trade_reversed`) already tells both,
+   * and the asymmetry was undocumented rather than decided.
+   *
+   * `role` is what the two sentences differ on, and the only thing: the proposer's offer went out,
+   * the counterparty's came in. `counterpartyTeamName` is always the OTHER manager from this
+   * recipient's own point of view, the same "pre-rendered per recipient" shape `trade_reversed`
+   * uses.
+   */
+  readonly trade_superseded: {
+    readonly leagueName: string;
+    readonly counterpartyTeamName: string;
+    readonly role: "proposer" | "counterparty";
+  };
+  /**
+   * `reverseTradeInTx`'s own notice (`@/league-service/trade-reversal`, Task 7), sent to BOTH
+   * parties — the one decision in this product that changes two rosters on nobody's own request,
+   * so both people are affected and both read the identical words (the product never signals which
+   * of the two was the one under suspicion). `gotBackSummary`/`gaveBackSummary` are pre-rendered
+   * from THIS recipient's own side, the same "a template composes a sentence" discipline
+   * `trade_executed` keeps. `note` is the OPERATOR's own words, carried the same way
+   * `operator_warning`'s `note` is — unused by the template below, read by `quoteFor` instead.
+   */
+  readonly trade_reversed: {
+    readonly leagueName: string;
+    readonly counterpartyTeamName: string;
+    readonly gotBackSummary: string;
+    readonly gaveBackSummary: string;
+    readonly note: string;
+  };
 }
 
 /**
@@ -154,6 +248,50 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   stat_week_corrected: ({ leagueName, week, points, outcome }) => ({
     title: `We corrected your week ${week} score`,
     body: `Our stats provider revised its numbers for week ${week}, so we recomputed ${leagueName}. Your team now has ${points} points, and ${outcome}.`,
+  }),
+  trade_proposed: ({ leagueName, proposerTeamName, giveSummary, getSummary }) => ({
+    title: `${proposerTeamName} sent you a trade offer`,
+    body: `In ${leagueName}, ${proposerTeamName} offers you ${giveSummary} for ${getSummary}. Open the trade page to see both sides valued, then accept or decline. The offer stands for three days.`,
+  }),
+  trade_rejected: ({ leagueName, counterpartyTeamName }) => ({
+    title: "Your trade offer got a no",
+    body: `${counterpartyTeamName} declined the offer you sent in ${leagueName}. You can put together a different package any time.`,
+  }),
+  trade_withdrawn: ({ leagueName, proposerTeamName }) => ({
+    title: "A trade offer came off the table",
+    body: `${proposerTeamName} took back the offer they sent you in ${leagueName}. Nothing on your roster changed.`,
+  }),
+  trade_executed: ({ leagueName, counterpartyTeamName, gaveSummary, gotSummary }) => ({
+    title: "Your trade went through",
+    body: `You and ${counterpartyTeamName} completed a trade in ${leagueName}. You sent ${gaveSummary} and you got ${gotSummary}. Your lineup for this week already reflects it, so check your starters before kickoff.`,
+  }),
+  trade_superseded: ({ leagueName, counterpartyTeamName, role }) =>
+    role === "proposer"
+      ? {
+          title: "One of your offers can no longer go through",
+          body: `A player in the offer you had out to ${counterpartyTeamName} in ${leagueName} moved to another team, so that offer is off the table. Nobody declined it. You can put together a new one any time.`,
+        }
+      : {
+          title: "An offer waiting on you can no longer go through",
+          body: `A player in the offer ${counterpartyTeamName} sent you in ${leagueName} moved to another team, so that offer is off the table. Nobody declined it, and nothing on your roster changed. Ask them for a fresh one any time.`,
+        },
+  // `note` is stored on the row (`context.note`) but deliberately unused HERE, the same reason
+  // every other quoting template's own field is: the operator's own words travel as their own
+  // field on the wire (`quoteFor`), rendered as a distinct blockquote. The last sentence is the
+  // same founder decision #4 every other sanction-shaped notice in this file states: there is no
+  // appeal path, and this decision is a moderation consequence, so silence about that would invite
+  // a member to go looking for a reply channel that does not exist.
+  //
+  // Fix round 2 (F2, naming consistency): the action is named "reversed" here, in the title AND
+  // the body's own opening clause — never "put back", which used to be the only verb the title
+  // gave a member, splitting from the decision label, the trail row and the already-reversed
+  // note elsewhere on this same flag. "You have X again, and Y has Z" stays as the one place this
+  // notice is allowed to describe the CONSEQUENCE in its own words, per the same rule: an effect
+  // phrase may explain what a decision did, in body copy, but must never stand in for the
+  // decision's own name.
+  trade_reversed: ({ leagueName, counterpartyTeamName, gotBackSummary, gaveBackSummary }) => ({
+    title: "An operator reversed your trade",
+    body: `An operator reversed the trade you and ${counterpartyTeamName} completed in ${leagueName}. You have ${gotBackSummary} again, and ${counterpartyTeamName} has ${gaveBackSummary}. Scores from weeks you have already played stay as they were. There is no reply to this message.`,
   }),
 };
 

@@ -122,4 +122,16 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   operator_warning: { leagueName: "Sunday Money", note: "Keep the trash talk about the teams." },
   chat_message_removed: { leagueName: "Sunday Money", reason: "off topic" },
   stat_week_corrected: { leagueName: "Sunday Money", week: 3, points: 84.2, outcome: "that turns your matchup into a win" },
+  trade_proposed: { leagueName: "Sunday Money", proposerTeamName: "Bay Bandits", giveSummary: "Bijan Robinson", getSummary: "Justin Jefferson", note: "one more year of this and I'm out" },
+  trade_rejected: { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls" },
+  trade_withdrawn: { leagueName: "Sunday Money", proposerTeamName: "Bay Bandits" },
+  trade_executed: { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls", gaveSummary: "Bijan Robinson", gotSummary: "Justin Jefferson" },
+  trade_superseded: { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls", role: "proposer" },
+  trade_reversed: {
+    leagueName: "Sunday Money",
+    counterpartyTeamName: "Iron Owls",
+    gotBackSummary: "Bijan Robinson",
+    gaveBackSummary: "Justin Jefferson",
+    note: "Two accounts, one household, and this trade is why we looked.",
+  },
 };

@@ -1,36 +1,69 @@
 import { describe, expect, it } from "vitest";
 import {
   DECISION_OWNER,
+  DECISION_WIRED_FOR,
   FLAG_SUBJECT_TYPES,
   FLAG_TYPES,
   RESOLUTION_DECISIONS,
   SUBJECT_OF,
+  contentRemovalIsWiredFor,
   decisionIsAvailable,
+  decisionIsWiredFor,
 } from "./flags";
 
 describe("the resolution vocabulary", () => {
-  it("offers an operator only decisions this product can actually carry out", () => {
-    expect(RESOLUTION_DECISIONS.filter(decisionIsAvailable)).toEqual(["no_action", "warned_user", "content_removed"]);
+  it("asks whether a decision is wired, not which plan wrote it", () => {
+    // `decisionIsAvailable` used to be `DECISION_OWNER[d] === "plan-b"`, which was the right
+    // question while those two facts agreed. Plan C is where they part: `trade_reversed` is
+    // still owned by plan-c and is now wired, so ownership stops being able to answer.
+    expect(RESOLUTION_DECISIONS.filter(decisionIsAvailable)).toEqual(["no_action", "warned_user", "content_removed", "trade_reversed"]);
+    expect(DECISION_OWNER.trade_reversed).toBe("plan-c"); // provenance survives the wiring
   });
 
-  it("declares trade_reversed, names its owner, and refuses it today", () => {
-    // The score.update precedent: reserved through one plan, turned on by name in the next.
+  it("says which subjects each decision can actually be carried out against, in one table", () => {
+    // The two-axis version of Plan B's LOW 13: `resolveFlagSchema` accepted `content_removed` for
+    // ANY flag, and a direct POST against an `account_pair` reached an unwired branch and became
+    // a 500. A 500 is not a refusal. One table, exhaustive on both axes, so a new decision or a
+    // new subject without a wiring row fails to compile.
+    expect(DECISION_WIRED_FOR.content_removed).toEqual({ review: true, chat_message: true, account_pair: false, trade: false });
+    expect(DECISION_WIRED_FOR.trade_reversed).toEqual({ review: false, chat_message: false, account_pair: false, trade: true });
+    expect(DECISION_WIRED_FOR.no_action).toEqual({ review: true, chat_message: true, account_pair: true, trade: true });
+  });
+
+  it("keeps contentRemovalIsWiredFor answering exactly what it answered before", () => {
+    // Derived from the new table rather than deleted, so the diff at Plan B's three consumers
+    // (the detail page, resolveFlag's pre-write refusal, removeSubject's backstop) is zero. The
+    // same "a re-export is what makes this a de-duplication rather than a refactor" discipline
+    // ruling 21 of Plan B used for src/moderation.
+    for (const subject of FLAG_SUBJECT_TYPES) {
+      expect(contentRemovalIsWiredFor(subject)).toBe(DECISION_WIRED_FOR.content_removed[subject]);
+    }
+  });
+
+  it("still declares account_restricted nowhere at all", () => {
+    // Founder decision 5, unchanged and re-asserted here because this is the commit that makes a
+    // reserved decision real, and the next reader will wonder whether the other one is next.
+    expect(RESOLUTION_DECISIONS as readonly string[]).not.toContain("account_restricted");
+  });
+
+  it("names trade_reversed's own owner, provenance surviving the wiring", () => {
     expect(RESOLUTION_DECISIONS).toContain("trade_reversed");
     expect(DECISION_OWNER.trade_reversed).toBe("plan-c");
-    expect(decisionIsAvailable("trade_reversed")).toBe(false);
-  });
-
-  it("does not declare account_restricted at all", () => {
-    // Founder decision 5. Unlike trade_reversed it has no owning plan, and the spec's own
-    // out-of-scope list forbids any account action in this phase. A reserved name with no owner
-    // is how a control wired to nothing gets wired to something by a reader who assumes intent.
-    expect(RESOLUTION_DECISIONS as readonly string[]).not.toContain("account_restricted");
   });
 
   it("assigns every declared decision an owning plan, or fails to compile", () => {
     // DECISION_OWNER is an exhaustive Record over the union, so this assertion is belt to the
     // type system's braces and exists so the property is visible in the suite.
     expect(Object.keys(DECISION_OWNER).sort()).toEqual([...RESOLUTION_DECISIONS].sort());
+  });
+
+  it("assigns every declared decision a wiring row for every subject type, or fails to compile", () => {
+    for (const decision of RESOLUTION_DECISIONS) {
+      expect(Object.keys(DECISION_WIRED_FOR[decision]).sort()).toEqual([...FLAG_SUBJECT_TYPES].sort());
+      for (const subject of FLAG_SUBJECT_TYPES) {
+        expect(decisionIsWiredFor(decision, subject)).toBe(DECISION_WIRED_FOR[decision][subject]);
+      }
+    }
   });
 });
 
@@ -46,5 +79,4 @@ describe("the flag vocabulary", () => {
     expect(Object.values(SUBJECT_OF).every((subject) => (FLAG_SUBJECT_TYPES as readonly string[]).includes(subject))).toBe(true);
     expect(Object.keys(SUBJECT_OF).sort()).toEqual([...FLAG_TYPES].sort());
   });
-
 });

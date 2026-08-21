@@ -95,9 +95,19 @@ const SERVER_ONLY_MODULE_GROUPS = [
 /**
  * NOT on the list above, deliberately: `@/identity` (`src/identity/**`) joins `@/chat`
  * (`src/chat/**`), `@/matchmaking` (`src/matchmaking/**`), `@/help` (`src/help/**`),
- * `@/reviews` (`src/reviews/**`) and `@/moderation` (`src/moderation/**`) in the browser-safe
- * exempt set — pure, I/O-free code with no server module behind it, so client code may
- * value-import it directly. `src/chat-room/**` reaches `parseAvatarRef` indirectly through
+ * `@/reviews` (`src/reviews/**`), `@/moderation` (`src/moderation/**`) and `@/trades`
+ * (`src/trades/**`) in the browser-safe exempt set — pure, I/O-free code with no server module
+ * behind it, so client code may value-import it directly. `@/trades` is new in Phase 3 Plan C. The
+ * real browser VALUE-imports are `TRADE_CONFIG.maxAssetsPerSide` (`trade-composer.tsx`) and
+ * `describeAsset`/`isExpired` (`trade-card.tsx`); `TradeProposalView` is an `interface`
+ * (`src/trades/contract.ts`) and every consumer reaches it through `import type`, which needs no
+ * exemption at all (final review, LOW 7 item 4 — this used to name it as the value-import).
+ * `@/ai-advisor` — where
+ * `tradeBalance` and its types used to live — stays on the BLOCKED list above precisely because
+ * it is not browser-safe; the fairness core moved to this pure directory for that reason among
+ * others (`src/trades/fairness.ts`'s own docblock).
+ *
+ * `src/chat-room/**` reaches `parseAvatarRef` indirectly through
  * `Avatar` (`src/components/ui/avatar.tsx`) rather than importing `@/identity` itself, but the
  * omission here is what keeps that path legal. `@/help` is reached the same indirect way today —
  * every room directory renders `InfoTip` (`src/components/ui/info-tip.tsx`), which is the only

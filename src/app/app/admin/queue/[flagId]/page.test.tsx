@@ -172,6 +172,146 @@ describe("AdminFlagDetailPage — the read", () => {
     expect(screen.queryByRole("radio", { name: "Remove the content" })).not.toBeInTheDocument();
   });
 
+  const TRADE_SUBJECT = {
+    kind: "trade" as const,
+    tradeId: "trade_1",
+    proposerTeamName: "Team Alice",
+    counterpartyTeamName: "Team Bob",
+    gave: [{ playerId: "p1", name: "Star RB", position: "RB" as const, averagePoints: 22.4 }],
+    got: [{ playerId: "p2", name: "Bench WR", position: "WR" as const, averagePoints: 3.1 }],
+    acceptedAt: "2026-08-10T00:00:00.000Z",
+    reversedAt: null,
+    valuationBasis: "The platform valued this trade the moment it was accepted.",
+    fairnessGapSummary: "The two sides differ by 22.4 points per week, at or past the 20-point threshold that raised this flag.",
+    playersMovedAgain: false,
+  };
+
+  describe("the trade subject arm (Task 7)", () => {
+    it("renders both teams, both sides valued, when it was accepted, the valuation basis, and the fairness gap (fix round 2, F3), in both themes, axe-clean", async () => {
+      vi.mocked(flagDetail).mockResolvedValue({
+        ...OPEN_REVIEW_DETAIL,
+        leagueId: "l1",
+        subject: TRADE_SUBJECT,
+        decisions: ["no_action", "warned_user", "trade_reversed"],
+      });
+      const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+      const page = await callPage();
+      await inBothThemes(
+        <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+        async ({ container }) => {
+          expect(await screen.findByText("Team Alice and Team Bob")).toBeInTheDocument();
+          expect(screen.getByText(/Star RB \(RB\), 22.4 points per week/)).toBeInTheDocument();
+          expect(screen.getByText(/Bench WR \(WR\), 3.1 points per week/)).toBeInTheDocument();
+          expect(screen.getByText(/The platform valued this trade the moment it was accepted\./)).toBeInTheDocument();
+          expect(screen.getByText(/The two sides differ by 22\.4 points per week, at or past the 20-point threshold/)).toBeInTheDocument();
+          expect(screen.getByRole("radio", { name: "Reverse the trade" })).toBeInTheDocument();
+          expect(screen.queryByRole("radio", { name: "Remove the content" })).not.toBeInTheDocument();
+          expect(await axe(container)).toHaveNoViolations();
+        },
+      );
+    });
+
+    it("says a trade has already been reversed, and withholds the reversal decision, once reversedAt is set (fix round 2, F2 naming)", async () => {
+      vi.mocked(flagDetail).mockResolvedValue({
+        ...OPEN_REVIEW_DETAIL,
+        leagueId: "l1",
+        subject: { ...TRADE_SUBJECT, reversedAt: "2026-08-15T00:00:00.000Z" },
+        decisions: ["no_action", "warned_user"],
+      });
+      await renderPage();
+
+      expect(await screen.findByText(/An operator already reversed this trade/)).toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "Reverse the trade" })).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "No action" })).toBeInTheDocument();
+    });
+
+    it("never offers a trade reversal on a non-trade subject (the SUBJECT-narrowed decisions from flagDetail)", async () => {
+      vi.mocked(flagDetail).mockResolvedValue(OPEN_REVIEW_DETAIL); // a review, decisions from the fixture
+      await renderPage();
+
+      expect(await screen.findByRole("radio", { name: "No action" })).toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "Reverse the trade" })).not.toBeInTheDocument();
+    });
+
+    /**
+     * Fix round 1 (LOW, M8 discipline). The moved-again refusal now previews BEFORE the click,
+     * not just as a 409 on submit — `playersMovedAgain` withholds the decision and the card says
+     * why, the same pattern the already-reversed state just above already established.
+     */
+    it("says a traded player has moved on since, and withholds the reversal decision, once playersMovedAgain is set", async () => {
+      vi.mocked(flagDetail).mockResolvedValue({
+        ...OPEN_REVIEW_DETAIL,
+        leagueId: "l1",
+        subject: { ...TRADE_SUBJECT, playersMovedAgain: true },
+        decisions: ["no_action", "warned_user"],
+      });
+      await renderPage();
+
+      expect(await screen.findByText(/One of these players has been traded again since/)).toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "Reverse the trade" })).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "No action" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Warn the member" })).toBeInTheDocument();
+    });
+
+    it("says nothing about a moved-again player, or an already-reversed trade, on a normal reversible trade", async () => {
+      vi.mocked(flagDetail).mockResolvedValue({
+        ...OPEN_REVIEW_DETAIL,
+        leagueId: "l1",
+        subject: TRADE_SUBJECT,
+        decisions: ["no_action", "warned_user", "trade_reversed"],
+      });
+      await renderPage();
+
+      expect(await screen.findByRole("radio", { name: "Reverse the trade" })).toBeInTheDocument();
+      expect(screen.queryByText(/traded again since/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/already reversed this trade/)).not.toBeInTheDocument();
+    });
+
+    /**
+     * Fix round 2, F4. The raw Evidence panel drops `giving`/`receiving` for a trade subject —
+     * the friendly `TradedPlayerList`s above already render that same data as names, positions
+     * and points — but keeps every other evidence field (`verdict`, `gap`, `threshold`, ...),
+     * since those have no friendly-card twin.
+     */
+    it("drops giving/receiving from the raw Evidence panel for a trade subject, keeping the non-duplicated fields", async () => {
+      vi.mocked(flagDetail).mockResolvedValue({
+        ...OPEN_REVIEW_DETAIL,
+        leagueId: "l1",
+        subject: TRADE_SUBJECT,
+        decisions: ["no_action", "warned_user", "trade_reversed"],
+        evidence: {
+          verdict: "lopsided",
+          flags: ["value_gap_over_threshold"],
+          givingValue: 22.4,
+          receivingValue: 3.1,
+          gap: 19.3,
+          threshold: 20,
+          giving: [{ playerId: "p1", name: "Bijan Robinson", position: "RB", averagePoints: 22.4 }],
+          receiving: [{ playerId: "p2", name: "Justin Jefferson", position: "WR", averagePoints: 18.1 }],
+          basis: "accept_evaluation",
+        },
+      });
+      await renderPage();
+
+      expect(await screen.findByText("verdict")).toBeInTheDocument();
+      expect(screen.getByText("gap")).toBeInTheDocument();
+      expect(screen.getByText("threshold")).toBeInTheDocument();
+      expect(screen.queryByText("giving")).not.toBeInTheDocument();
+      expect(screen.queryByText("receiving")).not.toBeInTheDocument();
+    });
+
+    it("keeps giving/receiving in the raw Evidence panel for a non-trade subject (nothing to duplicate)", async () => {
+      vi.mocked(flagDetail).mockResolvedValue({
+        ...OPEN_REVIEW_DETAIL,
+        evidence: { giving: ["irrelevant here"], receiving: ["also irrelevant"] },
+      });
+      await renderPage();
+
+      expect(await screen.findByText("giving")).toBeInTheDocument();
+      expect(screen.getByText("receiving")).toBeInTheDocument();
+    });
+  });
+
   it("renders the resolution — decision, note, who, and when — once a flag is already resolved, instead of a bare sentence, in both themes, axe-clean (fix round 1, FIX 5)", async () => {
     vi.mocked(flagDetail).mockResolvedValue({
       ...OPEN_REVIEW_DETAIL,

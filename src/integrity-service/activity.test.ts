@@ -155,6 +155,63 @@ describe("listLeagueActivity", () => {
     );
   });
 
+  it("resolves real team and player names for a trade — proposerTeamId/counterpartyTeamId and proposerAssetIds/counterpartyAssetIds, never the bare teamId/playerId every other renderer uses", async () => {
+    // A regression pin: `trade_accepted` and `roster_move`'s own "trade" reason name their teams
+    // and players under DIFFERENT payload keys than every other renderer (`proposerTeamId`/
+    // `counterpartyTeamId`, `proposerAssetIds`/`counterpartyAssetIds` — plural, arrays), which
+    // `listLeagueActivity`'s own batched name lookup did not gather until this fix, so a real
+    // trade in a real feed always fell back to "a team that's no longer in the league" and "a
+    // player who is no longer listed" even though both plainly still are (caught first by
+    // `e2e/trades.spec.ts`'s own real end-to-end walk, Phase 3 Plan C Task 9).
+    await seedRealNames();
+    await db.insert(users).values({ id: "user_real_bob", email: "bob@test.local", displayName: "Bob Real" });
+    await db.insert(teams).values({ id: "team_real_2", leagueId: "league_1", userId: "user_real_bob", name: "Bob's Real Team" });
+    await db.insert(players).values({ id: "player_real_2", name: "Real Justin", position: "WR", nflTeam: "MIA" });
+
+    await db.transaction((tx) =>
+      league1Logger.record(tx, {
+        eventType: "trade_accepted",
+        actorId: "user_real_alice",
+        actorType: "user",
+        leagueId: "league_1",
+        payload: {
+          tradeId: "trade_1",
+          proposerTeamId: "team_real_1",
+          counterpartyTeamId: "team_real_2",
+          proposerAssetIds: ["player_real_1"],
+          counterpartyAssetIds: ["player_real_2"],
+        },
+        occurredAt: "2026-08-20T17:00:00.000Z",
+      }),
+    );
+    await db.transaction((tx) =>
+      league1Logger.record(tx, {
+        eventType: "roster_move",
+        actorId: "user_real_alice",
+        actorType: "user",
+        leagueId: "league_1",
+        payload: {
+          reason: "trade",
+          tradeId: "trade_1",
+          proposerTeamId: "team_real_1",
+          counterpartyTeamId: "team_real_2",
+          proposerAssetIds: ["player_real_1"],
+          counterpartyAssetIds: ["player_real_2"],
+        },
+        occurredAt: "2026-08-20T17:00:01.000Z",
+      }),
+    );
+
+    const page = await listLeagueActivity(db, { leagueId: "league_1", viewerUserId: "user_bob" });
+    expect(page.rows).toContainEqual(
+      expect.objectContaining({
+        headline: "Alice's Real Team and Bob's Real Team completed a trade.",
+        detail: "Alice's Real Team sent Real Bijan and got Real Justin.",
+      }),
+    );
+    expect(page.rows).toContainEqual(expect.objectContaining({ headline: "Alice's Real Team and Bob's Real Team swapped rosters." }));
+  });
+
   it("falls back to plain language, never an id, when a name genuinely can't resolve", async () => {
     // No users/teams/players rows seeded for any of these ids at all — the fallback path, kept
     // alongside the resolved-name test above rather than in place of it.

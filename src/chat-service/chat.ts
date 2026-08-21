@@ -302,30 +302,46 @@ export interface ToggleReactionInput {
  * The message is re-read scoped to the LEAGUE first: a member of league A must not be able to
  * react onto a message in league B by guessing its id — the route's membership gate proves who
  * you are, this proves the message is one you were allowed to see.
+ *
+ * THE SELECT/INSERT/DELETE NOW SHARE ONE TRANSACTION — a FLAKE reduction, not a correctness fix
+ * (Plan B's own final review adjudicated this and carried it here in writing). Un-transacted, the
+ * three statements could interleave with another connection's own three under pooler load and
+ * produce a spurious frame; they never produced torn state, because the verdict above was always
+ * read from each write's own `RETURNING` rows, never from a prior read — that property is
+ * unchanged by wrapping them, and the test below pins it so a future edit cannot quietly swap it
+ * for a read-then-write shape instead.
  */
 export async function toggleReaction(db: Db, input: ToggleReactionInput): Promise<ToggleReactionResult> {
   const messageId = Number(input.messageId);
-  const [message] = await db
-    .select({ id: chatMessages.id })
-    .from(chatMessages)
-    .where(and(eq(chatMessages.id, messageId), eq(chatMessages.leagueId, input.leagueId)));
-  if (message === undefined) return { ok: false, status: 404, reason: "That message is no longer here." };
 
-  const inserted = await db
-    .insert(chatReactions)
-    .values({ messageId, userId: input.userId, emoji: input.emoji })
-    .onConflictDoNothing()
-    .returning({ emoji: chatReactions.emoji });
+  const outcome = await db.transaction(async (tx) => {
+    const [message] = await tx
+      .select({ id: chatMessages.id })
+      .from(chatMessages)
+      .where(and(eq(chatMessages.id, messageId), eq(chatMessages.leagueId, input.leagueId)));
+    if (message === undefined) return { ok: false as const, status: 404, reason: "That message is no longer here." };
 
-  const didAdd = inserted.length > 0;
-  const didRemove = didAdd
-    ? false
-    : (
-        await db
-          .delete(chatReactions)
-          .where(and(eq(chatReactions.messageId, messageId), eq(chatReactions.userId, input.userId), eq(chatReactions.emoji, input.emoji)))
-          .returning({ emoji: chatReactions.emoji })
-      ).length > 0;
+    const inserted = await tx
+      .insert(chatReactions)
+      .values({ messageId, userId: input.userId, emoji: input.emoji })
+      .onConflictDoNothing()
+      .returning({ emoji: chatReactions.emoji });
+
+    const didAdd = inserted.length > 0;
+    const didRemove = didAdd
+      ? false
+      : (
+          await tx
+            .delete(chatReactions)
+            .where(and(eq(chatReactions.messageId, messageId), eq(chatReactions.userId, input.userId), eq(chatReactions.emoji, input.emoji)))
+            .returning({ emoji: chatReactions.emoji })
+        ).length > 0;
+
+    return { ok: true as const, didAdd, didRemove };
+  });
+
+  if (!outcome.ok) return outcome;
+  const { didAdd, didRemove } = outcome;
 
   // "removed" whenever this call didn't add it — whether this call's own DELETE removed it or
   // a concurrent caller's did. Both are honestly reported as "removed": it is the true

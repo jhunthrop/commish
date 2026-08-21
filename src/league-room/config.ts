@@ -9,4 +9,11 @@ export const LEAGUE_ROOM_CONFIG = {
    * standing between the page and a wasted request; see that component's docblock.
    */
   homeRefreshIntervalMs: 30_000,
+  /**
+   * How often `TradeCard`'s own `useNow` tick recomputes its expiry line, ms. Day-granularity
+   * display (`daysUntil`/`formatExpiry`, `./lib/format.ts`) has no need for `DRAFT_ROOM_CONFIG
+   * .countdownTickMs`'s second-by-second cadence — this is deliberately coarse, cheap enough for
+   * every open card in an inbox to run its own tick without it mattering.
+   */
+  expiryTickMs: 300_000,
 } as const;

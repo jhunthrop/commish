@@ -1,17 +1,21 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, chatMessages, drafts, leagues, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, users } from "@/db/schema";
+import { auditChains, chatMessages, drafts, integrityFlags, leagues, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { joinLeagueInTx } from "@/league-service/join";
 import { writeSchedule } from "@/league-service/schedule";
+import { seasonCurrentWeek } from "@/league-service/test-support";
+import { acceptTrade, proposeTrade, rejectTrade } from "@/league-service/trades";
+import { reverseTradeInTx } from "@/league-service/trade-reversal";
 import type { StatLine } from "@/domain/player";
 import { correctSettledWeek } from "@/stats-pipeline/correction";
 import { finalizeWeek } from "@/stats-pipeline/finalize";
 import { fakeStatsProvider } from "@/stats-pipeline/test-support";
 import { syncUserFromWorkOS } from "@/lib/auth/user-sync";
+import { toggleReaction } from "@/chat-service/chat";
 import { reportMessage } from "@/chat-service/moderation";
 import { reportReview } from "@/review-service/reviews";
 import { raiseFlag, resolveFlag } from "./flags";
@@ -41,6 +45,32 @@ import { players } from "@/db/schema";
  * already be holding the anchor T_join is about to ask for, and one of the two dies. The
  * interleaving is deterministic in both directions, so this is a real regression guard and not a
  * race that happens to pass.
+ *
+ * ---------------------------------------------------------------------------------------------
+ * THE LESSON THIS SUITE EXISTS TO ENFORCE, RESTATED AFTER PLAN C'S FINAL REVIEW (HIGH 2):
+ *
+ *   A LOCK-ORDER REVIEW MUST ENUMERATE FOREIGN KEYS, BECAUSE AN INSERT'S PARENT-ROW LOCKS ARE
+ *   INVISIBLE AT THE CALL SITE.
+ *
+ * Every deadlock this codebase has produced so far lives in a lock no line of source code
+ * mentions. `proposeTrade` shipped with a docblock that reasoned about this exact hazard and
+ * stopped one foreign key short: it correctly argued that the `trade_proposals` INSERT re-taking
+ * `FOR KEY SHARE` on the PROPOSER's team row was not a second lock (that row was already held
+ * `FOR UPDATE`), and never mentioned the COUNTERPARTY's row, which was not held at all. That made
+ * its true order proposer-then-counterparty, the opposite of `acceptTrade`'s and
+ * `reverseTradeInTx`'s sorted-by-id order whenever the proposer sorted second — and two managers
+ * offering each other a trade on a Sunday morning deadlocked, with a 500 to whichever one lost.
+ *
+ * So: when reading a transaction for its lock order, list the statements AND the foreign keys
+ * every one of those statements touches. And prove it here rather than by inspection — a proof
+ * that parks the actual contended row, released only once the other side is genuinely blocked
+ * behind it (`waitForBlockedBackend`), never a hopeful interleaving.
+ *
+ * COVERAGE: all 7 of Plan C's new writers are driven below — `proposeTrade` (league FK, and the
+ * mirror-propose team-FK proof), `settleProposal` via `rejectTrade`, `acceptTrade` (week lock,
+ * notice order, mirror-accept team locks), `reverseTradeInTx` (week lock, team locks),
+ * `raiseTradeFairnessFlag` in its real after-commit position, `resolveFlag`'s `trade_reversed`
+ * two-transaction shape, and `toggleReaction`.
  */
 const joinDb = createTestDb();
 const pickDb = createTestDb();
@@ -668,6 +698,663 @@ describe("grantAdmin's notice order", () => {
 });
 
 /**
+ * Plan C's actual first transaction in this proof (Task 3, fix round 1: F2's review named this
+ * gap — `proposeTrade`'s own sequence had no lock-order proof of its own, only `rejectTrade`'s
+ * did). `proposeTrade`'s `trade_proposals` insert carries a foreign key to `leagues`, so it
+ * reaches for `leagues FOR KEY SHARE` before its anchor — the SAME row `joinLeagueInTx` holds
+ * `FOR UPDATE`. It ALSO takes BOTH `teams` rows `FOR UPDATE` first, in canonical sorted-by-id
+ * order — different rows than the one the join holds, so those locks do not participate in THIS
+ * pair. The team locks have their own two-connection proof directly below; it is the one the
+ * waiver that used to sit here was hiding.
+ *
+ * This drives a real join and a real trade proposal against the SAME league on two connections,
+ * with the join parked exactly where the cycle used to sit, and asserts no deadlock plus the
+ * correct chain: `trade_proposed` lands on the LEAGUE chain beside the join's own
+ * `member_joined` (ruling 1 — a trade is league content even though its `ACTIVITY_VISIBILITY`
+ * is `"hidden"`, and the two are independent on purpose).
+ */
+describe("proposeTrade's insert order", () => {
+  it("lets a join and a trade proposal in the same league run concurrently without deadlocking", async () => {
+    await seedLeagueWith("lg_propose_lock", ["u_propose_commish", "u_propose_alice", "u_propose_bob", "u_propose_joiner"]);
+    await joinDb.insert(teams).values([
+      { id: "team_propose_alice", leagueId: "lg_propose_lock", userId: "u_propose_alice", name: "Alice's Team" },
+      { id: "team_propose_bob", leagueId: "lg_propose_lock", userId: "u_propose_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_propose_a", name: "Propose A", position: "RB", nflTeam: "KC" },
+      { id: "p_propose_b", name: "Propose B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_propose_alice", slot: "BENCH", slotIndex: 0, playerId: "p_propose_a" },
+      { teamId: "team_propose_bob", slot: "BENCH", slotIndex: 0, playerId: "p_propose_b" },
+    ]);
+
+    const join = parkedJoin("lg_propose_lock", "u_propose_joiner", "team_propose_joiner");
+    await join.leagueLocked;
+
+    // T_propose: the real proposeTrade, on its own connection, reaching for the SAME league row
+    // through its trade_proposals insert (the leagueId FK -> leagues FOR KEY SHARE) before it
+    // reaches the league anchor.
+    const proposing = proposeTrade(pickDb, {
+      leagueId: "lg_propose_lock",
+      userId: "u_propose_alice",
+      counterpartyTeamId: "team_propose_bob",
+      proposerAssets: [{ kind: "player", playerId: "p_propose_a" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_propose_b" }],
+      note: null,
+      clock,
+      deliver: async () => {},
+    });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await proposing).toMatchObject({ ok: true });
+
+    // Both transactions really did land on the SAME league chain: the join's member_joined and
+    // the proposal's trade_proposed.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_propose_lock"));
+    expect(leagueAnchor!.headSequence).toBe(2);
+  });
+});
+
+/**
+ * FINAL REVIEW, HIGH 2 — the proof that replaces a waiver comment.
+ *
+ * `proposeTrade`'s team lock used to be waived in the test above as "a DIFFERENT row than the one
+ * the join holds, so that lock costs nothing here". True of THAT pair, and it hid the one that
+ * mattered: the `trade_proposals` INSERT carries foreign keys to BOTH team rows, so the
+ * transaction reached for the COUNTERPARTY's row `FOR KEY SHARE` after holding the PROPOSER's
+ * `FOR UPDATE` — proposer-first ordering, invisible in the source, opposite to `acceptTrade`'s
+ * and `reverseTradeInTx`'s sorted-by-id order whenever the proposer sorted second. Two MIRROR
+ * proposals (Alice offers Bob a trade while Bob offers Alice one) then genuinely deadlocked, with
+ * a real `40P01` and an unexplained 500 to the loser — no operator, no accept, no race either
+ * manager could perceive.
+ *
+ * The suite's real gap was that NO test ever parked a `teams` row against a trade writer. This
+ * one does, on the row both mirror proposals must now reach for FIRST (`"team_mp_a"` sorts before
+ * `"team_mp_b"`), released only once BOTH are genuinely blocked behind it — so the convergence is
+ * proved, not assumed. Against the pre-fix code this reddens immediately.
+ */
+describe("proposeTrade's team-lock order — the mirror-propose deadlock proof", () => {
+  it("lets two mirror proposals between the same two teams run concurrently without deadlocking", async () => {
+    await seedLeagueWith("lg_mirror_propose", ["u_mp_commish", "u_mp_alice", "u_mp_bob"]);
+    // Sorted lexicographically, `"team_mp_a" < "team_mp_b"` — both proposals below compute the
+    // identical `[firstTeamId, secondTeamId]` pair no matter which team is proposing.
+    await joinDb.insert(teams).values([
+      { id: "team_mp_a", leagueId: "lg_mirror_propose", userId: "u_mp_alice", name: "Alice's Team" },
+      { id: "team_mp_b", leagueId: "lg_mirror_propose", userId: "u_mp_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_mp_1", name: "Player One", position: "RB", nflTeam: "KC" },
+      { id: "p_mp_2", name: "Player Two", position: "RB", nflTeam: "SF" },
+      { id: "p_mp_3", name: "Player Three", position: "RB", nflTeam: "DAL" },
+      { id: "p_mp_4", name: "Player Four", position: "RB", nflTeam: "MIA" },
+    ]);
+    // A DIFFERENT asset pair per proposal, so the two rows never collide on the fingerprint index
+    // independent of the team-lock question this test is actually about.
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_mp_a", slot: "BENCH", slotIndex: 0, playerId: "p_mp_1" },
+      { teamId: "team_mp_a", slot: "BENCH", slotIndex: 1, playerId: "p_mp_4" },
+      { teamId: "team_mp_b", slot: "BENCH", slotIndex: 0, playerId: "p_mp_2" },
+      { teamId: "team_mp_b", slot: "BENCH", slotIndex: 1, playerId: "p_mp_3" },
+    ]);
+
+    // The bystander: holds the ONE row both proposals must reach for first.
+    let holdsFirstTeamLock: () => void = () => {};
+    const firstTeamLocked = new Promise<void>((resolve) => (holdsFirstTeamLock = resolve));
+    let releaseFirstTeamLock: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseFirstTeamLock = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM teams WHERE id = ${"team_mp_a"} FOR UPDATE`);
+      holdsFirstTeamLock();
+      await released;
+    });
+    await firstTeamLocked;
+
+    // T_propose1 and T_propose2: the real `proposeTrade`, twice, on TWO separate connections —
+    // each team offering the other, which is the exact production shape that deadlocked.
+    const proposing1 = proposeTrade(pickDb, {
+      leagueId: "lg_mirror_propose",
+      userId: "u_mp_alice",
+      counterpartyTeamId: "team_mp_b",
+      proposerAssets: [{ kind: "player", playerId: "p_mp_1" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_mp_2" }],
+      note: null,
+      clock,
+      deliver: async () => {},
+    });
+    const proposing2 = proposeTrade(resolveDb, {
+      leagueId: "lg_mirror_propose",
+      userId: "u_mp_bob",
+      counterpartyTeamId: "team_mp_a",
+      proposerAssets: [{ kind: "player", playerId: "p_mp_3" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_mp_4" }],
+      note: null,
+      clock,
+      deliver: async () => {},
+    });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFirstTeamLock();
+
+    await expect(holding).resolves.toBeUndefined();
+    const [result1, result2] = await Promise.all([proposing1, proposing2]);
+
+    // No deadlock, and BOTH outcomes correct — never one victim rethrown as a 500.
+    expect(result1).toMatchObject({ ok: true });
+    expect(result2).toMatchObject({ ok: true });
+
+    // Both offers really exist, one in each direction, both still open.
+    const rows = await joinDb.select().from(tradeProposals).where(eq(tradeProposals.leagueId, "lg_mirror_propose"));
+    expect(rows).toHaveLength(2);
+    expect(rows.every((row) => row.status === "open")).toBe(true);
+    expect(rows.map((row) => row.proposerTeamId).sort()).toEqual(["team_mp_a", "team_mp_b"]);
+
+    // And both landed on the SAME league chain, at consecutive sequences.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_mirror_propose"));
+    expect(leagueAnchor!.headSequence).toBe(2);
+  });
+});
+
+describe("rejectTrade's notice order", () => {
+  it("lets a join and a trade rejection in the same league run concurrently without deadlocking", async () => {
+    await seedLeagueWith("lg_trade_lock", ["u_trade_commish", "u_trade_alice", "u_trade_bob", "u_trade_joiner"]);
+    await joinDb.insert(teams).values([
+      { id: "team_trade_alice", leagueId: "lg_trade_lock", userId: "u_trade_alice", name: "Alice's Team" },
+      { id: "team_trade_bob", leagueId: "lg_trade_lock", userId: "u_trade_bob", name: "Bob's Team" },
+    ]);
+    const proposedAt = new Date(clock.now());
+    const expiresAt = new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000);
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_lock_1",
+      leagueId: "lg_trade_lock",
+      proposerTeamId: "team_trade_alice",
+      counterpartyTeamId: "team_trade_bob",
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_lock_1" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_lock_2" }],
+      fingerprint: "fp_trade_lock_1",
+      note: null,
+      status: "open",
+      proposedAt,
+      expiresAt,
+    });
+
+    const join = parkedJoin("lg_trade_lock", "u_trade_joiner", "team_trade_joiner");
+    await join.leagueLocked;
+
+    // T_reject: the real rejectTrade, on its own connection, reaching for the SAME league row
+    // through its notice insert (leagues FOR KEY SHARE) before it reaches the league anchor.
+    const rejecting = rejectTrade(resolveDb, { tradeId: "trade_lock_1", leagueId: "lg_trade_lock", userId: "u_trade_bob", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await rejecting).toMatchObject({ ok: true });
+
+    // Both transactions really did land on the SAME league chain: the join's member_joined and
+    // the rejection's trade_rejected.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_trade_lock"));
+    expect(leagueAnchor!.headSequence).toBe(2);
+
+    // And the notice rejectTrade wrote before the anchor still names the event minted after it.
+    const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_trade_alice"));
+    expect(notice?.auditEventId).not.toBeNull();
+  });
+});
+
+/**
+ * Task 5's own transaction, first half: `acceptTrade`'s week lock. It parks a real week-status
+ * write — the same statement `persistTick` (`@/stats-pipeline/persist`) issues, standing in for
+ * it because `persistTick` has no seam to park inside — holding `stat_weeks[4]` open, and drives
+ * a real `acceptTrade` against the SAME row on a second connection. The claim is narrower than
+ * the pairs above: not "no deadlock", but that the trade genuinely BLOCKS ON THE WEEK rather than
+ * skipping past a stale read and reaching (or blocking on) the league anchor instead — the same
+ * "FOR SHARE against an uncommitted concurrent writer" proof `trade-transfer.test.ts`'s own
+ * `materializeLockedLineupsInTx` test runs, driven here through the real service entry point.
+ */
+describe("acceptTrade's week lock", () => {
+  it("blocks a concurrent accept behind a real stat-week write, and refuses once it sees the flip", async () => {
+    await seedLeagueWith("lg_accept_week_lock", ["u_aw_commish", "u_aw_alice", "u_aw_bob"]);
+    await joinDb.insert(teams).values([
+      { id: "team_aw_alice", leagueId: "lg_accept_week_lock", userId: "u_aw_alice", name: "Alice's Team" },
+      { id: "team_aw_bob", leagueId: "lg_accept_week_lock", userId: "u_aw_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_aw_a", name: "Player A", position: "RB", nflTeam: "KC" },
+      { id: "p_aw_b", name: "Player B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_aw_alice", slot: "BENCH", slotIndex: 0, playerId: "p_aw_a" },
+      { teamId: "team_aw_bob", slot: "BENCH", slotIndex: 0, playerId: "p_aw_b" },
+    ]);
+    // An EXISTING row, matching `persistTick`'s own upsert shape — a `SELECT … FOR SHARE` against
+    // a row still being INSERTED (never committed, so not yet visible) would not block at all.
+    await joinDb.insert(statWeeks).values({ week: 4, status: "scheduled" });
+    // Week 4 is this LEAGUE's current week, seeded as a real season (weeks 1-3 scored). Since the
+    // final review's CRITICAL 1, `acceptTrade` locks the week it DERIVES, never the week the
+    // proposal names — so a fixture that wants the accept to block on `stat_weeks[4]` has to be a
+    // league whose current week genuinely is 4.
+    await seasonCurrentWeek(joinDb, { leagueId: "lg_accept_week_lock", homeTeamId: "team_aw_alice", awayTeamId: "team_aw_bob", week: 4 });
+    const proposedAt = new Date(clock.now());
+    const expiresAt = new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000);
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_aw_1",
+      leagueId: "lg_accept_week_lock",
+      proposerTeamId: "team_aw_alice",
+      counterpartyTeamId: "team_aw_bob",
+      weekNumber: 4,
+      proposerAssets: [{ kind: "player", playerId: "p_aw_a" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_aw_b" }],
+      fingerprint: "fp_trade_aw_1",
+      note: null,
+      status: "open",
+      proposedAt,
+      expiresAt,
+    });
+
+    let releaseFlip: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseFlip = resolve));
+    const flipping = joinDb.transaction(async (tx) => {
+      await tx.update(statWeeks).set({ status: "in_progress" }).where(eq(statWeeks.week, 4));
+      await released;
+    });
+
+    const accepting = acceptTrade(pickDb, { tradeId: "trade_aw_1", leagueId: "lg_accept_week_lock", userId: "u_aw_bob", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFlip();
+    await flipping;
+
+    // Blocked on the WEEK, never on the anchor: no league chain row exists for this league at
+    // all, because the week lock refuses the trade before `acceptTrade` ever reaches its own
+    // `audit.recordAll`.
+    expect(await accepting).toMatchObject({ ok: false, status: 409 });
+    const anchors = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_accept_week_lock"));
+    expect(anchors).toEqual([]);
+  });
+});
+
+/**
+ * Task 5's own transaction, second half: the notice inserts. `acceptTrade`'s `trade_executed`
+ * notices carry the same implicit `FOR KEY SHARE` on `leagues` every other notice-writing
+ * transaction in this file does, and they are written BEFORE the league anchor, exactly like
+ * `rejectTrade`'s own pair above. This drives a real join and a real trade ACCEPTANCE against the
+ * SAME league on two connections, with the join parked exactly where the cycle used to sit, and
+ * asserts no deadlock plus the correct chain: `trade_accepted` and `roster_move` land beside the
+ * join's own `member_joined`, all three on one chain, one batch.
+ */
+describe("acceptTrade's notice order", () => {
+  it("lets a join and a trade acceptance in the same league run concurrently without deadlocking", async () => {
+    await seedLeagueWith("lg_accept_lock", ["u_an_commish", "u_an_alice", "u_an_bob", "u_an_joiner"]);
+    await joinDb.insert(teams).values([
+      { id: "team_an_alice", leagueId: "lg_accept_lock", userId: "u_an_alice", name: "Alice's Team" },
+      { id: "team_an_bob", leagueId: "lg_accept_lock", userId: "u_an_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_an_a", name: "Player A", position: "RB", nflTeam: "KC" },
+      { id: "p_an_b", name: "Player B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_an_alice", slot: "BENCH", slotIndex: 0, playerId: "p_an_a" },
+      { teamId: "team_an_bob", slot: "BENCH", slotIndex: 0, playerId: "p_an_b" },
+    ]);
+    const proposedAt = new Date(clock.now());
+    const expiresAt = new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000);
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_an_1",
+      leagueId: "lg_accept_lock",
+      proposerTeamId: "team_an_alice",
+      counterpartyTeamId: "team_an_bob",
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_an_a" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_an_b" }],
+      fingerprint: "fp_trade_an_1",
+      note: null,
+      status: "open",
+      proposedAt,
+      expiresAt,
+    });
+
+    const join = parkedJoin("lg_accept_lock", "u_an_joiner", "team_an_joiner");
+    await join.leagueLocked;
+
+    // T_accept: the real acceptTrade, on its own connection, reaching for the SAME league row
+    // through its notice inserts (leagues FOR KEY SHARE) before it reaches the league anchor.
+    const accepting = acceptTrade(pickDb, { tradeId: "trade_an_1", leagueId: "lg_accept_lock", userId: "u_an_bob", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await accepting).toMatchObject({ ok: true });
+
+    // Both transactions really did land on the SAME league chain: the join's member_joined, and
+    // the acceptance's trade_accepted + roster_move, one batch.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_accept_lock"));
+    expect(leagueAnchor!.headSequence).toBe(3);
+
+    // And a notice acceptTrade wrote before the anchor still names the event minted after it.
+    const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_an_alice"));
+    expect(notice?.auditEventId).not.toBeNull();
+  });
+});
+
+/**
+ * Fix round 1, MEDIUM. Ruling 1's central safety claim — sorted-by-id team locking is
+ * deadlock-free against a concurrent MIRROR accept (team A's accept of an A→B trade racing team
+ * B's accept of a DIFFERENT, B→A trade between the SAME two teams) — was documented but never
+ * driven against a real Postgres. Both trades below compute the identical
+ * `[proposerTeamId, counterpartyTeamId].sort()` pair regardless of which team proposed which one,
+ * so both attempts converge on locking `team_mirror_a` FIRST — the property a bystander holding
+ * exactly that row, released only once BOTH concurrent accepts are genuinely blocked behind it
+ * (`waitForBlockedBackend`, never a hopeful interleaving), proves directly. Proposer-first
+ * ordering would have one transaction lock A-then-B while the mirror locked B-then-A, a real
+ * two-resource cycle Postgres would kill after `deadlock_timeout`; sorted ordering has both want
+ * the same row first, so there is never a cycle to kill.
+ */
+describe("acceptTrade's team-lock order — the mirror-accept deadlock proof", () => {
+  it("lets two mirror trades between the same two teams accept concurrently without deadlocking", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_mirror_alice", email: "mirror_alice@test.local", displayName: "Alice" },
+      { id: "u_mirror_bob", email: "mirror_bob@test.local", displayName: "Bob" },
+    ]);
+    await joinDb.insert(leagues).values({
+      id: "lg_mirror_lock",
+      name: "Mirror Lock League",
+      format: "snake",
+      teamCount: 2,
+      commissionerUserId: "u_mirror_alice",
+    });
+    // Sorted lexicographically, `"team_mirror_a" < "team_mirror_b"` — both mirror trades below
+    // compute the identical `[firstTeamId, secondTeamId]` pair no matter which team proposed,
+    // which is the whole property under test.
+    await joinDb.insert(teams).values([
+      { id: "team_mirror_a", leagueId: "lg_mirror_lock", userId: "u_mirror_alice", name: "Alice's Team" },
+      { id: "team_mirror_b", leagueId: "lg_mirror_lock", userId: "u_mirror_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_mirror_1", name: "Player One", position: "RB", nflTeam: "KC" },
+      { id: "p_mirror_2", name: "Player Two", position: "RB", nflTeam: "SF" },
+      { id: "p_mirror_3", name: "Player Three", position: "RB", nflTeam: "DAL" },
+      { id: "p_mirror_4", name: "Player Four", position: "RB", nflTeam: "MIA" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_mirror_a", slot: "BENCH", slotIndex: 0, playerId: "p_mirror_1" },
+      { teamId: "team_mirror_a", slot: "BENCH", slotIndex: 1, playerId: "p_mirror_4" },
+      { teamId: "team_mirror_b", slot: "BENCH", slotIndex: 0, playerId: "p_mirror_2" },
+      { teamId: "team_mirror_b", slot: "BENCH", slotIndex: 1, playerId: "p_mirror_3" },
+    ]);
+    const proposedAt = new Date(clock.now());
+    const expiresAt = new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000);
+    // Trade 1: `team_mirror_a` proposes, `team_mirror_b` is the counterparty.
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_mirror_1",
+      leagueId: "lg_mirror_lock",
+      proposerTeamId: "team_mirror_a",
+      counterpartyTeamId: "team_mirror_b",
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_mirror_1" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_mirror_2" }],
+      fingerprint: "fp_trade_mirror_1",
+      note: null,
+      status: "open",
+      proposedAt,
+      expiresAt,
+    });
+    // Trade 2: the MIRROR — `team_mirror_b` proposes this time, `team_mirror_a` is the
+    // counterparty. A DIFFERENT asset pair than trade 1, so the two trades' own writes never
+    // collide with each other independent of the team-lock question this test is actually about.
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_mirror_2",
+      leagueId: "lg_mirror_lock",
+      proposerTeamId: "team_mirror_b",
+      counterpartyTeamId: "team_mirror_a",
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_mirror_3" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_mirror_4" }],
+      fingerprint: "fp_trade_mirror_2",
+      note: null,
+      status: "open",
+      proposedAt,
+      expiresAt,
+    });
+
+    // The bystander: holds the ONE row both mirror accepts must reach for first, so releasing it
+    // only once BOTH are genuinely blocked behind it is a real proof of convergence, not a
+    // fixture that happens not to collide.
+    let holdsFirstTeamLock: () => void = () => {};
+    const firstTeamLocked = new Promise<void>((resolve) => (holdsFirstTeamLock = resolve));
+    let releaseFirstTeamLock: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseFirstTeamLock = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM teams WHERE id = ${"team_mirror_a"} FOR UPDATE`);
+      holdsFirstTeamLock();
+      await released;
+    });
+    await firstTeamLocked;
+
+    // T_accept1 and T_accept2: the real `acceptTrade`, twice, on TWO separate connections —
+    // one mirror trade each, both reaching for `team_mirror_a` first.
+    const accepting1 = acceptTrade(pickDb, { tradeId: "trade_mirror_1", leagueId: "lg_mirror_lock", userId: "u_mirror_bob", clock, deliver: async () => {} });
+    const accepting2 = acceptTrade(resolveDb, { tradeId: "trade_mirror_2", leagueId: "lg_mirror_lock", userId: "u_mirror_alice", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFirstTeamLock();
+
+    await expect(holding).resolves.toBeUndefined();
+    const [result1, result2] = await Promise.all([accepting1, accepting2]);
+
+    // No deadlock, and exactly one outcome per trade — both mirror trades genuinely executed.
+    expect(result1).toMatchObject({ ok: true, tradeId: "trade_mirror_1" });
+    expect(result2).toMatchObject({ ok: true, tradeId: "trade_mirror_2" });
+
+    const teamARoster = await joinDb.select({ playerId: rosterSlots.playerId }).from(rosterSlots).where(eq(rosterSlots.teamId, "team_mirror_a"));
+    const teamBRoster = await joinDb.select({ playerId: rosterSlots.playerId }).from(rosterSlots).where(eq(rosterSlots.teamId, "team_mirror_b"));
+    const filledIds = (rows: readonly { readonly playerId: string | null }[]) => rows.flatMap((r) => (r.playerId === null ? [] : [r.playerId])).sort();
+    // Alice gave away p_mirror_1 (trade 1) and p_mirror_4 (trade 2), and received p_mirror_2
+    // (trade 1) and p_mirror_3 (trade 2) — both trades really did move both ways.
+    expect(filledIds(teamARoster)).toEqual(["p_mirror_2", "p_mirror_3"]);
+    expect(filledIds(teamBRoster)).toEqual(["p_mirror_1", "p_mirror_4"]);
+  });
+});
+
+/**
+ * Task 7's own transaction, first half: `reverseTradeInTx`'s week lock. The brief's own note: "the
+ * reversal reaches `stat_weeks FOR SHARE` first, before" anything else in its own transaction —
+ * matching `setLineup`'s and `acceptTrade`'s own position exactly, so the three roster-adjacent
+ * writers in this codebase all take the same first lock in the same position, the property that
+ * keeps them from forming a cycle. This parks a real week-status write — the same statement
+ * `persistTick` issues, standing in for it exactly as `acceptTrade's week lock`'s own test does —
+ * holding `stat_weeks[1]` open, and drives a real `reverseTradeInTx` against the SAME row on a
+ * second connection. Unlike `acceptTrade`, a reversal never REFUSES on the week's own status
+ * (ruling 18 — it is exactly the mechanism that lets a reversal outlive a locked week), so the
+ * claim here is narrower still: the reversal genuinely BLOCKS on the week before it does anything
+ * else, and completes cleanly once the flip releases it.
+ */
+describe("reverseTradeInTx's week lock", () => {
+  it("blocks behind a concurrent stat-week write, and completes once it releases", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_rv_wk_alice", email: "rv_wk_alice@test.local", displayName: "Alice" },
+      { id: "u_rv_wk_bob", email: "rv_wk_bob@test.local", displayName: "Bob" },
+    ]);
+    await joinDb.insert(leagues).values({ id: "lg_rv_wk", name: "Reversal Week Lock", format: "snake", teamCount: 2, commissionerUserId: "u_rv_wk_alice" });
+    await joinDb.insert(teams).values([
+      { id: "team_rv_wk_alice", leagueId: "lg_rv_wk", userId: "u_rv_wk_alice", name: "Alice's Team" },
+      { id: "team_rv_wk_bob", leagueId: "lg_rv_wk", userId: "u_rv_wk_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_rv_wk_a", name: "Player A", position: "RB", nflTeam: "KC" },
+      { id: "p_rv_wk_b", name: "Player B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_rv_wk_alice", slot: "BENCH", slotIndex: 0, playerId: "p_rv_wk_a" },
+      { teamId: "team_rv_wk_bob", slot: "BENCH", slotIndex: 0, playerId: "p_rv_wk_b" },
+    ]);
+    await joinDb.insert(statWeeks).values({ week: 1, status: "scheduled" });
+
+    const proposed = await proposeTrade(pickDb, {
+      leagueId: "lg_rv_wk",
+      userId: "u_rv_wk_alice",
+      counterpartyTeamId: "team_rv_wk_bob",
+      proposerAssets: [{ kind: "player", playerId: "p_rv_wk_a" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_rv_wk_b" }],
+      note: null,
+      clock,
+      deliver: async () => {},
+    });
+    if (!proposed.ok) throw new Error(proposed.reason);
+    const accepted = await acceptTrade(pickDb, { tradeId: proposed.tradeId, leagueId: "lg_rv_wk", userId: "u_rv_wk_bob", clock, deliver: async () => {} });
+    if (!accepted.ok) throw new Error(accepted.reason);
+    const flag = await joinDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_fairness",
+        subjectId: proposed.tradeId,
+        leagueId: "lg_rv_wk",
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => "flag_rv_wk_1",
+      }),
+    );
+
+    let releaseFlip: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseFlip = resolve));
+    const flipping = joinDb.transaction(async (tx) => {
+      await tx.update(statWeeks).set({ status: "in_progress" }).where(eq(statWeeks.week, 1));
+      await released;
+    });
+
+    const reversing = resolveDb.transaction((tx) =>
+      reverseTradeInTx(tx, { tradeId: proposed.tradeId, leagueId: "lg_rv_wk", flagId: flag.id, operatorUserId: "u_op_rv_wk", note: "n", clock }),
+    );
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFlip();
+    await flipping;
+
+    expect(await reversing).toMatchObject({ ok: true, tradeId: proposed.tradeId });
+    const aliceRows = await joinDb.select({ playerId: rosterSlots.playerId }).from(rosterSlots).where(eq(rosterSlots.teamId, "team_rv_wk_alice"));
+    expect(aliceRows.some((row) => row.playerId === "p_rv_wk_a")).toBe(true); // back where it started
+  });
+});
+
+/**
+ * Task 7's own transaction, second half: `reverseTradeInTx`'s own team-lock order, ledgered as
+ * "both teams' rows FOR UPDATE in canonical sorted-by-id order, same as acceptTrade". The novel
+ * combination this proves is a REVERSAL racing a fresh ACCEPT between the SAME two teams — a
+ * different trade for the accept, so the two writes never collide with each other independent of
+ * the team-lock question this test is actually about. Both compute the identical
+ * `[teamId, teamId].sort()` pair, so both converge on locking the same row first; a bystander
+ * holding exactly that row, released only once BOTH are genuinely blocked behind it, proves the
+ * convergence directly rather than trusting the two functions share one ordering by inspection.
+ */
+describe("reverseTradeInTx's team-lock order — racing a fresh accept between the same two teams", () => {
+  it("lets a reversal and an unrelated accept between the same two teams run concurrently without deadlocking", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_rv_tl_alice", email: "rv_tl_alice@test.local", displayName: "Alice" },
+      { id: "u_rv_tl_bob", email: "rv_tl_bob@test.local", displayName: "Bob" },
+    ]);
+    await joinDb.insert(leagues).values({ id: "lg_rv_tl", name: "Reversal Team Lock", format: "snake", teamCount: 2, commissionerUserId: "u_rv_tl_alice" });
+    // Sorted lexicographically, `"team_rv_tl_alice" < "team_rv_tl_bob"` — both the reversal and
+    // the accept below compute the identical `[firstTeamId, secondTeamId]` pair.
+    await joinDb.insert(teams).values([
+      { id: "team_rv_tl_alice", leagueId: "lg_rv_tl", userId: "u_rv_tl_alice", name: "Alice's Team" },
+      { id: "team_rv_tl_bob", leagueId: "lg_rv_tl", userId: "u_rv_tl_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_rv_tl_1", name: "Player One", position: "RB", nflTeam: "KC" },
+      { id: "p_rv_tl_2", name: "Player Two", position: "RB", nflTeam: "SF" },
+      { id: "p_rv_tl_3", name: "Player Three", position: "RB", nflTeam: "DAL" },
+      { id: "p_rv_tl_4", name: "Player Four", position: "RB", nflTeam: "MIA" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_rv_tl_alice", slot: "BENCH", slotIndex: 0, playerId: "p_rv_tl_1" },
+      { teamId: "team_rv_tl_alice", slot: "BENCH", slotIndex: 1, playerId: "p_rv_tl_4" },
+      { teamId: "team_rv_tl_bob", slot: "BENCH", slotIndex: 0, playerId: "p_rv_tl_2" },
+      { teamId: "team_rv_tl_bob", slot: "BENCH", slotIndex: 1, playerId: "p_rv_tl_3" },
+    ]);
+
+    // Trade 1: already accepted — the one this test reverses.
+    const firstTrade = await proposeTrade(pickDb, {
+      leagueId: "lg_rv_tl",
+      userId: "u_rv_tl_alice",
+      counterpartyTeamId: "team_rv_tl_bob",
+      proposerAssets: [{ kind: "player", playerId: "p_rv_tl_1" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_rv_tl_2" }],
+      note: null,
+      clock,
+      deliver: async () => {},
+    });
+    if (!firstTrade.ok) throw new Error(firstTrade.reason);
+    const firstAccepted = await acceptTrade(pickDb, { tradeId: firstTrade.tradeId, leagueId: "lg_rv_tl", userId: "u_rv_tl_bob", clock, deliver: async () => {} });
+    if (!firstAccepted.ok) throw new Error(firstAccepted.reason);
+    const flag = await joinDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_fairness",
+        subjectId: firstTrade.tradeId,
+        leagueId: "lg_rv_tl",
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => "flag_rv_tl_1",
+      }),
+    );
+
+    // Trade 2: a SEPARATE, still-open offer over the two OTHER players, still open when the race
+    // starts — accepted concurrently with the reversal above.
+    const secondTrade = await proposeTrade(pickDb, {
+      leagueId: "lg_rv_tl",
+      userId: "u_rv_tl_bob",
+      counterpartyTeamId: "team_rv_tl_alice",
+      proposerAssets: [{ kind: "player", playerId: "p_rv_tl_3" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_rv_tl_4" }],
+      note: null,
+      clock,
+      deliver: async () => {},
+    });
+    if (!secondTrade.ok) throw new Error(secondTrade.reason);
+
+    // The bystander: holds the ONE row both operations must reach for first.
+    let holdsFirstTeamLock: () => void = () => {};
+    const firstTeamLocked = new Promise<void>((resolve) => (holdsFirstTeamLock = resolve));
+    let releaseFirstTeamLock: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseFirstTeamLock = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM teams WHERE id = ${"team_rv_tl_alice"} FOR UPDATE`);
+      holdsFirstTeamLock();
+      await released;
+    });
+    await firstTeamLocked;
+
+    const reversing = resolveDb.transaction((tx) =>
+      reverseTradeInTx(tx, { tradeId: firstTrade.tradeId, leagueId: "lg_rv_tl", flagId: flag.id, operatorUserId: "u_op_rv_tl", note: "n", clock }),
+    );
+    const accepting = acceptTrade(pickDb, { tradeId: secondTrade.tradeId, leagueId: "lg_rv_tl", userId: "u_rv_tl_alice", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFirstTeamLock();
+
+    await expect(holding).resolves.toBeUndefined();
+    const [reversed, secondAccepted] = await Promise.all([reversing, accepting]);
+
+    expect(reversed).toMatchObject({ ok: true, tradeId: firstTrade.tradeId });
+    expect(secondAccepted).toMatchObject({ ok: true, tradeId: secondTrade.tradeId });
+
+    // Both operations really did land: trade 1 reversed (players 1 and 2 back where they
+    // started) and trade 2 accepted (players 3 and 4 swapped).
+    const aliceRoster = await joinDb.select({ playerId: rosterSlots.playerId }).from(rosterSlots).where(eq(rosterSlots.teamId, "team_rv_tl_alice"));
+    const bobRoster = await joinDb.select({ playerId: rosterSlots.playerId }).from(rosterSlots).where(eq(rosterSlots.teamId, "team_rv_tl_bob"));
+    const filledIds = (rows: readonly { readonly playerId: string | null }[]) => rows.flatMap((r) => (r.playerId === null ? [] : [r.playerId])).sort();
+    expect(filledIds(aliceRoster)).toEqual(["p_rv_tl_1", "p_rv_tl_3"]);
+    expect(filledIds(bobRoster)).toEqual(["p_rv_tl_2", "p_rv_tl_4"]);
+  });
+});
+
+/**
  * `correctLeagueInTx`, the fifth and last (final review, LOW 17). It is Plan A's own transaction
  * shape carried into Plan B's phase: notices FIRST (each an FK on `leagues` and on the manager's
  * `users` row), then the LEAGUE anchor, then `attachAuditEvent`. It is also the one writer whose
@@ -773,5 +1460,203 @@ describe("correctLeagueInTx's notice order", () => {
     const notices = await joinDb.select().from(memberNotices).where(eq(memberNotices.leagueId, CORRECT_LEAGUE));
     expect(notices.length).toBeGreaterThan(0);
     for (const notice of notices) expect(notice.auditEventId).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// FINAL REVIEW, HIGH 2 (second half): the suite covered 4 of Plan C's 7 new writers. The three
+// below close it to 7/7. Each follows the identical rendezvous every proof above does — park the
+// row the writer's own foreign key is about to reach for, drive the real writer on a second
+// connection, ASK Postgres whether a backend is genuinely blocked, release, require both sides to
+// finish — because the whole lesson of this suite is that an FK acquisition is invisible at the
+// call site and has to be driven, not reasoned about.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Writer 5: `raiseTradeFairnessFlag`, IN ITS REAL AFTER-COMMIT POSITION. `raiseFlag` has a proof
+ * of its own far above, but only when driven directly — never as `acceptTrade` actually reaches
+ * it, in a SECOND transaction opened after the league-chain one has already committed. That
+ * second transaction inserts into `integrity_flags` (a foreign key onto `leagues`, so
+ * `FOR KEY SHARE` on the league row) and then appends to the PLATFORM chain, while the
+ * transaction that just closed appended to the LEAGUE chain. This drives a real lopsided trade
+ * all the way through `acceptTrade` against a join parked on `leagues[X] FOR UPDATE`, and
+ * requires both the flag and the join to land.
+ */
+describe("raiseTradeFairnessFlag's after-commit position", () => {
+  it("raises a real trade's flag beside a concurrent join in the same league without deadlocking", async () => {
+    await seedLeagueWith("lg_fair_lock", ["u_fl_commish", "u_fl_alice", "u_fl_bob", "u_fl_joiner"]);
+    await joinDb.insert(teams).values([
+      { id: "team_fl_alice", leagueId: "lg_fair_lock", userId: "u_fl_alice", name: "Alice's Team" },
+      { id: "team_fl_bob", leagueId: "lg_fair_lock", userId: "u_fl_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_fl_star", name: "Flag Star", position: "RB", nflTeam: "KC" },
+      { id: "p_fl_scrub", name: "Flag Scrub", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_fl_alice", slot: "BENCH", slotIndex: 0, playerId: "p_fl_star" },
+      { teamId: "team_fl_bob", slot: "BENCH", slotIndex: 0, playerId: "p_fl_scrub" },
+    ]);
+    // Three scored weeks of a monster line, and a season whose current week is 4 — what makes the
+    // trade genuinely cross `fairnessFlagThreshold` and the after-commit write actually happen.
+    await joinDb.insert(playerStatLines).values([1, 2, 3].map((week) => ({ playerId: "p_fl_star", week, rushingYards: 300, rushingTouchdowns: 5 })));
+    await seasonCurrentWeek(joinDb, { leagueId: "lg_fair_lock", homeTeamId: "team_fl_alice", awayTeamId: "team_fl_bob", week: 4 });
+
+    const proposed = await proposeTrade(pickDb, {
+      leagueId: "lg_fair_lock",
+      userId: "u_fl_alice",
+      counterpartyTeamId: "team_fl_bob",
+      proposerAssets: [{ kind: "player", playerId: "p_fl_star" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_fl_scrub" }],
+      note: null,
+      clock,
+      deliver: async () => {},
+    });
+    if (!proposed.ok) throw new Error(proposed.reason);
+
+    const join = parkedJoin("lg_fair_lock", "u_fl_joiner", "team_fl_joiner");
+    await join.leagueLocked;
+
+    const accepting = acceptTrade(resolveDb, { tradeId: proposed.tradeId, leagueId: "lg_fair_lock", userId: "u_fl_bob", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await accepting).toMatchObject({ ok: true, fairness: { flagWorthy: true } });
+
+    // The after-commit flag really landed, on the PLATFORM chain, beside a league chain that
+    // carries the join and the acceptance and nothing about the flag.
+    const flags = await joinDb.select().from(integrityFlags).where(eq(integrityFlags.subjectId, proposed.tradeId));
+    expect(flags).toHaveLength(1);
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(1); // flag_raised, alone
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_fair_lock"));
+    expect(leagueAnchor!.headSequence).toBe(4); // trade_proposed, member_joined, trade_accepted + roster_move
+  });
+});
+
+/**
+ * Writer 6: `resolveFlag`'s `trade_reversed` branch — the only resolution shaped as TWO
+ * transactions. `reverseTradeInTx` runs and COMMITS first on the LEAGUE chain, and only then does
+ * `resolveFlag` open its own transaction for the PLATFORM-chain `flag_resolved` stamp. The suite
+ * drove the `warned_user` and `content_removed` branches; this one was never driven at all, and it
+ * is the branch that reaches for `leagues` twice, from two different transactions, around a real
+ * roster mutation.
+ */
+describe("resolveFlag's trade_reversed branch — two transactions, two chains", () => {
+  it("reverses a trade beside a concurrent join in the same league without deadlocking", async () => {
+    await seedLeagueWith("lg_rv_res", ["u_rvr_commish", "u_rvr_alice", "u_rvr_bob", "u_rvr_joiner", "u_rvr_op"]);
+    await joinDb.insert(teams).values([
+      { id: "team_rvr_alice", leagueId: "lg_rv_res", userId: "u_rvr_alice", name: "Alice's Team" },
+      { id: "team_rvr_bob", leagueId: "lg_rv_res", userId: "u_rvr_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_rvr_a", name: "Player A", position: "RB", nflTeam: "KC" },
+      { id: "p_rvr_b", name: "Player B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_rvr_alice", slot: "BENCH", slotIndex: 0, playerId: "p_rvr_a" },
+      { teamId: "team_rvr_bob", slot: "BENCH", slotIndex: 0, playerId: "p_rvr_b" },
+    ]);
+
+    const proposed = await proposeTrade(pickDb, {
+      leagueId: "lg_rv_res",
+      userId: "u_rvr_alice",
+      counterpartyTeamId: "team_rvr_bob",
+      proposerAssets: [{ kind: "player", playerId: "p_rvr_a" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_rvr_b" }],
+      note: null,
+      clock,
+      deliver: async () => {},
+    });
+    if (!proposed.ok) throw new Error(proposed.reason);
+    const accepted = await acceptTrade(pickDb, { tradeId: proposed.tradeId, leagueId: "lg_rv_res", userId: "u_rvr_bob", clock, deliver: async () => {} });
+    if (!accepted.ok) throw new Error(accepted.reason);
+    const flag = await joinDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_fairness",
+        subjectId: proposed.tradeId,
+        leagueId: "lg_rv_res",
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => "flag_rvr_1",
+      }),
+    );
+
+    const join = parkedJoin("lg_rv_res", "u_rvr_joiner", "team_rvr_joiner");
+    await join.leagueLocked;
+
+    const resolving = resolveFlag(resolveDb, {
+      flagId: flag.id,
+      decision: "trade_reversed",
+      note: "Reversed.",
+      operatorUserId: "u_rvr_op",
+      clock,
+    });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await resolving).toMatchObject({ ok: true });
+
+    // Both transactions landed: the reversal really moved both rosters back, and the flag closed.
+    const aliceRows = await joinDb.select({ playerId: rosterSlots.playerId }).from(rosterSlots).where(eq(rosterSlots.teamId, "team_rvr_alice"));
+    expect(aliceRows.some((row) => row.playerId === "p_rvr_a")).toBe(true);
+    const [resolved] = await joinDb.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(resolved!.resolvedAt).not.toBeNull();
+  });
+});
+
+/**
+ * Writer 7: `toggleReaction`. It shares no second resource with any trade writer by construction
+ * (`chat_messages` read, `chat_reactions` write), but "by construction" is exactly the reasoning
+ * that got `proposeTrade` wrong, so it is driven rather than argued. `chat_reactions` carries
+ * foreign keys onto `chat_messages` AND `users`, both taken `FOR KEY SHARE` by its insert, and no
+ * production caller takes a `users` row `FOR UPDATE` — so a bystander stands in for one, exactly
+ * as `recordSessionSignals`' and `grantAdmin`'s own cases above do. The claim: it blocks on that
+ * row, completes when released, and never reaches an audit anchor at all (a reaction is not an
+ * audited event, which is the property that makes it incapable of joining any cycle this file
+ * guards).
+ */
+describe("toggleReaction's reaction insert", () => {
+  it("reacts beside a concurrent hold on the reacting user's row and completes without deadlocking", async () => {
+    await seedLeagueWith("lg_react_lock", ["u_react_commish", "u_react_author", "u_react_fan"]);
+    const [message] = await joinDb
+      .insert(chatMessages)
+      .values({ leagueId: "lg_react_lock", authorUserId: "u_react_author", body: "big play" })
+      .returning({ id: chatMessages.id });
+
+    let holdsUserLock: () => void = () => {};
+    const userLocked = new Promise<void>((resolve) => (holdsUserLock = resolve));
+    let releaseHold: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseHold = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM users WHERE id = ${"u_react_fan"} FOR UPDATE`);
+      holdsUserLock();
+      await parked;
+    });
+    await userLocked;
+
+    const reacting = toggleReaction(resolveDb, {
+      leagueId: "lg_react_lock",
+      messageId: String(message!.id),
+      userId: "u_react_fan",
+      emoji: "🔥",
+      publish: async () => "1-0",
+    });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseHold();
+
+    await expect(holding).resolves.toBeUndefined();
+    expect(await reacting).toMatchObject({ ok: true, action: "added" });
+
+    // No chain of any kind: a reaction is not an audited event, so a wrong order here could only
+    // ever cycle on the two rows above — which is the whole reason it is safe, proved rather than
+    // asserted.
+    expect(await joinDb.select().from(auditChains)).toEqual([]);
   });
 });

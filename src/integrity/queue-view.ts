@@ -1,6 +1,7 @@
 import type { IconName } from "@/components/ui/icon";
 import type { AuditEvent, JsonObject } from "@/domain/audit";
-import { decisionIsAvailable, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision } from "@/integrity/flags";
+import type { Position } from "@/domain/player";
+import { decisionIsWiredFor, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision, type TradeFairnessBasis } from "@/integrity/flags";
 import type { ActivityRow } from "@/integrity/activity-view";
 
 /**
@@ -38,7 +39,7 @@ export interface FlagDetail {
   /** `null` while open. Once resolved, `decisions` is empty — the record is the `flag_resolved`
    *  audit event on `trail`, not a second attempt this page could offer. */
   readonly resolution: FlagResolutionView | null;
-  readonly decisions: readonly ResolutionDecision[]; // only those decisionIsAvailable() allows, and only while open
+  readonly decisions: readonly ResolutionDecision[]; // only those decisionIsWiredFor(d, subject.kind) allows, and only while open
 }
 
 /**
@@ -65,11 +66,73 @@ export interface FlagResolutionView {
  * never deletes but a future one might) still renders an honest sentence rather than a crash —
  * the same "a former member" discipline `activity-view.ts`'s `buildActivityNames` uses.
  */
+/**
+ * One traded player, as the detector valued it — the HISTORICAL number, not a live one. `Task 6`'s
+ * `raiseTradeFairnessFlag` (`@/integrity-service/trade-fairness`) writes this into the flag's own
+ * `evidence` once, at raise time, and `subjectFor` (`@/integrity-service/flags`) reads it back
+ * from there rather than re-deriving it — the session data it was computed from will have moved
+ * on by the time an operator looks (Plan B ruling 5), and that applies to a player's own form
+ * exactly as it does to the multi-account signals that ruling was written for.
+ */
+export interface TradedPlayerView {
+  readonly playerId: string;
+  readonly name: string;
+  readonly position: Position | null;
+  /** Points per week, at the week the trade was valued — never re-priced at read time. */
+  readonly averagePoints: number;
+}
+
 export type FlagSubjectView =
   | { readonly kind: "review"; readonly reviewId: string; readonly body: string; readonly authorName: string; readonly removedAt: string | null }
   | { readonly kind: "chat_message"; readonly messageId: string; readonly body: string | null; readonly authorName: string; readonly removedAt: string | null }
   | { readonly kind: "account_pair"; readonly userIds: readonly [string, string]; readonly names: readonly [string, string] }
-  | { readonly kind: "trade"; readonly tradeId: string };
+  | {
+      readonly kind: "trade";
+      readonly tradeId: string;
+      readonly proposerTeamName: string;
+      readonly counterpartyTeamName: string;
+      readonly gave: readonly TradedPlayerView[];
+      readonly got: readonly TradedPlayerView[];
+      readonly acceptedAt: string;
+      /** Non-null once an operator has already undone it. The detail page reads this to withhold
+       *  `trade_reversed` from a trade that is already reversed, the same way `subjectIsRemoved`
+       *  withholds `content_removed` from a message already gone (Plan B, MEDIUM 8) — see
+       *  `subjectIsAlreadyReversed` below. Set by `reverseTradeInTx`'s own guarded UPDATE
+       *  (`@/league-service/trade-reversal`), never rewound: a reversal is forward-only history. */
+      readonly reversedAt: string | null;
+      /**
+       * Task 6 fix round 1 (review MEDIUM 1). Plain words for how `gave`/`got` were priced —
+       * `tradeFairnessBasisPhrase`'s own output, computed once by `subjectFor`
+       * (`@/integrity-service/flags`) from the flag's stored `evidence.basis` so the operator
+       * reads a sentence, never a raw enum. Always a real sentence, even for a flag that predates
+       * basis tracking — `tradeFairnessBasisPhrase(null)` answers that honestly rather than
+       * leaving this field empty.
+       */
+      readonly valuationBasis: string;
+      /**
+       * Fix round 2, F3. The plain-language restatement of the number that actually raised this
+       * flag — `tradeFairnessGapPhrase`'s own output, computed once by `subjectFor`
+       * (`@/integrity-service/flags`) from the flag's stored `evidence.gap`/`.threshold`, the same
+       * "a raw number becomes one sentence" treatment `valuationBasis` already gets. Always a real
+       * sentence, honest about a flag that predates gap tracking rather than leaving this field
+       * empty.
+       */
+      readonly fairnessGapSummary: string;
+      /**
+       * Fix round 1 (LOW, M8 discipline). Whether a traded player has left the roster the trade
+       * put him on since it was accepted — precomputed at READ time by `subjectFor`
+       * (`@/integrity-service/flags`, `tradePlayersHaveMovedAgain`), the SAME ownership check
+       * `reverseTradeInTx`'s own STEP 4 makes, so the two can never quietly disagree. The detail
+       * page reads this to withhold `trade_reversed` with an explanation instead of letting an
+       * operator click into a 409 — the same "never offer a decision that will refuse" discipline
+       * `subjectIsRemoved`/`subjectIsAlreadyReversed` already hold `content_removed`/
+       * `trade_reversed` to. Always `false` once `reversedAt` is set (a reversed trade withholds
+       * the decision for a different reason, and this read is skipped rather than wasted).
+       * A PREVIEW, not a guarantee: a write can still land between this read and the operator's
+       * click, and `reverseTradeInTx`'s own check stays the authoritative one either way.
+       */
+      readonly playersMovedAgain: boolean;
+    };
 
 /**
  * Whether this subject's content is ALREADY gone — non-null `removed_at` on the row behind it.
@@ -84,6 +147,28 @@ export type FlagSubjectView =
  */
 export function subjectIsRemoved(subject: FlagSubjectView): boolean {
   return (subject.kind === "review" || subject.kind === "chat_message") && subject.removedAt !== null;
+}
+
+/**
+ * Whether this trade has ALREADY been put back — `subjectIsRemoved`'s own twin for Task 7.
+ * `resolveFlag`/`reverseTradeInTx` refuse a second reversal with a 409 (the guard lives in the
+ * reversal's own guarded `UPDATE`), but an operator should never be OFFERED the decision in the
+ * first place once the answer is already known from the row this page already has in hand — the
+ * same "never offer a decision that will refuse" discipline `subjectIsRemoved` established.
+ */
+export function subjectIsAlreadyReversed(subject: FlagSubjectView): boolean {
+  return subject.kind === "trade" && subject.reversedAt !== null;
+}
+
+/**
+ * Fix round 1 (LOW, M8 discipline). Whether a traded player has moved on since — `subject.
+ * playersMovedAgain`'s own honest read, narrowed to the `trade` kind. `subjectIsAlreadyReversed`'s
+ * own twin for the SECOND way a reversal can refuse: not because the trade already happened, but
+ * because the world moved on since. Both withhold `trade_reversed` for the same "never offer a
+ * decision that will refuse" reason.
+ */
+export function subjectPlayersMovedAgain(subject: FlagSubjectView): boolean {
+  return subject.kind === "trade" && subject.playersMovedAgain;
 }
 
 /** One reporter's own account of it — who, why, and when. Derived at read time from
@@ -161,10 +246,15 @@ export interface FlagDetailInput {
 
 /**
  * Pure. `flagDetail` fetches the flag row, the subject, the reporters and the trail; this
- * function decides the shape an operator reads them in. `decisions` is `RESOLUTION_DECISIONS`
- * narrowed by `decisionIsAvailable` — an operator is never offered a decision this product
- * cannot carry out (`trade_reversed`, reserved for Plan C), the same refusal `resolveFlag` itself
- * enforces at the write.
+ * function decides the shape an operator reads them in. `decisions` narrows on the SUBJECT, not
+ * on availability alone (Task 7) — `RESOLUTION_DECISIONS` filtered by `decisionIsWiredFor(d,
+ * subject.kind)`, which is what stops the detail page ever offering a trade reversal on a chat
+ * report, the same refusal `resolveFlag` itself enforces at the write. `trade_reversed` is
+ * withheld TWO further ways on top of that, both the same "never offer a decision that will
+ * refuse" discipline `subjectIsRemoved` already holds `content_removed` to: a trade already put
+ * back (`subjectIsAlreadyReversed`) never offers a second one, and a trade whose players have
+ * moved on since (`subjectPlayersMovedAgain`, fix round 1) never offers one that would 409 on
+ * submit.
  */
 export function flagDetailFor(
   flag: FlagDetailInput,
@@ -184,7 +274,14 @@ export function flagDetailFor(
     resolution: flag.resolution,
     // An already-resolved flag offers no decision at all: the record is the `flag_resolved`
     // event on `trail`, not a second attempt this page could invite.
-    decisions: flag.resolution === null ? RESOLUTION_DECISIONS.filter(decisionIsAvailable) : [],
+    decisions:
+      flag.resolution === null
+        ? RESOLUTION_DECISIONS.filter(
+            (decision) =>
+              decisionIsWiredFor(decision, subject.kind) &&
+              (decision !== "trade_reversed" || (!subjectIsAlreadyReversed(subject) && !subjectPlayersMovedAgain(subject))),
+          )
+        : [],
   };
 }
 
@@ -214,18 +311,82 @@ function isResolutionDecision(value: string): value is ResolutionDecision {
 }
 
 /**
+ * The plain-language restatement of `TradeFairnessBasis` (`@/integrity/flags`) an operator reads
+ * on a trade flag's detail — Task 6 fix round 1 (review MEDIUM 1). Active voice, no em dashes,
+ * the same house style `DECISION_PHRASE`'s own sentences keep. Exhaustive over both declared
+ * bases, so a third one added later fails to compile here rather than rendering silently blank.
+ *
+ * Plan B's historical-vs-live framing, made explicit for the third time this plan needs it
+ * (`TradedPlayerView`'s own docblock is the first, `subjectIsRemoved`'s the second): a number an
+ * operator reads here was true WHEN IT WAS COMPUTED, and this is what tells them when that was.
+ */
+export const TRADE_FAIRNESS_BASIS_PHRASE: Readonly<Record<TradeFairnessBasis, string>> = {
+  accept_evaluation: "The platform valued this trade the moment it was accepted.",
+  sweep_rederivation: "The fairness sweep valued this trade later, from the rosters as they stood when it ran.",
+};
+
+/**
+ * `TRADE_FAIRNESS_BASIS_PHRASE[basis]`, with an honest fallback for `null` — a flag raised before
+ * this field existed on `evidence` at all. `subjectFor` (`@/integrity-service/flags`) is the one
+ * caller, and it passes `null` rather than guessing one of the two real bases for a row that
+ * simply predates them.
+ */
+export function tradeFairnessBasisPhrase(basis: TradeFairnessBasis | null): string {
+  return basis === null ? "This flag predates valuation-basis tracking, so the method isn't recorded." : TRADE_FAIRNESS_BASIS_PHRASE[basis];
+}
+
+/**
+ * The operator-facing plain-language restatement of the number that actually raised this flag —
+ * fix round 2, F3. The friendly `TradeSubjectCard` (`@/app/app/admin/queue/[flagId]/page`) shows
+ * each player's own average points but, before this fix, never the trade's own `gap`/`threshold`
+ * — the values `tradeBalance` computed and `crossesFairnessThreshold` tested against — leaving an
+ * operator to do the subtraction themselves or trust an unlabeled JSON number in the raw Evidence
+ * panel two cards down. `tradeFairnessBasisPhrase` (above) is the precedent this follows: a raw
+ * number, turned into one sentence, in the SAME "points per week" unit `fairnessGap`'s own
+ * docblock (`@/trades/fairness`) already names but never surfaced past that comment before now.
+ *
+ * Deliberately silent on `verdict` — ruling 30's "no severity word" discipline, which this same
+ * card already holds to for `valuationBasis`: the number is reported honestly, and the operator
+ * is left to judge it, not told "lopsided" to their face.
+ */
+export function tradeFairnessGapPhrase(gap: number | null, threshold: number | null): string {
+  if (gap === null || threshold === null) return "This flag predates gap tracking, so the number isn't recorded.";
+  return `The two sides differ by ${gap} points per week, at or past the ${threshold}-point threshold that raised this flag.`;
+}
+
+/** An actor's own display name for the trail's voice — "Alice offered this trade.", never "You"
+ *  or a bare id. `actorNames` is resolved once, batched, by the caller (`trailFor`,
+ *  `@/integrity-service/flags`) — the same "resolved at read time, never per-row" discipline
+ *  `aboutFor`'s own docblock states. `null` (a system actor) and an id the map has no entry for
+ *  (a former member) both read the same honest fallback every other subject-view branch uses. */
+function trailActorName(actorId: string | null, actorNames: ReadonlyMap<string, string>): string {
+  if (actorId === null) return "A former member";
+  return actorNames.get(actorId) ?? "A former member";
+}
+
+/**
  * The operator-facing rendering of ONE audit event on this flag's trail — `flag_raised`,
- * `flag_resolved`, `review_removed` and the `member_joined` context an account-pair investigation
- * pulls from the league chain. Deliberately its OWN switch rather than a call into
- * `activity-view.ts`'s `renderPayload`: those types are all `"hidden"` in `ACTIVITY_VISIBILITY`
- * (or, for `member_joined`, rendered in the MEMBER's voice, "X joined the league" without the
- * operator framing this trail needs), so reusing that renderer would mean teaching it about an
- * audience it must never serve.
+ * `flag_resolved`, `review_removed`, the `member_joined` context an account-pair investigation
+ * pulls from the league chain, and (Task 6) the `trade_proposed` / `trade_accepted` /
+ * `roster_move` sequence a trade-fairness flag's own trail pulls from that same league chain.
+ * Deliberately its OWN switch rather than a call into `activity-view.ts`'s `renderPayload`: those
+ * types are all `"hidden"` in `ACTIVITY_VISIBILITY` (or, for `member_joined`/`trade_accepted`/
+ * `roster_move`, rendered in the MEMBER's voice — "X joined the league", "A and B completed a
+ * trade" — without the operator framing this trail needs, and `trade_proposed` is `"hidden"`
+ * outright), so reusing that renderer would mean teaching it about an audience it must never
+ * serve.
+ *
+ * `actorNames` is the trade branch's own name lookup — every other branch ignores it, the same
+ * way `member_joined` renders with no name at all today. Defaults to an empty map so every
+ * existing single-argument call site (a `.map(flagTrailRowFor)` over a non-trade trail) is
+ * unaffected; `trailFor`'s trade branch is the one caller that ever supplies a populated one.
  *
  * Returns `null` for anything this trail does not know how to explain — deny-by-default, the same
- * guarantee `activityRowFor`'s own unreachable `default` case documents.
+ * guarantee `activityRowFor`'s own unreachable `default` case documents. A `roster_move` whose own
+ * `reason` isn't `"trade"` (a future `"trade_reversed"` entry, once that decision ships) denies
+ * the same way rather than guess at a sentence this task does not own yet.
  */
-export function flagTrailRowFor(event: AuditEvent): ActivityRow | null {
+export function flagTrailRowFor(event: AuditEvent, actorNames: ReadonlyMap<string, string> = new Map()): ActivityRow | null {
   if (event.eventType === "flag_raised") {
     return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "alert-triangle", headline: "This flag was opened.", detail: null };
   }
@@ -239,6 +400,43 @@ export function flagTrailRowFor(event: AuditEvent): ActivityRow | null {
   }
   if (event.eventType === "member_joined") {
     return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "users", headline: "This account joined the league.", detail: null };
+  }
+  if (event.eventType === "trade_proposed") {
+    return {
+      eventId: event.eventId,
+      occurredAt: event.occurredAt,
+      icon: "refresh-cw",
+      headline: `${trailActorName(event.actorId, actorNames)} offered this trade.`,
+      detail: null,
+    };
+  }
+  if (event.eventType === "trade_accepted") {
+    return {
+      eventId: event.eventId,
+      occurredAt: event.occurredAt,
+      icon: "check",
+      headline: `${trailActorName(event.actorId, actorNames)} accepted it.`,
+      detail: null,
+    };
+  }
+  if (event.eventType === "roster_move") {
+    const reason = payloadStr(event.payload, "reason");
+    if (reason === "trade") {
+      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "Two players changed teams.", detail: null };
+    }
+    // Task 7: `reverseTradeInTx`'s own compensating transfer, on the SAME league chain, with the
+    // SAME event type — a reversal is a roster_move, not a second trade-typed event
+    // (`AUDIT_EVENT_TYPES` is frozen). `payload.reason` is the honest spelling that tells the two
+    // apart, the identical "one type, `payload.outcome` distinguishes" shape `trade_rejected`/
+    // `trade_withdrawn` already share.
+    //
+    // Fix round 2 (F2, naming consistency): "reversed", never "put back" — the panel found this
+    // trail row using a different verb than `DECISION_PHRASE.trade_reversed`'s own "reversed the
+    // trade" and the notice title both use for the identical action.
+    if (reason === "trade_reversed") {
+      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "An operator reversed the trade.", detail: null };
+    }
+    return null;
   }
   return null;
 }

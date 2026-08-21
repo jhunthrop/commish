@@ -32,11 +32,13 @@ import { candidateCopyIn, sourceFilesIn } from "./test-support";
  * string reddens the scan for the file it lives in.
  */
 
-/** The two client-room directories the review named. The other rooms are swept by the rendered
- *  sweep's own `describe` blocks; these two are added here rather than there because the gap
- *  that let 5 and 6 ship was not "somebody forgot a block", it was that a hand-maintained list
- *  cannot cover a directory. */
-const ROOM_DIRS = ["src/chat-room", "src/admin-room"];
+/** The client-room directories the review named, plus `src/league-room` (Phase 3 Plan C, Task
+ *  8, ruling 27): every string in the league room had been sweep-free since Phase 1, and this
+ *  plan is the one that adds thirty more of them (the trade surface). Directory-derived, so a
+ *  component added next month is covered the moment it exists rather than when somebody
+ *  remembers — the same reason the other two are here rather than in the rendered sweep's
+ *  hand-maintained `describe` list. */
+const ROOM_DIRS = ["src/chat-room", "src/admin-room", "src/league-room"];
 
 const REPO_ROOT = process.cwd();
 
@@ -45,8 +47,15 @@ const files = sourceFilesIn(ROOM_DIRS, ".tsx");
 describe("the chat room and the admin room write in the house voice", () => {
   it("finds the component files to sweep, so an empty scan can never pass silently", () => {
     expect(files.length).toBeGreaterThanOrEqual(10);
+    // Every swept directory is pinned by name, LITERALLY — never by iterating `ROOM_DIRS`, which
+    // would delete the assertion along with the entry it was meant to defend. `src/league-room`
+    // was the one missing (final review, LOW 8): deleting it from `ROOM_DIRS` dropped 31 files —
+    // the whole trade surface, thirty-odd new strings — and this suite stayed green, because the
+    // length floor clears on the other two directories alone. A guard a deletion can silently
+    // satisfy is not a guard.
     expect(files.some((file) => file.startsWith("src/chat-room"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/admin-room"))).toBe(true);
+    expect(files.some((file) => file.startsWith("src/league-room"))).toBe(true);
     // Its own tests, and the module holding this scan's helpers, are the things DOING the
     // checking rather than things being checked — the same exclusion `flag-only.test.ts`'s own
     // walker makes, asserted here so widening the filter cannot silently pull them in.
