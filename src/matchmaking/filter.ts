@@ -1,10 +1,11 @@
+import { compositionCategoryFor } from "@/participation/composition";
 import { MATCHMAKING_CONFIG } from "./config";
 import type { BrowseFilter, PublicLeagueSummary } from "./contract";
 
 const ANY = MATCHMAKING_CONFIG.anyValue;
 
 /** Nothing narrowed: what browse answers with before anybody touches a control. */
-export const EMPTY_BROWSE_FILTER: BrowseFilter = { format: ANY, experienceTier: ANY, stakeTier: ANY };
+export const EMPTY_BROWSE_FILTER: BrowseFilter = { format: ANY, experienceTier: ANY, stakeTier: ANY, participationTier: ANY };
 
 /**
  * Turns whatever arrived on a query string into a filter the rest of the system can trust.
@@ -18,6 +19,7 @@ export function normalizeBrowseFilter(raw: {
   readonly format?: string | null;
   readonly experienceTier?: string | null;
   readonly stakeTier?: string | null;
+  readonly participationTier?: string | null;
 }): BrowseFilter {
   const stake = Number(raw.stakeTier);
   const stakeIsConfigured =
@@ -31,7 +33,22 @@ export function normalizeBrowseFilter(raw: {
     format: MATCHMAKING_CONFIG.formats.find((value) => value === raw.format) ?? ANY,
     experienceTier: MATCHMAKING_CONFIG.experienceTiers.find((value) => value === raw.experienceTier) ?? ANY,
     stakeTier: stakeIsConfigured ? stake : ANY,
+    participationTier: MATCHMAKING_CONFIG.participationTiers.find((value) => value === raw.participationTier) ?? ANY,
   };
+}
+
+/**
+ * Whether `league` reads as leaning `tier`, per `compositionCategoryFor`'s own comparison
+ * (`@/participation/composition`) — the SAME `newcomers > veterans` rule the composition label
+ * renders from, never a second copy of it. `"newcomer"` matches only a league that has actually
+ * earned that lean (`all_newcomers`/`mostly_newcomers`); `"veteran"` matches everything else,
+ * including a tie and an empty roster — there is no "mostly veterans" bucket to match against
+ * (`TIER_COMPOSITION_LABEL`'s own docblock), so the veteran filter reads as "not newcomer-leaning"
+ * rather than as its own third comparison.
+ */
+function matchesParticipationTier(league: PublicLeagueSummary, tier: Exclude<BrowseFilter["participationTier"], "any">): boolean {
+  const leansNewcomer = compositionCategoryFor(league.tierComposition) !== "open";
+  return tier === "newcomer" ? leansNewcomer : !leansNewcomer;
 }
 
 /** True when a league matches every narrowed field. The one filter rule in the product. */
@@ -39,6 +56,7 @@ export function matchesBrowseFilter(league: PublicLeagueSummary, filter: BrowseF
   if (filter.format !== ANY && league.format !== filter.format) return false;
   if (filter.experienceTier !== ANY && league.experienceTier !== filter.experienceTier) return false;
   if (filter.stakeTier !== ANY && league.stakeTier !== filter.stakeTier) return false;
+  if (filter.participationTier !== ANY && !matchesParticipationTier(league, filter.participationTier)) return false;
   return true;
 }
 

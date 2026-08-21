@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
 import { STANDARD_SCORING, type ScoringSettings } from "@/domain/scoring";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { EMPTY_BROWSE_FILTER, hasOpenSeat, matchesBrowseFilter } from "@/matchmaking/filter";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
@@ -21,6 +22,9 @@ interface SeedLeague {
   readonly filled: number;
   readonly isPublicMatchmade: boolean;
   readonly draftStatus?: "scheduled" | "in_progress" | "complete";
+  /** Defaults to `${id}_u${index}` per seat. Set explicitly so a caller can give a specific seat
+   *  a completed-season history (`giveCompletedSeasons`) before seating them here. */
+  readonly seatUserIds?: readonly string[];
   /** Defaults to the row's own `defaultNow()`. Set explicitly to pin ordering in a test. */
   readonly createdAt?: Date;
   /** Defaults to `STANDARD_SCORING` — every real league has a scoring_settings row. */
@@ -49,9 +53,34 @@ async function seed(league: SeedLeague): Promise<void> {
   });
   await db.insert(scoringSettings).values({ leagueId: league.id, ...(league.scoring ?? STANDARD_SCORING) });
   for (let i = 0; i < league.filled; i++) {
-    const userId = `${league.id}_u${i}`;
-    await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: `Manager ${i}` });
+    const userId = league.seatUserIds?.[i] ?? `${league.id}_u${i}`;
+    // `onConflictDoNothing`: a caller may have already given this exact user id a completed-
+    // season history (`giveCompletedSeasons`, below) before seating them here.
+    await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: `Manager ${i}` }).onConflictDoNothing();
     await db.insert(teams).values({ id: `${league.id}_t${i}`, leagueId: league.id, userId, name: `Team ${i}` });
+  }
+}
+
+/**
+ * Gives `userId` `count` OTHER completed leagues — a one-team league apiece, matching
+ * `participation.test.ts`'s own `seatIn` shape — so their seat in whatever league the caller
+ * seeds them into next reads as a veteran's, per `INTEGRITY_CONFIG.participation
+ * .veteranSeasonCutoff`. Called BEFORE `seed()`/`seedPublicLeague()` seats the same id, so the
+ * user row already exists when those insert the league that references it.
+ */
+async function giveCompletedSeasons(userId: string, count: number): Promise<void> {
+  await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: userId }).onConflictDoNothing();
+  for (let i = 0; i < count; i++) {
+    const leagueId = `${userId}_history_${i}`;
+    await db.insert(leagues).values({
+      id: leagueId,
+      name: leagueId,
+      format: "snake",
+      teamCount: 1,
+      commissionerUserId: userId,
+      seasonCompletedAt: new Date("2025-01-01T00:00:00.000Z"),
+    });
+    await db.insert(teams).values({ id: `${leagueId}_team`, leagueId, userId, name: "Team" });
   }
 }
 
@@ -96,6 +125,9 @@ async function seedPublicLeague(
     teamCount: overrides.teamCount,
     filledTeams: overrides.filledTeams,
     scoringLabel: "Standard",
+    // `seed()` never gives a manager a completed league of their own, so every seat here is a
+    // newcomer — matching `listPublicLeagues`'s own answer for the same corpus.
+    tierComposition: { newcomers: overrides.filledTeams, veterans: 0 },
   };
 }
 
@@ -116,7 +148,10 @@ describe("listPublicLeagues", () => {
     });
     const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
     expect(rows).toEqual([
-      { id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 8, scoringLabel: "Standard" },
+      {
+        id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0,
+        teamCount: 12, filledTeams: 8, scoringLabel: "Standard", tierComposition: { newcomers: 8, veterans: 0 },
+      },
     ]);
   });
 
@@ -209,7 +244,9 @@ describe("listPublicLeagues", () => {
     expect((await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, format: "auction" })).map((l) => l.id)).toEqual(["b"]);
     expect((await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, experienceTier: "beginner" })).map((l) => l.id)).toEqual(["a"]);
     expect((await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, stakeTier: 3 })).map((l) => l.id)).toEqual(["b"]);
-    expect(await listPublicLeagues(db, { format: "snake", experienceTier: "experienced", stakeTier: 3 })).toEqual([]);
+    expect(
+      await listPublicLeagues(db, { format: "snake", experienceTier: "experienced", stakeTier: 3, participationTier: "any" }),
+    ).toEqual([]);
   });
 
   it("returns matching leagues oldest-first, per the docblock's own promise", async () => {
@@ -248,6 +285,128 @@ describe("listPublicLeagues", () => {
 
 });
 
+describe("listPublicLeagues tier composition", () => {
+  it("carries the composition as two counts and nothing that names a person", async () => {
+    await seed({
+      id: "comp_all_newcomer", name: "Rookie Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 6, isPublicMatchmade: true,
+    });
+    const [summary] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(summary!.tierComposition).toEqual({ newcomers: 6, veterans: 0 });
+    expect(Object.keys(summary!).sort()).toEqual([...PUBLIC_LEAGUE_FIELDS].sort());
+    expect(JSON.stringify(summary)).not.toContain("comp_all_newcomer_u0");
+  });
+
+  it("counts a seat as a veteran once that seat-holder's OWN completed-season history crosses the cutoff", async () => {
+    await giveCompletedSeasons("mix_veteran", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    await seed({
+      id: "mix", name: "Mixed League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 2, isPublicMatchmade: true,
+      seatUserIds: ["mix_veteran", "mix_newcomer"],
+    });
+    const [summary] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(summary!.tierComposition).toEqual({ newcomers: 1, veterans: 1 });
+  });
+
+  it("counts an empty seat as neither a newcomer nor a veteran", async () => {
+    await seed({
+      id: "empty_seats", name: "Just Opened", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 0, isPublicMatchmade: true,
+    });
+    const [summary] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(summary!.tierComposition).toEqual({ newcomers: 0, veterans: 0 });
+  });
+
+  it("costs exactly two queries, whether or not any seat-holder has a completed-season history", async () => {
+    // `listPublicLeagues` is `browseQuery` + `scoringWeightsByLeagueId` — the composition join is
+    // FOLDED into `browseQuery` itself (measured in `src/db/index-plans.test.ts`), never a third
+    // round trip, so this stays two queries regardless of how many leagues or seats it answers
+    // for.
+    await giveCompletedSeasons("counting_veteran", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    await seed({
+      id: "counting", name: "Counting League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 2, isPublicMatchmade: true,
+      seatUserIds: ["counting_veteran", "counting_newcomer"],
+    });
+    const counting = countingDb(db);
+    await listPublicLeagues(counting.db, EMPTY_BROWSE_FILTER);
+    expect(counting.selectCount()).toBe(2);
+  });
+});
+
+describe("listPublicLeagues narrows on participation tier", () => {
+  it("returns only leagues that lean newcomer when the filter asks for newcomers", async () => {
+    await giveCompletedSeasons("pt_veteran", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    await seed({
+      id: "pt_newcomer_league", name: "Newcomer Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 3, isPublicMatchmade: true,
+    });
+    await seed({
+      id: "pt_veteran_league", name: "Veteran Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      seatUserIds: ["pt_veteran"],
+    });
+    const rows = await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, participationTier: "newcomer" });
+    expect(rows.map((l) => l.id)).toEqual(["pt_newcomer_league"]);
+  });
+
+  it("returns only leagues that do not lean newcomer when the filter asks for veterans, including a tie", async () => {
+    await giveCompletedSeasons("pt2_veteran", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    await seed({
+      id: "pt2_newcomer_league", name: "Newcomer Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 3, isPublicMatchmade: true,
+    });
+    await seed({
+      id: "pt2_veteran_league", name: "Veteran Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      seatUserIds: ["pt2_veteran"],
+    });
+    const rows = await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, participationTier: "veteran" });
+    expect(rows.map((l) => l.id)).toEqual(["pt2_veteran_league"]);
+  });
+
+  it("agrees with the pure rule (matchesBrowseFilter) over the same corpus", async () => {
+    await giveCompletedSeasons("pt3_veteran", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    await seed({
+      id: "pt3_a", name: "A", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 3, isPublicMatchmade: true,
+    });
+    await seed({
+      id: "pt3_b", name: "B", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      seatUserIds: ["pt3_veteran"],
+    });
+    for (const participationTier of ["any", "newcomer", "veteran"] as const) {
+      const filter = { ...EMPTY_BROWSE_FILTER, participationTier };
+      const fromSql = (await listPublicLeagues(db, filter)).map((l) => l.id).sort();
+      const fromRule = (await listPublicLeagues(db, EMPTY_BROWSE_FILTER))
+        .filter((league) => matchesBrowseFilter(league, filter))
+        .map((l) => l.id)
+        .sort();
+      expect(fromSql).toEqual(fromRule);
+    }
+  });
+
+  it("narrows on participation tier BEFORE the cap, so a participation-narrowed browse never under-fills a page more matches exist for", async () => {
+    for (let i = 0; i < MATCHMAKING_CONFIG.maxResults + 10; i += 1) {
+      await seed({
+        id: `pt_wide_${i}`, name: `Room ${i}`, format: "snake", experienceTier: "beginner",
+        stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      });
+    }
+    await giveCompletedSeasons("pt_wide_veteran", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    for (let i = 0; i < 5; i += 1) {
+      await seed({
+        id: `pt_wide_veteran_${i}`, name: `Veteran Room ${i}`, format: "snake", experienceTier: "beginner",
+        stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+        seatUserIds: ["pt_wide_veteran"],
+      });
+    }
+    const veteranOnly = await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, participationTier: "veteran" });
+    expect(veteranOnly).toHaveLength(5);
+  });
+});
+
 describe("listPublicLeagues narrows in SQL", () => {
   /**
    * The anti-drift device. `matchesBrowseFilter`/`hasOpenSeat` are the product's ONE filter
@@ -269,11 +428,14 @@ describe("listPublicLeagues narrows in SQL", () => {
       }
     }
 
+    // `participationTier` is deliberately NOT a fourth axis here: it is covered on its own,
+    // directly, by "narrows on participation tier" below — this matrix stays the three static
+    // columns it always was, cross-checked against the pure rule at "any" participation tier.
     const combinations: BrowseFilter[] = [];
     for (const format of [...MATCHMAKING_CONFIG.formats, "any" as const]) {
       for (const experienceTier of [...MATCHMAKING_CONFIG.experienceTiers, "any" as const]) {
         for (const stakeTier of [...MATCHMAKING_CONFIG.stakeTiers.map((entry) => entry.tier), "any" as const]) {
-          combinations.push({ format, experienceTier, stakeTier });
+          combinations.push({ format, experienceTier, stakeTier, participationTier: "any" });
         }
       }
     }
@@ -297,7 +459,12 @@ describe("listPublicLeagues narrows in SQL", () => {
       await seedPublicLeague(db, { format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 12, filledTeams: 0 });
     }
 
-    const narrow = await listPublicLeagues(db, { format: "auction", experienceTier: "experienced", stakeTier: 3 });
+    const narrow = await listPublicLeagues(db, {
+      format: "auction",
+      experienceTier: "experienced",
+      stakeTier: 3,
+      participationTier: "any",
+    });
     expect(narrow).toHaveLength(5);
   });
 

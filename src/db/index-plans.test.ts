@@ -37,9 +37,70 @@ describe("hot read paths use indexes", () => {
   it("a narrowed browse also avoids a sequential scan of leagues", async () => {
     const plan = await explainPlan(
       db,
-      browseQuery(db, { format: "auction", experienceTier: "experienced", stakeTier: 3 }),
+      browseQuery(db, { format: "auction", experienceTier: "experienced", stakeTier: 3, participationTier: "any" }),
     );
     expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
+  });
+
+  /**
+   * PHASE 3 PLAN D, TASK 2. The composition join (`newcomers`/`veterans`, folded into
+   * `browseQuery` itself — `browse.ts`'s own docblock) measured over the SAME 5,000-league
+   * realistic corpus every assertion in this `describe` block builds from, per the brief's own
+   * Step 2: "the composition is a `GROUP BY` folded into `browseQuery`'s existing `leftJoin
+   * (teams)`... and that join is the one this task must measure rather than assume."
+   *
+   * `leagues_public_browse_idx` still leads the plan — the `LATERAL` join computing each seat's
+   * own completed-season count is a SCALAR per outer row, not a fan-out, so it changes the shape
+   * of the plan below the `GROUP BY` without changing which index the planner uses to find the
+   * candidate leagues in the first place.
+   */
+  it("plans the browse query with the composition join and still uses leagues_public_browse_idx", async () => {
+    const plan = await explainPlan(db, browseQuery(db, EMPTY_BROWSE_FILTER));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
+    expect(indexScanNode(plan, "leagues_public_browse_idx")).toBeDefined();
+    // The composition join runs on EVERY browse, narrowed or not — `tierComposition` is a
+    // display field, not only a filter — so the default, unnarrowed path already exercises
+    // `leagues_season_completed_idx` too. See "DOES choose leagues_season_completed_idx" below
+    // for the full account of why.
+    expect(indexScanNode(plan, "leagues_season_completed_idx")).toBeDefined();
+  });
+
+  /**
+   * A participation-narrowed browse (the `HAVING` predicate built from the SAME composition
+   * join) is the query that changed shape the most, so it gets its own measurement rather than
+   * inheriting the unnarrowed case's proof by assumption.
+   */
+  it("a participation-narrowed browse still uses leagues_public_browse_idx, never a sequential scan", async () => {
+    const plan = await explainPlan(db, browseQuery(db, { ...EMPTY_BROWSE_FILTER, participationTier: "veteran" }));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
+    expect(indexScanNode(plan, "leagues_public_browse_idx")).toBeDefined();
+  });
+
+  /**
+   * THE MEASUREMENT THE CONTROLLER RULING TURNS ON, and the surprise in it. Task 1's review
+   * flagged `leagues_season_completed_idx` as an index with no consumer named anywhere in the
+   * plan, and predicted Task 2's composition join would reach `leagues` by PRIMARY KEY and never
+   * choose it — the same reasoning `completedSeasonsQuery`'s own plan proves for the per-account
+   * read (a plain `INNER JOIN … WHERE season_completed_at IS NOT NULL`, filtered AFTER the join
+   * rather than as part of it).
+   *
+   * `seatCompletedSeasonsQuery` (`browse.ts`) is shaped differently, and the difference is what
+   * flips the answer: `season_completed_at IS NOT NULL` rides in the `LEFT JOIN`'s own `ON`
+   * clause (`and(eq(seatLeagues.id, seatTeams.leagueId), isNotNull(seatLeagues.seasonCompletedAt))`
+   * — the SAME shape `memberCompletedSeasonsQuery`, `@/league-service/participation`, already
+   * uses for `leagueTierComposition`), not a `WHERE` applied after. That is EXACTLY the partial
+   * index's own predicate, so the planner answers "does a completed league with this id exist"
+   * with an `Index Only Scan` on `leagues_season_completed_idx` rather than a primary-key lookup
+   * plus a heap fetch to check the column — measured here at 4,500 loops (one per candidate seat
+   * before the `HAVING`/`LIMIT` ever runs), each an index-only point lookup rather than a heap
+   * fetch. The index has a real consumer after all: not the per-account read Task 1 shipped it
+   * beside, but the composition join this task adds. No drop migration ships.
+   */
+  it("DOES choose leagues_season_completed_idx — the composition join's ON clause matches the partial predicate exactly", async () => {
+    const plan = await explainPlan(db, browseQuery(db, { ...EMPTY_BROWSE_FILTER, participationTier: "veteran" }));
+    const usedIndex = indexScanNode(plan, "leagues_season_completed_idx");
+    expect(usedIndex).toBeDefined();
+    expect(usedIndex?.["Node Type"]).toBe("Index Only Scan");
   });
 
   it("a user's teams are found by index, not by scanning every team", async () => {
@@ -547,6 +608,17 @@ describe("the completed-season count uses an account's own team index, never a l
  * THE MUTATION PROOF: drop and recreate the index WITHOUT its partial predicate, and the catalog
  * comparison reddens deterministically — the predicate is part of `indexdef`'s own text, not a
  * heuristic that might or might not move. An index test that cannot fail is a comment.
+ *
+ * CONTROLLER RULING, RESOLVED (Phase 3 Plan D, Task 2). Task 1's review flagged this index as
+ * having no consumer anywhere in the plan and asked Task 2 to measure rather than assume. It
+ * does have one, just not in Task 1's own scope: "DOES choose leagues_season_completed_idx" in
+ * the "hot read paths use indexes" `describe` block above EXPLAINs `browseQuery`'s composition
+ * join (`@/league-service/browse`) and finds an `Index Only Scan` on this exact index — the
+ * `LEFT JOIN`'s `ON` clause carries `season_completed_at IS NOT NULL` alongside the id equality,
+ * which matches this partial index's predicate exactly, unlike `completedSeasonsQuery`'s plain
+ * `WHERE` below. No drop migration ships; this catalog proof stays as the mutation guard against
+ * `drizzle-kit generate` silently widening the predicate, and the EXPLAIN proof above is the
+ * cost-based confirmation that the index earns its keep.
  */
 describe("leagues_season_completed_idx carries its partial predicate", () => {
   const EXPECTED_INDEXDEF = "CREATE INDEX leagues_season_completed_idx ON public.leagues USING btree (id) WHERE (season_completed_at IS NOT NULL)";

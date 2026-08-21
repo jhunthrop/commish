@@ -193,8 +193,10 @@ export function renderInLeague(ui: ReactElement, deps: LeagueRoomDeps): RenderRe
   return render(<LeagueRoomDepsProvider deps={deps}>{ui}</LeagueRoomDepsProvider>);
 }
 
-/** Open leagues as `listPublicLeagues` hands them back: one nearly empty, one nearly full. */
+/** Open leagues as `listPublicLeagues` hands them back: one nearly empty, one nearly full — and
+ *  one all-newcomer composition, one veteran-leaning composition, so a consumer's rendering of
+ *  BOTH `TIER_COMPOSITION_LABEL` buckets it is likely to show has real fixture data to render. */
 export const PUBLIC_LEAGUES: readonly PublicLeagueSummary[] = [
-  { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 3, scoringLabel: "Standard" },
-  { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 10, filledTeams: 9, scoringLabel: "PPR" },
+  { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 3, scoringLabel: "Standard", tierComposition: { newcomers: 3, veterans: 0 } },
+  { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 10, filledTeams: 9, scoringLabel: "PPR", tierComposition: { newcomers: 4, veterans: 5 } },
 ];

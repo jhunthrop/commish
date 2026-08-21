@@ -39,6 +39,7 @@ export async function GET(request: Request) {
     format: params.get("format"),
     experienceTier: params.get("experienceTier"),
     stakeTier: params.get("stakeTier"),
+    participationTier: params.get("participationTier"),
   });
   try {
     return ok<BrowseBody>({ leagues: await listPublicLeagues(getDb(), filter) });

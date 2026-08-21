@@ -1,8 +1,11 @@
-import { and, asc, eq, inArray, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "@/db/client";
 import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
+import { tierCompositionFor } from "@/participation/composition";
 import { describeScoring, type ScoringRules } from "@/scoring";
 
 /**
@@ -18,12 +21,48 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "teamCount",
   "filledTeams",
   "scoringLabel",
+  "tierComposition",
 ];
+
+/** The league's own seats, aliased a second time so a `LATERAL` join can ask "how many of THIS
+ *  seat-holder's OTHER leagues have completed a season" without colliding with the outer
+ *  query's own `teams`/`leagues` references — the identical shape `memberTeams`/`memberLeagues`
+ *  (`@/league-service/participation`) already use for the single-league read. */
+const seatTeams = alias(teams, "seat_teams");
+const seatLeagues = alias(leagues, "seat_leagues");
+
+/**
+ * One seated manager's OWN completed-season count, as a query built to run `LATERAL` — correlated
+ * to the outer query's own `teams` row (the league's seat) by `user_id`, never by league, so it
+ * counts the seat-holder's OTHER completed leagues. `teams` is joined TWICE for the same reason
+ * `memberCompletedSeasonsQuery` (`@/league-service/participation`) already joins it twice: once
+ * for the league's own seats (the outer query's `teams`), once for the seat-holder's history
+ * (`seatTeams`/`seatLeagues` here).
+ *
+ * `LATERAL`, not a second `GROUP BY` join on the outer query: a plain join would fan the outer
+ * query's `teams` rows across every one of a seat-holder's OTHER teams before `GROUP BY
+ * leagues.id` ever ran, corrupting `filledTeams` (`count(teams.id)`) in the same breath this task
+ * fixes composition. A `LATERAL` subquery answers with a SCALAR per outer row — one number per
+ * seat, never a fan-out — which is what keeps `filledTeams` exactly as correct as it was before.
+ */
+function seatCompletedSeasonsQuery(db: Db) {
+  return db
+    .select({ completedSeasons: sql<number>`count(${seatLeagues.id})::int`.as("completed_seasons") })
+    .from(seatTeams)
+    .leftJoin(seatLeagues, and(eq(seatLeagues.id, seatTeams.leagueId), isNotNull(seatLeagues.seasonCompletedAt)))
+    .where(eq(seatTeams.userId, teams.userId));
+}
 
 /**
  * Turns a normalized filter into the narrowing predicates the query applies. `undefined` for a
  * field means "any", and Drizzle's `and()` drops `undefined` operands, so an unnarrowed browse
  * produces exactly the two mandatory predicates and nothing else.
+ *
+ * `participationTier` is deliberately NOT here: the other three narrow on a raw column `leagues`
+ * already carries, evaluated in the `WHERE` before any aggregation runs. Participation is a fact
+ * about the league's SEATS, not a column on `leagues` itself, so it can only be evaluated after
+ * the composition aggregate exists — `browseQuery` applies it as a `HAVING` predicate instead,
+ * built from the SAME `newcomers`/`veterans` expressions the composition label reads.
  */
 function narrowingFor(filter: BrowseFilter): readonly (SQL | undefined)[] {
   const ANY = MATCHMAKING_CONFIG.anyValue;
@@ -65,8 +104,52 @@ function narrowingFor(filter: BrowseFilter): readonly (SQL | undefined)[] {
  * Exported as a builder, not just run inline, so `src/db/index-plans.test.ts` can `EXPLAIN`
  * exactly what production runs rather than a hand-copied lookalike that could drift into being
  * fast while the real one is slow.
+ *
+ * PHASE 3 PLAN D, TASK 2. `newcomers`/`veterans` are a `GROUP BY` folded into this SAME query,
+ * beside `filledTeams`, rather than a per-league call to `leagueTierComposition`
+ * (`@/league-service/participation`): the browse page returns up to `maxResults` (48) leagues,
+ * and 48 round trips on this app's one unauthenticated route is exactly the N+1
+ * `listLeagueActivity`'s own shape exists to refuse. Both counts, and the `participationTier`
+ * `HAVING` predicate built from them, apply BEFORE the `LIMIT` — the same "narrow before you cap"
+ * property `filledTeams`'s own open-seat `HAVING` already holds, so a participation-narrowed
+ * browse returns every match the database holds up to the cap, never an under-filled page
+ * because the cap ate the candidates first.
+ *
+ * Measured (`src/db/index-plans.test.ts`, "plans the browse query with the composition join")
+ * over the 5,000-league realistic corpus: the plan still leads with `leagues_public_browse_idx`
+ * and never sequentially scans `leagues` — the `LATERAL` join is a scalar per seat, not a fan-out,
+ * so it changes the plan's shape below the `GROUP BY` without changing which index the planner
+ * chooses to find the candidate leagues in the first place.
+ *
+ * `leagues_season_completed_idx` (`drizzle/0028_season_completion.sql`), flagged in Task 1's
+ * review as an index with no consumer anywhere in the plan: `seatCompletedSeasonsQuery`'s `LEFT
+ * JOIN` carries `season_completed_at IS NOT NULL` in its own `ON` clause, alongside the id
+ * equality (`and(eq(seatLeagues.id, seatTeams.leagueId), isNotNull(seatLeagues.seasonCompletedAt))`
+ * — the same shape `memberCompletedSeasonsQuery`, `@/league-service/participation`, already uses)
+ * — which matches this partial index's own predicate exactly, so the planner answers with an
+ * `Index Only Scan` on it rather than a primary-key lookup plus a heap fetch. Measured, not
+ * assumed: "DOES choose leagues_season_completed_idx" in `index-plans.test.ts`. The index has a
+ * real consumer after all, and no drop migration ships.
  */
 export function browseQuery(db: Db, filter: BrowseFilter) {
+  const ANY = MATCHMAKING_CONFIG.anyValue;
+  const cutoff = INTEGRITY_CONFIG.participation.veteranSeasonCutoff;
+  const seatCompletion = seatCompletedSeasonsQuery(db).as("seat_completion");
+  // `teams.id IS NOT NULL` excludes an unfilled seat from both buckets — an empty seat is
+  // neither a newcomer nor a veteran, the same reason `filledTeams` itself is `count(teams.id)`
+  // rather than `count(*)`.
+  const veteranSeats = sql<number>`count(*) filter (where ${teams.id} is not null and ${seatCompletion.completedSeasons} >= ${cutoff})::int`;
+  const newcomerSeats = sql<number>`count(*) filter (where ${teams.id} is not null and ${seatCompletion.completedSeasons} < ${cutoff})::int`;
+  // The SAME `newcomers > veterans` comparison `compositionCategoryFor` (`@/participation/
+  // composition`) renders the label from, expressed once here in SQL rather than reimplemented —
+  // `filter.test.ts` cross-checks the two never disagree over one corpus.
+  const participationHaving =
+    filter.participationTier === ANY
+      ? undefined
+      : filter.participationTier === "newcomer"
+        ? sql`${newcomerSeats} > ${veteranSeats}`
+        : sql`not (${newcomerSeats} > ${veteranSeats})`;
+
   return db
     .select({
       id: leagues.id,
@@ -76,13 +159,16 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
       stakeTier: leagues.stakeTier,
       teamCount: leagues.teamCount,
       filledTeams: sql<number>`count(${teams.id})::int`,
+      newcomers: newcomerSeats,
+      veterans: veteranSeats,
     })
     .from(leagues)
     .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
     .leftJoin(teams, eq(teams.leagueId, leagues.id))
+    .leftJoinLateral(seatCompletion, sql`true`)
     .where(and(eq(leagues.isPublicMatchmade, true), eq(drafts.status, "scheduled"), ...narrowingFor(filter)))
     .groupBy(leagues.id)
-    .having(sql`count(${teams.id}) < ${leagues.teamCount}`)
+    .having(and(sql`count(${teams.id}) < ${leagues.teamCount}`, participationHaving))
     .orderBy(asc(leagues.createdAt))
     .limit(MATCHMAKING_CONFIG.maxResults);
 }
@@ -132,12 +218,21 @@ async function scoringWeightsByLeagueId(db: Db, leagueIds: readonly string[]): P
  * numbers. A league somehow missing its `scoring_settings` row (never true in production —
  * `createLeague` writes both in one transaction) reads "Custom" rather than throwing: a browse
  * card is not the place to surface a data-integrity bug to a stranger.
+ *
+ * `tierComposition` is assembled the same way: `browseQuery`'s own `newcomers`/`veterans`
+ * columns are reduced through `tierCompositionFor` (`@/participation/composition`) — the same
+ * named constructor `leagueTierComposition` uses — rather than a bare object literal, and the two
+ * raw counts never reach the return value under their own names.
  */
 export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<readonly PublicLeagueSummary[]> {
   const rows = await browseQuery(db, filter);
   const weightsByLeagueId = await scoringWeightsByLeagueId(db, rows.map((row) => row.id));
-  return rows.map((row) => {
+  return rows.map(({ newcomers, veterans, ...row }) => {
     const weights = weightsByLeagueId.get(row.id);
-    return { ...row, scoringLabel: weights === undefined ? "Custom" : describeScoring(weights) };
+    return {
+      ...row,
+      scoringLabel: weights === undefined ? "Custom" : describeScoring(weights),
+      tierComposition: tierCompositionFor({ newcomers, veterans }),
+    };
   });
 }

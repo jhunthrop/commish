@@ -1,5 +1,6 @@
 import type { DraftFormat } from "@/domain/league";
 import type { ExperienceTier } from "@/domain/user";
+import { PARTICIPATION_TIERS } from "@/participation/tier";
 
 /**
  * Every tunable public matchmaking has.
@@ -22,6 +23,13 @@ export const MATCHMAKING_CONFIG = {
    */
   formats: ["snake", "auction"] as readonly DraftFormat[],
   experienceTiers: ["beginner", "experienced"] as readonly ExperienceTier[],
+  /**
+   * The default, always-visible filter Step 6 asks for — extending this same filter rather than
+   * a parallel one. `PARTICIPATION_TIERS` (`@/participation/tier`) is the vocabulary's one source;
+   * this re-exports it rather than copying the tuple, so a third participation tier (there is no
+   * reason to expect one) would not require remembering a second list to update.
+   */
+  participationTiers: PARTICIPATION_TIERS,
   /**
    * COSMETIC ONLY. No entry fee is charged, no prize is paid and no balance exists anywhere in
    * this phase — a stake tier is a label on a card and nothing else. Real money arrives in a

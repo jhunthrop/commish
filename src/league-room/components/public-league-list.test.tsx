@@ -19,6 +19,7 @@ const CUSTOM_SCORING_LEAGUE: PublicLeagueSummary = {
   teamCount: 12,
   filledTeams: 5,
   scoringLabel: "Custom",
+  tierComposition: { newcomers: 5, veterans: 0 },
 };
 
 // A signed-in list renders `JoinPublicLeagueButton` per card, which navigates via
@@ -38,6 +39,8 @@ describe("PublicLeagueList", () => {
         expect(screen.getByText(/9 of 10 joined/)).toBeInTheDocument();
         expect(screen.getByText("9 spots left")).toBeInTheDocument();
         expect(screen.getByText("1 spot left")).toBeInTheDocument();
+        expect(screen.getByText("All newcomers")).toBeInTheDocument();
+        expect(screen.getByText("Open to everyone")).toBeInTheDocument();
         expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
@@ -86,6 +89,30 @@ describe("PublicLeagueList", () => {
     expect(screen.queryByRole("button", { name: /^Join / })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Sign in to join Rookie Snake Room" })).toHaveAttribute("href", "/sign-in");
     expect(screen.getByRole("link", { name: "Sign in to join Sharks Only Auction" })).toHaveAttribute("href", "/sign-in");
+  });
+
+  it("labels the composition honestly, in the three phrases the brief names and no others", () => {
+    const allNewcomers: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_all", tierComposition: { newcomers: 4, veterans: 0 } };
+    const mostlyNewcomers: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_mostly", tierComposition: { newcomers: 3, veterans: 1 } };
+    const open: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_open", tierComposition: { newcomers: 1, veterans: 1 } };
+    render(<PublicLeagueList leagues={[allNewcomers, mostlyNewcomers, open]} signedIn />);
+    expect(screen.getByText("All newcomers")).toBeInTheDocument();
+    expect(screen.getByText("Mostly newcomers")).toBeInTheDocument();
+    expect(screen.getByText("Open to everyone")).toBeInTheDocument();
+    // Never a raw ratio or a percentage — a browse card is a decision aid, not a statistic.
+    expect(screen.queryByText(/\d+ of \d+ (veteran|newcomer)/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+  });
+
+  it("marks the newcomer-leaning composition with a clover and everything else with a crown", () => {
+    const newcomerLeaning: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_clover", tierComposition: { newcomers: 4, veterans: 0 } };
+    const notNewcomerLeaning: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_crown", tierComposition: { newcomers: 0, veterans: 4 } };
+    const { container } = render(<PublicLeagueList leagues={[newcomerLeaning, notNewcomerLeaning]} signedIn />);
+    // `Icon` is decorative here (no `label`), so it renders `aria-hidden` — the adjacent text
+    // already carries the meaning for a screen reader, which is also what keeps this axe-clean.
+    const svgs = [...container.querySelectorAll("svg[aria-hidden='true']")];
+    expect(svgs.some((svg) => svg.classList.contains("lucide-clover"))).toBe(true);
+    expect(svgs.some((svg) => svg.classList.contains("lucide-crown"))).toBe(true);
   });
 
   it("offers a next action when no league matches, rather than a dead end", async () => {
