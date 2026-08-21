@@ -102,8 +102,8 @@ one, and it is not this plan's to make.
 ## 3. The queue's shape
 
 **Chosen:** one table, `integrity_flags`, with a `flag_type` discriminator (`multi_account`,
-`review_report`, `chat_report`, and `trade_fairness` reserved for Plan C) rather than one table per
-detector. `resolved_at`/`resolved_by_user_id`/`resolution`/`resolution_note` are stamped columns on
+`review_report`, `chat_report`, and `trade_fairness`, raised by Phase 3 Plan C's own detector —
+see `docs/decisions/trades-and-fairness.md` §6 and §9) rather than one table per detector. `resolved_at`/`resolved_by_user_id`/`resolution`/`resolution_note` are stamped columns on
 the same row, not a separate resolutions table. Status is derived, not stored: `FLAG_STATUSES =
 ["open", "resolved"]` names the two values a reader computes from `resolved_at IS NULL`, and there
 is no `status` column to disagree with it.
@@ -182,13 +182,20 @@ the stamp, so a decision and its consequence cannot come apart — a refusal fro
 transaction back rather than leaving a flag stamped "resolved: content_removed" with nothing
 actually removed.
 
-**What Plan C changes.** `trade_reversed` moves from refused to implemented: Plan C adds the
-`trade` subject's reversal and flips nothing in this file except the code that runs when the
-decision is chosen — `DECISION_OWNER` already says `plan-c`, so no new plumbing is needed to make
-the choice legal, only to make it do something. If Plan C's trade feature ships without a reversal
-mechanism, the honest move is renaming the owner to `plan-d` rather than deleting the entry —
-the same "declared, not deleted" discipline that keeps a reserved name legible in the audit trail
-even while it is unexercised.
+**What Plan C changed.** `trade_reversed` moved from refused to implemented:
+`reverseTradeInTx` (`src/league-service/trade-reversal.ts`) is the mechanism, called from
+`resolveFlag`'s `trade_reversed` branch in its own transaction (§5's "one transaction, one chain"
+ruling — the reversal's own anchor is the league chain, `resolveFlag`'s is the platform chain).
+Nothing else in this file's vocabulary changed: `DECISION_OWNER.trade_reversed` still reads
+`plan-c` as PROVENANCE (who built it), but `decisionIsAvailable` no longer asks who owns a
+decision — Plan C's own fix replaced the one-axis `DECISION_OWNER[d] === "plan-b"` check with a
+two-axis `DECISION_WIRED_FOR: Record<ResolutionDecision, Record<FlagSubjectType, boolean>>` that
+also subsumes what used to be a separate `CONTENT_REMOVAL_WIRED_FOR` table — the collapse was
+worth doing in the same commit that first made ownership and wiring diverge, because Plan B's own
+LOW 13 was the one-axis version of the identical bug (a `content_removed` decision against an
+account pair reaching an unwired branch became a 500, and a 500 is not a refusal). See
+`docs/decisions/trades-and-fairness.md` §8 for the reversal's own shape — a compensating transfer,
+forward-only, never re-scoring a settled week.
 
 ## 5. Where an operator action is recorded
 
@@ -518,7 +525,7 @@ review comment somebody could miss:
 | `stat_week_corrected` | **true** | A fact about the league's shared scoreboard, true for everyone in it, about nobody's conduct. A member who is not told is a member reading standings that changed under them. |
 | `chain_verification_failed` | **false** | Restates Plan A's ruling 8: telling a league its record may have been altered, before a human has read the output, is the accusatory failure mode this phase spends a denylist preventing. |
 | `lineup_auto_set` | **false**, denied in advance | The competitive-sensitivity argument that makes `lineup_change` `actor_only` (Plan A ruling 15) applies at least as hard to a system-authored sentence describing one manager's lineup — broadcasting the lapse publicly while a manual change stays private would be worse than either. |
-| `trade_held_for_review` | **false** | Reserved and undecided, not defaulted open: no publisher exists yet (Plan C's trade-fairness work is the likely one), and denying by default means whoever writes it inherits a real decision to argue with rather than a silent gap to rediscover. |
+| `trade_held_for_review` | **false** | Reserved and undecided, not defaulted open. Phase 3 Plan C shipped the trade-fairness work this row anticipated and deliberately did NOT flip it: `evaluateTradeBeforeExecute` already computes `hold` and `INTEGRITY_CONFIG.trade.autoHoldThreshold` already exists, but the threshold ships `null` — no trade is ever held, so no publisher exists yet either. Plan D is the plan that supplies a number (see `docs/decisions/trades-and-fairness.md` §7); denying by default until then means whoever writes it inherits a real decision to argue with rather than a silent gap to rediscover. |
 
 **The pre-decided answer for Plan D's `lineup_auto_set`.** Plan D should not simply flip the table
 entry. What it needs is an **actor-scoped** delivery path — a new visibility, not a new summary —
@@ -670,3 +677,15 @@ it for every write in this product including this plan's, without this plan doin
 Nothing specific to the operator role needs its own hardening beyond what §1 and §2 already build:
 the role's entire security model is "make the grant unreachable from any code a compromised session
 can execute," and that is complete as shipped, not partial.
+
+**Phase 3 Plan C's addition: two accounts under one person can now move value between themselves in
+a single audited transaction.** A trade between a manager's own two teams in the same league is
+legal at the application layer — `proposeTrade` never checks whether the two `userId`s behind two
+teams are the same person, because nothing about a trade's mechanics depends on that fact. That is
+exactly the behavior `trade_fairness` detection exists to raise a question about: an unusually
+lopsided completed trade between two specific teams is the observable signature this mechanism was
+built to notice, regardless of why the two sides agreed to it. See
+`docs/decisions/trades-and-fairness.md` §10 for the full addition, including what it deliberately
+does NOT add — no account action reachable from a trade flag, no money movement, and no path from a
+flag to an automatic consequence. The detection is a question for a human, exactly like every other
+flag type this section already covers.

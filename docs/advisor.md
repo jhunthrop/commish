@@ -38,19 +38,25 @@ proposed change and a different plan.
 
 ## The deterministic core
 
-`tradeBalance` (`src/ai-advisor/valuation.ts`) and `baselineStartSit` compute the answer first,
-always — the model is layered on top of an answer that already exists, never the other way
-around.
+`tradeBalance` and `baselineStartSit` compute the answer first, always — the model is layered on
+top of an answer that already exists, never the other way around. `baselineStartSit` still lives
+here, in `src/ai-advisor/valuation.ts`. `tradeBalance` does not: it moved to
+`src/trades/fairness.ts` in Phase 3 Plan C, and `src/ai-advisor/valuation.ts` re-exports it
+identity-pinned (`expect(reExported).toBe(tradeBalance)`), so this section's description of its
+behavior stays accurate and every existing consumer's import is unchanged. See
+`docs/decisions/trades-and-fairness.md` §2 for why it moved and why the re-export is safe.
 
 `tradeBalance(giving, receiving)` takes two valued sides and **nothing else** — no user, no
 question, no model, not even the league. That is deliberate (strategy doc §4.1): it is **the
-platform's trade-fairness / collusion detector**, not an advisor helper. A later automated
-integrity sweep runs this exact function over every proposed trade with system-supplied
-valuations and gets the identical `verdict` and `flags` a manager was shown, so "what the advisor
-told you" and "what integrity flagged" can never be two different opinions. Its `flags`
-(`empty_side`, `uneven_player_count`, `value_gap_over_threshold`) are machine-readable reasons, not
-prose — a later sweep escalates on the flag itself, and an advisor turns the same flag into a
-sentence via `FLAG_COPY`.
+platform's trade-fairness / collusion detector**, not an advisor helper. The completed-trade
+sweep this section used to describe as a future integrity sweep now exists —
+`src/integrity-service/trade-fairness.ts`'s `evaluateTradeBeforeExecute` (inside the accept
+transaction) and `raiseTradeFairnessFlag`/`sweepUnflaggedTrades` (after commit) both call this
+exact function with system-supplied valuations and get the identical `verdict` and `flags` a
+manager was shown at propose time, so "what the advisor told you" and "what integrity flagged"
+can never be two different opinions. Its `flags` (`empty_side`, `uneven_player_count`,
+`value_gap_over_threshold`) are machine-readable reasons, not prose — the sweep escalates on the
+flag itself, and an advisor turns the same flag into a sentence via `FLAG_COPY`.
 
 Boundary semantics are **lenient at both thresholds**: a gap exactly equal to `evenDelta` (3) is
 still called `"even"` (`gap <= evenDelta`), and a gap exactly equal to `lopsidedDelta` (12) is
@@ -130,7 +136,7 @@ field — and answer a question. Neither writes anything.
 | Route | Who | Notes |
 |---|---|---|
 | `POST /api/leagues/[leagueId]/advisor/start-sit` | a manager with a team in the league | Body: `{ weekNumber, question }`. Answers start/sit advice for the caller's own team. Writes nothing. |
-| `POST /api/leagues/[leagueId]/advisor/trade` | a manager with a team in the league | Body: `{ weekNumber, counterpartyTeamId, give, receive }`. Assesses a proposed trade's fairness. Never executes one — there is no accept path and nothing is persisted. |
+| `POST /api/leagues/[leagueId]/advisor/trade` | a manager with a team in the league | Body: `{ weekNumber, counterpartyTeamId, give, receive }`. Assesses a proposed trade's fairness. Never executes one — there is no accept path and nothing is persisted. `POST /api/leagues/[leagueId]/trades/[tradeId]` (`docs/trades.md`) is the route that does, and it is a different service (`src/league-service/trades.ts`), never this one. |
 
 The advisor panel built on top of the start/sit route (`AdvisorPanel`, `src/league-room/**`) is
 **start/sit only** in this plan. The trade-analyzer route exists and is fully tested, but no panel
@@ -138,11 +144,11 @@ calls it yet — that UI is deliberately out of scope for this plan.
 
 ## Known follow-ups
 
-- **A real trade block**, with a proposal both sides can see, and two-sided human accept/decline.
-  `tradeBalance` and the trade route already answer "is this fair"; nothing yet lets two managers
-  actually make the trade `TradeProposal` describes.
 - **Waiver-wire advice.** The advisor only reasons about a roster's own players today — nothing
-  reads the pool of unrostered players the way a "who should I pick up" question would need.
-- **Running `tradeBalance` as a scheduled integrity sweep.** The function is already written to be
-  reused this way (see "The deterministic core" above); nothing yet calls it outside a manager's
-  own advisor request.
+  reads the pool of unrostered players the way a "who should I pick up" question would need. This
+  product has no waiver wire and no free agency at all yet — see `docs/trades.md`.
+
+Phase 3 Plan C closed the other two items this section used to name: a real trade block now exists
+(`docs/trades.md` — propose, analyze, accept, flag, reverse, end to end), and `tradeBalance` now
+runs as the after-acceptance integrity sweep this section used to describe as future work
+(`docs/decisions/trades-and-fairness.md` §6).

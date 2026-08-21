@@ -44,6 +44,15 @@ npm run stats:correct     # re-read and re-settle a week that has already gone f
                           # npm run stats:correct -- --week <n> --by <operatorUserId>. Reserves
                           # against the same monthly request budget the worker draws from and
                           # fails closed on a denial. See docs/decisions/operators-and-moderation.md §10.
+npm run trades:sweep      # the trade-fairness detector's manual re-run: raises a trade_fairness
+                          # flag for every ACCEPTED trade over INTEGRITY_CONFIG.trade
+                          # .fairnessFlagThreshold that has no flag yet, scoped to one league with
+                          # npm run trades:sweep -- --league <leagueId> or every league when
+                          # omitted. The remedy for the after-commit flag write's own honest gap
+                          # (a process dying between an accept committing and its flag landing) —
+                          # idempotent by construction, the same shape npm run integrity:sweep
+                          # already uses. See docs/trades.md and
+                          # docs/decisions/trades-and-fairness.md §6.
 npm run e2e:install       # one-time: download the Playwright browser
 npm run e2e               # browser end-to-end suite (needs a build + a WorkOS test key)
 npm run e2e:ui            # same suite, in Playwright's interactive UI mode
