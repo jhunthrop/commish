@@ -92,7 +92,7 @@ function ContentRemovedPreview({ preview, note, isChatSubject }: { readonly prev
       <p className="text-sm font-medium text-text-primary">{preview.title}</p>
       <p className="text-sm text-text-muted">{preview.body}</p>
       <blockquote className="border-l-2 border-border pl-3 text-sm italic text-text-muted">{`"${phrase}"`}</blockquote>
-      <p className="text-xs text-text-muted">Your note is kept on file for this decision, but the member reads this general reason, not your words.</p>
+      <p className="text-xs text-text-muted">We keep your note on file for this decision. The member reads this general reason, not your words.</p>
     </div>
   );
 }
@@ -197,7 +197,7 @@ export function ResolutionForm({ flagId, decisions, noteMaxLength, previews, isC
         value={note}
         onChange={(event) => setNote(event.target.value)}
         maxLength={maxLengthFor(decision, noteMaxLength)}
-        hint={decision === "content_removed" ? "Your own words. The member reads a general reason instead — see below." : "Your own words. Kept on the record either way."}
+        hint={decision === "content_removed" ? "Your own words. The member reads a general reason instead. The preview below shows it." : "Your own words. Kept on the record either way."}
       />
 
       <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-elevated p-3" aria-label="What the member will see">

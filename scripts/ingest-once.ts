@@ -23,7 +23,7 @@ async function main(): Promise<void> {
 
   const outcomes = await getIngestionWorker().tick();
   if (outcomes.length === 0) {
-    console.log("nothing to ingest — every examined week is already final");
+    console.log("nothing to ingest. Every examined week is already final.");
   } else {
     for (const outcome of outcomes) console.log(describeOutcome(outcome));
   }

@@ -225,3 +225,59 @@ describe("the admin flag detail page says nothing that breaks the house copy rul
     }
   });
 });
+
+/**
+ * THE INTERACTION-STATE GAP, closed (final review, MEDIUM 7(b)). Everything above renders a FIRST
+ * PAINT, and `ResolutionForm` initializes `decision` to `decisions[0]` — the fixture's
+ * `no_action` — so two of the three decision branches, and every state that follows typing a
+ * note, were swept by nothing. That is exactly where MEDIUM 6's em dash lived: on the
+ * `content_removed` hint, in a component the sweep above mounts on every run.
+ *
+ * So: every decision, with and without a note, and the submitted state too. Driven through the
+ * real radios rather than by re-rendering with a different prop, because the branch that ships is
+ * the one an operator clicks into.
+ */
+describe("the resolution form says nothing that breaks the house copy rules, in every state", () => {
+  const PREVIEWS = {
+    warned_user: { title: "An operator reviewed a report about you", body: "We looked at a report about something you posted in Sunday Money." },
+    content_removed: { title: "We removed your review", body: "An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message." },
+  } as const;
+  const DECISION_RADIOS = ["No action", "Warn the member", "Remove the content"] as const;
+
+  it.each(DECISION_RADIOS)("is clean on the %s branch, empty and with a note", async (radioLabel) => {
+    const { AdminRoomDepsProvider } = await import("@/admin-room/hooks/deps");
+    const { fixtureAdminDeps } = await import("@/admin-room/test-fixtures");
+    const { ResolutionForm } = await import("@/admin-room/components/resolution-form");
+
+    const fixture = fixtureAdminDeps();
+    const { container } = render(
+      <AdminRoomDepsProvider deps={fixture.deps}>
+        <ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user", "content_removed"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />
+      </AdminRoomDepsProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: radioLabel }));
+    expectClean(container, PREVIEWS.warned_user.title, PREVIEWS.warned_user.body, PREVIEWS.content_removed.title, PREVIEWS.content_removed.body);
+
+    // And again once the operator has typed, since the previews swap their placeholder for the
+    // note the moment there is one.
+    fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "Keep it civil." } });
+    expectClean(container, PREVIEWS.warned_user.title, PREVIEWS.warned_user.body, PREVIEWS.content_removed.title, PREVIEWS.content_removed.body, '"Keep it civil."');
+  });
+
+  it("is clean once a decision is recorded", async () => {
+    const { AdminRoomDepsProvider } = await import("@/admin-room/hooks/deps");
+    const { fixtureAdminDeps } = await import("@/admin-room/test-fixtures");
+    const { ResolutionForm } = await import("@/admin-room/components/resolution-form");
+
+    const fixture = fixtureAdminDeps();
+    const { container } = render(
+      <AdminRoomDepsProvider deps={fixture.deps}>
+        <ResolutionForm flagId="flag_1" decisions={["no_action"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />
+      </AdminRoomDepsProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Submit decision" }));
+    await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+    expectClean(container);
+  });
+});
