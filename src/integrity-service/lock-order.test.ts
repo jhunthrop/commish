@@ -1,13 +1,21 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, chatMessages, leagues, memberNotices, sessionSignals, users } from "@/db/schema";
+import { auditChains, chatMessages, drafts, leagues, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { joinLeagueInTx } from "@/league-service/join";
+import { writeSchedule } from "@/league-service/schedule";
+import type { StatLine } from "@/domain/player";
+import { correctSettledWeek } from "@/stats-pipeline/correction";
+import { finalizeWeek } from "@/stats-pipeline/finalize";
+import { fakeStatsProvider } from "@/stats-pipeline/test-support";
 import { syncUserFromWorkOS } from "@/lib/auth/user-sync";
+import { reportMessage } from "@/chat-service/moderation";
+import { reportReview } from "@/review-service/reviews";
 import { raiseFlag, resolveFlag } from "./flags";
+import { grantAdmin } from "./grant-admin";
 import type { DraftPoolEntry } from "@/domain/draft";
 import { players } from "@/db/schema";
 
@@ -417,5 +425,353 @@ describe("recordSessionSignals' insert order", () => {
     expect(signal).toBeDefined();
     const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
     expect(platformAnchor!.headSequence).toBe(1); // the sign-in's own session_started, and nothing else
+  });
+});
+
+/**
+ * THE REMAINING FIVE WRITERS (final review, LOW 17). Everything above proves the rule for
+ * `raiseFlag`, `resolveFlag`'s `warned_user` branch and `recordSessionSignals`. The reviewer
+ * walked the other five by hand and found no inversion — which is a property asserted by review
+ * rather than by the suite, and this codebase's whole position on lock order is that reasoning
+ * about implicit foreign-key locks is exactly what got it wrong the first time.
+ *
+ * Each of the five follows the identical rendezvous: a real transaction is parked holding the row
+ * the writer's own FK is about to reach for, the writer is driven on a second connection, Postgres
+ * is ASKED whether a backend is genuinely blocked (never a sleep), the park is released, and both
+ * sides are required to finish. With an inverted order the writer would already be holding the
+ * anchor the parked transaction is about to want, and one of the two would die.
+ */
+
+/** Parks a real join inside its own precondition — after `leagues[X] FOR UPDATE`, before the
+ *  append — and hands back the release. The exact shape the three tests above build inline;
+ *  extracted here because five more of them would be five more copies of it. */
+function parkedJoin(leagueId: string, userId: string, teamId: string) {
+  let holdsLeagueLock: () => void = () => {};
+  const leagueLocked = new Promise<void>((resolve) => (holdsLeagueLock = resolve));
+  let release: () => void = () => {};
+  const parked = new Promise<void>((resolve) => (release = resolve));
+
+  const joining = joinDb.transaction((tx) =>
+    joinLeagueInTx(
+      tx,
+      { leagueId, userId, newId: () => teamId, via: "public_browse", occurredAt: clock.now() },
+      async () => {
+        holdsLeagueLock();
+        await parked;
+        return null;
+      },
+    ),
+  );
+  return { joining, leagueLocked, release: () => release() };
+}
+
+/** Users, a league and (optionally) a team — the shell every case below needs. */
+async function seedLeagueWith(leagueId: string, userIds: readonly string[]): Promise<void> {
+  await joinDb.insert(users).values(userIds.map((id) => ({ id, email: `${id}@test.local`, displayName: id })));
+  await joinDb.insert(leagues).values({ id: leagueId, name: leagueId, format: "snake", teamCount: 3, commissionerUserId: userIds[0]! });
+}
+
+describe("resolveFlag's content_removed branches", () => {
+  it("removes a CHAT MESSAGE beside a concurrent join in the same league without deadlocking", async () => {
+    await seedLeagueWith("lg_cr_chat", ["u_cr_commish", "u_cr_author", "u_cr_op", "u_cr_joiner"]);
+    const [message] = await joinDb
+      .insert(chatMessages)
+      .values({ leagueId: "lg_cr_chat", authorUserId: "u_cr_author", body: "hello" })
+      .returning({ id: chatMessages.id });
+    const flag = await joinDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "chat_report",
+        subjectId: String(message!.id),
+        leagueId: "lg_cr_chat",
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => "flag_cr_chat",
+      }),
+    );
+
+    const join = parkedJoin("lg_cr_chat", "u_cr_joiner", "team_cr_chat");
+    await join.leagueLocked;
+
+    // The chat removal writes a `chat_message_removed` notice (leagues FOR KEY SHARE) and
+    // appends TWICE to the platform chain — `admin_action` then `flag_resolved` — so this is also
+    // the re-entrant-anchor case, driven rather than reasoned about.
+    const resolving = resolveFlag(resolveDb, {
+      flagId: flag.id,
+      decision: "content_removed",
+      note: "spam",
+      operatorUserId: "u_cr_op",
+      publish: async () => null,
+    });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await resolving).toMatchObject({ ok: true });
+
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_cr_chat"));
+    expect(leagueAnchor!.headSequence).toBe(1); // the join's member_joined, and nothing else
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(3); // flag_raised, then admin_action + flag_resolved
+  });
+
+  it("removes a REVIEW beside a concurrent join without deadlocking", async () => {
+    await seedLeagueWith("lg_cr_review", ["u_rv_commish", "u_rv_author", "u_rv_op", "u_rv_joiner"]);
+    await joinDb.insert(reviews).values({
+      id: "review_cr_1", userId: "u_rv_author", rating: 4, body: "meh",
+      createdAt: new Date(clock.now()), updatedAt: new Date(clock.now()),
+    });
+    const flag = await joinDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "review_report",
+        subjectId: "review_cr_1",
+        leagueId: null, // reviews are platform-scoped (ruling 1) — no league on the flag at all
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => "flag_cr_review",
+      }),
+    );
+
+    // The review removal's own notice has `leagueId: null`, so it never reaches `leagues` — the
+    // contended row here is the AUTHOR's `users` row, which the notice's FK takes KEY SHARE on.
+    let holdsUserLock: () => void = () => {};
+    const userLocked = new Promise<void>((resolve) => (holdsUserLock = resolve));
+    let releaseHold: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseHold = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM users WHERE id = ${"u_rv_author"} FOR UPDATE`);
+      holdsUserLock();
+      await parked;
+    });
+    await userLocked;
+
+    const resolving = resolveFlag(resolveDb, { flagId: flag.id, decision: "content_removed", note: "spam", operatorUserId: "u_rv_op" });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseHold();
+
+    await expect(holding).resolves.toBeUndefined();
+    expect(await resolving).toMatchObject({ ok: true });
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(3);
+  });
+});
+
+describe("reportMessage's and reportReview's insert order", () => {
+  it("reports a chat message beside a concurrent join in the same league without deadlocking", async () => {
+    await seedLeagueWith("lg_report_chat", ["u_rc_commish", "u_rc_author", "u_rc_reporter", "u_rc_joiner"]);
+    const [message] = await joinDb
+      .insert(chatMessages)
+      .values({ leagueId: "lg_report_chat", authorUserId: "u_rc_author", body: "hello" })
+      .returning({ id: chatMessages.id });
+
+    const join = parkedJoin("lg_report_chat", "u_rc_joiner", "team_rc");
+    await join.leagueLocked;
+
+    // `reportMessage` opens its own transaction: the report row (FK to `chat_messages` and
+    // `users`) first, then `raiseFlag`'s insert, then the platform anchor. Its flag carries
+    // `leagueId: null` (ruling 1), so it never takes a lock on the row the join is holding — this
+    // proves that separation under real contention rather than asserting it.
+    const reporting = reportMessage(flagDb, {
+      messageId: String(message!.id),
+      leagueId: "lg_report_chat",
+      reporterUserId: "u_rc_reporter",
+      reason: "spam",
+      newId: () => "flag_report_chat",
+      clock,
+    });
+
+    expect(await reporting).toMatchObject({ ok: true });
+    join.release();
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_report_chat"));
+    expect(leagueAnchor!.headSequence).toBe(1);
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(1);
+  });
+
+  it("reports a review beside a concurrent hold on its author's row without deadlocking", async () => {
+    await seedLeagueWith("lg_report_review", ["u_rr_commish", "u_rr_author", "u_rr_reporter"]);
+    await joinDb.insert(reviews).values({
+      id: "review_report_1", userId: "u_rr_author", rating: 4, body: "meh",
+      createdAt: new Date(clock.now()), updatedAt: new Date(clock.now()),
+    });
+
+    // The contended row is the REPORTER's `users` row, which `review_reports`' own FK takes
+    // KEY SHARE on before `reportReview` reaches the platform anchor.
+    let holdsUserLock: () => void = () => {};
+    const userLocked = new Promise<void>((resolve) => (holdsUserLock = resolve));
+    let releaseHold: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseHold = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM users WHERE id = ${"u_rr_reporter"} FOR UPDATE`);
+      holdsUserLock();
+      await parked;
+    });
+    await userLocked;
+
+    const reporting = reportReview(flagDb, {
+      reviewId: "review_report_1",
+      reporterUserId: "u_rr_reporter",
+      reason: "spam",
+      newId: () => "flag_report_review",
+      clock,
+    });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseHold();
+
+    await expect(holding).resolves.toBeUndefined();
+    expect(await reporting).toMatchObject({ ok: true });
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(1);
+  });
+});
+
+describe("grantAdmin's notice order", () => {
+  it("grants beside a concurrent hold on the SAME user row and completes without deadlocking", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_grant_subject", email: "grant_subject@test.local", displayName: "Subject" },
+      { id: "u_grant_by", email: "grant_by@test.local", displayName: "Granter", isAdmin: true },
+    ]);
+
+    // `grantAdmin` UPDATEs `users[subject]` and then writes an `admin_granted` notice whose FK
+    // takes KEY SHARE on the same row — both before the platform anchor. No production caller
+    // takes a `users` row `FOR UPDATE`, so a bystander stands in for one, exactly as
+    // `recordSessionSignals`' own case above does.
+    let holdsUserLock: () => void = () => {};
+    const userLocked = new Promise<void>((resolve) => (holdsUserLock = resolve));
+    let releaseHold: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseHold = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM users WHERE id = ${"u_grant_subject"} FOR UPDATE`);
+      holdsUserLock();
+      await parked;
+    });
+    await userLocked;
+
+    const granting = grantAdmin(resolveDb, { userId: "u_grant_subject", grant: true, grantedBy: "u_grant_by", clock });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseHold();
+
+    await expect(holding).resolves.toBeUndefined();
+    expect(await granting).toMatchObject({ ok: true, isAdmin: true });
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(1);
+    const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_grant_subject"));
+    expect(notice?.auditEventId).not.toBeNull();
+  });
+});
+
+/**
+ * `correctLeagueInTx`, the fifth and last (final review, LOW 17). It is Plan A's own transaction
+ * shape carried into Plan B's phase: notices FIRST (each an FK on `leagues` and on the manager's
+ * `users` row), then the LEAGUE anchor, then `attachAuditEvent`. It is also the one writer whose
+ * anchor is a league chain rather than the platform one, which is exactly the row
+ * `joinLeagueInTx` also appends to — so unlike the four above, a wrong order here is a genuine
+ * two-transaction cycle on one anchor, not merely a hazard-shaped read.
+ *
+ * Driven through the real `correctSettledWeek`, over a real settled week with real revised stat
+ * lines, because the notice-producing branch only runs when a team's points ACTUALLY move.
+ */
+describe("correctLeagueInTx's notice order", () => {
+  const CORRECT_WEEK = 3;
+  const CORRECT_LEAGUE = "lg_correct_lock";
+
+  /** Grants every reservation without touching Redis, mirroring `correction.test.ts`'s own. */
+  const grantedBudget = {
+    reserve: async () => ({ granted: true as const }),
+    reserveBackfill: async () => ({ granted: true as const }),
+    remaining: async () => 1_000,
+  };
+
+  function statLine(playerId: string, over: Partial<StatLine> = {}): StatLine {
+    return {
+      playerId, week: CORRECT_WEEK, passingYards: 0, passingTouchdowns: 0, interceptions: 0, rushingYards: 0,
+      rushingTouchdowns: 0, receivingYards: 0, receivingTouchdowns: 0, receptions: 0, fumblesLost: 0,
+      fieldGoalsMade: 0, extraPointsMade: 0, sacks: 0, defensiveInterceptions: 0, defensiveTouchdowns: 0,
+      ...over,
+    };
+  }
+
+  it("corrects a league beside a concurrent join in the SAME league, on the same chain, without deadlocking", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_corr_a", email: "corr_a@test.local", displayName: "Manager A" },
+      { id: "u_corr_b", email: "corr_b@test.local", displayName: "Manager B" },
+      { id: "u_corr_joiner", email: "corr_joiner@test.local", displayName: "Joiner" },
+      { id: "u_corr_op", email: "corr_op@test.local", displayName: "Operator" },
+    ]);
+    await joinDb.insert(leagues).values({
+      id: CORRECT_LEAGUE, name: CORRECT_LEAGUE, format: "snake", teamCount: 3, commissionerUserId: "u_corr_a",
+      rosterSlots: [{ slot: "QB", count: 1, eligiblePositions: ["QB"] }],
+    });
+    await joinDb.insert(teams).values([
+      { id: "team_corr_a", leagueId: CORRECT_LEAGUE, userId: "u_corr_a", name: "A" },
+      { id: "team_corr_b", leagueId: CORRECT_LEAGUE, userId: "u_corr_b", name: "B" },
+    ]);
+    await joinDb.insert(drafts).values({
+      id: `${CORRECT_LEAGUE}_draft`, leagueId: CORRECT_LEAGUE, format: "snake", status: "complete",
+      kickoffAt: new Date("2026-09-01T00:00:00.000Z"), auctionBudget: null,
+    });
+    await joinDb.transaction((tx) => writeSchedule(tx, { leagueId: CORRECT_LEAGUE, teamIds: ["team_corr_a", "team_corr_b"], weeks: CORRECT_WEEK }));
+    await joinDb.insert(players).values([
+      { id: "qb_corr_a", name: "QB Corr A", position: "QB", nflTeam: "KC" },
+      { id: "qb_corr_b", name: "QB Corr B", position: "QB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_corr_a", slot: "QB", slotIndex: 0, playerId: "qb_corr_a" },
+      { teamId: "team_corr_b", slot: "QB", slotIndex: 0, playerId: "qb_corr_b" },
+    ]);
+    await joinDb.insert(playerStatLines).values([
+      { playerId: "qb_corr_a", week: CORRECT_WEEK, passingYards: 300, passingTouchdowns: 3 },
+      { playerId: "qb_corr_b", week: CORRECT_WEEK, passingYards: 200, passingTouchdowns: 1 },
+    ]);
+    await finalizeWeek(joinDb, CORRECT_LEAGUE, CORRECT_WEEK);
+    await joinDb.insert(statWeeks).values({ week: CORRECT_WEEK, status: "final", version: 1, gamesTotal: 1, gamesFinal: 1, updatedAt: new Date(clock.now()) });
+
+    const join = parkedJoin(CORRECT_LEAGUE, "u_corr_joiner", "team_corr_joiner");
+    await join.leagueLocked;
+
+    // The provider revises `qb_corr_a` upward, so team A's points move and the notice branch runs.
+    const correcting = correctSettledWeek(pickDb, {
+      week: CORRECT_WEEK,
+      by: "u_corr_op",
+      clock,
+      budget: grantedBudget,
+      provider: fakeStatsProvider({
+        games: {
+          [CORRECT_WEEK]: [
+            {
+              gameId: "g_corr", week: CORRECT_WEEK, status: "final", homeNflTeam: "KC", awayNflTeam: "SF",
+              lines: [statLine("qb_corr_a", { passingYards: 400, passingTouchdowns: 5 })],
+            },
+          ],
+        },
+      }),
+    });
+
+    expect(await waitForBlockedBackend(10_000)).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    const result = await correcting;
+    // A deadlock would surface HERE, as a reported per-league failure rather than a throw —
+    // `attemptLeague` catches everything — so the empty list is the real assertion.
+    expect(result).toMatchObject({ ok: true, changed: true });
+    if (result.ok) expect(result.leaguesFailed).toEqual([]);
+
+    // Both transactions really did append to the SAME league chain, which is what makes the
+    // absence of a deadlock meaningful rather than incidental.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, CORRECT_LEAGUE));
+    expect(leagueAnchor!.headSequence).toBe(2); // the join's member_joined and the correction's system_action
+
+    // And the notices written before that anchor still name the event minted after it.
+    const notices = await joinDb.select().from(memberNotices).where(eq(memberNotices.leagueId, CORRECT_LEAGUE));
+    expect(notices.length).toBeGreaterThan(0);
+    for (const notice of notices) expect(notice.auditEventId).not.toBeNull();
   });
 });
