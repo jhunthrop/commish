@@ -5,6 +5,10 @@ export interface PlanNode {
   readonly "Node Type": string;
   readonly "Relation Name"?: string;
   readonly "Index Name"?: string;
+  /** The predicate the index itself SEEKS on. Absent when the planner could only scan and filter. */
+  readonly "Index Cond"?: string;
+  /** The predicate applied to rows the index already returned — the half an index did not serve. */
+  readonly Filter?: string;
   /** Present only when a `Filter` clause discarded rows an index/scan condition did not exclude. */
   readonly "Rows Removed by Filter"?: number;
   readonly Plans?: readonly PlanNode[];
@@ -72,4 +76,17 @@ export function indexScanNode(plan: PlanNode, indexName: string): PlanNode | und
     if (found !== undefined) return found;
   }
   return undefined;
+}
+
+/**
+ * Every `Node Type` in the plan tree, in encounter order, duplicates included.
+ *
+ * The assertion this exists for is an inverted one: a plan that reaches the right index and
+ * still carries a `Sort` or an `Incremental Sort` above it is a plan whose index only serves
+ * PART of its ordering — the exact shape `integrity_flags_queue_idx` had before
+ * `drizzle/0026_measured_index_shapes.sql` gave it the cursor's second key. `indexScanNode`
+ * cannot see that: the right index really is in the tree, doing half the job.
+ */
+export function nodeTypes(plan: PlanNode): readonly string[] {
+  return [plan["Node Type"], ...(plan.Plans ?? []).flatMap(nodeTypes)];
 }

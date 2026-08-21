@@ -141,6 +141,19 @@ export async function recordSessionSignals(
  */
 export async function signalsForUsers(db: Db, userIds: readonly string[]): Promise<readonly SessionSignal[]> {
   if (userIds.length === 0) return [];
-  const rows = await db.select().from(sessionSignals).where(inArray(sessionSignals.userId, userIds)).orderBy(desc(sessionSignals.occurredAt));
+  const rows = await signalsForUsersQuery(db, userIds);
   return rows.map(toSignal);
+}
+
+/**
+ * `signalsForUsers`' statement, as a builder — exported for the same reason `browseQuery`,
+ * `pendingFlagQuery` and `chatPageQuery` are: `src/db/index-plans.test.ts` EXPLAINs it, and a
+ * plan assertion over a hand-copied lookalike measures the lookalike (final review, HIGH 3 is
+ * what that costs). The ORDERING IS GLOBAL, across every requested user at once, which is why
+ * `session_signals_user_occurred_idx` is `(user_id)` alone: a per-user `occurred_at` ordering
+ * cannot serve a global sort, so the second column was pure write cost
+ * (`drizzle/0026_measured_index_shapes.sql` carries the measurement).
+ */
+export function signalsForUsersQuery(db: Db, userIds: readonly string[]) {
+  return db.select().from(sessionSignals).where(inArray(sessionSignals.userId, userIds)).orderBy(desc(sessionSignals.occurredAt));
 }

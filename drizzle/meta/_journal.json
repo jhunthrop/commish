@@ -183,6 +183,13 @@
       "when": 1787269530108,
       "tag": "0025_session_signals",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1787289157381,
+      "tag": "0026_measured_index_shapes",
+      "breakpoints": true
     }
   ]
 }

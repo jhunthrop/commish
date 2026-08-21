@@ -1,10 +1,12 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
-import type { Db } from "./client";
 import { createTestDb, truncateAll } from "./test-db";
-import { chatMessages, draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
-import { explainPlan, indexScanNode, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
+import { draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
+import { explainPlan, indexScanNode, nodeTypes, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
+import { chatPageQuery } from "@/chat-service/chat";
+import { pendingFlagQuery } from "@/integrity-service/flags";
+import { signalsForUsersQuery } from "@/integrity-service/session-signals";
 import { browseQuery } from "@/league-service/browse";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { AUDIT_EVENT_TYPES } from "@/domain/audit";
@@ -36,6 +38,27 @@ const SEASON_WEEKS = 14;
 const UNSETTLED_LEAGUE_INTERVAL = 500;
 /** Distinct synthetic player ids spread across the corpus, so `p-1`..`p-3` stay a small, selective slice. */
 const PLAYER_POOL_SIZE = 5_000;
+/**
+ * Chat's shape, and the numbers a chat-page plan assertion actually depends on. A few leagues
+ * hold a real conversation (`lg1`..`lg40`, including the `lg7` every chat assertion below reads)
+ * and everybody else holds a handful of messages. `lg7` therefore carries 200 of 40,000 rows —
+ * half a percent, which is the order of magnitude one league's chat occupies in a product with
+ * thousands of them, and the regime where seeking beats scanning the primary key backward. See
+ * `seedCorpus`'s own note.
+ */
+const BUSY_CHAT_LEAGUES = 40;
+const MESSAGES_PER_BUSY_LEAGUE = 200;
+const CHAT_TAIL_MESSAGES = 32_000;
+/**
+ * The operator queue's population. One flag in every `OPEN_FLAG_INTERVAL` is still open, which
+ * is the ratio that makes `integrity_flags_queue_idx`'s partial predicate worth having: a
+ * detector plus a report button produce flags forever, and an operator only ever reads the
+ * handful nobody has answered yet.
+ */
+const FLAG_COUNT = 60_000;
+const OPEN_FLAG_INTERVAL = 50;
+/** Sign-ins on record. `signalsForUsers` reads one league's whole membership at once. */
+const SESSION_SIGNAL_COUNT = 100_000;
 
 async function seedCorpus(): Promise<void> {
   await db.execute(sql`
@@ -69,10 +92,22 @@ async function seedCorpus(): Promise<void> {
     SELECT 'tm' || g || '_' || t, 'lg' || g, 'u' || (1 + ((g * 7 + t) % ${USER_COUNT})), 'Team ' || t
     FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${TEAMS_PER_LEAGUE}) t
   `);
+  // Chat's league spread is the whole point of this corpus, not an incidental detail. The
+  // earlier version put all 20,000 messages into 50 leagues, which gave every league 2% of the
+  // table — a slice big enough that a backward primary-key scan really is the planner's best
+  // plan, and small enough to look realistic. It is not: in a product with thousands of leagues
+  // one league's conversation is a fraction of a percent of all chat, which is exactly when a
+  // `(league_id, id)` seek stops being optional. So the seed is shaped like the real thing —
+  // a handful of busy leagues carrying real conversations, and a long tail of everybody else.
   await db.execute(sql`
     INSERT INTO chat_messages (league_id, author_user_id, body)
-    SELECT 'lg' || (1 + (g % 50)), 'u' || (1 + (g % ${USER_COUNT})), 'message ' || g
-    FROM generate_series(1, 20000) g
+    SELECT 'lg' || l, 'u' || (1 + ((l * 13 + g) % ${USER_COUNT})), 'message ' || g
+    FROM generate_series(1, ${BUSY_CHAT_LEAGUES}) l, generate_series(1, ${MESSAGES_PER_BUSY_LEAGUE}) g
+  `);
+  await db.execute(sql`
+    INSERT INTO chat_messages (league_id, author_user_id, body)
+    SELECT 'lg' || (${BUSY_CHAT_LEAGUES} + 1 + (g % ${LEAGUE_COUNT - 40})), 'u' || (1 + (g % ${USER_COUNT})), 'tail ' || g
+    FROM generate_series(1, ${CHAT_TAIL_MESSAGES}) g
   `);
   // Every team's full roster — every drafted team has one, so this is the whole population, not
   // a slice of it. 5,000 leagues x 3 teams x 15 slots = 225,000 rows, comfortably past the
@@ -107,31 +142,32 @@ async function seedCorpus(): Promise<void> {
   `);
   // Without ANALYZE the planner works from empty-table statistics and will choose a sequential
   // scan for everything, which would make this whole suite a false negative.
-  await db.execute(sql`ANALYZE users, leagues, drafts, teams, roster_slots, lineup_slots, matchups`);
-  // chat_messages gets a VACUUM too, not only ANALYZE: `chat_messages_league_id_idx` is a
-  // covering index (`INCLUDE (body)`, `drizzle/0018_chat_messages_covering_index.sql`), and an
-  // Index-Only Scan only skips its heap fetch for pages the VISIBILITY MAP already marks
-  // all-visible — a fact ANALYZE's statistics don't carry. Real production gets this from
-  // autovacuum running on a busy, insert-only table; a freshly-seeded test corpus has to ask for
-  // it explicitly, or the planner (correctly, given what it can see) treats the Index-Only Scan
-  // as no cheaper than a plain one and picks `chat_messages_pkey` instead — a scan-and-discard
-  // whose ratio gets worse as chat volume grows, exactly what the next test below pins against.
-  await db.execute(sql`VACUUM (ANALYZE) chat_messages`);
-}
-
-/**
- * The chat page's own read, exactly as `listMessages` (`@/chat-service/chat.ts`) makes it —
- * every column `chat_messages_league_id_idx`'s `INCLUDE` list carries, widened for Task 6's
- * removal stamp, and nothing more. Exported as a builder, mirroring `feedQuery`/`pendingFlagQuery`,
- * so both the Seq-Scan guard and the Index-Only-Scan pin below measure the identical statement.
- */
-function chatPageQuery(db: Db) {
-  return db
-    .select({ id: chatMessages.id, body: chatMessages.body, removedAt: chatMessages.removedAt, removalReason: chatMessages.removalReason })
-    .from(chatMessages)
-    .where(eq(chatMessages.leagueId, "lg7"))
-    .orderBy(asc(chatMessages.id))
-    .limit(50);
+  // The operator queue's own corpus. Mostly RESOLVED, because that ratio is the whole reason the
+  // queue index is partial: an operator's page one must stay proportional to what is still open,
+  // not to every flag the platform ever raised.
+  await db.execute(sql`
+    INSERT INTO integrity_flags (id, flag_type, subject_type, subject_id, evidence, raised_at, resolved_at)
+    SELECT 'flg' || g, 'chat_report', 'chat_message', 'msg' || g, '{}'::jsonb,
+           now() - (g || ' seconds')::interval,
+           CASE WHEN g % ${OPEN_FLAG_INTERVAL} = 0 THEN NULL ELSE now() END
+    FROM generate_series(1, ${FLAG_COUNT}) g
+  `);
+  // Session signals, many per account: `signalsForUsers` reads every row for every member of one
+  // league at once, so the population that matters is "one account's whole sign-in history",
+  // repeated across the user base.
+  await db.execute(sql`
+    INSERT INTO session_signals (id, user_id, occurred_at, user_agent, accept_language, ip_source)
+    SELECT 'sig' || g, 'u' || (1 + (g % ${USER_COUNT})), now() - (g || ' seconds')::interval,
+           'UA/' || (g % 7), 'en-US', 'xff_unverified'
+    FROM generate_series(1, ${SESSION_SIGNAL_COUNT}) g
+  `);
+  await db.execute(sql`ANALYZE users, leagues, drafts, teams, roster_slots, lineup_slots, matchups, integrity_flags, session_signals`);
+  // `chat_messages` is analyzed separately because it is seeded in two passes above and the
+  // planner needs statistics that reflect both. No VACUUM is needed any more: the covering
+  // INCLUDE list this used to exist for is gone (`drizzle/0026_measured_index_shapes.sql` —
+  // the chat page joins two tables and reads eleven columns the index never carried, so an
+  // Index-Only Scan was never reachable and the visibility map never mattered here).
+  await db.execute(sql`ANALYZE chat_messages`);
 }
 
 describe("hot read paths use indexes", () => {
@@ -165,31 +201,45 @@ describe("hot read paths use indexes", () => {
     expect(sequentiallyScannedRelations(await explainPlan(db, query))).not.toContain("teams");
   });
 
-  it("a chat page is an index range scan, not a scan of the whole league's history", async () => {
-    const plan = await explainPlan(db, chatPageQuery(db));
+  /**
+   * THE chat page read, and it is the production builder itself (`chatPageQuery`, exported from
+   * `@/chat-service/chat`), not a lookalike. Final review, HIGH 3: this used to EXPLAIN a
+   * four-column, join-free, `ORDER BY id ASC` stand-in whose docblock claimed it was "the chat
+   * page's own read, exactly as `listMessages` makes it… and nothing more" — false on all three
+   * counts, which is how a green test came to stand over an index the real query never used.
+   */
+  it("a chat page seeks straight to its league's range, rather than scanning the primary key and discarding", async () => {
+    const plan = await explainPlan(db, chatPageQuery(db, { leagueId: "lg7" }));
     expect(sequentiallyScannedRelations(plan)).not.toContain("chat_messages");
-    // Not enough on its own: dropping `chat_messages_league_id_idx` still avoids a Seq Scan by
-    // falling back to an Index Scan on the primary key, filtering out every other league's rows
-    // rather than seeking straight to this one's range — a ratio that grows with total chat
-    // volume. Pin the index by name, and confirm nothing was discarded by a Filter clause (the
-    // signature of exactly that pkey-scan-and-discard fallback).
+    // Avoiding a Seq Scan is not the property. WITHOUT `chat_messages_league_id_idx` the planner
+    // falls back to a backward Index Scan on `chat_messages_pkey` with
+    // `Filter: (league_id = ...)`, discarding every other league's rows on the way — a ratio that
+    // gets worse with every message the product ever stores. So: pin the index BY NAME, and
+    // assert nothing was discarded, which is the signature of exactly that fallback.
     const usedIndex = indexScanNode(plan, "chat_messages_league_id_idx");
     expect(usedIndex).toBeDefined();
     expect(usedIndex?.["Rows Removed by Filter"] ?? 0).toBe(0);
+    // And the index's SECOND key is doing its job: `ORDER BY id DESC` is served by walking the
+    // index backward, not by sorting what it returned. Drop `id` from the index and this is the
+    // assertion that reddens.
+    expect(nodeTypes(plan)).not.toContain("Sort");
+    expect(nodeTypes(plan)).not.toContain("Incremental Sort");
   });
 
   /**
-   * The 0018 lesson, re-run BEFORE this migration's own risk (three more nullable columns
-   * widening `chat_messages`, the same shape 0017's six tipped the planner off with) has a
-   * chance to bite silently. `chatPageQuery` below selects exactly what `ChatMessageView` now
-   * needs (`removed_at`, `removal_reason` alongside `body`) — the widened SELECT list a real
-   * chat page read makes now that removal renders in place — so this is the actual read the
-   * covering index has to serve, not the pre-Task-6 two-column stand-in.
+   * The cursor page, which is what backward pagination actually issues and what nothing measured
+   * before. `id < $2` narrows the same index range rather than adding a Filter on top of it.
    */
-  it("still chooses an Index-Only Scan for a league's chat page over the 20,000-row corpus", async () => {
-    const usedIndex = indexScanNode(await explainPlan(db, chatPageQuery(db)), "chat_messages_league_id_idx");
+  it("pages backwards through a league's history on the same index, still without discarding", async () => {
+    const plan = await explainPlan(db, chatPageQuery(db, { leagueId: "lg7", before: "150" }));
+    const usedIndex = indexScanNode(plan, "chat_messages_league_id_idx");
     expect(usedIndex).toBeDefined();
-    expect(usedIndex?.["Node Type"]).toBe("Index Only Scan");
+    expect(usedIndex?.["Rows Removed by Filter"] ?? 0).toBe(0);
+    // Both halves of the cursor are an Index Cond. `id < $2` landing as a `Filter` instead would
+    // mean re-walking the league's whole history on every page back.
+    expect(usedIndex?.["Index Cond"]).toContain("league_id");
+    expect(usedIndex?.["Index Cond"]).toContain("id <");
+    expect(usedIndex?.Filter).toBeUndefined();
   });
 
   it("a draft's action log replays by index", async () => {
@@ -238,6 +288,53 @@ describe("hot read paths use indexes", () => {
     expect(indexScanNode(plan, "matchups_unsettled_idx")).toBeDefined();
   });
 
+  /**
+   * THE OPERATOR QUEUE'S OWN READ, and the cursor page under it — both EXPLAINed against
+   * `pendingFlagQuery` itself (`@/integrity-service/flags`). Final review, LOW 11: `integrity_
+   * flags` had a catalog assertion that its indexes EXIST and no assertion that anything USES
+   * them, which is precisely why HIGH 4 was invisible to a green suite.
+   */
+  it("the operator queue's first page is a plain index scan, with no sort node above it", async () => {
+    const plan = await explainPlan(db, pendingFlagQuery(db, {}));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("integrity_flags");
+    const usedIndex = indexScanNode(plan, "integrity_flags_queue_idx");
+    expect(usedIndex).toBeDefined();
+    // The finding, pinned. With a one-column `(raised_at)` index the query's own
+    // `ORDER BY raised_at, id` is only PARTLY served, so Postgres puts an `Incremental Sort`
+    // above the scan — correct, and a cost that grows with the open queue on every page load.
+    expect(nodeTypes(plan)).not.toContain("Incremental Sort");
+    expect(nodeTypes(plan)).not.toContain("Sort");
+  });
+
+  it("the operator queue's cursor page seeks on the cursor, rather than filtering with it", async () => {
+    const [oldest] = await db.execute<{ raised_at: string; id: string }>(
+      sql`SELECT raised_at, id FROM integrity_flags WHERE resolved_at IS NULL ORDER BY raised_at, id OFFSET 500 LIMIT 1`,
+    );
+    const plan = await explainPlan(db, pendingFlagQuery(db, { before: { raisedAt: new Date(oldest!.raised_at).toISOString(), id: oldest!.id } }));
+    const usedIndex = indexScanNode(plan, "integrity_flags_queue_idx");
+    expect(usedIndex).toBeDefined();
+    // The keyset cursor is a ROW COMPARISON on `(raised_at, id)`. Against a one-column index it
+    // lands as `Filter: (ROW(raised_at, id) > ROW(...))` and every page re-walks from the oldest
+    // OPEN flag and throws away what it already showed. Against `(raised_at, id)` it is an
+    // `Index Cond` — the seek a keyset cursor exists to be. `Rows Removed by Filter` is NOT the
+    // assertion: a Filter that happens to discard nothing on this page still re-walks the range.
+    expect(usedIndex?.["Index Cond"]).toContain("ROW(raised_at, id) >");
+    expect(usedIndex?.Filter).toBeUndefined();
+  });
+
+  /**
+   * `session_signals`' index, measured rather than assumed (final review, MEDIUM 10 and LOW 11).
+   * The Sort here is UNAVOIDABLE and is not the failure: `signalsForUsers` orders globally across
+   * every requested user, which no per-user index ordering can serve. What is asserted is the
+   * only thing the index can deliver — the rows are FOUND by index rather than by scanning the
+   * table — which is exactly why the index's second column was dead weight and is now gone.
+   */
+  it("a league's session signals are found by index, and the global ordering is sorted on top", async () => {
+    const plan = await explainPlan(db, signalsForUsersQuery(db, ["u1", "u2", "u3", "u4", "u5", "u6", "u7", "u8", "u9", "u10"]));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("session_signals");
+    expect(indexScanNode(plan, "session_signals_user_occurred_idx")).toBeDefined();
+  });
+
   it("finds the teams that OWN a changed player by index, for teams with no saved lineup", async () => {
     // The fallback half of the resolver: `getLineup` derives a legal lineup from the roster when
     // a manager never opened the editor, so a changed player can affect a team that has no
@@ -252,33 +349,31 @@ describe("hot read paths use indexes", () => {
 });
 
 /**
- * A STRUCTURAL guard, independent of `seedCorpus`/the planner: `chat_messages_league_id_idx`
- * physically carries `INCLUDE (body)` (`drizzle/0018_chat_messages_covering_index.sql`), which
- * `schema.ts`'s `index()` builder has no API to express — the covering column is real on disk,
- * but invisible to `drizzle-kit generate`'s diffing. Reproduced by hand before this test existed:
- * changing `chat_messages_league_id_idx`'s `.on(...)` column list in `schema.ts` and re-running
- * `db:generate` silently produces a migration that DROPs and recreates the index WITHOUT its
- * `INCLUDE` list — drizzle has no record it was ever there, so nothing about that regenerated
- * migration looks wrong on its own. The comment on the index definition documents the hazard for
- * a human reader; this is what fails the BUILD instead of only a review, the moment the physical
- * index on the actual database stops matching what "a chat page is an index range scan" above
- * relies on to answer as an Index-Only Scan.
+ * A STRUCTURAL guard, independent of `seedCorpus`/the planner. It used to assert the opposite of
+ * what it asserts now, and the reversal is the finding.
  *
- * Widened by `drizzle/0024_chat_moderation.sql` (Task 6) from `INCLUDE (body)` to
- * `INCLUDE (body, removed_at, removal_reason)` — three more nullable columns on `chat_messages`,
- * the same shape 0017's six were, so this test is re-measured BEFORE that migration lands rather
- * than trusted to still pass by resemblance to the pre-Task-6 assertion. `removed_by_user_id` is
- * deliberately absent from the list (see `chat_messages`' own docblock in `src/db/schema.ts`):
- * which operator removed a message is an operator fact, not a member-facing one, and the fewer
- * columns in a covering index the longer it stays chosen.
+ * From 0018 through 0024 this index physically carried an INCLUDE list (`body`, later widened
+ * with the two removal columns), which `schema.ts`'s `index()` builder has no API to express —
+ * so the covering columns were real on disk and invisible to `drizzle-kit generate`'s diffing,
+ * and this test existed to fail the build if a regenerated migration silently dropped them.
+ * `drizzle/0026_measured_index_shapes.sql` dropped them ON PURPOSE, because the measurement said
+ * they never did anything: `chatPageQuery` selects eleven more `chat_messages` columns than the
+ * list carried and joins two tables, so no Index-Only Scan was ever reachable and the covering
+ * columns bought 2.7x the index size for nothing (final review, HIGH 3).
+ *
+ * The guard is kept, inverted, for the same reason it was written: drizzle cannot see an INCLUDE
+ * list, so it cannot see one being ADDED back either — by a hand-written migration, or by
+ * somebody restoring 0024 from memory. The plan assertions above are what prove the index is
+ * useful; this is what proves nobody quietly re-inflated it.
  */
-describe("chat_messages_league_id_idx stays a covering index", () => {
-  it("keeps chat_messages_league_id_idx covering after this migration too", async () => {
+describe("chat_messages_league_id_idx stays the slim two-column index the measurement justified", () => {
+  it("carries the key and nothing else — no INCLUDE list, in either direction", async () => {
     const rows = await db.execute<{ indexname: string; indexdef: string }>(
       sql`SELECT indexname, indexdef FROM pg_indexes WHERE indexname = 'chat_messages_league_id_idx'`,
     );
     expect(rows).toHaveLength(1);
-    expect(rows[0]!.indexdef).toContain("INCLUDE (body, removed_at, removal_reason)");
+    expect(rows[0]!.indexdef).toMatch(/\(league_id, id\)/);
+    expect(rows[0]!.indexdef).not.toContain("INCLUDE");
   });
 });
 
@@ -354,7 +449,10 @@ describe("integrity_flags carries its open-subject and queue indexes", () => {
     const byName = new Map(rows.map((row) => [row.indexname, row.indexdef]));
     expect(byName.get("integrity_flags_open_subject_idx")).toMatch(/UNIQUE.*\(subject_type, subject_id\)/);
     expect(byName.get("integrity_flags_open_subject_idx")).toContain("WHERE (resolved_at IS NULL)");
-    expect(byName.get("integrity_flags_queue_idx")).toMatch(/\(raised_at\)/);
+    // BOTH cursor keys (`drizzle/0026_measured_index_shapes.sql`). `(raised_at)` alone is only a
+    // presorted prefix of `pendingFlagQuery`'s ordering, which is what put an Incremental Sort
+    // over page one and turned the keyset cursor into a Filter — see the plan assertions above.
+    expect(byName.get("integrity_flags_queue_idx")).toMatch(/\(raised_at, id\)/);
     expect(byName.get("integrity_flags_queue_idx")).toContain("WHERE (resolved_at IS NULL)");
   });
 });

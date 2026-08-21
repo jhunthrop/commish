@@ -75,6 +75,13 @@ against a live `reviews` table with real traffic, same as above.
 
 ### `0018`'s covering-index swap needs an out-of-band runbook, and here it is
 
+> **Superseded shape, live runbook.** `drizzle/0026_measured_index_shapes.sql` dropped the
+> `INCLUDE` list this section was written about, after measuring it inert for the real chat page
+> read (see that migration's own comment). The RUNBOOK below is unchanged and still the procedure
+> — every `DROP INDEX` + `CREATE INDEX` on a grown `chat_messages` has exactly this problem,
+> 0026 included — but build the CURRENT shape, `(league_id, id)` with no `INCLUDE` clause, not the
+> one the example SQL quotes.
+
 `drizzle/0018_chat_messages_covering_index.sql` does a plain `DROP INDEX` + `CREATE INDEX` on
 `chat_messages` to widen `chat_messages_league_id_idx` with `INCLUDE (body)`. That is a harder
 case than `0011`/`0013`, on the table the migration's own comment calls unbounded: the `DROP`

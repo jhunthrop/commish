@@ -470,9 +470,10 @@ export const statWeeks = pgTable("stat_weeks", {
  * read, not at the write — a removed review vanishes from its feed, but a removed message
  * renders IN PLACE (ruling 18): a conversation with a hole in it is a conversation everybody
  * misreads, and the members who saw it before it went already know it existed. `removed_by_
- * user_id` is deliberately NOT in the covering index below and not on `ChatMessageView` — which
- * operator removed a message is an operator fact, not a member-facing one, and the fewer columns
- * in a covering index the longer it stays chosen.
+ * user_id` is deliberately NOT on `ChatMessageView` — which operator removed a message is an
+ * operator fact, not a member-facing one. Neither is `removal_reason` (final review, HIGH 1):
+ * the wire-bound `ChatMessageRemoval` is `{ at }`, so the reason reaches the author's private
+ * notice and nobody else.
  */
 export const chatMessages = pgTable(
   "chat_messages",
@@ -503,14 +504,13 @@ export const chatMessages = pgTable(
     removedByUserId: text("removed_by_user_id").references(() => users.id),
     removalReason: text("removal_reason"),
   },
-  // The physical index also carries `INCLUDE (body, removed_at, removal_reason)` — added by hand
-  // in `drizzle/0018_chat_messages_covering_index.sql` (originally `INCLUDE (body)`) and widened
-  // again in `drizzle/0024_chat_moderation.sql`, because drizzle-orm's `index()` builder has no
-  // `.include()` API to express it here. `src/db/index-plans.test.ts` reads the physical index
-  // definition back out of `pg_indexes` rather than trusting this file to still describe it. A
-  // future migration that drops and recreates this index from THIS definition must re-add the
-  // full `INCLUDE` list by hand, the same way — `removed_by_user_id` is deliberately excluded
-  // (see this table's own docblock).
+  // `(league_id, id)` and nothing else, which is now the WHOLE physical index too. It carried
+  // `INCLUDE (body, ...)` from 0018 through 0024; `drizzle/0026_measured_index_shapes.sql`
+  // dropped that list after measuring it inert — `chatPageQuery` (`@/chat-service/chat`) selects
+  // eleven more columns than the list carried and joins two tables, so it can never be an
+  // Index-Only Scan, and the covering columns bought 2.7x the index size for nothing. This
+  // definition and the physical index finally agree, so a `db:generate` recreation of it is no
+  // longer a silent loss (`src/db/index-plans.test.ts` still reads it back out of `pg_indexes`).
   (t) => [index("chat_messages_league_id_idx").on(t.leagueId, t.id)],
 );
 
@@ -788,8 +788,13 @@ export const integrityFlags = pgTable(
     uniqueIndex("integrity_flags_open_subject_idx")
       .on(t.subjectType, t.subjectId)
       .where(sql`${t.resolvedAt} is null`),
-    /** The queue's only ordering: oldest first, open only (ruling 30). */
-    index("integrity_flags_queue_idx").on(t.raisedAt).where(sql`${t.resolvedAt} is null`),
+    /**
+     * The queue's only ordering: oldest first, open only (ruling 30). BOTH keys, because
+     * `pendingFlagQuery`'s keyset cursor seeks on `(raised_at, id)` as a row comparison — with
+     * `raised_at` alone that comparison plans as a Filter and every page re-walks from the
+     * oldest open flag (`drizzle/0026_measured_index_shapes.sql` carries the measurement).
+     */
+    index("integrity_flags_queue_idx").on(t.raisedAt, t.id).where(sql`${t.resolvedAt} is null`),
   ],
 );
 
@@ -823,5 +828,9 @@ export const sessionSignals = pgTable(
     ipHash: text("ip_hash"),
     ipSource: text("ip_source").notNull(),
   },
-  (t) => [index("session_signals_user_occurred_idx").on(t.userId, t.occurredAt)],
+  // `user_id` alone. The name keeps its `occurred_at` half for continuity with the migration
+  // that created it, but the column is gone: the sole reader (`signalsForUsers`) orders
+  // GLOBALLY across every requested user, so a per-user `occurred_at` ordering cannot serve it
+  // (`drizzle/0026_measured_index_shapes.sql` carries the measurement).
+  (t) => [index("session_signals_user_occurred_idx").on(t.userId)],
 );

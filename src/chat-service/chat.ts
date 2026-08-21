@@ -202,18 +202,23 @@ export interface ChatPage {
 }
 
 /**
- * One page, newest-first from the database and reversed to oldest-first for rendering. There
- * is deliberately no unpaginated read: chat is the one table in this product that grows
- * without bound, so an "all messages" query would be a slow query waiting for its first busy
- * league. `pageSize + 1` is fetched so `hasMore` costs no second round trip.
+ * THE chat page read, as a builder rather than inline in `listMessages` — exported for the same
+ * reason `browseQuery` and `pendingFlagQuery` are: `src/db/index-plans.test.ts` measures its
+ * EXPLAIN plan, and it can only do that honestly against the STATEMENT PRODUCTION MAKES.
+ *
+ * Final review, HIGH 3: that test used to build a four-column, join-free, `ORDER BY id ASC`
+ * stand-in and call it "the chat page's own read, exactly as `listMessages` makes it". It was
+ * none of those things, so it measured an Index-Only Scan on a covering index the real query
+ * (eleven columns, two joins, `ORDER BY id DESC`) never uses. One builder, one measurement, no
+ * resemblance.
  */
-export async function listMessages(db: Db, input: ListMessagesInput): Promise<ChatPage> {
+export function chatPageQuery(db: Db, input: ListMessagesInput) {
   const scope =
     input.before === undefined
       ? eq(chatMessages.leagueId, input.leagueId)
       : and(eq(chatMessages.leagueId, input.leagueId), lt(chatMessages.id, Number(input.before)));
 
-  const rows = await db
+  return db
     .select({
       id: chatMessages.id,
       authorUserId: chatMessages.authorUserId,
@@ -237,6 +242,16 @@ export async function listMessages(db: Db, input: ListMessagesInput): Promise<Ch
     .where(scope)
     .orderBy(desc(chatMessages.id))
     .limit(CHAT_CONFIG.pageSize + 1);
+}
+
+/**
+ * One page, newest-first from the database and reversed to oldest-first for rendering. There
+ * is deliberately no unpaginated read: chat is the one table in this product that grows
+ * without bound, so an "all messages" query would be a slow query waiting for its first busy
+ * league. `pageSize + 1` is fetched so `hasMore` costs no second round trip.
+ */
+export async function listMessages(db: Db, input: ListMessagesInput): Promise<ChatPage> {
+  const rows = await chatPageQuery(db, input);
 
   const hasMore = rows.length > CHAT_CONFIG.pageSize;
   const page = hasMore ? rows.slice(0, CHAT_CONFIG.pageSize) : rows;
