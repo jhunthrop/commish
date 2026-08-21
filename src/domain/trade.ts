@@ -1,8 +1,11 @@
 /**
- * A proposed trade. **Nothing in this phase executes one** — no table stores it, no service
- * applies it, and the advisor that reads it has no write path at all (see `docs/advisor.md`).
- * It exists so the fairness analyzer has a typed input, and so the same shape is already right
- * when a later phase adds a real trade block with human accept/decline on both sides.
+ * A proposed trade — the pure shape the advisor's fairness analyzer takes. This is not the
+ * stored proposal: Phase 3 Plan C adds `trade_proposals` (`src/league-service/trades.ts`) and a
+ * real execution path (`acceptTrade`, `applyTradeInTx`), so a trade DOES execute now, on a row
+ * with an id, a status and timestamps this bare shape has none of. This type and
+ * `isBalancedProposal` stay here rather than moving to `src/trades`, because `src/ai-advisor`
+ * already imports them and a move would be churn with no property attached — see
+ * `src/trades/contract.ts` for the wire types the stored, executable trade uses instead.
  */
 export interface TradeSide {
   readonly teamId: string;

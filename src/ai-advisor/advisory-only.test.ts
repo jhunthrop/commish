@@ -19,6 +19,13 @@ const WRITE_PATTERNS = [
   "applyAction",
   "commitDraft",
   "acceptInvite",
+  // Phase 3 Plan C: a trade EXISTS now. The advisor assembles both sides of one and returns a
+  // verdict about it, which is exactly one import away from executing it, and this list is what
+  // keeps that import from compiling unnoticed. `setLineup`, `commitDraft` and `acceptInvite`
+  // were added for the same reason when each of those became reachable.
+  "acceptTrade",
+  "executeTrade",
+  "applyTradeInTx",
 ] as const;
 
 /**

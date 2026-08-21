@@ -145,4 +145,32 @@ export const INTEGRITY_CONFIG = {
       maxSignaturesPerAccount: 50,
     },
   },
+  /**
+   * The trade-fairness axis, in points per week — the SAME scale `ADVISOR_CONFIG.evenDelta` (3)
+   * and `.lopsidedDelta` (12) sit on, because `tradeBalance` is one function and its delta has
+   * one unit. Four thresholds now live on that axis and `src/integrity/config.test.ts` orders
+   * all four; the spec asks for an invariant between two.
+   */
+  trade: {
+    /**
+     * The spec's `TRADE_FAIRNESS_FLAG_THRESHOLD`. A COMPLETED trade whose per-week gap reaches
+     * this raises a `trade_fairness` flag into the operator queue. Deliberately above
+     * `lopsidedDelta` (12): the advisor calls a 13-point gap lopsided to a member's face, and
+     * every one of those reaching an operator would be a queue full of ordinary bad trades.
+     * A flag is a question about collusion, not a review of somebody's judgment.
+     */
+    fairnessFlagThreshold: 20,
+    /**
+     * The spec's `TRADE_AUTO_HOLD_THRESHOLD`, and **Plan D owns it**. `null` means no trade is
+     * ever held, which is what ships here: `evaluateTradeBeforeExecute` already reads this field
+     * and already has the hold branch (Task 5), so Plan D supplies a NUMBER rather than a code
+     * path. `src/integrity-service/reserved.test.ts`'s grep proves nothing in this plan reads it
+     * for a real decision, the same way it proves a reserved event type has no publisher.
+     */
+    autoHoldThreshold: null as number | null,
+    /** `sweepUnflaggedTrades`' page size — the manual re-run for a trade whose after-commit flag
+     *  write did not land (Task 6). Bounded for the same reason `INTEGRITY_CONFIG.queue.pageSize`
+     *  is: an operator script that reads an unbounded set is a script nobody runs twice. */
+    sweepBatchSize: 100,
+  },
 } as const;

@@ -30,7 +30,7 @@ import type { RaiseFlagInput } from "@/integrity-service/flags";
  * that one's SHAPE (the same four kinds of property, the same "collect every offender" style)
  * without touching it.
  */
-const INTEGRITY_DIRS = ["src/integrity", "src/integrity-service"];
+const INTEGRITY_DIRS = ["src/integrity", "src/integrity-service", "src/trades"];
 
 /** The one file this scan does not read as a potential offender: `grantAdmin`'s own module,
  *  which legitimately writes `isAdmin` — that IS the sanctioned account action, the opposite
@@ -208,7 +208,7 @@ function importClosureOf(entryFile: string): { readonly names: readonly string[]
 
 describe("the detector is flags-only", () => {
   it("has files to check, so the guard is never vacuous", () => {
-    expect(sourceFiles(INTEGRITY_DIRS).length).toBeGreaterThan(10);
+    expect(sourceFiles(INTEGRITY_DIRS).length).toBeGreaterThan(15);
   });
 
   it("contains no code path that takes an action against an account", () => {

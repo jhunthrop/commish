@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ADVISOR_CONFIG } from "@/domain/advisor";
 import { INTEGRITY_CONFIG } from "./config";
 
 describe("INTEGRITY_CONFIG.multiAccount", () => {
@@ -45,5 +46,37 @@ describe("INTEGRITY_CONFIG.multiAccount", () => {
   it("cadenceToleranceSeconds and minActionsForBehavioral are both positive — a 0 tolerance or a 0-action floor would not gate anything", () => {
     expect(INTEGRITY_CONFIG.multiAccount.signals.cadenceToleranceSeconds).toBeGreaterThan(0);
     expect(INTEGRITY_CONFIG.multiAccount.signals.minActionsForBehavioral).toBeGreaterThan(0);
+  });
+});
+
+describe("INTEGRITY_CONFIG.trade", () => {
+  it("keeps all four thresholds on one axis in one order, not just the two the spec names", () => {
+    const { evenDelta, lopsidedDelta } = ADVISOR_CONFIG;
+    const { fairnessFlagThreshold, autoHoldThreshold } = INTEGRITY_CONFIG.trade;
+    // even <= lopsided <= flag <= hold. Every one of these is a real failure mode if inverted:
+    // even > lopsided makes the verdict unreachable; lopsided > flag flags trades the advisor
+    // itself calls fine; flag > hold holds a trade nobody ever flagged, which is the spec's own
+    // Step 5 invariant read the right way round.
+    expect(evenDelta).toBeLessThanOrEqual(lopsidedDelta);
+    expect(lopsidedDelta).toBeLessThanOrEqual(fairnessFlagThreshold);
+    if (autoHoldThreshold !== null) {
+      expect(fairnessFlagThreshold).toBeLessThanOrEqual(autoHoldThreshold);
+    }
+  });
+
+  it("keeps every threshold on the axis positive and finite", () => {
+    for (const value of [ADVISOR_CONFIG.evenDelta, ADVISOR_CONFIG.lopsidedDelta, INTEGRITY_CONFIG.trade.fairnessFlagThreshold]) {
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThan(0);
+    }
+  });
+
+  it("ships autoHoldThreshold null — Plan D supplies a number, not a code path", () => {
+    expect(INTEGRITY_CONFIG.trade.autoHoldThreshold).toBeNull();
+  });
+
+  it("bounds sweepBatchSize — an unbounded manual re-run is a script nobody runs twice", () => {
+    expect(INTEGRITY_CONFIG.trade.sweepBatchSize).toBeGreaterThan(0);
+    expect(Number.isFinite(INTEGRITY_CONFIG.trade.sweepBatchSize)).toBe(true);
   });
 });
