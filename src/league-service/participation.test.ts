@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, matchups, teams, users } from "@/db/schema";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import { completedSeasonsFor, leagueTierComposition, participationFor, stampSeasonCompleteInTx } from "./participation";
+import { completedSeasonsFor, participationFor, stampSeasonCompleteInTx } from "./participation";
 
 const db = createTestDb();
 
@@ -81,43 +81,6 @@ describe("participationFor", () => {
     const counting = countingDb(db);
     await participationFor(counting.db, "u_carol");
     expect(counting.selectCount()).toBe(1);
-  });
-});
-
-describe("leagueTierComposition", () => {
-  it("names an aggregate and never a member", async () => {
-    // `PublicLeagueSummary` is the privacy boundary of this product's one unauthenticated read.
-    // A composition is two counts; a list of who is a newcomer would be a roster of strangers'
-    // inexperience published to anybody with the URL.
-    const commissionerId = "u_pub_commish";
-    await db.insert(users).values({ id: commissionerId, email: "commish@test.local", displayName: "Commish" });
-    await db.insert(leagues).values({ id: "lg_public", name: "Public League", format: "snake", teamCount: 12, commissionerUserId: commissionerId });
-    const memberIds = Array.from({ length: 8 }, (_, index) => `u_pub_member_${index}`);
-    await db.insert(users).values(memberIds.map((id) => ({ id, email: `${id}@test.local`, displayName: id })));
-    await db.insert(teams).values(memberIds.map((id, index) => ({ id: `team_pub_${index}`, leagueId: "lg_public", userId: id, name: id })));
-
-    expect(await leagueTierComposition(db, "lg_public")).toEqual({ newcomers: 8, veterans: 0 });
-  });
-
-  it("counts a member as a veteran once their OWN completed-season history crosses the cutoff", async () => {
-    const commissionerId = "u_mix_commish";
-    await db.insert(users).values([
-      { id: commissionerId, email: "mix_commish@test.local", displayName: "Commish" },
-      { id: "u_mix_veteran", email: "mix_veteran@test.local", displayName: "Veteran" },
-      { id: "u_mix_newcomer", email: "mix_newcomer@test.local", displayName: "Newcomer" },
-    ]);
-    // Three OTHER completed leagues for the veteran, crossing veteranSeasonCutoff (3).
-    await seatIn("u_mix_veteran", "lg_mix_prior_a", "2025-01-01T00:00:00.000Z");
-    await seatIn("u_mix_veteran", "lg_mix_prior_b", "2025-06-01T00:00:00.000Z");
-    await seatIn("u_mix_veteran", "lg_mix_prior_c", "2025-12-01T00:00:00.000Z");
-
-    await db.insert(leagues).values({ id: "lg_mix", name: "Mixed League", format: "snake", teamCount: 12, commissionerUserId: commissionerId });
-    await db.insert(teams).values([
-      { id: "team_mix_veteran", leagueId: "lg_mix", userId: "u_mix_veteran", name: "Veteran's Team" },
-      { id: "team_mix_newcomer", leagueId: "lg_mix", userId: "u_mix_newcomer", name: "Newcomer's Team" },
-    ]);
-
-    expect(await leagueTierComposition(db, "lg_mix")).toEqual({ newcomers: 1, veterans: 1 });
   });
 });
 

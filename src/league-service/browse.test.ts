@@ -92,6 +92,12 @@ let seedCounter = 0;
  * `hasOpenSeat`) can be run against directly. Built on `seed()` above rather than duplicating
  * its insert logic — this only adds id/name generation and the shape translation
  * (`filledTeams` -> `filled`) `seed()` doesn't do itself.
+ *
+ * `veteranSeats` (default 0, so every prior caller's composition is unchanged): the FIRST this
+ * many of `filledTeams` seats belong to a manager `giveCompletedSeasons` has already given a real
+ * completed-season history — fix round F3, so the SQL-vs-pure-rule matrix below has a real
+ * newcomer/veteran mix to exercise `participationTier` narrowing against, not only the all-
+ * newcomer corpus every prior test here built.
  */
 async function seedPublicLeague(
   db: Db,
@@ -101,11 +107,19 @@ async function seedPublicLeague(
     readonly stakeTier: number;
     readonly teamCount: number;
     readonly filledTeams: number;
+    readonly veteranSeats?: number;
   },
 ): Promise<PublicLeagueSummary> {
   seedCounter += 1;
   const id = `seed_${seedCounter}`;
   const name = `Seeded League ${seedCounter}`;
+  const veteranSeats = overrides.veteranSeats ?? 0;
+  const seatUserIds = Array.from({ length: overrides.filledTeams }, (_, index) =>
+    index < veteranSeats ? `${id}_veteran_${index}` : `${id}_u${index}`,
+  );
+  for (let i = 0; i < veteranSeats; i++) {
+    await giveCompletedSeasons(`${id}_veteran_${i}`, INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+  }
   await seed({
     id,
     name,
@@ -115,6 +129,7 @@ async function seedPublicLeague(
     teamCount: overrides.teamCount,
     filled: overrides.filledTeams,
     isPublicMatchmade: true,
+    seatUserIds,
   });
   return {
     id,
@@ -125,9 +140,9 @@ async function seedPublicLeague(
     teamCount: overrides.teamCount,
     filledTeams: overrides.filledTeams,
     scoringLabel: "Standard",
-    // `seed()` never gives a manager a completed league of their own, so every seat here is a
-    // newcomer — matching `listPublicLeagues`'s own answer for the same corpus.
-    tierComposition: { newcomers: overrides.filledTeams, veterans: 0 },
+    // `seed()` never gives a manager a completed league of their own UNLESS `veteranSeats` asked
+    // for one — matching `listPublicLeagues`'s own answer for the same corpus.
+    tierComposition: { newcomers: overrides.filledTeams - veteranSeats, veterans: veteranSeats },
   };
 }
 
@@ -428,18 +443,38 @@ describe("listPublicLeagues narrows in SQL", () => {
       }
     }
 
-    // `participationTier` is deliberately NOT a fourth axis here: it is covered on its own,
-    // directly, by "narrows on participation tier" below — this matrix stays the three static
-    // columns it always was, cross-checked against the pure rule at "any" participation tier.
+    // Fix round F3: `participationTier` IS a fourth axis below, and this small slice is what
+    // gives it something real to exercise — the loop above never varies composition, so every
+    // one of its leagues reads `all_newcomers` and a `veteran` filter would answer empty
+    // regardless of whether the predicate were even wired up. `matchesBrowseFilter`'s own
+    // reviewer note stands: the predicate sets are structurally independent (a raw `leagues`
+    // column vs. an aggregate over `teams`), so this is cheap insurance against that changing,
+    // not a claim that the two axes interact today.
+    for (const veteranSeats of [0, 1, 6]) {
+      for (const format of MATCHMAKING_CONFIG.formats) {
+        const league = await seedPublicLeague(db, {
+          format,
+          experienceTier: "beginner",
+          stakeTier: 0,
+          teamCount: 12,
+          filledTeams: 6,
+          veteranSeats,
+        });
+        corpus.push(league);
+      }
+    }
+
     const combinations: BrowseFilter[] = [];
     for (const format of [...MATCHMAKING_CONFIG.formats, "any" as const]) {
       for (const experienceTier of [...MATCHMAKING_CONFIG.experienceTiers, "any" as const]) {
         for (const stakeTier of [...MATCHMAKING_CONFIG.stakeTiers.map((entry) => entry.tier), "any" as const]) {
-          combinations.push({ format, experienceTier, stakeTier, participationTier: "any" });
+          for (const participationTier of [...MATCHMAKING_CONFIG.participationTiers, "any" as const]) {
+            combinations.push({ format, experienceTier, stakeTier, participationTier });
+          }
         }
       }
     }
-    expect(combinations).toHaveLength(3 * 3 * 5);
+    expect(combinations).toHaveLength(3 * 3 * 5 * 3);
 
     for (const filter of combinations) {
       const fromSql = await listPublicLeagues(db, filter);

@@ -87,9 +87,10 @@ describe("hot read paths use indexes", () => {
    * `seatCompletedSeasonsQuery` (`browse.ts`) is shaped differently, and the difference is what
    * flips the answer: `season_completed_at IS NOT NULL` rides in the `LEFT JOIN`'s own `ON`
    * clause (`and(eq(seatLeagues.id, seatTeams.leagueId), isNotNull(seatLeagues.seasonCompletedAt))`
-   * — the SAME shape `memberCompletedSeasonsQuery`, `@/league-service/participation`, already
-   * uses for `leagueTierComposition`), not a `WHERE` applied after. That is EXACTLY the partial
-   * index's own predicate, so the planner answers "does a completed league with this id exist"
+   * — the SAME shape Task 1's now-deleted `memberCompletedSeasonsQuery` used for the per-league
+   * `leagueTierComposition` this task's fix round removed as a dead, never-called helper), not a
+   * `WHERE` applied after. That is EXACTLY the partial index's own predicate, so the planner
+   * answers "does a completed league with this id exist"
    * with an `Index Only Scan` on `leagues_season_completed_idx` rather than a primary-key lookup
    * plus a heap fetch to check the column — measured here at 4,500 loops (one per candidate seat
    * before the `HAVING`/`LIMIT` ever runs), each an index-only point lookup rather than a heap

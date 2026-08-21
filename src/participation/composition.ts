@@ -53,6 +53,14 @@ export const TIER_COMPOSITION_LABEL: Readonly<Record<CompositionCategory, string
  * `matchesBrowseFilter`'s `participationTier` narrowing (`@/matchmaking/filter`) is built on the
  * SAME comparison (`newcomers > veterans`) rather than a second copy of it, so the filter and the
  * label a visitor reads can never disagree about the same league.
+ *
+ * A SPARSE league (one seated manager out of twelve) reads exactly as confidently
+ * `"all_newcomers"` as a nearly-full one — deliberately, not a gap: `public-league-list.tsx`
+ * always renders this label beside `"1 of 12 joined"`, and that adjacent count is what tells a
+ * visitor how much the composition label should weigh, which is the whole reason this function
+ * itself never reaches for a ratio or a sample-size caveat of its own (this file's own docblock).
+ * A future reader who wants to "fix" a one-seat league reading as confidently as an eleven-seat
+ * one should read `public-league-list.tsx`'s card layout first.
  */
 export function compositionCategoryFor(composition: TierComposition): CompositionCategory {
   if (composition.veterans === 0) {

@@ -106,10 +106,14 @@ function narrowingFor(filter: BrowseFilter): readonly (SQL | undefined)[] {
  * fast while the real one is slow.
  *
  * PHASE 3 PLAN D, TASK 2. `newcomers`/`veterans` are a `GROUP BY` folded into this SAME query,
- * beside `filledTeams`, rather than a per-league call to `leagueTierComposition`
- * (`@/league-service/participation`): the browse page returns up to `maxResults` (48) leagues,
- * and 48 round trips on this app's one unauthenticated route is exactly the N+1
- * `listLeagueActivity`'s own shape exists to refuse. Both counts, and the `participationTier`
+ * beside `filledTeams`, rather than a per-league round trip: the browse page returns up to
+ * `maxResults` (48) leagues, and 48 round trips on this app's one unauthenticated route is
+ * exactly the N+1 `listLeagueActivity`'s own shape exists to refuse. Task 1 shipped a per-league
+ * reader for this exact aggregate (`leagueTierComposition`, `@/league-service/participation`) for
+ * a caller that never arrived — this task's fix-round deleted it rather than leaving a
+ * reserved-without-owner helper beside the query that made it redundant; `git log` on
+ * `src/league-service/participation.ts` carries its history for a reader who needs the shape it
+ * used. Both counts, and the `participationTier`
  * `HAVING` predicate built from them, apply BEFORE the `LIMIT` — the same "narrow before you cap"
  * property `filledTeams`'s own open-seat `HAVING` already holds, so a participation-narrowed
  * browse returns every match the database holds up to the cap, never an under-filled page
@@ -125,11 +129,11 @@ function narrowingFor(filter: BrowseFilter): readonly (SQL | undefined)[] {
  * review as an index with no consumer anywhere in the plan: `seatCompletedSeasonsQuery`'s `LEFT
  * JOIN` carries `season_completed_at IS NOT NULL` in its own `ON` clause, alongside the id
  * equality (`and(eq(seatLeagues.id, seatTeams.leagueId), isNotNull(seatLeagues.seasonCompletedAt))`
- * — the same shape `memberCompletedSeasonsQuery`, `@/league-service/participation`, already uses)
- * — which matches this partial index's own predicate exactly, so the planner answers with an
- * `Index Only Scan` on it rather than a primary-key lookup plus a heap fetch. Measured, not
- * assumed: "DOES choose leagues_season_completed_idx" in `index-plans.test.ts`. The index has a
- * real consumer after all, and no drop migration ships.
+ * — the same shape the now-deleted `memberCompletedSeasonsQuery` used) — which matches this
+ * partial index's own predicate exactly, so the planner answers with an `Index Only Scan` on it
+ * rather than a primary-key lookup plus a heap fetch. Measured, not assumed: "DOES choose
+ * leagues_season_completed_idx" in `index-plans.test.ts`. The index has a real consumer after
+ * all, and no drop migration ships.
  */
 export function browseQuery(db: Db, filter: BrowseFilter) {
   const ANY = MATCHMAKING_CONFIG.anyValue;
@@ -220,9 +224,9 @@ async function scoringWeightsByLeagueId(db: Db, leagueIds: readonly string[]): P
  * card is not the place to surface a data-integrity bug to a stranger.
  *
  * `tierComposition` is assembled the same way: `browseQuery`'s own `newcomers`/`veterans`
- * columns are reduced through `tierCompositionFor` (`@/participation/composition`) — the same
- * named constructor `leagueTierComposition` uses — rather than a bare object literal, and the two
- * raw counts never reach the return value under their own names.
+ * columns are reduced through `tierCompositionFor` (`@/participation/composition`) — a named
+ * constructor rather than a bare object literal — and the two raw counts never reach the return
+ * value under their own names.
  */
 export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<readonly PublicLeagueSummary[]> {
   const rows = await browseQuery(db, filter);

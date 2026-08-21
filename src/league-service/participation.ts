@@ -1,9 +1,7 @@
 import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
 import type { DbTx, ReadonlyDb } from "@/db/client";
 import { leagues, matchups, teams } from "@/db/schema";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import { tierCompositionFor, type TierComposition } from "@/participation/composition";
 import type { ParticipationSummary } from "@/participation/contract";
 import { participationTierFor } from "@/participation/tier";
 import { isVerifiedPlayer } from "@/participation/verified";
@@ -53,45 +51,6 @@ export async function participationFor(db: ReadonlyDb, userId: string): Promise<
     tier: participationTierFor(completedSeasons, INTEGRITY_CONFIG.participation.veteranSeasonCutoff),
     verified: isVerifiedPlayer(completedSeasons, INTEGRITY_CONFIG.participation.verifiedSeasonCutoff),
   };
-}
-
-/** The same user's OTHER leagues and teams, aliased so a self-join can ask "how many of this
- *  league's members have completed seasons elsewhere" without colliding with the outer query's
- *  own `teams`/`leagues` references. */
-const memberTeams = alias(teams, "member_teams");
-const memberLeagues = alias(leagues, "member_leagues");
-
-/**
- * One row per member of `leagueId`, with their OWN completed-season count — bounded by this
- * league's own team count (`teams.league_id` is indexed), never by the platform's total matchup
- * volume. `leagueTierComposition` below reduces this to the two-count aggregate a browse card may
- * actually disclose.
- */
-function memberCompletedSeasonsQuery(db: ReadonlyDb, leagueId: string) {
-  return db
-    .select({ userId: teams.userId, completedSeasons: sql<number>`count(${memberLeagues.id})::int` })
-    .from(teams)
-    .innerJoin(memberTeams, eq(memberTeams.userId, teams.userId))
-    .leftJoin(memberLeagues, and(eq(memberLeagues.id, memberTeams.leagueId), isNotNull(memberLeagues.seasonCompletedAt)))
-    .where(eq(teams.leagueId, leagueId))
-    .groupBy(teams.userId);
-}
-
-/**
- * A league's tier composition — two counts, never a member. `PublicLeagueSummary` is the privacy
- * boundary of this product's one unauthenticated read (`@/matchmaking/contract`), and a per-member
- * breakdown would be a roster of strangers' inexperience published to anybody holding the URL.
- */
-export async function leagueTierComposition(db: ReadonlyDb, leagueId: string): Promise<TierComposition> {
-  const rows = await memberCompletedSeasonsQuery(db, leagueId);
-  const cutoff = INTEGRITY_CONFIG.participation.veteranSeasonCutoff;
-  let newcomers = 0;
-  let veterans = 0;
-  for (const row of rows) {
-    if (participationTierFor(row.completedSeasons, cutoff) === "veteran") veterans += 1;
-    else newcomers += 1;
-  }
-  return tierCompositionFor({ newcomers, veterans });
 }
 
 /**

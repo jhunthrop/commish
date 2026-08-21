@@ -25,11 +25,10 @@ import type { ParticipationTier } from "@/participation/tier";
  * this field for the fuller reasoning.
  *
  * `tierComposition` is the SAME kind of exception, and for the same reason `scoringLabel` is:
- * `leagueTierComposition` (`@/league-service/participation`) already reduces a league's whole
- * membership down to two counts before this field is ever assembled, so what reaches the wire is
- * an aggregate over the league, never a fact about any one person in it — the same "two counts,
- * never a member" discipline `TierComposition`'s own docblock (`@/participation/composition`)
- * states.
+ * `browseQuery` (`@/league-service/browse`) already reduces a league's whole membership down to
+ * two counts before this field is ever assembled, so what reaches the wire is an aggregate over
+ * the league, never a fact about any one person in it — the same "two counts, never a member"
+ * discipline `TierComposition`'s own docblock (`@/participation/composition`) states.
  *
  * A stranger gets what they need to CHOOSE a league and nothing about the people already in it.
  */
