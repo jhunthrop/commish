@@ -1,12 +1,15 @@
 import { describe, expect, it, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
+import type { DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { auditEvents, drafts, leagues, matchups, memberNotices, players, playerStatLines, rosterSlots, statWeeks, teams, users } from "@/db/schema";
+import type { AuditEvent, AuditEventInput } from "@/domain/audit";
 import type { StatLine } from "@/domain/player";
 import { writeSchedule } from "@/league-service/schedule";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { copyViolations } from "@/integrity/copy-rules";
 import type { RequestBudget } from "./budget";
-import { correctSettledWeek, correctionOutcome, matchupResultFor } from "./correction";
+import { correctSettledWeek, correctionOutcome, matchupResultFor, type CorrectionResult } from "./correction";
 import { finalizeWeek } from "./finalize";
 import { fakeStatsProvider } from "./test-support";
 
@@ -142,6 +145,30 @@ function budgetDenyingBoxScores(): RequestBudget {
 
 const emptyProvider = fakeStatsProvider({ games: {} });
 
+/** Narrows a `CorrectionResult` to its `ok: true` arm, or fails the test with the refusal reason —
+ *  every fix-round-2 test needs `leaguesFailed`, which only exists on that arm. */
+function expectOk(result: CorrectionResult): Extract<CorrectionResult, { readonly ok: true }> {
+  if (!result.ok) throw new Error(`expected ok:true, got refusal: ${result.reason}`);
+  return result;
+}
+
+/** A real `AuditLogger` (`getAuditLogger()`) that throws for exactly one league's own append,
+ *  simulating a mid-loop failure — the fix-round-2 (F2) failure-injection case. Every OTHER
+ *  league's append goes through the real logger untouched. */
+function auditThrowingForLeague(leagueId: string): AuditLogger {
+  const real = getAuditLogger();
+  return {
+    record: async (tx: DbTx, input: AuditEventInput): Promise<AuditEvent> => {
+      if (input.leagueId === leagueId) throw new Error(`simulated audit failure for ${leagueId}`);
+      return real.record(tx, input);
+    },
+    recordAll: async (tx: DbTx, inputs: readonly AuditEventInput[]): Promise<readonly AuditEvent[]> => {
+      if (inputs.some((entry) => entry.leagueId === leagueId)) throw new Error(`simulated audit failure for ${leagueId}`);
+      return real.recordAll(tx, inputs);
+    },
+  };
+}
+
 /** Two leagues, two teams each, one QB rostered per team, week `WEEK` already settled once —
  *  exactly the state the ingestion worker would have left it in, before any correction runs. */
 async function seedTwoLeagueFixture(): Promise<void> {
@@ -238,11 +265,42 @@ describe("correctSettledWeek", () => {
     expect(qbA!.passingYards).toBe(300);
   });
 
-  it("re-settles each affected league in its own transaction, because a transaction appends to one chain", async () => {
+  it("re-settles two leagues that both actually changed, each in its own transaction and its own chain", async () => {
+    // Both lg_a's qb_a and lg_b's qb_c are revised, so both leagues genuinely have something to
+    // record — Plan A ruling 3's proof that a transaction appends to exactly one chain needs two
+    // REAL leagues, not one real and one that only re-settles to the same numbers (that scenario
+    // is the next test, and after fix round 1's F1 it would prove the opposite property).
     await seedTwoLeagueFixture();
-    await correctSettledWeek(db, { week: WEEK, by: "u_op", provider: correctionProvider(), budget: grantedBudget });
+    const provider = fakeStatsProvider({
+      games: {
+        [WEEK]: [
+          {
+            gameId: "g_correct", week: WEEK, status: "final", homeNflTeam: "KC", awayNflTeam: "SF",
+            lines: [statLine("qb_a", WEEK, { passingYards: 350, passingTouchdowns: 4 }), statLine("qb_c", WEEK, { passingYards: 300, passingTouchdowns: 3 })],
+          },
+        ],
+      },
+    });
+    const result = expectOk(await correctSettledWeek(db, { week: WEEK, by: "u_op", provider, budget: grantedBudget }));
+    expect(result).toMatchObject({ leaguesResettled: 2, leaguesChanged: 2, leaguesFailed: [] });
     expect(await auditEventsOn("lg_a")).toHaveLength(1);
     expect(await auditEventsOn("lg_b")).toHaveLength(1);
+  });
+
+  /**
+   * Fix round 1, F1 (HIGH, adjudicated): a league that re-settles to BYTE-IDENTICAL numbers used
+   * to get a `system_action` anyway, because the write happened unconditionally. Ruled: gate the
+   * anchor (and every notice) on that league's OWN before/after diff, exactly as the notices
+   * already were — "always re-settling" (founder decision 11) is a claim about the write, not
+   * about the record. lg_b fields the week but none of its rostered players are in the provider's
+   * script, so it re-settles to the SAME numbers it already had and must write nothing about it.
+   */
+  it("does not record a system_action for a league whose recomputed results are byte-identical, even though it still re-settles", async () => {
+    await seedTwoLeagueFixture();
+    const result = expectOk(await correctSettledWeek(db, { week: WEEK, by: "u_op", provider: correctionProvider(), budget: grantedBudget }));
+    expect(result).toMatchObject({ leaguesResettled: 2, leaguesChanged: 1, leaguesFailed: [] });
+    expect(await auditEventsOn("lg_a")).toHaveLength(1);
+    expect(await auditEventsOn("lg_b")).toHaveLength(0);
   });
 
   it("tells every manager whose points moved, and says whether the result moved with them", async () => {
@@ -280,15 +338,21 @@ describe("correctSettledWeek", () => {
     await finalizeWeek(db, "lg_a", WEEK);
     await markWeekSettled(WEEK, NOW);
 
-    const result = await correctSettledWeek(db, { week: WEEK, by: "u_op", provider: correctionProvider(), budget: grantedBudget });
-    expect(result).toMatchObject({ ok: true, changed: true, leaguesResettled: 1 });
+    const result = expectOk(await correctSettledWeek(db, { week: WEEK, by: "u_op", provider: correctionProvider(), budget: grantedBudget }));
+    expect(result).toMatchObject({ changed: true, leaguesResettled: 1, leaguesChanged: 1, leaguesFailed: [] });
     expect(await auditEventsOn("lg_a")).toHaveLength(1);
     expect(await auditEventsOn("lg_undrafted")).toHaveLength(0);
     const [undraftedRow] = await db.select().from(matchups).where(and(eq(matchups.leagueId, "lg_undrafted"), eq(matchups.weekNumber, WEEK)));
     expect(undraftedRow!.homeScore).toBeNull();
   });
 
-  it("compares against nothing, and sends no notice, for a league whose week was never previously scored", async () => {
+  /**
+   * A league whose week was never previously scored has no baseline to diff against — every team
+   * reads `beforeState === undefined` and is skipped from `moved`, so this ALSO exercises F1's
+   * gate: the league genuinely re-settles (its null scores become real ones) but records nothing,
+   * because "moved from nothing to something" is not a comparison this notice can make honestly.
+   */
+  it("compares against nothing, records nothing, and sends no notice, for a league whose week was never previously scored", async () => {
     await db.insert(players).values({ id: "qb_a", name: "QB A", position: "QB", nflTeam: "KC" });
     await seedLeagueShell("lg_a", [{ teamId: "team_a", userId: "u_manager" }, { teamId: "team_b", userId: "u_rival" }], "complete");
     await addRoster("team_a", "qb_a");
@@ -297,12 +361,92 @@ describe("correctSettledWeek", () => {
     // every other test's fixture.
     await markWeekSettled(WEEK, NOW);
 
-    const result = await correctSettledWeek(db, { week: WEEK, by: "u_op", provider: correctionProvider(), budget: grantedBudget });
-    expect(result).toMatchObject({ ok: true, changed: true, leaguesResettled: 1 });
-    expect(await auditEventsOn("lg_a")).toHaveLength(1);
+    const result = expectOk(await correctSettledWeek(db, { week: WEEK, by: "u_op", provider: correctionProvider(), budget: grantedBudget }));
+    expect(result).toMatchObject({ changed: true, leaguesResettled: 1, leaguesChanged: 0, leaguesFailed: [] });
+    expect(await auditEventsOn("lg_a")).toHaveLength(0);
     expect(await noticesFor("u_manager")).toHaveLength(0);
     const [row] = await db.select().from(matchups).where(and(eq(matchups.leagueId, "lg_a"), eq(matchups.weekNumber, WEEK)));
     expect(row!.homeScore).not.toBeNull();
+  });
+
+  /**
+   * Fix round 1, F2 (HIGH/MEDIUM): the per-league loop had no try/catch, so a mid-loop transaction
+   * failure propagated as an unhandled rejection and lost every OTHER league's result along with
+   * it. Ruled: wrap each league's own transaction, collect failures by name and reason, and keep
+   * attempting the rest — each league's correction is independent, so attempting every one is more
+   * operator-friendly than stopping at the first failure. Three leagues, all three genuinely
+   * revised; the audit logger throws for the MIDDLE one only.
+   */
+  it("wraps each league's own transaction: one failure does not stop the others, and is reported by name and reason", async () => {
+    await db.insert(players).values([
+      { id: "qb_x", name: "QB X", position: "QB", nflTeam: "KC" },
+      { id: "qb_y", name: "QB Y", position: "QB", nflTeam: "SF" },
+      { id: "qb_z", name: "QB Z", position: "QB", nflTeam: "DAL" },
+    ]);
+    for (const [leagueId, teamId, userId, playerId] of [
+      ["lg_1", "team_x", "u_x", "qb_x"],
+      ["lg_2", "team_y", "u_y", "qb_y"],
+      ["lg_3", "team_z", "u_z", "qb_z"],
+    ] as const) {
+      await seedLeagueShell(leagueId, [{ teamId, userId }, { teamId: `${teamId}_rival`, userId: `${userId}_rival` }], "complete");
+      await addRoster(teamId, playerId);
+      await db.insert(playerStatLines).values({ playerId, week: WEEK, passingYards: 200, passingTouchdowns: 1 });
+      await finalizeWeek(db, leagueId, WEEK);
+    }
+    await markWeekSettled(WEEK, NOW);
+
+    const provider = fakeStatsProvider({
+      games: {
+        [WEEK]: [
+          {
+            gameId: "g_all", week: WEEK, status: "final", homeNflTeam: "KC", awayNflTeam: "SF",
+            lines: [
+              statLine("qb_x", WEEK, { passingYards: 300, passingTouchdowns: 3 }),
+              statLine("qb_y", WEEK, { passingYards: 300, passingTouchdowns: 3 }),
+              statLine("qb_z", WEEK, { passingYards: 300, passingTouchdowns: 3 }),
+            ],
+          },
+        ],
+      },
+    });
+
+    const result = expectOk(
+      await correctSettledWeek(db, { week: WEEK, by: "u_op", provider, budget: grantedBudget, audit: auditThrowingForLeague("lg_2") }),
+    );
+    expect(result).toMatchObject({ changed: true, leaguesResettled: 2, leaguesChanged: 2 });
+    expect(result.leaguesFailed).toEqual([{ leagueId: "lg_2", reason: expect.stringContaining("simulated audit failure for lg_2") }]);
+
+    expect(await auditEventsOn("lg_1")).toHaveLength(1);
+    expect(await auditEventsOn("lg_2")).toHaveLength(0);
+    expect(await auditEventsOn("lg_3")).toHaveLength(1);
+
+    // lg_2's own transaction rolled back entirely — no notice for its manager either.
+    expect(await noticesFor("u_y")).toHaveLength(0);
+    expect(await noticesFor("u_x")).toHaveLength(1);
+    expect(await noticesFor("u_z")).toHaveLength(1);
+
+    // What rolled back is scoped to lg_2's OWN transaction: `player_stat_lines` committed in the
+    // earlier, separate `persistTick` transaction regardless, but lg_2's `matchups` row — written
+    // inside the failed transaction — kept its ORIGINAL score (200 * 0.04 + 1 * 4 = 12), not the
+    // corrected one (300 * 0.04 + 3 * 4 = 24).
+    const [qbYLine] = await db.select().from(playerStatLines).where(eq(playerStatLines.playerId, "qb_y"));
+    expect(qbYLine!.passingYards).toBe(300);
+    const [lg2Row] = await db.select().from(matchups).where(and(eq(matchups.leagueId, "lg_2"), eq(matchups.weekNumber, WEEK)));
+    const teamYScore = lg2Row!.homeTeamId === "team_y" ? lg2Row!.homeScore : lg2Row!.awayScore;
+    expect(teamYScore).toBe(12);
+  });
+
+  it("stringifies a thrown non-Error value the same way, rather than assuming every failure is an Error", async () => {
+    await seedTwoLeagueFixture();
+    // `notify` throws a bare string — not every rejection in JS is an `Error` instance, and the
+    // failure report has to name it either way.
+    const throwingNotify: typeof import("@/integrity-service/notify").notifyAffectedMember = async () => {
+      throw "not an Error instance";
+    };
+    const result = expectOk(
+      await correctSettledWeek(db, { week: WEEK, by: "u_op", provider: correctionProvider(), budget: grantedBudget, notify: throwingNotify }),
+    );
+    expect(result.leaguesFailed).toEqual([{ leagueId: "lg_a", reason: "not an Error instance" }]);
   });
 });
 

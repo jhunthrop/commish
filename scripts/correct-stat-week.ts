@@ -134,7 +134,7 @@ async function main(): Promise<void> {
     console.log(`  a manager whose points move (for example ${sample.teamName} in ${sample.leagueName}) reads a notice shaped like:`);
     console.log(`    ${notice.title}`);
     console.log(`    ${notice.body}`);
-    console.log("  (today's points and a neutral outcome — the correction decides the real ones)");
+    console.log("  (today's points and a neutral outcome, not the real ones; the correction decides those)");
   }
 
   const proceed = await confirm("Correct this week?");

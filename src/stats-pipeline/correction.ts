@@ -1,5 +1,5 @@
 import { and, eq } from "drizzle-orm";
-import type { Db, ReadonlyDb } from "@/db/client";
+import type { Db, DbTx, ReadonlyDb } from "@/db/client";
 import { leagues, matchups, statWeeks, teams } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
 import type { Clock } from "@/domain/timing";
@@ -9,7 +9,7 @@ import type { StatWeekCorrectionOutcome } from "@/integrity/notices";
 import type { SystemActionCode } from "@/integrity/system-actions";
 import type { StatsProvider } from "@/stats/provider";
 import type { ReservationDenial, RequestBudget } from "./budget";
-import { finalizeWeekInTx } from "./finalize";
+import { checkFinalizeGuards, finalizeWeekInTx } from "./finalize";
 import { getIngestionBudget, getStatsProvider } from "./index";
 import { persistTick } from "./persist";
 
@@ -39,6 +39,13 @@ export interface CorrectSettledWeekInput {
   readonly notify?: typeof notifyAffectedMember;
 }
 
+/** One league this run tried to correct, and how it went. Never thrown — a per-league failure is
+ *  reported here, alongside every league that committed, rather than losing the rest of the run. */
+export interface FailedLeagueCorrection {
+  readonly leagueId: string;
+  readonly reason: string;
+}
+
 export type CorrectionResult =
   | {
       readonly ok: true;
@@ -46,9 +53,22 @@ export type CorrectionResult =
       /** `false` when the provider's numbers matched exactly what Postgres already held —
        *  `persistTick`'s own arbiter, never a diff this module computes itself. */
       readonly changed: boolean;
-      /** How many leagues were actually re-settled. Zero when `changed` is `false`, and can be
-       *  fewer than "every league fielding this week" when one of them turns out undrafted. */
+      /** How many leagues actually committed a re-settlement (founder decision #11: EVERY league
+       *  fielding the week is attempted, not only leagues with a team that moved) — zero when
+       *  `changed` is `false`, and can be fewer than "every league fielding this week" when a
+       *  league turns out undrafted (skipped, not a failure) or its own transaction fails (see
+       *  `leaguesFailed`). */
       readonly leaguesResettled: number;
+      /** Of the leagues that committed, how many actually had at least one team's result move —
+       *  the only ones that got a `system_action` and any notices. Can be smaller than
+       *  `leaguesResettled`: a league that re-settles to byte-identical numbers is still
+       *  re-settled, but records nothing, because a row claiming it changed something would be a
+       *  lie. See `correctLeagueInTx`. */
+      readonly leaguesChanged: number;
+      /** Every league whose OWN transaction threw and rolled back, by id and reason — never
+       *  silently dropped. A league failing here does not stop the rest of the week's leagues
+       *  from being attempted; each league's correction is independent. */
+      readonly leaguesFailed: readonly FailedLeagueCorrection[];
     }
   | { readonly ok: false; readonly reason: string };
 
@@ -123,18 +143,26 @@ const LEAGUE_WIDE_SUMMARY = (week: number): string =>
  * `removeChatMessageInTx` already use (notice(s) before the anchor, whose FK-taking inserts must
  * land before the lock the anchor append takes, and the anchor always last).
  *
- * Writes the league-wide `system_action` unconditionally once `finalizeWeekInTx` actually settles
- * the league (founder decision #11: "always re-settling") — even for a league none of whose teams
- * moved, because its standings were still recomputed from the corrected numbers and a member
- * reading the activity feed is owed that fact. Writes NOTHING for a league `finalizeWeekInTx`
- * itself refuses (a league whose draft somehow is not complete, or that vanished) — the same
- * "skip, don't fail the tick" discipline the worker's own `finalizeDrafted` uses for exactly this
- * guard, so one odd league in the week never stops the rest of it from being corrected.
+ * `finalizeWeekInTx` always runs, unconditionally — founder decision #11's "always re-settling" is
+ * a claim about the WRITE. The `system_action` anchor and every notice are conditional on this
+ * league's OWN before/after diff finding at least one team whose points actually moved (fix round
+ * 1, HIGH — this used to fire for every resettled league regardless): a league that recomputes to
+ * byte-identical numbers has still been re-settled, honestly, but a `system_action` row for it
+ * would say an operator acted on this league when nothing about it changed, which is exactly the
+ * false record this phase exists to prevent — the same reasoning `correctSettledWeek`'s own
+ * `changed: false` early return already applies at the whole-week level, applied here per league.
  *
- * Returns whether this league was actually resettled, for the caller's `leaguesResettled` count.
+ * ASSUMES `checkFinalizeGuards` has already passed for `(leagueId, week)` — the caller's job, done
+ * BEFORE this function's transaction opens (see `finalize.ts`'s own docblock on why the guards
+ * stay outside every transaction that reaches this write). Any error thrown here — `notify`,
+ * `audit.record`, or the write itself — propagates to the caller with the whole transaction rolled
+ * back; `attemptLeague` below is what turns that into a reported failure instead of an unhandled
+ * rejection.
+ *
+ * Returns whether this league's diff found real movement — the caller's `changed` accounting.
  */
-async function correctLeague(
-  db: Db,
+async function correctLeagueInTx(
+  tx: DbTx,
   leagueId: string,
   week: number,
   by: string,
@@ -142,51 +170,94 @@ async function correctLeague(
   audit: AuditLogger,
   notify: typeof notifyAffectedMember,
 ): Promise<boolean> {
-  return db.transaction(async (tx) => {
-    const before = await teamStatesFor(tx, leagueId, week);
-    const result = await finalizeWeekInTx(tx, leagueId, week);
-    if (!result.ok) return false;
-    const after = await teamStatesFor(tx, leagueId, week);
+  const before = await teamStatesFor(tx, leagueId, week);
+  await finalizeWeekInTx(tx, leagueId, week);
+  const after = await teamStatesFor(tx, leagueId, week);
 
-    // `leagues.id` is what `matchups.leagueId` (the source of `leagueId`, via `leaguesInWeek`) is
-    // a NOT NULL foreign key to, so this row always exists.
-    const [league] = await tx.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, leagueId));
-    const leagueName = league!.name;
+  const moved: { readonly teamId: string; readonly before: TeamState; readonly after: TeamState }[] = [];
+  for (const [teamId, afterState] of after) {
+    const beforeState = before.get(teamId);
+    // `undefined` when this league's week was never previously scored (a matchup row can predate
+    // its own first settlement) — nothing to compare against, so nothing to report as "moved".
+    if (beforeState === undefined || beforeState.points === afterState.points) continue;
+    moved.push({ teamId, before: beforeState, after: afterState });
+  }
 
-    const notices: MemberNotice[] = [];
-    for (const [teamId, afterState] of after) {
-      const beforeState = before.get(teamId);
-      // `undefined` when this league's week was never previously scored (a matchup row can
-      // predate its own first settlement) — nothing to compare against, so nothing to report.
-      if (beforeState === undefined || beforeState.points === afterState.points) continue;
+  if (moved.length === 0) return false;
 
-      // `teams.id` is what `matchups.homeTeamId`/`awayTeamId` are a NOT NULL foreign key to, and
-      // `teamId` came from exactly those columns above — so this row always exists.
-      const [team] = await tx.select({ userId: teams.userId }).from(teams).where(eq(teams.id, teamId));
-      notices.push(
-        await notify(tx, {
-          leagueId,
-          userId: team!.userId,
-          noticeType: "stat_week_corrected",
-          context: { leagueName, week, points: afterState.points, outcome: correctionOutcome(beforeState.result, afterState.result) },
-          occurredAt: clock.now(),
-          auditEventId: null,
-        }),
-      );
-    }
+  // `leagues.id` is what `matchups.leagueId` (the source of `leagueId`, via `leaguesInWeek`) is
+  // a NOT NULL foreign key to, so this row always exists.
+  const [league] = await tx.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, leagueId));
+  const leagueName = league!.name;
 
-    const event = await audit.record(tx, {
-      eventType: "system_action",
-      actorId: by,
-      actorType: "user",
-      leagueId,
-      payload: { action: ACTION, week, summary: LEAGUE_WIDE_SUMMARY(week) },
-      occurredAt: clock.now(),
-    });
-    for (const notice of notices) await attachAuditEvent(tx, notice, event.eventId);
+  const notices: MemberNotice[] = [];
+  for (const { teamId, before: beforeState, after: afterState } of moved) {
+    // `teams.id` is what `matchups.homeTeamId`/`awayTeamId` are a NOT NULL foreign key to, and
+    // `teamId` came from exactly those columns — so this row always exists.
+    const [team] = await tx.select({ userId: teams.userId }).from(teams).where(eq(teams.id, teamId));
+    notices.push(
+      await notify(tx, {
+        leagueId,
+        userId: team!.userId,
+        noticeType: "stat_week_corrected",
+        context: { leagueName, week, points: afterState.points, outcome: correctionOutcome(beforeState.result, afterState.result) },
+        occurredAt: clock.now(),
+        auditEventId: null,
+      }),
+    );
+  }
 
-    return true;
+  const event = await audit.record(tx, {
+    eventType: "system_action",
+    actorId: by,
+    actorType: "user",
+    leagueId,
+    payload: { action: ACTION, week, summary: LEAGUE_WIDE_SUMMARY(week) },
+    occurredAt: clock.now(),
   });
+  for (const notice of notices) await attachAuditEvent(tx, notice, event.eventId);
+
+  return true;
+}
+
+/** One league's whole attempt: skipped (a guard refused it — not a failure, the worker's own
+ *  `finalizeDrafted` skips the same way), failed (its transaction threw and rolled back), or
+ *  committed (with or without anything actually moving). */
+interface LeagueAttempt {
+  readonly leagueId: string;
+  readonly resettled: boolean;
+  readonly changed: boolean;
+  readonly failure: string | null;
+}
+
+/**
+ * `checkFinalizeGuards`, OUTSIDE any transaction (fix round 1, F5 — see `finalize.ts`'s own
+ * docblock), then `correctLeagueInTx` inside this league's OWN transaction, wrapped in a
+ * try/catch (fix round 1, HIGH/MEDIUM — F2): a thrown error from `notify`, `audit.record` or the
+ * write itself used to propagate out of the per-league loop as an unhandled rejection, losing
+ * every OTHER league's result along with it. Caught here instead, so one league's failure is
+ * reported by name and reason while the rest of the week's leagues are still attempted — each
+ * league's correction is independent, and attempting every one is more operator-friendly than
+ * stopping at the first failure.
+ */
+async function attemptLeague(
+  db: Db,
+  leagueId: string,
+  week: number,
+  by: string,
+  clock: Clock,
+  audit: AuditLogger,
+  notify: typeof notifyAffectedMember,
+): Promise<LeagueAttempt> {
+  const guardFailure = await checkFinalizeGuards(db, leagueId, week);
+  if (guardFailure !== null) return { leagueId, resettled: false, changed: false, failure: null };
+
+  try {
+    const changed = await db.transaction((tx) => correctLeagueInTx(tx, leagueId, week, by, clock, audit, notify));
+    return { leagueId, resettled: true, changed, failure: null };
+  } catch (error: unknown) {
+    return { leagueId, resettled: false, changed: false, failure: error instanceof Error ? error.message : String(error) };
+  }
 }
 
 /**
@@ -253,14 +324,26 @@ export async function correctSettledWeek(db: Db, input: CorrectSettledWeekInput)
   });
 
   if (persisted.changedCount === 0) {
-    return { ok: true, week: input.week, changed: false, leaguesResettled: 0 };
+    return { ok: true, week: input.week, changed: false, leaguesResettled: 0, leaguesChanged: 0, leaguesFailed: [] };
   }
 
   const leagueIds = await leaguesInWeek(db, input.week);
-  let leaguesResettled = 0;
+  const attempts: LeagueAttempt[] = [];
   for (const leagueId of leagueIds) {
-    if (await correctLeague(db, leagueId, input.week, input.by, clock, audit, notify)) leaguesResettled += 1;
+    attempts.push(await attemptLeague(db, leagueId, input.week, input.by, clock, audit, notify));
   }
 
-  return { ok: true, week: input.week, changed: true, leaguesResettled };
+  const leaguesFailed: FailedLeagueCorrection[] = [];
+  for (const attempt of attempts) {
+    if (attempt.failure !== null) leaguesFailed.push({ leagueId: attempt.leagueId, reason: attempt.failure });
+  }
+
+  return {
+    ok: true,
+    week: input.week,
+    changed: true,
+    leaguesResettled: attempts.filter((attempt) => attempt.resettled).length,
+    leaguesChanged: attempts.filter((attempt) => attempt.changed).length,
+    leaguesFailed,
+  };
 }

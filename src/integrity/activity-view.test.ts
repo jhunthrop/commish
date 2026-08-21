@@ -44,6 +44,23 @@ function chainVerificationFailedEvent(): AuditEvent {
   return systemActionEvent({ action: "chain_verification_failed", scopes: ["platform"], checkedAt: "2026-08-20T17:00:00.000Z" });
 }
 
+/**
+ * The same real shape, PLUS a synthetic `summary` (fix round 1, F4) — the verifier writes no
+ * summary today, so `chainVerificationFailedEvent()` above is denied by the "no summary" check
+ * alone and never actually exercises the allowlist itself. This variant is what the gate test
+ * below needs: with a summary present, only `SYSTEM_ACTION_SUMMARY_ALLOWED.chain_verification_
+ * failed === false` is left to deny it, so deleting THAT check (not the summary check) is what
+ * this pins.
+ */
+function chainVerificationFailedEventWithSummary(): AuditEvent {
+  return systemActionEvent({
+    action: "chain_verification_failed",
+    scopes: ["platform"],
+    checkedAt: "2026-08-20T17:00:00.000Z",
+    summary: "Some chains failed verification.",
+  });
+}
+
 const pickPayload: JsonObject = {
   draftId: "d",
   teamId: "team_1",
@@ -272,8 +289,11 @@ describe("activityRowFor", () => {
  * Task 10's re-review, pinned. `SYSTEM_ACTION_SUMMARY_ALLOWED` (`./system-actions`) is the third
  * deny-by-default dimension this gate closure adds, and these three states are what it has to
  * hold to: an action nobody signed off (even carrying a summary), an action code this process has
- * never heard of, and the verifier's own real event, unchanged. Deleting the guard in
- * `renderSystemAction` reddens every one of these rather than nothing — that is the mutation
+ * never heard of, and the verifier's own event — WITH a synthetic summary added (fix round 1, F4:
+ * the verifier writes no summary today, so the real payload alone denies on the "no summary" check
+ * without ever touching the allowlist; `chainVerificationFailedEventWithSummary()` is what
+ * actually isolates the allowlist's own denial). Deleting the allowlist guard in
+ * `renderSystemAction` reddens every one of these three rather than nothing — that is the mutation
  * proof the brief asks for.
  */
 describe("renderSystemAction — the summary allowlist gate", () => {
@@ -287,8 +307,8 @@ describe("renderSystemAction — the summary allowlist gate", () => {
     expect(activityRowFor(systemActionEvent({ action: "whatever", summary: "hi" }), viewer, names)).toBeNull();
   });
 
-  it("still renders nothing for the verifier's own event, which is Plan A's ruling 8 unchanged", () => {
-    expect(activityRowFor(chainVerificationFailedEvent(), viewer, names)).toBeNull();
+  it("still renders nothing for the verifier's own event, even carrying a summary, which is Plan A's ruling 8 unchanged", () => {
+    expect(activityRowFor(chainVerificationFailedEventWithSummary(), viewer, names)).toBeNull();
   });
 });
 
