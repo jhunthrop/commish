@@ -30,7 +30,10 @@ import type { RaiseFlagInput } from "@/integrity-service/flags";
  * that one's SHAPE (the same four kinds of property, the same "collect every offender" style)
  * without touching it.
  */
-const INTEGRITY_DIRS = ["src/integrity", "src/integrity-service", "src/trades"];
+// `src/participation` (Phase 3 Plan D, Task 1) joins the scan the same commit that creates it: no
+// function in it may reach an account action — the flags-only contract extends to the directory
+// that decides who is a `veteran`, exactly as it already does for `src/trades`.
+const INTEGRITY_DIRS = ["src/integrity", "src/integrity-service", "src/trades", "src/participation"];
 
 /** The one file this scan does not read as a potential offender: `grantAdmin`'s own module,
  *  which legitimately writes `isAdmin` — that IS the sanctioned account action, the opposite

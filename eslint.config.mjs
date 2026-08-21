@@ -95,9 +95,10 @@ const SERVER_ONLY_MODULE_GROUPS = [
 /**
  * NOT on the list above, deliberately: `@/identity` (`src/identity/**`) joins `@/chat`
  * (`src/chat/**`), `@/matchmaking` (`src/matchmaking/**`), `@/help` (`src/help/**`),
- * `@/reviews` (`src/reviews/**`), `@/moderation` (`src/moderation/**`) and `@/trades`
- * (`src/trades/**`) in the browser-safe exempt set — pure, I/O-free code with no server module
- * behind it, so client code may value-import it directly. `@/trades` is new in Phase 3 Plan C. The
+ * `@/reviews` (`src/reviews/**`), `@/moderation` (`src/moderation/**`), `@/trades`
+ * (`src/trades/**`) and `@/participation` (`src/participation/**`) in the browser-safe exempt
+ * set — pure, I/O-free code with no server module behind it, so client code may value-import it
+ * directly. `@/trades` is new in Phase 3 Plan C. The
  * real browser VALUE-imports are `TRADE_CONFIG.maxAssetsPerSide` (`trade-composer.tsx`) and
  * `describeAsset`/`isExpired` (`trade-card.tsx`); `TradeProposalView` is an `interface`
  * (`src/trades/contract.ts`) and every consumer reaches it through `import type`, which needs no
@@ -106,6 +107,19 @@ const SERVER_ONLY_MODULE_GROUPS = [
  * `tradeBalance` and its types used to live — stays on the BLOCKED list above precisely because
  * it is not browser-safe; the fairness core moved to this pure directory for that reason among
  * others (`src/trades/fairness.ts`'s own docblock).
+ *
+ * `@/participation` is new in Phase 3 Plan D — a THIRD meaning of "tier"
+ * (`src/participation/tier.ts`'s own docblock), computed rather than self-reported, and pure for
+ * the identical reason `@/trades` is: no database, no clock, no I/O, only the vocabulary and the
+ * two pure predicates (`participationTierFor`, `isVerifiedPlayer`) that read it. Not `@/domain`:
+ * that directory is under `eslint-plugin-functional`'s immutability rules and holds types the
+ * whole product shares, while a participation tier's labels and thresholds are one feature's
+ * vocabulary. Not `@/integrity`: that pair stays BLOCKED because neither half is browser-safe, and
+ * `src/league-room/components/browse-card.tsx` needs `PARTICIPATION_TIER_LABEL` as a value the
+ * same way `browse-filters.tsx` will need `TIER_COMPOSITION_LABEL`. The DB-reading half —
+ * `completedSeasonsFor`, `participationFor`, `leagueTierComposition`, `stampSeasonCompleteInTx` —
+ * lives in `@/league-service/participation`, which stays exactly as blocked as the rest of
+ * `@/league-service` always has been.
  *
  * `src/chat-room/**` reaches `parseAvatarRef` indirectly through
  * `Avatar` (`src/components/ui/avatar.tsx`) rather than importing `@/identity` itself, but the

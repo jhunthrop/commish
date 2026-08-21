@@ -201,4 +201,46 @@ export const INTEGRITY_CONFIG = {
      *  is: an operator script that reads an unbounded set is a script nobody runs twice. */
     sweepBatchSize: 100,
   },
+  /**
+   * The third meaning of "tier" (`@/participation`) reads its two cutoffs from here, never from a
+   * hardcoded number of its own — `participationTierFor`/`isVerifiedPlayer` both take the cutoff
+   * as a parameter for exactly the reason `crossesFairnessThreshold` does: a test proves changing
+   * the config changes the outcome with no code change.
+   */
+  participation: {
+    /**
+     * The spec's `EXPERIENCE_TIER_CONTEST_COUNT_CUTOFF`. Completed seasons at or past this and an
+     * account is a `veteran` for public-league segregation.
+     *
+     * THREE (founder decision #7's default, a conservative single-digit number). It is deliberately
+     * NOT any state's statutory figure: Tennessee separates under-51 from 500-plus contests and
+     * Mississippi marks 1,000-plus, and strategy §4.1 asks for one platform-wide default rather
+     * than a state toggle. Those numbers count CONTESTS (a daily-fantasy entry); this product's
+     * unit is a season-long league, and three finished seasons is a real fantasy history by any
+     * reading. It is config-driven for exactly the reason the spec says: this is the number most
+     * likely to need tuning once the platform has a history to tune against.
+     *
+     * THE GRANDFATHERING RULE IS STRUCTURAL, NOT A SPECIAL CASE. Segregation is enforced at the
+     * JOIN, and nowhere else, so nobody already sitting in a league is ever reclassified out of it.
+     * No league on this platform has completed a season yet, which means every account is a
+     * `newcomer` today and no join is blocked today. That is the mechanism being CORRECT and not
+     * yet firing.
+     */
+    veteranSeasonCutoff: 3,
+    /**
+     * Founder decision #8's default: one completed season in one league is what the review feed's
+     * "verified" badge claims, and the badge's own tooltip says so in those words
+     * (`VERIFIED_BADGE_TOOLTIP`, `@/participation/verified`). Necessarily at or below
+     * `veteranSeasonCutoff` — an account cannot be experienced enough to segregate and too
+     * inexperienced to have played here.
+     */
+    verifiedSeasonCutoff: 1,
+    /**
+     * Step 6's rollback, as the spec words it: "tier computed but inert." `false` leaves every
+     * label, filter and badge exactly as they are and stops the join gate refusing anybody. Not
+     * yet read by any join gate — Task 1 only computes the tier; the gate that reads this switch
+     * is a later task's.
+     */
+    enforceTierSegregation: true,
+  },
 } as const;

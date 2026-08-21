@@ -4,9 +4,11 @@ import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
 import { draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
 import { explainPlan, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
+import { seedRealisticCorpus, seedTradeCorpus } from "./test-corpus";
 import { chatPageQuery } from "@/chat-service/chat";
 import { pendingFlagQuery } from "@/integrity-service/flags";
 import { signalsForUsersQuery } from "@/integrity-service/session-signals";
+import { completedSeasonsQuery } from "@/league-service/participation";
 import { browseQuery } from "@/league-service/browse";
 import { tradesQuery } from "@/league-service/trades";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
@@ -14,167 +16,10 @@ import { AUDIT_EVENT_TYPES } from "@/domain/audit";
 
 const db = createTestDb();
 
-/**
- * Big enough that the planner has a real choice. Postgres will happily sequential-scan a
- * hundred-row table no matter what indexes exist, so a plan assertion against a toy dataset
- * asserts nothing at all. 5,000 leagues with 10% public and three teams each is roughly the
- * shape of a product with a few thousand leagues, which is where these paths start to matter.
- */
-const LEAGUE_COUNT = 5_000;
-const TEAMS_PER_LEAGUE = 3;
-const USER_COUNT = 200;
-
-/**
- * The full 15-slot roster and its 9-slot starting subset, inlined as raw-SQL `VALUES` lists
- * rather than imported from `@/domain/roster`: this file seeds through `db.execute(sql\`...\`)`,
- * not the domain layer, and the shape only needs to produce a realistic row count and column
- * spread, not stay wired to `STANDARD_ROSTER_SLOTS`.
- */
-const LINEUP_STARTER_SLOTS = sql`(VALUES ('QB',0),('RB',0),('RB',1),('WR',0),('WR',1),('TE',0),('FLEX',0),('K',0),('DEF',0)) AS s(slot, idx)`;
-const ROSTER_SLOTS = sql`(VALUES ('QB',0),('RB',0),('RB',1),('WR',0),('WR',1),('TE',0),('FLEX',0),('K',0),('DEF',0),('BENCH',0),('BENCH',1),('BENCH',2),('BENCH',3),('BENCH',4),('BENCH',5)) AS s(slot, idx)`;
-const LINEUP_WEEKS = 3;
-/** A full regular season of fixtures per league, which is what makes `matchups` the largest table here. */
-const SEASON_WEEKS = 14;
-/** One league in every this-many is left unsettled, so the partial index has a realistic slice to hold. */
-const UNSETTLED_LEAGUE_INTERVAL = 500;
-/** Distinct synthetic player ids spread across the corpus, so `p-1`..`p-3` stay a small, selective slice. */
-const PLAYER_POOL_SIZE = 5_000;
-/**
- * Chat's shape, and the numbers a chat-page plan assertion actually depends on. A few leagues
- * hold a real conversation (`lg1`..`lg40`, including the `lg7` every chat assertion below reads)
- * and everybody else holds a handful of messages. `lg7` therefore carries 200 of 40,000 rows —
- * half a percent, which is the order of magnitude one league's chat occupies in a product with
- * thousands of them, and the regime where seeking beats scanning the primary key backward. See
- * `seedCorpus`'s own note.
- */
-const BUSY_CHAT_LEAGUES = 40;
-const MESSAGES_PER_BUSY_LEAGUE = 200;
-const CHAT_TAIL_MESSAGES = 32_000;
-/**
- * The operator queue's population. One flag in every `OPEN_FLAG_INTERVAL` is still open, which
- * is the ratio that makes `integrity_flags_queue_idx`'s partial predicate worth having: a
- * detector plus a report button produce flags forever, and an operator only ever reads the
- * handful nobody has answered yet.
- */
-const FLAG_COUNT = 60_000;
-const OPEN_FLAG_INTERVAL = 50;
-/** Sign-ins on record. `signalsForUsers` reads one league's whole membership at once. */
-const SESSION_SIGNAL_COUNT = 100_000;
-
-async function seedCorpus(): Promise<void> {
-  await db.execute(sql`
-    INSERT INTO users (id, email, display_name)
-    SELECT 'u' || g, 'u' || g || '@example.test', 'Manager ' || g
-    FROM generate_series(1, ${USER_COUNT}) g
-  `);
-  await db.execute(sql`
-    INSERT INTO leagues (id, name, format, team_count, stake_tier, is_public_matchmade, experience_tier, commissioner_user_id, created_at)
-    SELECT 'lg' || g,
-           'League ' || g,
-           (ARRAY['snake','auction'])[1 + (g % 2)]::draft_format,
-           12,
-           g % 4,
-           (g % 10 = 0),
-           (ARRAY['beginner','experienced'])[1 + (g % 2)]::experience_tier,
-           'u' || (1 + (g % ${USER_COUNT})),
-           now() - (g || ' minutes')::interval
-    FROM generate_series(1, ${LEAGUE_COUNT}) g
-  `);
-  await db.execute(sql`
-    INSERT INTO drafts (id, league_id, format, status, kickoff_at)
-    SELECT 'df' || g, 'lg' || g,
-           (ARRAY['snake','auction'])[1 + (g % 2)]::draft_format,
-           'scheduled'::draft_status,
-           now() + interval '1 day'
-    FROM generate_series(1, ${LEAGUE_COUNT}) g
-  `);
-  await db.execute(sql`
-    INSERT INTO teams (id, league_id, user_id, name)
-    SELECT 'tm' || g || '_' || t, 'lg' || g, 'u' || (1 + ((g * 7 + t) % ${USER_COUNT})), 'Team ' || t
-    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${TEAMS_PER_LEAGUE}) t
-  `);
-  // Chat's league spread is the whole point of this corpus, not an incidental detail. The
-  // earlier version put all 20,000 messages into 50 leagues, which gave every league 2% of the
-  // table — a slice big enough that a backward primary-key scan really is the planner's best
-  // plan, and small enough to look realistic. It is not: in a product with thousands of leagues
-  // one league's conversation is a fraction of a percent of all chat, which is exactly when a
-  // `(league_id, id)` seek stops being optional. So the seed is shaped like the real thing —
-  // a handful of busy leagues carrying real conversations, and a long tail of everybody else.
-  await db.execute(sql`
-    INSERT INTO chat_messages (league_id, author_user_id, body)
-    SELECT 'lg' || l, 'u' || (1 + ((l * 13 + g) % ${USER_COUNT})), 'message ' || g
-    FROM generate_series(1, ${BUSY_CHAT_LEAGUES}) l, generate_series(1, ${MESSAGES_PER_BUSY_LEAGUE}) g
-  `);
-  await db.execute(sql`
-    INSERT INTO chat_messages (league_id, author_user_id, body)
-    SELECT 'lg' || (${BUSY_CHAT_LEAGUES} + 1 + (g % ${LEAGUE_COUNT - 40})), 'u' || (1 + (g % ${USER_COUNT})), 'tail ' || g
-    FROM generate_series(1, ${CHAT_TAIL_MESSAGES}) g
-  `);
-  // Every team's full roster — every drafted team has one, so this is the whole population, not
-  // a slice of it. 5,000 leagues x 3 teams x 15 slots = 225,000 rows, comfortably past the
-  // 50,000-row floor a real planner choice needs.
-  await db.execute(sql`
-    INSERT INTO roster_slots (team_id, slot, slot_index, player_id)
-    SELECT 'tm' || g || '_' || t, s.slot, s.idx,
-           'p-' || (1 + ((g * 17 + t * 11 + s.idx * 5) % ${PLAYER_POOL_SIZE}))
-    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${TEAMS_PER_LEAGUE}) t, ${ROSTER_SLOTS}
-  `);
-  // A genuine subset, not the whole population: `lineup_slots`'s own docstring says an absent row
-  // is normal, since `defaultLineup()` derives a legal lineup from the roster for anyone who never
-  // opened the editor. One team per league across 3 weeks of starters: 5,000 x 3 x 9 = 135,000
-  // rows, again well past the floor, while leaving most teams with no lineup row for most weeks —
-  // which is exactly the shape "finds the teams that OWN a changed player" below exists to cover.
-  await db.execute(sql`
-    INSERT INTO lineup_slots (team_id, week_number, slot, slot_index, player_id)
-    SELECT 'tm' || g || '_1', w, s.slot, s.idx,
-           'p-' || (1 + ((g * 31 + w * 13 + s.idx * 7) % ${PLAYER_POOL_SIZE}))
-    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${LINEUP_WEEKS}) w, ${LINEUP_STARTER_SLOTS}
-  `);
-  // A full season of fixtures for every league: 5,000 x 14 = 70,000 rows, nearly all of them
-  // SETTLED. That ratio is the point — the ingestion worker's late-settlement query looks for the
-  // handful that are not, every thirty minutes, and a partial index is only worth having if the
-  // corpus reflects how rare its rows are.
-  await db.execute(sql`
-    INSERT INTO matchups (league_id, week_number, home_team_id, away_team_id, home_score, away_score)
-    SELECT 'lg' || g, w, 'tm' || g || '_1', 'tm' || g || '_2',
-           CASE WHEN g % ${UNSETTLED_LEAGUE_INTERVAL} = 0 THEN NULL ELSE 100 + (g % 40) END,
-           CASE WHEN g % ${UNSETTLED_LEAGUE_INTERVAL} = 0 THEN NULL ELSE 90 + (g % 35) END
-    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${SEASON_WEEKS}) w
-  `);
-  // Without ANALYZE the planner works from empty-table statistics and will choose a sequential
-  // scan for everything, which would make this whole suite a false negative.
-  // The operator queue's own corpus. Mostly RESOLVED, because that ratio is the whole reason the
-  // queue index is partial: an operator's page one must stay proportional to what is still open,
-  // not to every flag the platform ever raised.
-  await db.execute(sql`
-    INSERT INTO integrity_flags (id, flag_type, subject_type, subject_id, evidence, raised_at, resolved_at)
-    SELECT 'flg' || g, 'chat_report', 'chat_message', 'msg' || g, '{}'::jsonb,
-           now() - (g || ' seconds')::interval,
-           CASE WHEN g % ${OPEN_FLAG_INTERVAL} = 0 THEN NULL ELSE now() END
-    FROM generate_series(1, ${FLAG_COUNT}) g
-  `);
-  // Session signals, many per account: `signalsForUsers` reads every row for every member of one
-  // league at once, so the population that matters is "one account's whole sign-in history",
-  // repeated across the user base.
-  await db.execute(sql`
-    INSERT INTO session_signals (id, user_id, occurred_at, user_agent, accept_language, ip_source)
-    SELECT 'sig' || g, 'u' || (1 + (g % ${USER_COUNT})), now() - (g || ' seconds')::interval,
-           'UA/' || (g % 7), 'en-US', 'xff_unverified'
-    FROM generate_series(1, ${SESSION_SIGNAL_COUNT}) g
-  `);
-  await db.execute(sql`ANALYZE users, leagues, drafts, teams, roster_slots, lineup_slots, matchups, integrity_flags, session_signals`);
-  // `chat_messages` is analyzed separately because it is seeded in two passes above and the
-  // planner needs statistics that reflect both. No VACUUM is needed any more: the covering
-  // INCLUDE list this used to exist for is gone (`drizzle/0026_measured_index_shapes.sql` —
-  // the chat page joins two tables and reads eleven columns the index never carried, so an
-  // Index-Only Scan was never reachable and the visibility map never mattered here).
-  await db.execute(sql`ANALYZE chat_messages`);
-}
-
 describe("hot read paths use indexes", () => {
   beforeAll(async () => {
     await truncateAll(db);
-    await seedCorpus();
+    await seedRealisticCorpus(db);
   }, 120_000);
 
   // `teams` is deliberately not asserted here: at this corpus size, the planner's genuine
@@ -438,86 +283,20 @@ async function healTradeProposalsIndexes(): Promise<void> {
  * history, and open proposals held UNDER the per-team cap (`TRADE_CONFIG.maxOpenProposalsPerTeam`
  * is 10) for every team, not a handful of leagues carrying the whole table between them.
  *
- * A separate corpus and a separate `beforeAll` from `seedCorpus` above, on purpose: reusing the
- * 5,000-league/3-teams-per-league shape above would either give every league too few teams to
- * hold a realistic trade history, or force every OTHER plan assertion in this file to carry
- * `trade_proposals` rows it has no use for. `truncateAll` in this block's own `beforeAll` clears
- * the corpus above before this one is written, and nothing after this block depends on either.
+ * A separate corpus and a separate `beforeAll` from `seedRealisticCorpus` above, on purpose:
+ * reusing the 5,000-league/3-teams-per-league shape above would either give every league too few
+ * teams to hold a realistic trade history, or force every OTHER plan assertion in this file to
+ * carry `trade_proposals` rows it has no use for. `truncateAll` in this block's own `beforeAll`
+ * clears the corpus above before this one is written, and nothing after this block depends on
+ * either. `seedTradeCorpus`'s own density contract is documented on it directly, in
+ * `@/db/test-corpus`.
  */
 describe("trade proposals: inbox and outbox serve from their own partial indexes, over a realistic corpus", () => {
-  const TRADE_LEAGUE_COUNT = 200;
-  const TRADE_TEAMS_PER_LEAGUE = 12;
-  /** Settled (TERMINAL) offers behind every team — the ratio that makes the partial index
-   *  worth having: most of a team's history is not something the inbox/outbox ever reads again. */
-  const SETTLED_PROPOSALS_PER_TEAM = 8;
-  /** Held under the cap, not at it — `TRADE_CONFIG.maxOpenProposalsPerTeam` is 10, and a corpus
-   *  where every team sits at the ceiling would not be the shape a real league is usually in. */
-  const OPEN_PROPOSALS_PER_TEAM = 3;
   const CORPUS_LEAGUE = "tlg1";
   /** League 1's team 1. Every league's team `t` proposes to team `1 + (t % TEAMS_PER_LEAGUE)`,
    *  so team 1 is the one team in every league that receives from the LAST team rather than the
    *  one before it — team 1's inbox is exactly this league's `ttm1_12` offers, nothing more. */
   const CORPUS_TEAM = "ttm1_1";
-
-  async function seedTradeCorpus(): Promise<void> {
-    await db.execute(sql`
-      INSERT INTO users (id, email, display_name)
-      SELECT 'tu' || g, 'tu' || g || '@example.test', 'Trade Manager ' || g
-      FROM generate_series(1, ${TRADE_LEAGUE_COUNT * TRADE_TEAMS_PER_LEAGUE}) g
-    `);
-    await db.execute(sql`
-      INSERT INTO leagues (id, name, format, team_count, commissioner_user_id)
-      SELECT 'tlg' || g, 'Trade League ' || g, 'snake'::draft_format, ${TRADE_TEAMS_PER_LEAGUE},
-             'tu' || (((g - 1) * ${TRADE_TEAMS_PER_LEAGUE}) + 1)
-      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g
-    `);
-    await db.execute(sql`
-      INSERT INTO teams (id, league_id, user_id, name)
-      SELECT 'ttm' || g || '_' || t, 'tlg' || g, 'tu' || (((g - 1) * ${TRADE_TEAMS_PER_LEAGUE}) + t), 'Team ' || t
-      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g, generate_series(1, ${TRADE_TEAMS_PER_LEAGUE}) t
-    `);
-    await db.execute(sql`
-      INSERT INTO trade_proposals
-        (id, league_id, proposer_team_id, counterparty_team_id, week_number,
-         proposer_assets, counterparty_assets, fingerprint, status, proposed_at, expires_at, settled_at)
-      SELECT
-        'tpr_s_' || g || '_' || t || '_' || n,
-        'tlg' || g,
-        'ttm' || g || '_' || t,
-        'ttm' || g || '_' || (1 + (t % ${TRADE_TEAMS_PER_LEAGUE})),
-        1,
-        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-' || g || '-' || t || '-' || n || '-a')),
-        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-' || g || '-' || t || '-' || n || '-b')),
-        md5('settled-' || g || '-' || t || '-' || n),
-        'rejected',
-        now() - (n || ' days')::interval,
-        now() + interval '3 days',
-        now() - (n || ' days')::interval + interval '1 hour'
-      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g, generate_series(1, ${TRADE_TEAMS_PER_LEAGUE}) t,
-           generate_series(1, ${SETTLED_PROPOSALS_PER_TEAM}) n
-    `);
-    await db.execute(sql`
-      INSERT INTO trade_proposals
-        (id, league_id, proposer_team_id, counterparty_team_id, week_number,
-         proposer_assets, counterparty_assets, fingerprint, status, proposed_at, expires_at)
-      SELECT
-        'tpr_o_' || g || '_' || t || '_' || n,
-        'tlg' || g,
-        'ttm' || g || '_' || t,
-        'ttm' || g || '_' || (1 + (t % ${TRADE_TEAMS_PER_LEAGUE})),
-        1,
-        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-open-' || g || '-' || t || '-' || n || '-a')),
-        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-open-' || g || '-' || t || '-' || n || '-b')),
-        md5('open-' || g || '-' || t || '-' || n),
-        'open',
-        now() - (n || ' hours')::interval,
-        now() + interval '3 days'
-      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g, generate_series(1, ${TRADE_TEAMS_PER_LEAGUE}) t,
-           generate_series(1, ${OPEN_PROPOSALS_PER_TEAM}) n
-    `);
-    await db.execute(sql`ANALYZE users, leagues, teams`);
-    await db.execute(sql`VACUUM ANALYZE trade_proposals`);
-  }
 
   /** Set by the first test, read by the mutation-proof test — the same "measure once, compare
    *  later" shape the corpus's own docblock argues for: a regression is a claim about a DELTA,
@@ -530,7 +309,7 @@ describe("trade proposals: inbox and outbox serve from their own partial indexes
     // alone cannot be trusted to have run.
     await healTradeProposalsIndexes();
     await truncateAll(db);
-    await seedTradeCorpus();
+    await seedTradeCorpus(db);
   }, 120_000);
 
   // The mutation-proof test below DROPs and recreates `trade_proposals_inbox_idx` without its
@@ -596,7 +375,7 @@ describe("trade proposals: inbox and outbox serve from their own partial indexes
 });
 
 /**
- * A STRUCTURAL guard, independent of `seedCorpus`/the planner. It used to assert the opposite of
+ * A STRUCTURAL guard, independent of `seedRealisticCorpus`/the planner. It used to assert the opposite of
  * what it asserts now, and the reversal is the finding.
  *
  * From 0018 through 0024 this index physically carried an INCLUDE list (`body`, later widened
@@ -725,5 +504,74 @@ describe("trade_proposals carries exactly the indexes it declares", () => {
     for (const [name, expected] of Object.entries(EXPECTED_TRADE_PROPOSALS_INDEXDEFS)) {
       expect(byName.get(name)).toBe(expected);
     }
+  });
+});
+
+/**
+ * PHASE 3 PLAN D, TASK 1. The completed-season count (`completedSeasonsFor`,
+ * `@/league-service/participation`) is the read the whole participation tier is built on — the
+ * production builder itself, `completedSeasonsQuery`, EXPLAINed over the SAME realistic corpus
+ * every "hot read paths" assertion above builds from. A separate `beforeAll` re-seeds it (the
+ * trade corpus block above truncated and replaced it), rather than reordering `describe` blocks —
+ * this file's execution order already carries meaning (`fileParallelism: false`, the trade block's
+ * own closing catalog check runs deliberately last today), and reseeding is cheap next to
+ * reasoning about a reordering that could silently break that.
+ */
+describe("the completed-season count uses an account's own team index, never a leagues scan", () => {
+  beforeAll(async () => {
+    await truncateAll(db);
+    await seedRealisticCorpus(db);
+  }, 120_000);
+
+  it("serves the completed-season count from teams_user_id_idx, not a leagues scan", async () => {
+    const plan = await explainPlan(db, completedSeasonsQuery(db, "u1"));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
+    expect(indexScanNode(plan, "teams_user_id_idx")).toBeDefined();
+  });
+});
+
+/**
+ * `leagues_season_completed_idx`'s own catalog proof (`drizzle/0028_season_completion.sql`) — the
+ * SAME "read the definition back out of `pg_indexes`" discipline `chat_messages_league_id_idx`,
+ * `integrity_flags` and `trade_proposals` all use above, chosen here over an EXPLAIN-based cost
+ * mutation proof for a specific reason: no query in this task's own scope drives the planner to
+ * CHOOSE this index over the primary key — a per-account completed-season count is a handful of
+ * point lookups by `leagues.id` (proven above: `teams_user_id_idx` then a primary-key join, never
+ * this index), which always wins a cost comparison against any secondary index. The risk this
+ * partial index actually guards against is `drizzle-kit generate` silently dropping the clause
+ * (Plan B ruling 17's `INCLUDE` trap turning a partial index into a full one nobody notices), not
+ * the planner declining to use a clause it never needed — so the assertion that can actually
+ * redden for the right reason is the catalog comparison, not a cost estimate that would never
+ * move regardless of whether the predicate survived.
+ *
+ * THE MUTATION PROOF: drop and recreate the index WITHOUT its partial predicate, and the catalog
+ * comparison reddens deterministically — the predicate is part of `indexdef`'s own text, not a
+ * heuristic that might or might not move. An index test that cannot fail is a comment.
+ */
+describe("leagues_season_completed_idx carries its partial predicate", () => {
+  const EXPECTED_INDEXDEF = "CREATE INDEX leagues_season_completed_idx ON public.leagues USING btree (id) WHERE (season_completed_at IS NOT NULL)";
+
+  async function indexDef(): Promise<string | undefined> {
+    const rows = await db.execute<{ indexdef: string }>(sql`SELECT indexdef FROM pg_indexes WHERE indexname = 'leagues_season_completed_idx'`);
+    return rows[0]?.indexdef;
+  }
+
+  afterAll(async () => {
+    // Restores the real index — a real DDL change against the shared, long-lived test database,
+    // not something `truncateAll` undoes. Left broken, every later run would measure the
+    // corrupted index as its own baseline, the same crash-safety discipline
+    // `healTradeProposalsIndexes` exists for above.
+    await db.execute(sql`DROP INDEX IF EXISTS leagues_season_completed_idx`);
+    await db.execute(sql.raw(`${EXPECTED_INDEXDEF};`));
+  });
+
+  it("matches the migration's own definition, byte for byte", async () => {
+    expect(await indexDef()).toBe(EXPECTED_INDEXDEF);
+  });
+
+  it("reddens when the partial predicate is dropped and the index is recreated without it", async () => {
+    await db.execute(sql`DROP INDEX leagues_season_completed_idx`);
+    await db.execute(sql`CREATE INDEX leagues_season_completed_idx ON leagues (id)`);
+    expect(await indexDef()).not.toBe(EXPECTED_INDEXDEF);
   });
 });

@@ -1,0 +1,136 @@
+import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
+import type { DbTx, ReadonlyDb } from "@/db/client";
+import { leagues, matchups, teams } from "@/db/schema";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
+import { tierCompositionFor, type TierComposition } from "@/participation/composition";
+import type { ParticipationSummary } from "@/participation/contract";
+import { participationTierFor } from "@/participation/tier";
+import { isVerifiedPlayer } from "@/participation/verified";
+
+/**
+ * The DB-reading half of participation. `@/participation` itself stays pure — no Postgres, no
+ * clock, no I/O — so it can sit on the client-boundary exempt list; every read against `leagues`,
+ * `teams` and `matchups` lives here instead.
+ */
+
+/**
+ * The production read, exported as a builder — the same "EXPLAIN what production runs, never a
+ * hand-copied lookalike" discipline `browseQuery`/`chatPageQuery`/`pendingFlagQuery`/`tradesQuery`
+ * already use. A completed season is a completed LEAGUE this account has a team in — `teams` is
+ * the account's own bounded set (one row per league joined), so this is a single indexed join,
+ * never a per-league round trip and never a rollup row that could disagree with the leagues it
+ * summarizes. `data-layer-hardening.md`'s threshold is unbounded growth: an account's own team
+ * count is bounded by the leagues it has joined, and the unbounded half — every matchup in the
+ * product — is exactly what `stampSeasonCompleteInTx` moved off this read path.
+ */
+export function completedSeasonsQuery(db: ReadonlyDb, userId: string) {
+  return db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(teams)
+    .innerJoin(leagues, eq(leagues.id, teams.leagueId))
+    .where(and(eq(teams.userId, userId), isNotNull(leagues.seasonCompletedAt)));
+}
+
+/** How many seasons this account has actually finished — the count `participationTierFor` and
+ *  `isVerifiedPlayer` are both read through, never a second copy of the rule. */
+export async function completedSeasonsFor(db: ReadonlyDb, userId: string): Promise<number> {
+  // `count(*)` with no `GROUP BY` always returns exactly one row, even when nothing matches
+  // (a count of 0) — there is no "no rows at all" case to fall back from.
+  const [row] = await completedSeasonsQuery(db, userId);
+  return row!.count;
+}
+
+/**
+ * The whole participation record, in ONE query: `completedSeasonsFor` is the only round trip this
+ * function makes, and both `tier` and `verified` are derived from that single count through the
+ * configured cutoffs — never a second query, and never a second copy of either rule.
+ */
+export async function participationFor(db: ReadonlyDb, userId: string): Promise<ParticipationSummary> {
+  const completedSeasons = await completedSeasonsFor(db, userId);
+  return {
+    completedSeasons,
+    tier: participationTierFor(completedSeasons, INTEGRITY_CONFIG.participation.veteranSeasonCutoff),
+    verified: isVerifiedPlayer(completedSeasons, INTEGRITY_CONFIG.participation.verifiedSeasonCutoff),
+  };
+}
+
+/** The same user's OTHER leagues and teams, aliased so a self-join can ask "how many of this
+ *  league's members have completed seasons elsewhere" without colliding with the outer query's
+ *  own `teams`/`leagues` references. */
+const memberTeams = alias(teams, "member_teams");
+const memberLeagues = alias(leagues, "member_leagues");
+
+/**
+ * One row per member of `leagueId`, with their OWN completed-season count — bounded by this
+ * league's own team count (`teams.league_id` is indexed), never by the platform's total matchup
+ * volume. `leagueTierComposition` below reduces this to the two-count aggregate a browse card may
+ * actually disclose.
+ */
+function memberCompletedSeasonsQuery(db: ReadonlyDb, leagueId: string) {
+  return db
+    .select({ userId: teams.userId, completedSeasons: sql<number>`count(${memberLeagues.id})::int` })
+    .from(teams)
+    .innerJoin(memberTeams, eq(memberTeams.userId, teams.userId))
+    .leftJoin(memberLeagues, and(eq(memberLeagues.id, memberTeams.leagueId), isNotNull(memberLeagues.seasonCompletedAt)))
+    .where(eq(teams.leagueId, leagueId))
+    .groupBy(teams.userId);
+}
+
+/**
+ * A league's tier composition — two counts, never a member. `PublicLeagueSummary` is the privacy
+ * boundary of this product's one unauthenticated read (`@/matchmaking/contract`), and a per-member
+ * breakdown would be a roster of strangers' inexperience published to anybody holding the URL.
+ */
+export async function leagueTierComposition(db: ReadonlyDb, leagueId: string): Promise<TierComposition> {
+  const rows = await memberCompletedSeasonsQuery(db, leagueId);
+  const cutoff = INTEGRITY_CONFIG.participation.veteranSeasonCutoff;
+  let newcomers = 0;
+  let veterans = 0;
+  for (const row of rows) {
+    if (participationTierFor(row.completedSeasons, cutoff) === "veteran") veterans += 1;
+    else newcomers += 1;
+  }
+  return tierCompositionFor({ newcomers, veterans });
+}
+
+/**
+ * LOCK NOTE, and the reason this is the LAST statement `finalizeWeekInTx` (`@/stats-pipeline/
+ * finalize`) runs rather than the first. `joinLeagueInTx` (`@/league-service/join`) takes
+ * `leagues[id] FOR UPDATE` before anything else it does, so a writer that touched `leagues`
+ * BEFORE `matchups` inside a settlement transaction would be taking the same two rows in the
+ * opposite order and could cycle with it. This statement is an `UPDATE … WHERE
+ * season_completed_at IS NULL AND NOT EXISTS(unscored matchup)` — it takes a row-exclusive lock
+ * on ONE `leagues` row and nothing else (there is no FK out of `leagues` this statement touches).
+ * The ordering property that keeps it safe is not its position among `finalizeWeekInTx`'s own
+ * statements but the fact that a settlement transaction takes NO other lock that `joinLeagueInTx`
+ * also takes: a league whose last week is being scored has a complete draft
+ * (`checkFinalizeGuards`), and a league with a complete draft refuses joins at
+ * `publicJoinPrecondition` before it locks anything at all.
+ *
+ * A ONE-WAY STAMP, the same discipline `reviews.removed_at` and `integrity_flags.resolved_at`
+ * both already use twice: the guard against re-stamping lives in the UPDATE's own `WHERE`, not in
+ * a prior read, so `correctSettledWeek` re-running `finalizeWeekInTx` weeks later on an
+ * already-completed season leaves the original date alone — a season ended when it ended.
+ *
+ * The `NOT EXISTS` sub-select reads `matchups` for this league where `home_score IS NULL`, served
+ * by `matchups_unsettled_idx` when the week is known and a small per-league scan otherwise. It
+ * runs once per settled week per league and never on a read path.
+ *
+ * Returns whether this call actually stamped the season complete — `false` for every week that
+ * isn't the season's last, and for a season that was already stamped.
+ */
+export async function stampSeasonCompleteInTx(tx: DbTx, leagueId: string, occurredAt: string): Promise<boolean> {
+  const written = await tx
+    .update(leagues)
+    .set({ seasonCompletedAt: new Date(occurredAt) })
+    .where(
+      and(
+        eq(leagues.id, leagueId),
+        isNull(leagues.seasonCompletedAt),
+        sql`not exists (select 1 from ${matchups} where ${matchups.leagueId} = ${leagues.id} and ${matchups.homeScore} is null)`,
+      ),
+    )
+    .returning({ id: leagues.id });
+  return written.length > 0;
+}

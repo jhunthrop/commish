@@ -1,13 +1,15 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, lineupSlots, matchups, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
+import { drafts, leagues, lineupSlots, matchups, players, playerStatLines, rosterSlots, statWeeks, teams, users } from "@/db/schema";
 import type { ScoringPresetName } from "@/domain/scoring";
 import { HALF_PPR_SCORING, PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints } from "@/scoring";
 import { createLeague } from "@/league-service/creation";
 import { writeSchedule } from "@/league-service/schedule";
+import { correctSettledWeek } from "./correction";
 import { finalizeWeek, requireScore, scoreTeamsForWeek } from "./finalize";
+import { fakeStatsProvider } from "./test-support";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-17T12:00:00.000Z" };
@@ -241,6 +243,109 @@ describe("scoreTeamsForWeek", () => {
     // guard against a league vanishing between that lookup and this one, exercised directly
     // since no current caller can otherwise reach it through a real league that's gone missing.
     expect(await scoreTeamsForWeek(db, "does-not-exist", 1, ["some-team"])).toEqual(new Map());
+  });
+});
+
+describe("finalizeWeek — season completion stamp", () => {
+  /** A minimal 2-team, N-week season shell — no players or rosters, since scoring itself is not
+   *  what these tests are about (an empty roster scores 0, which finalizeWeek already handles).
+   *  Mirrors `correction.test.ts`'s own `seedLeagueShell`, inlined here rather than shared since
+   *  that helper is private to its own file. */
+  async function leagueWithSeason(weeksCount: number): Promise<{ readonly id: string; readonly teamA: string; readonly teamB: string }> {
+    const leagueId = newId();
+    const teamA = newId();
+    const teamB = newId();
+    const userA = newId();
+    const userB = newId();
+    await db.insert(users).values([
+      { id: userA, email: `${userA}@test.local`, displayName: "Manager A" },
+      { id: userB, email: `${userB}@test.local`, displayName: "Manager B" },
+    ]);
+    await db.insert(leagues).values({ id: leagueId, name: leagueId, format: "snake", teamCount: 2, commissionerUserId: userA });
+    await db.insert(teams).values([
+      { id: teamA, leagueId, userId: userA, name: "Team A" },
+      { id: teamB, leagueId, userId: userB, name: "Team B" },
+    ]);
+    await db.insert(drafts).values({
+      id: `${leagueId}_draft`, leagueId, format: "snake", status: "complete",
+      kickoffAt: new Date("2026-08-01T00:00:00.000Z"), auctionBudget: null,
+    });
+    await db.transaction((tx) => writeSchedule(tx, { leagueId, teamIds: [teamA, teamB], weeks: weeksCount }));
+    return { id: leagueId, teamA, teamB };
+  }
+
+  async function seasonCompletedAt(leagueId: string): Promise<Date | null> {
+    const [row] = await db.select({ seasonCompletedAt: leagues.seasonCompletedAt }).from(leagues).where(eq(leagues.id, leagueId));
+    return row?.seasonCompletedAt ?? null;
+  }
+
+  it("stamps the league's season complete on the write that scores its last week", async () => {
+    const league = await leagueWithSeason(3);
+    await finalizeWeek(db, league.id, 1, undefined, clock);
+    await finalizeWeek(db, league.id, 2, undefined, clock);
+    expect(await seasonCompletedAt(league.id)).toBeNull();
+
+    await finalizeWeek(db, league.id, 3, undefined, clock);
+    expect((await seasonCompletedAt(league.id))?.toISOString()).toBe(clock.now());
+  });
+
+  it("does not stamp a league with an unscored week left, however many are done", async () => {
+    const league = await leagueWithSeason(3);
+    await finalizeWeek(db, league.id, 3, undefined, clock);
+    await finalizeWeek(db, league.id, 1, undefined, clock);
+    expect(await seasonCompletedAt(league.id)).toBeNull();
+  });
+
+  it("never re-stamps, so a correction to an already-settled week leaves the original date alone", async () => {
+    // `correctSettledWeek` re-runs `finalizeWeekInTx` weeks later. A season ended when it ended,
+    // and the guard is in the UPDATE's own WHERE, not in a prior read: the same one-way-stamp
+    // discipline `reviews.removed_at` and `integrity_flags.resolved_at` already use twice.
+    const league = await leagueWithSeason(3);
+    await db.insert(players).values({ id: "corr_qb", name: "Corr QB", position: "QB", nflTeam: "KC" });
+    await db.insert(rosterSlots).values({ teamId: league.teamA, slot: "QB", slotIndex: 0, playerId: "corr_qb" });
+    await db.insert(playerStatLines).values({ playerId: "corr_qb", week: 2, passingYards: 100, passingTouchdowns: 1 });
+
+    await finalizeWeek(db, league.id, 1, undefined, clock);
+    await finalizeWeek(db, league.id, 2, undefined, clock);
+    await finalizeWeek(db, league.id, 3, undefined, clock);
+    const first = await seasonCompletedAt(league.id);
+    expect(first).not.toBeNull();
+
+    await db.insert(statWeeks).values({ week: 2, status: "final", version: 1, gamesTotal: 1, gamesFinal: 1, updatedAt: new Date(clock.now()) });
+    await db.insert(users).values({ id: "u_admin", email: "admin@test.local", displayName: "Admin" });
+
+    // The provider revises the QB's line, so `persistTick` reports a real change and
+    // `correctLeagueInTx` genuinely re-runs `finalizeWeekInTx` for week 2.
+    const provider = fakeStatsProvider({
+      games: {
+        2: [
+          {
+            gameId: "g_corr",
+            week: 2,
+            status: "final",
+            homeNflTeam: "KC",
+            awayNflTeam: "SF",
+            lines: [
+              {
+                playerId: "corr_qb", week: 2, passingYards: 400, passingTouchdowns: 5, interceptions: 0,
+                rushingYards: 0, rushingTouchdowns: 0, receivingYards: 0, receivingTouchdowns: 0, receptions: 0,
+                fumblesLost: 0, fieldGoalsMade: 0, extraPointsMade: 0, sacks: 0, defensiveInterceptions: 0, defensiveTouchdowns: 0,
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const grantedBudget = {
+      reserve: async () => ({ granted: true as const }),
+      reserveBackfill: async () => ({ granted: true as const }),
+      remaining: async () => 1000,
+    };
+    const result = await correctSettledWeek(db, { week: 2, by: "u_admin", clock, budget: grantedBudget, provider });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.changed).toBe(true);
+
+    expect((await seasonCompletedAt(league.id))?.toISOString()).toBe(first?.toISOString());
   });
 });
 

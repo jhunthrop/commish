@@ -109,6 +109,21 @@ export const leagues = pgTable(
     /** The league's roster shape. The draft reads this to know its rounds and slot rules. */
     rosterSlots: jsonb("roster_slots").$type<readonly RosterSlotConfig[]>().notNull().default([...STANDARD_ROSTER_SLOTS]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Stamped ONCE, by `stampSeasonCompleteInTx` (`@/league-service/participation`), inside the
+     * same transaction as the write that scores the league's LAST week (`finalizeWeekInTx`,
+     * `@/stats-pipeline/finalize`) — never computed at read time by scanning `matchups`, which is
+     * what makes "how many seasons has this account finished?" a bounded, indexed count instead
+     * of an anti-join over every matchup in the product.
+     *
+     * Nullable, no default, no backfill: a league that finished its season before this column
+     * existed does not exist, because no league on this platform has finished one yet. A
+     * ONE-WAY STAMP, matching `reviews.removed_at` and `integrity_flags.resolved_at` — the guard
+     * against re-stamping lives in the UPDATE's own `WHERE season_completed_at IS NULL`, not in a
+     * prior read, so a correction to an already-settled week (`correctSettledWeek`, weeks later)
+     * leaves the original date alone.
+     */
+    seasonCompletedAt: timestamp("season_completed_at", { withTimezone: true }),
   },
   (t) => [
     /**
@@ -130,6 +145,15 @@ export const leagues = pgTable(
      * cost with no read to pay for it. Add one the day a "leagues I commission" query exists.
      */
     index("leagues_public_browse_idx").on(t.createdAt).where(sql`${t.isPublicMatchmade}`),
+    /**
+     * PARTIAL on the same rows the column itself is rare for — a handful of completed leagues
+     * against every league the platform holds. Written BY HAND, not `drizzle-kit generate`
+     * (`drizzle/0028_season_completion.sql`): Plan B ruling 17's `INCLUDE` trap already proved
+     * that generated DDL can silently drop a clause, and a partial index that quietly became a
+     * full one is a bigger table nobody notices. `src/db/index-plans.test.ts` reads the catalog
+     * definition back out of `pg_indexes` rather than trusting this declaration.
+     */
+    index("leagues_season_completed_idx").on(t.id).where(sql`${t.seasonCompletedAt} is not null`),
   ],
 );
 

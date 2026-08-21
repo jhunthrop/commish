@@ -4,8 +4,10 @@ import { drafts, leagues, matchups, players, playerStatLines, scoringSettings } 
 import type { Position, StatLine } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
+import type { Clock } from "@/domain/timing";
 import { startersOf } from "@/league";
 import { getLineup } from "@/league-service/lineups";
+import { stampSeasonCompleteInTx } from "@/league-service/participation";
 import { scoreLineup, type ScoringRules } from "@/scoring";
 import type { ScoreCache } from "./score-cache";
 
@@ -13,6 +15,8 @@ import type { ScoreCache } from "./score-cache";
 const NOOP_SCORE_CACHE: Pick<ScoreCache, "invalidate"> = {
   invalidate: async () => {},
 };
+
+const systemClock: Clock = { now: () => new Date().toISOString() };
 
 export type FinalizeResult =
   | { readonly ok: true; readonly weekNumber: number; readonly matchupsScored: number }
@@ -141,11 +145,12 @@ export async function finalizeWeek(
   leagueId: string,
   weekNumber: number,
   cache: Pick<ScoreCache, "invalidate"> = NOOP_SCORE_CACHE,
+  clock: Clock = systemClock,
 ): Promise<FinalizeResult> {
   const guardFailure = await checkFinalizeGuards(db, leagueId, weekNumber);
   if (guardFailure !== null) return guardFailure;
 
-  const write = await db.transaction((tx) => finalizeWeekInTx(tx, leagueId, weekNumber));
+  const write = await db.transaction((tx) => finalizeWeekInTx(tx, leagueId, weekNumber, clock.now()));
   await cache.invalidate(leagueId, weekNumber);
   return { ok: true, weekNumber: write.weekNumber, matchupsScored: write.matchupsScored };
 }
@@ -196,8 +201,19 @@ export interface FinalizeWrite {
  * called that first. Every write that used to live inside `finalizeWeek`'s `db.transaction`
  * callback lives here unchanged; nothing about the scoring or the write ordering is different for
  * either caller.
+ *
+ * `occurredAt` is the caller's own clock reading (never `new Date()` taken here — see
+ * `@/domain/timing`'s `Clock`), passed straight through to `stampSeasonCompleteInTx` below.
+ *
+ * `stampSeasonCompleteInTx` (`@/league-service/participation`) runs LAST, after every matchup row
+ * for this week has its score written — it is a conditional `UPDATE … WHERE season_completed_at
+ * IS NULL AND NOT EXISTS(unscored matchup)` against `leagues`, so it can only find the season
+ * complete once THIS week's own scores are already visible to its own `NOT EXISTS` sub-select.
+ * Placed last for the LOCK ORDER too, not only correctness: see that function's own docblock for
+ * why a settlement transaction touching `leagues` after `matchups` never inverts against
+ * `joinLeagueInTx`'s `leagues FOR UPDATE`.
  */
-export async function finalizeWeekInTx(tx: DbTx, leagueId: string, weekNumber: number): Promise<FinalizeWrite> {
+export async function finalizeWeekInTx(tx: DbTx, leagueId: string, weekNumber: number, occurredAt: string): Promise<FinalizeWrite> {
   const week = await tx
     .select()
     .from(matchups)
@@ -213,6 +229,8 @@ export async function finalizeWeekInTx(tx: DbTx, leagueId: string, weekNumber: n
       .set({ homeScore: requireScore(scores, row.homeTeamId), awayScore: requireScore(scores, row.awayTeamId) })
       .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber), eq(matchups.homeTeamId, row.homeTeamId)));
   }
+
+  await stampSeasonCompleteInTx(tx, leagueId, occurredAt);
 
   return { weekNumber, matchupsScored: week.length };
 }

@@ -81,6 +81,25 @@ describe("INTEGRITY_CONFIG.trade", () => {
   });
 });
 
+describe("INTEGRITY_CONFIG.participation", () => {
+  it("keeps the verified cutoff at or below the veteran cutoff", () => {
+    // An inversion would mean an account the platform segregates as experienced and refuses to
+    // call verified, which is two statements about one person that contradict each other.
+    expect(INTEGRITY_CONFIG.participation.verifiedSeasonCutoff).toBeLessThanOrEqual(INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+  });
+
+  it("keeps both cutoffs positive and finite", () => {
+    for (const value of [INTEGRITY_CONFIG.participation.veteranSeasonCutoff, INTEGRITY_CONFIG.participation.verifiedSeasonCutoff]) {
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThan(0);
+    }
+  });
+
+  it("ships enforceTierSegregation true — this task computes the tier; the join gate that reads this switch is a later task's", () => {
+    expect(INTEGRITY_CONFIG.participation.enforceTierSegregation).toBe(true);
+  });
+});
+
 /**
  * FINAL REVIEW, MEDIUM 6. The notices ceiling is reachable by ORDINARY BROWSING, not by abuse:
  * every page mounts `useNotices` in its own subtree (there is no shared app layout), and each

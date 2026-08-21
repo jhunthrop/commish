@@ -1463,6 +1463,64 @@ describe("correctLeagueInTx's notice order", () => {
   });
 });
 
+/**
+ * PHASE 3 PLAN D, TASK 1's own transaction: `stampSeasonCompleteInTx`
+ * (`@/league-service/participation`), the LAST statement `finalizeWeekInTx` runs. Its own docblock
+ * argues that a settlement transaction never inverts against `joinLeagueInTx`'s `leagues FOR
+ * UPDATE` because a league whose last week is being scored has a complete draft, and a league
+ * with a complete draft refuses joins before it locks anything — a claim about PRODUCTION
+ * behavior, not about what this lower-level `joinLeagueInTx` proof (which drives the real function
+ * with its OWN precondition override, bypassing `publicJoinPrecondition` on purpose, exactly like
+ * every sibling above) can be made to do.
+ *
+ * So this proves the narrower, structural claim directly: EVEN WHEN a join is parked holding
+ * `leagues[id] FOR UPDATE`, a concurrent `finalizeWeek` call whose stamp genuinely fires (the
+ * league's only week, about to become its last) blocks BEHIND the join rather than cycling with
+ * it — a one-directional wait, the same shape `recordSessionSignals`' proof above uses, because
+ * the join transaction never reaches for anything the settlement transaction holds.
+ */
+describe("stampSeasonCompleteInTx's lock, inside finalizeWeekInTx", () => {
+  it("blocks behind a concurrent join holding the same league row, and still stamps the season complete once it releases", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_stamp_commish", email: "stamp_commish@test.local", displayName: "Commish" },
+      { id: "u_stamp_away", email: "stamp_away@test.local", displayName: "Away" },
+      { id: "u_stamp_joiner", email: "stamp_joiner@test.local", displayName: "Joiner" },
+    ]);
+    // teamCount 3, not 2: the join under test needs an open seat, and `writeSchedule` below only
+    // schedules the two REAL teams — the third seat is what the joiner fills.
+    await joinDb.insert(leagues).values({
+      id: "lg_stamp_lock", name: "lg_stamp_lock", format: "snake", teamCount: 3, commissionerUserId: "u_stamp_commish",
+    });
+    await joinDb.insert(teams).values([
+      { id: "team_stamp_home", leagueId: "lg_stamp_lock", userId: "u_stamp_commish", name: "Home" },
+      { id: "team_stamp_away", leagueId: "lg_stamp_lock", userId: "u_stamp_away", name: "Away" },
+    ]);
+    await joinDb.insert(drafts).values({
+      id: "draft_stamp_lock", leagueId: "lg_stamp_lock", format: "snake", status: "complete",
+      kickoffAt: new Date("2026-09-01T00:00:00.000Z"), auctionBudget: null,
+    });
+    // A one-week season: this league's ONLY week is also its LAST, so finalizing it is exactly
+    // the call whose stamp UPDATE reaches for `leagues[id]`.
+    await joinDb.transaction((tx) => writeSchedule(tx, { leagueId: "lg_stamp_lock", teamIds: ["team_stamp_home", "team_stamp_away"], weeks: 1 }));
+
+    const join = parkedJoin("lg_stamp_lock", "u_stamp_joiner", "team_stamp_joiner");
+    await join.leagueLocked;
+
+    // T_finalize: the real finalizeWeek, on its own connection, reaching for the SAME league row
+    // through the stamp's UPDATE — a lock `finalizeWeekInTx` never took before this task.
+    const finalizing = finalizeWeek(pickDb, "lg_stamp_lock", 1);
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await finalizing).toMatchObject({ ok: true, weekNumber: 1, matchupsScored: 1 });
+
+    const [league] = await joinDb.select().from(leagues).where(eq(leagues.id, "lg_stamp_lock"));
+    expect(league!.seasonCompletedAt).not.toBeNull();
+  });
+});
+
 // ---------------------------------------------------------------------------------------------
 // FINAL REVIEW, HIGH 2 (second half): the suite covered 4 of Plan C's 7 new writers. The three
 // below close it to 7/7. Each follows the identical rendezvous every proof above does — park the
