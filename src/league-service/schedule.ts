@@ -52,7 +52,10 @@ export async function writeSchedule(tx: DbTx, input: WriteScheduleInput): Promis
  * stands INSIDE the transaction that is about to move rosters, not a snapshot read before it.
  *
  * A league with no schedule yet answers week 1 — `currentWeekNumber`'s own documented floor, not
- * a fallback invented here.
+ * a fallback invented here. No TRADE path can reach that floor: a proposal requires the proposer
+ * to own rostered players, `roster_slots` is only ever written atomically with `matchups` inside
+ * `commitDraftState`, so by the time a trade can exist the schedule does too. The floor is real
+ * only for the pre-draft read paths (`leagueHome`), where week 1 is the honest answer.
  */
 export async function currentWeekOf(db: ReadonlyDb, leagueId: string): Promise<number> {
   const rows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));

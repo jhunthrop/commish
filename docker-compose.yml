@@ -23,6 +23,11 @@ services:
       POSTGRES_USER: commish
       POSTGRES_PASSWORD: commish
       POSTGRES_DB: commish_test
+    # The data dir is a 1.4 GB tmpfs, and Postgres recycles WAL up to max_wal_size (default
+    # 1 GB) without ever shrinking it, so a long test session fills the tmpfs with pg_wal and
+    # the suite starts failing 53100 "No space left on device" while the host has plenty.
+    # Capping WAL keeps the throwaway test DB inside its own memory budget.
+    command: ["postgres", "-c", "max_wal_size=256MB"]
     ports:
       - "5433:5432"
     tmpfs:
