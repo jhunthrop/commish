@@ -143,14 +143,17 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // that race silently on a shared, reused database, which is exactly what made this section
     // read as passing while never actually reaching the queue. An operator triaging on a phone
     // at 11pm is the realistic case this spec exists to check, not an exotic second identity to
-    // mint. The queue reads empty here (nothing in the seeded fixture or the other specs raises
-    // a flag), which is itself the state an operator sees most, per the page's own docblock —
-    // the empty state's own link back to the manager's leagues is the control this spec proves
-    // is reachable rather than pushed off the 360px edge.
+    // mint. The queue is NOT empty here — `npm run seed`'s own multi-account fixture
+    // (`dev_league_integrity`) raises one real, permanently-open flag Task 9's detector found,
+    // and `league-lifecycle.spec.ts` (which runs before this spec, alphabetically, under this
+    // suite's single worker) resolves its own — so exactly this one row remains. That is itself
+    // a realistic state an operator sees, and this spec proves a populated queue's own row is
+    // reachable rather than pushed off the 360px edge.
     await page.goto("/app/admin/queue");
     await expect(page.getByRole("heading", { name: "Dispute queue" })).toBeVisible();
-    await expect(page.getByText("The queue is clear.")).toBeVisible();
-    await expect(page.getByRole("link", { name: "Go to your leagues" })).toBeVisible();
+    const queueRows = page.getByRole("list", { name: "Open flags" }).getByRole("listitem");
+    await expect(queueRows).toHaveCount(1);
+    await expect(queueRows.getByText("The platform flagged two accounts that may be the same person")).toBeVisible();
     await expectNoHorizontalScroll(page, "the dispute queue");
   } finally {
     await context.close();

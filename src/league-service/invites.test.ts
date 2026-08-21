@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, leagueInvites, teams, users } from "@/db/schema";
+import { auditEvents, draftActions, integrityFlags, leagueInvites, sessionSignals, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
+import { canonicalPairId } from "@/integrity-service/multi-account";
 import { LEAGUE_CONFIG } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { createLeague } from "./creation";
@@ -325,6 +327,43 @@ describe("acceptInvite", () => {
     const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "member_joined"));
     expect(event).toMatchObject({ actorId: "u2", actorType: "user", leagueId: created.leagueId });
     expect(event!.payload).toEqual({ teamId: outcome.teamId, via: "invite" });
+  });
+
+  it("triggers a real multi-account sweep after accepting an invite commits, and it can raise a real flag", async () => {
+    // The invite door's own end-to-end proof of the join-time trigger (ruling 11) — the same
+    // property `join.test.ts` proves for the public-browse door. u1 (the commissioner) and u2
+    // share one client signature and a matching draft-pick tempo, so the sweep this accept
+    // fires finds a real pair over threshold and raises a real flag, with no separate call to
+    // the sweep anywhere in this test.
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    // `createLeague` consumes `newId()` three times in order (leagueId, teamId, draftId —
+    // `creation.ts`), and `createInvite` mints its code from `random`, never from `newId` — so
+    // this is the fourth call, and `joinLeagueInTx` makes it for the new team id
+    // deterministically: "id_4". `created.draftId` names the third, real from `createLeague`'s
+    // own result rather than re-derived.
+    const joinerTeam = "id_4";
+
+    await db.insert(sessionSignals).values([
+      { id: "sig_u1", userId: "u1", occurredAt: new Date(nowIso), userAgent: "SharedClient/1.0", acceptLanguage: "en-US", ipHash: null, ipSource: "xff_unverified" },
+      { id: "sig_u2", userId: "u2", occurredAt: new Date(nowIso), userAgent: "SharedClient/1.0", acceptLanguage: "en-US", ipHash: null, ipSource: "xff_unverified" },
+    ]);
+    const minActions = INTEGRITY_CONFIG.multiAccount.signals.minActionsForBehavioral;
+    const pickRows = (teamId: string, offsetMs: number) =>
+      Array.from({ length: minActions + 1 }, (_, i) => {
+        const timestamp = new Date(Date.parse(nowIso) + offsetMs + i * 30_000);
+        return { draftId: created.draftId, action: { v: 1, type: "MAKE_PICK", timestamp: timestamp.toISOString(), teamId, playerId: `p_${teamId}_${i}` }, timestamp };
+      });
+    const allPickRows = [...pickRows(created.teamId, 0), ...pickRows(joinerTeam, 5_000)].map((row, i) => ({ ...row, sequence: i + 1 }));
+    await db.insert(draftActions).values(allPickRows);
+
+    const outcome = await acceptInvite(writeDeps(), { code: invite.code, userId: "u2" });
+    expect(outcome).toMatchObject({ ok: true, alreadyMember: false, teamId: joinerTeam });
+
+    const [flag] = await db.select().from(integrityFlags).where(isNull(integrityFlags.resolvedAt));
+    expect(flag).toMatchObject({ flagType: "multi_account", subjectId: canonicalPairId("u1", "u2"), leagueId: created.leagueId });
   });
 });
 

@@ -960,7 +960,7 @@ describe("pendingFlagQuery / listPendingFlags — the queue's own read model", (
   it("describes an account-pair flag by both accounts' names, batched rather than per-row", async () => {
     await seedUser("u_pair_a");
     await seedUser("u_pair_b");
-    await raiseTestFlag({ id: "queue_pair_flag", flagType: "multi_account", subjectId: "u_pair_a,u_pair_b", occurredAt: "2026-08-01T00:00:00.000Z", evidence: { device: 0.9 } });
+    await raiseTestFlag({ id: "queue_pair_flag", flagType: "multi_account", subjectId: "u_pair_a:u_pair_b", occurredAt: "2026-08-01T00:00:00.000Z", evidence: { device: 0.9 } });
 
     const page = await listPendingFlags(db, {});
     expect(page.rows[0]).toMatchObject({ question: "The platform flagged two accounts that may be the same person", about: "u_pair_a and u_pair_b" });
@@ -991,9 +991,9 @@ describe("pendingFlagQuery / listPendingFlags — the queue's own read model", (
     expect(page.rows[0]).toMatchObject({ about: "A message from a former member" });
   });
 
-  it("names an account pair honestly when it is malformed (no comma) or names accounts that don't resolve", async () => {
+  it("names an account pair honestly when it is malformed (no separator) or names accounts that don't resolve", async () => {
     await raiseTestFlag({ id: "queue_lone_pair_flag", flagType: "multi_account", subjectId: "u_lone_only", occurredAt: "2026-08-01T00:00:00.000Z" });
-    await raiseTestFlag({ id: "queue_ghost_pair_flag", flagType: "multi_account", subjectId: "u_ghost_1,u_ghost_2", occurredAt: "2026-08-02T00:00:00.000Z" });
+    await raiseTestFlag({ id: "queue_ghost_pair_flag", flagType: "multi_account", subjectId: "u_ghost_1:u_ghost_2", occurredAt: "2026-08-02T00:00:00.000Z" });
 
     const page = await listPendingFlags(db, {});
     const lone = page.rows.find((r) => r.flagId === "queue_lone_pair_flag");
@@ -1225,7 +1225,7 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
     const flag = await db.transaction((tx) =>
       raiseFlag(tx, {
         flagType: "multi_account",
-        subjectId: "u_pair_detail_a,u_pair_detail_b",
+        subjectId: "u_pair_detail_a:u_pair_detail_b",
         leagueId: "lg_detail_pair",
         evidence: { device: 0.9 },
         raisedByUserId: null,
@@ -1242,7 +1242,7 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
     expect(detail!.reporters).toEqual([]);
   });
 
-  it("reads a malformed account-pair subject (no comma) honestly — one real id, one blank", async () => {
+  it("reads a malformed account-pair subject (no separator) honestly — one real id, one blank", async () => {
     await seedUser("u_lone_detail");
     const flag = await db.transaction((tx) =>
       raiseFlag(tx, {

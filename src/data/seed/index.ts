@@ -5,6 +5,7 @@ import { envOrUndefined } from "@/lib/env";
 import { DEV_SEED } from "./config";
 import { assertLocalSeedTarget } from "./guard";
 import { seedDevLeagues } from "./seed-dev-leagues";
+import { seedMultiAccountSuspect } from "./seed-integrity";
 import { seedOperator } from "./seed-operator";
 import { seedPlayers } from "./seed-players";
 import { seedPublicLeagues } from "./seed-public-leagues";
@@ -45,6 +46,12 @@ async function main(): Promise<void> {
   console.log(`seeded a ${season.teams}-team season league with ${season.weeks} weeks (${season.scoredWeeks} scored)`);
   const open = await seedPublicLeagues(db, { now: () => new Date().toISOString() });
   console.log(`seeded ${open.leagues} public matchmaking leagues with ${open.teams} joined managers`);
+
+  // The real detector, against real rows — the spec's "seed several flags for manual
+  // verification" honored without a decorative row (ruling 29). `npm run seed && npm run dev`
+  // puts an actual PENDING_REVIEW flag in the operator queue.
+  const integrity = await seedMultiAccountSuspect(db, { now: () => new Date().toISOString() }, claimUserId);
+  console.log(`multi-account sweep: compared ${integrity.pairsCompared} pair(s), raised ${integrity.flagsRaised} flag(s)`);
 }
 
 main().then(() => process.exit(0)).catch((err: unknown) => {

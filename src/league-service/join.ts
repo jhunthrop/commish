@@ -4,6 +4,7 @@ import { isUniqueViolation } from "@/db/errors";
 import { drafts, leagues, teams, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { defaultSweepDeps, sweepLeagueForMultiAccounts, type SweepDeps } from "@/integrity-service/multi-account";
 import { hasOpenSeat } from "@/matchmaking/filter";
 
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
@@ -115,6 +116,40 @@ export async function joinLeagueInTx(
 }
 
 /**
+ * The multi-account sweep's own join-time TRIGGER (ruling 11) — the ONE place in this plan an
+ * integrity write is deliberately outside its business transaction. Both doors into a league
+ * (`joinPublicLeague`, below, and `acceptInvite` in `@/league-service/invites`) call this AFTER
+ * their own `db.transaction(...)` has committed, never from inside `joinLeagueInTx` itself.
+ *
+ * LOCK ORDER is the reason, not convenience. The sweep reads every OTHER member's `session_
+ * signals`/`draft_actions` rows and appends a `flag_raised` event to the PLATFORM chain — a
+ * second anchor lock, on a chain the join transaction has no reason to touch — while the join
+ * transaction that triggered it may still be holding `leagues` `FOR UPDATE` (both doors) and
+ * `league_invites` `FOR UPDATE` (the invite door specifically, taken BEFORE `leagues` per
+ * `acceptInvite`'s own fixed order). Running the sweep inside that transaction would mean taking
+ * a THIRD lock, on a chain anchor row, while two others are already held — exactly the kind of
+ * lock-ordering hazard `audit-logger.ts`'s own docblock spent a real incident explaining. Outside
+ * the transaction, the sweep's own writes take no lock the join is holding at all.
+ *
+ * A failed sweep must not fail a join — the person joining did nothing wrong — so a thrown error
+ * here is logged and swallowed, never re-thrown. `scripts/sweep-multi-account.ts` (`npm run
+ * integrity:sweep`) is the manual re-run for a league whose signals moved after this ran, or
+ * whose trigger failed here.
+ *
+ * A no-op for anything that isn't a BRAND NEW seat (`!outcome.ok`, or `outcome.alreadyMember`):
+ * the pair set of a league changes exactly when a seat is FILLED, never when an existing member
+ * merely re-arrives.
+ */
+export async function triggerMultiAccountSweep(db: Db, outcome: JoinLeagueOutcome, deps: SweepDeps = defaultSweepDeps()): Promise<void> {
+  if (!outcome.ok || outcome.alreadyMember) return;
+  try {
+    await sweepLeagueForMultiAccounts(db, outcome.leagueId, deps);
+  } catch (error: unknown) {
+    console.error("[integrity] multi-account sweep failed after a league join", { leagueId: outcome.leagueId }, error);
+  }
+}
+
+/**
  * The public browse page's gate: a league must still be LISTED and still be PRE-DRAFT. Both are
  * re-checked here rather than trusted from the card the visitor clicked, because a browse page
  * is a snapshot and a league can fill or start between the render and the press.
@@ -164,6 +199,7 @@ export async function joinPublicLeague(
     // with, so a caller cannot tell "no such league" apart from "a league that exists but isn't
     // public" (see `publicJoinPrecondition`'s docblock, and `acceptInvite`'s identical collapse).
     if (!outcome.ok && outcome.status === 404) return { ok: false, status: 404, reason: NOT_PUBLIC };
+    await triggerMultiAccountSweep(db, outcome);
     return outcome;
   } catch (error: unknown) {
     if (isUniqueViolation(error, TEAM_MEMBERSHIP_UNIQUE_INDEX)) {

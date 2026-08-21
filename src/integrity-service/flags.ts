@@ -126,9 +126,18 @@ export interface IntegrityFlag {
   readonly raisedAt: string;
 }
 
+/**
+ * What `canonicalPairId` (`@/integrity-service/multi-account`) joins an `account_pair` subject id
+ * with — defined here, not imported from there, because `multi-account.ts` imports `raiseFlag`
+ * from THIS file and a reverse import would be a cycle. `aboutFor`/`subjectFor`/`trailFor` below
+ * are the three readers that split on it; `canonicalPairId` is the one writer.
+ */
+const PAIR_ID_SEPARATOR = ":";
+
 export interface RaiseFlagInput {
   readonly flagType: FlagType;
-  /** The reviewed thing. For `account_pair`, the two user ids joined low-id-first (ruling 28). */
+  /** The reviewed thing. For `account_pair`, the two user ids sorted and joined with
+   *  `PAIR_ID_SEPARATOR` (ruling 28, `canonicalPairId`) — so "a:b" and "b:a" are one subject. */
   readonly subjectId: string;
   /** Where it happened. Not a chain scope — see `integrityFlags`' own docblock. */
   readonly leagueId: string | null;
@@ -627,7 +636,7 @@ type PendingFlagRow = Awaited<ReturnType<typeof pendingFlagQuery>>[number];
 async function aboutFor(db: Db, rows: readonly PendingFlagRow[]): Promise<ReadonlyMap<string, string>> {
   const reviewIds = [...new Set(rows.filter((r) => r.subjectType === "review").map((r) => r.subjectId))];
   const chatIds = [...new Set(rows.filter((r) => r.subjectType === "chat_message").map((r) => r.subjectId))];
-  const pairUserIds = [...new Set(rows.filter((r) => r.subjectType === "account_pair").flatMap((r) => r.subjectId.split(",")))];
+  const pairUserIds = [...new Set(rows.filter((r) => r.subjectType === "account_pair").flatMap((r) => r.subjectId.split(PAIR_ID_SEPARATOR)))];
 
   const [reviewRows, chatRows, pairRows] = await Promise.all([
     reviewIds.length === 0
@@ -652,13 +661,13 @@ async function aboutFor(db: Db, rows: readonly PendingFlagRow[]): Promise<Readon
     if (row.subjectType === "review") about.set(row.id, `A review by ${reviewAuthor.get(row.subjectId) ?? "a former member"}`);
     else if (row.subjectType === "chat_message") about.set(row.id, `A message from ${chatAuthor.get(row.subjectId) ?? "a former member"}`);
     else if (row.subjectType === "account_pair") {
-      // `subjectId.split(",")` on a non-empty string always yields a first element (`a` is a
-      // real `string`, never `undefined`, no matter what TypeScript's own destructuring type
-      // claims without `noUncheckedIndexedAccess`) — only the SECOND element is genuinely
-      // optional, for a malformed pair with no comma at all. `b ?? ""` is the guard that fact
-      // actually needs; a matching guard on `a` would be dead code defending against a state
-      // `.split(",")` cannot produce.
-      const [a, b] = row.subjectId.split(",");
+      // `subjectId.split(PAIR_ID_SEPARATOR)` on a non-empty string always yields a first element
+      // (`a` is a real `string`, never `undefined`, no matter what TypeScript's own
+      // destructuring type claims without `noUncheckedIndexedAccess`) — only the SECOND element
+      // is genuinely optional, for a malformed pair with no separator at all. `b ?? ""` is the
+      // guard that fact actually needs; a matching guard on `a` would be dead code defending
+      // against a state `.split()` cannot produce.
+      const [a, b] = row.subjectId.split(PAIR_ID_SEPARATOR);
       about.set(row.id, `${pairName.get(a) ?? "A former member"} and ${pairName.get(b ?? "") ?? "a former member"}`);
     } else about.set(row.id, `A trade (${row.subjectId})`);
   }
@@ -725,12 +734,13 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
       : { kind: "chat_message", messageId: subjectId, body: row.body, authorName: row.authorName };
   }
   if (subjectType === "account_pair") {
-    // `idA` is always a real `string` — `subjectId.split(",")` on a non-empty string always
-    // yields a first element, whatever TypeScript's own destructuring type claims without
-    // `noUncheckedIndexedAccess`. Only `idB` is genuinely optional (a malformed pair with no
-    // comma at all), so `ids` always holds at least `idA` and the ternary `aboutFor`'s sibling
-    // block used to need here would be dead code defending against a state this can't produce.
-    const [idA, idB] = subjectId.split(",");
+    // `idA` is always a real `string` — `subjectId.split(PAIR_ID_SEPARATOR)` on a non-empty
+    // string always yields a first element, whatever TypeScript's own destructuring type claims
+    // without `noUncheckedIndexedAccess`. Only `idB` is genuinely optional (a malformed pair with
+    // no separator at all), so `ids` always holds at least `idA` and the ternary `aboutFor`'s
+    // sibling block used to need here would be dead code defending against a state this can't
+    // produce.
+    const [idA, idB] = subjectId.split(PAIR_ID_SEPARATOR);
     const ids = idB === undefined ? [idA] : [idA, idB];
     const rows = await db.select({ id: users.id, name: users.displayName }).from(users).where(inArray(users.id, ids));
     const nameOf = (id: string | undefined) => rows.find((r) => r.id === id)?.name ?? FALLBACK_SUBJECT_MEMBER;
@@ -791,7 +801,7 @@ async function trailFor(db: Db, flagId: string, leagueId: string | null, subject
 
   if (leagueId === null || subjectType !== "account_pair") return platformRows.map(toEvent);
 
-  const actorIds = subjectId.split(",").filter((id) => id.length > 0);
+  const actorIds = subjectId.split(PAIR_ID_SEPARATOR).filter((id) => id.length > 0);
   const leagueRows =
     actorIds.length === 0
       ? []
