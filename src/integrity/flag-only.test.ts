@@ -236,6 +236,31 @@ describe("the detector is flags-only", () => {
     expect(importClosureOf("src/integrity-service/multi-account.ts").modules).not.toContain(AUTHORITY_GRANTING_MODULE);
   });
 
+  /**
+   * Task 6 fix round 1 (review LOW 3). The manual read in the task report claimed
+   * `trade-fairness.ts` only reaches `assembleAdvisorContext`/`valuePlayers` (`ReadonlyDb`-typed
+   * by construction), `assetPlayerIds`, the pure `trades/fairness` functions, `getAuditLogger`
+   * and `raiseFlag` — never a trade WRITE. This is that claim, checked structurally rather than
+   * trusted from a read, the same MODULE-PATH discipline (fix round 1, F1c) the `grantAdmin`
+   * proof above uses: is the mutating module ITSELF ever a file this walk opens, not merely
+   * whether an import specifier string happens to match.
+   *
+   * `applyTradeInTx` (the whole-slot-map roster transfer) lives in `trade-transfer.ts`;
+   * `acceptTrade` (the execution transaction that calls it) lives in `trades.ts`. Both are named
+   * here by path, not by export, for the identical reason `AUTHORITY_GRANTING_MODULE` is:
+   * a namespace import or a re-export under a different name cannot dodge a check on the file
+   * itself. `reverseTradeInTx` (Task 7, still reserved — `DECISION_OWNER.trade_reversed`) has no
+   * module yet to name; whoever lands it should add that path to `TRADE_MUTATION_MODULES` in the
+   * same commit, the same obligation `DECISION_OWNER`'s own docblock already places on that work.
+   */
+  it("keeps every trade-mutating module unreachable from the fairness detector", () => {
+    const TRADE_MUTATION_MODULES = ["src/league-service/trade-transfer.ts", "src/league-service/trades.ts"] as const;
+    const closure = importClosureOf("src/integrity-service/trade-fairness.ts").modules;
+    for (const mutationModule of TRADE_MUTATION_MODULES) {
+      expect(closure).not.toContain(mutationModule);
+    }
+  });
+
   it("can only ever write a flag at pending, never at resolved", () => {
     const validInput: RaiseFlagInput = {
       flagType: "multi_account",

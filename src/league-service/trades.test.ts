@@ -1294,6 +1294,9 @@ describe("acceptTrade", () => {
     const flags = await openFlags(db);
     expect(flags).toHaveLength(1);
     expect(flags[0]).toMatchObject({ flagType: "trade_fairness", subjectType: "trade", subjectId: trade.id, leagueId: "lg_1" });
+    // Fix round 1 (review MEDIUM 1): the after-commit caller's own basis, distinct from the
+    // sweep's — an operator reading this flag's evidence can tell it was frozen at accept time.
+    expect(flags[0]!.evidence).toMatchObject({ basis: "accept_evaluation" });
     // Platform-scoped, never the league's own chain — ruling 1.
     expect(await auditEventsOn(db, "platform", "flag_raised")).toHaveLength(1);
     expect(await auditEventsOn(db, "lg_1", "flag_raised")).toHaveLength(0);

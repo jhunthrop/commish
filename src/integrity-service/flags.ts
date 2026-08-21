@@ -5,12 +5,23 @@ import type { AuditEvent, AuditEventType, JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
 import type { Position } from "@/domain/player";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import { contentRemovalIsWiredFor, decisionIsAvailable, RESOLUTION_DECISIONS, SUBJECT_OF, type FlagSubjectType, type FlagType, type ResolutionDecision } from "@/integrity/flags";
+import {
+  contentRemovalIsWiredFor,
+  decisionIsAvailable,
+  RESOLUTION_DECISIONS,
+  SUBJECT_OF,
+  TRADE_FAIRNESS_BASES,
+  type FlagSubjectType,
+  type FlagType,
+  type ResolutionDecision,
+  type TradeFairnessBasis,
+} from "@/integrity/flags";
 import type { NoticeType } from "@/integrity/notices";
 import {
   flagDetailFor,
   flagTrailRowFor,
   queueRowFor,
+  tradeFairnessBasisPhrase,
   type FlagCursor,
   type FlagDetail,
   type FlagSubjectView,
@@ -700,6 +711,18 @@ function tradedPlayersFromEvidence(evidence: JsonObject, key: "giving" | "receiv
   });
 }
 
+/**
+ * `evidence.basis`, narrowed to `TradeFairnessBasis` — Task 6 fix round 1 (review MEDIUM 1).
+ * `null` for anything that isn't one of the two declared values, which covers both a flag raised
+ * before this field existed on `evidence` at all (`undefined`) and a malformed one (any other
+ * type) with the SAME honest answer, the same "absent and wrong read alike" discipline
+ * `tradedPlayersFromEvidence` just above already holds every stored field to.
+ */
+function basisFromEvidence(evidence: JsonObject): TradeFairnessBasis | null {
+  const value = evidence.basis;
+  return typeof value === "string" && (TRADE_FAIRNESS_BASES as readonly string[]).includes(value) ? (value as TradeFairnessBasis) : null;
+}
+
 /** The reported content, or the account pair, as an operator needs to see it — one query per
  *  subject type, dispatched by `flagDetail`'s own single lookup of the flag row. `evidence` is
  *  that same lookup's own `evidence` column, threaded through for the `trade` branch only
@@ -744,6 +767,9 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
   // "what was true when it was raised" discipline every other field on this row already keeps.
   const gave = tradedPlayersFromEvidence(evidence, "giving");
   const got = tradedPlayersFromEvidence(evidence, "receiving");
+  // Task 6 fix round 1 (review MEDIUM 1): plain words for WHICH evaluation priced `gave`/`got` —
+  // the accept-time one, frozen inside the accept transaction, or a later sweep re-derivation.
+  const valuationBasis = tradeFairnessBasisPhrase(basisFromEvidence(evidence));
 
   const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, subjectId));
   if (row === undefined) {
@@ -756,6 +782,7 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
       got,
       acceptedAt: "",
       reversedAt: null,
+      valuationBasis,
     };
   }
 
@@ -778,6 +805,7 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
     // this branch finds is never mid-negotiation.
     acceptedAt: row.settledAt!.toISOString(),
     reversedAt: row.reversedAt?.toISOString() ?? null,
+    valuationBasis,
   };
 }
 

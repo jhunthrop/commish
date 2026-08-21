@@ -1,7 +1,7 @@
 import type { IconName } from "@/components/ui/icon";
 import type { AuditEvent, JsonObject } from "@/domain/audit";
 import type { Position } from "@/domain/player";
-import { decisionIsAvailable, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision } from "@/integrity/flags";
+import { decisionIsAvailable, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision, type TradeFairnessBasis } from "@/integrity/flags";
 import type { ActivityRow } from "@/integrity/activity-view";
 
 /**
@@ -101,6 +101,15 @@ export type FlagSubjectView =
        *  writes `trade_proposals.reversed_at` yet — but the field is read honestly now rather
        *  than added alongside the reversal itself. */
       readonly reversedAt: string | null;
+      /**
+       * Task 6 fix round 1 (review MEDIUM 1). Plain words for how `gave`/`got` were priced —
+       * `tradeFairnessBasisPhrase`'s own output, computed once by `subjectFor`
+       * (`@/integrity-service/flags`) from the flag's stored `evidence.basis` so the operator
+       * reads a sentence, never a raw enum. Always a real sentence, even for a flag that predates
+       * basis tracking — `tradeFairnessBasisPhrase(null)` answers that honestly rather than
+       * leaving this field empty.
+       */
+      readonly valuationBasis: string;
     };
 
 /**
@@ -243,6 +252,31 @@ export const DECISION_PHRASE: Readonly<Record<ResolutionDecision, string>> = {
 
 function isResolutionDecision(value: string): value is ResolutionDecision {
   return (RESOLUTION_DECISIONS as readonly string[]).includes(value);
+}
+
+/**
+ * The plain-language restatement of `TradeFairnessBasis` (`@/integrity/flags`) an operator reads
+ * on a trade flag's detail — Task 6 fix round 1 (review MEDIUM 1). Active voice, no em dashes,
+ * the same house style `DECISION_PHRASE`'s own sentences keep. Exhaustive over both declared
+ * bases, so a third one added later fails to compile here rather than rendering silently blank.
+ *
+ * Plan B's historical-vs-live framing, made explicit for the third time this plan needs it
+ * (`TradedPlayerView`'s own docblock is the first, `subjectIsRemoved`'s the second): a number an
+ * operator reads here was true WHEN IT WAS COMPUTED, and this is what tells them when that was.
+ */
+export const TRADE_FAIRNESS_BASIS_PHRASE: Readonly<Record<TradeFairnessBasis, string>> = {
+  accept_evaluation: "The platform valued this trade the moment it was accepted.",
+  sweep_rederivation: "The fairness sweep valued this trade later, from the rosters as they stood when it ran.",
+};
+
+/**
+ * `TRADE_FAIRNESS_BASIS_PHRASE[basis]`, with an honest fallback for `null` — a flag raised before
+ * this field existed on `evidence` at all. `subjectFor` (`@/integrity-service/flags`) is the one
+ * caller, and it passes `null` rather than guessing one of the two real bases for a row that
+ * simply predates them.
+ */
+export function tradeFairnessBasisPhrase(basis: TradeFairnessBasis | null): string {
+  return basis === null ? "This flag predates valuation-basis tracking, so the method isn't recorded." : TRADE_FAIRNESS_BASIS_PHRASE[basis];
 }
 
 /** An actor's own display name for the trail's voice — "Alice offered this trade.", never "You"

@@ -85,3 +85,19 @@ export const CONTENT_REMOVAL_WIRED_FOR: Readonly<Record<FlagSubjectType, boolean
 export function contentRemovalIsWiredFor(subjectType: FlagSubjectType): boolean {
   return CONTENT_REMOVAL_WIRED_FOR[subjectType];
 }
+
+/**
+ * How a `trade_fairness` flag's evidence was computed — Task 6 fix round 1 (review MEDIUM 1).
+ * `evidence` is written ONCE, at raise time, and never rewritten, so this is the one honest way
+ * an operator can tell a flag `acceptTrade`'s own after-commit call raised (the score frozen
+ * inside the accept transaction, from the rosters a moment before they moved) apart from one
+ * `npm run trades:sweep` raised later (re-derived from whichever rosters hold the assets today —
+ * see `reDeriveAcceptedTradeValue`'s own docblock, `@/integrity-service/trade-fairness`).
+ *
+ * A flag raised before this field existed carries no `basis` at all — `subjectFor`
+ * (`@/integrity-service/flags`) reads that honestly as "unknown" rather than guessing one of the
+ * two, the same "malformed or missing reads as absent" discipline every other evidence reader in
+ * this file holds to.
+ */
+export const TRADE_FAIRNESS_BASES = ["accept_evaluation", "sweep_rederivation"] as const;
+export type TradeFairnessBasis = (typeof TRADE_FAIRNESS_BASES)[number];

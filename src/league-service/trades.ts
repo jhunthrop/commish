@@ -1053,6 +1053,7 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
     gap: outcome.fairness.gap,
     giving: outcome.fairness.giving,
     receiving: outcome.fairness.receiving,
+    basis: "accept_evaluation",
     occurredAt: now,
   });
   return { ok: true, tradeId: outcome.tradeId, supersededCount: outcome.supersededCount, fairness: outcome.fairness };

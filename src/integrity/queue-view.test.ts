@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { AuditEvent, AuditEventType, JsonObject } from "@/domain/audit";
+import { TRADE_FAIRNESS_BASES } from "@/integrity/flags";
 import { ACTIVITY_VISIBILITY, activityRowFor } from "./activity-view";
-import { flagDetailFor, flagTrailRowFor, formatFlagCursor, parseFlagCursor, queueRowFor, type FlagSubjectView } from "./queue-view";
+import {
+  flagDetailFor,
+  flagTrailRowFor,
+  formatFlagCursor,
+  parseFlagCursor,
+  queueRowFor,
+  TRADE_FAIRNESS_BASIS_PHRASE,
+  tradeFairnessBasisPhrase,
+  type FlagSubjectView,
+} from "./queue-view";
 
 const names = {
   member: (id: string | null) => (id === "u_reporter" ? "Reporter" : "A former member"),
@@ -190,9 +200,33 @@ describe("FlagSubjectView's trade arm (Task 6)", () => {
       got: [{ playerId: "p2", name: "Bench WR", position: "WR", averagePoints: 3.1 }],
       acceptedAt: "2026-08-10T00:00:00.000Z",
       reversedAt: null,
+      valuationBasis: "The platform valued this trade the moment it was accepted.",
     };
     const detail = flagDetailFor({ ...flag, flagType: "trade_fairness" }, subject, [], []);
     expect(detail.subject).toBe(subject);
+  });
+});
+
+describe("tradeFairnessBasisPhrase (Task 6 fix round 1, review MEDIUM 1)", () => {
+  it("puts each declared basis in active-voice, operator-facing plain language", () => {
+    expect(tradeFairnessBasisPhrase("accept_evaluation")).toBe("The platform valued this trade the moment it was accepted.");
+    expect(tradeFairnessBasisPhrase("sweep_rederivation")).toBe(
+      "The fairness sweep valued this trade later, from the rosters as they stood when it ran.",
+    );
+  });
+
+  it("answers honestly, never a guess, for a flag that predates basis tracking", () => {
+    expect(tradeFairnessBasisPhrase(null)).toBe("This flag predates valuation-basis tracking, so the method isn't recorded.");
+  });
+
+  it("contains no em dash in any of its sentences", () => {
+    for (const basis of [...TRADE_FAIRNESS_BASES, null] as const) {
+      expect(tradeFairnessBasisPhrase(basis)).not.toContain("—");
+    }
+  });
+
+  it("is exhaustive over every declared TradeFairnessBasis — a Record, not a partial map", () => {
+    expect(Object.keys(TRADE_FAIRNESS_BASIS_PHRASE).sort()).toEqual([...TRADE_FAIRNESS_BASES].sort());
   });
 });
 

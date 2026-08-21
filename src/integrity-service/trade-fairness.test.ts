@@ -251,6 +251,7 @@ describe("raiseTradeFairnessFlag", () => {
       gap: evaluation.gap,
       giving: evaluation.giving,
       receiving: evaluation.receiving,
+      basis: "accept_evaluation",
       occurredAt: NOW,
       newId: nextFlagId,
       audit: logger,
@@ -270,6 +271,8 @@ describe("raiseTradeFairnessFlag", () => {
       threshold: INTEGRITY_CONFIG.trade.fairnessFlagThreshold,
       giving: [expect.objectContaining({ playerId: "p_star" })],
       receiving: [expect.objectContaining({ playerId: "p_scrub" })],
+      // Fix round 1 (review MEDIUM 1): which caller produced this evidence, written verbatim.
+      basis: "accept_evaluation",
     });
   });
 
@@ -294,6 +297,7 @@ describe("raiseTradeFairnessFlag", () => {
       gap: evaluation.gap,
       giving: evaluation.giving,
       receiving: evaluation.receiving,
+      basis: "accept_evaluation",
       occurredAt: NOW,
       newId: nextFlagId,
       audit: logger,
@@ -315,6 +319,7 @@ describe("raiseTradeFairnessFlag", () => {
       gap: evaluation.gap,
       giving: evaluation.giving,
       receiving: evaluation.receiving,
+      basis: "accept_evaluation",
       occurredAt: NOW,
       fairnessFlagThreshold: 5,
       newId: nextFlagId,
@@ -327,6 +332,7 @@ describe("raiseTradeFairnessFlag", () => {
       gap: evaluation.gap,
       giving: evaluation.giving,
       receiving: evaluation.receiving,
+      basis: "accept_evaluation",
       occurredAt: NOW,
       fairnessFlagThreshold: 999,
       newId: nextFlagId,
@@ -348,6 +354,7 @@ describe("raiseTradeFairnessFlag", () => {
       gap: evaluation.gap,
       giving: evaluation.giving,
       receiving: evaluation.receiving,
+      basis: "accept_evaluation" as const,
       occurredAt: NOW,
       newId: nextFlagId,
       audit: logger,
@@ -416,6 +423,10 @@ describe("sweepUnflaggedTrades", () => {
     const flags = await openFlags(db);
     expect(flags).toHaveLength(1);
     expect(flags[0]).toMatchObject({ subjectType: "trade", subjectId: "trade_sweep_missed", leagueId: league.leagueId });
+    // Fix round 1 (review MEDIUM 1): the sweep's own basis, distinct from the after-commit
+    // caller's — an operator reading this flag's evidence can tell it was re-derived, not frozen
+    // at accept time.
+    expect(flags[0]!.evidence).toMatchObject({ basis: "sweep_rederivation" });
   });
 
   it("re-raises nothing for a trade already flagged, however many times the sweep runs", async () => {

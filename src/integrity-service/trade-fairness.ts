@@ -4,6 +4,7 @@ import { integrityFlags, tradeProposals } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { assembleAdvisorContext, valuePlayers, type AdvisorTeamContext } from "@/ai-advisor/context";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
+import type { TradeFairnessBasis } from "@/integrity/flags";
 import { assetPlayerIds } from "@/trades/assets";
 import { crossesFairnessThreshold, fairnessGap, tradeBalance, type TradeBalance, type ValuedPlayer } from "@/trades/fairness";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
@@ -121,6 +122,16 @@ export interface RaiseTradeFairnessInput {
   /** The evidence's own copy — see `TradeFairnessEvaluation.giving`/`.receiving`'s docblock. */
   readonly giving: readonly ValuedPlayer[];
   readonly receiving: readonly ValuedPlayer[];
+  /**
+   * Task 6 fix round 1 (review MEDIUM 1). REQUIRED, not defaulted: `evidence` is written ONCE
+   * and never rewritten, so a caller that forgot to say which of the two evaluations it is
+   * passing would write a flag no later read can attribute — a compile error here is cheaper
+   * than that gap. `trades.ts`'s after-commit call always passes `"accept_evaluation"`;
+   * `sweepUnflaggedTrades` always passes `"sweep_rederivation"`. See `TradeFairnessBasis`'s own
+   * docblock (`@/integrity/flags`) for what the two mean and why an operator needs to tell them
+   * apart.
+   */
+  readonly basis: TradeFairnessBasis;
   readonly occurredAt: string;
   /**
    * TEST SEAM ONLY, mirroring `EvaluateTradeInput.autoHoldThreshold`'s own docblock. Defaults to
@@ -135,7 +146,7 @@ export interface RaiseTradeFairnessInput {
   readonly audit?: AuditLogger;
 }
 
-function evidenceFor(input: Pick<RaiseTradeFairnessInput, "balance" | "gap" | "giving" | "receiving">, threshold: number) {
+function evidenceFor(input: Pick<RaiseTradeFairnessInput, "balance" | "gap" | "giving" | "receiving" | "basis">, threshold: number) {
   return {
     verdict: input.balance.verdict,
     // Stored VERBATIM — the analyzer's own machine-readable reasons, never re-summarized.
@@ -144,6 +155,10 @@ function evidenceFor(input: Pick<RaiseTradeFairnessInput, "balance" | "gap" | "g
     receivingValue: input.balance.receivingValue,
     gap: input.gap,
     threshold,
+    // Task 6 fix round 1 (review MEDIUM 1): which of the two callers computed this evidence —
+    // read back honestly, never re-derived, by `subjectFor`'s `valuationBasis`
+    // (`@/integrity-service/flags`, `@/integrity/queue-view`'s `tradeFairnessBasisPhrase`).
+    basis: input.basis,
     // The per-player breakdown `FlagSubjectView`'s trade arm reads at render time — written ONCE,
     // here, never re-derived on a later read (Plan B's own evidence discipline: `evidence` is
     // "what was true when it was raised", and a player's form has moved on by the time an
@@ -330,6 +345,7 @@ export async function sweepUnflaggedTrades(db: Db, input: SweepTradeFairnessInpu
       gap: value.gap,
       giving: value.giving,
       receiving: value.receiving,
+      basis: "sweep_rederivation",
       occurredAt: clock.now(),
       newId,
       audit: input.audit,

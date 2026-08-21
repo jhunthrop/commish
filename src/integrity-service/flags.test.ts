@@ -1177,6 +1177,9 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
       got: [],
       acceptedAt: "",
       reversedAt: null,
+      // Empty evidence predates basis tracking too — the honest "we don't know" sentence,
+      // Task 6 fix round 1 (review MEDIUM 1).
+      valuationBasis: "This flag predates valuation-basis tracking, so the method isn't recorded.",
     });
     expect(detail!.reporters).toEqual([]);
   });
@@ -1207,6 +1210,7 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
       threshold: 20,
       giving: [{ playerId: "p_gave", name: "Gave Guy", position: "RB", averagePoints: 60 }],
       receiving: [{ playerId: "p_got", name: "Got Guy", position: "WR", averagePoints: 0 }],
+      basis: "sweep_rederivation",
     };
     const flag = await db.transaction((tx) =>
       raiseFlag(tx, {
@@ -1231,6 +1235,9 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
       got: [{ playerId: "p_got", name: "Got Guy", position: "WR", averagePoints: 0 }],
       acceptedAt,
       reversedAt: null,
+      // Fix round 1 (review MEDIUM 1): the operator-facing plain-language restatement of
+      // `evidence.basis`, computed by `subjectFor` rather than left for a future page to guess.
+      valuationBasis: "The fairness sweep valued this trade later, from the rosters as they stood when it ran.",
     });
     expect(detail!.reporters).toEqual([]);
     // ADMIN-ONLY: the raw score lives in evidence, and never anywhere a member can reach it —
@@ -1425,7 +1432,17 @@ describe("the trade branch's operator trail, end to end (Task 6)", () => {
 
     const [flagRow] = await db.select().from(integrityFlags).where(eq(integrityFlags.subjectId, proposed.tradeId));
     expect(flagRow).toBeDefined();
-    const detail = await flagDetail(db, flagRow!.id);
+
+    // Fix round 1 (review MEDIUM 2): `trailFor`'s own docblock claims "bounded at two queries
+    // for trade" — proved here, the same `countingDb` idiom the `chat_report` reporters test
+    // uses (`flags.test.ts`, "reads a chat_report flag's reporters..."), rather than left as
+    // prose only. The bound: the flag row itself (1), `subjectFor`'s trade branch (the trade row
+    // plus its two team names, 2), `reportersFor` (0 — the trade branch answers synchronously),
+    // and `trailFor`'s own claimed two (the trade's own league-chain rows, plus the batched
+    // actor-name lookup) = 5.
+    const counted = countingDb(db);
+    const detail = await flagDetail(counted.db, flagRow!.id);
+    expect(counted.selectCount()).toBeLessThanOrEqual(5);
     expect(detail!.trail.map((row) => row.headline)).toEqual(["Alice offered this trade.", "Bob accepted it.", "Two players changed teams."]);
   });
 
