@@ -1,6 +1,7 @@
 import { getDb } from "@/db/client";
 import { resolveFlag } from "@/integrity-service/flags";
 import { resolveFlagSchema } from "@/integrity-service/schemas";
+import { getScoreCache } from "@/league-service/score-cache-instance";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { createRateLimiter } from "@/lib/api/rate-limit";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
@@ -47,7 +48,18 @@ export async function POST(request: Request, { params }: RouteContext) {
     const parsed = await parseJson(req, resolveFlagSchema);
     if (!parsed.ok) return parsed.response;
 
-    const result = await resolveFlag(getDb(), { flagId, decision: parsed.value.decision, note: parsed.value.note, operatorUserId });
+    // `cache`: the real score cache, supplied here rather than defaulted inside the service — the
+    // identical shape `POST /api/leagues/[leagueId]/trades/[tradeId]` uses for `acceptTrade`'s own
+    // eviction. A `trade_reversed` decision moves both rosters, so the league's current-week
+    // scores are stale the moment it commits (final review, MEDIUM 4); every other decision
+    // ignores it.
+    const result = await resolveFlag(getDb(), {
+      flagId,
+      decision: parsed.value.decision,
+      note: parsed.value.note,
+      operatorUserId,
+      cache: getScoreCache(),
+    });
     if (!result.ok) return fail(result.reason, result.status);
     return ok<{ readonly flagId: string; readonly decision: typeof result.decision }>({ flagId: result.flagId, decision: result.decision });
   });

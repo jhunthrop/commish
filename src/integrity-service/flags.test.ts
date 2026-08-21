@@ -12,6 +12,7 @@ import type { FlagType } from "@/integrity/flags";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { listLeagueActivity } from "./activity";
 import { createLeague } from "@/league-service/creation";
+import { currentWeekOf } from "@/league-service/schedule";
 import { seasonCurrentWeek } from "@/league-service/test-support";
 import { acceptTrade, proposeTrade } from "@/league-service/trades";
 import { createAuditLogger, type AuditLogger } from "./audit-logger";
@@ -1069,6 +1070,8 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
     expect(row.reversedAt).not.toBeNull();
     expect(row.reversedByFlagId).toBe(fx.flagId);
 
+    // (The cache eviction this same commit adds has its own case below.)
+
     // The moved-again read is skipped once the trade IS already reversed — `subjectIsAlreadyReversed`
     // withholds the decision for that reason already, so the preview reads honestly `false`
     // without spending a roster query on a question the page won't ask anyway.
@@ -1179,6 +1182,69 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
     const second = await resolveFlag(db, { flagId: reReportedId, decision: "trade_reversed", note: "n", operatorUserId: "u_op2", clock: trClock });
     expect(second).toMatchObject({ ok: false, status: 409, reason: "This trade has already been reversed." });
     expect(await isOpenFlag(reReportedId)).toBe(true); // still open — a different decision, or no_action, can close it
+  });
+
+  /**
+   * FINAL REVIEW, MEDIUM 4. `acceptTrade` evicts after commit, matching `setLineup` and
+   * `finalizeWeek` — the codebase's cache-invalidating writers. The reversal is the FOURTH roster
+   * mutator on the same path and evicted nothing, so an operator's reversal left
+   * `crossLeagueHome`'s cached scores stale until TTL. It even returned the `weekNumber` nobody
+   * consumed. Same scope as `acceptTrade`'s: the league's derived current week, post-commit.
+   */
+  it("evicts the score cache for the league's current week after the reversal commits", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("cache");
+    const calls: { readonly leagueId: string; readonly week: number }[] = [];
+    const cache = {
+      invalidate: async (leagueId: string, week: number) => {
+        calls.push({ leagueId, week });
+      },
+    };
+
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock, cache });
+    expect(result).toMatchObject({ ok: true });
+    expect(calls).toEqual([{ leagueId: fx.leagueId, week: await currentWeekOf(db, fx.leagueId) }]);
+  });
+
+  it("never fails a reversal that already committed because the cache eviction failed", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("cachefail");
+    const cache = {
+      invalidate: async () => {
+        throw new Error("redis is down");
+      },
+    };
+
+    const errors: unknown[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    let result: Awaited<ReturnType<typeof resolveFlag>>;
+    try {
+      result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock, cache });
+    } finally {
+      console.error = originalError;
+    }
+
+    // The rosters really moved back and the flag really closed — a stale cache key is one read
+    // bounded by its own TTL, never worth failing a resolution that already landed.
+    expect(result).toMatchObject({ ok: true, decision: "trade_reversed" });
+    expect((await tradeRow(fx.tradeId)).reversedAt).not.toBeNull();
+    expect(await isOpenFlag(fx.flagId)).toBe(false);
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("[integrity-service] score cache invalidation failed after a trade reversal");
+  });
+
+  /** Every OTHER decision leaves the cache alone: nothing moved, so nothing is stale. */
+  it("evicts nothing for a decision that moves no roster", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("nocache");
+    const calls: unknown[] = [];
+    const cache = { invalidate: async () => void calls.push(1) };
+
+    await resolveFlag(db, { flagId: fx.flagId, decision: "no_action", note: "Looked, found nothing.", operatorUserId: "u_op", clock: trClock, cache });
+    expect(calls).toEqual([]);
   });
 
   it("tells BOTH managers, and the note travels as their own words", async () => {

@@ -36,6 +36,7 @@ import { getPublisher } from "@/lib/realtime/publisher";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { removeReviewInTx } from "@/review-service/reviews";
 import { REVIEW_CONFIG } from "@/reviews/config";
+import type { ScoreCache } from "@/stats-pipeline/score-cache";
 import { assetPlayerIds } from "@/trades/assets";
 import { attachAuditEvent, notifyAffectedMember } from "./notify";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
@@ -58,6 +59,10 @@ export { raiseFlag, type IntegrityFlag, type RaiseFlagInput, type RaiseFlagResul
  * is the one writer.
  */
 const PAIR_ID_SEPARATOR = ":";
+
+/** `AcceptTradeInput.cache`'s own default, restated for the reversal branch: an eviction nobody
+ *  injected does nothing, so a test never needs a live Redis connection. */
+const NOOP_SCORE_CACHE: Pick<ScoreCache, "invalidate"> = { invalidate: async () => {} };
 
 export interface ResolveFlagInput {
   readonly flagId: string;
@@ -83,6 +88,15 @@ export interface ResolveFlagInput {
    * to inject a recorder the same way `chat.test.ts` already does.
    */
   readonly publish?: PublishFn;
+  /**
+   * The score cache to evict after a `trade_reversed` decision's reversal commits (final review,
+   * MEDIUM 4). Defaults to a no-op, exactly as `AcceptTradeInput.cache` does and for the same
+   * reason: a test never needs a live Redis connection, and the route supplies the real
+   * `getScoreCache()` (`@/league-service/score-cache-instance`). A reversal is the fourth
+   * roster-mutating writer in this codebase; the other three all evict, and this one used to be
+   * the only one leaving `crossLeagueHome`'s cached scores stale until TTL.
+   */
+  readonly cache?: Pick<ScoreCache, "invalidate">;
 }
 
 export type ResolveFlagResult =
@@ -463,6 +477,22 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
         throw error;
       }
       if (!reversal.ok) return reversal;
+
+      // THE SCORE-CACHE EVICTION, after the reversal's own transaction has committed and before
+      // this function's own opens — `acceptTrade`'s post-commit scope, mirrored exactly (final
+      // review, MEDIUM 4). Both rosters just moved, so `crossLeagueHome`'s cached scores for the
+      // league's current week are stale, and this is the fourth roster-mutating writer joining
+      // `setLineup`, `finalizeWeek` and `acceptTrade` in saying so. `reversal.weekNumber` is the
+      // week the reversal itself derived — a value this branch previously ignored entirely.
+      // Best-effort and swallowed, the identical failure asymmetry `invalidateScoreCacheQuietly`
+      // (`@/league-service/trades`) accepts: a missed eviction is one stale read bounded by the
+      // key's TTL, never worth failing a reversal that already committed.
+      try {
+        await (input.cache ?? NOOP_SCORE_CACHE).invalidate(leagueId, reversal.weekNumber);
+      } catch (error: unknown) {
+        console.error("[integrity-service] score cache invalidation failed after a trade reversal", { leagueId, week: reversal.weekNumber }, error);
+      }
+
       // Fall through to this function's own transaction below: the PLATFORM-chain record of the
       // decision that ordered the reversal which just committed. `trade_reversed`'s own notices
       // were already sent, inside the transaction above — `NOTICE_FOR_DECISION.trade_reversed`

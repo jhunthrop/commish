@@ -6,6 +6,7 @@ import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logg
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { assetPlayerIds } from "@/trades/assets";
 import type { ValuedPlayer } from "@/trades/fairness";
+import { currentWeekOf } from "./schedule";
 import { applyTradeInTx } from "./trade-transfer";
 import { playersById, summarizeAssets } from "./trades";
 
@@ -43,7 +44,20 @@ export interface ReverseTradeInput {
 }
 
 export type ReversalResult =
-  | { readonly ok: true; readonly tradeId: string; readonly weekNumber: number; readonly notices: readonly MemberNotice[] }
+  | {
+      readonly ok: true;
+      readonly tradeId: string;
+      /**
+       * The league's CURRENT week, derived here (`currentWeekOf`, `./schedule`) — the week whose
+       * scores this reversal just moved, and therefore the score-cache key the caller must evict.
+       * `resolveFlag` (`@/integrity-service/flags`) consumes it after this transaction commits,
+       * mirroring `acceptTrade`'s own post-commit eviction exactly (final review, MEDIUM 4: this
+       * field was returned and read by nobody, and the fourth roster mutator in the codebase was
+       * the only one leaving `crossLeagueHome`'s cached scores stale until TTL).
+       */
+      readonly weekNumber: number;
+      readonly notices: readonly MemberNotice[];
+    }
   | { readonly ok: false; readonly status: number; readonly reason: string };
 
 /**
@@ -89,8 +103,10 @@ export type ReversalResult =
  * LOCK ORDER. In order: (1) a plain read of the trade row, no write — safe to refuse from
  * (not-found / not-accepted / already-reversed-by-another-flag) and equally safe to report success
  * from without writing anything (already-reversed-by-THIS-flag, the healing branch); (2)
- * `stat_weeks[weekNumber] FOR SHARE`, taken
- * FIRST among this transaction's own locks — matching `setLineup`'s and `acceptTrade`'s own
+ * `stat_weeks[weekNumber] FOR SHARE` on the league's DERIVED CURRENT week (`currentWeekOf`, the
+ * same one `acceptTrade` derives — a reversal moves rosters NOW, so the live week is the one a
+ * concurrent `persistTick` could be flipping, and the only week whose scores this can change),
+ * taken FIRST among this transaction's own locks — matching `setLineup`'s and `acceptTrade`'s own
  * position — so the three roster-adjacent writers in this codebase all take the same first lock in
  * the same position, which is the property that keeps them from forming a cycle
  * (`lock-order.test.ts` drives this against a parked `persistTick`); (3) both teams' rows, `FOR
@@ -118,6 +134,14 @@ export async function reverseTradeInTx(tx: DbTx, input: ReverseTradeInput): Prom
   if (existing === undefined || existing.status !== "accepted") {
     return { ok: false, status: 404, reason: TRADE_NOT_FOUND };
   }
+
+  // THE WEEK, DERIVED — the league's CURRENT week, not the week the trade was accepted in. A
+  // reversal moves rosters NOW, so the week it can change scores for is the week the league is
+  // living in, which is also the only `stat_weeks` row whose status a concurrent `persistTick`
+  // could be flipping. The same `currentWeekOf` `acceptTrade` derives from (final review,
+  // CRITICAL 1), read through `tx` for the same reason.
+  const weekNumber = await currentWeekOf(tx, input.leagueId);
+
   if (existing.reversedAt !== null) {
     // THE RETRY-HEALING BRANCH (fix round 1, HIGH). `resolveFlag` commits this function's own
     // transaction FIRST and only opens its own (platform-chain) stamp transaction afterward — if
@@ -131,7 +155,7 @@ export async function reverseTradeInTx(tx: DbTx, input: ReverseTradeInput): Prom
     // reversal would) and report success so `resolveFlag` proceeds to close the flag it never
     // got to stamp. Reversed by ANY OTHER flag is the ordinary double-reversal refusal, unchanged.
     if (existing.reversedByFlagId === input.flagId) {
-      return { ok: true, tradeId: existing.id, weekNumber: existing.weekNumber, notices: [] };
+      return { ok: true, tradeId: existing.id, weekNumber, notices: [] };
     }
     return { ok: false, status: 409, reason: ALREADY_REVERSED };
   }
@@ -141,7 +165,7 @@ export async function reverseTradeInTx(tx: DbTx, input: ReverseTradeInput): Prom
   // it is exactly the mechanism that lets a reversal happen after a week has locked), but it must
   // still take this lock in this position for the same cycle-avoidance reason every other
   // roster-adjacent writer in this codebase does.
-  await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, existing.weekNumber)).for("share");
+  await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, weekNumber)).for("share");
 
   // STEP 3 — both teams' rows, FOR UPDATE, canonical sorted-by-id order — identical to
   // acceptTrade's own ruling.
@@ -274,5 +298,5 @@ export async function reverseTradeInTx(tx: DbTx, input: ReverseTradeInput): Prom
   await attachAuditEvent(tx, proposerNotice, event.eventId);
   await attachAuditEvent(tx, counterpartyNotice, event.eventId);
 
-  return { ok: true, tradeId: row.id, weekNumber: row.weekNumber, notices: [proposerNotice, counterpartyNotice] };
+  return { ok: true, tradeId: row.id, weekNumber, notices: [proposerNotice, counterpartyNotice] };
 }

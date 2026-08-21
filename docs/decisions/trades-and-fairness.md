@@ -351,8 +351,8 @@ All three are indistinguishable from real collusion at the moment the flag is ra
 precisely why suppressing them (raising the threshold further, or filtering by some heuristic
 meant to "catch only the real ones") would suppress the one case that actually matters: it looks
 identical from here. A human, not a formula, is what separates them, and the whole design of the
-resolution vocabulary (`no_action`, `trade_reversed`) exists so that the common, harmless case
-costs an operator ten seconds and the rare, real one has a remedy.
+resolution vocabulary (`no_action`, `warned_user`, `trade_reversed`) exists so that the common,
+harmless case costs an operator ten seconds and the rare, real one has a remedy.
 
 ## 10. Threat model additions
 
@@ -386,4 +386,18 @@ covers the multi-account detector, proving no code path reachable from evaluatio
 suspend, ban, or restrict anything. No money moves — this product has no money-movement surface at
 all yet. And there is no path from a flag straight to an automatic consequence: every
 `trade_fairness` flag waits in the same oldest-first, no-severity-sort queue every other flag type
-does, and a human decides `no_action` or `trade_reversed`, every time.
+does, and a human decides, every time.
+
+**What an operator is actually offered on a trade flag: THREE decisions, not two.**
+`decisionIsWiredFor` (`src/integrity/flags.ts`) wires `no_action`, `warned_user` AND
+`trade_reversed` for a `trade` subject, and `queue-view.ts` offers every wired decision — so the
+record above understated operator authority over members' rosters, which is the one class of doc
+drift worth correcting on sight (final review, MEDIUM 5; the code is right and the doc was wrong).
+
+`warned_user` is a legitimate outcome, and it is the one an operator reaches for when a trade is
+genuinely lopsided but the explanation holds up: a manager rebuilding, a package that looked worse
+on paper than in the league's own context, a first-timer who did not understand what they were
+giving away. The gap is real, so closing with `no_action` would say nothing happened; the trade is
+not collusion, so reversing it would take back a deal two people meant. A warning says the true
+thing — we looked, we are telling you we looked, and the rosters stand. `trade_reversed` is for
+when the operator concludes the trade should not stand at all.

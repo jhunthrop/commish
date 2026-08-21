@@ -2,7 +2,7 @@ import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, drafts, lineupSlots, memberNotices, players, rosterSlots, statWeeks, teams, tradeProposals, users } from "@/db/schema";
+import { auditEvents, drafts, lineupSlots, matchups, memberNotices, players, rosterSlots, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
 import { raiseFlag } from "@/integrity-service/flags";
@@ -396,6 +396,9 @@ describe("reverseTradeInTx", () => {
       select: () => ({
         from: (table: unknown) => {
           if (table === tradeProposals) return { where: async () => [existingRow] };
+          // `currentWeekOf`'s own read (final review, MEDIUM 4): no schedule at all, which
+          // `currentWeekNumber` answers as week 1 — its documented floor.
+          if (table === matchups) return { where: async () => [] };
           if (table === rosterSlots) {
             return {
               where: async () => [
