@@ -220,6 +220,7 @@ describe("the admin flag detail page says nothing that breaks the house copy rul
       acceptedAt: "2026-08-10T00:00:00.000Z",
       reversedAt: null,
       valuationBasis: "The platform valued this trade the moment it was accepted.",
+      playersMovedAgain: false,
     };
 
     for (const detail of [
@@ -228,6 +229,7 @@ describe("the admin flag detail page says nothing that breaks the house copy rul
       { ...FLAG_DETAIL, reporters: [], trail: [] },
       { ...FLAG_DETAIL, leagueId: "l1", flagType: "trade_fairness" as const, subject: TRADE_SUBJECT, decisions: ["no_action", "warned_user", "trade_reversed"] as const },
       { ...FLAG_DETAIL, leagueId: "l1", flagType: "trade_fairness" as const, subject: { ...TRADE_SUBJECT, reversedAt: "2026-08-15T00:00:00.000Z" }, decisions: ["no_action", "warned_user"] as const },
+      { ...FLAG_DETAIL, leagueId: "l1", flagType: "trade_fairness" as const, subject: { ...TRADE_SUBJECT, playersMovedAgain: true }, decisions: ["no_action", "warned_user"] as const },
     ]) {
       vi.mocked(flagDetail).mockResolvedValue(detail);
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });

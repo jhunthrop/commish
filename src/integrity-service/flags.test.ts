@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db, DbTx } from "@/db/client";
@@ -14,6 +16,7 @@ import { acceptTrade, proposeTrade } from "@/league-service/trades";
 import { createAuditLogger, type AuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
 import { flagDetail, listPendingFlags, pendingFlagQuery, raiseFlag, removeSubject, resolveFlag } from "./flags";
+import { raiseFlag as raiseFlagReExported } from "./raise-flag";
 
 const db = createTestDb();
 const NOW = "2026-08-20T18:00:00.000Z";
@@ -65,6 +68,23 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await truncateAll(db);
+});
+
+describe("one raiseFlag, one home (fix round 1, LOW — the raise-flag.ts move)", () => {
+  it("is the same function object trade-fairness.ts and multi-account.ts call, not a copy that could drift", () => {
+    // The same identity-pin idiom Task 1 established for `tradeBalance`'s move to `src/trades/
+    // fairness.ts` (`src/trades/fairness.test.ts`) — a re-export satisfies "it still works" even
+    // if a second implementation gets pasted in beside it later; only object identity proves this
+    // is a de-duplication, not a fork.
+    expect(raiseFlagReExported).toBe(raiseFlag);
+  });
+
+  it("leaves no second implementation behind in flags.ts", () => {
+    // A grep, not an import check — the same belt Task 1's own move test uses.
+    const source = readFileSync(join(process.cwd(), "src", "integrity-service", "flags.ts"), "utf8");
+    expect(source).not.toContain("onConflictDoNothing({ target: [integrityFlags.subjectType");
+    expect(source).not.toContain("function existingOpenFlagFor");
+  });
 });
 
 describe("raiseFlag", () => {
@@ -958,6 +978,12 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
     expect(row.status).toBe("accepted");
     expect(row.reversedAt).not.toBeNull();
     expect(row.reversedByFlagId).toBe(fx.flagId);
+
+    // The moved-again read is skipped once the trade IS already reversed — `subjectIsAlreadyReversed`
+    // withholds the decision for that reason already, so the preview reads honestly `false`
+    // without spending a roster query on a question the page won't ask anyway.
+    const detail = await flagDetail(db, fx.flagId);
+    expect(detail!.subject).toMatchObject({ kind: "trade", reversedAt: expect.any(String), playersMovedAgain: false });
   });
 
   it("refuses when a traded player has since moved on, leaves the flag OPEN, and stamps nothing at all", async () => {
@@ -995,6 +1021,50 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
   });
 
+  /**
+   * F3 (LOW, M8 discipline): the precomputed preview `flagDetail` gives the queue detail page —
+   * `false` before a traded player moves on, `true` after, using the SAME ownership check
+   * `reverseTradeInTx`'s own STEP 4 makes (`tradePlayersHaveMovedAgain`), so the two can never
+   * disagree about what "moved again" means.
+   */
+  it("previews playersMovedAgain honestly — false while the trade is still reversible, true once a player has moved on", async () => {
+    const fx = await acceptedTradeWithFlag("preview");
+    const before = await flagDetail(db, fx.flagId);
+    expect(before!.subject).toMatchObject({ kind: "trade", playersMovedAgain: false });
+
+    const userC = "u_tr_carol_preview";
+    await db.insert(users).values({ id: userC, email: `${userC}@test.local`, displayName: "Carol" });
+    const teamC = "team_tr_carol_preview";
+    await db.insert(teams).values({ id: teamC, leagueId: fx.leagueId, userId: userC, name: "Team Carol" });
+    await db.insert(players).values({ id: "p_tr_carol_preview_1", name: "Carol's Player", position: "RB", nflTeam: "LAC" });
+    await db.insert(rosterSlots).values({ teamId: teamC, slot: "BENCH", slotIndex: 0, playerId: "p_tr_carol_preview_1" });
+    const secondProposed = await proposeTrade(db, {
+      leagueId: fx.leagueId,
+      userId: fx.userB,
+      counterpartyTeamId: teamC,
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_tr_rb_preview" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_tr_carol_preview_1" }],
+      note: null,
+      clock: trClock,
+      deliver: async () => {},
+    });
+    if (!secondProposed.ok) throw new Error(secondProposed.reason);
+    await acceptTrade(db, { tradeId: secondProposed.tradeId, leagueId: fx.leagueId, userId: userC, clock: trClock, deliver: async () => {} });
+
+    const after = await flagDetail(db, fx.flagId);
+    expect(after!.subject).toMatchObject({ kind: "trade", playersMovedAgain: true });
+    // The preview and the service's own refusal agree, because they run the identical check.
+    expect(after!.decisions).not.toContain("trade_reversed");
+  });
+
+  /**
+   * STATE 3 (fix round 1, F1's three-state discrimination): reversed via a DIFFERENT flag. Not
+   * the same flag retrying its own work (the healing test above, state 2) — a genuinely SECOND
+   * flag, opened by a fresh report after the first already reversed the trade, gets the ordinary
+   * double-reversal refusal, and its own attempt stays open (a different decision, or no_action,
+   * is what actually closes it).
+   */
   it("refuses a second reversal of the same trade across two different flags, and the second flag stays open", async () => {
     await ensureOperator("u_op");
     await ensureOperator("u_op2");
@@ -1034,18 +1104,26 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
     expect(bobReversal).toBeDefined();
   });
 
+  async function ownerTeamOf(playerId: string): Promise<string | null> {
+    const [row] = await db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(eq(rosterSlots.playerId, playerId));
+    return row?.teamId ?? null;
+  }
+
   /**
-   * THE FAILURE INJECTION (dispatch instruction, binding). `reverseTradeInTx`'s own transaction
-   * commits FIRST; `resolveFlag`'s own (the platform-chain stamp) opens only after. This proves
-   * the SECOND transaction's own failure directly: an `audit` that lets a LEAGUE-scoped append
-   * through (the reversal succeeds and commits) but throws on a PLATFORM-scoped one (this
-   * function's own `flag_resolved`) leaves the trade genuinely reversed with the flag still open
-   * — nothing is silently swallowed, and the failure propagates to the caller as a rejected
-   * promise rather than a false `{ ok: true }`.
+   * THE FAILURE INJECTION AND ITS HEALING (dispatch instruction, binding; fix round 1, HIGH).
+   * `reverseTradeInTx`'s own transaction commits FIRST; `resolveFlag`'s own (the platform-chain
+   * stamp) opens only after. An `audit` that lets a LEAGUE-scoped append through (the reversal
+   * succeeds and commits) but throws on a PLATFORM-scoped one (this function's own
+   * `flag_resolved`) proves that first half directly: the trade is genuinely reversed, the flag
+   * stays open, and nothing is silently swallowed — the failure propagates as a rejected promise.
+   * A RETRY of the identical decision, with a working `audit`, must then HEAL that partial state
+   * rather than getting stuck behind `reverseTradeInTx`'s own already-reversed guard: it recognizes
+   * the trade as this SAME flag's own completed work (`reversedByFlagId` already names it),
+   * skips the transfer (it already ran, exactly once), and lets `resolveFlag` reach its own stamp.
    */
-  it("leaves the trade reversed even when THIS function's own transaction fails afterward, and never lies about it", async () => {
+  it("heals a stuck-open flag on retry after a partial resolveFlag failure — the reversal completes exactly once", async () => {
     await ensureOperator("u_op");
-    const fx = await acceptedTradeWithFlag("failinjection");
+    const fx = await acceptedTradeWithFlag("heal");
     const failingAudit: AuditLogger = {
       record: async (tx, input) => {
         if (input.leagueId === null) throw new Error("injected platform-chain failure");
@@ -1057,23 +1135,37 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
       },
     };
 
+    // FIRST ATTEMPT: the reversal's own (earlier, separate) transaction commits; this function's
+    // own platform-chain stamp then fails.
     await expect(
       resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock, audit: failingAudit }),
     ).rejects.toThrow("injected platform-chain failure");
-
-    // The reversal's OWN (earlier, separate) transaction committed — the trade really is reversed.
-    const row = await tradeRow(fx.tradeId);
-    expect(row.reversedAt).not.toBeNull();
-    expect(row.reversedByFlagId).toBe(fx.flagId);
-    // But the flag this function was supposed to stamp never got there.
     expect(await isOpenFlag(fx.flagId)).toBe(true);
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
 
-    // A retry with a WORKING audit meets the reversal's own already-reversed guard — the trade is
-    // not reversed twice, but the flag still needs a different decision (or a corrected retry
-    // path) to close.
+    // RETRY, with a working audit: heals rather than refuses.
     const retry = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
-    expect(retry).toMatchObject({ ok: false, status: 409, reason: "This trade has already been reversed." });
+    expect(retry).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_reversed" });
+
+    // The flag is actually resolved now, not stuck.
+    expect(await isOpenFlag(fx.flagId)).toBe(false);
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(1);
+
+    // The trade is reversed exactly once — stamped by the FIRST attempt, untouched by the retry.
+    const row = await tradeRow(fx.tradeId);
+    expect(row.reversedAt).not.toBeNull();
+    expect(row.reversedByFlagId).toBe(fx.flagId);
+
+    // The rosters are correct — the retry never re-ran the transfer.
+    expect(await ownerTeamOf("p_tr_rb_heal")).toBe(fx.teamA);
+    expect(await ownerTeamOf("p_tr_wr_heal")).toBe(fx.teamB);
+
+    // Exactly ONE reversal roster_move exists on the league chain (plus the original trade's own),
+    // never two — the retry's skip-the-transfer branch never appends a second one.
+    const moves = await auditEventsOn(fx.leagueId, "roster_move");
+    expect(moves).toHaveLength(2); // the original trade, then the reversal — once each
+    const reversalMoves = moves.filter((m) => (m.payload as { readonly reason?: string }).reason === "trade_reversed");
+    expect(reversalMoves).toHaveLength(1);
   });
 
   /**
@@ -1493,6 +1585,8 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
       // Empty evidence predates basis tracking too — the honest "we don't know" sentence,
       // Task 6 fix round 1 (review MEDIUM 1).
       valuationBasis: "This flag predates valuation-basis tracking, so the method isn't recorded.",
+      // No trade row at all — the moved-again read is skipped rather than asked of nothing.
+      playersMovedAgain: false,
     });
     expect(detail!.reporters).toEqual([]);
   });
@@ -1551,6 +1645,12 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
       // Fix round 1 (review MEDIUM 1): the operator-facing plain-language restatement of
       // `evidence.basis`, computed by `subjectFor` rather than left for a future page to guess.
       valuationBasis: "The fairness sweep valued this trade later, from the rosters as they stood when it ran.",
+      // Fix round 1 (LOW, M8 discipline): honestly `true` here — this fixture seeds the trade row
+      // directly (`seedAcceptedTrade`), never the real `roster_slots` rows `p_gave`/`p_got` would
+      // need to be found on either team, so the same read `reverseTradeInTx` would make finds
+      // neither player anywhere and reports the trade unreversible, exactly as it should for a
+      // trade this fixture never actually gave either team.
+      playersMovedAgain: true,
     });
     expect(detail!.reporters).toEqual([]);
     // ADMIN-ONLY: the raw score lives in evidence, and never anywhere a member can reach it —
@@ -1750,12 +1850,12 @@ describe("the trade branch's operator trail, end to end (Task 6)", () => {
     // for trade" — proved here, the same `countingDb` idiom the `chat_report` reporters test
     // uses (`flags.test.ts`, "reads a chat_report flag's reporters..."), rather than left as
     // prose only. The bound: the flag row itself (1), `subjectFor`'s trade branch (the trade row
-    // plus its two team names, 2), `reportersFor` (0 — the trade branch answers synchronously),
-    // and `trailFor`'s own claimed two (the trade's own league-chain rows, plus the batched
-    // actor-name lookup) = 5.
+    // plus its two team names, 2, plus fix round 1's own `tradePlayersHaveMovedAgain` roster read,
+    // 1 more = 3), `reportersFor` (0 — the trade branch answers synchronously), and `trailFor`'s
+    // own claimed two (the trade's own league-chain rows, plus the batched actor-name lookup) = 6.
     const counted = countingDb(db);
     const detail = await flagDetail(counted.db, flagRow!.id);
-    expect(counted.selectCount()).toBeLessThanOrEqual(5);
+    expect(counted.selectCount()).toBeLessThanOrEqual(6);
     expect(detail!.trail.map((row) => row.headline)).toEqual(["Alice offered this trade.", "Bob accepted it.", "Two players changed teams."]);
   });
 

@@ -210,6 +210,38 @@ describe("reverseTradeInTx", () => {
     expect(row.reversedByFlagId).toBe(fx.flagId);
   });
 
+  /**
+   * STATE 2 (fix round 1, HIGH): the SAME flag id, called a second time, is idempotent — reports
+   * success without re-running the transfer, never refusing. This is the branch that heals a
+   * `resolveFlag` retry after its own (later, separate) platform-chain transaction failed: the
+   * reversal already committed as this flag's own work, and re-entering `reverseTradeInTx` with
+   * the identical `flagId` must let the caller proceed to close the flag rather than getting stuck
+   * behind the ordinary double-reversal refusal state 3 (the test just above) uses.
+   */
+  it("is idempotent for the SAME flag id — reports success without moving anything a second time", async () => {
+    const fx = await seedAcceptedTrade({ flagId: "flag_idempotent" });
+    const first = await db.transaction((tx) =>
+      reverseTradeInTx(tx, { tradeId: fx.tradeId, leagueId: fx.leagueId, flagId: fx.flagId, operatorUserId: "u_op", note: "n", clock }),
+    );
+    expect(first).toMatchObject({ ok: true, tradeId: fx.tradeId });
+
+    const again = await db.transaction((tx) =>
+      reverseTradeInTx(tx, { tradeId: fx.tradeId, leagueId: fx.leagueId, flagId: fx.flagId, operatorUserId: "u_op", note: "n", clock }),
+    );
+    expect(again).toEqual({ ok: true, tradeId: fx.tradeId, weekNumber: fx.weekNumber, notices: [] });
+
+    // Rosters unchanged by the second call — nothing moved twice.
+    expect(await ownerTeamOf(`p_rb1_${fx.flagId}`)).toBe(fx.teamA);
+    expect(await ownerTeamOf(`p_wr1_${fx.flagId}`)).toBe(fx.teamB);
+    // Exactly ONE reversal roster_move on the league chain, never two.
+    const moves = await auditEventsOn(fx.leagueId, "roster_move");
+    const reversalMoves = moves.filter((m) => (m.payload as { readonly reason?: string }).reason === "trade_reversed");
+    expect(reversalMoves).toHaveLength(1);
+    // No second notice pair either — the second call sent none.
+    expect((await noticesFor(fx.userA)).filter((n) => n.noticeType === "trade_reversed")).toHaveLength(1);
+    expect((await noticesFor(fx.userB)).filter((n) => n.noticeType === "trade_reversed")).toHaveLength(1);
+  });
+
   it("refuses a trade id this league doesn't recognize, honestly", async () => {
     const fx = await seedAcceptedTrade({ flagId: "flag_ghost" });
     const result = await db.transaction((tx) =>

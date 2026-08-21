@@ -1,6 +1,6 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
-import { auditEvents, chatMessageReports, chatMessages, integrityFlags, leagues, reviewReports, reviews, teams, tradeProposals, users } from "@/db/schema";
+import { auditEvents, chatMessageReports, chatMessages, integrityFlags, leagues, reviewReports, reviews, rosterSlots, teams, tradeProposals, users } from "@/db/schema";
 import type { AuditEvent, AuditEventType, JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
 import type { Position } from "@/domain/player";
@@ -35,6 +35,7 @@ import { getPublisher } from "@/lib/realtime/publisher";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { removeReviewInTx } from "@/review-service/reviews";
 import { REVIEW_CONFIG } from "@/reviews/config";
+import { assetPlayerIds } from "@/trades/assets";
 import { attachAuditEvent, notifyAffectedMember } from "./notify";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
 import { raiseFlag, type IntegrityFlag, type RaiseFlagInput, type RaiseFlagResult } from "./raise-flag";
@@ -734,6 +735,7 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
       acceptedAt: "",
       reversedAt: null,
       valuationBasis,
+      playersMovedAgain: false,
     };
   }
 
@@ -744,6 +746,17 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
   // row away with it). No fallback here, the same "FK-guaranteed, no fallback" discipline
   // `resolverNameFor` uses for its own `resolved_by_user_id` lookup, a few functions up.
   const teamNameOf = (id: string) => teamRows.find((t) => t.id === id)!.name;
+
+  // Fix round 1 (LOW, M8 discipline): the SAME ownership check `reverseTradeInTx`'s own STEP 4
+  // makes, precomputed at READ time so the queue detail can withhold `trade_reversed` with an
+  // explanation instead of letting an operator click into a 409. Only worth asking once the trade
+  // is NOT already reversed — `flagDetailFor` withholds the decision for a reversed trade on its
+  // own, for a different reason, and this read would be wasted work in that state. A read at
+  // display time can still race a write between the preview and the click — the service's own
+  // check stays the authoritative one — the same "preview, not a guarantee" honesty `subjectIsRemoved`
+  // already keeps for `content_removed`.
+  const playersMovedAgain = row.reversedAt !== null ? false : await tradePlayersHaveMovedAgain(db, row);
+
   return {
     kind: "trade",
     tradeId: subjectId,
@@ -757,7 +770,28 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
     acceptedAt: row.settledAt!.toISOString(),
     reversedAt: row.reversedAt?.toISOString() ?? null,
     valuationBasis,
+    playersMovedAgain,
   };
+}
+
+/**
+ * Whether undoing this trade would take a player off a team that never agreed to anything —
+ * `reverseTradeInTx`'s own STEP 4 ownership check (`@/league-service/trade-reversal`), read here
+ * rather than re-implemented, so the two can never silently disagree about what "moved again"
+ * means. Every traded asset must still be exactly where the trade put it: what the PROPOSER gave
+ * (now the counterparty's) still on the counterparty's roster, and what the COUNTERPARTY gave
+ * (now the proposer's) still on the proposer's.
+ */
+async function tradePlayersHaveMovedAgain(db: Db, row: typeof tradeProposals.$inferSelect): Promise<boolean> {
+  const gaveIds = assetPlayerIds(row.proposerAssets);
+  const gotIds = assetPlayerIds(row.counterpartyAssets);
+  const currentRosterRows = await db
+    .select({ teamId: rosterSlots.teamId, playerId: rosterSlots.playerId })
+    .from(rosterSlots)
+    .where(inArray(rosterSlots.teamId, [row.proposerTeamId, row.counterpartyTeamId]));
+  const ownedByProposer = new Set(currentRosterRows.filter((r) => r.teamId === row.proposerTeamId).map((r) => r.playerId));
+  const ownedByCounterparty = new Set(currentRosterRows.filter((r) => r.teamId === row.counterpartyTeamId).map((r) => r.playerId));
+  return !gotIds.every((id) => ownedByProposer.has(id)) || !gaveIds.every((id) => ownedByCounterparty.has(id));
 }
 
 /**
@@ -895,11 +929,13 @@ async function resolverNameFor(db: Db, resolvedByUserId: string): Promise<string
 
 /**
  * The detail read: one flag, its subject, its reporters and its relevant audit trail — bounded
- * at exactly FIVE queries for an OPEN flag regardless of how much history either chain holds:
- * the flag row itself, `subjectFor` (one), `reportersFor` (one), and `trailFor`'s own two. A
- * RESOLVED flag costs one query more (`resolverNameFor`, sequenced after the batch since it
- * only runs once `resolution` is known non-null) — six total. `flags.test.ts` asserts both
- * bounds with `countingDb`.
+ * at exactly FIVE queries for an OPEN, non-trade flag regardless of how much history either
+ * chain holds: the flag row itself, `subjectFor` (one), `reportersFor` (one), and `trailFor`'s
+ * own two. An OPEN TRADE flag costs one query more (`subjectFor`'s own `tradePlayersHaveMovedAgain`
+ * read, fix round 1, LOW — skipped entirely once the trade is already reversed) — six. A RESOLVED
+ * flag of either shape costs one query more still (`resolverNameFor`, sequenced after the batch
+ * since it only runs once `resolution` is known non-null) — six or seven total. `flags.test.ts`
+ * asserts these bounds with `countingDb`.
  *
  * Returns `null` for a flag id that names nothing — the route (`GET`-equivalent Server Component
  * per Task 5's brief) turns that into `notFound()`, never a 403 or a 500.

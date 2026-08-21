@@ -9,6 +9,7 @@ import {
   parseFlagCursor,
   queueRowFor,
   subjectIsAlreadyReversed,
+  subjectPlayersMovedAgain,
   TRADE_FAIRNESS_BASIS_PHRASE,
   tradeFairnessBasisPhrase,
   type FlagSubjectView,
@@ -207,6 +208,7 @@ describe("FlagSubjectView's trade arm (Task 6)", () => {
       acceptedAt: "2026-08-10T00:00:00.000Z",
       reversedAt: null,
       valuationBasis: "The platform valued this trade the moment it was accepted.",
+      playersMovedAgain: false,
     };
     const detail = flagDetailFor({ ...flag, flagType: "trade_fairness" }, subject, [], []);
     expect(detail.subject).toBe(subject);
@@ -224,6 +226,7 @@ describe("flagDetailFor's decisions narrow on the SUBJECT, Task 7", () => {
     acceptedAt: "2026-08-10T00:00:00.000Z",
     reversedAt: null,
     valuationBasis: "The platform valued this trade the moment it was accepted.",
+    playersMovedAgain: false,
   };
 
   it("offers a trade reversal for a reversible trade subject, and no content removal (a trade is not content)", () => {
@@ -247,6 +250,23 @@ describe("flagDetailFor's decisions narrow on the SUBJECT, Task 7", () => {
   it("answers false for any non-trade subject and for an un-reversed trade", () => {
     expect(subjectIsAlreadyReversed(tradeSubject)).toBe(false);
     expect(subjectIsAlreadyReversed({ kind: "review", reviewId: "r1", body: "x", authorName: "A", removedAt: null })).toBe(false);
+  });
+
+  /**
+   * Fix round 1 (LOW, M8 discipline). `playersMovedAgain`'s own precomputed state withholds
+   * `trade_reversed` the SAME way `subjectIsAlreadyReversed` does, for the other reason a
+   * reversal can refuse: the world moved on, not that it already happened.
+   */
+  it("never offers a trade reversal once a traded player has moved on since, and offers no_action/warned_user instead", () => {
+    const movedAgain: FlagSubjectView = { ...tradeSubject, playersMovedAgain: true };
+    expect(subjectPlayersMovedAgain(movedAgain)).toBe(true);
+    const detail = flagDetailFor({ ...flag, flagType: "trade_fairness" }, movedAgain, [], []);
+    expect(detail.decisions).toEqual(["no_action", "warned_user"]);
+  });
+
+  it("answers false for subjectPlayersMovedAgain on any non-trade subject and on an unaffected trade", () => {
+    expect(subjectPlayersMovedAgain(tradeSubject)).toBe(false);
+    expect(subjectPlayersMovedAgain({ kind: "chat_message", messageId: "5", body: "hi", authorName: "Bob", removedAt: null })).toBe(false);
   });
 });
 

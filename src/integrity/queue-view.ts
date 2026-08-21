@@ -109,6 +109,20 @@ export type FlagSubjectView =
        * leaving this field empty.
        */
       readonly valuationBasis: string;
+      /**
+       * Fix round 1 (LOW, M8 discipline). Whether a traded player has left the roster the trade
+       * put him on since it was accepted — precomputed at READ time by `subjectFor`
+       * (`@/integrity-service/flags`, `tradePlayersHaveMovedAgain`), the SAME ownership check
+       * `reverseTradeInTx`'s own STEP 4 makes, so the two can never quietly disagree. The detail
+       * page reads this to withhold `trade_reversed` with an explanation instead of letting an
+       * operator click into a 409 — the same "never offer a decision that will refuse" discipline
+       * `subjectIsRemoved`/`subjectIsAlreadyReversed` already hold `content_removed`/
+       * `trade_reversed` to. Always `false` once `reversedAt` is set (a reversed trade withholds
+       * the decision for a different reason, and this read is skipped rather than wasted).
+       * A PREVIEW, not a guarantee: a write can still land between this read and the operator's
+       * click, and `reverseTradeInTx`'s own check stays the authoritative one either way.
+       */
+      readonly playersMovedAgain: boolean;
     };
 
 /**
@@ -135,6 +149,17 @@ export function subjectIsRemoved(subject: FlagSubjectView): boolean {
  */
 export function subjectIsAlreadyReversed(subject: FlagSubjectView): boolean {
   return subject.kind === "trade" && subject.reversedAt !== null;
+}
+
+/**
+ * Fix round 1 (LOW, M8 discipline). Whether a traded player has moved on since — `subject.
+ * playersMovedAgain`'s own honest read, narrowed to the `trade` kind. `subjectIsAlreadyReversed`'s
+ * own twin for the SECOND way a reversal can refuse: not because the trade already happened, but
+ * because the world moved on since. Both withhold `trade_reversed` for the same "never offer a
+ * decision that will refuse" reason.
+ */
+export function subjectPlayersMovedAgain(subject: FlagSubjectView): boolean {
+  return subject.kind === "trade" && subject.playersMovedAgain;
 }
 
 /** One reporter's own account of it — who, why, and when. Derived at read time from
@@ -216,9 +241,11 @@ export interface FlagDetailInput {
  * on availability alone (Task 7) — `RESOLUTION_DECISIONS` filtered by `decisionIsWiredFor(d,
  * subject.kind)`, which is what stops the detail page ever offering a trade reversal on a chat
  * report, the same refusal `resolveFlag` itself enforces at the write. `trade_reversed` is
- * withheld a second way on top of that: a trade already put back (`subjectIsAlreadyReversed`)
- * never offers a second one, the same "never offer a decision that will refuse" discipline
- * `subjectIsRemoved` already holds `content_removed` to.
+ * withheld TWO further ways on top of that, both the same "never offer a decision that will
+ * refuse" discipline `subjectIsRemoved` already holds `content_removed` to: a trade already put
+ * back (`subjectIsAlreadyReversed`) never offers a second one, and a trade whose players have
+ * moved on since (`subjectPlayersMovedAgain`, fix round 1) never offers one that would 409 on
+ * submit.
  */
 export function flagDetailFor(
   flag: FlagDetailInput,
@@ -241,7 +268,9 @@ export function flagDetailFor(
     decisions:
       flag.resolution === null
         ? RESOLUTION_DECISIONS.filter(
-            (decision) => decisionIsWiredFor(decision, subject.kind) && (decision !== "trade_reversed" || !subjectIsAlreadyReversed(subject)),
+            (decision) =>
+              decisionIsWiredFor(decision, subject.kind) &&
+              (decision !== "trade_reversed" || (!subjectIsAlreadyReversed(subject) && !subjectPlayersMovedAgain(subject))),
           )
         : [],
   };

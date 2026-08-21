@@ -113,9 +113,14 @@ function TradeSubjectCard({ subject }: { readonly subject: Extract<FlagSubjectVi
         <TradedPlayerList label={`${subject.proposerTeamName} sent`} players={subject.gave} />
         <TradedPlayerList label={`${subject.counterpartyTeamName} sent`} players={subject.got} />
       </div>
-      {subject.reversedAt === null ? null : (
+      {subject.reversedAt !== null ? (
         <p className="mt-3 text-sm text-text-muted">An operator already put this trade back, on {formatWhen(subject.reversedAt)}.</p>
-      )}
+      ) : subject.playersMovedAgain ? (
+        <p className="mt-3 text-sm text-text-muted">
+          One of these players has been traded again since. This trade can no longer be put back automatically; close it with no action, or warn the
+          member instead.
+        </p>
+      ) : null}
     </Card>
   );
 }

@@ -182,6 +182,7 @@ describe("AdminFlagDetailPage — the read", () => {
     acceptedAt: "2026-08-10T00:00:00.000Z",
     reversedAt: null,
     valuationBasis: "The platform valued this trade the moment it was accepted.",
+    playersMovedAgain: false,
   };
 
   describe("the trade subject arm (Task 7)", () => {
@@ -228,6 +229,40 @@ describe("AdminFlagDetailPage — the read", () => {
 
       expect(await screen.findByRole("radio", { name: "No action" })).toBeInTheDocument();
       expect(screen.queryByRole("radio", { name: "Reverse the trade" })).not.toBeInTheDocument();
+    });
+
+    /**
+     * Fix round 1 (LOW, M8 discipline). The moved-again refusal now previews BEFORE the click,
+     * not just as a 409 on submit — `playersMovedAgain` withholds the decision and the card says
+     * why, the same pattern the already-reversed state just above already established.
+     */
+    it("says a traded player has moved on since, and withholds the reversal decision, once playersMovedAgain is set", async () => {
+      vi.mocked(flagDetail).mockResolvedValue({
+        ...OPEN_REVIEW_DETAIL,
+        leagueId: "l1",
+        subject: { ...TRADE_SUBJECT, playersMovedAgain: true },
+        decisions: ["no_action", "warned_user"],
+      });
+      await renderPage();
+
+      expect(await screen.findByText(/One of these players has been traded again since/)).toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "Reverse the trade" })).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "No action" })).toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "Warn the member" })).toBeInTheDocument();
+    });
+
+    it("says nothing about a moved-again player, or an already-reversed trade, on a normal reversible trade", async () => {
+      vi.mocked(flagDetail).mockResolvedValue({
+        ...OPEN_REVIEW_DETAIL,
+        leagueId: "l1",
+        subject: TRADE_SUBJECT,
+        decisions: ["no_action", "warned_user", "trade_reversed"],
+      });
+      await renderPage();
+
+      expect(await screen.findByRole("radio", { name: "Reverse the trade" })).toBeInTheDocument();
+      expect(screen.queryByText(/traded again since/)).not.toBeInTheDocument();
+      expect(screen.queryByText(/already put this trade back/)).not.toBeInTheDocument();
     });
   });
 

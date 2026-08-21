@@ -59,16 +59,17 @@ export type ReversalResult =
  * COMMIT ORDER, STATED: this transaction commits FIRST, and `resolveFlag`'s own stamp only opens
  * once this one has succeeded. A refusal here (the world has moved on, or a race already reversed
  * this trade) therefore leaves the flag OPEN — `resolveFlag` never even begins its own
- * transaction, so there is nothing to roll back and nothing false is ever recorded. The narrower
- * risk this ordering accepts, honestly: if THIS transaction commits and `resolveFlag`'s own later
- * fails (a thrown `audit`/`notify` failure), the trade IS reversed but the flag stays open with no
- * automatic remedy — the same asymmetry `raiseTradeFairnessFlag` accepts for the opposite ordering
- * (Task 6), except here nothing is silently swallowed: the failure propagates out of `resolveFlag`
- * as a rejected promise, so an operator sees an error rather than a false "ok" for a resolution
- * that never landed. A retry of the SAME flag then meets this function's own `ALREADY_REVERSED`
- * guard and refuses cleanly — the trade is not reversed twice, but the flag needs a different
- * decision (or a fixed `flag_resolved` write) to close. Named here rather than hidden, per the
- * dispatch instruction to implement and test this failure injection directly.
+ * transaction, so there is nothing to roll back and nothing false is ever recorded. If THIS
+ * transaction commits and `resolveFlag`'s own later transaction then fails (a thrown `audit`/
+ * `notify` failure), the trade IS genuinely reversed but the flag stays open with no automatic
+ * remedy from THAT attempt — the failure propagates out of `resolveFlag` as a rejected promise, so
+ * an operator sees an error rather than a false "ok" for a resolution that never landed (nothing is
+ * silently swallowed, the same asymmetry `raiseTradeFairnessFlag` accepts for the opposite ordering
+ * in Task 6). Fix round 1 (HIGH): a RETRY of the SAME decision heals that partial state rather than
+ * getting stuck behind it — see the `existing.reversedByFlagId === input.flagId` branch below,
+ * which recognizes the trade as this flag's OWN already-completed work and reports success without
+ * re-running the transfer, so `resolveFlag`'s retry reaches its own stamp and the flag actually
+ * closes. Reversed by a DIFFERENT flag is still the ordinary refusal, unchanged.
  *
  * A reversal is a COMPENSATING TRANSFER, not an undo (ruling 4): it runs `applyTradeInTx` with the
  * two sides swapped — what now sits with the proposer (the counterparty's original assets) leaves
@@ -85,8 +86,10 @@ export type ReversalResult =
  * should be looking at a question they still have to answer, not at a flag stamped with a decision
  * that did not happen.
  *
- * LOCK ORDER. In order: (1) a plain read of the trade row, no write, safe to refuse from
- * (not-found / not-accepted / already-reversed); (2) `stat_weeks[weekNumber] FOR SHARE`, taken
+ * LOCK ORDER. In order: (1) a plain read of the trade row, no write — safe to refuse from
+ * (not-found / not-accepted / already-reversed-by-another-flag) and equally safe to report success
+ * from without writing anything (already-reversed-by-THIS-flag, the healing branch); (2)
+ * `stat_weeks[weekNumber] FOR SHARE`, taken
  * FIRST among this transaction's own locks — matching `setLineup`'s and `acceptTrade`'s own
  * position — so the three roster-adjacent writers in this codebase all take the same first lock in
  * the same position, which is the property that keeps them from forming a cycle
@@ -116,6 +119,20 @@ export async function reverseTradeInTx(tx: DbTx, input: ReverseTradeInput): Prom
     return { ok: false, status: 404, reason: TRADE_NOT_FOUND };
   }
   if (existing.reversedAt !== null) {
+    // THE RETRY-HEALING BRANCH (fix round 1, HIGH). `resolveFlag` commits this function's own
+    // transaction FIRST and only opens its own (platform-chain) stamp transaction afterward — if
+    // THAT second transaction fails, the trade is genuinely reversed but the flag stays open, and
+    // a retry of the identical decision re-enters this function with the SAME `flagId`.
+    // `reversed_by_flag_id` is the ONE-TIME stamp this function's own guarded UPDATE (below) sets
+    // alongside `reversed_at`, in the same statement — it already carries exactly the provenance
+    // an idempotency check needs, so no second column duplicates it. If IT names THIS call's own
+    // flag, the transfer already happened as this flag's own completed work: skip it entirely
+    // (re-running would violate ruling 4, forward-only history, as surely as a fresh double-
+    // reversal would) and report success so `resolveFlag` proceeds to close the flag it never
+    // got to stamp. Reversed by ANY OTHER flag is the ordinary double-reversal refusal, unchanged.
+    if (existing.reversedByFlagId === input.flagId) {
+      return { ok: true, tradeId: existing.id, weekNumber: existing.weekNumber, notices: [] };
+    }
     return { ok: false, status: 409, reason: ALREADY_REVERSED };
   }
 
