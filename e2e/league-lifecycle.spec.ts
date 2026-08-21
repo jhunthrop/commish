@@ -211,13 +211,14 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   await expect(managerA.getByText("Reported. An operator will take a look. Thank you.")).toBeVisible();
   await managerA.getByRole("button", { name: "Done" }).click();
 
-  // --- The seeded operator opens the queue and sees this row, plus the ONE real flag Task 9's
-  //     detector raises from `npm run seed`'s own multi-account fixture (`dev_league_integrity`
-  //     — always open, since nothing in this spec resolves it) -----------------------------
+  // --- The seeded operator opens the queue and sees this row, plus the TWO real, permanently-
+  //     open flags `npm run seed` itself raises: Task 9's own multi-account fixture
+  //     (`dev_league_integrity`) and Phase 3 Plan C Task 9's own trade fixture (`seedTrades`,
+  //     `dev_league_trades`) — neither resolved by anything this spec does -------------------
   await managerA.goto("/app/admin/queue");
   await expect(managerA.getByRole("heading", { name: "Dispute queue" })).toBeVisible();
   const queueRows = managerA.getByRole("list", { name: "Open flags" }).getByRole("listitem");
-  await expect(queueRows).toHaveCount(2);
+  await expect(queueRows).toHaveCount(3);
   // Found by its own question text, not `.first()`: the seed's flag is OLDER than this spec's
   // own (the queue is oldest-first, ruling 30), so ordinal position would click the wrong row.
   const reportRow = queueRows.filter({ hasText: "A member reported a message" });

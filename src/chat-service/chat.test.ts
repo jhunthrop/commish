@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { describe, it, expect, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import { CHAT_CONFIG } from "@/chat/config";
@@ -297,6 +299,16 @@ describe("toggleReaction", () => {
 });
 
 describe("toggleReaction — atomic transition", () => {
+  it("keeps judging by its own RETURNING rows, not by a read inside the transaction", () => {
+    // The property the transaction (Phase 3 Plan C, Task 9 — Plan B's own carried flake-
+    // reduction fix) must not quietly replace. A `SELECT ... FOR UPDATE` here would be a
+    // read-then-write, which is the shape this function was deliberately written to avoid and
+    // which `removeReview` and `resolveFlag` both cite it as the exemplar of.
+    const source = readFileSync(join(process.cwd(), "src", "chat-service", "chat.ts"), "utf8");
+    const toggleReactionSource = source.slice(source.indexOf("export async function toggleReaction"));
+    expect(toggleReactionSource).not.toMatch(/\.for\(\s*["']update["']\s*\)/);
+  });
+
   it('reports "removed" when another writer already holds the reaction', async () => {
     const bus = recorder();
     const message = await postMessage(db, { leagueId: "l1", userId: "u1", body: "already there", publish: bus.publish });

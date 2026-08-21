@@ -10,6 +10,7 @@ import { seedOperator } from "./seed-operator";
 import { seedPlayers } from "./seed-players";
 import { seedPublicLeagues } from "./seed-public-leagues";
 import { seedSeasonLeague } from "./seed-season-league";
+import { seedTrades } from "./seed-trades";
 
 /**
  * The ONE seed entry point (`npm run seed`). Later steps add seeders here — a demo league,
@@ -52,6 +53,12 @@ async function main(): Promise<void> {
   // puts an actual PENDING_REVIEW flag in the operator queue.
   const integrity = await seedMultiAccountSuspect(db, { now: () => new Date().toISOString() }, claimUserId);
   console.log(`multi-account sweep: compared ${integrity.pairsCompared} pair(s), raised ${integrity.flagsRaised} flag(s)`);
+
+  // Ruling 29's own gap, closed (Phase 3 Plan C, Task 9): three real trades through the real
+  // `proposeTrade`/`acceptTrade` routes, so the operator queue also carries a real `trade_
+  // fairness` flag raised by the real detector — never a decorative row.
+  const trades = await seedTrades(db, { now: () => new Date().toISOString() }, claimUserId);
+  console.log(`seeded ${trades.tradesAccepted} trade(s) in ${trades.leagueId}, raised ${trades.flagsRaised} fairness flag(s)`);
 }
 
 main().then(() => process.exit(0)).catch((err: unknown) => {

@@ -525,7 +525,13 @@ describe("applyTradeInTx", () => {
     // Grep, not import graph: the claim is that no second implementation exists, and a second one
     // would not import the first.
     const writers = grepSourceTree(/\.insert\(rosterSlots\)|\.update\(rosterSlots\)/, { dirs: ["src", "scripts"], exclude: /\.test\.tsx?$|test-support/ });
-    expect(writers).toEqual(["src/data/seed/seed-season-league.ts", "src/draft-service/commit.ts", "src/league-service/trade-transfer.ts"]);
+    // `seed-trades.ts` (Phase 3 Plan C, Task 9) deals its own dedicated league's rosters the
+    // identical "snake order over `rankedPlayers`, `assignSlot` decides the slot" way
+    // `seed-season-league.ts` already does — a second SEEDER, never a second TRANSFER
+    // implementation. `applyTradeInTx` remains the only writer that ever moves an ALREADY-
+    // OWNED player between two rosters; this file's own trade fixtures are proposed and accepted
+    // through that same, real function, not through a shortcut this list would need to catch.
+    expect(writers).toEqual(["src/data/seed/seed-season-league.ts", "src/data/seed/seed-trades.ts", "src/draft-service/commit.ts", "src/league-service/trade-transfer.ts"]);
   });
 });
 
