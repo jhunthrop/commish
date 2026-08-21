@@ -911,6 +911,125 @@ describe("acceptTrade's notice order", () => {
 });
 
 /**
+ * Fix round 1, MEDIUM. Ruling 1's central safety claim — sorted-by-id team locking is
+ * deadlock-free against a concurrent MIRROR accept (team A's accept of an A→B trade racing team
+ * B's accept of a DIFFERENT, B→A trade between the SAME two teams) — was documented but never
+ * driven against a real Postgres. Both trades below compute the identical
+ * `[proposerTeamId, counterpartyTeamId].sort()` pair regardless of which team proposed which one,
+ * so both attempts converge on locking `team_mirror_a` FIRST — the property a bystander holding
+ * exactly that row, released only once BOTH concurrent accepts are genuinely blocked behind it
+ * (`waitForBlockedBackend`, never a hopeful interleaving), proves directly. Proposer-first
+ * ordering would have one transaction lock A-then-B while the mirror locked B-then-A, a real
+ * two-resource cycle Postgres would kill after `deadlock_timeout`; sorted ordering has both want
+ * the same row first, so there is never a cycle to kill.
+ */
+describe("acceptTrade's team-lock order — the mirror-accept deadlock proof", () => {
+  it("lets two mirror trades between the same two teams accept concurrently without deadlocking", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_mirror_alice", email: "mirror_alice@test.local", displayName: "Alice" },
+      { id: "u_mirror_bob", email: "mirror_bob@test.local", displayName: "Bob" },
+    ]);
+    await joinDb.insert(leagues).values({
+      id: "lg_mirror_lock",
+      name: "Mirror Lock League",
+      format: "snake",
+      teamCount: 2,
+      commissionerUserId: "u_mirror_alice",
+    });
+    // Sorted lexicographically, `"team_mirror_a" < "team_mirror_b"` — both mirror trades below
+    // compute the identical `[firstTeamId, secondTeamId]` pair no matter which team proposed,
+    // which is the whole property under test.
+    await joinDb.insert(teams).values([
+      { id: "team_mirror_a", leagueId: "lg_mirror_lock", userId: "u_mirror_alice", name: "Alice's Team" },
+      { id: "team_mirror_b", leagueId: "lg_mirror_lock", userId: "u_mirror_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_mirror_1", name: "Player One", position: "RB", nflTeam: "KC" },
+      { id: "p_mirror_2", name: "Player Two", position: "RB", nflTeam: "SF" },
+      { id: "p_mirror_3", name: "Player Three", position: "RB", nflTeam: "DAL" },
+      { id: "p_mirror_4", name: "Player Four", position: "RB", nflTeam: "MIA" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_mirror_a", slot: "BENCH", slotIndex: 0, playerId: "p_mirror_1" },
+      { teamId: "team_mirror_a", slot: "BENCH", slotIndex: 1, playerId: "p_mirror_4" },
+      { teamId: "team_mirror_b", slot: "BENCH", slotIndex: 0, playerId: "p_mirror_2" },
+      { teamId: "team_mirror_b", slot: "BENCH", slotIndex: 1, playerId: "p_mirror_3" },
+    ]);
+    const proposedAt = new Date(clock.now());
+    const expiresAt = new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000);
+    // Trade 1: `team_mirror_a` proposes, `team_mirror_b` is the counterparty.
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_mirror_1",
+      leagueId: "lg_mirror_lock",
+      proposerTeamId: "team_mirror_a",
+      counterpartyTeamId: "team_mirror_b",
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_mirror_1" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_mirror_2" }],
+      fingerprint: "fp_trade_mirror_1",
+      note: null,
+      status: "open",
+      proposedAt,
+      expiresAt,
+    });
+    // Trade 2: the MIRROR — `team_mirror_b` proposes this time, `team_mirror_a` is the
+    // counterparty. A DIFFERENT asset pair than trade 1, so the two trades' own writes never
+    // collide with each other independent of the team-lock question this test is actually about.
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_mirror_2",
+      leagueId: "lg_mirror_lock",
+      proposerTeamId: "team_mirror_b",
+      counterpartyTeamId: "team_mirror_a",
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_mirror_3" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_mirror_4" }],
+      fingerprint: "fp_trade_mirror_2",
+      note: null,
+      status: "open",
+      proposedAt,
+      expiresAt,
+    });
+
+    // The bystander: holds the ONE row both mirror accepts must reach for first, so releasing it
+    // only once BOTH are genuinely blocked behind it is a real proof of convergence, not a
+    // fixture that happens not to collide.
+    let holdsFirstTeamLock: () => void = () => {};
+    const firstTeamLocked = new Promise<void>((resolve) => (holdsFirstTeamLock = resolve));
+    let releaseFirstTeamLock: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseFirstTeamLock = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM teams WHERE id = ${"team_mirror_a"} FOR UPDATE`);
+      holdsFirstTeamLock();
+      await released;
+    });
+    await firstTeamLocked;
+
+    // T_accept1 and T_accept2: the real `acceptTrade`, twice, on TWO separate connections —
+    // one mirror trade each, both reaching for `team_mirror_a` first.
+    const accepting1 = acceptTrade(pickDb, { tradeId: "trade_mirror_1", leagueId: "lg_mirror_lock", userId: "u_mirror_bob", clock, deliver: async () => {} });
+    const accepting2 = acceptTrade(resolveDb, { tradeId: "trade_mirror_2", leagueId: "lg_mirror_lock", userId: "u_mirror_alice", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFirstTeamLock();
+
+    await expect(holding).resolves.toBeUndefined();
+    const [result1, result2] = await Promise.all([accepting1, accepting2]);
+
+    // No deadlock, and exactly one outcome per trade — both mirror trades genuinely executed.
+    expect(result1).toMatchObject({ ok: true, tradeId: "trade_mirror_1" });
+    expect(result2).toMatchObject({ ok: true, tradeId: "trade_mirror_2" });
+
+    const teamARoster = await joinDb.select({ playerId: rosterSlots.playerId }).from(rosterSlots).where(eq(rosterSlots.teamId, "team_mirror_a"));
+    const teamBRoster = await joinDb.select({ playerId: rosterSlots.playerId }).from(rosterSlots).where(eq(rosterSlots.teamId, "team_mirror_b"));
+    const filledIds = (rows: readonly { readonly playerId: string | null }[]) => rows.flatMap((r) => (r.playerId === null ? [] : [r.playerId])).sort();
+    // Alice gave away p_mirror_1 (trade 1) and p_mirror_4 (trade 2), and received p_mirror_2
+    // (trade 1) and p_mirror_3 (trade 2) — both trades really did move both ways.
+    expect(filledIds(teamARoster)).toEqual(["p_mirror_2", "p_mirror_3"]);
+    expect(filledIds(teamBRoster)).toEqual(["p_mirror_1", "p_mirror_4"]);
+  });
+});
+
+/**
  * `correctLeagueInTx`, the fifth and last (final review, LOW 17). It is Plan A's own transaction
  * shape carried into Plan B's phase: notices FIRST (each an FK on `leagues` and on the manager's
  * `users` row), then the LEAGUE anchor, then `attachAuditEvent`. It is also the one writer whose

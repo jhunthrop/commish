@@ -967,6 +967,33 @@ describe("acceptTrade", () => {
     await db.insert(statWeeks).values({ week, status }).onConflictDoUpdate({ target: statWeeks.week, set: { status } });
   }
 
+  /**
+   * Fix round 1, CRITICAL: every refusal path must leave EXACTLY as much trace as if
+   * `acceptTrade` had never been called — a refusal that commits a partial write (the row
+   * stamped `accepted` with nothing actually moved) is the defect this asserts against directly,
+   * rather than trusting the returned `{ ok: false }` shape to imply nothing else happened.
+   * `expectedTradeStatus` defaults to `"open"` (the untouched row); a caller in a race scenario
+   * (superseded, already-settled) passes the row's true prior state instead.
+   */
+  async function expectNoAcceptanceTookPlace(
+    db: Db,
+    tradeId: string | null,
+    unmoved: readonly { readonly playerId: string; readonly teamId: string }[],
+    expectedTradeStatus: string = "open",
+  ): Promise<void> {
+    if (tradeId !== null) {
+      expect((await tradeRow(db, tradeId)).status).toBe(expectedTradeStatus);
+    }
+    for (const asset of unmoved) {
+      expect(await ownerTeamOf(db, asset.playerId)).toBe(asset.teamId);
+    }
+    expect(await auditEventsOn(db, "lg_1", "trade_accepted")).toEqual([]);
+    expect(await auditEventsOn(db, "lg_1", "roster_move")).toEqual([]);
+    for (const userId of ["u_alice", "u_bob", "u_carol", "u_dave"]) {
+      expect(await noticesFor(db, userId)).toEqual([]);
+    }
+  }
+
   beforeEach(async () => {
     await truncateAll(db);
     await seedAcceptTradeLeague(db);
@@ -999,12 +1026,29 @@ describe("acceptTrade", () => {
     const trade = await openAcceptTrade(db);
     const result = await acceptAs("u_alice", trade.id);
     expect(result).toMatchObject({ ok: false, status: 404 });
+    await expectNoAcceptanceTookPlace(db, trade.id, [
+      { playerId: "p_rb1", teamId: "team_a" },
+      { playerId: "p_wr1", teamId: "team_b" },
+    ]);
   });
 
   it("refuses a caller with no team at all in this league, the same 404 as the wrong manager", async () => {
     const trade = await openAcceptTrade(db);
     const result = await acceptAs("u_dave", trade.id);
     expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+    await expectNoAcceptanceTookPlace(db, trade.id, [
+      { playerId: "p_rb1", teamId: "team_a" },
+      { playerId: "p_wr1", teamId: "team_b" },
+    ]);
+  });
+
+  it("refuses a trade id that names nothing at all, leaving no trace", async () => {
+    const result = await acceptAs("u_bob", "trade_totally_ghost");
+    expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+    await expectNoAcceptanceTookPlace(db, null, [
+      { playerId: "p_rb1", teamId: "team_a" },
+      { playerId: "p_wr1", teamId: "team_b" },
+    ]);
   });
 
   it("moves nothing and writes nothing to move when neither side names an asset", async () => {
@@ -1024,6 +1068,10 @@ describe("acceptTrade", () => {
       deliver: deliverNoticeFake,
     });
     expect(result).toEqual({ ok: false, status: 409, reason: "That offer expired before anyone answered it." });
+    await expectNoAcceptanceTookPlace(db, trade.id, [
+      { playerId: "p_rb1", teamId: "team_a" },
+      { playerId: "p_wr1", teamId: "team_b" },
+    ]);
   });
 
   it("refuses when a named player left the roster since the offer was made", async () => {
@@ -1047,6 +1095,12 @@ describe("acceptTrade", () => {
       status: 409,
       reason: "One of the players in this offer has already moved to another team. Ask for a fresh offer.",
     });
+    // `p_rb1` stays exactly where the OTHER trade left it — team_c — and `p_wr1`, never named as
+    // moved by anything, stays on team_b: this refusal moves nothing of its own.
+    await expectNoAcceptanceTookPlace(db, trade.id, [
+      { playerId: "p_rb1", teamId: "team_c" },
+      { playerId: "p_wr1", teamId: "team_b" },
+    ]);
   });
 
   it("passes an applyTradeInTx 'no room' refusal straight through, with its own message", async () => {
@@ -1055,6 +1109,11 @@ describe("acceptTrade", () => {
     const trade = await openAcceptTrade(db, { give: ["p_rb1", "p_te1"], get: ["p_wr1"] });
     const result = await acceptAs("u_bob", trade.id);
     expect(result).toMatchObject({ ok: false, status: 409, reason: expect.stringContaining("no room") });
+    await expectNoAcceptanceTookPlace(db, trade.id, [
+      { playerId: "p_rb1", teamId: "team_a" },
+      { playerId: "p_te1", teamId: "team_a" },
+      { playerId: "p_wr1", teamId: "team_b" },
+    ]);
   });
 
   it("settles every other open offer naming a player that just moved, and calls it superseded", async () => {
@@ -1074,6 +1133,22 @@ describe("acceptTrade", () => {
     expect(copyViolations(`${carolNotice!.title} ${carolNotice!.body}`)).toEqual([]);
   });
 
+  it("frees the fingerprint for reuse once superseded, the same partial-index mechanism a rejection already proves", async () => {
+    const dead = await openAcceptTrade(db, { proposerTeamId: "team_c", counterpartyTeamId: "team_a", give: ["p_bench_c1"], get: ["p_rb1"] });
+    const executed = await openAcceptTrade(db);
+
+    const result = await acceptAs("u_bob", executed.id);
+    expect(result).toMatchObject({ ok: true, supersededCount: 1 });
+    expect((await tradeRow(db, dead.id)).status).toBe("superseded");
+
+    // The identical package, re-proposed after the supersede: `trade_proposals_open_fingerprint
+    // _idx` (`src/db/schema.ts`) is scoped to `WHERE status = 'open'`, so a row that leaves
+    // `open` — by rejection (already proven, "allows the identical package again once the first
+    // one is settled") or by this sweep's own `superseded` — frees its fingerprint the same way.
+    const reproposed = await openAcceptTrade(db, { proposerTeamId: "team_c", counterpartyTeamId: "team_a", give: ["p_bench_c1"], get: ["p_rb1"] });
+    expect((await tradeRow(db, reproposed.id)).status).toBe("open");
+  });
+
   it("refuses to move a roster while the week is locked, and says which week", async () => {
     // The same rule `setLineup` enforces, read the same way: a week is locked once it has
     // STARTED, not once it has been scored.
@@ -1081,6 +1156,13 @@ describe("acceptTrade", () => {
     const trade = await openAcceptTrade(db, { weekNumber: 4 });
     const result = await acceptAs("u_bob", trade.id);
     expect(result).toEqual({ ok: false, status: 409, reason: "Week 4 has started, so rosters can't change until it ends." });
+    // Fix round 1, CRITICAL: this is the exact path that used to commit `status='accepted'`
+    // with nothing actually moved — the guarded UPDATE ran before this check and a plain
+    // `return` after it committed silently. It must now leave no trace at all.
+    await expectNoAcceptanceTookPlace(db, trade.id, [
+      { playerId: "p_rb1", teamId: "team_a" },
+      { playerId: "p_wr1", teamId: "team_b" },
+    ]);
   });
 
   it("takes FOR SHARE on the week before it validates, so a kickoff mid-transaction cannot slip through", async () => {
@@ -1112,6 +1194,10 @@ describe("acceptTrade", () => {
     await flip;
 
     expect(await accepting).toMatchObject({ ok: false, status: 409 });
+    await expectNoAcceptanceTookPlace(db, trade.id, [
+      { playerId: "p_rb1", teamId: "team_a" },
+      { playerId: "p_wr1", teamId: "team_b" },
+    ]);
   });
 
   it("writes trade_accepted AND roster_move on the same league chain, in one batch", async () => {

@@ -692,34 +692,52 @@ export type AcceptTradeResult =
  *
  * LOCK ORDER (ruling 3, and ruling 17 of this plan). In order:
  *
- *   1. `trade_proposals[id]` via the guarded UPDATE — a one-way stamp, `WHERE status = 'open'`,
- *      so the loser of a concurrent accept/reject race (or a second accept click) matches zero
- *      rows rather than a stale "yes". Also takes `FOR KEY SHARE` on `leagues` and both `teams`
- *      rows through its foreign keys.
+ *   1. `trade_proposals[id]` — a PLAIN read, scoped to `(id, leagueId)`, no write. Everything
+ *      that follows through step 5 below is a REFUSAL CHECK, never a write, and every one of
+ *      them can therefore return a plain `{ ok: false, ... }` safely: `db.transaction()` only
+ *      rolls back on a THROWN error, so a refusal returned AFTER a write would silently COMMIT
+ *      that write. (Fix round 1, CRITICAL: this is exactly the bug the guarded UPDATE running
+ *      FIRST produced — a week-locked or ownership-changed refusal used to commit the trade as
+ *      `accepted` with nothing actually moved. The guarded UPDATE is now the LAST write before
+ *      the transfer, never the first statement, so every refusal above it is genuinely free.)
  *   2. `stat_weeks[weekNumber] FOR SHARE` — matching `setLineup`'s own re-check exactly, on the
- *      week THIS TRADE concerns (`row.weekNumber`, the field the row already carries so a
- *      re-read months later can still explain the trade). `persistTick` flips a week's status in
- *      its own transaction with no coordination; this lock is what makes the two agree, and it is
- *      taken before anything below validates.
+ *      week THIS TRADE concerns (the plain read's own `weekNumber`, the field the row already
+ *      carries so a re-read months later can still explain the trade). `persistTick` flips a
+ *      week's status in its own transaction with no coordination; this lock is what makes the
+ *      two agree, and it is taken before any write in this transaction, matching `setLineup`'s
+ *      own position at the very top of ITS transaction.
  *   3. BOTH teams' rows, `FOR UPDATE`, in CANONICAL SORTED-BY-ID order — never proposer-first.
  *      Two concurrent accepts on MIRROR trades (each side the proposer of one) would deadlock
  *      under proposer-first ordering; sorted-id ordering is deadlock-free against both a
  *      concurrent `proposeTrade` (which locks only the proposer's own team) and a concurrent
  *      mirror accept. Two sequential single-row `FOR UPDATE`s, not one `IN (...)` select — only a
  *      sequence of single-row locks guarantees the acquisition order, since an `IN` list's row
- *      order is the planner's to choose. `lock-order.test.ts`'s two-connection proof drives this.
- *   4. `roster_slots` / `lineup_slots` writes — `materializeLockedLineupsInTx`'s own `FOR SHARE`
+ *      order is the planner's to choose. `lock-order.test.ts`'s two-connection proof drives this,
+ *      for both the week lock and a real mirror-trade pair.
+ *   4. the ownership re-check's own read of `roster_slots` — safe to refuse from, still no write,
+ *      and stable once the team locks above are held (any writer of either roster takes an
+ *      implicit `FOR KEY SHARE` on the SAME `teams` row through its own foreign key, so nothing
+ *      can move a named player out from under this read between here and the transfer below).
+ *   5. `trade_proposals[id]` via the guarded UPDATE — the one-way stamp, `WHERE status = 'open'`,
+ *      so the loser of a concurrent accept/reject race (or a second accept click, or a row that
+ *      settled/expired between the plain read at step 1 and here) matches zero rows rather than a
+ *      stale "yes" — safe as a plain return even here, because zero rows changing is not a write.
+ *      Also takes `FOR KEY SHARE` on `leagues` and both `teams` rows through its foreign keys.
+ *      EVERYTHING FROM HERE ON is either the happy path or a THROW (`applyTradeInTx`'s own
+ *      `TransferRefusedError`, or `evaluateTradeBeforeExecute`'s), never a plain refusal return —
+ *      a throw is the only way to roll back a write that already landed.
+ *   6. `roster_slots` / `lineup_slots` writes — `materializeLockedLineupsInTx`'s own `FOR SHARE`
  *      (internal to `applyTradeInTx`, over the whole season) and then the transfer itself,
  *      `FOR KEY SHARE` on both `teams` rows through its own foreign keys (already held stronger,
  *      above).
- *   5. the supersede sweep's `UPDATE` — same table, same class of lock, after the row that caused
+ *   7. the supersede sweep's `UPDATE` — same table, same class of lock, after the row that caused
  *      it.
- *   6. the notice inserts — `FOR KEY SHARE` on `users` and `leagues`.
- *   7. `audit.recordAll` — the anchor, ALWAYS last. `trade_accepted` and `roster_move`, ONE batch:
+ *   8. the notice inserts — `FOR KEY SHARE` on `users` and `leagues`.
+ *   9. `audit.recordAll` — the anchor, ALWAYS last. `trade_accepted` and `roster_move`, ONE batch:
  *      both are league-scoped, so one call carries both and the two land at consecutive
  *      sequences with no second anchor lock (Plan A ruling 3 — a transaction appends to at most
  *      one chain).
- *   8. `attachAuditEvent` — the one statement permitted after the anchor.
+ *  10. `attachAuditEvent` — the one statement permitted after the anchor.
  *
  * Then commit. Then `deliverNotice` for every recipient, then the score-cache eviction for the
  * one week this trade touched, both best-effort and both OUTSIDE the transaction — the same
@@ -729,9 +747,10 @@ export type AcceptTradeResult =
  * appends to the PLATFORM chain and this one has already appended to the league's.
  *
  * `evaluateTradeBeforeExecute` (`@/integrity-service/trade-fairness`) runs INSIDE this
- * transaction, after the ownership re-check and before `applyTradeInTx` moves anything — the
- * rosters as they stand a moment before they move. Its verdict rides this function's own result
- * for Task 6 to act on after commit; `hold` is always `false` while
+ * transaction, after the ownership re-check and after the guarded UPDATE (both rosters
+ * confirmed current and the acceptance itself confirmed live) and before `applyTradeInTx` moves
+ * anything — the rosters as they stand a moment before they move. Its verdict rides this
+ * function's own result for Task 6 to act on after commit; `hold` is always `false` while
  * `INTEGRITY_CONFIG.trade.autoHoldThreshold` is `null`, which is every trade this plan executes.
  */
 export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<AcceptTradeResult> {
@@ -756,10 +775,63 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
   try {
     outcome = await db.transaction(async (tx) => {
       const [team] = await tx.select({ id: teams.id }).from(teams).where(and(eq(teams.leagueId, input.leagueId), eq(teams.userId, input.userId)));
-      // No team in this league at all: never a real match for the counterparty column below, so
-      // this sentinel guarantees the guarded UPDATE matches nothing and `refusalFor` answers 404.
+      // No team in this league at all: never a real match for the counterparty column the
+      // guarded UPDATE checks below, so this sentinel guarantees it matches nothing and
+      // `refusalFor` answers 404.
       const actorTeamId = team?.id ?? "";
 
+      // STEP 1 — a PLAIN READ, no write. See the LOCK ORDER docblock above (fix round 1,
+      // CRITICAL): every refusal from here through the guarded UPDATE at step 5 must be free to
+      // return a plain `{ ok: false, ... }`, because `db.transaction()` only rolls back on a
+      // THROW — a refusal returned after a write would silently commit that write.
+      const [existing] = await tx
+        .select()
+        .from(tradeProposals)
+        .where(and(eq(tradeProposals.id, input.tradeId), eq(tradeProposals.leagueId, input.leagueId)));
+      if (existing === undefined) {
+        return { ok: false as const, status: 404, reason: "We couldn't find that offer." };
+      }
+
+      // STEP 2 — the week lock, matching `setLineup`'s own re-check exactly: taken before any
+      // write in this transaction, on the week THIS TRADE concerns.
+      const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, existing.weekNumber)).for("share");
+      if (isLineupLocked(week?.status ?? "scheduled")) {
+        return { ok: false as const, status: 409, reason: `Week ${existing.weekNumber} has started, so rosters can't change until it ends.` };
+      }
+
+      // STEP 3 — both teams' rows, `FOR UPDATE`, in CANONICAL SORTED-BY-ID order — never
+      // proposer-first (see the LOCK ORDER docblock's ruling 1).
+      const [firstTeamId, secondTeamId] = [existing.proposerTeamId, existing.counterpartyTeamId].sort();
+      await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, firstTeamId)).for("update");
+      await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, secondTeamId)).for("update");
+
+      const giveIds = assetPlayerIds(existing.proposerAssets);
+      const getIds = assetPlayerIds(existing.counterpartyAssets);
+
+      // STEP 4 — OWNERSHIP, RE-CHECKED HERE — the other half of "plan at propose time, enforce at
+      // accept time". Between the offer and the yes, another trade may have moved the same
+      // player, and the guard is in THIS transaction's own read (taken after the team locks
+      // above, so it cannot race a concurrent writer) rather than in a stale plan.
+      const currentRosterRows = await tx
+        .select({ teamId: rosterSlots.teamId, playerId: rosterSlots.playerId })
+        .from(rosterSlots)
+        .where(inArray(rosterSlots.teamId, [existing.proposerTeamId, existing.counterpartyTeamId]));
+      const ownedByProposer = new Set(currentRosterRows.filter((r) => r.teamId === existing.proposerTeamId).map((r) => r.playerId));
+      const ownedByCounterparty = new Set(currentRosterRows.filter((r) => r.teamId === existing.counterpartyTeamId).map((r) => r.playerId));
+      if (!giveIds.every((id) => ownedByProposer.has(id)) || !getIds.every((id) => ownedByCounterparty.has(id))) {
+        return {
+          ok: false as const,
+          status: 409,
+          reason: "One of the players in this offer has already moved to another team. Ask for a fresh offer.",
+        };
+      }
+
+      // STEP 5 — THE GUARDED UPDATE, the one true authorization gate and the LAST write before
+      // the transfer itself. Still safe as a plain return on failure: a `WHERE` that matches zero
+      // rows changes nothing, whether that is because the caller was never the counterparty, the
+      // offer already settled, or a concurrent settlement won the race since the plain read at
+      // step 1. From here on, every remaining refusal is a THROW, never a plain return —
+      // `applyTradeInTx`'s own `TransferRefusedError`, caught outside the transaction below.
       const [row] = await tx
         .update(tradeProposals)
         .set({ status: "accepted", settledAt: new Date(now), settledByUserId: input.userId })
@@ -778,36 +850,6 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
         // accept, the same role `reject` already answers to, so this reuses that implementation
         // rather than restating the same three messages under a fourth transition.
         return refusalFor(tx, { tradeId: input.tradeId, leagueId: input.leagueId, userId: input.userId, transition: "reject", actorTeamId });
-      }
-
-      const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, row.weekNumber)).for("share");
-      if (isLineupLocked(week?.status ?? "scheduled")) {
-        return { ok: false as const, status: 409, reason: `Week ${row.weekNumber} has started, so rosters can't change until it ends.` };
-      }
-
-      const [firstTeamId, secondTeamId] = [row.proposerTeamId, row.counterpartyTeamId].sort();
-      await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, firstTeamId)).for("update");
-      await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, secondTeamId)).for("update");
-
-      const giveIds = assetPlayerIds(row.proposerAssets);
-      const getIds = assetPlayerIds(row.counterpartyAssets);
-
-      // OWNERSHIP, RE-CHECKED HERE — the other half of "plan at propose time, enforce at accept
-      // time". Between the offer and the yes, another trade may have moved the same player, and
-      // the guard is in THIS transaction's own read (taken after the team locks above, so it
-      // cannot race a concurrent writer) rather than in a stale plan.
-      const currentRosterRows = await tx
-        .select({ teamId: rosterSlots.teamId, playerId: rosterSlots.playerId })
-        .from(rosterSlots)
-        .where(inArray(rosterSlots.teamId, [row.proposerTeamId, row.counterpartyTeamId]));
-      const ownedByProposer = new Set(currentRosterRows.filter((r) => r.teamId === row.proposerTeamId).map((r) => r.playerId));
-      const ownedByCounterparty = new Set(currentRosterRows.filter((r) => r.teamId === row.counterpartyTeamId).map((r) => r.playerId));
-      if (!giveIds.every((id) => ownedByProposer.has(id)) || !getIds.every((id) => ownedByCounterparty.has(id))) {
-        return {
-          ok: false as const,
-          status: 409,
-          reason: "One of the players in this offer has already moved to another team. Ask for a fresh offer.",
-        };
       }
 
       const [leagueRow] = await tx.select({ name: leagues.name, rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId));
