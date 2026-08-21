@@ -17,7 +17,6 @@ import { seasonCurrentWeek } from "./test-support";
 import { applyTradeInTx } from "./trade-transfer";
 import {
   acceptTrade,
-  isExpired,
   listTrades,
   proposalFingerprint,
   proposeTrade,
@@ -302,20 +301,6 @@ describe("tradesQuery", () => {
 
     const counterpartyHistory = await tradesQuery(db, { leagueId: "lg_1", teamId: "team_b", box: "history" });
     expect(counterpartyHistory.map((row) => row.id)).toEqual(["tr_rejected"]);
-  });
-});
-
-describe("isExpired", () => {
-  it("is true for an open offer past its expiry", () => {
-    expect(isExpired({ status: "open", expiresAt: "2026-08-01T00:00:00.000Z" }, "2026-08-02T00:00:00.000Z")).toBe(true);
-  });
-
-  it("is false for an open offer still inside its window", () => {
-    expect(isExpired({ status: "open", expiresAt: "2026-08-04T00:00:00.000Z" }, "2026-08-02T00:00:00.000Z")).toBe(false);
-  });
-
-  it("is false for a terminal row, even one whose expiry has long since passed", () => {
-    expect(isExpired({ status: "accepted", expiresAt: "2026-08-01T00:00:00.000Z" }, "2026-08-02T00:00:00.000Z")).toBe(false);
   });
 });
 
@@ -737,6 +722,23 @@ describe("proposeTrade", () => {
 });
 
 describe("rejectTrade and withdrawTrade", () => {
+  /**
+   * The settle path's own `expectNoAcceptanceTookPlace` (final review, HIGH 3): a refusal must
+   * leave EXACTLY as much trace as if the call had never been made. `settleProposal` writes three
+   * things on success — the status stamp, one notice, one `trade_rejected` audit event — so a
+   * refusal is proved by all three still being absent, never by the returned shape alone.
+   */
+  async function expectNoSettlementTookPlace(db: Db, tradeId: string): Promise<void> {
+    const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, tradeId));
+    expect(row!.status).toBe("open");
+    expect(row!.settledAt).toBeNull();
+    expect(row!.settledByUserId).toBeNull();
+    expect(await auditEventsOn(db, "lg_1", "trade_rejected")).toEqual([]);
+    for (const userId of ["u_alice", "u_bob", "u_carol"]) {
+      expect(await noticesFor(db, userId)).toEqual([]);
+    }
+  }
+
   beforeEach(async () => {
     await truncateAll(db);
     await seedFullTradeLeague(db);
@@ -807,6 +809,11 @@ describe("rejectTrade and withdrawTrade", () => {
     expect(await auditEventsOn(db, "lg_1", "trade_rejected")).toHaveLength(1);
   });
 
+  /**
+   * FINAL REVIEW, HIGH 3. The refusal itself was already right; what it lacked was the Task 5
+   * test class — a refusal must leave EXACTLY as much trace as if the call had never happened,
+   * asserted directly rather than inferred from the `{ ok: false }` shape.
+   */
   it("refuses to answer an offer that has aged out, and says so in the offer's own words", async () => {
     const trade = await openTrade(db, { proposedAt: "2026-08-01T00:00:00.000Z" });
     const result = await rejectTrade(db, {
@@ -817,6 +824,55 @@ describe("rejectTrade and withdrawTrade", () => {
       deliver: deliverNoticeFake,
     });
     expect(result).toEqual({ ok: false, status: 409, reason: "That offer expired before anyone answered it." });
+    await expectNoSettlementTookPlace(db, trade.id);
+  });
+
+  /**
+   * FINAL REVIEW, HIGH 3, the other side of the same ruling: expiry gates ANSWERING an offer, not
+   * CLEARING YOUR OWN. A proposer whose offer ran out is doing housekeeping, and refusing that
+   * would leave them looking at a card with no control on it that works. Withdraw is the one
+   * transition `expiryGuards` lets through.
+   */
+  it("still lets the proposer withdraw an offer that has aged out — housekeeping, not answering", async () => {
+    const trade = await openTrade(db, { proposedAt: "2026-08-01T00:00:00.000Z" });
+    const result = await withdrawTrade(db, {
+      tradeId: trade.id,
+      leagueId: "lg_1",
+      userId: "u_alice",
+      clock: fixedClock("2026-08-21T00:00:00.000Z"),
+      deliver: deliverNoticeFake,
+    });
+    expect(result).toEqual({ ok: true, tradeId: trade.id, status: "withdrawn" });
+    expect((await db.select().from(tradeProposals).where(eq(tradeProposals.id, trade.id)))[0]!.status).toBe("withdrawn");
+  });
+
+  /** And an expired offer is still not answerable by the party who never answered it, whichever
+   *  role they hold — the wrong-manager 404 and the expiry 409 do not trade places. */
+  it("refuses an expired offer's counterparty a withdraw, the same 404 an open one gets", async () => {
+    const trade = await openTrade(db, { proposedAt: "2026-08-01T00:00:00.000Z" });
+    const result = await withdrawTrade(db, {
+      tradeId: trade.id,
+      leagueId: "lg_1",
+      userId: "u_bob",
+      clock: fixedClock("2026-08-21T00:00:00.000Z"),
+      deliver: deliverNoticeFake,
+    });
+    expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+    await expectNoSettlementTookPlace(db, trade.id);
+  });
+
+  /** An expired-but-open offer stays where its two parties can see it: `tradesQuery`'s inbox and
+   *  outbox filter on `status = 'open'` and nothing writes `status = 'expired'`, so the row is
+   *  still in both boxes — visible, never actionable except by its proposer's withdraw — and the
+   *  history filter still refuses it, because history is `ne(status, 'open')` by construction. */
+  it("keeps an expired open offer in both parties' boxes, and out of history", async () => {
+    const trade = await openTrade(db, { proposedAt: "2026-08-01T00:00:00.000Z" });
+    const proposerView = await listTrades(db, { leagueId: "lg_1", teamId: "team_a" });
+    const counterpartyView = await listTrades(db, { leagueId: "lg_1", teamId: "team_b" });
+    expect(proposerView.outbox.map((row) => row.id)).toEqual([trade.id]);
+    expect(counterpartyView.inbox.map((row) => row.id)).toEqual([trade.id]);
+    expect(proposerView.history).toEqual([]);
+    expect(counterpartyView.history).toEqual([]);
   });
 
   it("lets the counterparty reject an open offer, notices the proposer and settles the status", async () => {

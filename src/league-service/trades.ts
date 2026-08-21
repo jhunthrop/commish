@@ -164,16 +164,6 @@ export function tradesQuery(db: Db, input: TradesQueryInput) {
   }
 }
 
-/**
- * Pure, and the lazy half of expiry: a row whose `expiresAt` has passed reads as expired and is
- * refused on accept, without a scheduler ever having touched it. Only meaningful for a row still
- * `open` — a terminal row's `expiresAt` is a fact about an offer nobody can act on any more
- * anyway, so this returns `false` rather than double-labeling an already-settled row.
- */
-export function isExpired(row: Pick<TradeProposal, "status" | "expiresAt">, now: string): boolean {
-  return row.status === "open" && new Date(row.expiresAt).getTime() <= new Date(now).getTime();
-}
-
 const systemClock: Clock = { now: () => new Date().toISOString() };
 
 /** English, singular or joined naturally ("A", "A and B", "A, B, and C") — no hand-rolled comma
@@ -499,6 +489,20 @@ function roleColumnFor(transition: SettleTransition) {
 }
 
 /**
+ * Whether this transition refuses an offer whose `expiresAt` has passed (final review, HIGH 3).
+ *
+ * ANSWERING a dead offer is refused: `accept` and `reject` both act on an offer the other manager
+ * is no longer bound by, and executing either would move rosters (or record a decision) on a
+ * negotiation that ran out. CLEARING YOUR OWN dead offer is not answering it — a proposer
+ * withdrawing an expired offer is housekeeping, tidying a card out of their own outbox, and
+ * refusing that would leave a manager staring at a row with no control that works on it. So
+ * `withdraw` is the one transition expiry does not gate.
+ */
+function expiryGuards(transition: SettleTransition): boolean {
+  return transition !== "withdraw";
+}
+
+/**
  * The league name both `trade_rejected` and `trade_withdrawn` templates interpolate — resolved
  * once so neither composes its own copy of the same lookup. `league!.name`: `trade_proposals
  * .league_id` carries a real foreign key onto `leagues.id` with `onDelete: "cascade"` — a league
@@ -552,7 +556,10 @@ export async function refusalFor(
     return { ok: false, status: 409, reason: "Someone already answered that offer." };
   }
   // status is still open and the caller IS the right party, so the only remaining reason the
-  // guarded UPDATE above failed to match is the one condition left: expiry.
+  // guarded UPDATE above failed to match is the one condition left: expiry. Reached only for the
+  // transitions that GUARD on expiry (`reject`, and `accept` which reuses this diagnosis) — a
+  // `withdraw` cannot arrive here at all, since its own UPDATE carries no expiry predicate, so an
+  // open row with the right proposer always matches (`expiryGuards`' own docblock).
   return { ok: false, status: 409, reason: "That offer expired before anyone answered it." };
 }
 
@@ -608,7 +615,7 @@ async function settleProposal(db: Db, input: SettleProposalInput): Promise<Settl
         and(
           eq(tradeProposals.id, input.tradeId),
           eq(tradeProposals.status, "open"),
-          gt(tradeProposals.expiresAt, new Date(now)),
+          expiryGuards(input.transition) ? gt(tradeProposals.expiresAt, new Date(now)) : undefined,
           eq(roleColumnFor(input.transition), actorTeamId),
         ),
       )
@@ -663,7 +670,9 @@ export async function rejectTrade(db: Db, input: SettleTradeInput): Promise<Sett
   return settleProposal(db, { ...input, transition: "reject" });
 }
 
-/** Only the PROPOSER may withdraw. */
+/** Only the PROPOSER may withdraw — and, unlike `reject`, an EXPIRED offer may still be withdrawn
+ *  (final review, HIGH 3): clearing your own dead offer is housekeeping, not answering it. See
+ *  `expiryGuards`' own docblock. */
 export async function withdrawTrade(db: Db, input: SettleTradeInput): Promise<SettleTradeResult> {
   return settleProposal(db, { ...input, transition: "withdraw" });
 }

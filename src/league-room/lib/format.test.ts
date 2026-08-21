@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { daysUntil, formatExpiry, formatPoints, formatRecord, formatWeek } from "./format";
+import { daysUntil, formatExpired, formatExpiry, formatPoints, formatRecord, formatWeek } from "./format";
 
 describe("league display formatting", () => {
   it("writes a record, dropping ties when there are none", () => {
@@ -26,8 +26,12 @@ describe("daysUntil", () => {
     expect(daysUntil("2026-08-24T12:00:00.000Z", NOW)).toBe(3);
   });
 
-  it("never goes negative for a timestamp already in the past", () => {
-    expect(daysUntil("2026-08-20T00:00:00.000Z", NOW)).toBe(0);
+  /** Final review, HIGH 3: this used to clamp at zero, which turned an offer that died three
+   *  days ago into "Expires today." — false copy, not merely stale. A count that goes negative is
+   *  what lets the sentence below tell the truth. */
+  it("goes negative for a timestamp already in the past, rather than clamping to today", () => {
+    expect(daysUntil("2026-08-20T00:00:00.000Z", NOW)).toBe(-2);
+    expect(daysUntil("2026-08-21T11:00:00.000Z", NOW)).toBe(-1);
   });
 });
 
@@ -38,7 +42,23 @@ describe("formatExpiry", () => {
     expect(formatExpiry(3)).toBe("Expires in 3 days.");
   });
 
+  it("never claims a past-due offer expires today", () => {
+    expect(formatExpiry(-1)).toBe("Expired.");
+    expect(formatExpiry(-30)).toBe("Expired.");
+  });
+
   it("carries no em dash or en dash", () => {
-    for (const days of [0, 1, 3]) expect(formatExpiry(days)).not.toMatch(/[–—]/);
+    for (const days of [-1, 0, 1, 3]) expect(formatExpiry(days)).not.toMatch(/[–—]/);
+  });
+});
+
+describe("formatExpired", () => {
+  it("names the day the offer ran out, in words a reader does not have to decode", () => {
+    expect(formatExpired("2026-08-18T12:00:00.000Z")).toBe("Expired August 18.");
+    expect(formatExpired("2026-01-03T23:00:00.000Z")).toBe("Expired January 3.");
+  });
+
+  it("carries no em dash or en dash", () => {
+    expect(formatExpired("2026-08-18T12:00:00.000Z")).not.toMatch(/[–—]/);
   });
 });

@@ -36,12 +36,36 @@ a real negotiation between two named managers).
 | `accepted` | **yes** | Both managers agreed and the rosters moved. A later operator reversal stamps `reversedAt` on this SAME row — `status` never moves off `accepted`, because the acceptance happened and a status that erased it would make the row and the audit chain disagree about the same afternoon. |
 | `rejected` | yes | The counterparty said no. |
 | `withdrawn` | yes | The proposer took it back. |
-| `expired` | yes | Nobody answered inside `TRADE_CONFIG.proposalTtlHours` (72). Reached lazily, on read or inside the accept transaction's own `WHERE` — nothing sweeps for it. |
+| `expired` | yes | Declared in the vocabulary, and NEVER WRITTEN. Expiry has no event moment without a scheduler, so it is DERIVED, not stored: `isExpired` (`src/trades/lifecycle.ts`) answers it from `expiresAt`, and a dead offer sits in the table still `open`. See "How expiry actually works" below. |
 | `superseded` | yes | A DIFFERENT trade moved a player this offer named. Distinct from `rejected` because nobody declined it, and the notice says so ("Nobody declined it") so a manager does not draw a false conclusion about a leaguemate. |
 
 Every transition is legal from `open` and from nowhere else — enforced in SQL, by the guarded
 `UPDATE`'s own `WHERE status = 'open'`, not by a prior read: a losing concurrent caller matches
 zero rows, never a stale "yes".
+
+## How expiry actually works
+
+**Derived, never stored, and load-bearing anyway.** There is no scheduler in this phase, so there
+is no moment at which anything could honestly write `status = 'expired'` — a row that ran out did
+so because time passed, not because something happened. So nothing writes it, and a dead offer
+stays `open` in the table. `isExpired` (`src/trades/lifecycle.ts`, the browser-safe half) is the
+one function that answers the question, and BOTH sides of the product ask it:
+
+- **The card.** `TradeCard` gates its "Needs your answer" badge and its Accept/Decline pair on it,
+  against its own ticking clock, so an offer that ages out while the page is open loses its
+  controls without a refetch. Its expiry line says `Expired August 18.` — the state and the day —
+  rather than "Expires today." forever.
+- **The server.** `acceptTrade` and `rejectTrade` refuse a dead offer in the guarded `UPDATE`'s
+  own `WHERE`, with product copy ("That offer expired before anyone answered it.") and no trace
+  left behind.
+- **Withdraw is the exception, deliberately.** A proposer may still withdraw an offer that ran
+  out: clearing your own dead offer is housekeeping, not answering it, and refusing it would leave
+  a manager looking at a card with no control on it that works.
+
+An expired-but-open offer stays visible to its two parties in their own inbox and outbox — the
+boxes filter on `status = 'open'`, which it still is — and stays out of the league's shared
+history, which is `status <> 'open'` by construction. Visible, honest, never actionable except by
+its own proposer's withdraw.
 
 ## Where the thresholds live, and what each one does
 

@@ -1,4 +1,4 @@
-import { afterEach, describe, it, expect, vi } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
@@ -65,9 +65,64 @@ describe("TradeCard", () => {
     render(<TradeCard trade={trade} meTeamId="me" playersById={PLAYERS} />);
     expect(screen.queryByText(/^Expires/)).not.toBeInTheDocument();
   });
+
+  /**
+   * FINAL REVIEW, HIGH 3 — the member's dead end, closed. Nothing ever writes `status =
+   * 'expired'` (there is no event moment to write one at, and no scheduler), so a dead offer is
+   * still `open` on the wire. `isExpired` had ZERO production consumers, so this card kept
+   * rendering "Needs your answer" and a live Accept button on an offer whose Accept could only
+   * ever 409, above an expiry line that said "Expires today." for as long as the row existed.
+   */
+  it("shows a past-due offer as expired, with the day it ran out, never as expiring today", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-24T00:00:00.000Z")); // three days after BASE.expiresAt
+
+    render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    expect(screen.getByText("Expired August 21.")).toBeInTheDocument();
+    expect(screen.queryByText("Expires today.")).not.toBeInTheDocument();
+  });
+
+  it("takes the answer controls and the badge off an expired offer, for the party who owes an answer", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-24T00:00:00.000Z"));
+
+    render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    expect(screen.queryByText("Needs your answer")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Decline" })).not.toBeInTheDocument();
+  });
+
+  it("leaves the proposer their Withdraw on an expired offer, and stops claiming it is waiting for a reply", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-24T00:00:00.000Z"));
+
+    render(<TradeCard trade={BASE} meTeamId="them" playersById={PLAYERS} onWithdraw={() => {}} />);
+    expect(screen.getByRole("button", { name: "Withdraw" })).toBeInTheDocument();
+    expect(screen.queryByText("Proposed. Waiting for a reply.")).not.toBeInTheDocument();
+    expect(screen.getByText("Nobody answered before this ran out. Clear it whenever you like.")).toBeInTheDocument();
+  });
+
+  it("keeps the answer controls right up to the moment the offer runs out", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-20T23:59:59.000Z")); // one second left
+
+    render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    expect(screen.getByText("Needs your answer")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+  });
 });
 
 describe("TradeCard states", () => {
+  // The clock is PINNED for every case below (final review, HIGH 3). `BASE` is an OPEN offer with
+  // a fixed `expiresAt`, and an open offer's controls now depend on whether that date has passed
+  // — so against a real wall clock this whole block would silently start asserting the expired
+  // card the day `BASE.expiresAt` went by. `shouldAdvanceTime` keeps `axe`'s own async work
+  // running normally.
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date("2026-08-19T00:00:00.000Z")); // BASE is live, two days out
+  });
+
   it("shows the verdict beside the accept control, never instead of it, in both themes, axe-clean", async () => {
     await inBothThemes(
       <TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} assessmentStatus="ready" assessment={LOPSIDED_ASSESSMENT} />,

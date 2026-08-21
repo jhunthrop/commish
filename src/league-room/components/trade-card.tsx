@@ -5,9 +5,10 @@ import { Badge, Button, Card, Modal, PositionBadge, Sticker } from "@/components
 import { describeAsset, type TradeAsset } from "@/trades/assets";
 import type { TradeProposalView, TradeSideView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
+import { isExpired } from "@/trades/lifecycle";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useNow } from "../hooks/use-now";
-import { daysUntil, formatExpiry, formatWeek } from "../lib/format";
+import { daysUntil, formatExpired, formatExpiry, formatWeek } from "../lib/format";
 import { TradeVerdict, type TradeAssessmentSummary } from "./trade-verdict";
 
 export interface TradeCardProps {
@@ -121,7 +122,16 @@ export function TradeCard({
   const sides = myAndTheirSides(trade, meTeamId);
   const iAmProposer = trade.from.teamId === meTeamId;
   const iAmCounterparty = trade.to.teamId === meTeamId;
-  const isAnswerable = trade.status === "open" && iAmCounterparty;
+  // FINAL REVIEW, HIGH 3: `isExpired` (`@/trades/lifecycle`) had zero production consumers, so a
+  // dead offer still wore "Needs your answer" and a live Accept button whose 409 was the only
+  // thing that ever told the member it had run out. The pure function both halves of the product
+  // share is asked here, against `useNow`'s tick, so an offer that ages out while the page is
+  // open loses its controls without a refetch — and nothing writes `status = 'expired'`, because
+  // there is no event moment to write one at (expiry stays DERIVED).
+  const expired = isExpired(trade, new Date(now).toISOString());
+  const isAnswerable = trade.status === "open" && !expired && iAmCounterparty;
+  // Withdraw survives expiry: clearing your own dead offer is housekeeping, not answering it, and
+  // `withdrawTrade` (`@/league-service/trades`) accepts it — the server and this card agree.
   const isMineWaiting = trade.status === "open" && iAmProposer;
   const settled = settledCopy(trade, meTeamId);
 
@@ -145,8 +155,13 @@ export function TradeCard({
             wire field the panel found unused — so this is a live remaining count, not a static
             "three days" restated from `TRADE_CONFIG` on every render regardless of how long the
             offer has actually been sitting. Shown to whichever side an open offer belongs to:
-            the recipient deciding whether to answer now, and the sender waiting on a reply. */}
-        {trade.status === "open" ? <p className="text-sm text-text-muted">{formatExpiry(daysUntil(trade.expiresAt, new Date(now)))}</p> : null}
+            the recipient deciding whether to answer now, and the sender waiting on a reply.
+            Final review, HIGH 3: a past-due offer says "Expired August 18." — the state and the
+            day — rather than "Expires today." forever, which is what the old `Math.max(0, …)`
+            clamp produced for an offer that died three days ago. */}
+        {trade.status === "open" ? (
+          <p className="text-sm text-text-muted">{expired ? formatExpired(trade.expiresAt) : formatExpiry(daysUntil(trade.expiresAt, new Date(now)))}</p>
+        ) : null}
 
         <div className="flex flex-col gap-3 sm:flex-row">
           <AssetList heading={givingHeading} assets={givingSide.assets} playersById={playersById} />
@@ -195,8 +210,10 @@ export function TradeCard({
           <div className="flex flex-col gap-2">
             {/* Fix round 1, F6 (LOW), converged fully in fix round 2, F2: one completion name
                 for this event throughout — the composer's own confirmation now says "Trade
-                proposed." too, so this card and that screen agree on the word. */}
-            <p className="text-sm text-text-muted">Proposed. Waiting for a reply.</p>
+                proposed." too, so this card and that screen agree on the word. Final review,
+                HIGH 3: an offer that ran out is not still waiting for a reply, and saying so was
+                the second half of the same lie the expiry line told. */}
+            <p className="text-sm text-text-muted">{expired ? "Nobody answered before this ran out. Clear it whenever you like." : "Proposed. Waiting for a reply."}</p>
             <div>
               <Button variant="secondary" onClick={() => onWithdraw?.(trade.id)} disabled={busy}>
                 Withdraw

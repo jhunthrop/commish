@@ -339,13 +339,20 @@ const TRADE_PLAYERS: Readonly<Record<string, ValuedPlayer>> = {
   p2: { playerId: "p2", name: "Puka Nacua", position: "WR", averagePoints: 15.4 },
 };
 
+/** Three days out from whenever this suite runs — see `trade-inbox.test.tsx`'s own note. An open
+ *  offer's controls and copy now depend on whether its expiry has passed (final review, HIGH 3),
+ *  so a fixed past date would silently turn every "open" state below into the expired one. The
+ *  expired states this sweep DOES need are written explicitly, with a past `expiresAt`. */
+const LIVE_EXPIRY = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+const PAST_EXPIRY = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
 const TRADE_BASE: TradeProposalView = {
   id: "trade_1",
   leagueId: "league_1",
   weekNumber: 5,
   status: "open",
   proposedAt: "2026-08-18T00:00:00.000Z",
-  expiresAt: "2026-08-21T00:00:00.000Z",
+  expiresAt: LIVE_EXPIRY,
   settledAt: null,
   reversedAt: null,
   note: null,
@@ -366,6 +373,11 @@ describe("TradeCard says nothing that breaks the house copy rules, in every stat
       { label: "withdrawn, by me", trade: { ...TRADE_BASE, status: "withdrawn", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "them" },
       { label: "withdrawn, by them", trade: { ...TRADE_BASE, status: "withdrawn", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
       { label: "expired", trade: { ...TRADE_BASE, status: "expired" }, meTeamId: "me" },
+      // Final review, HIGH 3: the two states a DERIVED expiry actually produces. Nothing writes
+      // `status = 'expired'`, so a dead offer reaches the card still `open` — and both parties'
+      // copy for that state is new, which makes it exactly the copy this sweep exists to check.
+      { label: "open, past its expiry, seen by the counterparty", trade: { ...TRADE_BASE, expiresAt: PAST_EXPIRY }, meTeamId: "me" },
+      { label: "open, past its expiry, seen by the proposer", trade: { ...TRADE_BASE, expiresAt: PAST_EXPIRY }, meTeamId: "them" },
       { label: "superseded", trade: { ...TRADE_BASE, status: "superseded", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
       { label: "with a note", trade: { ...TRADE_BASE, note: "Rebuilding my TE spot" }, meTeamId: "me" },
     ];

@@ -43,3 +43,31 @@ export function transitionIsLegal(from: TradeStatus): boolean {
 export function nextStatusFor(transition: TradeTransition): TradeStatus {
   return TARGET_OF[transition];
 }
+
+/** The two fields expiry is a question about — satisfied by both the stored row
+ *  (`TradeProposal`, `@/league-service/trades`) and the wire view (`TradeProposalView`,
+ *  `./contract`), so server and browser ask the identical function. */
+export interface ExpirableProposal {
+  readonly status: TradeStatus;
+  readonly expiresAt: string;
+}
+
+/**
+ * Pure, and the WHOLE of expiry: a row whose `expiresAt` has passed reads as expired without a
+ * scheduler ever having touched it, and no `status = 'expired'` is ever written — there is no
+ * event moment to write one at, so expiry is DERIVED rather than stored (the same discipline every
+ * other derived state in this codebase keeps).
+ *
+ * Only meaningful for a row still `open`: a terminal row's `expiresAt` is a fact about an offer
+ * nobody can act on any more anyway, so this returns `false` rather than double-labeling a row
+ * that already says what happened to it.
+ *
+ * IT IS LOAD-BEARING, and lives here rather than in `@/league-service` for that reason (final
+ * review, HIGH 3). It had zero production consumers: the card's "Needs your answer" badge and its
+ * live Accept button both ignored expiry, so a member was shown a prominent offer whose Accept
+ * always 409'd. `@/trades` is the browser-safe half, so `TradeCard` asks THIS function against its
+ * own ticking clock and the two halves of the product cannot drift on what "expired" means.
+ */
+export function isExpired(row: ExpirableProposal, now: string): boolean {
+  return row.status === "open" && new Date(row.expiresAt).getTime() <= new Date(now).getTime();
+}

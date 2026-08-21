@@ -20,13 +20,23 @@ const CONTEXT: TradeRoomContext = {
 
 const EMPTY_PAGE: TradesPageBody = { leagueId: "l1", meTeamId: "me", inbox: [], outbox: [], history: [] };
 
+/**
+ * Three days out from whenever this suite runs — what a freshly proposed offer's own
+ * `TRADE_CONFIG.proposalTtlHours` window actually is. A FIXED past date would have been a time
+ * bomb since the final review's HIGH 3: an open offer's Accept control now depends on whether its
+ * expiry has passed, so a hard-coded date silently turns every case below into the expired card
+ * on the day it goes by. These cases are about the verdict and the accept flow, never about the
+ * expiry line, so "genuinely live" is the honest fixture.
+ */
+const LIVE_EXPIRY = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString();
+
 const INBOUND: TradeProposalView = {
   id: "t1",
   leagueId: "l1",
   weekNumber: 5,
   status: "open",
   proposedAt: "2026-08-18T00:00:00.000Z",
-  expiresAt: "2026-08-21T00:00:00.000Z",
+  expiresAt: LIVE_EXPIRY,
   settledAt: null,
   reversedAt: null,
   note: null,
