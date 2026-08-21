@@ -5,7 +5,7 @@ import { chromium, type FullConfig } from "@playwright/test";
 import { eq } from "drizzle-orm";
 import { createDb, type Db } from "../src/db/client";
 import { statWeeks, users } from "../src/db/schema";
-import { BOOTSTRAP_ACTOR, grantAdmin } from "../src/integrity-service/flags";
+import { BOOTSTRAP_ACTOR, grantAdmin } from "../src/integrity-service/grant-admin";
 import { LEAGUE_CONFIG } from "../src/league";
 import { createRedisConnection } from "../src/lib/realtime/redis";
 import { mintLabSession, SESSION_COOKIE_NAME } from "../scripts/lib/lab-session";

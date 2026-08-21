@@ -17,7 +17,7 @@ import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
 import { users } from "@/db/schema";
 import { renderNotice } from "@/integrity/notices";
-import { grantAdmin } from "@/integrity-service/flags";
+import { grantAdmin } from "@/integrity-service/grant-admin";
 
 interface Args {
   readonly user: string;

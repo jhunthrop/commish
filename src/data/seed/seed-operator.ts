@@ -1,6 +1,6 @@
 import type { Db } from "@/db/client";
 import type { Clock } from "@/domain/timing";
-import { BOOTSTRAP_ACTOR, grantAdmin, type GrantAdminResult } from "@/integrity-service/flags";
+import { BOOTSTRAP_ACTOR, grantAdmin, type GrantAdminResult } from "@/integrity-service/grant-admin";
 import { DEV_SEED } from "./config";
 
 /**

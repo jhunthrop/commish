@@ -1,9 +1,10 @@
-import { isNull } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
-import { draftActions, drafts, integrityFlags, leagues, sessionSignals, teams, users } from "@/db/schema";
+import { auditEvents, draftActions, drafts, integrityFlags, leagues, sessionSignals, teams, users } from "@/db/schema";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
+import { triggerMultiAccountSweep } from "@/league-service/join";
 import { createAuditLogger } from "./audit-logger";
 import { flagDetail, listPendingFlags } from "./flags";
 import { listLeagueActivity } from "./activity";
@@ -220,6 +221,50 @@ describe("sweepLeagueForMultiAccounts", () => {
 
     const [flag] = await openFlags(db);
     expect(flag!.evidence).toMatchObject({ device: expect.any(Number), behavioral: expect.any(Number), ip: 0, total: expect.any(Number) });
+  });
+
+  it("dedupes a real second sighting through raiseFlag's own confirmation path, sweeping twice and once via the join door", async () => {
+    // F3 (fix round 1, review MEDIUM): `canonicalPairId`'s sort algebra was proven in isolation,
+    // but nothing drove a SECOND sighting of the same pair through the REAL path. This does:
+    // `sweepLeagueForMultiAccounts` runs three times total against one league whose pair stays
+    // over threshold the whole time — twice directly, once through `triggerMultiAccountSweep`
+    // (the join door's own trigger, cheap to call here with a fabricated `JoinLeagueOutcome`
+    // rather than driving a real join end to end, which `join.test.ts`/`invites.test.ts` already
+    // do for the wiring itself).
+    const { userA, userB } = await twoAccountsOnOneDevice(db, { leagueId: "lg_dedupe" });
+
+    const first = await sweepLeagueForMultiAccounts(db, "lg_dedupe", baseDeps);
+    expect(first.flagsRaised).toBe(1);
+    const afterFirst = await openFlags(db);
+    expect(afterFirst).toHaveLength(1);
+    const flagId = afterFirst[0]!.id;
+
+    // Second sighting, direct. `raiseFlag`'s own docblock: "a second detector run finding the
+    // same pair is not news" — the open-subject unique index conflicts, `existingOpenFlagFor`
+    // reads the SAME row back, and NO second `flag_raised` event is appended (checked below).
+    const second = await sweepLeagueForMultiAccounts(db, "lg_dedupe", baseDeps);
+    expect(second.flagsRaised).toBe(1); // the sweep still counts a pair over threshold as "raised" —
+    // idempotent confirmation, not "found nothing" — see `sweepLeagueForMultiAccounts`'s own docblock.
+    const afterSecond = await openFlags(db);
+    expect(afterSecond).toHaveLength(1);
+    expect(afterSecond[0]!.id).toBe(flagId); // the SAME row, not a new one — the confirmation path, not a duplicate
+
+    // Third sighting, through the OTHER door: `triggerMultiAccountSweep` is the exact function
+    // `joinPublicLeague`/`acceptInvite` call after their own transaction commits (ruling 11) —
+    // exercised here directly rather than driving a full join, since it is a thin, already-tested
+    // wrapper around this same `sweepLeagueForMultiAccounts` call.
+    await triggerMultiAccountSweep(db, { ok: true, leagueId: "lg_dedupe", teamId: "irrelevant", alreadyMember: false }, baseDeps);
+    const afterThird = await openFlags(db);
+    expect(afterThird).toHaveLength(1);
+    expect(afterThird[0]!.id).toBe(flagId);
+    expect(afterThird[0]!.subjectId).toBe(canonicalPairId(userA, userB));
+
+    // The real, literal manifestation of "confirmation, not a duplicate" for THIS subject type:
+    // `account_pair` flags have no reporter table and no `confirmedAt` column (unlike
+    // `review_report`/`chat_report`, whose confirmation shows up as a second reporter row) — the
+    // audit trail is the record, and it moved exactly once, on the FIRST sighting only.
+    const raisedEvents = await db.select().from(auditEvents).where(and(eq(auditEvents.eventType, "flag_raised"), sql`${auditEvents.payload} ->> 'flagId' = ${flagId}`));
+    expect(raisedEvents).toHaveLength(1);
   });
 
   it("does not flag a pair below the threshold, and a config change alone flips that", async () => {

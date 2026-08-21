@@ -104,7 +104,7 @@ describe("ruling 15 — no in-product way to grant operator access (a drift trip
     // the pattern to dodge one known-safe match is exactly the kind of adjustment that quietly
     // widens what this tripwire would miss on a REAL second writer later.
     const writers = grepSourceTree(/\bisAdmin\s*:/, { dirs: ["src", "scripts"], exclude: /\.test\.tsx?$/ });
-    expect(writers).toEqual(["src/components/app-shell/app-header.tsx", "src/db/schema.ts", "src/integrity-service/flags.ts"]);
+    expect(writers).toEqual(["src/components/app-shell/app-header.tsx", "src/db/schema.ts", "src/integrity-service/grant-admin.ts"]);
 
     // The same claim, in the RAW COLUMN spelling (`is_admin`) rather than the TS property name —
     // this is what catches a hand-written `sql\`UPDATE users SET is_admin = …\`` that never types
@@ -117,8 +117,10 @@ describe("ruling 15 — no in-product way to grant operator access (a drift trip
     expect(columnWriters).toEqual([]);
 
     // …and the only callers of grantAdmin are the script, the seed's own bootstrap grant, and
-    // the function's own declaration.
+    // the function's own declaration (moved to its own module, fix round 1 — see that file's
+    // docblock: `raiseFlag`/`grantAdmin` colocation in `flags.ts` let a same-file call escape
+    // `flag-only.test.ts`'s import-closure proof entirely).
     const callers = grepSourceTree(/grantAdmin\(/, { dirs: ["src", "scripts"], exclude: /\.test\.tsx?$/ });
-    expect(callers).toEqual(["scripts/grant-admin.ts", "src/data/seed/seed-operator.ts", "src/integrity-service/flags.ts"]);
+    expect(callers).toEqual(["scripts/grant-admin.ts", "src/data/seed/seed-operator.ts", "src/integrity-service/grant-admin.ts"]);
   });
 });
