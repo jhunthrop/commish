@@ -7,7 +7,7 @@ import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { joinLeagueInTx } from "@/league-service/join";
 import { writeSchedule } from "@/league-service/schedule";
-import { rejectTrade } from "@/league-service/trades";
+import { proposeTrade, rejectTrade } from "@/league-service/trades";
 import type { StatLine } from "@/domain/player";
 import { correctSettledWeek } from "@/stats-pipeline/correction";
 import { finalizeWeek } from "@/stats-pipeline/finalize";
@@ -669,15 +669,67 @@ describe("grantAdmin's notice order", () => {
 });
 
 /**
- * Plan C's own first transaction in this proof (Task 3). `rejectTrade`'s notice insert reaches
- * for `leagues FOR KEY SHARE` before its anchor, exactly like every writer above — so this drives
- * a real join and a real trade rejection against the SAME league on two connections, with the
- * join parked exactly where the cycle used to sit, and asserts no deadlock plus the correct
- * chain: `trade_rejected` lands on the LEAGUE chain beside the join's own `member_joined`
- * (ruling 1: a trade is league content, even though its `ACTIVITY_VISIBILITY` is `"hidden"` —
- * the two are independent on purpose), never the platform chain a flag or an admin action would
- * use.
+ * Plan C's actual first transaction in this proof (Task 3, fix round 1: F2's review named this
+ * gap — `proposeTrade`'s own sequence had no lock-order proof of its own, only `rejectTrade`'s
+ * did). `proposeTrade`'s `trade_proposals` insert carries a foreign key to `leagues`, so it
+ * reaches for `leagues FOR KEY SHARE` before its anchor — the SAME row `joinLeagueInTx` holds
+ * `FOR UPDATE`. It ALSO takes `teams[proposerTeamId] FOR UPDATE` first (F2's own fix, the
+ * open-offer-cap race guard) — a DIFFERENT row than the one the join holds, so that lock costs
+ * nothing here and is not what this test is driving at.
+ *
+ * This drives a real join and a real trade proposal against the SAME league on two connections,
+ * with the join parked exactly where the cycle used to sit, and asserts no deadlock plus the
+ * correct chain: `trade_proposed` lands on the LEAGUE chain beside the join's own
+ * `member_joined` (ruling 1 — a trade is league content even though its `ACTIVITY_VISIBILITY`
+ * is `"hidden"`, and the two are independent on purpose).
  */
+describe("proposeTrade's insert order", () => {
+  it("lets a join and a trade proposal in the same league run concurrently without deadlocking", async () => {
+    await seedLeagueWith("lg_propose_lock", ["u_propose_commish", "u_propose_alice", "u_propose_bob", "u_propose_joiner"]);
+    await joinDb.insert(teams).values([
+      { id: "team_propose_alice", leagueId: "lg_propose_lock", userId: "u_propose_alice", name: "Alice's Team" },
+      { id: "team_propose_bob", leagueId: "lg_propose_lock", userId: "u_propose_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_propose_a", name: "Propose A", position: "RB", nflTeam: "KC" },
+      { id: "p_propose_b", name: "Propose B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_propose_alice", slot: "BENCH", slotIndex: 0, playerId: "p_propose_a" },
+      { teamId: "team_propose_bob", slot: "BENCH", slotIndex: 0, playerId: "p_propose_b" },
+    ]);
+
+    const join = parkedJoin("lg_propose_lock", "u_propose_joiner", "team_propose_joiner");
+    await join.leagueLocked;
+
+    // T_propose: the real proposeTrade, on its own connection, reaching for the SAME league row
+    // through its trade_proposals insert (the leagueId FK -> leagues FOR KEY SHARE) before it
+    // reaches the league anchor.
+    const proposing = proposeTrade(pickDb, {
+      leagueId: "lg_propose_lock",
+      userId: "u_propose_alice",
+      counterpartyTeamId: "team_propose_bob",
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_propose_a" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_propose_b" }],
+      note: null,
+      clock,
+      deliver: async () => {},
+    });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await proposing).toMatchObject({ ok: true });
+
+    // Both transactions really did land on the SAME league chain: the join's member_joined and
+    // the proposal's trade_proposed.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_propose_lock"));
+    expect(leagueAnchor!.headSequence).toBe(2);
+  });
+});
+
 describe("rejectTrade's notice order", () => {
   it("lets a join and a trade rejection in the same league run concurrently without deadlocking", async () => {
     await seedLeagueWith("lg_trade_lock", ["u_trade_commish", "u_trade_alice", "u_trade_bob", "u_trade_joiner"]);
@@ -707,7 +759,7 @@ describe("rejectTrade's notice order", () => {
 
     // T_reject: the real rejectTrade, on its own connection, reaching for the SAME league row
     // through its notice insert (leagues FOR KEY SHARE) before it reaches the league anchor.
-    const rejecting = rejectTrade(resolveDb, { tradeId: "trade_lock_1", userId: "u_trade_bob", clock, deliver: async () => {} });
+    const rejecting = rejectTrade(resolveDb, { tradeId: "trade_lock_1", leagueId: "lg_trade_lock", userId: "u_trade_bob", clock, deliver: async () => {} });
 
     expect(await waitForBlockedBackend()).toBe(true);
     join.release();

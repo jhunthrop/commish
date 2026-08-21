@@ -388,9 +388,9 @@ async function auditEventsOn(db: Db, scope: string, eventType: AuditEventType): 
 /** Ten DISTINCT open offers from `team_a`, filling `TRADE_CONFIG.maxOpenProposalsPerTeam`. Asset
  *  ids are filler, resolved against no real roster — the open-offer cap counts rows, not
  *  legality, and this only ever seeds the cap, never proposes through the real service. */
-async function tenOpenOffers(db: Db, opts: { readonly from: "team_a" }): Promise<void> {
+async function tenOpenOffers(db: Db, opts: { readonly from: "team_a" }, count: number = TRADE_CONFIG.maxOpenProposalsPerTeam): Promise<void> {
   const counterpartyTeamId = opts.from === "team_a" ? "team_b" : "team_a";
-  for (let i = 0; i < TRADE_CONFIG.maxOpenProposalsPerTeam; i += 1) {
+  for (let i = 0; i < count; i += 1) {
     const proposerAssets = [playerAsset(`p_filler_from_${i}`)];
     const counterpartyAssets = [playerAsset(`p_filler_to_${i}`)];
     await db.insert(tradeProposals).values({
@@ -514,6 +514,32 @@ describe("proposeTrade", () => {
     });
   });
 
+  it("serializes two concurrent proposes racing for the SAME last cap slot, under real contention (F2)", async () => {
+    // Nine existing open offers — one short of the cap. Two DIFFERENT, otherwise legal swaps
+    // race for the tenth (and only remaining) slot. A count taken without a preceding lock would
+    // let both see "9 open" and both insert, landing 11; the `teams FOR UPDATE` fix serializes
+    // them so exactly one lands and the loser gets the cap's own product copy, never a raw
+    // constraint error.
+    await tenOpenOffers(db, { from: "team_a" }, TRADE_CONFIG.maxOpenProposalsPerTeam - 1);
+    const [a, b] = await Promise.all([
+      proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_rb_a"], receive: ["p_rb_b"] })),
+      proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_qb2"], receive: ["p_qb_b"] })),
+    ]);
+    const results = [a, b];
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    const loser = results.find((r) => !r.ok);
+    expect(loser).toMatchObject({
+      ok: false,
+      status: 409,
+      reason: `You have ${TRADE_CONFIG.maxOpenProposalsPerTeam} offers out already. Withdraw one before you send another.`,
+    });
+    const openRows = await db
+      .select({ id: tradeProposals.id })
+      .from(tradeProposals)
+      .where(and(eq(tradeProposals.proposerTeamId, "team_a"), eq(tradeProposals.status, "open")));
+    expect(openRows).toHaveLength(TRADE_CONFIG.maxOpenProposalsPerTeam);
+  });
+
   it("refuses an offer that would leave the receiving roster illegal, before anybody has to answer it", async () => {
     // Two quarterbacks into a one-QB league with a full bench has no legal home, and finding
     // that out at ACCEPT time would mean a manager agreeing to something the product then
@@ -567,6 +593,22 @@ describe("proposeTrade", () => {
     expect(await proposeTrade(db, input)).toEqual({ ok: false, status: 409, reason: "You already have this exact trade open." });
   });
 
+  it("serializes two concurrent IDENTICAL proposals under real contention, never a raw constraint error (F3)", async () => {
+    // Two DIFFERENT row ids (each `proposeInput` call mints its own), the SAME package — so the
+    // SAME fingerprint. Driven through `Promise.all` on the pooled `db`, the idiom
+    // `join.test.ts`'s own concurrent-join race uses, so this is a real two-connection race, not
+    // a sequential await pretending to be one.
+    const [a, b] = await Promise.all([
+      proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_rb_a"], receive: ["p_rb_b"] })),
+      proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_rb_a"], receive: ["p_rb_b"] })),
+    ]);
+    const results = [a, b];
+    expect(results.filter((r) => r.ok)).toHaveLength(1);
+    const loser = results.find((r) => !r.ok);
+    expect(loser).toEqual({ ok: false, status: 409, reason: "You already have this exact trade open." });
+    expect(await db.select().from(tradeProposals).where(eq(tradeProposals.proposerTeamId, "team_a"))).toHaveLength(1);
+  });
+
   it("propagates a write failure that isn't the fingerprint conflict, rather than swallowing it", async () => {
     const clashingId = () => "trade_pk_clash";
     await proposeTrade(db, { ...(await proposeInput(db, { as: "u_alice", give: ["p_rb_a"], receive: ["p_rb_b"] })), newId: clashingId });
@@ -617,12 +659,12 @@ describe("rejectTrade and withdrawTrade", () => {
 
   it("lets only the counterparty reject, and only the proposer withdraw", async () => {
     const trade = await openTrade(db, { proposer: "u_alice", counterparty: "u_bob" });
-    expect(await rejectTrade(db, { tradeId: trade.id, userId: "u_alice", deliver: deliverNoticeFake })).toEqual({
+    expect(await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_alice", deliver: deliverNoticeFake })).toEqual({
       ok: false,
       status: 404,
       reason: "We couldn't find that offer.",
     });
-    expect(await withdrawTrade(db, { tradeId: trade.id, userId: "u_bob", deliver: deliverNoticeFake })).toEqual({
+    expect(await withdrawTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake })).toEqual({
       ok: false,
       status: 404,
       reason: "We couldn't find that offer.",
@@ -632,27 +674,46 @@ describe("rejectTrade and withdrawTrade", () => {
   it("answers 404 rather than 403 to the wrong manager, so an id tells a prober nothing", async () => {
     // The codebase's non-oracle discipline, third time: publicJoinPrecondition, withAdmin, here.
     const trade = await openTrade(db, { proposer: "u_alice", counterparty: "u_bob" });
-    const result = await rejectTrade(db, { tradeId: trade.id, userId: "u_carol", deliver: deliverNoticeFake });
+    const result = await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_carol", deliver: deliverNoticeFake });
     expect(result.status).toBe(404);
   });
 
   it("refuses a caller with no team at all in this league, the same 404 as the wrong manager", async () => {
     const trade = await openTrade(db);
-    const result = await withdrawTrade(db, { tradeId: trade.id, userId: "u_carol", deliver: deliverNoticeFake });
+    const result = await withdrawTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_carol", deliver: deliverNoticeFake });
     expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
   });
 
   it("refuses a trade id that names nothing at all", async () => {
-    const result = await rejectTrade(db, { tradeId: "trade_ghost", userId: "u_bob", deliver: deliverNoticeFake });
+    const result = await rejectTrade(db, { tradeId: "trade_ghost", leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake });
     expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+  });
+
+  it("refuses a real trade id borrowed from another league, no differently than a bogus one (F1)", async () => {
+    // The URL says which league this is. A tradeId that is real, but belongs to a DIFFERENT
+    // league than the URL's own, must read exactly like a ghost id — never acted on just
+    // because the caller happens to ALSO field a team in that other league.
+    const trade = await openTrade(db);
+    await db.insert(users).values({ id: "u_dave", email: "u_dave@test.local", displayName: "Dave" });
+    await db.insert(leagues).values({ id: "lg_2", name: "Other League", format: "snake", teamCount: 2, commissionerUserId: "u_dave" });
+    await db.insert(teams).values({ id: "team_other", leagueId: "lg_2", userId: "u_dave", name: "Other Team" });
+
+    const wrongLeague = await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_2", userId: "u_dave", deliver: deliverNoticeFake });
+    const ghost = await rejectTrade(db, { tradeId: "trade_totally_ghost", leagueId: "lg_2", userId: "u_dave", deliver: deliverNoticeFake });
+    expect(wrongLeague).toEqual(ghost);
+    expect(wrongLeague).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+
+    // And the RIGHT league still acts on the very same offer.
+    const rightLeague = await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake });
+    expect(rightLeague).toMatchObject({ ok: true });
   });
 
   it("serializes a reject and a withdraw arriving at the same instant, and exactly one lands", async () => {
     // The guard is in the UPDATE's own WHERE. A prior read would let both through.
     const trade = await openTrade(db);
     const [a, b] = await Promise.all([
-      rejectTrade(db, { tradeId: trade.id, userId: "u_bob", deliver: deliverNoticeFake }),
-      withdrawTrade(db, { tradeId: trade.id, userId: "u_alice", deliver: deliverNoticeFake }),
+      rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake }),
+      withdrawTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_alice", deliver: deliverNoticeFake }),
     ]);
     expect([a.ok, b.ok].filter(Boolean)).toHaveLength(1);
     // ONE event type covers both outcomes (`payload.outcome` tells them apart), so whichever of
@@ -665,6 +726,7 @@ describe("rejectTrade and withdrawTrade", () => {
     const trade = await openTrade(db, { proposedAt: "2026-08-01T00:00:00.000Z" });
     const result = await rejectTrade(db, {
       tradeId: trade.id,
+      leagueId: "lg_1",
       userId: "u_bob",
       clock: fixedClock("2026-08-21T00:00:00.000Z"),
       deliver: deliverNoticeFake,
@@ -674,7 +736,7 @@ describe("rejectTrade and withdrawTrade", () => {
 
   it("lets the counterparty reject an open offer, notices the proposer and settles the status", async () => {
     const trade = await openTrade(db);
-    const result = await rejectTrade(db, { tradeId: trade.id, userId: "u_bob", deliver: deliverNoticeFake });
+    const result = await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake });
     expect(result).toEqual({ ok: true, tradeId: trade.id, status: "rejected" });
     const [notice] = await noticesFor(db, "u_alice");
     expect(notice!.noticeType).toBe("trade_rejected");
@@ -685,7 +747,7 @@ describe("rejectTrade and withdrawTrade", () => {
 
   it("lets the proposer withdraw an open offer, notices the counterparty and settles the status", async () => {
     const trade = await openTrade(db);
-    const result = await withdrawTrade(db, { tradeId: trade.id, userId: "u_alice", deliver: deliverNoticeFake });
+    const result = await withdrawTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_alice", deliver: deliverNoticeFake });
     expect(result).toEqual({ ok: true, tradeId: trade.id, status: "withdrawn" });
     const [notice] = await noticesFor(db, "u_bob");
     expect(notice!.noticeType).toBe("trade_withdrawn");
@@ -698,16 +760,16 @@ describe("rejectTrade and withdrawTrade", () => {
 
   it("refuses a decision on an offer the RIGHT party already settled, distinctly from a stranger's 404", async () => {
     const trade = await openTrade(db);
-    expect(await rejectTrade(db, { tradeId: trade.id, userId: "u_bob", deliver: deliverNoticeFake })).toMatchObject({ ok: true });
-    const second = await rejectTrade(db, { tradeId: trade.id, userId: "u_bob", deliver: deliverNoticeFake });
+    expect(await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake })).toMatchObject({ ok: true });
+    const second = await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake });
     expect(second).toEqual({ ok: false, status: 409, reason: "Someone already answered that offer." });
   });
 
   it("rolls back the whole settlement when the audit append fails", async () => {
     const trade = await openTrade(db);
-    await expect(rejectTrade(db, { tradeId: trade.id, userId: "u_bob", audit: failingAudit, deliver: deliverNoticeFake })).rejects.toThrow(
-      "audit append failed",
-    );
+    await expect(
+      rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", audit: failingAudit, deliver: deliverNoticeFake }),
+    ).rejects.toThrow("audit append failed");
     const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, trade.id));
     expect(row!.status).toBe("open");
     expect(await noticesFor(db, "u_alice")).toEqual([]);
@@ -720,14 +782,14 @@ describe("rejectTrade and withdrawTrade", () => {
       return notifyAffectedMember(tx, notifyInput);
     };
     const trade = await openTrade(db);
-    const result = await withdrawTrade(db, { tradeId: trade.id, userId: "u_alice", notify: spyNotify, deliver: deliverNoticeFake });
+    const result = await withdrawTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_alice", notify: spyNotify, deliver: deliverNoticeFake });
     expect(result).toMatchObject({ ok: true });
     expect(called).toBe(true);
   });
 
   it("works end to end with every dependency defaulted to the real implementation", async () => {
     const trade = await openTrade(db);
-    const result = await rejectTrade(db, { tradeId: trade.id, userId: "u_bob" });
+    const result = await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob" });
     expect(result).toMatchObject({ ok: true });
   });
 });
@@ -747,6 +809,7 @@ describe("refusalFor's impossible-state guard", () => {
 
     const result = await refusalFor(stub, {
       tradeId: "trade_ghost",
+      leagueId: "lg_1",
       userId: "u_alice",
       transition: "reject",
       actorTeamId: "team_a",
@@ -767,7 +830,7 @@ describe("listTrades", () => {
     const second = await proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_qb2"], receive: ["p_qb_b"] }));
     expect(second).toMatchObject({ ok: true });
     if (!second.ok) return;
-    await rejectTrade(db, { tradeId: second.tradeId, userId: "u_bob", deliver: deliverNoticeFake });
+    await rejectTrade(db, { tradeId: second.tradeId, leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake });
 
     const aliceView = await listTrades(db, { leagueId: "lg_1", teamId: "team_a" });
     expect(aliceView.leagueId).toBe("lg_1");

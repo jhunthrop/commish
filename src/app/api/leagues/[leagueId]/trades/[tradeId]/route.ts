@@ -26,6 +26,11 @@ interface RouteContext {
  * -> `parseJson` -> the matching service call -> `fail`/`ok`, the same fixed order every route in
  * this codebase uses. `userId` is `actor.userId`, from the session — `rejectTrade`/`withdrawTrade`
  * both re-derive the caller's own team from it rather than trusting a body to name one.
+ *
+ * `leagueId` is `actor.leagueId`, from the URL — never trusted as authorization on its own, but
+ * REQUIRED so a `tradeId` borrowed from another league 404s rather than being found and acted on
+ * because the caller happens to also field a team in that other league (`SettleTradeInput`'s own
+ * docblock, `@/league-service/trades`).
  */
 export async function POST(request: Request, context: RouteContext) {
   return withLeagueMemberActor(request, context, async (actor, req) => {
@@ -42,7 +47,7 @@ export async function POST(request: Request, context: RouteContext) {
     }
 
     const settle = parsed.value.action === "reject" ? rejectTrade : withdrawTrade;
-    const result = await settle(getDb(), { tradeId, userId: actor.userId });
+    const result = await settle(getDb(), { tradeId, leagueId: actor.leagueId, userId: actor.userId });
     if (!result.ok) return fail(result.reason, result.status);
     return ok<{ readonly tradeId: string; readonly status: typeof result.status }>({ tradeId: result.tradeId, status: result.status });
   });

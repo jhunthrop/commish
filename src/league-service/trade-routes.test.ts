@@ -264,4 +264,24 @@ describe("POST /api/leagues/[leagueId]/trades/[tradeId]", () => {
     expect(response.status).toBe(404);
     expect((await response.json()).error).toBe("We couldn't find that offer.");
   });
+
+  it("404s a real tradeId acted on through the WRONG league's URL, indistinguishably from a bogus one (F1)", async () => {
+    await seedRouteLeague();
+    const trade = await openTrade();
+    // A second league, with a member who is NOT a party to the first league's trade at all.
+    await db.insert(users).values({ id: "u_dave", email: "u_dave@test.local", displayName: "Dave" });
+    await db.insert(leagues).values({ id: "lg_2", name: "Other League", format: "snake", teamCount: 2, commissionerUserId: "u_dave" });
+    await db.insert(teams).values({ id: "team_other", leagueId: "lg_2", userId: "u_dave", name: "Other Team" });
+    signedInAs("u_dave");
+
+    const wrongLeague = await postDecision("lg_2", trade.id, { action: "reject" });
+    const ghost = await postDecision("lg_2", "trade_totally_ghost", { action: "reject" });
+    expect(wrongLeague.status).toBe(404);
+    expect(await wrongLeague.json()).toEqual(await ghost.json());
+
+    // The RIGHT league's URL still acts on the very same offer.
+    signedInAs("u_bob");
+    const rightLeague = await postDecision("lg_1", trade.id, { action: "reject" });
+    expect(rightLeague.status).toBe(200);
+  });
 });

@@ -327,6 +327,21 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
   let outcome: { readonly ok: true; readonly tradeId: string; readonly notice: MemberNotice } | { readonly ok: false; readonly status: number; readonly reason: string };
   try {
     outcome = await db.transaction(async (tx) => {
+      // THE FIRST LOCK, ahead of the count. `SELECT ... FOR UPDATE` on the proposer's own team
+      // row serializes every concurrent `proposeTrade` from this team: without it, two proposals
+      // arriving at once both read the SAME "N-1 open offers" snapshot and both insert, because a
+      // row lock on the rows a count reads cannot fence a PHANTOM insert nobody has written yet.
+      // Locking the team row first means the second caller's count only ever runs after the
+      // first's insert has committed (or rolled back) and released it.
+      //
+      // LOCK ORDER (ruling 3): a business row, taken first, ahead of the notice's `FOR KEY SHARE`
+      // on `leagues`/`users` and ahead of the anchor — the global order, unchanged. The insert
+      // below takes the identical `FOR KEY SHARE` on this SAME row through its own foreign key;
+      // re-taking a weaker lock on a row this transaction already holds `FOR UPDATE` on is not a
+      // second lock. `src/integrity-service/lock-order.test.ts`'s `proposeTrade's insert order`
+      // drives this against a real park on `leagues[X] FOR UPDATE` and proves no deadlock.
+      await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, proposerTeamId)).for("update");
+
       const openOffers = await tx
         .select({ id: tradeProposals.id })
         .from(tradeProposals)
@@ -409,9 +424,17 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
   return { ok: true, tradeId: outcome.tradeId, verdict };
 }
 
-/** `rejectTrade`/`withdrawTrade` share every field. */
+/**
+ * `rejectTrade`/`withdrawTrade` share every field. `leagueId` is the URL's own league — never
+ * trusted as an authorization boundary on its own (`settleProposal` still re-derives the actor's
+ * team from the row, the same as ever), but REQUIRED so a `tradeId` borrowed from another league
+ * 404s here rather than being found and acted on because the caller happens to also field a team
+ * in that other league. The same URL-scoping idiom `reportMessage`
+ * (`@/chat-service/moderation`) fuses into its own lookup's `WHERE`.
+ */
 export interface SettleTradeInput {
   readonly tradeId: string;
+  readonly leagueId: string;
   readonly userId: string;
   readonly clock?: Clock;
   readonly audit?: AuditLogger;
@@ -519,10 +542,17 @@ async function settleProposal(db: Db, input: SettleProposalInput): Promise<Settl
   const now = clock.now();
 
   const outcome = await db.transaction(async (tx) => {
-    const [existing] = await tx.select({ leagueId: tradeProposals.leagueId }).from(tradeProposals).where(eq(tradeProposals.id, input.tradeId));
+    // URL-SCOPED, fused into one `WHERE` — the same shape `reportMessage` uses for its own
+    // `(id, leagueId)` lookup. A `tradeId` that is real but belongs to a DIFFERENT league than
+    // the URL's own reads as "not found" here, before anything downstream ever asks who the
+    // caller is, so a borrowed id from another league can never be told apart from a bogus one.
+    const [existing] = await tx
+      .select({ id: tradeProposals.id })
+      .from(tradeProposals)
+      .where(and(eq(tradeProposals.id, input.tradeId), eq(tradeProposals.leagueId, input.leagueId)));
     if (existing === undefined) return { ok: false as const, status: 404, reason: "We couldn't find that offer." };
 
-    const [team] = await tx.select({ id: teams.id }).from(teams).where(and(eq(teams.leagueId, existing.leagueId), eq(teams.userId, input.userId)));
+    const [team] = await tx.select({ id: teams.id }).from(teams).where(and(eq(teams.leagueId, input.leagueId), eq(teams.userId, input.userId)));
     // No team in this league at all: never a real match for either role column, so this
     // sentinel guarantees the guarded UPDATE below matches nothing and `refusalFor` answers 404.
     const actorTeamId = team?.id ?? "";
