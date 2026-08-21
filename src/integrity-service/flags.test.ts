@@ -10,7 +10,7 @@ import type { FlagType } from "@/integrity/flags";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { createAuditLogger, type AuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
-import { flagDetail, listPendingFlags, pendingFlagQuery, raiseFlag, resolveFlag } from "./flags";
+import { flagDetail, listPendingFlags, pendingFlagQuery, raiseFlag, removeSubject, resolveFlag } from "./flags";
 
 const db = createTestDb();
 const NOW = "2026-08-20T18:00:00.000Z";
@@ -485,6 +485,30 @@ describe("resolveFlag", () => {
     const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
     expect(row!.resolvedAt).toBeNull();
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  /**
+   * `removeSubject`'s own backstop, driven directly because `resolveFlag` can no longer reach it:
+   * the pre-transaction `contentRemovalIsWiredFor` check refuses an unwired subject type before
+   * this function is called at all. A guard nothing exercises is a guard nobody knows still
+   * works, and this one is what would catch a future subject type added to
+   * `CONTENT_REMOVAL_WIRED_FOR` before its remover is wired here.
+   */
+  it("removeSubject itself still throws for a subject type with no remover, as the backstop", async () => {
+    await expect(
+      db.transaction((tx) =>
+        removeSubject(tx, "account_pair", {
+          subjectId: "u_a_u_b",
+          flagId: "flag_backstop",
+          operatorUserId: "u_op",
+          reason: "spam",
+          clock: { now: () => NOW },
+          audit: logger,
+          notify: notifyAffectedMember,
+          publish: async () => null,
+        }),
+      ),
+    ).rejects.toThrow('resolveFlag: content_removed has no remover wired for subject type "account_pair".');
   });
 
   /** The unresolvable-flag half of MEDIUM 8, at the service level: `resolveFlag`'s refusal is the

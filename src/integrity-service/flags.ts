@@ -287,7 +287,15 @@ class ContentRemovalRefused extends Error {
  * no `flag_resolved` event to explain it would be exactly the hole in the record this whole plan
  * exists to close.
  */
-async function removeSubject(
+/**
+ * EXPORTED for one narrow test and nothing else (final review, LOW 13). Its trailing throw is
+ * unreachable through `resolveFlag`, which refuses an unwired subject type before its transaction
+ * opens — and a guard nothing exercises is a guard nobody knows still works. `flags.test.ts`
+ * calls it directly with `account_pair` to put the code in the state it defends against, the same
+ * narrow-test discipline `vitest.config.mts`'s own docblock sanctions for every other
+ * unreachable-through-Postgres branch in this directory. No production caller outside this file.
+ */
+export async function removeSubject(
   tx: DbTx,
   subjectType: FlagSubjectType,
   opts: {

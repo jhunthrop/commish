@@ -47,6 +47,16 @@ describe("the chat room and the admin room write in the house voice", () => {
     expect(files.length).toBeGreaterThanOrEqual(10);
     expect(files.some((file) => file.startsWith("src/chat-room"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/admin-room"))).toBe(true);
+    // Its own tests, and the module holding this scan's helpers, are the things DOING the
+    // checking rather than things being checked — the same exclusion `flag-only.test.ts`'s own
+    // walker makes, asserted here so widening the filter cannot silently pull them in.
+    expect(files.some((file) => file.includes(".test."))).toBe(false);
+  });
+
+  /** A directory that does not exist answers empty rather than throwing — the scan names its
+   *  directories by hand, and a rename should not take the whole suite down with an ENOENT. */
+  it("answers empty for a directory that is not there", () => {
+    expect(sourceFilesIn(["src/no-such-room"], ".tsx")).toEqual([]);
   });
 
   it.each(files)("%s says nothing that breaks the copy rules", (file) => {

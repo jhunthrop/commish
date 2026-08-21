@@ -55,9 +55,14 @@ export function renderableSource(source: string): string {
     .replace(/className=(?:"[^"]*"|'[^']*'|\{`[^`]*`\})/g, "");
 }
 
-/** Every single-line quoted, single-quoted or interpolation-free templated literal in `code`. */
+/**
+ * Every single-line quoted, single-quoted or interpolation-free templated literal in `code`.
+ *
+ * Exactly one of the three alternation groups participates in any match — including for an empty
+ * literal, where the group is `""` rather than `undefined` — so the chain always resolves.
+ */
 function literalsIn(code: string): readonly string[] {
-  return [...code.matchAll(/"([^"\\\n]*)"|'([^'\\\n]*)'|`([^`$\\\n]*)`/g)].map((match) => match[1] ?? match[2] ?? match[3] ?? "");
+  return [...code.matchAll(/"([^"\\\n]*)"|'([^'\\\n]*)'|`([^`$\\\n]*)`/g)].map((match) => (match[1] ?? match[2] ?? match[3])!);
 }
 
 /** Drops whitespace-only and symbol-only fragments — nothing the copy rules could speak to. */
