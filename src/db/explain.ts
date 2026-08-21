@@ -11,6 +11,10 @@ export interface PlanNode {
   readonly Filter?: string;
   /** Present only when a `Filter` clause discarded rows an index/scan condition did not exclude. */
   readonly "Rows Removed by Filter"?: number;
+  /** The planner's own cost estimate for this node, in its usual arbitrary units — not
+   *  wall-clock time. `planCost` reads the root node's, which is the estimate for the plan
+   *  as a whole. */
+  readonly "Total Cost": number;
   readonly Plans?: readonly PlanNode[];
 }
 
@@ -89,4 +93,19 @@ export function indexScanNode(plan: PlanNode, indexName: string): PlanNode | und
  */
 export function nodeTypes(plan: PlanNode): readonly string[] {
   return [plan["Node Type"], ...(plan.Plans ?? []).flatMap(nodeTypes)];
+}
+
+/**
+ * The planner's own total-cost estimate for the plan as a whole (the root node's `Total Cost`),
+ * in arbitrary cost units — never wall-clock time. Used only as a RELATIVE measure: recreating
+ * an index without the partial predicate that made it selective does not always change which
+ * `Node Type` the planner picks (a small enough per-key row count can still make an index scan
+ * plus a `Filter` cheaper than a sequential scan), so `sequentiallyScannedRelations` alone can
+ * miss the regression. The cost estimate cannot: scanning the rows the dropped predicate used to
+ * exclude, and then filtering them out one by one, is strictly more expensive than never reading
+ * them, so a mutation-proof test compares this number against a baseline taken before the index
+ * was recreated rather than asserting a specific `Node Type`.
+ */
+export function planCost(plan: PlanNode): number {
+  return plan["Total Cost"];
 }

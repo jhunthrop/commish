@@ -1,13 +1,14 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
 import { draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
-import { explainPlan, indexScanNode, nodeTypes, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
+import { explainPlan, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
 import { chatPageQuery } from "@/chat-service/chat";
 import { pendingFlagQuery } from "@/integrity-service/flags";
 import { signalsForUsersQuery } from "@/integrity-service/session-signals";
 import { browseQuery } from "@/league-service/browse";
+import { tradesQuery } from "@/league-service/trades";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { AUDIT_EVENT_TYPES } from "@/domain/audit";
 
@@ -345,6 +346,145 @@ describe("hot read paths use indexes", () => {
       db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(inArray(rosterSlots.playerId, ["p-1", "p-2", "p-3"])),
     );
     expect(planUsesSeqScanOn(plan, "roster_slots")).toBe(false);
+  });
+});
+
+/**
+ * `trade_proposals`' own corpus — the carried item from Plan B's final review made mechanical
+ * (ruling 24). Plan B's own gate tests were found to have measured queries production never
+ * makes, over a corpus where every league held 2% of the table; this corpus is shaped the way a
+ * real league actually produces rows instead — twelve teams, a season's worth of settled
+ * history, and open proposals held UNDER the per-team cap (`TRADE_CONFIG.maxOpenProposalsPerTeam`
+ * is 10) for every team, not a handful of leagues carrying the whole table between them.
+ *
+ * A separate corpus and a separate `beforeAll` from `seedCorpus` above, on purpose: reusing the
+ * 5,000-league/3-teams-per-league shape above would either give every league too few teams to
+ * hold a realistic trade history, or force every OTHER plan assertion in this file to carry
+ * `trade_proposals` rows it has no use for. `truncateAll` in this block's own `beforeAll` clears
+ * the corpus above before this one is written, and nothing after this block depends on either.
+ */
+describe("trade proposals: inbox and outbox serve from their own partial indexes, over a realistic corpus", () => {
+  const TRADE_LEAGUE_COUNT = 200;
+  const TRADE_TEAMS_PER_LEAGUE = 12;
+  /** Settled (TERMINAL) offers behind every team — the ratio that makes the partial index
+   *  worth having: most of a team's history is not something the inbox/outbox ever reads again. */
+  const SETTLED_PROPOSALS_PER_TEAM = 8;
+  /** Held under the cap, not at it — `TRADE_CONFIG.maxOpenProposalsPerTeam` is 10, and a corpus
+   *  where every team sits at the ceiling would not be the shape a real league is usually in. */
+  const OPEN_PROPOSALS_PER_TEAM = 3;
+  const CORPUS_LEAGUE = "tlg1";
+  /** League 1's team 1. Every league's team `t` proposes to team `1 + (t % TEAMS_PER_LEAGUE)`,
+   *  so team 1 is the one team in every league that receives from the LAST team rather than the
+   *  one before it — team 1's inbox is exactly this league's `ttm1_12` offers, nothing more. */
+  const CORPUS_TEAM = "ttm1_1";
+
+  async function seedTradeCorpus(): Promise<void> {
+    await db.execute(sql`
+      INSERT INTO users (id, email, display_name)
+      SELECT 'tu' || g, 'tu' || g || '@example.test', 'Trade Manager ' || g
+      FROM generate_series(1, ${TRADE_LEAGUE_COUNT * TRADE_TEAMS_PER_LEAGUE}) g
+    `);
+    await db.execute(sql`
+      INSERT INTO leagues (id, name, format, team_count, commissioner_user_id)
+      SELECT 'tlg' || g, 'Trade League ' || g, 'snake'::draft_format, ${TRADE_TEAMS_PER_LEAGUE},
+             'tu' || (((g - 1) * ${TRADE_TEAMS_PER_LEAGUE}) + 1)
+      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g
+    `);
+    await db.execute(sql`
+      INSERT INTO teams (id, league_id, user_id, name)
+      SELECT 'ttm' || g || '_' || t, 'tlg' || g, 'tu' || (((g - 1) * ${TRADE_TEAMS_PER_LEAGUE}) + t), 'Team ' || t
+      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g, generate_series(1, ${TRADE_TEAMS_PER_LEAGUE}) t
+    `);
+    await db.execute(sql`
+      INSERT INTO trade_proposals
+        (id, league_id, proposer_team_id, counterparty_team_id, week_number,
+         proposer_assets, counterparty_assets, fingerprint, status, proposed_at, expires_at, settled_at)
+      SELECT
+        'tpr_s_' || g || '_' || t || '_' || n,
+        'tlg' || g,
+        'ttm' || g || '_' || t,
+        'ttm' || g || '_' || (1 + (t % ${TRADE_TEAMS_PER_LEAGUE})),
+        1,
+        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-' || g || '-' || t || '-' || n || '-a')),
+        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-' || g || '-' || t || '-' || n || '-b')),
+        md5('settled-' || g || '-' || t || '-' || n),
+        'rejected',
+        now() - (n || ' days')::interval,
+        now() + interval '3 days',
+        now() - (n || ' days')::interval + interval '1 hour'
+      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g, generate_series(1, ${TRADE_TEAMS_PER_LEAGUE}) t,
+           generate_series(1, ${SETTLED_PROPOSALS_PER_TEAM}) n
+    `);
+    await db.execute(sql`
+      INSERT INTO trade_proposals
+        (id, league_id, proposer_team_id, counterparty_team_id, week_number,
+         proposer_assets, counterparty_assets, fingerprint, status, proposed_at, expires_at)
+      SELECT
+        'tpr_o_' || g || '_' || t || '_' || n,
+        'tlg' || g,
+        'ttm' || g || '_' || t,
+        'ttm' || g || '_' || (1 + (t % ${TRADE_TEAMS_PER_LEAGUE})),
+        1,
+        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-open-' || g || '-' || t || '-' || n || '-a')),
+        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-open-' || g || '-' || t || '-' || n || '-b')),
+        md5('open-' || g || '-' || t || '-' || n),
+        'open',
+        now() - (n || ' hours')::interval,
+        now() + interval '3 days'
+      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g, generate_series(1, ${TRADE_TEAMS_PER_LEAGUE}) t,
+           generate_series(1, ${OPEN_PROPOSALS_PER_TEAM}) n
+    `);
+    await db.execute(sql`ANALYZE users, leagues, teams`);
+    await db.execute(sql`VACUUM ANALYZE trade_proposals`);
+  }
+
+  /** Set by the first test, read by the mutation-proof test — the same "measure once, compare
+   *  later" shape the corpus's own docblock argues for: a regression is a claim about a DELTA,
+   *  not an absolute number pulled out of the air. */
+  let baselineInboxCost = 0;
+
+  beforeAll(async () => {
+    await truncateAll(db);
+    await seedTradeCorpus();
+  }, 120_000);
+
+  // The mutation-proof test below DROPs and recreates `trade_proposals_inbox_idx` without its
+  // partial predicate — a real DDL change against the shared, long-lived test database, not
+  // something `truncateAll` undoes. Left unrestored, every run after the first would measure
+  // the BROKEN index as its own baseline and this whole block would pass for the wrong reason.
+  afterAll(async () => {
+    await db.execute(sql`DROP INDEX IF EXISTS trade_proposals_inbox_idx`);
+    await db.execute(sql`CREATE INDEX trade_proposals_inbox_idx ON trade_proposals (counterparty_team_id, proposed_at) WHERE status = 'open'`);
+  });
+
+  it("serves the inbox from the partial index, over a corpus with real per-league density", async () => {
+    const plan = await explainPlan(db, tradesQuery(db, { leagueId: CORPUS_LEAGUE, teamId: CORPUS_TEAM, box: "inbox" }));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("trade_proposals");
+    expect(indexScanNode(plan, "trade_proposals_inbox_idx")).toBeDefined();
+    baselineInboxCost = planCost(plan);
+  });
+
+  it("serves the outbox from its own partial index — same shape, other side", async () => {
+    const plan = await explainPlan(db, tradesQuery(db, { leagueId: CORPUS_LEAGUE, teamId: CORPUS_TEAM, box: "outbox" }));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("trade_proposals");
+    expect(indexScanNode(plan, "trade_proposals_outbox_idx")).toBeDefined();
+  });
+
+  /**
+   * The mutation proof. A migration that recreated `trade_proposals_inbox_idx` without
+   * `WHERE status = 'open'` would still BE an index, and at this corpus's per-team row counts
+   * the planner can still choose it — so the assertion above only means something because this
+   * one goes red when the predicate goes: the recreated index can no longer exclude a team's
+   * settled history on its own, so the plan pays to read and then filter out rows the partial
+   * predicate used to exclude for free, and the planner's own cost estimate rises to say so.
+   */
+  it("costs more than the baseline once the partial predicate is dropped from the inbox index", async () => {
+    expect(baselineInboxCost).toBeGreaterThan(0);
+    await db.execute(sql`DROP INDEX trade_proposals_inbox_idx`);
+    await db.execute(sql`CREATE INDEX trade_proposals_inbox_idx ON trade_proposals (counterparty_team_id, proposed_at)`);
+    await db.execute(sql`ANALYZE trade_proposals`);
+    const plan = await explainPlan(db, tradesQuery(db, { leagueId: CORPUS_LEAGUE, teamId: CORPUS_TEAM, box: "inbox" }));
+    expect(planCost(plan)).toBeGreaterThan(baselineInboxCost);
   });
 });
 
