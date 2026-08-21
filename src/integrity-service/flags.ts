@@ -7,9 +7,8 @@ import type { Position } from "@/domain/player";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import {
   contentRemovalIsWiredFor,
-  decisionIsAvailable,
+  decisionIsWiredFor,
   RESOLUTION_DECISIONS,
-  SUBJECT_OF,
   TRADE_FAIRNESS_BASES,
   type FlagSubjectType,
   type FlagType,
@@ -30,139 +29,33 @@ import {
   type TradedPlayerView,
 } from "@/integrity/queue-view";
 import { removeChatMessageInTx } from "@/chat-service/moderation";
+import { reverseTradeInTx } from "@/league-service/trade-reversal";
+import { TransferRefusedError } from "@/league-service/trade-transfer";
 import { getPublisher } from "@/lib/realtime/publisher";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { removeReviewInTx } from "@/review-service/reviews";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { attachAuditEvent, notifyAffectedMember } from "./notify";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
+import { raiseFlag, type IntegrityFlag, type RaiseFlagInput, type RaiseFlagResult } from "./raise-flag";
 
 const systemClock: Clock = { now: () => new Date().toISOString() };
 
-/**
- * The queue's own row, as it is raised — `resolved_at` and everything Task 3 stamps alongside it
- * are deliberately absent here: `raiseFlag` never writes them, so a shape that named them would
- * describe a state this function cannot produce (ruling 4).
- */
-export interface IntegrityFlag {
-  readonly id: string;
-  readonly flagType: FlagType;
-  readonly subjectType: FlagSubjectType;
-  readonly subjectId: string;
-  readonly leagueId: string | null;
-  readonly evidence: JsonObject;
-  readonly raisedAt: string;
-}
+// `raiseFlag` and its own input/result types moved to `./raise-flag` (Task 7) — see that module's
+// own docblock for why (the fairness detector's reachability contract). Re-exported verbatim so
+// every existing caller of `raiseFlag`/`IntegrityFlag`/`RaiseFlagInput`/`RaiseFlagResult` FROM
+// THIS FILE (`review-service/reviews.ts`, `chat-service/moderation.ts`, `multi-account.ts`, this
+// file's own test) is unaffected — this is a move, not a behavior change.
+export { raiseFlag, type IntegrityFlag, type RaiseFlagInput, type RaiseFlagResult };
 
 /**
  * What `canonicalPairId` (`@/integrity-service/multi-account`) joins an `account_pair` subject id
  * with — defined here, not imported from there, because `multi-account.ts` imports `raiseFlag`
- * from THIS file and a reverse import would be a cycle. `aboutFor`/`subjectFor`/`trailFor` below
- * are the three readers that split on it; `canonicalPairId` is the one writer.
+ * (now re-exported from here, `./raise-flag`) and a reverse import would be a cycle.
+ * `aboutFor`/`subjectFor`/`trailFor` below are the three readers that split on it; `canonicalPairId`
+ * is the one writer.
  */
 const PAIR_ID_SEPARATOR = ":";
-
-export interface RaiseFlagInput {
-  readonly flagType: FlagType;
-  /** The reviewed thing. For `account_pair`, the two user ids sorted and joined with
-   *  `PAIR_ID_SEPARATOR` (ruling 28, `canonicalPairId`) — so "a:b" and "b:a" are one subject. */
-  readonly subjectId: string;
-  /** Where it happened. Not a chain scope — see `integrityFlags`' own docblock. */
-  readonly leagueId: string | null;
-  readonly evidence: JsonObject;
-  /** A reporter's `users.id`, or `null` when the platform's own sweep raised it. */
-  readonly raisedByUserId: string | null;
-  readonly occurredAt: string;
-  readonly newId: () => string;
-  /** Defaults to the process-wide logger (`getAuditLogger()`). */
-  readonly audit?: AuditLogger;
-}
-
-export type RaiseFlagResult = IntegrityFlag;
-
-function toFlag(row: typeof integrityFlags.$inferSelect): IntegrityFlag {
-  return {
-    id: row.id,
-    flagType: row.flagType as FlagType,
-    subjectType: row.subjectType as FlagSubjectType,
-    subjectId: row.subjectId,
-    leagueId: row.leagueId,
-    evidence: row.evidence,
-    raisedAt: row.raisedAt.toISOString(),
-  };
-}
-
-/**
- * The confirmation path: a second insert on an already-open subject matched the partial unique
- * index and wrote nothing, so this reads back the row that already answers the question.
- *
- * The `row === undefined` branch is unreachable through real Postgres — the conflict that sent
- * `raiseFlag` here is proof an open row exists — and is covered by a stub `DbTx` test, the same
- * "impossible-state guard" discipline `AuditLogger.record`'s `lockAnchor` uses.
- */
-async function existingOpenFlagFor(tx: DbTx, input: RaiseFlagInput): Promise<IntegrityFlag> {
-  const subjectType = SUBJECT_OF[input.flagType];
-  const [row] = await tx
-    .select()
-    .from(integrityFlags)
-    .where(and(eq(integrityFlags.subjectType, subjectType), eq(integrityFlags.subjectId, input.subjectId), isNull(integrityFlags.resolvedAt)));
-  if (row === undefined) {
-    throw new Error(`raiseFlag conflicted on an open flag for ${subjectType}:${input.subjectId} that is no longer there.`);
-  }
-  return toFlag(row);
-}
-
-/**
- * Raise a flag. Idempotent on the open-subject index: a second call about the same open subject
- * returns the existing flag rather than failing or duplicating, because a second report IS
- * confirmation and a second detector run finding the same pair is not news.
- *
- * The audit event goes on the PLATFORM chain, never a league chain (ruling 1). A record about a
- * person under review is not the league's business, and `audit_events.league_id` is what decides
- * chain scope (`scopeFor`), so the league id lives in the payload instead. The consequence is
- * deliberate: `flag_raised` cannot appear in any league activity feed even if a future author
- * flips its `ACTIVITY_VISIBILITY`, because platform-chain events are never read by
- * `listLeagueActivity` at all.
- *
- * ruling 12: every caller is a system path — a detector's sweep, or a report route that has
- * already validated its own input and calls this from inside its own transaction. There is no
- * route that lets a member raise a flag directly; `raisedByUserId` names a reporter, not an
- * accuser aiming this function at someone.
- *
- * LOCK ORDER (ruling 3): this insert carries a foreign key to `leagues`, so it takes an implicit
- * `FOR KEY SHARE` on that row — the same class of lock `member_notices`' insert takes — and must
- * therefore run BEFORE the chain anchor, never after. It is the only write in this function, so
- * that ordering is automatic here rather than something a caller has to sequence by hand.
- */
-export async function raiseFlag(tx: DbTx, input: RaiseFlagInput): Promise<RaiseFlagResult> {
-  const audit = input.audit ?? getAuditLogger();
-
-  const [row] = await tx
-    .insert(integrityFlags)
-    .values({
-      id: input.newId(),
-      flagType: input.flagType,
-      subjectType: SUBJECT_OF[input.flagType],
-      subjectId: input.subjectId,
-      leagueId: input.leagueId,
-      evidence: input.evidence,
-      raisedAt: new Date(input.occurredAt),
-    })
-    .onConflictDoNothing({ target: [integrityFlags.subjectType, integrityFlags.subjectId], where: isNull(integrityFlags.resolvedAt) })
-    .returning();
-
-  if (row === undefined) return existingOpenFlagFor(tx, input); // the confirmation path: no second event
-
-  await audit.record(tx, {
-    eventType: "flag_raised",
-    actorId: input.raisedByUserId, // a reporter, or null when the platform's own sweep raised it
-    actorType: input.raisedByUserId === null ? "system" : "user",
-    leagueId: null, // platform chain — ruling 1
-    payload: { flagId: row.id, flagType: row.flagType, subjectType: row.subjectType, leagueId: input.leagueId },
-    occurredAt: input.occurredAt,
-  });
-  return toFlag(row);
-}
 
 export interface ResolveFlagInput {
   readonly flagId: string;
@@ -210,8 +103,11 @@ export type ResolveFlagResult =
  * its own notice inside the SAME transaction (`review_removed`, and the chat equivalent). A
  * second notice from here would tell the member twice about one decision.
  *
- * `trade_reversed` is unreachable today — `decisionIsAvailable` refuses it before this table is
- * ever read — and stays `null` rather than naming a notice type this plan does not own.
+ * `trade_reversed` is `null` here too, for the SAME reason `content_removed` is: it already
+ * notified. `reverseTradeInTx` (`@/league-service/trade-reversal`, Task 7) sends its own
+ * `trade_reversed` notice to BOTH parties, inside its own (earlier, already-committed)
+ * transaction — a third, generic notice from here would tell one of them twice, and this map has
+ * no way to notice two people from one entry anyway.
  */
 const NOTICE_FOR_DECISION: Readonly<Record<ResolutionDecision, NoticeType | null>> = {
   no_action: null,
@@ -407,12 +303,18 @@ async function leagueNameForFlag(tx: DbTx, leagueId: string | null): Promise<str
  * against the now-committed winner before it can match, so the second decision is refused rather
  * than silently overwriting the first.
  *
- * ONCE: refuses outright (before any write) a decision no plan in this phase owns
- * (`decisionIsAvailable`), a `content_removed` note past `REVIEW_CONFIG.removalReason.maxLength`
- * (the tighter removal-reason cap, checked first since it is the one the note is ACTUALLY bound
- * by on that branch), and a note past `INTEGRITY_CONFIG.moderation.noteMaxLength` otherwise — all
- * three checked before the transaction opens, the same "fail fast, no partial write" shape
- * `removeReviewInTx`'s own reason-length check uses.
+ * ONCE: refuses outright (before any write) a `content_removed` note past `REVIEW_CONFIG.
+ * removalReason.maxLength` (the tighter removal-reason cap, checked first since it is the one the
+ * note is ACTUALLY bound by on that branch), a note past `INTEGRITY_CONFIG.moderation.
+ * noteMaxLength` otherwise, and a decision this SUBJECT can't carry out (`decisionIsWiredFor`,
+ * `content_removed` and `trade_reversed` each get their own subject-aware check below) — all
+ * checked before the transaction opens, the same "fail fast, no partial write" shape
+ * `removeReviewInTx`'s own reason-length check uses. `resolveFlagSchema`'s own `.refine`
+ * (`decisionIsAvailable`, `@/integrity-service/schemas`) is the boundary check for a decision
+ * declared but wired for NO subject at all — none, today, since `DECISION_WIRED_FOR` is exhaustive
+ * over every declared decision and a new one without a wiring row fails to compile — so this
+ * function does not repeat that check: every `ResolutionDecision` the type system lets a caller
+ * name here IS available.
  *
  * THE AUDIT EVENT IS THE RECORD: `flag_resolved`, on the PLATFORM chain (ruling 1, never the
  * league's — a record about a person under review is not the league's business), inside the SAME
@@ -421,17 +323,16 @@ async function leagueNameForFlag(tx: DbTx, leagueId: string | null): Promise<str
  * (`attachAuditEvent`), the identical lock order `grantAdmin` and `removeReview` already hold to:
  * `notifyAffectedMember`'s insert takes an implicit `FOR KEY SHARE` on `users` and `leagues`,
  * which must never follow the anchor lock.
+ *
+ * `trade_reversed` (Task 7) is the one decision whose consequence CANNOT live inside this
+ * function's own transaction: `reverseTradeInTx` (`@/league-service/trade-reversal`) appends to the
+ * LEAGUE chain and this function's own stamp appends to the PLATFORM chain, and one transaction
+ * may append to at most one chain (`docs/decisions/operators-and-moderation.md` §5). So the
+ * reversal runs FIRST, in its own transaction, before this function's own ever opens — see
+ * `reverseTradeInTx`'s own docblock for the full commit-order accounting, including what happens
+ * if this function's OWN transaction is the one that fails afterward.
  */
 export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<ResolveFlagResult> {
-  if (!decisionIsAvailable(input.decision)) {
-    // Hardcoded rather than a per-decision table: `trade_reversed` is the ONLY reserved decision
-    // `DECISION_OWNER` declares today, and a table with three permanently-unreachable entries
-    // (`no_action`/`warned_user`/`content_removed` all have owners) would be dead weight this
-    // suite would then have to pretend to exercise. Whoever reserves the next decision updates
-    // this message alongside it — the same obligation `DECISION_OWNER`'s own docblock places on
-    // that commit.
-    return { ok: false, status: 400, reason: "This product can't reverse a trade yet." };
-  }
   // `content_removed`'s note becomes a REMOVAL REASON (`removeSubject` passes it straight through
   // as `removeReviewInTx`'s `reason`), not an `operator_warning` notice body — so it is bound by
   // `REVIEW_CONFIG.removalReason.maxLength` (200), the tighter cap `removeReviewInTx` itself
@@ -459,6 +360,56 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
     if (flag !== undefined && !contentRemovalIsWiredFor(flag.subjectType as FlagSubjectType)) {
       return { ok: false, status: 400, reason: "There is no content to remove on this flag. Close it with no action, or warn the member." };
     }
+  }
+  // SUBJECT-AWARE, and before ANY transaction opens — `trade_reversed`'s own version of the
+  // `content_removed` check just above. A `trade_fairness` flag always names a real `trade`
+  // subject; a direct POST of `trade_reversed` against any other flag type is refused here, in
+  // product copy, rather than reaching `reverseTradeInTx` with a subject it was never built for.
+  if (input.decision === "trade_reversed") {
+    const [flag] = await db
+      .select({ subjectType: integrityFlags.subjectType, subjectId: integrityFlags.subjectId, leagueId: integrityFlags.leagueId })
+      .from(integrityFlags)
+      .where(eq(integrityFlags.id, input.flagId));
+    if (flag !== undefined) {
+      if (!decisionIsWiredFor("trade_reversed", flag.subjectType as FlagSubjectType)) {
+        return { ok: false, status: 400, reason: "There is no trade on this flag to reverse. Close it with no action, or warn the member." };
+      }
+      // A `trade` subject's flag ALWAYS carries a real `leagueId` — `raiseTradeFairnessFlag`'s own
+      // `leagueId` input is required, never optional — so this is never actually null here.
+      const leagueId = flag.leagueId!;
+
+      // THE REVERSAL, IN ITS OWN TRANSACTION, COMMITTED BEFORE THIS FUNCTION'S OWN EVER OPENS —
+      // see `reverseTradeInTx`'s own docblock and `resolveFlag`'s own docblock above for why. A
+      // refusal here (`{ ok: false }`) is returned straight through: this function's own
+      // transaction never opens, so the flag stays open with nothing written at all.
+      let reversal: Awaited<ReturnType<typeof reverseTradeInTx>>;
+      try {
+        reversal = await db.transaction((tx) =>
+          reverseTradeInTx(tx, {
+            tradeId: flag.subjectId,
+            leagueId,
+            flagId: input.flagId,
+            operatorUserId: input.operatorUserId,
+            note: input.note,
+            clock: input.clock,
+            audit: input.audit,
+            notify: input.notify,
+          }),
+        );
+      } catch (error: unknown) {
+        if (error instanceof TransferRefusedError) {
+          return { ok: false, status: 409, reason: error.message };
+        }
+        throw error;
+      }
+      if (!reversal.ok) return reversal;
+      // Fall through to this function's own transaction below: the PLATFORM-chain record of the
+      // decision that ordered the reversal which just committed. `trade_reversed`'s own notices
+      // were already sent, inside the transaction above — `NOTICE_FOR_DECISION.trade_reversed`
+      // stays `null` so nothing here sends a third, generic one.
+    }
+    // `flag === undefined`: fall through. The guarded UPDATE below will match no row either, and
+    // `alreadyResolvedOrMissing` answers the same 404 every other unknown flagId gets.
   }
 
   const clock = input.clock ?? systemClock;

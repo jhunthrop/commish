@@ -102,6 +102,20 @@ describe("NOTICE_TEMPLATES", () => {
     expect(superseded.body).toContain("Nobody declined it");
   });
 
+  it("says what happened when an operator puts a trade back, verbatim (Task 7)", () => {
+    const reversed = renderNotice("trade_reversed", NOTICE_SAMPLES.trade_reversed);
+    expect(reversed.title).toBe("An operator put a trade back");
+    expect(reversed.body).toBe(
+      "An operator reviewed the trade you and Iron Owls completed in Sunday Money and put both rosters back the way they were. You have Bijan Robinson again, and Iron Owls has Justin Jefferson. Scores from weeks you have already played stay as they were. There is no reply to this message.",
+    );
+    // The operator's own note is deliberately absent from `body` — it renders as its own
+    // blockquote (`quoteFor`), the same split every other quoting template keeps.
+    expect(reversed.body).not.toContain("household");
+    // Founder decision #4: this is a moderation consequence, and the notice says there is no
+    // appeal path rather than leaving a reversed-on manager to go hunting for one.
+    expect(reversed.body).toContain("There is no reply to this message.");
+  });
+
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
@@ -115,6 +129,7 @@ describe("NOTICE_TEMPLATES", () => {
       "trade_executed",
       "trade_proposed",
       "trade_rejected",
+      "trade_reversed",
       "trade_superseded",
       "trade_withdrawn",
     ]);

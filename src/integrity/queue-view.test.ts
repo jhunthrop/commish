@@ -8,6 +8,7 @@ import {
   formatFlagCursor,
   parseFlagCursor,
   queueRowFor,
+  subjectIsAlreadyReversed,
   TRADE_FAIRNESS_BASIS_PHRASE,
   tradeFairnessBasisPhrase,
   type FlagSubjectView,
@@ -177,8 +178,13 @@ describe("flagTrailRowFor", () => {
       expect(flagTrailRowFor(row)?.headline).toBe("Two players changed teams.");
     });
 
-    it("denies a roster_move for any reason other than 'trade' — the reversal's own trail message isn't written yet", () => {
-      const row = event("roster_move", { reason: "trade_reversed", tradeId: "trade_1" }, "league_1");
+    it("renders the reversal's own roster_move distinctly, Task 7 — an operator put it back, not a second trade", () => {
+      const row = event("roster_move", { reason: "trade_reversed", tradeId: "trade_1", flagId: "flag_1" }, "league_1");
+      expect(flagTrailRowFor(row)?.headline).toBe("An operator put the trade back.");
+    });
+
+    it("denies a roster_move for any reason other than 'trade' or 'trade_reversed'", () => {
+      const row = event("roster_move", { reason: "waiver", tradeId: "trade_1" }, "league_1");
       expect(flagTrailRowFor(row)).toBeNull();
     });
 
@@ -204,6 +210,43 @@ describe("FlagSubjectView's trade arm (Task 6)", () => {
     };
     const detail = flagDetailFor({ ...flag, flagType: "trade_fairness" }, subject, [], []);
     expect(detail.subject).toBe(subject);
+  });
+});
+
+describe("flagDetailFor's decisions narrow on the SUBJECT, Task 7", () => {
+  const tradeSubject: FlagSubjectView = {
+    kind: "trade",
+    tradeId: "trade_1",
+    proposerTeamName: "Team Alice",
+    counterpartyTeamName: "Team Bob",
+    gave: [],
+    got: [],
+    acceptedAt: "2026-08-10T00:00:00.000Z",
+    reversedAt: null,
+    valuationBasis: "The platform valued this trade the moment it was accepted.",
+  };
+
+  it("offers a trade reversal for a reversible trade subject, and no content removal (a trade is not content)", () => {
+    const detail = flagDetailFor({ ...flag, flagType: "trade_fairness" }, tradeSubject, [], []);
+    expect(detail.decisions).toEqual(["no_action", "warned_user", "trade_reversed"]);
+  });
+
+  it("never offers a trade reversal on a chat report — the wrong subject type entirely", () => {
+    const chatSubject: FlagSubjectView = { kind: "chat_message", messageId: "5", body: "hi", authorName: "Bob", removedAt: null };
+    const detail = flagDetailFor({ ...flag, flagType: "chat_report" }, chatSubject, [], []);
+    expect(detail.decisions).not.toContain("trade_reversed");
+  });
+
+  it("never offers a trade reversal a second time, once the trade is already reversed", () => {
+    const alreadyReversed: FlagSubjectView = { ...tradeSubject, reversedAt: "2026-08-15T00:00:00.000Z" };
+    expect(subjectIsAlreadyReversed(alreadyReversed)).toBe(true);
+    const detail = flagDetailFor({ ...flag, flagType: "trade_fairness" }, alreadyReversed, [], []);
+    expect(detail.decisions).toEqual(["no_action", "warned_user"]);
+  });
+
+  it("answers false for any non-trade subject and for an un-reversed trade", () => {
+    expect(subjectIsAlreadyReversed(tradeSubject)).toBe(false);
+    expect(subjectIsAlreadyReversed({ kind: "review", reviewId: "r1", body: "x", authorName: "A", removedAt: null })).toBe(false);
   });
 });
 

@@ -231,6 +231,11 @@ export async function listNotices(db: Db, userId: string): Promise<NoticesPage> 
  * belongs in a quote, not folded into the middle of the platform's own sentence. A proposal with
  * no note reads as no quote at all, the same narrowing every branch above uses.
  *
+ * `trade_reversed` (Plan C, Task 7) is the fourth quoting type, and shares `operator_warning`'s
+ * own reasoning exactly: `context.note` here is the OPERATOR's own words (`resolveFlag`'s own
+ * `input.note`, carried through `reverseTradeInTx`), not a stored token to map through a phrase
+ * table.
+ *
  * `stripHiddenCharacters` runs on it too, same as the composed title/body above — operators are
  * trusted with what they choose to SAY, not with what a bidi override or a zero-width character
  * would make a reader's browser DO with it. `resolveFlag` writes `context.note` unstripped (it is
@@ -250,7 +255,7 @@ export function quoteFor(notice: MemberNotice): string | null {
     const reason = notice.context.reason;
     return typeof reason === "string" ? chatRemovalPhraseFor(reason) : null;
   }
-  if (notice.noticeType === "operator_warning" || notice.noticeType === "trade_proposed") {
+  if (notice.noticeType === "operator_warning" || notice.noticeType === "trade_proposed" || notice.noticeType === "trade_reversed") {
     const note = notice.context.note;
     return typeof note === "string" ? stripHiddenCharacters(note) : null;
   }

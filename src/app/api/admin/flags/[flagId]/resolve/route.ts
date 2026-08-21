@@ -28,10 +28,12 @@ function resolveRateLimited(operatorUserId: string): Response | null {
  * ONE WAY, ONCE. `withAdmin` -> rate limit -> `await params` -> `parseJson` -> `resolveFlag` ->
  * `fail`/`ok`, the fixed order every route in this codebase uses. The schema
  * (`resolveFlagSchema`, `@/integrity-service/schemas`) already narrows `decision` past the closed
- * `RESOLUTION_DECISIONS` enum with `decisionIsAvailable`, so a request naming a decision this plan
- * does not implement is a 400 naming the field, before `resolveFlag` is ever called — the same
- * "refuse at the boundary, not a second time inside the service" discipline every schema-plus-
- * service pair in this codebase holds to.
+ * `RESOLUTION_DECISIONS` enum with `decisionIsAvailable`, so a request naming a decision wired for
+ * NO subject at all (`account_restricted` is not even declared; nothing IN the enum is unwired
+ * everywhere today) is a 400 naming the field, before `resolveFlag` is ever called. WHICH subjects
+ * a wired decision actually applies to — the reason `trade_reversed` against a `review_report`
+ * flag still 400s — is answered one layer deeper, by `resolveFlag`'s own `decisionIsWiredFor`
+ * check, because that answer needs the flag's own row.
  *
  * `operatorUserId` comes from `withAdmin`'s own verified session, never from the body — a body
  * that could name a different operator would let one admin sign another admin's decision.

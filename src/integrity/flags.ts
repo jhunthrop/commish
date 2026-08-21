@@ -38,16 +38,20 @@ export const RESOLUTION_DECISIONS = [
   /** The reported content is stamped removed in the same transaction as the decision. */
   "content_removed",
   /**
-   * RESERVED — Plan C owns this. There is no trade in this product to reverse, so `resolveFlag`
-   * refuses it and `decisionIsAvailable` returns false. Plan C turns it on by adding the subject
-   * type and the reversal, together, in one commit. Compare `account_restricted`, which is not
+   * Plan C owns this, and Plan C is where it stops being reserved: `reverseTradeInTx`
+   * (`@/league-service/trade-reversal`) is the real compensating transfer, wired for the `trade`
+   * subject type in `DECISION_WIRED_FOR` below. Compare `account_restricted`, which is not
    * declared at all: it has no owning plan, and the spec forbids account actions in this phase.
    */
   "trade_reversed",
 ] as const;
 export type ResolutionDecision = (typeof RESOLUTION_DECISIONS)[number];
 
-/** Which plan may exercise each decision. Exhaustive: a new decision without an owner will not compile. */
+/**
+ * Which plan may exercise each decision — PROVENANCE, kept even after the wiring below makes
+ * `decisionIsAvailable` stop asking it. Exhaustive: a new decision without an owner will not
+ * compile.
+ */
 export const DECISION_OWNER: Readonly<Record<ResolutionDecision, "plan-b" | "plan-c">> = {
   no_action: "plan-b",
   warned_user: "plan-b",
@@ -55,35 +59,55 @@ export const DECISION_OWNER: Readonly<Record<ResolutionDecision, "plan-b" | "pla
   trade_reversed: "plan-c",
 };
 
+/**
+ * Which decisions this product can actually carry out, against which subjects. TWO axes in one
+ * exhaustive table, so "can an operator do this to this?" is answered in ONE place rather than by
+ * three consumers each re-deriving half of it: the queue detail page (`flagDetailFor`, `@/
+ * integrity/queue-view`, which decisions to offer), `resolveFlag` (`@/integrity-service/flags`,
+ * which to refuse before it writes) and `resolveFlagSchema`'s own `.refine` (the boundary, via
+ * `decisionIsAvailable` below).
+ *
+ * It replaces two narrower answers this file used to give: `decisionIsAvailable`, which used to
+ * ask `DECISION_OWNER[decision] === "plan-b"` — a question about which PLAN wrote a thing, right
+ * only while ownership and wiring agreed, and this is the commit where they part (`trade_reversed`
+ * is still owned by `plan-c` and is now wired) — and `CONTENT_REMOVAL_WIRED_FOR`, which asked the
+ * honest question on one axis only. `contentRemovalIsWiredFor` is derived from this table rather
+ * than deleted, so the diff at every existing consumer of it is zero.
+ *
+ * `no_action` is wired for everything, deliberately: an operator must always be able to close a
+ * question by deciding nothing needs to happen, whatever the question was about.
+ * `warned_user` is not wired for `account_pair`, unchanged from before: a pair flag names two
+ * people and a warning names one.
+ */
+export const DECISION_WIRED_FOR: Readonly<Record<ResolutionDecision, Readonly<Record<FlagSubjectType, boolean>>>> = {
+  no_action: { review: true, chat_message: true, account_pair: true, trade: true },
+  warned_user: { review: true, chat_message: true, account_pair: false, trade: true },
+  content_removed: { review: true, chat_message: true, account_pair: false, trade: false },
+  /** Plan C. A trade is not content and cannot be removed; the decision a trade takes is to be
+   *  put back. */
+  trade_reversed: { review: false, chat_message: false, account_pair: false, trade: true },
+};
+
+export function decisionIsWiredFor(decision: ResolutionDecision, subjectType: FlagSubjectType): boolean {
+  return DECISION_WIRED_FOR[decision][subjectType];
+}
+
+/** True when this decision is wired for at least one subject type — the "does this control do
+ *  anything at all?" question this function has always answered, now derived from the two-axis
+ *  table above rather than from `DECISION_OWNER`. */
 export function decisionIsAvailable(decision: ResolutionDecision): boolean {
-  return DECISION_OWNER[decision] === "plan-b";
+  return FLAG_SUBJECT_TYPES.some((subject) => decisionIsWiredFor(decision, subject));
 }
 
 /**
- * Which subject types `content_removed` actually has a remover wired for. Exhaustive: a new
- * subject type declared without an entry here will not compile, so "does this decision work on
- * this subject?" is answered in ONE place rather than by three consumers each re-deriving it —
- * the queue detail page (which decisions to offer), `resolveFlag` (which to refuse before it
- * writes) and `removeSubject` (the backstop that throws).
- *
- * Final review, LOW 13: `resolveFlagSchema` accepted `content_removed` for any flag, and a direct
- * POST against an `account_pair` flag reached `removeSubject`'s unwired branch, threw a plain
- * `Error`, and became a 500. Admin-only and fail-safe (the transaction rolled back), but a 500 is
- * not a refusal — it is a crash that happened to be harmless, and the boundary should say no in
- * the product's own words.
+ * Which subject types `content_removed` actually has a remover wired for — derived from
+ * `DECISION_WIRED_FOR` above (final review, LOW 13's original discipline, unchanged in shape):
+ * "does this decision work on this subject?" is answered in ONE place rather than by three
+ * consumers each re-deriving it — the queue detail page (which decisions to offer), `resolveFlag`
+ * (which to refuse before it writes) and `removeSubject` (the backstop that throws).
  */
-export const CONTENT_REMOVAL_WIRED_FOR: Readonly<Record<FlagSubjectType, boolean>> = {
-  review: true,
-  chat_message: true,
-  /** Two accounts, not a piece of content. `warned_user` is not wired for it either — a pair
-   *  flag names two people and a warning names one. */
-  account_pair: false,
-  /** RESERVED for Plan C, alongside `trade_reversed`, which is the decision a trade takes. */
-  trade: false,
-};
-
 export function contentRemovalIsWiredFor(subjectType: FlagSubjectType): boolean {
-  return CONTENT_REMOVAL_WIRED_FOR[subjectType];
+  return decisionIsWiredFor("content_removed", subjectType);
 }
 
 /**

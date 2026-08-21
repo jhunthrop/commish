@@ -246,15 +246,15 @@ describe("the detector is flags-only", () => {
    * whether an import specifier string happens to match.
    *
    * `applyTradeInTx` (the whole-slot-map roster transfer) lives in `trade-transfer.ts`;
-   * `acceptTrade` (the execution transaction that calls it) lives in `trades.ts`. Both are named
-   * here by path, not by export, for the identical reason `AUTHORITY_GRANTING_MODULE` is:
-   * a namespace import or a re-export under a different name cannot dodge a check on the file
-   * itself. `reverseTradeInTx` (Task 7, still reserved — `DECISION_OWNER.trade_reversed`) has no
-   * module yet to name; whoever lands it should add that path to `TRADE_MUTATION_MODULES` in the
-   * same commit, the same obligation `DECISION_OWNER`'s own docblock already places on that work.
+   * `acceptTrade` (the execution transaction that calls it) lives in `trades.ts`; `reverseTradeInTx`
+   * (Task 7's compensating transfer, the reversal's own module) lives in `trade-reversal.ts` and is
+   * named here now that it exists — the carry `trade-fairness.ts`'s own review (fix round 1, LOW 3)
+   * placed on whoever landed it. All three are named by path, not by export, for the identical
+   * reason `AUTHORITY_GRANTING_MODULE` is: a namespace import or a re-export under a different
+   * name cannot dodge a check on the file itself.
    */
   it("keeps every trade-mutating module unreachable from the fairness detector", () => {
-    const TRADE_MUTATION_MODULES = ["src/league-service/trade-transfer.ts", "src/league-service/trades.ts"] as const;
+    const TRADE_MUTATION_MODULES = ["src/league-service/trade-transfer.ts", "src/league-service/trades.ts", "src/league-service/trade-reversal.ts"] as const;
     const closure = importClosureOf("src/integrity-service/trade-fairness.ts").modules;
     for (const mutationModule of TRADE_MUTATION_MODULES) {
       expect(closure).not.toContain(mutationModule);

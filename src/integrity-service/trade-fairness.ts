@@ -8,7 +8,12 @@ import type { TradeFairnessBasis } from "@/integrity/flags";
 import { assetPlayerIds } from "@/trades/assets";
 import { crossesFairnessThreshold, fairnessGap, tradeBalance, type TradeBalance, type ValuedPlayer } from "@/trades/fairness";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
-import { raiseFlag, type IntegrityFlag } from "./flags";
+// Imported from `./raise-flag` DIRECTLY, never from `./flags` — `flags.ts` also wires
+// `resolveFlag`'s `trade_reversed` branch to `reverseTradeInTx` (`@/league-service/trade-
+// reversal`), and this detector's own closure must never reach a trade-mutating module
+// (`src/integrity/flag-only.test.ts`'s own contract). `raise-flag.ts` is the self-contained slice
+// that keeps that true; `flags.ts` re-exports the identical names for every OTHER caller.
+import { raiseFlag, type IntegrityFlag } from "./raise-flag";
 
 const systemClock: Clock = { now: () => new Date().toISOString() };
 

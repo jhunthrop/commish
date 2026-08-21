@@ -172,6 +172,65 @@ describe("AdminFlagDetailPage — the read", () => {
     expect(screen.queryByRole("radio", { name: "Remove the content" })).not.toBeInTheDocument();
   });
 
+  const TRADE_SUBJECT = {
+    kind: "trade" as const,
+    tradeId: "trade_1",
+    proposerTeamName: "Team Alice",
+    counterpartyTeamName: "Team Bob",
+    gave: [{ playerId: "p1", name: "Star RB", position: "RB" as const, averagePoints: 22.4 }],
+    got: [{ playerId: "p2", name: "Bench WR", position: "WR" as const, averagePoints: 3.1 }],
+    acceptedAt: "2026-08-10T00:00:00.000Z",
+    reversedAt: null,
+    valuationBasis: "The platform valued this trade the moment it was accepted.",
+  };
+
+  describe("the trade subject arm (Task 7)", () => {
+    it("renders both teams, both sides valued, when it was accepted, and the valuation basis, in both themes, axe-clean", async () => {
+      vi.mocked(flagDetail).mockResolvedValue({
+        ...OPEN_REVIEW_DETAIL,
+        leagueId: "l1",
+        subject: TRADE_SUBJECT,
+        decisions: ["no_action", "warned_user", "trade_reversed"],
+      });
+      const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+      const page = await callPage();
+      await inBothThemes(
+        <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+        async ({ container }) => {
+          expect(await screen.findByText("Team Alice and Team Bob")).toBeInTheDocument();
+          expect(screen.getByText(/Star RB \(RB\), 22.4 points per week/)).toBeInTheDocument();
+          expect(screen.getByText(/Bench WR \(WR\), 3.1 points per week/)).toBeInTheDocument();
+          expect(screen.getByText(/The platform valued this trade the moment it was accepted\./)).toBeInTheDocument();
+          expect(screen.getByRole("radio", { name: "Reverse the trade" })).toBeInTheDocument();
+          expect(screen.queryByRole("radio", { name: "Remove the content" })).not.toBeInTheDocument();
+          expect(await axe(container)).toHaveNoViolations();
+        },
+      );
+    });
+
+    it("says a trade has already been put back, and withholds the reversal decision, once reversedAt is set", async () => {
+      vi.mocked(flagDetail).mockResolvedValue({
+        ...OPEN_REVIEW_DETAIL,
+        leagueId: "l1",
+        subject: { ...TRADE_SUBJECT, reversedAt: "2026-08-15T00:00:00.000Z" },
+        decisions: ["no_action", "warned_user"],
+      });
+      await renderPage();
+
+      expect(await screen.findByText(/An operator already put this trade back/)).toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "Reverse the trade" })).not.toBeInTheDocument();
+      expect(screen.getByRole("radio", { name: "No action" })).toBeInTheDocument();
+    });
+
+    it("never offers a trade reversal on a non-trade subject (the SUBJECT-narrowed decisions from flagDetail)", async () => {
+      vi.mocked(flagDetail).mockResolvedValue(OPEN_REVIEW_DETAIL); // a review, decisions from the fixture
+      await renderPage();
+
+      expect(await screen.findByRole("radio", { name: "No action" })).toBeInTheDocument();
+      expect(screen.queryByRole("radio", { name: "Reverse the trade" })).not.toBeInTheDocument();
+    });
+  });
+
   it("renders the resolution — decision, note, who, and when — once a flag is already resolved, instead of a bare sentence, in both themes, axe-clean (fix round 1, FIX 5)", async () => {
     vi.mocked(flagDetail).mockResolvedValue({
       ...OPEN_REVIEW_DETAIL,

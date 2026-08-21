@@ -1,7 +1,7 @@
 import type { IconName } from "@/components/ui/icon";
 import type { AuditEvent, JsonObject } from "@/domain/audit";
 import type { Position } from "@/domain/player";
-import { decisionIsAvailable, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision, type TradeFairnessBasis } from "@/integrity/flags";
+import { decisionIsWiredFor, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision, type TradeFairnessBasis } from "@/integrity/flags";
 import type { ActivityRow } from "@/integrity/activity-view";
 
 /**
@@ -39,7 +39,7 @@ export interface FlagDetail {
   /** `null` while open. Once resolved, `decisions` is empty — the record is the `flag_resolved`
    *  audit event on `trail`, not a second attempt this page could offer. */
   readonly resolution: FlagResolutionView | null;
-  readonly decisions: readonly ResolutionDecision[]; // only those decisionIsAvailable() allows, and only while open
+  readonly decisions: readonly ResolutionDecision[]; // only those decisionIsWiredFor(d, subject.kind) allows, and only while open
 }
 
 /**
@@ -96,10 +96,9 @@ export type FlagSubjectView =
       readonly acceptedAt: string;
       /** Non-null once an operator has already undone it. The detail page reads this to withhold
        *  `trade_reversed` from a trade that is already reversed, the same way `subjectIsRemoved`
-       *  withholds `content_removed` from a message already gone (Plan B, MEDIUM 8). Always
-       *  `null` today — `trade_reversed` is still reserved (`DECISION_OWNER`) and no code path
-       *  writes `trade_proposals.reversed_at` yet — but the field is read honestly now rather
-       *  than added alongside the reversal itself. */
+       *  withholds `content_removed` from a message already gone (Plan B, MEDIUM 8) — see
+       *  `subjectIsAlreadyReversed` below. Set by `reverseTradeInTx`'s own guarded UPDATE
+       *  (`@/league-service/trade-reversal`), never rewound: a reversal is forward-only history. */
       readonly reversedAt: string | null;
       /**
        * Task 6 fix round 1 (review MEDIUM 1). Plain words for how `gave`/`got` were priced —
@@ -125,6 +124,17 @@ export type FlagSubjectView =
  */
 export function subjectIsRemoved(subject: FlagSubjectView): boolean {
   return (subject.kind === "review" || subject.kind === "chat_message") && subject.removedAt !== null;
+}
+
+/**
+ * Whether this trade has ALREADY been put back — `subjectIsRemoved`'s own twin for Task 7.
+ * `resolveFlag`/`reverseTradeInTx` refuse a second reversal with a 409 (the guard lives in the
+ * reversal's own guarded `UPDATE`), but an operator should never be OFFERED the decision in the
+ * first place once the answer is already known from the row this page already has in hand — the
+ * same "never offer a decision that will refuse" discipline `subjectIsRemoved` established.
+ */
+export function subjectIsAlreadyReversed(subject: FlagSubjectView): boolean {
+  return subject.kind === "trade" && subject.reversedAt !== null;
 }
 
 /** One reporter's own account of it — who, why, and when. Derived at read time from
@@ -202,10 +212,13 @@ export interface FlagDetailInput {
 
 /**
  * Pure. `flagDetail` fetches the flag row, the subject, the reporters and the trail; this
- * function decides the shape an operator reads them in. `decisions` is `RESOLUTION_DECISIONS`
- * narrowed by `decisionIsAvailable` — an operator is never offered a decision this product
- * cannot carry out (`trade_reversed`, reserved for Plan C), the same refusal `resolveFlag` itself
- * enforces at the write.
+ * function decides the shape an operator reads them in. `decisions` narrows on the SUBJECT, not
+ * on availability alone (Task 7) — `RESOLUTION_DECISIONS` filtered by `decisionIsWiredFor(d,
+ * subject.kind)`, which is what stops the detail page ever offering a trade reversal on a chat
+ * report, the same refusal `resolveFlag` itself enforces at the write. `trade_reversed` is
+ * withheld a second way on top of that: a trade already put back (`subjectIsAlreadyReversed`)
+ * never offers a second one, the same "never offer a decision that will refuse" discipline
+ * `subjectIsRemoved` already holds `content_removed` to.
  */
 export function flagDetailFor(
   flag: FlagDetailInput,
@@ -225,7 +238,12 @@ export function flagDetailFor(
     resolution: flag.resolution,
     // An already-resolved flag offers no decision at all: the record is the `flag_resolved`
     // event on `trail`, not a second attempt this page could invite.
-    decisions: flag.resolution === null ? RESOLUTION_DECISIONS.filter(decisionIsAvailable) : [],
+    decisions:
+      flag.resolution === null
+        ? RESOLUTION_DECISIONS.filter(
+            (decision) => decisionIsWiredFor(decision, subject.kind) && (decision !== "trade_reversed" || !subjectIsAlreadyReversed(subject)),
+          )
+        : [],
   };
 }
 
@@ -346,8 +364,18 @@ export function flagTrailRowFor(event: AuditEvent, actorNames: ReadonlyMap<strin
   }
   if (event.eventType === "roster_move") {
     const reason = payloadStr(event.payload, "reason");
-    if (reason !== "trade") return null;
-    return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "Two players changed teams.", detail: null };
+    if (reason === "trade") {
+      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "Two players changed teams.", detail: null };
+    }
+    // Task 7: `reverseTradeInTx`'s own compensating transfer, on the SAME league chain, with the
+    // SAME event type — a reversal is a roster_move, not a second trade-typed event
+    // (`AUDIT_EVENT_TYPES` is frozen). `payload.reason` is the honest spelling that tells the two
+    // apart, the identical "one type, `payload.outcome` distinguishes" shape `trade_rejected`/
+    // `trade_withdrawn` already share.
+    if (reason === "trade_reversed") {
+      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "An operator put the trade back.", detail: null };
+    }
+    return null;
   }
   return null;
 }

@@ -151,6 +151,22 @@ export interface NoticeContexts {
     readonly leagueName: string;
     readonly counterpartyTeamName: string;
   };
+  /**
+   * `reverseTradeInTx`'s own notice (`@/league-service/trade-reversal`, Task 7), sent to BOTH
+   * parties — the one decision in this product that changes two rosters on nobody's own request,
+   * so both people are affected and both read the identical words (the product never signals which
+   * of the two was the one under suspicion). `gotBackSummary`/`gaveBackSummary` are pre-rendered
+   * from THIS recipient's own side, the same "a template composes a sentence" discipline
+   * `trade_executed` keeps. `note` is the OPERATOR's own words, carried the same way
+   * `operator_warning`'s `note` is — unused by the template below, read by `quoteFor` instead.
+   */
+  readonly trade_reversed: {
+    readonly leagueName: string;
+    readonly counterpartyTeamName: string;
+    readonly gotBackSummary: string;
+    readonly gaveBackSummary: string;
+    readonly note: string;
+  };
 }
 
 /**
@@ -240,6 +256,16 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   trade_superseded: ({ leagueName, counterpartyTeamName }) => ({
     title: "One of your offers can no longer go through",
     body: `A player in the offer you had out to ${counterpartyTeamName} in ${leagueName} moved to another team, so that offer is off the table. Nobody declined it. You can put together a new one any time.`,
+  }),
+  // `note` is stored on the row (`context.note`) but deliberately unused HERE, the same reason
+  // every other quoting template's own field is: the operator's own words travel as their own
+  // field on the wire (`quoteFor`), rendered as a distinct blockquote. The last sentence is the
+  // same founder decision #4 every other sanction-shaped notice in this file states: there is no
+  // appeal path, and this decision is a moderation consequence, so silence about that would invite
+  // a member to go looking for a reply channel that does not exist.
+  trade_reversed: ({ leagueName, counterpartyTeamName, gotBackSummary, gaveBackSummary }) => ({
+    title: "An operator put a trade back",
+    body: `An operator reviewed the trade you and ${counterpartyTeamName} completed in ${leagueName} and put both rosters back the way they were. You have ${gotBackSummary} again, and ${counterpartyTeamName} has ${gaveBackSummary}. Scores from weeks you have already played stay as they were. There is no reply to this message.`,
   }),
 };
 

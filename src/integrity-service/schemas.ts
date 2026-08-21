@@ -29,9 +29,13 @@ export const markNoticesReadSchema = z.object({
  * a different operator would let one admin sign another admin's name to a decision.
  *
  * `decision` is narrowed past the closed `RESOLUTION_DECISIONS` enum by `decisionIsAvailable`, so
- * a request naming a decision this plan does not implement (today, only `trade_reversed`) is
- * refused HERE, at the boundary, as a 400 naming the exact field — `parseJson`'s usual shape —
- * rather than reaching `resolveFlag` and being told the same thing a second time.
+ * a request naming a decision wired for NO subject at all (none, today — every declared decision
+ * is wired for at least one, since Task 7 turned `trade_reversed` on) is refused HERE, at the
+ * boundary, as a 400 naming the exact field — `parseJson`'s usual shape — rather than reaching
+ * `resolveFlag` and being told the same thing a second time. WHICH subjects a wired decision
+ * actually applies to is a narrower, per-request question this schema cannot answer without the
+ * flag row itself — `resolveFlag`'s own `decisionIsWiredFor` check (`@/integrity/flags`) is where
+ * that refusal lives.
  *
  * `note` shares `resolveFlag`'s own cap (`INTEGRITY_CONFIG.moderation.noteMaxLength`) rather than
  * a second number that could drift from it — `resolveFlag` still enforces it itself too, the same

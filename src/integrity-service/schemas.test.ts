@@ -15,19 +15,18 @@ describe("markNoticesReadSchema", () => {
 });
 
 describe("resolveFlagSchema", () => {
-  it("accepts every decision this product can carry out today", () => {
-    for (const decision of ["no_action", "warned_user", "content_removed"] as const) {
+  it("accepts every decision this product can carry out today — trade_reversed included, Task 7", () => {
+    for (const decision of ["no_action", "warned_user", "content_removed", "trade_reversed"] as const) {
       expect(resolveFlagSchema.safeParse({ decision, note: "n" }).success).toBe(true);
     }
   });
 
-  it("refuses a decision no plan in this phase owns, at the boundary, naming the field", () => {
-    const result = resolveFlagSchema.safeParse({ decision: "trade_reversed", note: "n" });
-    expect(result.success).toBe(false);
-    expect(result.error?.issues[0]?.message).toBe("This product can't carry out that decision yet.");
-    expect(result.error?.issues[0]?.path).toEqual(["decision"]);
-  });
-
+  // `decisionIsAvailable`'s own refine still runs at this boundary (unchanged code, `@/integrity/
+  // flags`) — but every declared `ResolutionDecision` is now wired for at least one subject, so
+  // there is no longer a decision IN the closed enum this refine can catch. That property moved
+  // to `DECISION_WIRED_FOR`'s per-subject axis (`src/integrity/flags.test.ts`'s own vocabulary
+  // suite) and to `resolveFlag`'s own subject-aware refusal (`src/integrity-service/flags.test.ts`)
+  // — this schema's job is narrower now: reject anything outside the enum entirely, below.
   it("refuses a decision outside the closed enum entirely", () => {
     expect(resolveFlagSchema.safeParse({ decision: "account_restricted", note: "n" }).success).toBe(false);
   });

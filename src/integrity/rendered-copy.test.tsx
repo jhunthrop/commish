@@ -210,10 +210,24 @@ describe("the admin flag detail page says nothing that breaks the house copy rul
     vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
     vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
 
+    const TRADE_SUBJECT = {
+      kind: "trade" as const,
+      tradeId: "trade_1",
+      proposerTeamName: "Bay Bandits",
+      counterpartyTeamName: "Iron Owls",
+      gave: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" as const, averagePoints: 22.4 }],
+      got: [{ playerId: "p2", name: "Justin Jefferson", position: "WR" as const, averagePoints: 18.1 }],
+      acceptedAt: "2026-08-10T00:00:00.000Z",
+      reversedAt: null,
+      valuationBasis: "The platform valued this trade the moment it was accepted.",
+    };
+
     for (const detail of [
       FLAG_DETAIL,
       { ...FLAG_DETAIL, resolution: { decision: "no_action" as const, note: "n", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op", resolvedByName: "Op Erator" }, decisions: [] },
       { ...FLAG_DETAIL, reporters: [], trail: [] },
+      { ...FLAG_DETAIL, leagueId: "l1", flagType: "trade_fairness" as const, subject: TRADE_SUBJECT, decisions: ["no_action", "warned_user", "trade_reversed"] as const },
+      { ...FLAG_DETAIL, leagueId: "l1", flagType: "trade_fairness" as const, subject: { ...TRADE_SUBJECT, reversedAt: "2026-08-15T00:00:00.000Z" }, decisions: ["no_action", "warned_user"] as const },
     ]) {
       vi.mocked(flagDetail).mockResolvedValue(detail);
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
@@ -241,8 +255,12 @@ describe("the resolution form says nothing that breaks the house copy rules, in 
   const PREVIEWS = {
     warned_user: { title: "An operator reviewed a report about you", body: "We looked at a report about something you posted in Sunday Money." },
     content_removed: { title: "We removed your review", body: "An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message." },
+    trade_reversed: {
+      title: "An operator put a trade back",
+      body: "An operator reviewed the trade you and Iron Owls completed in Sunday Money and put both rosters back the way they were. You have Bijan Robinson again, and Iron Owls has Justin Jefferson. Scores from weeks you have already played stay as they were. There is no reply to this message.",
+    },
   } as const;
-  const DECISION_RADIOS = ["No action", "Warn the member", "Remove the content"] as const;
+  const DECISION_RADIOS = ["No action", "Warn the member", "Remove the content", "Reverse the trade"] as const;
 
   it.each(DECISION_RADIOS)("is clean on the %s branch, empty and with a note", async (radioLabel) => {
     const { AdminRoomDepsProvider } = await import("@/admin-room/hooks/deps");
@@ -252,17 +270,32 @@ describe("the resolution form says nothing that breaks the house copy rules, in 
     const fixture = fixtureAdminDeps();
     const { container } = render(
       <AdminRoomDepsProvider deps={fixture.deps}>
-        <ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user", "content_removed"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />
+        <ResolutionForm
+          flagId="flag_1"
+          decisions={["no_action", "warned_user", "content_removed", "trade_reversed"]}
+          noteMaxLength={500}
+          previews={PREVIEWS}
+          isChatSubject={false}
+        />
       </AdminRoomDepsProvider>,
     );
 
+    const allPreviewCopy = [
+      PREVIEWS.warned_user.title,
+      PREVIEWS.warned_user.body,
+      PREVIEWS.content_removed.title,
+      PREVIEWS.content_removed.body,
+      PREVIEWS.trade_reversed.title,
+      PREVIEWS.trade_reversed.body,
+    ];
+
     fireEvent.click(screen.getByRole("radio", { name: radioLabel }));
-    expectClean(container, PREVIEWS.warned_user.title, PREVIEWS.warned_user.body, PREVIEWS.content_removed.title, PREVIEWS.content_removed.body);
+    expectClean(container, ...allPreviewCopy);
 
     // And again once the operator has typed, since the previews swap their placeholder for the
     // note the moment there is one.
     fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "Keep it civil." } });
-    expectClean(container, PREVIEWS.warned_user.title, PREVIEWS.warned_user.body, PREVIEWS.content_removed.title, PREVIEWS.content_removed.body, '"Keep it civil."');
+    expectClean(container, ...allPreviewCopy, '"Keep it civil."');
   });
 
   it("is clean once a decision is recorded", async () => {

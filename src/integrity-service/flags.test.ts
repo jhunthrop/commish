@@ -411,13 +411,23 @@ describe("resolveFlag", () => {
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(1);
   });
 
-  it("refuses a decision no plan in this phase owns", async () => {
+  it("refuses trade_reversed for a subject that isn't a trade, before any write (Task 7)", async () => {
+    // `trade_reversed` is real now — this is the subject-aware refusal that replaces the old
+    // blanket "not owned by this plan" message, mirroring `content_removed`'s own unwired-subject
+    // check just above.
     await ensureUser("u_op");
     const flag = await openFlag({ flagType: "review_report" });
 
     const result = await resolveFlag(db, { flagId: flag.id, decision: "trade_reversed", note: "n", operatorUserId: "u_op" });
-    expect(result).toEqual({ ok: false, status: 400, reason: "This product can't reverse a trade yet." });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: "There is no trade on this flag to reverse. Close it with no action, or warn the member.",
+    });
     expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row!.resolvedAt).toBeNull();
   });
 
   it("tells the member in the operator's own words when the decision is a warning", async () => {
@@ -816,6 +826,309 @@ describe("resolveFlag", () => {
       resolveFlag(stubDb, { flagId: "flag_stub", decision: "warned_user", note: "n", operatorUserId: "u_op", notify: spyNotify }),
     ).rejects.toThrow("test probe stop");
     expect(capturedLeagueName).toBe("lg_ghost");
+  });
+});
+
+describe("resolveFlag's trade_reversed branch (Task 7)", () => {
+  const trClock = { now: () => "2026-08-25T00:00:00.000Z" };
+  const TR_SLOTS = [
+    { slot: "RB" as const, count: 1, eligiblePositions: ["RB" as const] },
+    { slot: "WR" as const, count: 1, eligiblePositions: ["WR" as const] },
+    { slot: "BENCH" as const, count: 1, eligiblePositions: ["RB" as const, "WR" as const] },
+  ];
+
+  /** A real accepted trade (Alice's RB for Bob's WR), plus a `trade_fairness` flag naming it. */
+  async function acceptedTradeWithFlag(suffix: string): Promise<{
+    readonly leagueId: string;
+    readonly teamA: string;
+    readonly teamB: string;
+    readonly userA: string;
+    readonly userB: string;
+    readonly tradeId: string;
+    readonly flagId: string;
+  }> {
+    const userA = `u_tr_alice_${suffix}`;
+    const userB = `u_tr_bob_${suffix}`;
+    await db.insert(users).values([
+      { id: userA, email: `${userA}@test.local`, displayName: "Alice" },
+      { id: userB, email: `${userB}@test.local`, displayName: "Bob" },
+    ]);
+    const created = await createLeague({ db, clock: trClock, newId: () => `lg_tr_${suffix}_${crypto.randomUUID()}` }, {
+      name: "Reversal Integration League",
+      format: "snake",
+      teamCount: 2,
+      scoringPreset: "ppr",
+      auctionBudget: null,
+      rosterSlots: TR_SLOTS,
+      commissionerUserId: userA,
+      teamName: "Team Alice",
+      experienceTier: "beginner",
+      stakeTier: 0,
+      isPublicMatchmade: false,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const teamB = `team_tr_bob_${suffix}`;
+    await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
+    await db
+      .insert(players)
+      .values([
+        { id: `p_tr_rb_${suffix}`, name: "Star RB", position: "RB", nflTeam: "KC" },
+        { id: `p_tr_wr_${suffix}`, name: "Bench WR", position: "WR", nflTeam: "SF" },
+      ])
+      .onConflictDoNothing();
+    await db.insert(rosterSlots).values([
+      { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: `p_tr_rb_${suffix}` },
+      { teamId: teamB, slot: "WR", slotIndex: 0, playerId: `p_tr_wr_${suffix}` },
+    ]);
+
+    const proposed = await proposeTrade(db, {
+      leagueId: created.leagueId,
+      userId: userA,
+      counterpartyTeamId: teamB,
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: `p_tr_rb_${suffix}` }],
+      counterpartyAssets: [{ kind: "player", playerId: `p_tr_wr_${suffix}` }],
+      note: null,
+      clock: trClock,
+      deliver: async () => {},
+    });
+    if (!proposed.ok) throw new Error(proposed.reason);
+    const accepted = await acceptTrade(db, { tradeId: proposed.tradeId, leagueId: created.leagueId, userId: userB, clock: trClock, deliver: async () => {} });
+    if (!accepted.ok) throw new Error(accepted.reason);
+
+    const flagId = `flag_tr_${suffix}`;
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_fairness",
+        subjectId: proposed.tradeId,
+        leagueId: created.leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: trClock.now(),
+        newId: () => flagId,
+        audit: logger,
+      }),
+    );
+
+    return { leagueId: created.leagueId, teamA: created.teamId, teamB, userA, userB, tradeId: proposed.tradeId, flagId };
+  }
+
+  async function isOpenFlag(flagId: string): Promise<boolean> {
+    const [row] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, flagId));
+    return row !== undefined && row.resolvedAt === null;
+  }
+
+  async function tradeRow(tradeId: string) {
+    const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, tradeId));
+    return row!;
+  }
+
+  async function auditEventsOn(scope: string, eventType: AuditEventType) {
+    return db.select().from(auditEvents).where(and(eq(auditEvents.chainScope, scope), eq(auditEvents.eventType, eventType)));
+  }
+
+  /** The resolving operator — a real `users` row, since `integrity_flags.resolved_by_user_id`
+   *  carries a real foreign key. */
+  async function ensureOperator(id: string): Promise<void> {
+    await db.insert(users).values({ id, email: `${id}@test.local`, displayName: id }).onConflictDoNothing();
+  }
+
+  it("puts the reversal on the LEAGUE chain and the decision on the platform chain — the two-class sentence, driven", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("chain");
+    const result = await resolveFlag(db, {
+      flagId: fx.flagId,
+      decision: "trade_reversed",
+      note: "Two accounts, one household, and this trade is why we looked.",
+      operatorUserId: "u_op",
+      clock: trClock,
+    });
+    expect(result).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_reversed" });
+
+    // The league can SEE two rosters change back, so the roster_move is theirs: the trade, then
+    // the reversal — two rows, one chain.
+    expect(await auditEventsOn(fx.leagueId, "roster_move")).toHaveLength(2);
+    // The investigation that ordered it is not the league's business: one flag_resolved, on the
+    // platform chain, and NONE on the league's.
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(1);
+    expect(await auditEventsOn(fx.leagueId, "flag_resolved")).toHaveLength(0);
+
+    const row = await tradeRow(fx.tradeId);
+    expect(row.status).toBe("accepted");
+    expect(row.reversedAt).not.toBeNull();
+    expect(row.reversedByFlagId).toBe(fx.flagId);
+  });
+
+  it("refuses when a traded player has since moved on, leaves the flag OPEN, and stamps nothing at all", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("moved");
+    // A third manager: Bob moves the player he got from Alice onward to Carol.
+    const userC = "u_tr_carol_moved";
+    await db.insert(users).values({ id: userC, email: `${userC}@test.local`, displayName: "Carol" });
+    const teamC = "team_tr_carol_moved";
+    await db.insert(teams).values({ id: teamC, leagueId: fx.leagueId, userId: userC, name: "Team Carol" });
+    await db.insert(players).values({ id: "p_tr_carol_1", name: "Carol's Player", position: "RB", nflTeam: "LAC" });
+    await db.insert(rosterSlots).values({ teamId: teamC, slot: "BENCH", slotIndex: 0, playerId: "p_tr_carol_1" });
+    const secondProposed = await proposeTrade(db, {
+      leagueId: fx.leagueId,
+      userId: fx.userB,
+      counterpartyTeamId: teamC,
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_tr_rb_moved" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_tr_carol_1" }],
+      note: null,
+      clock: trClock,
+      deliver: async () => {},
+    });
+    if (!secondProposed.ok) throw new Error(secondProposed.reason);
+    const secondAccepted = await acceptTrade(db, { tradeId: secondProposed.tradeId, leagueId: fx.leagueId, userId: userC, clock: trClock, deliver: async () => {} });
+    expect(secondAccepted.ok).toBe(true);
+
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      reason: "One of these players has been traded again since. Undoing this trade would take a player off a third team, so it needs a different decision.",
+    });
+    expect(await isOpenFlag(fx.flagId)).toBe(true); // the question stays open
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+  });
+
+  it("refuses a second reversal of the same trade across two different flags, and the second flag stays open", async () => {
+    await ensureOperator("u_op");
+    await ensureOperator("u_op2");
+    const fx = await acceptedTradeWithFlag("twice");
+    const first = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
+    expect(first).toMatchObject({ ok: true });
+
+    // A second report on the same trade opens a NEW flag — the open-subject index only dedupes
+    // OPEN flags, and this one is already resolved.
+    const reReportedId = "flag_tr_twice_again";
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_fairness",
+        subjectId: fx.tradeId,
+        leagueId: fx.leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: trClock.now(),
+        newId: () => reReportedId,
+        audit: logger,
+      }),
+    );
+
+    const second = await resolveFlag(db, { flagId: reReportedId, decision: "trade_reversed", note: "n", operatorUserId: "u_op2", clock: trClock });
+    expect(second).toMatchObject({ ok: false, status: 409, reason: "This trade has already been reversed." });
+    expect(await isOpenFlag(reReportedId)).toBe(true); // still open — a different decision, or no_action, can close it
+  });
+
+  it("tells BOTH managers, and the note travels as their own words", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("both");
+    await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "Two accounts, one household.", operatorUserId: "u_op", clock: trClock });
+
+    const aliceReversal = (await db.select().from(memberNotices).where(eq(memberNotices.userId, fx.userA))).find((n) => n.noticeType === "trade_reversed");
+    const bobReversal = (await db.select().from(memberNotices).where(eq(memberNotices.userId, fx.userB))).find((n) => n.noticeType === "trade_reversed");
+    expect(aliceReversal).toBeDefined();
+    expect(bobReversal).toBeDefined();
+  });
+
+  /**
+   * THE FAILURE INJECTION (dispatch instruction, binding). `reverseTradeInTx`'s own transaction
+   * commits FIRST; `resolveFlag`'s own (the platform-chain stamp) opens only after. This proves
+   * the SECOND transaction's own failure directly: an `audit` that lets a LEAGUE-scoped append
+   * through (the reversal succeeds and commits) but throws on a PLATFORM-scoped one (this
+   * function's own `flag_resolved`) leaves the trade genuinely reversed with the flag still open
+   * — nothing is silently swallowed, and the failure propagates to the caller as a rejected
+   * promise rather than a false `{ ok: true }`.
+   */
+  it("leaves the trade reversed even when THIS function's own transaction fails afterward, and never lies about it", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("failinjection");
+    const failingAudit: AuditLogger = {
+      record: async (tx, input) => {
+        if (input.leagueId === null) throw new Error("injected platform-chain failure");
+        return logger.record(tx, input);
+      },
+      recordAll: async (tx, inputs) => {
+        if (inputs.some((i) => i.leagueId === null)) throw new Error("injected platform-chain failure");
+        return logger.recordAll(tx, inputs);
+      },
+    };
+
+    await expect(
+      resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock, audit: failingAudit }),
+    ).rejects.toThrow("injected platform-chain failure");
+
+    // The reversal's OWN (earlier, separate) transaction committed — the trade really is reversed.
+    const row = await tradeRow(fx.tradeId);
+    expect(row.reversedAt).not.toBeNull();
+    expect(row.reversedByFlagId).toBe(fx.flagId);
+    // But the flag this function was supposed to stamp never got there.
+    expect(await isOpenFlag(fx.flagId)).toBe(true);
+    expect(await auditEventsOn("platform", "flag_resolved")).toHaveLength(0);
+
+    // A retry with a WORKING audit meets the reversal's own already-reversed guard — the trade is
+    // not reversed twice, but the flag still needs a different decision (or a corrected retry
+    // path) to close.
+    const retry = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
+    expect(retry).toMatchObject({ ok: false, status: 409, reason: "This trade has already been reversed." });
+  });
+
+  /**
+   * `reverseTradeInTx`'s own `applyTradeInTx` re-check can throw `TransferRefusedError` for a
+   * genuine roster-space conflict (never for "already reversed" or "moved again", both of which
+   * `reverseTradeInTx` answers as a plain refusal) — `resolveFlag`'s own `catch` around the
+   * reversal's transaction is what converts that throw into a clean 409 rather than an uncaught
+   * rejection reaching the route. Bob's WR slot and its one BENCH slot (also WR-eligible) both get
+   * filled by unrelated players between accept and reversal, leaving no home for the WR the
+   * reversal would return to him.
+   */
+  it("converts a genuine roster-space TransferRefusedError into a clean 409, not an uncaught throw", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("noroom");
+    await db.insert(players).values([
+      { id: "p_tr_filler_wr", name: "Filler WR", position: "WR", nflTeam: "DAL" },
+      { id: "p_tr_filler_bench", name: "Filler Bench", position: "WR", nflTeam: "MIA" },
+    ]);
+    await db.update(rosterSlots).set({ playerId: "p_tr_filler_wr" }).where(and(eq(rosterSlots.teamId, fx.teamB), eq(rosterSlots.slot, "WR"), eq(rosterSlots.slotIndex, 0)));
+    await db.update(rosterSlots).set({ playerId: "p_tr_filler_bench" }).where(and(eq(rosterSlots.teamId, fx.teamB), eq(rosterSlots.slot, "BENCH"), eq(rosterSlots.slotIndex, 0)));
+
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
+    expect(result).toMatchObject({ ok: false, status: 409 });
+    expect(await isOpenFlag(fx.flagId)).toBe(true);
+    const row = await tradeRow(fx.tradeId);
+    expect(row.reversedAt).toBeNull(); // the whole reversal transaction rolled back
+  });
+
+  /**
+   * The `catch` block's OTHER branch: anything that isn't `TransferRefusedError` propagates as a
+   * rejected promise rather than becoming a graceful `{ ok: false }` — the identical discipline
+   * `acceptTrade`'s own `catch` around `applyTradeInTx` holds to. A throwing `notify`, injected
+   * into the reversal via `resolveFlag`'s own `input.notify` (threaded straight through to
+   * `reverseTradeInTx`), stands in for any unexpected failure inside that transaction.
+   */
+  it("rethrows anything that is NOT a TransferRefusedError from the reversal's own transaction", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("rethrow");
+    const throwingNotify: typeof notifyAffectedMember = async () => {
+      throw new Error("unexpected reversal-transaction failure");
+    };
+
+    await expect(
+      resolveFlag(db, { flagId: fx.flagId, decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock, notify: throwingNotify }),
+    ).rejects.toThrow("unexpected reversal-transaction failure");
+
+    expect(await isOpenFlag(fx.flagId)).toBe(true);
+    const row = await tradeRow(fx.tradeId);
+    expect(row.reversedAt).toBeNull(); // the whole reversal transaction rolled back, not just the notice
+  });
+
+  it("falls through to the ordinary 404 for a flagId that names nothing at all, even for trade_reversed", async () => {
+    await ensureOperator("u_op");
+    const result = await resolveFlag(db, { flagId: "flag_tr_ghost", decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
+    expect(result).toEqual({ ok: false, status: 404, reason: 'No flag with id "flag_tr_ghost".' });
   });
 });
 

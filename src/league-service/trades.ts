@@ -155,11 +155,16 @@ const systemClock: Clock = { now: () => new Date().toISOString() };
  *  logic to keep coverage-honest, and no dash either way. */
 const ASSET_LIST_FORMAT = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
 
-function summarizeAssets(assets: readonly TradeAsset[], playersById: Readonly<Record<string, ValuedPlayer>>): string {
+/** Exported for `reverseTradeInTx` (`./trade-reversal`, Task 7), which composes its own
+ *  `trade_reversed` notices from the SAME `describeAsset`/`Intl.ListFormat` machinery rather than
+ *  a second copy — a reversal's notice is built from the identical moved-asset shape a trade's
+ *  own `trade_executed` notice already is. */
+export function summarizeAssets(assets: readonly TradeAsset[], playersById: Readonly<Record<string, ValuedPlayer>>): string {
   return ASSET_LIST_FORMAT.format(assets.map((asset) => describeAsset(asset, playersById).label));
 }
 
-function playersById(players: readonly ValuedPlayer[]): Readonly<Record<string, ValuedPlayer>> {
+/** Exported for the same reason `summarizeAssets` is. */
+export function playersById(players: readonly ValuedPlayer[]): Readonly<Record<string, ValuedPlayer>> {
   return Object.fromEntries(players.map((player) => [player.playerId, player]));
 }
 

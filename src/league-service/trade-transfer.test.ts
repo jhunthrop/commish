@@ -356,6 +356,30 @@ describe("plannedTransfer", () => {
     if (plan.ok) return;
     expect(plan.reason).toContain("no room");
   });
+
+  /**
+   * THE GAP-INDEX REGRESSION, at `plannedTransfer`'s own level (found by `reverseTradeInTx`'s
+   * lock-order proof, Task 7; the underlying fix lives in `assignSlot`, `@/draft-engine/slotting`
+   * — see that test file's own regression case for the mechanism). A two-RB roster gives away the
+   * LOWER-indexed occupant and keeps the higher-indexed one, then receives a new RB back — exactly
+   * the shape a reversal produces when the trade it is undoing shares a position with something
+   * picked up in between. Before the fix, the incoming player silently overwrote the survivor at
+   * the SAME slot index instead of taking the now-open lower one, and the survivor vanished from
+   * the plan entirely.
+   */
+  it("fills the freed lower index rather than colliding with a kept higher-indexed occupant", () => {
+    const twoRbSlots: readonly RosterSlotConfig[] = [{ slot: "RB", count: 2, eligiblePositions: ["RB"] }];
+    const plan = plannedTransfer({
+      slotConfig: twoRbSlots,
+      proposer: { teamId: "gap1", roster: [filled("RB", 1, "p_survivor")] }, // index 0 already open
+      counterparty: { teamId: "gap2", roster: [] },
+      give: [],
+      get: [rb("p_incoming")],
+    });
+    expect(plan.ok).toBe(true);
+    expect(slotOf(plan, "p_survivor")).toEqual({ slot: "RB", slotIndex: 1 }); // never displaced
+    expect(slotOf(plan, "p_incoming")).toEqual({ slot: "RB", slotIndex: 0 }); // the TRUE open index
+  });
 });
 
 // --- Step 4: applyTradeInTx, and the assertion that no player ends up on two teams -------------

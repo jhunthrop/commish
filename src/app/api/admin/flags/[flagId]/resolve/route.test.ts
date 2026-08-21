@@ -94,15 +94,32 @@ describe("POST /api/admin/flags/[flagId]/resolve", () => {
     expect(await response.json()).toEqual({ ok: false, error: "Not found." });
   });
 
-  it("answers 400 naming the field for a decision this plan does not implement, before resolveFlag ever runs", async () => {
+  it("answers 400 for a decision outside the closed enum entirely, naming the field, before resolveFlag ever runs", async () => {
     await db.insert(users).values({ id: "u_op", email: "u_op@test.local", displayName: "u_op", isAdmin: true });
     signedInAs("u_op");
     const { flagId } = await openReviewFlag("boundary");
 
-    const response = await post(flagId, { decision: "trade_reversed", note: "n" });
+    const response = await post(flagId, { decision: "account_restricted", note: "n" });
     expect(response.status).toBe(400);
     const body = await response.json();
     expect(body.error).toContain("decision");
+  });
+
+  /**
+   * Task 7: `trade_reversed` is wired now, so `resolveFlagSchema`'s own enum-level refine no
+   * longer catches this — the SERVICE's subject-aware check does, one layer deeper
+   * (`decisionIsWiredFor`, `@/integrity/flags`). Still a clean 400, still before any write, just
+   * from `resolveFlag` rather than the schema boundary.
+   */
+  it("answers 400 for trade_reversed against a subject that isn't a trade, from resolveFlag's own subject check", async () => {
+    await db.insert(users).values({ id: "u_op", email: "u_op@test.local", displayName: "u_op", isAdmin: true });
+    signedInAs("u_op");
+    const { flagId } = await openReviewFlag("trade-boundary");
+
+    const response = await post(flagId, { decision: "trade_reversed", note: "n" });
+    expect(response.status).toBe(400);
+    const body = await response.json();
+    expect(body.error).toBe("There is no trade on this flag to reverse. Close it with no action, or warn the member.");
   });
 
   it("resolves a real flag, notices nobody for no_action, and answers ok with the decision", async () => {
