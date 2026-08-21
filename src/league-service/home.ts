@@ -94,8 +94,11 @@ export async function crossLeagueHome(
     phaseByLeague.set(league.id, { currentWeek, myTeamId, nameById, mine, record });
   }
 
+  // Always non-empty: `leagueRows.length === 0` already returned above, and the loop just above
+  // sets exactly one `phaseByLeague` entry per league row, so there is always at least one
+  // current week here — no `currentWeeks.length === 0` guard needed for `inArray`.
   const currentWeeks = [...new Set([...phaseByLeague.values()].map((phase) => phase.currentWeek))];
-  const statWeekRows = currentWeeks.length === 0 ? [] : await db.select().from(statWeeks).where(inArray(statWeeks.week, currentWeeks));
+  const statWeekRows = await db.select().from(statWeeks).where(inArray(statWeeks.week, currentWeeks));
   const statWeekByWeek = new Map(statWeekRows.map((row) => [row.week, row]));
 
   const weekStatusFor = (weekNumber: number): WeekStatus => statWeekByWeek.get(weekNumber)?.status ?? "scheduled";

@@ -291,4 +291,68 @@ describe("crossLeagueHome", () => {
     const card = result.leagues.find((league) => league.id === "lgUnfilled");
     expect(card?.nextAction).toEqual({ kind: "invite-managers", label: "Invite managers" });
   });
+
+  it("finds the current week's matchup when the caller's team is the AWAY side, not just the home side", async () => {
+    // Every other matchup fixture in this file seeds the caller as the home team for the week
+    // under test — the `.find()`'s `||` never evaluates its right operand without this.
+    await seedLeague({
+      leagueId: "lgAway",
+      commissionerUserId: "u1",
+      teamCount: 2,
+      teams: [{ teamId: "away_t1", userId: "u1" }, { teamId: "away_t2", userId: "u2" }],
+    });
+    await seedMatchup("lgAway", 1, "away_t2", "away_t1", null, null);
+
+    const result = await crossLeagueHome(db, "u1");
+    const card = result.leagues.find((league) => league.id === "lgAway");
+    expect(card?.matchup).toMatchObject({ homeTeamId: "away_t2", awayTeamId: "away_t1" });
+  });
+
+  it("falls back on every '??' guard a league's own membership rows can never actually violate through real Postgres", async () => {
+    // `myLeaguesOverview`'s `ids` — the set every other query is scoped to — comes directly from
+    // the caller's own team rows, so a REAL Postgres read can never hand this function a league
+    // with no matching team/draft/myTeamByLeague entry. A stub `Db` whose four independent
+    // SELECTs disagree with each other is the only way to put the code in that state, proving
+    // every defensive `?? null` / `?? 0` fallback below `myLeaguesOverview`'s call actually does
+    // something, rather than merely existing.
+    interface Thenable {
+      then(resolve: (value: readonly unknown[]) => void): void;
+      where(): Thenable;
+      orderBy(): Thenable;
+    }
+    function thenableChain(data: readonly unknown[]): Thenable {
+      const chain: Thenable = {
+        then: (resolve) => resolve(data),
+        where: () => chain,
+        orderBy: () => chain,
+      };
+      return chain;
+    }
+    const responses: (readonly unknown[])[] = [
+      [{ leagueId: "lg_real", teamId: "team_real" }], // myLeaguesOverview: "mine"
+      [
+        { id: "lg_real", name: "Real League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", rosterSlots: [], createdAt: new Date() },
+        // A league Postgres could never actually return here — its id is absent from `ids`.
+        { id: "lg_phantom", name: "Phantom League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", rosterSlots: [], createdAt: new Date() },
+      ], // leagueRows
+      [{ id: "team_real", leagueId: "lg_real", name: "Real Team" }], // teamRows — none for lg_phantom
+      [], // draftRows — none for either league
+      [], // allMatchups
+      [], // statWeekRows
+    ];
+    let call = 0;
+    const stubDb = {
+      select: () => ({
+        from: () => {
+          const data = responses[call] ?? [];
+          call += 1;
+          return thenableChain(data);
+        },
+      }),
+    } as unknown as import("@/db/client").Db;
+
+    const result = await crossLeagueHome(stubDb, "u1");
+    const phantom = result.leagues.find((league) => league.id === "lg_phantom");
+    expect(phantom).toMatchObject({ myTeamId: null, filledTeams: 0, draftId: null, draftStatus: null, record: null });
+  });
 });

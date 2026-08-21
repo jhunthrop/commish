@@ -1,8 +1,9 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { leagues, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
-import { listTeamCards } from "./teams";
+import { leagueNameFor, listTeamCards } from "./teams";
 
 const db = createTestDb();
 
@@ -39,5 +40,24 @@ describe("listTeamCards", () => {
     expect(cards[1]).toMatchObject({
       id: "team_b", name: "Team B", ownerDisplayName: "Zed Owner", ownerAvatarUrl: "https://example.test/avatars/zed.png",
     });
+  });
+});
+
+describe("leagueNameFor", () => {
+  it("returns the league's real name", async () => {
+    const leagueId = "league_named";
+    await db.insert(users).values({ id: "user_named", email: "user_named@test.local", displayName: "Owner" });
+    await db.insert(leagues).values({
+      id: leagueId, name: "The Real Name", format: "snake", teamCount: 2,
+      commissionerUserId: "user_named", rosterSlots: [...STANDARD_ROSTER_SLOTS],
+    });
+    expect(await leagueNameFor(db, leagueId)).toBe("The Real Name");
+  });
+
+  it("falls back to the league id when the row somehow isn't there", async () => {
+    // A draft's `leagueId` is a NOT NULL foreign key, so this can't happen through real
+    // Postgres — a stub `Db` is the only way to put the code in the state it defends against.
+    const stubDb = { select: () => ({ from: () => ({ where: () => Promise.resolve([]) }) }) } as unknown as Db;
+    expect(await leagueNameFor(stubDb, "league_ghost")).toBe("league_ghost");
   });
 });

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { players, playerStatLines, scoringSettings } from "@/db/schema";
 import { STANDARD_SCORING } from "@/domain/scoring";
@@ -169,5 +170,24 @@ describe("rankedPlayers", () => {
     const ppr = await rankedPlayers(db, "league_ppr");
     expect(standard.map((p) => p.id)).toEqual(["grinder2", "possession2"]);
     expect(ppr.map((p) => p.id)).toEqual(["possession2", "grinder2"]);
+  });
+
+  it("skips a stat line whose player is missing from the roster read, rather than throwing", async () => {
+    // `playerStatLines.playerId` is a NOT NULL foreign key to `players.id` ON DELETE CASCADE —
+    // through real Postgres a stat line can never outlive its player. The two reads
+    // (`roster`, `lines`) are still two independent SELECTs rather than one JOIN, so the guard
+    // stays defensive; a stub `Db` is the only way to put it in the state it defends against.
+    const stubDb = {
+      select: () => ({
+        from: (table: unknown) => {
+          if (table === players) return Promise.resolve([]);
+          if (table === scoringSettings) return { where: () => Promise.resolve([]) };
+          if (table === playerStatLines) return { where: () => Promise.resolve([{ ...zeroLine, playerId: "ghost", week: 1, rushingYards: 999 }]) };
+          return Promise.resolve([]);
+        },
+      }),
+    } as unknown as Db;
+
+    await expect(rankedPlayers(stubDb, "league_ghost_stat_line")).resolves.toEqual([]);
   });
 });

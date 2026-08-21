@@ -44,6 +44,17 @@ const COVERAGE_GATED_DIRS = [
   "src/review-service",
   "src/integrity",
   "src/integrity-service",
+  // Gates 17 and 18, recommended by name in Plan A's final whole-branch review
+  // (`.superpowers/sdd/meta-loop.md`) for the same reason gates 13-16 exist: every
+  // whole-branch review in this loop found its HIGH findings in the service layer, and
+  // this plan writes into both directories (`join.ts`'s sweep trigger, `store.ts`'s
+  // existing notice path).
+  "src/league-service",
+  "src/draft-service",
+  // Gate 19. `src/moderation` is a new pure directory and gates for the reason every
+  // pure directory does, and because it is the single home of the vocabulary that
+  // decides what may be removed (ruling 21).
+  "src/moderation",
 ] as const;
 /**
  * The three service directories' `schemas.ts` files are named explicitly alongside the `**` glob
@@ -184,6 +195,31 @@ export default defineConfig({
           statements: 100,
         },
         "src/integrity-service/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        // Gates 17 and 18 — recommended by name in Plan A's final whole-branch review for
+        // this plan. Guards unreachable through real Postgres get narrow stub-`Db` tests
+        // that put the code in the state it defends against, the same discipline
+        // `identity-service` and `integrity-service` already use.
+        "src/league-service/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        "src/draft-service/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        // Gate 19. `src/moderation` is pure and gates for the same reason every pure
+        // directory does; it is the single home of the closed removal vocabulary
+        // (ruling 21).
+        "src/moderation/**": {
           branches: 100,
           functions: 100,
           lines: 100,

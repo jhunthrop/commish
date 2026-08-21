@@ -154,6 +154,26 @@ describe("nudge scheduler", () => {
     expect(published).toEqual([]);
   });
 
+  it("nudges the nominating team to nominate, before any lot is open", async () => {
+    // Before the first NOMINATE, teamOnClock() is the nominating team (auction.lot === null),
+    // and the copy is for "nominate" rather than "pick" — the auction lot's own live-lot test
+    // above only proves the OPPOSITE state (skipped, nobody on the clock alone).
+    const draft = await liveDraft("auction");
+    const { scheduler, published } = schedulerWith();
+    expect(await scheduler.nudge(draft.state, AFTER_THRESHOLD)).toBe("published");
+    expect(published[0]!.payload).toMatchObject({ teamId: draft.state.draftOrder[0]! });
+  });
+
+  it("falls back to a generic team name when the on-the-clock team row is somehow gone", async () => {
+    // Real Postgres always has a team row for whoever's drafting — this proves the copy still
+    // reads sensibly if it somehow doesn't, without inventing a code path that produces it.
+    const draft = await liveDraft();
+    const ghostState: DraftState = { ...draft.state, draftOrder: ["team_ghost", ...draft.state.draftOrder.slice(1)] };
+    const { scheduler, published } = schedulerWith(async (input) => input.teamName);
+    expect(await scheduler.nudge(ghostState, AFTER_THRESHOLD)).toBe("published");
+    expect(published[0]!.payload).toMatchObject({ message: "Your team" });
+  });
+
   it("falls back to the static reminder, using the team's real name", async () => {
     const draft = await liveDraft();
     const { scheduler, published } = schedulerWith(async (input) => staticNudge(input));

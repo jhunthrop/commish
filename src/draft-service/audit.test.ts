@@ -95,4 +95,24 @@ describe("auditEventsForPicks", () => {
     const events = auditEventsForPicks(stateWithPicks(2), stateWithAutoPick(3), null, ownerOf);
     expect(events[0]).toMatchObject({ actorType: "system", actorId: null });
   });
+
+  it("falls all the way through to a null actorId when no submitting actor and no owner map entry apply", () => {
+    // A non-auto pick with no submitting actor and an owner map that does not name this team's
+    // owner — the structural gap the docblock names, still `actorType: "user"` since `auto` is
+    // false, but honestly `actorId: null` rather than inventing an attribution.
+    const events = auditEventsForPicks(stateWithPicks(2), stateWithPicks(3), null, new Map());
+    expect(events[0]).toMatchObject({ actorType: "user", actorId: null });
+  });
+
+  it("records a null position when the new pick's player is not in the pool", () => {
+    // `positionOf` is built from `next.pool`; a picked player absent from it (never expected in
+    // practice, since a pick removes its player from the pool) still gets a payload rather than
+    // throwing.
+    const next: DraftState = {
+      ...stateWithPicks(2),
+      picks: [...stateWithPicks(2).picks, pickAt(3, { playerId: "player_unlisted" })],
+    };
+    const events = auditEventsForPicks(stateWithPicks(2), next, "user_alice");
+    expect(events[0]!.payload).toMatchObject({ position: null });
+  });
 });

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { eq, isNull } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db, DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { auditEvents, draftActions, integrityFlags, leagueInvites, sessionSignals, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
@@ -40,6 +40,39 @@ function dbWhoseTransactionThrows(error: unknown): Db {
     get(target, prop, receiver) {
       if (prop === "transaction") return () => Promise.reject(error);
       return Reflect.get(target, prop, receiver);
+    },
+  }) as Db;
+}
+
+/**
+ * A `Db` whose transaction runs for real, EXCEPT the second `SELECT` issued inside it (which
+ * `joinLeagueInTx`'s own `leagues ... FOR UPDATE` always is, right after `acceptInvite`'s own
+ * invite lock) comes back empty. `league_invites.league_id` cascades on delete, so a real,
+ * still-valid invite can never point at a league that isn't there — this is the only way to
+ * put `acceptInvite`'s LEAGUE_MISSING → INVALID remap (line ~127) in the state it defends.
+ */
+function dbWhoseInnerLeagueLookupMisses(): Db {
+  return new Proxy(db, {
+    get(target, prop, receiver) {
+      if (prop !== "transaction") return Reflect.get(target, prop, receiver);
+      return (fn: (tx: DbTx) => Promise<unknown>) =>
+        (target as Db).transaction((realTx) => {
+          let selectCount = 0;
+          const tx = new Proxy(realTx, {
+            get(txTarget, txProp, txReceiver) {
+              const value: unknown = Reflect.get(txTarget, txProp, txReceiver);
+              if (txProp !== "select" || typeof value !== "function") return value;
+              return (...args: unknown[]) => {
+                selectCount += 1;
+                if (selectCount === 2) {
+                  return { from: () => ({ where: () => ({ for: () => Promise.resolve([]) }) }) };
+                }
+                return (value as (...a: unknown[]) => unknown).apply(txTarget, args);
+              };
+            },
+          }) as DbTx;
+          return fn(tx);
+        });
     },
   }) as Db;
 }
@@ -297,6 +330,36 @@ describe("acceptInvite", () => {
     expect(raced).toEqual({ ok: true, leagueId: created.leagueId, teamId: joined.teamId, alreadyMember: true });
   });
 
+  it("falls through to the generic 500 when the unique-index backstop fires but the compensating lookup finds nothing", async () => {
+    // Real Postgres never produces this pairing — a 23505 on `teams_league_user_idx` means the
+    // conflicting team's INSERT already committed, so the join-through-the-invite lookup right
+    // below the catch always finds it. Forcing the transaction to always throw, for a user who
+    // never actually joined, is the only way to prove the fallback exists rather than assume it.
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await acceptInvite(
+        { db: dbWhoseTransactionThrows(uniqueViolation("teams_league_user_idx")), clock, newId },
+        { code: invite.code, userId: "u2" },
+      );
+      expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." });
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it("collapses 'the league it points at is gone' into the same INVALID answer as a dead code, never its own 404", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await acceptInvite({ db: dbWhoseInnerLeagueLookupMisses(), clock, newId }, { code: invite.code, userId: "u2" });
+    expect(result).toEqual({ ok: false, status: 404, reason: "That invite link isn't valid. Ask your commissioner for a new one." });
+  });
+
   it("answers a plain-language 500 for an unexpected failure, and logs the real detail", async () => {
     const created = await league();
     const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
@@ -450,5 +513,62 @@ describe("invitePreview", () => {
       reason: "That invite link has already been used up. Ask your commissioner for a new one.",
     });
     expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
+  });
+
+  /**
+   * A `Db` whose Nth `SELECT` (1-indexed, in call order) comes back empty, everything else
+   * real — `invitePreview` issues five in a fixed order (invite, league, commissioner, scoring
+   * settings, filled teams), and each of the three tests below needs exactly one of the last
+   * four to miss despite the invite itself being genuinely valid, which real Postgres can never
+   * produce (every one of those rows is reachable only through a chain of NOT NULL foreign keys
+   * starting at that same invite).
+   */
+  function dbWithNthSelectEmpty(position: number): Db {
+    let count = 0;
+    return new Proxy(db, {
+      get(target, prop, receiver) {
+        const value: unknown = Reflect.get(target, prop, receiver);
+        if (prop !== "select" || typeof value !== "function") return value;
+        return (...args: unknown[]) => {
+          count += 1;
+          if (count === position) return { from: () => ({ where: () => Promise.resolve([]) }) };
+          return (value as (...a: unknown[]) => unknown).apply(target, args);
+        };
+      },
+    }) as Db;
+  }
+
+  it("collapses a valid invite pointing at a gone league into the same INVALID answer, never a leak", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await invitePreview(dbWithNthSelectEmpty(2), invite.code);
+    expect(result).toEqual({ ok: false, reason: "That invite link isn't valid. Ask your commissioner for a new one." });
+    expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
+  });
+
+  it("falls back to a generic 'Commissioner' label when the commissioner's own profile row is somehow gone", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await invitePreview(dbWithNthSelectEmpty(3), invite.code);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.terms.commissionerName).toBe("Commissioner");
+    expect(result.terms.commissionerAvatar).toBeNull();
+  });
+
+  it("falls back to the PPR default when a league's own scoring settings row is somehow gone", async () => {
+    // `scoring_settings` is written in the SAME transaction as `leagues` (`createLeague`) — a
+    // missing row here never happens in production, mirrored from `matchupWeek`'s own
+    // defensive default.
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await invitePreview(dbWithNthSelectEmpty(4), invite.code);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.terms.scoringLabel).toBe("PPR");
   });
 });

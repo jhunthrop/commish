@@ -11,8 +11,10 @@ vi.mock("@/lib/auth/current-user", () => ({
 }));
 
 import { eq } from "drizzle-orm";
+import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, users } from "@/db/schema";
+import { listLeaguesForUser, toSummary } from "./read";
 import { LEAGUE_CONFIG } from "@/league";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { GET as listLeagues, POST as postLeague } from "@/app/api/leagues/route";
@@ -135,6 +137,65 @@ describe("GET /api/leagues", () => {
       id: created.leagueId, name: "Sunday Money", teamCount: 12, filledTeams: 1,
       isCommissioner: true, myTeamId: created.teamId, draftId: created.draftId, draftStatus: "scheduled",
     });
+  });
+
+  it("falls back on every '??' guard a league's own membership rows can never actually violate through real Postgres", async () => {
+    // `myLeaguesOverview`'s `ids` — the set every other query is scoped to — comes directly from
+    // the caller's own team rows, so a REAL Postgres read can never hand `listLeaguesForUser` a
+    // league with no matching team/draft/myTeamByLeague entry. A stub `Db` whose four
+    // independent SELECTs disagree with each other is the only way to prove the fallbacks below
+    // that call are real code, not merely present — mirrors `home.test.ts`'s identical proof for
+    // `crossLeagueHome`, which extends the very same shared read.
+    interface Thenable {
+      then(resolve: (value: readonly unknown[]) => void): void;
+      where(): Thenable;
+      orderBy(): Thenable;
+    }
+    function thenableChain(data: readonly unknown[]): Thenable {
+      const chain: Thenable = {
+        then: (resolve) => resolve(data),
+        where: () => chain,
+        orderBy: () => chain,
+      };
+      return chain;
+    }
+    const responses: (readonly unknown[])[] = [
+      [{ leagueId: "lg_real", teamId: "team_real" }], // myLeaguesOverview: "mine"
+      [
+        { id: "lg_real", name: "Real League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", rosterSlots: [], createdAt: new Date() },
+        // A league Postgres could never actually return here — its id is absent from `ids`.
+        { id: "lg_phantom", name: "Phantom League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", rosterSlots: [], createdAt: new Date() },
+      ], // leagueRows
+      [{ id: "team_real", leagueId: "lg_real", name: "Real Team" }], // teamRows — none for lg_phantom
+      [], // draftRows — none for either league
+    ];
+    let call = 0;
+    const stubDb = {
+      select: () => ({
+        from: () => {
+          const data = responses[call] ?? [];
+          call += 1;
+          return thenableChain(data);
+        },
+      }),
+    } as unknown as Db;
+
+    const summaries = await listLeaguesForUser(stubDb, "u1");
+    const phantom = summaries.find((league) => league.id === "lg_phantom");
+    expect(phantom).toMatchObject({ filledTeams: 0, myTeamId: null, draftId: null, draftStatus: null });
+  });
+});
+
+describe("toSummary", () => {
+  it("falls back to the raw team id when a name can't be found for it in the map it was handed", () => {
+    // Every real caller (`leagueHome`, `crossLeagueHome`) builds `nameById` from the SAME
+    // league's `teams` rows the matchup itself references, so a real matchup's team is always
+    // in it — this proves the fallback directly, against the pure function, rather than trying
+    // to engineer that mismatch through either caller's own DB reads.
+    const row = { leagueId: "lg_x", weekNumber: 1, homeTeamId: "team_ghost_home", awayTeamId: "team_ghost_away", homeScore: null, awayScore: null };
+    const summary = toSummary(row, new Map(), "scheduled");
+    expect(summary.homeTeamName).toBe("team_ghost_home");
+    expect(summary.awayTeamName).toBe("team_ghost_away");
   });
 });
 

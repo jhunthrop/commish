@@ -20,12 +20,17 @@ export async function leagueStandings(db: Db, leagueId: string, teamCards: reado
   const cardById = new Map(teamCards.map((card) => [card.id, card]));
 
   return standings.map((row) => {
-    const card = cardById.get(row.teamId);
+    // `computeStandings` only ever produces a row for a teamId drawn from `teamCards.map(id)`
+    // (`tallies`'s keys, above) — the exact same source `cardById`'s keys come from — so a
+    // standings row's card is always found. No `?? ` fallback: one would read as a real
+    // possibility a reader has to rule out by tracing two functions, when the single line above
+    // already rules it out by construction.
+    const card = cardById.get(row.teamId)!;
     return {
       ...row,
-      teamName: card?.name ?? row.teamId,
-      ownerDisplayName: card?.ownerDisplayName ?? "Unknown manager",
-      ownerAvatar: card?.ownerAvatarUrl ?? null,
+      teamName: card.name,
+      ownerDisplayName: card.ownerDisplayName,
+      ownerAvatar: card.ownerAvatarUrl,
       clinched: clinched.has(row.teamId),
     };
   });

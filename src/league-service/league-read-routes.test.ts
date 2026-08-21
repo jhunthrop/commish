@@ -19,9 +19,11 @@ vi.mock("@/league-service/browse", async (importOriginal) => {
 
 import { eq } from "drizzle-orm";
 import Redis from "ioredis";
+import type { Db } from "@/db/client";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, leagues, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
+import { drafts, leagues, matchups, players, playerStatLines, rosterSlots, scoringSettings, statWeeks, teams, users } from "@/db/schema";
 import type { Player } from "@/domain/player";
+import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { POST as postLeague } from "@/app/api/leagues/route";
@@ -253,6 +255,106 @@ describe("the read models' own guards", () => {
   it("answer null for a league that doesn't exist — the routes' 404 never reaches them", async () => {
     expect(await leagueHome(db, "nope", "u1")).toBeNull();
     expect(await matchupWeek(db, "nope", 1, "u1")).toBeNull();
+  });
+
+  it("myTeamId is null for a caller who fields no team here — the route's own 403 is what keeps a stranger from reaching this in production, not this function", async () => {
+    const created = await createDefaultLeague("u1");
+    await playableSeason(created.leagueId, created.teamId);
+    await db.insert(users).values({ id: "stranger", email: "stranger@test.local", displayName: "Stranger" });
+
+    const home = await leagueHome(db, created.leagueId, "stranger");
+    expect(home?.myTeamId).toBeNull();
+
+    const week = await matchupWeek(db, created.leagueId, 1, "stranger");
+    expect(week?.myTeamId).toBeNull();
+  });
+
+  /** A recursive thenable: every chain method (`where`, `innerJoin`, `orderBy`) returns another
+   *  one wrapping the SAME data, so it answers whatever `.select().from(table)...` shape the
+   *  code under test happens to build, regardless of call order. */
+  interface Thenable {
+    then(resolve: (value: readonly unknown[]) => void): void;
+    where(): Thenable;
+    orderBy(): Thenable;
+  }
+  function thenableChain(data: readonly unknown[]): Thenable {
+    const chain: Thenable = {
+      then: (resolve) => resolve(data),
+      where: () => chain,
+      orderBy: () => chain,
+    };
+    return chain;
+  }
+
+  it("falls back on every '??' guard leagueHome's own two independent team reads can never actually disagree on through real Postgres", async () => {
+    // `leagueHome` reads `teams` plainly (its own `teamRows`) and again through `listTeamCards`'s
+    // join — two SEPARATE SELECTs a real transaction keeps consistent, but a stub can make
+    // disagree: a commissioner's own team present in one and absent from the other, and no
+    // draft row at all despite `createLeague` always writing one. This is the only way to prove
+    // the fallbacks below `leagueHome`'s own reads are real code, not merely present.
+    const REAL_LEAGUE = {
+      id: "lg_stub", name: "Stub League", format: "snake" as const, teamCount: 2, stakeTier: 0,
+      isPublicMatchmade: false, experienceTier: "beginner" as const, commissionerUserId: "u1",
+      rosterSlots: [], createdAt: new Date(),
+    };
+    const stubDb = {
+      select: () => ({
+        from: (table: unknown) => {
+          if (table === leagues) return thenableChain([REAL_LEAGUE]);
+          if (table === matchups) return thenableChain([]);
+          if (table === teams) {
+            return {
+              // The plain `teamRows` read: only the commissioner's own team.
+              where: () => thenableChain([{ id: "t_commish", leagueId: "lg_stub", name: "Commish Team", userId: "u1" }]),
+              // `listTeamCards`'s joined read: a DIFFERENT team, absent from `teamRows` above.
+              innerJoin: () => ({ where: () => ({ orderBy: () => thenableChain([{ id: "t_phantom", name: "Phantom Team", ownerDisplayName: "Ghost", ownerAvatarUrl: null }]) }) }),
+            };
+          }
+          if (table === drafts) return thenableChain([]); // no draft row at all
+          if (table === scoringSettings) return thenableChain([]);
+          if (table === statWeeks) return thenableChain([]);
+          return thenableChain([]);
+        },
+      }),
+    } as unknown as Db;
+
+    const home = await leagueHome(stubDb, "lg_stub", "u1");
+    // `t_phantom`'s card has no matching `teamRows` entry, so `ownerUserIdByTeamId.get` misses.
+    expect(home?.teams).toEqual([expect.objectContaining({ id: "t_phantom", ownerUserId: "t_phantom" })]);
+    // The commissioner's OWN team ("t_commish") has no card at all, so `commissionerCard` is
+    // undefined.
+    expect(home?.terms.commissionerName).toBe("Commissioner");
+    expect(home?.terms.commissionerAvatar).toBeNull();
+    // No draft row exists.
+    expect(home?.draftId).toBeNull();
+    expect(home?.draftStatus).toBeNull();
+  });
+
+  it("falls back to the raw team id in a matchup side's own name when matchupWeek's two independent reads disagree, which real Postgres cannot produce", async () => {
+    // `matchupWeek` reads `matchups` and `teams` as two SEPARATE selects over the same league —
+    // real Postgres keeps them consistent, a stub does not. An empty `teams` table (never
+    // reachable for a league whose FK-constrained matchups DO exist) is the direct way to put
+    // `sideFor`'s own `nameById.get(teamId) ?? teamId` fallback in the state it defends.
+    const REAL_LEAGUE = {
+      id: "lg_stub_wk", name: "Stub League", format: "snake" as const, teamCount: 2, stakeTier: 0,
+      isPublicMatchmade: false, experienceTier: "beginner" as const, commissionerUserId: "u1",
+      rosterSlots: [...STANDARD_ROSTER_SLOTS], createdAt: new Date(),
+    };
+    const MATCHUP_ROW = { leagueId: "lg_stub_wk", weekNumber: 1, homeTeamId: "team_ghost_home", awayTeamId: "team_ghost_away", homeScore: null, awayScore: null };
+    const stubDb = {
+      select: () => ({
+        from: (table: unknown) => {
+          if (table === leagues) return thenableChain([REAL_LEAGUE]);
+          if (table === matchups) return thenableChain([MATCHUP_ROW]);
+          if (table === teams) return thenableChain([]); // no team rows at all
+          return thenableChain([]); // statWeeks, scoringSettings, players, playerStatLines, lineupSlots, rosterSlots
+        },
+      }),
+    } as unknown as Db;
+
+    const week = await matchupWeek(stubDb, "lg_stub_wk", 1, "u1");
+    expect(week?.matchups[0]?.home.teamName).toBe("team_ghost_home");
+    expect(week?.matchups[0]?.away.teamName).toBe("team_ghost_away");
   });
 });
 

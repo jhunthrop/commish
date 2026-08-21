@@ -17,6 +17,28 @@ const deps = () => ({ db, newId, clock });
 let counter = 0;
 const logger = createAuditLogger({ newId: () => `evt_${(counter += 1)}` });
 
+/**
+ * A `Db` whose `transaction(...)` rejects with the given error but whose reads still hit the
+ * real database — the league row lock (`FOR UPDATE`, taken before the "already a member" check)
+ * is expected to prevent two concurrent same-user joins from ever racing each other into the
+ * unique-index backstop, so no test in this file can schedule that race reliably. Mirrors
+ * `invites.test.ts`'s helper of the same name and shape.
+ */
+function dbWhoseTransactionThrows(error: unknown): Db {
+  return new Proxy(db, {
+    get(target, prop, receiver) {
+      if (prop === "transaction") return () => Promise.reject(error);
+      return Reflect.get(target, prop, receiver);
+    },
+  }) as Db;
+}
+
+/** The shape `postgres-js` raises through Drizzle: the driver fields sit one level under `.cause`. */
+const uniqueViolation = (constraint: string) =>
+  Object.assign(new Error("duplicate key value violates unique constraint"), {
+    cause: { code: "23505", constraint_name: constraint },
+  });
+
 async function seedLeague(over: {
   readonly id?: string;
   readonly teamCount?: number;
@@ -160,6 +182,50 @@ describe("joinPublicLeague", () => {
     await joinPublicLeague({ db, newId, clock, audit: logger }, { leagueId, userId: "joiner" });
     await joinPublicLeague({ db, newId, clock, audit: logger }, { leagueId, userId: "joiner" });
     expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "member_joined"))).toHaveLength(1);
+  });
+
+  it("treats the unique-index backstop firing as 'already a member', not an error", async () => {
+    const leagueId = await seedLeague();
+    const joined = await joinPublicLeague(deps(), { leagueId, userId: "joiner" });
+    if (!joined.ok) throw new Error(joined.reason);
+
+    const raced = await joinPublicLeague(
+      { db: dbWhoseTransactionThrows(uniqueViolation("teams_league_user_idx")), newId, clock },
+      { leagueId, userId: "joiner" },
+    );
+    expect(raced).toEqual({ ok: true, leagueId, teamId: joined.teamId, alreadyMember: true });
+  });
+
+  it("falls through to the generic 500 when the unique-index backstop fires but the compensating lookup finds nothing", async () => {
+    // Real Postgres never produces this pairing — see the analogous test in `invites.test.ts`
+    // for `acceptInvite`'s own copy of this same backstop.
+    const leagueId = await seedLeague();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await joinPublicLeague(
+        { db: dbWhoseTransactionThrows(uniqueViolation("teams_league_user_idx")), newId, clock },
+        { leagueId, userId: "joiner" },
+      );
+      expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." });
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it("computes the 'New team' fallback name even for a caller whose profile row is somehow gone", async () => {
+    // `teams.userId` is a NOT NULL foreign key to `users.id`, so a caller with no profile row
+    // can never actually reach a committed team — the INSERT below fails first. The name
+    // expression itself (`teamName ?? profile?.displayName ?? "New team"`) still evaluates
+    // BEFORE that insert runs, which is what this proves: the fallback string is real code, not
+    // dead weight, even though nothing durable can ever carry it out through real Postgres.
+    const leagueId = await seedLeague();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await joinPublicLeague(deps(), { leagueId, userId: "ghost_no_profile" });
+      expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." });
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 
   it("triggers a real multi-account sweep after the join commits, and it can raise a real flag", async () => {
