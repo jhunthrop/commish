@@ -351,20 +351,41 @@ beside Phase 2 Plan D's XFF-limiter item — the same underlying platform-verifi
 gates both, and a reader who finds one gate should find the other beside it, not have to go
 looking.
 
-**The trigger, and why it is a sweep and not a subscriber.** A league's pair set changes exactly
-when a seat fills, so `joinLeagueInTx`'s two callers (`acceptInvite`, `joinPublicLeague`) call
-`triggerMultiAccountSweep(db, outcome)` **after** their own transaction commits, never inside it
-(ruling 11). A subscriber on every session start would re-derive the same answer thousands of times
-for a question whose inputs change once. The **after-commit** placement is the deliberate part: the
-sweep appends to the platform chain (a second anchor lock) while the join transaction may still be
-holding `league_invites` `FOR UPDATE` (the invite door) and `leagues` `FOR UPDATE` — running the
-sweep inside that transaction would be a second anchor lock taken while another lock is already
-held, exactly the ordering hazard Plan A's write-ordering rule exists to prevent. A failed sweep is
-logged and swallowed, never re-thrown: the person joining did nothing wrong, and
+**The triggers, and why it is a sweep and not a subscriber.** There are **two**, and each fires at
+the moment one of the sweep's own inputs comes into existence. A subscriber on every session start
+would re-derive the same answer thousands of times for a question whose inputs change twice.
+
+1. **A seat fills.** A league's pair set changes exactly here, so `joinLeagueInTx`'s two callers
+   (`acceptInvite`, `joinPublicLeague`) call `triggerMultiAccountSweep(db, outcome)` **after** their
+   own transaction commits, never inside it (ruling 11).
+2. **A draft completes.** The behavioral signal changes exactly here: `profilesFor` derives cadence
+   from the league's own `MAKE_PICK` rows, and a league has none until its draft has run. The draft
+   store (`src/draft-service/store.ts`) fires the sweep after the transaction that turned the draft
+   into a season commits.
+
+The second trigger is not an optimization; without it the detector **raises nothing in production**,
+which the final whole-branch review found and which is arithmetic rather than a bug. A join is
+refused once the draft leaves `scheduled` (`publicJoinPrecondition`) and no seat reopens afterwards,
+so at every real firing of trigger 1 the league has zero `MAKE_PICK` rows,
+`behavioralSimilarity` returns its sample floor of `0`, and the remaining weight
+(`device` 0.6, `ip` 0) cannot reach `flagThreshold` 0.75 even at a perfect device match. Trigger 1
+stays because the pair set really does change there and it becomes meaningful the day the IP weight
+leaves zero; `multi-account.test.ts`'s "the trigger timing that actually ships" drives both moments
+against a real join and a real completed draft, and asserts that ceiling explicitly so the
+limitation is a red test the day a weight changes rather than a fact nobody rediscovers.
+
+The **after-commit** placement is the deliberate part, and it is the same for both triggers: the
+sweep appends to the platform chain (a second anchor lock) while the triggering transaction may
+still be holding `league_invites` `FOR UPDATE` (the invite door), `leagues` `FOR UPDATE` (both join
+doors) or `drafts` `FOR UPDATE` (the draft store) — running the sweep inside that transaction would
+be a second anchor lock taken while another lock is already held, exactly the ordering hazard Plan
+A's write-ordering rule exists to prevent. A failed sweep is logged and swallowed, never re-thrown
+(one implementation, `sweepQuietly`, shared by both triggers): the person joining did nothing wrong
+and neither did the league that just finished drafting, and
 `scripts/sweep-multi-account.ts` (`npm run integrity:sweep -- --league <id>`) is the manual re-run
-for a league whose signals moved after the trigger fired, or whose trigger itself failed. The join's
-own audit event, `member_joined`, is written **inside** its transaction, where it belongs — the
-sweep's `flag_raised`, if any, is a second, independent append.
+for a league whose signals moved after both triggers fired, or whose trigger itself failed. The
+join's own audit event, `member_joined`, is written **inside** its transaction, where it belongs —
+the sweep's `flag_raised`, if any, is a second, independent append.
 
 **A flag is raised by the platform; a member's report is a signal that raises one (ruling 12).**
 There is no "report this member" affordance anywhere in this plan — everything reportable is a

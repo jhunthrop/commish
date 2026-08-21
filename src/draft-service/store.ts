@@ -14,6 +14,7 @@ import {
   type DraftState,
 } from "@/draft-engine";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { sweepQuietly } from "@/integrity-service/multi-account";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
@@ -216,6 +217,11 @@ export function createDraftStore({
         // transaction, but their live frames must only go out once that transaction has
         // actually committed — see `deliverNotice`'s own docblock.
         let previous: DraftState | null = null;
+        // Set inside the transaction, on the ONE branch that turns a draft into a season, and
+        // read after the commit by the multi-account sweep's second trigger below. Captured
+        // there rather than re-derived here for the same reason `previous` is: the before-state
+        // this transition is judged against only exists inside the transaction.
+        let completedLeagueId: string | null = null;
         const createdNotices: MemberNotice[] = [];
 
         try {
@@ -323,6 +329,7 @@ export function createDraftStore({
             // the anchor, not after it.
             const counts =
               result.state.phase === "complete" && state.phase !== "complete" ? await commitDraftState(tx, result.state) : null;
+            if (counts !== null) completedLeagueId = result.state.config.leagueId;
 
             // THE ANCHOR, LAST. Nothing below takes a lock on any table another audited
             // transaction locks first.
@@ -354,6 +361,16 @@ export function createDraftStore({
 
           cache.set(draftId, outcome.state);
           if (previous !== null) await broadcast(previous, outcome.state, action);
+          // THE MULTI-ACCOUNT SWEEP'S SECOND TRIGGER (final review, HIGH 2), after the commit for
+          // the same reason `broadcast` is: this transaction has just released `drafts` FOR
+          // UPDATE, and the sweep appends to the PLATFORM chain — a third lock, on an anchor row,
+          // which ruling 3 forbids taking while a business lock is held. `sweepQuietly` swallows
+          // its own failures, so a detector that falls over never rolls back a finished draft.
+          //
+          // Fires on the TRANSITION only, and only here: a league's behavioral signal comes into
+          // existence exactly when its draft finishes, and until then the join-time trigger's
+          // arithmetic cannot reach `flagThreshold` at all (see `triggerMultiAccountSweep`).
+          if (completedLeagueId !== null) await sweepQuietly(db, completedLeagueId, "draft_completed");
           // Best-effort, after the commit, beside `broadcast` — the inverse of `notifyAffectedMember`'s
           // own discipline: the durable row above already failed the transaction if it had to;
           // this frame never fails anything, because the write it announces already landed.

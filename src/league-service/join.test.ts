@@ -289,7 +289,10 @@ describe("joinPublicLeague", () => {
       } as unknown as Db;
       const outcome: JoinLeagueOutcome = { ok: true, leagueId: "lg_broken", teamId: "t1", alreadyMember: false };
       await expect(triggerMultiAccountSweep(brokenDb, outcome, sweepDeps)).resolves.toBeUndefined();
-      expect(spy).toHaveBeenCalledWith("[integrity] multi-account sweep failed after a league join", { leagueId: "lg_broken" }, expect.any(Error));
+      // The swallow itself lives in `sweepQuietly` (`@/integrity-service/multi-account`), shared
+      // with the draft-completion trigger; the `trigger` tag is what tells an operator reading
+      // the log which of the two dropped a sweep.
+      expect(spy).toHaveBeenCalledWith("[integrity] multi-account sweep failed", { leagueId: "lg_broken", trigger: "league_join" }, expect.any(Error));
       spy.mockRestore();
     });
   });

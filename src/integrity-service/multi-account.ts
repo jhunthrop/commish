@@ -226,13 +226,25 @@ export interface SweepResult {
  * exposure, and the second reason is the one that matters: two strangers on one office network
  * who have never met are not a question anybody should be asked to answer.
  *
- * It is a SWEEP WITH A TRIGGER, not a subscriber (ruling 11). The pair set of a league changes
- * exactly when a seat is filled, so `joinLeagueInTx` is the trigger (`@/league-service/join`,
- * `@/league-service/invites` — run AFTER the join's own transaction commits, never inside it,
- * see those files' own docblocks for the lock-order reasoning) and `scripts/sweep-multi-
- * account.ts` is the manual re-run for a league whose signals moved after it filled up. A
- * subscriber on every session start would re-derive the same answer thousands of times for a
- * question whose inputs change once.
+ * It is a SWEEP WITH TRIGGERS, not a subscriber (ruling 11). There are TWO, and each fires at a
+ * moment one of the sweep's inputs comes into existence — both AFTER their own transaction
+ * commits, never inside it, see `sweepQuietly` below and those files' own docblocks for the
+ * lock-order reasoning:
+ *
+ *  1. A SEAT IS FILLED (`@/league-service/join`, `@/league-service/invites`). The pair set of a
+ *     league changes exactly here and nowhere else.
+ *  2. A DRAFT COMPLETES (`@/draft-service/store`). The behavioral signal changes exactly here:
+ *     `profilesFor` derives cadence from this league's own `MAKE_PICK` rows, and a league has
+ *     none of them until its draft has run. Final review, HIGH 2: with trigger 1 alone the
+ *     detector could never raise anything in production — a join is refused once the draft
+ *     leaves `scheduled`, so at every real firing of trigger 1 the behavioral score is pinned at
+ *     `behavioralSimilarity`'s sample floor of 0 and the remaining weight cannot reach
+ *     `flagThreshold`. `multi-account.test.ts`'s "the trigger timing that actually ships" drives
+ *     both moments for real and pins that arithmetic.
+ *
+ * `scripts/sweep-multi-account.ts` is the manual re-run for a league whose signals moved after
+ * both triggers had already fired. A subscriber on every session start would re-derive the same
+ * answer thousands of times for a question whose inputs change twice.
  *
  * FLAGS ONLY. There is no branch in this file, or reachable from it, that takes any action
  * against an account — proved by `src/integrity/flag-only.test.ts` rather than asserted here.
@@ -274,4 +286,33 @@ export async function sweepLeagueForMultiAccounts(db: Db, leagueId: string, deps
   }
 
   return { leagueId, pairsCompared: pairs.length, flagsRaised };
+}
+
+/** Which moment asked for a sweep. Recorded on the log line a swallowed failure leaves behind,
+ *  so an operator re-running the script by hand knows which trigger dropped it. */
+export type SweepTrigger = "league_join" | "draft_completed";
+
+/**
+ * The sweep, run for its side effect, with the failure isolation every TRIGGER needs — the one
+ * place that swallow is implemented, shared by both doors into a league and by the draft store.
+ *
+ * A failed sweep must never fail the business write that triggered it: the person who joined,
+ * and the ten people who just finished a draft, did nothing wrong, and an integrity read falling
+ * over is not a reason to reject a seat or roll back a completed season. The error is logged and
+ * `npm run integrity:sweep -- --league <id>` is the manual re-run.
+ *
+ * Callers invoke this AFTER their own `db.transaction(...)` has resolved. Lock order is the
+ * reason, not convenience: the sweep appends `flag_raised` to the PLATFORM chain — an anchor lock
+ * on a chain the triggering transaction has no reason to touch — while that transaction may
+ * still hold `leagues` `FOR UPDATE` (both join doors), `league_invites` `FOR UPDATE` (the invite
+ * door) or `drafts` `FOR UPDATE` (the draft store). Taking a third lock, on a chain anchor,
+ * while two others are held is exactly the hazard `audit-logger.ts`'s own docblock spent a real
+ * incident explaining. Outside the transaction the sweep's writes take no lock the trigger holds.
+ */
+export async function sweepQuietly(db: Db, leagueId: string, trigger: SweepTrigger, deps: SweepDeps = defaultSweepDeps()): Promise<void> {
+  try {
+    await sweepLeagueForMultiAccounts(db, leagueId, deps);
+  } catch (error: unknown) {
+    console.error("[integrity] multi-account sweep failed", { leagueId, trigger }, error);
+  }
 }

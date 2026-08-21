@@ -1,10 +1,15 @@
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { Db } from "@/db/client";
-import { auditEvents, draftActions, drafts, integrityFlags, leagues, sessionSignals, teams, users } from "@/db/schema";
+import { auditEvents, draftActions, drafts, integrityFlags, leagues, players, sessionSignals, teams, users } from "@/db/schema";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
+import type { DraftPoolEntry } from "@/domain/draft";
+import type { RosterSlotConfig } from "@/domain/roster";
+import { teamOnClock } from "@/draft-engine";
+import { createDraftStore } from "@/draft-service/store";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import { triggerMultiAccountSweep } from "@/league-service/join";
+import { multiAccountSuspicion } from "@/integrity/similarity";
+import { joinPublicLeague, triggerMultiAccountSweep } from "@/league-service/join";
 import { createAuditLogger } from "./audit-logger";
 import { flagDetail, listPendingFlags } from "./flags";
 import { listLeagueActivity } from "./activity";
@@ -514,5 +519,117 @@ describe("defaultSweepDeps", () => {
     expect(deps.weights).toEqual(INTEGRITY_CONFIG.multiAccount.weights);
     expect(deps.flagThreshold).toBe(INTEGRITY_CONFIG.multiAccount.flagThreshold);
     expect(typeof deps.newId()).toBe("string");
+  });
+});
+
+/**
+ * FINAL REVIEW, HIGH 2. Every other test in this file hands the sweep a league whose draft log
+ * already exists, which proves the detector works and hides WHEN it can run. Composed with the
+ * real timing, the join-time trigger could never raise anything: joins are refused once a draft
+ * leaves `scheduled` (`publicJoinPrecondition`) and no seat ever reopens after one, so at every
+ * real firing the league has zero `MAKE_PICK` rows, `behavioralSimilarity` is pinned at its
+ * sample floor of 0, and device alone tops out below the threshold.
+ *
+ * These two tests drive that timing for real — a real `joinPublicLeague` into a scheduled draft,
+ * then a real draft played to completion through the real store — and pin the arithmetic so the
+ * limitation is a red assertion the day it changes rather than a fact nobody rediscovers.
+ */
+describe("the trigger timing that actually ships", () => {
+  const LEAGUE = "lg_timing";
+  const DRAFT = "lg_timing_draft";
+  const [USER_A, USER_B] = [`${LEAGUE}_ua`, `${LEAGUE}_ub`];
+  const TEAM_A = `${LEAGUE}_ta`;
+  /** Five slots, so two teams produce ten picks and each side clears `minActionsForBehavioral`. */
+  const ROSTER: readonly RosterSlotConfig[] = [
+    { slot: "QB", count: 1, eligiblePositions: ["QB"] },
+    { slot: "RB", count: 2, eligiblePositions: ["RB"] },
+    { slot: "WR", count: 2, eligiblePositions: ["WR"] },
+  ];
+  const POOL: readonly DraftPoolEntry[] = [
+    { playerId: "tqb1", position: "QB" }, { playerId: "tqb2", position: "QB" },
+    { playerId: "trb1", position: "RB" }, { playerId: "trb2", position: "RB" },
+    { playerId: "trb3", position: "RB" }, { playerId: "trb4", position: "RB" },
+    { playerId: "twr1", position: "WR" }, { playerId: "twr2", position: "WR" },
+    { playerId: "twr3", position: "WR" }, { playerId: "twr4", position: "WR" },
+  ];
+
+  /** A PUBLIC league with one seat still open, a scheduled draft, and both accounts already
+   *  signing in from the same client — everything the detector needs except a draft. */
+  async function seedLeagueAwaitingItsLastSeat(): Promise<void> {
+    await seedUser(USER_A);
+    await seedUser(USER_B);
+    await db.insert(leagues).values({
+      id: LEAGUE, name: LEAGUE, format: "snake", teamCount: 2,
+      commissionerUserId: USER_A, isPublicMatchmade: true, rosterSlots: [...ROSTER],
+    });
+    await db.insert(teams).values({ id: TEAM_A, leagueId: LEAGUE, userId: USER_A, name: "A" });
+    await db.insert(drafts).values({ id: DRAFT, leagueId: LEAGUE, format: "snake", status: "scheduled", kickoffAt: new Date(NOW) });
+    await db.insert(players).values(POOL.map((entry) => ({ id: entry.playerId, name: entry.playerId, position: entry.position, nflTeam: "FA" })));
+    for (const userId of [USER_A, USER_B]) await seedSignal(userId, { userAgent: "SharedClient/1.0", acceptLanguage: "en-US" });
+  }
+
+  it("raises nothing at join time, and the arithmetic is why — no draft has run, so behavioral is floored at zero", async () => {
+    await seedLeagueAwaitingItsLastSeat();
+
+    // The real door, with its real precondition (the draft is still `scheduled`, which is the
+    // ONLY state a join is accepted in) and its real after-commit trigger.
+    const joined = await joinPublicLeague(
+      { db, newId: nextId, clock: { now: () => NOW }, audit: logger },
+      { leagueId: LEAGUE, userId: USER_B, teamName: "B" },
+    );
+    expect(joined.ok).toBe(true);
+    await triggerMultiAccountSweep(db, joined, baseDeps);
+
+    expect(await openFlags(db)).toHaveLength(0);
+
+    // WHY it raised nothing, stated as arithmetic rather than left as an observation. At join
+    // time the league has no `MAKE_PICK` rows at all, so `behavioralSimilarity` returns its
+    // sample-floor 0 for every pair; the best a pair can then reach is every OTHER signal at
+    // 1.0. That ceiling is below the flag threshold, and this assertion is what turns "the join
+    // trigger is inert today" into a red test the day a weight changes.
+    const { weights, flagThreshold } = INTEGRITY_CONFIG.multiAccount;
+    const ceilingWithoutBehavioral = multiAccountSuspicion({ device: 1, ip: 1, behavioral: 0 }, weights);
+    expect(ceilingWithoutBehavioral).toBeLessThan(flagThreshold);
+    // And the sweep really did run over a real pair — it found nothing, it did not skip.
+    expect(await db.select().from(teams).where(eq(teams.leagueId, LEAGUE))).toHaveLength(2);
+  });
+
+  it("raises the pair when the draft completes, which is the first instant a behavioral signal exists", async () => {
+    await seedLeagueAwaitingItsLastSeat();
+    const joined = await joinPublicLeague(
+      { db, newId: nextId, clock: { now: () => NOW }, audit: logger },
+      { leagueId: LEAGUE, userId: USER_B, teamName: "B" },
+    );
+    expect(joined.ok).toBe(true);
+    await triggerMultiAccountSweep(db, joined, baseDeps);
+    expect(await openFlags(db)).toHaveLength(0);
+
+    // The real store, the real action log, real MAKE_PICK rows — the behavioral data coming into
+    // existence for the first time, which is exactly the moment the new trigger fires on.
+    const store = createDraftStore({ db, publish: async () => "1-0", clock: { now: () => NOW }, audit: logger });
+    const teamIds = (await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, LEAGUE))).map((row) => row.id).sort();
+    const started = await store.applyAction(DRAFT, { v: 1, type: "START_DRAFT", minBid: 1, timestamp: NOW, draftOrder: teamIds, pool: [...POOL] });
+    expect(started.ok).toBe(true);
+
+    for (let taken = 0; taken < POOL.length; taken += 1) {
+      const state = await store.getDraftState(DRAFT);
+      if (state === null || state.phase === "complete") break;
+      const onClock = teamOnClock(state)!;
+      const available = POOL.find((entry) => !state.picks.some((p) => p.playerId === entry.playerId))!;
+      const result = await store.applyAction(
+        DRAFT,
+        { v: 1, type: "MAKE_PICK", timestamp: NOW, teamId: onClock, playerId: available.playerId },
+        { actor: { id: onClock === TEAM_A ? USER_A : USER_B } },
+      );
+      expect(result.ok).toBe(true);
+    }
+    expect((await store.getDraftState(DRAFT))?.phase).toBe("complete");
+
+    // No manual sweep call here: the completing transaction's own after-commit trigger is what
+    // raised this.
+    const flags = await openFlags(db);
+    expect(flags).toHaveLength(1);
+    expect(flags[0]!.flagType).toBe("multi_account");
+    expect(flags[0]!.subjectId).toBe(canonicalPairId(USER_A, USER_B));
   });
 });

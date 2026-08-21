@@ -1,8 +1,10 @@
-// The manual re-run for the multi-account detector (ruling 11): `joinLeagueInTx`'s own trigger
-// (`@/league-service/join`'s `triggerMultiAccountSweep`) fires the sweep once, right after a
-// seat is filled — this script is for the two cases that trigger cannot cover: a league whose
-// members' signals moved AFTER it filled up (a later sign-in from a new device, more draft
-// picks), or a trigger that ran and logged a failure instead of raising what it found.
+// The manual re-run for the multi-account detector (ruling 11). Two triggers fire the sweep on
+// their own, each right after its own transaction commits: a filled seat
+// (`@/league-service/join`'s `triggerMultiAccountSweep`, the moment the pair set changes) and a
+// completed draft (`@/draft-service/store`, the moment the behavioral signal first exists).
+// This script is for the cases neither can cover: a league whose members' signals moved AFTER
+// both had fired (a later sign-in from a new device), or a trigger that ran and logged a
+// failure instead of raising what it found.
 //
 // Run: npm run integrity:sweep -- --league <leagueId>
 //
