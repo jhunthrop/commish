@@ -32,11 +32,13 @@ import { candidateCopyIn, sourceFilesIn } from "./test-support";
  * string reddens the scan for the file it lives in.
  */
 
-/** The two client-room directories the review named. The other rooms are swept by the rendered
- *  sweep's own `describe` blocks; these two are added here rather than there because the gap
- *  that let 5 and 6 ship was not "somebody forgot a block", it was that a hand-maintained list
- *  cannot cover a directory. */
-const ROOM_DIRS = ["src/chat-room", "src/admin-room"];
+/** The client-room directories the review named, plus `src/league-room` (Phase 3 Plan C, Task
+ *  8, ruling 27): every string in the league room had been sweep-free since Phase 1, and this
+ *  plan is the one that adds thirty more of them (the trade surface). Directory-derived, so a
+ *  component added next month is covered the moment it exists rather than when somebody
+ *  remembers — the same reason the other two are here rather than in the rendered sweep's
+ *  hand-maintained `describe` list. */
+const ROOM_DIRS = ["src/chat-room", "src/admin-room", "src/league-room"];
 
 const REPO_ROOT = process.cwd();
 

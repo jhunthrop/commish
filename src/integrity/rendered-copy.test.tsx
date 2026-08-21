@@ -6,6 +6,13 @@ import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 import type { NoticeView } from "@/account-room/contract";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
 import type { ActivityRow } from "@/integrity/activity-view";
+import type { TradeProposalView } from "@/trades/contract";
+import type { ValuedPlayer } from "@/trades/fairness";
+import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { fixtureLeagueDeps } from "@/league-room/test-fixtures";
+import { TradeCard } from "@/league-room/components/trade-card";
+import { TradeComposer } from "@/league-room/components/trade-composer";
+import type { TradeRoomContext } from "@/league-room/contract";
 import { copyViolations } from "./copy-rules";
 
 /**
@@ -315,5 +322,101 @@ describe("the resolution form says nothing that breaks the house copy rules, in 
     fireEvent.click(screen.getByRole("button", { name: "Submit decision" }));
     await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
     expectClean(container);
+  });
+});
+
+/**
+ * Task 8. `TRADE_TEAM_COPY` below is the content this sweep subtracts before checking the rest —
+ * team names, player names, and the note a proposer typed — the same "everything else is house
+ * copy" discipline `expectClean`'s own callers use throughout this file. Every `TradeCard` status
+ * branch gets its own render (open/inbound, open/outbound, accepted, accepted+reversed, rejected,
+ * withdrawn, expired, superseded), plus the confirm dialog opened on the one status that has an
+ * Accept control — Plan B's final review found an em dash on a branch that never mounted, and a
+ * `Modal` opened only by a click is exactly that shape of gap.
+ */
+const TRADE_PLAYERS: Readonly<Record<string, ValuedPlayer>> = {
+  p1: { playerId: "p1", name: "Bijan Robinson", position: "RB", averagePoints: 18.2 },
+  p2: { playerId: "p2", name: "Puka Nacua", position: "WR", averagePoints: 15.4 },
+};
+
+const TRADE_BASE: TradeProposalView = {
+  id: "trade_1",
+  leagueId: "league_1",
+  weekNumber: 5,
+  status: "open",
+  proposedAt: "2026-08-18T00:00:00.000Z",
+  expiresAt: "2026-08-21T00:00:00.000Z",
+  settledAt: null,
+  reversedAt: null,
+  note: null,
+  from: { teamId: "them", teamName: "Iron Owls", assets: [{ kind: "player", playerId: "p1" }] },
+  to: { teamId: "me", teamName: "Bay Bandits", assets: [{ kind: "player", playerId: "p2" }] },
+};
+
+const TRADE_CONTENT = ["Iron Owls", "Bay Bandits", "Bijan Robinson", "Puka Nacua"];
+
+describe("TradeCard says nothing that breaks the house copy rules, in every status", () => {
+  it("is clean across every status a stored proposal can hold", () => {
+    const states: readonly { readonly label: string; readonly trade: TradeProposalView; readonly meTeamId: string }[] = [
+      { label: "open, answerable", trade: TRADE_BASE, meTeamId: "me" },
+      { label: "open, waiting on a reply", trade: TRADE_BASE, meTeamId: "them" },
+      { label: "accepted", trade: { ...TRADE_BASE, status: "accepted", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
+      { label: "accepted, then reversed", trade: { ...TRADE_BASE, status: "accepted", settledAt: "2026-08-19T00:00:00.000Z", reversedAt: "2026-08-20T00:00:00.000Z" }, meTeamId: "me" },
+      { label: "rejected", trade: { ...TRADE_BASE, status: "rejected", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
+      { label: "withdrawn, by me", trade: { ...TRADE_BASE, status: "withdrawn", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "them" },
+      { label: "withdrawn, by them", trade: { ...TRADE_BASE, status: "withdrawn", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
+      { label: "expired", trade: { ...TRADE_BASE, status: "expired" }, meTeamId: "me" },
+      { label: "superseded", trade: { ...TRADE_BASE, status: "superseded", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
+      { label: "with a note", trade: { ...TRADE_BASE, note: "Rebuilding my TE spot" }, meTeamId: "me" },
+    ];
+
+    for (const { trade, meTeamId } of states) {
+      const { container, unmount } = render(
+        <TradeCard trade={trade} meTeamId={meTeamId} playersById={TRADE_PLAYERS} assessment={{ verdict: "lopsided", givingValue: 5, receivingValue: 40 }} />,
+      );
+      expectClean(container, ...TRADE_CONTENT, '"Rebuilding my TE spot"');
+      unmount();
+    }
+  });
+
+  it("is clean on the accept confirm dialog", () => {
+    const { container } = render(<TradeCard trade={TRADE_BASE} meTeamId="me" playersById={TRADE_PLAYERS} />);
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
+    expectClean(container, ...TRADE_CONTENT);
+  });
+});
+
+const TRADE_CONTEXT: TradeRoomContext = {
+  weekNumber: 5,
+  myTeamId: "me",
+  counterparties: [{ teamId: "them", teamName: "Iron Owls" }],
+  rostersByTeamId: {
+    me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" }],
+    them: [{ playerId: "p2", name: "Puka Nacua", position: "WR" }],
+  },
+};
+
+describe("TradeComposer says nothing that breaks the house copy rules, with and without a note", () => {
+  it("is clean before a team is chosen, after players are picked, and with a note typed", async () => {
+    const onAssess = vi.fn().mockResolvedValue({
+      ok: true,
+      data: { headline: "Close call.", reasoning: "Both sides give up similar weekly production.", degraded: false, verdict: "even", flags: [], givingValue: 18, receivingValue: 17.5 },
+    });
+    const { container } = render(
+      <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
+        <TradeComposer context={TRADE_CONTEXT} onAssess={onAssess} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />
+      </LeagueRoomDepsProvider>,
+    );
+    expectClean(container, ...TRADE_CONTENT);
+
+    fireEvent.change(screen.getByLabelText("Trade with"), { target: { value: "them" } });
+    fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
+    fireEvent.click(screen.getByLabelText(/Puka Nacua/));
+    await waitFor(() => expect(onAssess).toHaveBeenCalled());
+    await screen.findByText(/close to even/i);
+    expectClean(container, ...TRADE_CONTENT, "Close call.", "Both sides give up similar weekly production.");
+
+    fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Rebuilding my TE spot" } });
+    expectClean(container, ...TRADE_CONTENT, "Close call.", "Both sides give up similar weekly production.");
   });
 });

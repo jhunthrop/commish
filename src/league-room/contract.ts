@@ -234,3 +234,38 @@ export interface TradeAssessmentBody extends AdviceBody {
   readonly givingValue: number;
   readonly receivingValue: number;
 }
+
+/**
+ * One player as `TradeComposer`/`TradeCard` (Task 8) render it: enough for a `Sticker` plus a
+ * `PositionBadge`, nothing more. Built from the SAME roster read `MatchupWeekPage` already makes
+ * (`matchupWeek`'s starters + bench) rather than a new roster route — the trade surface needs no
+ * more of a roster than the matchup page already assembles, and a second query for the same rows
+ * would drift the moment one of them adds a bench slot the other forgets.
+ */
+export interface TradeRosterPlayer {
+  readonly playerId: string;
+  readonly name: string;
+  readonly position: Position;
+}
+
+/** One team a manager could open a trade with: enough to fill the composer's counterparty `Select`. */
+export interface TradeCounterpartyOption {
+  readonly teamId: string;
+  readonly teamName: string;
+}
+
+/**
+ * Everything the trade room needs beyond `TradesPageBody` (`@/trades/contract`), assembled once,
+ * server side, on `/app/leagues/[leagueId]/trades`: the week a proposal is valued at, the
+ * caller's own team, every leaguemate to trade with, and a roster for every team in the league
+ * keyed by id. `rostersByTeamId` resolves a stored trade's bare `TradeAsset` ids back to a name
+ * and a position for `TradeCard`, in addition to feeding `TradeComposer`'s own player pickers —
+ * one read, two consumers, rather than a second fetch for display that the picker already paid
+ * for.
+ */
+export interface TradeRoomContext {
+  readonly weekNumber: number;
+  readonly myTeamId: string;
+  readonly counterparties: readonly TradeCounterpartyOption[];
+  readonly rostersByTeamId: Readonly<Record<string, readonly TradeRosterPlayer[]>>;
+}

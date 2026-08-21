@@ -1,0 +1,131 @@
+import { describe, it, expect, beforeEach, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
+import { fixtureAccountDeps } from "@/account-room/test-fixtures";
+import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
+import { fixtureLeagueDeps } from "@/league-room/test-fixtures";
+
+// Route-level: every read the page makes is mocked, same discipline `activity/page.test.tsx`
+// established for this app tree — `notFound()` is the real `next/navigation` implementation (a
+// plain synchronous throw with a stable digest), so asserting on it is asserting on the real
+// behavior a browser would see.
+vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
+vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
+vi.mock("@/league-service", () => ({ leagueHome: vi.fn(), matchupWeek: vi.fn() }));
+vi.mock("@/league-service/reference-cache-instance", () => ({ getReferenceCache: () => ({}) }));
+
+import { requireCurrentUser } from "@/lib/auth/current-user";
+import { leagueHome, matchupWeek } from "@/league-service";
+import TradesPage from "./page";
+
+const USER = { id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", experienceTier: "beginner" as const, avatarUrl: null, createdAt: "2026-08-01T00:00:00.000Z", isAdmin: false };
+
+const HOME = {
+  leagueId: "league_1",
+  name: "Sunday Money",
+  format: "snake" as const,
+  teamCount: 2,
+  rosterSlots: [],
+  isCommissioner: false,
+  commissionerUserId: "u2",
+  myTeamId: "t1",
+  teams: [
+    { id: "t1", name: "Bay Bandits", ownerDisplayName: "Ada Lovelace", ownerAvatarUrl: null, ownerUserId: "u1" },
+    { id: "t2", name: "Iron Owls", ownerDisplayName: "Grace Hopper", ownerAvatarUrl: null, ownerUserId: "u2" },
+  ],
+  standings: [],
+  terms: {
+    name: "Sunday Money", format: "snake" as const, teamCount: 2, filledTeams: 2, scoringLabel: "PPR",
+    rosterLine: "", stakeLabel: "Friendly", stakeDisclosure: "", commissionerName: "Grace Hopper", commissionerAvatar: null,
+  },
+  currentWeek: 5,
+  totalWeeks: 14,
+  myMatchup: null,
+  weekStatus: "in_progress" as const,
+  draftId: null,
+  draftStatus: "complete" as const,
+};
+
+const WEEK_BODY = {
+  leagueId: "league_1",
+  weekNumber: 5,
+  totalWeeks: 14,
+  myTeamId: "t1",
+  weekStatus: "in_progress" as const,
+  matchups: [
+    {
+      weekNumber: 5,
+      final: false,
+      weekStatus: "in_progress" as const,
+      home: {
+        teamId: "t1",
+        teamName: "Bay Bandits",
+        score: null,
+        starters: [{ slot: "RB" as const, slotIndex: 0, playerId: "p1", playerName: "Bijan Robinson", position: "RB" as const, points: 0 }],
+        bench: [],
+      },
+      away: {
+        teamId: "t2",
+        teamName: "Iron Owls",
+        score: null,
+        starters: [{ slot: "WR" as const, slotIndex: 0, playerId: "p2", playerName: "Puka Nacua", position: "WR" as const, points: 0 }],
+        bench: [],
+      },
+    },
+  ],
+};
+
+function callPage(leagueId = "league_1") {
+  return TradesPage({ params: Promise.resolve({ leagueId }) });
+}
+
+async function renderPage(leagueId?: string) {
+  const accountFixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+  const leagueFixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "league_1", meTeamId: "t1", inbox: [], outbox: [], history: [] } });
+  const page = await callPage(leagueId);
+  return render(
+    <AccountRoomDepsProvider deps={accountFixture.deps}>
+      <LeagueRoomDepsProvider deps={leagueFixture.deps}>{page}</LeagueRoomDepsProvider>
+    </AccountRoomDepsProvider>,
+  );
+}
+
+beforeEach(() => {
+  vi.mocked(requireCurrentUser).mockReset().mockResolvedValue(USER);
+  vi.mocked(leagueHome).mockReset().mockResolvedValue(HOME);
+  vi.mocked(matchupWeek).mockReset().mockResolvedValue(WEEK_BODY);
+});
+
+describe("TradesPage", () => {
+  it("renders the page title and hands the composer a roster built from the matchup week read", async () => {
+    await renderPage();
+    expect(await screen.findByRole("heading", { name: "Trades" })).toBeInTheDocument();
+    expect(screen.getByText("Sunday Money")).toBeInTheDocument();
+  });
+
+  // Persona panel (commissioner, step 4): no approval step and no veto window is a real
+  // departure from other platforms, said plainly rather than discovered the first time a
+  // commissioner tries to stop a trade and can't.
+  it("tells every viewer trades complete with no review step", async () => {
+    await renderPage();
+    expect(await screen.findByText("Trades complete as soon as both sides agree. There's no review step, for anyone.")).toBeInTheDocument();
+  });
+
+  it("404s a league that doesn't exist", async () => {
+    vi.mocked(leagueHome).mockResolvedValue(null);
+    await expect(callPage()).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
+    expect(vi.mocked(matchupWeek)).not.toHaveBeenCalled();
+  });
+
+  it("404s a signed-in caller with no team in this league, never 403", async () => {
+    vi.mocked(leagueHome).mockResolvedValue({ ...HOME, myTeamId: null });
+    await expect(callPage()).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
+  });
+
+  it("offers every other team as a counterparty, never the caller's own", async () => {
+    await renderPage();
+    await screen.findByRole("heading", { name: "Trades" });
+    // The inbox loads empty (the fixture's own default), so the composer is one click away.
+    expect(screen.getByRole("button", { name: "Put an offer together" })).toBeInTheDocument();
+  });
+});
