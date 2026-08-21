@@ -140,7 +140,7 @@ describe("TradesPage", () => {
   // yet, leaves `matchupWeek` with no row for the caller's own team — the composer's roster
   // picker degrades honestly rather than crashing, and this pins that it still does once the
   // empty state gained cause-and-action copy.
-  it("degrades honestly, with Send offer staying disabled, when the caller's own team has no matchup row this week", async () => {
+  it("degrades honestly, with Propose trade staying disabled, when the caller's own team has no matchup row this week", async () => {
     vi.mocked(matchupWeek).mockResolvedValue({ ...WEEK_BODY, matchups: [] });
     await renderPage();
     fireEvent.click(await screen.findByRole("button", { name: "Put an offer together" }));
@@ -148,6 +148,6 @@ describe("TradesPage", () => {
 
     const yourPlayers = screen.getByRole("group", { name: "Your players" });
     expect(within(yourPlayers).getByText(/Nobody available to trade for on this team right now\./)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Send offer" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Propose trade" })).toBeDisabled();
   });
 });

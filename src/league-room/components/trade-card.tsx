@@ -5,6 +5,8 @@ import { Badge, Button, Card, Modal, PositionBadge, Sticker } from "@/components
 import { describeAsset, type TradeAsset } from "@/trades/assets";
 import type { TradeProposalView, TradeSideView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
+import { LEAGUE_ROOM_CONFIG } from "../config";
+import { useNow } from "../hooks/use-now";
 import { daysUntil, formatExpiry, formatWeek } from "../lib/format";
 import { TradeVerdict, type TradeAssessmentSummary } from "./trade-verdict";
 
@@ -111,6 +113,11 @@ export function TradeCard({
   busy = false,
 }: TradeCardProps) {
   const [confirmingAccept, setConfirmingAccept] = useState(false);
+  // Fix round 2, F1: the wall clock is read in exactly ONE place in this room (`useNow`, the
+  // same idiom `useCountdown` uses in `src/draft-room`), never inline as `new Date()` here —
+  // `docs/conventions.md`'s "no ambient clock" rule, and what keeps this value mockable in a
+  // test without patching the global clock.
+  const now = useNow(LEAGUE_ROOM_CONFIG.expiryTickMs);
   const sides = myAndTheirSides(trade, meTeamId);
   const iAmProposer = trade.from.teamId === meTeamId;
   const iAmCounterparty = trade.to.teamId === meTeamId;
@@ -139,7 +146,7 @@ export function TradeCard({
             "three days" restated from `TRADE_CONFIG` on every render regardless of how long the
             offer has actually been sitting. Shown to whichever side an open offer belongs to:
             the recipient deciding whether to answer now, and the sender waiting on a reply. */}
-        {trade.status === "open" ? <p className="text-sm text-text-muted">{formatExpiry(daysUntil(trade.expiresAt, new Date()))}</p> : null}
+        {trade.status === "open" ? <p className="text-sm text-text-muted">{formatExpiry(daysUntil(trade.expiresAt, new Date(now)))}</p> : null}
 
         <div className="flex flex-col gap-3 sm:flex-row">
           <AssetList heading={givingHeading} assets={givingSide.assets} playersById={playersById} />
@@ -186,10 +193,9 @@ export function TradeCard({
 
         {isMineWaiting ? (
           <div className="flex flex-col gap-2">
-            {/* Fix round 1, F6 (LOW): the verb chain this action is named through (propose it,
-                send it, see it as "Proposed" here on the card you get back to later) used to
-                stop after the composer's own "Offer sent." confirmation — the outbox card itself
-                never said what state the trade was actually in. */}
+            {/* Fix round 1, F6 (LOW), converged fully in fix round 2, F2: one completion name
+                for this event throughout — the composer's own confirmation now says "Trade
+                proposed." too, so this card and that screen agree on the word. */}
             <p className="text-sm text-text-muted">Proposed. Waiting for a reply.</p>
             <div>
               <Button variant="secondary" onClick={() => onWithdraw?.(trade.id)} disabled={busy}>

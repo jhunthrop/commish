@@ -76,12 +76,12 @@ describe("TradeComposer", () => {
 
   it("keeps Send disabled until both sides have at least one player", () => {
     render(<TradeComposer context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
-    expect(screen.getByRole("button", { name: "Send offer" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Propose trade" })).toBeDisabled();
     selectCounterparty();
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
-    expect(screen.getByRole("button", { name: "Send offer" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Propose trade" })).toBeDisabled();
     fireEvent.click(screen.getByLabelText(/Puka Nacua/));
-    expect(screen.getByRole("button", { name: "Send offer" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Propose trade" })).toBeEnabled();
   });
 
   it("sends the counterparty team and assets, never the proposer's own identity", async () => {
@@ -92,7 +92,7 @@ describe("TradeComposer", () => {
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
     fireEvent.click(screen.getByLabelText(/Puka Nacua/));
     fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Rebuilding TE" } });
-    fireEvent.click(screen.getByRole("button", { name: "Send offer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Propose trade" }));
 
     await waitFor(() =>
       expect(onPropose).toHaveBeenCalledWith({
@@ -114,9 +114,9 @@ describe("TradeComposer", () => {
     selectCounterparty();
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
     fireEvent.click(screen.getByLabelText(/Puka Nacua/));
-    fireEvent.click(screen.getByRole("button", { name: "Send offer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Propose trade" }));
 
-    expect(await screen.findByText("Offer sent.")).toBeInTheDocument();
+    expect(await screen.findByText("Trade proposed.")).toBeInTheDocument();
     expect(screen.getByText(/favors what you would get back/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(onDone).toHaveBeenCalled();
@@ -132,9 +132,9 @@ describe("TradeComposer", () => {
     selectCounterparty();
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
     fireEvent.click(screen.getByLabelText(/Puka Nacua/));
-    fireEvent.click(screen.getByRole("button", { name: "Send offer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Propose trade" }));
 
-    expect(await screen.findByText("Offer sent.")).toBeInTheDocument();
+    expect(await screen.findByText("Trade proposed.")).toBeInTheDocument();
     expect(screen.getByText(`Expires in ${TRADE_CONFIG.proposalTtlHours / 24} days. If nobody answers by then, it expires on its own and neither roster changes.`)).toBeInTheDocument();
   });
 
@@ -145,7 +145,7 @@ describe("TradeComposer", () => {
     selectCounterparty();
     fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
     fireEvent.click(screen.getByLabelText(/Puka Nacua/));
-    fireEvent.click(screen.getByRole("button", { name: "Send offer" }));
+    fireEvent.click(screen.getByRole("button", { name: "Propose trade" }));
 
     expect(await screen.findByText("You have 10 offers out already. Withdraw one before you send another.")).toBeInTheDocument();
   });
@@ -195,10 +195,10 @@ describe("TradeComposer", () => {
     expect(screen.getByLabelText("Note (optional)")).toHaveFocus();
 
     await user.tab();
-    expect(screen.getByRole("button", { name: "Send offer" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Propose trade" })).toHaveFocus();
     await user.keyboard("{Enter}");
 
     await waitFor(() => expect(onPropose).toHaveBeenCalled());
-    expect(await screen.findByText("Offer sent.")).toBeInTheDocument();
+    expect(await screen.findByText("Trade proposed.")).toBeInTheDocument();
   });
 });

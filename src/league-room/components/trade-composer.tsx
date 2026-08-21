@@ -149,7 +149,11 @@ export function TradeComposer({ context, onAssess, onPropose, onDone, onCancel }
     return (
       <Card>
         <div className="flex flex-col gap-3">
-          <p className="text-lg font-medium text-text-primary">Offer sent.</p>
+          {/* Fix round 2, F2: converged on "Propose"/"Proposed" as the one completion name for
+              this event, per the brief's own original naming rule ("Propose → Proposed") — the
+              outbox card already said "Proposed.", so this screen and the submit control below
+              change to match it, rather than the reverse. */}
+          <p className="text-lg font-medium text-text-primary">Trade proposed.</p>
           {/* Fix round 1, F2 (HIGH, member panel): a first-timer who just sent their first offer
               could not answer "what happens next" from anything this screen showed before. */}
           <p className="text-sm text-text-muted">{`${formatExpiry(PROPOSAL_TTL_DAYS)} If nobody answers by then, it expires on its own and neither roster changes.`}</p>
@@ -205,7 +209,7 @@ export function TradeComposer({ context, onAssess, onPropose, onDone, onCancel }
 
         {error === null ? null : (
           <ErrorState
-            title="We couldn't send that offer."
+            title="We couldn't propose that trade."
             description={error}
             action={
               <Button variant="secondary" onClick={() => void send()}>
@@ -217,7 +221,7 @@ export function TradeComposer({ context, onAssess, onPropose, onDone, onCancel }
 
         <div className="flex flex-wrap gap-3">
           <Button type="submit" loading={proposing} disabled={!canSend}>
-            Send offer
+            Propose trade
           </Button>
           <Button type="button" variant="secondary" onClick={onCancel} disabled={proposing}>
             Cancel
