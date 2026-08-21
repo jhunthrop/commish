@@ -14,9 +14,11 @@ export const SYSTEM_ACTION_CODES = [
    * Vocabulary only, ahead of its own publisher — the same shape `trade_held_for_review` and
    * `tier_blocked_join` shipped in before this plan's Tasks 5 and 3 gave them writers. The
    * scheduler that actually starts a draft for a league whose commissioner never pressed the
-   * button is a later task's; `SYSTEM_ACTION_VISIBILITY` below still has to decide this code's
-   * visibility NOW, because it is a `Record` over the whole union and a code without a decision
-   * does not compile.
+   * button is TASK 7's (`src/draft-service/auto-start.ts`, per the plan doc's own Step 4:
+   * "`SYSTEM_ACTION_CODES` gains `draft_auto_started`") — no `NoticeContexts.draft_auto_started`
+   * entry and no publisher exist yet; `SYSTEM_ACTION_VISIBILITY` below still has to decide this
+   * code's visibility NOW, because it is a `Record` over the whole union and a code without a
+   * decision does not compile.
    */
   "draft_auto_started",
 ] as const;

@@ -5,7 +5,8 @@ import type { Position } from "@/domain/player";
 import { BENCH_SLOT, type RosterSlot, type RosterSlotConfig } from "@/domain/roster";
 import { defaultLineup, deriveBenchSlots, isLineupLocked, startersOf } from "@/league";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
-import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
+import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
+import type { ScoreCache } from "@/stats-pipeline/score-cache";
 import { toRosterSlots } from "./lineups";
 import { enforcementAppliesTo } from "./enforcement";
 
@@ -129,9 +130,49 @@ export interface AutoSetOutcome {
   readonly leaguesFailed: readonly FailedLeagueAutoSet[];
 }
 
+/** No Redis round trip needed: a caller with no cache to fill keeps working untouched — the same
+ *  idiom `setLineup`'s and `acceptTrade`'s own `NOOP_SCORE_CACHE` use. */
+const NOOP_SCORE_CACHE: Pick<ScoreCache, "invalidate"> = { invalidate: async () => {} };
+
+/**
+ * Awaits the eviction and swallows its failure, with a log — the identical discipline
+ * `invalidateScoreCacheQuietly` (`@/league-service/trades`) and `invalidateQuietly`
+ * (`@/league-service/lineups`) both keep for their own cache. A missed eviction is one stale read
+ * bounded by the key's TTL; it is never worth failing a sweep that already committed real writes.
+ */
+async function invalidateScoreCacheQuietly(cache: Pick<ScoreCache, "invalidate">, leagueId: string, weekNumber: number): Promise<void> {
+  try {
+    await cache.invalidate(leagueId, weekNumber);
+  } catch (error: unknown) {
+    console.error("[league-service] score cache invalidation failed", { leagueId, weekNumber }, error);
+  }
+}
+
+/**
+ * The delivery twin of `invalidateScoreCacheQuietly`, above. `deliverNotice`'s own real publisher
+ * never throws by contract (`createPublisher`'s "a Redis failure here returns null and never
+ * throws"), but `deliver` is an injected dependency here exactly like `cache` is — a test can
+ * supply one that does, and this run's `leaguesFailed` must never say a league failed when its
+ * writes already committed and only the best-effort push after commit did not.
+ */
+async function deliverNoticeQuietly(deliver: typeof deliverNotice, notice: MemberNotice): Promise<void> {
+  try {
+    await deliver(notice);
+  } catch (error: unknown) {
+    console.error("[league-service] auto-set notice delivery failed", { noticeId: notice.id, userId: notice.userId }, error);
+  }
+}
+
 interface AutoSetDeps {
   readonly audit: AuditLogger;
   readonly notify: typeof notifyAffectedMember;
+}
+
+/** One league's own attempt, returned to the caller so delivery and eviction — both best-effort,
+ *  both outside the transaction — run only after this league's own commit actually lands. */
+interface LeagueAutoSetResult {
+  readonly teamsSet: number;
+  readonly notices: readonly MemberNotice[];
 }
 
 /**
@@ -151,6 +192,12 @@ interface AutoSetDeps {
  *      notified this run (one event per team, since `SYSTEM_ACTION_VISIBILITY.lineup_auto_set` is
  *      `"subject_only"` and each event needs its own `subjectUserId`).
  *   5. `attachAuditEvent`  — the one statement permitted after the anchor.
+ * Then commit, then `deliverNotice` for every recipient and the score-cache eviction for this
+ * league's own week — both best-effort and both OUTSIDE the transaction, called by
+ * `autoSetLineupsForWeek` once THIS league's own transaction has actually landed. The same
+ * failure asymmetry `setLineup` and `acceptTrade` accept for their own cache and delivery: a
+ * slightly-late push or eviction costs one stale read or one missed realtime nudge, never worth
+ * reporting this league as failed when its writes already committed.
  *
  * A team already holding a saved row for this week is left ENTIRELY alone — never read past the
  * existence check, never planned, never written. That is both the "leave a manager who set their
@@ -161,15 +208,29 @@ interface AutoSetDeps {
  * its row materialized — `plannedAutoLineup` falls back to exactly what `getLineup` would have
  * derived — but gets no notice and no `system_action`: nothing was carried forward to report, the
  * same "a materialization and not a decision" property Plan C's trade lineup freeze has.
+ *
+ * THE EXISTENCE CHECK CANNOT AND DOES NOT DISTINGUISH A ROW'S ORIGIN. `lineup_slots` carries no
+ * source column, so a row `materializeLockedLineupsInTx` (`@/league-service/trade-transfer`)
+ * froze for a locked week a trade just touched reads identically to one a manager saved by hand —
+ * both leave a team ENTIRELY alone here, on purpose: `materializeLockedLineupsInTx`'s own
+ * docblock already treats any existing row as untouchable regardless of how it got there ("a real
+ * save is already immune — never re-derived"), and this function holds every team to the
+ * identical rule rather than inventing a second, narrower one just for auto-set.
  */
-export async function autoSetLineupInTx(tx: DbTx, leagueId: string, weekNumber: number, occurredAt: string, deps: AutoSetDeps): Promise<number> {
+export async function autoSetLineupInTx(
+  tx: DbTx,
+  leagueId: string,
+  weekNumber: number,
+  occurredAt: string,
+  deps: AutoSetDeps,
+): Promise<LeagueAutoSetResult> {
   const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, weekNumber)).for("share");
-  if (week === undefined || !isLineupLocked(week.status)) return 0;
+  if (week === undefined || !isLineupLocked(week.status)) return { teamsSet: 0, notices: [] };
 
   // `leagues.id` is what `matchups.leagueId` (the source of every `leagueId` this function is
   // called with) is a NOT NULL foreign key to, so this row always exists.
   const [league] = await tx.select({ rosterSlots: leagues.rosterSlots, name: leagues.name }).from(leagues).where(eq(leagues.id, leagueId));
-  if (league === undefined) return 0;
+  if (league === undefined) return { teamsSet: 0, notices: [] };
 
   const playerRows = await tx.select({ id: players.id, name: players.name, position: players.position }).from(players);
   const playerPositions = Object.fromEntries(playerRows.map((row) => [row.id, row.position]));
@@ -256,7 +317,7 @@ export async function autoSetLineupInTx(tx: DbTx, leagueId: string, weekNumber: 
     }
   }
 
-  return planned.length;
+  return { teamsSet: planned.length, notices: notified.map(({ notice }) => notice) };
 }
 
 /** Every league fielding this week, from `matchups` — the same "matchups is the source of truth
@@ -274,6 +335,14 @@ export interface AutoSetInput {
   readonly audit?: AuditLogger;
   /** Defaults to the real `notifyAffectedMember`. Injectable so a test can force its failure. */
   readonly notify?: typeof notifyAffectedMember;
+  /** Defaults to the real `deliverNotice` (`@/integrity-service/notify`), called once per
+   *  auto-set manager AFTER their own league's transaction commits. Injectable so a test can
+   *  spy on it or force its failure without a live Redis connection. */
+  readonly deliver?: typeof deliverNotice;
+  /** Defaults to a no-op — injectable so a test never needs a live Redis connection, the same
+   *  `setLineup`/`acceptTrade` idiom. The worker trigger supplies the real `getScoreCache()`
+   *  (`@/league-service/score-cache-instance`). */
+  readonly cache?: Pick<ScoreCache, "invalidate">;
 }
 
 /**
@@ -293,6 +362,8 @@ export interface AutoSetInput {
 export async function autoSetLineupsForWeek(db: Db, input: AutoSetInput): Promise<AutoSetOutcome> {
   const audit = input.audit ?? getAuditLogger();
   const notify = input.notify ?? notifyAffectedMember;
+  const deliver = input.deliver ?? deliverNotice;
+  const cache = input.cache ?? NOOP_SCORE_CACHE;
   const deps: AutoSetDeps = { audit, notify };
 
   const leagueIds = await leaguesInWeek(db, input.weekNumber);
@@ -303,10 +374,21 @@ export async function autoSetLineupsForWeek(db: Db, input: AutoSetInput): Promis
     const [row] = await db.select({ isPublicMatchmade: leagues.isPublicMatchmade }).from(leagues).where(eq(leagues.id, leagueId));
     if (row === undefined || !enforcementAppliesTo(row)) continue;
 
+    let result: LeagueAutoSetResult;
     try {
-      teamsSet += await db.transaction((tx) => autoSetLineupInTx(tx, leagueId, input.weekNumber, input.occurredAt, deps));
+      result = await db.transaction((tx) => autoSetLineupInTx(tx, leagueId, input.weekNumber, input.occurredAt, deps));
     } catch (error: unknown) {
       leaguesFailed.push({ leagueId, reason: error instanceof Error ? error.message : String(error) });
+      continue;
+    }
+
+    teamsSet += result.teamsSet;
+    // Best-effort, outside the transaction, ONLY once this league's own commit actually landed —
+    // NEVER inside the `try` above: a failed push or eviction must not report a league whose
+    // writes already committed as a failed league.
+    if (result.teamsSet > 0) {
+      for (const notice of result.notices) await deliverNoticeQuietly(deliver, notice);
+      await invalidateScoreCacheQuietly(cache, leagueId, input.weekNumber);
     }
   }
 

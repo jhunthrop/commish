@@ -584,7 +584,10 @@ export function createIngestionWorker({
     // comes from the per-team guard inside `autoSetLineupsForWeek`, not from firing exactly once.
     if (plan.priorStatus === "scheduled" && status !== "scheduled") {
       try {
-        await autoSet(db, { weekNumber: week, occurredAt: nowIso });
+        // The SAME score cache this worker already writes live scores into — `autoSetLineupsForWeek`
+        // evicts it for any league it actually touched, on the identical "route/worker supplies the
+        // real cache" idiom `setLineup`/`acceptTrade` use.
+        await autoSet(db, { weekNumber: week, occurredAt: nowIso, cache: scoreCache });
       } catch (error: unknown) {
         console.error("[stats-pipeline] auto-set lineup failed for week", week, error);
         reportIfDue({ week, applied: false, reason: "Couldn't auto-set lineups for managers who missed this week's deadline." }, nowMs);
