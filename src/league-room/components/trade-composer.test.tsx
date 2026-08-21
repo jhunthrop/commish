@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { TRADE_CONFIG } from "@/trades/config";
@@ -121,6 +122,22 @@ describe("TradeComposer", () => {
     expect(onDone).toHaveBeenCalled();
   });
 
+  // Fix round 1, F2 (HIGH, member panel): a first-timer's "what happens next?" went unanswered
+  // by this screen. `TRADE_CONFIG.proposalTtlHours` is 72, so this reads "Expires in 3 days." —
+  // derived from config, never a hardcoded "three".
+  it("tells the sender when the offer expires and what happens if nobody answers", async () => {
+    const onPropose = vi.fn().mockResolvedValue({ ok: true, data: { tradeId: "t1", verdict: { givingValue: 18, receivingValue: 17, delta: 1, verdict: "even", flags: [] } } });
+    render(<TradeComposer context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />);
+
+    selectCounterparty();
+    fireEvent.click(screen.getByLabelText(/Bijan Robinson/));
+    fireEvent.click(screen.getByLabelText(/Puka Nacua/));
+    fireEvent.click(screen.getByRole("button", { name: "Send offer" }));
+
+    expect(await screen.findByText("Offer sent.")).toBeInTheDocument();
+    expect(screen.getByText(`Expires in ${TRADE_CONFIG.proposalTtlHours / 24} days. If nobody answers by then, it expires on its own and neither roster changes.`)).toBeInTheDocument();
+  });
+
   it("shows the server's reason when a proposal is refused", async () => {
     const onPropose = vi.fn().mockResolvedValue({ ok: false, error: "You have 10 offers out already. Withdraw one before you send another." });
     render(<TradeComposer context={CONTEXT} onAssess={vi.fn().mockResolvedValue(ASSESSMENT_OK)} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />);
@@ -145,5 +162,43 @@ describe("TradeComposer", () => {
   it("carries no em dash or en dash", () => {
     render(<TradeComposer context={CONTEXT} onAssess={vi.fn()} onPropose={vi.fn()} onDone={vi.fn()} onCancel={vi.fn()} />);
     expect(document.body.textContent).not.toMatch(/[–—]/);
+  });
+
+  // Fix round 1, F5 (MEDIUM): the brief's own Step 2 called for the primary flow walked
+  // keyboard-only, and nothing in this diff did. Mirrors `ResolutionForm`'s own fix-round-1
+  // precedent (`resolution-form.test.tsx`, FIX 6) — `selectOptions` is testing-library's own
+  // keyboard-equivalent for a native `<select>` (a real per-keystroke OS dropdown has no faithful
+  // jsdom/happy-dom equivalent); every other control here is driven by Tab, Space and Enter, with
+  // no `fireEvent.click`/`userEvent.click` anywhere in this test.
+  it("walks the primary propose flow keyboard-only: choose a team, pick a player each side, send", async () => {
+    const user = userEvent.setup();
+    const onAssess = vi.fn().mockResolvedValue(ASSESSMENT_OK);
+    const onPropose = vi.fn().mockResolvedValue({ ok: true, data: { tradeId: "t1", verdict: { givingValue: 18, receivingValue: 17.5, delta: 0.5, verdict: "even", flags: [] } } });
+    render(<TradeComposer context={CONTEXT} onAssess={onAssess} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />);
+
+    await user.selectOptions(screen.getByLabelText("Trade with"), "them");
+
+    await user.tab();
+    expect(screen.getByLabelText(/Bijan Robinson/)).toHaveFocus();
+    await user.keyboard(" ");
+    expect(screen.getByLabelText(/Bijan Robinson/)).toBeChecked();
+
+    await user.tab();
+    expect(screen.getByLabelText(/Puka Nacua/)).toHaveFocus();
+    await user.keyboard(" ");
+    expect(screen.getByLabelText(/Puka Nacua/)).toBeChecked();
+
+    await waitFor(() => expect(onAssess).toHaveBeenCalled());
+    expect(await screen.findByText(/close to even/i)).toBeInTheDocument();
+
+    await user.tab();
+    expect(screen.getByLabelText("Note (optional)")).toHaveFocus();
+
+    await user.tab();
+    expect(screen.getByRole("button", { name: "Send offer" })).toHaveFocus();
+    await user.keyboard("{Enter}");
+
+    await waitFor(() => expect(onPropose).toHaveBeenCalled());
+    expect(await screen.findByText("Offer sent.")).toBeInTheDocument();
   });
 });

@@ -5,7 +5,7 @@ import { Badge, Button, Card, Modal, PositionBadge, Sticker } from "@/components
 import { describeAsset, type TradeAsset } from "@/trades/assets";
 import type { TradeProposalView, TradeSideView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
-import { formatWeek } from "../lib/format";
+import { daysUntil, formatExpiry, formatWeek } from "../lib/format";
 import { TradeVerdict, type TradeAssessmentSummary } from "./trade-verdict";
 
 export interface TradeCardProps {
@@ -18,11 +18,18 @@ export interface TradeCardProps {
    *  function this codebase permits to switch on `TradeAssetKind` at all. Built once, upstream,
    *  from the same read `TradeComposer`'s pickers use (`TradeRoomContext.rostersByTeamId`). */
   readonly playersById: Readonly<Record<string, ValuedPlayer>>;
-  /** The viewer's own advisory read on an OPEN, answerable offer — present only once `useTrades`'
-   *  `assess` call for this card has resolved. `undefined` while it hasn't been asked for yet,
-   *  `null` while it's in flight; either way `TradeCard` renders the accept control without
-   *  waiting on it, because the verdict sits BESIDE the decision, never gates it. */
+  /** The viewer's own advisory read on an OPEN, answerable offer. `"idle"` (the default) until
+   *  the manager asks for it — fix round 1, F4: an inbox that fetched every card's verdict on
+   *  mount could burst the shared advisor rate limiter (`ADVISOR_CONFIG`, 20 requests/60s across
+   *  every advisor route a session touches) once it held more than a handful of open offers, and
+   *  the failure mode was a silently missing verdict with no error shown. Lazy per-card, on the
+   *  SAME "ask, then show the answer" shape `AdvisorPanel` already uses, bounds this to at most
+   *  one request per card the manager actually looks at. Either way `TradeCard` renders the
+   *  accept control without waiting on it — the verdict sits BESIDE the decision, never gates it. */
+  readonly assessmentStatus?: "idle" | "loading" | "ready" | "error";
   readonly assessment?: TradeAssessmentSummary | null;
+  /** Fires once, when the manager asks to see the platform's read on an answerable offer. */
+  readonly onRequestAssessment?: (tradeId: string) => void;
   readonly onAccept?: (tradeId: string) => void;
   readonly onDecline?: (tradeId: string) => void;
   readonly onWithdraw?: (tradeId: string) => void;
@@ -61,9 +68,13 @@ function AssetList({ heading, assets, playersById }: { readonly heading: string;
 function settledCopy(trade: TradeProposalView, meTeamId: string): string | null {
   if (trade.status === "open") return null;
   if (trade.status === "accepted") {
+    // "Reversed", never "put back" — the one action verb Task 7's own panel fixed everywhere
+    // else in this arc (the notice title/body, the operator queue trail). Fix round 1, F3: this
+    // card was the one surface that fix round missed. The action verb leads; "moved back" stays
+    // an effect phrase in the second sentence, never the headline word.
     return trade.reversedAt === null
       ? "Both rosters changed when this trade was accepted."
-      : "An operator put this trade back. Both rosters moved back to how they were.";
+      : "An operator reversed this trade. Both rosters moved back to how they were.";
   }
   if (trade.status === "rejected") return "Declined.";
   if (trade.status === "withdrawn") {
@@ -87,7 +98,18 @@ function myAndTheirSides(trade: TradeProposalView, meTeamId: string): { readonly
  * (`Modal` confirms Accept, never Decline), so it renders ONLY for the counterparty of an OPEN
  * offer — everyone else sees a settled state's own sentence instead.
  */
-export function TradeCard({ trade, meTeamId, playersById, assessment, onAccept, onDecline, onWithdraw, busy = false }: TradeCardProps) {
+export function TradeCard({
+  trade,
+  meTeamId,
+  playersById,
+  assessmentStatus = "idle",
+  assessment,
+  onRequestAssessment,
+  onAccept,
+  onDecline,
+  onWithdraw,
+  busy = false,
+}: TradeCardProps) {
   const [confirmingAccept, setConfirmingAccept] = useState(false);
   const sides = myAndTheirSides(trade, meTeamId);
   const iAmProposer = trade.from.teamId === meTeamId;
@@ -111,6 +133,14 @@ export function TradeCard({ trade, meTeamId, playersById, assessment, onAccept, 
           {isAnswerable ? <Badge tone="accent">Needs your answer</Badge> : null}
         </div>
 
+        {/* Fix round 1, F2 (HIGH, member panel): neither side of an open offer was ever told
+            when it stops being answerable. Read straight off the stored `expiresAt` — the SAME
+            wire field the panel found unused — so this is a live remaining count, not a static
+            "three days" restated from `TRADE_CONFIG` on every render regardless of how long the
+            offer has actually been sitting. Shown to whichever side an open offer belongs to:
+            the recipient deciding whether to answer now, and the sender waiting on a reply. */}
+        {trade.status === "open" ? <p className="text-sm text-text-muted">{formatExpiry(daysUntil(trade.expiresAt, new Date()))}</p> : null}
+
         <div className="flex flex-col gap-3 sm:flex-row">
           <AssetList heading={givingHeading} assets={givingSide.assets} playersById={playersById} />
           <AssetList heading={gettingHeading} assets={gettingSide.assets} playersById={playersById} />
@@ -122,7 +152,24 @@ export function TradeCard({ trade, meTeamId, playersById, assessment, onAccept, 
 
         {isAnswerable ? (
           <div className="flex flex-col gap-3">
-            {assessment !== null && assessment !== undefined ? <TradeVerdict assessment={assessment} /> : null}
+            {assessmentStatus === "idle" ? (
+              <div>
+                <Button variant="secondary" onClick={() => onRequestAssessment?.(trade.id)}>
+                  See what the platform thinks of this trade
+                </Button>
+              </div>
+            ) : assessmentStatus === "loading" ? (
+              <p className="text-sm text-text-muted">Checking what the platform thinks of this trade.</p>
+            ) : assessmentStatus === "error" ? (
+              <p className="text-sm text-text-muted">
+                Advice is unavailable right now.{" "}
+                <button type="button" className="text-accent underline" onClick={() => onRequestAssessment?.(trade.id)}>
+                  Try again
+                </button>
+              </p>
+            ) : assessment !== null && assessment !== undefined ? (
+              <TradeVerdict assessment={assessment} />
+            ) : null}
             {/* `gap-4`, never a tighter value: the one irreversible button pair in this product
                 sits side by side, so the gap between them is a deliberate choice rather than
                 whatever a flex row defaults to. */}
@@ -139,7 +186,11 @@ export function TradeCard({ trade, meTeamId, playersById, assessment, onAccept, 
 
         {isMineWaiting ? (
           <div className="flex flex-col gap-2">
-            <p className="text-sm text-text-muted">Waiting for a reply.</p>
+            {/* Fix round 1, F6 (LOW): the verb chain this action is named through (propose it,
+                send it, see it as "Proposed" here on the card you get back to later) used to
+                stop after the composer's own "Offer sent." confirmation — the outbox card itself
+                never said what state the trade was actually in. */}
+            <p className="text-sm text-text-muted">Proposed. Waiting for a reply.</p>
             <div>
               <Button variant="secondary" onClick={() => onWithdraw?.(trade.id)} disabled={busy}>
                 Withdraw
@@ -166,7 +217,7 @@ export function TradeCard({ trade, meTeamId, playersById, assessment, onAccept, 
                 setConfirmingAccept(false);
               }}
             >
-              Confirm accept
+              Confirm trade
             </Button>
           </>
         }

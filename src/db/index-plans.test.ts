@@ -557,17 +557,21 @@ describe("trade proposals: inbox and outbox serve from their own partial indexes
 
   /**
    * History's shape is genuinely different from inbox/outbox, not a reuse of the same path: it
-   * has no `status = 'open'` predicate at all (history is a league's WHOLE settled record, not
-   * its open queue), so it cannot use either partial index and resolves through the non-partial
+   * has no `status = 'open'` predicate at all (history is `status = 'accepted'` OR the caller's
+   * own row on either side — fix round 1, F1 — never every row in the league regardless of
+   * status), so it cannot use either partial index and resolves through the non-partial
    * `trade_proposals_league_idx` instead — measured, at this corpus's 132-row-per-league density
    * (~0.5% of the 26,400-row table), as a Bitmap Index Scan on `league_id` feeding a `Sort` on
-   * `proposed_at`. The `Sort` is not a defect to chase away: the index's second key only
-   * pre-sorts a PLAIN Index Scan, and at this per-league row count the planner's own cost model
-   * prefers the bitmap path over walking the tree in order — the same tradeoff `signalsForUsers`
-   * above accepts for the same reason. What is asserted is the property the index actually owns:
-   * the league is found by seeking on `league_id`, never by scanning every row in the table.
+   * `proposed_at`. The `OR` added by F1 costs no second seek: the league is still found by ONE
+   * seek on `league_id`, and `status = 'accepted' OR proposer_team_id = $1 OR
+   * counterparty_team_id = $1` is applied as a `Filter` on the rows that seek already found. The
+   * `Sort` is not a defect to chase away: the index's second key only pre-sorts a PLAIN Index
+   * Scan, and at this per-league row count the planner's own cost model prefers the bitmap path
+   * over walking the tree in order — the same tradeoff `signalsForUsers` above accepts for the
+   * same reason. What is asserted is the property the index actually owns: the league is found by
+   * seeking on `league_id`, never by scanning every row in the table.
    */
-  it("serves history from the league index — not partial, because history is the settled record", async () => {
+  it("serves history from the league index, filtered to accepted trades plus the caller's own dead ones", async () => {
     const plan = await explainPlan(db, tradesQuery(db, { leagueId: CORPUS_LEAGUE, teamId: CORPUS_TEAM, box: "history" }));
     expect(sequentiallyScannedRelations(plan)).not.toContain("trade_proposals");
     expect(indexScanNode(plan, "trade_proposals_league_idx")).toBeDefined();

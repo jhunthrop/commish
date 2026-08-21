@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
@@ -29,10 +29,48 @@ const BASE: TradeProposalView = {
 
 const LOPSIDED_ASSESSMENT: TradeAssessmentSummary = { verdict: "lopsided", givingValue: 40, receivingValue: 5 };
 
+afterEach(() => {
+  if (vi.isFakeTimers()) vi.useRealTimers();
+});
+
 describe("TradeCard", () => {
+  // Fix round 1, F2 (HIGH, member panel): neither the recipient nor the sender was ever told
+  // when an open offer stops being answerable, despite `expiresAt` already being on the wire.
+  it("shows a live remaining count on an open offer, for both the recipient and the sender", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-18T00:00:00.000Z")); // 3 full days before BASE.expiresAt
+
+    const recipient = render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    expect(screen.getByText("Expires in 3 days.")).toBeInTheDocument();
+    recipient.unmount();
+
+    render(<TradeCard trade={BASE} meTeamId="them" playersById={PLAYERS} />);
+    expect(screen.getByText("Expires in 3 days.")).toBeInTheDocument();
+  });
+
+  it("says today or tomorrow rather than a fraction of a day", () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-20T00:00:00.000Z")); // exactly 1 day before BASE.expiresAt
+    const tomorrow = render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    expect(screen.getByText("Expires tomorrow.")).toBeInTheDocument();
+    tomorrow.unmount();
+
+    vi.setSystemTime(new Date("2026-08-20T18:00:00.000Z")); // 6 hours left
+    render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} />);
+    expect(screen.getByText("Expires today.")).toBeInTheDocument();
+  });
+
+  it("shows no expiry line once a trade has settled — there is nothing left to expire", () => {
+    const trade: TradeProposalView = { ...BASE, status: "rejected", settledAt: "2026-08-19T00:00:00.000Z" };
+    render(<TradeCard trade={trade} meTeamId="me" playersById={PLAYERS} />);
+    expect(screen.queryByText(/^Expires/)).not.toBeInTheDocument();
+  });
+});
+
+describe("TradeCard states", () => {
   it("shows the verdict beside the accept control, never instead of it, in both themes, axe-clean", async () => {
     await inBothThemes(
-      <TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} assessment={LOPSIDED_ASSESSMENT} />,
+      <TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} assessmentStatus="ready" assessment={LOPSIDED_ASSESSMENT} />,
       async ({ container }) => {
         expect(screen.getByText(/a long way from even/i)).toBeVisible();
         expect(screen.getByRole("button", { name: "Accept" })).toBeEnabled();
@@ -40,6 +78,34 @@ describe("TradeCard", () => {
         expect(await axe(container)).toHaveNoViolations();
       },
     );
+  });
+
+  // Fix round 1, F4 (MEDIUM): the verdict must be asked for, never fetched for every card on
+  // mount — the same "ask, then show the answer" shape `AdvisorPanel` already uses, so an inbox
+  // full of open offers can never burst the shared advisor rate limiter.
+  it("asks before it shows a verdict, on the same shape AdvisorPanel already uses", () => {
+    const onRequestAssessment = vi.fn();
+    render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} onRequestAssessment={onRequestAssessment} />);
+    expect(screen.queryByText(/weekly production/i)).not.toBeInTheDocument();
+    const ask = screen.getByRole("button", { name: "See what the platform thinks of this trade" });
+    fireEvent.click(ask);
+    expect(onRequestAssessment).toHaveBeenCalledWith("t1");
+  });
+
+  it("shows it is checking, not a blank card, while the verdict is in flight", () => {
+    render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} assessmentStatus="loading" />);
+    expect(screen.getByText("Checking what the platform thinks of this trade.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "See what the platform thinks of this trade" })).not.toBeInTheDocument();
+  });
+
+  // Fix round 1, F4 (MEDIUM): a failed verdict fetch used to leave the card silently missing its
+  // verdict panel, with no error and no retry — never distinguishable from "nobody asked yet".
+  it("says the advice failed, honestly, and offers a retry rather than staying silent", () => {
+    const onRequestAssessment = vi.fn();
+    render(<TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} assessmentStatus="error" onRequestAssessment={onRequestAssessment} />);
+    expect(screen.getByText(/Advice is unavailable right now\./)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    expect(onRequestAssessment).toHaveBeenCalledWith("t1");
   });
 
   it("renders both sides through PositionBadge and a name, framed as what you give and get", () => {
@@ -77,7 +143,7 @@ describe("TradeCard", () => {
     expect(screen.getByRole("dialog")).toHaveTextContent("Both rosters change as soon as you accept. You can't undo it.");
     expect(onAccept).not.toHaveBeenCalled();
 
-    fireEvent.click(screen.getByRole("button", { name: "Confirm accept" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm trade" }));
     expect(onAccept).toHaveBeenCalledWith("t1");
   });
 
@@ -93,7 +159,7 @@ describe("TradeCard", () => {
     const onWithdraw = vi.fn();
     render(<TradeCard trade={BASE} meTeamId="them" playersById={PLAYERS} onWithdraw={onWithdraw} />);
     expect(screen.queryByRole("button", { name: "Accept" })).not.toBeInTheDocument();
-    expect(screen.getByText("Waiting for a reply.")).toBeInTheDocument();
+    expect(screen.getByText("Proposed. Waiting for a reply.")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
     expect(onWithdraw).toHaveBeenCalledWith("t1");
   });
@@ -113,7 +179,7 @@ describe("TradeCard", () => {
       reversedAt: "2026-08-20T00:00:00.000Z",
     };
     render(<TradeCard trade={trade} meTeamId="me" playersById={PLAYERS} />);
-    expect(screen.getByText(/an operator put this trade back/i)).toBeInTheDocument();
+    expect(screen.getByText(/an operator reversed this trade/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
   });
 

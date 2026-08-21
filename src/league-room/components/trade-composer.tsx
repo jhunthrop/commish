@@ -7,7 +7,12 @@ import { TRADE_CONFIG } from "@/trades/config";
 import type { TradeRoomContext, TradeRosterPlayer } from "../contract";
 import type { ProposedTrade, TradeActionResult } from "../hooks/use-trades";
 import type { TradeAssessmentBody } from "../contract";
+import { formatExpiry } from "../lib/format";
 import { TradeVerdict, type TradeAssessmentSummary } from "./trade-verdict";
+
+/** The full window a fresh offer stands for, in days — `TRADE_CONFIG.proposalTtlHours` read as a
+ *  value (`src/trades` is client-boundary exempt), never a hardcoded "three" (fix round 1, F2). */
+const PROPOSAL_TTL_DAYS = Math.round(TRADE_CONFIG.proposalTtlHours / 24);
 
 export interface TradeComposerProps {
   readonly context: TradeRoomContext;
@@ -41,7 +46,14 @@ function PlayerPicker({
     <fieldset className="flex min-w-0 flex-1 flex-col gap-2">
       <legend className="text-sm font-medium text-text-primary">{legend}</legend>
       {roster.length === 0 ? (
-        <p className="text-sm text-text-muted">Nobody available to trade for on this team right now.</p>
+        // Fix round 1, F6 (LOW): a bare "nobody available" used to give no cause and no way
+        // forward — the one empty state in this room that read as a dead end. This is a bye
+        // week or a week whose matchups aren't generated yet, so the cause is named and the
+        // manager is pointed at what actually resolves it, rather than left to guess.
+        <p className="text-sm text-text-muted">
+          Nobody available to trade for on this team right now. This usually means the week&apos;s matchups aren&apos;t set yet. Check back once
+          they are, or ask your commissioner.
+        </p>
       ) : (
         <ul className="flex flex-col gap-2">
           {roster.map((player) => {
@@ -138,6 +150,9 @@ export function TradeComposer({ context, onAssess, onPropose, onDone, onCancel }
       <Card>
         <div className="flex flex-col gap-3">
           <p className="text-lg font-medium text-text-primary">Offer sent.</p>
+          {/* Fix round 1, F2 (HIGH, member panel): a first-timer who just sent their first offer
+              could not answer "what happens next" from anything this screen showed before. */}
+          <p className="text-sm text-text-muted">{`${formatExpiry(PROPOSAL_TTL_DAYS)} If nobody answers by then, it expires on its own and neither roster changes.`}</p>
           <TradeVerdict assessment={sent} />
           <div>
             <Button onClick={onDone}>Done</Button>

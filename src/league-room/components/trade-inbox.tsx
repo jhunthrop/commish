@@ -1,12 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Button, EmptyState, ErrorState, Skeleton } from "@/components/ui";
 import type { TradeProposalView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import type { TradeRoomContext } from "../contract";
 import { useTrades, type TradeDecision } from "../hooks/use-trades";
-import { TradeCard } from "./trade-card";
+import { TradeCard, type TradeCardProps } from "./trade-card";
 import { TradeComposer } from "./trade-composer";
 import type { TradeAssessmentSummary } from "./trade-verdict";
 
@@ -14,6 +14,8 @@ export interface TradeInboxProps {
   readonly leagueId: string;
   readonly context: TradeRoomContext;
 }
+
+type AssessmentStatus = NonNullable<TradeCardProps["assessmentStatus"]>;
 
 function flattenPlayers(rostersByTeamId: TradeRoomContext["rostersByTeamId"]): Readonly<Record<string, ValuedPlayer>> {
   const byId: Record<string, ValuedPlayer> = {};
@@ -34,8 +36,9 @@ function Band({
   trades,
   meTeamId,
   playersById,
+  assessmentStatusById,
   assessments,
-  assessing,
+  onRequestAssessment,
   busyTradeId,
   onAccept,
   onDecline,
@@ -45,8 +48,9 @@ function Band({
   readonly trades: readonly TradeProposalView[];
   readonly meTeamId: string;
   readonly playersById: Readonly<Record<string, ValuedPlayer>>;
+  readonly assessmentStatusById: Readonly<Record<string, AssessmentStatus>>;
   readonly assessments: Readonly<Record<string, TradeAssessmentSummary>>;
-  readonly assessing: ReadonlySet<string>;
+  readonly onRequestAssessment: (tradeId: string) => void;
   readonly busyTradeId: string | null;
   readonly onAccept: (tradeId: string) => void;
   readonly onDecline: (tradeId: string) => void;
@@ -63,7 +67,9 @@ function Band({
             trade={trade}
             meTeamId={meTeamId}
             playersById={playersById}
-            assessment={assessing.has(trade.id) ? null : (assessments[trade.id] ?? undefined)}
+            assessmentStatus={assessmentStatusById[trade.id] ?? "idle"}
+            assessment={assessments[trade.id]}
+            onRequestAssessment={onRequestAssessment}
             busy={busyTradeId === trade.id}
             onAccept={onAccept}
             onDecline={onDecline}
@@ -76,17 +82,21 @@ function Band({
 }
 
 /**
- * The trade room: three bands (offers to answer, offers sent, the league's settled history),
- * the propose flow, and every action a manager takes on a stored offer. Owns `useTrades` itself,
- * the same shape `NoticeInbox`/`LeagueChat` already use for a room that fetches its own data
- * rather than being handed it — the composing/browsing toggle lives here too, since "read the
- * inbox" and "build an offer" are the same room, never two routes.
+ * The trade room: three bands (offers to answer, offers sent, and trade history), the propose
+ * flow, and every action a manager takes on a stored offer. Owns `useTrades` itself, the same
+ * shape `NoticeInbox`/`LeagueChat` already use for a room that fetches its own data rather than
+ * being handed it — the composing/browsing toggle lives here too, since "read the inbox" and
+ * "build an offer" are the same room, never two routes.
  *
- * Every OPEN, answerable (inbound) offer gets its own advisory read the moment it's on screen —
- * `assess`, called once per trade id and cached in `assessments`, from the viewer's OWN
- * perspective (never the proposer's private propose-time read, which `proposeTrade` never stores
- * or shows the counterparty in the first place). This is the second caller `POST /api/leagues/
- * [leagueId]/advisor/trade` gets in this task, beside `TradeComposer`'s own pre-send preview.
+ * An OPEN, answerable (inbound) offer's advisory read is asked for, never fetched on mount — fix
+ * round 1, F4. This is the second caller `POST /api/leagues/[leagueId]/advisor/trade` gets in
+ * this task, beside `TradeComposer`'s own pre-send preview, but it follows `AdvisorPanel`'s exact
+ * shape: nothing is asked for until a manager clicks to see it, so an inbox holding any number of
+ * open offers can never burst the shared advisor rate limiter (`ADVISOR_CONFIG`, 20 requests/60s
+ * across every advisor route a session touches) the way fetching every card's verdict on mount
+ * could. `assessmentStatusById` tracks each card's own request independently — `"idle"` until
+ * asked, `"loading"` while in flight, `"ready"`/`"error"` once it resolves — so a failed request
+ * renders an honest state on its own card instead of silently missing a verdict panel.
  */
 export function TradeInbox({ leagueId, context }: TradeInboxProps) {
   const { inbox, outbox, history, meTeamId, status, error, refetch, propose, decide, assess } = useTrades(leagueId);
@@ -94,34 +104,31 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
   const [busyTradeId, setBusyTradeId] = useState<string | null>(null);
   const [decisionError, setDecisionError] = useState<string | null>(null);
   const [assessments, setAssessments] = useState<Readonly<Record<string, TradeAssessmentSummary>>>({});
-  const askedRef = useRef(new Set<string>());
-  const [assessingIds, setAssessingIds] = useState<ReadonlySet<string>>(new Set());
+  const [assessmentStatusById, setAssessmentStatusById] = useState<Readonly<Record<string, AssessmentStatus>>>({});
 
   const playersById = flattenPlayers(context.rostersByTeamId);
 
-  useEffect(() => {
-    if (meTeamId === null) return;
-    const answerable = inbox.filter((trade) => trade.status === "open" && trade.to.teamId === meTeamId);
-    for (const trade of answerable) {
-      if (askedRef.current.has(trade.id)) continue;
-      askedRef.current.add(trade.id);
-      setAssessingIds((current) => new Set(current).add(trade.id));
-      const give = trade.to.assets.filter((asset) => asset.kind === "player").map((asset) => asset.playerId);
-      const receive = trade.from.assets.filter((asset) => asset.kind === "player").map((asset) => asset.playerId);
-      void assess({ weekNumber: trade.weekNumber, counterpartyTeamId: trade.from.teamId, give, receive }).then((result) => {
-        setAssessingIds((current) => {
-          const next = new Set(current);
-          next.delete(trade.id);
-          return next;
-        });
-        if (!result.ok) return;
-        setAssessments((current) => ({
-          ...current,
-          [trade.id]: { verdict: result.data.verdict, givingValue: result.data.givingValue, receivingValue: result.data.receivingValue },
-        }));
-      });
-    }
-  }, [inbox, meTeamId, assess]);
+  const requestAssessment = (tradeId: string): void => {
+    // A second click while a request is already in flight (or once it's already answered) is a
+    // no-op — this is what keeps ONE click a ONE request, retryable only from an error.
+    if (assessmentStatusById[tradeId] === "loading" || assessmentStatusById[tradeId] === "ready") return;
+    const trade = [...inbox, ...outbox, ...history].find((row) => row.id === tradeId);
+    if (trade === undefined) return;
+    setAssessmentStatusById((current) => ({ ...current, [tradeId]: "loading" }));
+    const give = trade.to.assets.filter((asset) => asset.kind === "player").map((asset) => asset.playerId);
+    const receive = trade.from.assets.filter((asset) => asset.kind === "player").map((asset) => asset.playerId);
+    void assess({ weekNumber: trade.weekNumber, counterpartyTeamId: trade.from.teamId, give, receive }).then((result) => {
+      if (!result.ok) {
+        setAssessmentStatusById((current) => ({ ...current, [tradeId]: "error" }));
+        return;
+      }
+      setAssessments((current) => ({
+        ...current,
+        [tradeId]: { verdict: result.data.verdict, givingValue: result.data.givingValue, receivingValue: result.data.receivingValue },
+      }));
+      setAssessmentStatusById((current) => ({ ...current, [tradeId]: "ready" }));
+    });
+  };
 
   const decideAndRefresh = async (tradeId: string, action: TradeDecision): Promise<void> => {
     setBusyTradeId(tradeId);
@@ -169,8 +176,9 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
   const bandProps = {
     meTeamId: meTeamId ?? "",
     playersById,
+    assessmentStatusById,
     assessments,
-    assessing: assessingIds,
+    onRequestAssessment: requestAssessment,
     busyTradeId,
     onAccept: (tradeId: string) => void decideAndRefresh(tradeId, "accept"),
     onDecline: (tradeId: string) => void decideAndRefresh(tradeId, "reject"),
@@ -179,9 +187,17 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-end">
-        <Button onClick={() => setComposing(true)}>Propose a trade</Button>
-      </div>
+      {/* Fix round 1, F6 (LOW): two different verbs for the identical action of opening the
+          composer used to sit on the same page. Rather than showing both at once with the same
+          label once they agree (which would leave two identically-named buttons on screen), this
+          header control renders ONLY once the empty state's own — the brief's pinned copy — has
+          nothing left to show, so there is always exactly one way to start an offer, named the
+          same way everywhere it appears. */}
+      {nothingHere ? null : (
+        <div className="flex justify-end">
+          <Button onClick={() => setComposing(true)}>Put an offer together</Button>
+        </div>
+      )}
 
       {decisionError === null ? null : (
         <p role="alert" className="text-sm text-negative">
@@ -199,7 +215,11 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
         <>
           <Band title="Offers to answer" trades={inbox} {...bandProps} />
           <Band title="Offers you have out" trades={outbox} {...bandProps} />
-          <Band title="Completed trades" trades={history} {...bandProps} />
+          {/* Fix round 1, F1: this band is no longer only completed trades — it also carries the
+              caller's own dead offers (rejected/withdrawn/expired/superseded on either side),
+              which `tradesQuery`'s `history` box now includes so the two managers who negotiated
+              a trade that fell through keep their own copy of it. "Trade history" covers both. */}
+          <Band title="Trade history" trades={history} {...bandProps} />
         </>
       )}
     </div>

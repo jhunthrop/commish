@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, within } from "@testing-library/react";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
@@ -122,10 +122,32 @@ describe("TradesPage", () => {
     await expect(callPage()).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
   });
 
+  // Fix round 1, F6 (LOW, code review): this test's own name promised something its body never
+  // checked. Now it actually opens the composer and reads the `Select`'s own options.
   it("offers every other team as a counterparty, never the caller's own", async () => {
     await renderPage();
-    await screen.findByRole("heading", { name: "Trades" });
-    // The inbox loads empty (the fixture's own default), so the composer is one click away.
-    expect(screen.getByRole("button", { name: "Put an offer together" })).toBeInTheDocument();
+    fireEvent.click(await screen.findByRole("button", { name: "Put an offer together" }));
+
+    const select = screen.getByLabelText("Trade with") as HTMLSelectElement;
+    const optionLabels = within(select)
+      .getAllByRole("option")
+      .map((option) => option.textContent);
+    expect(optionLabels).toContain("Iron Owls");
+    expect(optionLabels).not.toContain("Bay Bandits"); // the caller's own team, HOME.myTeamId
+  });
+
+  // Fix round 1, F6 (LOW, code review): a bye week, or a week whose schedule isn't generated
+  // yet, leaves `matchupWeek` with no row for the caller's own team — the composer's roster
+  // picker degrades honestly rather than crashing, and this pins that it still does once the
+  // empty state gained cause-and-action copy.
+  it("degrades honestly, with Send offer staying disabled, when the caller's own team has no matchup row this week", async () => {
+    vi.mocked(matchupWeek).mockResolvedValue({ ...WEEK_BODY, matchups: [] });
+    await renderPage();
+    fireEvent.click(await screen.findByRole("button", { name: "Put an offer together" }));
+    fireEvent.change(screen.getByLabelText("Trade with"), { target: { value: "t2" } });
+
+    const yourPlayers = screen.getByRole("group", { name: "Your players" });
+    expect(within(yourPlayers).getByText(/Nobody available to trade for on this team right now\./)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send offer" })).toBeDisabled();
   });
 });

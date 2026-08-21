@@ -372,7 +372,7 @@ describe("TradeCard says nothing that breaks the house copy rules, in every stat
 
     for (const { trade, meTeamId } of states) {
       const { container, unmount } = render(
-        <TradeCard trade={trade} meTeamId={meTeamId} playersById={TRADE_PLAYERS} assessment={{ verdict: "lopsided", givingValue: 5, receivingValue: 40 }} />,
+        <TradeCard trade={trade} meTeamId={meTeamId} playersById={TRADE_PLAYERS} assessmentStatus="ready" assessment={{ verdict: "lopsided", givingValue: 5, receivingValue: 40 }} />,
       );
       expectClean(container, ...TRADE_CONTENT, '"Rebuilding my TE spot"');
       unmount();
@@ -383,6 +383,17 @@ describe("TradeCard says nothing that breaks the house copy rules, in every stat
     const { container } = render(<TradeCard trade={TRADE_BASE} meTeamId="me" playersById={TRADE_PLAYERS} />);
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     expectClean(container, ...TRADE_CONTENT);
+  });
+
+  // Fix round 1, F4: three more interaction states this card can be in — idle (nobody has asked
+  // for a verdict yet), loading, and a failed fetch's own retry offer — none of them swept before
+  // the lazy-verdict fix existed.
+  it("is clean idle, loading, and on a failed verdict fetch", () => {
+    for (const status of ["idle", "loading", "error"] as const) {
+      const { container, unmount } = render(<TradeCard trade={TRADE_BASE} meTeamId="me" playersById={TRADE_PLAYERS} assessmentStatus={status} />);
+      expectClean(container, ...TRADE_CONTENT);
+      unmount();
+    }
   });
 });
 

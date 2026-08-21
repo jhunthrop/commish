@@ -59,7 +59,7 @@ describe("TradeInbox", () => {
     const page: TradesPageBody = { ...EMPTY_PAGE, history: [{ ...INBOUND, status: "rejected", settledAt: "x" }] };
     const fixture = fixtureLeagueDeps({ ok: true, data: page });
     renderInLeague(<TradeInbox leagueId="l1" context={CONTEXT} />, fixture.deps);
-    fireEvent.click(await screen.findByRole("button", { name: "Propose a trade" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Put an offer together" }));
     expect(screen.getByLabelText("Trade with")).toBeInTheDocument();
   });
 
@@ -94,22 +94,48 @@ describe("TradeInbox", () => {
 
     expect(await screen.findByRole("region", { name: "Offers to answer" })).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Offers you have out" })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Completed trades" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Trade history" })).toBeInTheDocument();
   });
 
-  it("shows the verdict beside the accept control, never instead of it, for an offer awaiting an answer", async () => {
+  // Fix round 1, F4: the verdict is asked for, never fetched on mount — a mount fires exactly
+  // one request (the page's own GET), never a second one per open offer.
+  it("fetches no verdict until asked, then shows it beside the accept control, never instead of it", async () => {
     const page: TradesPageBody = { leagueId: "l1", meTeamId: "me", inbox: [INBOUND], outbox: [], history: [] };
     const fixture = fixtureLeagueDeps({ ok: true, data: page }, { deferred: true });
     renderInLeague(<TradeInbox leagueId="l1" context={CONTEXT} />, fixture.deps);
     await fixture.settle(0, { ok: true, data: page });
 
     expect(await screen.findByRole("button", { name: "Accept" })).toBeEnabled();
+    expect(fixture.calls).toEqual(["GET /api/leagues/l1/trades"]); // no verdict call yet
+
+    fireEvent.click(screen.getByRole("button", { name: "See what the platform thinks of this trade" }));
+    expect(screen.getByText("Checking what the platform thinks of this trade.")).toBeInTheDocument();
     await fixture.settle(1, {
       ok: true,
       data: { headline: "Lopsided.", reasoning: "One side gives up far more per week.", degraded: false, verdict: "lopsided", flags: [], givingValue: 5, receivingValue: 40 },
     });
     expect(await screen.findByText(/a long way from even/i)).toBeVisible();
     expect(screen.getByRole("button", { name: "Accept" })).toBeEnabled();
+  });
+
+  // Fix round 1, F4: a failed verdict fetch used to leave the card silently missing its panel.
+  it("shows an honest failure and lets the manager try again when the verdict fetch fails", async () => {
+    const page: TradesPageBody = { leagueId: "l1", meTeamId: "me", inbox: [INBOUND], outbox: [], history: [] };
+    const fixture = fixtureLeagueDeps({ ok: true, data: page }, { deferred: true });
+    renderInLeague(<TradeInbox leagueId="l1" context={CONTEXT} />, fixture.deps);
+    await fixture.settle(0, { ok: true, data: page });
+    await screen.findByRole("button", { name: "Accept" });
+
+    fireEvent.click(screen.getByRole("button", { name: "See what the platform thinks of this trade" }));
+    await fixture.settle(1, { ok: false, error: "Too many trade actions in a short time. Give it a minute and try again." });
+    expect(await screen.findByText(/Advice is unavailable right now\./)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await fixture.settle(2, {
+      ok: true,
+      data: { headline: "Even.", reasoning: "Both sides give up similar value.", degraded: false, verdict: "even", flags: [], givingValue: 10, receivingValue: 10 },
+    });
+    expect(await screen.findByText(/close to even/i)).toBeVisible();
   });
 
   it("accepts an offer through the confirm dialog, then refetches", async () => {
@@ -119,11 +145,8 @@ describe("TradeInbox", () => {
     await fixture.settle(0, { ok: true, data: page });
     await screen.findByRole("button", { name: "Accept" });
 
-    // Call 1 is the per-card advisory assess; let it resolve out of the way first.
-    await fixture.settle(1, { ok: true, data: { headline: "x", reasoning: "y", degraded: false, verdict: "even", flags: [], givingValue: 10, receivingValue: 10 } });
-
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
-    fireEvent.click(screen.getByRole("button", { name: "Confirm accept" }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm trade" }));
     await waitFor(() => expect(fixture.calls).toContain("POST /api/leagues/l1/trades/t1"));
     const acceptIndex = fixture.calls.indexOf("POST /api/leagues/l1/trades/t1");
 

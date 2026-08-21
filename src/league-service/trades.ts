@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, gt, inArray } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, ne, or } from "drizzle-orm";
 import { assembleAdvisorContext, valuePlayers } from "@/ai-advisor/context";
 import type { Db, DbTx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
@@ -93,14 +93,14 @@ export function proposalFingerprint(input: {
   return createHash("sha256").update(canonical).digest("hex");
 }
 
-/** The three bands `TradesPageBody` renders: offers to answer, offers sent, and settled history. */
+/** The three bands `TradesPageBody` renders: offers to answer, offers sent, and the league's
+ *  shared record of what actually happened plus the caller's own dead offers. */
 export type TradeBox = "inbox" | "outbox" | "history";
 
 export interface TradesQueryInput {
   readonly leagueId: string;
-  /** Unused for `box: "history"` — a league's whole settled record has no single team's inbox
-   *  or outbox to key off of. Carried anyway so callers building all three bands from one
-   *  `{ leagueId, teamId }` pair (`TradesPageBody`) pass one input shape, not three. */
+  /** Read by every box, `"history"` included (fix round 1, F1) — see `tradesQuery`'s own
+   *  docblock for why history needs the caller's team id too, not just the league's. */
   readonly teamId: string;
   readonly box: TradeBox;
 }
@@ -112,9 +112,22 @@ export interface TradesQueryInput {
  *
  * `inbox` and `outbox` are partial on `status = 'open'` — the same predicate
  * `trade_proposals_inbox_idx`/`trade_proposals_outbox_idx` carry — so the index serves the whole
- * WHERE clause and nothing is left for a `Filter` to discard. `history` is deliberately NOT
- * narrowed to open rows: it is the league's settled record, and `trade_proposals_league_idx` is
- * not partial for exactly that reason.
+ * WHERE clause and nothing is left for a `Filter` to discard.
+ *
+ * `history` (fix round 1, F1 — a HIGH from both the code review and the member panel): a still-
+ * negotiating or dead proposal between two OTHER teams is not this caller's to see. Ruling 12's
+ * whole reason `trade_proposed` is hidden from the activity feed — "a bid discloses what a
+ * manager thinks his own players are worth" (`@/integrity/activity-view.ts`) — is defeated if the
+ * SAME information reaches every OTHER league member here instead, mislabeled as settled. So
+ * `history` answers with exactly two kinds of row, both NEVER `open` (an open row already has its
+ * own home in `inbox`/`outbox`, and would otherwise double-render there and here): every ACCEPTED
+ * trade in the league (executed, so it is a fact about rosters that already moved — a reversed
+ * one stays `status = 'accepted'` and is included the same way `TradeCard`'s own reversed branch
+ * expects), and the CALLER'S OWN dead proposals — rejected, withdrawn, expired or superseded, on
+ * either side of the deal — the two managers who negotiated a trade that fell through keep their
+ * own copy of it; a third team never sees it. Both conditions are still reached through
+ * `league_id` first (`trade_proposals_league_idx`), so this needs no new index: the `AND`/`OR` is
+ * a `Filter` applied after the league is found, not a second seek.
  */
 export function tradesQuery(db: Db, input: TradesQueryInput) {
   switch (input.box) {
@@ -134,7 +147,17 @@ export function tradesQuery(db: Db, input: TradesQueryInput) {
       return db
         .select()
         .from(tradeProposals)
-        .where(eq(tradeProposals.leagueId, input.leagueId))
+        .where(
+          and(
+            eq(tradeProposals.leagueId, input.leagueId),
+            ne(tradeProposals.status, "open"),
+            or(
+              eq(tradeProposals.status, "accepted"),
+              eq(tradeProposals.proposerTeamId, input.teamId),
+              eq(tradeProposals.counterpartyTeamId, input.teamId),
+            ),
+          ),
+        )
         .orderBy(desc(tradeProposals.proposedAt));
   }
 }
@@ -1103,8 +1126,9 @@ function toProposalView(row: TradeProposal, nameById: ReadonlyMap<string, string
 }
 
 /** The three bands `GET /api/leagues/[leagueId]/trades` answers with: offers to answer, offers
- *  sent, and the league's settled history — the caller's own team's inbox/outbox, the league's
- *  whole history. Team names are resolved batched, once, never per row. */
+ *  sent, and history — the caller's own team's inbox/outbox, and (fix round 1, F1) the league's
+ *  ACCEPTED trades plus the caller's own dead ones, never another pair's still-open or dead
+ *  negotiation. Team names are resolved batched, once, never per row. */
 export async function listTrades(db: Db, input: ListTradesInput): Promise<TradesPageBody> {
   const [inboxRows, outboxRows, historyRows] = await Promise.all([
     tradesQuery(db, { ...input, box: "inbox" }),

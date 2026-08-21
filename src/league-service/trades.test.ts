@@ -214,8 +214,15 @@ describe("toTradeProposal", () => {
   });
 });
 
+/** A third team in `lg_1`, with no part in any `team_a`/`team_b` proposal — the bystander every
+ *  fix round 1 (F1) privacy test negotiates against. */
+async function addBystanderTeam(db: Db): Promise<void> {
+  await db.insert(users).values({ id: "u_c", email: "u_c@test.local", displayName: "Manager C" });
+  await db.insert(teams).values({ id: "team_c", leagueId: "lg_1", userId: "u_c", name: "Team C" });
+}
+
 describe("tradesQuery", () => {
-  it("inbox is the counterparty's open offers; outbox is the proposer's; history is the league's whole record", async () => {
+  it("inbox is the counterparty's open offers; outbox is the proposer's", async () => {
     await truncateAll(db);
     await seedTradeableLeague(db);
     await insertProposal(db, { id: "tr_open", from: ["p_rb1"], to: ["p_wr1"] });
@@ -227,9 +234,73 @@ describe("tradesQuery", () => {
 
     const outbox = await tradesQuery(db, { leagueId: "lg_1", teamId: "team_a", box: "outbox" });
     expect(outbox.map((row) => row.id)).toEqual(["tr_open"]);
+  });
 
-    const history = await tradesQuery(db, { leagueId: "lg_1", teamId: "team_a", box: "history" });
-    expect(history.map((row) => row.id).sort()).toEqual(["tr_open", "tr_settled"]);
+  /**
+   * Fix round 1, F1 (HIGH — the code review's own MEDIUM undersold it, and the member panel
+   * named it its sharpest finding). Before this fix, `history` answered with every row in the
+   * league regardless of status, which meant a still-negotiating or dead proposal between two
+   * OTHER teams rendered on the trades page as a done deal to the whole league — exactly the
+   * disclosure `trade_proposed`'s hidden activity-feed visibility (ruling 12,
+   * `@/integrity/activity-view.ts`) exists to prevent. The wire-level proof: a THIRD team's own
+   * `history` read for `team_a`/`team_b`'s negotiation.
+   */
+  it("never answers a third team's history with another pair's open or dead proposal", async () => {
+    await truncateAll(db);
+    await seedTradeableLeague(db);
+    await addBystanderTeam(db);
+    await insertProposal(db, { id: "tr_open", from: ["p_rb1"], to: ["p_wr1"] });
+    await insertProposal(db, { id: "tr_rejected", from: ["p_rb2"], to: ["p_wr2"] });
+    await insertProposal(db, { id: "tr_withdrawn", from: ["p_rb3"], to: ["p_wr3"] });
+    await insertProposal(db, { id: "tr_expired", from: ["p_rb4"], to: ["p_wr4"] });
+    await insertProposal(db, { id: "tr_superseded", from: ["p_rb5"], to: ["p_wr5"] });
+    await db.update(tradeProposals).set({ status: "rejected", settledAt: new Date() }).where(eq(tradeProposals.id, "tr_rejected"));
+    await db.update(tradeProposals).set({ status: "withdrawn", settledAt: new Date() }).where(eq(tradeProposals.id, "tr_withdrawn"));
+    await db.update(tradeProposals).set({ status: "expired" }).where(eq(tradeProposals.id, "tr_expired"));
+    await db.update(tradeProposals).set({ status: "superseded", settledAt: new Date() }).where(eq(tradeProposals.id, "tr_superseded"));
+
+    const bystanderHistory = await tradesQuery(db, { leagueId: "lg_1", teamId: "team_c", box: "history" });
+    expect(bystanderHistory).toEqual([]);
+  });
+
+  it("answers a third team's history with an ACCEPTED trade between two other teams, reversed or not", async () => {
+    await truncateAll(db);
+    await seedTradeableLeague(db);
+    await addBystanderTeam(db);
+    await insertProposal(db, { id: "tr_accepted", from: ["p_rb1"], to: ["p_wr1"] });
+    await insertProposal(db, { id: "tr_reversed", from: ["p_rb2"], to: ["p_wr2"] });
+    await db.update(tradeProposals).set({ status: "accepted", settledAt: new Date() }).where(eq(tradeProposals.id, "tr_accepted"));
+    await db
+      .update(tradeProposals)
+      .set({ status: "accepted", settledAt: new Date(), reversedAt: new Date() })
+      .where(eq(tradeProposals.id, "tr_reversed"));
+
+    const bystanderHistory = await tradesQuery(db, { leagueId: "lg_1", teamId: "team_c", box: "history" });
+    expect(bystanderHistory.map((row) => row.id).sort()).toEqual(["tr_accepted", "tr_reversed"]);
+  });
+
+  it("never duplicates the caller's own OPEN offer into history — it already lives in inbox/outbox", async () => {
+    await truncateAll(db);
+    await seedTradeableLeague(db);
+    await insertProposal(db, { id: "tr_open", from: ["p_rb1"], to: ["p_wr1"] });
+
+    const proposerHistory = await tradesQuery(db, { leagueId: "lg_1", teamId: "team_a", box: "history" });
+    expect(proposerHistory).toEqual([]);
+    const counterpartyHistory = await tradesQuery(db, { leagueId: "lg_1", teamId: "team_b", box: "history" });
+    expect(counterpartyHistory).toEqual([]);
+  });
+
+  it("keeps a member's own dead offer visible to BOTH parties, not just the proposer", async () => {
+    await truncateAll(db);
+    await seedTradeableLeague(db);
+    await insertProposal(db, { id: "tr_rejected", from: ["p_rb1"], to: ["p_wr1"] });
+    await db.update(tradeProposals).set({ status: "rejected", settledAt: new Date() }).where(eq(tradeProposals.id, "tr_rejected"));
+
+    const proposerHistory = await tradesQuery(db, { leagueId: "lg_1", teamId: "team_a", box: "history" });
+    expect(proposerHistory.map((row) => row.id)).toEqual(["tr_rejected"]);
+
+    const counterpartyHistory = await tradesQuery(db, { leagueId: "lg_1", teamId: "team_b", box: "history" });
+    expect(counterpartyHistory.map((row) => row.id)).toEqual(["tr_rejected"]);
   });
 });
 
@@ -850,6 +921,37 @@ describe("listTrades", () => {
   it("answers empty bands for a league with no trades yet", async () => {
     const page = await listTrades(db, { leagueId: "lg_1", teamId: "team_a" });
     expect(page).toEqual({ leagueId: "lg_1", meTeamId: "team_a", inbox: [], outbox: [], history: [] });
+  });
+
+  /**
+   * Fix round 1, F1, at the exact function `GET /api/leagues/[leagueId]/trades/route.ts` calls —
+   * the wire-level proof, not just `tradesQuery`'s own. A third team's `listTrades` read must
+   * never carry another pair's still-open or dead negotiation in its `history` band, and must
+   * still carry an accepted one.
+   */
+  it("never wires a third team's page with another pair's open or dead proposal, but does with an accepted one", async () => {
+    await addBystanderTeam(db);
+
+    const open = await proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_rb_a"], receive: ["p_rb_b"] }));
+    expect(open).toMatchObject({ ok: true });
+
+    const rejected = await proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_qb2"], receive: ["p_qb_b"] }));
+    expect(rejected).toMatchObject({ ok: true });
+    if (!rejected.ok) return;
+    await rejectTrade(db, { tradeId: rejected.tradeId, leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake });
+
+    // Bench-for-bench, deliberately: both sides' BENCH slots accept any position, so this swap
+    // is legal regardless of who gives up what — unlike a starting-slot swap, which this test has
+    // no need to reason about.
+    const accepted = await proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_te_a"], receive: ["p_bench_b2"] }));
+    expect(accepted).toMatchObject({ ok: true });
+    if (!accepted.ok) return;
+    await acceptTrade(db, { tradeId: accepted.tradeId, leagueId: "lg_1", userId: "u_bob" });
+
+    const bystanderView = await listTrades(db, { leagueId: "lg_1", teamId: "team_c" });
+    expect(bystanderView.inbox).toEqual([]);
+    expect(bystanderView.outbox).toEqual([]);
+    expect(bystanderView.history.map((row) => row.id)).toEqual([accepted.tradeId]);
   });
 });
 
