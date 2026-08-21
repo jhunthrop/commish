@@ -124,6 +124,33 @@ export interface NoticeContexts {
     readonly leagueName: string;
     readonly proposerTeamName: string;
   };
+  /**
+   * `acceptTrade`'s own notice (`@/league-service/trades`), sent to BOTH parties — the one moment
+   * this product tells a member their roster just moved. `gaveSummary`/`getSummary` are pre-
+   * rendered from THIS recipient's own side of the deal, the same "a template composes a
+   * sentence, it does not re-derive one from a payload shape" discipline `trade_proposed` keeps —
+   * so the proposer's notice and the counterparty's notice are two calls with the two sides
+   * swapped, never one shared object.
+   */
+  readonly trade_executed: {
+    readonly leagueName: string;
+    readonly counterpartyTeamName: string;
+    readonly gaveSummary: string;
+    readonly gotSummary: string;
+  };
+  /**
+   * `acceptTrade`'s supersede sweep (Task 5): sent to the PROPOSER of every OTHER open offer that
+   * named a player the accepted trade just moved. `ACTIVITY_VISIBILITY` has no entry for this —
+   * it is a notice type only, the same way `trade_withdrawn` is — because "superseded" is a fact
+   * about one manager's own dead offer, not league content. Deliberately NOT `trade_rejected`'s
+   * copy: nobody declined this offer, and a manager who reads a decline where there wasn't one
+   * draws a worse conclusion than the truth (`INTEGRITY_CONFIG.notices.accusatoryTerms`'s whole
+   * reason for existing).
+   */
+  readonly trade_superseded: {
+    readonly leagueName: string;
+    readonly counterpartyTeamName: string;
+  };
 }
 
 /**
@@ -205,6 +232,14 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   trade_withdrawn: ({ leagueName, proposerTeamName }) => ({
     title: "A trade offer came off the table",
     body: `${proposerTeamName} took back the offer they sent you in ${leagueName}. Nothing on your roster changed.`,
+  }),
+  trade_executed: ({ leagueName, counterpartyTeamName, gaveSummary, gotSummary }) => ({
+    title: "Your trade went through",
+    body: `You and ${counterpartyTeamName} completed a trade in ${leagueName}. You sent ${gaveSummary} and you got ${gotSummary}. Your lineup for this week already reflects it, so check your starters before kickoff.`,
+  }),
+  trade_superseded: ({ leagueName, counterpartyTeamName }) => ({
+    title: "One of your offers can no longer go through",
+    body: `A player in the offer you had out to ${counterpartyTeamName} in ${leagueName} moved to another team, so that offer is off the table. Nobody declined it. You can put together a new one any time.`,
   }),
 };
 

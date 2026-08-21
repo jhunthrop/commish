@@ -3,20 +3,23 @@ import { and, desc, eq, gt, inArray } from "drizzle-orm";
 import { assembleAdvisorContext, valuePlayers } from "@/ai-advisor/context";
 import type { Db, DbTx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
-import { leagues, teams, tradeProposals } from "@/db/schema";
+import { leagues, players, rosterSlots, statWeeks, teams, tradeProposals } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { Position } from "@/domain/player";
+import { isLineupLocked } from "@/league";
 import { canonicalSerialize } from "@/integrity/canonical";
 import type { NoticeContexts } from "@/integrity/notices";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
+import { evaluateTradeBeforeExecute, type TradeFairnessEvaluation } from "@/integrity-service/trade-fairness";
 import { tradeBalance, type TradeBalance, type ValuedPlayer } from "@/trades/fairness";
 import { assetPlayerIds, describeAsset, type TradeAsset } from "@/trades/assets";
 import { TRADE_CONFIG } from "@/trades/config";
 import { isBalancedProposal } from "@/domain/trade";
 import { nextStatusFor, type TradeStatus } from "@/trades/lifecycle";
 import type { TradeProposalView, TradeSideView, TradesPageBody } from "@/trades/contract";
-import { plannedTransfer, type FilledRosterSlot, type TransferAsset } from "./trade-transfer";
+import type { ScoreCache } from "@/stats-pipeline/score-cache";
+import { applyTradeInTx, plannedTransfer, TransferRefusedError, type FilledRosterSlot, type TransferAsset } from "./trade-transfer";
 
 /**
  * `trade_proposals`, ISO-stringed at the boundary — the same "`Date` only inside Drizzle"
@@ -599,6 +602,380 @@ export async function rejectTrade(db: Db, input: SettleTradeInput): Promise<Sett
 /** Only the PROPOSER may withdraw. */
 export async function withdrawTrade(db: Db, input: SettleTradeInput): Promise<SettleTradeResult> {
   return settleProposal(db, { ...input, transition: "withdraw" });
+}
+
+// ---------------------------------------------------------------------------------------------
+// Task 5: acceptTrade — the execution transaction.
+// ---------------------------------------------------------------------------------------------
+
+const NOOP_SCORE_CACHE: Pick<ScoreCache, "invalidate"> = { invalidate: async () => {} };
+
+/**
+ * Awaits the eviction and swallows its failure, with a log — the identical discipline
+ * `invalidateQuietly` (`@/league-service/lineups`) keeps for `setLineup`'s own cache. A missed
+ * eviction is one stale read bounded by the key's TTL, never worth failing a trade that already
+ * committed.
+ */
+async function invalidateScoreCacheQuietly(cache: Pick<ScoreCache, "invalidate">, leagueId: string, weekNumber: number): Promise<void> {
+  try {
+    await cache.invalidate(leagueId, weekNumber);
+  } catch (error: unknown) {
+    console.error("[league-service] score cache invalidation failed", { leagueId, weekNumber }, error);
+  }
+}
+
+/**
+ * Every OTHER open offer in this league naming a player the just-accepted trade moved — the
+ * supersede sweep's own read. ONE bounded query over `trade_proposals_league_idx` (this league's
+ * rows), filtered in TypeScript with `assetPlayerIds`: the asset lists are `jsonb` and bounded at
+ * `TRADE_CONFIG.maxAssetsPerSide` per row, so a `jsonb` containment predicate per moved player
+ * would buy nothing and cost an index this plan does not have. `excludeTradeId` is the trade that
+ * just accepted — belt over the brace that its own `status` is no longer `'open'` by the time
+ * this runs, so the filter below would already exclude it either way.
+ */
+async function openProposalsNaming(
+  tx: DbTx,
+  leagueId: string,
+  movedPlayerIds: readonly string[],
+  excludeTradeId: string,
+): Promise<readonly (typeof tradeProposals.$inferSelect)[]> {
+  const rows = await tx
+    .select()
+    .from(tradeProposals)
+    .where(and(eq(tradeProposals.leagueId, leagueId), eq(tradeProposals.status, "open")));
+  const moved = new Set(movedPlayerIds);
+  return rows.filter(
+    (row) =>
+      row.id !== excludeTradeId &&
+      [...assetPlayerIds(row.proposerAssets), ...assetPlayerIds(row.counterpartyAssets)].some((id) => moved.has(id)),
+  );
+}
+
+export interface AcceptTradeInput {
+  readonly tradeId: string;
+  readonly leagueId: string;
+  readonly userId: string;
+  readonly clock?: Clock;
+  readonly audit?: AuditLogger;
+  readonly notify?: typeof notifyAffectedMember;
+  readonly deliver?: (notice: MemberNotice) => Promise<void>;
+  /** Defaults to a no-op — injectable so a test never needs a live Redis connection. The route
+   *  supplies the real `getScoreCache()` (`@/league-service/score-cache-instance`). */
+  readonly cache?: Pick<ScoreCache, "invalidate">;
+}
+
+export type AcceptTradeResult =
+  | {
+      readonly ok: true;
+      readonly tradeId: string;
+      /** How many other open offers this acceptance just made unhonorable. */
+      readonly supersededCount: number;
+      /** The seam Plan D needs: computed inside this same transaction, from the rosters as they
+       *  stood a moment before this trade moved them. Rides to Task 6's after-commit flag write. */
+      readonly fairness: TradeFairnessEvaluation;
+    }
+  | { readonly ok: false; readonly status: number; readonly reason: string };
+
+/**
+ * Answer "yes" to an offer: move both rosters, settle every other offer it just invalidated, and
+ * tell everyone who is owed a word — all in one transaction. Founder decision #6: immediate
+ * execution on acceptance, no veto window, no commissioner approval, no league vote.
+ *
+ * Refuses, in order: no such offer for the caller's own team as the COUNTERPARTY, or one already
+ * settled, or one that has since expired (404/409, `refusalFor`'s own diagnosis, reused as-is —
+ * the counterparty is the authorized role for both `reject` and `accept`, so the two share one
+ * implementation rather than a second copy of the same three messages); the week this offer was
+ * valued at has since started (409, the week lock below); a named player has since left the
+ * roster it was named from (409, the ownership re-check below); the package would leave either
+ * roster illegal once cleared and refilled (409, `applyTradeInTx`'s own `TransferRefusedError`,
+ * caught outside the transaction and passed through verbatim).
+ *
+ * LOCK ORDER (ruling 3, and ruling 17 of this plan). In order:
+ *
+ *   1. `trade_proposals[id]` via the guarded UPDATE — a one-way stamp, `WHERE status = 'open'`,
+ *      so the loser of a concurrent accept/reject race (or a second accept click) matches zero
+ *      rows rather than a stale "yes". Also takes `FOR KEY SHARE` on `leagues` and both `teams`
+ *      rows through its foreign keys.
+ *   2. `stat_weeks[weekNumber] FOR SHARE` — matching `setLineup`'s own re-check exactly, on the
+ *      week THIS TRADE concerns (`row.weekNumber`, the field the row already carries so a
+ *      re-read months later can still explain the trade). `persistTick` flips a week's status in
+ *      its own transaction with no coordination; this lock is what makes the two agree, and it is
+ *      taken before anything below validates.
+ *   3. BOTH teams' rows, `FOR UPDATE`, in CANONICAL SORTED-BY-ID order — never proposer-first.
+ *      Two concurrent accepts on MIRROR trades (each side the proposer of one) would deadlock
+ *      under proposer-first ordering; sorted-id ordering is deadlock-free against both a
+ *      concurrent `proposeTrade` (which locks only the proposer's own team) and a concurrent
+ *      mirror accept. Two sequential single-row `FOR UPDATE`s, not one `IN (...)` select — only a
+ *      sequence of single-row locks guarantees the acquisition order, since an `IN` list's row
+ *      order is the planner's to choose. `lock-order.test.ts`'s two-connection proof drives this.
+ *   4. `roster_slots` / `lineup_slots` writes — `materializeLockedLineupsInTx`'s own `FOR SHARE`
+ *      (internal to `applyTradeInTx`, over the whole season) and then the transfer itself,
+ *      `FOR KEY SHARE` on both `teams` rows through its own foreign keys (already held stronger,
+ *      above).
+ *   5. the supersede sweep's `UPDATE` — same table, same class of lock, after the row that caused
+ *      it.
+ *   6. the notice inserts — `FOR KEY SHARE` on `users` and `leagues`.
+ *   7. `audit.recordAll` — the anchor, ALWAYS last. `trade_accepted` and `roster_move`, ONE batch:
+ *      both are league-scoped, so one call carries both and the two land at consecutive
+ *      sequences with no second anchor lock (Plan A ruling 3 — a transaction appends to at most
+ *      one chain).
+ *   8. `attachAuditEvent` — the one statement permitted after the anchor.
+ *
+ * Then commit. Then `deliverNotice` for every recipient, then the score-cache eviction for the
+ * one week this trade touched, both best-effort and both OUTSIDE the transaction — the same
+ * failure asymmetry `setLineup` accepts for its own cache: a slightly-late eviction costs one
+ * stale read bounded by the key's TTL, an early one would cache a roster the write might still
+ * roll back. Then, in a SEPARATE transaction, `raiseTradeFairnessFlag` (Task 6) — that one
+ * appends to the PLATFORM chain and this one has already appended to the league's.
+ *
+ * `evaluateTradeBeforeExecute` (`@/integrity-service/trade-fairness`) runs INSIDE this
+ * transaction, after the ownership re-check and before `applyTradeInTx` moves anything — the
+ * rosters as they stand a moment before they move. Its verdict rides this function's own result
+ * for Task 6 to act on after commit; `hold` is always `false` while
+ * `INTEGRITY_CONFIG.trade.autoHoldThreshold` is `null`, which is every trade this plan executes.
+ */
+export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<AcceptTradeResult> {
+  const clock = input.clock ?? systemClock;
+  const audit = input.audit ?? getAuditLogger();
+  const notify = input.notify ?? notifyAffectedMember;
+  const deliver = input.deliver ?? deliverNotice;
+  const cache = input.cache ?? NOOP_SCORE_CACHE;
+  const now = clock.now();
+
+  let outcome:
+    | {
+        readonly ok: true;
+        readonly tradeId: string;
+        readonly supersededCount: number;
+        readonly fairness: TradeFairnessEvaluation;
+        readonly weekNumber: number;
+        readonly notices: readonly MemberNotice[];
+      }
+    | { readonly ok: false; readonly status: number; readonly reason: string };
+
+  try {
+    outcome = await db.transaction(async (tx) => {
+      const [team] = await tx.select({ id: teams.id }).from(teams).where(and(eq(teams.leagueId, input.leagueId), eq(teams.userId, input.userId)));
+      // No team in this league at all: never a real match for the counterparty column below, so
+      // this sentinel guarantees the guarded UPDATE matches nothing and `refusalFor` answers 404.
+      const actorTeamId = team?.id ?? "";
+
+      const [row] = await tx
+        .update(tradeProposals)
+        .set({ status: "accepted", settledAt: new Date(now), settledByUserId: input.userId })
+        .where(
+          and(
+            eq(tradeProposals.id, input.tradeId),
+            eq(tradeProposals.leagueId, input.leagueId),
+            eq(tradeProposals.status, "open"),
+            gt(tradeProposals.expiresAt, new Date(now)),
+            eq(tradeProposals.counterpartyTeamId, actorTeamId),
+          ),
+        )
+        .returning();
+      if (row === undefined) {
+        // `refusalFor`'s counterparty-column diagnosis IS accept's own: only the counterparty may
+        // accept, the same role `reject` already answers to, so this reuses that implementation
+        // rather than restating the same three messages under a fourth transition.
+        return refusalFor(tx, { tradeId: input.tradeId, leagueId: input.leagueId, userId: input.userId, transition: "reject", actorTeamId });
+      }
+
+      const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, row.weekNumber)).for("share");
+      if (isLineupLocked(week?.status ?? "scheduled")) {
+        return { ok: false as const, status: 409, reason: `Week ${row.weekNumber} has started, so rosters can't change until it ends.` };
+      }
+
+      const [firstTeamId, secondTeamId] = [row.proposerTeamId, row.counterpartyTeamId].sort();
+      await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, firstTeamId)).for("update");
+      await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, secondTeamId)).for("update");
+
+      const giveIds = assetPlayerIds(row.proposerAssets);
+      const getIds = assetPlayerIds(row.counterpartyAssets);
+
+      // OWNERSHIP, RE-CHECKED HERE — the other half of "plan at propose time, enforce at accept
+      // time". Between the offer and the yes, another trade may have moved the same player, and
+      // the guard is in THIS transaction's own read (taken after the team locks above, so it
+      // cannot race a concurrent writer) rather than in a stale plan.
+      const currentRosterRows = await tx
+        .select({ teamId: rosterSlots.teamId, playerId: rosterSlots.playerId })
+        .from(rosterSlots)
+        .where(inArray(rosterSlots.teamId, [row.proposerTeamId, row.counterpartyTeamId]));
+      const ownedByProposer = new Set(currentRosterRows.filter((r) => r.teamId === row.proposerTeamId).map((r) => r.playerId));
+      const ownedByCounterparty = new Set(currentRosterRows.filter((r) => r.teamId === row.counterpartyTeamId).map((r) => r.playerId));
+      if (!giveIds.every((id) => ownedByProposer.has(id)) || !getIds.every((id) => ownedByCounterparty.has(id))) {
+        return {
+          ok: false as const,
+          status: 409,
+          reason: "One of the players in this offer has already moved to another team. Ask for a fresh offer.",
+        };
+      }
+
+      const [leagueRow] = await tx.select({ name: leagues.name, rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId));
+      // FK-guaranteed: `trade_proposals.league_id` references `leagues.id`, cascading — a row this
+      // transaction just guarded-updated always names a league that is still there.
+      const league = leagueRow!;
+
+      // THE SEAM, computed from the rosters a moment before they move — see this function's own
+      // docblock and `evaluateTradeBeforeExecute`'s.
+      const fairness = await evaluateTradeBeforeExecute(tx, {
+        leagueId: input.leagueId,
+        weekNumber: row.weekNumber,
+        proposerTeamId: row.proposerTeamId,
+        counterpartyTeamId: row.counterpartyTeamId,
+        proposerAssetIds: giveIds,
+        counterpartyAssetIds: getIds,
+      });
+
+      await applyTradeInTx(tx, {
+        leagueId: input.leagueId,
+        slotConfig: league.rosterSlots,
+        proposerTeamId: row.proposerTeamId,
+        counterpartyTeamId: row.counterpartyTeamId,
+        proposerAssets: row.proposerAssets,
+        counterpartyAssets: row.counterpartyAssets,
+      });
+
+      // THE SUPERSEDE SWEEP — one statement, not a loop, derived from the moved player ids.
+      const movedPlayerIds = [...giveIds, ...getIds];
+      const doomed = await openProposalsNaming(tx, row.leagueId, movedPlayerIds, row.id);
+      const supersededRows =
+        doomed.length === 0
+          ? []
+          : await tx
+              .update(tradeProposals)
+              .set({ status: "superseded", settledAt: new Date(now) })
+              .where(
+                and(
+                  eq(tradeProposals.status, "open"),
+                  inArray(
+                    tradeProposals.id,
+                    doomed.map((proposal) => proposal.id),
+                  ),
+                ),
+              )
+              .returning();
+
+      // NOTICES — `trade_executed` to both parties, `trade_superseded` to every doomed proposer.
+      const teamIds = [
+        ...new Set([row.proposerTeamId, row.counterpartyTeamId, ...supersededRows.flatMap((s) => [s.proposerTeamId, s.counterpartyTeamId])]),
+      ];
+      const teamRows = await tx.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(inArray(teams.id, teamIds));
+      const teamById = new Map(teamRows.map((t) => [t.id, t]));
+
+      const playerRows =
+        movedPlayerIds.length === 0
+          ? []
+          : await tx.select({ id: players.id, name: players.name, position: players.position }).from(players).where(inArray(players.id, movedPlayerIds));
+      // `averagePoints` is unused by `summarizeAssets`/`describeAsset` (name/position only render)
+      // — stubbed at 0 rather than paying for a second `assembleAdvisorContext` call just to fill
+      // a field nothing reads.
+      const movedPlayersById: Readonly<Record<string, ValuedPlayer>> = Object.fromEntries(
+        playerRows.map((p) => [p.id, { playerId: p.id, name: p.name, position: p.position, averagePoints: 0 }]),
+      );
+
+      const proposerTeam = teamById.get(row.proposerTeamId)!;
+      const counterpartyTeam = teamById.get(row.counterpartyTeamId)!;
+
+      const proposerNotice = await notify(tx, {
+        leagueId: row.leagueId,
+        userId: proposerTeam.userId,
+        noticeType: "trade_executed",
+        context: {
+          leagueName: league.name,
+          counterpartyTeamName: counterpartyTeam.name,
+          gaveSummary: summarizeAssets(row.proposerAssets, movedPlayersById),
+          gotSummary: summarizeAssets(row.counterpartyAssets, movedPlayersById),
+        },
+        occurredAt: now,
+        auditEventId: null,
+      });
+      const counterpartyNotice = await notify(tx, {
+        leagueId: row.leagueId,
+        userId: counterpartyTeam.userId,
+        noticeType: "trade_executed",
+        context: {
+          leagueName: league.name,
+          counterpartyTeamName: proposerTeam.name,
+          gaveSummary: summarizeAssets(row.counterpartyAssets, movedPlayersById),
+          gotSummary: summarizeAssets(row.proposerAssets, movedPlayersById),
+        },
+        occurredAt: now,
+        auditEventId: null,
+      });
+
+      const supersededNotices: MemberNotice[] = [];
+      for (const superseded of supersededRows) {
+        const doomedProposer = teamById.get(superseded.proposerTeamId)!;
+        const doomedCounterparty = teamById.get(superseded.counterpartyTeamId)!;
+        supersededNotices.push(
+          await notify(tx, {
+            leagueId: row.leagueId,
+            userId: doomedProposer.userId,
+            noticeType: "trade_superseded",
+            context: { leagueName: league.name, counterpartyTeamName: doomedCounterparty.name },
+            occurredAt: now,
+            auditEventId: null,
+          }),
+        );
+      }
+
+      // AUDIT — `trade_accepted` AND `roster_move`, ONE batch, the league chain.
+      const events = await audit.recordAll(tx, [
+        {
+          eventType: "trade_accepted",
+          actorId: input.userId,
+          actorType: "user",
+          leagueId: row.leagueId,
+          payload: {
+            tradeId: row.id,
+            proposerTeamId: row.proposerTeamId,
+            counterpartyTeamId: row.counterpartyTeamId,
+            proposerAssetIds: giveIds,
+            counterpartyAssetIds: getIds,
+          },
+          occurredAt: now,
+        },
+        {
+          eventType: "roster_move",
+          actorId: input.userId,
+          actorType: "user",
+          leagueId: row.leagueId,
+          payload: {
+            reason: "trade",
+            tradeId: row.id,
+            proposerTeamId: row.proposerTeamId,
+            counterpartyTeamId: row.counterpartyTeamId,
+            proposerAssetIds: giveIds,
+            counterpartyAssetIds: getIds,
+          },
+          occurredAt: now,
+        },
+      ]);
+      const tradeAcceptedEventId = events[0]!.eventId;
+      await attachAuditEvent(tx, proposerNotice, tradeAcceptedEventId);
+      await attachAuditEvent(tx, counterpartyNotice, tradeAcceptedEventId);
+      for (const notice of supersededNotices) await attachAuditEvent(tx, notice, tradeAcceptedEventId);
+
+      return {
+        ok: true as const,
+        tradeId: row.id,
+        supersededCount: supersededRows.length,
+        fairness,
+        weekNumber: row.weekNumber,
+        notices: [proposerNotice, counterpartyNotice, ...supersededNotices],
+      };
+    });
+  } catch (error: unknown) {
+    if (error instanceof TransferRefusedError) {
+      return { ok: false, status: 409, reason: error.message };
+    }
+    throw error;
+  }
+
+  if (!outcome.ok) return outcome;
+  for (const notice of outcome.notices) await deliver(notice);
+  await invalidateScoreCacheQuietly(cache, input.leagueId, outcome.weekNumber);
+  return { ok: true, tradeId: outcome.tradeId, supersededCount: outcome.supersededCount, fairness: outcome.fairness };
 }
 
 export interface ListTradesInput {

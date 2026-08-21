@@ -7,7 +7,7 @@ import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { joinLeagueInTx } from "@/league-service/join";
 import { writeSchedule } from "@/league-service/schedule";
-import { proposeTrade, rejectTrade } from "@/league-service/trades";
+import { acceptTrade, proposeTrade, rejectTrade } from "@/league-service/trades";
 import type { StatLine } from "@/domain/player";
 import { correctSettledWeek } from "@/stats-pipeline/correction";
 import { finalizeWeek } from "@/stats-pipeline/finalize";
@@ -774,6 +774,138 @@ describe("rejectTrade's notice order", () => {
 
     // And the notice rejectTrade wrote before the anchor still names the event minted after it.
     const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_trade_alice"));
+    expect(notice?.auditEventId).not.toBeNull();
+  });
+});
+
+/**
+ * Task 5's own transaction, first half: `acceptTrade`'s week lock. It parks a real week-status
+ * write — the same statement `persistTick` (`@/stats-pipeline/persist`) issues, standing in for
+ * it because `persistTick` has no seam to park inside — holding `stat_weeks[4]` open, and drives
+ * a real `acceptTrade` against the SAME row on a second connection. The claim is narrower than
+ * the pairs above: not "no deadlock", but that the trade genuinely BLOCKS ON THE WEEK rather than
+ * skipping past a stale read and reaching (or blocking on) the league anchor instead — the same
+ * "FOR SHARE against an uncommitted concurrent writer" proof `trade-transfer.test.ts`'s own
+ * `materializeLockedLineupsInTx` test runs, driven here through the real service entry point.
+ */
+describe("acceptTrade's week lock", () => {
+  it("blocks a concurrent accept behind a real stat-week write, and refuses once it sees the flip", async () => {
+    await seedLeagueWith("lg_accept_week_lock", ["u_aw_commish", "u_aw_alice", "u_aw_bob"]);
+    await joinDb.insert(teams).values([
+      { id: "team_aw_alice", leagueId: "lg_accept_week_lock", userId: "u_aw_alice", name: "Alice's Team" },
+      { id: "team_aw_bob", leagueId: "lg_accept_week_lock", userId: "u_aw_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_aw_a", name: "Player A", position: "RB", nflTeam: "KC" },
+      { id: "p_aw_b", name: "Player B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_aw_alice", slot: "BENCH", slotIndex: 0, playerId: "p_aw_a" },
+      { teamId: "team_aw_bob", slot: "BENCH", slotIndex: 0, playerId: "p_aw_b" },
+    ]);
+    // An EXISTING row, matching `persistTick`'s own upsert shape — a `SELECT … FOR SHARE` against
+    // a row still being INSERTED (never committed, so not yet visible) would not block at all.
+    await joinDb.insert(statWeeks).values({ week: 4, status: "scheduled" });
+    const proposedAt = new Date(clock.now());
+    const expiresAt = new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000);
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_aw_1",
+      leagueId: "lg_accept_week_lock",
+      proposerTeamId: "team_aw_alice",
+      counterpartyTeamId: "team_aw_bob",
+      weekNumber: 4,
+      proposerAssets: [{ kind: "player", playerId: "p_aw_a" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_aw_b" }],
+      fingerprint: "fp_trade_aw_1",
+      note: null,
+      status: "open",
+      proposedAt,
+      expiresAt,
+    });
+
+    let releaseFlip: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseFlip = resolve));
+    const flipping = joinDb.transaction(async (tx) => {
+      await tx.update(statWeeks).set({ status: "in_progress" }).where(eq(statWeeks.week, 4));
+      await released;
+    });
+
+    const accepting = acceptTrade(pickDb, { tradeId: "trade_aw_1", leagueId: "lg_accept_week_lock", userId: "u_aw_bob", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFlip();
+    await flipping;
+
+    // Blocked on the WEEK, never on the anchor: no league chain row exists for this league at
+    // all, because the week lock refuses the trade before `acceptTrade` ever reaches its own
+    // `audit.recordAll`.
+    expect(await accepting).toMatchObject({ ok: false, status: 409 });
+    const anchors = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_accept_week_lock"));
+    expect(anchors).toEqual([]);
+  });
+});
+
+/**
+ * Task 5's own transaction, second half: the notice inserts. `acceptTrade`'s `trade_executed`
+ * notices carry the same implicit `FOR KEY SHARE` on `leagues` every other notice-writing
+ * transaction in this file does, and they are written BEFORE the league anchor, exactly like
+ * `rejectTrade`'s own pair above. This drives a real join and a real trade ACCEPTANCE against the
+ * SAME league on two connections, with the join parked exactly where the cycle used to sit, and
+ * asserts no deadlock plus the correct chain: `trade_accepted` and `roster_move` land beside the
+ * join's own `member_joined`, all three on one chain, one batch.
+ */
+describe("acceptTrade's notice order", () => {
+  it("lets a join and a trade acceptance in the same league run concurrently without deadlocking", async () => {
+    await seedLeagueWith("lg_accept_lock", ["u_an_commish", "u_an_alice", "u_an_bob", "u_an_joiner"]);
+    await joinDb.insert(teams).values([
+      { id: "team_an_alice", leagueId: "lg_accept_lock", userId: "u_an_alice", name: "Alice's Team" },
+      { id: "team_an_bob", leagueId: "lg_accept_lock", userId: "u_an_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_an_a", name: "Player A", position: "RB", nflTeam: "KC" },
+      { id: "p_an_b", name: "Player B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_an_alice", slot: "BENCH", slotIndex: 0, playerId: "p_an_a" },
+      { teamId: "team_an_bob", slot: "BENCH", slotIndex: 0, playerId: "p_an_b" },
+    ]);
+    const proposedAt = new Date(clock.now());
+    const expiresAt = new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000);
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_an_1",
+      leagueId: "lg_accept_lock",
+      proposerTeamId: "team_an_alice",
+      counterpartyTeamId: "team_an_bob",
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_an_a" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_an_b" }],
+      fingerprint: "fp_trade_an_1",
+      note: null,
+      status: "open",
+      proposedAt,
+      expiresAt,
+    });
+
+    const join = parkedJoin("lg_accept_lock", "u_an_joiner", "team_an_joiner");
+    await join.leagueLocked;
+
+    // T_accept: the real acceptTrade, on its own connection, reaching for the SAME league row
+    // through its notice inserts (leagues FOR KEY SHARE) before it reaches the league anchor.
+    const accepting = acceptTrade(pickDb, { tradeId: "trade_an_1", leagueId: "lg_accept_lock", userId: "u_an_bob", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await accepting).toMatchObject({ ok: true });
+
+    // Both transactions really did land on the SAME league chain: the join's member_joined, and
+    // the acceptance's trade_accepted + roster_move, one batch.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_accept_lock"));
+    expect(leagueAnchor!.headSequence).toBe(3);
+
+    // And a notice acceptTrade wrote before the anchor still names the event minted after it.
+    const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_an_alice"));
     expect(notice?.auditEventId).not.toBeNull();
   });
 });

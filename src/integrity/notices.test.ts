@@ -85,6 +85,23 @@ describe("NOTICE_TEMPLATES", () => {
     expect(withdrawn.body).toBe("Bay Bandits took back the offer they sent you in Sunday Money. Nothing on your roster changed.");
   });
 
+  it("says what happened for the two acceptance-time trade notices, verbatim", () => {
+    const executed = renderNotice("trade_executed", NOTICE_SAMPLES.trade_executed);
+    expect(executed.title).toBe("Your trade went through");
+    expect(executed.body).toBe(
+      "You and Iron Owls completed a trade in Sunday Money. You sent Bijan Robinson and you got Justin Jefferson. Your lineup for this week already reflects it, so check your starters before kickoff.",
+    );
+
+    const superseded = renderNotice("trade_superseded", NOTICE_SAMPLES.trade_superseded);
+    expect(superseded.title).toBe("One of your offers can no longer go through");
+    expect(superseded.body).toBe(
+      "A player in the offer you had out to Iron Owls in Sunday Money moved to another team, so that offer is off the table. Nobody declined it. You can put together a new one any time.",
+    );
+    // "Nobody declined it" is the whole point of this template: a manager who sees an offer die
+    // must not read it as a refusal.
+    expect(superseded.body).toContain("Nobody declined it");
+  });
+
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
@@ -95,8 +112,10 @@ describe("NOTICE_TEMPLATES", () => {
       "operator_warning",
       "review_removed",
       "stat_week_corrected",
+      "trade_executed",
       "trade_proposed",
       "trade_rejected",
+      "trade_superseded",
       "trade_withdrawn",
     ]);
   });

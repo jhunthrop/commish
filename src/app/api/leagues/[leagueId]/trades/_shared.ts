@@ -3,11 +3,11 @@ import { createRateLimiter } from "@/lib/api/rate-limit";
 import { TRADE_CONFIG } from "@/trades/config";
 
 /**
- * ONE budget per user across every trade route: proposing, withdrawing and rejecting (and,
- * once Task 5 wires it, accepting) all spend the same scarce resource — a multi-table
- * transaction against this league — the same "one budget across sibling routes" call
- * `advisorRateLimited` (`@/app/api/leagues/[leagueId]/advisor/_shared`) and
- * `INTEGRITY_CONFIG.notices.rateLimit` both make.
+ * ONE budget per user across every trade route: proposing, withdrawing, rejecting and accepting
+ * all spend the same scarce resource — a multi-table transaction against this league — the same
+ * "one budget across sibling routes" call `advisorRateLimited`
+ * (`@/app/api/leagues/[leagueId]/advisor/_shared`) and `INTEGRITY_CONFIG.notices.rateLimit` both
+ * make.
  */
 const tradeRequests = createRateLimiter(TRADE_CONFIG.rateLimit);
 

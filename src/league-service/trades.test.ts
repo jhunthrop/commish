@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db, DbTx } from "@/db/client";
-import { auditEvents, leagues, memberNotices, players, rosterSlots, teams, tradeProposals, users } from "@/db/schema";
+import { auditEvents, leagues, memberNotices, players, rosterSlots, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import { isUniqueViolation } from "@/db/errors";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { AuditEventType } from "@/domain/audit";
@@ -12,7 +12,9 @@ import type { AuditLogger } from "@/integrity-service/audit-logger";
 import { notifyAffectedMember } from "@/integrity-service/notify";
 import type { TradeAsset } from "@/trades/assets";
 import { TRADE_CONFIG } from "@/trades/config";
+import { applyTradeInTx } from "./trade-transfer";
 import {
+  acceptTrade,
   isExpired,
   listTrades,
   proposalFingerprint,
@@ -847,5 +849,331 @@ describe("listTrades", () => {
   it("answers empty bands for a league with no trades yet", async () => {
     const page = await listTrades(db, { leagueId: "lg_1", teamId: "team_a" });
     expect(page).toEqual({ leagueId: "lg_1", meTeamId: "team_a", inbox: [], outbox: [], history: [] });
+  });
+});
+
+/**
+ * Task 5: `acceptTrade` — the execution transaction. Three teams this time (`team_a`/`u_alice`,
+ * `team_b`/`u_bob`, `team_c`/`u_carol`), because the supersede sweep needs a THIRD party with an
+ * offer of her own out to one of the first two. Every roster carries exactly ONE open bench spot
+ * — never two — so a straight RB-for-WR swap (the fixture's own default offer) needs the room a
+ * trade actually leaves behind rather than room that was there anyway, and a package that asks
+ * for a SECOND bench spot genuinely has none to give.
+ */
+describe("acceptTrade", () => {
+  async function seedAcceptTradeLeague(db: Db): Promise<void> {
+    await db.insert(users).values([
+      { id: "u_alice", email: "u_alice@test.local", displayName: "Alice" },
+      { id: "u_bob", email: "u_bob@test.local", displayName: "Bob" },
+      { id: "u_carol", email: "u_carol@test.local", displayName: "Carol" },
+      // No team of her own — the "caller isn't a member at all" case.
+      { id: "u_dave", email: "u_dave@test.local", displayName: "Dave" },
+    ]);
+    await db.insert(leagues).values({
+      id: "lg_1",
+      name: "Accept League",
+      format: "snake",
+      teamCount: 3,
+      commissionerUserId: "u_alice",
+      rosterSlots: FULL_LEAGUE_SLOTS,
+    });
+    await db.insert(teams).values([
+      { id: "team_a", leagueId: "lg_1", userId: "u_alice", name: "Team Alice" },
+      { id: "team_b", leagueId: "lg_1", userId: "u_bob", name: "Team Bob" },
+      { id: "team_c", leagueId: "lg_1", userId: "u_carol", name: "Team Carol" },
+    ]);
+    await db.insert(players).values([
+      { id: "p_qb_a", name: "QB Alice", position: "QB", nflTeam: "KC" },
+      { id: "p_rb1", name: "RB One", position: "RB", nflTeam: "DAL" },
+      { id: "p_wr_a", name: "WR Alice", position: "WR", nflTeam: "MIA" },
+      { id: "p_te1", name: "TE One", position: "TE", nflTeam: "PHI" },
+      { id: "p_qb_b", name: "QB Bob", position: "QB", nflTeam: "BUF" },
+      { id: "p_rb_b", name: "RB Bob", position: "RB", nflTeam: "NYJ" },
+      { id: "p_wr1", name: "WR One", position: "WR", nflTeam: "SEA" },
+      { id: "p_bench_b1", name: "Bench Bob One", position: "K", nflTeam: "LAC" },
+      { id: "p_qb_c", name: "QB Carol", position: "QB", nflTeam: "GB" },
+      { id: "p_rb_c", name: "RB Carol", position: "RB", nflTeam: "CIN" },
+      { id: "p_wr_c", name: "WR Carol", position: "WR", nflTeam: "LAR" },
+      { id: "p_bench_c1", name: "Bench Carol One", position: "K", nflTeam: "TEN" },
+    ]);
+    await db.insert(rosterSlots).values([
+      { teamId: "team_a", slot: "QB", slotIndex: 0, playerId: "p_qb_a" },
+      { teamId: "team_a", slot: "RB", slotIndex: 0, playerId: "p_rb1" },
+      { teamId: "team_a", slot: "WR", slotIndex: 0, playerId: "p_wr_a" },
+      { teamId: "team_a", slot: "BENCH", slotIndex: 0, playerId: "p_te1" },
+      { teamId: "team_b", slot: "QB", slotIndex: 0, playerId: "p_qb_b" },
+      { teamId: "team_b", slot: "RB", slotIndex: 0, playerId: "p_rb_b" },
+      { teamId: "team_b", slot: "WR", slotIndex: 0, playerId: "p_wr1" },
+      { teamId: "team_b", slot: "BENCH", slotIndex: 0, playerId: "p_bench_b1" },
+      { teamId: "team_c", slot: "QB", slotIndex: 0, playerId: "p_qb_c" },
+      { teamId: "team_c", slot: "RB", slotIndex: 0, playerId: "p_rb_c" },
+      { teamId: "team_c", slot: "WR", slotIndex: 0, playerId: "p_wr_c" },
+      { teamId: "team_c", slot: "BENCH", slotIndex: 0, playerId: "p_bench_c1" },
+    ]);
+  }
+
+  interface OpenAcceptTradeOpts {
+    readonly proposerTeamId?: string;
+    readonly counterpartyTeamId?: string;
+    readonly give?: readonly string[];
+    readonly get?: readonly string[];
+    readonly weekNumber?: number;
+    readonly proposedAt?: string;
+  }
+
+  /** One open, unexpired offer, inserted directly — `team_a` -> `team_b`, `p_rb1` for `p_wr1`,
+   *  unless overridden. Every accept test negotiates over this same three-team league. */
+  async function openAcceptTrade(db: Db, opts: OpenAcceptTradeOpts = {}): Promise<{ readonly id: string }> {
+    const proposerTeamId = opts.proposerTeamId ?? "team_a";
+    const counterpartyTeamId = opts.counterpartyTeamId ?? "team_b";
+    const proposerAssets = (opts.give ?? ["p_rb1"]).map(playerAsset);
+    const counterpartyAssets = (opts.get ?? ["p_wr1"]).map(playerAsset);
+    const weekNumber = opts.weekNumber ?? 1;
+    const proposedAt = new Date(opts.proposedAt ?? NOW);
+    const expiresAt = new Date(proposedAt.getTime() + TRADE_CONFIG.proposalTtlHours * 60 * 60 * 1000);
+    const id = `accept_trade_${(tradeIdCounter += 1)}`;
+    await db.insert(tradeProposals).values({
+      id,
+      leagueId: "lg_1",
+      proposerTeamId,
+      counterpartyTeamId,
+      weekNumber,
+      proposerAssets,
+      counterpartyAssets,
+      fingerprint: proposalFingerprint({ leagueId: "lg_1", proposerTeamId, counterpartyTeamId, proposerAssets, counterpartyAssets }),
+      note: null,
+      status: "open",
+      proposedAt,
+      expiresAt,
+    });
+    return { id };
+  }
+
+  async function acceptAs(userId: string, tradeId: string) {
+    return acceptTrade(db, { tradeId, leagueId: "lg_1", userId, clock: fixedClock(NOW), deliver: deliverNoticeFake });
+  }
+
+  async function ownerTeamOf(db: Db, playerId: string): Promise<string | undefined> {
+    const [row] = await db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(eq(rosterSlots.playerId, playerId));
+    return row?.teamId;
+  }
+
+  async function tradeRow(db: Db, tradeId: string): Promise<typeof tradeProposals.$inferSelect> {
+    const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, tradeId));
+    return row!;
+  }
+
+  async function lockWeek(db: Db, week: number, status: "in_progress" | "final" = "in_progress"): Promise<void> {
+    await db.insert(statWeeks).values({ week, status }).onConflictDoUpdate({ target: statWeeks.week, set: { status } });
+  }
+
+  beforeEach(async () => {
+    await truncateAll(db);
+    await seedAcceptTradeLeague(db);
+  });
+
+  it("moves both rosters, settles the row and tells both managers, in one transaction", async () => {
+    const trade = await openAcceptTrade(db);
+    const result = await acceptAs("u_bob", trade.id);
+    expect(result).toMatchObject({ ok: true, tradeId: trade.id, supersededCount: 0 });
+
+    expect(await ownerTeamOf(db, "p_rb1")).toBe("team_b");
+    expect(await ownerTeamOf(db, "p_wr1")).toBe("team_a");
+    expect((await tradeRow(db, trade.id)).status).toBe("accepted");
+
+    const [aliceNotice] = await noticesFor(db, "u_alice");
+    const [bobNotice] = await noticesFor(db, "u_bob");
+    expect(aliceNotice!.noticeType).toBe("trade_executed");
+    expect(bobNotice!.noticeType).toBe("trade_executed");
+    expect(copyViolations(`${aliceNotice!.title} ${aliceNotice!.body}`)).toEqual([]);
+    expect(copyViolations(`${bobNotice!.title} ${bobNotice!.body}`)).toEqual([]);
+  });
+
+  it("carries the fairness verdict Task 6 needs, computed in the same transaction", async () => {
+    const trade = await openAcceptTrade(db);
+    const result = await acceptAs("u_bob", trade.id);
+    expect(result).toMatchObject({ ok: true, fairness: { hold: false, flagWorthy: expect.any(Boolean), gap: expect.any(Number) } });
+  });
+
+  it("lets only the counterparty accept", async () => {
+    const trade = await openAcceptTrade(db);
+    const result = await acceptAs("u_alice", trade.id);
+    expect(result).toMatchObject({ ok: false, status: 404 });
+  });
+
+  it("refuses a caller with no team at all in this league, the same 404 as the wrong manager", async () => {
+    const trade = await openAcceptTrade(db);
+    const result = await acceptAs("u_dave", trade.id);
+    expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+  });
+
+  it("moves nothing and writes nothing to move when neither side names an asset", async () => {
+    const trade = await openAcceptTrade(db, { give: [], get: [] });
+    const result = await acceptAs("u_bob", trade.id);
+    expect(result).toMatchObject({ ok: true, supersededCount: 0 });
+    expect((await tradeRow(db, trade.id)).status).toBe("accepted");
+  });
+
+  it("refuses to answer an offer that has aged out", async () => {
+    const trade = await openAcceptTrade(db, { proposedAt: "2026-08-01T00:00:00.000Z" });
+    const result = await acceptTrade(db, {
+      tradeId: trade.id,
+      leagueId: "lg_1",
+      userId: "u_bob",
+      clock: fixedClock("2026-08-21T00:00:00.000Z"),
+      deliver: deliverNoticeFake,
+    });
+    expect(result).toEqual({ ok: false, status: 409, reason: "That offer expired before anyone answered it." });
+  });
+
+  it("refuses when a named player left the roster since the offer was made", async () => {
+    // The other half of "plan at propose time, enforce at accept time". Between the offer and the
+    // yes, another trade may have moved the same player — driven here directly through
+    // `applyTradeInTx`, the one real mover in the codebase, rather than through a second accept.
+    const trade = await openAcceptTrade(db);
+    await db.transaction((tx) =>
+      applyTradeInTx(tx, {
+        leagueId: "lg_1",
+        slotConfig: FULL_LEAGUE_SLOTS,
+        proposerTeamId: "team_a",
+        counterpartyTeamId: "team_c",
+        proposerAssets: [playerAsset("p_rb1")],
+        counterpartyAssets: [],
+      }),
+    );
+    const result = await acceptAs("u_bob", trade.id);
+    expect(result).toEqual({
+      ok: false,
+      status: 409,
+      reason: "One of the players in this offer has already moved to another team. Ask for a fresh offer.",
+    });
+  });
+
+  it("passes an applyTradeInTx 'no room' refusal straight through, with its own message", async () => {
+    // Two players in, one out: `team_b` clears its one WR for `p_rb1` (fine — a bench spot just
+    // opened) but has nowhere left for `p_te1`, since its own single bench spot is already spent.
+    const trade = await openAcceptTrade(db, { give: ["p_rb1", "p_te1"], get: ["p_wr1"] });
+    const result = await acceptAs("u_bob", trade.id);
+    expect(result).toMatchObject({ ok: false, status: 409, reason: expect.stringContaining("no room") });
+  });
+
+  it("settles every other open offer naming a player that just moved, and calls it superseded", async () => {
+    // Not `rejected`: nobody rejected them. Carol has two offers out to Alice for two DIFFERENT
+    // players; only the one naming `p_rb1` dies when Bob's trade for it goes through.
+    const dead = await openAcceptTrade(db, { proposerTeamId: "team_c", counterpartyTeamId: "team_a", give: ["p_bench_c1"], get: ["p_rb1"] });
+    const live = await openAcceptTrade(db, { proposerTeamId: "team_c", counterpartyTeamId: "team_a", give: ["p_bench_c1"], get: ["p_te1"] });
+    const executed = await openAcceptTrade(db);
+
+    const result = await acceptAs("u_bob", executed.id);
+    expect(result).toMatchObject({ ok: true, supersededCount: 1 });
+
+    expect((await tradeRow(db, dead.id)).status).toBe("superseded");
+    expect((await tradeRow(db, live.id)).status).toBe("open");
+    const [carolNotice] = await noticesFor(db, "u_carol");
+    expect(carolNotice!.noticeType).toBe("trade_superseded");
+    expect(copyViolations(`${carolNotice!.title} ${carolNotice!.body}`)).toEqual([]);
+  });
+
+  it("refuses to move a roster while the week is locked, and says which week", async () => {
+    // The same rule `setLineup` enforces, read the same way: a week is locked once it has
+    // STARTED, not once it has been scored.
+    await lockWeek(db, 4);
+    const trade = await openAcceptTrade(db, { weekNumber: 4 });
+    const result = await acceptAs("u_bob", trade.id);
+    expect(result).toEqual({ ok: false, status: 409, reason: "Week 4 has started, so rosters can't change until it ends." });
+  });
+
+  it("takes FOR SHARE on the week before it validates, so a kickoff mid-transaction cannot slip through", async () => {
+    // The read-validate-write hole `setLineup` already closed, in the transaction that moves more
+    // than `setLineup` does. A concurrent writer flips `stat_weeks[4]` to `in_progress` and holds
+    // the transaction open (uncommitted) — the same rendezvous `trade-transfer.test.ts`'s own
+    // `materializeLockedLineupsInTx` FOR SHARE proof uses, since under READ COMMITTED a plain
+    // unlocked SELECT would NOT block on this and would read the stale pre-flip value instead.
+    const trade = await openAcceptTrade(db, { weekNumber: 4 });
+    // An EXISTING row, not a fresh insert: a `SELECT … FOR SHARE` against a row `flip` is still
+    // inserting (never committed, so not yet visible) would not block at all under READ
+    // COMMITTED — there is nothing there yet to lock. `persistTick` always upserts an existing
+    // week's row in production, so this is the real shape.
+    await db.insert(statWeeks).values({ week: 4, status: "scheduled" });
+
+    let release: () => void = () => {};
+    const released = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const flip = db.transaction(async (tx) => {
+      await tx.update(statWeeks).set({ status: "in_progress" }).where(eq(statWeeks.week, 4));
+      await released;
+    });
+
+    const otherDb = createTestDb();
+    const accepting = acceptTrade(otherDb, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    release();
+    await flip;
+
+    expect(await accepting).toMatchObject({ ok: false, status: 409 });
+  });
+
+  it("writes trade_accepted AND roster_move on the same league chain, in one batch", async () => {
+    // Plan A ruling 3: a transaction appends to at most one chain, and `recordAll` throws on a
+    // batch that spans two. Both events are league-scoped, so one call carries both.
+    const trade = await openAcceptTrade(db);
+    await acceptAs("u_bob", trade.id);
+    const events = await db.select().from(auditEvents).where(eq(auditEvents.chainScope, "lg_1"));
+    expect(events.map((event) => event.eventType)).toEqual(expect.arrayContaining(["trade_accepted", "roster_move"]));
+    expect(await auditEventsOn(db, "platform", "trade_accepted")).toHaveLength(0);
+  });
+
+  it("evicts the cached score for the trade's own week after the transaction commits, never inside it", async () => {
+    const trade = await openAcceptTrade(db, { weekNumber: 4 });
+    const calls: { readonly leagueId: string; readonly week: number }[] = [];
+    const cache = {
+      invalidate: async (leagueId: string, week: number) => {
+        calls.push({ leagueId, week });
+      },
+    };
+    const result = await acceptTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake, cache });
+    expect(result).toMatchObject({ ok: true });
+    expect(calls).toEqual([{ leagueId: "lg_1", week: 4 }]);
+  });
+
+  it("rolls back the whole acceptance when the audit append fails", async () => {
+    const trade = await openAcceptTrade(db);
+    await expect(
+      acceptTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake, audit: failingAudit }),
+    ).rejects.toThrow("audit append failed");
+    expect((await tradeRow(db, trade.id)).status).toBe("open");
+    expect(await ownerTeamOf(db, "p_rb1")).toBe("team_a");
+    expect(await noticesFor(db, "u_alice")).toEqual([]);
+  });
+
+  it("works end to end with every dependency defaulted to the real implementation", async () => {
+    const trade = await openAcceptTrade(db);
+    const result = await acceptTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob" });
+    expect(result).toMatchObject({ ok: true });
+  });
+
+  it("swallows a cache eviction failure with a log, rather than failing a trade that already committed", async () => {
+    // The identical discipline `lineups.test.ts` proves for `setLineup`'s own cache: a dead
+    // Redis costs a stale read bounded by the key's TTL, never a 500 for a write that landed.
+    const trade = await openAcceptTrade(db);
+    const failingCache = {
+      invalidate: async () => {
+        throw new Error("redis down");
+      },
+    };
+    const errors: unknown[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    try {
+      const result = await acceptTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", clock: fixedClock(NOW), deliver: deliverNoticeFake, cache: failingCache });
+      expect(result).toMatchObject({ ok: true });
+    } finally {
+      console.error = originalError;
+    }
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("[league-service] score cache invalidation failed");
   });
 });

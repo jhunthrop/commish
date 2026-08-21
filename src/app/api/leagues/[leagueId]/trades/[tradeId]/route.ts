@@ -2,7 +2,8 @@ import { getDb } from "@/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { NO_TEAM_MESSAGE } from "@/lib/leagues/membership";
 import { withLeagueMemberActor } from "@/app/api/leagues/_shared";
-import { rejectTrade, withdrawTrade } from "@/league-service/trades";
+import { acceptTrade, rejectTrade, withdrawTrade } from "@/league-service/trades";
+import { getScoreCache } from "@/league-service/score-cache-instance";
 import { tradeDecisionSchema } from "@/league-service/trade-schemas";
 import { tradeRateLimited } from "../_shared";
 
@@ -17,15 +18,16 @@ interface RouteContext {
  * Answer an offer: accept, reject or withdraw, dispatched by `action` with no string comparison
  * of our own beyond the schema's — `tradeDecisionSchema` is the discriminated union.
  *
- * `accept` is Task 5's: `acceptTrade` does not exist yet, and this route refuses that arm with a
- * clean, product-copy 501 rather than a broken reference. Tasks 4 and 5 land before this plan
- * merges, so no release ever ships with `accept` unreachable — this line is the seam Task 5 wires
- * a real call into.
+ * `accept` is Task 5's own wiring: `acceptTrade` runs the whole execution transaction (both
+ * rosters move, the supersede sweep settles every offer it just invalidated, both parties are
+ * told) and passes the real `getScoreCache()` (`@/league-service/score-cache-instance`) — the
+ * same live cache `crossLeagueHome`'s own read path uses — rather than the no-op default a test
+ * relies on.
  *
  * `withLeagueMemberActor` -> `actor.teamId === null` check -> `tradeRateLimited` -> `await params`
  * -> `parseJson` -> the matching service call -> `fail`/`ok`, the same fixed order every route in
- * this codebase uses. `userId` is `actor.userId`, from the session — `rejectTrade`/`withdrawTrade`
- * both re-derive the caller's own team from it rather than trusting a body to name one.
+ * this codebase uses. `userId` is `actor.userId`, from the session — every service call below
+ * re-derives the caller's own team from it rather than trusting a body to name one.
  *
  * `leagueId` is `actor.leagueId`, from the URL — never trusted as authorization on its own, but
  * REQUIRED so a `tradeId` borrowed from another league 404s rather than being found and acted on
@@ -43,7 +45,9 @@ export async function POST(request: Request, context: RouteContext) {
     if (!parsed.ok) return parsed.response;
 
     if (parsed.value.action === "accept") {
-      return fail("Accepting a trade isn't available in this league yet. Check back soon.", 501);
+      const result = await acceptTrade(getDb(), { tradeId, leagueId: actor.leagueId, userId: actor.userId, cache: getScoreCache() });
+      if (!result.ok) return fail(result.reason, result.status);
+      return ok<{ readonly tradeId: string; readonly status: "accepted" }>({ tradeId: result.tradeId, status: "accepted" });
     }
 
     const settle = parsed.value.action === "reject" ? rejectTrade : withdrawTrade;

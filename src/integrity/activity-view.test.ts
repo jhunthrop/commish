@@ -110,12 +110,13 @@ const SAMPLE_PAYLOADS: Readonly<Record<AuditEventType, readonly { readonly paylo
       actorId: null,
     },
   ],
-  // Hidden today. A sample is still declared for each so that flipping one to `"everyone"` needs
-  // no second edit here and cannot land unswept; the `Record` over the full union is what forces
-  // a new vocabulary entry to be considered at all.
-  roster_move: [{ payload: {}, actorId: "user_bob" }],
+  // Task 5 (ruling 12): both flipped to `"everyone"`, and rendered for real — `renderRosterMove`
+  // covers the `"trade_reversed"` reason too, in `activityRowFor`'s own describe block below.
+  roster_move: [{ payload: { reason: "trade", tradeId: "trade_1", proposerTeamId: "team_1", counterpartyTeamId: "team_2", proposerAssetIds: ["player_1"], counterpartyAssetIds: ["player_1"] }, actorId: "user_bob" }],
   trade_proposed: [{ payload: {}, actorId: "user_bob" }],
-  trade_accepted: [{ payload: {}, actorId: "user_bob" }],
+  trade_accepted: [
+    { payload: { tradeId: "trade_1", proposerTeamId: "team_1", counterpartyTeamId: "team_2", proposerAssetIds: ["player_1"], counterpartyAssetIds: ["player_1"] }, actorId: "user_bob" },
+  ],
   trade_rejected: [{ payload: {}, actorId: "user_bob" }],
   flag_raised: [{ payload: {}, actorId: null }],
   flag_resolved: [{ payload: {}, actorId: null }],
@@ -136,9 +137,14 @@ describe("ACTIVITY_VISIBILITY", () => {
   });
 
   it("hides every type this plan does not publish, so a later plan has to decide on purpose", () => {
-    for (const type of ["trade_proposed", "trade_accepted", "trade_rejected", "roster_move", "flag_raised", "flag_resolved", "admin_action"] as const) {
+    for (const type of ["trade_proposed", "trade_rejected", "flag_raised", "flag_resolved", "admin_action"] as const) {
       expect(ACTIVITY_VISIBILITY[type]).toBe("hidden");
     }
+  });
+
+  it("publishes trade_accepted and roster_move — Task 5's own flip (ruling 12)", () => {
+    expect(ACTIVITY_VISIBILITY.trade_accepted).toBe("everyone");
+    expect(ACTIVITY_VISIBILITY.roster_move).toBe("everyone");
   });
 
   it("hides the platform chain's types, which can never appear in a league feed anyway", () => {
@@ -296,6 +302,84 @@ describe("activityRowFor", () => {
  * `renderSystemAction` reddens every one of these three rather than nothing — that is the mutation
  * proof the brief asks for.
  */
+describe("renderTradeAccepted", () => {
+  const payload: JsonObject = {
+    tradeId: "trade_1",
+    proposerTeamId: "team_1",
+    counterpartyTeamId: "team_2",
+    proposerAssetIds: ["player_1"],
+    counterpartyAssetIds: ["player_2"],
+  };
+
+  it("names both teams and both sides in full — a trade the league can see half of is a rumour", () => {
+    expect(activityRowFor(event("trade_accepted", payload, "user_alice"), viewer, names)).toEqual({
+      eventId: "evt_1",
+      occurredAt: "2026-08-20T17:00:00.000Z",
+      icon: "check",
+      headline: "Alice's team and Another team completed a trade.",
+      detail: "Alice's team sent Bijan Robinson and got A player who is no longer listed.",
+    });
+  });
+
+  it("denies a payload missing an asset list", () => {
+    const { proposerAssetIds: _omit, ...withoutGive } = payload;
+    void _omit;
+    expect(activityRowFor(event("trade_accepted", withoutGive, "user_alice"), viewer, names)).toBeNull();
+  });
+
+  it("denies a payload whose asset list isn't an array of ids", () => {
+    expect(activityRowFor(event("trade_accepted", { ...payload, proposerAssetIds: "player_1" }, "user_alice"), viewer, names)).toBeNull();
+  });
+
+  it("denies a payload whose asset list is an array holding a non-string entry", () => {
+    expect(activityRowFor(event("trade_accepted", { ...payload, proposerAssetIds: [1] }, "user_alice"), viewer, names)).toBeNull();
+  });
+});
+
+describe("renderRosterMove", () => {
+  const payload: JsonObject = {
+    reason: "trade",
+    tradeId: "trade_1",
+    proposerTeamId: "team_1",
+    counterpartyTeamId: "team_2",
+    proposerAssetIds: ["player_1"],
+    counterpartyAssetIds: ["player_2"],
+  };
+
+  it("renders for reason 'trade'", () => {
+    expect(activityRowFor(event("roster_move", payload, "user_alice"), viewer, names)).toEqual({
+      eventId: "evt_1",
+      occurredAt: "2026-08-20T17:00:00.000Z",
+      icon: "refresh-cw",
+      headline: "Alice's team and Another team swapped rosters.",
+      detail: null,
+    });
+  });
+
+  it("renders for reason 'trade_reversed' too, the reason a later reversal writes", () => {
+    expect(activityRowFor(event("roster_move", { ...payload, reason: "trade_reversed" }, "user_alice"), viewer, names)).toMatchObject({
+      headline: "Alice's team and Another team's roster swap was reversed.",
+    });
+  });
+
+  it("denies any reason it does not recognize, rather than guessing a sentence", () => {
+    expect(activityRowFor(event("roster_move", { ...payload, reason: "waiver" }, "user_alice"), viewer, names)).toBeNull();
+    expect(activityRowFor(event("roster_move", { tradeId: "trade_1" }, "user_alice"), viewer, names)).toBeNull();
+  });
+
+  it("denies a recognized reason missing the proposer team id", () => {
+    const { proposerTeamId: _omit, ...withoutProposer } = payload;
+    void _omit;
+    expect(activityRowFor(event("roster_move", withoutProposer, "user_alice"), viewer, names)).toBeNull();
+  });
+
+  it("denies a recognized reason missing the counterparty team id", () => {
+    const { counterpartyTeamId: _omit, ...withoutCounterparty } = payload;
+    void _omit;
+    expect(activityRowFor(event("roster_move", withoutCounterparty, "user_alice"), viewer, names)).toBeNull();
+  });
+});
+
 describe("renderSystemAction — the summary allowlist gate", () => {
   it("renders nothing for an action nobody signed off, even when it carries a summary", () => {
     const denied = systemActionEvent({ action: "lineup_auto_set", summary: "We set Alice's lineup." });

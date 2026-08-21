@@ -9,6 +9,7 @@ vi.mock("@/lib/auth/current-user", () => ({
   getCurrentUser: vi.fn(),
 }));
 
+import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { leagues, players, rosterSlots, teams, tradeProposals, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -226,15 +227,28 @@ describe("POST /api/leagues/[leagueId]/trades/[tradeId]", () => {
     expect(response.status).toBe(400);
   });
 
-  it("refuses the accept arm cleanly, with product copy, until Task 5 wires it", async () => {
+  it("lets the counterparty accept, moving both rosters and answering the settled status", async () => {
     await seedRouteLeague();
     const trade = await openTrade();
     signedInAs("u_bob");
     const response = await postDecision("lg_1", trade.id, { action: "accept" });
-    expect(response.status).toBe(501);
-    const body = await response.json();
-    expect(body.ok).toBe(false);
-    expect(body.error).toContain("isn't available");
+    expect(response.status).toBe(200);
+    const body = (await response.json()).data;
+    expect(body).toEqual({ tradeId: trade.id, status: "accepted" });
+
+    const teamARoster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, "team_a"));
+    const teamBRoster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, "team_b"));
+    expect(teamARoster.some((row) => row.playerId === "p_rb_b")).toBe(true);
+    expect(teamBRoster.some((row) => row.playerId === "p_rb_a")).toBe(true);
+  });
+
+  it("passes a service-level refusal straight through when the wrong party tries to accept", async () => {
+    await seedRouteLeague();
+    const trade = await openTrade();
+    signedInAs("u_alice"); // the PROPOSER, not the counterparty
+    const response = await postDecision("lg_1", trade.id, { action: "accept" });
+    expect(response.status).toBe(404);
+    expect((await response.json()).error).toBe("We couldn't find that offer.");
   });
 
   it("lets the counterparty reject, and answers the settled status", async () => {
