@@ -1,7 +1,7 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Db, DbTx } from "@/db/client";
-import { auditEvents, leagues, memberNotices, players, rosterSlots, statWeeks, teams, tradeProposals, users } from "@/db/schema";
+import { auditEvents, integrityFlags, leagues, memberNotices, playerStatLines, players, rosterSlots, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import { isUniqueViolation } from "@/db/errors";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { AuditEventType } from "@/domain/audit";
@@ -10,6 +10,7 @@ import type { RosterSlotConfig } from "@/domain/roster";
 import { copyViolations } from "@/integrity/copy-rules";
 import type { AuditLogger } from "@/integrity-service/audit-logger";
 import { notifyAffectedMember } from "@/integrity-service/notify";
+import { raiseTradeFairnessFlag, sweepUnflaggedTrades } from "@/integrity-service/trade-fairness";
 import type { TradeAsset } from "@/trades/assets";
 import { TRADE_CONFIG } from "@/trades/config";
 import { applyTradeInTx } from "./trade-transfer";
@@ -949,9 +950,25 @@ describe("acceptTrade", () => {
     return { id };
   }
 
-  async function acceptAs(userId: string, tradeId: string) {
-    return acceptTrade(db, { tradeId, leagueId: "lg_1", userId, clock: fixedClock(NOW), deliver: deliverNoticeFake });
+  async function acceptAs(userId: string, tradeId: string, extra: Partial<Parameters<typeof acceptTrade>[1]> = {}) {
+    return acceptTrade(db, { tradeId, leagueId: "lg_1", userId, clock: fixedClock(NOW), deliver: deliverNoticeFake, ...extra });
   }
+
+  /** Three completed weeks (1-3) of a monster line for `p_rb1`, so a `weekNumber: 4` trade
+   *  giving it up reads as grotesquely lopsided against `p_wr1`'s zero — the identical arithmetic
+   *  `trade-fairness.test.ts`'s own `fairnessLeague` fixture uses, reused here rather than
+   *  restated so `acceptTrade`'s after-commit call has something real to flag. */
+  async function seedLopsidedStatLines(db: Db): Promise<void> {
+    await db.insert(playerStatLines).values([1, 2, 3].map((week) => ({ playerId: "p_rb1", week, rushingYards: 300, rushingTouchdowns: 5 })));
+  }
+
+  async function openFlags(db: Db) {
+    return db.select().from(integrityFlags).where(isNull(integrityFlags.resolvedAt));
+  }
+
+  const throwingFairnessRaiser: typeof raiseTradeFairnessFlag = async () => {
+    throw new Error("fairness flag write failed");
+  };
 
   async function ownerTeamOf(db: Db, playerId: string): Promise<string | undefined> {
     const [row] = await db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(eq(rosterSlots.playerId, playerId));
@@ -1261,5 +1278,86 @@ describe("acceptTrade", () => {
     }
     expect(errors).toHaveLength(1);
     expect(errors[0]).toContain("[league-service] score cache invalidation failed");
+  });
+
+  // -------------------------------------------------------------------------------------------
+  // Task 6: the after-commit fairness flag — a SEPARATE transaction, its own failure isolation.
+  // -------------------------------------------------------------------------------------------
+
+  it("raises exactly one trade_fairness flag, in its own transaction after commit, for a lopsided trade", async () => {
+    await seedLopsidedStatLines(db);
+    const trade = await openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 4 });
+
+    const result = await acceptAs("u_bob", trade.id);
+    expect(result).toMatchObject({ ok: true, fairness: { flagWorthy: true } });
+
+    const flags = await openFlags(db);
+    expect(flags).toHaveLength(1);
+    expect(flags[0]).toMatchObject({ flagType: "trade_fairness", subjectType: "trade", subjectId: trade.id, leagueId: "lg_1" });
+    // Platform-scoped, never the league's own chain — ruling 1.
+    expect(await auditEventsOn(db, "platform", "flag_raised")).toHaveLength(1);
+    expect(await auditEventsOn(db, "lg_1", "flag_raised")).toHaveLength(0);
+  });
+
+  it("raises no flag for a trade that never crosses the threshold", async () => {
+    const trade = await openAcceptTrade(db); // p_rb1 for p_wr1, no stat lines at all — an even trade
+    const result = await acceptAs("u_bob", trade.id);
+    expect(result).toMatchObject({ ok: true, fairness: { flagWorthy: false } });
+    expect(await openFlags(db)).toEqual([]);
+  });
+
+  it("flags a lopsided trade and never touches either account — the flag-only contract, at the outcome", async () => {
+    await seedLopsidedStatLines(db);
+    const trade = await openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 4 });
+
+    await acceptAs("u_bob", trade.id);
+
+    expect(await openFlags(db)).toHaveLength(1);
+    const [alice] = await db.select().from(users).where(eq(users.id, "u_alice"));
+    const [bob] = await db.select().from(users).where(eq(users.id, "u_bob"));
+    expect(alice!.isAdmin).toBe(false);
+    expect(bob!.isAdmin).toBe(false);
+    // The trade STANDS. A flag is a question, never an undo.
+    expect((await tradeRow(db, trade.id)).status).toBe("accepted");
+    expect(await ownerTeamOf(db, "p_rb1")).toBe("team_b");
+  });
+
+  it("never fails a trade because the after-commit flag write failed", async () => {
+    await seedLopsidedStatLines(db);
+    const trade = await openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 4 });
+
+    const errors: unknown[] = [];
+    const originalError = console.error;
+    console.error = (...args: unknown[]) => {
+      errors.push(args);
+    };
+    let result: Awaited<ReturnType<typeof acceptTrade>>;
+    try {
+      result = await acceptAs("u_bob", trade.id, { raiseFairnessFlag: throwingFairnessRaiser });
+    } finally {
+      console.error = originalError;
+    }
+
+    // The person who accepted did nothing wrong and can do nothing about it.
+    expect(result).toMatchObject({ ok: true });
+    expect((await tradeRow(db, trade.id)).status).toBe("accepted");
+    expect(await openFlags(db)).toEqual([]); // the write never landed — this IS the gap the sweep exists for
+    expect(errors).toHaveLength(1);
+    expect(errors[0]).toContain("[league-service] trade fairness flag raise failed");
+  });
+
+  it("lets npm run trades:sweep catch a trade whose after-commit flag write never landed", async () => {
+    await seedLopsidedStatLines(db);
+    const trade = await openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 4 });
+
+    await acceptAs("u_bob", trade.id, { raiseFairnessFlag: throwingFairnessRaiser });
+    expect((await tradeRow(db, trade.id)).status).toBe("accepted");
+    expect(await openFlags(db)).toEqual([]);
+
+    const swept = await sweepUnflaggedTrades(db, { leagueId: "lg_1" });
+    expect(swept.flagsRaised).toBe(1);
+    const flags = await openFlags(db);
+    expect(flags).toHaveLength(1);
+    expect(flags[0]).toMatchObject({ subjectType: "trade", subjectId: trade.id });
   });
 });

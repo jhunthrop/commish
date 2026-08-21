@@ -132,6 +132,68 @@ describe("flagTrailRowFor", () => {
     expect(flagTrailRowFor(event("league_created", { name: "x" }))).toBeNull();
     expect(flagTrailRowFor(event("session_started", {}))).toBeNull();
   });
+
+  describe("the trade branch (Task 6)", () => {
+    const names = new Map([
+      ["u_alice", "Alice"],
+      ["u_bob", "Bob"],
+    ]);
+
+    it("renders a trade being offered, in the actor's own name", () => {
+      const row = event("trade_proposed", { tradeId: "trade_1", proposerTeamId: "team_a", counterpartyTeamId: "team_b" }, "league_1");
+      const rendered = flagTrailRowFor({ ...row, actorId: "u_alice" }, names);
+      expect(rendered).toMatchObject({ headline: "Alice offered this trade." });
+    });
+
+    it("renders a trade being accepted, in the actor's own name", () => {
+      const row = event("trade_accepted", { tradeId: "trade_1", proposerTeamId: "team_a", counterpartyTeamId: "team_b" }, "league_1");
+      const rendered = flagTrailRowFor({ ...row, actorId: "u_bob" }, names);
+      expect(rendered).toMatchObject({ headline: "Bob accepted it." });
+    });
+
+    it("falls back to 'A former member' for an actor id the names map has no entry for, or none at all", () => {
+      const proposed = event("trade_proposed", { tradeId: "trade_1" }, "league_1");
+      expect(flagTrailRowFor({ ...proposed, actorId: "u_ghost" }, names)?.headline).toBe("A former member offered this trade.");
+      expect(flagTrailRowFor({ ...proposed, actorId: null }, names)?.headline).toBe("A former member offered this trade.");
+    });
+
+    it("falls back to the same honest name with NO map supplied at all — the default-parameter seam every other call site relies on", () => {
+      const proposed = event("trade_proposed", { tradeId: "trade_1" }, "league_1");
+      expect(flagTrailRowFor({ ...proposed, actorId: "u_alice" })?.headline).toBe("A former member offered this trade.");
+    });
+
+    it("renders a trade's own roster_move generically — no team names, just the fact", () => {
+      const row = event("roster_move", { reason: "trade", tradeId: "trade_1", proposerTeamId: "team_a", counterpartyTeamId: "team_b" }, "league_1");
+      expect(flagTrailRowFor(row)?.headline).toBe("Two players changed teams.");
+    });
+
+    it("denies a roster_move for any reason other than 'trade' — the reversal's own trail message isn't written yet", () => {
+      const row = event("roster_move", { reason: "trade_reversed", tradeId: "trade_1" }, "league_1");
+      expect(flagTrailRowFor(row)).toBeNull();
+    });
+
+    it("denies a roster_move with no reason at all, the same malformed-payload discipline every other renderer holds to", () => {
+      const row = event("roster_move", { tradeId: "trade_1" }, "league_1");
+      expect(flagTrailRowFor(row)).toBeNull();
+    });
+  });
+});
+
+describe("FlagSubjectView's trade arm (Task 6)", () => {
+  it("carries both team names, both sides' historical valuation, when it was accepted, and whether it's since been reversed", () => {
+    const subject: FlagSubjectView = {
+      kind: "trade",
+      tradeId: "trade_1",
+      proposerTeamName: "Team Alice",
+      counterpartyTeamName: "Team Bob",
+      gave: [{ playerId: "p1", name: "Star RB", position: "RB", averagePoints: 22.4 }],
+      got: [{ playerId: "p2", name: "Bench WR", position: "WR", averagePoints: 3.1 }],
+      acceptedAt: "2026-08-10T00:00:00.000Z",
+      reversedAt: null,
+    };
+    const detail = flagDetailFor({ ...flag, flagType: "trade_fairness" }, subject, [], []);
+    expect(detail.subject).toBe(subject);
+  });
 });
 
 describe("formatFlagCursor / parseFlagCursor — the queue's pagination cursor (fix round 1, FIX 3)", () => {

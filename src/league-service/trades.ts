@@ -11,7 +11,7 @@ import { canonicalSerialize } from "@/integrity/canonical";
 import type { NoticeContexts } from "@/integrity/notices";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
-import { evaluateTradeBeforeExecute, type TradeFairnessEvaluation } from "@/integrity-service/trade-fairness";
+import { evaluateTradeBeforeExecute, raiseTradeFairnessFlag, type TradeFairnessEvaluation } from "@/integrity-service/trade-fairness";
 import { tradeBalance, type TradeBalance, type ValuedPlayer } from "@/trades/fairness";
 import { assetPlayerIds, describeAsset, type TradeAsset } from "@/trades/assets";
 import { TRADE_CONFIG } from "@/trades/config";
@@ -625,6 +625,26 @@ async function invalidateScoreCacheQuietly(cache: Pick<ScoreCache, "invalidate">
 }
 
 /**
+ * Awaits Task 6's after-commit flag write and swallows its failure, with a log — the identical
+ * discipline `sweepQuietly` (`@/integrity-service/multi-account`) keeps for its own after-commit
+ * trigger, and for the identical reason: the manager who accepted did nothing wrong and can do
+ * nothing about a flag write that failed, and the trade already committed. `npm run trades:sweep`
+ * is the operator's re-run — see `raiseTradeFairnessFlag`'s own docblock (`@/integrity-service/
+ * trade-fairness`) for why this cannot be inside `acceptTrade`'s own transaction at all.
+ */
+async function raiseFairnessFlagQuietly(
+  raise: typeof raiseTradeFairnessFlag,
+  db: Db,
+  input: Parameters<typeof raiseTradeFairnessFlag>[1],
+): Promise<void> {
+  try {
+    await raise(db, input);
+  } catch (error: unknown) {
+    console.error("[league-service] trade fairness flag raise failed", { tradeId: input.tradeId }, error);
+  }
+}
+
+/**
  * Every OTHER open offer in this league naming a player the just-accepted trade moved — the
  * supersede sweep's own read. ONE bounded query over `trade_proposals_league_idx` (this league's
  * rows), filtered in TypeScript with `assetPlayerIds`: the asset lists are `jsonb` and bounded at
@@ -662,6 +682,11 @@ export interface AcceptTradeInput {
   /** Defaults to a no-op — injectable so a test never needs a live Redis connection. The route
    *  supplies the real `getScoreCache()` (`@/league-service/score-cache-instance`). */
   readonly cache?: Pick<ScoreCache, "invalidate">;
+  /** Defaults to the real `raiseTradeFairnessFlag` (`@/integrity-service/trade-fairness`).
+   *  Injectable so a test can force its failure without needing a real threshold-crossing trade —
+   *  see `raiseFairnessFlagQuietly`'s own docblock for why a failure here never fails this
+   *  function's own result. */
+  readonly raiseFairnessFlag?: typeof raiseTradeFairnessFlag;
 }
 
 export type AcceptTradeResult =
@@ -759,6 +784,7 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
   const notify = input.notify ?? notifyAffectedMember;
   const deliver = input.deliver ?? deliverNotice;
   const cache = input.cache ?? NOOP_SCORE_CACHE;
+  const raiseFairnessFlag = input.raiseFairnessFlag ?? raiseTradeFairnessFlag;
   const now = clock.now();
 
   let outcome:
@@ -1017,6 +1043,18 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
   if (!outcome.ok) return outcome;
   for (const notice of outcome.notices) await deliver(notice);
   await invalidateScoreCacheQuietly(cache, input.leagueId, outcome.weekNumber);
+  // Task 6: a SEPARATE transaction, after this one has already committed — see
+  // `raiseTradeFairnessFlag`'s own docblock for why, and `raiseFairnessFlagQuietly`'s for why a
+  // failure here never fails this function's own result.
+  await raiseFairnessFlagQuietly(raiseFairnessFlag, db, {
+    tradeId: outcome.tradeId,
+    leagueId: input.leagueId,
+    balance: outcome.fairness.balance,
+    gap: outcome.fairness.gap,
+    giving: outcome.fairness.giving,
+    receiving: outcome.fairness.receiving,
+    occurredAt: now,
+  });
   return { ok: true, tradeId: outcome.tradeId, supersededCount: outcome.supersededCount, fairness: outcome.fairness };
 }
 

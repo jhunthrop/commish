@@ -1,8 +1,9 @@
 import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
-import { auditEvents, chatMessageReports, chatMessages, integrityFlags, leagues, reviewReports, reviews, users } from "@/db/schema";
-import type { AuditEvent, JsonObject } from "@/domain/audit";
+import { auditEvents, chatMessageReports, chatMessages, integrityFlags, leagues, reviewReports, reviews, teams, tradeProposals, users } from "@/db/schema";
+import type { AuditEvent, AuditEventType, JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
+import type { Position } from "@/domain/player";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { contentRemovalIsWiredFor, decisionIsAvailable, RESOLUTION_DECISIONS, SUBJECT_OF, type FlagSubjectType, type FlagType, type ResolutionDecision } from "@/integrity/flags";
 import type { NoticeType } from "@/integrity/notices";
@@ -15,6 +16,7 @@ import {
   type FlagSubjectView,
   type QueueRow,
   type ReporterView,
+  type TradedPlayerView,
 } from "@/integrity/queue-view";
 import { removeChatMessageInTx } from "@/chat-service/moderation";
 import { getPublisher } from "@/lib/realtime/publisher";
@@ -569,15 +571,18 @@ type PendingFlagRow = Awaited<ReturnType<typeof pendingFlagQuery>>[number];
 /**
  * Who or what each row in `rows` is about, batched by subject type rather than one query per
  * row — the same N+1 `listLeagueActivity`'s batched name lookups avoid. However many rows the
- * page holds, this costs at most three queries: the distinct reported reviews, the distinct
- * reported messages, and the distinct account-pair user ids named across the page.
+ * page holds, this costs at most FIVE queries: the distinct reported reviews, the distinct
+ * reported messages, the distinct account-pair user ids, the distinct trades (Task 6), and the
+ * distinct teams those trades name — the last two skipped outright when the page holds no trade
+ * row, the same "0 or 1 round trips" shape the first three already keep.
  */
 async function aboutFor(db: Db, rows: readonly PendingFlagRow[]): Promise<ReadonlyMap<string, string>> {
   const reviewIds = [...new Set(rows.filter((r) => r.subjectType === "review").map((r) => r.subjectId))];
   const chatIds = [...new Set(rows.filter((r) => r.subjectType === "chat_message").map((r) => r.subjectId))];
   const pairUserIds = [...new Set(rows.filter((r) => r.subjectType === "account_pair").flatMap((r) => r.subjectId.split(PAIR_ID_SEPARATOR)))];
+  const tradeIds = [...new Set(rows.filter((r) => r.subjectType === "trade").map((r) => r.subjectId))];
 
-  const [reviewRows, chatRows, pairRows] = await Promise.all([
+  const [reviewRows, chatRows, pairRows, tradeRows] = await Promise.all([
     reviewIds.length === 0
       ? []
       : db.select({ id: reviews.id, authorName: users.displayName }).from(reviews).innerJoin(users, eq(users.id, reviews.userId)).where(inArray(reviews.id, reviewIds)),
@@ -589,11 +594,22 @@ async function aboutFor(db: Db, rows: readonly PendingFlagRow[]): Promise<Readon
           .innerJoin(users, eq(users.id, chatMessages.authorUserId))
           .where(inArray(chatMessages.id, chatIds.map(Number))),
     pairUserIds.length === 0 ? [] : db.select({ id: users.id, name: users.displayName }).from(users).where(inArray(users.id, pairUserIds)),
+    tradeIds.length === 0
+      ? []
+      : db
+          .select({ id: tradeProposals.id, proposerTeamId: tradeProposals.proposerTeamId, counterpartyTeamId: tradeProposals.counterpartyTeamId })
+          .from(tradeProposals)
+          .where(inArray(tradeProposals.id, tradeIds)),
   ]);
+
+  const tradeTeamIds = [...new Set(tradeRows.flatMap((row) => [row.proposerTeamId, row.counterpartyTeamId]))];
+  const tradeTeamRows = tradeTeamIds.length === 0 ? [] : await db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, tradeTeamIds));
 
   const reviewAuthor = new Map(reviewRows.map((r) => [r.id, r.authorName]));
   const chatAuthor = new Map(chatRows.map((r) => [String(r.id), r.authorName]));
   const pairName = new Map(pairRows.map((r) => [r.id, r.name]));
+  const tradeById = new Map(tradeRows.map((r) => [r.id, r]));
+  const tradeTeamName = new Map(tradeTeamRows.map((r) => [r.id, r.name]));
 
   const about = new Map<string, string>();
   for (const row of rows) {
@@ -608,7 +624,21 @@ async function aboutFor(db: Db, rows: readonly PendingFlagRow[]): Promise<Readon
       // against a state `.split()` cannot produce.
       const [a, b] = row.subjectId.split(PAIR_ID_SEPARATOR);
       about.set(row.id, `${pairName.get(a) ?? "A former member"} and ${pairName.get(b ?? "") ?? "a former member"}`);
-    } else about.set(row.id, `A trade (${row.subjectId})`);
+    } else {
+      // "trade" — the only remaining `FlagSubjectType`. A trade row this old (or never
+      // committed, for a test fixture pinning the honest fallback) still names itself by its
+      // bare id rather than crash the queue over a subject that has moved on. Once the row IS
+      // found, its two team names are never missing — `trade_proposals`' own foreign keys onto
+      // `teams.id` (`onDelete: "cascade"`) guarantee it, the same "FK-guaranteed, no fallback"
+      // reasoning `subjectFor`'s own trade branch uses for the identical lookup.
+      const trade = tradeById.get(row.subjectId);
+      about.set(
+        row.id,
+        trade === undefined
+          ? `A trade (${row.subjectId})`
+          : `${tradeTeamName.get(trade.proposerTeamId)!} and ${tradeTeamName.get(trade.counterpartyTeamId)!}`,
+      );
+    }
   }
   return about;
 }
@@ -648,10 +678,33 @@ export async function listPendingFlags(db: Db, input: ListPendingFlagsInput = {}
 }
 
 const FALLBACK_SUBJECT_MEMBER = "A former member";
+const FALLBACK_SUBJECT_TEAM = "A former team";
+
+/**
+ * `evidence[key]`, narrowed to the `TradedPlayerView[]` `raiseTradeFairnessFlag`'s own
+ * `evidenceFor` wrote (`@/integrity-service/trade-fairness`) — read back rather than re-derived,
+ * per that function's own docblock (Plan B ruling 5: the session data a value was computed from
+ * has moved on by the time an operator looks). An entry missing a field, or a field of the wrong
+ * type, is dropped rather than half-rendered — the same "malformed payload renders nothing"
+ * discipline `activity-view.ts`'s `str`/`num`/`strArray` hold every stored field to; a flag raised
+ * before this shape existed reads as an empty list rather than a crash.
+ */
+function tradedPlayersFromEvidence(evidence: JsonObject, key: "giving" | "receiving"): readonly TradedPlayerView[] {
+  const value = evidence[key];
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry): readonly TradedPlayerView[] => {
+    if (typeof entry !== "object" || entry === null) return [];
+    const { playerId, name, position, averagePoints } = entry as Record<string, unknown>;
+    if (typeof playerId !== "string" || typeof name !== "string" || typeof averagePoints !== "number") return [];
+    return [{ playerId, name, position: typeof position === "string" ? (position as Position) : null, averagePoints }];
+  });
+}
 
 /** The reported content, or the account pair, as an operator needs to see it — one query per
- *  subject type, dispatched by `flagDetail`'s own single lookup of the flag row. */
-async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: string): Promise<FlagSubjectView> {
+ *  subject type, dispatched by `flagDetail`'s own single lookup of the flag row. `evidence` is
+ *  that same lookup's own `evidence` column, threaded through for the `trade` branch only
+ *  (Task 6) — every other branch ignores it, unused parameters costing nothing here. */
+async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: string, evidence: JsonObject): Promise<FlagSubjectView> {
   if (subjectType === "review") {
     const [row] = await db
       .select({ body: reviews.body, authorName: users.displayName, removedAt: reviews.removedAt })
@@ -685,7 +738,47 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
     const nameOf = (id: string | undefined) => rows.find((r) => r.id === id)?.name ?? FALLBACK_SUBJECT_MEMBER;
     return { kind: "account_pair", userIds: [idA, idB ?? ""], names: [nameOf(idA), nameOf(idB)] };
   }
-  return { kind: "trade", tradeId: subjectId };
+
+  // "trade" — the only remaining `FlagSubjectType`. `gave`/`got` come straight from `evidence`
+  // (Task 6, `tradedPlayersFromEvidence`) — never re-priced from a live roster read, the same
+  // "what was true when it was raised" discipline every other field on this row already keeps.
+  const gave = tradedPlayersFromEvidence(evidence, "giving");
+  const got = tradedPlayersFromEvidence(evidence, "receiving");
+
+  const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, subjectId));
+  if (row === undefined) {
+    return {
+      kind: "trade",
+      tradeId: subjectId,
+      proposerTeamName: FALLBACK_SUBJECT_TEAM,
+      counterpartyTeamName: FALLBACK_SUBJECT_TEAM,
+      gave,
+      got,
+      acceptedAt: "",
+      reversedAt: null,
+    };
+  }
+
+  const teamRows = await db.select({ id: teams.id, name: teams.name }).from(teams).where(inArray(teams.id, [row.proposerTeamId, row.counterpartyTeamId]));
+  // `teamRows.find(...)!`: `trade_proposals.proposer_team_id`/`.counterparty_team_id` carry real
+  // foreign keys onto `teams.id` with `onDelete: "cascade"` — a `trade_proposals` row this branch
+  // finds always names two teams that are still there (deleting either would cascade the trade
+  // row away with it). No fallback here, the same "FK-guaranteed, no fallback" discipline
+  // `resolverNameFor` uses for its own `resolved_by_user_id` lookup, a few functions up.
+  const teamNameOf = (id: string) => teamRows.find((t) => t.id === id)!.name;
+  return {
+    kind: "trade",
+    tradeId: subjectId,
+    proposerTeamName: teamNameOf(row.proposerTeamId),
+    counterpartyTeamName: teamNameOf(row.counterpartyTeamId),
+    gave,
+    got,
+    // `row.settledAt!`: a `trade_fairness` flag is only ever raised for a trade `acceptTrade`
+    // already stamped `accepted`, and that stamp sets `settled_at` in the SAME statement — a row
+    // this branch finds is never mid-negotiation.
+    acceptedAt: row.settledAt!.toISOString(),
+    reversedAt: row.reversedAt?.toISOString() ?? null,
+  };
 }
 
 /**
@@ -722,23 +815,68 @@ async function reportersFor(db: Db, subjectType: FlagSubjectType, subjectId: str
   return [];
 }
 
+/** `trailFor`'s own return — the events to render, and (Task 6's trade branch only) the actor
+ *  names `flagTrailRowFor` needs to say "Alice offered this trade." instead of a bare id. Every
+ *  other branch answers an empty map, matching `flagTrailRowFor`'s own default parameter. */
+interface TrailResult {
+  readonly events: readonly AuditEvent[];
+  readonly actorNames: ReadonlyMap<string, string>;
+}
+
+/** The three event types a trade's own lifecycle can ever put on its league chain — the *"full
+ *  propose → accept audit sequence for that trade"* the spec asks for by name. `trade_rejected`
+ *  is deliberately absent: a flag only ever names an ACCEPTED trade, and a trade that was rejected
+ *  never reaches acceptance to be valued at all. */
+const TRADE_TRAIL_EVENT_TYPES: readonly AuditEventType[] = ["trade_proposed", "trade_accepted", "roster_move"];
+
 /**
- * The relevant audit trail: the PLATFORM chain's events about this flag by id (`flag_raised`,
- * `flag_resolved`, and `review_removed` when `content_removed` reached it — all three carry
- * `payload.flagId`), plus, where the subject has a league (an `account_pair` flag, the only
- * subject type this plan raises WITH a `leagueId` — ruling 1, `review_report`/`chat_report` flags
- * carry `leagueId: null`), that league's own chain events for the two accounts named — context
- * for an investigation the platform chain alone cannot supply. Bounded at exactly two queries,
- * the second skipped outright when there is no league to ask.
+ * The relevant audit trail. For MOST subject types, that is the PLATFORM chain's events about
+ * this flag by id (`flag_raised`, `flag_resolved`, and `review_removed` when `content_removed`
+ * reached it — all three carry `payload.flagId`), plus, for `account_pair`, that league's own
+ * `member_joined` context for the two accounts named — the investigation an operator actually
+ * needs.
+ *
+ * `trade` (Task 6) is the one EXCEPTION, deliberately: it answers the league chain's own
+ * propose/accept/roster-move sequence for this trade (`payload.tradeId`, never by actor — the
+ * proposer and the accepter are two different people) and NOTHING from the platform chain. The
+ * `flag_raised`/`flag_resolved` story is already told elsewhere on `FlagDetail` (`raisedAt`,
+ * `resolution`) — the trade's own trail is the *"full propose → accept audit sequence for that
+ * trade"* the spec asks for by name, not a merged timeline of both.
+ *
+ * Bounded at two queries for `trade` (the trail read plus its own batched actor-name lookup) and
+ * for `account_pair` (the platform read plus the league read), one otherwise.
  */
-async function trailFor(db: Db, flagId: string, leagueId: string | null, subjectType: FlagSubjectType, subjectId: string): Promise<readonly AuditEvent[]> {
+async function trailFor(db: Db, flagId: string, leagueId: string | null, subjectType: FlagSubjectType, subjectId: string): Promise<TrailResult> {
+  if (leagueId !== null && subjectType === "trade") {
+    const tradeRows = await db
+      .select()
+      .from(auditEvents)
+      .where(
+        and(
+          eq(auditEvents.chainScope, leagueId),
+          sql`${auditEvents.payload} ->> 'tradeId' = ${subjectId}`,
+          inArray(auditEvents.eventType, TRADE_TRAIL_EVENT_TYPES),
+        ),
+      )
+      .orderBy(asc(auditEvents.occurredAt))
+      .limit(INTEGRITY_CONFIG.queue.trailLimit);
+
+    const actorIds = [...new Set(tradeRows.flatMap((row) => (row.actorId === null ? [] : [row.actorId])))];
+    const nameRows = actorIds.length === 0 ? [] : await db.select({ id: users.id, name: users.displayName }).from(users).where(inArray(users.id, actorIds));
+
+    return {
+      events: tradeRows.map(toEvent),
+      actorNames: new Map(nameRows.map((row) => [row.id, row.name])),
+    };
+  }
+
   const platformRows = await db
     .select()
     .from(auditEvents)
     .where(and(eq(auditEvents.chainScope, INTEGRITY_CONFIG.chain.platformScope), sql`${auditEvents.payload} ->> 'flagId' = ${flagId}`))
     .orderBy(asc(auditEvents.occurredAt));
 
-  if (leagueId === null || subjectType !== "account_pair") return platformRows.map(toEvent);
+  if (leagueId === null || subjectType !== "account_pair") return { events: platformRows.map(toEvent), actorNames: new Map() };
 
   const actorIds = subjectId.split(PAIR_ID_SEPARATOR).filter((id) => id.length > 0);
   const leagueRows =
@@ -751,7 +889,10 @@ async function trailFor(db: Db, flagId: string, leagueId: string | null, subject
           .orderBy(asc(auditEvents.occurredAt))
           .limit(INTEGRITY_CONFIG.queue.trailLimit);
 
-  return [...platformRows.map(toEvent), ...leagueRows.map(toEvent)].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
+  return {
+    events: [...platformRows.map(toEvent), ...leagueRows.map(toEvent)].sort((a, b) => a.occurredAt.localeCompare(b.occurredAt)),
+    actorNames: new Map(),
+  };
 }
 
 /**
@@ -789,13 +930,15 @@ export async function flagDetail(db: Db, flagId: string): Promise<FlagDetail | n
   if (flagRow === undefined) return null;
 
   const subjectType = flagRow.subjectType as FlagSubjectType;
-  const [subject, reporters, trailEvents] = await Promise.all([
-    subjectFor(db, subjectType, flagRow.subjectId),
+  const [subject, reporters, trailResult] = await Promise.all([
+    subjectFor(db, subjectType, flagRow.subjectId, flagRow.evidence),
     reportersFor(db, subjectType, flagRow.subjectId),
     trailFor(db, flagRow.id, flagRow.leagueId, subjectType, flagRow.subjectId),
   ]);
 
-  const trail = trailEvents.map(flagTrailRowFor).filter((row): row is NonNullable<typeof row> => row !== null);
+  const trail = trailResult.events
+    .map((event) => flagTrailRowFor(event, trailResult.actorNames))
+    .filter((row): row is NonNullable<typeof row> => row !== null);
 
   // `resolveFlag`'s stamp UPDATE sets `resolved_at`, `resolved_by_user_id`, `resolution` and
   // `resolution_note` together, in the one statement — a row where the first three are non-null

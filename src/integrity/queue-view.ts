@@ -1,5 +1,6 @@
 import type { IconName } from "@/components/ui/icon";
 import type { AuditEvent, JsonObject } from "@/domain/audit";
+import type { Position } from "@/domain/player";
 import { decisionIsAvailable, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision } from "@/integrity/flags";
 import type { ActivityRow } from "@/integrity/activity-view";
 
@@ -65,11 +66,42 @@ export interface FlagResolutionView {
  * never deletes but a future one might) still renders an honest sentence rather than a crash —
  * the same "a former member" discipline `activity-view.ts`'s `buildActivityNames` uses.
  */
+/**
+ * One traded player, as the detector valued it — the HISTORICAL number, not a live one. `Task 6`'s
+ * `raiseTradeFairnessFlag` (`@/integrity-service/trade-fairness`) writes this into the flag's own
+ * `evidence` once, at raise time, and `subjectFor` (`@/integrity-service/flags`) reads it back
+ * from there rather than re-deriving it — the session data it was computed from will have moved
+ * on by the time an operator looks (Plan B ruling 5), and that applies to a player's own form
+ * exactly as it does to the multi-account signals that ruling was written for.
+ */
+export interface TradedPlayerView {
+  readonly playerId: string;
+  readonly name: string;
+  readonly position: Position | null;
+  /** Points per week, at the week the trade was valued — never re-priced at read time. */
+  readonly averagePoints: number;
+}
+
 export type FlagSubjectView =
   | { readonly kind: "review"; readonly reviewId: string; readonly body: string; readonly authorName: string; readonly removedAt: string | null }
   | { readonly kind: "chat_message"; readonly messageId: string; readonly body: string | null; readonly authorName: string; readonly removedAt: string | null }
   | { readonly kind: "account_pair"; readonly userIds: readonly [string, string]; readonly names: readonly [string, string] }
-  | { readonly kind: "trade"; readonly tradeId: string };
+  | {
+      readonly kind: "trade";
+      readonly tradeId: string;
+      readonly proposerTeamName: string;
+      readonly counterpartyTeamName: string;
+      readonly gave: readonly TradedPlayerView[];
+      readonly got: readonly TradedPlayerView[];
+      readonly acceptedAt: string;
+      /** Non-null once an operator has already undone it. The detail page reads this to withhold
+       *  `trade_reversed` from a trade that is already reversed, the same way `subjectIsRemoved`
+       *  withholds `content_removed` from a message already gone (Plan B, MEDIUM 8). Always
+       *  `null` today — `trade_reversed` is still reserved (`DECISION_OWNER`) and no code path
+       *  writes `trade_proposals.reversed_at` yet — but the field is read honestly now rather
+       *  than added alongside the reversal itself. */
+      readonly reversedAt: string | null;
+    };
 
 /**
  * Whether this subject's content is ALREADY gone — non-null `removed_at` on the row behind it.
@@ -213,19 +245,39 @@ function isResolutionDecision(value: string): value is ResolutionDecision {
   return (RESOLUTION_DECISIONS as readonly string[]).includes(value);
 }
 
+/** An actor's own display name for the trail's voice — "Alice offered this trade.", never "You"
+ *  or a bare id. `actorNames` is resolved once, batched, by the caller (`trailFor`,
+ *  `@/integrity-service/flags`) — the same "resolved at read time, never per-row" discipline
+ *  `aboutFor`'s own docblock states. `null` (a system actor) and an id the map has no entry for
+ *  (a former member) both read the same honest fallback every other subject-view branch uses. */
+function trailActorName(actorId: string | null, actorNames: ReadonlyMap<string, string>): string {
+  if (actorId === null) return "A former member";
+  return actorNames.get(actorId) ?? "A former member";
+}
+
 /**
  * The operator-facing rendering of ONE audit event on this flag's trail — `flag_raised`,
- * `flag_resolved`, `review_removed` and the `member_joined` context an account-pair investigation
- * pulls from the league chain. Deliberately its OWN switch rather than a call into
- * `activity-view.ts`'s `renderPayload`: those types are all `"hidden"` in `ACTIVITY_VISIBILITY`
- * (or, for `member_joined`, rendered in the MEMBER's voice, "X joined the league" without the
- * operator framing this trail needs), so reusing that renderer would mean teaching it about an
- * audience it must never serve.
+ * `flag_resolved`, `review_removed`, the `member_joined` context an account-pair investigation
+ * pulls from the league chain, and (Task 6) the `trade_proposed` / `trade_accepted` /
+ * `roster_move` sequence a trade-fairness flag's own trail pulls from that same league chain.
+ * Deliberately its OWN switch rather than a call into `activity-view.ts`'s `renderPayload`: those
+ * types are all `"hidden"` in `ACTIVITY_VISIBILITY` (or, for `member_joined`/`trade_accepted`/
+ * `roster_move`, rendered in the MEMBER's voice — "X joined the league", "A and B completed a
+ * trade" — without the operator framing this trail needs, and `trade_proposed` is `"hidden"`
+ * outright), so reusing that renderer would mean teaching it about an audience it must never
+ * serve.
+ *
+ * `actorNames` is the trade branch's own name lookup — every other branch ignores it, the same
+ * way `member_joined` renders with no name at all today. Defaults to an empty map so every
+ * existing single-argument call site (a `.map(flagTrailRowFor)` over a non-trade trail) is
+ * unaffected; `trailFor`'s trade branch is the one caller that ever supplies a populated one.
  *
  * Returns `null` for anything this trail does not know how to explain — deny-by-default, the same
- * guarantee `activityRowFor`'s own unreachable `default` case documents.
+ * guarantee `activityRowFor`'s own unreachable `default` case documents. A `roster_move` whose own
+ * `reason` isn't `"trade"` (a future `"trade_reversed"` entry, once that decision ships) denies
+ * the same way rather than guess at a sentence this task does not own yet.
  */
-export function flagTrailRowFor(event: AuditEvent): ActivityRow | null {
+export function flagTrailRowFor(event: AuditEvent, actorNames: ReadonlyMap<string, string> = new Map()): ActivityRow | null {
   if (event.eventType === "flag_raised") {
     return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "alert-triangle", headline: "This flag was opened.", detail: null };
   }
@@ -239,6 +291,29 @@ export function flagTrailRowFor(event: AuditEvent): ActivityRow | null {
   }
   if (event.eventType === "member_joined") {
     return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "users", headline: "This account joined the league.", detail: null };
+  }
+  if (event.eventType === "trade_proposed") {
+    return {
+      eventId: event.eventId,
+      occurredAt: event.occurredAt,
+      icon: "refresh-cw",
+      headline: `${trailActorName(event.actorId, actorNames)} offered this trade.`,
+      detail: null,
+    };
+  }
+  if (event.eventType === "trade_accepted") {
+    return {
+      eventId: event.eventId,
+      occurredAt: event.occurredAt,
+      icon: "check",
+      headline: `${trailActorName(event.actorId, actorNames)} accepted it.`,
+      detail: null,
+    };
+  }
+  if (event.eventType === "roster_move") {
+    const reason = payloadStr(event.payload, "reason");
+    if (reason !== "trade") return null;
+    return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "Two players changed teams.", detail: null };
   }
   return null;
 }
