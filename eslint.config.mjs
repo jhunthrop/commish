@@ -102,7 +102,9 @@ const SERVER_ONLY_MODULE_GROUPS = [
  * `src/league-room/components/trade-composer.tsx` as values, and `@/ai-advisor` — where
  * `tradeBalance` and its types used to live — stays on the BLOCKED list above precisely because
  * it is not browser-safe; the fairness core moved to this pure directory for that reason among
- * others (`src/trades/fairness.ts`'s own docblock). `src/chat-room/**` reaches `parseAvatarRef` indirectly through
+ * others (`src/trades/fairness.ts`'s own docblock).
+ *
+ * `src/chat-room/**` reaches `parseAvatarRef` indirectly through
  * `Avatar` (`src/components/ui/avatar.tsx`) rather than importing `@/identity` itself, but the
  * omission here is what keeps that path legal. `@/help` is reached the same indirect way today —
  * every room directory renders `InfoTip` (`src/components/ui/info-tip.tsx`), which is the only
