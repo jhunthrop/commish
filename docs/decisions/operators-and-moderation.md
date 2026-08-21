@@ -615,8 +615,11 @@ the checkpoint cross-check for a rewound anchor. Nothing about holding `is_admin
 immunity from any of that; it grants a wider set of transactions to write, every one of which is
 still just a transaction.
 
-**What a compromised operator session CAN do:** resolve flags (any decision this phase implements —
-`no_action`, `warned_user`, `content_removed`), remove chat messages and reviews, and read the
+**What a compromised operator session CAN do:** resolve flags (any decision now wired —
+`no_action`, `warned_user`, `content_removed`, and since Plan C `trade_reversed`), remove chat
+messages and reviews, reverse an executed trade between two members (a roster mutation, though one
+bounded to restoring a recorded prior state and refused once any traded player has moved again —
+`docs/decisions/trades-and-fairness.md`), and read the
 detector's raw evidence for every open flag (`src/integrity/queue-view.ts`, admin-only by
 construction — §3, ruling 16). Each of these is a real, if unwelcome, capability an attacker with a
 stolen operator session would have, and each leaves the identical trail an honest operator's use of
