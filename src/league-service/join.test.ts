@@ -1,9 +1,12 @@
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { eq } from "drizzle-orm";
+import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { eq, isNull } from "drizzle-orm";
+import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, drafts, leagues, teams, users } from "@/db/schema";
+import { auditEvents, draftActions, drafts, integrityFlags, leagues, sessionSignals, teams, users } from "@/db/schema";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
-import { DRAFT_ALREADY_STARTED, joinPublicLeague, LEAGUE_FULL, NOT_PUBLIC } from "./join";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
+import { canonicalPairId, defaultSweepDeps, type SweepDeps } from "@/integrity-service/multi-account";
+import { DRAFT_ALREADY_STARTED, joinPublicLeague, LEAGUE_FULL, NOT_PUBLIC, triggerMultiAccountSweep, type JoinLeagueOutcome } from "./join";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-20T17:00:00.000Z" };
@@ -13,6 +16,28 @@ const deps = () => ({ db, newId, clock });
 
 let counter = 0;
 const logger = createAuditLogger({ newId: () => `evt_${(counter += 1)}` });
+
+/**
+ * A `Db` whose `transaction(...)` rejects with the given error but whose reads still hit the
+ * real database — the league row lock (`FOR UPDATE`, taken before the "already a member" check)
+ * is expected to prevent two concurrent same-user joins from ever racing each other into the
+ * unique-index backstop, so no test in this file can schedule that race reliably. Mirrors
+ * `invites.test.ts`'s helper of the same name and shape.
+ */
+function dbWhoseTransactionThrows(error: unknown): Db {
+  return new Proxy(db, {
+    get(target, prop, receiver) {
+      if (prop === "transaction") return () => Promise.reject(error);
+      return Reflect.get(target, prop, receiver);
+    },
+  }) as Db;
+}
+
+/** The shape `postgres-js` raises through Drizzle: the driver fields sit one level under `.cause`. */
+const uniqueViolation = (constraint: string) =>
+  Object.assign(new Error("duplicate key value violates unique constraint"), {
+    cause: { code: "23505", constraint_name: constraint },
+  });
 
 async function seedLeague(over: {
   readonly id?: string;
@@ -157,5 +182,118 @@ describe("joinPublicLeague", () => {
     await joinPublicLeague({ db, newId, clock, audit: logger }, { leagueId, userId: "joiner" });
     await joinPublicLeague({ db, newId, clock, audit: logger }, { leagueId, userId: "joiner" });
     expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "member_joined"))).toHaveLength(1);
+  });
+
+  it("treats the unique-index backstop firing as 'already a member', not an error", async () => {
+    const leagueId = await seedLeague();
+    const joined = await joinPublicLeague(deps(), { leagueId, userId: "joiner" });
+    if (!joined.ok) throw new Error(joined.reason);
+
+    const raced = await joinPublicLeague(
+      { db: dbWhoseTransactionThrows(uniqueViolation("teams_league_user_idx")), newId, clock },
+      { leagueId, userId: "joiner" },
+    );
+    expect(raced).toEqual({ ok: true, leagueId, teamId: joined.teamId, alreadyMember: true });
+  });
+
+  it("falls through to the generic 500 when the unique-index backstop fires but the compensating lookup finds nothing", async () => {
+    // Real Postgres never produces this pairing — see the analogous test in `invites.test.ts`
+    // for `acceptInvite`'s own copy of this same backstop.
+    const leagueId = await seedLeague();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await joinPublicLeague(
+        { db: dbWhoseTransactionThrows(uniqueViolation("teams_league_user_idx")), newId, clock },
+        { leagueId, userId: "joiner" },
+      );
+      expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." });
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it("computes the 'New team' fallback name even for a caller whose profile row is somehow gone", async () => {
+    // `teams.userId` is a NOT NULL foreign key to `users.id`, so a caller with no profile row
+    // can never actually reach a committed team — the INSERT below fails first. The name
+    // expression itself (`teamName ?? profile?.displayName ?? "New team"`) still evaluates
+    // BEFORE that insert runs, which is what this proves: the fallback string is real code, not
+    // dead weight, even though nothing durable can ever carry it out through real Postgres.
+    const leagueId = await seedLeague();
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await joinPublicLeague(deps(), { leagueId, userId: "ghost_no_profile" });
+      expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." });
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
+  it("triggers a real multi-account sweep after the join commits, and it can raise a real flag", async () => {
+    // The join-time trigger (ruling 11), end to end: an existing member and the joiner share
+    // one client signature and a matching draft-pick tempo — the same combined shape
+    // `multi-account.test.ts` builds by hand — so the sweep this join fires finds a real pair
+    // over threshold and raises a real flag, with NO separate call to the sweep anywhere in
+    // this test.
+    const leagueId = await seedLeague({ teamCount: 4, filled: 1 });
+    const seatmate = `${leagueId}_seat_0`;
+    const seatmateTeam = `${leagueId}_t0`;
+    const draftId = `${leagueId}_draft`;
+    // `newId` is `team_${++nextId}`, reset to 0 in `beforeEach`: this is the FIRST join call in
+    // this test, so the joiner's team id is deterministically "team_1" — known before the join
+    // ever runs, so the joiner's own picks can be seeded ahead of it (the sweep only reads them
+    // AFTER commit, and `draft_actions.action` carries no foreign key on the embedded team id).
+    const joinerTeam = "team_1";
+
+    await db.insert(sessionSignals).values([
+      { id: "sig_seatmate", userId: seatmate, occurredAt: new Date(clock.now()), userAgent: "SharedClient/1.0", acceptLanguage: "en-US", ipHash: null, ipSource: "xff_unverified" },
+      { id: "sig_joiner", userId: "joiner", occurredAt: new Date(clock.now()), userAgent: "SharedClient/1.0", acceptLanguage: "en-US", ipHash: null, ipSource: "xff_unverified" },
+    ]);
+    const minActions = INTEGRITY_CONFIG.multiAccount.signals.minActionsForBehavioral;
+    const pickRows = (teamId: string, offsetMs: number) =>
+      Array.from({ length: minActions + 1 }, (_, i) => {
+        const timestamp = new Date(Date.parse(clock.now()) + offsetMs + i * 30_000);
+        return { draftId, action: { v: 1, type: "MAKE_PICK", timestamp: timestamp.toISOString(), teamId, playerId: `p_${teamId}_${i}` }, timestamp };
+      });
+    const allPickRows = [...pickRows(seatmateTeam, 0), ...pickRows(joinerTeam, 5_000)].map((row, i) => ({ ...row, sequence: i + 1 }));
+    await db.insert(draftActions).values(allPickRows);
+
+    const outcome = await joinPublicLeague(deps(), { leagueId, userId: "joiner" });
+    expect(outcome).toMatchObject({ ok: true, alreadyMember: false });
+
+    const [flag] = await db.select().from(integrityFlags).where(isNull(integrityFlags.resolvedAt));
+    expect(flag).toMatchObject({ flagType: "multi_account", subjectId: canonicalPairId("joiner", seatmate), leagueId });
+  });
+
+  describe("triggerMultiAccountSweep", () => {
+    const sweepDeps: SweepDeps = defaultSweepDeps(newId);
+
+    it("does nothing for an outcome that seated nobody new", async () => {
+      const notOk: JoinLeagueOutcome = { ok: false, status: 409, reason: "full" };
+      const already: JoinLeagueOutcome = { ok: true, leagueId: "lg", teamId: "t1", alreadyMember: true };
+      // Neither call reaches `sweepLeagueForMultiAccounts` at all: a `db` that throws the moment
+      // anything queries it proves the guard short-circuits before any I/O, not merely that the
+      // sweep happened to find nothing.
+      const explodingDb = { select: () => { throw new Error("must not be called"); } } as unknown as Db;
+      await expect(triggerMultiAccountSweep(explodingDb, notOk, sweepDeps)).resolves.toBeUndefined();
+      await expect(triggerMultiAccountSweep(explodingDb, already, sweepDeps)).resolves.toBeUndefined();
+    });
+
+    it("logs and swallows a sweep failure rather than throwing it at the join's own caller", async () => {
+      // The person joining did nothing wrong — a broken sweep must never turn their join into a
+      // 500. `scripts/sweep-multi-account.ts` is the operator's manual re-run for exactly this.
+      const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const brokenDb = {
+        select: () => {
+          throw new Error("sweep boom");
+        },
+      } as unknown as Db;
+      const outcome: JoinLeagueOutcome = { ok: true, leagueId: "lg_broken", teamId: "t1", alreadyMember: false };
+      await expect(triggerMultiAccountSweep(brokenDb, outcome, sweepDeps)).resolves.toBeUndefined();
+      // The swallow itself lives in `sweepQuietly` (`@/integrity-service/multi-account`), shared
+      // with the draft-completion trigger; the `trigger` tag is what tells an operator reading
+      // the log which of the two dropped a sweep.
+      expect(spy).toHaveBeenCalledWith("[integrity] multi-account sweep failed", { leagueId: "lg_broken", trigger: "league_join" }, expect.any(Error));
+      spy.mockRestore();
+    });
   });
 });

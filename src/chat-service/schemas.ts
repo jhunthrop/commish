@@ -59,8 +59,17 @@ export const reactionSchema = z.object({
  */
 const MESSAGE_ID = /^\d{1,18}$/;
 
-/** The path param on the reactions route. */
+/** The path param on the reactions route, and on the report route below. */
 export const chatMessageIdSchema = z.string().regex(MESSAGE_ID, { message: "That isn't a message we can react to." });
 
 /** The `?before=` page cursor — same rule, its own plain-language copy. */
 export const chatCursorSchema = z.string().regex(MESSAGE_ID, { message: "That isn't a place we can load from." });
+
+/**
+ * The reason a report picks from, validated through `CHAT_CONFIG.reportReasons` — itself a
+ * re-export of `MODERATION_CONFIG.reasons` (`@/moderation/config`), the SAME closed vocabulary
+ * `reportReviewSchema` (`@/review-service/schemas`) validates against. One list, two boundaries.
+ */
+const CHAT_REPORT_REASONS = CHAT_CONFIG.reportReasons.map((entry) => entry.value) as [string, ...string[]];
+
+export const reportMessageSchema = z.object({ reason: z.enum(CHAT_REPORT_REASONS) });

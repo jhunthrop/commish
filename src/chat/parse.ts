@@ -1,4 +1,4 @@
-import type { ChatGif, ChatMessageView, ChatReactionPayload, ChatReactionView } from "./contract";
+import type { ChatGif, ChatMessageRemoval, ChatMessageView, ChatReactionPayload, ChatReactionView } from "./contract";
 
 export type ChatFrame =
   | { readonly kind: "message"; readonly message: ChatMessageView }
@@ -27,6 +27,20 @@ function toGif(value: unknown): ChatGif | null {
   const height = asFiniteNumber(record.height);
   if (url === null || previewUrl === null || alt === null || width === null || height === null) return null;
   return { url, previewUrl, alt, width, height };
+}
+
+/**
+ * A malformed or absent `removal` field is treated as "not removed" — the message still renders
+ * with its body — never a fatal parse. `at` is the whole type (`ChatMessageRemoval`), and it is
+ * required: a removal object without it did not come from a real one and is not trusted. Any
+ * OTHER key on the frame is dropped here rather than passed through, so a server that regressed
+ * and re-attached a reason still could not put it into client state.
+ */
+function toRemoval(value: unknown): ChatMessageRemoval | null {
+  const record = asRecord(value);
+  if (record === null) return null;
+  const at = asString(record.at);
+  return at === null ? null : { at };
 }
 
 function toReactions(value: unknown): readonly ChatReactionView[] {
@@ -58,6 +72,7 @@ function toMessage(value: unknown): ChatMessageView | null {
     createdAt,
     reactions: toReactions(record.reactions),
     gif: toGif(record.gif),
+    removal: toRemoval(record.removal),
   };
 }
 

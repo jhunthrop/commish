@@ -6,6 +6,7 @@ import type { AuditEventInput } from "@/domain/audit";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { NOTICE_TEMPLATES } from "@/integrity/notices";
 import { REMOVAL_REASON_VALUES, removalPhraseFor } from "@/reviews/config";
+import { chatRemovalPhraseFor } from "@/moderation/removal";
 import type { PublishToUserFn } from "@/lib/realtime/publish";
 import { createAuditLogger } from "./audit-logger";
 import { deliverNotice, listNotices, markNoticesRead, notifyAffectedMember, quoteFor, type MemberNotice, type NotifyInput } from "./notify";
@@ -245,6 +246,42 @@ describe("quoteFor", () => {
     }
   });
 
+  /**
+   * The chat sibling of the test above — the SAME branch shape, but through `chatRemovalPhraseFor`
+   * (fix round 1), NOT `removalPhraseFor`: the two domains' generic fallback differs.
+   */
+  it("renders the AUTHOR-FACING PHRASE for a chat_message_removed notice too, through chat's OWN mapper, never the token", () => {
+    for (const reason of REMOVAL_REASON_VALUES) {
+      const notice: MemberNotice = {
+        id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "chat_message_removed",
+        title: "We removed one of your messages", body: "...", context: { leagueName: "Sunday Money", reason },
+        auditEventId: "evt_1", createdAt: NOW, readAt: null,
+      };
+      expect(quoteFor(notice)).toBe(chatRemovalPhraseFor(reason));
+      expect(quoteFor(notice)).not.toBe(reason);
+    }
+  });
+
+  /** Direct regression guard (fix round 1): "other" used to render reviews' own catch-all phrase. */
+  it("never renders reviews' own catch-all phrase for a chat_message_removed notice", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "chat_message_removed",
+      title: "We removed one of your messages", body: "...", context: { leagueName: "Sunday Money", reason: "other" },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBe("breaking the chat rules");
+    expect(quoteFor(notice)).not.toBe("breaking the review rules");
+  });
+
+  it("is null for a chat_message_removed notice whose context reason is not a string", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "chat_message_removed",
+      title: "We removed one of your messages", body: "…", context: { leagueName: "Sunday Money" },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBeNull();
+  });
+
   it("falls back to the generic phrase for a stored value from outside that vocabulary", () => {
     // Rows written by hand in SQL, or before the script constrained `--reason`. The mapper's own
     // docblock has always said a stored value must not be printed raw; this is that rule holding.
@@ -267,5 +304,49 @@ describe("quoteFor", () => {
 
   it("is null for any other notice type", async () => {
     expect(quoteFor(await seedOneNotice())).toBeNull();
+  });
+
+  it("renders the operator's own note VERBATIM for operator_warning, not through a mapper", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "operator_warning",
+      title: "An operator left you a note", body: "...",
+      context: { leagueName: "Sunday Money", note: "Keep the trash talk about the teams." },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBe("Keep the trash talk about the teams.");
+  });
+
+  /**
+   * Operators are trusted with what they choose to SAY, not with what a bidi override or a
+   * zero-width character would make a reader's browser DO with it — the same HIGH-2 belt
+   * `notifyAffectedMember`'s own composed `title`/`body` gets, applied here because `context.note`
+   * is stored unstripped (it is provenance) and this is the one place it is ever rendered.
+   */
+  it("strips characters a reader cannot see out of the operator's note at render time", () => {
+    const rtlOverride = String.fromCharCode(0x202e);
+    const zeroWidth = String.fromCharCode(0x200b);
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "operator_warning",
+      title: "An operator left you a note", body: "...",
+      context: { leagueName: "Sunday Money", note: `${rtlOverride}Keep the trash${zeroWidth} talk about the teams.` },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    const quoted = quoteFor(notice);
+    expect(quoted).toBe("Keep the trash talk about the teams.");
+    expect(quoted).not.toContain(rtlOverride);
+    expect(quoted).not.toContain(zeroWidth);
+    // `context` itself keeps what it was rendered FROM, untouched — the strip is at render, not at
+    // the write, the same provenance-vs-copy split `notifyAffectedMember`'s own docblock draws.
+    expect(notice.context.note).toBe(`${rtlOverride}Keep the trash${zeroWidth} talk about the teams.`);
+  });
+
+  it("is null for an operator_warning notice whose context note is not a string", () => {
+    const notice: MemberNotice = {
+      id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "operator_warning",
+      title: "An operator left you a note", body: "...",
+      context: { leagueName: "Sunday Money" },
+      auditEventId: "evt_1", createdAt: NOW, readAt: null,
+    };
+    expect(quoteFor(notice)).toBeNull();
   });
 });

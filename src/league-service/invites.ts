@@ -7,7 +7,7 @@ import type { Clock } from "@/domain/timing";
 import { generateInviteCode, leagueTerms, LEAGUE_CONFIG, type LeagueTerms } from "@/league";
 import { MS_PER_DAY } from "./config";
 import type { LeagueWriteDeps } from "./creation";
-import { joinLeagueInTx, type JoinLeagueOutcome, type JoinPrecondition } from "./join";
+import { joinLeagueInTx, triggerMultiAccountSweep, type JoinLeagueOutcome, type JoinPrecondition } from "./join";
 
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
 const TEAM_MEMBERSHIP_UNIQUE_INDEX = "teams_league_user_idx";
@@ -94,7 +94,7 @@ export async function acceptInvite(
   input: AcceptInviteInput,
 ): Promise<AcceptInviteResult> {
   try {
-    return await db.transaction(async (tx) => {
+    const outcome = await db.transaction(async (tx) => {
       // `for update`: the cap check below reads `invite.uses`, so this row must be held until
       // the matching increment commits. Invite first, THEN league (`joinLeagueInTx` takes the
       // league lock) — one fixed order, so no two accepts can deadlock.
@@ -131,6 +131,11 @@ export async function acceptInvite(
       await tx.update(leagueInvites).set({ uses: sql`${leagueInvites.uses} + 1` }).where(eq(leagueInvites.code, input.code));
       return outcome;
     });
+    // AFTER the transaction above has committed, never inside it — see `triggerMultiAccountSweep`
+    // (`@/league-service/join`)'s own docblock for the lock-order reasoning (this door is the one
+    // holding `league_invites` `FOR UPDATE` it was written to describe).
+    await triggerMultiAccountSweep(db, outcome);
+    return outcome;
   } catch (error: unknown) {
     if (isUniqueViolation(error, TEAM_MEMBERSHIP_UNIQUE_INDEX)) {
       // The unique-index backstop fired: a concurrent accept created this user's team first.

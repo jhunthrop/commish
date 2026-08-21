@@ -22,7 +22,7 @@ const signedInAs = (id: string | null) =>
   vi.mocked(getCurrentUser).mockResolvedValue(
     id === null
       ? null
-      : { id, email: `${id}@test.local`, displayName: id, experienceTier: "beginner", avatarUrl: null, createdAt: "2026-09-01T00:00:00.000Z" },
+      : { id, email: `${id}@test.local`, displayName: id, experienceTier: "beginner", avatarUrl: null, createdAt: "2026-09-01T00:00:00.000Z", isAdmin: false },
   );
 
 function post(reviewId: string, body: unknown) {

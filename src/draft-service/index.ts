@@ -1,6 +1,7 @@
 import { getDb } from "@/db/client";
 import { isLLMEnabled, getLlmClient } from "@/lib/llm/client";
 import { getPublisher } from "@/lib/realtime/publisher";
+import type { PublishFn } from "./store";
 import { createNudgeScheduler } from "./nudge";
 import { createNudgeCopy } from "./nudge-copy";
 import { createDraftStore, type DraftStore } from "./store";
@@ -12,13 +13,36 @@ const systemClock = { now: () => new Date().toISOString() };
 let store: DraftStore | undefined;
 let ticker: DraftTicker | undefined;
 
+/**
+ * The store's `onPublishError` wiring, extracted to its own name — same reasoning as
+ * `publishViaSharedPublisher` in `src/stats-pipeline/index.ts`: a full store failure would
+ * otherwise be the only way to reach it, since it only runs when a publish actually fails.
+ */
+export function logDraftPublishError(error: unknown, event: unknown): void {
+  console.error("[draft] publish failed", event, error);
+}
+
+/** The ticker's nudger's `onError` wiring, extracted for the same reason. */
+export function logDraftNudgeError(error: unknown, context: unknown): void {
+  console.error("[draft] nudge failed", context, error);
+}
+
+/**
+ * Both the store and the nudger publish through the same process-wide publisher; extracted to
+ * one named function (rather than an inline arrow at each call site) so this wiring is directly
+ * unit-testable — the store's own applied-action tests reach the store's call site, but nothing
+ * short of a real nudge firing would ever reach a second, separately-defined inline arrow at
+ * the nudger's call site.
+ */
+export const publishDraftEvent: PublishFn = (input) => getPublisher().publish(input);
+
 export function getDraftStore(): DraftStore {
   if (store === undefined) {
     store = createDraftStore({
       db: getDb(),
-      publish: (input) => getPublisher().publish(input),
+      publish: publishDraftEvent,
       clock: systemClock,
-      onPublishError: (error, event) => console.error("[draft] publish failed", event, error),
+      onPublishError: logDraftPublishError,
     });
   }
   return store;
@@ -32,11 +56,11 @@ export function getDraftTicker(): DraftTicker {
       clock: systemClock,
       nudger: createNudgeScheduler({
         db: getDb(),
-        publish: (input) => getPublisher().publish(input),
+        publish: publishDraftEvent,
         // `isLLMEnabled()` is read once, here, at the edge — the copy function itself never
         // touches process.env, so tests drive both states by construction.
         copy: createNudgeCopy({ enabled: isLLMEnabled(), llm: getLlmClient() }),
-        onError: (error, context) => console.error("[draft] nudge failed", context, error),
+        onError: logDraftNudgeError,
       }),
     });
   }

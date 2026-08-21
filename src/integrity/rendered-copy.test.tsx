@@ -104,12 +104,20 @@ describe("NoticeInbox says nothing that breaks the house copy rules", () => {
  * the persona panel's FIX-5 privacy statement, which is the single most carefully worded string on
  * the surface and was covered by no sweep at all.
  */
-vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn() }));
+vi.mock("@/lib/auth/current-user", () => ({ requireCurrentUser: vi.fn(), requireAdmin: vi.fn() }));
 vi.mock("@/lib/leagues/membership", () => ({ resolveLeagueMembership: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/draft-service/teams", () => ({ leagueNameFor: vi.fn() }));
 vi.mock("@/integrity-service/activity", () => ({ listLeagueActivity: vi.fn() }));
 vi.mock("@/integrity-service/notify", () => ({ listNotices: vi.fn(), quoteFor: vi.fn(() => null) }));
+vi.mock("@/integrity-service/flags", () => ({ listPendingFlags: vi.fn(), flagDetail: vi.fn() }));
+// `ResolutionForm` (Task 5, `src/admin-room/components/resolution-form.tsx`) calls `useRouter()`
+// for its post-submit `router.refresh()` — `notFound()` needs no request context (a plain
+// synchronous throw), so it stays real; `useRouter()` is the one export this file mocks.
+vi.mock("next/navigation", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("next/navigation")>();
+  return { ...actual, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) };
+});
 
 describe("the league activity page says nothing that breaks the house copy rules", () => {
   it("is clean with and without a platform-action band", async () => {
@@ -122,7 +130,7 @@ describe("the league activity page says nothing that breaks the house copy rules
 
     vi.mocked(requireCurrentUser).mockResolvedValue({
       id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", experienceTier: "beginner", avatarUrl: null,
-      createdAt: "2026-08-01T00:00:00.000Z",
+      createdAt: "2026-08-01T00:00:00.000Z", isAdmin: false,
     });
     vi.mocked(resolveLeagueMembership).mockResolvedValue({
       ok: true,
@@ -147,5 +155,129 @@ describe("the league activity page says nothing that breaks the house copy rules
       expectClean(container, NOTICE.title, NOTICE.body, ROW.headline, ROW.detail ?? "");
       unmount();
     }
+  });
+});
+
+const QUEUE_ROW = { flagId: "flag_1", icon: "alert-triangle" as const, question: "A member reported a review", about: "A review by Ada Lovelace", raisedAt: "2026-08-01T00:00:00.000Z" };
+
+const FLAG_DETAIL = {
+  flagId: "flag_1",
+  flagType: "review_report" as const,
+  raisedAt: "2026-08-01T00:00:00.000Z",
+  leagueId: null,
+  subject: { kind: "review" as const, reviewId: "r1", body: "Great season overall.", authorName: "Ada Lovelace", removedAt: null },
+  evidence: {},
+  reporters: [{ userId: "u_reporter", name: "Reporter Rita", reason: "spam", reportedAt: "2026-08-01T00:00:01.000Z" }],
+  trail: [ROW],
+  resolution: null,
+  decisions: ["no_action", "warned_user", "content_removed"] as const,
+};
+
+const OPERATOR = { id: "u_op", email: "u_op@test.local", displayName: "Op Erator", experienceTier: "beginner" as const, avatarUrl: null, createdAt: "2026-08-01T00:00:00.000Z", isAdmin: true };
+
+/**
+ * Task 5's operator surface — added as its own `describe` block, per this file's own point.
+ * `withAdmin`'s Server Component overload is exercised for real (only `requireAdmin` is mocked),
+ * so this also proves the gate itself renders clean copy, not just the read below it.
+ */
+describe("the admin queue page says nothing that breaks the house copy rules", () => {
+  it("is clean empty and clean populated", async () => {
+    const { requireAdmin } = await import("@/lib/auth/current-user");
+    const { listPendingFlags } = await import("@/integrity-service/flags");
+    const { default: AdminQueuePage } = await import("@/app/app/admin/queue/page");
+
+    vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
+
+    for (const rows of [[], [QUEUE_ROW]]) {
+      vi.mocked(listPendingFlags).mockResolvedValue({ rows, nextBefore: null });
+      const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+      const page = await AdminQueuePage({ searchParams: Promise.resolve({}) });
+      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      await screen.findByText("Dispute queue");
+      expectClean(container, QUEUE_ROW.question, QUEUE_ROW.about);
+      unmount();
+    }
+  });
+});
+
+describe("the admin flag detail page says nothing that breaks the house copy rules", () => {
+  it("is clean open, resolved, and with every panel empty", async () => {
+    const { requireAdmin } = await import("@/lib/auth/current-user");
+    const { flagDetail } = await import("@/integrity-service/flags");
+    const { leagueNameFor } = await import("@/draft-service/teams");
+    const { default: AdminFlagDetailPage } = await import("@/app/app/admin/queue/[flagId]/page");
+
+    vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
+    vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
+
+    for (const detail of [
+      FLAG_DETAIL,
+      { ...FLAG_DETAIL, resolution: { decision: "no_action" as const, note: "n", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op", resolvedByName: "Op Erator" }, decisions: [] },
+      { ...FLAG_DETAIL, reporters: [], trail: [] },
+    ]) {
+      vi.mocked(flagDetail).mockResolvedValue(detail);
+      const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+      const page = await AdminFlagDetailPage({ params: Promise.resolve({ flagId: "flag_1" }) });
+      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      await screen.findByText("Flag detail");
+      expectClean(container, detail.subject.kind === "review" ? detail.subject.body : "", ROW.headline, ROW.detail ?? "");
+      unmount();
+    }
+  });
+});
+
+/**
+ * THE INTERACTION-STATE GAP, closed (final review, MEDIUM 7(b)). Everything above renders a FIRST
+ * PAINT, and `ResolutionForm` initializes `decision` to `decisions[0]` — the fixture's
+ * `no_action` — so two of the three decision branches, and every state that follows typing a
+ * note, were swept by nothing. That is exactly where MEDIUM 6's em dash lived: on the
+ * `content_removed` hint, in a component the sweep above mounts on every run.
+ *
+ * So: every decision, with and without a note, and the submitted state too. Driven through the
+ * real radios rather than by re-rendering with a different prop, because the branch that ships is
+ * the one an operator clicks into.
+ */
+describe("the resolution form says nothing that breaks the house copy rules, in every state", () => {
+  const PREVIEWS = {
+    warned_user: { title: "An operator reviewed a report about you", body: "We looked at a report about something you posted in Sunday Money." },
+    content_removed: { title: "We removed your review", body: "An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message." },
+  } as const;
+  const DECISION_RADIOS = ["No action", "Warn the member", "Remove the content"] as const;
+
+  it.each(DECISION_RADIOS)("is clean on the %s branch, empty and with a note", async (radioLabel) => {
+    const { AdminRoomDepsProvider } = await import("@/admin-room/hooks/deps");
+    const { fixtureAdminDeps } = await import("@/admin-room/test-fixtures");
+    const { ResolutionForm } = await import("@/admin-room/components/resolution-form");
+
+    const fixture = fixtureAdminDeps();
+    const { container } = render(
+      <AdminRoomDepsProvider deps={fixture.deps}>
+        <ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user", "content_removed"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />
+      </AdminRoomDepsProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("radio", { name: radioLabel }));
+    expectClean(container, PREVIEWS.warned_user.title, PREVIEWS.warned_user.body, PREVIEWS.content_removed.title, PREVIEWS.content_removed.body);
+
+    // And again once the operator has typed, since the previews swap their placeholder for the
+    // note the moment there is one.
+    fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "Keep it civil." } });
+    expectClean(container, PREVIEWS.warned_user.title, PREVIEWS.warned_user.body, PREVIEWS.content_removed.title, PREVIEWS.content_removed.body, '"Keep it civil."');
+  });
+
+  it("is clean once a decision is recorded", async () => {
+    const { AdminRoomDepsProvider } = await import("@/admin-room/hooks/deps");
+    const { fixtureAdminDeps } = await import("@/admin-room/test-fixtures");
+    const { ResolutionForm } = await import("@/admin-room/components/resolution-form");
+
+    const fixture = fixtureAdminDeps();
+    const { container } = render(
+      <AdminRoomDepsProvider deps={fixture.deps}>
+        <ResolutionForm flagId="flag_1" decisions={["no_action"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />
+      </AdminRoomDepsProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Submit decision" }));
+    await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+    expectClean(container);
   });
 });

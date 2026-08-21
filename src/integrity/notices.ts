@@ -30,7 +30,74 @@ export interface NoticeContexts {
      */
     readonly reason: string;
   };
+  /**
+   * The one notice `scripts/grant-admin.ts` sends, and the only door this privilege arrives
+   * through at all (ruling 15). `grantedByUserId` is the operator id who ran the script, or the
+   * literal `"bootstrap"` sentinel on a fresh database's first grant — carried in `context` for
+   * the audit trail even though the rendered copy below names no one, because THIS notice is
+   * deliberately the one place in this product that tells a member about a privilege rather than
+   * an action taken on their own data.
+   */
+  readonly admin_granted: {
+    readonly grantedByUserId: string;
+  };
+  /**
+   * `resolveFlag`'s `warned_user` decision (Task 3): a report stays up, but the operator leaves
+   * the author their own words. `note` is free text, the operator's own — NOT bound by this
+   * file's denylist (that rulebook binds PLATFORM copy, the templates below; a quote is not the
+   * platform's voice) — bound instead by `INTEGRITY_CONFIG.moderation.noteMaxLength`, the same
+   * "the service enforces its own boundary" discipline `REVIEW_CONFIG.removalReason.maxLength`
+   * uses. `leagueName` is carried separately so the template can say WHERE without the operator
+   * having to.
+   */
+  readonly operator_warning: {
+    readonly leagueName: string;
+    readonly note: string;
+  };
+  /**
+   * `removeChatMessageInTx`'s (`@/chat-service/moderation`) own notice, mirroring `review_removed`
+   * field for field: `reason` is one of the SAME closed tokens (`MODERATION_CONFIG.reasons`), not
+   * free text, mapped to a phrase at render (`quoteFor` -> `removalPhraseFor`) rather than printed
+   * raw. `leagueName` is carried because a chat removal, unlike a review's, always has a real
+   * league — the message stood in one league's own conversation.
+   */
+  readonly chat_message_removed: {
+    readonly leagueName: string;
+    readonly reason: string;
+  };
+  /**
+   * `correctSettledWeek`'s (`@/stats-pipeline/correction`) own notice — Task 10's residual, and
+   * the first notice a fully AUTOMATED action sends rather than an operator's own decision. Sent
+   * only to a manager whose TEAM's points actually moved as a result of the correction; a manager
+   * whose roster the revision never touched hears nothing, because a notice about no change would
+   * be noise, not news.
+   *
+   * `outcome` is one of three FIXED clauses (`StatWeekCorrectionOutcome`), resolved by the caller
+   * from the team's before/after result — never free text, so the copy sweep covers every
+   * sentence this notice can produce rather than one sample of it. This is the twin of the
+   * league-wide `system_action` summary the same correction writes (`SYSTEM_ACTION_SUMMARY_ALLOWED`
+   * allows exactly this action, `@/integrity/system-actions`): composed from the same template so
+   * the impersonal, league-wide sentence and this personal one can never say different things.
+   */
+  readonly stat_week_corrected: {
+    readonly leagueName: string;
+    readonly week: number;
+    readonly points: number;
+    readonly outcome: StatWeekCorrectionOutcome;
+  };
 }
+
+/**
+ * The three, and only three, sentences `stat_week_corrected`'s `outcome` clause may say — resolved
+ * by the caller from a team's before/after matchup result, never free text. A closed union rather
+ * than a string is what lets `notices.test.ts` sweep every sentence this notice can actually
+ * produce (`NOTICE_SAMPLES` carries one; a dedicated test iterates all three) instead of trusting
+ * one sample to represent all of them.
+ */
+export type StatWeekCorrectionOutcome =
+  | "your matchup result stays the same"
+  | "that turns your matchup into a win"
+  | "that turns your matchup into a loss";
 
 export type NoticeType = keyof NoticeContexts;
 
@@ -50,17 +117,44 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   // author-facing phrase travels as its own field on the wire (`NoticeView.quote`, `GET
   // /api/notices`'s own `quoteFor`), rendered as a distinct blockquote rather than folded into
   // this sentence — a quotation embedded in a paragraph reads as this product's own voice, not
-  // a quote.
+  // a quote. Fix round 1 (panel HIGH): the last sentence is founder decision #4, the same one
+  // `operator_warning` already states — there is no appeal path, and a notice that stays silent
+  // about that invites a removed author to go looking for a reply channel that does not exist.
   review_removed: () => ({
     title: "We removed your review",
-    body: "An operator removed your review. We keep your review on file exactly as you wrote it.",
+    body: "An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message.",
   }),
-};
-
-/** One neutral context per type, so the denylist and em-dash checks have something to render. */
-export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } = {
-  draft_auto_picked: { leagueName: "Sunday Money", pickNumber: 24, playerName: "Bijan Robinson", position: "RB" },
-  review_removed: { reason: "off topic" },
+  admin_granted: () => ({
+    title: "You can now use the operator tools",
+    body: "Someone with database access turned on operator access for your account. You can open the dispute queue from your account menu. Every decision you record there carries your name and cannot be taken back.",
+  }),
+  // `note` is stored on the row (`context.note`) but deliberately unused HERE, for the same
+  // reason `review_removed`'s `reason` is: the operator's own words travel as their own field on
+  // the wire (`quoteFor`), rendered as a distinct blockquote rather than folded into this
+  // sentence. The last sentence is founder decision #4, stated rather than implied: there is no
+  // appeal path, and a notice that stays silent about that invites a member to go looking for one.
+  operator_warning: ({ leagueName }) => ({
+    title: "An operator left you a note",
+    body: `Somebody reported something you posted in ${leagueName}. An operator read it, decided to leave your post up, and wrote you this note. There is no reply to this message.`,
+  }),
+  // `reason` is stored on the row (`context.reason`) but deliberately unused HERE, the same
+  // reason `review_removed`'s own `reason` is: its author-facing phrase travels as its own field
+  // on the wire (`quoteFor`), rendered as a distinct blockquote. Unlike a removed review, the
+  // room itself already shows that the message went (`RemovedMessage`, `@/chat-room/components`)
+  // — this notice tells the author what the room can see, not something new to them. Fix round 1
+  // (panel HIGH): the last sentence is the same founder decision #4 `operator_warning` and (this
+  // round) `review_removed` both state — there is no appeal path.
+  chat_message_removed: ({ leagueName }) => ({
+    title: "We removed one of your messages",
+    body: `An operator removed a message you posted in ${leagueName}. Your leaguemates can see that the message went and who posted it, and they can no longer read it. We keep your words on file exactly as you wrote them. There is no reply to this message.`,
+  }),
+  // No "no reply to this message" line, unlike the three removal/warning templates above: this is
+  // informational, not a sanction, and there is nothing to appeal. `outcome` is the closed
+  // three-clause union (`StatWeekCorrectionOutcome`), never a free string.
+  stat_week_corrected: ({ leagueName, week, points, outcome }) => ({
+    title: `We corrected your week ${week} score`,
+    body: `Our stats provider revised its numbers for week ${week}, so we recomputed ${leagueName}. Your team now has ${points} points, and ${outcome}.`,
+  }),
 };
 
 export function renderNotice<T extends NoticeType>(type: T, context: NoticeContexts[T]): RenderedNotice {

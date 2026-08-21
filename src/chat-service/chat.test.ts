@@ -1,7 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import { CHAT_CONFIG } from "@/chat/config";
+import { REASON_FRAGMENTS } from "@/moderation/test-support";
 import type { Db } from "@/db/client";
-import { chatReactions, users } from "@/db/schema";
+import { chatMessages, chatReactions, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import { listMessages, postMessage, toggleReaction } from "./chat";
@@ -152,6 +154,75 @@ describe("listMessages", () => {
     await postMessage(db, { leagueId: "l1", userId: "u1", body: "ours", publish: bus.publish });
     const page = await listMessages(db, { leagueId: "l_other" });
     expect(page.messages).toEqual([]);
+  });
+
+  describe("a removed message", () => {
+    it("withholds body and gif but keeps attribution, and stamps the removal with its time and nothing else", async () => {
+      const bus = recorder();
+      const posted = await postMessage(db, { leagueId: "l1", userId: "u1", body: "should never be sent", publish: bus.publish });
+      await db
+        .update(chatMessages)
+        .set({ removedAt: new Date("2026-08-20T00:00:00.000Z"), removedByUserId: "u1", removalReason: "spam" })
+        .where(eq(chatMessages.id, Number(posted.id)));
+
+      const page = await listMessages(db, { leagueId: "l1" });
+      expect(page.messages).toHaveLength(1);
+      const [message] = page.messages;
+      expect(message!.body).toBe("");
+      expect(message!.gif).toBeNull();
+      expect(message!.authorUserId).toBe("u1");
+      expect(message!.authorName).toBe("Bay Bandits");
+      expect(message!.removal).toEqual({ at: "2026-08-20T00:00:00.000Z" });
+    });
+
+    /**
+     * THE WIRE-LEVEL GUARD (final review, HIGH 1). The reason used to ride on
+     * `ChatMessageView.removal.phrase`: no room-visible surface rendered it, but every member of
+     * the league received it in this exact payload and could read it out of devtools. Unrendered
+     * is not unsent, so the assertion is made where the leak was — over the SERIALIZED page, the
+     * bytes the route hands the browser, for every reason in the closed vocabulary.
+     */
+    it("puts no removal reason on the wire, in any form, for any reason in the vocabulary", async () => {
+      const bus = recorder();
+      for (const reason of ["spam", "abusive", "other"]) {
+        await truncateAll(db);
+        await chatLeagueFixture(db);
+        const posted = await postMessage(db, { leagueId: "l1", userId: "u1", body: "the words the room keeps", publish: bus.publish });
+        await db
+          .update(chatMessages)
+          .set({ removedAt: new Date("2026-08-20T00:00:00.000Z"), removedByUserId: "u1", removalReason: reason })
+          .where(eq(chatMessages.id, Number(posted.id)));
+
+        const page = await listMessages(db, { leagueId: "l1" });
+        // Exactly what `GET /api/leagues/[leagueId]/chat` serializes into its response body.
+        const onTheWire = JSON.stringify(page);
+        for (const fragment of REASON_FRAGMENTS) {
+          expect(onTheWire).not.toContain(fragment);
+        }
+        // The author's own words are withheld too — the same rule, proven on the same bytes.
+        expect(onTheWire).not.toContain("the words the room keeps");
+      }
+    });
+
+    it("withholds a removed GIF message's url too — the stamp covers it by construction", async () => {
+      const bus = recorder();
+      const posted = await postMessage(db, { leagueId: "l1", userId: "u1", body: TOUCHDOWN_GIF.alt, gif: TOUCHDOWN_GIF, publish: bus.publish });
+      await db
+        .update(chatMessages)
+        .set({ removedAt: new Date("2026-08-20T00:00:00.000Z"), removedByUserId: "u1", removalReason: "other" })
+        .where(eq(chatMessages.id, Number(posted.id)));
+
+      const page = await listMessages(db, { leagueId: "l1" });
+      expect(page.messages[0]?.gif).toBeNull();
+      expect(page.messages[0]?.body).toBe("");
+    });
+
+    it("reports removal: null for every message that stands", async () => {
+      const bus = recorder();
+      await postMessage(db, { leagueId: "l1", userId: "u1", body: "still here", publish: bus.publish });
+      const page = await listMessages(db, { leagueId: "l1" });
+      expect(page.messages[0]?.removal).toBeNull();
+    });
   });
 });
 

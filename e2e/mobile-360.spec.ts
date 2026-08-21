@@ -134,6 +134,36 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // manager A has already left a review by the time the onboarding spec has run once.
     await expect(page.getByRole("button", { name: "Save", exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page, "/app/profile");
+
+    // --- Task 5: the operator's dispute queue -----------------------------------------------
+    // Manager A IS the operator in this environment, DETERMINISTICALLY: `global-setup.ts`'s
+    // `ensureE2eOperator` grants it through the real `grantAdmin` writer, idempotently and
+    // regardless of who (if anyone) already holds the database's one bootstrap slot — fix round
+    // 1, FIX 2's own finding was that the seed pipeline's own attempt (`seedOperator`) can lose
+    // that race silently on a shared, reused database, which is exactly what made this section
+    // read as passing while never actually reaching the queue. An operator triaging on a phone
+    // at 11pm is the realistic case this spec exists to check, not an exotic second identity to
+    // mint. The queue is NOT empty here — `npm run seed`'s own multi-account fixture
+    // (`dev_league_integrity`) raises one real, permanently-open flag Task 9's detector found,
+    // and `league-lifecycle.spec.ts` (which runs before this spec, alphabetically, under this
+    // suite's single worker) resolves its own — so exactly this one row remains. That is itself
+    // a realistic state an operator sees, and this spec proves a populated queue's own row is
+    // reachable rather than pushed off the 360px edge.
+    await page.goto("/app/admin/queue");
+    await expect(page.getByRole("heading", { name: "Dispute queue" })).toBeVisible();
+    const queueRows = page.getByRole("list", { name: "Open flags" }).getByRole("listitem");
+    await expect(queueRows).toHaveCount(1);
+    await expect(queueRows.getByText("The platform flagged two accounts that may be the same person")).toBeVisible();
+    await expectNoHorizontalScroll(page, "the dispute queue");
+
+    // --- Task 5: one flag's own detail page — the admin field set, raw scores included,
+    // opposite the member feed's (ruling 16) ------------------------------------------------
+    // The flagId is read off this row's own link rather than hardcoded: the seed is
+    // deterministic, but its id is not this spec's to know in advance, and deriving it here is
+    // what keeps this route check honest against whatever the queue actually shows.
+    await queueRows.getByRole("link").click();
+    await expect(page.getByRole("heading", { name: "Flag detail" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "a flag's detail page");
   } finally {
     await context.close();
   }

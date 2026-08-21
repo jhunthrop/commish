@@ -25,7 +25,7 @@ const signedInAs = (id: string | null) =>
   vi.mocked(getCurrentUser).mockResolvedValue(
     id === null
       ? null
-      : { id, email: `${id}@test.local`, displayName: id, experienceTier: "beginner", avatarUrl: null, createdAt: "2026-08-17T12:00:00.000Z" },
+      : { id, email: `${id}@test.local`, displayName: id, experienceTier: "beginner", avatarUrl: null, createdAt: "2026-08-17T12:00:00.000Z", isAdmin: false },
   );
 
 const membership = (teamId: string | null, isCommissioner: boolean) =>

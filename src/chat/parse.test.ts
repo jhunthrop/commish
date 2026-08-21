@@ -13,9 +13,12 @@ const MESSAGE = {
       createdAt: "2026-08-18T12:00:00.000Z",
       reactions: [{ emoji: "🔥", userId: "u2" }],
       gif: null,
+      removal: null,
     },
   },
 };
+
+const REMOVAL = { at: "2026-08-20T00:00:00.000Z" };
 
 const GIF = { url: "https://media.giphy.com/g.gif", previewUrl: "https://media.giphy.com/g-preview.gif", alt: "Touchdown", width: 480, height: 270 };
 
@@ -69,7 +72,7 @@ describe("parseChatFrame", () => {
       createdAt: MESSAGE.payload.message.createdAt,
     };
     const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: messageWithoutReactions } }));
-    expect(frame).toEqual({ kind: "message", message: { ...messageWithoutReactions, reactions: [], gif: null } });
+    expect(frame).toEqual({ kind: "message", message: { ...messageWithoutReactions, reactions: [], gif: null, removal: null } });
   });
 
   it("parses a well-formed gif field", () => {
@@ -111,6 +114,46 @@ describe("parseChatFrame", () => {
       JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, gif: { ...GIF, width: "480" } } } }),
     );
     expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+  });
+
+  it("parses a well-formed removal field", () => {
+    const withRemoval = { ...MESSAGE.payload.message, removal: REMOVAL };
+    const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: withRemoval } }));
+    expect(frame).toEqual({ kind: "message", message: withRemoval });
+  });
+
+  it("treats a missing removal field as no removal", () => {
+    const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: MESSAGE.payload.message } }));
+    expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+  });
+
+  it("drops a removal field that isn't an object, rather than failing the whole message", () => {
+    const frame = parseChatFrame(
+      JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, removal: "not an object" } } }),
+    );
+    expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+  });
+
+  it("drops a removal field with no `at` — the only property a real removal has", () => {
+    const frame = parseChatFrame(JSON.stringify({ type: "chat.message", payload: { message: { ...MESSAGE.payload.message, removal: { at: 7 } } } }));
+    expect(frame).toEqual({ kind: "message", message: MESSAGE.payload.message });
+  });
+
+  /**
+   * Final review, HIGH 1: the removal reason is off the wire, and this parser is the client-side
+   * half of keeping it off. A frame that carried one anyway — a regressed server, a replayed old
+   * Redis entry from before the fix, anything — has it dropped here rather than folded into
+   * client state where a later render could reach it.
+   */
+  it("keeps only `at` off a removal, dropping any reason a frame carries", () => {
+    const frame = parseChatFrame(
+      JSON.stringify({
+        type: "chat.message",
+        payload: { message: { ...MESSAGE.payload.message, removal: { ...REMOVAL, phrase: "spam or fake content", reason: "spam" } } },
+      }),
+    );
+    expect(frame).toEqual({ kind: "message", message: { ...MESSAGE.payload.message, removal: REMOVAL } });
+    expect(JSON.stringify(frame)).not.toContain("spam");
   });
 
   it("returns null when the reaction payload isn't an object", () => {

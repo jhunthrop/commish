@@ -123,21 +123,43 @@ src/
                           committed fixtures — mirrors stats/tank01/ exactly). Consumed by
                           GET /api/gifs/search and by the chat route's GET, which sets
                           ChatPageBody.gifSearchEnabled from createGifProvider() !== null.
-  integrity/              Pure audit rules: the hash chain (chain.ts — linkEvent, verifyLinkedRun,
-                          computeEventHash, normalizeInstant), the canonical rejecting encoder
-                          (canonical.ts), the member-visible activity allowlist + renderers
-                          (activity-view.ts), the notice copy registry (notices.ts —
+  integrity/              Pure audit + moderation-queue rules: the hash chain (chain.ts —
+                          linkEvent, verifyLinkedRun, computeEventHash, normalizeInstant), the
+                          canonical rejecting encoder (canonical.ts), the member-visible activity
+                          allowlist + renderers (activity-view.ts), the system-action summary
+                          allowlist (system-actions.ts — SYSTEM_ACTION_SUMMARY_ALLOWED, a third
+                          deny-by-default dimension), the notice copy registry (notices.ts —
                           NOTICE_TEMPLATES, distinct from identity/notifications.ts's topic
-                          catalog) and INTEGRITY_CONFIG. NO I/O. 100% coverage. See
-                          docs/decisions/audit-and-integrity.md.
-  integrity-service/      Audit read/write service over Postgres: AuditLogger (record/recordAll,
-                          the one way anything writes an audit event), verifyChainIntegrity/
-                          verifyFullChainIntegrity, notifyAffectedMember/deliverNotice/
-                          listNotices/markNoticesRead, and listLeagueActivity (the member-visible
-                          feed's read side). Consumed by src/draft-service/**, src/league-service/**,
-                          src/review-service/**, src/identity-service/**, src/lib/auth/**,
-                          src/app/** and scripts/verify-audit-chain.ts. See
-                          docs/decisions/audit-and-integrity.md.
+                          catalog), the dispute-queue vocabulary (flags.ts — FlagType,
+                          ResolutionDecision, DECISION_OWNER), the admin-only field set
+                          (queue-view.ts, the deliberate opposite number of activity-view.ts), the
+                          three multi-account similarity heuristics (similarity.ts —
+                          deviceSimilarity/ipCorrelation/behavioralSimilarity,
+                          multiAccountSuspicion) and INTEGRITY_CONFIG. NO I/O. 100% coverage. See
+                          docs/decisions/audit-and-integrity.md and
+                          docs/decisions/operators-and-moderation.md.
+  integrity-service/      Audit + moderation read/write service over Postgres: AuditLogger
+                          (record/recordAll, the one way anything writes an audit event),
+                          verifyChainIntegrity/verifyFullChainIntegrity,
+                          notifyAffectedMember/deliverNotice/listNotices/markNoticesRead,
+                          listLeagueActivity (the member-visible feed's read side), grantAdmin
+                          (grant-admin.ts, the ONLY writer of users.is_admin), raiseFlag/
+                          resolveFlag/listPendingFlags/flagDetail (flags.ts, the dispute queue's
+                          own read/write seam) and sweepLeagueForMultiAccounts/canonicalPairId
+                          (multi-account.ts, the detector). Consumed by src/draft-service/**,
+                          src/league-service/**, src/review-service/**, src/identity-service/**,
+                          src/chat-service/**, src/lib/auth/**, src/app/** and
+                          scripts/verify-audit-chain.ts, scripts/grant-admin.ts,
+                          scripts/sweep-multi-account.ts, scripts/correct-stat-week.ts. See
+                          docs/decisions/audit-and-integrity.md and
+                          docs/decisions/operators-and-moderation.md.
+  moderation/             The one closed report/removal reason vocabulary (config.ts —
+                          MODERATION_CONFIG.reasons) and its two renderers (removal.ts —
+                          removalPhraseFor for reviews, chatRemovalPhraseFor for chat). Pure,
+                          I/O-free, browser-safe — the single source both a review report and a
+                          chat report pick from; src/reviews/config.ts re-exports it so the diff
+                          at every existing consumer is zero. NO I/O. 100% coverage. See
+                          docs/decisions/operators-and-moderation.md §8.
   db/                     schema.ts (Drizzle, pg-core: users, leagues, teams, league_invites,
                           scoring_settings, roster_slots, lineup_slots, drafts, draft_actions,
                           draft_nudges, draft_picks, weeks, matchups, players,
@@ -167,7 +189,15 @@ src/
                           Skeleton, EmptyState, ErrorState, Icon, …) — see design-system.md.
 drizzle/                  generated SQL migrations (committed)
 docs/                     conventions.md (this), design-system.md, draft-engine.md, draft-room.md,
-                          draft-moderator.md, league.md, research/
+                          draft-moderator.md, league.md, research/, decisions/ (architecture
+                          decision records — audit-and-integrity.md, operators-and-moderation.md, …)
+scripts/                  Operator-run CLIs, never imported by src/**: seed (npm run seed),
+                          audit:verify (verify-audit-chain.ts), reviews:remove
+                          (remove-review.ts), admin:grant (grant-admin.ts, the only door
+                          users.is_admin opens through), integrity:sweep
+                          (sweep-multi-account.ts, the multi-account detector's manual re-run)
+                          and stats:correct (correct-stat-week.ts, the post-final settlement
+                          correction). See docs/decisions/operators-and-moderation.md.
 e2e/                      Playwright specs plus the sealed-session global setup (see README).
 plans/                    the phase blueprints
 ```
@@ -284,8 +314,18 @@ manager watches tick down while they type can never be a different number than t
 server accepts. `@/review-service` is the Postgres half and is on the blocked list above, reached
 only over the wire from `src/account-room/**`, same as every other service module.
 
+`src/moderation/**` joins the exempt set for the same reason: `MODERATION_CONFIG.reasons` (the one
+closed report/removal vocabulary) and its two renderers are pure, I/O-free rule code, and the chat
+report dialog (`src/chat-room/components/report-dialog.tsx`) value-imports it directly for the
+reason picker's labels — the SAME closed set `reportMessageSchema` enforces at the API boundary.
+It is deliberately **not** part of `@/integrity`, which is blocked (see below): two record types
+(a review, a chat message) cannot share a vocabulary that lives inside either one's own directory,
+and `@/integrity` reads `node:crypto` and Postgres besides, so it could not be exempt even if the
+vocabulary did live there. `integrity`/`moderation` is the same server-machinery-vs-vocabulary split
+`docs/decisions/operators-and-moderation.md` §8 names in full.
+
 `src/integrity/**` and `src/integrity-service/**` join the BLOCKED list instead — unlike
-`@/chat`, `@/matchmaking`, `@/identity`, `@/help` and `@/reviews`, neither half of the audit spine
+`@/chat`, `@/matchmaking`, `@/identity`, `@/help`, `@/reviews` and `@/moderation`, neither half of the audit spine
 is exempt, because neither half is actually browser-safe: `src/integrity/**` is pure but reads
 `node:crypto` (`chain.ts`'s `createHash`), which has no browser polyfill in this stack, and
 `src/integrity-service/**` is Postgres-backed outright. Client code needs neither as a value —
@@ -320,9 +360,18 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**` and `src/integrity-service/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — sixteen gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
-- **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**`, `src/integrity-service/**`, `src/league-service/**`, `src/draft-service/**` and `src/moderation/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — nineteen gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. `src/league-service` and `src/draft-service` (gates 17 and 18) are gated for the identical service-layer reason; `src/moderation` (gate 19) is pure and gates for the reason every pure directory does. See `docs/decisions/operators-and-moderation.md`. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there. `playwright.config.ts` pins `workers: 1` and `fullyParallel: false`, so every run is one worker walking the suite in one deterministic, alphabetical file order — a real cross-spec ordering dependency, not a latent flake: `mobile-360.spec.ts`'s dispute-queue check depends on `league-lifecycle.spec.ts` having already run and resolved its own flag, sorting first only because its filename does. A spec relying on suite order names the file it depends on in its own comment, the way both of these do; running either spec in isolation (`npx playwright test mobile-360.spec.ts` alone) will not reproduce the count that spec asserts.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
+
+### Copy sweeps
+One rulebook, `src/integrity/copy-rules.ts` (`copyViolations`): no em or en dash, nothing accusatory, no passive construction. Four sweeps enforce it, and each covers a blind spot of the others:
+- `src/integrity/notices.test.ts` sweeps the stored notice templates, registry-derived from `NOTICE_TEMPLATES`, so a new template is swept the commit it lands.
+- `src/integrity/activity-view.test.ts` sweeps the composed activity headlines.
+- `src/integrity/rendered-copy.test.tsx` sweeps what a person SEES, per SURFACE — the empty states, the pager labels, the aria-labels, the component's own voice. It is the strongest of the four and the one to prefer. It is also a hand-maintained list of `describe` blocks, and it now drives INTERACTION STATES rather than first paint alone (each decision branch of `ResolutionForm`, with and without a note, plus the submitted state) — the gap that let an em dash ship on a branch that never mounted.
+- `src/integrity/room-copy.source.test.ts` and `src/integrity/script-copy.source.test.ts` sweep SOURCE, directory-derived, so a new file is covered the moment it exists: every `.tsx` under `src/chat-room` and `src/admin-room`, and every `console.*` literal under `scripts/`. Blind to composition by construction — a sentence assembled from three variables is invisible to them, which is why they add to the rendered sweep rather than replace it. Shared extraction lives in `src/integrity/test-support.ts`.
+
+**Known limitations, accepted.** The source scans read literals, not renders, so runtime-composed copy is only covered where it is composed. Scripts are swept on their `console.*` output only: a script's `throw` and `Error` strings are developer-facing and deliberately out of scope. `src/app/app/admin/admin-routes.test.ts`'s route-tree tripwire is a TEXT GREP over file contents — a file under the admin tree that merely mentions `withAdmin(` in a comment passes ungated, and it reads only those two directories, so admin capability introduced elsewhere would not be seen (verified clean by hand at Phase 3 Plan B; `resolveFlag`, `flagDetail`, `listPendingFlags` and `grantAdmin` each have exactly one production caller, all gated or CLI).
 
 ### Migrations
 `ADD COLUMN … NOT NULL` without a `DEFAULT` is acceptable only while the table is empty (pre-first-deploy, as in `drizzle/0001`); once deployed, add with a DEFAULT or backfill in a separate migration.

@@ -1,5 +1,5 @@
 import { and, asc, eq } from "drizzle-orm";
-import type { Db, ReadonlyDb } from "@/db/client";
+import type { Db, DbTx, ReadonlyDb } from "@/db/client";
 import { drafts, leagues, matchups, players, playerStatLines, scoringSettings } from "@/db/schema";
 import type { Position, StatLine } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
@@ -118,6 +118,23 @@ export async function scoreTeamsForWeek(
  * `cache` is injected with a no-op default. When a real cache is supplied, this league/week's
  * cached live scores are dropped AFTER the settlement commits: they were computed from a week in
  * progress, and the numbers that stand now live in `matchups`.
+ *
+ * TWO DOORS, the same shape `joinLeagueInTx`/`joinLeague` (`@/league-service/join.ts`) and Task 4's
+ * `removeReviewInTx`/`removeReview` (`@/review-service/reviews.ts`) already use: `finalizeWeekInTx`
+ * below is the write itself, taking the caller's OWN `tx`, and this function is the one-door
+ * wrapper that runs the guards, opens a fresh transaction and invalidates the cache once it
+ * commits. The seam exists for `correctSettledWeek` (`./correction`): a correction's audit event
+ * and its notices have to commit with the same re-settlement or not at all — Plan A's
+ * write-ordering rule (ruling 3) is not negotiable, and a nested `db.transaction` is a savepoint
+ * with different failure semantics, not the same transaction.
+ *
+ * THE GUARDS STAY OUTSIDE THE TRANSACTION, in `checkFinalizeGuards` below, run by BOTH doors
+ * before either opens its own lock-taking work — the original property this function has always
+ * had (see that function's own docblock for why), preserved rather than pulled inside the seam:
+ * `correctSettledWeek` calls it itself, per league, before opening that league's own transaction,
+ * exactly mirroring this wrapper's own order. `src/stats-pipeline` is gated at 100%, so both doors
+ * are covered by construction: this wrapper's own tests exercise every guard and the write on
+ * every path already, and `correction.test.ts` exercises the write again through its own caller.
  */
 export async function finalizeWeek(
   db: Db,
@@ -125,13 +142,33 @@ export async function finalizeWeek(
   weekNumber: number,
   cache: Pick<ScoreCache, "invalidate"> = NOOP_SCORE_CACHE,
 ): Promise<FinalizeResult> {
-  const [league] = await db.select({ rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, leagueId));
+  const guardFailure = await checkFinalizeGuards(db, leagueId, weekNumber);
+  if (guardFailure !== null) return guardFailure;
+
+  const write = await db.transaction((tx) => finalizeWeekInTx(tx, leagueId, weekNumber));
+  await cache.invalidate(leagueId, weekNumber);
+  return { ok: true, weekNumber: write.weekNumber, matchupsScored: write.matchupsScored };
+}
+
+/** A guard's own refusal, or `null` once every check has passed. */
+export type FinalizeGuardFailure = Extract<FinalizeResult, { readonly ok: false }>;
+
+/**
+ * The existence-and-eligibility checks a week's settlement — by the worker's own transition, OR
+ * by an operator's later correction of an already-settled week — must pass before EITHER caller
+ * takes a single lock. Read with plain `SELECT`s against a `ReadonlyDb`, never inside a
+ * transaction: keeping these reads outside is what keeps a settlement attempt a leaf in the
+ * codebase's lock order rather than a transaction that opens by touching `leagues`, `matchups` and
+ * `drafts` before it ever reaches the row it actually needs to write. `finalizeWeek` calls this
+ * once, itself, before opening its transaction; `correctSettledWeek` calls it once per league,
+ * itself, before opening THAT league's transaction — the same order, twice.
+ */
+export async function checkFinalizeGuards(db: ReadonlyDb, leagueId: string, weekNumber: number): Promise<FinalizeGuardFailure | null> {
+  const [league] = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, leagueId));
   if (league === undefined) return { ok: false, status: 404, reason: "That league doesn't exist." };
 
   // Guard order is "does this thing exist" before "is it allowed", so a week the league does not
-  // have answers 404 whatever the state of its draft. The check is one indexed existence probe
-  // rather than the week's rows, which are read inside the transaction below where they are also
-  // locked and ordered.
+  // have answers 404 whatever the state of its draft.
   const [exists] = await db
     .select({ weekNumber: matchups.weekNumber })
     .from(matchups)
@@ -141,32 +178,41 @@ export async function finalizeWeek(
 
   // A league that has not drafted has no rosters, so every team would score zero and the
   // standings would show a season of phantom losses. An undrafted league is not behind on
-  // scoring, it has not started. Read outside the transaction on purpose: it takes no lock on
-  // `drafts`, which is what keeps this function a leaf in the codebase's lock order.
+  // scoring, it has not started.
   const [draft] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, leagueId));
   if (draft?.status !== "complete") return { ok: false, status: 409, reason: "That league hasn't finished its draft yet." };
 
-  // One transaction for the whole week: a half-scored week is not a result, it's a bug in
-  // progress — `computeStandings` deliberately ignores a matchup with only one score.
-  const matchupsScored = await db.transaction(async (tx) => {
-    const week = await tx
-      .select()
-      .from(matchups)
-      .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)))
-      .orderBy(asc(matchups.homeTeamId));
+  return null;
+}
 
-    const teamIds = [...new Set(week.flatMap((row) => [row.homeTeamId, row.awayTeamId]))];
-    const scores = await scoreTeamsForWeek(tx, leagueId, weekNumber, teamIds);
+export interface FinalizeWrite {
+  readonly weekNumber: number;
+  readonly matchupsScored: number;
+}
 
-    for (const row of week) {
-      await tx
-        .update(matchups)
-        .set({ homeScore: requireScore(scores, row.homeTeamId), awayScore: requireScore(scores, row.awayTeamId) })
-        .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber), eq(matchups.homeTeamId, row.homeTeamId)));
-    }
-    return week.length;
-  });
+/**
+ * The write itself, inside the caller's OWN transaction, ASSUMING `checkFinalizeGuards` has
+ * already passed for this exact `(leagueId, weekNumber)` — neither door calls this without having
+ * called that first. Every write that used to live inside `finalizeWeek`'s `db.transaction`
+ * callback lives here unchanged; nothing about the scoring or the write ordering is different for
+ * either caller.
+ */
+export async function finalizeWeekInTx(tx: DbTx, leagueId: string, weekNumber: number): Promise<FinalizeWrite> {
+  const week = await tx
+    .select()
+    .from(matchups)
+    .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)))
+    .orderBy(asc(matchups.homeTeamId));
 
-  await cache.invalidate(leagueId, weekNumber);
-  return { ok: true, weekNumber, matchupsScored };
+  const teamIds = [...new Set(week.flatMap((row) => [row.homeTeamId, row.awayTeamId]))];
+  const scores = await scoreTeamsForWeek(tx, leagueId, weekNumber, teamIds);
+
+  for (const row of week) {
+    await tx
+      .update(matchups)
+      .set({ homeScore: requireScore(scores, row.homeTeamId), awayScore: requireScore(scores, row.awayTeamId) })
+      .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber), eq(matchups.homeTeamId, row.homeTeamId)));
+  }
+
+  return { weekNumber, matchupsScored: week.length };
 }

@@ -1,7 +1,9 @@
-// Operator-only removal for a review — ruling 18: no admin role and no admin UI exist in this
-// phase, so this script IS the removal path. It stamps `removed_at`/`removed_by_user_id`/
-// `removal_reason`; the review row and its text are never deleted or altered, only marked (see
-// `reviews`' own docblock in `@/db/schema`). Phase 3 owns real moderation and audit.
+// Operator-only removal for a review — Phase 2 ruling 18's own removal path, retained rather than
+// replaced now that Phase 3 Plan B's dispute queue (`resolveFlag`'s `content_removed` decision,
+// `docs/decisions/operators-and-moderation.md` §3-4) offers a second door onto the same
+// `removeReview` writer. This script stamps `removed_at`/`removed_by_user_id`/`removal_reason`;
+// the review row and its text are never deleted or altered, only marked (see `reviews`' own
+// docblock in `@/db/schema`).
 //
 // Run: npm run reviews:remove -- --id <reviewId> --reason "<reason>" --by <operatorUserId>
 //

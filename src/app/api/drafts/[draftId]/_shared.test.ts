@@ -28,7 +28,7 @@ describe("withDraftActor — error boundary", () => {
   it("returns a generic 500 and never leaks the real exception text when the handler throws", async () => {
     vi.mocked(getCurrentUser).mockResolvedValue({
       id: "u1", email: "u1@test.local", displayName: "u1", experienceTier: "beginner", avatarUrl: null,
-      createdAt: "2026-09-01T00:00:00.000Z",
+      createdAt: "2026-09-01T00:00:00.000Z", isAdmin: false,
     });
     vi.mocked(resolveDraftActor).mockResolvedValue({ ok: true, actor });
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});

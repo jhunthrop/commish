@@ -4,6 +4,7 @@ import { isUniqueViolation } from "@/db/errors";
 import { drafts, leagues, teams, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { defaultSweepDeps, sweepQuietly, type SweepDeps } from "@/integrity-service/multi-account";
 import { hasOpenSeat } from "@/matchmaking/filter";
 
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
@@ -115,6 +116,32 @@ export async function joinLeagueInTx(
 }
 
 /**
+ * The multi-account sweep's JOIN-TIME trigger (ruling 11) — one of the two places in this plan an
+ * integrity write is deliberately outside its business transaction. Both doors into a league
+ * (`joinPublicLeague`, below, and `acceptInvite` in `@/league-service/invites`) call this AFTER
+ * their own `db.transaction(...)` has committed, never from inside `joinLeagueInTx` itself. The
+ * lock-order reasoning, and the swallow that keeps a failed sweep from failing a join, both live
+ * in `sweepQuietly` (`@/integrity-service/multi-account`) — one implementation, shared with the
+ * draft store's completion trigger.
+ *
+ * A no-op for anything that isn't a BRAND NEW seat (`!outcome.ok`, or `outcome.alreadyMember`):
+ * the pair set of a league changes exactly when a seat is FILLED, never when an existing member
+ * merely re-arrives.
+ *
+ * WHAT THIS TRIGGER CAN AND CANNOT DO (final review, HIGH 2). It is the only moment the pair SET
+ * changes, so it belongs here — but on its own it can never raise a flag, and that is arithmetic,
+ * not a bug: a join is refused once the draft leaves `scheduled` (`publicJoinPrecondition`) and
+ * no seat reopens afterwards, so the league has zero `MAKE_PICK` rows at every real firing,
+ * `behavioralSimilarity` returns its sample floor of 0, and the remaining weight cannot reach
+ * `flagThreshold`. The draft-completion trigger (`@/draft-service/store`) is what makes the
+ * detector reachable; this one becomes meaningful the day the `ip` weight leaves zero.
+ */
+export async function triggerMultiAccountSweep(db: Db, outcome: JoinLeagueOutcome, deps: SweepDeps = defaultSweepDeps()): Promise<void> {
+  if (!outcome.ok || outcome.alreadyMember) return;
+  await sweepQuietly(db, outcome.leagueId, "league_join", deps);
+}
+
+/**
  * The public browse page's gate: a league must still be LISTED and still be PRE-DRAFT. Both are
  * re-checked here rather than trusted from the card the visitor clicked, because a browse page
  * is a snapshot and a league can fill or start between the render and the press.
@@ -164,6 +191,7 @@ export async function joinPublicLeague(
     // with, so a caller cannot tell "no such league" apart from "a league that exists but isn't
     // public" (see `publicJoinPrecondition`'s docblock, and `acceptInvite`'s identical collapse).
     if (!outcome.ok && outcome.status === 404) return { ok: false, status: 404, reason: NOT_PUBLIC };
+    await triggerMultiAccountSweep(db, outcome);
     return outcome;
   } catch (error: unknown) {
     if (isUniqueViolation(error, TEAM_MEMBERSHIP_UNIQUE_INDEX)) {

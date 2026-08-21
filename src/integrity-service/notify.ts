@@ -6,6 +6,7 @@ import { stripHiddenCharacters } from "@/identity/display-name";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { renderNotice, type NoticeContexts, type NoticeType } from "@/integrity/notices";
 import { removalPhraseFor } from "@/reviews/config";
+import { chatRemovalPhraseFor } from "@/moderation/removal";
 import type { PublishToUserFn } from "@/lib/realtime/publish";
 import { getPublisher } from "@/lib/realtime/publisher";
 
@@ -211,11 +212,42 @@ export async function listNotices(db: Db, userId: string): Promise<NoticesPage> 
  * row read back from Postgres) reads as no quote at all — the same discipline `activityRowFor`'s
  * payload readers use. Exported so the route and the page share one definition rather than two
  * copies agreeing by coincidence.
+ *
+ * `chat_message_removed` (Task 6) reads the SAME `context.reason` shape but maps it through
+ * `chatRemovalPhraseFor` (`@/moderation/removal`) instead — the chat-domain twin, whose generic
+ * fallback is "breaking the chat rules" rather than reviews' "breaking the review rules" (fix
+ * round 1, review HIGH: the two notice types must never share one mapper, or a chat removal's
+ * catch-all reason reads in reviews' own words).
+ *
+ * `operator_warning` (Task 3) is the second quoting type: `context.note` is the operator's OWN
+ * words, not a stored token to map through a phrase table — it renders VERBATIM, which is the
+ * whole reason `resolveFlag` bounds its length instead of its vocabulary. Same narrowing
+ * discipline as `reason` above: a row whose `note` is missing or not a string reads as no quote.
+ *
+ * `stripHiddenCharacters` runs on it too, same as the composed title/body above — operators are
+ * trusted with what they choose to SAY, not with what a bidi override or a zero-width character
+ * would make a reader's browser DO with it. `resolveFlag` writes `context.note` unstripped (it is
+ * provenance, the same "keeps what it was rendered FROM" rule `notifyAffectedMember`'s own
+ * `context` follows), so this is the one place that quote is ever rendered — the strip belongs
+ * HERE, at render, not at the write, for the same reason `notifyAffectedMember` strips `title`/
+ * `body` at compose time rather than trusting every future caller to have done it upstream. A
+ * note already written clean costs nothing extra; one written before this landed, or by a future
+ * caller that skips it, reads clean anyway.
  */
 export function quoteFor(notice: MemberNotice): string | null {
-  if (notice.noticeType !== "review_removed") return null;
-  const reason = notice.context.reason;
-  return typeof reason === "string" ? removalPhraseFor(reason) : null;
+  if (notice.noticeType === "review_removed") {
+    const reason = notice.context.reason;
+    return typeof reason === "string" ? removalPhraseFor(reason) : null;
+  }
+  if (notice.noticeType === "chat_message_removed") {
+    const reason = notice.context.reason;
+    return typeof reason === "string" ? chatRemovalPhraseFor(reason) : null;
+  }
+  if (notice.noticeType === "operator_warning") {
+    const note = notice.context.note;
+    return typeof note === "string" ? stripHiddenCharacters(note) : null;
+  }
+  return null;
 }
 
 export interface MarkNoticesReadInput {

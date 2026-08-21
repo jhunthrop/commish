@@ -33,7 +33,7 @@ export const AUDIT_EVENT_TYPES = [
   /** RESERVED — Plan B publishes these two, from its detector and its resolution action. */
   "flag_raised",
   "flag_resolved",
-  /** RESERVED — Plan B publishes this, from the admin surface it builds. */
+  /** Published by Plan B (Task 1), from `grantAdmin`'s transaction (`@/integrity-service/flags`). */
   "admin_action",
   /**
    * The platform acting on its own. Plan A publishes exactly one kind (a failed chain

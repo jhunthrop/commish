@@ -51,6 +51,19 @@ export const users = pgTable(
     avatarUrl: text("avatar_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     lastSeenAt: timestamp("last_seen_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * The product's first authority beyond league membership, and deliberately the smallest one
+     * that can exist: a boolean, not a role, not a permission set, not an RBAC framework (the
+     * spec's own out-of-scope list forbids one). An operator can read every pending flag on the
+     * platform and record one decision on each. They cannot restrict an account, because nothing
+     * in this product can (founder decision 5, ruling 2).
+     *
+     * There is NO in-product path that writes this column: `scripts/grant-admin.ts` is the only
+     * writer, and it runs against the database host, not through a session (ruling 15). A
+     * privilege escalation bug therefore has to be a bug in Postgres access control rather than a
+     * bug here.
+     */
+    isAdmin: boolean("is_admin").notNull().default(false),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
@@ -451,6 +464,16 @@ export const statWeeks = pgTable("stat_weeks", {
  * `id` is a bigserial because it is also the page cursor — a monotonic integer orders the
  * history with no timestamp tie to break, and `(league_id, id)` makes one page an index range
  * scan rather than a sort of the whole league's history.
+ *
+ * Removal is a stamp, never a delete (Task 6, mirroring `reviews`' own convention exactly): the
+ * row keeps its author, its body, who removed it and why. It DIVERGES from `reviews` at the
+ * read, not at the write — a removed review vanishes from its feed, but a removed message
+ * renders IN PLACE (ruling 18): a conversation with a hole in it is a conversation everybody
+ * misreads, and the members who saw it before it went already know it existed. `removed_by_
+ * user_id` is deliberately NOT on `ChatMessageView` — which operator removed a message is an
+ * operator fact, not a member-facing one. Neither is `removal_reason` (final review, HIGH 1):
+ * the wire-bound `ChatMessageRemoval` is `{ at }`, so the reason reaches the author's private
+ * notice and nobody else.
  */
 export const chatMessages = pgTable(
   "chat_messages",
@@ -474,15 +497,42 @@ export const chatMessages = pgTable(
     gifWidth: integer("gif_width"),
     gifHeight: integer("gif_height"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    // Additive, all nullable (0024_chat_moderation.sql) — the removal stamp. A GIF needs no
+    // second code path: a GIF is one `chat_messages` row (ruling 17), so this stamp covers it by
+    // construction.
+    removedAt: timestamp("removed_at", { withTimezone: true }),
+    removedByUserId: text("removed_by_user_id").references(() => users.id),
+    removalReason: text("removal_reason"),
   },
-  // The physical index also carries `INCLUDE (body)` — added by hand in
-  // `drizzle/0018_chat_messages_covering_index.sql` because drizzle-orm's `index()` builder has
-  // no `.include()` API to express it here. See that migration's own comment: widening this row
-  // (0017's gif_* columns) tipped the planner off `chat_messages_league_id_idx` for a paginated
-  // read and onto a much more expensive `chat_messages_pkey` scan-and-discard, which this
-  // covering index (an Index-Only Scan once vacuumed) undoes. A future migration that drops and
-  // recreates this index from THIS definition must re-add `INCLUDE (body)` by hand, the same way.
+  // `(league_id, id)` and nothing else, which is now the WHOLE physical index too. It carried
+  // `INCLUDE (body, ...)` from 0018 through 0024; `drizzle/0026_measured_index_shapes.sql`
+  // dropped that list after measuring it inert — `chatPageQuery` (`@/chat-service/chat`) selects
+  // eleven more columns than the list carried and joins two tables, so it can never be an
+  // Index-Only Scan, and the covering columns bought 2.7x the index size for nothing. This
+  // definition and the physical index finally agree, so a `db:generate` recreation of it is no
+  // longer a silent loss (`src/db/index-plans.test.ts` still reads it back out of `pg_indexes`).
   (t) => [index("chat_messages_league_id_idx").on(t.leagueId, t.id)],
+);
+
+/**
+ * A report is in-product moderation SIGNAL, not moderation ACTION (ruling 12: a member never
+ * aims a flag directly). One row per reporter per message — the primary key is the pair, copying
+ * `review_reports` exactly, so reporting twice is a no-op upsert (`onConflictDoNothing`) rather
+ * than a duplicate or an error: reporting the same message again is the same report, not a
+ * second one. A GIF needs no second report table either, for the identical reason the removal
+ * stamp above needs no second column set: a GIF is one `chat_messages` row.
+ */
+export const chatMessageReports = pgTable(
+  "chat_message_reports",
+  {
+    messageId: bigint("message_id", { mode: "number" })
+      .notNull()
+      .references(() => chatMessages.id, { onDelete: "cascade" }),
+    reporterUserId: text("reporter_user_id").notNull().references(() => users.id),
+    reason: text("reason").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.messageId, t.reporterUserId] })],
 );
 
 /**
@@ -537,10 +587,12 @@ export const reviews = pgTable(
 );
 
 /**
- * A report is in-product moderation SIGNAL, not moderation ACTION (ruling 18: no admin role
- * exists to act on it in this phase). One row per reporter per review — the primary key is the
- * pair, so reporting twice is a no-op upsert (`onConflictDoNothing`) rather than a duplicate or
- * an error: reporting the same review again is the same report, not a second one.
+ * A report is in-product moderation SIGNAL, not moderation ACTION (Phase 2 ruling 18) — a member
+ * never acts on their own report; it raises (or confirms) a `review_report` flag in
+ * `integrity_flags` for an operator to act on instead (Phase 3 Plan B,
+ * `docs/decisions/operators-and-moderation.md` §3). One row per reporter per review — the primary
+ * key is the pair, so reporting twice is a no-op upsert (`onConflictDoNothing`) rather than a
+ * duplicate or an error: reporting the same review again is the same report, not a second one.
  */
 export const reviewReports = pgTable(
   "review_reports",
@@ -690,4 +742,95 @@ export const memberNotices = pgTable(
      */
     index("member_notices_user_created_idx").on(t.userId, t.createdAt),
   ],
+);
+
+/**
+ * One row per open question a human has to answer. ONE table for every detector rather than one
+ * per detector (ruling 28): the queue read, the detail view and the resolution are one workflow,
+ * and three copies of it is how three of them drift.
+ *
+ * The row carries what was true WHEN IT WAS RAISED and nothing else. A review's report count is
+ * derived at read time from `review_reports`, because a report count per review is bounded and
+ * `docs/decisions/data-layer-hardening.md` says to derive over a bounded set and roll up only
+ * over an unbounded one (ruling 5). `evidence` is for facts a later read cannot recover: the
+ * similarity scores that crossed the threshold, computed against session data that will have
+ * moved on by the time an operator looks.
+ *
+ * Resolution is a STAMP with the no-re-stamp guard in the UPDATE's own WHERE, exactly as `reviews`
+ * removal is (ruling 4). The immutable record of the decision is the `flag_resolved` audit event;
+ * this row is the queue's index into it.
+ */
+export const integrityFlags = pgTable(
+  "integrity_flags",
+  {
+    id: text("id").primaryKey(),
+    flagType: text("flag_type").notNull(),
+    subjectType: text("subject_type").notNull(),
+    /** The reviewed thing. For `account_pair`, the two user ids joined low-id-first so the pair is canonical. */
+    subjectId: text("subject_id").notNull(),
+    /** Where it happened. NOT a chain scope: this row is not an audit event (ruling 1). */
+    leagueId: text("league_id").references(() => leagues.id, { onDelete: "cascade" }),
+    evidence: jsonb("evidence").$type<JsonObject>().notNull(),
+    raisedAt: timestamp("raised_at", { withTimezone: true }).notNull(),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    resolvedByUserId: text("resolved_by_user_id").references(() => users.id),
+    resolution: text("resolution"),
+    resolutionNote: text("resolution_note"),
+  },
+  (t) => [
+    /**
+     * At most one OPEN flag per subject. A second report of the same message, or a second sweep
+     * finding the same pair, is confirmation rather than a duplicate — the same property
+     * `review_reports`' composite primary key already gives one reporter, lifted to the subject.
+     * Partial on `resolved_at IS NULL` so a resolved flag never blocks a later one about the same
+     * subject: content reported again after a `no_action` is a new question, not the old one.
+     */
+    uniqueIndex("integrity_flags_open_subject_idx")
+      .on(t.subjectType, t.subjectId)
+      .where(sql`${t.resolvedAt} is null`),
+    /**
+     * The queue's only ordering: oldest first, open only (ruling 30). BOTH keys, because
+     * `pendingFlagQuery`'s keyset cursor seeks on `(raised_at, id)` as a row comparison — with
+     * `raised_at` alone that comparison plans as a Filter and every page re-walks from the
+     * oldest open flag (`drizzle/0026_measured_index_shapes.sql` carries the measurement).
+     */
+    index("integrity_flags_queue_idx").on(t.raisedAt, t.id).where(sql`${t.resolvedAt} is null`),
+  ],
+);
+
+/**
+ * What the server observed about the client at a sign-in. NOT an audit event, on purpose
+ * (ruling 7): `audit_events` refuses UPDATE and DELETE and carries no foreign keys, which is
+ * right for a record of what happened and wrong for a person's device and network. This table
+ * cascades from `users`, so deleting an account erases them.
+ *
+ * NO CLIENT BEACON FEEDS THIS (ruling 9). Three server-observed values: the User-Agent and
+ * Accept-Language headers, and a hash of the request address. Screen dimensions and a timezone
+ * would need a browser round trip reporting numbers the browser chooses, which is a new surface
+ * for a signal already ruled untrustworthy alone.
+ *
+ * `ip_source` is the release gate in a column. `INTEGRITY_CONFIG.multiAccount.weights.ip` is 0
+ * and stays 0 until Fly's proxy overwrites X-Forwarded-For (Phase 2 Plan D); this column is what
+ * lets the heuristic then use only the rows written after that, rather than trusting a history
+ * any caller could have written (ruling 8).
+ */
+export const sessionSignals = pgTable(
+  "session_signals",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    occurredAt: timestamp("occurred_at", { withTimezone: true }).notNull(),
+    userAgent: text("user_agent"),
+    acceptLanguage: text("accept_language"),
+    /** sha256(salt + address). Correlation needs equality; it never needs the address. */
+    ipHash: text("ip_hash"),
+    ipSource: text("ip_source").notNull(),
+  },
+  // `user_id` alone. The name keeps its `occurred_at` half for continuity with the migration
+  // that created it, but the column is gone: the sole reader (`signalsForUsers`) orders
+  // GLOBALLY across every requested user, so a per-user `occurred_at` ordering cannot serve it
+  // (`drizzle/0026_measured_index_shapes.sql` carries the measurement).
+  (t) => [index("session_signals_user_occurred_idx").on(t.userId)],
 );

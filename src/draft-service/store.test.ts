@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db, DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { auditEvents, draftActions, memberNotices, players } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
-import { currentDeadline } from "@/draft-engine";
+import { currentDeadline, initialDraftState, type DraftConfig } from "@/draft-engine";
 import type { MemberNotice } from "@/integrity-service/notify";
 import { createDraftStore, isSequenceConflict, type ApplyResult, type DraftStore, type DraftStoreDeps, type PublishFn } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
@@ -174,6 +174,53 @@ afterAll(async () => {
 describe("draft store — persistence", () => {
   it("returns null for a draft that doesn't exist", async () => {
     expect(await newStore().getDraftState("nope")).toBeNull();
+  });
+
+  it("refuses to apply an action against a draft that doesn't exist, inside the transaction's own lock", async () => {
+    // The FOR UPDATE lock itself is what proves this: distinct from getDraftState's read-only
+    // load(), applyAction's own "the row isn't there" check runs INSIDE the transaction, before
+    // any action can be admitted or replayed against it.
+    const result = await newStore().applyAction("nope", start(["team_a", "team_b"]));
+    expect(result).toEqual({ ok: false, reason: "That draft doesn't exist." });
+  });
+
+  it("refuses an action when the row locks but its config join comes back empty, inside the same transaction", async () => {
+    // `drafts.leagueId` is a NOT NULL foreign key to `leagues.id`, so `loadDraftConfig`'s inner
+    // join can never miss for a row the FOR UPDATE select above it just found — through real
+    // Postgres, `locked === undefined` and `state === null` are the same event. A stub `DbTx`
+    // is the only way to split them and prove `load()`'s own null case is handled too.
+    const stubTx = {
+      select: () => ({
+        from: () => ({
+          where: () => ({ for: () => Promise.resolve([{ id: "draft_locked_ghost" }]) }),
+          innerJoin: () => ({ where: () => Promise.resolve([]) }),
+        }),
+      }),
+    } as unknown as DbTx;
+    const stubDb = { transaction: (fn: (tx: DbTx) => Promise<ApplyResult>) => fn(stubTx) } as unknown as Db;
+    const store = createDraftStore({ db: stubDb, publish, clock });
+
+    const result = await store.applyAction("draft_locked_ghost", start(["team_a", "team_b"]));
+    expect(result).toEqual({ ok: false, reason: "That draft doesn't exist." });
+  });
+
+  it("skips the broadcast when the transaction resolves ok without ever setting `previous`", async () => {
+    // `previous` is captured OUTSIDE the transaction and set only once the transaction's own
+    // callback has loaded a real state — every REAL path that returns `ok: true` has therefore
+    // already set it before this check runs. Stubbing `db.transaction` to resolve without ever
+    // invoking the real callback is the only way to observe this guard's other branch, proving
+    // `broadcast` genuinely depends on it rather than always running unconditionally.
+    const config: DraftConfig = {
+      draftId: "draft_stub", leagueId: "league_stub", format: "snake",
+      kickoffAt: T, auctionBudget: null, slotConfig: [], clockSchedule: [],
+    };
+    const fakeState = initialDraftState(config);
+    const stubDb = { transaction: async () => ({ ok: true, state: fakeState }) } as unknown as Db;
+    const stubStore = createDraftStore({ db: stubDb, publish, clock });
+
+    const result = await stubStore.applyAction("draft_stub", start(["team_a", "team_b"]));
+    expect(result).toEqual({ ok: true, state: fakeState });
+    expect(published).toEqual([]);
   });
 
   it("appends one numbered action row per accepted action and materializes the state", async () => {
@@ -630,5 +677,27 @@ describe("draft store — notices", () => {
     // The failure was reported through the existing sink, not swallowed silently, and not
     // thrown back at the caller.
     expect(publishFailures).toEqual([{ type: "notice.created", leagueId }]);
+  });
+
+  it("falls back to an empty string in the failure sink when a notice's leagueId is somehow absent", async () => {
+    // `MemberNotice.leagueId` is nullable in the wider type (a platform-level notice carries
+    // none); THIS notice type always carries a real one — `notifyAffectedMember` is called with
+    // `result.state.config.leagueId`, a NOT NULL column. Mutating the notice inside the
+    // injected `deliverNotice` (the object the failure-sink read comes from) is the only way to
+    // put that read in the state it defends against, without inventing a notice type that could
+    // actually produce a null leagueId here.
+    const publishFailures: { type: string; leagueId: string }[] = [];
+    const { draftId, teamIds } = await fixture();
+    const store = newStore(publish, {
+      deliverNotice: async (notice) => {
+        (notice as { leagueId: string | null }).leagueId = null;
+        throw new Error("Redis is unreachable");
+      },
+      onPublishError: (_error, event) => publishFailures.push({ type: event.type, leagueId: event.leagueId }),
+    });
+    await store.applyAction(draftId, start(teamIds));
+    const result = await expireOnTheClock(store, draftId);
+    expect(result.ok).toBe(true);
+    expect(publishFailures).toEqual([{ type: "notice.created", leagueId: "" }]);
   });
 });

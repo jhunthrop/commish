@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { eq, getTableName, is, Table } from "drizzle-orm";
+import { eq, getTableName, is, isNull, Table } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { Db } from "@/db/client";
 import * as schema from "@/db/schema";
-import { auditEvents, memberNotices, reviews, users } from "@/db/schema";
+import { auditEvents, integrityFlags, memberNotices, reviewReports, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { notifyAffectedMember, quoteFor, type MemberNotice } from "@/integrity-service/notify";
@@ -350,6 +350,55 @@ describe("reportReview", () => {
     const result = await reportReview(db, { reviewId: "missing", reporterUserId: "u2", reason: "spam" });
     expect(result).toEqual({ ok: false, status: 404, reason: "That review is no longer here." });
   });
+
+  async function openFlags() {
+    return db.select().from(integrityFlags).where(isNull(integrityFlags.resolvedAt));
+  }
+
+  async function reportCount(reviewId: string): Promise<number> {
+    const rows = await db.select({ reporterUserId: reviewReports.reporterUserId }).from(reviewReports).where(eq(reviewReports.reviewId, reviewId));
+    return rows.length;
+  }
+
+  it("raises exactly one open flag however many people report the same review", async () => {
+    await seedUser("u1");
+    await seedUser("u_a");
+    await seedUser("u_b");
+    await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r_1" });
+
+    await reportReview(db, { reviewId: "r_1", reporterUserId: "u_a", reason: "spam" });
+    await reportReview(db, { reviewId: "r_1", reporterUserId: "u_b", reason: "abusive" });
+
+    const flags = await openFlags();
+    expect(flags).toHaveLength(1);
+    expect(flags[0]).toMatchObject({ flagType: "review_report", subjectType: "review", subjectId: "r_1" });
+    // Both reports are still rows in review_reports: that table stays the insert-only signal and
+    // this row is the decision. The queue derives the count, it does not store it (ruling 5).
+    expect(await reportCount("r_1")).toBe(2);
+  });
+
+  it("still treats a second report from the SAME reporter as confirmation, not an error", async () => {
+    // The behavior Phase 2 shipped on the composite primary key, unchanged by the flag.
+    await seedUser("u1");
+    await seedUser("u_a");
+    await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r_1" });
+
+    await reportReview(db, { reviewId: "r_1", reporterUserId: "u_a", reason: "spam" });
+    expect(await reportReview(db, { reviewId: "r_1", reporterUserId: "u_a", reason: "spam" })).toEqual({ ok: true });
+    expect(await openFlags()).toHaveLength(1);
+  });
+
+  it("raises the flag and the report row together, or neither — the transaction proof", async () => {
+    await seedUser("u1");
+    await seedUser("u_a");
+    await submitReview(db, { userId: "u1", rating: 1, body: SPAM, clock: at("2026-08-01T00:00:00Z"), newId: () => "r_1" });
+
+    const brokenAudit = { ...logger, record: async () => { throw new Error("audit append failed"); } };
+    await expect(reportReview(db, { reviewId: "r_1", reporterUserId: "u_a", reason: "spam", audit: brokenAudit })).rejects.toThrow("audit append failed");
+
+    expect(await reportCount("r_1")).toBe(0);
+    expect(await openFlags()).toHaveLength(0);
+  });
 });
 
 describe("removeReview", () => {
@@ -418,7 +467,8 @@ describe("removeReview", () => {
     await removeReview(db, { reviewId: "rev_1", removedByUserId: "user_operator", reason: "abuse", clock: at("2026-08-04T00:00:00Z"), audit: logger });
     const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "review_removed"));
     expect(event).toMatchObject({ chainScope: "platform", leagueId: null, actorId: "user_operator", actorType: "user" });
-    expect(event!.payload).toEqual({ reviewId: "rev_1", authorUserId: "user_bob", reason: "abuse" });
+    // `flagId` is `null` here — the script's own door, which resolves no flag.
+    expect(event!.payload).toEqual({ reviewId: "rev_1", authorUserId: "user_bob", reason: "abuse", flagId: null });
 
     // The no-re-stamp invariant means a second removal changes nothing, so it must record nothing.
     await removeReview(db, { reviewId: "rev_1", removedByUserId: "user_other", reason: "spam", clock: at("2026-08-05T00:00:00Z"), audit: logger });
@@ -467,7 +517,7 @@ describe("removeReview — notices", () => {
       readAt: null,
     });
     // The reason is stored on `context` as the token it is, and MAPPED at render — see `quoteFor`.
-    expect(notice!.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it.");
+    expect(notice!.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message.");
     expect(notice!.context).toEqual({ reason: "other" });
   });
 

@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
+import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { players } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import { currentDeadline } from "@/draft-engine";
-import { createDraftStore } from "./store";
+import { createDraftStore, type DraftStore } from "./store";
 import { createDraftTicker } from "./ticker";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -130,6 +131,96 @@ describe("draft ticker", () => {
     } finally {
       setIntervalSpy.mockRestore();
       clearIntervalSpy.mockRestore();
+    }
+  });
+
+  it("skips a draft whose row says in_progress but whose replayed state is somehow null", async () => {
+    // The scan's own SELECT filters on `drafts.status = 'in_progress'`, so real Postgres never
+    // hands `tickOne` a draft id `getDraftState` then can't rebuild — a stub store is the only
+    // way to put it in that state.
+    // liveDraft()'s own store.startDraft() call is what leaves a real `drafts.status =
+    // 'in_progress'` row for the ticker's scan to find; this test only replaces the STORE the
+    // ticker reads through, never the row.
+    await liveDraft();
+    now = "2026-09-01T09:00:00.000Z";
+    const store = {
+      getDraftState: async () => null,
+      applyAction: async () => ({ ok: false as const, reason: "n/a" }),
+      invalidate: () => {},
+    } as unknown as DraftStore;
+    const ticker = createDraftTicker({ db, store, clock });
+    expect(await ticker.tick()).toEqual([]);
+  });
+
+  it("tick() catches a per-draft error, logs it, and reports it — a stuck draft must not stop the scan", async () => {
+    const { fixture } = await liveDraft();
+    now = "2026-09-01T09:00:00.000Z";
+    const store = {
+      getDraftState: async () => { throw new Error("connection reset"); },
+      applyAction: async () => ({ ok: false as const, reason: "n/a" }),
+      invalidate: () => {},
+    } as unknown as DraftStore;
+    const onOutcome = vi.fn();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const ticker = createDraftTicker({ db, store, clock, onOutcome });
+      const outcomes = await ticker.tick();
+      const expected = { draftId: fixture.draftId, applied: false, reason: "Something went wrong checking this draft's clock." };
+      expect(outcomes).toEqual([expected]);
+      expect(onOutcome).toHaveBeenCalledWith(expected);
+      expect(errorSpy).toHaveBeenCalledWith("[draft] ticker failed for draft", fixture.draftId, expect.any(Error));
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("start()'s interval actually fires a real tick, skips an overlapping one, and recovers from tick() itself rejecting", async () => {
+    // A `db` whose first query hangs until released, so a second interval firing while the
+    // first tick is still in flight proves the `running` guard (line 121) rather than merely
+    // asserting it fired once by luck of timing. Releasing it to REJECT (not resolve) is what
+    // reaches `start()`'s own `.catch()` (lines 124-126), which `tick()` itself never triggers —
+    // `tick()`'s internal try/catch (the test above) only guards a single draft's `tickOne`.
+    let callCount = 0;
+    let releaseFirstCall: ((error: Error) => void) | undefined;
+    const failingDb = {
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            orderBy: () => ({
+              limit: () => {
+                callCount += 1;
+                if (callCount === 1) return new Promise((_resolve, reject) => { releaseFirstCall = reject; });
+                return Promise.reject(new Error("db down"));
+              },
+            }),
+          }),
+        }),
+      }),
+    } as unknown as Db;
+    const store = {
+      getDraftState: async () => null,
+      applyAction: async () => ({ ok: false as const, reason: "n/a" }),
+      invalidate: () => {},
+    } as unknown as DraftStore;
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const ticker = createDraftTicker({ db: failingDb, store, clock, intervalMs: 5 });
+    try {
+      ticker.start();
+      // Give the interval time to fire several times while the first call is still hanging.
+      await new Promise((resolve) => setTimeout(resolve, 40));
+      expect(callCount).toBe(1); // the overlap guard suppressed every later firing
+
+      releaseFirstCall?.(new Error("db down"));
+      // Let the rejection propagate through start()'s `.catch().finally()`.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(errorSpy).toHaveBeenCalledWith("[draft] ticker failed", expect.any(Error));
+
+      // `running` was reset in `.finally()`, so a later interval can fire again.
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(callCount).toBeGreaterThan(1);
+    } finally {
+      ticker.stop();
+      errorSpy.mockRestore();
     }
   });
 });

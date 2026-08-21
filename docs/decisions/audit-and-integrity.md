@@ -588,18 +588,27 @@ step should see stated plainly rather than buried in a task report.
   denylist preventing. A Plan D author reading the trap below should read this first — the renderer
   is not "working and only the visibility needs review"; it renders nothing until a publisher opts
   in by writing `summary`, and writing `summary` means choosing the words a member reads.
-  `activity-view.test.ts` pins it against the real verifier payload.
-- **The everyone-visible `renderSystemAction` trap.** `system_action` is `"everyone"` in
-  `ACTIVITY_VISIBILITY` because every `system_action` this plan itself publishes (verification's own
-  detection append) is platform-chain-scoped and never reaches a league feed at all — so
-  "everyone" has been a safe default *by accident of what exists today*, not because the type is
-  inherently safe to broadcast. `renderSystemAction` renders whatever `payload.summary` string it is
-  given, verbatim, to every league member. **Re-review is required before Plan D emits a
-  league-scoped `system_action` for an auto-set-lineup event** (or any other system action a plan
-  might reasonably want to record about one specific manager) — the same competitive-sensitivity
-  argument that makes `lineup_change` `actor_only` (ruling 15) applies just as hard to a
-  system-generated description of one manager's lineup, and nothing in today's type system would
-  catch a future author publishing one under the current `"everyone"` visibility.
+  `activity-view.test.ts` pins it against the real verifier payload. **Closed by Phase 3 Plan B**:
+  see the next bullet.
+- **The everyone-visible `renderSystemAction` trap — CLOSED by Phase 3 Plan B.** `system_action` is
+  `"everyone"` in `ACTIVITY_VISIBILITY` because every `system_action` this plan itself publishes
+  (verification's own detection append) is platform-chain-scoped and never reaches a league feed at
+  all — so "everyone" had been a safe default *by accident of what existed*, not because the type
+  is inherently safe to broadcast. `renderSystemAction` renders whatever `payload.summary` string it
+  is given, verbatim, to every league member. Re-review was required before anything emitted a
+  league-scoped `system_action`, and Plan B's stat-correction path (`correctSettledWeek`) is that
+  first publisher, so Plan B owed and ran the re-review: `SYSTEM_ACTION_SUMMARY_ALLOWED`
+  (`src/integrity/system-actions.ts`) is a third deny-by-default dimension, exhaustive over every
+  `SystemActionCode`, so writing a `summary` for an action nobody signed off on is a type error
+  rather than a review comment someone could miss. `stat_week_corrected` is allowed (a fact about
+  the league's shared scoreboard, true for everyone, about nobody's conduct);
+  `chain_verification_failed` stays denied, restating this doc's own ruling 8; and
+  `lineup_auto_set` — the auto-set-lineup event this residual named by name — is **denied in
+  advance** for Plan D, with the answer recorded rather than left as an open question: the
+  competitive-sensitivity argument that makes `lineup_change` `actor_only` (ruling 15) applies at
+  least as hard to a system-authored description of one manager's lineup, and what Plan D needs is
+  a new, actor-scoped visibility, not a new summary. Full account:
+  `docs/decisions/operators-and-moderation.md` §9.
 - **`/callback` is never exercised by the e2e suite.** The suite authenticates by minting a real
   WorkOS test-directory session and sealing it directly into the `wos-session` cookie
   (`scripts/lib/lab-session.ts`), which is deliberate and documented (`README.md`) — it lets the

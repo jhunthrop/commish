@@ -369,7 +369,12 @@ whichever plan picks them up next:
 - **Moderation surface question.** This plan's review-removal path is report-plus-operator-script
   with no admin role (ruling 18, above). Phase 3 owns building an actual moderation surface —
   a triage queue, a role, an audit trail beyond the removal row — and this plan deliberately did
-  not build a smaller version of it first.
+  not build a smaller version of it first. **Closed by Phase 3 Plan B**: `users.is_admin`, a
+  guarded grant script and no in-product grant path (`docs/decisions/operators-and-moderation.md`
+  §1); the dispute queue over `integrity_flags`, oldest-first, no severity sort (§3); and
+  `review_reports` gets its first real consumer — a report raises a `review_report` flag an
+  operator triages from that same queue, closing the "audit trail beyond the removal row" gap
+  named above (§5).
 - **Chat has no removal path at all**, and that is a larger gap than the review one above. A
   posted message or GIF in a league chat cannot be deleted, hidden or reported by anyone: not its
   author, not the commissioner, not the operator. `src/chat-service` has no delete, no hide and no
@@ -377,15 +382,28 @@ whichever plan picks them up next:
   user-content surface (an open GIF search, whose rating ceiling is the engineering default noted
   above) without the removal path the lower-volume one got, and says so here rather than leaving it
   to be discovered in a real league. Phase 3's moderation surface owns chat, not just reviews.
+  **Closed by Phase 3 Plan B**: `reportMessage` and `removeChatMessageInTx`
+  (`src/chat-service/moderation.ts`) mirror the review path field for field — GIFs covered by
+  construction, since a GIF is still one `chat_messages` row (ruling 17, above). The removed
+  message renders in place with a neutral tombstone rather than vanishing, deliberately the
+  opposite of a removed review's own shape, and the reason reaches only the author's own notice —
+  see `docs/decisions/operators-and-moderation.md` §8 for why chat and reviews diverge there and
+  §6 for the notice split.
 - **A removed review's author is told, and told the operator's own words.** `myReview` reports the
   removed state and `ReviewComposer` renders it instead of an editable form, because the
   alternative — letting them edit into a write `submitReview` refuses at the database — is a
   silent shadow-ban. The consequence to keep in mind: `--reason` in `scripts/remove-review.ts` is
   author-facing copy, not an internal note. What this still does not have is an appeal path.
+  **Still true under Phase 3 Plan B**, deliberately: founder decision #4 keeps there being no
+  appeal path, and every removal/warning notice this plan adds now says so outright rather than
+  leaving a member to infer it (`docs/decisions/operators-and-moderation.md` §6).
 - **The PG-13 founder question.** `GIPHY_CONFIG.rating: "pg-13"` is an engineering default, not a
   founder-reviewed content policy. Whether that's the right ceiling for a real-money product with
   real leagues talking in real chat rooms is a product decision nobody with the authority to make
-  it has weighed in on yet.
+  it has weighed in on yet. **Still open under Phase 3 Plan B**: the ceiling stays and stays
+  documented as unreviewed (founder decision #1's default) — see
+  `docs/decisions/operators-and-moderation.md` §8. The engineering half needed no work, because a
+  GIF removal is the same one-row stamp a text message's removal already is.
 - **A verified-played-here signal.** Every review is gated on `withCurrentUser` (a valid session),
   but nothing checks that the reviewer has actually played a season on this product — the review feed cannot yet
   distinguish "a manager who fielded a team here" from "a signed-in account." A "verified" badge

@@ -126,6 +126,30 @@ describe("createLeague", () => {
     expect(cache.invalidateScoringSettings).toHaveBeenCalledWith(result.leagueId);
   });
 
+  it("logs, but does not fail the create, when the cache invalidation itself throws", async () => {
+    // The league is already committed by the time this runs — a Redis outage on the way out
+    // must never undo an already-successful create.
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const failingCache: Pick<ReferenceCache, "invalidateScoringSettings"> = {
+        invalidateScoringSettings: async () => { throw new Error("redis down"); },
+      };
+      const result = await createLeague(deps(failingCache), {
+        name: "Cache Outage League", format: "snake", teamCount: LEAGUE_CONFIG.defaults.teamCount, scoringPreset: "ppr",
+        auctionBudget: null, rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Dana's Team",
+        experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
+      });
+      expect(result.ok).toBe(true);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[league] scoring settings cache invalidation failed",
+        expect.objectContaining({ leagueId: result.ok ? result.leagueId : undefined }),
+        expect.any(Error),
+      );
+    } finally {
+      consoleSpy.mockRestore();
+    }
+  });
+
   it("does not invalidate scoring settings when league creation fails", async () => {
     const cache = recordingReferenceCache();
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});

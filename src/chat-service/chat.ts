@@ -1,12 +1,18 @@
 import { and, desc, eq, inArray, lt } from "drizzle-orm";
-import type { ChatGif, ChatMessageView, ChatReactionView } from "@/chat/contract";
+import type { ChatGif, ChatMessageRemoval, ChatMessageView, ChatReactionView } from "@/chat/contract";
 import { CHAT_CONFIG } from "@/chat/config";
 import type { Db } from "@/db/client";
 import { chatMessages, chatReactions, teams, users } from "@/db/schema";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
 
-interface MessageRow {
+/**
+ * Exported (Task 6): `@/chat-service/moderation`'s `removeChatMessageInTx` builds one of these
+ * from its own author/team lookup so it can hand the SAME `toView` below the row it needs to
+ * publish a removal exactly the way `postMessage` publishes a new message — one mapper, not two
+ * that could drift on which columns decide `removal`.
+ */
+export interface MessageRow {
   readonly id: number;
   readonly authorUserId: string;
   readonly authorName: string;
@@ -19,9 +25,16 @@ interface MessageRow {
   readonly gifAlt: string | null;
   readonly gifWidth: number | null;
   readonly gifHeight: number | null;
+  /**
+   * Null for a message that stands. There is deliberately NO `removalReason` on this row shape:
+   * the reason never becomes part of a `ChatMessageView`, so the one mapper that builds the wire
+   * view is never handed it in the first place (final review, HIGH 1). `removeChatMessageInTx`
+   * reads the reason straight off its own `UPDATE ... RETURNING` for the author's private notice.
+   */
+  readonly removedAt: Date | null;
 }
 
-/** Null unless every one of the five columns is populated — `kind` alone is not trusted over the columns actually being there. */
+/** Null unless every one of the five columns is populated — `kind` alone is not trusted over the columns actually being there. Also null once the message is removed — see `toView` below. */
 function toGifView(row: MessageRow): ChatGif | null {
   if (row.kind !== "gif" || row.gifUrl === null || row.gifPreviewUrl === null || row.gifAlt === null || row.gifWidth === null || row.gifHeight === null) {
     return null;
@@ -29,16 +42,36 @@ function toGifView(row: MessageRow): ChatGif | null {
   return { url: row.gifUrl, previewUrl: row.gifPreviewUrl, alt: row.gifAlt, width: row.gifWidth, height: row.gifHeight };
 }
 
-function toView(row: MessageRow, reactions: readonly ChatReactionView[]): ChatMessageView {
+/**
+ * `at` and nothing else — see `ChatMessageRemoval`'s own docblock. This object reaches every
+ * member of the room, so a reason on it would be a public accusation; the reason reaches the
+ * author alone, through their private `chat_message_removed` notice.
+ */
+function toRemoval(row: MessageRow): ChatMessageRemoval | null {
+  return row.removedAt === null ? null : { at: row.removedAt.toISOString() };
+}
+
+/**
+ * Exported (Task 6) for `removeChatMessageInTx`'s own reuse — one row-to-wire mapping, shared by
+ * every writer of a `ChatMessageView` (a new message, a page read, a removal), so `body`/`gif`
+ * being withheld once `removal !== null` is a rule enforced in exactly one place.
+ */
+export function toView(row: MessageRow, reactions: readonly ChatReactionView[]): ChatMessageView {
+  const removal = toRemoval(row);
   return {
     id: String(row.id),
     authorUserId: row.authorUserId,
     authorName: row.authorName,
     authorAvatarUrl: row.authorAvatarUrl,
-    body: row.body,
+    // The wire does not carry a removed message's words (ChatMessageView.removal's own
+    // docblock) — the row itself keeps them, exactly as `reviews` preserves a removed review's
+    // body. `RemovedMessage` renders its own neutral tombstone sentence instead; nothing reads
+    // `body` once `removal !== null`.
+    body: removal === null ? row.body : "",
     createdAt: row.createdAt.toISOString(),
     reactions,
-    gif: toGifView(row),
+    gif: removal === null ? toGifView(row) : null,
+    removal,
   };
 }
 
@@ -61,8 +94,12 @@ const defaultOnPublishError: PublishErrorSink = (error, event) => {
  * The error sink defaults to `console.error` (today's only production behavior) but is
  * injectable, mirroring the draft store's `onPublishError` — so a caller (or a test) can
  * observe the swallow without spying on the global console.
+ *
+ * Exported (Task 6): `@/chat-service/moderation`'s `removeChatMessageInTx` reuses this exact
+ * swallow rather than a second copy of it — a removal frame's publish failure must be exactly as
+ * silent as a new message's.
  */
-async function publishQuietly(
+export async function publishQuietly(
   publish: PublishFn,
   input: Parameters<PublishFn>[0],
   onPublishError: PublishErrorSink = defaultOnPublishError,
@@ -143,6 +180,8 @@ export async function postMessage(db: Db, input: PostMessageInput): Promise<Chat
       gifAlt: input.gif?.alt ?? null,
       gifWidth: input.gif?.width ?? null,
       gifHeight: input.gif?.height ?? null,
+      // A message this call just created has never been removed.
+      removedAt: null,
     },
     [],
   );
@@ -163,18 +202,23 @@ export interface ChatPage {
 }
 
 /**
- * One page, newest-first from the database and reversed to oldest-first for rendering. There
- * is deliberately no unpaginated read: chat is the one table in this product that grows
- * without bound, so an "all messages" query would be a slow query waiting for its first busy
- * league. `pageSize + 1` is fetched so `hasMore` costs no second round trip.
+ * THE chat page read, as a builder rather than inline in `listMessages` — exported for the same
+ * reason `browseQuery` and `pendingFlagQuery` are: `src/db/index-plans.test.ts` measures its
+ * EXPLAIN plan, and it can only do that honestly against the STATEMENT PRODUCTION MAKES.
+ *
+ * Final review, HIGH 3: that test used to build a four-column, join-free, `ORDER BY id ASC`
+ * stand-in and call it "the chat page's own read, exactly as `listMessages` makes it". It was
+ * none of those things, so it measured an Index-Only Scan on a covering index the real query
+ * (eleven columns, two joins, `ORDER BY id DESC`) never uses. One builder, one measurement, no
+ * resemblance.
  */
-export async function listMessages(db: Db, input: ListMessagesInput): Promise<ChatPage> {
+export function chatPageQuery(db: Db, input: ListMessagesInput) {
   const scope =
     input.before === undefined
       ? eq(chatMessages.leagueId, input.leagueId)
       : and(eq(chatMessages.leagueId, input.leagueId), lt(chatMessages.id, Number(input.before)));
 
-  const rows = await db
+  return db
     .select({
       id: chatMessages.id,
       authorUserId: chatMessages.authorUserId,
@@ -189,6 +233,7 @@ export async function listMessages(db: Db, input: ListMessagesInput): Promise<Ch
       gifAlt: chatMessages.gifAlt,
       gifWidth: chatMessages.gifWidth,
       gifHeight: chatMessages.gifHeight,
+      removedAt: chatMessages.removedAt,
     })
     .from(chatMessages)
     .innerJoin(users, eq(users.id, chatMessages.authorUserId))
@@ -197,6 +242,16 @@ export async function listMessages(db: Db, input: ListMessagesInput): Promise<Ch
     .where(scope)
     .orderBy(desc(chatMessages.id))
     .limit(CHAT_CONFIG.pageSize + 1);
+}
+
+/**
+ * One page, newest-first from the database and reversed to oldest-first for rendering. There
+ * is deliberately no unpaginated read: chat is the one table in this product that grows
+ * without bound, so an "all messages" query would be a slow query waiting for its first busy
+ * league. `pageSize + 1` is fetched so `hasMore` costs no second round trip.
+ */
+export async function listMessages(db: Db, input: ListMessagesInput): Promise<ChatPage> {
+  const rows = await chatPageQuery(db, input);
 
   const hasMore = rows.length > CHAT_CONFIG.pageSize;
   const page = hasMore ? rows.slice(0, CHAT_CONFIG.pageSize) : rows;

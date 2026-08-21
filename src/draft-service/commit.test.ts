@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
+import type { DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { draftActions, draftPicks, drafts, matchups, players, rosterSlots, weeks } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
-import { DRAFT_CLOCK_SCHEDULE, currentDeadline, initialDraftState, reduceDraft, type DraftConfig } from "@/draft-engine";
+import { DRAFT_CLOCK_SCHEDULE, currentDeadline, initialDraftState, reduceDraft, type DraftConfig, type DraftState } from "@/draft-engine";
 import { LEAGUE_CONFIG } from "@/league";
+import { commitDraftState } from "./commit";
 import { createDraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -163,6 +165,24 @@ describe("startDraft", () => {
     expect(await db.select().from(draftActions).where(eq(draftActions.draftId, draftId))).toHaveLength(0);
   });
 
+  it("falls through to the reducer's own rejection for a REAL completed draft — one with an action log, not the seeded-season-league booby trap", async () => {
+    // `drafts.status = 'complete'` with a non-empty action log is what a real, honestly-drafted
+    // league looks like once it finishes. The booby-trap guard above exists for the OTHER
+    // shape (complete with an EMPTY log); this proves it stays out of the way for this one,
+    // leaving `reduceDraft`'s own top-level "already finished" check (`state.phase ===
+    // "complete"`) to answer instead — coincidentally the same words, reached by a different
+    // path, which is exactly why the booby-trap guard's own log-emptiness check matters.
+    const { draftId } = await fixture("snake");
+    await store.startDraft(draftId);
+    await runOnTheClock(draftId);
+    const [row] = await db.select().from(drafts).where(eq(drafts.id, draftId));
+    expect(row?.status).toBe("complete");
+    expect(await db.select().from(draftActions).where(eq(draftActions.draftId, draftId))).not.toHaveLength(0);
+
+    const result = await store.startDraft(draftId);
+    expect(result).toEqual({ ok: false, reason: "This draft has already finished." });
+  });
+
   it("refuses to start a draft whose pool can't fill every roster", async () => {
     // SPRINT_ROSTER_SLOTS is 3 slots/team * 2 teams = 6 players needed; insert only 5.
     const { draftId } = await seedDraftFixture(db, {
@@ -253,6 +273,54 @@ describe("commitDraftResults — auction", () => {
     }
     const [row] = await db.select().from(drafts).where(eq(drafts.id, draftId));
     expect(row?.status).toBe("complete");
+  });
+});
+
+describe("commitDraftState — the empty-rosters branch", () => {
+  it("skips the roster-slot insert entirely when a draft completes with no filled rosters", async () => {
+    // Real Postgres never reaches this: every completed draft in this repo fills at least one
+    // roster. A stub `DbTx` is the only way to put `commitDraftState` in that state directly,
+    // proving the `slotRows.length > 0` guard's false branch (never insert an empty `.values()`
+    // batch) without inventing a draft format that produces one.
+    const inserted: string[] = [];
+    const stubTx = {
+      insert: (table: unknown) => ({
+        values: () => {
+          inserted.push(table === draftPicks ? "draftPicks" : table === rosterSlots ? "rosterSlots" : "other");
+          return { onConflictDoUpdate: () => Promise.resolve(), onConflictDoNothing: () => Promise.resolve() };
+        },
+      }),
+      update: () => ({ set: () => ({ where: () => Promise.resolve() }) }),
+    } as unknown as DbTx;
+
+    const state: DraftState = {
+      config: {
+        draftId: "draft_solo",
+        leagueId: "league_solo",
+        format: "snake",
+        kickoffAt: "2026-09-10T17:00:00.000Z",
+        auctionBudget: null,
+        slotConfig: SPRINT_ROSTER_SLOTS,
+        clockSchedule: DRAFT_CLOCK_SCHEDULE,
+      },
+      phase: "complete",
+      sequence: 1,
+      // A single team: too few for `generateSchedule` to build fixtures, and paired with an
+      // empty `rosters` map so neither of `commitDraftState`'s two conditional inserts fires.
+      draftOrder: ["team_solo"],
+      pool: [],
+      picks: [],
+      rosters: {},
+      budgets: {},
+      queues: {},
+      auction: null,
+      pickNumber: 1,
+      turnStartedAt: null,
+    };
+
+    const result = await commitDraftState(stubTx, state);
+    expect(result).toEqual({ picks: 0, teams: 0 });
+    expect(inserted).toEqual(["draftPicks"]);
   });
 });
 

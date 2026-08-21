@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, lineupSlots, statWeeks } from "@/db/schema";
+import { auditEvents, lineupSlots, rosterSlots, statWeeks } from "@/db/schema";
 import type { WeekStatus } from "@/league";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
@@ -212,6 +212,12 @@ describe("setLineup", () => {
     expect(saved.filter((row) => row.weekNumber === 1)).toHaveLength(0);
   });
 
+  it("refuses a league that doesn't exist", async () => {
+    expect(
+      await setLineup(db, { leagueId: "nope", teamId: "team_x", weekNumber: 1, slots: validSwap, userId: "u1" }),
+    ).toEqual({ ok: false, status: 404, reason: "That league doesn't exist." });
+  });
+
   it("refuses a week the league doesn't have", async () => {
     const league = await twoTeamLeague(db);
     expect(
@@ -226,6 +232,27 @@ describe("setLineup", () => {
     expect(result.ok).toBe(true);
     expect(cache.invalidate).toHaveBeenCalledTimes(1);
     expect(cache.invalidate).toHaveBeenCalledWith(league.leagueId, 1);
+  });
+
+  it("logs, but does not fail the save, when the cache invalidation itself throws", async () => {
+    // The lineup is already committed by the time this runs — a Redis outage on the way out
+    // must never undo an already-successful save.
+    const league = await twoTeamLeague(db);
+    const throwingCache: Pick<ScoreCache, "invalidate"> = {
+      invalidate: async () => { throw new Error("redis down"); },
+    };
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const result = await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, slots: validSwap, userId: "u1" }, throwingCache);
+      expect(result.ok).toBe(true);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        "[league-service] score cache invalidation failed",
+        { leagueId: league.leagueId, weekNumber: 1 },
+        expect.any(Error),
+      );
+    } finally {
+      consoleSpy.mockRestore();
+    }
   });
 
   it("does not invalidate the score cache when the save is rejected", async () => {
@@ -254,5 +281,24 @@ describe("lineupView", () => {
     expect(view!.starters.map((s) => s.playerName)).toEqual(["QB One", "RB One"]);
     expect(view!.bench.map((s) => s.playerId)).toEqual(["qb2", "rb2"]);
     expect(view!.locked).toBe(false);
+  });
+
+  it("returns null for a league that doesn't exist", async () => {
+    expect(await lineupView(db, { leagueId: "nope", teamId: "team_x", weekNumber: 1 })).toBeNull();
+  });
+
+  it("renders a null name and position for a roster slot's player id that isn't in the players table, and for a genuinely empty slot", async () => {
+    // `roster_slots.player_id`/`lineup_slots.player_id` carry no foreign key to `players.id` —
+    // unlike `player_stat_lines`, which cascades on delete — so a stale id here is real,
+    // reachable data (e.g. a player pruned from a later reseed), not a defensive-only case. An
+    // empty slot (`playerId: null`) is the other, ordinary way to reach the same fallback.
+    const league = await twoTeamLeague(db);
+    await db.update(rosterSlots).set({ playerId: "player_pruned" }).where(and(eq(rosterSlots.teamId, league.teamId), eq(rosterSlots.slot, "QB")));
+    await db.update(rosterSlots).set({ playerId: null }).where(and(eq(rosterSlots.teamId, league.teamId), eq(rosterSlots.slot, "RB")));
+    const view = await lineupView(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1 });
+    const qbSlot = view!.starters.find((s) => s.slot === "QB");
+    expect(qbSlot).toMatchObject({ playerId: "player_pruned", playerName: null, position: null });
+    const rbSlot = view!.starters.find((s) => s.slot === "RB");
+    expect(rbSlot).toMatchObject({ playerId: null, playerName: null, position: null });
   });
 });

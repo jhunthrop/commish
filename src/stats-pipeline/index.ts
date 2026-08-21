@@ -55,8 +55,9 @@ const globalIngestion = globalThis as {
 /**
  * The process-wide `StatsProvider`. One instance, not one per consumer: the Tank01 adapter
  * memoizes its player list for the life of the instance (two upstream requests), and the worker,
- * the ledger and `npm run seed` all need to agree about which provider is configured — including
- * whether its calls cost anything (`requestCost`, read by `getIngestionBudget` below).
+ * the ledger, `npm run seed` and — as of Task 10 — `correctSettledWeek` (`./correction`, called
+ * from `scripts/correct-stat-week.ts`) all need to agree about which provider is configured,
+ * including whether its calls cost anything (`requestCost`, read by `getIngestionBudget` below).
  */
 export function getStatsProvider(): StatsProvider {
   globalIngestion.__commishStatsProvider ??= createStatsProvider();
@@ -78,7 +79,10 @@ export function getIngestionSettings(): IngestionSettings {
 /**
  * The process-wide ingestion request budget — the same instance `getIngestionWorker()` wires
  * into its worker, exported separately so `scripts/ingest-once.ts` can report what a tick cost
- * without a second Redis connection or a second wiring of its own.
+ * without a second Redis connection or a second wiring of its own. `correctSettledWeek`
+ * (`./correction`) defaults to this SAME instance too, deliberately: an operator correction is a
+ * third spender against one monthly ceiling, never a ledger of its own — see that module's own
+ * docblock for why a second ledger would be the wrong shape entirely.
  */
 export function getIngestionBudget(): RequestBudget {
   globalIngestion.__commishIngestionBudget ??= createRequestBudget({

@@ -42,7 +42,7 @@ export default async function LeaguePage({ params }: PageProps) {
 
   return (
     <>
-      <AppHeader displayName={user.displayName} avatar={user.avatarUrl} />
+      <AppHeader displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
       <LeagueHome home={home} lineup={lineup} helpLevel={preferences.helpLevel} />
     </>
   );

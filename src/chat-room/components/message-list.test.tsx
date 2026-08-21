@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
+import { REASON_FRAGMENTS } from "@/moderation/test-support";
 import { chatMessage, TOUCHDOWN_GIF } from "../test-fixtures";
 import { formatChatTime } from "../lib/format";
 import { MessageList } from "./message-list";
@@ -14,7 +15,7 @@ const MESSAGES = [
 describe("MessageList", () => {
   it("renders every message with its author and time, in both themes, axe-clean", async () => {
     await inBothThemes(
-      <MessageList messages={MESSAGES} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />,
+      <MessageList leagueId="l1" messages={MESSAGES} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />,
       async ({ container }) => {
         expect(screen.getByText("wheels up")).toBeInTheDocument();
         expect(screen.getByText("let's go")).toBeInTheDocument();
@@ -30,33 +31,33 @@ describe("MessageList", () => {
   });
 
   it("offers a way to start talking when there is nothing here yet", () => {
-    render(<MessageList messages={[]} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
+    render(<MessageList leagueId="l1" messages={[]} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
     expect(screen.getByText("Nobody's said anything yet")).toBeInTheDocument();
   });
 
   it("offers earlier messages only when there are some, and asks for them once", () => {
     const onLoadEarlier = vi.fn();
     const { rerender } = render(
-      <MessageList messages={MESSAGES} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={onLoadEarlier} onReact={() => {}} />,
+      <MessageList leagueId="l1" messages={MESSAGES} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={onLoadEarlier} onReact={() => {}} />,
     );
     expect(screen.queryByRole("button", { name: "Load earlier messages" })).not.toBeInTheDocument();
 
     rerender(
-      <MessageList messages={MESSAGES} meUserId="u1" hasMore loadingEarlier={false} onLoadEarlier={onLoadEarlier} onReact={() => {}} />,
+      <MessageList leagueId="l1" messages={MESSAGES} meUserId="u1" hasMore loadingEarlier={false} onLoadEarlier={onLoadEarlier} onReact={() => {}} />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Load earlier messages" }));
     expect(onLoadEarlier).toHaveBeenCalledTimes(1);
   });
 
   it("announces new messages politely without stealing focus", () => {
-    render(<MessageList messages={MESSAGES} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
+    render(<MessageList leagueId="l1" messages={MESSAGES} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
     expect(screen.getByRole("log")).toHaveAttribute("aria-live", "polite");
   });
 
   it("renders a GIF message as an image with its alt text and real dimensions, in both themes, axe-clean", async () => {
     const withGif = [chatMessage("3", { body: TOUCHDOWN_GIF.alt, gif: TOUCHDOWN_GIF })];
     await inBothThemes(
-      <MessageList messages={withGif} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />,
+      <MessageList leagueId="l1" messages={withGif} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />,
       async ({ container }) => {
         const img = screen.getByRole("img", { name: TOUCHDOWN_GIF.alt });
         expect(img).toHaveAttribute("width", String(TOUCHDOWN_GIF.width));
@@ -69,9 +70,67 @@ describe("MessageList", () => {
 
   it("does not render the GIF's alt text a second time as plain body text", () => {
     const withGif = [chatMessage("3", { body: TOUCHDOWN_GIF.alt, gif: TOUCHDOWN_GIF })];
-    render(<MessageList messages={withGif} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
+    render(<MessageList leagueId="l1" messages={withGif} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
     // The accessible name lives on the <img>; a second plain-text copy would be redundant noise
     // for a sighted reader and a doubled announcement for a screen reader.
     expect(screen.queryByText(TOUCHDOWN_GIF.alt, { selector: "p" })).not.toBeInTheDocument();
+  });
+
+  describe("the report affordance", () => {
+    it("offers Report on somebody else's message but never on the caller's own", () => {
+      render(<MessageList leagueId="l1" messages={MESSAGES} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
+      // MESSAGES[0] is authored by u2 (the fixture default); MESSAGES[1] is authored by u1, the
+      // caller here — exactly one "Report" button should exist.
+      expect(screen.getAllByRole("button", { name: "Report" })).toHaveLength(1);
+    });
+
+    it("opens the report dialog for the message that was reported, not some other one", () => {
+      render(<MessageList leagueId="l1" messages={MESSAGES} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
+      fireEvent.click(screen.getByRole("button", { name: "Report" }));
+      expect(screen.getByRole("dialog", { name: "Report this message" })).toBeInTheDocument();
+    });
+
+    it("never offers Report on an already-removed message", () => {
+      const removed = [chatMessage("9", { authorUserId: "u2", removal: { at: "2026-08-20T00:00:00.000Z" } })];
+      render(<MessageList leagueId="l1" messages={removed} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
+      expect(screen.queryByRole("button", { name: "Report" })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("a removed message", () => {
+    const REMOVED = [
+      chatMessage("9", { authorUserId: "u2", authorName: "Jordan Lee", body: "should never render", removal: { at: "2026-08-20T00:00:00.000Z" } }),
+    ];
+
+    it("renders in place — the author and avatar stay, the words do not", async () => {
+      await inBothThemes(
+        <MessageList leagueId="l1" messages={REMOVED} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />,
+        async ({ container }) => {
+          expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
+          expect(screen.getByText(/We removed this message\./)).toBeInTheDocument();
+          expect(screen.queryByText("should never render")).not.toBeInTheDocument();
+          expect(screen.getAllByRole("listitem")).toHaveLength(1);
+          expect(await axe(container)).toHaveNoViolations();
+        },
+      );
+    });
+
+    /**
+     * The room sees only the neutral fact, never the removal reason — reviews' own precedent
+     * (private-notice-only) mirrored, not broadcast. Final review, HIGH 1: the message no longer
+     * CARRIES the reason at all, so this asserts over the whole closed vocabulary rather than
+     * over the one phrase a fixture happened to set.
+     */
+    it("never renders any removal reason to the room", () => {
+      const { container } = render(<MessageList leagueId="l1" messages={REMOVED} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
+      for (const fragment of REASON_FRAGMENTS) {
+        expect(container.textContent).not.toContain(fragment);
+      }
+    });
+
+    it("offers no reactions on a removed message", () => {
+      render(<MessageList leagueId="l1" messages={REMOVED} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
+      expect(screen.queryByRole("button", { name: /React with/ })).not.toBeInTheDocument();
+    });
   });
 });

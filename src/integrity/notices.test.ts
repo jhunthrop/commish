@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { copyViolations } from "./copy-rules";
-import { NOTICE_SAMPLES, NOTICE_TEMPLATES, renderNotice, type NoticeType } from "./notices";
+import { NOTICE_TEMPLATES, renderNotice, type NoticeType, type StatWeekCorrectionOutcome } from "./notices";
+import { NOTICE_SAMPLES } from "./test-support";
 
 const TYPES = Object.keys(NOTICE_TEMPLATES) as readonly NoticeType[];
 
@@ -38,12 +39,72 @@ describe("NOTICE_TEMPLATES", () => {
 
     const removed = renderNotice("review_removed", NOTICE_SAMPLES.review_removed);
     expect(removed.title).toBe("We removed your review");
-    expect(removed.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it.");
+    // Fix round 1 (panel HIGH): states there is no appeal, the same founder decision #4
+    // `operator_warning` already stated and this notice was missing.
+    expect(removed.body).toBe("An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message.");
+
+    const granted = renderNotice("admin_granted", NOTICE_SAMPLES.admin_granted);
+    expect(granted.title).toBe("You can now use the operator tools");
+    expect(granted.body).toBe(
+      "Someone with database access turned on operator access for your account. You can open the dispute queue from your account menu. Every decision you record there carries your name and cannot be taken back.",
+    );
+
+    // The operator's own `note` is deliberately absent from `body` here — it renders as its own
+    // blockquote (`quoteFor`), not folded into the platform's sentence.
+    const warned = renderNotice("operator_warning", NOTICE_SAMPLES.operator_warning);
+    expect(warned.title).toBe("An operator left you a note");
+    expect(warned.body).toBe(
+      "Somebody reported something you posted in Sunday Money. An operator read it, decided to leave your post up, and wrote you this note. There is no reply to this message.",
+    );
+    expect(warned.body).not.toContain("Keep the trash talk");
+
+    // The chat sibling of `review_removed`, mirroring it field for field: the reason is
+    // deliberately absent from `body` here too — it renders as its own blockquote (`quoteFor`).
+    const chatRemoved = renderNotice("chat_message_removed", NOTICE_SAMPLES.chat_message_removed);
+    expect(chatRemoved.title).toBe("We removed one of your messages");
+    // Fix round 1 (panel HIGH): same no-appeal sentence as `review_removed` now states.
+    expect(chatRemoved.body).toBe(
+      "An operator removed a message you posted in Sunday Money. Your leaguemates can see that the message went and who posted it, and they can no longer read it. We keep your words on file exactly as you wrote them. There is no reply to this message.",
+    );
+    expect(chatRemoved.body).not.toContain("off topic");
   });
 
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
-    expect([...TYPES].sort()).toEqual(["draft_auto_picked", "review_removed"]);
+    expect([...TYPES].sort()).toEqual([
+      "admin_granted",
+      "chat_message_removed",
+      "draft_auto_picked",
+      "operator_warning",
+      "review_removed",
+      "stat_week_corrected",
+    ]);
+  });
+
+  /**
+   * Task 10's own requirement: `outcome` is a closed three-clause union, never a free string, so
+   * this notice's copy sweep covers every sentence it can actually produce rather than the one
+   * sample `NOTICE_SAMPLES` carries.
+   */
+  it("says what happened for every one of the three fixed outcome clauses, all copy-clean", () => {
+    const outcomes: readonly StatWeekCorrectionOutcome[] = [
+      "your matchup result stays the same",
+      "that turns your matchup into a win",
+      "that turns your matchup into a loss",
+    ];
+    for (const outcome of outcomes) {
+      const notice = renderNotice("stat_week_corrected", { leagueName: "Sunday Money", week: 3, points: 84.2, outcome });
+      expect(notice.title).toBe("We corrected your week 3 score");
+      expect(notice.body).toBe(
+        `Our stats provider revised its numbers for week 3, so we recomputed Sunday Money. Your team now has 84.2 points, and ${outcome}.`,
+      );
+      expect(copyViolations(`${notice.title} ${notice.body}`)).toEqual([]);
+    }
+  });
+
+  it("is informational, not a sanction, so it states no appeal path the way removal notices do", () => {
+    const notice = renderNotice("stat_week_corrected", NOTICE_SAMPLES.stat_week_corrected);
+    expect(notice.body).not.toContain("There is no reply to this message.");
   });
 });

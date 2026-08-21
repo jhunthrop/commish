@@ -1,6 +1,7 @@
 import type { IconName } from "@/components/ui/icon";
 import { type AuditEvent, type AuditEventType, type JsonObject } from "@/domain/audit";
 import { stripHiddenCharacters } from "@/identity/display-name";
+import { SYSTEM_ACTION_SUMMARY_ALLOWED } from "./system-actions";
 
 /**
  * Who may see an event type on the member-facing activity feed. `"everyone"` (any league member),
@@ -182,24 +183,34 @@ function renderLineupChange(event: AuditEvent): Rendered | null {
 
 /**
  * The contract Plan D writes against: a system action explains itself with its own `summary`
- * string, or it does not appear at all. No renderer here interprets `action` codes it was not
- * written for — that would be exactly the kind of guess `ACTIVITY_VISIBILITY`'s doc comment warns
- * against, just moved one level down.
+ * string, AND its `action` code has to be one `SYSTEM_ACTION_SUMMARY_ALLOWED` (`./system-actions`)
+ * says may say anything to a whole league — or it does not appear at all. No renderer here
+ * interprets `action` codes it was not written for — that would be exactly the kind of guess
+ * `ACTIVITY_VISIBILITY`'s doc comment warns against, just moved one level down.
  *
- * SO IT RENDERS NOTHING TODAY, AND THAT IS THE POINT — not an oversight, and worth stating plainly
- * because the shape looks like one. The only `system_action` publisher that exists writes
- * `{ action, scopes, checkedAt }` (`scripts/verify-audit-chain.ts`'s `recordDetection`), with no
- * `summary`, so this returns `null` for it. It should: that event says a chain failed
- * verification, and ruling 8 is explicit that telling a league its record may have been tampered
- * with, before a human has read the output, is the accusatory failure mode this phase spends a
- * denylist preventing. What happens next is a decision for the operator reading that output, not
- * a row in a member's feed.
+ * THE ALLOWLIST CHECK RUNS BEFORE `summary` IS EVEN READ. Task 10 closed the pre-wiring gate this
+ * docblock used to describe by itself: `renderSystemAction` rendering `payload.summary` verbatim
+ * was safe only by accident of what existed (the sole publisher wrote no `summary` at all), and
+ * Plan A's own residual required a re-review before anything emitted a league-scoped one.
+ * `SYSTEM_ACTION_SUMMARY_ALLOWED` is that re-review's answer, and this is where it is enforced —
+ * an action code missing from the table, or present as `false`, denies before `summary` is ever
+ * looked at, so a payload carrying a summary for an action nobody signed off cannot render one.
  *
- * A Plan D author reading this: the renderer is INERT until something writes `summary`, and
- * writing `summary` is how you opt an action into a member-visible sentence you have chosen the
- * words for. `activity-view.test.ts` pins the real verifier payload rendering as nothing.
+ * The verifier's own event (`scripts/verify-audit-chain.ts`'s `recordDetection`, writing
+ * `{ action: "chain_verification_failed", scopes, checkedAt }`, no `summary`) is denied on BOTH
+ * grounds today — it has no `summary` to read, and even if it grew one `chain_verification_failed`
+ * is `false` in the table (ruling 8: telling a league its record may have been tampered with,
+ * before a human has read the output, is the accusation this phase spends a denylist preventing).
+ *
+ * A Plan D author reading this: the renderer is INERT until an action is both ALLOWED in
+ * `SYSTEM_ACTION_SUMMARY_ALLOWED` and carries a `summary`. `activity-view.test.ts` pins all three
+ * denial states, and the mutation proof is that deleting this guard reddens a test rather than
+ * nothing.
  */
 function renderSystemAction(event: AuditEvent): Rendered | null {
+  const action = str(event.payload, "action");
+  const allowed = action !== undefined && (SYSTEM_ACTION_SUMMARY_ALLOWED as Readonly<Record<string, boolean | undefined>>)[action] === true;
+  if (!allowed) return null;
   const summary = str(event.payload, "summary");
   if (summary === undefined) return null;
   return { icon: "alert-triangle", headline: summary, detail: null };

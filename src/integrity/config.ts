@@ -78,4 +78,71 @@ export const INTEGRITY_CONFIG = {
      */
     rateLimit: { maxRequests: 30, windowMs: 60_000 },
   },
+  moderation: {
+    /**
+     * `resolveFlag`'s cap on an operator's own words (`Task 3`). The same order of magnitude as
+     * `REVIEW_CONFIG.removalReason.maxLength` (200), widened because a resolution note is free
+     * prose an operator writes to explain a real decision — not a short pick from a fixed reason
+     * list — and it is quoted to the member VERBATIM (`operator_warning`'s blockquote), so it
+     * needs room to actually explain something. Enforced in `resolveFlag` itself, the same "the
+     * service is the real boundary, not only the schema" discipline `removeReview` uses.
+     */
+    noteMaxLength: 500,
+    /** `POST /api/admin/flags/[flagId]/resolve`'s ceiling — keyed per operator id, an
+     *  authenticated write with an irreversible consequence (Task 5). */
+    resolveRateLimit: { maxRequests: 30, windowMs: 60_000 },
+  },
+  /** The queue's own read model (Task 5): `listPendingFlags`. */
+  queue: {
+    pageSize: 20,
+    /** The league chain's own contribution to an account-pair flag's trail — bounded, the same
+     *  "derive over a bounded set" discipline `INTEGRITY_CONFIG.notices.inboxSize` uses. */
+    trailLimit: 20,
+  },
+  /**
+   * Task 7 seeded this with only what `session_signals` needs to exist (`weights.ip`,
+   * `signals.maxUserAgentLength`, `signals.maxAcceptLanguageLength`). Task 8 adds the rest —
+   * `flagThreshold`, `weights.device`, `weights.behavioral`, `signals.cadenceToleranceSeconds`,
+   * `signals.minActionsForBehavioral`, `signals.maxSignaturesPerAccount` — as fields on this SAME
+   * object, never a second one. `src/integrity/similarity.ts` (Task 8) is the only reader of
+   * `weights`/`flagThreshold`/`cadenceToleranceSeconds`/`minActionsForBehavioral`; Task 9 is the
+   * only caller of the heuristics themselves.
+   */
+  multiAccount: {
+    /**
+     * THE IP WEIGHT IS ZERO AND STAYS ZERO. This is a release gate, recorded in
+     * `docs/decisions/operators-and-moderation.md` and in the phase overview's founder-gated
+     * bucket, not a tuning choice: every address this product can see today comes from
+     * `X-Forwarded-For`, which is caller-controlled until a trusted proxy overwrites it. A rate
+     * limiter keyed on a forgeable header loses a speed bump. A MULTI-ACCOUNT FLAG keyed on one
+     * lets an attacker manufacture suspicion against somebody else's account.
+     *
+     * Flipping it needs two things together, and `session_signals.ip_source` is why the second is
+     * mechanical: (1) Fly's proxy overwriting the header (Phase 2 Plan D), and (2) the heuristic
+     * counting only rows stamped `platform_verified`, which `ipCorrelation` already does.
+     */
+    weights: { device: 0.6, ip: 0, behavioral: 0.4 },
+    /** The spec's MULTI_ACCOUNT_FLAG_THRESHOLD. Reachable on device plus behavioral alone, by design. */
+    flagThreshold: 0.75,
+    signals: {
+      /** `behavioralSimilarity`'s tolerance, in seconds, for how far apart two accounts' median
+       *  pick time can sit before the signal stops counting them as alike at all. */
+      cadenceToleranceSeconds: 60,
+      /** `behavioralSimilarity`'s sample floor. Below this many actions a median is noise, not a
+       *  measurement, and the heuristic answers 0 rather than guess. */
+      minActionsForBehavioral: 5,
+      /**
+       * A `User-Agent` is caller-controlled and unbounded — storing one unbounded string per
+       * sign-in is a growth question this config answers with a number instead of inheriting.
+       * Real UA strings top out well under this; anything past it is padding, not signal.
+       */
+      maxUserAgentLength: 512,
+      /** Real `Accept-Language` headers are a short list of tags and weights (`"en-US,en;q=0.9"`)
+       *  — an order of magnitude under this, so the cap only ever bites a caller-supplied outlier. */
+      maxAcceptLanguageLength: 128,
+      /** The same growth-question discipline as `maxUserAgentLength`, applied to how many distinct
+       *  client signatures Task 9 will fold into one account's `DeviceProfile`. */
+      maxSignaturesPerAccount: 50,
+    },
+  },
 } as const;

@@ -88,6 +88,14 @@ describe("setTeamQueue", () => {
     expect(state?.picks[0]).toMatchObject({ teamId: f.teamIds[0]!, playerId: "rb1", auto: true });
   });
 
+  it("clears a queue without touching the players table, since an empty queue names nobody to validate", async () => {
+    const f = await fixture();
+    await setTeamQueue({ db, store: f.store, clock }, { draftId: f.draftId, teamId: f.teamIds[0]!, playerIds: ["rb1"] });
+    const result = await setTeamQueue({ db, store: f.store, clock }, { draftId: f.draftId, teamId: f.teamIds[0]!, playerIds: [] });
+    expect(result).toEqual({ ok: true, queue: [] });
+    expect(await getTeamQueue(f.store, f.draftId, f.teamIds[0]!)).toEqual([]);
+  });
+
   it("returns null for a draft that doesn't exist", async () => {
     const f = await fixture();
     expect(await getTeamQueue(f.store, "nope", f.teamIds[0]!)).toBeNull();

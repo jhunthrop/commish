@@ -16,14 +16,16 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   managerB,
 }) => {
   // This is the one spec in the suite driving TWO real browser contexts through create, invite,
-  // join, start-the-draft and a live pick's SSE fan-out — a dozen-plus real navigations, not the
-  // handful every other spec makes. The DOM at each step is healthy well inside the default
-  // budget on a quiet machine; under a shared machine's contention (concurrent builds/tests from
-  // other work on the same checkout) the cumulative page-load time alone can exceed the suite's
-  // default 90s, closing the context mid-action with an unhelpful "target page ... has been
-  // closed" rather than a real product failure. Scoped to only this test, not the global default
-  // every lighter spec still runs under.
-  test.setTimeout(180_000);
+  // join, start-the-draft, a live pick's SSE fan-out, AND (Task 6) the report-resolve-tombstone
+  // arc — two dozen-plus real navigations, not the handful every other spec makes. The DOM at
+  // each step is healthy well inside the default budget on a quiet machine; under a shared
+  // machine's contention (concurrent builds/tests from other work on the same checkout) the
+  // cumulative page-load time alone can exceed the suite's default 90s, closing the context
+  // mid-action with an unhelpful "target page ... has been closed" rather than a real product
+  // failure. Scoped to only this test, not the global default every lighter spec still runs
+  // under. 240s, not 180s: Task 6's own arc adds report, queue, resolve and two reloads on top
+  // of everything the 180s budget was already sized for.
+  test.setTimeout(240_000);
 
   const leagueName = `E2E League ${Date.now()}`;
 
@@ -177,4 +179,89 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   await picker.goto(`/app/leagues/${leagueId}/activity`);
   await expect(picker.getByRole("heading", { name: "League activity" })).toBeVisible();
   await expect(picker.getByRole("listitem").filter({ hasText: "drafted" }).first()).toBeVisible();
+
+  // --- Task 6's own arc: report -> operator resolves -> the room shows the tombstone --------
+  // Manager A IS the operator, deterministically: `global-setup.ts`'s `ensureE2eOperator`
+  // grants it through the real `grantAdmin` writer (see `mobile-360.spec.ts`'s own comment on
+  // the same fact). Manager B posts the message so the reporter and the author are two
+  // different real accounts, the same "two sessions, one real flag" shape the plan's own brief
+  // describes for this arc.
+  await managerA.goto(`/app/leagues/${leagueId}`);
+  await managerB.goto(`/app/leagues/${leagueId}`);
+  // `getByRole("textbox", ...)`, not `getByLabel`: by this point the log region itself carries
+  // `aria-label="Messages"`, which a plain `getByLabel("Message")` substring-matches alongside
+  // the composer's own "Message" label — unambiguous when chat was still empty (the original
+  // chat assertion above), ambiguous now that a message already stands in it.
+  const reportable = `Please remove me ${Date.now()}`;
+  await managerB.getByRole("textbox", { name: "Message" }).fill(reportable);
+  await managerB.getByRole("textbox", { name: "Message" }).press("Enter");
+
+  const operatorLog = managerA.getByRole("log", { name: "Messages" });
+  const reportableRow = operatorLog.getByRole("listitem").filter({ hasText: reportable });
+  await expect(reportableRow.getByText(reportable)).toBeVisible({ timeout: 20_000 });
+
+  // Click-and-verify, retried: a server-rendered "Report" button is visible and "stable"
+  // before React attaches its handler, the same pre-hydration hazard the draft button above
+  // documents.
+  await expect(async () => {
+    await reportableRow.getByRole("button", { name: "Report" }).click();
+    await expect(managerA.getByRole("dialog", { name: "Report this message" })).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 15_000 });
+  await managerA.getByRole("button", { name: "Send report" }).click();
+  await expect(managerA.getByText("Reported. An operator will take a look. Thank you.")).toBeVisible();
+  await managerA.getByRole("button", { name: "Done" }).click();
+
+  // --- The seeded operator opens the queue and sees this row, plus the ONE real flag Task 9's
+  //     detector raises from `npm run seed`'s own multi-account fixture (`dev_league_integrity`
+  //     — always open, since nothing in this spec resolves it) -----------------------------
+  await managerA.goto("/app/admin/queue");
+  await expect(managerA.getByRole("heading", { name: "Dispute queue" })).toBeVisible();
+  const queueRows = managerA.getByRole("list", { name: "Open flags" }).getByRole("listitem");
+  await expect(queueRows).toHaveCount(2);
+  // Found by its own question text, not `.first()`: the seed's flag is OLDER than this spec's
+  // own (the queue is oldest-first, ruling 30), so ordinal position would click the wrong row.
+  const reportRow = queueRows.filter({ hasText: "A member reported a message" });
+  await expect(reportRow).toHaveCount(1);
+  await reportRow.getByRole("link").click();
+
+  // --- Resolves it as content_removed, with a note that never reaches the member verbatim --
+  await expect(managerA.getByText(reportable)).toBeVisible();
+  await managerA.getByRole("radio", { name: "Remove the content" }).click();
+  await managerA.getByLabel("Your note").fill("spam");
+  await managerA.getByRole("button", { name: "Submit decision" }).click();
+  // Not the form's own transient "Decision recorded" message: `router.refresh()` re-renders
+  // the Server Component the instant the submit resolves, swapping `ResolutionForm` for
+  // `ResolutionSummary` before a fixed-string wait can reliably catch the transient one. The
+  // trail's own "removed the reported content" line is what survives that swap.
+  await expect(managerA.getByText("removed the reported content").first()).toBeVisible();
+
+  // --- The room shows the tombstone in place, not a hole (ruling 18) -----------------------
+  // Back to the league page, not a reload of the admin detail page it just submitted from.
+  await managerA.goto(`/app/leagues/${leagueId}`);
+  await expect(operatorLog.getByText("We removed this message.")).toBeVisible({ timeout: 20_000 });
+  await expect(operatorLog.getByText(reportable)).toHaveCount(0);
+  // The room sees ONLY the neutral fact — never the removal reason. The operator's note above
+  // ("spam") maps to the closed vocabulary's own "spam or fake content" phrase
+  // (`chatRemovalPhraseFor`); that phrase must not appear anywhere in the room, even though the
+  // SAME phrase reaches the author privately, through their own notice, asserted below.
+  await expect(operatorLog.getByText("spam or fake content")).toHaveCount(0);
+  // Final review, HIGH 1: the reason is not merely unrendered, it is not SENT. Assert on the
+  // page's own serialized chat payload — the bytes this browser actually received — because the
+  // leak this replaced was invisible to every render-level assertion above.
+  const chatPayload = await managerA.evaluate(() => document.documentElement.outerHTML);
+  expect(chatPayload).not.toContain("spam or fake content");
+
+  // --- And the author's own inbox carries the notice, WITH the reason, privately -----------
+  await managerB.goto(`/app/leagues/${leagueId}`);
+  await expect(async () => {
+    await managerB.getByRole("button", { name: /^Notices/ }).click();
+    await expect(managerB.getByRole("region", { name: "Notices" })).toBeVisible({ timeout: 3_000 });
+  }).toPass({ timeout: 15_000 });
+  await expect(managerB.getByText("We removed one of your messages").first()).toBeVisible();
+  // Founder decision #4 (fix round 1, panel HIGH): the notice says there is no appeal.
+  await expect(managerB.getByText("There is no reply to this message.").first()).toBeVisible();
+  // The private channel: the SAME phrase the room was never shown reaches the author here,
+  // through their own notice's blockquote (`quoteFor`) — confirming the reason moved, not
+  // vanished.
+  await expect(managerB.getByText(/spam or fake content/).first()).toBeVisible();
 });

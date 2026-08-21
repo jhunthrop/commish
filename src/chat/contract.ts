@@ -23,21 +23,58 @@ export interface ChatGif {
   readonly height: number;
 }
 
+/**
+ * Null for a message that stands. Populated for one that an operator removed, and the message
+ * still renders: a removed review vanishes from its feed, but a conversation with a hole in it is
+ * a conversation everybody misreads, and the members who saw it already know it existed (ruling
+ * 18).
+ *
+ * `at` IS THE WHOLE TYPE, and that is the privacy rule expressed as a type. Final review, HIGH 1:
+ * this interface used to carry a `phrase` field (`chatRemovalPhraseFor(reason)`) that no
+ * room-visible surface rendered — but unrendered is not unsent. Every member of the room receives
+ * this object, in the initial page payload and in every live `chat.message` SSE frame, so a
+ * reason on it is readable out of devtools or off the stream by anyone in the league: a permanent
+ * public accusation about a leaguemate, in a real-money product, which is exactly what ruling 6's
+ * minimal-disclosure norm exists to prevent. The field is gone rather than merely unread, so
+ * re-leaking it does not compile.
+ *
+ * The reason reaches the AUTHOR alone, through the private `chat_message_removed` notice's
+ * `quoteFor` blockquote (`@/integrity-service/notify`) — the identical private-disclosure shape
+ * `review_removed` already used. The sticky-removal fold (`@/chat/messages.ts`) keys on
+ * `removal !== null` and never read `.phrase`, so nothing needed it.
+ *
+ * There is no `removedByUserId` here: which operator removed a message is an operator fact, not
+ * a member-facing one (see `chat_messages`' own docblock in `src/db/schema.ts`).
+ */
+export interface ChatMessageRemoval {
+  readonly at: string;
+}
+
 export interface ChatMessageView {
   /** The `chat_messages.id` bigserial, as a string. Monotonic, so it is also the page cursor. */
   readonly id: string;
   readonly authorUserId: string;
   readonly authorName: string;
   readonly authorAvatarUrl: string | null;
+  /**
+   * `""` for a removed message — the row keeps the author's words exactly as written (the same
+   * stamp-never-delete discipline `reviews` uses), but the wire does not carry them.
+   * `RemovedMessage` renders its own neutral tombstone sentence instead of this field; nothing
+   * reads `body` when `removal !== null`.
+   */
   readonly body: string;
   readonly createdAt: string;
   readonly reactions: readonly ChatReactionView[];
   /**
    * Null for an ordinary text message. A GIF is a `chat.message` like any other (ruling 17 — no
    * separate `chat.gif` event, no second publish path, no second client fold) with this one field
-   * populated alongside `body`, which carries the GIF's alt text as a text fallback.
+   * populated alongside `body`, which carries the GIF's alt text as a text fallback. Also `null`
+   * for a REMOVED GIF message, the same "the wire does not carry it" rule `body` follows: a GIF is
+   * one `chat_messages` row (ruling 17), so the removal stamp covers it by construction with no
+   * second field to strip.
    */
   readonly gif: ChatGif | null;
+  readonly removal: ChatMessageRemoval | null;
 }
 
 export interface ChatPageBody {
