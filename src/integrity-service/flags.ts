@@ -21,6 +21,7 @@ import {
   flagTrailRowFor,
   queueRowFor,
   tradeFairnessBasisPhrase,
+  tradeFairnessGapPhrase,
   type FlagCursor,
   type FlagDetail,
   type FlagSubjectView,
@@ -116,6 +117,44 @@ const NOTICE_FOR_DECISION: Readonly<Record<ResolutionDecision, NoticeType | null
   content_removed: null,
   trade_reversed: null,
 };
+
+/**
+ * Fix round 2, F1. Whether THIS decision's own `note` is ever read by anyone other than the
+ * operator who wrote it (and a future operator revisiting the flag) — the shared seam the
+ * accusatory-language guard below runs against. Exhaustive over `ResolutionDecision`, the same
+ * "a new decision fails to compile without answering this" discipline `NOTICE_FOR_DECISION` and
+ * `DECISION_LABEL` both hold to.
+ *
+ * `no_action` is `false`: ruling 6 notices nobody, so this note is operator-to-operator only, and
+ * the guarantee below protects the person the note is written ABOUT — there is no such person
+ * here. The other three are all `true`, for three different reasons: `warned_user`'s note quotes
+ * VERBATIM in the member's own notice (`operator_warning`, `quoteFor`); `content_removed`'s note
+ * becomes the permanent removal `reason` stored on the row (mapped to a generic phrase for the
+ * removed author today, but the raw words persist as a written record about them regardless);
+ * `trade_reversed`'s note quotes VERBATIM to BOTH managers (`reverseTradeInTx`'s own notice).
+ */
+const NOTE_REACHES_SOMEONE_ELSE: Readonly<Record<ResolutionDecision, boolean>> = {
+  no_action: false,
+  warned_user: true,
+  content_removed: true,
+  trade_reversed: true,
+};
+
+/**
+ * The accusatory term `note` contains, or `null` for a clean note. Reuses `INTEGRITY_CONFIG.
+ * notices.accusatoryTerms` — the SAME denylist `copyViolations` (`@/integrity/copy-rules`) checks
+ * the platform's OWN template copy against — but narrower ON PURPOSE: an operator's own free-text
+ * note is otherwise unrestricted (dashes, passive voice, length governed by its own cap above),
+ * the same "trusted with what they choose to SAY" latitude `stripHiddenCharacters`'s own docblock
+ * (`@/integrity-service/notify`) already gives it. Only the accusatory-language axis matters here,
+ * because that is the one guarantee a note this decision's own notice repeats verbatim (or stores
+ * permanently) is supposed to keep — `copyViolations`'s other two rules (dash, passive) are about
+ * the PLATFORM's own voice, not an operator's.
+ */
+function accusatoryTermIn(note: string): string | null {
+  const lower = note.toLowerCase();
+  return INTEGRITY_CONFIG.notices.accusatoryTerms.find((term) => lower.includes(term)) ?? null;
+}
 
 /**
  * The phrase an already-resolved flag's OWN stored decision reads as, in the 409 a second
@@ -348,6 +387,26 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
   }
   if (input.note.length > INTEGRITY_CONFIG.moderation.noteMaxLength) {
     return { ok: false, status: 400, reason: `Keep the note to ${INTEGRITY_CONFIG.moderation.noteMaxLength} characters or fewer. The member reads it.` };
+  }
+  // THE ACCUSATORY-NOTE SEAM (fix round 2, F1). `INTEGRITY_CONFIG.notices.accusatoryTerms` has
+  // always bound the PLATFORM's own template copy (`copyViolations`, `@/integrity/copy-rules`,
+  // enforced on `notices.ts`'s templates by `notices.test.ts`) — never `context.note`, the
+  // operator's own free-text words. Plan B shipped two decisions whose note reaches someone else
+  // and guarded neither: `warned_user`'s note quotes VERBATIM in the member's own notice
+  // (`operator_warning`, `quoteFor`), and `content_removed`'s note becomes the permanent removal
+  // reason stored on the row (`removeReviewInTx`/`removeChatMessageInTx`'s own `reason`) — mapped
+  // to a generic phrase for the removed author today, but the operator's raw words persist as a
+  // written record about that person regardless. Plan C's `trade_reversed` would have been a
+  // third instance of the identical gap. One check, at the shared seam every decision passes
+  // through, closes the class rather than the one decision that happened to surface it.
+  // `no_action` is the one exception: ruling 6 notices nobody, so its note is read by an operator
+  // revisiting the flag and nobody else — the accusatory-language guarantee protects the person
+  // being written ABOUT, and there is no such person here.
+  if (NOTE_REACHES_SOMEONE_ELSE[input.decision]) {
+    const term = accusatoryTermIn(input.note);
+    if (term !== null) {
+      return { ok: false, status: 400, reason: `Your note can't include "${term}". Describe what happened without naming what you suspect, then try again.` };
+    }
   }
   // SUBJECT-AWARE, and before the transaction opens (final review, LOW 13). `content_removed`
   // only has a remover for the two content subject types; against an `account_pair` flag it used
@@ -675,6 +734,14 @@ function basisFromEvidence(evidence: JsonObject): TradeFairnessBasis | null {
   return typeof value === "string" && (TRADE_FAIRNESS_BASES as readonly string[]).includes(value) ? (value as TradeFairnessBasis) : null;
 }
 
+/** `evidence[key]`, narrowed to a real `number` — the same "absent and wrong read alike"
+ *  discipline `basisFromEvidence`/`tradedPlayersFromEvidence` already hold every other stored
+ *  field to. Fix round 2, F3's own reader for `evidence.gap`/`evidence.threshold`. */
+function numberFromEvidence(evidence: JsonObject, key: "gap" | "threshold"): number | null {
+  const value = evidence[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
 /** The reported content, or the account pair, as an operator needs to see it — one query per
  *  subject type, dispatched by `flagDetail`'s own single lookup of the flag row. `evidence` is
  *  that same lookup's own `evidence` column, threaded through for the `trade` branch only
@@ -722,6 +789,8 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
   // Task 6 fix round 1 (review MEDIUM 1): plain words for WHICH evaluation priced `gave`/`got` —
   // the accept-time one, frozen inside the accept transaction, or a later sweep re-derivation.
   const valuationBasis = tradeFairnessBasisPhrase(basisFromEvidence(evidence));
+  // Fix round 2, F3: plain words for the number that actually raised this flag.
+  const fairnessGapSummary = tradeFairnessGapPhrase(numberFromEvidence(evidence, "gap"), numberFromEvidence(evidence, "threshold"));
 
   const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, subjectId));
   if (row === undefined) {
@@ -735,6 +804,7 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
       acceptedAt: "",
       reversedAt: null,
       valuationBasis,
+      fairnessGapSummary,
       playersMovedAgain: false,
     };
   }
@@ -770,6 +840,7 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
     acceptedAt: row.settledAt!.toISOString(),
     reversedAt: row.reversedAt?.toISOString() ?? null,
     valuationBasis,
+    fairnessGapSummary,
     playersMovedAgain,
   };
 }

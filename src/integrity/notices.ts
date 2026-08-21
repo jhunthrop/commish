@@ -263,9 +263,17 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   // same founder decision #4 every other sanction-shaped notice in this file states: there is no
   // appeal path, and this decision is a moderation consequence, so silence about that would invite
   // a member to go looking for a reply channel that does not exist.
+  //
+  // Fix round 2 (F2, naming consistency): the action is named "reversed" here, in the title AND
+  // the body's own opening clause — never "put back", which used to be the only verb the title
+  // gave a member, splitting from the decision label, the trail row and the already-reversed
+  // note elsewhere on this same flag. "You have X again, and Y has Z" stays as the one place this
+  // notice is allowed to describe the CONSEQUENCE in its own words, per the same rule: an effect
+  // phrase may explain what a decision did, in body copy, but must never stand in for the
+  // decision's own name.
   trade_reversed: ({ leagueName, counterpartyTeamName, gotBackSummary, gaveBackSummary }) => ({
-    title: "An operator put a trade back",
-    body: `An operator reviewed the trade you and ${counterpartyTeamName} completed in ${leagueName} and put both rosters back the way they were. You have ${gotBackSummary} again, and ${counterpartyTeamName} has ${gaveBackSummary}. Scores from weeks you have already played stay as they were. There is no reply to this message.`,
+    title: "An operator reversed your trade",
+    body: `An operator reversed the trade you and ${counterpartyTeamName} completed in ${leagueName}. You have ${gotBackSummary} again, and ${counterpartyTeamName} has ${gaveBackSummary}. Scores from weeks you have already played stay as they were. There is no reply to this message.`,
   }),
 };
 

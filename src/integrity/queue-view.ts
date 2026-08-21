@@ -110,6 +110,15 @@ export type FlagSubjectView =
        */
       readonly valuationBasis: string;
       /**
+       * Fix round 2, F3. The plain-language restatement of the number that actually raised this
+       * flag — `tradeFairnessGapPhrase`'s own output, computed once by `subjectFor`
+       * (`@/integrity-service/flags`) from the flag's stored `evidence.gap`/`.threshold`, the same
+       * "a raw number becomes one sentence" treatment `valuationBasis` already gets. Always a real
+       * sentence, honest about a flag that predates gap tracking rather than leaving this field
+       * empty.
+       */
+      readonly fairnessGapSummary: string;
+      /**
        * Fix round 1 (LOW, M8 discipline). Whether a traded player has left the roster the trade
        * put him on since it was accepted — precomputed at READ time by `subjectFor`
        * (`@/integrity-service/flags`, `tradePlayersHaveMovedAgain`), the SAME ownership check
@@ -326,6 +335,25 @@ export function tradeFairnessBasisPhrase(basis: TradeFairnessBasis | null): stri
   return basis === null ? "This flag predates valuation-basis tracking, so the method isn't recorded." : TRADE_FAIRNESS_BASIS_PHRASE[basis];
 }
 
+/**
+ * The operator-facing plain-language restatement of the number that actually raised this flag —
+ * fix round 2, F3. The friendly `TradeSubjectCard` (`@/app/app/admin/queue/[flagId]/page`) shows
+ * each player's own average points but, before this fix, never the trade's own `gap`/`threshold`
+ * — the values `tradeBalance` computed and `crossesFairnessThreshold` tested against — leaving an
+ * operator to do the subtraction themselves or trust an unlabeled JSON number in the raw Evidence
+ * panel two cards down. `tradeFairnessBasisPhrase` (above) is the precedent this follows: a raw
+ * number, turned into one sentence, in the SAME "points per week" unit `fairnessGap`'s own
+ * docblock (`@/trades/fairness`) already names but never surfaced past that comment before now.
+ *
+ * Deliberately silent on `verdict` — ruling 30's "no severity word" discipline, which this same
+ * card already holds to for `valuationBasis`: the number is reported honestly, and the operator
+ * is left to judge it, not told "lopsided" to their face.
+ */
+export function tradeFairnessGapPhrase(gap: number | null, threshold: number | null): string {
+  if (gap === null || threshold === null) return "This flag predates gap tracking, so the number isn't recorded.";
+  return `The two sides differ by ${gap} points per week, at or past the ${threshold}-point threshold that raised this flag.`;
+}
+
 /** An actor's own display name for the trail's voice — "Alice offered this trade.", never "You"
  *  or a bare id. `actorNames` is resolved once, batched, by the caller (`trailFor`,
  *  `@/integrity-service/flags`) — the same "resolved at read time, never per-row" discipline
@@ -401,8 +429,12 @@ export function flagTrailRowFor(event: AuditEvent, actorNames: ReadonlyMap<strin
     // (`AUDIT_EVENT_TYPES` is frozen). `payload.reason` is the honest spelling that tells the two
     // apart, the identical "one type, `payload.outcome` distinguishes" shape `trade_rejected`/
     // `trade_withdrawn` already share.
+    //
+    // Fix round 2 (F2, naming consistency): "reversed", never "put back" — the panel found this
+    // trail row using a different verb than `DECISION_PHRASE.trade_reversed`'s own "reversed the
+    // trade" and the notice title both use for the identical action.
     if (reason === "trade_reversed") {
-      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "An operator put the trade back.", detail: null };
+      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "An operator reversed the trade.", detail: null };
     }
     return null;
   }

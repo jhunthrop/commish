@@ -12,6 +12,7 @@ import {
   subjectPlayersMovedAgain,
   TRADE_FAIRNESS_BASIS_PHRASE,
   tradeFairnessBasisPhrase,
+  tradeFairnessGapPhrase,
   type FlagSubjectView,
 } from "./queue-view";
 
@@ -179,9 +180,9 @@ describe("flagTrailRowFor", () => {
       expect(flagTrailRowFor(row)?.headline).toBe("Two players changed teams.");
     });
 
-    it("renders the reversal's own roster_move distinctly, Task 7 — an operator put it back, not a second trade", () => {
+    it("renders the reversal's own roster_move distinctly, Task 7 — reversed, not a second trade (fix round 2, F2 naming)", () => {
       const row = event("roster_move", { reason: "trade_reversed", tradeId: "trade_1", flagId: "flag_1" }, "league_1");
-      expect(flagTrailRowFor(row)?.headline).toBe("An operator put the trade back.");
+      expect(flagTrailRowFor(row)?.headline).toBe("An operator reversed the trade.");
     });
 
     it("denies a roster_move for any reason other than 'trade' or 'trade_reversed'", () => {
@@ -208,6 +209,7 @@ describe("FlagSubjectView's trade arm (Task 6)", () => {
       acceptedAt: "2026-08-10T00:00:00.000Z",
       reversedAt: null,
       valuationBasis: "The platform valued this trade the moment it was accepted.",
+      fairnessGapSummary: "The two sides differ by 19.3 points per week, at or past the 20-point threshold that raised this flag.",
       playersMovedAgain: false,
     };
     const detail = flagDetailFor({ ...flag, flagType: "trade_fairness" }, subject, [], []);
@@ -226,6 +228,7 @@ describe("flagDetailFor's decisions narrow on the SUBJECT, Task 7", () => {
     acceptedAt: "2026-08-10T00:00:00.000Z",
     reversedAt: null,
     valuationBasis: "The platform valued this trade the moment it was accepted.",
+    fairnessGapSummary: "The two sides differ by 19.3 points per week, at or past the 20-point threshold that raised this flag.",
     playersMovedAgain: false,
   };
 
@@ -290,6 +293,29 @@ describe("tradeFairnessBasisPhrase (Task 6 fix round 1, review MEDIUM 1)", () =>
 
   it("is exhaustive over every declared TradeFairnessBasis — a Record, not a partial map", () => {
     expect(Object.keys(TRADE_FAIRNESS_BASIS_PHRASE).sort()).toEqual([...TRADE_FAIRNESS_BASES].sort());
+  });
+});
+
+describe("tradeFairnessGapPhrase (fix round 2, F3)", () => {
+  it("names the gap and the threshold, in points per week, in one active-voice sentence", () => {
+    expect(tradeFairnessGapPhrase(19.3, 20)).toBe("The two sides differ by 19.3 points per week, at or past the 20-point threshold that raised this flag.");
+  });
+
+  it("says nothing about verdict or severity — ruling 30, the same discipline valuationBasis already holds to", () => {
+    const phrase = tradeFairnessGapPhrase(60, 20);
+    expect(phrase.toLowerCase()).not.toContain("lopsided");
+    expect(phrase.toLowerCase()).not.toContain("severe");
+  });
+
+  it("answers honestly, never a guess, when either number is missing", () => {
+    expect(tradeFairnessGapPhrase(null, 20)).toBe("This flag predates gap tracking, so the number isn't recorded.");
+    expect(tradeFairnessGapPhrase(19.3, null)).toBe("This flag predates gap tracking, so the number isn't recorded.");
+    expect(tradeFairnessGapPhrase(null, null)).toBe("This flag predates gap tracking, so the number isn't recorded.");
+  });
+
+  it("contains no em dash in any of its sentences", () => {
+    expect(tradeFairnessGapPhrase(19.3, 20)).not.toContain("—");
+    expect(tradeFairnessGapPhrase(null, null)).not.toContain("—");
   });
 });
 

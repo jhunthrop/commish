@@ -220,6 +220,7 @@ describe("the admin flag detail page says nothing that breaks the house copy rul
       acceptedAt: "2026-08-10T00:00:00.000Z",
       reversedAt: null,
       valuationBasis: "The platform valued this trade the moment it was accepted.",
+      fairnessGapSummary: "The two sides differ by 4.3 points per week, at or past the 20-point threshold that raised this flag.",
       playersMovedAgain: false,
     };
 
@@ -258,8 +259,8 @@ describe("the resolution form says nothing that breaks the house copy rules, in 
     warned_user: { title: "An operator reviewed a report about you", body: "We looked at a report about something you posted in Sunday Money." },
     content_removed: { title: "We removed your review", body: "An operator removed your review. We keep your review on file exactly as you wrote it. There is no reply to this message." },
     trade_reversed: {
-      title: "An operator put a trade back",
-      body: "An operator reviewed the trade you and Iron Owls completed in Sunday Money and put both rosters back the way they were. You have Bijan Robinson again, and Iron Owls has Justin Jefferson. Scores from weeks you have already played stay as they were. There is no reply to this message.",
+      title: "An operator reversed your trade",
+      body: "An operator reversed the trade you and Iron Owls completed in Sunday Money. You have Bijan Robinson again, and Iron Owls has Justin Jefferson. Scores from weeks you have already played stay as they were. There is no reply to this message.",
     },
   } as const;
   const DECISION_RADIOS = ["No action", "Warn the member", "Remove the content", "Reverse the trade"] as const;

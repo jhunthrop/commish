@@ -493,6 +493,66 @@ describe("resolveFlag", () => {
     expect(row!.resolvedAt).toBeNull();
   });
 
+  /**
+   * Fix round 2, F1 — THE ACCUSATORY-NOTE SEAM, one guard shared by every decision whose note
+   * reaches someone other than the operator who wrote it. `warned_user`'s own note quotes
+   * VERBATIM in the member's notice, so this is the most direct case.
+   */
+  it("refuses a warned_user note containing an accusatory term, before opening a transaction, naming the term", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "chat_report", subjectAuthor: "u_member_accusatory", leagueId: "lg_accusatory" });
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "warned_user", note: "This looks like cheating to me.", operatorUserId: "u_op" });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: 'Your note can\'t include "cheating". Describe what happened without naming what you suspect, then try again.',
+    });
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row!.resolvedAt).toBeNull();
+    expect(await noticesFor("u_member_accusatory")).toEqual([]);
+  });
+
+  it("refuses a content_removed note containing an accusatory term — the note becomes the permanent removal reason", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "review_report", subjectAuthor: "u_review_accusatory" });
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "content_removed", note: "Suspected of abuse in the league chat too.", operatorUserId: "u_op" });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: 'Your note can\'t include "suspected". Describe what happened without naming what you suspect, then try again.',
+    });
+
+    const [row] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(row!.resolvedAt).toBeNull();
+  });
+
+  it("never guards no_action's own note — ruling 6 notices nobody, so there is no one to protect from it", async () => {
+    await ensureUser("u_op");
+    const flag = await openFlag({ flagType: "review_report" });
+
+    const result = await resolveFlag(db, { flagId: flag.id, decision: "no_action", note: "Looked into the cheating allegation, found nothing.", operatorUserId: "u_op" });
+    expect(result).toMatchObject({ ok: true, decision: "no_action" });
+  });
+
+  /**
+   * THE SWEEP: proves the guard reads `INTEGRITY_CONFIG.notices.accusatoryTerms` itself, not a
+   * hand-copied subset that could drift from it — every term the real config list declares must
+   * be caught, for every decision the guard actually covers.
+   */
+  it("catches every term in the REAL accusatoryTerms config list, for every guarded decision", async () => {
+    await ensureUser("u_op_sweep");
+    for (const term of INTEGRITY_CONFIG.notices.accusatoryTerms) {
+      for (const decision of ["warned_user", "content_removed", "trade_reversed"] as const) {
+        const flag = await openFlag({ flagType: "review_report" });
+        const result = await resolveFlag(db, { flagId: flag.id, decision, note: `This is a note about ${term} happening.`, operatorUserId: "u_op_sweep" });
+        expect(result).toMatchObject({ ok: false, status: 400, reason: expect.stringContaining(`"${term}"`) });
+      }
+    }
+  });
+
   it("refuses a flagId that doesn't exist, distinctly from an already-resolved one", async () => {
     await ensureUser("u_op");
     const result = await resolveFlag(db, { flagId: "flag_ghost", decision: "no_action", note: "n", operatorUserId: "u_op" });
@@ -953,6 +1013,36 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
   async function ensureOperator(id: string): Promise<void> {
     await db.insert(users).values({ id, email: `${id}@test.local`, displayName: id }).onConflictDoNothing();
   }
+
+  /**
+   * Fix round 2, F1, on a REAL trade flag (the sweep in `resolveFlag`'s own describe block above
+   * proves the guard against every real config term, on a stand-in subject; this proves it fires
+   * BEFORE `reverseTradeInTx` ever opens a transaction for the one decision this whole task
+   * built). `trade_reversed`'s own notice quotes the note VERBATIM to both managers, which is
+   * exactly what Persona 3/4's panel finding named as the uncontrolled channel this guard closes.
+   */
+  it("refuses a trade_reversed note containing an accusatory term, before the reversal's own transaction ever opens", async () => {
+    await ensureOperator("u_op");
+    const fx = await acceptedTradeWithFlag("accusatory");
+
+    const result = await resolveFlag(db, {
+      flagId: fx.flagId,
+      decision: "trade_reversed",
+      note: "This trade looks like a violation of the collusion rules.",
+      operatorUserId: "u_op",
+      clock: trClock,
+    });
+    expect(result).toEqual({
+      ok: false,
+      status: 400,
+      reason: 'Your note can\'t include "violation". Describe what happened without naming what you suspect, then try again.',
+    });
+
+    expect(await isOpenFlag(fx.flagId)).toBe(true);
+    const row = await tradeRow(fx.tradeId);
+    expect(row.reversedAt).toBeNull(); // the reversal never ran at all
+    expect(await auditEventsOn(fx.leagueId, "roster_move")).toHaveLength(1); // the original trade only
+  });
 
   it("puts the reversal on the LEAGUE chain and the decision on the platform chain — the two-class sentence, driven", async () => {
     await ensureOperator("u_op");
@@ -1585,6 +1675,8 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
       // Empty evidence predates basis tracking too — the honest "we don't know" sentence,
       // Task 6 fix round 1 (review MEDIUM 1).
       valuationBasis: "This flag predates valuation-basis tracking, so the method isn't recorded.",
+      // Empty evidence predates gap tracking too — fix round 2, F3's own honest fallback.
+      fairnessGapSummary: "This flag predates gap tracking, so the number isn't recorded.",
       // No trade row at all — the moved-again read is skipped rather than asked of nothing.
       playersMovedAgain: false,
     });
@@ -1645,6 +1737,9 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
       // Fix round 1 (review MEDIUM 1): the operator-facing plain-language restatement of
       // `evidence.basis`, computed by `subjectFor` rather than left for a future page to guess.
       valuationBasis: "The fairness sweep valued this trade later, from the rosters as they stood when it ran.",
+      // Fix round 2, F3: the operator-facing plain-language restatement of `evidence.gap`/
+      // `.threshold` — the number that actually raised this flag.
+      fairnessGapSummary: "The two sides differ by 60 points per week, at or past the 20-point threshold that raised this flag.",
       // Fix round 1 (LOW, M8 discipline): honestly `true` here — this fixture seeds the trade row
       // directly (`seedAcceptedTrade`), never the real `roster_slots` rows `p_gave`/`p_got` would
       // need to be found on either team, so the same read `reverseTradeInTx` would make finds
@@ -1684,6 +1779,10 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
         { playerId: "p1", name: "No Position", averagePoints: 5 }, // no `position` field at all — reads as null
       ],
       receiving: "not an array",
+      // Fix round 2, F3: a string `gap` and a non-finite `threshold` both read the same honest
+      // "not recorded" way `numberFromEvidence` holds every malformed field to.
+      gap: "not a number",
+      threshold: Number.POSITIVE_INFINITY,
     };
     const flag = await db.transaction((tx) =>
       raiseFlag(tx, {
@@ -1703,6 +1802,7 @@ describe("flagDetail — bounded, and the trail includes what happened to this f
       kind: "trade",
       gave: [{ playerId: "p1", name: "No Position", position: null, averagePoints: 5 }],
       got: [],
+      fairnessGapSummary: "This flag predates gap tracking, so the number isn't recorded.",
     });
   });
 

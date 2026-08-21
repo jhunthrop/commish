@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
+import type { JsonObject } from "@/domain/audit";
 import { flagDetail } from "@/integrity-service/flags";
 import { leagueNameFor } from "@/draft-service/teams";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
@@ -94,8 +95,9 @@ function TradedPlayerList({ label, players }: { readonly label: string; readonly
 
 /**
  * The trade arm of `FlagSubjectView`, in full — both teams, both sides valued, when it was
- * accepted, whether an operator already put it back, and how those values were priced
- * (`valuationBasis`). Task 6 shipped this arm with the queue detail page still rendering only
+ * accepted, whether an operator already reversed it, how those values were priced
+ * (`valuationBasis`), and the number that actually raised this flag (`fairnessGapSummary`, fix
+ * round 2, F3). Task 6 shipped this arm with the queue detail page still rendering only
  * `subject.tradeId` (its own review's LOW); this is the render Task 7 owes it, now that the flag
  * this page most needs to explain in full is a trade one.
  */
@@ -109,12 +111,13 @@ function TradeSubjectCard({ subject }: { readonly subject: Extract<FlagSubjectVi
       <p className="mt-1 text-xs text-text-muted">
         Accepted {subject.acceptedAt.length === 0 ? "at an unknown time" : formatWhen(subject.acceptedAt)}. {subject.valuationBasis}
       </p>
+      <p className="mt-1 text-xs text-text-muted">{subject.fairnessGapSummary}</p>
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <TradedPlayerList label={`${subject.proposerTeamName} sent`} players={subject.gave} />
         <TradedPlayerList label={`${subject.counterpartyTeamName} sent`} players={subject.got} />
       </div>
       {subject.reversedAt !== null ? (
-        <p className="mt-3 text-sm text-text-muted">An operator already put this trade back, on {formatWhen(subject.reversedAt)}.</p>
+        <p className="mt-3 text-sm text-text-muted">An operator already reversed this trade, on {formatWhen(subject.reversedAt)}.</p>
       ) : subject.playersMovedAgain ? (
         <p className="mt-3 text-sm text-text-muted">
           One of these players has been traded again since. This trade can no longer be put back automatically; close it with no action, or warn the
@@ -213,6 +216,22 @@ function decisionsFor(decisions: readonly ResolutionDecision[], subject: FlagSub
 }
 
 /**
+ * Fix round 2, F4. For a trade subject, `evidence.giving`/`.receiving` are the SAME per-player
+ * arrays `TradeSubjectCard`'s own `TradedPlayerList`s already render as names, positions and
+ * points — the friendly version. Left in the raw Evidence `dl` below, they show up as an
+ * unreadable `break-all` JSON string competing for the same 360px width as the key label, for
+ * zero information the friendly card didn't already say better. Every OTHER evidence field
+ * (`verdict`, `flags`, `givingValue`, `receivingValue`, `gap`, `threshold`, `basis`) has no
+ * friendly-card twin and stays in the raw panel — this drops only the two duplicated keys, and
+ * only for a trade subject; every other flag type's evidence is untouched.
+ */
+function nonDuplicatedEvidenceEntries(evidence: JsonObject, subject: FlagSubjectView): readonly (readonly [string, unknown])[] {
+  const entries = Object.entries(evidence);
+  if (subject.kind !== "trade") return entries;
+  return entries.filter(([key]) => key !== "giving" && key !== "receiving");
+}
+
+/**
  * The detail page: `withAdmin`'s Server Component overload, then `flagDetail`, then render.
  * `flagDetail` returning `null` (a flag id that names nothing) is `notFound()` — the same
  * non-oracle discipline the gate itself holds to, so a guessed id and a real-but-inaccessible one
@@ -228,7 +247,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
     const leagueName = detail.leagueId === null ? "your league" : await leagueNameFor(getDb(), detail.leagueId);
     const previews = noticePreviewsFor(leagueName, detail.subject);
     const decisions = decisionsFor(detail.decisions, detail.subject);
-    const evidenceEntries = Object.entries(detail.evidence);
+    const evidenceEntries = nonDuplicatedEvidenceEntries(detail.evidence, detail.subject);
 
     return (
       <>

@@ -382,7 +382,7 @@ describe("quoteFor", () => {
   it("renders the operator's own note VERBATIM for trade_reversed", () => {
     const notice: MemberNotice = {
       id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "trade_reversed",
-      title: "An operator put a trade back", body: "...",
+      title: "An operator reversed your trade", body: "...",
       context: { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls", gotBackSummary: "Bijan Robinson", gaveBackSummary: "Justin Jefferson", note: "Two accounts, one household." },
       auditEventId: "evt_1", createdAt: NOW, readAt: null,
     };
@@ -392,7 +392,7 @@ describe("quoteFor", () => {
   it("is null for a trade_reversed notice whose context note is not a string", () => {
     const notice: MemberNotice = {
       id: "notice_1", userId: "user_bob", leagueId: "league_1", noticeType: "trade_reversed",
-      title: "An operator put a trade back", body: "...",
+      title: "An operator reversed your trade", body: "...",
       context: { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls", gotBackSummary: "Bijan Robinson", gaveBackSummary: "Justin Jefferson", note: 7 as unknown as string },
       auditEventId: "evt_1", createdAt: NOW, readAt: null,
     };

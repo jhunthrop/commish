@@ -102,11 +102,11 @@ describe("NOTICE_TEMPLATES", () => {
     expect(superseded.body).toContain("Nobody declined it");
   });
 
-  it("says what happened when an operator puts a trade back, verbatim (Task 7)", () => {
+  it("says what happened when an operator reverses a trade, verbatim (Task 7, fix round 2 F2 naming)", () => {
     const reversed = renderNotice("trade_reversed", NOTICE_SAMPLES.trade_reversed);
-    expect(reversed.title).toBe("An operator put a trade back");
+    expect(reversed.title).toBe("An operator reversed your trade");
     expect(reversed.body).toBe(
-      "An operator reviewed the trade you and Iron Owls completed in Sunday Money and put both rosters back the way they were. You have Bijan Robinson again, and Iron Owls has Justin Jefferson. Scores from weeks you have already played stay as they were. There is no reply to this message.",
+      "An operator reversed the trade you and Iron Owls completed in Sunday Money. You have Bijan Robinson again, and Iron Owls has Justin Jefferson. Scores from weeks you have already played stay as they were. There is no reply to this message.",
     );
     // The operator's own note is deliberately absent from `body` — it renders as its own
     // blockquote (`quoteFor`), the same split every other quoting template keeps.
