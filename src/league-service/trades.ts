@@ -255,10 +255,11 @@ export type ProposeTradeResult =
  * here is the offer's valuation basis while it sits open; `acceptTrade` re-derives at the moment
  * of the yes and re-stamps the row, because a 72-hour offer can straddle a week boundary.
  *
- * LOCK ORDER (ruling 3). Business rows first: the proposal row itself. Then the notice, which
- * takes `FOR KEY SHARE` on `users` and `leagues`. Then the anchor. Then `attachAuditEvent`. Then
- * commit, then `deliverNotice` outside the transaction entirely. Nothing here touches
- * `stat_weeks`: a proposal moves no roster.
+ * LOCK ORDER (ruling 3). Business rows first: BOTH teams' rows `FOR UPDATE` in canonical
+ * sorted-by-id order — the same rule `acceptTrade` and `reverseTradeInTx` follow — then the
+ * proposal row itself. Then the notice, which takes `FOR KEY SHARE` on `users` and `leagues`. Then
+ * the anchor. Then `attachAuditEvent`. Then commit, then `deliverNotice` outside the transaction
+ * entirely. Nothing here touches `stat_weeks`: a proposal moves no roster.
  */
 export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<ProposeTradeResult> {
   const clock = input.clock ?? systemClock;
@@ -347,20 +348,40 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
   let outcome: { readonly ok: true; readonly tradeId: string; readonly notice: MemberNotice } | { readonly ok: false; readonly status: number; readonly reason: string };
   try {
     outcome = await db.transaction(async (tx) => {
-      // THE FIRST LOCK, ahead of the count. `SELECT ... FOR UPDATE` on the proposer's own team
-      // row serializes every concurrent `proposeTrade` from this team: without it, two proposals
-      // arriving at once both read the SAME "N-1 open offers" snapshot and both insert, because a
-      // row lock on the rows a count reads cannot fence a PHANTOM insert nobody has written yet.
-      // Locking the team row first means the second caller's count only ever runs after the
-      // first's insert has committed (or rolled back) and released it.
+      // THE FIRST LOCKS, ahead of the count: BOTH teams' rows, `FOR UPDATE`, in CANONICAL
+      // SORTED-BY-ID order — the identical rule `acceptTrade` and `reverseTradeInTx` already
+      // follow, so all three trade writers converge on one order over the same lockable set.
       //
-      // LOCK ORDER (ruling 3): a business row, taken first, ahead of the notice's `FOR KEY SHARE`
-      // on `leagues`/`users` and ahead of the anchor — the global order, unchanged. The insert
-      // below takes the identical `FOR KEY SHARE` on this SAME row through its own foreign key;
-      // re-taking a weaker lock on a row this transaction already holds `FOR UPDATE` on is not a
-      // second lock. `src/integrity-service/lock-order.test.ts`'s `proposeTrade's insert order`
-      // drives this against a real park on `leagues[X] FOR UPDATE` and proves no deadlock.
-      await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, proposerTeamId)).for("update");
+      // The PROPOSER's own row is what serializes concurrent proposals from this team: without
+      // it, two arriving at once both read the SAME "N-1 open offers" snapshot and both insert,
+      // because a row lock on the rows a count reads cannot fence a PHANTOM insert nobody has
+      // written yet. The second caller's count only runs once the first's insert has committed
+      // (or rolled back) and released it.
+      //
+      // The COUNTERPARTY's row is taken here too, and that is the final review's HIGH 2 (a real
+      // `40P01`, reproduced three ways). This transaction was ALREADY acquiring it — invisibly,
+      // through the `trade_proposals` INSERT's own foreign key, which takes `FOR KEY SHARE` on
+      // both team rows. So the true order was proposer-then-counterparty, and whenever the
+      // proposer sorted SECOND that is the opposite order from `acceptTrade`'s and
+      // `reverseTradeInTx`'s. `FOR KEY SHARE` genuinely conflicts with `FOR UPDATE`, so two
+      // MIRROR proposals — Alice offering Bob a trade while Bob offers Alice one, no operator, no
+      // accept, no race either member could perceive — deadlocked, and `proposeTrade`'s catch
+      // handles only the fingerprint unique violation, so the victim saw an unexplained 500.
+      // Taking both rows here, sorted, makes the INSERT's FK acquisition a REACQUISITION of locks
+      // this transaction already holds strictly stronger, which costs nothing and closes the cycle.
+      //
+      // Two sequential single-row `FOR UPDATE`s, not one `IN (...)` select — only a sequence of
+      // single-row locks guarantees the acquisition ORDER, since an `IN` list's row order is the
+      // planner's to choose. Same construction `acceptTrade` uses, same reason.
+      //
+      // LOCK ORDER (ruling 3): business rows, taken first, ahead of the notice's `FOR KEY SHARE`
+      // on `leagues`/`users` and ahead of the anchor — the global order, unchanged.
+      // `src/integrity-service/lock-order.test.ts` drives BOTH halves against real Postgres: a
+      // park on `leagues[X] FOR UPDATE` (the insert's league FK) and a two-connection mirror-
+      // propose proof (the team FKs).
+      const [firstTeamId, secondTeamId] = [proposerTeamId, input.counterpartyTeamId].sort();
+      await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, firstTeamId)).for("update");
+      await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, secondTeamId)).for("update");
 
       const openOffers = await tx
         .select({ id: tradeProposals.id })
@@ -547,8 +568,11 @@ export async function refusalFor(
  * have changed the row in between).
  *
  * LOCK ORDER (ruling 3). Business rows first: the proposal row itself, taken through the guarded
- * UPDATE's own row lock, which also takes `FOR KEY SHARE` on `leagues` and both `teams` rows
- * through its foreign keys. Then the notice, which takes `FOR KEY SHARE` on `users` and
+ * UPDATE's own row lock. That UPDATE takes NO foreign-key lock on `leagues` or either `teams` row
+ * (final review, LOW 7 item 9 — this used to claim it did): Postgres re-checks a foreign key only
+ * when the REFERENCING column changes, and this statement writes `status`/`settledAt`/
+ * `settledByUserId` only, so its sole FK acquisition is `FOR KEY SHARE` on `users[actor]` through
+ * `settled_by_user_id`. Then the notice, which takes `FOR KEY SHARE` on `users` and
  * `leagues`. Then the anchor. Then `attachAuditEvent`. Then commit, then `deliverNotice` outside
  * the transaction entirely. Nothing here touches `stat_weeks`: a settlement moves no roster,
  * which is why this has no interaction with the week lock at all — `acceptTrade` (Task 5) is
@@ -789,7 +813,11 @@ export type AcceptTradeResult =
  *      so the loser of a concurrent accept/reject race (or a second accept click, or a row that
  *      settled/expired between the plain read at step 1 and here) matches zero rows rather than a
  *      stale "yes" — safe as a plain return even here, because zero rows changing is not a write.
- *      Also takes `FOR KEY SHARE` on `leagues` and both `teams` rows through its foreign keys.
+ *      Takes NO foreign-key lock on `leagues` or either `teams` row (final review, LOW 7 item 9 —
+ *      this used to claim it did): a foreign key is re-checked only when its REFERENCING column
+ *      changes, and this statement writes `status`/`settledAt`/`settledByUserId`/`weekNumber`, so
+ *      its sole FK acquisition is `FOR KEY SHARE` on `users[actor]`. Both `teams` rows are held
+ *      `FOR UPDATE` from step 3 anyway, which is strictly stronger.
  *      EVERYTHING FROM HERE ON is either the happy path or a THROW (`applyTradeInTx`'s own
  *      `TransferRefusedError`, or `evaluateTradeBeforeExecute`'s), never a plain refusal return —
  *      a throw is the only way to roll back a write that already landed.
