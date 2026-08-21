@@ -152,6 +152,21 @@ async function main(): Promise<void> {
   }
 
   console.log(JSON.stringify(result));
+
+  // Fix round 2 (MEDIUM): a partial failure is still ok:true — correctSettledWeek reports it as a
+  // non-empty leaguesFailed rather than refusing the whole run, per league independence (F2). This
+  // script has to notice that, not just result.ok, or an operator watching only the exit code sees
+  // a partial run as a clean one.
+  if (result.leaguesFailed.length > 0) {
+    console.error(`${result.leaguesFailed.length} league(s) did not commit:`);
+    for (const failure of result.leaguesFailed) {
+      console.error(`  ${failure.leagueId}: ${failure.reason}`);
+    }
+    console.error("Re-run this same command. The correction is idempotent, so re-running only touches the leagues that did not commit.");
+    await printBudgetDelta(before);
+    process.exit(1);
+  }
+
   await printBudgetDelta(before);
 }
 
