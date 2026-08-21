@@ -14,7 +14,17 @@ export type TradeAssetKind = (typeof TRADE_ASSET_KINDS)[number];
 
 export type TradeAsset = { readonly kind: "player"; readonly playerId: string };
 
-/** Every player id an asset list touches. The one place a caller turns assets into roster rows. */
+/**
+ * Every player id an asset list touches. The one place a caller turns assets into roster rows.
+ *
+ * A FILTER, NOT AN EXHAUSTIVE SWITCH, and Phase 9 must come here BY NAME (final review, LOW 7
+ * item 5 — the decision record used to claim this was a compile-time tripwire; it is not).
+ * A `{ kind: "pick" }` arm would be silently DROPPED here rather than caught by the compiler,
+ * which is correct for this function's own question ("which players?") and exactly why it cannot
+ * also serve as the guard. `describeAsset` below is the one exhaustive switch over
+ * `TradeAssetKind` in this codebase, and it is the one that will not compile until a new arm is
+ * handled.
+ */
 export function assetPlayerIds(assets: readonly TradeAsset[]): readonly string[] {
   return assets.filter((asset) => asset.kind === "player").map((asset) => asset.playerId);
 }
@@ -46,12 +56,12 @@ export interface AssetDescription {
 }
 
 /**
- * Dispatches exhaustively over `TradeAssetKind`, the same "switched on exhaustively" role
- * `plannedTransfer` (`src/league-service`) plays on the execution side — these are the only two
- * places in the codebase allowed to switch on this union at all, so every other caller goes
- * through one of them instead of re-deriving the per-kind logic. The `switch` below has no
- * `default` arm, so Phase 9's `"pick"` arm is a compile error here ("not all code paths return a
- * value") until it is described too.
+ * THE ONE EXHAUSTIVE SWITCH over `TradeAssetKind` in this codebase, and the only place allowed to
+ * switch on the union at all — every other caller goes through this instead of re-deriving the
+ * per-kind logic. The `switch` below has no `default` arm, so Phase 9's `"pick"` arm is a compile
+ * error here ("not all code paths return a value") until it is described too. (Final review, LOW 7
+ * item 5: this used to name `plannedTransfer` as a second such switch. `trade-transfer.ts`
+ * contains no `switch`, and `assetPlayerIds` above is a filter — see its own docblock.)
  *
  * `players` is supplied rather than looked up: `src/trades` is pure and has no roster to read,
  * so the caller (already holding one, from `AdvisorTeamContext` or a roster query) resolves

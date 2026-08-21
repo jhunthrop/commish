@@ -126,7 +126,7 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   trade_rejected: { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls" },
   trade_withdrawn: { leagueName: "Sunday Money", proposerTeamName: "Bay Bandits" },
   trade_executed: { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls", gaveSummary: "Bijan Robinson", gotSummary: "Justin Jefferson" },
-  trade_superseded: { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls" },
+  trade_superseded: { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls", role: "proposer" },
   trade_reversed: {
     leagueName: "Sunday Money",
     counterpartyTeamName: "Iron Owls",

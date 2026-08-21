@@ -139,17 +139,29 @@ export interface NoticeContexts {
     readonly gotSummary: string;
   };
   /**
-   * `acceptTrade`'s supersede sweep (Task 5): sent to the PROPOSER of every OTHER open offer that
+   * `acceptTrade`'s supersede sweep (Task 5): sent to BOTH parties of every OTHER open offer that
    * named a player the accepted trade just moved. `ACTIVITY_VISIBILITY` has no entry for this —
    * it is a notice type only, the same way `trade_withdrawn` is — because "superseded" is a fact
-   * about one manager's own dead offer, not league content. Deliberately NOT `trade_rejected`'s
-   * copy: nobody declined this offer, and a manager who reads a decline where there wasn't one
-   * draws a worse conclusion than the truth (`INTEGRITY_CONFIG.notices.accusatoryTerms`'s whole
-   * reason for existing).
+   * about one dead offer, not league content. Deliberately NOT `trade_rejected`'s copy: nobody
+   * declined this offer, and a manager who reads a decline where there wasn't one draws a worse
+   * conclusion than the truth (`INTEGRITY_CONFIG.notices.accusatoryTerms`'s whole reason for
+   * existing).
+   *
+   * BOTH PARTIES, from the final review's LOW 9: this used to tell only the doomed PROPOSER. The
+   * counterparty had that offer sitting in their inbox awaiting an answer, and something changed
+   * under them — the card simply vanished on the next refetch, with no word. Every other
+   * two-party trade notice in this file (`trade_executed`, `trade_reversed`) already tells both,
+   * and the asymmetry was undocumented rather than decided.
+   *
+   * `role` is what the two sentences differ on, and the only thing: the proposer's offer went out,
+   * the counterparty's came in. `counterpartyTeamName` is always the OTHER manager from this
+   * recipient's own point of view, the same "pre-rendered per recipient" shape `trade_reversed`
+   * uses.
    */
   readonly trade_superseded: {
     readonly leagueName: string;
     readonly counterpartyTeamName: string;
+    readonly role: "proposer" | "counterparty";
   };
   /**
    * `reverseTradeInTx`'s own notice (`@/league-service/trade-reversal`, Task 7), sent to BOTH
@@ -253,10 +265,16 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
     title: "Your trade went through",
     body: `You and ${counterpartyTeamName} completed a trade in ${leagueName}. You sent ${gaveSummary} and you got ${gotSummary}. Your lineup for this week already reflects it, so check your starters before kickoff.`,
   }),
-  trade_superseded: ({ leagueName, counterpartyTeamName }) => ({
-    title: "One of your offers can no longer go through",
-    body: `A player in the offer you had out to ${counterpartyTeamName} in ${leagueName} moved to another team, so that offer is off the table. Nobody declined it. You can put together a new one any time.`,
-  }),
+  trade_superseded: ({ leagueName, counterpartyTeamName, role }) =>
+    role === "proposer"
+      ? {
+          title: "One of your offers can no longer go through",
+          body: `A player in the offer you had out to ${counterpartyTeamName} in ${leagueName} moved to another team, so that offer is off the table. Nobody declined it. You can put together a new one any time.`,
+        }
+      : {
+          title: "An offer waiting on you can no longer go through",
+          body: `A player in the offer ${counterpartyTeamName} sent you in ${leagueName} moved to another team, so that offer is off the table. Nobody declined it, and nothing on your roster changed. Ask them for a fresh one any time.`,
+        },
   // `note` is stored on the row (`context.note`) but deliberately unused HERE, the same reason
   // every other quoting template's own field is: the operator's own words travel as their own
   // field on the wire (`quoteFor`), rendered as a distinct blockquote. The last sentence is the

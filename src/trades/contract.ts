@@ -37,7 +37,7 @@ export interface TradeProposalView {
   readonly settledAt: string | null;
   /** Set by an operator's reversal (Task 7). `status` stays `"accepted"` — the acceptance
    *  happened and nothing erases it — so this is the field a card checks to render "reversed"
-   *  rather than a sixth status. */
+   *  rather than a seventh status (`TRADE_STATUSES` already declares six). */
   readonly reversedAt: string | null;
   /** The proposer's optional note, capped at `TRADE_CONFIG.noteMaxLength`. */
   readonly note: string | null;

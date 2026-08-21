@@ -65,6 +65,13 @@ not 5432 — that is how the deployed app connects, and a pooler that is only in
 production is a pooler nobody has tested. Connecting directly to 5432 with `psql` is fine; it is
 just not what the app itself does. See `docs/decisions/data-layer-hardening.md`.
 
+**Prune docker volumes BY NAME, never blanket.** The docker daemon on a dev machine is shared with
+sibling projects, so `docker volume prune` (or any unscoped `-v` teardown) reclaims space by
+deleting volumes that belong to somebody else's stack. `docker-compose.yml` pins `name: fantasy`,
+so this project's own volumes are `fantasy_*` and can be removed individually when a disk actually
+fills up. That is the lesson from a real no-space incident, recorded here rather than left in a
+plan's ledger.
+
 `npm run db:migrate:test` applies the same migrations to the dedicated test database
 (`docker-compose.yml`'s `postgres-test`, tmpfs-backed) that `npm test` runs against.
 `npm run db:generate` regenerates a drizzle migration after a schema change;

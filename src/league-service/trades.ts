@@ -1014,7 +1014,8 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
               )
               .returning();
 
-      // NOTICES — `trade_executed` to both parties, `trade_superseded` to every doomed proposer.
+      // NOTICES — `trade_executed` to both parties, `trade_superseded` to BOTH parties of every
+      // doomed offer (final review, LOW 9).
       const teamIds = [
         ...new Set([row.proposerTeamId, row.counterpartyTeamId, ...supersededRows.flatMap((s) => [s.proposerTeamId, s.counterpartyTeamId])]),
       ];
@@ -1062,20 +1063,29 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
         auditEventId: null,
       });
 
+      // BOTH parties of every doomed offer, not just its proposer (final review, LOW 9): the
+      // counterparty had that offer in their inbox awaiting an answer, and something changed under
+      // them — without this the card simply vanished on the next refetch with no word. Each reads
+      // the sentence for their own side (`role`), naming the OTHER manager.
       const supersededNotices: MemberNotice[] = [];
       for (const superseded of supersededRows) {
         const doomedProposer = teamById.get(superseded.proposerTeamId)!;
         const doomedCounterparty = teamById.get(superseded.counterpartyTeamId)!;
-        supersededNotices.push(
-          await notify(tx, {
-            leagueId: row.leagueId,
-            userId: doomedProposer.userId,
-            noticeType: "trade_superseded",
-            context: { leagueName: league.name, counterpartyTeamName: doomedCounterparty.name },
-            occurredAt: now,
-            auditEventId: null,
-          }),
-        );
+        for (const recipient of [
+          { team: doomedProposer, otherTeamName: doomedCounterparty.name, role: "proposer" as const },
+          { team: doomedCounterparty, otherTeamName: doomedProposer.name, role: "counterparty" as const },
+        ]) {
+          supersededNotices.push(
+            await notify(tx, {
+              leagueId: row.leagueId,
+              userId: recipient.team.userId,
+              noticeType: "trade_superseded",
+              context: { leagueName: league.name, counterpartyTeamName: recipient.otherTeamName, role: recipient.role },
+              occurredAt: now,
+              auditEventId: null,
+            }),
+          );
+        }
       }
 
       // AUDIT — `trade_accepted` AND `roster_move`, ONE batch, the league chain.

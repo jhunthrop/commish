@@ -23,10 +23,12 @@ export const AUDIT_EVENT_TYPES = [
   /**
    * A roster change that is NEITHER a draft pick NOR a lineup change. Today that means exactly
    * one thing: the player transfer a trade performs. There is no free agency in this product,
-   * no waivers and no add/drop, so nothing else can produce one. RESERVED — Plan C publishes it.
+   * no waivers and no add/drop, so nothing else can produce one. PUBLISHED by Plan C, from
+   * `acceptTrade`'s own transfer and from `reverseTradeInTx`'s compensating one.
    */
   "roster_move",
-  /** RESERVED — Plan C publishes these three, from the trade lifecycle it builds. */
+  /** PUBLISHED by Plan C, from the trade lifecycle it built. `trade_rejected` carries a
+   *  withdrawal too — `payload.outcome` tells the two apart, because this list is frozen. */
   "trade_proposed",
   "trade_accepted",
   "trade_rejected",

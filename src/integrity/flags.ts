@@ -9,7 +9,8 @@ export const FLAG_TYPES = [
   "review_report",
   /** Raised by `reportMessage`. Covers a GIF with no second path: a GIF is one chat_messages row. */
   "chat_report",
-  /** RESERVED — Plan C raises this from its post-acceptance fairness check. */
+  /** Raised by Plan C's `raiseTradeFairnessFlag`, after an acceptance commits, and re-raised by
+   *  `sweepUnflaggedTrades` for any accepted trade over the threshold that has no flag. */
   "trade_fairness",
 ] as const;
 export type FlagType = (typeof FLAG_TYPES)[number];

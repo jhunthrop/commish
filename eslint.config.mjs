@@ -97,9 +97,12 @@ const SERVER_ONLY_MODULE_GROUPS = [
  * (`src/chat/**`), `@/matchmaking` (`src/matchmaking/**`), `@/help` (`src/help/**`),
  * `@/reviews` (`src/reviews/**`), `@/moderation` (`src/moderation/**`) and `@/trades`
  * (`src/trades/**`) in the browser-safe exempt set — pure, I/O-free code with no server module
- * behind it, so client code may value-import it directly. `@/trades` is new in Phase 3 Plan C:
- * `TRADE_CONFIG.maxAssetsPerSide` and `TradeProposalView` are read by
- * `src/league-room/components/trade-composer.tsx` as values, and `@/ai-advisor` — where
+ * behind it, so client code may value-import it directly. `@/trades` is new in Phase 3 Plan C. The
+ * real browser VALUE-imports are `TRADE_CONFIG.maxAssetsPerSide` (`trade-composer.tsx`) and
+ * `describeAsset`/`isExpired` (`trade-card.tsx`); `TradeProposalView` is an `interface`
+ * (`src/trades/contract.ts`) and every consumer reaches it through `import type`, which needs no
+ * exemption at all (final review, LOW 7 item 4 — this used to name it as the value-import).
+ * `@/ai-advisor` — where
  * `tradeBalance` and its types used to live — stays on the BLOCKED list above precisely because
  * it is not browser-safe; the fairness core moved to this pure directory for that reason among
  * others (`src/trades/fairness.ts`'s own docblock).

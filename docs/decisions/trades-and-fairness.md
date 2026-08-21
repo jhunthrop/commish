@@ -34,11 +34,17 @@ rosters changed and the league can already see both.
 ## 2. One fairness function, and where it now lives
 
 `tradeBalance` moved from `src/ai-advisor/valuation.ts` to `src/trades/fairness.ts` in Task 1, and
-`src/ai-advisor/valuation.ts` now re-exports every name — `tradeBalance`, `TradeBalance`,
-`TradeVerdict`, `TradeFlag`, `fairnessGap`, `crossesFairnessThreshold` — so the diff at every
-existing advisor consumer is zero. `src/ai-advisor/fairness-reexport.test.ts` (Task 1) asserts
-`expect(reExported).toBe(tradeBalance)` — object identity, not merely equal output — which is what
-keeps a re-export from silently becoming a second, drifting copy later.
+`src/ai-advisor/valuation.ts` re-exports exactly the names its own consumers had been importing —
+`tradeBalance`, `ValuedPlayer`, `TradeVerdict`, `TradeFlag`, `TradeBalance` — so the diff at every
+existing advisor consumer is zero. `fairnessGap` and `crossesFairnessThreshold` are NOT re-exported
+and never were: both are new in this plan, and their only callers (`evaluateTradeBeforeExecute`,
+`raiseTradeFairnessFlag`) import them from `@/trades/fairness` directly, which is where a new
+consumer should reach for them anyway.
+
+`src/trades/fairness.test.ts` asserts `expect(reExported).toBe(tradeBalance)` — object identity,
+not merely equal output — which is what keeps a re-export from silently becoming a second, drifting
+copy later. It also greps `valuation.ts` for the arithmetic's own constants, because an identity
+test still passes if somebody later pastes a second implementation in beside the re-export.
 
 Three properties made `src/ai-advisor` the wrong home, and all three are that directory's OWN
 rules, not a preference imported from outside it:
@@ -49,9 +55,9 @@ rules, not a preference imported from outside it:
   exclusion is correct for the advisor's prose layer and wrong for the one piece of arithmetic
   this whole phase's integrity story rests on — a detector `acceptTrade` calls inside a
   transaction had no gate over it at all.
-- **It is on the client-boundary BLOCKED list.** `src/league-room/components/trade-composer.tsx`
-  needs `TRADE_CONFIG.maxAssetsPerSide` and `TradeProposalView` as VALUES, and no browser code may
-  value-import `@/ai-advisor`.
+- **It is on the client-boundary BLOCKED list.** The league room needs `TRADE_CONFIG
+  .maxAssetsPerSide` (`trade-composer.tsx`) and `describeAsset`/`isExpired` (`trade-card.tsx`) as
+  VALUES, and no browser code may value-import `@/ai-advisor`.
 - **`advisory-only.test.ts` exists to prove nothing under `src/ai-advisor/**` writes.** A function
   the write path calls inside a transaction is a strange resident of a directory whose own test
   suite polices the opposite property.
@@ -125,16 +131,20 @@ same manager is ordinary negotiation, not a duplicate question, and is bounded b
 `maxOpenProposalsPerTeam` instead of by uniqueness.
 
 **Why the mirror offer is a different offer.** Team B offering back exactly what Team A asked for
-hashes differently on purpose: the ordered team pair sorts the SAME two ids into the SAME
-canonical order regardless of who is proposing, but the two asset lists have swapped roles —
-`proposerAssets` and `counterpartyAssets` are not interchangeable in the hash, so A→B and B→A are
-two rows, two audiences, two live negotiations. Merging them would collapse two different
+hashes differently on purpose, and the reason is simpler than this section used to state (final
+review, LOW 7 item 6 — the conclusion was right, the stated mechanism was backwards).
+`proposalFingerprint` does NOT sort the team ids: it hashes `proposerTeamId` and
+`counterpartyTeamId` in their own named fields, so A→B and B→A produce different canonical strings
+on the team pair alone, before the asset lists are even considered. (Only the two asset lists are
+sorted, and only internally, because array order is not part of an offer's meaning.) So A→B and
+B→A are two rows, two audiences, two live negotiations. Merging them would collapse two different
 questions — "will you take my offer" and "will you take my counter" — into one row a losing party
 never gets to answer.
 
 **Why `reversed_at` is a stamp and not a status.** `status` reaches `'accepted'` and stays there
 forever; a reversal writes `reversedAt`/`reversedByFlagId` on the SAME row rather than moving it
-to a sixth status, because `trade_accepted` is already on the immutable league chain and a status
+to a SEVENTH status (`TRADE_STATUSES` already declares six), because `trade_accepted` is already
+on the immutable league chain and a status
 that overwrote the acceptance would make the row and the chain disagree about the same afternoon
 (§8 below has the full reversal ruling).
 
@@ -146,9 +156,17 @@ bounded set: every proposal is capped at `TRADE_CONFIG.maxAssetsPerSide` (5) per
 column here is never an unbounded-growth risk, and a normalized table would model one arm today as
 a nullable-column layout a second arm would have to widen rather than extend. `TradeAssetKind`'s
 own docblock names the reason directly: `plans/phase-9-dynasty-and-keeper-depth.md` adds a
-`{ kind: "pick"; draftId: string; round: number }` arm, and every `switch` this plan writes over
-`TradeAssetKind` (`describeAsset`, `assetPlayerIds`) is exhaustive with no `default` — Phase 9's
-arm is a compile error everywhere it lands unhandled, rather than a silent fallthrough somewhere.
+`{ kind: "pick"; draftId: string; round: number }` arm.
+
+**Exactly ONE function switches exhaustively on `TradeAssetKind`, and it is `describeAsset`** (the
+final review's LOW 7 item 5 corrected this: it used to claim `assetPlayerIds` did too, and to name
+`plannedTransfer` as a second such switch). `describeAsset`'s `switch` has no `default` arm, so
+Phase 9's `"pick"` arm is a compile error there ("not all code paths return a value") until it is
+described. `assetPlayerIds` is a `.filter(kind === "player").map(...)` — a pick arm would be
+SILENTLY DROPPED rather than caught — and `trade-transfer.ts` contains no `switch` at all. Phase 9
+must therefore treat both as sites to revisit BY NAME, not as sites the compiler will point at:
+`describeAsset` is the tripwire, and these two are the quiet ones behind it.
+
 The cost of shipping the union now instead of a bare `playerIds: string[]` is one discriminator
 field per asset, which is nothing next to the fork a later widening would otherwise force.
 
@@ -194,8 +212,9 @@ codebase's default READ COMMITTED isolation. Without a lock, a boundary week cou
 would see a stale `scheduled`, skip materialization, and the roster move that follows would then
 retroactively change what that week's `getLineup` fallback derives, for a week that had, by the
 time the trade's transaction actually committed, already started. `FOR SHARE` on the `stat_weeks`
-read, taken FIRST — ahead of every other read in the function and in `applyTradeInTx`, matching
-`setLineup`'s own position exactly — blocks this read against `persistTick`'s uncommitted row and
+read, taken FIRST — ahead of every other LOCK in the function and ahead of every read in
+`applyTradeInTx`, matching `setLineup`'s own position exactly (in `acceptTrade` it follows two
+plain, unlocked reads, which take nothing and so cannot reorder anything) — blocks this read against `persistTick`'s uncommitted row and
 forces it to see whichever value actually wins the race. This was a real HIGH finding from Task
 4's review, confirmed live with a deterministic two-connection race test before the fix landed
 (fix round 1).
@@ -295,7 +314,8 @@ settled week. Three properties, each with a rejected alternative:
   a reversal that erased the acceptance would make the row and the chain disagree about the same
   afternoon.
 - **Not a status change**, for the identical reason — `reversedAt`/`reversedByFlagId` are stamped
-  on the SAME row beside `status: "accepted"`, never a sixth status that would require the row to
+  on the SAME row beside `status: "accepted"`, never a seventh status (`TRADE_STATUSES` already
+  declares six) that would require the row to
   stop meaning what it always meant.
 - **Never re-settles a played week.** A week that already happened was scored with the rosters as
   they stood at the time; both managers already saw that result. Re-scoring it after a later
@@ -312,8 +332,10 @@ been played and seen) is the worse failure mode this whole plan exists to preven
 case (§4), and it would be strange to reintroduce it specifically for the one operation whose job
 is to undo a mistake.
 
-Both managers are told the identical words — the product never signals which of the two was the
-one under suspicion. A free-text operator note reaches both, guarded (§9 in
+Both managers are told the SYMMETRIC words: the same sentence with each reader's own side filled
+in, never a different message to one of them. That is the load-bearing property — the product
+never signals which of the two was the one under suspicion — and it holds even though the two
+strings are not literally character-identical. A free-text operator note reaches both, guarded (§9 in
 `operators-and-moderation.md`'s companion sense — every note-carrying decision, `trade_reversed`
 included, is pre-validated at the shared `NOTE_REACHES_SOMEONE_ELSE` seam against the same
 accusatory-terms list a notice may never contain).

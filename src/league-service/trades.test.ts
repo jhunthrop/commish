@@ -1328,6 +1328,35 @@ describe("acceptTrade", () => {
     expect(copyViolations(`${carolNotice!.title} ${carolNotice!.body}`)).toEqual([]);
   });
 
+  /**
+   * FINAL REVIEW, LOW 9. Only the doomed PROPOSER used to be told. The COUNTERPARTY had that offer
+   * sitting in their inbox awaiting an answer, and the card simply vanished on the next refetch —
+   * asymmetric with the two-recipient discipline `trade_executed` and `trade_reversed` both keep,
+   * and undocumented rather than decided. Both affected managers are told now, each in the
+   * sentence for their own side.
+   */
+  it("tells BOTH parties of a superseded offer, each in their own words", async () => {
+    // Carol proposes to Alice for `p_rb1`; Bob's trade for the same player kills it. Carol is the
+    // doomed proposer, Alice the counterparty who was owed an answer.
+    await openAcceptTrade(db, { proposerTeamId: "team_c", counterpartyTeamId: "team_a", give: ["p_bench_c1"], get: ["p_rb1"] });
+    const executed = await openAcceptTrade(db);
+
+    expect(await acceptAs("u_bob", executed.id)).toMatchObject({ ok: true, supersededCount: 1 });
+
+    const carolNotices = (await noticesFor(db, "u_carol")).filter((n) => n.noticeType === "trade_superseded");
+    const aliceNotices = (await noticesFor(db, "u_alice")).filter((n) => n.noticeType === "trade_superseded");
+    expect(carolNotices).toHaveLength(1);
+    expect(aliceNotices).toHaveLength(1);
+
+    // Each names the OTHER manager, and each says which direction the dead offer went.
+    expect(carolNotices[0]!.body).toContain("the offer you had out to Team Alice");
+    expect(aliceNotices[0]!.body).toContain("the offer Team Carol sent you");
+    expect(aliceNotices[0]!.title).toBe("An offer waiting on you can no longer go through");
+    for (const notice of [...carolNotices, ...aliceNotices]) {
+      expect(copyViolations(`${notice.title} ${notice.body}`)).toEqual([]);
+    }
+  });
+
   it("frees the fingerprint for reuse once superseded, the same partial-index mechanism a rejection already proves", async () => {
     const dead = await openAcceptTrade(db, { proposerTeamId: "team_c", counterpartyTeamId: "team_a", give: ["p_bench_c1"], get: ["p_rb1"] });
     const executed = await openAcceptTrade(db);

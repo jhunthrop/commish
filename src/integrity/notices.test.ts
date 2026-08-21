@@ -97,6 +97,14 @@ describe("NOTICE_TEMPLATES", () => {
     expect(superseded.body).toBe(
       "A player in the offer you had out to Iron Owls in Sunday Money moved to another team, so that offer is off the table. Nobody declined it. You can put together a new one any time.",
     );
+
+    // Final review, LOW 9: the manager who RECEIVED the doomed offer is told too, in the sentence
+    // for their own side — it came in rather than went out, and their roster did not move.
+    const supersededForRecipient = renderNotice("trade_superseded", { ...NOTICE_SAMPLES.trade_superseded, role: "counterparty" });
+    expect(supersededForRecipient.title).toBe("An offer waiting on you can no longer go through");
+    expect(supersededForRecipient.body).toBe(
+      "A player in the offer Iron Owls sent you in Sunday Money moved to another team, so that offer is off the table. Nobody declined it, and nothing on your roster changed. Ask them for a fresh one any time.",
+    );
     // "Nobody declined it" is the whole point of this template: a manager who sees an offer die
     // must not read it as a refusal.
     expect(superseded.body).toContain("Nobody declined it");

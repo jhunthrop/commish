@@ -47,8 +47,15 @@ const files = sourceFilesIn(ROOM_DIRS, ".tsx");
 describe("the chat room and the admin room write in the house voice", () => {
   it("finds the component files to sweep, so an empty scan can never pass silently", () => {
     expect(files.length).toBeGreaterThanOrEqual(10);
+    // Every swept directory is pinned by name, LITERALLY — never by iterating `ROOM_DIRS`, which
+    // would delete the assertion along with the entry it was meant to defend. `src/league-room`
+    // was the one missing (final review, LOW 8): deleting it from `ROOM_DIRS` dropped 31 files —
+    // the whole trade surface, thirty-odd new strings — and this suite stayed green, because the
+    // length floor clears on the other two directories alone. A guard a deletion can silently
+    // satisfy is not a guard.
     expect(files.some((file) => file.startsWith("src/chat-room"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/admin-room"))).toBe(true);
+    expect(files.some((file) => file.startsWith("src/league-room"))).toBe(true);
     // Its own tests, and the module holding this scan's helpers, are the things DOING the
     // checking rather than things being checked — the same exclusion `flag-only.test.ts`'s own
     // walker makes, asserted here so widening the filter cannot silently pull them in.

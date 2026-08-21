@@ -62,7 +62,7 @@ src/
                           fetchJson deps seam (hooks/), and id→display-name formatting
                           (lib/format.ts). Imports from league/league-service are TYPE-ONLY — no
                           league rule runs in React; value-imports @/trades directly (pure,
-                          browser-safe) for TRADE_CONFIG and TradeProposalView.
+                          browser-safe) for TRADE_CONFIG, describeAsset and isExpired.
   matchmaking/            Pure public-matchmaking rules: the browse filter, the cosmetic stake
                           tiers, and PublicLeagueSummary, the field-by-field privacy boundary of
                           the app's ONE unauthenticated league read. NO I/O. 100% coverage.
@@ -116,7 +116,7 @@ src/
                           contract (contract.ts), and tradeBalance — the platform's ONE
                           trade-fairness / collusion function (fairness.ts), moved here from
                           src/ai-advisor (Phase 3 Plan C). NO I/O, no clock. 100% coverage.
-                          Browser-safe: a fourth pure exempt directory beside src/chat,
+                          Browser-safe: the seventh pure exempt directory, beside src/chat,
                           src/matchmaking, src/identity, src/help, src/reviews and
                           src/moderation. See docs/trades.md and
                           docs/decisions/trades-and-fairness.md.
@@ -350,9 +350,10 @@ vocabulary did live there. `integrity`/`moderation` is the same server-machinery
 
 `src/trades/**` joins the exempt set for the same reason (Phase 3 Plan C): `TRADE_CONFIG`, the
 lifecycle vocabulary, the asset union and `TradeProposalView` are pure, I/O-free rule code with no
-server module behind them, and `src/league-room/components/trade-composer.tsx` value-imports
-`TRADE_CONFIG.maxAssetsPerSide` and `TradeProposalView` directly for the same reason
-`ReviewComposer` value-imports `validateReviewDraft` — a client-side bound and a server-enforced
+server module behind them. The real browser VALUE-imports are `TRADE_CONFIG.maxAssetsPerSide`
+(`trade-composer.tsx`) and `describeAsset`/`isExpired` (`trade-card.tsx`) — `TradeProposalView` is
+an `interface`, reached through `import type`, which needs no exemption. The value-imports are
+there for the same reason `ReviewComposer` value-imports `validateReviewDraft` — a client-side bound and a server-enforced
 one must read the identical number. It is deliberately **not** part of `@/ai-advisor`, which is
 blocked below same as `@/integrity`: `tradeBalance` moved OUT of the advisor directory specifically
 because that directory is on the blocked list (`docs/decisions/trades-and-fairness.md` §2), and it

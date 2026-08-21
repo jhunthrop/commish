@@ -202,6 +202,14 @@ export async function reverseTradeInTx(tx: DbTx, input: ReverseTradeInput): Prom
     .where(and(eq(tradeProposals.id, input.tradeId), eq(tradeProposals.status, "accepted"), isNull(tradeProposals.reversedAt)))
     .returning();
   if (row === undefined) {
+    // TWO OPERATORS RACING THE SAME FLAG, ACCEPTED AS-IS (final review, LOW 10). Both pass step 1
+    // under READ COMMITTED, one wins the team locks and stamps; the loser's guarded UPDATE
+    // re-evaluates, matches zero rows, and answers 409 here rather than entering the healing
+    // branch above — which it would qualify for, since it holds the SAME `flagId`. It self-
+    // corrects on the next attempt (step 1 then sees `reversedByFlagId === flagId` and heals), and
+    // the 409's own copy already tells the operator the trade is reversed, so a reload shows them
+    // the truth. Roughness, not a hole, and healing here would mean re-reading the row inside the
+    // same statement's own race window for no outcome a retry does not already reach.
     return { ok: false, status: 409, reason: ALREADY_REVERSED };
   }
 

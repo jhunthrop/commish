@@ -10,17 +10,19 @@ analyze, accept, flag, reverse — is described end to end.
 
 | Layer | Path | Rule |
 |---|---|---|
-| Pure | `src/trades/` | `TRADE_CONFIG`, the lifecycle/status vocabulary, the asset union, the wire contract, and `tradeBalance` — the one fairness function. NO I/O, no clock, no database. 100% coverage. Browser-safe: a fourth pure exempt directory on the client-boundary list, beside `src/chat`, `src/matchmaking`, `src/identity`, `src/help`, `src/reviews` and `src/moderation`. |
+| Pure | `src/trades/` | `TRADE_CONFIG`, the lifecycle/status vocabulary, the asset union, the wire contract, and `tradeBalance` — the one fairness function. NO I/O, no clock, no database. 100% coverage. Browser-safe: the seventh pure exempt directory on the client-boundary list, beside `src/chat`, `src/matchmaking`, `src/identity`, `src/help`, `src/reviews` and `src/moderation` (`eslint.config.mjs` names all seven). |
 | Service | `src/league-service/trades.ts`, `trade-transfer.ts`, `trade-reversal.ts` | The only code that talks to Postgres for a trade: propose, withdraw, reject, accept (the transfer, the supersede sweep, the notices, the two league-chain events) and the operator's reversal. Blocked from the browser, same as `@/league-service` always is. |
 | Detector | `src/integrity-service/trade-fairness.ts` | `evaluateTradeBeforeExecute` (inside the accept transaction) and `raiseTradeFairnessFlag`/`sweepUnflaggedTrades` (after commit, the platform chain). |
 | Browser | `src/league-room/components/trade-composer.tsx`, `trade-inbox.tsx`, `trade-card.tsx`, and the trade page under `src/app/app/leagues/[leagueId]/trades/` | Reuses `AdvisorPanel`'s surface shape. Value-imports `@/trades` directly (pure); reaches the service layer only over the wire. |
 
 ## Who may call what
 
-Every route goes through `withLeagueMemberActor` — a manager with a team in the league, or the
-commissioner; a signed-in stranger gets 403, and a trade naming two OTHER teams answers 404 to
-everybody else (the codebase's non-oracle discipline: a 403 would confirm that a guessed id names
-a real negotiation between two named managers).
+Every route goes through `withLeagueMemberActor`, and then refuses a caller with no team of their
+own: all three handlers 403 on `actor.teamId === null`. So a commissioner who fields no team in
+their own league reaches nothing here — trading is a manager's act, and there is nobody for a
+teamless caller to trade as. A signed-in stranger gets the same 403, and a trade naming two OTHER
+teams answers 404 to everybody else (the codebase's non-oracle discipline: a 403 would confirm that
+a guessed id names a real negotiation between two named managers).
 
 | Route | Who | Notes |
 |---|---|---|
@@ -173,10 +175,12 @@ roster write itself, both for an ordinary trade and for a reversal.
 ## What a reader will look for and not find
 
 **There is no waiver wire and no free agency.** A roster is fixed from draft to season end.
-`roster_move` — the one audit event type every roster mutation in this product shares — means
-draft picks, lineup changes and trades, and nothing else; a `reason` it doesn't recognize renders
-as nothing (`renderRosterMove` returns `null`) rather than guessing, which is the seam a future
-waivers phase opts into by name rather than inherits by accident. There is likewise no season trade
+`roster_move` is the audit event type for a roster change that is NEITHER a draft pick NOR a
+lineup change (`src/domain/audit.ts`) — those two have their own types, `draft_pick` and
+`lineup_change`. Today `roster_move` therefore means exactly one thing, the player transfer a trade
+performs, plus the compensating transfer a reversal performs. A `reason` it doesn't recognize
+renders as nothing (`renderRosterMove` returns `null`) rather than guessing, which is the seam a
+future waivers phase opts into by name rather than inherits by accident. There is likewise no season trade
 deadline — a real fantasy concept, deliberately not invented here, because it is a league setting
 with a commissioner decision and a browse-visible term behind it, not a constant to guess. A trade
 is refused only while the CURRENT week is locked (`isLineupLocked`, the same rule `setLineup`
