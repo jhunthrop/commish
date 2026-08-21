@@ -67,8 +67,8 @@ mock stat dataset; `npm run stats:tank01:record` re-records the Tank01 fixtures
 printing what it found and what it cost against the monthly request budget — the way to see the
 pipeline work without waiting on `STATS_INGESTION_CONFIG.pollIntervalMs` (thirty minutes), and
 what to run first against a real `TANK01_API_KEY`; `npm run reviews:remove` is the review feed's
-one moderation action, an operator-run script (`scripts/remove-review.ts`, no admin UI or staff
-role exists) that stamps a review's `removedAt`/`removedByUserId`/`removalReason` rather than
+script-side moderation door (`scripts/remove-review.ts`, retained beside the dispute queue's
+in-product path) that stamps a review's `removedAt`/`removedByUserId`/`removalReason` rather than
 deleting the row, refusing a review that is already removed; `npm run infra:down` stops the local
 stack.
 
