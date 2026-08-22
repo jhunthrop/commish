@@ -154,4 +154,15 @@ describe("the audit vocabulary", () => {
       expect(source.filter((file) => file.text.includes(`eventType: "${type}"`)).length).toBe(0);
     }
   });
+
+  // Phase 3 Plan D, Task 11, Step 5. Phase 3 ends here. A reserved audit event type with a named
+  // owner is honest while the owner is coming; after the last plan it is a name with no writer
+  // and no plan that will ever write one. Every one of the sixteen `AUDIT_EVENT_TYPES` is
+  // published (`OWNER`'s own values above are all "plan-a" — Plan D adds no new event TYPE,
+  // ruling 7: `SYSTEM_ACTION_CODES` is the vocabulary this plan grows instead, a plain array with
+  // no database representation), and this assertion is what keeps a future reader from adding a
+  // seventeenth "for Plan D".
+  it("leaves the plan-d arm of OWNER unused, because there is no plan after this one", () => {
+    expect(Object.values(OWNER)).not.toContain("plan-d");
+  });
 });
