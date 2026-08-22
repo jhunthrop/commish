@@ -1,4 +1,6 @@
+import { eq } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
+import { leagues } from "@/db/schema";
 import type { ExperienceTier } from "@/domain/user";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { participationTierFor } from "@/participation/tier";
@@ -50,6 +52,34 @@ export interface PublicLeagueEnforcementPolicy {
 export function enforcementAppliesTo(league: Pick<PublicLeagueEnforcementPolicy, "isPublicMatchmade">): boolean {
   return league.isPublicMatchmade && INTEGRITY_CONFIG.participation.enforceTierSegregation;
 }
+
+/**
+ * The DEPLOY half of `enforcementAppliesTo`, asked on its own — and DEFINED in terms of it, never
+ * as a second read of the config, so the rule still exists exactly once (final review F18).
+ *
+ * The two SCANS need this shape and the gate paths do not. `autoStartDueDrafts`
+ * (`@/draft-service/auto-start`) and `autoSetLineupsForWeek` (`./auto-lineup`) both ask it FIRST,
+ * before any query runs at all: enforcement being off means the scan does not happen, rather than
+ * every row it would have found being refused one at a time. Both used to spell it
+ * `enforcementAppliesTo({ isPublicMatchmade: true })` inline, which reads as a claim about a
+ * league that does not exist; this says what it means.
+ */
+export function enforcementIsSwitchedOn(): boolean {
+  return enforcementAppliesTo({ isPublicMatchmade: true });
+}
+
+/**
+ * The PER-LEAGUE half, as the SQL predicate a scan applies inside its own candidate query — the
+ * second copy final review F18 named ("`enforcement.ts`'s 'single place that predicate lives' is
+ * true for 3 of 4 sites"). Both scans import THIS rather than hand-writing
+ * `eq(leagues.isPublicMatchmade, true)`, so the axis is one expression wherever it is asked,
+ * whether in TypeScript or in SQL.
+ *
+ * It is the `is_public_matchmade` axis ALONE and deliberately carries no config read: a `WHERE`
+ * clause cannot branch on a deploy switch, which is exactly why the switch is asked first, in
+ * TypeScript, by `enforcementIsSwitchedOn` above.
+ */
+export const ENFORCED_LEAGUE_SQL = eq(leagues.isPublicMatchmade, true);
 
 /**
  * The two refusals this rule can ever say, named once so the join gate and the creation gate

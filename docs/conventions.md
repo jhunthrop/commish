@@ -122,16 +122,16 @@ src/
                           docs/decisions/trades-and-fairness.md.
   participation/          THE THIRD MEANING OF "TIER" (Phase 3 Plan D): participationTier
                           (tier.ts — newcomer/veteran, participationTierFor), TierComposition +
-                          compositionCategoryFor (composition.ts, the browse card's two-count
-                          label), isVerifiedPlayer + the verified-badge copy (verified.ts) and
-                          ParticipationSummary (contract.ts) — a computed, enforced participation
+                          compositionCategoryFor (composition.ts, the coarse browse-card bucket
+                          the server reduces to before anything ships) and isVerifiedPlayer + the
+                          verified-badge copy (verified.ts) — a computed, enforced participation
                           fact, compile-distinct from users.experience_tier (self-reported) and
                           leagues.experience_tier (self-declared). NO I/O, no clock, no database.
                           100% coverage. Browser-safe: the eighth pure exempt directory, beside
                           src/chat, src/matchmaking, src/identity, src/help, src/reviews,
-                          src/moderation and src/trades — browse-filters.tsx value-imports
-                          PARTICIPATION_TIER_LABEL and TIER_COMPOSITION_LABEL directly. See
-                          docs/enforcement.md and docs/decisions/enforcement-and-tiers.md.
+                          src/moderation and src/trades — public-league-list.tsx value-imports
+                          TIER_COMPOSITION_LABEL directly. See docs/enforcement.md and
+                          docs/decisions/enforcement-and-tiers.md.
   scoring/                Pure fantasy-scoring engine: computeFantasyPoints/scoreLineup, every
                           preset (PPR/standard/K-DEF/TE-premium). NO I/O. 100% coverage.
   stats/                  The stats seam. provider.ts (the interface: listPlayers, listGames,
@@ -380,11 +380,10 @@ and `src/league-service` stays on the blocked list below, reached only over the 
 eighth pure directory on the list, not `src/domain` (which is under
 `eslint-plugin-functional`'s immutability rules and holds types the whole product shares, while a
 participation tier's labels and thresholds are one feature's vocabulary) and not `src/integrity`
-(which is BLOCKED — see below). `PARTICIPATION_TIER_LABEL` and `TIER_COMPOSITION_LABEL`
-(`browse-filters.tsx`) are the real browser VALUE-imports, the same "a client label and a
+(which is BLOCKED — see below). `TIER_COMPOSITION_LABEL` and `CompositionCategory`
+(`public-league-list.tsx`) are the real browser VALUE-imports, the same "a client label and a
 server-enforced rule must read the identical vocabulary" reason every other exempt directory is
-on this list; `ParticipationSummary` is an `interface`, reached through `import type`, which needs
-no exemption. It joins `flag-only.test.ts`'s `INTEGRITY_DIRS` in the same commit it joined this
+on this list. It joins `flag-only.test.ts`'s `INTEGRITY_DIRS` in the same commit it joined this
 list, because the directory that decides who is a veteran is exactly the directory somebody would
 one day reach for an account action from.
 

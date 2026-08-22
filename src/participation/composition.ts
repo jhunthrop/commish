@@ -32,7 +32,7 @@ export function tierCompositionFor(input: { readonly newcomers: number; readonly
 
 /**
  * The three buckets a browse card is allowed to say out loud — an exhaustive `Record`, the same
- * shape `PARTICIPATION_TIER_LABEL` (`./tier`) already uses, over a union derived from a
+ * shape every other copy table in this codebase uses, over a union derived from a
  * `readonly` tuple rather than a raw ratio. Deliberately NOT symmetric with `ParticipationTier`:
  * there is no "mostly veterans" or "all veterans" phrase, because the composition label exists to
  * answer one question — "will I be the only beginner here" — and a newcomer weighing that

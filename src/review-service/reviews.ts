@@ -130,8 +130,8 @@ async function ratingsFor(db: Db, ids: readonly string[]): Promise<ReadonlyMap<s
  * (a manager who has reviewed twice edits their one row, per `reviews_user_idx`'s own uniqueness,
  * but a page still names as many distinct authors as it has rows). `completedSeasonsForMany`
  * (`@/league-service/participation`) is the one query; `isVerifiedPlayer` is the same pure
- * predicate `participationFor` reads through, so this can never compute a different answer than
- * the badge's own definition (`@/participation/verified`).
+ * predicate the badge itself is defined by (`@/participation/verified`), so this can never
+ * compute a different answer than the badge's own definition.
  */
 async function verifiedFor(db: Db, userIds: readonly string[]): Promise<ReadonlySet<string>> {
   const distinct = [...new Set(userIds)];

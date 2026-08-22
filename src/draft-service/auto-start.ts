@@ -2,7 +2,7 @@ import { and, asc, eq, lte } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { drafts, leagues } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
-import { enforcementAppliesTo } from "@/league-service/enforcement";
+import { ENFORCED_LEAGUE_SQL, enforcementIsSwitchedOn } from "@/league-service/enforcement";
 import { DRAFT_SERVICE_CONFIG } from "./config";
 import type { DraftStore } from "./store";
 
@@ -91,7 +91,7 @@ export function dueDraftsQuery(db: Db, nowIso: string) {
     .select({ draftId: drafts.id })
     .from(drafts)
     .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
-    .where(and(eq(drafts.status, "scheduled"), lte(drafts.kickoffAt, new Date(nowIso)), eq(leagues.isPublicMatchmade, true)))
+    .where(and(eq(drafts.status, "scheduled"), lte(drafts.kickoffAt, new Date(nowIso)), ENFORCED_LEAGUE_SQL))
     .orderBy(asc(drafts.id))
     .limit(DRAFT_SERVICE_CONFIG.maxDraftsPerTick);
 }
@@ -144,7 +144,7 @@ async function startOneDraft(store: DraftStore, draftId: string): Promise<AutoSt
  * itself to.
  */
 export async function autoStartDueDrafts(db: Db, deps: AutoStartDeps): Promise<readonly AutoStartOutcome[]> {
-  if (!enforcementAppliesTo({ isPublicMatchmade: true })) return [];
+  if (!enforcementIsSwitchedOn()) return [];
 
   const now = deps.clock.now();
   const draftIds = await dueDraftIds(db, now);

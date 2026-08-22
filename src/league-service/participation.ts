@@ -1,10 +1,6 @@
 import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { DbTx, ReadonlyDb } from "@/db/client";
 import { leagues, matchups, teams } from "@/db/schema";
-import { INTEGRITY_CONFIG } from "@/integrity/config";
-import type { ParticipationSummary } from "@/participation/contract";
-import { participationTierFor } from "@/participation/tier";
-import { isVerifiedPlayer } from "@/participation/verified";
 
 /**
  * The DB-reading half of participation. `@/participation` itself stays pure — no Postgres, no
@@ -56,20 +52,6 @@ export async function completedSeasonsForMany(db: ReadonlyDb, userIds: readonly 
     .where(and(inArray(teams.userId, userIds), isNotNull(leagues.seasonCompletedAt)))
     .groupBy(teams.userId);
   return new Map(rows.map((row) => [row.userId, row.count]));
-}
-
-/**
- * The whole participation record, in ONE query: `completedSeasonsFor` is the only round trip this
- * function makes, and both `tier` and `verified` are derived from that single count through the
- * configured cutoffs — never a second query, and never a second copy of either rule.
- */
-export async function participationFor(db: ReadonlyDb, userId: string): Promise<ParticipationSummary> {
-  const completedSeasons = await completedSeasonsFor(db, userId);
-  return {
-    completedSeasons,
-    tier: participationTierFor(completedSeasons, INTEGRITY_CONFIG.participation.veteranSeasonCutoff),
-    verified: isVerifiedPlayer(completedSeasons, INTEGRITY_CONFIG.participation.verifiedSeasonCutoff),
-  };
 }
 
 /**

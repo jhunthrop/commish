@@ -23,8 +23,10 @@ const STAKE_OPTIONS = [
  * `participationTier`, a DIFFERENT axis from `experienceTier` above: that one is a
  * commissioner's self-declared label for who a league is FOR, this is a computed fact about who
  * is already IN it (`BrowseFilter`'s own docblock, `@/matchmaking/contract`). Options read
- * "Newcomer-friendly"/"Veteran-heavy" rather than the bare `PARTICIPATION_TIER_LABEL` values —
- * a visitor is choosing a KIND OF ROOM, not the tier vocabulary itself.
+ * "Newcomer-friendly"/"Veteran-heavy" rather than the bare tier words — a visitor is choosing a
+ * KIND OF ROOM, not the tier vocabulary itself. That is also why no shared account-facing tier
+ * label table exists: the one it would have served writes its own copy on purpose (final review
+ * F13 deleted `PARTICIPATION_TIER_LABEL`/`_BLURB`, which had no production reader at all).
  */
 const PARTICIPATION_OPTIONS = [
   { value: ANY, label: "Any experience level" },

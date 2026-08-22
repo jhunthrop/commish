@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, matchups, teams, users } from "@/db/schema";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import { completedSeasonsFor, completedSeasonsForMany, participationFor, stampSeasonCompleteInTx } from "./participation";
+import { completedSeasonsFor, completedSeasonsForMany, stampSeasonCompleteInTx } from "./participation";
 
 const db = createTestDb();
 
@@ -100,30 +100,6 @@ describe("completedSeasonsForMany", () => {
   });
 });
 
-describe("participationFor", () => {
-  it("reads the tier through the configured cutoff and not through a second copy of the rule", async () => {
-    await db.insert(users).values({ id: "u_veteran", email: "veteran@test.local", displayName: "Veteran" });
-    await seatIn("u_veteran", "lg_v_a", "2026-01-01T00:00:00.000Z");
-    await seatIn("u_veteran", "lg_v_b", "2026-01-08T00:00:00.000Z");
-    await seatIn("u_veteran", "lg_v_c", "2026-01-15T00:00:00.000Z");
-    expect(await participationFor(db, "u_veteran")).toEqual({ completedSeasons: 3, tier: "veteran", verified: true });
-  });
-
-  it("reads newcomer and unverified for an account below both cutoffs", async () => {
-    await db.insert(users).values({ id: "u_newcomer", email: "newcomer@test.local", displayName: "Newcomer" });
-    await seatIn("u_newcomer", "lg_n_a");
-    expect(await participationFor(db, "u_newcomer")).toEqual({ completedSeasons: 0, tier: "newcomer", verified: false });
-  });
-
-  it("costs exactly one query — participationFor makes no round trip beyond completedSeasonsFor's own", async () => {
-    await db.insert(users).values({ id: "u_carol", email: "carol@test.local", displayName: "Carol" });
-    await seatIn("u_carol", "lg_carol_a", "2026-01-01T00:00:00.000Z");
-    const counting = countingDb(db);
-    await participationFor(counting.db, "u_carol");
-    expect(counting.selectCount()).toBe(1);
-  });
-});
-
 describe("stampSeasonCompleteInTx", () => {
   async function seasonCompletedAt(leagueId: string): Promise<Date | null> {
     const [row] = await db.select({ seasonCompletedAt: leagues.seasonCompletedAt }).from(leagues).where(eq(leagues.id, leagueId));
@@ -179,8 +155,9 @@ describe("stampSeasonCompleteInTx", () => {
 describe("the participation cutoffs come from INTEGRITY_CONFIG, not a hardcoded copy", () => {
   it("keeps the module's own idea of the cutoffs in sync with the config it reads", () => {
     // A change to the ordering rule (`config.test.ts`'s own "verified at or below veteran"
-    // invariant) has real consequences here: `participationFor`'s `verified` and `tier` fields
-    // could disagree about the same account only if the two cutoffs inverted.
+    // invariant) has real consequences here: the badge (`isVerifiedPlayer`) and the join gate
+    // (`participationTierFor`) read the same count through two cutoffs, and could disagree about
+    // the same account only if those two inverted.
     expect(INTEGRITY_CONFIG.participation.verifiedSeasonCutoff).toBeLessThanOrEqual(INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
   });
 });

@@ -12,17 +12,16 @@ export const PARTICIPATION_TIERS = ["newcomer", "veteran"] as const;
 
 export type ParticipationTier = (typeof PARTICIPATION_TIERS)[number];
 
-/** So no page composes its own copy for the two values `PARTICIPATION_TIERS` can hold. */
-export const PARTICIPATION_TIER_LABEL: Readonly<Record<ParticipationTier, string>> = {
-  newcomer: "Newcomer",
-  veteran: "Veteran",
-};
-
-/** The one sentence each tier is explained with, wherever a page needs to say what it means. */
-export const PARTICIPATION_TIER_BLURB: Readonly<Record<ParticipationTier, string>> = {
-  newcomer: "Hasn't finished enough seasons on Commish yet to be marked a veteran.",
-  veteran: "Has finished enough seasons on Commish to be marked a veteran.",
-};
+/**
+ * NO LABEL OR BLURB TABLE LIVES HERE. `PARTICIPATION_TIER_LABEL` and `PARTICIPATION_TIER_BLURB`
+ * shipped beside this union with no production reader (final review F13) and were deleted rather
+ * than left to look like a shared vocabulary. The one surface that names these two tiers to a
+ * person, `browse-filters.tsx`, deliberately writes its own "Newcomer-friendly"/"Veteran-heavy"
+ * copy, because a filter control is describing what a league LEANS rather than labelling an
+ * account; `TIER_COMPOSITION_LABEL` (`./composition`) owns the three phrases a browse card says.
+ * A future surface that genuinely needs an account-facing tier word should add the table back
+ * with its consumer in the same commit, per the delete-dead-code rule.
+ */
 
 /**
  * `newcomer` below `cutoff`, `veteran` at it and above it — `>=`, on purpose, the same reasoning

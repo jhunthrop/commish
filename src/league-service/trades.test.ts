@@ -1782,6 +1782,61 @@ describe("acceptTrade", () => {
       expect((await tradeRow(db, trade.id)).status).toBe("held");
     });
 
+    /**
+     * FINAL REVIEW F17, PINNED RATHER THAN GUARDED. `trade_proposals_open_fingerprint_idx` is
+     * partial on `status = 'open'`, so `held` and `blocked` both fall outside it and the identical
+     * package can be re-proposed while a hold is pending or after a block. The reviewer's read is
+     * that no BYPASS results — the duplicate holds again — and these two tests are what make that
+     * a pinned property rather than a reading.
+     *
+     * WHY A GUARD IS NOT SHIPPED HERE. Refusing a re-proposal would mean asking
+     * `WHERE fingerprint = $1 AND status IN ('held','blocked')` on every propose, which no index
+     * serves today (the only fingerprint index is the partial one), so it would need a migration —
+     * a schema change, at the close of the phase, for a finding with no bypass behind it. The cost
+     * of leaving it is bounded and stated: one extra queue entry per re-proposal, each of which an
+     * operator answers independently, and no roster moves either way.
+     */
+    it("permits the identical package to be re-proposed while the first is HELD, and holds it again rather than executing", async () => {
+      await makeLeaguePublic();
+      const first = await openGrotesquelyLopsidedTrade();
+      await acceptAs("u_bob", first.id);
+      expect((await tradeRow(db, first.id)).status).toBe("held");
+
+      // The real propose path, same league, same two teams, same package. `held` is outside the
+      // partial unique index's own predicate, so nothing refuses it.
+      const reproposed = await proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_rb1"], receive: ["p_wr1"] }));
+      expect(reproposed).toMatchObject({ ok: true });
+
+      // And accepting it reaches the SAME verdict on the same numbers: a second hold, never an
+      // execution. That is the property that makes this queue amplification rather than a bypass.
+      const secondAccept = await acceptAs("u_bob", (reproposed as { readonly tradeId: string }).tradeId);
+      expect(secondAccept).toMatchObject({ ok: true, outcome: "held" });
+      expect(await ownerTeamOf(db, "p_rb1")).toBe("team_a"); // nothing moved, either time
+      expect(await ownerTeamOf(db, "p_wr1")).toBe("team_b");
+
+      // Two open holds, one per trade row — the open-subject unique index dedupes per SUBJECT,
+      // and these are two different trades naming the same package.
+      expect(await openFlagsOfType(db, "trade_hold")).toHaveLength(2);
+    });
+
+    it("permits it again after a BLOCK, and still refuses to execute it", async () => {
+      await makeLeaguePublic();
+      const first = await openGrotesquelyLopsidedTrade();
+      await acceptAs("u_bob", first.id);
+      // The operator's own decision, stamped directly: this test is about what `proposeTrade`
+      // does NEXT, and `blockHeldTradeInTx`'s own path is proven in its own suite.
+      await db.update(tradeProposals).set({ status: "blocked" }).where(eq(tradeProposals.id, first.id));
+
+      const reproposed = await proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_rb1"], receive: ["p_wr1"] }));
+      expect(reproposed).toMatchObject({ ok: true });
+
+      const secondAccept = await acceptAs("u_bob", (reproposed as { readonly tradeId: string }).tradeId);
+      expect(secondAccept).toMatchObject({ ok: true, outcome: "held" });
+      // The block is not a bypass to route around: the same package reaches an operator again,
+      // and the rosters stay exactly where the operator left them until one answers.
+      expect(await ownerTeamOf(db, "p_rb1")).toBe("team_a");
+    });
+
     it("supersedes a held trade when another trade moves one of its players, and tells both parties", async () => {
       await makeLeaguePublic();
       const held = await openGrotesquelyLopsidedTrade();

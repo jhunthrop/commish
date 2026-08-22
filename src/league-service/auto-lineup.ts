@@ -9,7 +9,7 @@ import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotic
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
 import { toRosterSlots } from "./lineups";
 import { AUTO_SET_CONFIG } from "./config";
-import { enforcementAppliesTo } from "./enforcement";
+import { ENFORCED_LEAGUE_SQL, enforcementIsSwitchedOn } from "./enforcement";
 
 /**
  * The missed-deadline lineup strategy, as a runtime array with the union derived from it — the
@@ -432,7 +432,7 @@ export function leaguesNeedingAutoSetQuery(db: Db, weekNumber: number) {
         // `matchups_unsettled_idx`'s own partial predicate (`@/db/schema`), which is the index
         // built for exactly this question.
         isNull(matchups.homeScore),
-        eq(leagues.isPublicMatchmade, true),
+        ENFORCED_LEAGUE_SQL,
         exists(
           db
             .select({ one: sql`1` })
@@ -511,7 +511,7 @@ export async function autoSetLineupsForWeek(db: Db, input: AutoSetInput): Promis
   const deliver = input.deliver ?? deliverNotice;
   const cache = input.cache ?? NOOP_SCORE_CACHE;
 
-  if (!enforcementAppliesTo({ isPublicMatchmade: true })) return { week: input.weekNumber, teamsSet: 0, leaguesFailed: [] };
+  if (!enforcementIsSwitchedOn()) return { week: input.weekNumber, teamsSet: 0, leaguesFailed: [] };
 
   const leagueIds = await leaguesNeedingAutoSet(db, input.weekNumber);
   // Nothing to do: skip the reference read entirely rather than scanning `players` for a run that

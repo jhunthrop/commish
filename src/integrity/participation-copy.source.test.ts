@@ -10,8 +10,8 @@ import { candidateCopyIn, sourceFilesIn } from "./test-support";
  * arguments only).
  *
  * Phase 3 Plan D, Task 2 fix round F2. `src/participation` ships user-facing copy as plain `.ts`
- * exports — `PARTICIPATION_TIER_LABEL`, `PARTICIPATION_TIER_BLURB`, `VERIFIED_BADGE_LABEL`,
- * `VERIFIED_BADGE_TOOLTIP`, `TIER_COMPOSITION_LABEL` — and NONE of it is JSX, so it sits outside
+ * exports — `VERIFIED_BADGE_LABEL`, `VERIFIED_BADGE_TOOLTIP`, `TIER_COMPOSITION_LABEL` — and
+ * NONE of it is JSX, so it sits outside
  * both existing scans: `room-copy.source.test.ts` only walks `.tsx` files, and this directory has
  * none. Task 2's own report claimed these strings were "swept by `room-copy.source.test.ts`,
  * which reads `src/league-room` since Plan C" — true of the STRINGS ONCE THEY REACH a `.tsx`
@@ -32,7 +32,11 @@ const files = sourceFilesIn(["src/participation"], ".ts");
 
 describe("src/participation writes its user-facing copy in the house voice", () => {
   it("finds the files to sweep, so an empty scan can never pass silently", () => {
-    expect(files.length).toBeGreaterThanOrEqual(4);
+    // THREE, not four: `contract.ts` held `ParticipationSummary` and nothing else, and it was
+    // deleted with `participationFor` (final review F12) when the reviewer found neither had a
+    // production consumer. The floor is named rather than derived on purpose — a scan whose floor
+    // is "however many files there happen to be" cannot notice a directory going quiet.
+    expect(files.length).toBeGreaterThanOrEqual(3);
     expect(files).toContain(join("src", "participation", "composition.ts"));
     expect(files).toContain(join("src", "participation", "tier.ts"));
     expect(files).toContain(join("src", "participation", "verified.ts"));
@@ -53,7 +57,7 @@ describe("src/participation writes its user-facing copy in the house voice", () 
   /**
    * THE PROOF OF BITE, so this scan can never become a green test over an extractor that stopped
    * extracting. Reproduces the shape an em dash would actually ship in: a plain string-literal
-   * export, the exact shape `PARTICIPATION_TIER_LABEL`/`TIER_COMPOSITION_LABEL` already use.
+   * export, the exact shape `TIER_COMPOSITION_LABEL` already uses.
    * Verified live against the real files by injecting an em dash into
    * `TIER_COMPOSITION_LABEL.open` (`"Open — to everyone"`), re-running this file, watching
    * `%s says nothing that breaks the copy rules` for `composition.ts` redden with a `dash`
