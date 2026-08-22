@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { act, fireEvent, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import type { NoticesBody, NoticeView } from "../contract";
 import { fixtureAccountDeps, renderInAccount } from "../test-fixtures";
 import { AccountRoomDepsProvider } from "../hooks/deps";
@@ -139,5 +140,32 @@ describe("NoticeInbox", () => {
     expect(quote.tagName).toBe("BLOCKQUOTE");
     // The body's own sentence no longer inlines the words this blockquote already shows.
     expect(screen.getByText(removal.body)).not.toHaveTextContent("off topic");
+  });
+
+  // Plan D Task 9: `NoticeInbox` itself is unchanged — every case above renders it through only
+  // `AccountRoomDepsProvider`, `useNotices`' standalone fallback path. This one proves the SAME
+  // markup, badge included, comes out through the real production path too: `NoticesProvider`
+  // mounted above it, the way `src/app/layout.tsx` actually renders it — byte-identical, not
+  // just "looks similar", by diffing the two trees' own `outerHTML` directly.
+  it("renders the same trigger and unread badge through a NoticesProvider ancestor, byte-identical", async () => {
+    const standaloneFixture = fixtureAccountDeps({ ok: true, data: ONE_UNREAD });
+    const standalone = render(
+      <AccountRoomDepsProvider deps={standaloneFixture.deps}>
+        <NoticeInbox />
+      </AccountRoomDepsProvider>,
+    );
+    const standaloneTrigger = await standalone.findByRole("button", { name: "Notices, 1 unread" });
+
+    const providedFixture = fixtureAccountDeps({ ok: true, data: ONE_UNREAD });
+    const provided = render(
+      <AccountRoomDepsProvider deps={providedFixture.deps}>
+        <NoticesProvider>
+          <NoticeInbox />
+        </NoticesProvider>
+      </AccountRoomDepsProvider>,
+    );
+    const providedTrigger = await provided.findByRole("button", { name: "Notices, 1 unread" });
+
+    expect(providedTrigger.outerHTML).toBe(standaloneTrigger.outerHTML);
   });
 });

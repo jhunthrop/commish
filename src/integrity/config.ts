@@ -70,41 +70,28 @@ export const INTEGRITY_CONFIG = {
      */
     passiveConstructions: ["was made", "was removed", "is kept", "was kept", "were made", "were removed"],
     /**
-     * `GET /api/notices` and `POST /api/notices/read`'s shared ceiling — sibling parity with
-     * `advisorRateLimited`'s "one budget across both routes" (`src/app/api/leagues/[leagueId]/
-     * advisor/_shared.ts`): both spend the same scarce resource, a Postgres round trip for this
-     * user's own notices, so splitting the ceiling per route would double what a single caller
-     * can spend for no product reason.
+     * 30 requests per 60 seconds, restored.
      *
-     * 120, AND THAT NUMBER IS A STOPGAP WITH ITS ARITHMETIC WRITTEN DOWN (final review, MEDIUM 6).
+     * THE STOPGAP IS OVER. Plan C raised this to 120 from an observed cost of two `GET /api/notices`
+     * per client-side navigation (the mount fetch, plus the refcounted stream's `open` refetch after
+     * it reopened), and wrote the arithmetic here so the number would be honest rather than
+     * comfortable. Phase 3 Plan D removed the cause: `NoticesProvider` lives in the root layout,
+     * survives every navigation, and holds one stream and one page of notices for the life of the
+     * tab.
      *
-     * THE REAL DEFECT IS ARCHITECTURAL AND BELONGS TO PLAN D: there is no shared
-     * `src/app/app/layout.tsx`, so every page renders `AppHeader` -> `NoticeInbox` -> `useNotices`
-     * in its OWN subtree and the hook REMOUNTS on every client-side navigation. Each mount costs
-     * TWO `GET /api/notices` — the mount fetch, and the SSE `open` refetch, because the stream is
-     * refcounted and `useNotices` is its only subscriber, so navigating away drops refs to zero,
-     * closes the connection, and the next page opens a fresh one that fires a fresh `open`. The
-     * fix is the shared layout (and/or suppressing the `open` refetch when it immediately follows
-     * a mount fetch); that changes the render tree of every page in the product, which is not a
-     * change to land at the final gate of a 22-commit branch. It is ledgered in the Phase 3
-     * overview's carried-items table, marked as the stopgap this is.
+     * THE NEW ARITHMETIC, from the new cost:
      *
-     * THE ARITHMETIC, from the observed cost above:
+     *     1 GET per SESSION            (the first subscriber's mount fetch)
+     *   + 1 GET per real reconnection  (the stream's `open`, which now fires only when the browser
+     *                                   actually reconnects, not on every page change)
+     *   + 1 GET per notice received    (`notice.created` still refetches, ruling 13)
+     *   + 1 POST /api/notices/read per bell-open with unread notices
      *
-     *     2 requests per navigation
-     *   x 30 navigations per minute   (one every 2 seconds, sustained — click, render, look:
-     *                                  faster than any real member browses for a whole minute)
-     *   = 60 GETs per 60s window
-     *   + 30                          (the shared `POST /api/notices/read`, at most one per
-     *                                  navigation, when the bell is opened with unread notices)
-     *   = 90 requests per window
-     *
-     * 120 is that number with a third of the budget left over as headroom for a burst faster than
-     * sustained. The old ceiling of 30 was reachable in FIFTEEN navigations — ordinary engaged
-     * browsing — and a 429 renders an error state in place of the member's notices, which is the
-     * surface carrying trade offers, executed trades and operator reversals.
+     * A member receiving a notice every four seconds for a minute, opening the bell each time, spends
+     * 30. That is not browsing, it is a stress case, and it is the ceiling. The old 30 was reachable
+     * in FIFTEEN navigations; the new 30 is not reachable by navigation at all.
      */
-    rateLimit: { maxRequests: 120, windowMs: 60_000 },
+    rateLimit: { maxRequests: 30, windowMs: 60_000 },
   },
   moderation: {
     /**

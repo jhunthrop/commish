@@ -665,3 +665,23 @@ step should see stated plainly rather than buried in a task report.
   overview) applied to the inbox badge without being restated there. Whether a badge count change
   warrants a polite live-region announcement, given the badge is not the primary content of any page
   it appears on, is left to the persona panel rather than decided here.
+- **The notices remount fix landed somewhere other than where this doc's own ledger pointed —
+  CLOSED by Phase 3 Plan D Task 9, by correction.** The Phase 3 overview's carried-items table (Plan
+  C final review, MEDIUM 6) proposed a shared `src/app/app/layout.tsx` rendering `AppHeader` once,
+  above the page subtree. That fix shape does not survive contact with the route tree: two pages
+  under `/app` deliberately do not render `AppHeader` and cannot be made to. The draft room
+  (`src/app/app/drafts/[draftId]/page.tsx`) has no page-level header at all — its `RoomRail` **is**
+  its header, under a no-page-scroll contract a second chrome stacked above it would break. The
+  invite page (`src/app/app/join/[code]/page.tsx`) is the ONE page under `/app` a signed-out visitor
+  reaches (`middleware.ts`'s single exemption), and renders its own signed-out header with no
+  session required — a layout that renders `AppHeader` unconditionally would either 500 on a
+  signed-out request or force a session this page's whole point is not to require. **The defect was
+  never about headers.** It was about the notices hook's LIFETIME: no component in the render tree
+  outlived a client-side navigation, so `useNotices` remounted, and remounting cost a fresh mount
+  fetch plus a fresh stream `open` refetch, every page change. The instrument that already outlives
+  every navigation is the ROOT layout (`src/app/layout.tsx`), which renders `ThemeProvider` around
+  every page in the product and is never remounted by the router. `NoticesProvider`
+  (`src/components/app-shell/notices-provider.tsx`) sits beside it, holds the hook's state for the
+  life of the tab, and renders no UI of its own — a requirement, not a stylistic choice, since it
+  mounts on the draft room and the signed-out invite page too. `INTEGRITY_CONFIG.notices.rateLimit`
+  is restored to 30, the P3C 120 having been an honest stopgap for a cost that no longer exists.
