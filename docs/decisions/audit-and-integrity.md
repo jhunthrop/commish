@@ -703,4 +703,6 @@ step should see stated plainly rather than buried in a task report.
   (`src/components/app-shell/notices-provider.tsx`) sits beside it, holds the hook's state for the
   life of the tab, and renders no UI of its own — a requirement, not a stylistic choice, since it
   mounts on the draft room and the signed-out invite page too. `INTEGRITY_CONFIG.notices.rateLimit`
-  is restored to 30, the P3C 120 having been an honest stopgap for a cost that no longer exists.
+  settles at 32, arithmetic-derived (the session-start pair plus two requests per notice window,
+  counted honestly in the config's own docblock) — the P3C 120 having been an honest stopgap for
+  a per-navigation cost that no longer exists.

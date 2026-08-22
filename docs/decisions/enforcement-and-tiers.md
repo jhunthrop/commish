@@ -261,6 +261,17 @@ table this codebase reads as documentation; `trade_reversed` describes undoing s
 OCCURRED, the exact false-word class Plan C's ruling 23 already refused when it made `superseded`
 its own status rather than calling it `rejected`.
 
+**Release order: the trade executes first, the flag resolves second (ruling 13).** A release runs
+the REAL accept machinery in the league's own transaction — week re-derived at release time,
+materialization, transfer, supersede sweep, notices, the league-chain audit — and only after that
+commits does `resolveFlag`'s platform-chain transaction stamp the flag resolved
+(`src/league-service/trades.ts:1733` → `src/integrity-service/flags.ts:591-596`). The order is the
+same asymmetric-failure shape the trade REVERSAL established: if the execution succeeds and the
+resolution then fails, the trade is genuinely done and the retry path heals the still-open flag
+(the reversal's own three-state provenance precedent); the inverse order would record a decision as
+resolved while the rosters it promised never moved, which is the lie the whole queue exists to
+prevent.
+
 ## 8. What a held trade is and is not
 
 A held trade is a QUESTION raised before a trade happens, not a judgment about the two people in
@@ -334,6 +345,17 @@ own closing battery is where every chain THIS plan's seed and e2e create gets it
 verification. A claim row would fix cross-instance duplication and leave an integrity job depending
 on a dev worker's liveness — worse than the runbook it would replace, which is why this plan
 deliberately does not adopt the walk onto the ticker it already has.
+
+**The due-kickoff scan's index, decided by measurement (migration 0029).** The ticker's every-tick
+`drafts ⋈ leagues` scan initially rode the single-column `drafts_status_idx`, and the plan
+assertion this plan requires of every hot query measured what that actually meant on a realistic
+corpus: the index narrowed to `scheduled` and then fetched-and-discarded the 91% of those rows
+whose kickoff was not yet due, every tick, uncapped (the `ORDER BY` sorts before the `LIMIT` can
+save anything). Migration `0029_draft_due_scan_index.sql` widens the index to
+`(status, kickoff_at)` — the measured plan is one Index Cond with zero discards, and the ticker's
+other reader (`status = 'in_progress'`, equality on the leading column) measures unchanged. Same
+rule as migration 0028's index in §2, opposite direction: there the measurement KEPT an index a
+prediction would have dropped; here it RESHAPED one a prediction had blessed.
 
 ## 10. The rollback switches, and why neither is a database column
 
