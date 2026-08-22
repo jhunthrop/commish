@@ -2,15 +2,17 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
-import { draftActions, integrityFlags, lineupSlots, matchups, rosterSlots, teams } from "./schema";
+import { draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
 import { explainPlan, findNode, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
 import { seedRealisticCorpus, seedTradeCorpus } from "./test-corpus";
 import { chatPageQuery } from "@/chat-service/chat";
 import { dueDraftsQuery } from "@/draft-service/auto-start";
-import { pendingFlagQuery } from "@/integrity-service/flags";
+import { liveDraftsQuery } from "@/draft-service/ticker";
+import { openQuestionsQuery, pendingFlagQuery } from "@/integrity-service/flags";
 import { signalsForUsersQuery } from "@/integrity-service/session-signals";
 import { completedSeasonsQuery } from "@/league-service/participation";
 import { browseQuery } from "@/league-service/browse";
+import { leaguesNeedingAutoSetQuery } from "@/league-service/auto-lineup";
 import { tradesQuery } from "@/league-service/trades";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { AUDIT_EVENT_TYPES } from "@/domain/audit";
@@ -144,6 +146,64 @@ describe("hot read paths use indexes", () => {
     expect(draftsNode).toBeDefined();
     expect(draftsNode?.Filter).toBeUndefined();
     expect(draftsNode?.["Rows Removed by Filter"] ?? 0).toBe(0);
+  });
+
+  /**
+   * FINAL REVIEW F16 — THE SECOND READER, NOW ACTUALLY MEASURED. `src/db/schema.ts` opened the
+   * `drafts_status_idx` comment with "TWO READERS, MEASURED" and
+   * `docs/decisions/enforcement-and-tiers.md` §9 said the other reader "measures unchanged", but
+   * only the due-kickoff scan above had an assertion behind it. Against this branch's own standard
+   * that is an overclaim, and the cheaper of the two fixes is the honest one: measure it.
+   *
+   * `liveDraftsQuery` (`@/draft-service/ticker`) is the ticker's expiry scan, run on every tick.
+   * It reads `status = 'in_progress'` alone, which is equality on the index's LEADING column, so
+   * widening the index to `(status, kickoff_at)` in migration 0029 could not have changed its plan
+   * — the argument the migration comment made carefully and this assertion now makes measured.
+   * Imported as the real builder, never a hand copy (F9's lesson).
+   */
+  it("the ticker's expiry scan still seeks on the leading status column alone — 0029's widening left it untouched", async () => {
+    const plan = await explainPlan(db, liveDraftsQuery(db));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("drafts");
+    const usedIndex = indexScanNode(plan, "drafts_status_idx");
+    expect(usedIndex).toBeDefined();
+    expect(usedIndex?.["Index Cond"]).toContain("status");
+    // The second column takes no part: this reader names only `status`, so a plan that had begun
+    // seeking on `kickoff_at` too would mean the index change reached a query it should not have.
+    expect(usedIndex?.["Index Cond"]).not.toContain("kickoff_at");
+  });
+
+  /**
+   * FINAL REVIEW F8 — the auto-set's driving scan, the one new scan on this branch that shipped
+   * with no measurement while its sibling automation's smaller scan got migration 0029.
+   *
+   * `leaguesNeedingAutoSetQuery` (`@/league-service/auto-lineup`) is the LEVEL-derived candidate
+   * query F2 replaced `leaguesInWeek` with: public matchmade leagues fielding this week that still
+   * have a team with no `lineup_slots` row for it, bounded at `AUTO_SET_CONFIG.maxLeaguesPerRun`.
+   * The old read was `SELECT DISTINCT league_id FROM matchups WHERE week_number = $1` with no
+   * `LIMIT`, which the primary key (leading with `league_id`) cannot serve and
+   * `matchups_unsettled_idx` (partial on `home_score IS NULL`) does not imply.
+   *
+   * THE MEASUREMENT DECIDED, and it decided NO NEW INDEX — stated because the opposite outcome is
+   * what this file usually records. Over the 5,000-league corpus the plan reaches every one of the
+   * four relations by index and nothing is sequentially scanned: `leagues` walked in primary-key
+   * order (which is what serves the `ORDER BY`), `matchups` probed by its own primary key as an
+   * Index Only Scan, `teams` by `teams_league_id_idx`, and `lineup_slots` by its primary key,
+   * also index-only. Because the ordering comes from an index walk rather than a Sort, the `LIMIT`
+   * genuinely short-circuits — the exact property `dueDraftsQuery` lacked before 0029, where
+   * `ORDER BY id` sorted the whole result first. So a bound was the fix here, and an index was
+   * not; adding one would be a write cost paid for a plan that is already index-only.
+   */
+  it("the auto-set's candidate scan reaches every table by index, and its LIMIT short-circuits", async () => {
+    const plan = await explainPlan(db, leaguesNeedingAutoSetQuery(db, 1));
+    expect(sequentiallyScannedRelations(plan)).toEqual([]);
+    // No Sort anywhere: the `ORDER BY` is served by the index walk, which is what lets the LIMIT
+    // stop early instead of materializing every candidate league in the product first.
+    expect(nodeTypes(plan)).not.toContain("Sort");
+    expect(nodeTypes(plan)).toContain("Limit");
+    // The two probes that answer "does this league still owe a lineup" are index-only: no heap
+    // page is touched to discover that a team already has a row for the week.
+    expect(indexScanNode(plan, "lineup_slots_team_id_week_number_slot_slot_index_pk")?.["Node Type"]).toBe("Index Only Scan");
+    expect(indexScanNode(plan, "teams_league_id_idx")).toBeDefined();
   });
 
   /**
@@ -285,13 +345,15 @@ describe("hot read paths use indexes", () => {
    * cycle (Task 11 addition — every flag's `league_id` was `NULL` before this, which would have
    * proven nothing about a real league's own read) so this measures against a corpus where a real
    * league's flags are a real, bounded slice.
+   *
+   * FINAL REVIEW F9: this used to hand-rebuild the query. Five of the six assertions this branch
+   * added imported the real builder and this one did not, so a filter added to production (F5's
+   * own `flag_type` predicate, as it turned out) would have left this green while measuring a
+   * query production no longer runs. `openQuestionsQuery` is now exported from `flags.ts` and
+   * imported here, which is the fix this file already applies five times.
    */
   it("a commissioner's moderation window counts one league's open flags by index, never by scanning the flag table", async () => {
-    const query = db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(integrityFlags)
-      .where(and(eq(integrityFlags.leagueId, "lg7"), isNull(integrityFlags.resolvedAt)));
-    const plan = await explainPlan(db, query);
+    const plan = await explainPlan(db, openQuestionsQuery(db, "lg7"));
     expect(sequentiallyScannedRelations(plan)).not.toContain("integrity_flags");
     const usedIndex = indexScanNode(plan, "integrity_flags_queue_idx") ?? indexScanNode(plan, "integrity_flags_open_subject_idx");
     expect(usedIndex).toBeDefined();

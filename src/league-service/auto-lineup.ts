@@ -164,9 +164,41 @@ async function deliverNoticeQuietly(deliver: typeof deliverNotice, notice: Membe
   }
 }
 
+/**
+ * Every player's position and name, read ONCE PER RUN (final review F8).
+ *
+ * `players` is the one table this module reads with no `WHERE` at all, because a carried-forward
+ * lineup can name any player in the pool. That read used to happen INSIDE each league's own
+ * transaction, so a run over L leagues paid L full table scans held inside L open transactions,
+ * for a table whose contents do not change between two leagues examined one second apart. Hoisted
+ * to the driver, it is one read per run, taken before the first transaction opens.
+ *
+ * SAFE TO READ OUTSIDE THE TRANSACTION, and not by luck: `players` is a reference table, not a
+ * league's own state. Nothing this transaction writes touches it, no lock this module takes
+ * protects it, and a player row appearing or changing mid-run cannot invalidate a plan built from
+ * a snapshot moments earlier — the same reasoning `scoringWeightsByLeagueId` (`./browse`) uses for
+ * its own out-of-transaction reference read. The facts that DO need transactional consistency (a
+ * team's roster, its saved rows, the week's own status) are all still read inside.
+ */
+export interface PlayerIndex {
+  readonly positions: Readonly<Record<string, string>>;
+  readonly names: Readonly<Record<string, string>>;
+}
+
+/** The one `players` read this module performs — see `PlayerIndex`'s own docblock. */
+export async function readPlayerIndex(db: Db): Promise<PlayerIndex> {
+  const rows = await db.select({ id: players.id, name: players.name, position: players.position }).from(players);
+  return {
+    positions: Object.fromEntries(rows.map((row) => [row.id, row.position])),
+    names: Object.fromEntries(rows.map((row) => [row.id, row.name])),
+  };
+}
+
 interface AutoSetDeps {
   readonly audit: AuditLogger;
   readonly notify: typeof notifyAffectedMember;
+  /** Read once per run by `autoSetLineupsForWeek`, never per league — `PlayerIndex`'s docblock. */
+  readonly players: PlayerIndex;
 }
 
 /** One league's own attempt, returned to the caller so delivery and eviction — both best-effort,
@@ -233,9 +265,7 @@ export async function autoSetLineupInTx(
   const [league] = await tx.select({ rosterSlots: leagues.rosterSlots, name: leagues.name }).from(leagues).where(eq(leagues.id, leagueId));
   if (league === undefined) return { teamsSet: 0, notices: [] };
 
-  const playerRows = await tx.select({ id: players.id, name: players.name, position: players.position }).from(players);
-  const playerPositions = Object.fromEntries(playerRows.map((row) => [row.id, row.position]));
-  const playerNames = Object.fromEntries(playerRows.map((row) => [row.id, row.name]));
+  const { positions: playerPositions, names: playerNames } = deps.players;
 
   const teamRows = await tx.select({ id: teams.id, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId)).orderBy(teams.id);
 
@@ -431,11 +461,16 @@ export async function autoSetLineupsForWeek(db: Db, input: AutoSetInput): Promis
   const notify = input.notify ?? notifyAffectedMember;
   const deliver = input.deliver ?? deliverNotice;
   const cache = input.cache ?? NOOP_SCORE_CACHE;
-  const deps: AutoSetDeps = { audit, notify };
 
   if (!enforcementAppliesTo({ isPublicMatchmade: true })) return { week: input.weekNumber, teamsSet: 0, leaguesFailed: [] };
 
   const leagueIds = await leaguesNeedingAutoSet(db, input.weekNumber);
+  // Nothing to do: skip the reference read entirely rather than scanning `players` for a run that
+  // will open no transaction at all — which is the common case once every league is set.
+  if (leagueIds.length === 0) return { week: input.weekNumber, teamsSet: 0, leaguesFailed: [] };
+
+  // ONE read per run, before the first transaction opens (final review F8).
+  const deps: AutoSetDeps = { audit, notify, players: await readPlayerIndex(db) };
   let teamsSet = 0;
   const leaguesFailed: FailedLeagueAutoSet[] = [];
 

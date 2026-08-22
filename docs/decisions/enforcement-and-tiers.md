@@ -428,6 +428,23 @@ other reader (`status = 'in_progress'`, equality on the leading column) measures
 rule as migration 0028's index in §2, opposite direction: there the measurement KEPT an index a
 prediction would have dropped; here it RESHAPED one a prediction had blessed.
 
+**Both readers, not one (final review F16).** This paragraph and `schema.ts`'s own index comment
+said "measures unchanged" and "TWO READERS, MEASURED" while only the due-kickoff half had an
+EXPLAIN assertion behind it. Against this branch's own standard that is an overclaim with two
+possible answers, and the cheaper one is also the honest one: the expiry scan is now exported as
+`liveDraftsQuery` (`@/draft-service/ticker`) and measured directly, asserting that its Index Cond
+names `status` and does NOT name `kickoff_at` — the second column takes no part, which is exactly
+the claim the migration comment argued.
+
+**The auto-set's scan, measured for the first time (final review F8).** The sibling automation's
+larger scan shipped with no measurement at all while this one got a migration. It is now
+`leaguesNeedingAutoSetQuery` (`@/league-service/auto-lineup`), level-derived and bounded at
+`AUTO_SET_CONFIG.maxLeaguesPerRun`, and the measurement over the same 5,000-league corpus decided
+NO new index: every one of its four relations is reached by index, two of them index-only, and
+because the `ORDER BY` comes from an index walk rather than a Sort the `LIMIT` genuinely
+short-circuits — the property the due-kickoff scan lacked before 0029. A bound was the fix here;
+an index would be a write cost paid for a plan that is already index-only.
+
 ## 10. The rollback switches, and why neither is a database column
 
 The spec asks for "a per-league feature flag" for the trade auto-hold and "a flag" for tier

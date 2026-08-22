@@ -1426,13 +1426,50 @@ function laterOf(a: Date | string | null, b: Date | string | null): string | nul
  *    eligible partial indexes — the property this read depends on is "some partial-on-open
  *    index", never a specific one, and is bounded by the platform's current OPEN queue, which by
  *    design (ruling 30, an operator resolves flags rather than lets them accumulate) stays small,
- *    never by the platform's all-time flag history.
+ *    never by the platform's all-time flag history. Built by `openQuestionsQuery` below and
+ *    IMPORTED by that measurement (final review F9), so the assertion can no longer measure a
+ *    lookalike this function has since moved on from.
  *
  * NEVER NAMES WHO, WHAT, OR WHY: no `select` here reaches `user_id`, `author_user_id`, `body`, or
  * `removal_reason` on any of the three tables — a stronger guarantee than "not returned", the
  * same "the column simply is not here to leak" discipline `feedQuery`'s own docblock states for
  * `rating`.
  */
+/**
+ * The open-question count, as the query BUILDER (not yet awaited) — the shape
+ * `browseQuery`/`dueDraftsQuery`/`pendingFlagQuery`/`completedSeasonsQuery` already use, and now
+ * this read too (final review F9).
+ *
+ * WHY IT IS EXPORTED AT ALL: `src/db/index-plans.test.ts` measures this read, and five of its six
+ * new EXPLAIN assertions import the real builder while this one hand-rebuilt the query. The shapes
+ * matched character-for-character and the test's own docblock disclosed it honestly, but nothing
+ * BOUND them: a join or a filter added to the production read would leave the assertion green
+ * while measuring a query production no longer runs — which is exactly what F5's `flag_type`
+ * predicate would have done. One builder, imported by both, is the fix the file already applies
+ * five times.
+ *
+ * `resolved_at IS NULL` is the predicate two partial indexes share
+ * (`integrity_flags_queue_idx`, `integrity_flags_open_subject_idx`), so the planner narrows to the
+ * open population by index and applies `league_id` and `flag_type` as filters over that bounded
+ * set — measured, never assumed.
+ */
+export function openQuestionsQuery(db: Db, leagueId: string) {
+  return db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(integrityFlags)
+    .where(
+      and(
+        eq(integrityFlags.leagueId, leagueId),
+        isNull(integrityFlags.resolvedAt),
+        // F5: `trade_hold` is league-SCOPED on the row and is not league NEWS — see
+        // `FLAG_IS_LEAGUE_QUESTION`'s own docblock (`@/integrity/flags`) for the whole
+        // accounting. Read from that table rather than a `ne(flagType, "trade_hold")` here, so
+        // the next flag type has to decide rather than default into a commissioner's counter.
+        inArray(integrityFlags.flagType, LEAGUE_QUESTION_FLAG_TYPES),
+      ),
+    );
+}
+
 export async function leagueModerationSummary(db: Db, input: LeagueModerationSummaryInput): Promise<ModerationSummaryView | null> {
   const [league] = await db.select({ commissionerUserId: leagues.commissionerUserId }).from(leagues).where(eq(leagues.id, input.leagueId));
   if (league === undefined || league.commissionerUserId !== input.userId) return null;
@@ -1447,20 +1484,7 @@ export async function leagueModerationSummary(db: Db, input: LeagueModerationSum
       .from(reviews)
       .innerJoin(teams, eq(teams.userId, reviews.userId))
       .where(and(eq(teams.leagueId, input.leagueId), isNotNull(reviews.removedAt))),
-    db
-      .select({ count: sql<number>`count(*)::int` })
-      .from(integrityFlags)
-      .where(
-        and(
-          eq(integrityFlags.leagueId, input.leagueId),
-          isNull(integrityFlags.resolvedAt),
-          // F5: `trade_hold` is league-SCOPED on the row and is not league NEWS — see
-          // `FLAG_IS_LEAGUE_QUESTION`'s own docblock (`@/integrity/flags`) for the whole
-          // accounting. Read from that table rather than a `ne(flagType, "trade_hold")` here, so
-          // the next flag type has to decide rather than default into a commissioner's counter.
-          inArray(integrityFlags.flagType, LEAGUE_QUESTION_FLAG_TYPES),
-        ),
-      ),
+    openQuestionsQuery(db, input.leagueId),
   ]);
 
   return {

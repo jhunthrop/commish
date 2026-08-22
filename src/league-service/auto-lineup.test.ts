@@ -16,6 +16,7 @@ import {
   autoSetLineupsForWeek,
   changedPlayersClauseFor,
   plannedAutoLineup,
+  readPlayerIndex,
   type PlannedAutoLineupInput,
 } from "./auto-lineup";
 import { setLineup, toRosterSlots, type LineupSlotInput } from "./lineups";
@@ -594,10 +595,54 @@ describe("autoSetLineupsForWeek", () => {
     expect((notices[0]!.context as { changedPlayers?: string }).changedPlayers).toContain("A player who is no longer listed");
   });
 
+  /**
+   * FINAL REVIEW F8: the `players` read is HOISTED out of the per-league transaction. It has no
+   * `WHERE` (a carried-forward lineup can name any player in the pool), so a run over L leagues
+   * used to pay L full table scans held inside L open transactions, for a reference table that
+   * cannot change meaningfully between two leagues examined a second apart.
+   *
+   * Proven by DISAGREEMENT rather than by counting queries: the injected index is handed a name
+   * the real `players` row contradicts, and the notice reads the injected one. A transaction that
+   * still read the table for itself would render "Star RB" here.
+   */
+  it("reads player names and positions ONLY from the run's own index, never from inside the transaction", async () => {
+    await seedPlayers();
+    await db.insert(players).values({ id: "real_rb", name: "Star RB", position: "RB", nflTeam: "KC" });
+    const { alice } = await publicLeague();
+    await db.insert(rosterSlots).values({ teamId: alice, slot: "BENCH", slotIndex: 2, playerId: "real_rb" });
+    await db.insert(lineupSlots).values([
+      { teamId: alice, weekNumber: 3, slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { teamId: alice, weekNumber: 3, slot: "RB", slotIndex: 0, playerId: "real_rb" },
+      { teamId: alice, weekNumber: 3, slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { teamId: alice, weekNumber: 3, slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ]);
+    await tradeAway(alice, "real_rb");
+    await lockWeek(4);
+
+    // The real function, the real driver, one index read before the first transaction opens.
+    const index = await readPlayerIndex(db);
+    expect(index.names.real_rb).toBe("Star RB");
+    // And the SAME function, called directly with an index that omits the player entirely: the
+    // notice must fall back, because the transaction has no second source to consult.
+    const result = await db.transaction((tx) =>
+      autoSetLineupInTx(tx, "league_auto", 4, NOW, {
+        audit: getAuditLogger(),
+        notify: notifyAffectedMember,
+        players: { positions: index.positions, names: {} },
+      }),
+    );
+
+    expect(result.teamsSet).toBe(3);
+    const notices = await noticesFor("u_alice");
+    expect(notices).toHaveLength(1);
+    expect((notices[0]!.context as { changedPlayers?: string }).changedPlayers).toContain("A player who is no longer listed");
+    expect((notices[0]!.context as { changedPlayers?: string }).changedPlayers).not.toContain("Star RB");
+  });
+
   it("returns 0 without writing anything when the league row is gone by the time the transaction opens", async () => {
     await lockWeek(4);
     const result = await db.transaction((tx) =>
-      autoSetLineupInTx(tx, "league_missing", 4, NOW, { audit: getAuditLogger(), notify: notifyAffectedMember }),
+      autoSetLineupInTx(tx, "league_missing", 4, NOW, { audit: getAuditLogger(), notify: notifyAffectedMember, players: { positions: {}, names: {} } }),
     );
     expect(result).toEqual({ teamsSet: 0, notices: [] });
   });

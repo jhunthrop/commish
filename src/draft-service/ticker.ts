@@ -15,6 +15,30 @@ export interface TickOutcome {
   readonly reason?: string;
 }
 
+/**
+ * The expiry scan: every live draft whose clock this tick has to check. `drafts_status_idx`'s
+ * FIRST reader, and the one whose plan `dueDraftsQuery`'s own widening to `(status, kickoff_at)`
+ * had to leave undisturbed (migration 0029).
+ *
+ * Exported as the query BUILDER (not yet awaited), the shape `dueDraftsQuery`/`browseQuery`/
+ * `openQuestionsQuery` already use, for the reason final review F16 named: the schema comment and
+ * the decision doc both said "TWO READERS, MEASURED" while only ONE of the two had an EXPLAIN
+ * assertion behind it. This is the seam that lets the second one be measured rather than argued
+ * (`src/db/index-plans.test.ts`, "the ticker's expiry scan"), against the real query rather than a
+ * hand copy (F9's lesson).
+ *
+ * Equality on the index's leading column, bounded by `maxDraftsPerTick` and ordered by `id` for
+ * the same determinism the due-kickoff scan keeps.
+ */
+export function liveDraftsQuery(db: Db) {
+  return db
+    .select({ id: drafts.id })
+    .from(drafts)
+    .where(eq(drafts.status, "in_progress"))
+    .orderBy(drafts.id)
+    .limit(DRAFT_SERVICE_CONFIG.maxDraftsPerTick);
+}
+
 export interface DraftTicker {
   /** Expire every clock that has run out, once. Tests drive this directly. */
   tick(): Promise<readonly TickOutcome[]>;
@@ -113,12 +137,7 @@ export function createDraftTicker({
       console.error("[draft] auto-start scan failed", error);
     }
 
-    const rows = await db
-      .select({ id: drafts.id })
-      .from(drafts)
-      .where(eq(drafts.status, "in_progress"))
-      .orderBy(drafts.id)
-      .limit(DRAFT_SERVICE_CONFIG.maxDraftsPerTick);
+    const rows = await liveDraftsQuery(db);
 
     for (const row of rows) {
       try {

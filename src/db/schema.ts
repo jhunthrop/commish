@@ -297,11 +297,15 @@ export const drafts = pgTable(
     // This converts that invariant-by-convention into an invariant-by-constraint before any
     // Phase 1 data exists to violate it.
     uniqueIndex("drafts_league_id_idx").on(t.leagueId),
-    // TWO READERS, MEASURED (Phase 3 Plan D, Task 7 review fix round 1, F3;
-    // src/db/index-plans.test.ts's "hot read paths" over `seedRealisticCorpus`,
-    // `@/db/test-corpus`). The ticker's expiry scan (`ticker.ts`) reads `status = 'in_progress'`
+    // TWO READERS, BOTH MEASURED (Phase 3 Plan D, Task 7 review fix round 1, F3, plus the final
+    // review's F16 — which caught this comment claiming a measurement for the first reader that
+    // did not exist yet, and was answered by taking it rather than softening the verb). Both
+    // assertions live in src/db/index-plans.test.ts's "hot read paths" over `seedRealisticCorpus`
+    // (`@/db/test-corpus`), and both EXPLAIN the real exported builder rather than a hand copy.
+    // The ticker's expiry scan (`liveDraftsQuery`, `ticker.ts`) reads `status = 'in_progress'`
     // alone, which a leading `status` column serves identically whether or not a second column
-    // follows it. `autoStartDueDrafts`'s (`@/draft-service/auto-start`) due-kickoff scan reads
+    // follows it — measured by "the ticker's expiry scan still seeks on the leading status column
+    // alone". `autoStartDueDrafts`'s (`@/draft-service/auto-start`) due-kickoff scan reads
     // `status = 'scheduled' AND kickoff_at <= now()`, every tick, on every instance, whether or
     // not any draft is actually due — with `status` alone, that scan's own EXPLAIN measured a
     // real, unbounded-with-growth cost: a bitmap heap fetch across the WHOLE `scheduled`
