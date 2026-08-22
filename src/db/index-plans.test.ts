@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
-import { draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
+import { draftActions, integrityFlags, lineupSlots, matchups, rosterSlots, teams } from "./schema";
 import { explainPlan, findNode, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
 import { seedRealisticCorpus, seedTradeCorpus } from "./test-corpus";
 import { chatPageQuery } from "@/chat-service/chat";
@@ -265,6 +265,41 @@ describe("hot read paths use indexes", () => {
     // assertion: a Filter that happens to discard nothing on this page still re-walks the range.
     expect(usedIndex?.["Index Cond"]).toContain("ROW(raised_at, id) >");
     expect(usedIndex?.Filter).toBeUndefined();
+  });
+
+  /**
+   * PHASE 3 PLAN D, TASK 11 — THE TASK 8 CARRY. `leagueModerationSummary`'s
+   * (`@/integrity-service/flags`) third read — the open-question count a commissioner's own
+   * moderation window shows — filters `integrity_flags` on `league_id = X AND resolved_at IS
+   * NULL`. Neither column LEADS `integrity_flags_queue_idx` OR `integrity_flags_open_subject_idx`
+   * — both are partial on the IDENTICAL predicate, `resolved_at IS NULL` — and MEASUREMENT, not
+   * the docblock's own prediction, decides which one the planner actually reaches for: over this
+   * corpus it is `integrity_flags_open_subject_idx`, chosen for its own cost reasons over the
+   * queue index that named-reasoning assumed, which is why this asserts "some partial-on-open
+   * index" rather than pinning either name — the property that matters is that `league_id` is
+   * applied as a `Filter` over the BOUNDED open-flag population, never a scan of the platform's
+   * whole flag history. The function itself awaits three inline reads with no exported query
+   * builder, so this is the identical shape hand-built, the same "a simple single-table WHERE
+   * reproduced by hand" pattern "a user's teams are found by index" above already uses.
+   * `seedRealisticCorpus` spreads `league_id` one flag per league per `FLAG_COUNT`/`LEAGUE_COUNT`
+   * cycle (Task 11 addition — every flag's `league_id` was `NULL` before this, which would have
+   * proven nothing about a real league's own read) so this measures against a corpus where a real
+   * league's flags are a real, bounded slice.
+   */
+  it("a commissioner's moderation window counts one league's open flags by index, never by scanning the flag table", async () => {
+    const query = db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(integrityFlags)
+      .where(and(eq(integrityFlags.leagueId, "lg7"), isNull(integrityFlags.resolvedAt)));
+    const plan = await explainPlan(db, query);
+    expect(sequentiallyScannedRelations(plan)).not.toContain("integrity_flags");
+    const usedIndex = indexScanNode(plan, "integrity_flags_queue_idx") ?? indexScanNode(plan, "integrity_flags_open_subject_idx");
+    expect(usedIndex).toBeDefined();
+    // The heap scan carries the `Filter`, one level above the `Index Name` (`findNode`'s own
+    // docblock): `league_id` is applied to the bounded set the partial index already narrowed to,
+    // never to every row `integrity_flags` holds.
+    const heapScan = findNode(plan, (node) => node["Relation Name"] === "integrity_flags");
+    expect(heapScan?.Filter).toContain("league_id");
   });
 
   /**

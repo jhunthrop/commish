@@ -199,9 +199,18 @@ export async function seedRealisticCorpus(db: Db): Promise<void> {
   // The operator queue's own corpus. Mostly RESOLVED, because that ratio is the whole reason the
   // queue index is partial: an operator's page one must stay proportional to what is still open,
   // not to every flag the platform ever raised.
+  //
+  // PHASE 3 PLAN D, TASK 11 (the Task 8 carry). `league_id` is spread one flag per league per
+  // 12-flag cycle (`FLAG_COUNT` / `LEAGUE_COUNT`) rather than left `NULL` as it was before this
+  // plan — `leagueModerationSummary`'s (`@/integrity-service/flags`) third read filters
+  // `integrity_flags` on `league_id = X AND resolved_at IS NULL`, and a corpus where every flag's
+  // `league_id` is `NULL` would prove nothing about the plan that read chooses: no real league
+  // would ever match a row. Real flags carry a real `league_id` today (`trade_fairness`,
+  // `trade_hold`), so this is the corpus catching up to a shape production already has, not a
+  // shape invented for the test.
   await db.execute(sql`
-    INSERT INTO integrity_flags (id, flag_type, subject_type, subject_id, evidence, raised_at, resolved_at)
-    SELECT 'flg' || g, 'chat_report', 'chat_message', 'msg' || g, '{}'::jsonb,
+    INSERT INTO integrity_flags (id, flag_type, subject_type, subject_id, league_id, evidence, raised_at, resolved_at)
+    SELECT 'flg' || g, 'chat_report', 'chat_message', 'msg' || g, 'lg' || (1 + (g % ${LEAGUE_COUNT})), '{}'::jsonb,
            now() - (g || ' seconds')::interval,
            CASE WHEN g % ${OPEN_FLAG_INTERVAL} = 0 THEN NULL ELSE now() END
     FROM generate_series(1, ${FLAG_COUNT}) g

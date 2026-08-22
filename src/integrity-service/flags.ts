@@ -1403,11 +1403,17 @@ function laterOf(a: Date | string | null, b: Date | string | null): string | nul
  *    platform: `teams_league_user_idx`'s own uniqueness means this join can never double-count an
  *    account across two seats in the same league.
  *  - `integrity_flags` filtered to `league_id = X AND resolved_at IS NULL`. No index carries
- *    `league_id` on its own, but the WHERE clause is a strict superset of
- *    `integrity_flags_queue_idx`'s own partial predicate (`resolved_at IS NULL`), so Postgres can
- *    still walk that index rather than the whole table — bounded by the platform's current OPEN
- *    queue, which by design (ruling 30, an operator resolves flags rather than lets them
- *    accumulate) stays small, never by the platform's all-time flag history.
+ *    `league_id` on its own, but the WHERE clause is a strict superset of TWO indexes' own
+ *    partial predicate (`resolved_at IS NULL`) — `integrity_flags_queue_idx` and
+ *    `integrity_flags_open_subject_idx` — so Postgres can still walk one of them rather than the
+ *    whole table, `league_id` applied as a `Filter` over the bounded result. MEASURED
+ *    (`src/db/index-plans.test.ts`, "a commissioner's moderation window counts one league's open
+ *    flags by index"), not assumed: over the realistic corpus the planner reaches for
+ *    `integrity_flags_open_subject_idx`, its own cost reasons choosing between two equally
+ *    eligible partial indexes — the property this read depends on is "some partial-on-open
+ *    index", never a specific one, and is bounded by the platform's current OPEN queue, which by
+ *    design (ruling 30, an operator resolves flags rather than lets them accumulate) stays small,
+ *    never by the platform's all-time flag history.
  *
  * NEVER NAMES WHO, WHAT, OR WHY: no `select` here reaches `user_id`, `author_user_id`, `body`, or
  * `removal_reason` on any of the three tables — a stronger guarantee than "not returned", the
