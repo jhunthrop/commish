@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { CreateLeagueBody } from "../contract";
 import { Button, Input, Select } from "@/components/ui";
+import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
@@ -22,6 +23,21 @@ const VISIBILITIES = [
   { value: "invite_only", label: "Invite only" },
   { value: "public", label: "Anyone can find and join" },
 ];
+/**
+ * WHO THE LEAGUE IS FOR, and the control the final review's own battery proved was missing.
+ *
+ * `createLeague` refuses a veteran opening a PUBLIC league declared `beginner`
+ * (`tierJoinPrecondition`, ruling 6) and tells them "Open it to everyone instead" — and this form
+ * carried no control that could do that, so the remedy the refusal named was unreachable and a
+ * veteran could not create a public league at all. `experienced` leads and is the default because
+ * it is the choice that refuses nobody: the only way to reach that refusal now is to pick the
+ * reserved option on purpose.
+ *
+ * Order and words both come from `LEAGUE_EXPERIENCE_TIER_LABEL` (`@/identity/config`) rather than
+ * being typed here, the same "one map decides the words" discipline `EXPERIENCE_TIER_LABEL`
+ * already holds the profile and browse surfaces to.
+ */
+const EXPERIENCE_TIERS = Object.entries(LEAGUE_EXPERIENCE_TIER_LABEL).map(([value, label]) => ({ value, label }));
 const STAKE_TIERS = MATCHMAKING_CONFIG.stakeTiers.map((entry) => ({ value: String(entry.tier), label: entry.label }));
 
 /**
@@ -42,6 +58,8 @@ export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: 
   const [scoringPreset, setScoringPreset] = useState("ppr");
   const [auctionBudget, setAuctionBudget] = useState("200");
   const [visibility, setVisibility] = useState("invite_only");
+  // `experienced` — the choice that refuses nobody. See `EXPERIENCE_TIERS` above.
+  const [experienceTier, setExperienceTier] = useState("experienced");
   const [stakeTier, setStakeTier] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -60,6 +78,7 @@ export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: 
           scoringPreset,
           auctionBudget: Number(auctionBudget),
           visibility,
+          experienceTier,
           stakeTier: Number(stakeTier),
         }),
       });
@@ -102,6 +121,13 @@ export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: 
             />
           ) : null}
           <Select label="Who can join" options={VISIBILITIES} value={visibility} onChange={(event) => setVisibility(event.target.value)} />
+          <Select
+            label="Who it's for"
+            options={EXPERIENCE_TIERS}
+            value={experienceTier}
+            hint={LEAGUE_EXPERIENCE_TIER_HINT}
+            onChange={(event) => setExperienceTier(event.target.value)}
+          />
           <Select label="Stake tier" options={STAKE_TIERS} value={stakeTier} onChange={(event) => setStakeTier(event.target.value)} />
           <p className="text-sm text-text-muted sm:col-span-2">{MATCHMAKING_CONFIG.stakeDisclosure}</p>
         </div>

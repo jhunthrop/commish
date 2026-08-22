@@ -112,4 +112,48 @@ describe("POST /api/leagues", () => {
     const body = (await response.json()) as { readonly ok: false; readonly error: string };
     expect(body.error).toBe(ENFORCEMENT_REFUSALS.create);
   });
+
+  /**
+   * FINAL REVIEW ROUND 2, R2 — the wire half of the create form's new designation control. Before
+   * it existed, the form sent no `experienceTier` at all, so the route's own
+   * `?? user.experienceTier` fallback silently declared every league for whatever the CREATOR had
+   * self-reported at sign-up. A veteran whose profile said "New to fantasy" therefore always
+   * created a `beginner` league and could never create a public one at all.
+   */
+  it("persists the designation the caller chose, rather than the creator's own self-reported tier", async () => {
+    // A veteran whose PROFILE still says `beginner` — the exact account the missing control
+    // stranded, and the one whose two outcomes now differ only by what the control sends.
+    await giveCompletedSeasons("u_vet_designation", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    await db.update(users).set({ experienceTier: "beginner" }).where(eq(users.id, "u_vet_designation"));
+    signedInAs("u_vet_designation");
+
+    // The control's own default: open to everyone. It succeeds where the old implicit fallback
+    // could not, and the league stores what was chosen.
+    const open = await post({ name: "Open Room", visibility: "public", experienceTier: "experienced" });
+    expect(open.status).toBe(201);
+    const openBody = (await open.json()) as { readonly ok: true; readonly data: { readonly leagueId: string } };
+    const [openLeague] = await db.select().from(leagues).where(eq(leagues.id, openBody.data.leagueId));
+    expect(openLeague).toMatchObject({ experienceTier: "experienced", isPublicMatchmade: true });
+
+    // And the reserved choice still reaches the gate, for the same account in the same request
+    // shape — so the control is what decides, not the profile.
+    const reserved = await post({ name: "Rookie Room", visibility: "public", experienceTier: "beginner" });
+    expect(reserved.status).toBe(409);
+  });
+
+  it("still falls back to the creator's own tier for an API caller that names none", async () => {
+    // The fallback is not deleted, only no longer the form's only behaviour: `experienceTier` is
+    // optional in `createLeagueSchema` and a scripted caller may still omit it. `currentUser`
+    // above is the session this route reads its default from (`requireCurrentUser`, mocked), and
+    // it reports `beginner` — so an omitted field lands there, exactly as it did before, while the
+    // test above proves a NAMED field no longer does.
+    await db.insert(users).values({ id: "u_fallback", email: "fallback@test.local", displayName: "Fallback" });
+    signedInAs("u_fallback");
+
+    const response = await post({ name: "Inherited Room" });
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { readonly ok: true; readonly data: { readonly leagueId: string } };
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, body.data.leagueId));
+    expect(league).toMatchObject({ experienceTier: "beginner" });
+  });
 });
