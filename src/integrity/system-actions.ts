@@ -13,7 +13,7 @@ export const SYSTEM_ACTION_CODES = [
   /**
    * The scheduler that starts a draft for a public matchmade league whose commissioner never
    * pressed the button — Task 7's own (`src/draft-service/auto-start.ts`, `autoStartDueDrafts` /
-   * `announceDraftAutoStarted`). Vocabulary and visibility shipped ahead of the writer in Task 4;
+   * `startDraft`'s fused auto-announce). Vocabulary and visibility shipped ahead of the writer in Task 4;
    * this is the code's publisher, and `NoticeContexts.draft_auto_started` (`@/integrity/notices`)
    * is its own notice.
    */

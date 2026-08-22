@@ -248,7 +248,7 @@ export interface NoticeContexts {
   /**
    * `autoStartDueDrafts`'s own notice (`@/draft-service/auto-start`, Plan D Task 7) — the platform
    * pressing the button Task 6 built when nobody else did. Sent to EVERY team in the league, all
-   * referencing the SAME `system_action` event (`announceDraftAutoStarted`'s own docblock), never
+   * referencing the SAME `system_action` event (`startDraft`'s fused auto-announce), never
    * to a subject alone: `SYSTEM_ACTION_VISIBILITY.draft_auto_started` (`@/integrity/system-actions`)
    * is `"everyone"`, on `stat_week_corrected`'s reasoning exactly — a fact about the league's
    * shared calendar, true for everyone in it, about nobody's conduct. A PRIVATE league's draft
