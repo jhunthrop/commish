@@ -251,9 +251,13 @@ export const INTEGRITY_CONFIG = {
     verifiedSeasonCutoff: 1,
     /**
      * Step 6's rollback, as the spec words it: "tier computed but inert." `false` leaves every
-     * label, filter and badge exactly as they are and stops the join gate refusing anybody. Not
-     * yet read by any join gate — Task 1 only computes the tier; the gate that reads this switch
-     * is a later task's.
+     * label, filter and badge exactly as they are and stops all four automated actions at once.
+     *
+     * Read through `enforcementAppliesTo` (`@/league-service/enforcement`) and nowhere else, by
+     * the join gate (`publicJoinPrecondition`), the creation gate (`createLeague`), the trade
+     * auto-hold (`acceptTrade`), the missed-deadline auto-set (`autoSetLineupsForWeek`) and the
+     * draft auto-start (`autoStartDueDrafts`). The invite door is exempt by design and asks
+     * neither this switch nor the predicate — `docs/decisions/enforcement-and-tiers.md` §4.
      */
     enforceTierSegregation: true,
   },

@@ -120,6 +120,19 @@ not a coincidence.
 veteranSeasonCutoff` alongside the four trade thresholds (§8) — one axis, one test, every inversion
 named.
 
+**The stamp/read window, and why it needs no lock.** The gate's count is a plain unlocked `SELECT`
+(`completedSeasonsQuery`, `src/league-service/participation.ts`) run against a one-way stamp
+(`stampSeasonCompleteInTx`) that a settling week writes under a `leagues` row lock. Those two can
+interleave, and the interleaving is left alone deliberately rather than overlooked. Because
+`seasonCompletedAt` is written once and never cleared, the count is monotonically non-decreasing,
+so the error is ONE-DIRECTIONAL: a join can be admitted against a count that was true a moment ago
+and is now one lower than reality (**admitting a stale newcomer is possible**), and no join can
+ever be refused against a count that is too high (**refusing a stale veteran is impossible**). The
+possible half is exactly the outcome the grandfathering rule below already accepts on purpose —
+nobody seated is ever reclassified out — reached a few milliseconds early. The impossible half is
+the one that would be unfair to a person, and it cannot happen. A lock here would buy nothing and
+cost the join gate a write lock on the league row.
+
 **Grandfathering is structural, not a special case.** Segregation is enforced at the JOIN and the
 CREATION (§4), and nowhere else — never re-checked against an existing membership. Nobody already
 seated in a league is ever reclassified out of it, because nothing ever asks the question again
@@ -161,6 +174,42 @@ it is what makes the label mean anything at all.
 
 **This is wrong only if a league's self-declared tier should not bind its own declarer**, which
 would make the label meaningless — a commissioner could then say "beginner" and mean nothing by it.
+
+### The THIRD door, and why it is open on purpose
+
+There are three ways into a league, not two, and the final review was right that this document
+never said so. The third is the INVITE: `acceptInvite` (`src/league-service/invites.ts`) runs its
+own `invitePrecondition` through `joinLeagueInTx`'s precondition hook, that precondition checks
+expiry and use count, and it never calls `tierJoinPrecondition`. A veteran handed an invite code
+joins a `beginner` league whatever its visibility. `createInvite` never reads
+`is_public_matchmade`, so this covers a PUBLIC matchmade beginner league exactly as much as a
+private one.
+
+**That is deliberate, and Task 3's review adjudicated it in those terms:**
+
+> the code's stated rationale ("invited by hand") is about the mechanism (an invite is always a
+> human handing a specific code to a specific person), not the league's own visibility flag, so
+> this is consistent rather than a gap the rationale doesn't cover.
+
+The rationale itself lives at `src/league-service/enforcement.ts`: this platform never polices what
+a commissioner does inside a group they invited by hand. Segregation exists so a STRANGER browsing
+`/browse` does not land among newcomers under a label chosen for them; an invite is the opposite
+situation in every respect, because somebody who already knows this person chose to hand them a
+code. A tier gate on the invite door would mean a commissioner could not invite their own friend
+into their own league, which is not a rule this product wants at any visibility setting.
+
+`src/league-service/join.test.ts` pins it in both directions over one league and one account: the
+public join door refuses with `ENFORCEMENT_REFUSALS.join`, and the invite door admits. Before the
+final review the only invite-path tier test used a private league, so the public combination was
+untested in both directions and a later narrowing of the exemption would have gone unnoticed.
+
+**The residual, recorded rather than adjudicated.** A newcomer creates a public beginner league;
+`/browse` honestly labels it as all newcomers; other newcomers join on that label; the commissioner
+then seats veterans through invite codes. The label stays truthful after the fact — the composition
+category is computed from who is actually in the league — but the people who joined on it never
+agreed to that. Closing it would mean either gating the invite door by tier (taking a
+commissioner's own invitations away from them) or hiding a league from `/browse` once it is
+invite-stuffed. Both are product decisions with owners other than this document.
 
 ## 5. The fourth deny-by-default dimension
 
@@ -265,7 +314,11 @@ its own status rather than calling it `rejected`.
 the REAL accept machinery in the league's own transaction — week re-derived at release time,
 materialization, transfer, supersede sweep, notices, the league-chain audit — and only after that
 commits does `resolveFlag`'s platform-chain transaction stamp the flag resolved
-(`src/league-service/trades.ts:1733` → `src/integrity-service/flags.ts:591-596`). The order is the
+(`src/integrity-service/flags.ts:590-604`, whose comment states it — the release transaction is
+committed before `resolveFlag`'s own ever opens — driving `releaseHeldTradeInTx`,
+`src/league-service/trades.ts:1483`). Note that the OTHER exit does not have this shape and is not
+a counterexample to it: `blockHeldTradeInTx` runs INSIDE `resolveFlag`'s own transaction, because a
+block moves no rosters and so has no league-chain work to commit first. The order is the
 same asymmetric-failure shape the trade REVERSAL established: if the execution succeeds and the
 resolution then fails, the trade is genuinely done and the retry path heals the still-open flag
 (the reversal's own three-state provenance precedent); the inverse order would record a decision as

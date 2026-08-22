@@ -385,6 +385,35 @@ describe("joinPublicLeague — tier enforcement (Task 3, ruling 6)", () => {
     expect(await acceptInvite({ db, clock, newId }, { code: invite.code, userId: "u_vet_private" })).toMatchObject({ ok: true });
   });
 
+  /**
+   * THE THIRD DOOR, PINNED IN BOTH DIRECTIONS (final review F3). `invitePrecondition`
+   * (`./invites`) checks expiry and use count and never calls `tierJoinPrecondition`, so an invite
+   * exempts a veteran from segregation into a PUBLIC beginner league exactly as much as into a
+   * private one. Task 3's review adjudicated that deliberate and this test exists to keep it
+   * deliberate: the exemption is about the MECHANISM ("an invite is always a human handing a
+   * specific code to a specific person"), not about the league's visibility flag, so a change that
+   * narrows it to private leagues reddens here rather than passing quietly.
+   *
+   * Both directions over ONE league and ONE account, which is what makes it a pin rather than two
+   * unrelated assertions: the public join door refuses, the invite door admits.
+   */
+  it("admits a veteran to a PUBLIC beginner league through the invite door, and refuses the same account at the public join door", async () => {
+    const leagueId = await seedLeague({ id: "lg_public_beginner_invite", isPublicMatchmade: true, experienceTier: "beginner" });
+    await giveCompletedSeasons("u_vet_public_invite", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+
+    // Direction 1: the door the segregation covers.
+    expect(await joinPublicLeague(deps(), { leagueId, userId: "u_vet_public_invite" })).toEqual({
+      ok: false,
+      status: 409,
+      reason: ENFORCEMENT_REFUSALS.join,
+    });
+
+    // Direction 2: the door it deliberately does not. Same league, same account, same tier.
+    const invite = await createInvite({ db, clock, random: () => 0.5 }, { leagueId, createdByUserId: "owner" });
+    if (!invite.ok) throw new Error(invite.reason);
+    expect(await acceptInvite({ db, clock, newId }, { code: invite.code, userId: "u_vet_public_invite" })).toMatchObject({ ok: true });
+  });
+
   it("answers 404 and not 409 for a league that is not public, exactly as it did before", async () => {
     // The no-oracle discipline, unchanged. The tier clause runs AFTER the public check, so a
     // private league's existence is never confirmed to a stranger by a tier refusal.

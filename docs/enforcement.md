@@ -35,10 +35,20 @@ a season.
 
 **Trigger:** a `veteran` account (three or more completed seasons,
 `INTEGRITY_CONFIG.participation.veteranSeasonCutoff`) tries to join, OR create, a public matchmade
-league declared `beginner`. Checked at both doors with the SAME predicate
-(`tierJoinPrecondition`) — the join gate (`publicJoinPrecondition`) and the creation gate
-(`createLeague`), because a self-declared `beginner` label binds its own declarer just as much as
-a stranger (`docs/decisions/enforcement-and-tiers.md` §4).
+league declared `beginner`. There are THREE doors into a league, and this predicate covers two of
+them. Checked at both of those with the SAME predicate (`tierJoinPrecondition`) — the join gate
+(`publicJoinPrecondition`) and the creation gate (`createLeague`), because a self-declared
+`beginner` label binds its own declarer just as much as a stranger
+(`docs/decisions/enforcement-and-tiers.md` §4).
+
+The third door is the INVITE (`acceptInvite`, `src/league-service/invites.ts`), and it is exempt on
+purpose. `invitePrecondition` checks expiry and use count and never asks this question, in a public
+matchmade `beginner` league as much as in a private one, because the exemption is about the
+mechanism rather than the visibility flag: an invite is always a human handing a specific code to a
+specific person, and this platform never polices what a commissioner does inside a group they
+invited by hand. `src/league-service/join.test.ts` pins the public-league case in both directions —
+the same account and the same league, refused at the join door and admitted at the invite one. See
+`docs/decisions/enforcement-and-tiers.md` §4 for the full account, including the residual it leaves.
 
 **What it does:** refuses the join (409) or the creation (409) before anything is written — no
 half-created league, no half-joined seat. The join's own refusal is also recorded, in a SEPARATE

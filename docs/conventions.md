@@ -441,6 +441,8 @@ One rulebook, `src/integrity/copy-rules.ts` (`copyViolations`): no em or en dash
 ### Migrations
 `ADD COLUMN … NOT NULL` without a `DEFAULT` is acceptable only while the table is empty (pre-first-deploy, as in `drizzle/0001`); once deployed, add with a DEFAULT or backfill in a separate migration.
 
+**Index rebuilds hold ACCESS EXCLUSIVE, and nothing in this repo uses `CONCURRENTLY`.** A `DROP INDEX` + `CREATE INDEX` pair (as in `drizzle/0029_draft_due_scan_index.sql`) locks the whole table for the duration of the rebuild, blocking every reader — including the draft ticker's every-tick scan. This is a repo-wide property, not a property of any one migration: drizzle-kit runs each migration inside a transaction and `CREATE INDEX CONCURRENTLY` cannot run inside one, so no migration here can express it. Acceptable today because no deploy has happened yet and every table is small. **Named for the deploy era:** once there is production data, an index rebuild on a hot table is a runbook step, applied by hand outside drizzle-kit (`CREATE INDEX CONCURRENTLY` under the new name, then `DROP INDEX CONCURRENTLY` the old one, then a no-op migration to bring the generated SQL back in line), never a migration run against a live database.
+
 ### Commits
 Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`). Commit after every completed step; commit bodies explain *why* and record any deviation from the plan.
 
