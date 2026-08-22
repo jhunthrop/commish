@@ -6,8 +6,10 @@ import {
   FLAG_TYPES,
   RESOLUTION_DECISIONS,
   SUBJECT_OF,
+  SYSTEM_ONLY_DECISIONS,
   contentRemovalIsWiredFor,
   decisionIsAvailable,
+  decisionIsOperatorChoosable,
   decisionIsWiredFor,
 } from "./flags";
 
@@ -16,6 +18,10 @@ describe("the resolution vocabulary", () => {
     // `decisionIsAvailable` used to be `DECISION_OWNER[d] === "plan-b"`, which was the right
     // question while those two facts agreed. Plan C is where they part: `trade_reversed` is
     // still owned by plan-c and is now wired, so ownership stops being able to answer.
+    // `superseded_before_review` (Plan D, fix round 1) is wired for `held_trade` too — available
+    // is "does the product carry this out at all", true for a system-only decision — the
+    // narrower "can an OPERATOR choose it" question belongs to `decisionIsOperatorChoosable`,
+    // covered below.
     expect(RESOLUTION_DECISIONS.filter(decisionIsAvailable)).toEqual([
       "no_action",
       "warned_user",
@@ -23,10 +29,12 @@ describe("the resolution vocabulary", () => {
       "trade_reversed",
       "trade_released",
       "trade_blocked",
+      "superseded_before_review",
     ]);
     expect(DECISION_OWNER.trade_reversed).toBe("plan-c"); // provenance survives the wiring
     expect(DECISION_OWNER.trade_released).toBe("plan-d");
     expect(DECISION_OWNER.trade_blocked).toBe("plan-d");
+    expect(DECISION_OWNER.superseded_before_review).toBe("plan-d");
   });
 
   it("says which subjects each decision can actually be carried out against, in one table", () => {
@@ -44,9 +52,9 @@ describe("the resolution vocabulary", () => {
     expect(DECISION_WIRED_FOR.trade_blocked).toEqual({ review: false, chat_message: false, account_pair: false, trade: false, held_trade: true });
   });
 
-  it("wires nothing but trade_released/trade_blocked for held_trade — no_action and warned_user would strand a waiting trade", () => {
+  it("wires trade_released/trade_blocked/superseded_before_review for held_trade — no_action and warned_user would strand a waiting trade", () => {
     for (const decision of RESOLUTION_DECISIONS) {
-      const shouldBeWired = decision === "trade_released" || decision === "trade_blocked";
+      const shouldBeWired = decision === "trade_released" || decision === "trade_blocked" || decision === "superseded_before_review";
       expect(decisionIsWiredFor(decision, "held_trade")).toBe(shouldBeWired);
     }
   });
@@ -85,6 +93,32 @@ describe("the resolution vocabulary", () => {
         expect(decisionIsWiredFor(decision, subject)).toBe(DECISION_WIRED_FOR[decision][subject]);
       }
     }
+  });
+});
+
+describe("the system-only decisions (Plan D, Task 5, fix round 1, Finding 1)", () => {
+  it("names superseded_before_review as the one and only system-only decision, today", () => {
+    expect(SYSTEM_ONLY_DECISIONS).toEqual(["superseded_before_review"]);
+  });
+
+  it("refuses the operator superseded_before_review while leaving every other declared decision speakable", () => {
+    for (const decision of RESOLUTION_DECISIONS) {
+      const isSystemOnly = (SYSTEM_ONLY_DECISIONS as readonly string[]).includes(decision);
+      expect(decisionIsOperatorChoosable(decision)).toBe(!isSystemOnly);
+    }
+    expect(decisionIsOperatorChoosable("superseded_before_review")).toBe(false);
+    expect(decisionIsOperatorChoosable("trade_released")).toBe(true);
+    expect(decisionIsOperatorChoosable("trade_blocked")).toBe(true);
+    expect(decisionIsOperatorChoosable("no_action")).toBe(true);
+  });
+
+  it("keeps a system-only decision available (the product runs it) even though no operator may choose it", () => {
+    // The two questions this fix round split apart: `decisionIsAvailable` is "does the product
+    // implement this at all" (true — `closeSupersededHoldFlag` really does write it), and
+    // `decisionIsOperatorChoosable` is the narrower "can a human ask for it" (false). Collapsing
+    // them back into one boolean is exactly the hole this fix round closed.
+    expect(decisionIsAvailable("superseded_before_review")).toBe(true);
+    expect(decisionIsOperatorChoosable("superseded_before_review")).toBe(false);
   });
 });
 

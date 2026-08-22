@@ -19,6 +19,7 @@ import { createAuditLogger, type AuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
 import { flagDetail, listPendingFlags, pendingFlagQuery, raiseFlag, removeSubject, resolveFlag } from "./flags";
 import { raiseFlag as raiseFlagReExported } from "./raise-flag";
+import { closeSupersededHoldFlag } from "./trade-fairness";
 
 const db = createTestDb();
 const NOW = "2026-08-20T18:00:00.000Z";
@@ -1493,6 +1494,19 @@ describe("resolveFlag's trade_released/trade_blocked branches (Plan D, Task 5)",
     await db.insert(users).values({ id, email: `${id}@test.local`, displayName: id }).onConflictDoNothing();
   }
 
+  it("closes any superseded-hold flags with the default system clock when the caller supplies none", async () => {
+    // Every OTHER trade_released test in this suite passes `clock: hClock`, which left this one
+    // `??` branch (`(input.clock ?? systemClock).now()` feeding `closeSupersededHoldFlagsQuietly`)
+    // uncovered — a production call really can omit `clock` (`@/app/api/admin/flags/[flagId]/
+    // resolve/route.ts` never supplies one), and this is that path, proven directly rather than
+    // inferred from the equivalent fallback elsewhere in this function.
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("default-clock");
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op" });
+    expect(result).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_released" });
+    expect((await tradeRow(fx.tradeId)).status).toBe("accepted");
+  });
+
   it("releases a held trade by executing it, then resolves the flag, in that order", async () => {
     await ensureOperator("u_op");
     const fx = await heldTradeWithFlag("release");
@@ -1576,6 +1590,24 @@ describe("resolveFlag's trade_released/trade_blocked branches (Plan D, Task 5)",
     expect(result).toMatchObject({ ok: false, status: 400 });
   });
 
+  // Plan D, Task 5, fix round 1 (Finding 1) — the operator-cannot-speak-the-system-word refusal,
+  // at the ONE layer that matters most: `resolveFlag` itself, the function every write actually
+  // goes through (`resolveFlagSchema`'s own refusal, `src/integrity-service/schemas.test.ts`, is
+  // the HTTP boundary in front of this; this is the backstop behind it, per `resolveFlag`'s own
+  // first statement).
+  it("refuses superseded_before_review from an operator, before any write — it is the platform's own word", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("system-word");
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "superseded_before_review", note: "n", operatorUserId: "u_op", clock: hClock });
+    expect(result).toEqual({ ok: false, status: 400, reason: "This decision is the platform's own, and cannot be chosen by an operator." });
+    // Nothing moved and nothing was stamped — the refusal happened before this function's own
+    // transaction ever opened, the same "before any write" discipline every other pre-write
+    // refusal in this suite keeps.
+    expect((await tradeRow(fx.tradeId)).status).toBe("held");
+    const [flag] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flag!.resolvedAt).toBeNull();
+  });
+
   it("heals a retry once the release already committed but the flag's own stamp never ran", async () => {
     // Mirrors `reverseTradeInTx`'s own healing-branch test: a process dying between the two
     // transactions leaves the trade genuinely released with the flag still open, and a second
@@ -1602,9 +1634,10 @@ describe("resolveFlag's trade_released/trade_blocked branches (Plan D, Task 5)",
 
   it("rolls the whole transaction back, flag stamp included, when the block dispatch itself refuses", async () => {
     // The world moved on WITHOUT going through `resolveFlag` at all — the trade is no longer
-    // held by the time the block dispatch runs, even though the flag is still open (exactly the
-    // gap `closeSupersededHoldFlagsInTx` normally closes; simulated directly here to prove
-    // `resolveFlag`'s OWN stamp rolls back with it rather than committing a lie).
+    // held by the time the block dispatch runs, even though the flag is still open (a raw write
+    // standing in for the crash window `sweepSupersededHoldFlags`, `@/integrity-service/trade-
+    // fairness`, exists to re-close; simulated directly here to prove `resolveFlag`'s OWN stamp
+    // rolls back with it rather than committing a lie).
     await ensureOperator("u_op");
     const fx = await heldTradeWithFlag("refused");
     await db.update(tradeProposals).set({ status: "accepted", settledAt: new Date(hClock.now()) }).where(eq(tradeProposals.id, fx.tradeId));
@@ -1817,6 +1850,28 @@ describe("resolveFlag's trade_released/trade_blocked branches (Plan D, Task 5)",
     const afterRelease = await flagDetail(db, flagId);
     const acceptedRow = afterRelease!.trail.find((row) => row.headline === "Op Detail accepted it.");
     expect(acceptedRow).toBeDefined();
+  });
+
+  it("flagDetail reads a SYSTEM resolution honestly — resolvedByName is 'The platform', never a lookup with nothing to find", async () => {
+    // Plan D, Task 5, fix round 1 (Finding 1) — the review's own bug trace, proved directly:
+    // `closeSupersededHoldFlag` (`@/integrity-service/trade-fairness`) stamps
+    // `resolvedByUserId: null`, and this is the read that must recognize that as RESOLVED, with an
+    // honest actor, rather than the collision that used to render live Release/Block buttons over
+    // an already-superseded trade.
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("system-detail");
+    await db.update(tradeProposals).set({ status: "superseded" }).where(eq(tradeProposals.id, fx.tradeId));
+    const closed = await closeSupersededHoldFlag(db, { tradeId: fx.tradeId, leagueId: fx.leagueId, occurredAt: hClock.now(), audit: logger });
+    expect(closed).toBe(true);
+
+    const detail = await flagDetail(db, fx.flagId);
+    expect(detail).not.toBeNull();
+    expect(detail!.decisions).toEqual([]); // no live decision — nothing left for an operator to choose
+    expect(detail!.resolution).toMatchObject({
+      decision: "superseded_before_review",
+      resolvedByUserId: null,
+      resolvedByName: "The platform",
+    });
   });
 
   it("reads a held_trade subject honestly when the named trade row is somehow gone", async () => {

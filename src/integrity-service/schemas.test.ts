@@ -31,6 +31,16 @@ describe("resolveFlagSchema", () => {
     expect(resolveFlagSchema.safeParse({ decision: "account_restricted", note: "n" }).success).toBe(false);
   });
 
+  // Plan D, Task 5, fix round 1 (Finding 1): `superseded_before_review` IS in the closed enum
+  // (`decisionIsAvailable` says the product carries it out) — the boundary refuses it for the
+  // narrower reason, `decisionIsOperatorChoosable`, so this is a distinct failure mode from the
+  // "outside the enum" refusal above, and gets its own message and its own test.
+  it("refuses superseded_before_review from an operator — it is in the enum, but the platform's own word", () => {
+    const result = resolveFlagSchema.safeParse({ decision: "superseded_before_review", note: "n" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]?.message).toBe("This decision is the platform's own, and cannot be chosen by an operator.");
+  });
+
   it("refuses a note past the shared cap, with the same message resolveFlag itself gives", () => {
     const tooLong = "x".repeat(INTEGRITY_CONFIG.moderation.noteMaxLength + 1);
     const result = resolveFlagSchema.safeParse({ decision: "warned_user", note: tooLong });

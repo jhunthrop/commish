@@ -7,6 +7,7 @@ import type { Position } from "@/domain/player";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import {
   contentRemovalIsWiredFor,
+  decisionIsOperatorChoosable,
   decisionIsWiredFor,
   RESOLUTION_DECISIONS,
   TRADE_FAIRNESS_BASES,
@@ -31,6 +32,7 @@ import {
   type TradedPlayerView,
 } from "@/integrity/queue-view";
 import { removeChatMessageInTx } from "@/chat-service/moderation";
+import { closeSupersededHoldFlagsQuietly } from "./trade-fairness";
 import { completedSeasonsFor } from "@/league-service/participation";
 import { reverseTradeInTx } from "@/league-service/trade-reversal";
 import { TransferRefusedError } from "@/league-service/trade-transfer";
@@ -135,6 +137,13 @@ export type ResolveFlagResult =
  * sends its own `trade_blocked` notice to both parties, from INSIDE this function's own
  * transaction rather than a separate one (a block moves nothing, so there is no second chain to
  * cross) — see this function's own `trade_blocked` branch below.
+ *
+ * `superseded_before_review` is `null` too (Plan D, fix round 1): the supersede sweep's own
+ * `trade_superseded` notice already told both parties their offer died, at the moment it died —
+ * a second notice from here, potentially days later when this decision actually lands, would be
+ * the same double-telling every other `null` entry on this map already avoids. This decision
+ * never reaches `resolveFlag` through the operator route at all (`decisionIsOperatorChoosable`),
+ * so this entry exists only for the exhaustive `Record`'s own sake.
  */
 const NOTICE_FOR_DECISION: Readonly<Record<ResolutionDecision, NoticeType | null>> = {
   no_action: null,
@@ -143,6 +152,7 @@ const NOTICE_FOR_DECISION: Readonly<Record<ResolutionDecision, NoticeType | null
   trade_reversed: null,
   trade_released: null,
   trade_blocked: null,
+  superseded_before_review: null,
 };
 
 /**
@@ -166,6 +176,11 @@ const NOTICE_FOR_DECISION: Readonly<Record<ResolutionDecision, NoticeType | null
  * operator only, the identical reasoning `no_action`'s own entry states. `trade_blocked` is
  * `true`, for the identical reason `trade_reversed` is: `blockHeldTradeInTx`'s own notice quotes
  * it VERBATIM to both managers.
+ *
+ * `superseded_before_review` is `false`: this decision never carries an operator's own words at
+ * all — `closeSupersededHoldFlag` (`@/integrity-service/trade-fairness`) writes a fixed,
+ * platform-authored `resolutionNote`, never free text, and no operator can reach this branch to
+ * type one (`decisionIsOperatorChoosable`).
  */
 const NOTE_REACHES_SOMEONE_ELSE: Readonly<Record<ResolutionDecision, boolean>> = {
   no_action: false,
@@ -174,6 +189,7 @@ const NOTE_REACHES_SOMEONE_ELSE: Readonly<Record<ResolutionDecision, boolean>> =
   trade_reversed: true,
   trade_released: false,
   trade_blocked: true,
+  superseded_before_review: false,
 };
 
 /**
@@ -205,6 +221,7 @@ const DECISION_LABEL: Readonly<Record<ResolutionDecision, string>> = {
   trade_reversed: "a trade reversal",
   trade_released: "released",
   trade_blocked: "blocked",
+  superseded_before_review: "superseded before review",
 };
 
 /**
@@ -427,6 +444,15 @@ async function leagueNameForFlag(tx: DbTx, leagueId: string | null): Promise<str
  * if this function's OWN transaction is the one that fails afterward.
  */
 export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<ResolveFlagResult> {
+  // THE SYSTEM-ONLY GATE (Plan D, Task 5, fix round 1, Finding 1) — checked FIRST, before any
+  // other refusal and before any write. `resolveFlagSchema` already refuses this at the HTTP
+  // boundary (`decisionIsOperatorChoosable`, `@/integrity/flags`); this is the SAME "the service
+  // is the real boundary, not only the schema" discipline every other check in this function
+  // holds to — a caller of `resolveFlag` directly (a script, a test, a future route) must never
+  // be able to speak `superseded_before_review` and have it stick.
+  if (!decisionIsOperatorChoosable(input.decision)) {
+    return { ok: false, status: 400, reason: "This decision is the platform's own, and cannot be chosen by an operator." };
+  }
   // `content_removed`'s note becomes a REMOVAL REASON (`removeSubject` passes it straight through
   // as `removeReviewInTx`'s `reason`), not an `operator_warning` notice body — so it is bound by
   // `REVIEW_CONFIG.removalReason.maxLength` (200), the tighter cap `removeReviewInTx` itself
@@ -593,6 +619,18 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
       } catch (error: unknown) {
         console.error("[integrity-service] score cache invalidation failed after a held-trade release", { leagueId, week: release.weekNumber }, error);
       }
+
+      // THE SUPERSEDED-HOLD FLAG CLOSURE(S), fix round 1, Finding 1 — the identical after-commit
+      // shape as the eviction just above: any OTHER held offer THIS release superseded gets its
+      // own `trade_hold` flag closed honestly, in its own platform-scoped transaction
+      // (`closeSupersededHoldFlagsQuietly`, `@/integrity-service/trade-fairness`), never inside
+      // `releaseHeldTradeInTx`'s own league-scoped one — the identical "one transaction, one
+      // chain" constraint `acceptTrade`'s own supersede sweep already carries.
+      await closeSupersededHoldFlagsQuietly(db, {
+        tradeIds: release.supersededHeldTradeIds,
+        leagueId,
+        occurredAt: (input.clock ?? systemClock).now(),
+      });
 
       // Fall through to this function's own transaction below: the PLATFORM-chain record of the
       // decision that ordered the release which just committed. `trade_released`'s own notices
@@ -1270,20 +1308,31 @@ export async function flagDetail(db: Db, flagId: string): Promise<FlagDetail | n
     .map((event) => flagTrailRowFor(event, trailResult.actorNames))
     .filter((row): row is NonNullable<typeof row> => row !== null);
 
-  // `resolveFlag`'s stamp UPDATE sets `resolved_at`, `resolved_by_user_id`, `resolution` and
-  // `resolution_note` together, in the one statement — a row where the first three are non-null
-  // but `resolution_note` is somehow still null cannot come from that write, so it is folded
-  // into the same "not resolved" guard rather than given its own fallback (`?? ""`) to defend a
-  // state this table's one writer cannot produce.
+  // `resolveFlag`'s own stamp UPDATE sets `resolved_at`, `resolved_by_user_id`, `resolution` and
+  // `resolution_note` together, in the one statement, so a row where `resolved_at`/`resolution`/
+  // `resolution_note` are non-null but `resolved_by_user_id` is somehow still null cannot come
+  // from THAT write — but `closeSupersededHoldFlag` (`@/integrity-service/trade-fairness`, fix
+  // round 1, Finding 1) is a SECOND writer, and it stamps exactly that: a real resolution with no
+  // operator behind it (`resolvedByUserId: null`, `resolution: "superseded_before_review"`). This
+  // check no longer requires `resolvedByUserId` non-null for that reason — requiring it made a
+  // system-closed flag misrender as still open, offering an operator two live decision buttons
+  // for a trade that had already been decided by the world. `resolution_note` stays in the guard:
+  // BOTH writers set it in the same statement as the other three fields, so it is still true that
+  // no writer can produce a row where it alone is null.
   const resolution =
-    flagRow.resolvedAt === null || flagRow.resolvedByUserId === null || flagRow.resolution === null || flagRow.resolutionNote === null
+    flagRow.resolvedAt === null || flagRow.resolution === null || flagRow.resolutionNote === null
       ? null
       : {
           decision: flagRow.resolution as ResolutionDecision,
           note: flagRow.resolutionNote,
           resolvedAt: flagRow.resolvedAt.toISOString(),
           resolvedByUserId: flagRow.resolvedByUserId,
-          resolvedByName: await resolverNameFor(db, flagRow.resolvedByUserId),
+          // "The platform" for a SYSTEM resolution (`resolvedByUserId: null`) rather than a
+          // lookup with nothing to find — `resolverNameFor`'s own docblock is why this branch,
+          // not a fallback inside that function, is the honest place for this: a real, non-null
+          // `resolved_by_user_id` is still an FK-guaranteed row every time, with no legitimate
+          // "missing" case of its own to degrade from.
+          resolvedByName: flagRow.resolvedByUserId === null ? "The platform" : await resolverNameFor(db, flagRow.resolvedByUserId),
         };
 
   return flagDetailFor(

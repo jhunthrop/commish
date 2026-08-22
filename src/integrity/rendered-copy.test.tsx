@@ -347,6 +347,55 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
     fireEvent.click(screen.getByRole("button", { name: "Block the trade" }));
     expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner", "Looks like the same person on both sides.");
   });
+
+  /**
+   * THE SWEEP GAP THIS FIX ROUND CLOSED (F4): every test above stops at the confirmation DIALOG —
+   * none of them ever clicked "Confirm", so `HeldTradeDetail`'s own DONE state (the sentence
+   * rendered once a decision actually lands) never mounted here, which is exactly how the em dash
+   * in that sentence (`held-trade-detail.tsx`, "This cannot be changed here — a different
+   * decision is a new flag.") escaped this file's own reason for existing (this describe block's
+   * own docblock, restated: "it renders FIRST PAINT ... copy behind an interaction never
+   * mounts"). Driven through `HeldTradeDetail` directly, mirroring `ResolutionForm`'s own "is
+   * clean once a decision is recorded" test just above, rather than through the full page — the
+   * done state needs a REAL `AdminRoomDepsProvider` fetch to succeed, and the full-page tests
+   * above only ever wrap `AccountRoomDepsProvider` (for `AppHeader`'s own notice inbox), never
+   * `AdminRoomDepsProvider` — so a click-to-Confirm through the full page would have hit a REAL
+   * network call and landed on the ERROR state, not the done one, proving nothing about this
+   * sentence either way.
+   */
+  it.each(["Release the trade", "Block the trade"] as const)("is clean once %s is confirmed and the decision is recorded", async (buttonLabel) => {
+    const { AdminRoomDepsProvider } = await import("@/admin-room/hooks/deps");
+    const { fixtureAdminDeps } = await import("@/admin-room/test-fixtures");
+    const { HeldTradeDetail } = await import("@/admin-room/components/held-trade-detail");
+
+    const fixture = fixtureAdminDeps({ ok: true, data: { flagId: "flag_1", decision: "trade_released" } });
+    const { container } = render(
+      <AdminRoomDepsProvider deps={fixture.deps}>
+        <HeldTradeDetail
+          flagId="flag_1"
+          subject={{
+            kind: "held_trade",
+            tradeId: "trade_1",
+            proposerTeamName: "Bay Bandits",
+            counterpartyTeamName: "Iron Owls",
+            gave: [{ playerId: "p1", name: "Bijan Robinson", position: "RB", averagePoints: 22.4 }],
+            got: [{ playerId: "p2", name: "Justin Jefferson", position: "WR", averagePoints: 18.1 }],
+            valuationBasis: "The platform valued this trade the moment it was accepted.",
+            fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
+            proposerManager: { userId: "u_bb", name: "Bay Bandits Owner", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
+            counterpartyManager: { userId: "u_io", name: "Iron Owls Owner", joinedAt: null, completedSeasons: 0 },
+          }}
+          trail={[]}
+          noteMaxLength={500}
+        />
+      </AdminRoomDepsProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: buttonLabel }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+    expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner");
+  });
 });
 
 /**

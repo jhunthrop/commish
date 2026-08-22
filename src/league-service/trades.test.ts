@@ -256,10 +256,15 @@ describe("tradesQuery", () => {
     await insertProposal(db, { id: "tr_withdrawn", from: ["p_rb3"], to: ["p_wr3"] });
     await insertProposal(db, { id: "tr_expired", from: ["p_rb4"], to: ["p_wr4"] });
     await insertProposal(db, { id: "tr_superseded", from: ["p_rb5"], to: ["p_wr5"] });
+    // Plan D, Task 5, fix round 1 (Finding 2): the brief's own privacy rule — the two managers of
+    // a held trade see it honestly, but the league (and a fortiori a bystander team) does NOT
+    // learn about it — had no wire-level regression test naming `held` specifically.
+    await insertProposal(db, { id: "tr_held", from: ["p_rb6"], to: ["p_wr6"] });
     await db.update(tradeProposals).set({ status: "rejected", settledAt: new Date() }).where(eq(tradeProposals.id, "tr_rejected"));
     await db.update(tradeProposals).set({ status: "withdrawn", settledAt: new Date() }).where(eq(tradeProposals.id, "tr_withdrawn"));
     await db.update(tradeProposals).set({ status: "expired" }).where(eq(tradeProposals.id, "tr_expired"));
     await db.update(tradeProposals).set({ status: "superseded", settledAt: new Date() }).where(eq(tradeProposals.id, "tr_superseded"));
+    await db.update(tradeProposals).set({ status: "held" }).where(eq(tradeProposals.id, "tr_held"));
 
     const bystanderHistory = await tradesQuery(db, { leagueId: "lg_1", teamId: "team_c", box: "history" });
     expect(bystanderHistory).toEqual([]);
@@ -1008,6 +1013,17 @@ describe("listTrades", () => {
     expect(rejected).toMatchObject({ ok: true });
     if (!rejected.ok) return;
     await rejectTrade(db, { tradeId: rejected.tradeId, leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake });
+
+    // Plan D, Task 5, fix round 1 (Finding 2): the wire-level twin of `tradesQuery`'s own held
+    // regression test above, at the exact function `GET /api/leagues/[leagueId]/trades/route.ts`
+    // calls. A held trade is inserted directly rather than driven through a real hold (a public,
+    // lopsided-enough league) — the auto-hold mechanism itself is `trades.test.ts`'s own
+    // `acceptTrade` describe block's job; this test is about `listTrades`' own privacy contract,
+    // which does not care how a row became `held`.
+    const heldCandidate = await proposeTrade(db, await proposeInput(db, { as: "u_alice", give: ["p_wr_a"], receive: ["p_wr1"] }));
+    expect(heldCandidate).toMatchObject({ ok: true });
+    if (!heldCandidate.ok) return;
+    await db.update(tradeProposals).set({ status: "held" }).where(eq(tradeProposals.id, heldCandidate.tradeId));
 
     // Bench-for-bench, deliberately: both sides' BENCH slots accept any position, so this swap
     // is legal regardless of who gives up what — unlike a starting-slot swap, which this test has
@@ -1791,6 +1807,26 @@ describe("acceptTrade", () => {
 
       expect((await tradeRow(db, held.id)).status).toBe("superseded");
       expect(await openFlagsOfType(db, "trade_hold")).toHaveLength(0); // the question died with it
+
+      // Fix round 1, Finding 1: the question died with it HONESTLY — a real system resolution,
+      // never a raw table write. The flag itself carries a real audit trail, and an operator who
+      // still has this flag's URL open reads a genuine "closed" state, not a live, unlabeled
+      // pair of Release/Block buttons over a trade that no longer has anything to decide.
+      const [flagAfter] = flagBefore;
+      const [closedFlag] = await db.select().from(integrityFlags).where(eq(integrityFlags.id, flagAfter!.id));
+      expect(closedFlag).toMatchObject({
+        resolvedByUserId: null,
+        resolution: "superseded_before_review",
+      });
+      expect(closedFlag!.resolvedAt).not.toBeNull();
+      expect(closedFlag!.resolutionNote).not.toBeNull();
+      const [platformResolved] = await auditEventsOn(db, "platform", "flag_resolved");
+      expect(platformResolved).toMatchObject({
+        actorId: null,
+        actorType: "system",
+        leagueId: null,
+        payload: { flagId: flagAfter!.id, flagType: "trade_hold", decision: "superseded_before_review", subjectId: held.id },
+      });
 
       const [aliceSupersededNotice] = (await noticesFor(db, "u_alice")).filter((n) => n.noticeType === "trade_superseded");
       const [bobSupersededNotice] = (await noticesFor(db, "u_bob")).filter((n) => n.noticeType === "trade_superseded");

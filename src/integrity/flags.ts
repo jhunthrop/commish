@@ -79,6 +79,22 @@ export const RESOLUTION_DECISIONS = [
    * resolution in this table already keeps. Wired for `held_trade` alone.
    */
   "trade_blocked",
+  /**
+   * Plan D, Task 5, fix round 1 (Finding 1). The world moved on before an operator ever looked: a
+   * DIFFERENT trade moved a player this held offer also named, `acceptTrade`'s/
+   * `releaseHeldTradeInTx`'s own supersede sweep already moved the row to `superseded`
+   * (`@/trades/lifecycle`), and the question this flag was asking no longer has an answer to
+   * give — not because nobody decided (`no_action`'s own reason for being unavailable here), but
+   * because there is nothing left FOR anybody to decide. `SYSTEM_ONLY_DECISIONS` below is what
+   * keeps this the platform's own word: an operator who could choose it too would be able to claim
+   * "the world moved on" about a trade that is still sitting there waiting on them, which is
+   * exactly the vocabulary-masquerading `no_action`'s own restriction exists to prevent. Written by
+   * `closeSupersededHoldFlag` (`@/integrity-service/trade-fairness`), in its own AFTER-COMMIT
+   * transaction — never a raw table write — the identical shape `raiseTradeFairnessFlag` already
+   * established for the SAME class of "this cannot share the accepting trade's own transaction"
+   * constraint (Plan A ruling 3: one transaction, one chain).
+   */
+  "superseded_before_review",
 ] as const;
 export type ResolutionDecision = (typeof RESOLUTION_DECISIONS)[number];
 
@@ -96,6 +112,7 @@ export const DECISION_OWNER: Readonly<Record<ResolutionDecision, "plan-b" | "pla
   trade_reversed: "plan-c",
   trade_released: "plan-d",
   trade_blocked: "plan-d",
+  superseded_before_review: "plan-d",
 };
 
 /**
@@ -145,6 +162,11 @@ export const DECISION_WIRED_FOR: Readonly<Record<ResolutionDecision, Readonly<Re
   /** Plan D. The trade never executes, and both rosters stay exactly as they were. Wired for
    *  `held_trade` alone, for the identical reason `trade_released` is. */
   trade_blocked: { review: false, chat_message: false, account_pair: false, trade: false, held_trade: true },
+  /** Plan D, fix round 1. Wired for `held_trade` alone — the world can only move on out from under
+   *  a HELD trade — but `SYSTEM_ONLY_DECISIONS` below is what actually keeps an operator from ever
+   *  choosing it; being wired here answers "can the PRODUCT carry this out", not "can an operator
+   *  ask for it". */
+  superseded_before_review: { review: false, chat_message: false, account_pair: false, trade: false, held_trade: true },
 };
 
 export function decisionIsWiredFor(decision: ResolutionDecision, subjectType: FlagSubjectType): boolean {
@@ -156,6 +178,34 @@ export function decisionIsWiredFor(decision: ResolutionDecision, subjectType: Fl
  *  table above rather than from `DECISION_OWNER`. */
 export function decisionIsAvailable(decision: ResolutionDecision): boolean {
   return FLAG_SUBJECT_TYPES.some((subject) => decisionIsWiredFor(decision, subject));
+}
+
+/**
+ * Decisions the PLATFORM can carry out but an operator must never be able to choose (Plan D, Task
+ * 5, fix round 1, Finding 1). `decisionIsAvailable` above answers "does the product implement
+ * this at all" — true for a system-only decision too, since it is genuinely carried out, just
+ * never on an operator's own say-so. This is the SECOND, narrower question: ruling 12's own
+ * reasoning ("every `raiseFlag` caller is a system path") restated for the RESOLUTION side of the
+ * queue — a system word an operator could speak through `POST /api/admin/flags/[flagId]/resolve`
+ * is a new hole in that same guarantee, letting an operator claim "the world moved on" about a
+ * trade that is, in fact, still sitting there waiting on them.
+ *
+ * `superseded_before_review` is the first and, as of this fix round, only entry — the platform's
+ * own answer for a held trade the supersede sweep moved out from under a review before anyone
+ * could look at it.
+ */
+export const SYSTEM_ONLY_DECISIONS = ["superseded_before_review"] as const satisfies readonly ResolutionDecision[];
+
+/**
+ * Whether an OPERATOR may choose this decision — `resolveFlagSchema`'s own boundary refusal
+ * (`@/integrity-service/schemas`), `resolveFlag`'s own defensive re-check before it writes
+ * anything (`@/integrity-service/flags`), and the queue detail page's own decision list
+ * (`flagDetailFor`, below) all ask THIS, never `decisionIsAvailable` alone — a system-only
+ * decision is available (the product runs it) but never operator-choosable (a human cannot ask
+ * for it).
+ */
+export function decisionIsOperatorChoosable(decision: ResolutionDecision): boolean {
+  return !(SYSTEM_ONLY_DECISIONS as readonly ResolutionDecision[]).includes(decision);
 }
 
 /**

@@ -136,6 +136,14 @@ describe("flagTrailRowFor", () => {
     expect(missing?.headline).toBe("An operator resolved this flag.");
   });
 
+  it("reads a SYSTEM resolution as the platform's own, never an operator's (Plan D, fix round 1)", () => {
+    // `actorId: null` is the exact construction `closeSupersededHoldFlag` writes
+    // (`@/integrity-service/trade-fairness`) — the same "no human decided this" shape every other
+    // system-authored event in this product carries.
+    const systemResolved = flagTrailRowFor({ ...event("flag_resolved", { flagId: "flag_1", decision: "superseded_before_review" }), actorId: null });
+    expect(systemResolved?.headline).toBe("The platform closed this flag once a different trade superseded it.");
+  });
+
   it("renders a review's removal", () => {
     const row = flagTrailRowFor(event("review_removed", { reviewId: "r1", authorUserId: "u1", reason: "x", flagId: "flag_1" }));
     expect(row?.headline).toBe("The reported review was removed.");

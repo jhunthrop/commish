@@ -16,6 +16,12 @@ const DECISION_LABEL: Readonly<Record<ResolutionDecision, string>> = {
   trade_reversed: "Reverse the trade",
   trade_released: "Release the trade",
   trade_blocked: "Block the trade",
+  // Never actually offered — `decisions` (the page's own prop) is already narrowed to what
+  // `decisionIsOperatorChoosable` allows before it reaches this form (Plan D, fix round 1), so
+  // this radio option can never render. Present only so `Record<ResolutionDecision, string>`
+  // stays exhaustive over the full vocabulary, the same "compile error over silent fallthrough"
+  // discipline every other Record in this file's own imports already holds to.
+  superseded_before_review: "Superseded before review",
 };
 
 /** The static half of the notice a decision sends — title and body never change with the note

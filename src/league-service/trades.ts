@@ -1,9 +1,9 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, gt, inArray, isNull, ne, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, ne, or } from "drizzle-orm";
 import { assembleAdvisorContext, valuePlayers } from "@/ai-advisor/context";
 import type { Db, DbTx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
-import { integrityFlags, leagues, players, rosterSlots, statWeeks, teams, tradeProposals } from "@/db/schema";
+import { leagues, players, rosterSlots, statWeeks, teams, tradeProposals } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { Position } from "@/domain/player";
 import { isLineupLocked } from "@/league";
@@ -12,7 +12,13 @@ import { INTEGRITY_CONFIG } from "@/integrity/config";
 import type { NoticeContexts } from "@/integrity/notices";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
-import { evaluateTradeBeforeExecute, evidenceFor, raiseTradeFairnessFlag, type TradeFairnessEvaluation } from "@/integrity-service/trade-fairness";
+import {
+  closeSupersededHoldFlagsQuietly,
+  evaluateTradeBeforeExecute,
+  evidenceFor,
+  raiseTradeFairnessFlag,
+  type TradeFairnessEvaluation,
+} from "@/integrity-service/trade-fairness";
 // Imported directly from `./raise-flag`, never from `@/integrity-service/flags` — the same
 // self-contained-slice discipline `trade-fairness.ts`'s own import already keeps, so this module
 // (already in the trade-mutating closure `src/integrity/flag-only.test.ts` guards) never widens
@@ -744,8 +750,10 @@ async function raiseFairnessFlagQuietly(
  * It dies the same way an open one does when a DIFFERENT trade moves one of its players — the
  * fairness review it was waiting on never gets an answer, because there is nothing left to answer
  * about (`TRADE_STATUSES.superseded`'s own docblock, `@/trades/lifecycle`). `closeSupersededHold
- * FlagsInTx`, below, is what keeps that trade's own `trade_hold` flag from lingering open forever
- * once this sweep supersedes it.
+ * FlagsQuietly` (`@/integrity-service/trade-fairness`), called AFTER this transaction commits by
+ * both of this function's own callers, is what keeps that trade's own `trade_hold` flag from
+ * lingering open forever once this sweep supersedes it — see fix round 1, Finding 1, for why that
+ * closure cannot live in this transaction, or in this module, at all.
  */
 async function openOrHeldProposalsNaming(
   tx: DbTx,
@@ -763,26 +771,6 @@ async function openOrHeldProposalsNaming(
       row.id !== excludeTradeId &&
       [...assetPlayerIds(row.proposerAssets), ...assetPlayerIds(row.counterpartyAssets)].some((id) => moved.has(id)),
   );
-}
-
-/**
- * The question died with it (Plan D, Task 5): a held trade the supersede sweep just moved to
- * `superseded` no longer has anything for an operator to decide, so its OWN `trade_hold` flag is
- * closed in the SAME statement — a plain, guarded `UPDATE`, never `resolveFlag`'s operator-
- * decision machinery (`DECISION_WIRED_FOR.no_action.held_trade` is `false` for exactly the reason
- * this is NOT that: an operator did not decide nothing needed to happen, the world made the
- * question moot before anyone had to). No new audit event: the fact this closure explains is
- * already on the record as the trade's own `status = 'superseded'`, and this UPDATE writes no
- * table any chain anchors. Idempotent by construction (`WHERE resolved_at IS NULL`) and a no-op
- * when `supersededTradeIds` names no held trade at all — the common case, since most superseded
- * offers were never held to begin with.
- */
-async function closeSupersededHoldFlagsInTx(tx: DbTx, supersededTradeIds: readonly string[], now: Date): Promise<void> {
-  if (supersededTradeIds.length === 0) return;
-  await tx
-    .update(integrityFlags)
-    .set({ resolvedAt: now, resolvedByUserId: null, resolution: "no_action", resolutionNote: "The trade this flag was about was superseded by a different trade before an operator could decide it." })
-    .where(and(eq(integrityFlags.subjectType, "held_trade"), inArray(integrityFlags.subjectId, supersededTradeIds), isNull(integrityFlags.resolvedAt)));
 }
 
 /**
@@ -1053,6 +1041,9 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
         readonly outcome: "executed";
         readonly tradeId: string;
         readonly supersededCount: number;
+        /** Fix round 1, Finding 1: every OTHER held offer this acceptance just superseded, so the
+         *  post-commit step below can close each one's own `trade_hold` flag honestly. */
+        readonly supersededHeldTradeIds: readonly string[];
         readonly fairness: TradeFairnessEvaluation;
         readonly weekNumber: number;
         readonly notices: readonly MemberNotice[];
@@ -1242,15 +1233,18 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
               )
               .returning();
       // The question died with them: any HELD offer this sweep just superseded had its own
-      // `trade_hold` flag waiting on an operator, and that flag closes in the same transaction —
-      // see `closeSupersededHoldFlagsInTx`'s own docblock for why this is not `resolveFlag`.
-      // `doomed` carries each row's status as it stood a moment BEFORE this UPDATE, which is the
-      // only place "was this one held" is still readable — the UPDATE's own `.returning()` answers
-      // only the AFTER image. Intersected with `supersededRows` so a doomed candidate this UPDATE's
-      // own `WHERE` did not actually match (raced by something else in between) is never closed.
+      // `trade_hold` flag waiting on an operator, and that flag needs to close — but not here.
+      // Fix round 1, Finding 1: closing it is a PLATFORM-scoped `flag_resolved` append, and this
+      // transaction's own anchor is the LEAGUE chain — one transaction, one chain (Plan A ruling
+      // 3). `supersededHeldTradeIds` rides this transaction's own result out to the AFTER-COMMIT
+      // step below (`closeSupersededHoldFlagsQuietly`, `@/integrity-service/trade-fairness`),
+      // mirroring `raiseTradeFairnessFlag`'s own post-commit shape exactly. `doomed` carries each
+      // row's status as it stood a moment BEFORE this UPDATE, which is the only place "was this
+      // one held" is still readable — the UPDATE's own `.returning()` answers only the AFTER
+      // image. Intersected with `supersededRows` so a doomed candidate this UPDATE's own `WHERE`
+      // did not actually match (raced by something else in between) is never closed.
       const actuallySupersededIds = new Set(supersededRows.map((s) => s.id));
-      const supersededHeldIds = doomed.filter((d) => d.status === "held" && actuallySupersededIds.has(d.id)).map((d) => d.id);
-      await closeSupersededHoldFlagsInTx(tx, supersededHeldIds, new Date(now));
+      const supersededHeldTradeIds = doomed.filter((d) => d.status === "held" && actuallySupersededIds.has(d.id)).map((d) => d.id);
 
       // NOTICES — `trade_executed` to both parties, `trade_superseded` to BOTH parties of every
       // doomed offer (final review, LOW 9).
@@ -1368,6 +1362,7 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
         outcome: "executed" as const,
         tradeId: row.id,
         supersededCount: supersededRows.length,
+        supersededHeldTradeIds,
         fairness,
         weekNumber,
         notices: [proposerNotice, counterpartyNotice, ...supersededNotices],
@@ -1392,6 +1387,12 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
   }
 
   await invalidateScoreCacheQuietly(cache, input.leagueId, outcome.weekNumber);
+  // Fix round 1, Finding 1: a SEPARATE transaction per superseded held trade, after this one has
+  // already committed — the identical shape `raiseFairnessFlagQuietly` just below uses, and for
+  // the identical reason (`closeSupersededHoldFlag`'s own docblock, `@/integrity-service/trade-
+  // fairness`). A failure here never fails this function's own result: the superseding trade
+  // already committed, and `npm run trades:sweep` is the re-run.
+  await closeSupersededHoldFlagsQuietly(db, { tradeIds: outcome.supersededHeldTradeIds, leagueId: input.leagueId, occurredAt: now });
   // Task 6: a SEPARATE transaction, after this one has already committed — see
   // `raiseTradeFairnessFlag`'s own docblock for why, and `raiseFairnessFlagQuietly`'s for why a
   // failure here never fails this function's own result.
@@ -1423,7 +1424,17 @@ export interface ReleaseHeldTradeInput {
 }
 
 export type ReleaseHeldTradeResult =
-  | { readonly ok: true; readonly tradeId: string; readonly weekNumber: number; readonly notices: readonly MemberNotice[] }
+  | {
+      readonly ok: true;
+      readonly tradeId: string;
+      readonly weekNumber: number;
+      readonly notices: readonly MemberNotice[];
+      /** Fix round 1, Finding 1: every OTHER held offer THIS release just superseded, so the
+       *  caller (`resolveFlag`'s own `trade_released` branch) can close each one's own
+       *  `trade_hold` flag honestly, after this transaction commits. Empty on the healing branch
+       *  — a retry never re-runs the sweep. */
+      readonly supersededHeldTradeIds: readonly string[];
+    }
   | { readonly ok: false; readonly status: number; readonly reason: string };
 
 /**
@@ -1487,7 +1498,7 @@ export async function releaseHeldTradeInTx(tx: DbTx, input: ReleaseHeldTradeInpu
   }
   if (existing.status === "accepted") {
     // THE HEALING BRANCH (mirroring `reverseTradeInTx`'s own) — see this function's own docblock.
-    return { ok: true, tradeId: existing.id, weekNumber: existing.weekNumber, notices: [] };
+    return { ok: true, tradeId: existing.id, weekNumber: existing.weekNumber, notices: [], supersededHeldTradeIds: [] };
   }
   if (existing.status !== "held") {
     return { ok: false, status: 409, reason: "This trade is no longer waiting on a decision." };
@@ -1556,9 +1567,13 @@ export async function releaseHeldTradeInTx(tx: DbTx, input: ReleaseHeldTradeInpu
           .set({ status: "superseded", settledAt: new Date(now) })
           .where(and(or(eq(tradeProposals.status, "open"), eq(tradeProposals.status, "held")), inArray(tradeProposals.id, doomed.map((p) => p.id))))
           .returning();
+  // Fix round 1, Finding 1: closing any superseded held trade's own flag is a PLATFORM-scoped
+  // `flag_resolved` append, and this transaction's own anchor is the LEAGUE chain — the identical
+  // "rides the result out to an after-commit step" shape `acceptTrade`'s own supersede sweep
+  // uses, and for the identical reason. The CALLER (`resolveFlag`'s `trade_released` branch)
+  // does the closing, once THIS transaction has committed.
   const actuallySupersededIds = new Set(supersededRows.map((s) => s.id));
-  const supersededHeldIds = doomed.filter((d) => d.status === "held" && actuallySupersededIds.has(d.id)).map((d) => d.id);
-  await closeSupersededHoldFlagsInTx(tx, supersededHeldIds, new Date(now));
+  const supersededHeldTradeIds = doomed.filter((d) => d.status === "held" && actuallySupersededIds.has(d.id)).map((d) => d.id);
 
   const teamIds = [...new Set([row.proposerTeamId, row.counterpartyTeamId, ...supersededRows.flatMap((s) => [s.proposerTeamId, s.counterpartyTeamId])])];
   const teamRows = await tx.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(inArray(teams.id, teamIds));
@@ -1660,7 +1675,7 @@ export async function releaseHeldTradeInTx(tx: DbTx, input: ReleaseHeldTradeInpu
   await attachAuditEvent(tx, counterpartyNotice, tradeAcceptedEventId);
   for (const notice of supersededNotices) await attachAuditEvent(tx, notice, tradeAcceptedEventId);
 
-  return { ok: true, tradeId: row.id, weekNumber, notices: [proposerNotice, counterpartyNotice, ...supersededNotices] };
+  return { ok: true, tradeId: row.id, weekNumber, notices: [proposerNotice, counterpartyNotice, ...supersededNotices], supersededHeldTradeIds };
 }
 
 export interface BlockHeldTradeInput {

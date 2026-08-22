@@ -1,7 +1,7 @@
 import type { IconName } from "@/components/ui/icon";
 import type { AuditEvent, JsonObject } from "@/domain/audit";
 import type { Position } from "@/domain/player";
-import { decisionIsWiredFor, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision, type TradeFairnessBasis } from "@/integrity/flags";
+import { decisionIsOperatorChoosable, decisionIsWiredFor, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision, type TradeFairnessBasis } from "@/integrity/flags";
 import type { ActivityRow } from "@/integrity/activity-view";
 
 /**
@@ -50,12 +50,17 @@ export interface FlagDetail {
  * caller resolve `resolvedByUserId` a second time — `resolvedByUserId` stays on the shape too,
  * for the same "keep the id alongside the derived name" provenance discipline `ReporterView`
  * already follows.
+ *
+ * `resolvedByUserId` is `null` for a SYSTEM resolution (Plan D, Task 5, fix round 1, Finding 1) —
+ * `closeSupersededHoldFlag` (`@/integrity-service/trade-fairness`) stamps a real `resolvedAt`/
+ * `resolution`/`resolutionNote` with no operator behind them, and `resolvedByName` still answers
+ * something a person can read ("The platform") rather than making the caller special-case it.
  */
 export interface FlagResolutionView {
   readonly decision: ResolutionDecision;
   readonly note: string;
   readonly resolvedAt: string;
-  readonly resolvedByUserId: string;
+  readonly resolvedByUserId: string | null;
   readonly resolvedByName: string;
 }
 
@@ -318,6 +323,10 @@ export function flagDetailFor(
         ? RESOLUTION_DECISIONS.filter(
             (decision) =>
               decisionIsWiredFor(decision, subject.kind) &&
+              // Plan D, fix round 1: a system-only decision is never OFFERED, whatever it is wired
+              // for — `superseded_before_review` is wired `true` for `held_trade` (the product
+              // does carry it out), but no operator ever chooses it from this list.
+              decisionIsOperatorChoosable(decision) &&
               (decision !== "trade_reversed" || (!subjectIsAlreadyReversed(subject) && !subjectPlayersMovedAgain(subject))),
           )
         : [],
@@ -345,6 +354,11 @@ export const DECISION_PHRASE: Readonly<Record<ResolutionDecision, string>> = {
   trade_reversed: "reversed the trade",
   trade_released: "released the trade",
   trade_blocked: "blocked the trade",
+  // Plan D, fix round 1. Reads correctly in BOTH sentence shapes this phrase fills: the trail's
+  // own "{who} {phrase}." (`flagTrailRowFor`, below, always renders "The platform" for this one,
+  // never "An operator") and the detail page's own "{name} {phrase} on {date}." (`resolvedByName`
+  // is "The platform" too, `@/integrity-service/flags`).
+  superseded_before_review: "closed this flag once a different trade superseded it",
 };
 
 function isResolutionDecision(value: string): value is ResolutionDecision {
@@ -434,7 +448,12 @@ export function flagTrailRowFor(event: AuditEvent, actorNames: ReadonlyMap<strin
   if (event.eventType === "flag_resolved") {
     const decision = payloadStr(event.payload, "decision");
     const phrase = decision !== undefined && isResolutionDecision(decision) ? DECISION_PHRASE[decision] : "resolved this flag";
-    return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "check", headline: `An operator ${phrase}.`, detail: null };
+    // Plan D, fix round 1: a SYSTEM resolution (`actorType: "system"`, `actorId: null` — the same
+    // construction every other system-authored event in this product carries,
+    // `@/integrity/system-actions.ts`'s own docblock) reads "The platform", never "An operator" —
+    // an operator did not decide this one, and the trail must not claim one did.
+    const who = event.actorId === null ? "The platform" : "An operator";
+    return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "check", headline: `${who} ${phrase}.`, detail: null };
   }
   if (event.eventType === "review_removed") {
     return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "x", headline: "The reported review was removed.", detail: null };

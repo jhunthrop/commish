@@ -165,7 +165,7 @@ export function HeldTradeDetail({ flagId, subject, trail, noteMaxLength }: HeldT
   if (done !== null) {
     return (
       <p role="status" className="text-sm text-positive">
-        {done === "trade_released" ? "Released. The trade went through." : "Blocked. The trade will not go through."} This cannot be changed here — a
+        {done === "trade_released" ? "Released. The trade went through." : "Blocked. The trade will not go through."} This cannot be changed here. A
         different decision is a new flag.
       </p>
     );
