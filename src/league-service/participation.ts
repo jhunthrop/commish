@@ -1,4 +1,4 @@
-import { and, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { DbTx, ReadonlyDb } from "@/db/client";
 import { leagues, matchups, teams } from "@/db/schema";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
@@ -37,6 +37,25 @@ export async function completedSeasonsFor(db: ReadonlyDb, userId: string): Promi
   // (a count of 0) — there is no "no rows at all" case to fall back from.
   const [row] = await completedSeasonsQuery(db, userId);
   return row!.count;
+}
+
+/**
+ * The batched sibling of `completedSeasonsFor`: one query for every id in `userIds`, grouped —
+ * the same "batched, never one round trip per row" discipline `listLeagueActivity`'s own name
+ * lookups use (`@/integrity-service/activity`). A `GROUP BY` reports no row at all for an id with
+ * zero completed seasons, so a missing key reads as zero, never as an error — the review feed's
+ * `verifiedFor` (`@/review-service/reviews`) is the first caller, batching the badge's own read
+ * over a page's distinct author ids rather than one lookup per review.
+ */
+export async function completedSeasonsForMany(db: ReadonlyDb, userIds: readonly string[]): Promise<ReadonlyMap<string, number>> {
+  if (userIds.length === 0) return new Map();
+  const rows = await db
+    .select({ userId: teams.userId, count: sql<number>`count(*)::int` })
+    .from(teams)
+    .innerJoin(leagues, eq(leagues.id, teams.leagueId))
+    .where(and(inArray(teams.userId, userIds), isNotNull(leagues.seasonCompletedAt)))
+    .groupBy(teams.userId);
+  return new Map(rows.map((row) => [row.userId, row.count]));
 }
 
 /**

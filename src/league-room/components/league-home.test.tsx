@@ -104,6 +104,29 @@ describe("LeagueHome", () => {
     expect(screen.queryByRole("button", { name: "Create invite link" })).not.toBeInTheDocument();
   });
 
+  // Task 8: the commissioner's own window onto platform moderation in their league — a member
+  // with extra buttons, not an operator, so it sits behind the identical `isCommissioner` gate
+  // `InvitePanel` already does, right beside it.
+  it("shows the commissioner's moderation window only to the commissioner", async () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(await screen.findByRole("region", { name: "Platform moderation in this league" })).toBeInTheDocument();
+  });
+
+  it("hides the moderation window from everybody else", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, isCommissioner: false }} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByRole("region", { name: "Platform moderation in this league" })).not.toBeInTheDocument();
+  });
+
   // The commissioner's "Score Week" control is retired — a feed that finalizes a week when the
   // games end makes manual scoring not a control but the ability to stamp a week the games have
   // not finished. The week's state now reads honestly off WeekStatusBadge instead.

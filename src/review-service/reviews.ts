@@ -2,9 +2,12 @@ import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { reviewReports, reviews, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { raiseFlag } from "@/integrity-service/flags";
 import { attachAuditEvent, notifyAffectedMember } from "@/integrity-service/notify";
+import { completedSeasonsFor, completedSeasonsForMany } from "@/league-service/participation";
+import { isVerifiedPlayer } from "@/participation/verified";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { formatReviewCursor, type ReviewCursor } from "@/reviews/cursor";
 import type { MyReviewState, ReviewView, ReviewsPage } from "@/reviews/contract";
@@ -13,6 +16,10 @@ const systemClock: Clock = { now: () => new Date().toISOString() };
 
 interface FeedRow {
   readonly id: string;
+  /** Never on `ReviewView` (`@/reviews/contract`'s own docblock) — carried only long enough for
+   *  `toView` to have read `userId`, `verifiedFor`'s own batched lookup and `submitReview`'s
+   *  single-account read to key off. */
+  readonly userId: string;
   readonly body: string;
   readonly createdAt: Date;
   readonly updatedAt: Date;
@@ -20,7 +27,24 @@ interface FeedRow {
   readonly authorAvatar: string | null;
 }
 
-function toView(row: FeedRow, rating: number | null): ReviewView {
+/**
+ * The exact key order `toView` builds `ReviewView` in, exported so `reviews.test.ts`'s
+ * `Object.keys(review)` assertion checks against THIS rather than a hand-copied list that could
+ * quietly fall behind it — the same disclosure-allowlist idiom `PUBLIC_LEAGUE_FIELDS`
+ * (`@/league-service/browse`) already uses for its own wire shape.
+ */
+export const REVIEW_VIEW_FIELDS: readonly (keyof ReviewView)[] = [
+  "id",
+  "rating",
+  "body",
+  "createdAt",
+  "updatedAt",
+  "authorName",
+  "authorAvatar",
+  "verified",
+];
+
+function toView(row: FeedRow, rating: number | null, verified: boolean): ReviewView {
   return {
     id: row.id,
     rating,
@@ -29,6 +53,7 @@ function toView(row: FeedRow, rating: number | null): ReviewView {
     updatedAt: row.updatedAt.toISOString(),
     authorName: row.authorName,
     authorAvatar: row.authorAvatar,
+    verified,
   };
 }
 
@@ -73,6 +98,10 @@ export function feedQuery(db: Db, input: ListReviewsInput) {
   return db
     .select({
       id: reviews.id,
+      // Never selected onto `ReviewView` itself — see `FeedRow.userId`'s own docblock. Adding it
+      // here names no new table and costs nothing extra: `reviews.user_id` is already the join
+      // key this SELECT's own `innerJoin` reads.
+      userId: reviews.userId,
       body: reviews.body,
       createdAt: reviews.createdAt,
       updatedAt: reviews.updatedAt,
@@ -94,6 +123,29 @@ async function ratingsFor(db: Db, ids: readonly string[]): Promise<ReadonlyMap<s
 }
 
 /**
+ * The verified badge's own read, batched over `userIds`' DISTINCT values — one query for the
+ * whole page, never one per review, the same shape `listLeagueActivity`'s three batched name
+ * lookups use (`@/integrity-service/activity`) and the same reason `ratingsFor` above is its own
+ * round trip rather than a join into `feedQuery`: a page can review a HANDFUL of distinct authors
+ * (a manager who has reviewed twice edits their one row, per `reviews_user_idx`'s own uniqueness,
+ * but a page still names as many distinct authors as it has rows). `completedSeasonsForMany`
+ * (`@/league-service/participation`) is the one query; `isVerifiedPlayer` is the same pure
+ * predicate `participationFor` reads through, so this can never compute a different answer than
+ * the badge's own definition (`@/participation/verified`).
+ */
+async function verifiedFor(db: Db, userIds: readonly string[]): Promise<ReadonlySet<string>> {
+  const distinct = [...new Set(userIds)];
+  if (distinct.length === 0) return new Set();
+  const counts = await completedSeasonsForMany(db, distinct);
+  const verified = new Set<string>();
+  for (const userId of distinct) {
+    const completedSeasons = counts.get(userId) ?? 0;
+    if (isVerifiedPlayer(completedSeasons, INTEGRITY_CONFIG.participation.verifiedSeasonCutoff)) verified.add(userId);
+  }
+  return verified;
+}
+
+/**
  * One page, newest-first, straight from the database — no reversal, unlike `listMessages`'
  * oldest-first chat log. `pageSize + 1` fetched so `hasMore` costs no second round trip, same
  * idiom as `listMessages` (`@/chat-service/chat.ts`).
@@ -103,9 +155,10 @@ export async function listReviews(db: Db, input: ListReviewsInput): Promise<Revi
   const hasMore = rows.length > REVIEW_CONFIG.pageSize;
   const page = hasMore ? rows.slice(0, REVIEW_CONFIG.pageSize) : rows;
   const ratings = await ratingsFor(db, page.map((row) => row.id));
+  const verified = await verifiedFor(db, page.map((row) => row.userId));
   const last = page[page.length - 1];
   return {
-    reviews: page.map((row) => toView(row, ratings.get(row.id) ?? null)),
+    reviews: page.map((row) => toView(row, ratings.get(row.id) ?? null, verified.has(row.userId))),
     hasMore,
     nextBefore: hasMore && last !== undefined ? formatReviewCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) : null,
   };
@@ -165,7 +218,12 @@ export async function submitReview(db: Db, input: SubmitReviewInput): Promise<Su
   }
 
   const [author] = await db.select({ displayName: users.displayName, avatarUrl: users.avatarUrl }).from(users).where(eq(users.id, input.userId));
-  return { ok: true, review: toView({ ...row, authorName: author?.displayName ?? "A manager", authorAvatar: author?.avatarUrl ?? null }, row.rating) };
+  const completedSeasons = await completedSeasonsFor(db, input.userId);
+  const verified = isVerifiedPlayer(completedSeasons, INTEGRITY_CONFIG.participation.verifiedSeasonCutoff);
+  return {
+    ok: true,
+    review: toView({ ...row, authorName: author?.displayName ?? "A manager", authorAvatar: author?.avatarUrl ?? null }, row.rating, verified),
+  };
 }
 
 /**
@@ -179,6 +237,7 @@ export async function myReview(db: Db, userId: string): Promise<MyReviewState> {
   const [row] = await db
     .select({
       id: reviews.id,
+      userId: reviews.userId,
       rating: reviews.rating,
       body: reviews.body,
       createdAt: reviews.createdAt,
@@ -205,7 +264,9 @@ export async function myReview(db: Db, userId: string): Promise<MyReviewState> {
     // mapper and lands on the generic phrase deliberately rather than coincidentally.
     return { state: "removed", reason: row.removalReason, removedAt: row.removedAt.toISOString() };
   }
-  return { state: "live", review: toView(row, row.rating) };
+  const completedSeasons = await completedSeasonsFor(db, row.userId);
+  const verified = isVerifiedPlayer(completedSeasons, INTEGRITY_CONFIG.participation.verifiedSeasonCutoff);
+  return { state: "live", review: toView(row, row.rating, verified) };
 }
 
 export interface ReportReviewInput {

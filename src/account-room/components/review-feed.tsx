@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
-import { Avatar, Button, EmptyState } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, InfoTip } from "@/components/ui";
+import { VERIFIED_BADGE_LABEL } from "@/participation/verified";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import { REVIEW_CONFIG, type ReportReasonValue } from "@/reviews/config";
 import type { ReviewsPage, ReviewView } from "@/reviews/contract";
@@ -113,7 +114,20 @@ function ReviewRow({ review }: { readonly review: ReviewView }) {
       <div className="flex items-center gap-3">
         <Avatar name={review.authorName} avatar={review.authorAvatar} />
         <div className="flex flex-col">
-          <span className="font-medium text-text-primary">{review.authorName}</span>
+          <span className="flex items-center gap-1">
+            <span className="font-medium text-text-primary">{review.authorName}</span>
+            {/* Founder decision #8: the inverted case renders NOTHING, not a negative badge —
+                an unverified reviewer looks exactly like this product looked before this badge
+                existed. `InfoTip`, not a `title` attribute, so the claim is click-activated and
+                actually readable (`VERIFIED_BADGE_TOOLTIP`, `@/participation/verified`), never a
+                hover-only tooltip nobody on a touch device ever sees. */}
+            {review.verified ? (
+              <span className="inline-flex items-center gap-0.5">
+                <Badge tone="positive">{VERIFIED_BADGE_LABEL}</Badge>
+                <InfoTip term="verified-reviewer" />
+              </span>
+            ) : null}
+          </span>
           <span className="text-sm text-text-muted">
             {rating === null ? null : (
               <>

@@ -295,6 +295,30 @@ export interface TradeCounterpartyOption {
  * one read, two consumers, rather than a second fetch for display that the picker already paid
  * for.
  */
+/**
+ * `GET /api/leagues/[leagueId]/moderation`'s whole response — Plan B's Task 6 persona-panel MEDIUM
+ * ("league-commissioner moderation visibility"), landed here (Task 8) as the narrow window the
+ * brief specifies: counts and a date, never who, what, or why. `leagueModerationSummary`
+ * (`@/integrity-service/flags`) is the one function that builds it, and it answers `null` — never
+ * this shape with zeros baked in — for anyone but the league's own commissioner, so a route
+ * mapping `null` to 404 never has to branch on WHY the read came back empty.
+ */
+export interface ModerationSummaryView {
+  /** Chat messages in this league the platform removed. Never who wrote them. */
+  readonly removedMessages: number;
+  /** Reviews the platform removed, written by someone who has (or had) a team in this league.
+   *  Reviews are platform-scoped, not league-scoped — see that function's own docblock for how
+   *  "in their league" is read for a table with no `league_id` column. */
+  readonly removedReviews: number;
+  /** The later of the two counts' own most recent removal, or `null` when neither count is
+   *  above zero — the healthy-league state, designed first because it is the common one. */
+  readonly mostRecentAt: string | null;
+  /** Unresolved `integrity_flags` scoped to this league — a count, never a list (ruling 6's own
+   *  reasoning: an open flag is a question about a person, and that question is nobody's business
+   *  but the person under it and the operator looking into it). */
+  readonly openQuestions: number;
+}
+
 export interface TradeRoomContext {
   readonly weekNumber: number;
   readonly myTeamId: string;

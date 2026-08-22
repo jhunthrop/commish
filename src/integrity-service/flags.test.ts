@@ -17,7 +17,7 @@ import { seasonCurrentWeek } from "@/league-service/test-support";
 import { acceptTrade, proposeTrade, releaseHeldTradeInTx } from "@/league-service/trades";
 import { createAuditLogger, type AuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
-import { flagDetail, listPendingFlags, pendingFlagQuery, raiseFlag, removeSubject, resolveFlag } from "./flags";
+import { flagDetail, leagueModerationSummary, listPendingFlags, MODERATION_SUMMARY_FIELDS, pendingFlagQuery, raiseFlag, removeSubject, resolveFlag } from "./flags";
 import { raiseFlag as raiseFlagReExported } from "./raise-flag";
 import { closeSupersededHoldFlag } from "./trade-fairness";
 
@@ -2606,5 +2606,210 @@ describe("the trade branch's operator trail, end to end (Task 6)", () => {
     expect(JSON.stringify(page.rows)).not.toMatch(/fairness|lopsided|flag/i);
     // …while the trade itself IS there, because a trade is league news and a flag is not.
     expect(page.rows.some((row) => row.headline.includes("trade"))).toBe(true);
+  });
+});
+
+/**
+ * Plan D, Task 8 step 2: the commissioner's own window onto platform moderation in their league.
+ * Plan B's Task 6 persona panel raised it as a MEDIUM and ruled it out of its own scope by name —
+ * see `leagueModerationSummary`'s own docblock for the exact ruling. Every test here builds its
+ * own league from scratch rather than sharing one across `it` blocks, so a count in one test can
+ * never be a fixture another test half-seeded.
+ */
+describe("leagueModerationSummary", () => {
+  // Every fixture's own remover, seeded once per test — `beforeEach` at the top of this file
+  // already truncated everything, so one seed per test is enough even for the tests that build
+  // more than one league (`seedLeagueWith` no longer seeds it, to stay safe against being called
+  // twice in one test).
+  beforeEach(async () => {
+    await seedUser("u_mod_operator", true);
+  });
+
+  async function seedLeagueWith(leagueId: string, commissionerUserId: string, memberUserIds: readonly string[] = []): Promise<void> {
+    await seedUser(commissionerUserId);
+    await seedLeague(leagueId, commissionerUserId);
+    for (const userId of memberUserIds) {
+      await seedUser(userId);
+      await db.insert(teams).values({ id: `${leagueId}_${userId}_team`, leagueId, userId, name: userId });
+    }
+  }
+
+  /** A chat message in `leagueId`, removed at `removedAt` (or never, if omitted). Every caller
+   *  goes through `seedLeagueWith` first, which seeds the operator this stamps as the remover. */
+  async function seedChatMessage(leagueId: string, authorUserId: string, opts: { readonly removedAt?: string } = {}): Promise<void> {
+    const [message] = await db.insert(chatMessages).values({ leagueId, authorUserId, body: "message body" }).returning({ id: chatMessages.id });
+    if (opts.removedAt !== undefined) {
+      await db
+        .update(chatMessages)
+        .set({ removedAt: new Date(opts.removedAt), removedByUserId: "u_mod_operator", removalReason: "spam" })
+        .where(eq(chatMessages.id, message!.id));
+    }
+  }
+
+  /** A review by `authorUserId` (a real, platform-scoped review — no `leagueId` of its own),
+   *  removed at `removedAt` (or never, if omitted). Every caller goes through `seedLeagueWith`
+   *  first, which seeds the operator this stamps as the remover. */
+  async function seedReview(id: string, authorUserId: string, opts: { readonly removedAt?: string } = {}): Promise<void> {
+    await db.insert(reviews).values({ id, userId: authorUserId, rating: 3, body: `review body ${id}`, createdAt: new Date(NOW), updatedAt: new Date(NOW) });
+    if (opts.removedAt !== undefined) {
+      await db
+        .update(reviews)
+        .set({ removedAt: new Date(opts.removedAt), removedByUserId: "u_mod_operator", removalReason: "spam" })
+        .where(eq(reviews.id, id));
+    }
+  }
+
+  async function seedOpenFlag(leagueId: string, subjectId: string): Promise<void> {
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "chat_report",
+        subjectId,
+        leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: NOW,
+        newId: () => `flag_mod_${subjectId}`,
+        audit: logger,
+      }),
+    );
+  }
+
+  it("tells the commissioner how many messages and reviews the platform removed in their league, and when", async () => {
+    await seedLeagueWith("lg_mod_1", "u_mod_commish", ["u_mod_bob"]);
+    await seedChatMessage("lg_mod_1", "u_mod_bob", { removedAt: "2026-08-18T09:00:00.000Z" });
+    await seedChatMessage("lg_mod_1", "u_mod_bob", { removedAt: "2026-08-19T14:02:00.000Z" });
+    await seedChatMessage("lg_mod_1", "u_mod_bob"); // never removed — not counted
+    await seedOpenFlag("lg_mod_1", "some_subject");
+
+    expect(await leagueModerationSummary(db, { leagueId: "lg_mod_1", userId: "u_mod_commish" })).toEqual({
+      removedMessages: 2,
+      removedReviews: 0,
+      mostRecentAt: "2026-08-19T14:02:00.000Z",
+      openQuestions: 1,
+    });
+  });
+
+  it("never names who was moderated, what they said, or why", async () => {
+    // The boundary. A commissioner is a member with extra buttons, not an operator: Plan B's
+    // founder decision #3 shipped "operator only" for removal and this does not reopen it. The
+    // removal reason reaches the author's own notice and nobody else (Plan B's wire-level HIGH),
+    // and a count is what tells a commissioner their league is being looked after without
+    // publishing a member's worst afternoon to the person who runs their league.
+    await seedLeagueWith("lg_mod_2", "u_mod_commish2", ["u_bob"]);
+    await seedChatMessage("lg_mod_2", "u_bob", { removedAt: "2026-08-18T09:00:00.000Z" });
+    await db.update(chatMessages).set({ removalReason: "harassed another manager" }).where(eq(chatMessages.leagueId, "lg_mod_2"));
+
+    const summary = await leagueModerationSummary(db, { leagueId: "lg_mod_2", userId: "u_mod_commish2" });
+    expect(JSON.stringify(summary)).not.toContain("u_bob");
+    expect(JSON.stringify(summary)).not.toContain("harassed");
+    expect(Object.keys(summary!)).toEqual([...MODERATION_SUMMARY_FIELDS]);
+  });
+
+  it("answers null (the route's 404) to an ordinary member of the same league", async () => {
+    await seedLeagueWith("lg_mod_3", "u_mod_commish3", ["u_mod_ordinary"]);
+    expect(await leagueModerationSummary(db, { leagueId: "lg_mod_3", userId: "u_mod_ordinary" })).toBeNull();
+  });
+
+  it("answers null for a league that doesn't exist, the identical shape a non-commissioner gets", async () => {
+    await seedUser("u_mod_nobody");
+    expect(await leagueModerationSummary(db, { leagueId: "lg_mod_ghost", userId: "u_mod_nobody" })).toBeNull();
+  });
+
+  it("counts open questions without saying what they are about", async () => {
+    // `openQuestions` is the number of unresolved `integrity_flags` scoped to this league. It is
+    // a count and never a list, for the identical reason: an open flag is a question about a
+    // person and `ACTIVITY_VISIBILITY.flag_raised` is `hidden` on that basis. What the
+    // commissioner gains is the knowledge that something is in hand, which is the entire
+    // complaint the panel raised.
+    await seedLeagueWith("lg_mod_4", "u_mod_commish4");
+    await seedOpenFlag("lg_mod_4", "subject_a");
+    await seedOpenFlag("lg_mod_4", "subject_b");
+    await seedOpenFlag("lg_mod_4", "subject_c");
+
+    expect((await leagueModerationSummary(db, { leagueId: "lg_mod_4", userId: "u_mod_commish4" }))!.openQuestions).toBe(3);
+  });
+
+  it("never counts a resolved flag as an open question", async () => {
+    await seedLeagueWith("lg_mod_5", "u_mod_commish5");
+    await seedOpenFlag("lg_mod_5", "subject_resolved");
+    await db.update(integrityFlags).set({ resolvedAt: new Date(NOW), resolvedByUserId: "u_mod_commish5", resolution: "no_action", resolutionNote: "n" }).where(eq(integrityFlags.leagueId, "lg_mod_5"));
+
+    expect((await leagueModerationSummary(db, { leagueId: "lg_mod_5", userId: "u_mod_commish5" }))!.openQuestions).toBe(0);
+  });
+
+  it("never counts an open flag raised against a DIFFERENT league", async () => {
+    await seedLeagueWith("lg_mod_6", "u_mod_commish6");
+    await seedLeagueWith("lg_mod_6_other", "u_mod_commish6_other");
+    await seedOpenFlag("lg_mod_6_other", "subject_elsewhere");
+
+    expect((await leagueModerationSummary(db, { leagueId: "lg_mod_6", userId: "u_mod_commish6" }))!.openQuestions).toBe(0);
+  });
+
+  it("counts a removed review authored by a member of this league, and reads 'in their league' by membership since reviews carry no league id of their own", async () => {
+    // `reviews.user_id` is UNIQUE (one review per account, ever — `reviews_user_idx`), so proving
+    // "the live one is not counted" needs a SECOND league member, not a second review from the
+    // one who was removed.
+    await seedLeagueWith("lg_mod_7", "u_mod_commish7", ["u_mod_reviewer", "u_mod_live_reviewer"]);
+    await seedReview("r_mod_1", "u_mod_reviewer", { removedAt: "2026-08-10T00:00:00.000Z" });
+    await seedReview("r_mod_2", "u_mod_live_reviewer"); // live — not counted
+
+    const summary = await leagueModerationSummary(db, { leagueId: "lg_mod_7", userId: "u_mod_commish7" });
+    expect(summary).toMatchObject({ removedReviews: 1, mostRecentAt: "2026-08-10T00:00:00.000Z" });
+  });
+
+  it("never counts a removed review from someone who has never fielded a team in this league", async () => {
+    await seedLeagueWith("lg_mod_8", "u_mod_commish8");
+    await seedUser("u_mod_stranger");
+    await seedReview("r_mod_stranger", "u_mod_stranger", { removedAt: "2026-08-10T00:00:00.000Z" });
+
+    const summary = await leagueModerationSummary(db, { leagueId: "lg_mod_8", userId: "u_mod_commish8" });
+    expect(summary).toMatchObject({ removedReviews: 0, mostRecentAt: null });
+  });
+
+  it("reports the later of a removed message and a removed review as mostRecentAt — the review wins", async () => {
+    await seedLeagueWith("lg_mod_9", "u_mod_commish9", ["u_mod_member9"]);
+    await seedChatMessage("lg_mod_9", "u_mod_member9", { removedAt: "2026-08-01T00:00:00.000Z" });
+    await seedReview("r_mod_9", "u_mod_member9", { removedAt: "2026-08-15T00:00:00.000Z" });
+
+    const summary = await leagueModerationSummary(db, { leagueId: "lg_mod_9", userId: "u_mod_commish9" });
+    expect(summary).toMatchObject({ removedMessages: 1, removedReviews: 1, mostRecentAt: "2026-08-15T00:00:00.000Z" });
+  });
+
+  it("reports the later of a removed message and a removed review as mostRecentAt — the message wins", async () => {
+    // `laterOf`'s own other branch — a removed chat message strictly newer than a removed
+    // review, so this is not the same comparison outcome as the test just above.
+    await seedLeagueWith("lg_mod_9b", "u_mod_commish9b", ["u_mod_member9b"]);
+    await seedChatMessage("lg_mod_9b", "u_mod_member9b", { removedAt: "2026-08-20T00:00:00.000Z" });
+    await seedReview("r_mod_9b", "u_mod_member9b", { removedAt: "2026-08-05T00:00:00.000Z" });
+
+    const summary = await leagueModerationSummary(db, { leagueId: "lg_mod_9b", userId: "u_mod_commish9b" });
+    expect(summary).toMatchObject({ removedMessages: 1, removedReviews: 1, mostRecentAt: "2026-08-20T00:00:00.000Z" });
+  });
+
+  it("reports null for mostRecentAt on a healthy league — nothing has ever needed attention", async () => {
+    await seedLeagueWith("lg_mod_10", "u_mod_commish10", ["u_mod_member10"]);
+    await seedChatMessage("lg_mod_10", "u_mod_member10"); // live — not counted
+
+    expect(await leagueModerationSummary(db, { leagueId: "lg_mod_10", userId: "u_mod_commish10" })).toEqual({
+      removedMessages: 0,
+      removedReviews: 0,
+      mostRecentAt: null,
+      openQuestions: 0,
+    });
+  });
+
+  it("costs a small, constant number of queries regardless of how much this league's own history holds", async () => {
+    await seedLeagueWith("lg_mod_11", "u_mod_commish11", ["u_mod_member11"]);
+    for (let i = 0; i < 8; i += 1) {
+      await seedChatMessage("lg_mod_11", "u_mod_member11", { removedAt: `2026-08-0${(i % 9) + 1}T00:00:00.000Z` });
+    }
+    await seedOpenFlag("lg_mod_11", "subject_bounded");
+
+    const counting = countingDb(db);
+    await leagueModerationSummary(counting.db, { leagueId: "lg_mod_11", userId: "u_mod_commish11" });
+    // The commissioner lookup, plus the three bounded counts (messages, reviews, open flags) —
+    // never one query per removed row, and never a query whose cost scales with the PLATFORM's
+    // own history rather than this league's own.
+    expect(counting.selectCount()).toBe(4);
   });
 });

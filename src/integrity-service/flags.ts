@@ -1,10 +1,11 @@
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { auditEvents, chatMessageReports, chatMessages, integrityFlags, leagues, reviewReports, reviews, rosterSlots, teams, tradeProposals, users } from "@/db/schema";
 import type { AuditEvent, AuditEventType, JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
 import type { Position } from "@/domain/player";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
+import type { ModerationSummaryView } from "@/league-room/contract";
 import {
   contentRemovalIsWiredFor,
   decisionIsOperatorChoosable,
@@ -1341,4 +1342,102 @@ export async function flagDetail(db: Db, flagId: string): Promise<FlagDetail | n
     reporters,
     trail,
   );
+}
+
+/**
+ * `ModerationSummaryView`'s (`@/league-room/contract`) own exact key order, exported so
+ * `flags.test.ts`'s `Object.keys(summary)` assertion checks against THIS rather than a
+ * hand-copied list — the same disclosure-allowlist idiom `REVIEW_VIEW_FIELDS`
+ * (`@/review-service/reviews`) and `PUBLIC_LEAGUE_FIELDS` (`@/league-service/browse`) already use
+ * for their own wire shapes.
+ */
+export const MODERATION_SUMMARY_FIELDS: readonly (keyof ModerationSummaryView)[] = ["removedMessages", "removedReviews", "mostRecentAt", "openQuestions"];
+
+export interface LeagueModerationSummaryInput {
+  readonly leagueId: string;
+  readonly userId: string;
+}
+
+/**
+ * The later of two nullable removal timestamps, as an ISO string — `null` only when both are,
+ * which is the healthy-league state (`ModerationSummaryView.mostRecentAt`'s own docblock).
+ * Accepts either shape a raw `max(...)` aggregate can hand back: postgres.js parses a plain
+ * column read into a `Date`, but a `sql<...>`-typed aggregate is a runtime string underneath the
+ * compile-time cast, and this is the one place that gap is closed rather than trusted away.
+ */
+function laterOf(a: Date | string | null, b: Date | string | null): string | null {
+  const dateA = a === null ? null : new Date(a);
+  const dateB = b === null ? null : new Date(b);
+  if (dateA === null) return dateB === null ? null : dateB.toISOString();
+  if (dateB === null) return dateA.toISOString();
+  return (dateA > dateB ? dateA : dateB).toISOString();
+}
+
+/**
+ * Plan B's Task 6 persona panel raised a commissioner's own blindness to platform moderation in
+ * their league as a MEDIUM, and Plan B ruled it out of its own scope by name (this function's own
+ * docblock in `ModerationSummaryView`, `@/league-room/contract`, restates the ruling). This is
+ * that window, and it is deliberately narrow: four facts, never who, what, or why.
+ *
+ * GATES ON COMMISSIONER-OF-THIS-LEAGUE, ANSWERING `null` FOR EVERYONE ELSE — the identical
+ * no-oracle shape `setDraftKickoff` (`@/league-service/draft-schedule`) already established for a
+ * commissioner-only surface: a nonexistent league and an ordinary member both come back `null`,
+ * so `GET /api/leagues/[leagueId]/moderation` can map that to one 404 without ever telling a
+ * caller which of the two is true. `withLeagueMemberActor` still refuses a complete stranger (no
+ * team, not the commissioner) with the league's ordinary 403 before this function is ever asked
+ * — a signed-in league MEMBER who isn't the commissioner is the caller this `null` is actually
+ * for.
+ *
+ * THREE BOUNDED READS, after the one commissioner check:
+ *
+ *  - `chat_messages` filtered to `league_id = X` (served by `chat_messages_league_id_idx`, the
+ *    same index `chatPageQuery` already reads this table by) and `removed_at IS NOT NULL` — the
+ *    scan is bounded by this league's own message count, never the platform's, the identical
+ *    "narrowed by an indexed league id" shape every other per-league read in this codebase holds
+ *    to.
+ *  - `reviews` INNER JOIN `teams` ON `teams.user_id = reviews.user_id`, filtered to
+ *    `teams.league_id = X` (served by `teams_league_id_idx`) and `reviews.removed_at IS NOT
+ *    NULL`. Reviews carry no `league_id` at all — they review Commish itself, not a league — so
+ *    "in their league" is read as "written by someone who has (or had) a team here", the one
+ *    definition that keeps this a bounded, indexed join rather than a scan of every review on the
+ *    platform: `teams_league_user_idx`'s own uniqueness means this join can never double-count an
+ *    account across two seats in the same league.
+ *  - `integrity_flags` filtered to `league_id = X AND resolved_at IS NULL`. No index carries
+ *    `league_id` on its own, but the WHERE clause is a strict superset of
+ *    `integrity_flags_queue_idx`'s own partial predicate (`resolved_at IS NULL`), so Postgres can
+ *    still walk that index rather than the whole table — bounded by the platform's current OPEN
+ *    queue, which by design (ruling 30, an operator resolves flags rather than lets them
+ *    accumulate) stays small, never by the platform's all-time flag history.
+ *
+ * NEVER NAMES WHO, WHAT, OR WHY: no `select` here reaches `user_id`, `author_user_id`, `body`, or
+ * `removal_reason` on any of the three tables — a stronger guarantee than "not returned", the
+ * same "the column simply is not here to leak" discipline `feedQuery`'s own docblock states for
+ * `rating`.
+ */
+export async function leagueModerationSummary(db: Db, input: LeagueModerationSummaryInput): Promise<ModerationSummaryView | null> {
+  const [league] = await db.select({ commissionerUserId: leagues.commissionerUserId }).from(leagues).where(eq(leagues.id, input.leagueId));
+  if (league === undefined || league.commissionerUserId !== input.userId) return null;
+
+  const [[messageRow], [reviewRow], [flagRow]] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int`, mostRecentAt: sql<string | null>`max(${chatMessages.removedAt})` })
+      .from(chatMessages)
+      .where(and(eq(chatMessages.leagueId, input.leagueId), isNotNull(chatMessages.removedAt))),
+    db
+      .select({ count: sql<number>`count(*)::int`, mostRecentAt: sql<string | null>`max(${reviews.removedAt})` })
+      .from(reviews)
+      .innerJoin(teams, eq(teams.userId, reviews.userId))
+      .where(and(eq(teams.leagueId, input.leagueId), isNotNull(reviews.removedAt))),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(integrityFlags)
+      .where(and(eq(integrityFlags.leagueId, input.leagueId), isNull(integrityFlags.resolvedAt))),
+  ]);
+
+  return {
+    removedMessages: messageRow!.count,
+    removedReviews: reviewRow!.count,
+    mostRecentAt: laterOf(messageRow!.mostRecentAt, reviewRow!.mostRecentAt),
+    openQuestions: flagRow!.count,
+  };
 }

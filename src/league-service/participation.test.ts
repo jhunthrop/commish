@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, matchups, teams, users } from "@/db/schema";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import { completedSeasonsFor, participationFor, stampSeasonCompleteInTx } from "./participation";
+import { completedSeasonsFor, completedSeasonsForMany, participationFor, stampSeasonCompleteInTx } from "./participation";
 
 const db = createTestDb();
 
@@ -57,6 +57,46 @@ describe("completedSeasonsFor", () => {
     const counting = countingDb(db);
     await completedSeasonsFor(counting.db, "u_bob");
     expect(counting.selectCount()).toBe(1);
+  });
+});
+
+describe("completedSeasonsForMany", () => {
+  it("counts completed seasons per account, batched in one query", async () => {
+    await db.insert(users).values([
+      { id: "u_many_vet", email: "many_vet@test.local", displayName: "Vet" },
+      { id: "u_many_new", email: "many_new@test.local", displayName: "New" },
+    ]);
+    await seatIn("u_many_vet", "lg_many_a", "2026-01-01T00:00:00.000Z");
+    await seatIn("u_many_vet", "lg_many_b", "2026-01-08T00:00:00.000Z");
+    await seatIn("u_many_new", "lg_many_c");
+
+    const counting = countingDb(db);
+    const counts = await completedSeasonsForMany(counting.db, ["u_many_vet", "u_many_new"]);
+
+    expect(counts.get("u_many_vet")).toBe(2);
+    // Zero completed seasons is absent from the map, not a zero-valued entry — a `GROUP BY`
+    // reports no row at all for a group with nothing in it.
+    expect(counts.has("u_many_new")).toBe(false);
+    expect(counting.selectCount()).toBe(1);
+  });
+
+  it("answers an empty map with no query for an empty id list", async () => {
+    const counting = countingDb(db);
+    const counts = await completedSeasonsForMany(counting.db, []);
+    expect(counts).toEqual(new Map());
+    expect(counting.selectCount()).toBe(0);
+  });
+
+  it("never counts an account's completed seasons against another account's id", async () => {
+    await db.insert(users).values([
+      { id: "u_many_x", email: "many_x@test.local", displayName: "X" },
+      { id: "u_many_y", email: "many_y@test.local", displayName: "Y" },
+    ]);
+    await seatIn("u_many_x", "lg_many_x", "2026-01-01T00:00:00.000Z");
+
+    const counts = await completedSeasonsForMany(db, ["u_many_x", "u_many_y"]);
+    expect(counts.get("u_many_x")).toBe(1);
+    expect(counts.has("u_many_y")).toBe(false);
   });
 });
 

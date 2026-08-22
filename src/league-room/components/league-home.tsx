@@ -12,6 +12,7 @@ import { LeagueTermsPanel } from "./league-terms-panel";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupScoreboard } from "./matchup-scoreboard";
+import { ModerationSummary } from "./moderation-summary";
 import { StandingsTable } from "./standings-table";
 import { TradeInboxLink } from "./trade-inbox-link";
 
@@ -127,6 +128,11 @@ export function LeagueHome({
       <LeagueMembersPanel teams={home.teams} teamCount={home.teamCount} commissionerUserId={home.commissionerUserId} myTeamId={home.myTeamId} />
 
       {home.isCommissioner ? <InvitePanel leagueId={home.leagueId} /> : null}
+
+      {/* Task 8: the commissioner's own window onto platform moderation in their league — a
+          member with extra buttons, not an operator, so this sits behind the identical
+          `isCommissioner` gate `InvitePanel` already does, right beside it. */}
+      {home.isCommissioner ? <ModerationSummary leagueId={home.leagueId} /> : null}
     </main>
   );
 }

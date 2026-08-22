@@ -15,10 +15,13 @@ import { DRAFT_SCHEDULE, HOME, LINEUP, PUBLIC_LEAGUES, TERMS, fixtureLeagueDeps 
 import { DraftSchedulePanel } from "@/league-room/components/draft-schedule-panel";
 import { LeagueHome } from "@/league-room/components/league-home";
 import { LeagueTermsPanel } from "@/league-room/components/league-terms-panel";
+import { ModerationSummary } from "@/league-room/components/moderation-summary";
 import { PublicLeagueList } from "@/league-room/components/public-league-list";
 import { TradeCard } from "@/league-room/components/trade-card";
 import { TradeComposer } from "@/league-room/components/trade-composer";
-import type { TradeRoomContext } from "@/league-room/contract";
+import type { ModerationSummaryView, TradeRoomContext } from "@/league-room/contract";
+import { ReviewFeed } from "@/account-room/components/review-feed";
+import type { ReviewsPage, ReviewView } from "@/reviews/contract";
 import { copyViolations } from "./copy-rules";
 import { renderNotice } from "./notices";
 
@@ -706,5 +709,73 @@ describe("LeagueHome says nothing that breaks the house copy rules, including ev
       );
       unmount();
     }
+  });
+});
+
+/**
+ * Task 8. `ModerationSummary` composes its own sentence and (on the populated branch) a
+ * formatted date from `mostRecentAt` — the exact kind of runtime composition
+ * `room-copy.source.test.ts` cannot see, so this is the sweep that actually checks it.
+ */
+describe("ModerationSummary says nothing that breaks the house copy rules", () => {
+  const POPULATED: ModerationSummaryView = { removedMessages: 2, removedReviews: 1, mostRecentAt: "2026-08-19T14:02:00.000Z", openQuestions: 1 };
+  const HEALTHY: ModerationSummaryView = { removedMessages: 0, removedReviews: 0, mostRecentAt: null, openQuestions: 0 };
+
+  it("is clean loading, healthy, populated with a composed date, and on a failed fetch", async () => {
+    for (const response of [{ ok: true as const, data: POPULATED }, { ok: true as const, data: HEALTHY }, { ok: false as const, error: "unreachable" }]) {
+      const fixture = fixtureLeagueDeps(response);
+      const { container, unmount } = render(
+        <LeagueRoomDepsProvider deps={fixture.deps}>
+          <ModerationSummary leagueId="league_1" />
+        </LeagueRoomDepsProvider>,
+      );
+      await waitFor(() => expect(screen.getByRole("region", { name: "Platform moderation in this league" })).toBeInTheDocument());
+      expectClean(container);
+      unmount();
+    }
+  });
+});
+
+/**
+ * Task 8's other half. `account-room` carries no directory-derived source sweep at all
+ * (`room-copy.source.test.ts`'s own `ROOM_DIRS` names only the four client-room directories that
+ * predate it), so `ReviewFeed` — the one component in this task that gained new rendered text,
+ * the verified badge — gets its coverage here instead, the same "one place to add" shape this
+ * file's own docblock describes.
+ */
+const VERIFIED_REVIEW: ReviewView = {
+  id: "r_sweep",
+  rating: 5,
+  body: "This league runs itself.",
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-01T00:00:00.000Z",
+  authorName: "Ada Lovelace",
+  authorAvatar: null,
+  verified: true,
+};
+
+describe("ReviewFeed says nothing that breaks the house copy rules, verified badge included", () => {
+  it("is clean with an unverified review, a verified one, and the badge's own InfoTip opened", () => {
+    const unverifiedPage: ReviewsPage = { reviews: [{ ...VERIFIED_REVIEW, id: "r_unverified", verified: false }], hasMore: false, nextBefore: null };
+    const verifiedPage: ReviewsPage = { reviews: [VERIFIED_REVIEW], hasMore: false, nextBefore: null };
+
+    for (const page of [unverifiedPage, verifiedPage]) {
+      const fixture = fixtureAccountDeps();
+      const { container, unmount } = render(
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <ReviewFeed initialPage={page} emptyAction={<span>Write the first review</span>} />
+        </AccountRoomDepsProvider>,
+      );
+      expectClean(container, VERIFIED_REVIEW.body, VERIFIED_REVIEW.authorName);
+      unmount();
+    }
+
+    const { container } = render(
+      <AccountRoomDepsProvider deps={fixtureAccountDeps().deps}>
+        <ReviewFeed initialPage={verifiedPage} emptyAction={<span>Write the first review</span>} />
+      </AccountRoomDepsProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "What is a verified reviewer?" }));
+    expectClean(container, VERIFIED_REVIEW.body, VERIFIED_REVIEW.authorName);
   });
 });

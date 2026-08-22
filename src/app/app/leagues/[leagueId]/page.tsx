@@ -27,6 +27,12 @@ interface PageProps {
  * `leagueHome` (`@/league-service`) is also where the terms panel's data comes from: `home.terms`
  * rides the same read this page already made, so every member sees the league's format, scoring
  * and commissioner without this page issuing a second request for them.
+ *
+ * Task 8: the commissioner's own window onto platform moderation in their league
+ * (`ModerationSummary`, `@/league-room/components/moderation-summary`) rides `LeagueHome`'s
+ * existing `home.leagueId`/`home.isCommissioner` — this page hands down no new prop for it, the
+ * same "own data layer" shape `TradeInboxLink` (Task 8 of Plan C) already established, so
+ * `leagueHome`'s own query budget is unchanged by a surface most of a league's members never see.
  */
 export default async function LeaguePage({ params }: PageProps) {
   const user = await requireCurrentUser();
