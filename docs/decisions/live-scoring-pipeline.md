@@ -432,3 +432,39 @@ through to `matchups.home_score` (null until settlement), and every live league 
 the one afternoon the number matters. `setLineup`'s invalidation deleted a key that never existed,
 and `finalizeWeek` now invalidates too — the cached value was computed from a week in progress, and
 after settlement the numbers that stand live in `matchups`.
+
+## 14. The worker's new post-transition trigger (Phase 3 Plan D)
+
+`runTick` (`src/stats-pipeline/worker.ts`) gained a second thing it does after `persistTick`
+commits: the missed-deadline lineup auto-set (`autoSetLineupsForWeek`, `@/league-service/
+auto-lineup`), fired on the tick that moves a week's `stat_weeks.status` OUT of `scheduled` — the
+lock transition every lineup deadline hangs off. `plan.priorStatus` is the status `runTick`'s own
+opening read found BEFORE this tick's write, so the condition is `plan.priorStatus === "scheduled"
+&& status !== "scheduled"`: a week already `in_progress` or `final` on entry never refires it, and
+a week that stays `scheduled` this tick never fires it early.
+
+**Placement, and why it is not inside `persistTick`.** `stat_weeks` is keyed on the week alone and
+is not league-scoped, so `persistTick`'s own transaction already commits before any per-league work
+starts — the identical reason `correctSettledWeek` runs its own global `persistTick` before, and
+outside, every per-league transaction it drives (§10). Auto-set follows that precedent rather than
+inventing a second one: one small, week-scoped write lands first, then a fan-out over however many
+leagues are actually affected runs after it, each in its OWN transaction (`autoSetLineupsForWeek`'s
+own per-league loop, one transaction per league — Plan A ruling 3, a transaction appends to at most
+one chain).
+
+**Failure isolation, the same asymmetry §7 already documents for degradation.** A thrown error from
+`autoSet` is caught, logged, and reported through the worker's own due-report channel — NEVER
+rethrown. The tick that just settled real scores for every league in the product must not fail
+because one league's missed-deadline lineup write had a bug; a broken auto-set is safe to leave for
+the next tick because its own idempotency comes from the per-team existence guard inside
+`autoSetLineupInTx` (a team with a saved row for the week is left entirely alone), never from firing
+exactly once. The score cache eviction auto-set performs reuses the SAME `ScoreCache` instance this
+worker already writes live scores into (`scoreCache`, passed through as `cache`), the identical
+"the worker supplies the real cache" idiom `setLineup`/`acceptTrade` use from the route layer.
+
+**What this trigger does NOT do.** It never runs for a private league, or for a public league with
+`INTEGRITY_CONFIG.participation.enforceTierSegregation` switched off at deploy —
+`autoSetLineupsForWeek` asks `enforcementAppliesTo` (`@/league-service/enforcement`) per league
+before opening a transaction for it, the identical predicate the join gate, the creation gate and
+the trade auto-hold all ask. See `docs/decisions/enforcement-and-tiers.md` §6 for the full account
+of the strategy this trigger applies and why only one strategy is declared.

@@ -76,8 +76,9 @@ export const users = pgTable(
  *
  * There is deliberately NO notification-channel column here. The catalog in
  * `src/identity/notifications.ts` describes what the product tells you about; email delivery is
- * Plan D's, and a stored preference for a channel with no sender is a switch wired to nothing.
- * The day the sender exists, this table gains the column and the surface gains the toggles.
+ * Phase 2 Plan D's, and a stored preference for a channel with no sender is a switch wired to
+ * nothing. The day the sender exists, this table gains the column and the surface gains the
+ * toggles.
  */
 export const userPreferences = pgTable("user_preferences", {
   userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),

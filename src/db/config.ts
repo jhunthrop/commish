@@ -28,15 +28,16 @@
  *
  * The three inputs are Postgres's own defaults today (`max_connections = 100`,
  * `superuser_reserved_connections = 3`) plus this product's own scaling ceiling for the phase.
- * When Plan D provisions a managed Postgres with a different `max_connections`, change the
- * number HERE and the pool sizes follow — that is the whole reason it is a formula.
+ * When Phase 2 Plan D provisions a managed Postgres with a different `max_connections`, change
+ * the number HERE and the pool sizes follow — that is the whole reason it is a formula. Spelled
+ * out in full because "Plan D" alone is ambiguous across two phases (Phase 3 also has one).
  */
 export const DB_POOL_CONFIG = {
-  /** Postgres's `max_connections`. The docker-compose image ships the default; Plan D's managed instance must be checked and this updated to match. */
+  /** Postgres's `max_connections`. The docker-compose image ships the default; Phase 2 Plan D's managed instance must be checked and this updated to match. */
   postgresMaxConnections: 100,
   /** Postgres's `superuser_reserved_connections`. Left for an operator to get in during an incident. */
   reservedSuperuserConnections: 3,
-  /** How many app instances may run at once this phase. Plan D's hosting sets the real ceiling. */
+  /** How many app instances may run at once this phase. Phase 2 Plan D's hosting sets the real ceiling. */
   expectedMaxInstances: 4,
   /** The separate pool background/batch work uses, PER INSTANCE, subtracted from the budget before the split. */
   backgroundJobPoolSize: 5,

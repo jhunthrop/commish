@@ -86,7 +86,7 @@ describe("crossesFairnessThreshold", () => {
     expect(crossesFairnessThreshold(balance, 21)).toBe(false);
   });
 
-  it("never crosses when the threshold is null — how Plan D's auto-hold ships inert", () => {
+  it("never crosses when the threshold is null — the test-seam shape Plan D's own autoHoldThreshold shipped past", () => {
     expect(crossesFairnessThreshold(balanceWithDelta(1000), null)).toBe(false);
   });
 });

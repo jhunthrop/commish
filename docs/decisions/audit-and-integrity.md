@@ -608,12 +608,27 @@ step should see stated plainly rather than buried in a task report.
   rather than a review comment someone could miss. `stat_week_corrected` is allowed (a fact about
   the league's shared scoreboard, true for everyone, about nobody's conduct);
   `chain_verification_failed` stays denied, restating this doc's own ruling 8; and
-  `lineup_auto_set` — the auto-set-lineup event this residual named by name — is **denied in
+  `lineup_auto_set` — the auto-set-lineup event this residual named by name — was **denied in
   advance** for Plan D, with the answer recorded rather than left as an open question: the
   competitive-sensitivity argument that makes `lineup_change` `actor_only` (ruling 15) applies at
   least as hard to a system-authored description of one manager's lineup, and what Plan D needs is
-  a new, actor-scoped visibility, not a new summary. Full account:
-  `docs/decisions/operators-and-moderation.md` §9.
+  a new, actor-scoped visibility, not a new summary.
+  **CLOSED FOR THE SECOND AND LAST TIME — by Phase 3 Plan D.** `SYSTEM_ACTION_SUMMARY_ALLOWED`
+  is gone as a hand-maintained table: `src/integrity/system-actions.ts` now exports
+  `SYSTEM_ACTION_VISIBILITY` (`"everyone" | "subject_only" | "hidden"`, the fourth deny-by-default
+  dimension), and the old boolean is DERIVED from it. Plan D's own publisher
+  (`autoSetLineupInTx`, `@/league-service/auto-lineup`) confirmed the pre-decided answer's
+  substance and corrected its one untestable word: a `system_action` carries `actorType: "system"`
+  and therefore `actorId: null` by construction, so the "actor-scoped" path this residual predicted
+  can never match one — `ACTIVITY_VISIBILITY`'s `actor_only` branch compares `event.actorId` to the
+  viewer, and `null` never equals a viewer's own id. The path that means something for an actorless
+  event is the SUBJECT, carried on `payload.subjectUserId`, so `lineup_auto_set` shipped
+  `"subject_only"`, not `"actor_only"`. `tier_blocked_join` and `trade_held_for_review` are both
+  `"hidden"` for a structural reason — both are written on the PLATFORM chain, never read by
+  `listLeagueActivity` at all — and `draft_auto_started` is `"everyone"`, on
+  `stat_week_corrected`'s own reasoning. Full account: `docs/decisions/enforcement-and-tiers.md`
+  §5. `docs/decisions/operators-and-moderation.md` §9 keeps the pre-decided answer as its own
+  history and points here for the correction.
 - **`/callback` is never exercised by the e2e suite.** The suite authenticates by minting a real
   WorkOS test-directory session and sealing it directly into the `wos-session` cookie
   (`scripts/lib/lab-session.ts`), which is deliberate and documented (`README.md`) — it lets the
@@ -644,11 +659,15 @@ step should see stated plainly rather than buried in a task report.
   moderation outcome) and the branch is where they will land; deleting it would mean the next plan
   re-derives the same three lines and the same `quoteFor` call. Harmless, and named here so a
   reader who greps for dead code finds the reason instead of the line.
-- **`setLineup` never asserts `teams.league_id === input.leagueId`.** Pre-existing, and safe only
-  because the route derives both from the session actor rather than from the request body
-  (`src/league-service/lineups.ts`). It is not a hole today; it is one assertion away from being
-  provably not a hole, and it is out of this plan's scope. Recorded so the next writer of a
-  team-scoped mutation adds the check rather than copying the omission.
+- **`setLineup` never asserts `teams.league_id === input.leagueId` — CLOSED by Phase 3 Plan D.**
+  Was pre-existing, and safe only because the route derived both from the session actor rather
+  than from the request body (`src/league-service/lineups.ts`). Recorded so the next writer of a
+  team-scoped mutation would add the check rather than copy the omission — and Plan D (ruling 18)
+  was that next writer, closing the real gap this residual named while proving the mechanically-
+  invalid-roster-move rejection Step 5 asked for was already shipped everywhere rather than
+  building a second, public-league-only copy of it. `lineups.ts` now reads `team.leagueId` and
+  refuses (the same plain-language 422 shape `validateLineup` already used) when it disagrees
+  with `input.leagueId`, before anything else runs.
 - **There is no repo-wide copy sweep.** `copyViolations` (`src/integrity/copy-rules.ts`) is now one
   rulebook for both surfaces this plan owns, and the older per-module dash sweeps elsewhere in the
   repo (`help/glossary.test.ts`, `matchmaking/filter.test.ts`, `data/seed/seed-public-leagues.test.ts`,

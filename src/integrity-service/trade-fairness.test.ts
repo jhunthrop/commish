@@ -127,7 +127,7 @@ describe("evaluateTradeBeforeExecute", () => {
     expect(evaluation.flagWorthy).toBe(true);
   });
 
-  it("holds when a threshold IS supplied, so Plan D inherits a proven branch and not an idea", async () => {
+  it("holds at a test-seam threshold independent of the shipped default, proving the branch reads its argument and not a hardcoded 35", async () => {
     await truncateAll(db);
     const input = await grotesquelyLopsided(db);
     const evaluation = await db.transaction((tx) => evaluateTradeBeforeExecute(tx, { ...input, autoHoldThreshold: 40 }));

@@ -404,11 +404,18 @@ whichever plan picks them up next:
   documented as unreviewed (founder decision #1's default) — see
   `docs/decisions/operators-and-moderation.md` §8. The engineering half needed no work, because a
   GIF removal is the same one-row stamp a text message's removal already is.
-- **A verified-played-here signal.** Every review is gated on `withCurrentUser` (a valid session),
-  but nothing checks that the reviewer has actually played a season on this product — the review feed cannot yet
-  distinguish "a manager who fielded a team here" from "a signed-in account." A "verified" badge
-  needs a definition of what verification means (one league completed? one season scored?) that
-  this plan did not receive.
+- **A verified-played-here signal — DEFINED AND SHIPPED by Phase 3 Plan D.** Every review is gated
+  on `withCurrentUser` (a valid session), but nothing checked that the reviewer had actually played
+  a season on this product — the review feed could not distinguish "a manager who fielded a team
+  here" from "a signed-in account." Founder decision #8's default is the definition this plan did
+  not receive: ONE completed season in one league, on the same participation read model
+  `docs/decisions/enforcement-and-tiers.md` §1 names (`isVerifiedPlayer`, `@/participation/verified`,
+  read through `INTEGRITY_CONFIG.participation.verifiedSeasonCutoff`). The badge carries a boolean
+  and never a count (ruling 26) — "3 seasons" on a public, unauthenticated review feed is a fact
+  about a stranger's history nobody asked them to publish — and its tooltip states the claim in the
+  words founder decision #8 asks for verbatim (`VERIFIED_BADGE_TOOLTIP`: "This reviewer finished at
+  least one full season on Commish."), rather than a bare "Verified" a reader has to guess the
+  meaning of. See `docs/decisions/enforcement-and-tiers.md` §1 and §6.
 - **Activity cues on member avatars**, raised while building `LeagueMembersPanel` (Task 3's panel)
   and not built: an online/last-active indicator beside a member's face. Deferred for the same
   reason voice messages were — no realtime presence channel exists yet, and this plan's realtime
