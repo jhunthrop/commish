@@ -98,12 +98,20 @@ test("a veteran browses, is refused a beginner league, and reads why", async ({ 
   await expect(managerA.getByLabel("Who's playing")).toBeVisible();
 
   // The target beginner league, already visible in the unfiltered default listing, carrying the
-  // composition label a real query computed: three seeded dev placeholders, every one of them
-  // still a newcomer (Task 10's own veteran leagues deliberately keep every OTHER seeded
-  // identity below the cutoff — see `seed-season-league.ts`'s `VETERAN_SEASON_LEAGUES` docblock).
+  // composition label a real query computed SERVER-side (final review F6 moved the reduction off
+  // the client, so this text is the bucket the wire actually carried).
+  //
+  // "MOSTLY NEWCOMERS", AND THE ARITHMETIC IS THE SEED'S OWN (final review round 2, R1). This read
+  // "All newcomers", with a comment claiming all three seeded placeholders were still newcomers.
+  // They are not: `dev_user_04` holds three completed seasons — exactly
+  // `INTEGRITY_CONFIG.participation.veteranSeasonCutoff` — from `VETERAN_SEASON_LEAGUES`, and it
+  // holds a seat here, so the honest computed bucket is two newcomers against one veteran. A
+  // database seeded before those veteran leagues existed hid the contradiction; a fresh one does
+  // not. The spec catches up to the seed rather than the other way round, and the assertion below
+  // is the one that actually matters here: this league still refuses this veteran.
   const card = managerA.locator("li").filter({ has: managerA.getByRole("heading", { name: target.name }) });
   await expect(card).toBeVisible();
-  await expect(card.getByText("All newcomers")).toBeVisible();
+  await expect(card.getByText("Mostly newcomers")).toBeVisible();
 
   // Manager A is the platform's own real veteran: three REAL completed seasons, stamped by
   // `finalizeWeekInTx` itself (`npm run seed`'s own `VETERAN_SEASON_LEAGUES` loop). Pressing

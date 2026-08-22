@@ -64,6 +64,15 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
       await page.getByLabel("League name", { exact: true }).fill(leagueName);
       await page.getByText(/Advanced settings/).click();
       await page.getByLabel("Who can join").selectOption("public");
+      // OPEN TO EVERYONE, NAMED RATHER THAN INHERITED (final review round 2, R1). Manager A is
+      // the platform's own real veteran — `enforcement.spec.ts` requires exactly that, and it is
+      // the point of that file's arc — so a PUBLIC league declared for beginners is the one thing
+      // the creation gate refuses this account (`tierJoinPrecondition`, ruling 6). Before the
+      // designation control shipped, this form sent no tier at all and the route defaulted to the
+      // creator's own self-reported `beginner`, so this step was refused on any correctly seeded
+      // database and this whole spec could not run. The choice is made explicitly here rather than
+      // left to the control's default, so the spec states its own requirement.
+      await page.getByLabel("Who it's for").selectOption("experienced");
       await page.getByRole("button", { name: "Create league" }).click();
     } else {
       await existing.click();
