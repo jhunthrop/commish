@@ -18,13 +18,13 @@ const league = (over: Partial<PublicLeagueSummary> = {}): PublicLeagueSummary =>
   teamCount: 12,
   filledTeams: 8,
   scoringLabel: "Standard",
-  tierComposition: { newcomers: 8, veterans: 0 },
+  compositionCategory: "all_newcomers",
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
   ...over,
 });
 
-const newcomerLeague = league({ id: "l_newcomer", tierComposition: { newcomers: 8, veterans: 0 } });
-const veteranLeague = league({ id: "l_veteran", tierComposition: { newcomers: 0, veterans: 8 } });
+const newcomerLeague = league({ id: "l_newcomer", compositionCategory: "all_newcomers" });
+const veteranLeague = league({ id: "l_veteran", compositionCategory: "open" });
 
 describe("normalizeBrowseFilter", () => {
   it("reads every supported value off a query string", () => {
@@ -113,7 +113,7 @@ describe("matchesBrowseFilter", () => {
     const filter = normalizeBrowseFilter({ participationTier: "veteran" });
     expect(matchesBrowseFilter(veteranLeague, filter)).toBe(true);
     expect(matchesBrowseFilter(newcomerLeague, filter)).toBe(false);
-    expect(matchesBrowseFilter(league({ tierComposition: { newcomers: 4, veterans: 4 } }), filter)).toBe(true);
+    expect(matchesBrowseFilter(league({ compositionCategory: "open" }), filter)).toBe(true);
   });
 });
 

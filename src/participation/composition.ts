@@ -1,9 +1,19 @@
 /**
- * What a browse card is allowed to say about who is already in a league: two counts, never a
- * member. `PublicLeagueSummary` (`@/matchmaking/contract`) is the privacy boundary of this
- * product's one unauthenticated read — a composition is an aggregate over the league's seated
- * managers, and a list of who is a newcomer would be a roster of strangers' inexperience
- * published to anybody holding the URL.
+ * The two counts a league's seated managers reduce to, SERVER-SIDE ONLY (final review F6).
+ *
+ * THIS SHAPE NEVER CROSSES THE PUBLIC WIRE, and the reasoning is arithmetic rather than taste: an
+ * aggregate over N=1 is not an aggregate. A public league with one filled seat and
+ * `{ newcomers: 1, veterans: 0 }` discloses that one manager's computed participation tier to
+ * anybody holding the URL, and polling the session-less endpoint across joins discloses each new
+ * member's tier as a delta. Both are facts about a PERSON, which is exactly what
+ * `PublicLeagueSummary` (`@/matchmaking/contract`), the privacy boundary of this product's one
+ * unauthenticated read, exists to keep out.
+ *
+ * `compositionCategoryFor` (below) reduces this to one of three coarse buckets, and only that
+ * bucket ships. The reduction used to happen client-side, which made the coarse-label discipline a
+ * rendering convention rather than a wire boundary; `listPublicLeagues` (`@/league-service/browse`)
+ * now performs it before the summary is assembled, and `browse.test.ts` asserts at the wire that
+ * neither count ever serializes.
  */
 export interface TierComposition {
   readonly newcomers: number;

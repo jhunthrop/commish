@@ -7,7 +7,7 @@ import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { formatDraftTime } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
-import { tierCompositionFor } from "@/participation/composition";
+import { compositionCategoryFor, tierCompositionFor } from "@/participation/composition";
 import { describeScoring, type ScoringRules } from "@/scoring";
 
 /** The outermost edge is the only place a wall clock is allowed — see every other service
@@ -27,7 +27,7 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "teamCount",
   "filledTeams",
   "scoringLabel",
-  "tierComposition",
+  "compositionCategory",
   "draftAt",
 ];
 
@@ -236,10 +236,13 @@ async function scoringWeightsByLeagueId(db: Db, leagueIds: readonly string[]): P
  * `createLeague` writes both in one transaction) reads "Custom" rather than throwing: a browse
  * card is not the place to surface a data-integrity bug to a stranger.
  *
- * `tierComposition` is assembled the same way: `browseQuery`'s own `newcomers`/`veterans`
- * columns are reduced through `tierCompositionFor` (`@/participation/composition`) — a named
- * constructor rather than a bare object literal — and the two raw counts never reach the return
- * value under their own names.
+ * `compositionCategory` is assembled the same way, and the reduction to a COARSE bucket happens
+ * HERE (final review F6): `browseQuery`'s own `newcomers`/`veterans` columns go through
+ * `tierCompositionFor` and then `compositionCategoryFor` (`@/participation/composition`), and only
+ * the bucket reaches the return value. The two raw counts are destructured out of `row` and die in
+ * this function. Before F6 they shipped on the wire and the client reduced them, which made an
+ * aggregate over one filled seat a disclosure of that one manager's tier to anyone holding the
+ * URL — `TierComposition`'s own docblock carries the whole argument.
  */
 export async function listPublicLeagues(
   db: Db,
@@ -254,7 +257,7 @@ export async function listPublicLeagues(
     return {
       ...row,
       scoringLabel: weights === undefined ? "Custom" : describeScoring(weights),
-      tierComposition: tierCompositionFor({ newcomers, veterans }),
+      compositionCategory: compositionCategoryFor(tierCompositionFor({ newcomers, veterans })),
       draftAt: formatDraftTime(kickoffAt.toISOString(), now),
     };
   });

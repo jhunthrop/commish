@@ -1,15 +1,17 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { describe, expect, it, beforeEach, afterAll, vi } from "vitest";
 import { createDb } from "@/db/client";
 import { DB_POOL_CONFIG } from "@/db/config";
 import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
-import { drafts, draftActions, memberNotices, players } from "@/db/schema";
+import { auditEvents, drafts, draftActions, memberNotices, players } from "@/db/schema";
+import { activityRowFor } from "@/integrity/activity-view";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
+import { copyViolations } from "@/integrity/copy-rules";
 import type { AuditEvent, AuditEventInput } from "@/domain/audit";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import type { MemberNotice } from "@/integrity-service/notify";
 import { autoStartDueDrafts, claimAutoStart } from "./auto-start";
-import { createDraftStore, type DraftStore } from "./store";
+import { createDraftStore, DRAFT_AUTO_STARTED_SUMMARY, type DraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
 const db = createTestDb();
@@ -200,6 +202,24 @@ describe("autoStartDueDrafts", () => {
     }
     // Best-effort live delivery, after the commit.
     expect(announced).toHaveLength(3);
+
+    // FINAL REVIEW F7: the league-wide `system_action` this same transaction writes carries a
+    // real summary, and therefore RENDERS. Before the fix it carried none, so
+    // `renderSystemAction` answered `null` for every viewer and the event was written, read and
+    // discarded — a code granted `"everyone"` that nobody could ever see.
+    const [event] = await db
+      .select()
+      .from(auditEvents)
+      .where(and(eq(auditEvents.eventType, "system_action"), eq(auditEvents.chainScope, "league_auto")));
+    expect(event!.payload).toMatchObject({ action: "draft_auto_started", summary: DRAFT_AUTO_STARTED_SUMMARY });
+    const row = activityRowFor(
+      { ...event!, occurredAt: event!.occurredAt.toISOString() } as unknown as Parameters<typeof activityRowFor>[0],
+      { userId: userIds[0]! },
+      { member: () => "A member", player: () => "A player", team: () => "A team" },
+    );
+    expect(row).not.toBeNull();
+    expect(row!.headline).toBe(DRAFT_AUTO_STARTED_SUMMARY);
+    expect(copyViolations(DRAFT_AUTO_STARTED_SUMMARY)).toEqual([]);
   });
 
   it("is idempotent: a re-tick after a successful start does nothing further", async () => {

@@ -8,6 +8,7 @@ import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { EMPTY_BROWSE_FILTER, hasOpenSeat, matchesBrowseFilter } from "@/matchmaking/filter";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
+import { compositionCategoryFor } from "@/participation/composition";
 import { listPublicLeagues, PUBLIC_LEAGUE_FIELDS } from "./browse";
 
 const db = createTestDb();
@@ -141,8 +142,10 @@ async function seedPublicLeague(
     filledTeams: overrides.filledTeams,
     scoringLabel: "Standard",
     // `seed()` never gives a manager a completed league of their own UNLESS `veteranSeats` asked
-    // for one — matching `listPublicLeagues`'s own answer for the same corpus.
-    tierComposition: { newcomers: overrides.filledTeams - veteranSeats, veterans: veteranSeats },
+    // for one — matching `listPublicLeagues`'s own answer for the same corpus. Reduced to the
+    // COARSE bucket here (final review F6) by the same function production reduces with, so the
+    // fixture and the wire cannot disagree about where a corpus lands.
+    compositionCategory: compositionCategoryFor({ newcomers: overrides.filledTeams - veteranSeats, veterans: veteranSeats }),
     // `seed()` always schedules the draft for the same fixed instant — no caller of this
     // fixture compares `draftAt` (they compare against `matchesBrowseFilter`/`.id`, neither of
     // which reads it), so this only needs to satisfy `PublicLeagueSummary`'s shape.
@@ -171,7 +174,7 @@ describe("listPublicLeagues", () => {
     expect(rows).toEqual([
       {
         id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0,
-        teamCount: 12, filledTeams: 8, scoringLabel: "Standard", tierComposition: { newcomers: 8, veterans: 0 },
+        teamCount: 12, filledTeams: 8, scoringLabel: "Standard", compositionCategory: "all_newcomers",
         draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)",
       },
     ]);
@@ -308,15 +311,45 @@ describe("listPublicLeagues", () => {
 });
 
 describe("listPublicLeagues tier composition", () => {
-  it("carries the composition as two counts and nothing that names a person", async () => {
+  it("carries the composition as ONE coarse bucket and nothing that names a person", async () => {
     await seed({
       id: "comp_all_newcomer", name: "Rookie Room", format: "snake", experienceTier: "beginner",
       stakeTier: 0, teamCount: 12, filled: 6, isPublicMatchmade: true,
     });
     const [summary] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
-    expect(summary!.tierComposition).toEqual({ newcomers: 6, veterans: 0 });
+    expect(summary!.compositionCategory).toBe("all_newcomers");
     expect(Object.keys(summary!).sort()).toEqual([...PUBLIC_LEAGUE_FIELDS].sort());
     expect(JSON.stringify(summary)).not.toContain("comp_all_newcomer_u0");
+  });
+
+  /**
+   * FINAL REVIEW F6, at the wire. The counts used to ship and the client reduced them, which made
+   * the coarse-label discipline a rendering convention rather than a boundary: an aggregate over
+   * N=1 is not an aggregate, so a one-seat public league published that one manager's computed
+   * participation tier to anybody holding the URL, and polling across joins published each new
+   * member's tier as a delta.
+   *
+   * Asserted over the SERIALIZED body rather than the object's keys, because that is what actually
+   * crosses the wire, and at `filledTeams: 1` — the worst case, not a comfortable one.
+   */
+  it("never serializes the raw counts, at the one filled seat where an aggregate is not an aggregate", async () => {
+    await giveCompletedSeasons("solo_veteran", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    await seed({
+      id: "solo", name: "One Seat Taken", format: "snake", experienceTier: "experienced",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true, seatUserIds: ["solo_veteran"],
+    });
+
+    const [summary] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const body = JSON.stringify(summary);
+
+    expect(summary!.filledTeams).toBe(1);
+    expect(body).not.toContain("newcomers");
+    expect(body).not.toContain("veterans");
+    expect(body).not.toContain("tierComposition");
+    // The bucket still answers honestly: one veteran and no newcomers is not a newcomer lean.
+    expect(summary!.compositionCategory).toBe("open");
+    // And the allowlist itself no longer names the pair, so a spread cannot reintroduce it.
+    expect(PUBLIC_LEAGUE_FIELDS).not.toContain("tierComposition" as never);
   });
 
   it("counts a seat as a veteran once that seat-holder's OWN completed-season history crosses the cutoff", async () => {
@@ -327,7 +360,8 @@ describe("listPublicLeagues tier composition", () => {
       seatUserIds: ["mix_veteran", "mix_newcomer"],
     });
     const [summary] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
-    expect(summary!.tierComposition).toEqual({ newcomers: 1, veterans: 1 });
+    // One each: `compositionCategoryFor`'s own `>` rather than `>=` puts an even split in `open`.
+    expect(summary!.compositionCategory).toBe("open");
   });
 
   it("counts an empty seat as neither a newcomer nor a veteran", async () => {
@@ -336,7 +370,8 @@ describe("listPublicLeagues tier composition", () => {
       stakeTier: 0, teamCount: 12, filled: 0, isPublicMatchmade: true,
     });
     const [summary] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
-    expect(summary!.tierComposition).toEqual({ newcomers: 0, veterans: 0 });
+    // An empty roster has signalled nothing, so it reads `open` rather than `all_newcomers`.
+    expect(summary!.compositionCategory).toBe("open");
   });
 
   it("costs exactly two queries, whether or not any seat-holder has a completed-season history", async () => {

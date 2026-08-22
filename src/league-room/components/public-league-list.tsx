@@ -8,7 +8,7 @@ import type { HelpLevel } from "@/identity/preferences";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
-import { TIER_COMPOSITION_LABEL, compositionCategoryFor, type CompositionCategory } from "@/participation/composition";
+import { TIER_COMPOSITION_LABEL, type CompositionCategory } from "@/participation/composition";
 import { JoinPublicLeagueButton } from "./join-public-league-button";
 
 const FORMAT_LABEL: Readonly<Record<string, string>> = { snake: "Snake", auction: "Auction" };
@@ -108,7 +108,9 @@ export function PublicLeagueList({
           otherwise lets a long league name widen the item past its column at 360px. */}
       <ul className="grid gap-3 sm:grid-cols-2">
         {leagues.map((league) => {
-          const compositionCategory = compositionCategoryFor(league.tierComposition);
+          // Read, never derived (final review F6): `listPublicLeagues` reduces the two counts to
+          // this bucket server-side, and the counts themselves never cross the public wire.
+          const compositionCategory = league.compositionCategory;
           return (
             <li key={league.id} className="min-w-0">
               <Card as="article" className="flex h-full flex-col gap-3">

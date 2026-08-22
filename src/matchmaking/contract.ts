@@ -1,6 +1,6 @@
 import type { DraftFormat } from "@/domain/league";
 import type { ExperienceTier } from "@/domain/user";
-import type { TierComposition } from "@/participation/composition";
+import type { CompositionCategory } from "@/participation/composition";
 import type { ParticipationTier } from "@/participation/tier";
 
 /**
@@ -24,16 +24,19 @@ import type { ParticipationTier } from "@/participation/tier";
  * privacy, it would just be a worse card. See `browse.ts`'s docblock and the commit that added
  * this field for the fuller reasoning.
  *
- * `tierComposition` is the SAME kind of exception, and for the same reason `scoringLabel` is:
- * `browseQuery` (`@/league-service/browse`) already reduces a league's whole membership down to
- * two counts before this field is ever assembled, so what reaches the wire is an aggregate over
- * the league, never a fact about any one person in it — the same "two counts, never a member"
- * discipline `TierComposition`'s own docblock (`@/participation/composition`) states.
+ * `compositionCategory` is the SAME kind of exception, and for the same reason `scoringLabel` is:
+ * it is a DERIVED bucket, one of three coarse phrases, never the counts it was derived from. Final
+ * review F6 is why it is the bucket and not the counts: this field used to be a
+ * `{ newcomers, veterans }` pair reduced to its bucket client-side, and an aggregate over N=1 is
+ * not an aggregate — at `filledTeams: 1` the raw pair discloses that one manager's computed
+ * participation tier to anybody holding the URL, and polling across joins discloses each new
+ * member's tier as a delta. The reduction now happens server-side, so the coarse-label discipline
+ * is a wire boundary rather than a rendering convention.
  *
  * `draftAt` (Phase 3 Plan D, Task 6) is the tenth field and the newest disclosure decision: a
  * draft's scheduled time is a scheduling fact about the LEAGUE, not about any person in it, and
  * a visitor who can't see it can't tell whether they are free to attend before they join
- * (ruling 15) — exactly the reasoning `scoringLabel` and `tierComposition` already established
+ * (ruling 15) — exactly the reasoning `scoringLabel` and `compositionCategory` already established
  * for this interface. Formatted by the SAME `formatDraftTime` (`@/league/terms`) `leagueTerms`
  * calls for `LeagueTerms.draftAt`, so the sentence a stranger reads on a browse card and the one
  * a prospect reads on the invite preview can only ever agree.
@@ -51,8 +54,8 @@ export interface PublicLeagueSummary {
   readonly filledTeams: number;
   /** Derived from the league's scoring weights (`describeScoring`) — never the raw weights. */
   readonly scoringLabel: string;
-  /** Two counts, never a member — see this interface's own docblock. */
-  readonly tierComposition: TierComposition;
+  /** One of three coarse buckets, never the counts behind it — see this interface's own docblock. */
+  readonly compositionCategory: CompositionCategory;
   /** Absolute-plus-relative, e.g. "Saturday 12 September, 7:00 PM UTC (in 3 days)" — see this
    *  interface's own docblock. */
   readonly draftAt: string;

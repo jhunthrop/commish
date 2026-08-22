@@ -101,6 +101,19 @@ export interface DraftStore {
 const SEQUENCE_UNIQUE_INDEX = "draft_actions_draft_sequence_idx";
 
 /**
+ * The league-wide activity-feed sentence for an auto-started draft (final review F7). A named
+ * constant, not an inline literal, for the reason `LINEUP_AUTO_SET_SUMMARY`
+ * (`@/league-service/auto-lineup`) is one: it is product copy, and copy this product ships lives
+ * where the copy sweeps can find it.
+ *
+ * No league name and no member name: `listLeagueActivity` renders this INSIDE the league it
+ * belongs to, so naming the league again would read as a message from somewhere else, and the
+ * event is about the calendar rather than about a person. Present tense on the fact, first person
+ * plural on the platform's own action, matching the notice body this same publisher sends.
+ */
+export const DRAFT_AUTO_STARTED_SUMMARY = "This draft reached its scheduled time, so we started it.";
+
+/**
  * True only for the specific race `applyAction` retries on: two writers both inserting the
  * same `(draft_id, sequence)`. Keying on the constraint name — not just the SQLSTATE — matters
  * because 23505 is the generic "unique violation" code; a `draft_picks` primary-key clash
@@ -525,7 +538,19 @@ export function createDraftStore({
               actorId: null,
               actorType: "system",
               leagueId: config.leagueId,
-              payload: { action: "draft_auto_started" },
+              // `summary` IS THE RENDERED SENTENCE, and without it this event was written, read
+              // and discarded for every viewer, always: `renderSystemAction`
+              // (`@/integrity/activity-view`) answers `null` for a `system_action` with no
+              // summary, so a code granted `"everyone"` shipped as a declared-and-unimplemented
+              // value (final review F7). Nothing failed and no test caught it, because the intent
+              // was delivered by the per-team notice above.
+              //
+              // Written for the SANCTIONED AUDIENCE, which for this code is the whole league
+              // (`SYSTEM_ACTION_VISIBILITY.draft_auto_started` is `"everyone"`: a fact about the
+              // league's shared calendar, true for everyone in it, about nobody's conduct). So
+              // the sentence names no member and says only what happened, in the same voice the
+              // notice's own body opens with.
+              payload: { action: "draft_auto_started", summary: DRAFT_AUTO_STARTED_SUMMARY },
               occurredAt: now,
             });
             const attached: MemberNotice[] = [];

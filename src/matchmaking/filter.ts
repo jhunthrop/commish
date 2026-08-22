@@ -1,4 +1,3 @@
-import { compositionCategoryFor } from "@/participation/composition";
 import { MATCHMAKING_CONFIG } from "./config";
 import type { BrowseFilter, PublicLeagueSummary } from "./contract";
 
@@ -38,16 +37,19 @@ export function normalizeBrowseFilter(raw: {
 }
 
 /**
- * Whether `league` reads as leaning `tier`, per `compositionCategoryFor`'s own comparison
- * (`@/participation/composition`) — the SAME `newcomers > veterans` rule the composition label
- * renders from, never a second copy of it. `"newcomer"` matches only a league that has actually
- * earned that lean (`all_newcomers`/`mostly_newcomers`); `"veteran"` matches everything else,
- * including a tie and an empty roster — there is no "mostly veterans" bucket to match against
+ * Whether `league` reads as leaning `tier`, off the SAME coarse bucket the composition label
+ * renders from, never a second copy of the comparison. `"newcomer"` matches only a league that has
+ * actually earned that lean (`all_newcomers`/`mostly_newcomers`); `"veteran"` matches everything
+ * else, including a tie and an empty roster — there is no "mostly veterans" bucket to match against
  * (`TIER_COMPOSITION_LABEL`'s own docblock), so the veteran filter reads as "not newcomer-leaning"
  * rather than as its own third comparison.
+ *
+ * Reads the bucket rather than re-deriving it (final review F6): `compositionCategoryFor` now runs
+ * server-side in `listPublicLeagues`, and the counts it runs over never reach this side of the
+ * wire at all.
  */
 function matchesParticipationTier(league: PublicLeagueSummary, tier: Exclude<BrowseFilter["participationTier"], "any">): boolean {
-  const leansNewcomer = compositionCategoryFor(league.tierComposition) !== "open";
+  const leansNewcomer = league.compositionCategory !== "open";
   return tier === "newcomer" ? leansNewcomer : !leansNewcomer;
 }
 

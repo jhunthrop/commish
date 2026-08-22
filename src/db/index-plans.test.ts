@@ -59,7 +59,7 @@ describe("hot read paths use indexes", () => {
     const plan = await explainPlan(db, browseQuery(db, EMPTY_BROWSE_FILTER));
     expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
     expect(indexScanNode(plan, "leagues_public_browse_idx")).toBeDefined();
-    // The composition join runs on EVERY browse, narrowed or not — `tierComposition` is a
+    // The composition join runs on EVERY browse, narrowed or not — `compositionCategory` is a
     // display field, not only a filter — so the default, unnarrowed path already exercises
     // `leagues_season_completed_idx` too. See "DOES choose leagues_season_completed_idx" below
     // for the full account of why.

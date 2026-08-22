@@ -19,7 +19,7 @@ const CUSTOM_SCORING_LEAGUE: PublicLeagueSummary = {
   teamCount: 12,
   filledTeams: 5,
   scoringLabel: "Custom",
-  tierComposition: { newcomers: 5, veterans: 0 },
+  compositionCategory: "all_newcomers",
   draftAt: "Monday 14 September, 6:00 PM UTC (in 5 days)",
 };
 
@@ -108,9 +108,9 @@ describe("PublicLeagueList", () => {
   });
 
   it("labels the composition honestly, in the three phrases the brief names and no others", () => {
-    const allNewcomers: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_all", tierComposition: { newcomers: 4, veterans: 0 } };
-    const mostlyNewcomers: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_mostly", tierComposition: { newcomers: 3, veterans: 1 } };
-    const open: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_open", tierComposition: { newcomers: 1, veterans: 1 } };
+    const allNewcomers: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_all", compositionCategory: "all_newcomers" };
+    const mostlyNewcomers: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_mostly", compositionCategory: "mostly_newcomers" };
+    const open: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_open", compositionCategory: "open" };
     render(<PublicLeagueList leagues={[allNewcomers, mostlyNewcomers, open]} signedIn />);
     expect(screen.getByText("All newcomers")).toBeInTheDocument();
     expect(screen.getByText("Mostly newcomers")).toBeInTheDocument();
@@ -121,8 +121,8 @@ describe("PublicLeagueList", () => {
   });
 
   it("marks the newcomer-leaning composition with a clover and everything else with a crown", () => {
-    const newcomerLeaning: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_clover", tierComposition: { newcomers: 4, veterans: 0 } };
-    const notNewcomerLeaning: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_crown", tierComposition: { newcomers: 0, veterans: 4 } };
+    const newcomerLeaning: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_clover", compositionCategory: "all_newcomers" };
+    const notNewcomerLeaning: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_crown", compositionCategory: "open" };
     const { container } = render(<PublicLeagueList leagues={[newcomerLeaning, notNewcomerLeaning]} signedIn />);
     // `Icon` is decorative here (no `label`), so it renders `aria-hidden` — the adjacent text
     // already carries the meaning for a screen reader, which is also what keeps this axe-clean.
