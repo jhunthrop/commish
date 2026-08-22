@@ -4,17 +4,21 @@ import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
+import { NoticesProvider } from "./notices-provider";
 import { AppHeader } from "./app-header";
 
-// `AppHeader` renders `NoticeInbox` (Task 10), a `"use client"` component that fetches its own
-// data through `useAccountRoomDeps()`. Every case below wraps `AppHeader` in
-// `AccountRoomDepsProvider` with a fixture so no case ever reaches the real `fetch` — the same
+// `AppHeader` renders `NoticeInbox` (Task 10), a `"use client"` component whose `useNotices()`
+// (Plan D Task 9) requires a `NoticesProvider` ancestor — it throws without one, no silent
+// standalone fallback. Every case below wraps `AppHeader` in `AccountRoomDepsProvider` AND
+// `NoticesProvider` with a fixture so no case ever reaches the real `fetch` — the same
 // no-module-mocks, no-real-network discipline every other account-room test already follows.
 function renderHeader(displayName: string, avatar: string | null, isAdmin = false) {
   const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
   return render(
     <AccountRoomDepsProvider deps={fixture.deps}>
-      <AppHeader displayName={displayName} avatar={avatar} isAdmin={isAdmin} />
+      <NoticesProvider>
+        <AppHeader displayName={displayName} avatar={avatar} isAdmin={isAdmin} />
+      </NoticesProvider>
     </AccountRoomDepsProvider>,
   );
 }
@@ -24,7 +28,9 @@ describe("AppHeader", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     await inBothThemes(
       <AccountRoomDepsProvider deps={fixture.deps}>
-        <AppHeader displayName="Ada Lovelace" avatar="preset:shield" isAdmin={false} />
+        <NoticesProvider>
+          <AppHeader displayName="Ada Lovelace" avatar="preset:shield" isAdmin={false} />
+        </NoticesProvider>
       </AccountRoomDepsProvider>,
       async ({ container }) => {
         const link = screen.getByRole("link", { name: /Ada Lovelace/ });
@@ -65,7 +71,9 @@ describe("AppHeader", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     await inBothThemes(
       <AccountRoomDepsProvider deps={fixture.deps}>
-        <AppHeader displayName="Ada Lovelace" avatar={null} isAdmin={true} />
+        <NoticesProvider>
+          <AppHeader displayName="Ada Lovelace" avatar={null} isAdmin={true} />
+        </NoticesProvider>
       </AccountRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByRole("link", { name: /Queue/ })).toHaveAttribute("href", "/app/admin/queue");

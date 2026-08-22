@@ -3,6 +3,7 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { NoticeInbox } from "@/account-room/components/notice-inbox";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import type { NoticeView } from "@/account-room/contract";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
@@ -102,7 +103,9 @@ describe("NoticeInbox says nothing that breaks the house copy rules", () => {
       const fixture = fixtureAccountDeps(page);
       const { container, unmount } = render(
         <AccountRoomDepsProvider deps={fixture.deps}>
-          <NoticeInbox />
+          <NoticesProvider>
+            <NoticeInbox />
+          </NoticesProvider>
         </AccountRoomDepsProvider>,
       );
       const trigger = await within(container).findByRole("button", { name: /^Notices/ });
@@ -167,7 +170,11 @@ describe("the league activity page says nothing that breaks the house copy rules
       vi.mocked(listNotices).mockResolvedValue({ notices, unreadCount: notices.length });
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
       const page = await LeagueActivityPage({ params: Promise.resolve({ leagueId: "league_1" }), searchParams: Promise.resolve({}) });
-      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      const { container, unmount } = render(
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <NoticesProvider>{page}</NoticesProvider>
+        </AccountRoomDepsProvider>,
+      );
       await screen.findByText("League activity");
       expectClean(container, NOTICE.title, NOTICE.body, ROW.headline, ROW.detail ?? "");
       unmount();
@@ -209,7 +216,11 @@ describe("the admin queue page says nothing that breaks the house copy rules", (
       vi.mocked(listPendingFlags).mockResolvedValue({ rows, nextBefore: null });
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
       const page = await AdminQueuePage({ searchParams: Promise.resolve({}) });
-      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      const { container, unmount } = render(
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <NoticesProvider>{page}</NoticesProvider>
+        </AccountRoomDepsProvider>,
+      );
       await screen.findByText("Dispute queue");
       expectClean(container, QUEUE_ROW.question, QUEUE_ROW.about);
       unmount();
@@ -252,7 +263,11 @@ describe("the admin flag detail page says nothing that breaks the house copy rul
       vi.mocked(flagDetail).mockResolvedValue(detail);
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
       const page = await AdminFlagDetailPage({ params: Promise.resolve({ flagId: "flag_1" }) });
-      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      const { container, unmount } = render(
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <NoticesProvider>{page}</NoticesProvider>
+        </AccountRoomDepsProvider>,
+      );
       await screen.findByText("Flag detail");
       expectClean(container, detail.subject.kind === "review" ? detail.subject.body : "", ROW.headline, ROW.detail ?? "");
       unmount();
@@ -304,7 +319,11 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
       vi.mocked(flagDetail).mockResolvedValue(detail);
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
       const page = await AdminFlagDetailPage({ params: Promise.resolve({ flagId: "flag_1" }) });
-      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      const { container, unmount } = render(
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <NoticesProvider>{page}</NoticesProvider>
+        </AccountRoomDepsProvider>,
+      );
       await screen.findByText("Held trade");
       expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner", "Both teams belong to one person.");
       unmount();
@@ -343,7 +362,11 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
     vi.mocked(flagDetail).mockResolvedValue(detail);
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const page = await AdminFlagDetailPage({ params: Promise.resolve({ flagId: "flag_1" }) });
-    const { container } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+    const { container } = render(
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <NoticesProvider>{page}</NoticesProvider>
+      </AccountRoomDepsProvider>,
+    );
     await screen.findByText("Held trade");
 
     fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "Looks like the same person on both sides." } });
@@ -367,10 +390,10 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
    * mounts"). Driven through `HeldTradeDetail` directly, mirroring `ResolutionForm`'s own "is
    * clean once a decision is recorded" test just above, rather than through the full page — the
    * done state needs a REAL `AdminRoomDepsProvider` fetch to succeed, and the full-page tests
-   * above only ever wrap `AccountRoomDepsProvider` (for `AppHeader`'s own notice inbox), never
-   * `AdminRoomDepsProvider` — so a click-to-Confirm through the full page would have hit a REAL
-   * network call and landed on the ERROR state, not the done one, proving nothing about this
-   * sentence either way.
+   * above only ever wrap `AccountRoomDepsProvider` and `NoticesProvider` (for `AppHeader`'s own
+   * notice inbox), never `AdminRoomDepsProvider` — so a click-to-Confirm through the full page
+   * would have hit a REAL network call and landed on the ERROR state, not the done one, proving
+   * nothing about this sentence either way.
    */
   it.each(["Release the trade", "Block the trade"] as const)("is clean once %s is confirmed and the decision is recorded", async (buttonLabel) => {
     const { AdminRoomDepsProvider } = await import("@/admin-room/hooks/deps");

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 
 // Route-level: proves the page's own 404 branches without a real Postgres connection — every
 // read the page makes is mocked, and `notFound()` is the real `next/navigation` implementation
@@ -33,7 +34,11 @@ function callPage(leagueId = "league_1") {
 async function renderPage(leagueId?: string) {
   const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
   const page = await callPage(leagueId);
-  return render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+  return render(
+    <AccountRoomDepsProvider deps={fixture.deps}>
+      <NoticesProvider>{page}</NoticesProvider>
+    </AccountRoomDepsProvider>,
+  );
 }
 
 beforeEach(() => {

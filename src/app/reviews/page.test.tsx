@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 
 const forwardedFor = { value: "203.0.113.9" };
 
@@ -22,7 +23,11 @@ const EMPTY_PAGE = { reviews: [], hasMore: false, nextBefore: null };
 
 async function renderPage() {
   const page = await ReviewsPage();
-  return render(<AccountRoomDepsProvider deps={fixtureAccountDeps().deps}>{page}</AccountRoomDepsProvider>);
+  return render(
+    <AccountRoomDepsProvider deps={fixtureAccountDeps().deps}>
+      <NoticesProvider>{page}</NoticesProvider>
+    </AccountRoomDepsProvider>,
+  );
 }
 
 beforeEach(() => {

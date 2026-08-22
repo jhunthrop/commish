@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
 import { fixtureLeagueDeps } from "@/league-room/test-fixtures";
 
@@ -87,7 +88,9 @@ async function renderPage(leagueId?: string) {
   const page = await callPage(leagueId);
   return render(
     <AccountRoomDepsProvider deps={accountFixture.deps}>
-      <LeagueRoomDepsProvider deps={leagueFixture.deps}>{page}</LeagueRoomDepsProvider>
+      <NoticesProvider>
+        <LeagueRoomDepsProvider deps={leagueFixture.deps}>{page}</LeagueRoomDepsProvider>
+      </NoticesProvider>
     </AccountRoomDepsProvider>,
   );
 }

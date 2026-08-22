@@ -27,11 +27,14 @@ export interface UseNoticesResult {
  *  caller of `useNotices()` already depends on, and `subscribe` is this file's own internal
  *  wiring, not something a page ever calls directly. */
 export interface NoticesContextValue extends UseNoticesResult {
-  /** Registers one live consumer and returns its own unsubscribe. Mirrors
-   *  `subscribeLeagueStream`'s refcount idiom (`@/event-stream/league-stream`) for WHEN the
-   *  first fetch fires, not for the stream's lifetime — see `start`'s own docblock for why the
-   *  two idioms diverge past that point. */
-  readonly subscribe: () => () => void;
+  /** Idempotent: the first call, ever, starts the mount fetch and opens the shared stream
+   *  (`start`'s own `startedRef` guard); every later call — including the one a page mounted a
+   *  SECOND `NoticeInbox` would make, or a page mounted after a draft-room trip with none at all
+   *  — is a no-op. No unsubscribe half: unlike `subscribeLeagueStream`'s refcount idiom
+   *  (`@/event-stream/league-stream`), which closes a connection when its last subscriber
+   *  leaves, this provider never closes anything — see `start`'s own docblock for why the two
+   *  idioms diverge past "when does the first fetch fire". */
+  readonly subscribe: () => void;
 }
 
 const NoticesContext = createContext<NoticesContextValue | null>(null);
@@ -65,11 +68,11 @@ export function NoticesProvider({ children }: { readonly children: ReactNode }) 
   const [status, setStatus] = useState<NoticesStatus>("loading");
   const [error, setError] = useState<string | null>(null);
   const generationRef = useRef(0);
-  /** Ever started, once, for the life of this provider — NOT tied to the subscriber count, which
-   *  is what makes navigating into the draft room and back out cost nothing: the state this
-   *  provider already holds stays held, and `start` never runs a second time to refetch it. */
+  /** Ever started, once, for the life of this provider — NOT tied to how many `NoticeInbox`es
+   *  are mounted right now, which is what makes navigating into the draft room and back out cost
+   *  nothing: the state this provider already holds stays held, and `start` never runs a second
+   *  time to refetch it. */
   const startedRef = useRef(false);
-  const subscriberCountRef = useRef(0);
 
   const refetch = useCallback(async (): Promise<void> => {
     const generationBeforeRequest = generationRef.current;
@@ -110,12 +113,8 @@ export function NoticesProvider({ children }: { readonly children: ReactNode }) 
     source.addEventListener("open", onFrame);
   }, [deps, refetch]);
 
-  const subscribe = useCallback((): (() => void) => {
-    subscriberCountRef.current += 1;
+  const subscribe = useCallback((): void => {
     start();
-    return () => {
-      subscriberCountRef.current -= 1;
-    };
   }, [start]);
 
   const markRead = useCallback(
@@ -152,9 +151,10 @@ export function NoticesProvider({ children }: { readonly children: ReactNode }) 
   return <NoticesContext.Provider value={value}>{children}</NoticesContext.Provider>;
 }
 
-/** `null` when rendered with no `NoticesProvider` ancestor — the fallback branch
- *  `useNotices()` needs to keep every existing bare-component test (`AppHeader`, page-level
- *  tests wrapping only `AccountRoomDepsProvider`) working unchanged. */
+/** `null` when rendered with no `NoticesProvider` ancestor. `useNotices()`
+ *  (`@/account-room/hooks/use-notices`) is the one caller of this and throws on `null` — same
+ *  "no silent fallback" idiom `useTheme`/`useToast` already use in this codebase — rather than
+ *  quietly running a second, competing implementation of the state this provider owns. */
 export function useNoticesContext(): NoticesContextValue | null {
   return useContext(NoticesContext);
 }

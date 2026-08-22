@@ -1,5 +1,6 @@
 import type { ReactElement } from "react";
 import { render, type RenderResult } from "@testing-library/react";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import type { ProfileBody } from "./contract";
 import { AccountRoomDepsProvider, type AccountRoomDeps } from "./hooks/deps";
 
@@ -86,6 +87,15 @@ export function fixtureAccountDeps(
   return fixture;
 }
 
+/** `NoticesProvider` (Plan D Task 9, fix round 1) wraps every case here, not only the notice
+ *  ones: `useNotices()` now throws without a provider ancestor, and `NoticeInbox` — reached
+ *  through `AppHeader` on several of this file's own callers' pages, and directly by
+ *  `notice-inbox.test.tsx` — is the one component under `src/account-room/**` that calls it. A
+ *  component that never calls `useNotices()` renders identically with or without this wrapper. */
 export function renderInAccount(ui: ReactElement, deps: AccountRoomDeps): RenderResult {
-  return render(<AccountRoomDepsProvider deps={deps}>{ui}</AccountRoomDepsProvider>);
+  return render(
+    <AccountRoomDepsProvider deps={deps}>
+      <NoticesProvider>{ui}</NoticesProvider>
+    </AccountRoomDepsProvider>,
+  );
 }

@@ -7,23 +7,14 @@ import { fixtureAccountDeps } from "../test-fixtures";
 import { AccountRoomDepsProvider, type AccountRoomDeps } from "./deps";
 import { useNotices } from "./use-notices";
 
-/** No `NoticesProvider` anywhere in this wrapper — every case below (except the last describe
- *  block) exercises `useNotices`' STANDALONE FALLBACK, the pre-Task-9 implementation kept
- *  verbatim for a caller with no provider ancestor. That is deliberate, not an oversight: most
- *  of the product's own tests (page-level tests under `src/app/app/**`, `AppHeader`'s own test)
- *  wrap only `AccountRoomDepsProvider`, and this file is what proves that fallback still behaves
- *  exactly as `useNotices` always did. The provider-backed path — the one `src/app/layout.tsx`
- *  actually renders in production — has its own lifetime tests in `notices-provider.test.tsx`;
- *  the last describe block here covers only that `useNotices()` correctly DELEGATES to a
- *  `NoticesProvider` ancestor when one is present, rather than fetching a second, competing copy
- *  of the same state. */
+/** Every case below renders through a real `NoticesProvider` — Plan D Task 9 fix round 1 deleted
+ *  `useNotices`' standalone fallback (it was unreachable in production, confirmed by the review
+ *  that ordered its removal), so this is now the ONLY way to render `useNotices()` at all. The
+ *  provider's own lifetime guarantees (one fetch across many navigations, one stream never
+ *  closed, no fetch until a real subscriber exists) are `notices-provider.test.tsx`'s job; this
+ *  file covers the hook's CONTRACT — the state shape, the `notice.created`/`open` refetches, the
+ *  `generationRef` race with `markRead` — through the one path that now reaches it. */
 function wrapper(deps: AccountRoomDeps) {
-  return function Wrapper({ children }: { readonly children: ReactNode }) {
-    return <AccountRoomDepsProvider deps={deps}>{children}</AccountRoomDepsProvider>;
-  };
-}
-
-function wrapperWithProvider(deps: AccountRoomDeps) {
   return function Wrapper({ children }: { readonly children: ReactNode }) {
     return (
       <AccountRoomDepsProvider deps={deps}>
@@ -49,6 +40,14 @@ const NOTICE_B: NoticesBody["notices"][number] = { ...NOTICE_A, id: "n2", title:
 const PAGE: NoticesBody = { notices: [NOTICE_A], unreadCount: 1 };
 
 describe("useNotices", () => {
+  it("throws a clear error when rendered outside a NoticesProvider — no silent standalone fallback", () => {
+    // The same "no ambient default, fail loudly" idiom `useTheme`/`useToast` already use in this
+    // codebase. `renderHook`'s default wrapper is `undefined` — no `AccountRoomDepsProvider`
+    // either, but that one degrades gracefully to `BROWSER_DEPS`; only the missing
+    // `NoticesProvider` is what this test is about, so the assertion is on the thrown message.
+    expect(() => renderHook(() => useNotices())).toThrow("useNotices must be used inside <NoticesProvider>.");
+  });
+
   it("loads the caller's own page on mount and derives the unread count from it", async () => {
     const fixture = fixtureAccountDeps({ ok: true, data: PAGE });
     const { result } = renderHook(() => useNotices(), { wrapper: wrapper(fixture.deps) });
@@ -171,26 +170,10 @@ describe("useNotices", () => {
     expect(result.current.notices.find((notice) => notice.id === NOTICE_A.id)?.readAt).not.toBeNull();
     expect(result.current.unreadCount).toBe(0);
   });
-});
 
-// Plan D Task 9: the state moved into `NoticesProvider`; `useNotices()` becomes a `useContext`
-// read plus a subscribe effect when a provider ancestor exists. The provider's own lifetime
-// guarantees (one fetch across many navigations, one stream never closed) are
-// `notices-provider.test.tsx`'s job — this describe block only proves the hook reads THROUGH
-// the provider rather than falling back to its own standalone fetch when one is present.
-describe("useNotices, wrapped in a NoticesProvider", () => {
-  it("reads the provider's shared state instead of fetching a second copy of its own", async () => {
+  it("stops subscribing on unmount, without refetching or reopening the stream", async () => {
     const fixture = fixtureAccountDeps({ ok: true, data: PAGE });
-    const { result } = renderHook(() => useNotices(), { wrapper: wrapperWithProvider(fixture.deps) });
-
-    await waitFor(() => expect(result.current.status).toBe("ready"));
-    expect(result.current.notices).toEqual([NOTICE_A]);
-    expect(fixture.calls).toEqual(["GET /api/notices"]);
-  });
-
-  it("stops counting as a subscriber on unmount, without refetching or reopening the stream", async () => {
-    const fixture = fixtureAccountDeps({ ok: true, data: PAGE });
-    const { result, unmount } = renderHook(() => useNotices(), { wrapper: wrapperWithProvider(fixture.deps) });
+    const { result, unmount } = renderHook(() => useNotices(), { wrapper: wrapper(fixture.deps) });
     await waitFor(() => expect(result.current.status).toBe("ready"));
 
     unmount();

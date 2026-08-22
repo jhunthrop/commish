@@ -70,7 +70,8 @@ export const INTEGRITY_CONFIG = {
      */
     passiveConstructions: ["was made", "was removed", "is kept", "was kept", "were made", "were removed"],
     /**
-     * 30 requests per 60 seconds, restored.
+     * 32 requests per 60 seconds, restored and re-derived to hold together under the real
+     * limiter semantics — see the fix-round correction below before trusting a smaller number.
      *
      * THE STOPGAP IS OVER. Plan C raised this to 120 from an observed cost of two `GET /api/notices`
      * per client-side navigation (the mount fetch, plus the refcounted stream's `open` refetch after
@@ -79,19 +80,36 @@ export const INTEGRITY_CONFIG = {
      * survives every navigation, and holds one stream and one page of notices for the life of the
      * tab.
      *
-     * THE NEW ARITHMETIC, from the new cost:
+     * FIX ROUND 1 CORRECTION: the first cut of this arithmetic (30) counted only the
+     * notice-driven steady state and silently dropped the two requests session start itself
+     * spends — `createRateLimiter` (`@/lib/api/rate-limit`) is a FIXED window per key, started at
+     * that key's first request, not a sliding one. A member who opens the app straight into a
+     * burst of activity spends the session-start pair AND the full notice-driven stress case
+     * inside that SAME still-open window, so leaving the pair out understated the ceiling by
+     * exactly the two requests it takes to reach it.
      *
-     *     1 GET per SESSION            (the first subscriber's mount fetch)
-     *   + 1 GET per real reconnection  (the stream's `open`, which now fires only when the browser
-     *                                   actually reconnects, not on every page change)
-     *   + 1 GET per notice received    (`notice.created` still refetches, ruling 13)
-     *   + 1 POST /api/notices/read per bell-open with unread notices
+     * THE ARITHMETIC, complete:
      *
-     * A member receiving a notice every four seconds for a minute, opening the bell each time, spends
-     * 30. That is not browsing, it is a stress case, and it is the ceiling. The old 30 was reachable
-     * in FIFTEEN navigations; the new 30 is not reachable by navigation at all.
+     *     1 GET  at session start          (the first subscriber's mount fetch)
+     *   + 1 GET  at session start          (the stream's OWN first `open` — it refetches on every
+     *                                       `open`, the initial connection included, not only a
+     *                                       later reconnect: `useLiveScores`' identical `onOpen`
+     *                                       refetch exists for the SAME mount-to-listener gap a
+     *                                       notice could otherwise land in unseen, and that gap is
+     *                                       just as real on the first connection as on a later
+     *                                       one, so this was never going to be the thing to cut)
+     *   + 1 GET  per notice received       (`notice.created` still refetches, ruling 13)
+     *   + 1 POST /api/notices/read         per bell-open with unread notices
+     *   ---------------------------------------------------------------------------------------
+     *   = 2 + (notices in the window x 2)
+     *
+     * A member receiving a notice every four seconds for a minute, opening the bell each time,
+     * spends 2 + (15 x 2) = 32 inside one fixed window if that burst starts right as the session
+     * does. That is not browsing, it is a stress case, and 32 — not 30 — is the honest ceiling
+     * for it. The old 30 was reachable in FIFTEEN navigations; 32 is not reachable by navigation
+     * at all, still an order of magnitude tighter than the P3C-era 120.
      */
-    rateLimit: { maxRequests: 30, windowMs: 60_000 },
+    rateLimit: { maxRequests: 32, windowMs: 60_000 },
   },
   moderation: {
     /**

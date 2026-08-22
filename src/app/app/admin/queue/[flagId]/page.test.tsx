@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 
 vi.mock("@/lib/auth/current-user", () => ({ requireAdmin: vi.fn() }));
@@ -46,7 +47,11 @@ function callPage(flagId = "flag_1") {
 async function renderPage(flagId?: string) {
   const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
   const page = await callPage(flagId);
-  return render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+  return render(
+    <AccountRoomDepsProvider deps={fixture.deps}>
+      <NoticesProvider>{page}</NoticesProvider>
+    </AccountRoomDepsProvider>,
+  );
 }
 
 beforeEach(() => {
@@ -74,7 +79,9 @@ describe("AdminFlagDetailPage — the read", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const page = await callPage();
     await inBothThemes(
-      <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <NoticesProvider>{page}</NoticesProvider>
+      </AccountRoomDepsProvider>,
       async ({ container }) => {
         expect(await screen.findByText("Great season overall.")).toBeInTheDocument();
         expect(screen.getByText("By Ada")).toBeInTheDocument();
@@ -197,7 +204,9 @@ describe("AdminFlagDetailPage — the read", () => {
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
       const page = await callPage();
       await inBothThemes(
-        <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <NoticesProvider>{page}</NoticesProvider>
+        </AccountRoomDepsProvider>,
         async ({ container }) => {
           expect(await screen.findByText("Team Alice and Team Bob")).toBeInTheDocument();
           expect(screen.getByText(/Star RB \(RB\), 22.4 points per week/)).toBeInTheDocument();
@@ -327,7 +336,9 @@ describe("AdminFlagDetailPage — the read", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const page = await callPage();
     await inBothThemes(
-      <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <NoticesProvider>{page}</NoticesProvider>
+      </AccountRoomDepsProvider>,
       async ({ container }) => {
         expect(await screen.findByText("Ada Operator", { exact: false })).toBeInTheDocument();
         expect(screen.getByText(/sent the member a warning/)).toBeInTheDocument();

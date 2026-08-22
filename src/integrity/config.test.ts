@@ -103,25 +103,38 @@ describe("INTEGRITY_CONFIG.participation", () => {
 });
 
 /**
- * PLAN D TASK 9. `NoticesProvider` (`@/components/app-shell/notices-provider`) fixed the
- * architecture the P3C stopgap was covering for: navigation no longer remounts `useNotices`, so
- * it no longer spends a request per page. What is left is a real stress case — a member
- * receiving notices continuously and opening the bell every time — not ordinary browsing, and
- * the point of pinning it here is unchanged from the stopgap it replaced: the NUMBER is derived
- * rather than picked, the arithmetic lives in `config.ts`'s own docblock, and this test is what
- * stops a later edit from quietly walking it back below what that stress case costs.
+ * PLAN D TASK 9, FIX ROUND 1. `NoticesProvider` (`@/components/app-shell/notices-provider`)
+ * fixed the architecture the P3C stopgap was covering for: navigation no longer remounts
+ * `useNotices`, so it no longer spends a request per page. What is left is a real stress case —
+ * a member receiving notices continuously and opening the bell every time — not ordinary
+ * browsing, and the point of pinning it here is unchanged from the stopgap it replaced: the
+ * NUMBER is derived rather than picked, the arithmetic lives in `config.ts`'s own docblock, and
+ * this test is what stops a later edit from quietly walking it back below what that stress case
+ * costs.
+ *
+ * `createRateLimiter` (`@/lib/api/rate-limit`) is a FIXED window per key, started at that key's
+ * first request — not a sliding window — so the worst case for one window is not "the
+ * notice-driven steady state" in isolation. It is that steady state PLUS the two requests
+ * session start itself spends (the mount fetch and the stream's own first `open`, which
+ * refetches on every `open` including the initial connection — see `config.ts`'s own docblock
+ * for why that request is not the one to cut) landing inside the SAME still-open window, which
+ * happens whenever a member opens the app straight into a burst of notices.
  */
-describe("the notices ceiling matches NoticesProvider's real cost, not per-navigation cost", () => {
+describe("the notices ceiling matches NoticesProvider's real cost under the fixed-window limiter", () => {
   /** A notice arriving every four seconds, sustained for the whole window — far faster than any
    *  real member receives notices, and each one is a `notice.created` refetch plus, if the bell
    *  is open, a `POST /api/notices/read` right behind it. */
   const NOTICE_INTERVAL_MS = 4_000;
   const REQUESTS_PER_NOTICE = 2;
+  /** The mount fetch plus the stream's own first `open` refetch — spent once, at session start,
+   *  inside the SAME fixed window a burst-on-open stress case also spends its notice-driven
+   *  requests in. */
+  const SESSION_START_REQUESTS = 2;
 
-  it("lets a member receive a notice every four seconds for a whole window, reading each one, without a 429", () => {
+  it("lets a member open the app straight into a notice every four seconds for a whole window, reading each one, without a 429", () => {
     const { maxRequests, windowMs } = INTEGRITY_CONFIG.notices.rateLimit;
     const noticesPerWindow = windowMs / NOTICE_INTERVAL_MS;
-    const worstCaseRequests = noticesPerWindow * REQUESTS_PER_NOTICE;
+    const worstCaseRequests = SESSION_START_REQUESTS + noticesPerWindow * REQUESTS_PER_NOTICE;
     expect(maxRequests).toBeGreaterThanOrEqual(worstCaseRequests);
   });
 
@@ -130,7 +143,7 @@ describe("the notices ceiling matches NoticesProvider's real cost, not per-navig
     expect(INTEGRITY_CONFIG.notices.rateLimit.windowMs).toBe(60_000);
   });
 
-  it("is the restored pre-stopgap ceiling — the P3C 120 is gone with the render tree that needed it", () => {
-    expect(INTEGRITY_CONFIG.notices.rateLimit.maxRequests).toBe(30);
+  it("is the restored, fully re-derived ceiling — the P3C 120 is gone with the render tree that needed it", () => {
+    expect(INTEGRITY_CONFIG.notices.rateLimit.maxRequests).toBe(32);
   });
 });
