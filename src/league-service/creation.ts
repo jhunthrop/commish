@@ -49,6 +49,15 @@ export interface CreateLeagueInput {
   readonly stakeTier: number;
   /** Opt-in. A league is invite-only and unlisted unless its creator chose otherwise. */
   readonly isPublicMatchmade: boolean;
+  /**
+   * ISO instant. Optional: the creation form itself never collects this (Task 6 only wires the
+   * schedule PANEL, reachable after a league exists, not a creation-time field), but a caller
+   * who already has a real chosen time — a seed, a fixture, a future creation flow — should not
+   * have to create the league blind and immediately follow with `setDraftKickoff`. Omitted, the
+   * SAME `LEAGUE_CONFIG.defaults.draftDaysFromCreation` arithmetic this function has used since
+   * Phase 1 still runs, so every existing caller is unaffected.
+   */
+  readonly kickoffAt?: string;
 }
 
 export type CreateLeagueResult =
@@ -87,7 +96,10 @@ export async function createLeague(
   const leagueId = newId();
   const teamId = newId();
   const draftId = newId();
-  const kickoffAt = new Date(Date.parse(clock.now()) + LEAGUE_CONFIG.defaults.draftDaysFromCreation * MS_PER_DAY);
+  const kickoffAt =
+    input.kickoffAt !== undefined
+      ? new Date(input.kickoffAt)
+      : new Date(Date.parse(clock.now()) + LEAGUE_CONFIG.defaults.draftDaysFromCreation * MS_PER_DAY);
 
   try {
     await db.transaction(async (tx) => {

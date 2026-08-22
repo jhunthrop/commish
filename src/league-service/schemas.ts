@@ -91,6 +91,13 @@ export const weekNumberSchema = z.number().int().positive().max(LEAGUE_CONFIG.ma
  * (`setLineup`'s doc comment explains why), so a client that sends BENCH entries too is
  * accepted and those entries are simply recomputed rather than trusted.
  */
+/** The commissioner's chosen draft time. `setDraftKickoff` (`./draft-schedule`) is where "in the
+ *  future" and "within the clock schedule's ceiling" are enforced — this boundary only checks
+ *  that the string is a real ISO instant at all. */
+export const setDraftKickoffSchema = z.object({
+  kickoffAt: z.iso.datetime({ message: "That doesn't look like a valid time." }),
+});
+
 export const setLineupSchema = z.object({
   weekNumber: weekNumberSchema,
   slots: z

@@ -140,6 +140,10 @@ export function PublicLeagueList({
                   <span className="font-medium">{spotsLeftLabel(league)}</span>
                 </p>
                 <p className="inline-flex items-center gap-1 text-sm text-text-muted">
+                  <Icon name="clock" size={16} />
+                  {`Drafts ${league.draftAt}`}
+                </p>
+                <p className="inline-flex items-center gap-1 text-sm text-text-muted">
                   <Icon name={COMPOSITION_ICON[compositionCategory]} size={16} />
                   {TIER_COMPOSITION_LABEL[compositionCategory]}
                 </p>

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { SCORING_PRESETS } from "@/domain/scoring";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
-import { leagueTerms, type LeagueTermsInput } from "./terms";
+import { formatDraftTime, leagueTerms, type LeagueTermsInput } from "./terms";
 
 /** A small custom roster shape — distinct from `STANDARD_ROSTER_SLOTS` so a test that swaps one
  *  in for the other proves `leagueTerms` reads the SLOTS it was given, not a fixed default. */
@@ -20,6 +20,8 @@ const BASE: LeagueTermsInput = {
   rosterSlots: SMALL_ROSTER,
   stakeTier: 1,
   commissioner: { displayName: "Alex Rivera", avatarUrl: "preset:crown" },
+  kickoffAt: "2026-09-12T23:00:00.000Z",
+  now: "2026-09-09T23:00:00.000Z",
 };
 
 describe("leagueTerms", () => {
@@ -69,5 +71,50 @@ describe("leagueTerms", () => {
   it("carries the commissioner's avatar ref through, including when they have none", () => {
     expect(leagueTerms(BASE).commissionerAvatar).toBe("preset:crown");
     expect(leagueTerms({ ...BASE, commissioner: { displayName: "Ada Lovelace", avatarUrl: null } }).commissionerAvatar).toBeNull();
+  });
+
+  it("renders the draft's scheduled time absolute-first, then relative", () => {
+    expect(leagueTerms(BASE).draftAt).toBe("Saturday 12 September, 11:00 PM UTC (in 3 days)");
+  });
+});
+
+describe("formatDraftTime", () => {
+  it("puts the absolute time before the relative one", () => {
+    expect(formatDraftTime("2026-09-12T23:00:00.000Z", "2026-09-09T23:00:00.000Z")).toBe(
+      "Saturday 12 September, 11:00 PM UTC (in 3 days)",
+    );
+  });
+
+  it("counts down in hours inside the final day", () => {
+    expect(formatDraftTime("2026-09-12T23:00:00.000Z", "2026-09-12T18:00:00.000Z")).toBe(
+      "Saturday 12 September, 11:00 PM UTC (in 5 hours)",
+    );
+  });
+
+  it("counts down in minutes inside the final hour", () => {
+    expect(formatDraftTime("2026-09-12T23:00:00.000Z", "2026-09-12T22:40:00.000Z")).toBe(
+      "Saturday 12 September, 11:00 PM UTC (in 20 minutes)",
+    );
+  });
+
+  it("uses the singular for exactly one day, hour or minute", () => {
+    expect(formatDraftTime("2026-09-12T23:00:00.000Z", "2026-09-11T23:00:00.000Z")).toBe(
+      "Saturday 12 September, 11:00 PM UTC (in 1 day)",
+    );
+    expect(formatDraftTime("2026-09-12T23:00:00.000Z", "2026-09-12T22:00:00.000Z")).toBe(
+      "Saturday 12 September, 11:00 PM UTC (in 1 hour)",
+    );
+    expect(formatDraftTime("2026-09-12T23:00:00.000Z", "2026-09-12T22:59:00.000Z")).toBe(
+      "Saturday 12 September, 11:00 PM UTC (in 1 minute)",
+    );
+  });
+
+  it("never goes negative — a kickoff at or past now reads as starting now", () => {
+    expect(formatDraftTime("2026-09-12T23:00:00.000Z", "2026-09-12T23:00:00.000Z")).toBe(
+      "Saturday 12 September, 11:00 PM UTC (starting now)",
+    );
+    expect(formatDraftTime("2026-09-12T23:00:00.000Z", "2026-09-13T00:00:00.000Z")).toBe(
+      "Saturday 12 September, 11:00 PM UTC (starting now)",
+    );
   });
 });

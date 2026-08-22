@@ -1,10 +1,11 @@
 import Link from "next/link";
 import type { LeagueHomeBody, LineupBody } from "../contract";
-import { Card, PageTitle } from "@/components/ui";
+import { PageTitle } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import type { HelpLevel } from "@/identity/preferences";
 import { formatWeek } from "../lib/format";
 import { AdvisorPanel } from "./advisor-panel";
+import { DraftSchedulePanel } from "./draft-schedule-panel";
 import { InvitePanel } from "./invite-panel";
 import { LeagueMembersPanel } from "./league-members-panel";
 import { LeagueTermsPanel } from "./league-terms-panel";
@@ -32,8 +33,6 @@ export function LeagueHome({
   readonly helpLevel?: HelpLevel;
 }) {
   const clinched = home.standings.some((row) => row.teamId === home.myTeamId && row.clinched);
-  const drafted = home.draftStatus === "complete";
-  const draftLive = home.draftStatus === "in_progress";
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
@@ -46,18 +45,12 @@ export function LeagueHome({
 
       <MatchupCelebration matchup={home.myMatchup} myTeamId={home.myTeamId} clinched={clinched} />
 
-      {drafted ? null : (
-        <Card>
-          <p className="text-text-primary">
-            {draftLive ? "Your draft is live right now." : "This league hasn't drafted yet."}
-          </p>
-          {home.draftId === null ? null : (
-            <Link className="text-accent underline" href={`/app/drafts/${home.draftId}`}>
-              {draftLive ? "Join the draft" : "Open the draft room"}
-            </Link>
-          )}
-        </Card>
-      )}
+      {/* Task 6: the button that has existed since Phase 1 and nobody could ever press on
+          purpose. Fetches its own schedule (`GET /api/leagues/[leagueId]/draft-schedule`) rather
+          than riding this page's own render, so a commissioner's edit or start updates without a
+          full page reload. Renders for every draft state, including `complete` — unlike the
+          static card this replaced, which rendered nothing once a league had drafted. */}
+      {home.draftId === null ? null : <DraftSchedulePanel leagueId={home.leagueId} isCommissioner={home.isCommissioner} />}
 
       <section className="flex flex-col gap-2" aria-label={`${formatWeek(home.currentWeek)} matchup`}>
         <div className="flex flex-wrap items-center justify-between gap-2">

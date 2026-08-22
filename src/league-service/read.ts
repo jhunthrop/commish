@@ -3,6 +3,7 @@ import type { Db } from "@/db/client";
 import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, teams } from "@/db/schema";
 import type { DraftStatus } from "@/domain/draft";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
+import type { Clock } from "@/domain/timing";
 import { listTeamCards } from "@/draft-service/teams";
 import { benchOf, LEAGUE_CONFIG, leagueTerms, seasonProgress, startersOf, type WeekStatus } from "@/league";
 import type {
@@ -19,6 +20,11 @@ import { computeFantasyPoints, type ScoringRules } from "@/scoring";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { getLineup, weekStatusFor } from "./lineups";
 import { leagueStandings } from "./results";
+
+/** The outermost edge is the only place a wall clock is allowed — see every other service
+ *  module's identical constant (`creation.ts`, `invites.ts`, ...). Read here, once, so
+ *  `leagueTerms`'s `draftAt` field has a `now` to measure "in 3 days" against. */
+const systemClock: Clock = { now: () => new Date().toISOString() };
 
 /** No Redis connection needed: every existing caller of `matchupWeek` keeps working untouched. */
 const NOOP_REFERENCE_CACHE: Pick<ReferenceCache, "players" | "scoringSettings"> = {
@@ -119,13 +125,13 @@ export const BASELINE_LEAGUE_HOME_QUERIES = 8;
  * imported from `@/draft-service/teams` rather than re-implemented — it is already the one
  * "team + owner's public profile" query in this codebase, and a second would drift.
  */
-export async function leagueHome(db: Db, leagueId: string, userId: string): Promise<LeagueHomeBody | null> {
+export async function leagueHome(db: Db, leagueId: string, userId: string, clock: Clock = systemClock): Promise<LeagueHomeBody | null> {
   const [league] = await db.select().from(leagues).where(eq(leagues.id, leagueId));
   if (league === undefined) return null;
 
   const matchupRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
   const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
-  const [draft] = await db.select({ id: drafts.id, status: drafts.status }).from(drafts).where(eq(drafts.leagueId, leagueId));
+  const [draft] = await db.select({ id: drafts.id, status: drafts.status, kickoffAt: drafts.kickoffAt }).from(drafts).where(eq(drafts.leagueId, leagueId));
   // `leagueTerms`'s one input this function did not already hold — every other field it needs
   // (`league`'s own columns, `teamRows`/`teamCards` for filled count and the commissioner's
   // name) rides rows this function reads anyway. Falls back to `PPR_SCORING` for the same
@@ -172,6 +178,11 @@ export async function leagueHome(db: Db, leagueId: string, userId: string): Prom
       displayName: commissionerCard?.ownerDisplayName ?? "Commissioner",
       avatarUrl: commissionerCard?.ownerAvatarUrl ?? null,
     },
+    // `drafts` is written in the same transaction as `leagues` (`createLeague`), so a missing
+    // row here never happens in production — falling back to `clock.now()` mirrors the same
+    // never-true defensive fallback `weights ?? PPR_SCORING` uses two lines above.
+    kickoffAt: draft?.kickoffAt.toISOString() ?? clock.now(),
+    now: clock.now(),
   });
 
   return {

@@ -143,6 +143,10 @@ async function seedPublicLeague(
     // `seed()` never gives a manager a completed league of their own UNLESS `veteranSeats` asked
     // for one — matching `listPublicLeagues`'s own answer for the same corpus.
     tierComposition: { newcomers: overrides.filledTeams - veteranSeats, veterans: veteranSeats },
+    // `seed()` always schedules the draft for the same fixed instant — no caller of this
+    // fixture compares `draftAt` (they compare against `matchesBrowseFilter`/`.id`, neither of
+    // which reads it), so this only needs to satisfy `PublicLeagueSummary`'s shape.
+    draftAt: "Thursday 10 September, 5:00 PM UTC",
   };
 }
 
@@ -161,11 +165,14 @@ describe("listPublicLeagues", () => {
       id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner",
       stakeTier: 0, teamCount: 12, filled: 8, isPublicMatchmade: true,
     });
-    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    // `seed()` schedules the draft for "2026-09-10T17:00:00.000Z" (below) — pin `now` so
+    // `draftAt`'s relative half is deterministic rather than measured against the real clock.
+    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER, { now: () => "2026-08-17T12:00:00.000Z" });
     expect(rows).toEqual([
       {
         id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0,
         teamCount: 12, filledTeams: 8, scoringLabel: "Standard", tierComposition: { newcomers: 8, veterans: 0 },
+        draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)",
       },
     ]);
   });

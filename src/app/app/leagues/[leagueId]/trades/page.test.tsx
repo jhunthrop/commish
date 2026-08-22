@@ -37,6 +37,7 @@ const HOME = {
   terms: {
     name: "Sunday Money", format: "snake" as const, teamCount: 2, filledTeams: 2, scoringLabel: "PPR",
     rosterLine: "", stakeLabel: "Friendly", stakeDisclosure: "", commissionerName: "Grace Hopper", commissionerAvatar: null,
+    draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
   },
   currentWeek: 5,
   totalWeeks: 14,

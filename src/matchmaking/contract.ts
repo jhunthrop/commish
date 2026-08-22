@@ -30,6 +30,14 @@ import type { ParticipationTier } from "@/participation/tier";
  * the league, never a fact about any one person in it — the same "two counts, never a member"
  * discipline `TierComposition`'s own docblock (`@/participation/composition`) states.
  *
+ * `draftAt` (Phase 3 Plan D, Task 6) is the tenth field and the newest disclosure decision: a
+ * draft's scheduled time is a scheduling fact about the LEAGUE, not about any person in it, and
+ * a visitor who can't see it can't tell whether they are free to attend before they join
+ * (ruling 15) — exactly the reasoning `scoringLabel` and `tierComposition` already established
+ * for this interface. Formatted by the SAME `formatDraftTime` (`@/league/terms`) `leagueTerms`
+ * calls for `LeagueTerms.draftAt`, so the sentence a stranger reads on a browse card and the one
+ * a prospect reads on the invite preview can only ever agree.
+ *
  * A stranger gets what they need to CHOOSE a league and nothing about the people already in it.
  */
 export interface PublicLeagueSummary {
@@ -45,6 +53,9 @@ export interface PublicLeagueSummary {
   readonly scoringLabel: string;
   /** Two counts, never a member — see this interface's own docblock. */
   readonly tierComposition: TierComposition;
+  /** Absolute-plus-relative, e.g. "Saturday 12 September, 7:00 PM UTC (in 3 days)" — see this
+   *  interface's own docblock. */
+  readonly draftAt: string;
 }
 
 /** A normalized browse filter: every field is a concrete value or the "any" sentinel. */

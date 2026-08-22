@@ -31,6 +31,7 @@ const TERMS: LeagueTerms = {
   stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
   commissionerName: "Alex Rivera",
   commissionerAvatar: null,
+  draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
 };
 
 describe("JoinForm", () => {

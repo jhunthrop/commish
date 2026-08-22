@@ -20,6 +20,7 @@ const CUSTOM_SCORING_LEAGUE: PublicLeagueSummary = {
   filledTeams: 5,
   scoringLabel: "Custom",
   tierComposition: { newcomers: 5, veterans: 0 },
+  draftAt: "Monday 14 September, 6:00 PM UTC (in 5 days)",
 };
 
 // A signed-in list renders `JoinPublicLeagueButton` per card, which navigates via

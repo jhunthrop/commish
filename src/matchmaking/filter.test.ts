@@ -19,6 +19,7 @@ const league = (over: Partial<PublicLeagueSummary> = {}): PublicLeagueSummary =>
   filledTeams: 8,
   scoringLabel: "Standard",
   tierComposition: { newcomers: 8, veterans: 0 },
+  draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
   ...over,
 });
 

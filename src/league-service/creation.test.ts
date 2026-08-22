@@ -105,6 +105,26 @@ describe("createLeague", () => {
     expect(draft!.kickoffAt.toISOString()).toBe("2026-08-24T12:00:00.000Z");
   });
 
+  it("takes the commissioner's chosen time at creation instead of computing one", async () => {
+    const result = await createLeague(deps(), {
+      ...validInput(),
+      kickoffAt: "2026-09-12T23:00:00.000Z",
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const [draft] = await db.select().from(drafts).where(eq(drafts.id, result.draftId));
+    expect(draft!.kickoffAt.toISOString()).toBe("2026-09-12T23:00:00.000Z");
+  });
+
+  it("still computes a default when no time is chosen, so nothing that exists today breaks", async () => {
+    const result = await createLeague(deps(), validInput());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const [draft] = await db.select().from(drafts).where(eq(drafts.id, result.draftId));
+    const expected = new Date(Date.parse(clock.now()) + LEAGUE_CONFIG.defaults.draftDaysFromCreation * 24 * 60 * 60 * 1000);
+    expect(draft!.kickoffAt.toISOString()).toBe(expected.toISOString());
+  });
+
   it("carries the auction budget through for an auction league", async () => {
     const result = await createLeague(deps(), {
       name: "Auction Night", format: "auction", teamCount: 10, scoringPreset: "te_premium",

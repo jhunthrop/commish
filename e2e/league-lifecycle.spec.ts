@@ -80,14 +80,14 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   await expect(managerA.locator("header").getByText("2 of 8 managers")).toBeVisible();
 
   // --- Open the draft ----------------------------------------------------------------------
-  // No UI starts a draft yet (see the plan's open questions), so this drives the REAL
-  // commissioner-only route with the REAL session cookie the context already carries. It is
-  // the same HTTP request a future button will make, not a test-only door.
+  // Task 6: the button that used to be reachable only by curl (`POST /api/drafts/[draftId]
+  // /start`) is now real UI — `DraftSchedulePanel`'s commissioner-only "Start the draft"
+  // control, fetched and rendered client-side on the league's own page. This drives it exactly
+  // the way a commissioner would, no direct API call.
   await managerA.goto(`/app/leagues/${leagueId}`);
-  const draftHref = await managerA.getByRole("link", { name: "Open the draft room" }).getAttribute("href");
+  await managerA.getByRole("button", { name: "Start the draft" }).click();
+  const draftHref = await managerA.getByRole("link", { name: "Join the draft" }).getAttribute("href");
   const draftId = draftHref!.split("/").pop()!;
-  const started = await managerA.request.post(`/api/drafts/${draftId}/start`);
-  expect(started.ok()).toBe(true);
 
   // --- Both managers watch the same board -------------------------------------------------
   await managerA.goto(`/app/drafts/${draftId}`);

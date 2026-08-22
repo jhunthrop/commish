@@ -92,6 +92,7 @@ export const TERMS: LeagueTerms = {
   stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
   commissionerName: "Alex Rivera",
   commissionerAvatar: null,
+  draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
 };
 
 /** Everything `LeagueHome` needs: a commissioner, mid-season, drafted, `t1` up this week. */
@@ -197,6 +198,6 @@ export function renderInLeague(ui: ReactElement, deps: LeagueRoomDeps): RenderRe
  *  one all-newcomer composition, one veteran-leaning composition, so a consumer's rendering of
  *  BOTH `TIER_COMPOSITION_LABEL` buckets it is likely to show has real fixture data to render. */
 export const PUBLIC_LEAGUES: readonly PublicLeagueSummary[] = [
-  { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 3, scoringLabel: "Standard", tierComposition: { newcomers: 3, veterans: 0 } },
-  { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 10, filledTeams: 9, scoringLabel: "PPR", tierComposition: { newcomers: 4, veterans: 5 } },
+  { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 3, scoringLabel: "Standard", tierComposition: { newcomers: 3, veterans: 0 }, draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)" },
+  { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 10, filledTeams: 9, scoringLabel: "PPR", tierComposition: { newcomers: 4, veterans: 5 }, draftAt: "Sunday 13 September, 1:00 PM UTC (in 4 days)" },
 ];

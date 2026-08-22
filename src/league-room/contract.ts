@@ -26,6 +26,23 @@ export interface LeagueListBody {
   readonly leagues: readonly LeagueSummary[];
 }
 
+/**
+ * What `GET /api/leagues/[leagueId]/draft-schedule` answers, and what `PUT` echoes back on
+ * success. `draft-schedule-panel.tsx` is this route's only reader — it fetches its own data
+ * rather than riding `LeagueHomeBody`, the same self-contained shape `InvitePreviewBody` uses
+ * for `JoinForm`.
+ */
+export interface DraftScheduleBody {
+  readonly draftId: string;
+  readonly leagueId: string;
+  readonly status: DraftStatus;
+  /** ISO instant. */
+  readonly kickoffAt: string;
+  /** Whether the platform will start this draft on its own if nobody presses the button
+   *  (Task 7) — read by the panel to decide whether to say so. */
+  readonly isPublicMatchmade: boolean;
+}
+
 export interface CreateLeagueBody {
   readonly leagueId: string;
   readonly teamId: string;

@@ -2,11 +2,17 @@ import { and, asc, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "@/db/client";
 import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
+import type { Clock } from "@/domain/timing";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
+import { formatDraftTime } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
 import { tierCompositionFor } from "@/participation/composition";
 import { describeScoring, type ScoringRules } from "@/scoring";
+
+/** The outermost edge is the only place a wall clock is allowed — see every other service
+ *  module's identical constant (`creation.ts`, `read.ts`, ...). */
+const systemClock: Clock = { now: () => new Date().toISOString() };
 
 /**
  * The disclosure allowlist, in one place. Exported so the tests and the route assert against
@@ -22,6 +28,7 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "filledTeams",
   "scoringLabel",
   "tierComposition",
+  "draftAt",
 ];
 
 /** The league's own seats, aliased a second time so a `LATERAL` join can ask "how many of THIS
@@ -163,6 +170,12 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
       stakeTier: leagues.stakeTier,
       teamCount: leagues.teamCount,
       filledTeams: sql<number>`count(${teams.id})::int`,
+      // A plain column, not an aggregate. Postgres accepts an ungrouped column only when the
+      // `GROUP BY` covers ITS OWN table's primary key, so `drafts.id` joins `leagues.id` in the
+      // `groupBy` below — `drafts_league_id_idx` (`@/db/schema`) makes that a no-op on
+      // cardinality (still exactly one draft row per league), purely a functional-dependency
+      // proof for the planner.
+      kickoffAt: drafts.kickoffAt,
       newcomers: newcomerSeats,
       veterans: veteranSeats,
     })
@@ -171,7 +184,7 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
     .leftJoin(teams, eq(teams.leagueId, leagues.id))
     .leftJoinLateral(seatCompletion, sql`true`)
     .where(and(eq(leagues.isPublicMatchmade, true), eq(drafts.status, "scheduled"), ...narrowingFor(filter)))
-    .groupBy(leagues.id)
+    .groupBy(leagues.id, drafts.id)
     .having(and(sql`count(${teams.id}) < ${leagues.teamCount}`, participationHaving))
     .orderBy(asc(leagues.createdAt))
     .limit(MATCHMAKING_CONFIG.maxResults);
@@ -228,15 +241,21 @@ async function scoringWeightsByLeagueId(db: Db, leagueIds: readonly string[]): P
  * constructor rather than a bare object literal — and the two raw counts never reach the return
  * value under their own names.
  */
-export async function listPublicLeagues(db: Db, filter: BrowseFilter): Promise<readonly PublicLeagueSummary[]> {
+export async function listPublicLeagues(
+  db: Db,
+  filter: BrowseFilter,
+  clock: Clock = systemClock,
+): Promise<readonly PublicLeagueSummary[]> {
   const rows = await browseQuery(db, filter);
   const weightsByLeagueId = await scoringWeightsByLeagueId(db, rows.map((row) => row.id));
-  return rows.map(({ newcomers, veterans, ...row }) => {
+  const now = clock.now();
+  return rows.map(({ newcomers, veterans, kickoffAt, ...row }) => {
     const weights = weightsByLeagueId.get(row.id);
     return {
       ...row,
       scoringLabel: weights === undefined ? "Custom" : describeScoring(weights),
       tierComposition: tierCompositionFor({ newcomers, veterans }),
+      draftAt: formatDraftTime(kickoffAt.toISOString(), now),
     };
   });
 }
