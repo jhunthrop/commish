@@ -136,4 +136,6 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   },
   tier_blocked_join: { leagueName: "Rookie Snake Room" },
   lineup_auto_set: { leagueName: "Sunday Money", week: 4, carriedFrom: 3, changedPlayers: "" },
+  trade_held_for_review: { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls" },
+  trade_blocked: { leagueName: "Sunday Money", note: "Both teams belong to one person." },
 };

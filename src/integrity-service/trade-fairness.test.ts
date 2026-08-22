@@ -105,12 +105,20 @@ async function grotesquelyLopsided(db: Db): Promise<EvaluateTradeInput> {
 }
 
 describe("evaluateTradeBeforeExecute", () => {
-  it("never holds a trade while no hold threshold is configured, however lopsided it is", async () => {
+  it("holds a genuinely lopsided trade by DEFAULT now that Plan D's own number ships", async () => {
     await truncateAll(db);
-    expect(INTEGRITY_CONFIG.trade.autoHoldThreshold).toBeNull();
+    expect(INTEGRITY_CONFIG.trade.autoHoldThreshold).toBe(35);
     const input = await grotesquelyLopsided(db);
     const evaluation = await db.transaction((tx) => evaluateTradeBeforeExecute(tx, input));
     expect(evaluation.gap).toBeGreaterThan(50);
+    expect(evaluation.hold).toBe(true);
+    expect(evaluation.flagWorthy).toBe(true);
+  });
+
+  it("never holds a trade when the threshold is explicitly disabled (null), however lopsided it is", async () => {
+    await truncateAll(db);
+    const input = await grotesquelyLopsided(db);
+    const evaluation = await db.transaction((tx) => evaluateTradeBeforeExecute(tx, { ...input, autoHoldThreshold: null }));
     expect(evaluation.hold).toBe(false);
     expect(evaluation.flagWorthy).toBe(true);
   });

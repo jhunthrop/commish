@@ -238,6 +238,27 @@ describe("TradeCard states", () => {
     expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
   });
 
+  it("shows the held-trade banner for a held trade, honestly, to both parties, and offers no accept/decline", () => {
+    const trade: TradeProposalView = { ...BASE, status: "held" };
+    const recipient = render(<TradeCard trade={trade} meTeamId="me" playersById={PLAYERS} leagueName="Sunday Money" />);
+    expect(screen.getByText(/Your trade with Iron Owls in Sunday Money is on hold/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Decline" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Withdraw" })).toBeNull();
+    recipient.unmount();
+
+    render(<TradeCard trade={trade} meTeamId="them" playersById={PLAYERS} leagueName="Sunday Money" />);
+    expect(screen.getByText(/Your trade with Bay Bandits in Sunday Money is on hold/)).toBeInTheDocument();
+  });
+
+  it("renders a blocked trade with what happened, and offers nothing to answer", () => {
+    const trade: TradeProposalView = { ...BASE, status: "blocked", settledAt: "2026-08-19T00:00:00.000Z" };
+    render(<TradeCard trade={trade} meTeamId="me" playersById={PLAYERS} />);
+    expect(screen.getByText(/was blocked/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Accept" })).toBeNull();
+    expect(screen.queryByText(/Your trade with/)).not.toBeInTheDocument(); // no held banner leaks into a blocked render
+  });
+
   it("names an accepted, non reversed trade as settled without implying anything can still be answered", () => {
     const trade: TradeProposalView = { ...BASE, status: "accepted", settledAt: "2026-08-19T00:00:00.000Z" };
     render(<TradeCard trade={trade} meTeamId="me" playersById={PLAYERS} />);

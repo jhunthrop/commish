@@ -30,8 +30,9 @@ export const markNoticesReadSchema = z.object({
  *
  * `decision` is narrowed past the closed `RESOLUTION_DECISIONS` enum by `decisionIsAvailable`, so
  * a request naming a decision wired for NO subject at all (none, today — every declared decision
- * is wired for at least one, since Task 7 turned `trade_reversed` on) is refused HERE, at the
- * boundary, as a 400 naming the exact field — `parseJson`'s usual shape — rather than reaching
+ * is wired for at least one, since Task 7 turned `trade_reversed` on and Plan D Task 5 landed
+ * `trade_released`/`trade_blocked` wired the same commit they were declared) is refused HERE, at
+ * the boundary, as a 400 naming the exact field — `parseJson`'s usual shape — rather than reaching
  * `resolveFlag` and being told the same thing a second time. WHICH subjects a wired decision
  * actually applies to is a narrower, per-request question this schema cannot answer without the
  * flag row itself — `resolveFlag`'s own `decisionIsWiredFor` check (`@/integrity/flags`) is where

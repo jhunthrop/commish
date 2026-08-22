@@ -15,6 +15,7 @@ const CONTEXT: TradeRoomContext = {
     me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" }],
     them: [{ playerId: "p2", name: "Puka Nacua", position: "WR" }],
   },
+  leagueName: "Sunday Money",
 };
 
 const ASSESSMENT_OK = {

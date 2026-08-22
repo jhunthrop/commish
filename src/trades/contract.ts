@@ -37,7 +37,9 @@ export interface TradeProposalView {
   readonly settledAt: string | null;
   /** Set by an operator's reversal (Task 7). `status` stays `"accepted"` — the acceptance
    *  happened and nothing erases it — so this is the field a card checks to render "reversed"
-   *  rather than a seventh status (`TRADE_STATUSES` already declares six). */
+   *  rather than a new status. Plan D's `held`/`blocked` (`@/trades/lifecycle`) are the opposite
+   *  case: nothing executed, so there is nothing this field could truthfully record either way,
+   *  and `status` itself is where a held or blocked trade's own state lives. */
   readonly reversedAt: string | null;
   /** The proposer's optional note, capped at `TRADE_CONFIG.noteMaxLength`. */
   readonly note: string | null;

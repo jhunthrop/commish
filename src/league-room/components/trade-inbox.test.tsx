@@ -16,6 +16,7 @@ const CONTEXT: TradeRoomContext = {
     me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" }],
     them: [{ playerId: "p2", name: "Puka Nacua", position: "WR" }],
   },
+  leagueName: "Sunday Money",
 };
 
 const EMPTY_PAGE: TradesPageBody = { leagueId: "l1", meTeamId: "me", inbox: [], outbox: [], history: [] };

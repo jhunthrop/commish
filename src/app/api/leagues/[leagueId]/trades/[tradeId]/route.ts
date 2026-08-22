@@ -47,7 +47,11 @@ export async function POST(request: Request, context: RouteContext) {
     if (parsed.value.action === "accept") {
       const result = await acceptTrade(getDb(), { tradeId, leagueId: actor.leagueId, userId: actor.userId, cache: getScoreCache() });
       if (!result.ok) return fail(result.reason, result.status);
-      return ok<{ readonly tradeId: string; readonly status: "accepted" }>({ tradeId: result.tradeId, status: "accepted" });
+      // Plan D, Task 5: `outcome` tells "executed" and "held" apart, and the wire status says
+      // which honestly — a manager who accepted a trade that then held is not looking at an
+      // accepted offer, and `TradeStatus` (`@/trades/lifecycle`) already has the word for it.
+      const status = result.outcome === "held" ? "held" : "accepted";
+      return ok<{ readonly tradeId: string; readonly status: "accepted" | "held" }>({ tradeId: result.tradeId, status });
     }
 
     const settle = parsed.value.action === "reject" ? rejectTrade : withdrawTrade;

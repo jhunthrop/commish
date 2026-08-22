@@ -59,6 +59,7 @@ describe("INTEGRITY_CONFIG.trade", () => {
     // Step 5 invariant read the right way round.
     expect(evenDelta).toBeLessThanOrEqual(lopsidedDelta);
     expect(lopsidedDelta).toBeLessThanOrEqual(fairnessFlagThreshold);
+    expect(autoHoldThreshold).not.toBeNull();
     if (autoHoldThreshold !== null) {
       expect(fairnessFlagThreshold).toBeLessThanOrEqual(autoHoldThreshold);
     }
@@ -71,8 +72,9 @@ describe("INTEGRITY_CONFIG.trade", () => {
     }
   });
 
-  it("ships autoHoldThreshold null — Plan D supplies a number, not a code path", () => {
-    expect(INTEGRITY_CONFIG.trade.autoHoldThreshold).toBeNull();
+  it("ships autoHoldThreshold as 35, Plan D's own number, above the fairness flag threshold", () => {
+    expect(INTEGRITY_CONFIG.trade.autoHoldThreshold).toBe(35);
+    expect(INTEGRITY_CONFIG.trade.autoHoldThreshold).toBeGreaterThan(INTEGRITY_CONFIG.trade.fairnessFlagThreshold);
   });
 
   it("bounds sweepBatchSize — an unbounded manual re-run is a script nobody runs twice", () => {

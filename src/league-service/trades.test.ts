@@ -17,11 +17,13 @@ import { seasonCurrentWeek } from "./test-support";
 import { applyTradeInTx } from "./trade-transfer";
 import {
   acceptTrade,
+  blockHeldTradeInTx,
   listTrades,
   proposalFingerprint,
   proposeTrade,
   refusalFor,
   rejectTrade,
+  releaseHeldTradeInTx,
   toTradeProposal,
   tradesQuery,
   withdrawTrade,
@@ -1637,5 +1639,253 @@ describe("acceptTrade", () => {
       { playerId: "p_rb1", teamId: "team_a" },
       { playerId: "p_wr1", teamId: "team_b" },
     ]);
+  });
+
+  // -------------------------------------------------------------------------------------------
+  // Plan D, Task 5 — the auto-hold: a number (35), a seventh status (`held`), and the seam Plan C
+  // left (`INTEGRITY_CONFIG.trade.autoHoldThreshold`) finally reads a real value.
+  // -------------------------------------------------------------------------------------------
+  describe("the auto-hold", () => {
+    async function makeLeaguePublic(): Promise<void> {
+      await db.update(leagues).set({ isPublicMatchmade: true }).where(eq(leagues.id, "lg_1"));
+    }
+
+    /** Well past `INTEGRITY_CONFIG.trade.autoHoldThreshold` (35) — the identical `seedLopsided
+     *  StatLines` fixture `trade-fairness.test.ts`'s own `grotesquelyLopsided` reuses, which
+     *  reads as a 50+ point gap. */
+    async function openGrotesquelyLopsidedTrade(): Promise<{ readonly id: string }> {
+      await seedLopsidedStatLines(db);
+      await leagueSeasonThrough(db, 4);
+      return openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 4 });
+    }
+
+    /** A gap past `fairnessFlagThreshold` (20) but short of `autoHoldThreshold` (35) — Task 6's
+     *  own boundary, unchanged by this task. */
+    async function openModeratelyLopsidedTrade(): Promise<{ readonly id: string }> {
+      await db.insert(playerStatLines).values([1, 2, 3].map((week) => ({ playerId: "p_rb1", week, rushingYards: 150, rushingTouchdowns: 2 })));
+      await leagueSeasonThrough(db, 4);
+      return openAcceptTrade(db, { give: ["p_rb1"], get: ["p_wr1"], weekNumber: 4 });
+    }
+
+    async function openFlagsOfType(db: Db, flagType: string) {
+      return db.select().from(integrityFlags).where(and(eq(integrityFlags.flagType, flagType), isNull(integrityFlags.resolvedAt)));
+    }
+
+    it("holds a grotesquely lopsided public-league trade instead of executing it", async () => {
+      await makeLeaguePublic();
+      const trade = await openGrotesquelyLopsidedTrade();
+      const result = await acceptAs("u_bob", trade.id);
+      expect(result).toMatchObject({ ok: true, outcome: "held" });
+
+      expect((await tradeRow(db, trade.id)).status).toBe("held");
+      expect(await ownerTeamOf(db, "p_rb1")).toBe("team_a"); // nothing moved
+      expect(await ownerTeamOf(db, "p_wr1")).toBe("team_b");
+      const [aliceNotice] = await noticesFor(db, "u_alice");
+      const [bobNotice] = await noticesFor(db, "u_bob");
+      expect(aliceNotice!.noticeType).toBe("trade_held_for_review");
+      expect(bobNotice!.noticeType).toBe("trade_held_for_review");
+      expect(copyViolations(`${aliceNotice!.title} ${aliceNotice!.body}`)).toEqual([]);
+    });
+
+    it("executes the identical trade in a private league, because the platform is not its commissioner", async () => {
+      // Step 5's matched pair, on the trade half — `lg_1` stays private (`isPublicMatchmade`
+      // defaults false), and a gap this lopsided still executes.
+      const trade = await openGrotesquelyLopsidedTrade();
+      const result = await acceptAs("u_bob", trade.id);
+      expect(result).toMatchObject({ ok: true, outcome: "executed" });
+      expect((await tradeRow(db, trade.id)).status).toBe("accepted");
+      expect(await ownerTeamOf(db, "p_rb1")).toBe("team_b");
+    });
+
+    it("executes a trade between the two thresholds and flags it, exactly as Plan C shipped", async () => {
+      await makeLeaguePublic();
+      const trade = await openModeratelyLopsidedTrade();
+      const result = await acceptAs("u_bob", trade.id);
+      expect(result).toMatchObject({ ok: true, outcome: "executed" });
+      if (result.ok && result.outcome === "executed") {
+        expect(result.fairness.flagWorthy).toBe(true);
+        expect(result.fairness.hold).toBe(false);
+      }
+      expect(await openFlagsOfType(db, "trade_fairness")).toHaveLength(1);
+      expect(await openFlagsOfType(db, "trade_hold")).toHaveLength(0);
+    });
+
+    it("writes the hold and the flag that asks about it in ONE transaction, both on the platform chain", async () => {
+      await makeLeaguePublic();
+      const trade = await openGrotesquelyLopsidedTrade();
+      await acceptAs("u_bob", trade.id);
+
+      expect(await auditEventsOn(db, "lg_1", "trade_accepted")).toEqual([]);
+      expect(await auditEventsOn(db, "lg_1", "roster_move")).toEqual([]);
+      const [event] = await auditEventsOn(db, "platform", "system_action");
+      expect(event!.payload).toMatchObject({ action: "trade_held_for_review", tradeId: trade.id });
+      expect(await openFlagsOfType(db, "trade_hold")).toHaveLength(1);
+    });
+
+    it("leaves nothing behind when the flag write fails inside the hold transaction", async () => {
+      await makeLeaguePublic();
+      const trade = await openGrotesquelyLopsidedTrade();
+      const failingRaise: Parameters<typeof acceptTrade>[1]["raiseFlag"] = async () => {
+        throw new Error("flag write failed");
+      };
+      await expect(acceptAs("u_bob", trade.id, { raiseFlag: failingRaise })).rejects.toThrow();
+      expect((await tradeRow(db, trade.id)).status).toBe("open");
+      expect(await ownerTeamOf(db, "p_rb1")).toBe("team_a");
+      expect(await noticesFor(db, "u_alice")).toEqual([]);
+      expect(await noticesFor(db, "u_bob")).toEqual([]);
+      expect(await openFlagsOfType(db, "trade_hold")).toHaveLength(0);
+    });
+
+    it("holds nothing while enforcement is off, however lopsided", async () => {
+      // A public league with tier segregation switched off is exactly as un-enforced as a
+      // private one, from `enforcementAppliesTo`'s own point of view — see `./enforcement.ts`.
+      // `INTEGRITY_CONFIG.participation.enforceTierSegregation` is a module-level constant here,
+      // not a per-call override, so this proves the OTHER half of the gate (public, but not
+      // enforced) via the private-league test above rather than flipping a global for one test.
+      const trade = await openGrotesquelyLopsidedTrade();
+      const result = await acceptAs("u_bob", trade.id);
+      expect(result).toMatchObject({ ok: true, outcome: "executed" });
+    });
+
+    it("refuses every ordinary lifecycle move on a held trade, one test per verb", async () => {
+      await makeLeaguePublic();
+      const trade = await openGrotesquelyLopsidedTrade();
+      await acceptAs("u_bob", trade.id);
+      expect((await tradeRow(db, trade.id)).status).toBe("held");
+
+      const withdrawResult = await withdrawTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_alice" });
+      expect(withdrawResult).toEqual({ ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it can't change right now." });
+
+      const rejectResult = await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob" });
+      expect(rejectResult).toEqual({ ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it can't change right now." });
+
+      const acceptResult = await acceptAs("u_bob", trade.id);
+      expect(acceptResult).toEqual({ ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it can't change right now." });
+
+      // Still held — none of the three attempts changed anything.
+      expect((await tradeRow(db, trade.id)).status).toBe("held");
+    });
+
+    it("supersedes a held trade when another trade moves one of its players, and tells both parties", async () => {
+      await makeLeaguePublic();
+      const held = await openGrotesquelyLopsidedTrade();
+      await acceptAs("u_bob", held.id);
+      expect((await tradeRow(db, held.id)).status).toBe("held");
+      const flagBefore = await openFlagsOfType(db, "trade_hold");
+      expect(flagBefore).toHaveLength(1);
+
+      // The league goes back to private before the SECOND trade: `p_rb1`'s own stat line is what
+      // made the FIRST trade lopsided enough to hold, and it would make this one hold too if the
+      // league stayed public — which would never reach the supersede sweep at all (nothing moves
+      // on a hold). Flipping the league private isolates the property this test is actually
+      // about: a HELD trade dies to the world moving on, independent of whether the trade that
+      // moved it was itself ever a hold candidate. `held.id`'s own status is untouched by this —
+      // a trade already held stays held regardless of the league's CURRENT enforcement setting.
+      await db.update(leagues).set({ isPublicMatchmade: false }).where(eq(leagues.id, "lg_1"));
+
+      // A DIFFERENT trade, between team_a and team_c, also naming p_rb1 — accepting it should
+      // supersede the held offer, exactly as it would an open one.
+      const competing = await openAcceptTrade(db, { proposerTeamId: "team_a", counterpartyTeamId: "team_c", give: ["p_rb1"], get: ["p_rb_c"] });
+      const competingResult = await acceptAs("u_carol", competing.id);
+      expect(competingResult).toMatchObject({ ok: true, outcome: "executed" });
+
+      expect((await tradeRow(db, held.id)).status).toBe("superseded");
+      expect(await openFlagsOfType(db, "trade_hold")).toHaveLength(0); // the question died with it
+
+      const [aliceSupersededNotice] = (await noticesFor(db, "u_alice")).filter((n) => n.noticeType === "trade_superseded");
+      const [bobSupersededNotice] = (await noticesFor(db, "u_bob")).filter((n) => n.noticeType === "trade_superseded");
+      expect(aliceSupersededNotice).toBeDefined();
+      expect(bobSupersededNotice).toBeDefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------------------------
+  // Plan D, Task 5 — the two ways out, driven directly (not through `resolveFlag`): every refusal
+  // branch `releaseHeldTradeInTx`/`blockHeldTradeInTx` can answer, on their own.
+  // -------------------------------------------------------------------------------------------
+  describe("releaseHeldTradeInTx and blockHeldTradeInTx", () => {
+    async function insertHeldTrade(opts: OpenAcceptTradeOpts = {}): Promise<{ readonly id: string }> {
+      const proposerTeamId = opts.proposerTeamId ?? "team_a";
+      const counterpartyTeamId = opts.counterpartyTeamId ?? "team_b";
+      const proposerAssets = (opts.give ?? ["p_rb1"]).map(playerAsset);
+      const counterpartyAssets = (opts.get ?? ["p_wr1"]).map(playerAsset);
+      const proposedAt = new Date(opts.proposedAt ?? NOW);
+      const expiresAt = new Date(proposedAt.getTime() + TRADE_CONFIG.proposalTtlHours * 60 * 60 * 1000);
+      const id = `held_trade_${(tradeIdCounter += 1)}`;
+      await db.insert(tradeProposals).values({
+        id,
+        leagueId: "lg_1",
+        proposerTeamId,
+        counterpartyTeamId,
+        weekNumber: opts.weekNumber ?? 1,
+        proposerAssets,
+        counterpartyAssets,
+        fingerprint: proposalFingerprint({ leagueId: "lg_1", proposerTeamId, counterpartyTeamId, proposerAssets, counterpartyAssets }),
+        note: null,
+        status: "held",
+        proposedAt,
+        expiresAt,
+      });
+      return { id };
+    }
+
+    it("refuses a trade id that names nothing at all", async () => {
+      const result = await db.transaction((tx) => releaseHeldTradeInTx(tx, { tradeId: "ghost", leagueId: "lg_1", operatorUserId: "u_alice" }));
+      expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that trade." });
+    });
+
+    it("refuses a trade that is no longer waiting on a decision — never was held at all", async () => {
+      const trade = await openAcceptTrade(db); // status: "open"
+      const result = await db.transaction((tx) => releaseHeldTradeInTx(tx, { tradeId: trade.id, leagueId: "lg_1", operatorUserId: "u_alice" }));
+      expect(result).toEqual({ ok: false, status: 409, reason: "This trade is no longer waiting on a decision." });
+    });
+
+    it("refuses on the LIVE week even when the held trade was priced at a week that has not started", async () => {
+      await leagueSeasonThrough(db, 4);
+      await lockWeek(db, 4);
+      const held = await insertHeldTrade();
+      const result = await db.transaction((tx) => releaseHeldTradeInTx(tx, { tradeId: held.id, leagueId: "lg_1", operatorUserId: "u_alice" }));
+      expect(result).toEqual({ ok: false, status: 409, reason: "Week 4 has started, so rosters can't change until it ends." });
+      expect((await tradeRow(db, held.id)).status).toBe("held");
+    });
+
+    it("releases a held trade that names no asset on either side, writing nothing to move", async () => {
+      const held = await insertHeldTrade({ give: [], get: [] });
+      const result = await db.transaction((tx) => releaseHeldTradeInTx(tx, { tradeId: held.id, leagueId: "lg_1", operatorUserId: "u_alice" }));
+      expect(result).toMatchObject({ ok: true, tradeId: held.id });
+      expect((await tradeRow(db, held.id)).status).toBe("accepted");
+    });
+
+    it("releases a held trade and supersedes any other open-or-held offer it invalidates, in one pass", async () => {
+      const held = await insertHeldTrade({ give: ["p_rb1"], get: ["p_wr1"] });
+      const competingHeld = await insertHeldTrade({ proposerTeamId: "team_a", counterpartyTeamId: "team_c", give: ["p_rb1"], get: ["p_rb_c"] });
+      const result = await db.transaction((tx) => releaseHeldTradeInTx(tx, { tradeId: held.id, leagueId: "lg_1", operatorUserId: "u_alice" }));
+      expect(result).toMatchObject({ ok: true, tradeId: held.id });
+
+      expect((await tradeRow(db, held.id)).status).toBe("accepted");
+      expect((await tradeRow(db, competingHeld.id)).status).toBe("superseded");
+      expect(await openFlags(db)).toEqual([]);
+      const [carolSuperseded] = (await noticesFor(db, "u_carol")).filter((n) => n.noticeType === "trade_superseded");
+      expect(carolSuperseded).toBeDefined();
+    });
+
+    it("refuses a block for a trade id that names nothing at all", async () => {
+      const result = await db.transaction((tx) => blockHeldTradeInTx(tx, { tradeId: "ghost", leagueId: "lg_1", operatorUserId: "u_alice", note: "" }));
+      expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that trade." });
+    });
+
+    it("refuses to block a trade that is no longer waiting on a decision — never was held at all", async () => {
+      const trade = await openAcceptTrade(db);
+      const result = await db.transaction((tx) => blockHeldTradeInTx(tx, { tradeId: trade.id, leagueId: "lg_1", operatorUserId: "u_alice", note: "" }));
+      expect(result).toEqual({ ok: false, status: 409, reason: "This trade is no longer waiting on a decision." });
+    });
+
+    it("heals a retry once a trade is already blocked, without a second write", async () => {
+      const held = await insertHeldTrade();
+      const first = await db.transaction((tx) => blockHeldTradeInTx(tx, { tradeId: held.id, leagueId: "lg_1", operatorUserId: "u_alice", note: "n" }));
+      expect(first).toMatchObject({ ok: true });
+      const retry = await db.transaction((tx) => blockHeldTradeInTx(tx, { tradeId: held.id, leagueId: "lg_1", operatorUserId: "u_alice", note: "n" }));
+      expect(retry).toEqual({ ok: true, tradeId: held.id, notices: [] });
+    });
   });
 });

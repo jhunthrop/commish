@@ -268,4 +268,9 @@ export interface TradeRoomContext {
   readonly myTeamId: string;
   readonly counterparties: readonly TradeCounterpartyOption[];
   readonly rostersByTeamId: Readonly<Record<string, readonly TradeRosterPlayer[]>>;
+  /** The league's own name — `held-trade-banner.tsx` (Plan D, Task 5) needs it to say the
+   *  identical sentence `trade_held_for_review`'s own notice already says
+   *  (`@/integrity/notices`), and a room component may never import that module as a value (the
+   *  client boundary, `eslint.config.mjs`), so the page hands the name down as plain data. */
+  readonly leagueName: string;
 }

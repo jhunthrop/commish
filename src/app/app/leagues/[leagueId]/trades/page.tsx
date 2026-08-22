@@ -66,6 +66,7 @@ export default async function TradesPage({ params }: PageProps) {
     myTeamId: home.myTeamId,
     counterparties,
     rostersByTeamId: week === null ? {} : rostersByTeamId(week),
+    leagueName: home.name,
   };
 
   return (

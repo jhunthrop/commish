@@ -135,6 +135,35 @@ describe("NOTICE_TEMPLATES", () => {
     expect(blocked.body).not.toContain("There is no reply to this message.");
   });
 
+  it("says what happened when a trade is held for a fairness review, verbatim (Plan D, Task 5)", () => {
+    const held = renderNotice("trade_held_for_review", NOTICE_SAMPLES.trade_held_for_review);
+    expect(held.title).toBe("Your trade is waiting on a fairness review");
+    expect(held.body).toBe(
+      "Your trade with Iron Owls in Sunday Money is on hold while somebody at Commish looks at it. Public leagues get a second pair of eyes on trades this lopsided, and neither roster changes until that finishes. We will tell you both as soon as there is an answer.",
+    );
+    // Founder decision #10's own words: "somebody at Commish looks at it", never "under
+    // investigation"; "this lopsided", never "suspicious" — the accusatory-terms denylist would
+    // catch the latter, but the WORDS matter beyond what the denylist happens to enforce.
+    expect(held.body).not.toContain("investigation");
+    expect(held.body).not.toContain("suspicious");
+  });
+
+  it("says what happened when an operator blocks a held trade, verbatim (Plan D, Task 5)", () => {
+    const blocked = renderNotice("trade_blocked", NOTICE_SAMPLES.trade_blocked);
+    expect(blocked.title).toBe("Your trade will not go through");
+    expect(blocked.body).toBe(
+      "After the fairness review, your trade in Sunday Money will not go ahead, and both rosters stay exactly as they were. You can put together a different offer any time.",
+    );
+    // Not a sanction against either named manager, so — unlike trade_reversed's own note — no
+    // "no reply to this message" line: neither party is accused of anything, only told a rule
+    // this trade ran into.
+    expect(blocked.body).not.toContain("There is no reply to this message.");
+    // No counterparty name either — deliberately, so the SAME body reaches both managers
+    // byte-identical (`resolveFlag`'s own `trade_blocked` branch sends this exact context to
+    // both), never a sentence that names "the other manager" and therefore differs by recipient.
+    expect(blocked.body).not.toContain("Iron Owls");
+  });
+
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
@@ -147,7 +176,9 @@ describe("NOTICE_TEMPLATES", () => {
       "review_removed",
       "stat_week_corrected",
       "tier_blocked_join",
+      "trade_blocked",
       "trade_executed",
+      "trade_held_for_review",
       "trade_proposed",
       "trade_rejected",
       "trade_reversed",

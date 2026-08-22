@@ -255,7 +255,12 @@ export function quoteFor(notice: MemberNotice): string | null {
     const reason = notice.context.reason;
     return typeof reason === "string" ? chatRemovalPhraseFor(reason) : null;
   }
-  if (notice.noticeType === "operator_warning" || notice.noticeType === "trade_proposed" || notice.noticeType === "trade_reversed") {
+  if (
+    notice.noticeType === "operator_warning" ||
+    notice.noticeType === "trade_proposed" ||
+    notice.noticeType === "trade_reversed" ||
+    notice.noticeType === "trade_blocked"
+  ) {
     const note = notice.context.note;
     return typeof note === "string" ? stripHiddenCharacters(note) : null;
   }

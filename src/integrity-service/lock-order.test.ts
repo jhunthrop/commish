@@ -10,7 +10,7 @@ import { joinLeagueInTx, recordTierBlockedJoin } from "@/league-service/join";
 import { setLineup } from "@/league-service/lineups";
 import { writeSchedule } from "@/league-service/schedule";
 import { seasonCurrentWeek } from "@/league-service/test-support";
-import { acceptTrade, proposeTrade, rejectTrade } from "@/league-service/trades";
+import { acceptTrade, blockHeldTradeInTx, proposeTrade, rejectTrade, releaseHeldTradeInTx } from "@/league-service/trades";
 import { reverseTradeInTx } from "@/league-service/trade-reversal";
 import type { StatLine } from "@/domain/player";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
@@ -79,6 +79,8 @@ const joinDb = createTestDb();
 const pickDb = createTestDb();
 const flagDb = createTestDb();
 const resolveDb = createTestDb();
+const blockDb = createTestDb();
+const releaseDb = createTestDb();
 
 /**
  * Waits until some backend on this database is genuinely blocked on a lock.
@@ -1594,6 +1596,284 @@ describe("raiseTradeFairnessFlag's after-commit position", () => {
     expect(platformAnchor!.headSequence).toBe(1); // flag_raised, alone
     const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_fair_lock"));
     expect(leagueAnchor!.headSequence).toBe(4); // trade_proposed, member_joined, trade_accepted + roster_move
+  });
+});
+
+/**
+ * Plan D, Task 5 — the hold transaction. Unlike EVERY other writer above, this one never touches
+ * the league chain at all: `acceptTrade`'s hold branch (`holdTradeInTx`) appends its `trade_hold`
+ * flag (`raiseFlag`'s own insert, `FOR KEY SHARE` on `leagues` through its FK) and its
+ * `system_action` event both to the PLATFORM chain, in the SAME transaction. This drives a real
+ * hold beside a concurrent join in the SAME league — the join's own `leagues[X] FOR UPDATE` is
+ * exactly the row the flag's FK reaches for — and proves both the absence of a deadlock AND that
+ * the split is real: the league chain carries only the join's `member_joined` (and the trade's own
+ * `trade_proposed`, from setup), never anything about the hold.
+ */
+describe("acceptTrade's hold branch — the flag's own leagues FK, against a concurrent join", () => {
+  it("holds a trade beside a concurrent join in the same league without deadlocking, and never touches the league chain for the hold itself", async () => {
+    await seedLeagueWith("lg_hold_lock", ["u_hl_commish", "u_hl_alice", "u_hl_bob", "u_hl_joiner"]);
+    await joinDb.update(leagues).set({ isPublicMatchmade: true }).where(eq(leagues.id, "lg_hold_lock"));
+    await joinDb.insert(teams).values([
+      { id: "team_hl_alice", leagueId: "lg_hold_lock", userId: "u_hl_alice", name: "Alice's Team" },
+      { id: "team_hl_bob", leagueId: "lg_hold_lock", userId: "u_hl_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_hl_star", name: "Hold Star", position: "RB", nflTeam: "KC" },
+      { id: "p_hl_scrub", name: "Hold Scrub", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_hl_alice", slot: "BENCH", slotIndex: 0, playerId: "p_hl_star" },
+      { teamId: "team_hl_bob", slot: "BENCH", slotIndex: 0, playerId: "p_hl_scrub" },
+    ]);
+    // Well past `INTEGRITY_CONFIG.trade.autoHoldThreshold` (35) — the same fixture shape
+    // `raiseTradeFairnessFlag's after-commit position` uses above, for the same reason.
+    await joinDb.insert(playerStatLines).values([1, 2, 3].map((week) => ({ playerId: "p_hl_star", week, rushingYards: 300, rushingTouchdowns: 5 })));
+    await seasonCurrentWeek(joinDb, { leagueId: "lg_hold_lock", homeTeamId: "team_hl_alice", awayTeamId: "team_hl_bob", week: 4 });
+
+    const proposed = await proposeTrade(pickDb, {
+      leagueId: "lg_hold_lock",
+      userId: "u_hl_alice",
+      counterpartyTeamId: "team_hl_bob",
+      proposerAssets: [{ kind: "player", playerId: "p_hl_star" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_hl_scrub" }],
+      note: null,
+      clock,
+      deliver: async () => {},
+    });
+    if (!proposed.ok) throw new Error(proposed.reason);
+
+    const join = parkedJoin("lg_hold_lock", "u_hl_joiner", "team_hl_joiner");
+    await join.leagueLocked;
+
+    // T_hold: the real acceptTrade, on its own connection, reaching for the SAME league row
+    // through `raiseFlag`'s own `integrity_flags` insert (the `leagueId` FK -> `leagues FOR KEY
+    // SHARE`) before it reaches the platform anchor — twice, in fact (the flag's own append, then
+    // the `system_action` append re-entering the same anchor row).
+    const holding = acceptTrade(resolveDb, { tradeId: proposed.tradeId, leagueId: "lg_hold_lock", userId: "u_hl_bob", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await holding).toMatchObject({ ok: true, outcome: "held" });
+
+    // The league chain carries the join and the PROPOSAL only — nothing about the hold itself.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_hold_lock"));
+    expect(leagueAnchor!.headSequence).toBe(2); // trade_proposed, member_joined
+    // The platform chain carries both hold writes: flag_raised, then system_action.
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(2);
+    const flags = await joinDb.select().from(integrityFlags).where(eq(integrityFlags.subjectId, proposed.tradeId));
+    expect(flags).toHaveLength(1);
+    expect(flags[0]!.flagType).toBe("trade_hold");
+  });
+});
+
+/**
+ * Plan D, Task 5 — `resolveFlag`'s `trade_released` branch, the SECOND resolution shaped as two
+ * transactions. `releaseHeldTradeInTx` re-enters `applyTradeInTx`'s FULL lock set — already proved
+ * by `acceptTrade`'s own week-lock and mirror-accept tests above — commits FIRST on the LEAGUE
+ * chain, and only then does `resolveFlag` open its own PLATFORM-chain `flag_resolved` stamp. This
+ * drives a real release beside a concurrent join in the SAME league, the identical shape the
+ * `trade_reversed` proof above uses.
+ */
+describe("resolveFlag's trade_released branch — two transactions, two chains", () => {
+  it("releases a held trade beside a concurrent join in the same league without deadlocking", async () => {
+    await seedLeagueWith("lg_rl_res", ["u_rlr_commish", "u_rlr_alice", "u_rlr_bob", "u_rlr_joiner", "u_rlr_op"]);
+    await joinDb.insert(teams).values([
+      { id: "team_rlr_alice", leagueId: "lg_rl_res", userId: "u_rlr_alice", name: "Alice's Team" },
+      { id: "team_rlr_bob", leagueId: "lg_rl_res", userId: "u_rlr_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_rlr_a", name: "Player A", position: "RB", nflTeam: "KC" },
+      { id: "p_rlr_b", name: "Player B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_rlr_alice", slot: "BENCH", slotIndex: 0, playerId: "p_rlr_a" },
+      { teamId: "team_rlr_bob", slot: "BENCH", slotIndex: 0, playerId: "p_rlr_b" },
+    ]);
+
+    // A HELD trade, inserted directly — this proof is about the two-transaction lock order, not
+    // about re-proving the threshold math `acceptTrade's hold branch` above already drives.
+    const proposedAt = new Date(clock.now());
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_rlr_1",
+      leagueId: "lg_rl_res",
+      proposerTeamId: "team_rlr_alice",
+      counterpartyTeamId: "team_rlr_bob",
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_rlr_a" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_rlr_b" }],
+      fingerprint: "fp_trade_rlr_1",
+      note: null,
+      status: "held",
+      proposedAt,
+      expiresAt: new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000),
+    });
+    const flag = await joinDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_hold",
+        subjectId: "trade_rlr_1",
+        leagueId: "lg_rl_res",
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => "flag_rlr_1",
+      }),
+    );
+
+    const join = parkedJoin("lg_rl_res", "u_rlr_joiner", "team_rlr_joiner");
+    await join.leagueLocked;
+
+    const resolving = resolveFlag(resolveDb, {
+      flagId: flag.id,
+      decision: "trade_released",
+      note: "",
+      operatorUserId: "u_rlr_op",
+      clock,
+    });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await resolving).toMatchObject({ ok: true, decision: "trade_released" });
+
+    // Both transactions landed: the release really moved both rosters, and the flag closed.
+    const aliceRows = await joinDb.select({ playerId: rosterSlots.playerId }).from(rosterSlots).where(eq(rosterSlots.teamId, "team_rlr_bob"));
+    expect(aliceRows.some((row) => row.playerId === "p_rlr_a")).toBe(true);
+    const [resolved] = await joinDb.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(resolved!.resolvedAt).not.toBeNull();
+  });
+});
+
+/**
+ * Plan D, Task 5 — the guarded UPDATE both `releaseHeldTradeInTx` and `blockHeldTradeInTx` share
+ * (`WHERE status = 'held'`), driven to a genuine loss on BOTH sides. `release` takes both teams'
+ * rows `FOR UPDATE` before it ever reaches the guarded update; `block` takes no lock beyond the
+ * row itself. A bystander holds `trade_proposals[id] FOR UPDATE` first, so both writers queue at
+ * the SAME row, in the order they arrive — Postgres grants a contested row lock FIFO, so starting
+ * one, confirming it is genuinely blocked, THEN starting the other, pins which one wins.
+ */
+describe("releaseHeldTradeInTx and blockHeldTradeInTx — the guarded UPDATE race, both directions", () => {
+  /** `waitForBlockedBackend`'s own `> 0` check is ambiguous once a FIRST waiter is already
+   *  parked — it would report "blocked" the instant the FIRST one queues, before the SECOND has
+   *  necessarily reached its own wait. This waits for `count >= n`, so confirming the SECOND
+   *  contender is used only once BOTH are genuinely queued (and therefore queued in the order
+   *  each was started, which is what pins the winner deterministically). */
+  async function waitForBlockedCount(n: number, timeoutMs = 5_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const rows = await joinDb.execute<{ count: string }>(
+        sql`SELECT count(*) AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()`,
+      );
+      if (Number(rows[0]?.count ?? 0) >= n) return true;
+      if (Date.now() > deadline) return false;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+
+  async function seedHeldTrade(leagueId: string, suffix: string): Promise<{ readonly tradeId: string; readonly teamA: string; readonly teamB: string }> {
+    await seedLeagueWith(leagueId, [`u_race_commish_${suffix}`, `u_race_alice_${suffix}`, `u_race_bob_${suffix}`, `u_race_op_${suffix}`]);
+    const teamA = `team_race_alice_${suffix}`;
+    const teamB = `team_race_bob_${suffix}`;
+    await joinDb.insert(teams).values([
+      { id: teamA, leagueId, userId: `u_race_alice_${suffix}`, name: "Alice's Team" },
+      { id: teamB, leagueId, userId: `u_race_bob_${suffix}`, name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: `p_race_a_${suffix}`, name: "Player A", position: "RB", nflTeam: "KC" },
+      { id: `p_race_b_${suffix}`, name: "Player B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: teamA, slot: "BENCH", slotIndex: 0, playerId: `p_race_a_${suffix}` },
+      { teamId: teamB, slot: "BENCH", slotIndex: 0, playerId: `p_race_b_${suffix}` },
+    ]);
+    const proposedAt = new Date(clock.now());
+    const tradeId = `trade_race_${suffix}`;
+    await joinDb.insert(tradeProposals).values({
+      id: tradeId,
+      leagueId,
+      proposerTeamId: teamA,
+      counterpartyTeamId: teamB,
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: `p_race_a_${suffix}` }],
+      counterpartyAssets: [{ kind: "player", playerId: `p_race_b_${suffix}` }],
+      fingerprint: `fp_${tradeId}`,
+      note: null,
+      status: "held",
+      proposedAt,
+      expiresAt: new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000),
+    });
+    return { tradeId, teamA, teamB };
+  }
+
+  it("block wins a race that starts first — release loses the guarded update, cleanly", async () => {
+    const { tradeId } = await seedHeldTrade("lg_race_block_wins", "bw");
+
+    let holdsTradeLock: () => void = () => {};
+    const tradeLocked = new Promise<void>((resolve) => (holdsTradeLock = resolve));
+    let releaseBystander: () => void = () => {};
+    const bystanderParked = new Promise<void>((resolve) => (releaseBystander = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM trade_proposals WHERE id = ${tradeId} FOR UPDATE`);
+      holdsTradeLock();
+      await bystanderParked;
+    });
+    await tradeLocked;
+
+    // T_block reaches the wait queue first — no team locks in its way, straight to the row.
+    const blocking = blockDb.transaction((tx) => blockHeldTradeInTx(tx, { tradeId, leagueId: "lg_race_block_wins", operatorUserId: "u_race_op_bw", note: "" }));
+    expect(await waitForBlockedBackend()).toBe(true);
+
+    // T_release queues second, behind both the bystander AND (once released) block's own commit.
+    const releasing = releaseDb.transaction((tx) => releaseHeldTradeInTx(tx, { tradeId, leagueId: "lg_race_block_wins", operatorUserId: "u_race_op_bw" }));
+    expect(await waitForBlockedCount(2)).toBe(true);
+
+    releaseBystander();
+    await expect(holding).resolves.toBeUndefined();
+
+    const blockResult = await blocking;
+    const releaseResult = await releasing;
+    expect(blockResult).toMatchObject({ ok: true });
+    expect(releaseResult).toEqual({ ok: false, status: 409, reason: "This trade is no longer waiting on a decision." });
+
+    const [row] = await joinDb.select().from(tradeProposals).where(eq(tradeProposals.id, tradeId));
+    expect(row!.status).toBe("blocked");
+  });
+
+  it("release wins a race that starts first — block loses the guarded update, cleanly", async () => {
+    const { tradeId } = await seedHeldTrade("lg_race_release_wins", "rw");
+
+    let holdsTradeLock: () => void = () => {};
+    const tradeLocked = new Promise<void>((resolve) => (holdsTradeLock = resolve));
+    let releaseBystander: () => void = () => {};
+    const bystanderParked = new Promise<void>((resolve) => (releaseBystander = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM trade_proposals WHERE id = ${tradeId} FOR UPDATE`);
+      holdsTradeLock();
+      await bystanderParked;
+    });
+    await tradeLocked;
+
+    // T_release queues first this time — its own team locks are uncontended, so it still reaches
+    // the trade row's own guarded update ahead of T_block.
+    const releasing = releaseDb.transaction((tx) => releaseHeldTradeInTx(tx, { tradeId, leagueId: "lg_race_release_wins", operatorUserId: "u_race_op_rw" }));
+    expect(await waitForBlockedBackend()).toBe(true);
+
+    const blocking = blockDb.transaction((tx) => blockHeldTradeInTx(tx, { tradeId, leagueId: "lg_race_release_wins", operatorUserId: "u_race_op_rw", note: "" }));
+    expect(await waitForBlockedCount(2)).toBe(true);
+
+    releaseBystander();
+    await expect(holding).resolves.toBeUndefined();
+
+    const releaseResult = await releasing;
+    const blockResult = await blocking;
+    expect(releaseResult).toMatchObject({ ok: true });
+    expect(blockResult).toEqual({ ok: false, status: 409, reason: "This trade is no longer waiting on a decision." });
+
+    const [row] = await joinDb.select().from(tradeProposals).where(eq(tradeProposals.id, tradeId));
+    expect(row!.status).toBe("accepted");
   });
 });
 

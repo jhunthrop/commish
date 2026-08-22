@@ -14,6 +14,7 @@ import { TradeCard } from "@/league-room/components/trade-card";
 import { TradeComposer } from "@/league-room/components/trade-composer";
 import type { TradeRoomContext } from "@/league-room/contract";
 import { copyViolations } from "./copy-rules";
+import { renderNotice } from "./notices";
 
 /**
  * THE HOUSE COPY RULES, APPLIED TO WHAT A PERSON ACTUALLY SEES.
@@ -250,6 +251,104 @@ describe("the admin flag detail page says nothing that breaks the house copy rul
   });
 });
 
+describe("the admin flag detail page's held-trade surface says nothing that breaks the house copy rules (Plan D, Task 5)", () => {
+  it("is clean open (with the two decisions offered) and resolved", async () => {
+    const { requireAdmin } = await import("@/lib/auth/current-user");
+    const { flagDetail } = await import("@/integrity-service/flags");
+    const { leagueNameFor } = await import("@/draft-service/teams");
+    const { default: AdminFlagDetailPage } = await import("@/app/app/admin/queue/[flagId]/page");
+
+    vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
+    vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
+
+    const HELD_TRADE_SUBJECT = {
+      kind: "held_trade" as const,
+      tradeId: "trade_1",
+      proposerTeamName: "Bay Bandits",
+      counterpartyTeamName: "Iron Owls",
+      gave: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" as const, averagePoints: 22.4 }],
+      got: [{ playerId: "p2", name: "Justin Jefferson", position: "WR" as const, averagePoints: 18.1 }],
+      valuationBasis: "The platform valued this trade the moment it was accepted.",
+      fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
+      proposerManager: { userId: "u_bb", name: "Bay Bandits Owner", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
+      counterpartyManager: { userId: "u_io", name: "Iron Owls Owner", joinedAt: null, completedSeasons: 0 },
+    };
+    const HELD_DETAIL = {
+      ...FLAG_DETAIL,
+      leagueId: "l1",
+      flagType: "trade_hold" as const,
+      subject: HELD_TRADE_SUBJECT,
+      reporters: [],
+      trail: [{ eventId: "e2", occurredAt: "2026-08-18T20:00:00.000Z", icon: "alert-triangle" as const, headline: "The platform held this trade for a fairness review.", detail: null }],
+      decisions: ["trade_released", "trade_blocked"] as const,
+    };
+
+    for (const detail of [
+      HELD_DETAIL,
+      { ...HELD_DETAIL, trail: [] },
+      {
+        ...HELD_DETAIL,
+        resolution: { decision: "trade_blocked" as const, note: "Both teams belong to one person.", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op", resolvedByName: "Op Erator" },
+        decisions: [],
+      },
+    ]) {
+      vi.mocked(flagDetail).mockResolvedValue(detail);
+      const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+      const page = await AdminFlagDetailPage({ params: Promise.resolve({ flagId: "flag_1" }) });
+      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      await screen.findByText("Held trade");
+      expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner", "Both teams belong to one person.");
+      unmount();
+    }
+  });
+
+  it("is clean with a note typed and on both confirmation dialogs", async () => {
+    const { requireAdmin } = await import("@/lib/auth/current-user");
+    const { flagDetail } = await import("@/integrity-service/flags");
+    const { leagueNameFor } = await import("@/draft-service/teams");
+    const { default: AdminFlagDetailPage } = await import("@/app/app/admin/queue/[flagId]/page");
+
+    vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
+    vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
+
+    const detail = {
+      ...FLAG_DETAIL,
+      leagueId: "l1",
+      flagType: "trade_hold" as const,
+      subject: {
+        kind: "held_trade" as const,
+        tradeId: "trade_1",
+        proposerTeamName: "Bay Bandits",
+        counterpartyTeamName: "Iron Owls",
+        gave: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" as const, averagePoints: 22.4 }],
+        got: [{ playerId: "p2", name: "Justin Jefferson", position: "WR" as const, averagePoints: 18.1 }],
+        valuationBasis: "The platform valued this trade the moment it was accepted.",
+        fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
+        proposerManager: { userId: "u_bb", name: "Bay Bandits Owner", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
+        counterpartyManager: { userId: "u_io", name: "Iron Owls Owner", joinedAt: null, completedSeasons: 0 },
+      },
+      reporters: [],
+      trail: [],
+      decisions: ["trade_released", "trade_blocked"] as const,
+    };
+    vi.mocked(flagDetail).mockResolvedValue(detail);
+    const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+    const page = await AdminFlagDetailPage({ params: Promise.resolve({ flagId: "flag_1" }) });
+    const { container } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+    await screen.findByText("Held trade");
+
+    fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "Looks like the same person on both sides." } });
+    expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner", "Looks like the same person on both sides.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Release the trade" }));
+    expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner", "Looks like the same person on both sides.");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Block the trade" }));
+    expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner", "Looks like the same person on both sides.");
+  });
+});
+
 /**
  * THE INTERACTION-STATE GAP, closed (final review, MEDIUM 7(b)). Everything above renders a FIRST
  * PAINT, and `ResolutionForm` initializes `decision` to `decisions[0]` — the fixture's
@@ -380,11 +479,22 @@ describe("TradeCard says nothing that breaks the house copy rules, in every stat
       { label: "open, past its expiry, seen by the proposer", trade: { ...TRADE_BASE, expiresAt: PAST_EXPIRY }, meTeamId: "them" },
       { label: "superseded", trade: { ...TRADE_BASE, status: "superseded", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
       { label: "with a note", trade: { ...TRADE_BASE, note: "Rebuilding my TE spot" }, meTeamId: "me" },
+      // Plan D, Task 5: the auto-hold's own two new statuses.
+      { label: "held", trade: { ...TRADE_BASE, status: "held" }, meTeamId: "me" },
+      { label: "held, seen by the other side", trade: { ...TRADE_BASE, status: "held" }, meTeamId: "them" },
+      { label: "blocked", trade: { ...TRADE_BASE, status: "blocked", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
     ];
 
     for (const { trade, meTeamId } of states) {
       const { container, unmount } = render(
-        <TradeCard trade={trade} meTeamId={meTeamId} playersById={TRADE_PLAYERS} assessmentStatus="ready" assessment={{ verdict: "lopsided", givingValue: 5, receivingValue: 40 }} />,
+        <TradeCard
+          trade={trade}
+          meTeamId={meTeamId}
+          playersById={TRADE_PLAYERS}
+          leagueName="Sunday Money"
+          assessmentStatus="ready"
+          assessment={{ verdict: "lopsided", givingValue: 5, receivingValue: 40 }}
+        />,
       );
       expectClean(container, ...TRADE_CONTENT, '"Rebuilding my TE spot"');
       unmount();
@@ -395,6 +505,19 @@ describe("TradeCard says nothing that breaks the house copy rules, in every stat
     const { container } = render(<TradeCard trade={TRADE_BASE} meTeamId="me" playersById={TRADE_PLAYERS} />);
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     expectClean(container, ...TRADE_CONTENT);
+  });
+
+  /**
+   * Plan D, Task 5's own binding requirement: a member reading two different sentences about one
+   * fact reads one of them as a euphemism, so `held-trade-banner.tsx` says the SAME sentence
+   * `trade_held_for_review`'s own notice says — copied by necessity (`@/integrity` is blocked as
+   * a value import from room code), kept honest here by rendering both and comparing the text
+   * directly rather than trusting the two authors to never drift.
+   */
+  it("says the identical sentence a held trade's own notice says — the banner and the notice must never drift", () => {
+    render(<TradeCard trade={{ ...TRADE_BASE, status: "held" }} meTeamId="me" playersById={TRADE_PLAYERS} leagueName="Sunday Money" />);
+    const notice = renderNotice("trade_held_for_review", { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls" });
+    expect(screen.getByText(notice.body)).toBeInTheDocument();
   });
 
   // Fix round 1, F4: three more interaction states this card can be in — idle (nobody has asked
@@ -417,6 +540,7 @@ const TRADE_CONTEXT: TradeRoomContext = {
     me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" }],
     them: [{ playerId: "p2", name: "Puka Nacua", position: "WR" }],
   },
+  leagueName: "Sunday Money",
 };
 
 describe("TradeComposer says nothing that breaks the house copy rules, with and without a note", () => {

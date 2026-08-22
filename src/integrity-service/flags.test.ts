@@ -14,7 +14,7 @@ import { listLeagueActivity } from "./activity";
 import { createLeague } from "@/league-service/creation";
 import { currentWeekOf } from "@/league-service/schedule";
 import { seasonCurrentWeek } from "@/league-service/test-support";
-import { acceptTrade, proposeTrade } from "@/league-service/trades";
+import { acceptTrade, proposeTrade, releaseHeldTradeInTx } from "@/league-service/trades";
 import { createAuditLogger, type AuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
 import { flagDetail, listPendingFlags, pendingFlagQuery, raiseFlag, removeSubject, resolveFlag } from "./flags";
@@ -1375,6 +1375,471 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
     await ensureOperator("u_op");
     const result = await resolveFlag(db, { flagId: "flag_tr_ghost", decision: "trade_reversed", note: "n", operatorUserId: "u_op", clock: trClock });
     expect(result).toEqual({ ok: false, status: 404, reason: 'No flag with id "flag_tr_ghost".' });
+  });
+});
+
+describe("resolveFlag's trade_released/trade_blocked branches (Plan D, Task 5)", () => {
+  const hClock = { now: () => "2026-08-26T00:00:00.000Z" };
+  const H_SLOTS = [
+    { slot: "RB" as const, count: 1, eligiblePositions: ["RB" as const] },
+    { slot: "WR" as const, count: 1, eligiblePositions: ["WR" as const] },
+    { slot: "BENCH" as const, count: 1, eligiblePositions: ["RB" as const, "WR" as const] },
+  ];
+
+  /**
+   * A real HELD trade (Alice's RB for Bob's WR), plus its own `trade_hold` flag — the exact state
+   * `holdTradeInTx` (`@/league-service/trades`) produces, built directly rather than through a
+   * real lopsided `acceptTrade`: this suite holds the trade it wants without also re-proving the
+   * threshold math Task 5's own `trades.test.ts` already covers end to end.
+   */
+  async function heldTradeWithFlag(suffix: string): Promise<{
+    readonly leagueId: string;
+    readonly teamA: string;
+    readonly teamB: string;
+    readonly userA: string;
+    readonly userB: string;
+    readonly tradeId: string;
+    readonly flagId: string;
+    readonly gavePlayerId: string;
+    readonly gotPlayerId: string;
+  }> {
+    const userA = `u_ht_alice_${suffix}`;
+    const userB = `u_ht_bob_${suffix}`;
+    await db.insert(users).values([
+      { id: userA, email: `${userA}@test.local`, displayName: "Alice" },
+      { id: userB, email: `${userB}@test.local`, displayName: "Bob" },
+    ]);
+    const created = await createLeague({ db, clock: hClock, newId: () => `lg_ht_${suffix}_${crypto.randomUUID()}` }, {
+      name: "Held Trade Integration League",
+      format: "snake",
+      teamCount: 2,
+      scoringPreset: "ppr",
+      auctionBudget: null,
+      rosterSlots: H_SLOTS,
+      commissionerUserId: userA,
+      teamName: "Team Alice",
+      experienceTier: "beginner",
+      stakeTier: 0,
+      isPublicMatchmade: true,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const teamB = `team_ht_bob_${suffix}`;
+    await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
+    const gavePlayerId = `p_ht_rb_${suffix}`;
+    const gotPlayerId = `p_ht_wr_${suffix}`;
+    await db
+      .insert(players)
+      .values([
+        { id: gavePlayerId, name: "Star RB", position: "RB", nflTeam: "KC" },
+        { id: gotPlayerId, name: "Bench WR", position: "WR", nflTeam: "SF" },
+      ])
+      .onConflictDoNothing();
+    await db.insert(rosterSlots).values([
+      { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: gavePlayerId },
+      { teamId: teamB, slot: "WR", slotIndex: 0, playerId: gotPlayerId },
+    ]);
+
+    const tradeId = `trade_ht_${suffix}`;
+    const proposedAt = new Date(hClock.now());
+    await db.insert(tradeProposals).values({
+      id: tradeId,
+      leagueId: created.leagueId,
+      proposerTeamId: created.teamId,
+      counterpartyTeamId: teamB,
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: gavePlayerId }],
+      counterpartyAssets: [{ kind: "player", playerId: gotPlayerId }],
+      fingerprint: `fp_${tradeId}`,
+      note: null,
+      status: "held",
+      proposedAt,
+      expiresAt: new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000),
+    });
+
+    const flagId = `flag_ht_${suffix}`;
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_hold",
+        subjectId: tradeId,
+        leagueId: created.leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: hClock.now(),
+        newId: () => flagId,
+        audit: logger,
+      }),
+    );
+
+    return { leagueId: created.leagueId, teamA: created.teamId, teamB, userA, userB, tradeId, flagId, gavePlayerId, gotPlayerId };
+  }
+
+  async function tradeRow(tradeId: string) {
+    const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, tradeId));
+    return row!;
+  }
+
+  async function ownerTeamOf(playerId: string): Promise<string | undefined> {
+    const [row] = await db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(eq(rosterSlots.playerId, playerId));
+    return row?.teamId;
+  }
+
+  async function noticeBody(userId: string, noticeType: string): Promise<string | undefined> {
+    const rows = await db.select().from(memberNotices).where(eq(memberNotices.userId, userId));
+    return rows.find((n) => n.noticeType === noticeType)?.body;
+  }
+
+  async function ensureOperator(id: string): Promise<void> {
+    await db.insert(users).values({ id, email: `${id}@test.local`, displayName: id }).onConflictDoNothing();
+  }
+
+  it("releases a held trade by executing it, then resolves the flag, in that order", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("release");
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock });
+    expect(result).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_released" });
+
+    expect((await tradeRow(fx.tradeId)).status).toBe("accepted");
+    expect(await ownerTeamOf(fx.gavePlayerId)).toBe(fx.teamB);
+    expect(await ownerTeamOf(fx.gotPlayerId)).toBe(fx.teamA);
+    const aliceExecuted = (await db.select().from(memberNotices).where(eq(memberNotices.userId, fx.userA))).find((n) => n.noticeType === "trade_executed");
+    expect(aliceExecuted).toBeDefined();
+  });
+
+  it("blocks a held trade without moving anything, and tells both managers in the same words", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("block");
+    const result = await resolveFlag(db, {
+      flagId: fx.flagId,
+      decision: "trade_blocked",
+      note: "Both teams belong to one person.",
+      operatorUserId: "u_op",
+      clock: hClock,
+    });
+    expect(result).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_blocked" });
+
+    expect((await tradeRow(fx.tradeId)).status).toBe("blocked");
+    expect(await ownerTeamOf(fx.gavePlayerId)).toBe(fx.teamA);
+    expect(await ownerTeamOf(fx.gotPlayerId)).toBe(fx.teamB);
+    const aliceBody = await noticeBody(fx.userA, "trade_blocked");
+    const bobBody = await noticeBody(fx.userB, "trade_blocked");
+    expect(aliceBody).toBe(bobBody);
+    expect(aliceBody).toBeDefined();
+  });
+
+  it("refuses to release a trade the world has moved past, and says what changed", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("moved");
+    // The world moves on WITHOUT going through the trade system — a raw write standing in for
+    // whatever OTHER mechanism could move it. The supersede sweep already covers the "another
+    // trade moved it" case (Task 5's own `trades.test.ts`); this is the second way a release can
+    // refuse, the identical ownership re-check `acceptTrade`'s own STEP 4 makes.
+    await db.update(rosterSlots).set({ playerId: null }).where(eq(rosterSlots.playerId, fx.gavePlayerId));
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock });
+    expect(result).toMatchObject({ ok: false, status: 409 });
+    if (!result.ok) expect(result.reason).toContain("has already moved to another team");
+    expect((await tradeRow(fx.tradeId)).status).toBe("held");
+    // Nothing about the flag changed either — the refusal happened before this function's own
+    // transaction ever opened.
+    const [flag] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flag!.resolvedAt).toBeNull();
+  });
+
+  it("carries the operator's own words to both managers when a trade is blocked, and refuses an accusatory one before any write", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("cheat");
+    const result = await resolveFlag(db, {
+      flagId: fx.flagId,
+      decision: "trade_blocked",
+      note: "This looks like a violation.",
+      operatorUserId: "u_op",
+      clock: hClock,
+    });
+    // The SAME accusatory-note guard `trade_reversed`'s own note already passes through
+    // (`NOTE_REACHES_SOMEONE_ELSE.trade_blocked` is `true`) — refused here, at 400, matching the
+    // exact status/shape that guard answers with everywhere else in this file.
+    expect(result).toMatchObject({ ok: false, status: 400 });
+    if (!result.ok) expect(result.reason).toContain("violation");
+    // Refused before any write: the trade stays held.
+    expect((await tradeRow(fx.tradeId)).status).toBe("held");
+  });
+
+  it("refuses trade_released for a subject that isn't a held trade, before any write", async () => {
+    await ensureOperator("u_op");
+    await seedUser("u_pr_author");
+    await db.insert(reviews).values({ id: "review_pr_1", userId: "u_pr_author", rating: 4, body: "meh", createdAt: new Date(NOW), updatedAt: new Date(NOW) });
+    const flagId = "flag_pr_wrong_subject";
+    await db.transaction((tx) =>
+      raiseFlag(tx, { flagType: "review_report", subjectId: "review_pr_1", leagueId: null, evidence: {}, raisedByUserId: null, occurredAt: NOW, newId: () => flagId, audit: logger }),
+    );
+    const result = await resolveFlag(db, { flagId, decision: "trade_released", note: "n", operatorUserId: "u_op" });
+    expect(result).toMatchObject({ ok: false, status: 400 });
+  });
+
+  it("heals a retry once the release already committed but the flag's own stamp never ran", async () => {
+    // Mirrors `reverseTradeInTx`'s own healing-branch test: a process dying between the two
+    // transactions leaves the trade genuinely released with the flag still open, and a second
+    // attempt on the SAME flag must succeed rather than fail on "no longer held". Simulated
+    // directly here — `releaseHeldTradeInTx` is exercised on its own, real and successful,
+    // standing in for the first attempt's own execution half having already committed.
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("heal");
+    const firstAttempt = await db.transaction((tx) =>
+      releaseHeldTradeInTx(tx, { tradeId: fx.tradeId, leagueId: fx.leagueId, operatorUserId: "u_op", clock: hClock, audit: logger }),
+    );
+    expect(firstAttempt).toMatchObject({ ok: true });
+    expect((await tradeRow(fx.tradeId)).status).toBe("accepted");
+    // The flag itself is still open — this is exactly the gap `resolveFlag`'s own docblock
+    // describes: the process died before its own (platform-chain) stamp transaction ever opened.
+    const [flagBeforeRetry] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flagBeforeRetry!.resolvedAt).toBeNull();
+
+    const retry = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock });
+    expect(retry).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_released" });
+    const [flagAfterRetry] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flagAfterRetry!.resolvedAt).not.toBeNull();
+  });
+
+  it("rolls the whole transaction back, flag stamp included, when the block dispatch itself refuses", async () => {
+    // The world moved on WITHOUT going through `resolveFlag` at all — the trade is no longer
+    // held by the time the block dispatch runs, even though the flag is still open (exactly the
+    // gap `closeSupersededHoldFlagsInTx` normally closes; simulated directly here to prove
+    // `resolveFlag`'s OWN stamp rolls back with it rather than committing a lie).
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("refused");
+    await db.update(tradeProposals).set({ status: "accepted", settledAt: new Date(hClock.now()) }).where(eq(tradeProposals.id, fx.tradeId));
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_blocked", note: "", operatorUserId: "u_op", clock: hClock });
+    expect(result).toEqual({ ok: false, status: 409, reason: "This trade is no longer waiting on a decision." });
+    // The flag's own stamp UPDATE rolled back too — still open.
+    const [flag] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flag!.resolvedAt).toBeNull();
+  });
+
+  it("passes a TransferRefusedError from the release's own transaction straight through as a 409", async () => {
+    // A slot config with no bench and no flex — releasing a trade that swaps an RB for a WR
+    // leaves the receiving side with nowhere legal to put the incoming asset, the identical
+    // `TransferRefusedError` `acceptTrade`'s own catch already handles.
+    await ensureOperator("u_op");
+    const TIGHT_SLOTS = [
+      { slot: "RB" as const, count: 1, eligiblePositions: ["RB" as const] },
+      { slot: "WR" as const, count: 1, eligiblePositions: ["WR" as const] },
+    ];
+    const userA = "u_ht_alice_tight";
+    const userB = "u_ht_bob_tight";
+    await db.insert(users).values([
+      { id: userA, email: `${userA}@test.local`, displayName: "Alice" },
+      { id: userB, email: `${userB}@test.local`, displayName: "Bob" },
+    ]);
+    const created = await createLeague({ db, clock: hClock, newId: () => `lg_ht_tight_${crypto.randomUUID()}` }, {
+      name: "Tight Slots League",
+      format: "snake",
+      teamCount: 2,
+      scoringPreset: "ppr",
+      auctionBudget: null,
+      rosterSlots: TIGHT_SLOTS,
+      commissionerUserId: userA,
+      teamName: "Team Alice",
+      experienceTier: "beginner",
+      stakeTier: 0,
+      isPublicMatchmade: true,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const teamB = "team_ht_bob_tight";
+    await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
+    await db
+      .insert(players)
+      .values([
+        { id: "p_ht_rb_tight", name: "Star RB", position: "RB", nflTeam: "KC" },
+        { id: "p_ht_wr_tight", name: "Bench WR", position: "WR", nflTeam: "SF" },
+        // Each side's OTHER slot is already occupied by a player not in this trade, so the slot
+        // the incoming asset would need is genuinely full, not merely empty-and-eligible.
+        { id: "p_ht_other_wr", name: "Other WR", position: "WR", nflTeam: "DAL" },
+        { id: "p_ht_other_rb", name: "Other RB", position: "RB", nflTeam: "MIA" },
+      ])
+      .onConflictDoNothing();
+    await db.insert(rosterSlots).values([
+      { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: "p_ht_rb_tight" },
+      { teamId: created.teamId, slot: "WR", slotIndex: 0, playerId: "p_ht_other_wr" },
+      { teamId: teamB, slot: "WR", slotIndex: 0, playerId: "p_ht_wr_tight" },
+      { teamId: teamB, slot: "RB", slotIndex: 0, playerId: "p_ht_other_rb" },
+    ]);
+    const tradeId = "trade_ht_tight";
+    const proposedAt = new Date(hClock.now());
+    await db.insert(tradeProposals).values({
+      id: tradeId,
+      leagueId: created.leagueId,
+      proposerTeamId: created.teamId,
+      counterpartyTeamId: teamB,
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_ht_rb_tight" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_ht_wr_tight" }],
+      fingerprint: "fp_trade_ht_tight",
+      note: null,
+      status: "held",
+      proposedAt,
+      expiresAt: new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000),
+    });
+    const flagId = "flag_ht_tight";
+    await db.transaction((tx) =>
+      raiseFlag(tx, { flagType: "trade_hold", subjectId: tradeId, leagueId: created.leagueId, evidence: {}, raisedByUserId: null, occurredAt: hClock.now(), newId: () => flagId, audit: logger }),
+    );
+
+    const result = await resolveFlag(db, { flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(409);
+    // Nothing moved, and the flag stays open — the whole release transaction rolled back.
+    expect((await tradeRow(tradeId)).status).toBe("held");
+    const [flag] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, flagId));
+    expect(flag!.resolvedAt).toBeNull();
+  });
+
+  it("logs and swallows a failed score-cache eviction after a release commits, never failing the decision itself", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("cache-fail");
+    const throwingCache = { invalidate: async () => { throw new Error("redis unreachable"); } };
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock, cache: throwingCache });
+    expect(result).toMatchObject({ ok: true, decision: "trade_released" });
+    expect((await tradeRow(fx.tradeId)).status).toBe("accepted"); // the release itself still landed
+  });
+
+  it("falls through to the ordinary 404 for a flagId that names nothing at all, even for trade_released", async () => {
+    await ensureOperator("u_op");
+    const result = await resolveFlag(db, { flagId: "flag_rl_ghost", decision: "trade_released", note: "n", operatorUserId: "u_op", clock: hClock });
+    expect(result).toEqual({ ok: false, status: 404, reason: 'No flag with id "flag_rl_ghost".' });
+  });
+
+  it("re-throws a non-TransferRefusedError from the release's own transaction rather than swallowing it", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("notify-fails");
+    const throwingNotify: typeof notifyAffectedMember = async () => {
+      throw new Error("notify exploded");
+    };
+    await expect(
+      resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock, notify: throwingNotify }),
+    ).rejects.toThrow("notify exploded");
+    // The whole release transaction rolled back — still held, and nothing this function's own
+    // stamp transaction never reached.
+    expect((await tradeRow(fx.tradeId)).status).toBe("held");
+    const [flag] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flag!.resolvedAt).toBeNull();
+  });
+
+  it("carries a held trade's own subject through flagDetail — both managers' standing, both sides valued", async () => {
+    const userA = "u_ht_alice_detail";
+    const userB = "u_ht_bob_detail";
+    await db.insert(users).values([
+      { id: userA, email: `${userA}@test.local`, displayName: "Alice" },
+      { id: userB, email: `${userB}@test.local`, displayName: "Bob" },
+    ]);
+    const created = await createLeague({ db, clock: hClock, newId: () => `lg_ht_detail_${crypto.randomUUID()}` }, {
+      name: "Held Detail League",
+      format: "snake",
+      teamCount: 2,
+      scoringPreset: "ppr",
+      auctionBudget: null,
+      rosterSlots: H_SLOTS,
+      commissionerUserId: userA,
+      teamName: "Team Alice",
+      experienceTier: "beginner",
+      stakeTier: 0,
+      isPublicMatchmade: true,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const teamB = "team_ht_bob_detail";
+    await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
+    await db
+      .insert(players)
+      .values([
+        { id: "p_ht_rb_detail", name: "Star RB", position: "RB", nflTeam: "KC" },
+        { id: "p_ht_wr_detail", name: "Bench WR", position: "WR", nflTeam: "SF" },
+      ])
+      .onConflictDoNothing();
+    await db.insert(rosterSlots).values([
+      { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: "p_ht_rb_detail" },
+      { teamId: teamB, slot: "WR", slotIndex: 0, playerId: "p_ht_wr_detail" },
+    ]);
+    // A real `member_joined` event for ALICE ONLY — Bob's own `joinedAt` reads honestly as
+    // unknown, the same "malformed or missing reads as absent" discipline every other evidence
+    // reader in this file holds to.
+    await db.transaction((tx) =>
+      logger.record(tx, { eventType: "member_joined", actorId: userA, actorType: "user", leagueId: created.leagueId, payload: {}, occurredAt: hClock.now() }),
+    );
+    const tradeId = "trade_ht_detail";
+    const proposedAt = new Date(hClock.now());
+    await db.insert(tradeProposals).values({
+      id: tradeId,
+      leagueId: created.leagueId,
+      proposerTeamId: created.teamId,
+      counterpartyTeamId: teamB,
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_ht_rb_detail" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_ht_wr_detail" }],
+      fingerprint: "fp_trade_ht_detail",
+      note: null,
+      status: "held",
+      proposedAt,
+      expiresAt: new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000),
+    });
+    const flagId = "flag_ht_detail";
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_hold",
+        subjectId: tradeId,
+        leagueId: created.leagueId,
+        evidence: { verdict: "lopsided", flags: [], givingValue: 40, receivingValue: 5, gap: 35, threshold: 35, basis: "accept_evaluation" },
+        raisedByUserId: null,
+        occurredAt: hClock.now(),
+        newId: () => flagId,
+        audit: logger,
+      }),
+    );
+
+    const detail = await flagDetail(db, flagId);
+    expect(detail).not.toBeNull();
+    expect(detail!.subject.kind).toBe("held_trade");
+    if (detail!.subject.kind === "held_trade") {
+      expect(detail!.subject.proposerTeamName).toBe("Team Alice");
+      expect(detail!.subject.counterpartyTeamName).toBe("Team Bob");
+      expect(detail!.subject.proposerManager.joinedAt).not.toBeNull();
+      expect(detail!.subject.counterpartyManager.joinedAt).toBeNull();
+      expect(detail!.subject.proposerManager.completedSeasons).toBe(0);
+    }
+
+    // Once released, the trail carries a real actor-named row too — `trade_accepted`/
+    // `roster_move`, both stamped with the operator's own id — proving `trailFor`'s held_trade
+    // branch resolves a real name rather than leaving an id unresolved.
+    await db.insert(users).values({ id: "u_op_detail", email: "u_op_detail@test.local", displayName: "Op Detail" }).onConflictDoNothing();
+    const released = await resolveFlag(db, { flagId, decision: "trade_released", note: "", operatorUserId: "u_op_detail", clock: hClock });
+    expect(released).toMatchObject({ ok: true, decision: "trade_released" });
+
+    const afterRelease = await flagDetail(db, flagId);
+    const acceptedRow = afterRelease!.trail.find((row) => row.headline === "Op Detail accepted it.");
+    expect(acceptedRow).toBeDefined();
+  });
+
+  it("reads a held_trade subject honestly when the named trade row is somehow gone", async () => {
+    // Trade rows are never deleted in this product, so this is defensive — the identical
+    // "FK-guaranteed, but read honestly anyway" discipline the `trade` branch's own fallback
+    // above already keeps.
+    await seedUser("u_ht_ghost_commish");
+    await seedLeague("lg_ht_ghost", "u_ht_ghost_commish");
+    const flagId = "flag_ht_ghost";
+    await db.transaction((tx) =>
+      raiseFlag(tx, { flagType: "trade_hold", subjectId: "trade_ht_nonexistent", leagueId: "lg_ht_ghost", evidence: {}, raisedByUserId: null, occurredAt: NOW, newId: () => flagId, audit: logger }),
+    );
+    const detail = await flagDetail(db, flagId);
+    expect(detail).not.toBeNull();
+    expect(detail!.subject).toMatchObject({
+      kind: "held_trade",
+      tradeId: "trade_ht_nonexistent",
+      proposerTeamName: "A former team",
+      counterpartyTeamName: "A former team",
+    });
+    if (detail!.subject.kind === "held_trade") {
+      expect(detail!.subject.proposerManager).toEqual({ userId: "", name: "A former member", joinedAt: null, completedSeasons: 0 });
+    }
   });
 });
 

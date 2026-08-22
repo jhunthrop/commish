@@ -14,6 +14,8 @@ const DECISION_LABEL: Readonly<Record<ResolutionDecision, string>> = {
   warned_user: "Warn the member",
   content_removed: "Remove the content",
   trade_reversed: "Reverse the trade",
+  trade_released: "Release the trade",
+  trade_blocked: "Block the trade",
 };
 
 /** The static half of the notice a decision sends — title and body never change with the note

@@ -1,17 +1,23 @@
 import { createHash } from "node:crypto";
-import { and, desc, eq, gt, inArray, ne, or } from "drizzle-orm";
+import { and, desc, eq, gt, inArray, isNull, ne, or } from "drizzle-orm";
 import { assembleAdvisorContext, valuePlayers } from "@/ai-advisor/context";
 import type { Db, DbTx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
-import { leagues, players, rosterSlots, statWeeks, teams, tradeProposals } from "@/db/schema";
+import { integrityFlags, leagues, players, rosterSlots, statWeeks, teams, tradeProposals } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { Position } from "@/domain/player";
 import { isLineupLocked } from "@/league";
 import { canonicalSerialize } from "@/integrity/canonical";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
 import type { NoticeContexts } from "@/integrity/notices";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
-import { evaluateTradeBeforeExecute, raiseTradeFairnessFlag, type TradeFairnessEvaluation } from "@/integrity-service/trade-fairness";
+import { evaluateTradeBeforeExecute, evidenceFor, raiseTradeFairnessFlag, type TradeFairnessEvaluation } from "@/integrity-service/trade-fairness";
+// Imported directly from `./raise-flag`, never from `@/integrity-service/flags` — the same
+// self-contained-slice discipline `trade-fairness.ts`'s own import already keeps, so this module
+// (already in the trade-mutating closure `src/integrity/flag-only.test.ts` guards) never widens
+// what it pulls in beyond the one function it actually calls.
+import { raiseFlag } from "@/integrity-service/raise-flag";
 import { tradeBalance, type TradeBalance, type ValuedPlayer } from "@/trades/fairness";
 import { assetPlayerIds, describeAsset, type TradeAsset } from "@/trades/assets";
 import { TRADE_CONFIG } from "@/trades/config";
@@ -19,6 +25,7 @@ import { isBalancedProposal } from "@/domain/trade";
 import { nextStatusFor, type TradeStatus } from "@/trades/lifecycle";
 import type { TradeProposalView, TradeSideView, TradesPageBody } from "@/trades/contract";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
+import { enforcementAppliesTo } from "./enforcement";
 import { currentWeekOf } from "./schedule";
 import { applyTradeInTx, plannedTransfer, TransferRefusedError, type FilledRosterSlot, type TransferAsset } from "./trade-transfer";
 
@@ -552,6 +559,13 @@ export async function refusalFor(
     // Same answer for "doesn't exist" and "isn't yours" — an id must tell a prober nothing.
     return { ok: false, status: 404, reason: "We couldn't find that offer." };
   }
+  // Plan D (Task 5): a held trade is no longer a question between these two managers — it is a
+  // question for an operator — so the ordinary refusal ("someone already answered") would be a
+  // lie; nobody answered anything. Checked before the generic terminal-status message so a held
+  // row gets the honest one rather than the one every OTHER non-open row gets.
+  if (row.status === "held") {
+    return { ok: false, status: 409, reason: "This trade is waiting on a fairness review, so it can't change right now." };
+  }
   if (row.status !== "open") {
     return { ok: false, status: 409, reason: "Someone already answered that offer." };
   }
@@ -718,15 +732,22 @@ async function raiseFairnessFlagQuietly(
 }
 
 /**
- * Every OTHER open offer in this league naming a player the just-accepted trade moved — the
- * supersede sweep's own read. ONE bounded query over `trade_proposals_league_idx` (this league's
- * rows), filtered in TypeScript with `assetPlayerIds`: the asset lists are `jsonb` and bounded at
- * `TRADE_CONFIG.maxAssetsPerSide` per row, so a `jsonb` containment predicate per moved player
- * would buy nothing and cost an index this plan does not have. `excludeTradeId` is the trade that
- * just accepted — belt over the brace that its own `status` is no longer `'open'` by the time
- * this runs, so the filter below would already exclude it either way.
+ * Every OTHER open-OR-HELD offer in this league naming a player the just-accepted trade moved —
+ * the supersede sweep's own read. ONE bounded query over `trade_proposals_league_idx` (this
+ * league's rows), filtered in TypeScript with `assetPlayerIds`: the asset lists are `jsonb` and
+ * bounded at `TRADE_CONFIG.maxAssetsPerSide` per row, so a `jsonb` containment predicate per moved
+ * player would buy nothing and cost an index this plan does not have. `excludeTradeId` is the
+ * trade that just accepted — belt over the brace that its own `status` is no longer `'open'` by
+ * the time this runs, so the filter below would already exclude it either way.
+ *
+ * `held` joins `open` here (Plan D, Task 5): a held trade is not immune to the world moving on.
+ * It dies the same way an open one does when a DIFFERENT trade moves one of its players — the
+ * fairness review it was waiting on never gets an answer, because there is nothing left to answer
+ * about (`TRADE_STATUSES.superseded`'s own docblock, `@/trades/lifecycle`). `closeSupersededHold
+ * FlagsInTx`, below, is what keeps that trade's own `trade_hold` flag from lingering open forever
+ * once this sweep supersedes it.
  */
-async function openProposalsNaming(
+async function openOrHeldProposalsNaming(
   tx: DbTx,
   leagueId: string,
   movedPlayerIds: readonly string[],
@@ -735,13 +756,132 @@ async function openProposalsNaming(
   const rows = await tx
     .select()
     .from(tradeProposals)
-    .where(and(eq(tradeProposals.leagueId, leagueId), eq(tradeProposals.status, "open")));
+    .where(and(eq(tradeProposals.leagueId, leagueId), or(eq(tradeProposals.status, "open"), eq(tradeProposals.status, "held"))));
   const moved = new Set(movedPlayerIds);
   return rows.filter(
     (row) =>
       row.id !== excludeTradeId &&
       [...assetPlayerIds(row.proposerAssets), ...assetPlayerIds(row.counterpartyAssets)].some((id) => moved.has(id)),
   );
+}
+
+/**
+ * The question died with it (Plan D, Task 5): a held trade the supersede sweep just moved to
+ * `superseded` no longer has anything for an operator to decide, so its OWN `trade_hold` flag is
+ * closed in the SAME statement — a plain, guarded `UPDATE`, never `resolveFlag`'s operator-
+ * decision machinery (`DECISION_WIRED_FOR.no_action.held_trade` is `false` for exactly the reason
+ * this is NOT that: an operator did not decide nothing needed to happen, the world made the
+ * question moot before anyone had to). No new audit event: the fact this closure explains is
+ * already on the record as the trade's own `status = 'superseded'`, and this UPDATE writes no
+ * table any chain anchors. Idempotent by construction (`WHERE resolved_at IS NULL`) and a no-op
+ * when `supersededTradeIds` names no held trade at all — the common case, since most superseded
+ * offers were never held to begin with.
+ */
+async function closeSupersededHoldFlagsInTx(tx: DbTx, supersededTradeIds: readonly string[], now: Date): Promise<void> {
+  if (supersededTradeIds.length === 0) return;
+  await tx
+    .update(integrityFlags)
+    .set({ resolvedAt: now, resolvedByUserId: null, resolution: "no_action", resolutionNote: "The trade this flag was about was superseded by a different trade before an operator could decide it." })
+    .where(and(eq(integrityFlags.subjectType, "held_trade"), inArray(integrityFlags.subjectId, supersededTradeIds), isNull(integrityFlags.resolvedAt)));
+}
+
+/**
+ * THE WHOLE OF A HOLD (Plan D, Task 5), called from `acceptTrade`'s own transaction the moment its
+ * guarded UPDATE has already stamped `held` — never a separate transaction, and never after
+ * commit. See `acceptTrade`'s own "THE AUTO-HOLD" docblock section for why that is provably safe:
+ * every write below is PLATFORM-scoped, so this function never touches the league chain at all,
+ * and one transaction appending to at most one chain (Plan A ruling 3) is satisfied by never
+ * reaching for the league's.
+ *
+ * ORDER, all four writes inside the ONE transaction `acceptTrade` already opened: (1) both
+ * `trade_held_for_review` notices — `FOR KEY SHARE` on `users` and `leagues`, taken first, matching
+ * the "business rows and notices before any anchor" order every other writer in this file holds
+ * to; (2) `raiseFlag` — its own insert (`FOR KEY SHARE` on `leagues` again, already held, so this
+ * re-acquisition costs nothing) and its own `flag_raised` append, the FIRST anchor lock this
+ * sub-path takes; (3) the `system_action` append — the SAME platform anchor row, re-entered, the
+ * identical "two platform-chain appends in one transaction" shape `resolveFlag`'s own
+ * `content_removed` branch already proves safe (`lock-order.test.ts`, "removes a CHAT MESSAGE...
+ * appends TWICE to the platform chain"); (4) `attachAuditEvent` for both notices, against the
+ * `system_action` event — the one statement permitted after an anchor.
+ *
+ * `raiseFlag`, never `raiseTradeFairnessFlag`: a `trade_hold` flag is not a fairness flag (two
+ * different `FlagType`s, two different subject types — `SUBJECT_OF.trade_hold`'s own docblock,
+ * `@/integrity/flags`), and `raiseTradeFairnessFlag` is built to run in its OWN, separate
+ * transaction for a trade that has ALREADY executed — the opposite of this one.
+ */
+async function holdTradeInTx(
+  tx: DbTx,
+  input: {
+    readonly row: typeof tradeProposals.$inferSelect;
+    readonly league: Pick<typeof leagues.$inferSelect, "name">;
+    readonly fairness: TradeFairnessEvaluation;
+    readonly now: string;
+    readonly audit: AuditLogger;
+    readonly notify: typeof notifyAffectedMember;
+    readonly newId: () => string;
+    readonly raiseFlag: typeof raiseFlag;
+  },
+): Promise<{
+  readonly ok: true;
+  readonly outcome: "held";
+  readonly tradeId: string;
+  readonly fairness: TradeFairnessEvaluation;
+  readonly notices: readonly MemberNotice[];
+}> {
+  const { row, league, fairness, now, audit, notify, newId, raiseFlag: raise } = input;
+
+  const teamRows = await tx.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(inArray(teams.id, [row.proposerTeamId, row.counterpartyTeamId]));
+  const teamById = new Map(teamRows.map((t) => [t.id, t]));
+  const proposerTeam = teamById.get(row.proposerTeamId)!;
+  const counterpartyTeam = teamById.get(row.counterpartyTeamId)!;
+
+  const proposerNotice = await notify(tx, {
+    leagueId: row.leagueId,
+    userId: proposerTeam.userId,
+    noticeType: "trade_held_for_review",
+    context: { leagueName: league.name, counterpartyTeamName: counterpartyTeam.name },
+    occurredAt: now,
+    auditEventId: null,
+  });
+  const counterpartyNotice = await notify(tx, {
+    leagueId: row.leagueId,
+    userId: counterpartyTeam.userId,
+    noticeType: "trade_held_for_review",
+    context: { leagueName: league.name, counterpartyTeamName: proposerTeam.name },
+    occurredAt: now,
+    auditEventId: null,
+  });
+
+  // `fairness.hold` is true, and it can only be true when a threshold exists at all
+  // (`crossesFairnessThreshold` answers `false` for a `null` threshold, by construction) — so
+  // `INTEGRITY_CONFIG.trade.autoHoldThreshold!` is safe here the same way `acceptTrade`'s own
+  // `shouldHold` gate already established it.
+  await raise(tx, {
+    flagType: "trade_hold",
+    subjectId: row.id,
+    leagueId: row.leagueId,
+    evidence: evidenceFor(
+      { balance: fairness.balance, gap: fairness.gap, giving: fairness.giving, receiving: fairness.receiving, basis: "accept_evaluation" },
+      INTEGRITY_CONFIG.trade.autoHoldThreshold!,
+    ),
+    raisedByUserId: null, // a system path, never a member accusing another — ruling 12
+    occurredAt: now,
+    newId,
+    audit,
+  });
+
+  const event = await audit.record(tx, {
+    eventType: "system_action",
+    actorId: null,
+    actorType: "system",
+    leagueId: null, // platform chain — nothing about a hold is league news (ruling 12)
+    payload: { action: "trade_held_for_review", tradeId: row.id, leagueId: row.leagueId },
+    occurredAt: now,
+  });
+  await attachAuditEvent(tx, proposerNotice, event.eventId);
+  await attachAuditEvent(tx, counterpartyNotice, event.eventId);
+
+  return { ok: true, outcome: "held", tradeId: row.id, fairness, notices: [proposerNotice, counterpartyNotice] };
 }
 
 export interface AcceptTradeInput {
@@ -758,18 +898,38 @@ export interface AcceptTradeInput {
   /** Defaults to the real `raiseTradeFairnessFlag` (`@/integrity-service/trade-fairness`).
    *  Injectable so a test can force its failure without needing a real threshold-crossing trade —
    *  see `raiseFairnessFlagQuietly`'s own docblock for why a failure here never fails this
-   *  function's own result. */
+   *  function's own result. Never called on the `held` branch — a held trade's own `trade_hold`
+   *  flag is raised INSIDE this same transaction, not after commit. */
   readonly raiseFairnessFlag?: typeof raiseTradeFairnessFlag;
+  /** Plan D's own test seam, mirroring `proposeTrade`'s `newId` — the id `raiseFlag` stamps on a
+   *  new `trade_hold` flag. Defaults to `crypto.randomUUID()`; production never supplies this. */
+  readonly newId?: () => string;
+  /** Defaults to the real `raiseFlag` (`@/integrity-service/raise-flag`). Injectable so a test can
+   *  force ITS failure specifically — inside the hold transaction, never after — and prove the
+   *  whole hold rolls back with it: no stamp, no notices, no flag. Production never supplies this. */
+  readonly raiseFlag?: typeof raiseFlag;
 }
 
 export type AcceptTradeResult =
   | {
       readonly ok: true;
       readonly tradeId: string;
-      /** How many other open offers this acceptance just made unhonorable. */
+      readonly outcome: "executed";
+      /** How many other open-or-held offers this acceptance just made unhonorable. */
       readonly supersededCount: number;
       /** The seam Plan D needs: computed inside this same transaction, from the rosters as they
        *  stood a moment before this trade moved them. Rides to Task 6's after-commit flag write. */
+      readonly fairness: TradeFairnessEvaluation;
+    }
+  | {
+      readonly ok: true;
+      /**
+       * Plan D, Task 5. Nothing executed: no roster moved, and every notice both managers got says
+       * so. `supersededCount` has no place in this variant — a held trade never runs the supersede
+       * sweep, because nothing about it moved to invalidate any OTHER offer.
+       */
+      readonly outcome: "held";
+      readonly tradeId: string;
       readonly fairness: TradeFairnessEvaluation;
     }
   | { readonly ok: false; readonly status: number; readonly reason: string };
@@ -851,11 +1011,32 @@ export type AcceptTradeResult =
  * appends to the PLATFORM chain and this one has already appended to the league's.
  *
  * `evaluateTradeBeforeExecute` (`@/integrity-service/trade-fairness`) runs INSIDE this
- * transaction, after the ownership re-check and after the guarded UPDATE (both rosters
- * confirmed current and the acceptance itself confirmed live) and before `applyTradeInTx` moves
- * anything — the rosters as they stand a moment before they move. Its verdict rides this
- * function's own result for Task 6 to act on after commit; `hold` is always `false` while
- * `INTEGRITY_CONFIG.trade.autoHoldThreshold` is `null`, which is every trade this plan executes.
+ * transaction, after the ownership re-check and BEFORE the guarded UPDATE (Plan D, Task 5 — moved
+ * up from where Plan C left it, since the update's own target status now depends on the verdict) —
+ * the rosters as they stand a moment before they would move. Its verdict rides this function's own
+ * result for the after-commit fairness-flag write to act on (`outcome: "executed"`), OR decides
+ * the update's own target status and is acted on immediately, in this same transaction
+ * (`outcome: "held"`).
+ *
+ * THE AUTO-HOLD (Plan D, Task 5). When `fairness.hold` is true AND `enforcementAppliesTo` says the
+ * platform is this league's own commissioner (a public, platform-enforced league —
+ * `@/league-service/enforcement`), the guarded UPDATE at step 5 stamps `held` instead of
+ * `accepted`, and NOTHING FROM STEP 6 ON EVER RUNS: no `applyTradeInTx`, no supersede sweep, no
+ * `trade_executed` notice, no `trade_accepted`/`roster_move` append. In their place,
+ * `holdTradeInTx` (below) does the WHOLE of what a hold is, inside this SAME transaction: two
+ * `trade_held_for_review` notices, a `trade_hold` flag (`raiseFlag`, never `raiseTradeFairnessFlag`
+ * — this is not a fairness flag), and ONE `system_action` event. Every one of those four writes is
+ * PLATFORM-scoped — the flag by construction, the `system_action` because nothing about a hold is
+ * league news (ruling 12), and the two notices carry `leagueId` only as metadata, the same way
+ * every other notice in this file does. So this transaction, on the hold branch, appends to the
+ * PLATFORM chain and NEVER to the league's — the opposite of the ordinary execute branch, which
+ * appends to the league chain and never the platform's. One transaction, one chain, either way;
+ * which chain is the one thing the auto-hold changes. THE CONSEQUENCE, STATED: there is no
+ * after-commit gap for the hold to leave. Plan C's own fairness flag has to be written after this
+ * transaction commits because a league-scoped `trade_accepted` and a platform-scoped `flag_raised`
+ * cannot share one transaction; a hold has no league-scoped write to share a transaction WITH, so
+ * its own flag commits inside the very transaction that decided to hold — see `holdTradeInTx`'s
+ * own docblock for the row-by-row accounting.
  */
 export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<AcceptTradeResult> {
   const clock = input.clock ?? systemClock;
@@ -869,10 +1050,18 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
   let outcome:
     | {
         readonly ok: true;
+        readonly outcome: "executed";
         readonly tradeId: string;
         readonly supersededCount: number;
         readonly fairness: TradeFairnessEvaluation;
         readonly weekNumber: number;
+        readonly notices: readonly MemberNotice[];
+      }
+    | {
+        readonly ok: true;
+        readonly outcome: "held";
+        readonly tradeId: string;
+        readonly fairness: TradeFairnessEvaluation;
         readonly notices: readonly MemberNotice[];
       }
     | { readonly ok: false; readonly status: number; readonly reason: string };
@@ -936,21 +1125,63 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
         };
       }
 
+      const [leagueRow] = await tx
+        .select({ name: leagues.name, rosterSlots: leagues.rosterSlots, isPublicMatchmade: leagues.isPublicMatchmade })
+        .from(leagues)
+        .where(eq(leagues.id, input.leagueId));
+      // FK-guaranteed: `trade_proposals.league_id` references `leagues.id`, cascading — the row
+      // step 1's own plain read already found always names a league that is still there.
+      const league = leagueRow!;
+
+      // THE SEAM, computed from the rosters a moment before they move, and BEFORE the guarded
+      // update below (Plan D, Task 5 — moved up from where Plan C left it): the target status the
+      // guarded update stamps depends on this verdict, so the verdict has to exist first. Nothing
+      // about moving this earlier changes what it reads or locks — `evaluateTradeBeforeExecute`
+      // takes no lock of its own beyond the plain reads `assembleAdvisorContext` already makes, so
+      // this is still safe to run ahead of any write. Valued at the DERIVED accept-time week (the
+      // same one about to be stamped onto the row either way), never at a week the proposal was
+      // allowed to name. See this function's own docblock and `evaluateTradeBeforeExecute`'s.
+      const fairness = await evaluateTradeBeforeExecute(tx, {
+        leagueId: input.leagueId,
+        weekNumber,
+        proposerTeamId: existing.proposerTeamId,
+        counterpartyTeamId: existing.counterpartyTeamId,
+        proposerAssetIds: giveIds,
+        counterpartyAssetIds: getIds,
+      });
+
+      // THE SECOND GATE (Plan D, Task 5): a crossed threshold holds nothing unless the platform is
+      // this league's own commissioner — `enforcementAppliesTo` (`./enforcement`), the identical
+      // predicate the tier-segregation join gate reads, so "is this public and platform-enforced"
+      // has exactly one answer across every automated action this phase takes. A private league's
+      // manager never has a trade held, however lopsided: the platform is never that league's
+      // commissioner, so it is never that league's business either.
+      const shouldHold = fairness.hold && enforcementAppliesTo({ isPublicMatchmade: league.isPublicMatchmade });
+
       // STEP 5 — THE GUARDED UPDATE, the one true authorization gate and the LAST write before
-      // the transfer itself. Still safe as a plain return on failure: a `WHERE` that matches zero
+      // either branch below. Still safe as a plain return on failure: a `WHERE` that matches zero
       // rows changes nothing, whether that is because the caller was never the counterparty, the
       // offer already settled, or a concurrent settlement won the race since the plain read at
       // step 1. From here on, every remaining refusal is a THROW, never a plain return —
       // `applyTradeInTx`'s own `TransferRefusedError`, caught outside the transaction below.
+      //
+      // `weekNumber` is RE-STAMPED to the accept-time week either way, not left at the propose-time
+      // one (final review, CRITICAL 1): the row records the week this trade was last VALUED at,
+      // which is what `sweepUnflaggedTrades` re-derives its own valuation at long afterward for an
+      // EXECUTED trade (`reDeriveAcceptedTradeValue`, `@/integrity-service/trade-fairness`) — a
+      // trade proposed on Sunday and accepted on Tuesday is a Tuesday trade. A HELD trade carries
+      // no `settledAt`/`settledByUserId` at all: it is not settled, by construction (`held` is not
+      // terminal, `TERMINAL_STATUSES.held` is `false`, `@/trades/lifecycle`), and `resolveFlag`'s
+      // own `trade_released` branch re-derives the week AGAIN at the moment of release rather than
+      // trusting this one — see that branch's own docblock for why. Not a foreign-key column
+      // either way, so this still takes no lock beyond the ones step 5's own docblock enumerates.
       const [row] = await tx
         .update(tradeProposals)
-        // `weekNumber` is RE-STAMPED to the accept-time week, not left at the propose-time one
-        // (final review, CRITICAL 1): the row records the week this trade actually happened in,
-        // which is what `sweepUnflaggedTrades` re-derives its own valuation at long afterward
-        // (`reDeriveAcceptedTradeValue`, `@/integrity-service/trade-fairness`). A trade proposed
-        // on Sunday and accepted on Tuesday is a Tuesday trade. Not a foreign-key column, so this
-        // still takes no lock beyond the ones step 5's own docblock already enumerates.
-        .set({ status: "accepted", settledAt: new Date(now), settledByUserId: input.userId, weekNumber })
+        .set(
+          shouldHold
+            ? { status: "held", weekNumber }
+            : { status: "accepted", settledAt: new Date(now), settledByUserId: input.userId, weekNumber },
+        )
         .where(
           and(
             eq(tradeProposals.id, input.tradeId),
@@ -968,22 +1199,18 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
         return refusalFor(tx, { tradeId: input.tradeId, leagueId: input.leagueId, userId: input.userId, transition: "reject", actorTeamId });
       }
 
-      const [leagueRow] = await tx.select({ name: leagues.name, rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId));
-      // FK-guaranteed: `trade_proposals.league_id` references `leagues.id`, cascading — a row this
-      // transaction just guarded-updated always names a league that is still there.
-      const league = leagueRow!;
-
-      // THE SEAM, computed from the rosters a moment before they move — see this function's own
-      // docblock and `evaluateTradeBeforeExecute`'s. Valued at the DERIVED accept-time week (the
-      // same one just stamped onto `row`), never at a week the proposal was allowed to name.
-      const fairness = await evaluateTradeBeforeExecute(tx, {
-        leagueId: input.leagueId,
-        weekNumber,
-        proposerTeamId: row.proposerTeamId,
-        counterpartyTeamId: row.counterpartyTeamId,
-        proposerAssetIds: giveIds,
-        counterpartyAssetIds: getIds,
-      });
+      if (shouldHold) {
+        return holdTradeInTx(tx, {
+          row,
+          league,
+          fairness,
+          now,
+          audit,
+          notify,
+          newId: input.newId ?? (() => crypto.randomUUID()),
+          raiseFlag: input.raiseFlag ?? raiseFlag,
+        });
+      }
 
       await applyTradeInTx(tx, {
         leagueId: input.leagueId,
@@ -995,8 +1222,9 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
       });
 
       // THE SUPERSEDE SWEEP — one statement, not a loop, derived from the moved player ids.
+      // `held` joins `open` (Plan D, Task 5): a held trade dies the same way an open one does.
       const movedPlayerIds = [...giveIds, ...getIds];
-      const doomed = await openProposalsNaming(tx, row.leagueId, movedPlayerIds, row.id);
+      const doomed = await openOrHeldProposalsNaming(tx, row.leagueId, movedPlayerIds, row.id);
       const supersededRows =
         doomed.length === 0
           ? []
@@ -1005,7 +1233,7 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
               .set({ status: "superseded", settledAt: new Date(now) })
               .where(
                 and(
-                  eq(tradeProposals.status, "open"),
+                  or(eq(tradeProposals.status, "open"), eq(tradeProposals.status, "held")),
                   inArray(
                     tradeProposals.id,
                     doomed.map((proposal) => proposal.id),
@@ -1013,6 +1241,16 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
                 ),
               )
               .returning();
+      // The question died with them: any HELD offer this sweep just superseded had its own
+      // `trade_hold` flag waiting on an operator, and that flag closes in the same transaction —
+      // see `closeSupersededHoldFlagsInTx`'s own docblock for why this is not `resolveFlag`.
+      // `doomed` carries each row's status as it stood a moment BEFORE this UPDATE, which is the
+      // only place "was this one held" is still readable — the UPDATE's own `.returning()` answers
+      // only the AFTER image. Intersected with `supersededRows` so a doomed candidate this UPDATE's
+      // own `WHERE` did not actually match (raced by something else in between) is never closed.
+      const actuallySupersededIds = new Set(supersededRows.map((s) => s.id));
+      const supersededHeldIds = doomed.filter((d) => d.status === "held" && actuallySupersededIds.has(d.id)).map((d) => d.id);
+      await closeSupersededHoldFlagsInTx(tx, supersededHeldIds, new Date(now));
 
       // NOTICES — `trade_executed` to both parties, `trade_superseded` to BOTH parties of every
       // doomed offer (final review, LOW 9).
@@ -1127,6 +1365,7 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
 
       return {
         ok: true as const,
+        outcome: "executed" as const,
         tradeId: row.id,
         supersededCount: supersededRows.length,
         fairness,
@@ -1143,6 +1382,15 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
 
   if (!outcome.ok) return outcome;
   for (const notice of outcome.notices) await deliver(notice);
+
+  if (outcome.outcome === "held") {
+    // NOTHING FURTHER RUNS. No score-cache eviction (no roster moved, no week's scores changed),
+    // no after-commit fairness-flag write (the `trade_hold` flag already committed INSIDE the
+    // transaction that just returned — see `holdTradeInTx`'s own docblock and this function's own
+    // "THE AUTO-HOLD" section for the full accounting of why there is no gap here to fill).
+    return { ok: true, outcome: "held", tradeId: outcome.tradeId, fairness: outcome.fairness };
+  }
+
   await invalidateScoreCacheQuietly(cache, input.leagueId, outcome.weekNumber);
   // Task 6: a SEPARATE transaction, after this one has already committed — see
   // `raiseTradeFairnessFlag`'s own docblock for why, and `raiseFairnessFlagQuietly`'s for why a
@@ -1157,7 +1405,353 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
     basis: "accept_evaluation",
     occurredAt: now,
   });
-  return { ok: true, tradeId: outcome.tradeId, supersededCount: outcome.supersededCount, fairness: outcome.fairness };
+  return { ok: true, outcome: "executed", tradeId: outcome.tradeId, supersededCount: outcome.supersededCount, fairness: outcome.fairness };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Plan D, Task 5: the two ways out of a hold. `resolveFlag`'s `trade_released`/`trade_blocked`
+// branches (`@/integrity-service/flags`) are the only callers.
+// ---------------------------------------------------------------------------------------------
+
+export interface ReleaseHeldTradeInput {
+  readonly tradeId: string;
+  readonly leagueId: string;
+  readonly operatorUserId: string;
+  readonly clock?: Clock;
+  readonly audit?: AuditLogger;
+  readonly notify?: typeof notifyAffectedMember;
+}
+
+export type ReleaseHeldTradeResult =
+  | { readonly ok: true; readonly tradeId: string; readonly weekNumber: number; readonly notices: readonly MemberNotice[] }
+  | { readonly ok: false; readonly status: number; readonly reason: string };
+
+/**
+ * `trade_released`'s own execution: the trade the two managers agreed to actually goes through —
+ * exactly what `acceptTrade` would have done had the gap never crossed the auto-hold threshold.
+ * Called from `resolveFlag`'s own `trade_released` branch, in ITS OWN transaction, BEFORE
+ * `resolveFlag`'s own ever opens — the identical two-transaction, two-chain shape
+ * `reverseTradeInTx` already established for `trade_reversed` (`@/league-service/trade-reversal`,
+ * whose own docblock states the full commit-order accounting this mirrors): this transaction's own
+ * anchor is the LEAGUE chain (`trade_accepted` + `roster_move`, a fact two managers can already
+ * see); `resolveFlag`'s is the PLATFORM chain (`flag_resolved`, a record about a decision). Plan
+ * A's ruling 3 forbids one transaction spanning both, so two transactions is not a style choice —
+ * it is the only shape either chain ruling allows.
+ *
+ * COMMIT ORDER, STATED, THE SAME REASONING `reverseTradeInTx` GIVES: this transaction commits
+ * FIRST. A refusal here (a named player has moved on, or a race already decided this trade) leaves
+ * the flag OPEN — `resolveFlag` never even opens its own transaction, so nothing false is ever
+ * recorded. If THIS transaction commits and `resolveFlag`'s own later transaction then fails, the
+ * trade IS genuinely released but the flag stays open — an operator resolving the SAME flag again
+ * re-enters this function, and the HEALING branch below (`existing.status === "accepted"`) reports
+ * success without re-running the transfer, so the retry reaches `resolveFlag`'s own stamp and the
+ * flag actually closes. A held trade can only ever become `accepted` through THIS function — the
+ * ordinary `acceptTrade` refuses a held row outright (`refusalFor`'s own held-specific message) —
+ * so `accepted` on the trade this flag names is unambiguous proof this exact release already ran;
+ * no second marker column is needed to tell it apart from an ordinary acceptance the way
+ * `reversed_by_flag_id` has to for a reversal.
+ *
+ * THE WEEK IS RE-DERIVED HERE, NOT READ OFF THE HELD ROW (the C1 lesson, restated a third time in
+ * this arc): `existing.weekNumber` is whatever week this trade was last VALUED at — the moment of
+ * the hold, which can be days or weeks before an operator actually decides it. `currentWeekOf` is
+ * asked again, fresh, the identical "the week is the server's to derive at the moment of the yes"
+ * discipline `acceptTrade`'s own docblock states — a trade held on a Sunday and released on a
+ * Wednesday is a Wednesday trade, priced and scored at the week it actually executes in, never the
+ * week it happened to be frozen at.
+ *
+ * RE-VALIDATION, NOT ASSUMPTION: ownership is re-checked against the CURRENT roster, the identical
+ * guard `acceptTrade`'s own STEP 4 makes, because the world can still have moved since the hold —
+ * a named player traded away through some OTHER path this held trade's own supersede coverage
+ * did not catch refuses here (409, naming what changed) rather than executing a transfer against a
+ * roster that no longer matches the offer.
+ *
+ * The supersede sweep runs here exactly as it does in `acceptTrade`'s own execute branch: a
+ * release is a real acceptance, and any OTHER open-or-held offer this release just invalidated
+ * dies the same way it always does.
+ */
+export async function releaseHeldTradeInTx(tx: DbTx, input: ReleaseHeldTradeInput): Promise<ReleaseHeldTradeResult> {
+  const clock = input.clock ?? systemClock;
+  const audit = input.audit ?? getAuditLogger();
+  const notify = input.notify ?? notifyAffectedMember;
+  const now = clock.now();
+
+  // STEP 1 — a plain read, no write. Every refusal below through the guarded UPDATE can therefore
+  // return a plain `{ ok: false, ... }` safely, the same discipline `acceptTrade` and
+  // `reverseTradeInTx` both hold to.
+  const [existing] = await tx
+    .select()
+    .from(tradeProposals)
+    .where(and(eq(tradeProposals.id, input.tradeId), eq(tradeProposals.leagueId, input.leagueId)));
+  if (existing === undefined) {
+    return { ok: false, status: 404, reason: "We couldn't find that trade." };
+  }
+  if (existing.status === "accepted") {
+    // THE HEALING BRANCH (mirroring `reverseTradeInTx`'s own) — see this function's own docblock.
+    return { ok: true, tradeId: existing.id, weekNumber: existing.weekNumber, notices: [] };
+  }
+  if (existing.status !== "held") {
+    return { ok: false, status: 409, reason: "This trade is no longer waiting on a decision." };
+  }
+
+  // THE WEEK, RE-DERIVED — see this function's own docblock.
+  const weekNumber = await currentWeekOf(tx, input.leagueId);
+  const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, weekNumber)).for("share");
+  if (isLineupLocked(week?.status ?? "scheduled")) {
+    return { ok: false, status: 409, reason: `Week ${weekNumber} has started, so rosters can't change until it ends.` };
+  }
+
+  // Both teams' rows, FOR UPDATE, canonical sorted-by-id order — identical to `acceptTrade`'s own
+  // ruling, and for the identical reason (a concurrent release racing a fresh accept, or another
+  // release, on either of these two teams).
+  const [firstTeamId, secondTeamId] = [existing.proposerTeamId, existing.counterpartyTeamId].sort();
+  await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, firstTeamId)).for("update");
+  await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, secondTeamId)).for("update");
+
+  const giveIds = assetPlayerIds(existing.proposerAssets);
+  const getIds = assetPlayerIds(existing.counterpartyAssets);
+
+  // OWNERSHIP, RE-CHECKED HERE — the world may have moved since the hold.
+  const currentRosterRows = await tx
+    .select({ teamId: rosterSlots.teamId, playerId: rosterSlots.playerId })
+    .from(rosterSlots)
+    .where(inArray(rosterSlots.teamId, [existing.proposerTeamId, existing.counterpartyTeamId]));
+  const ownedByProposer = new Set(currentRosterRows.filter((r) => r.teamId === existing.proposerTeamId).map((r) => r.playerId));
+  const ownedByCounterparty = new Set(currentRosterRows.filter((r) => r.teamId === existing.counterpartyTeamId).map((r) => r.playerId));
+  if (!giveIds.every((id) => ownedByProposer.has(id)) || !getIds.every((id) => ownedByCounterparty.has(id))) {
+    return { ok: false, status: 409, reason: "One of the players in this offer has already moved to another team. Ask for a fresh offer." };
+  }
+
+  // THE GUARDED UPDATE — the one-way stamp, `WHERE status = 'held'`, so a race (another operator,
+  // or a concurrent supersede sweep) matches zero rows rather than a stale "yes".
+  const [row] = await tx
+    .update(tradeProposals)
+    .set({ status: "accepted", settledAt: new Date(now), settledByUserId: input.operatorUserId, weekNumber })
+    .where(and(eq(tradeProposals.id, input.tradeId), eq(tradeProposals.status, "held")))
+    .returning();
+  if (row === undefined) {
+    return { ok: false, status: 409, reason: "This trade is no longer waiting on a decision." };
+  }
+
+  const [leagueRow] = await tx.select({ name: leagues.name, rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId));
+  const league = leagueRow!;
+
+  await applyTradeInTx(tx, {
+    leagueId: input.leagueId,
+    slotConfig: league.rosterSlots,
+    proposerTeamId: row.proposerTeamId,
+    counterpartyTeamId: row.counterpartyTeamId,
+    proposerAssets: row.proposerAssets,
+    counterpartyAssets: row.counterpartyAssets,
+  });
+
+  // THE SUPERSEDE SWEEP — a release is a real acceptance, so any OTHER open-or-held offer this
+  // just invalidated dies the same way it always does.
+  const movedPlayerIds = [...giveIds, ...getIds];
+  const doomed = await openOrHeldProposalsNaming(tx, row.leagueId, movedPlayerIds, row.id);
+  const supersededRows =
+    doomed.length === 0
+      ? []
+      : await tx
+          .update(tradeProposals)
+          .set({ status: "superseded", settledAt: new Date(now) })
+          .where(and(or(eq(tradeProposals.status, "open"), eq(tradeProposals.status, "held")), inArray(tradeProposals.id, doomed.map((p) => p.id))))
+          .returning();
+  const actuallySupersededIds = new Set(supersededRows.map((s) => s.id));
+  const supersededHeldIds = doomed.filter((d) => d.status === "held" && actuallySupersededIds.has(d.id)).map((d) => d.id);
+  await closeSupersededHoldFlagsInTx(tx, supersededHeldIds, new Date(now));
+
+  const teamIds = [...new Set([row.proposerTeamId, row.counterpartyTeamId, ...supersededRows.flatMap((s) => [s.proposerTeamId, s.counterpartyTeamId])])];
+  const teamRows = await tx.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(inArray(teams.id, teamIds));
+  const teamById = new Map(teamRows.map((t) => [t.id, t]));
+
+  const playerRows =
+    movedPlayerIds.length === 0 ? [] : await tx.select({ id: players.id, name: players.name, position: players.position }).from(players).where(inArray(players.id, movedPlayerIds));
+  const movedPlayersById: Readonly<Record<string, ValuedPlayer>> = playersById(
+    playerRows.map((p) => ({ playerId: p.id, name: p.name, position: p.position, averagePoints: 0 })),
+  );
+
+  const proposerTeam = teamById.get(row.proposerTeamId)!;
+  const counterpartyTeam = teamById.get(row.counterpartyTeamId)!;
+
+  const proposerNotice = await notify(tx, {
+    leagueId: row.leagueId,
+    userId: proposerTeam.userId,
+    noticeType: "trade_executed",
+    context: {
+      leagueName: league.name,
+      counterpartyTeamName: counterpartyTeam.name,
+      gaveSummary: summarizeAssets(row.proposerAssets, movedPlayersById),
+      gotSummary: summarizeAssets(row.counterpartyAssets, movedPlayersById),
+    },
+    occurredAt: now,
+    auditEventId: null,
+  });
+  const counterpartyNotice = await notify(tx, {
+    leagueId: row.leagueId,
+    userId: counterpartyTeam.userId,
+    noticeType: "trade_executed",
+    context: {
+      leagueName: league.name,
+      counterpartyTeamName: proposerTeam.name,
+      gaveSummary: summarizeAssets(row.counterpartyAssets, movedPlayersById),
+      gotSummary: summarizeAssets(row.proposerAssets, movedPlayersById),
+    },
+    occurredAt: now,
+    auditEventId: null,
+  });
+
+  const supersededNotices: MemberNotice[] = [];
+  for (const superseded of supersededRows) {
+    const doomedProposer = teamById.get(superseded.proposerTeamId)!;
+    const doomedCounterparty = teamById.get(superseded.counterpartyTeamId)!;
+    for (const recipient of [
+      { team: doomedProposer, otherTeamName: doomedCounterparty.name, role: "proposer" as const },
+      { team: doomedCounterparty, otherTeamName: doomedProposer.name, role: "counterparty" as const },
+    ]) {
+      supersededNotices.push(
+        await notify(tx, {
+          leagueId: row.leagueId,
+          userId: recipient.team.userId,
+          noticeType: "trade_superseded",
+          context: { leagueName: league.name, counterpartyTeamName: recipient.otherTeamName, role: recipient.role },
+          occurredAt: now,
+          auditEventId: null,
+        }),
+      );
+    }
+  }
+
+  // ANCHOR — LEAGUE chain, `trade_accepted` + `roster_move`, ONE batch, LAST — identical shape to
+  // `acceptTrade`'s own.
+  const events = await audit.recordAll(tx, [
+    {
+      eventType: "trade_accepted",
+      actorId: input.operatorUserId,
+      actorType: "user",
+      leagueId: row.leagueId,
+      payload: {
+        tradeId: row.id,
+        proposerTeamId: row.proposerTeamId,
+        counterpartyTeamId: row.counterpartyTeamId,
+        proposerAssetIds: giveIds,
+        counterpartyAssetIds: getIds,
+        releasedFromHold: true,
+      },
+      occurredAt: now,
+    },
+    {
+      eventType: "roster_move",
+      actorId: input.operatorUserId,
+      actorType: "user",
+      leagueId: row.leagueId,
+      payload: {
+        reason: "trade",
+        tradeId: row.id,
+        proposerTeamId: row.proposerTeamId,
+        counterpartyTeamId: row.counterpartyTeamId,
+        proposerAssetIds: giveIds,
+        counterpartyAssetIds: getIds,
+      },
+      occurredAt: now,
+    },
+  ]);
+  const tradeAcceptedEventId = events[0]!.eventId;
+  await attachAuditEvent(tx, proposerNotice, tradeAcceptedEventId);
+  await attachAuditEvent(tx, counterpartyNotice, tradeAcceptedEventId);
+  for (const notice of supersededNotices) await attachAuditEvent(tx, notice, tradeAcceptedEventId);
+
+  return { ok: true, tradeId: row.id, weekNumber, notices: [proposerNotice, counterpartyNotice, ...supersededNotices] };
+}
+
+export interface BlockHeldTradeInput {
+  readonly tradeId: string;
+  readonly leagueId: string;
+  readonly operatorUserId: string;
+  /** The operator's own words — `resolveFlag`'s own `input.note`, carried through verbatim so
+   *  `trade_blocked`'s notice can quote it (`quoteFor`), the same split `trade_reversed`'s note
+   *  already keeps. */
+  readonly note: string;
+  readonly clock?: Clock;
+  readonly notify?: typeof notifyAffectedMember;
+}
+
+export type BlockHeldTradeResult =
+  | { readonly ok: true; readonly tradeId: string; readonly notices: readonly MemberNotice[] }
+  | { readonly ok: false; readonly status: number; readonly reason: string };
+
+/**
+ * `trade_blocked`'s own execution: the trade never happens, and both rosters stay exactly as they
+ * were. Called from `resolveFlag`'s own `trade_blocked` branch, INSIDE `resolveFlag`'s own
+ * transaction — unlike `trade_released`, this needs no second transaction and no second chain: a
+ * block moves nothing, so there is no league-scoped fact to record at all, and this function's own
+ * writes (the stamp and both notices) are exactly as platform-scoped as the hold itself was. The
+ * `flag_resolved` event `resolveFlag` appends right after this returns IS the record.
+ *
+ * ONE WAY: the guard is the guarded UPDATE's own `WHERE status = 'held'`, not a prior read. The
+ * healing branch (`existing.status === "blocked"`) mirrors `releaseHeldTradeInTx`'s own — a held
+ * trade can only ever become `blocked` through this function, so finding it already there is
+ * unambiguous proof this exact decision already landed, most likely because `resolveFlag`'s own
+ * platform-chain stamp failed on a prior attempt after this part had already committed.
+ */
+export async function blockHeldTradeInTx(tx: DbTx, input: BlockHeldTradeInput): Promise<BlockHeldTradeResult> {
+  const clock = input.clock ?? systemClock;
+  const notify = input.notify ?? notifyAffectedMember;
+  const now = clock.now();
+
+  const [existing] = await tx
+    .select()
+    .from(tradeProposals)
+    .where(and(eq(tradeProposals.id, input.tradeId), eq(tradeProposals.leagueId, input.leagueId)));
+  if (existing === undefined) {
+    return { ok: false, status: 404, reason: "We couldn't find that trade." };
+  }
+  if (existing.status === "blocked") {
+    return { ok: true, tradeId: existing.id, notices: [] };
+  }
+  if (existing.status !== "held") {
+    return { ok: false, status: 409, reason: "This trade is no longer waiting on a decision." };
+  }
+
+  const [row] = await tx
+    .update(tradeProposals)
+    .set({ status: "blocked", settledAt: new Date(now), settledByUserId: input.operatorUserId })
+    .where(and(eq(tradeProposals.id, input.tradeId), eq(tradeProposals.status, "held")))
+    .returning();
+  if (row === undefined) {
+    return { ok: false, status: 409, reason: "This trade is no longer waiting on a decision." };
+  }
+
+  const teamRows = await tx.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(inArray(teams.id, [row.proposerTeamId, row.counterpartyTeamId]));
+  const teamById = new Map(teamRows.map((t) => [t.id, t]));
+  const proposerTeam = teamById.get(row.proposerTeamId)!;
+  const counterpartyTeam = teamById.get(row.counterpartyTeamId)!;
+  const [leagueRow] = await tx.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, input.leagueId));
+  const leagueName = leagueRow!.name;
+
+  // BOTH managers, the SAME context object — BYTE-IDENTICAL words, unlike `trade_executed`'s own
+  // pair, which deliberately swaps `counterpartyTeamName` per side. `NoticeContexts.trade_blocked`
+  // carries no counterparty name at all for exactly that reason (see its own docblock,
+  // `@/integrity/notices`): the product never signals which of the two, if either, the review was
+  // actually about.
+  const noticeContext = { leagueName, note: input.note };
+  const proposerNotice = await notify(tx, {
+    leagueId: row.leagueId,
+    userId: proposerTeam.userId,
+    noticeType: "trade_blocked",
+    context: noticeContext,
+    occurredAt: now,
+    auditEventId: null,
+  });
+  const counterpartyNotice = await notify(tx, {
+    leagueId: row.leagueId,
+    userId: counterpartyTeam.userId,
+    noticeType: "trade_blocked",
+    context: noticeContext,
+    occurredAt: now,
+    auditEventId: null,
+  });
+
+  return { ok: true, tradeId: row.id, notices: [proposerNotice, counterpartyNotice] };
 }
 
 export interface ListTradesInput {

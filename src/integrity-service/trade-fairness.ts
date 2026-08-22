@@ -42,8 +42,10 @@ export interface TradeFairnessEvaluation {
   readonly gap: number;
   /** At or past `INTEGRITY_CONFIG.trade.fairnessFlagThreshold`. Task 6 acts on it AFTER commit. */
   readonly flagWorthy: boolean;
-  /** At or past `INTEGRITY_CONFIG.trade.autoHoldThreshold`. Always `false` while that is `null`.
-   *  Plan D acts on it, INSIDE the accept transaction, by not executing. */
+  /** At or past `INTEGRITY_CONFIG.trade.autoHoldThreshold`. `false` whenever that config is
+   *  `null` (a test seam only — production ships `35`). `acceptTrade` acts on it, INSIDE the
+   *  accept transaction, by not executing — see that function's own docblock for the second gate
+   *  (`enforcementAppliesTo`) that decides whether a crossed threshold actually holds anything. */
   readonly hold: boolean;
   /**
    * Both sides, valued, from the SAME read `balance` came from — the rosters a moment before the
@@ -70,8 +72,15 @@ export interface TradeFairnessEvaluation {
  * this function's own result. Plan D supplies a number for `INTEGRITY_CONFIG.trade
  * .autoHoldThreshold`; it does not reopen this transaction to add a code path.
  *
- * `autoHoldThreshold` is `null` on merge, so `hold` is `false` for every trade this plan
- * executes.
+ * Plan D (Task 5) supplied the number: `INTEGRITY_CONFIG.trade.autoHoldThreshold` is `35`, so
+ * `hold` is `true` for a trade whose gap reaches it — this function's own contract did not change
+ * at all, only the config value a real caller now reads through it. `acceptTrade`
+ * (`@/league-service/trades`) is the one production caller that acts on `hold`, and only when
+ * `enforcementAppliesTo` also says the platform is this league's commissioner (a public,
+ * platform-enforced league) — a private league's manager never has a trade held, however lopsided,
+ * because the platform is never that league's commissioner. That second gate lives in
+ * `acceptTrade` itself, not here: this function answers "how lopsided", never "whose business is
+ * it".
  *
  * FLAG-ONLY, and provably so: this function returns a verdict and writes nothing.
  * `src/integrity/flag-only.test.ts` covers the directory it lives in.
@@ -152,7 +161,14 @@ export interface RaiseTradeFairnessInput {
   readonly audit?: AuditLogger;
 }
 
-function evidenceFor(input: Pick<RaiseTradeFairnessInput, "balance" | "gap" | "giving" | "receiving" | "basis">, threshold: number) {
+/**
+ * Exported for `acceptTrade`'s own hold branch (`@/league-service/trades`, Plan D Task 5): the
+ * `trade_hold` flag's evidence is the SAME shape a `trade_fairness` flag's is — both sides valued,
+ * the balance, the gap, the threshold that raised it — computed from the SAME `TradeFairnessEvaluation`
+ * `evaluateTradeBeforeExecute` already returned, so a held trade's evidence is read back from real
+ * numbers rather than restated by a second copy of this function.
+ */
+export function evidenceFor(input: Pick<RaiseTradeFairnessInput, "balance" | "gap" | "giving" | "receiving" | "basis">, threshold: number) {
   return {
     verdict: input.balance.verdict,
     // Stored VERBATIM — the analyzer's own machine-readable reasons, never re-summarized.

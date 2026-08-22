@@ -189,13 +189,22 @@ export const INTEGRITY_CONFIG = {
      */
     fairnessFlagThreshold: 20,
     /**
-     * The spec's `TRADE_AUTO_HOLD_THRESHOLD`, and **Plan D owns it**. `null` means no trade is
-     * ever held, which is what ships here: `evaluateTradeBeforeExecute` already reads this field
-     * and already has the hold branch (Task 5), so Plan D supplies a NUMBER rather than a code
-     * path. `src/integrity-service/reserved.test.ts`'s grep proves nothing in this plan reads it
-     * for a real decision, the same way it proves a reserved event type has no publisher.
+     * The spec's `TRADE_AUTO_HOLD_THRESHOLD`. Plan C left this `null` (no trade ever held) and
+     * shipped only the seam: `evaluateTradeBeforeExecute` already read this field and already had
+     * the hold branch, waiting on a number. Plan D (Task 5) is that number.
+     *
+     * **35.** Above `fairnessFlagThreshold` (20) by the same "reachable, not trivial" logic that
+     * separates `fairnessFlagThreshold` from `ADVISOR_CONFIG.lopsidedDelta` (12) one step down:
+     * a 20-point gap is a fairness QUESTION worth an operator's queue, but flagging every trade
+     * that crosses it and freezing it outright would hold the same trades the advisor calls
+     * merely "lopsided" to a member's face. A hold is not a question — it is a trade that does
+     * not happen until an operator says so — so its bar sits well past the flag's own, at a gap
+     * `src/trades/fairness.test.ts`'s own fixtures show as genuinely one-sided rather than a
+     * shrewd-but-defensible offer. `INTEGRITY_CONFIG.trade`'s own test orders all four thresholds
+     * on one axis and this is the number that keeps `fairnessFlagThreshold <= autoHoldThreshold`
+     * true.
      */
-    autoHoldThreshold: null as number | null,
+    autoHoldThreshold: 35 as number | null,
     /** `sweepUnflaggedTrades`' page size — the manual re-run for a trade whose after-commit flag
      *  write did not land (Task 6). Bounded for the same reason `INTEGRITY_CONFIG.queue.pageSize`
      *  is: an operator script that reads an unbounded set is a script nobody runs twice. */

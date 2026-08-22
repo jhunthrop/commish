@@ -82,10 +82,47 @@ export interface TradedPlayerView {
   readonly averagePoints: number;
 }
 
+/**
+ * One manager's own standing, as `held-trade-detail.tsx` (Plan D, Task 5) needs it beside the
+ * players changing hands: WHO they are, HOW LONG they have been a Commish member (`joinedAt`,
+ * from the league chain's own `member_joined` event — `null` for a member who joined before this
+ * plan started recording it, or whose event this bounded read did not reach), and their whole
+ * platform history (`completedSeasons`, the SAME count `participationTierFor`/`isVerifiedPlayer`
+ * both read through). An operator deciding whether to overrule two adults about their own teams
+ * is deciding on the strength of a number; this is the context that number sits beside.
+ */
+export interface HeldTradeManagerView {
+  readonly userId: string;
+  readonly name: string;
+  readonly joinedAt: string | null;
+  readonly completedSeasons: number;
+}
+
 export type FlagSubjectView =
   | { readonly kind: "review"; readonly reviewId: string; readonly body: string; readonly authorName: string; readonly removedAt: string | null }
   | { readonly kind: "chat_message"; readonly messageId: string; readonly body: string | null; readonly authorName: string; readonly removedAt: string | null }
   | { readonly kind: "account_pair"; readonly userIds: readonly [string, string]; readonly names: readonly [string, string] }
+  | {
+      /**
+       * Plan D's own subject (Task 5), deliberately NOT the `trade` arm below even though both
+       * can name the identical trade id — see `SUBJECT_OF.trade_hold`'s own docblock
+       * (`@/integrity/flags`) for why two subject types exist. A `trade_fairness` flag's `trade`
+       * describes something that already happened; this describes something that has NOT, and
+       * carries the two managers' own standing (`proposerManager`/`counterpartyManager`) because
+       * the operator surface built for it (`held-trade-detail.tsx`) is a different question from
+       * the one `TradeSubjectCard` answers: not "was this fair", but "should this go through".
+       */
+      readonly kind: "held_trade";
+      readonly tradeId: string;
+      readonly proposerTeamName: string;
+      readonly counterpartyTeamName: string;
+      readonly gave: readonly TradedPlayerView[];
+      readonly got: readonly TradedPlayerView[];
+      readonly valuationBasis: string;
+      readonly fairnessGapSummary: string;
+      readonly proposerManager: HeldTradeManagerView;
+      readonly counterpartyManager: HeldTradeManagerView;
+    }
   | {
       readonly kind: "trade";
       readonly tradeId: string;
@@ -204,6 +241,7 @@ const QUESTION_FOR_FLAG_TYPE: Readonly<Record<FlagType, string>> = {
   review_report: "A member reported a review",
   chat_report: "A member reported a message",
   trade_fairness: "The platform flagged a trade for a fairness review",
+  trade_hold: "The platform held a trade until an operator decides",
 };
 
 const ICON_FOR_FLAG_TYPE: Readonly<Record<FlagType, IconName>> = {
@@ -211,6 +249,7 @@ const ICON_FOR_FLAG_TYPE: Readonly<Record<FlagType, IconName>> = {
   review_report: "alert-triangle",
   chat_report: "alert-triangle",
   trade_fairness: "refresh-cw",
+  trade_hold: "refresh-cw",
 };
 
 export interface QueueRowInput {
@@ -304,6 +343,8 @@ export const DECISION_PHRASE: Readonly<Record<ResolutionDecision, string>> = {
   warned_user: "sent the member a warning",
   content_removed: "removed the reported content",
   trade_reversed: "reversed the trade",
+  trade_released: "released the trade",
+  trade_blocked: "blocked the trade",
 };
 
 function isResolutionDecision(value: string): value is ResolutionDecision {
@@ -435,6 +476,18 @@ export function flagTrailRowFor(event: AuditEvent, actorNames: ReadonlyMap<strin
     // trade" and the notice title both use for the identical action.
     if (reason === "trade_reversed") {
       return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "An operator reversed the trade.", detail: null };
+    }
+    return null;
+  }
+  // Plan D (Task 5): the hold itself. Written on the PLATFORM chain (`acceptTrade`'s own
+  // docblock, `@/league-service/trades`), so a `held_trade` subject's trail is the one place this
+  // event type is ever rendered — `trailFor`'s `trade` branch (a `trade_fairness` flag) reads the
+  // league chain alone and never reaches it. Deny-by-default for every OTHER `system_action`
+  // code: this trail only knows how to explain the one this plan owns.
+  if (event.eventType === "system_action") {
+    const action = payloadStr(event.payload, "action");
+    if (action === "trade_held_for_review") {
+      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "alert-triangle", headline: "The platform held this trade for a fairness review.", detail: null };
     }
     return null;
   }
