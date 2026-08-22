@@ -469,7 +469,19 @@ export interface CloseSupersededHoldFlagInput {
  * held at all, or there is no open `trade_hold` flag for this trade for any other reason) answers
  * `false` and writes nothing — the same "no second event" shape `raiseFlag`'s own open-subject
  * index gives its callers, achieved here with a guarded `UPDATE` (`WHERE resolved_at IS NULL`)
- * rather than a unique index, since resolving (unlike raising) has no conflict to catch.
+ * rather than a unique index, since resolving (unlike raising) has no conflict to catch. Under
+ * real CONCURRENCY too, not only in sequence: the second caller's UPDATE blocks on the row the
+ * first holds and then re-evaluates its own guard against the committed value.
+ *
+ * LOCK ORDER, and the FK acquisitions enumerated (final review F10 — this was the last of this
+ * plan's nine writers with no proof in `src/integrity-service/lock-order.test.ts`, which now
+ * drives it on two connections):
+ *   1. the `integrity_flags` row, taken by the guarded UPDATE itself. No `FOR KEY SHARE` on
+ *      `leagues` comes with it: `integrity_flags.league_id` does carry a foreign key, but Postgres
+ *      locks a referenced row only when a statement WRITES the referencing key column, and this
+ *      one writes the four resolution columns and never `league_id`.
+ *   2. `audit.record` — the PLATFORM anchor, ALWAYS last. This transaction touches `leagues` at no
+ *      point, so it cannot be half of the join-versus-append cycle ruling 3 exists for.
  */
 export async function closeSupersededHoldFlag(db: Db, input: CloseSupersededHoldFlagInput): Promise<boolean> {
   const audit = input.audit ?? getAuditLogger();

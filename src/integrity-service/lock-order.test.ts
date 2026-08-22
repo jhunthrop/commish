@@ -1,11 +1,12 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, chatMessages, drafts, integrityFlags, leagues, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
+import { auditChains, chatMessages, drafts, integrityFlags, leagues, lineupSlots, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
-import { autoSetLineupsForWeek } from "@/league-service/auto-lineup";
+import { autoSetLineupInTx, autoSetLineupsForWeek } from "@/league-service/auto-lineup";
+import { setDraftKickoff } from "@/league-service/draft-schedule";
 import { joinLeagueInTx, recordTierBlockedJoin } from "@/league-service/join";
 import { setLineup } from "@/league-service/lineups";
 import { writeSchedule } from "@/league-service/schedule";
@@ -14,14 +15,16 @@ import { acceptTrade, blockHeldTradeInTx, proposeTrade, rejectTrade, releaseHeld
 import { reverseTradeInTx } from "@/league-service/trade-reversal";
 import type { StatLine } from "@/domain/player";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { notifyAffectedMember } from "@/integrity-service/notify";
 import { correctSettledWeek } from "@/stats-pipeline/correction";
-import { finalizeWeek } from "@/stats-pipeline/finalize";
+import { finalizeWeek, finalizeWeekInTx } from "@/stats-pipeline/finalize";
 import { fakeStatsProvider } from "@/stats-pipeline/test-support";
 import { syncUserFromWorkOS } from "@/lib/auth/user-sync";
 import { toggleReaction } from "@/chat-service/chat";
 import { reportMessage } from "@/chat-service/moderation";
 import { reportReview } from "@/review-service/reviews";
 import { raiseFlag, resolveFlag } from "./flags";
+import { closeSupersededHoldFlag } from "./trade-fairness";
 import { grantAdmin } from "./grant-admin";
 import type { DraftPoolEntry } from "@/domain/draft";
 import { players } from "@/db/schema";
@@ -2276,5 +2279,298 @@ describe("startDraft's fused auto-start announcement, { auto: true }", () => {
     // announcement's own single `system_action` shared by both notices — one chain, no cycle.
     const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, leagueId));
     expect(anchor!.headSequence).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// FINAL REVIEW F10 — LOCK-ORDER COVERAGE FROM 7 OF 9 TO 9 OF 9. The two writers no describe block
+// above drives: `closeSupersededHoldFlag` (an `integrity_flags` guarded UPDATE plus a
+// platform-chain append, the exact ordering four other blocks exist to prove, opened N times in
+// sequence from two after-commit callers) and `setDraftKickoff` — the interesting one, because its
+// own docblock PROMISES a concurrency property that nothing measured.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * `closeSupersededHoldFlag` (`./trade-fairness`) takes exactly two locks, in this order: the
+ * `integrity_flags` row its guarded `UPDATE ... WHERE resolved_at IS NULL` matches, then the
+ * PLATFORM chain anchor through `audit.record`. Anchor last, the rule this whole suite exists for.
+ *
+ * NO FK LOCK HIDES IN THAT UPDATE, which is the half a reader has to enumerate rather than assume
+ * (this file's own lesson): `integrity_flags.league_id` does carry a foreign key onto `leagues`,
+ * but Postgres takes `FOR KEY SHARE` on a referenced row only when a statement writes the
+ * referencing key column, and this UPDATE writes `resolved_at`/`resolved_by_user_id`/`resolution`/
+ * `resolution_note` and never `league_id`. So this transaction never touches `leagues` at all and
+ * cannot be half of the join-versus-append cycle the blocks above defend against.
+ */
+describe("closeSupersededHoldFlag's lock order", () => {
+  async function heldTradeReadyToClose(flagId: string, tradeId: string, leagueId: string): Promise<void> {
+    await seedLeagueWith(leagueId, [`${leagueId}_a`, `${leagueId}_b`]);
+    await joinDb.insert(teams).values([
+      { id: `${tradeId}_home`, leagueId, userId: `${leagueId}_a`, name: "Home" },
+      { id: `${tradeId}_away`, leagueId, userId: `${leagueId}_b`, name: "Away" },
+    ]);
+    const now = new Date(clock.now());
+    await joinDb.insert(tradeProposals).values({
+      id: tradeId,
+      leagueId,
+      proposerTeamId: `${tradeId}_home`,
+      counterpartyTeamId: `${tradeId}_away`,
+      weekNumber: 4,
+      proposerAssets: [],
+      counterpartyAssets: [],
+      fingerprint: `fp_${tradeId}`,
+      note: null,
+      // Already superseded — the crash-window state this function exists to clean up.
+      status: "superseded",
+      proposedAt: now,
+      expiresAt: new Date(now.getTime() + 72 * 60 * 60 * 1000),
+    });
+    await joinDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_hold",
+        subjectId: tradeId,
+        leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => flagId,
+      }),
+    );
+  }
+
+  /** Parks a `closeSupersededHoldFlag` call inside its own `audit.record` — after the guarded
+   *  UPDATE has taken the `integrity_flags` row and BEFORE the anchor is taken. The same
+   *  injected-logger technique this file already uses for `setLineup`, delaying BEFORE delegating
+   *  rather than after, because the lock under test is the one the delegate acquires. */
+  function parkedClose(db: typeof joinDb, tradeId: string, leagueId: string) {
+    let holdsFlagRow: () => void = () => {};
+    const flagRowLocked = new Promise<void>((resolve) => (holdsFlagRow = resolve));
+    let release: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (release = resolve));
+    const real = getAuditLogger();
+    const audit: AuditLogger = {
+      ...real,
+      record: async (tx, event) => {
+        holdsFlagRow();
+        await parked;
+        return real.record(tx, event);
+      },
+    };
+    const closing = closeSupersededHoldFlag(db, { tradeId, leagueId, occurredAt: clock.now(), audit });
+    return { closing, flagRowLocked, release: () => release() };
+  }
+
+  it("takes the platform anchor LAST: a concurrent platform append runs straight past it while it holds the flag row", async () => {
+    await heldTradeReadyToClose("flag_close_order", "trade_close_order", "lg_close_order");
+    const close = parkedClose(joinDb, "trade_close_order", "lg_close_order");
+    await close.flagRowLocked;
+
+    // T_raise: a real platform-chain append on a DIFFERENT subject, on its own connection. Had
+    // `closeSupersededHoldFlag` taken the anchor before the flag row, this would block behind it.
+    const raised = await pickDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "multi_account",
+        subjectId: "u_x|u_y",
+        leagueId: null,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => "flag_close_order_other",
+      }),
+    );
+    expect(raised.id).toBe("flag_close_order_other");
+
+    close.release();
+    expect(await close.closing).toBe(true);
+
+    // Three appends on the ONE platform chain, in commit order: the setup's own raise, T_raise,
+    // and this close's `flag_resolved`.
+    const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(anchor!.headSequence).toBe(3);
+  });
+
+  it("resolves one at a time when two after-commit callers close the same flag at once", async () => {
+    // The reviewer's own framing: this is opened N times in sequence from two after-commit
+    // callers (`acceptTrade`'s post-commit step and `resolveFlag`'s `trade_released` branch), so
+    // two of them landing on one flag is a real interleaving rather than a hypothetical one.
+    await heldTradeReadyToClose("flag_close_race", "trade_close_race", "lg_close_race");
+    const first = parkedClose(joinDb, "trade_close_race", "lg_close_race");
+    await first.flagRowLocked;
+
+    // The second caller's guarded UPDATE blocks on the row the first already holds — it cannot
+    // read a stale "still open" and write a second resolution.
+    const second = closeSupersededHoldFlag(pickDb, {
+      tradeId: "trade_close_race",
+      leagueId: "lg_close_race",
+      occurredAt: clock.now(),
+    });
+    expect(await waitForBlockedBackend()).toBe(true);
+    first.release();
+
+    expect(await first.closing).toBe(true);
+    // Released, its UPDATE re-evaluates `resolved_at IS NULL` against the committed row and
+    // matches nothing: no second stamp, and no second event.
+    expect(await second).toBe(false);
+    const events = await joinDb.execute<{ count: string }>(sql`SELECT count(*) AS count FROM audit_events WHERE event_type = 'flag_resolved'`);
+    expect(Number(events[0]!.count)).toBe(1);
+  });
+});
+
+/**
+ * `setDraftKickoff` (`@/league-service/draft-schedule`) is the one writer on this branch whose own
+ * docblock PROMISES a concurrency property — "two concurrent reschedules, or a reschedule racing
+ * `startDraft`, resolve one at a time rather than both reading `scheduled` and both deciding they
+ * may proceed" — that nothing measured (final review F10). The promise gets its proof here.
+ *
+ * THE LOCK IS WIDER THAN THE CALL SITE READS, which is exactly the class of thing this file exists
+ * to make visible: the `.for("update")` spans an `innerJoin`, so it locks the `drafts` row AND the
+ * `leagues` row it joined through — the same two rows `startDraft`'s fused auto-start announcement
+ * takes. It takes NO audit anchor at all (a reschedule appends nothing), so it can never be half
+ * of an anchor cycle; the whole question is whether it serializes, and against what.
+ */
+describe("setDraftKickoff's row lock", () => {
+  async function schedulableDraft(leagueId: string, commissionerUserId: string): Promise<void> {
+    await joinDb.insert(users).values({ id: commissionerUserId, email: `${commissionerUserId}@test.local`, displayName: commissionerUserId });
+    await joinDb.insert(leagues).values({ id: leagueId, name: leagueId, format: "snake", teamCount: 3, commissionerUserId });
+    await joinDb.insert(drafts).values({
+      id: `${leagueId}_draft`, leagueId, format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+  }
+
+  it("locks the LEAGUE row too, not only the draft row — it blocks behind a concurrent join and then reschedules", async () => {
+    await schedulableDraft("lg_kickoff_lock", "u_kickoff_commish");
+    await joinDb.insert(users).values({ id: "u_kickoff_joiner", email: "kickoff_joiner@test.local", displayName: "Joiner" });
+
+    const join = parkedJoin("lg_kickoff_lock", "u_kickoff_joiner", "team_kickoff_joiner");
+    await join.leagueLocked;
+
+    // T_reschedule: the real function, on its own connection. Nothing in its source names
+    // `leagues` as a locked row; the `innerJoin` under `.for("update")` is what takes it.
+    const rescheduling = setDraftKickoff(
+      pickDb,
+      { leagueId: "lg_kickoff_lock", userId: "u_kickoff_commish", kickoffAt: "2026-09-20T17:00:00.000Z" },
+      clock,
+    );
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await rescheduling).toEqual({ ok: true, kickoffAt: "2026-09-20T17:00:00.000Z" });
+  });
+
+  it("refuses a reschedule that raced a start, rather than rescheduling a draft that is already live", async () => {
+    // THE PROMISE, EXACTLY AS THE DOCBLOCK WORDS IT. The starting side is stood in for by a real
+    // transaction taking the identical row-exclusive lock `startDraft`'s own claim takes — the
+    // same technique the `autoSetLineupInTx` week-lock case above uses for `persistTick` — because
+    // what is under test is the RESCHEDULE's behaviour when it loses the row, not the start's.
+    await schedulableDraft("lg_kickoff_race", "u_kickoff_race_commish");
+
+    let releaseStart: () => void = () => {};
+    const startCommitted = new Promise<void>((resolve) => (releaseStart = resolve));
+    const starting = joinDb.transaction(async (tx) => {
+      await tx.update(drafts).set({ status: "in_progress" }).where(eq(drafts.leagueId, "lg_kickoff_race"));
+      await startCommitted;
+    });
+
+    const rescheduling = setDraftKickoff(
+      pickDb,
+      { leagueId: "lg_kickoff_race", userId: "u_kickoff_race_commish", kickoffAt: "2026-09-20T17:00:00.000Z" },
+      clock,
+    );
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseStart();
+    await starting;
+
+    // It waited, re-read the row the winner committed, and refused — never read a stale
+    // `scheduled` and decided it could proceed.
+    expect(await rescheduling).toMatchObject({ ok: false, status: 409 });
+    const [row] = await joinDb.select().from(drafts).where(eq(drafts.leagueId, "lg_kickoff_race"));
+    expect(row!.status).toBe("in_progress");
+    expect(row!.kickoffAt.toISOString()).toBe("2026-09-10T17:00:00.000Z"); // untouched
+  });
+});
+
+/**
+ * FINAL REVIEW F11 — the pairing that did not exist, over the race that was real.
+ *
+ * Within one leased worker `tickWeek` awaits the auto-set before `finalizeDrafted`, so that
+ * ordering is sequential and correct. The exposure is that the Redis lease is best-effort BY
+ * DESIGN (`worker.ts` — an unreachable Redis runs the tick UNLEASED), so two instances can put
+ * `finalizeWeekInTx` for week W beside `autoSetLineupInTx` for week W. They shared NO lock: the
+ * auto-set writes `lineup_slots` and finalize reads it through `getLineup` with a plain unlocked
+ * `SELECT`, and the auto-set's `stat_weeks FOR SHARE` is aimed at `persistTick`, which finalize
+ * never touches. Under read-committed, finalize could score a team from the roster-derived default
+ * while the auto-set's carried-forward lineup committed a moment later.
+ *
+ * The auto-set now takes `matchups[league, week] FOR UPDATE`, ordered by `home_team_id` exactly
+ * the way `finalizeWeekInTx` orders its own row locks over the same rows. `matchups` is the row
+ * finalize actually WRITES, which is why the lock goes there rather than on `lineup_slots`: a
+ * share lock on a table finalize only reads is a lock finalize never queues behind.
+ */
+describe("autoSetLineupInTx and finalizeWeekInTx serialize on the matchups rows", () => {
+  it("blocks behind a concurrent settlement, and then declines to touch the week it just settled", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_fin_home", email: "fin_home@test.local", displayName: "Home" },
+      { id: "u_fin_away", email: "fin_away@test.local", displayName: "Away" },
+    ]);
+    await joinDb.insert(leagues).values({
+      id: "lg_fin_lock", name: "lg_fin_lock", format: "snake", teamCount: 2, commissionerUserId: "u_fin_home",
+      rosterSlots: SPRINT_ROSTER_SLOTS, isPublicMatchmade: true,
+    });
+    await joinDb.insert(teams).values([
+      { id: "team_fin_home", leagueId: "lg_fin_lock", userId: "u_fin_home", name: "Home" },
+      { id: "team_fin_away", leagueId: "lg_fin_lock", userId: "u_fin_away", name: "Away" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_fin_qb", name: "Fin QB", position: "QB", nflTeam: "KC" },
+      { id: "p_fin_rb", name: "Fin RB", position: "RB", nflTeam: "KC" },
+      { id: "p_fin_wr", name: "Fin WR", position: "WR", nflTeam: "KC" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_fin_home", slot: "QB", slotIndex: 0, playerId: "p_fin_qb" },
+      { teamId: "team_fin_home", slot: "RB", slotIndex: 0, playerId: "p_fin_rb" },
+      { teamId: "team_fin_home", slot: "WR", slotIndex: 0, playerId: "p_fin_wr" },
+    ]);
+    await joinDb.transaction((tx) => writeSchedule(tx, { leagueId: "lg_fin_lock", teamIds: ["team_fin_home", "team_fin_away"], weeks: 1 }));
+    await joinDb.insert(statWeeks).values({ week: 1, status: "final" });
+
+    // T_finalize: the REAL settlement write, parked after its own matchup UPDATEs have taken the
+    // row locks and before its transaction commits.
+    let settled: () => void = () => {};
+    const written = new Promise<void>((resolve) => (settled = resolve));
+    let releaseFinalize: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseFinalize = resolve));
+    const finalizing = joinDb.transaction(async (tx) => {
+      const write = await finalizeWeekInTx(tx, "lg_fin_lock", 1, clock.now());
+      settled();
+      await parked;
+      return write;
+    });
+    await written;
+
+    // T_autoset: the real auto-set for the SAME league and week, on its own connection, called
+    // directly so the candidate query's own settled-week predicate cannot short-circuit the
+    // proof — this is about the LOCK, and the transaction is what holds it.
+    const setting = pickDb.transaction((tx) =>
+      autoSetLineupInTx(tx, "lg_fin_lock", 1, clock.now(), {
+        audit: getAuditLogger(),
+        notify: notifyAffectedMember,
+        players: { positions: { p_fin_qb: "QB", p_fin_rb: "RB", p_fin_wr: "WR" }, names: {} },
+      }),
+    );
+
+    // Before F11 the two shared no lock at all, and this would never block.
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFinalize();
+
+    expect(await finalizing).toMatchObject({ weekNumber: 1, matchupsScored: 1 });
+    // Released, it re-reads the rows the settlement committed and declines: the week's scores
+    // stand, so materializing a lineup now would be a lineup the correction sweep re-scores from.
+    expect(await setting).toEqual({ teamsSet: 0, notices: [] });
+    const rows = await joinDb.select().from(lineupSlots).where(eq(lineupSlots.weekNumber, 1));
+    expect(rows).toEqual([]);
   });
 });

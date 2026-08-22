@@ -107,7 +107,11 @@ export type SetDraftKickoffResult =
  *
  * Locks the draft row `FOR UPDATE` before checking anything, so two concurrent reschedules (or
  * a reschedule racing `startDraft`) resolve one at a time rather than both reading `scheduled`
- * and both deciding they may proceed. NO-WRITE-BEFORE-REFUSAL holds here exactly as it does at
+ * and both deciding they may proceed. PROVEN, not promised (final review F10 — this docblock
+ * asserted the property and nothing measured it): `src/integrity-service/lock-order.test.ts`'s
+ * "setDraftKickoff's row lock" drives both races on two real connections, including the half the
+ * call site does not read — the `.for("update")` spans the `innerJoin`, so it locks the `leagues`
+ * row as well as the `drafts` one. NO-WRITE-BEFORE-REFUSAL holds here exactly as it does at
  * `createLeague`'s own gate: every refusal branch below returns before the `UPDATE` statement is
  * ever reached, so a refused reschedule commits nothing but the row lock it already had to take
  * to ask the question safely.

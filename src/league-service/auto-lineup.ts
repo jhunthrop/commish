@@ -1,4 +1,4 @@
-import { and, asc, eq, exists, notExists, sql } from "drizzle-orm";
+import { and, asc, eq, exists, isNull, notExists, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { leagues, lineupSlots, matchups, players, rosterSlots, statWeeks, teams } from "@/db/schema";
 import type { Position } from "@/domain/player";
@@ -218,13 +218,44 @@ interface LeagueAutoSetResult {
  *      the opposite job it does there: this writer REQUIRES the week to be LOCKED and holds the
  *      share so `persistTick` cannot advance it out from under the write — a week still
  *      `scheduled` (a race with the trigger, or a direct call in a test) means nothing to do.
- *   2. `lineup_slots` INSERT  — implicit `FOR KEY SHARE` on `teams`, and through `teams` nothing
+ *   2. `matchups[league, week] FOR UPDATE`, ordered by `home_team_id`  — the SETTLEMENT lock
+ *      (final review F11), see the paragraph below. Ordered exactly the way `finalizeWeekInTx`
+ *      (`@/stats-pipeline/finalize`) orders its own row locks over the same rows, so the two can
+ *      queue but never deadlock. BEFORE `leagues` and before the notices, which is also the
+ *      order finalize takes them in (`matchups` first, `leagues` last through
+ *      `stampSeasonCompleteInTx`) — one agreed order across both writers.
+ *   3. `lineup_slots` INSERT  — implicit `FOR KEY SHARE` on `teams`, and through `teams` nothing
  *      further; `lineup_slots` has no other parent.
- *   3. the notice inserts  — implicit `FOR KEY SHARE` on `users` and `leagues`.
- *   4. `audit.recordAll`  — the anchor, ALWAYS last, taken ONCE for every team this league
+ *   4. the notice inserts  — implicit `FOR KEY SHARE` on `users` and `leagues`.
+ *   5. `audit.recordAll`  — the anchor, ALWAYS last, taken ONCE for every team this league
  *      notified this run (one event per team, since `SYSTEM_ACTION_VISIBILITY.lineup_auto_set` is
  *      `"subject_only"` and each event needs its own `subjectUserId`).
- *   5. `attachAuditEvent`  — the one statement permitted after the anchor.
+ *   6. `attachAuditEvent`  — the one statement permitted after the anchor.
+ *
+ * THE SETTLEMENT LOCK, AND THE RACE IT CLOSES (final review F11). Within one leased worker the
+ * ordering is already correct and sequential: `tickWeek` awaits this before `finalizeDrafted`. The
+ * exposure is elsewhere, because the Redis lease is best-effort by explicit design
+ * (`worker.ts` — an unreachable Redis runs the tick UNLEASED), so two instances can put
+ * `finalizeWeekInTx` for week W beside this function for week W. They used to share NO lock:
+ * this writes `lineup_slots` and finalize reads it through `getLineup` with a plain unlocked
+ * `SELECT`, and the `stat_weeks FOR SHARE` above is aimed at `persistTick`, which finalize never
+ * touches. Under read-committed, finalize could score a team from the roster-derived default
+ * while this function's carried-forward lineup committed moments later — the stored lineup then
+ * disagreeing with the score it supposedly produced.
+ *
+ * The lock is taken on `matchups` rather than on `lineup_slots`, and that is the point: `matchups`
+ * is the row finalize actually WRITES, so a `FOR UPDATE` here genuinely serializes against it,
+ * whereas a share lock on `lineup_slots` would be a lock finalize does not take and therefore
+ * cannot queue behind. It is the same predicate `settleMissedWeeks` already reads a week's
+ * settlement state by.
+ *
+ * It is also the SETTLED-WEEK GUARD this function never had. `isLineupLocked` answers `true` for
+ * `"final"`, so nothing above stopped an auto-set materializing a lineup for a week whose scores
+ * already stand — which the correction sweep would then re-score from. A week with any scored
+ * matchup is left entirely alone. That guard is only safe BECAUSE the trigger is level-derived
+ * (F2): a league that failed at the lock heals on the next tick, thirty minutes later and days
+ * before the week settles, so refusing a settled week refuses work that has already had every
+ * chance to happen rather than abandoning it.
  * Then commit, then `deliverNotice` for every recipient and the score-cache eviction for this
  * league's own week — both best-effort and both OUTSIDE the transaction, called by
  * `autoSetLineupsForWeek` once THIS league's own transaction has actually landed. The same
@@ -259,6 +290,17 @@ export async function autoSetLineupInTx(
 ): Promise<LeagueAutoSetResult> {
   const [week] = await tx.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, weekNumber)).for("share");
   if (week === undefined || !isLineupLocked(week.status)) return { teamsSet: 0, notices: [] };
+
+  // Step 1b: the settlement lock and the settled-week guard, in one statement — see the
+  // paragraph in this function's own docblock. `ORDER BY home_team_id` is `finalizeWeekInTx`'s
+  // own order over the same rows.
+  const fixtures = await tx
+    .select({ homeScore: matchups.homeScore })
+    .from(matchups)
+    .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)))
+    .orderBy(asc(matchups.homeTeamId))
+    .for("update");
+  if (fixtures.some((row) => row.homeScore !== null)) return { teamsSet: 0, notices: [] };
 
   // `leagues.id` is what `matchups.leagueId` (the source of every `leagueId` this function is
   // called with) is a NOT NULL foreign key to, so this row always exists.
@@ -383,6 +425,13 @@ export function leaguesNeedingAutoSetQuery(db: Db, weekNumber: number) {
     .where(
       and(
         eq(matchups.weekNumber, weekNumber),
+        // UNSETTLED fixtures only (final review F11). `autoSetLineupInTx` refuses a week whose
+        // scores already stand, and a candidate query that kept offering settled leagues would
+        // open a transaction per league per tick forever to be refused inside it — the level
+        // trigger makes a stale predicate expensive rather than merely untidy. It also matches
+        // `matchups_unsettled_idx`'s own partial predicate (`@/db/schema`), which is the index
+        // built for exactly this question.
+        isNull(matchups.homeScore),
         eq(leagues.isPublicMatchmade, true),
         exists(
           db

@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { auditEvents, leagues, lineupSlots, memberNotices, players, rosterSlots, statWeeks, teams, users } from "@/db/schema";
+import { auditEvents, leagues, lineupSlots, matchups, memberNotices, players, rosterSlots, statWeeks, teams, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { RosterSlot } from "@/domain/roster";
 import { validateLineup } from "@/domain/roster-eligibility";
@@ -15,6 +15,7 @@ import {
   autoSetLineupInTx,
   autoSetLineupsForWeek,
   changedPlayersClauseFor,
+  leaguesNeedingAutoSetQuery,
   plannedAutoLineup,
   readPlayerIndex,
   type PlannedAutoLineupInput,
@@ -417,6 +418,50 @@ describe("autoSetLineupsForWeek", () => {
 
     expect(bySlot((await savedLineup(alice, 4))!)).toEqual(bySlot(savedAfterFirst!));
     expect(await noticesFor("u_alice")).toHaveLength(1);
+  });
+
+  /**
+   * FINAL REVIEW F11: the settled-week guard this function never had. `isLineupLocked` answers
+   * `true` for `"final"`, so nothing stopped an auto-set materializing a lineup for a week whose
+   * scores already stand — and the correction sweep would then re-score from it, making the
+   * standings a function of a lineup invented after the fact.
+   *
+   * Safe only BECAUSE the trigger is level-derived (F2): a league that failed at the lock heals
+   * on the next tick, thirty minutes later and days before the week settles.
+   */
+  it("leaves a SETTLED week entirely alone, at both layers — the candidate query and the transaction's own guard", async () => {
+    await seedPlayers();
+    const { leagueId, alice } = await publicLeague();
+    await setLineup(db, {
+      leagueId,
+      teamId: alice,
+      weekNumber: 3,
+      slots: [
+        { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+        { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+        { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+        { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+      ],
+      userId: "u_alice",
+    });
+    await lockWeek(4);
+    // `finalizeWeekInTx`'s own write, standing in: week 4's matchups carry scores that stand.
+    await db.update(matchups).set({ homeScore: 101, awayScore: 98 }).where(eq(matchups.weekNumber, 4));
+
+    // Layer 1: the candidate query no longer offers this league at all, so no transaction opens.
+    expect(await leaguesNeedingAutoSetQuery(db, 4)).toEqual([]);
+
+    const outcome = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+    expect(outcome).toEqual({ week: 4, teamsSet: 0, leaguesFailed: [] });
+    expect(await savedLineup(alice, 4)).toBeNull();
+
+    // Layer 2: called DIRECTLY, past the candidate query, the transaction refuses on its own.
+    const index = await readPlayerIndex(db);
+    const direct = await db.transaction((tx) =>
+      autoSetLineupInTx(tx, leagueId, 4, NOW, { audit: getAuditLogger(), notify: notifyAffectedMember, players: index }),
+    );
+    expect(direct).toEqual({ teamsSet: 0, notices: [] });
+    expect(await savedLineup(alice, 4)).toBeNull();
   });
 
   it("does nothing while the week is still scheduled — the trigger's own precondition, defended a second time", async () => {

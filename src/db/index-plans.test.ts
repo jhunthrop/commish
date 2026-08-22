@@ -184,22 +184,30 @@ describe("hot read paths use indexes", () => {
    * `matchups_unsettled_idx` (partial on `home_score IS NULL`) does not imply.
    *
    * THE MEASUREMENT DECIDED, and it decided NO NEW INDEX — stated because the opposite outcome is
-   * what this file usually records. Over the 5,000-league corpus the plan reaches every one of the
-   * four relations by index and nothing is sequentially scanned: `leagues` walked in primary-key
-   * order (which is what serves the `ORDER BY`), `matchups` probed by its own primary key as an
-   * Index Only Scan, `teams` by `teams_league_id_idx`, and `lineup_slots` by its primary key,
-   * also index-only. Because the ordering comes from an index walk rather than a Sort, the `LIMIT`
-   * genuinely short-circuits — the exact property `dueDraftsQuery` lacked before 0029, where
-   * `ORDER BY id` sorted the whole result first. So a bound was the fix here, and an index was
-   * not; adding one would be a write cost paid for a plan that is already index-only.
+   * what this file usually records. Over the 5,000-league corpus nothing is sequentially scanned
+   * and the plan DRIVES off `matchups_unsettled_idx` as an Index Only Scan: the partial index
+   * built for exactly this question, `(week_number, league_id) WHERE home_score IS NULL`, whose
+   * predicate this query matches because of F11's settled-week guard. That guard's job is
+   * correctness; matching the partial index is its side effect, and it is a large one (the
+   * measured plan cost falls by an order of magnitude, because a settled league is never a
+   * candidate to begin with). `leagues` is then a primary-key probe per candidate rather than a
+   * walk, `teams` rides `teams_league_id_idx`, and `lineup_slots` its own primary key, index-only
+   * — no heap page is touched to discover that a team already has a row for the week.
+   *
+   * Because the ordering comes from an index walk rather than a Sort, the `LIMIT` genuinely
+   * short-circuits — the exact property `dueDraftsQuery` lacked before 0029, where `ORDER BY id`
+   * sorted the whole result first. So a bound was the fix here, and an index was not; adding one
+   * would be a write cost paid for a plan that is already index-only.
    */
-  it("the auto-set's candidate scan reaches every table by index, and its LIMIT short-circuits", async () => {
+  it("the auto-set's candidate scan drives off matchups_unsettled_idx, and its LIMIT short-circuits", async () => {
     const plan = await explainPlan(db, leaguesNeedingAutoSetQuery(db, 1));
     expect(sequentiallyScannedRelations(plan)).toEqual([]);
     // No Sort anywhere: the `ORDER BY` is served by the index walk, which is what lets the LIMIT
     // stop early instead of materializing every candidate league in the product first.
     expect(nodeTypes(plan)).not.toContain("Sort");
     expect(nodeTypes(plan)).toContain("Limit");
+    // The partial index earns a second reader — it shipped for `settleMissedWeeks` alone.
+    expect(indexScanNode(plan, "matchups_unsettled_idx")?.["Node Type"]).toBe("Index Only Scan");
     // The two probes that answer "does this league still owe a lineup" are index-only: no heap
     // page is touched to discover that a team already has a row for the week.
     expect(indexScanNode(plan, "lineup_slots_team_id_week_number_slot_slot_index_pk")?.["Node Type"]).toBe("Index Only Scan");
