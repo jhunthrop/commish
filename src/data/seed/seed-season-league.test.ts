@@ -5,10 +5,14 @@ import { leagues, matchups, rosterSlots, teams, users } from "@/db/schema";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import { totalRosterSlots } from "@/draft-engine";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { computeStandings, LEAGUE_CONFIG } from "@/league";
+import { completedSeasonsFor } from "@/league-service/participation";
+import { participationTierFor } from "@/participation/tier";
 import { DEV_SEED } from "./config";
+import { ensureDevUsers } from "./dev-users";
 import { seedPlayers } from "./seed-players";
-import { seedSeasonLeague } from "./seed-season-league";
+import { seedSeasonLeague, VETERAN_SEASON_LEAGUES } from "./seed-season-league";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-17T12:00:00.000Z" };
@@ -111,5 +115,35 @@ describe("seedSeasonLeague", () => {
     // The rest of the roster is still refreshed to the (still-placeholder) dev owners.
     const [team2] = await db.select().from(teams).where(eq(teams.id, `${DEV_SEED.season.leagueId}_team_02`));
     expect(team2!.userId).toBe(`${DEV_SEED.userIdPrefix}02`);
+  });
+});
+
+describe("VETERAN_SEASON_LEAGUES (Phase 3 Plan D, Task 10, Step 1)", () => {
+  it("crosses team 1's owner over the veteran cutoff by finishing three REAL seasons, while every other seeded identity stays below it", async () => {
+    for (const config of [DEV_SEED.season, ...VETERAN_SEASON_LEAGUES]) {
+      await seedSeasonLeague(db, clock, undefined, config);
+    }
+
+    const ownerIds = await ensureDevUsers(db);
+    // Team 1's owner (index 0) sat every one of the three playthroughs, in every league —
+    // three REAL completed seasons, each stamped by `finalizeWeekInTx` itself.
+    const veteranSeasons = await completedSeasonsFor(db, ownerIds[0]!);
+    expect(veteranSeasons).toBe(3);
+    expect(participationTierFor(veteranSeasons, INTEGRITY_CONFIG.participation.veteranSeasonCutoff)).toBe("veteran");
+
+    // The two `VETERAN_SEASON_LEAGUES` entries deliberately use DISJOINT non-veteran indices
+    // (1-3, then 4-6) — every one of THOSE identities sat at most two of the three playthroughs,
+    // never three, and stays a newcomer.
+    for (const index of [1, 2, 3, 4, 5, 6]) {
+      const seasons = await completedSeasonsFor(db, ownerIds[index]!);
+      expect(seasons).toBeLessThan(3);
+      expect(participationTierFor(seasons, INTEGRITY_CONFIG.participation.veteranSeasonCutoff)).toBe("newcomer");
+    }
+
+    // Indices 7-11 never sat in either extra league at all — one completed season, from the
+    // primary league only.
+    for (const index of [7, 8, 9, 10, 11]) {
+      expect(await completedSeasonsFor(db, ownerIds[index]!)).toBe(1);
+    }
   });
 });

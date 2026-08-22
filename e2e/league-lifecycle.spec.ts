@@ -211,14 +211,20 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   await expect(managerA.getByText("Reported. An operator will take a look. Thank you.")).toBeVisible();
   await managerA.getByRole("button", { name: "Done" }).click();
 
-  // --- The seeded operator opens the queue and sees this row, plus the TWO real, permanently-
-  //     open flags `npm run seed` itself raises: Task 9's own multi-account fixture
-  //     (`dev_league_integrity`) and Phase 3 Plan C Task 9's own trade fixture (`seedTrades`,
-  //     `dev_league_trades`) — neither resolved by anything this spec does -------------------
+  // --- The seeded operator opens the queue and sees this row, plus FOUR real, permanently-open
+  //     flags nothing before this spec resolves: Task 9's own multi-account fixture
+  //     (`dev_league_integrity`), Phase 3 Plan C Task 9's own trade-fairness fixture (`seedTrades`,
+  //     `dev_league_trades`), and (Phase 3 Plan D, Task 10) TWO real `trade_hold` flags — one from
+  //     `npm run seed` itself (`seed-enforcement.ts`, `dev_public_trade_hold`) and one from
+  //     `e2e/enforcement.spec.ts`'s own held-trade league (`e2e_held_trade_league`), already in
+  //     the queue by the time this spec runs: `enforcement.spec.ts` sorts alphabetically before
+  //     `league-lifecycle.spec.ts` under this suite's single worker (`playwright.config.ts`'s own
+  //     `workers: 1`) — see `enforcement.spec.ts`'s own docblock for the run-order reasoning.
+  //     2 (old) + 2 (held trades) + 1 (this spec's own report) = 5 -------------------------------
   await managerA.goto("/app/admin/queue");
   await expect(managerA.getByRole("heading", { name: "Dispute queue" })).toBeVisible();
   const queueRows = managerA.getByRole("list", { name: "Open flags" }).getByRole("listitem");
-  await expect(queueRows).toHaveCount(3);
+  await expect(queueRows).toHaveCount(5);
   // Found by its own question text, not `.first()`: the seed's flag is OLDER than this spec's
   // own (the queue is oldest-first, ruling 30), so ordinal position would click the wrong row.
   const reportRow = queueRows.filter({ hasText: "A member reported a message" });

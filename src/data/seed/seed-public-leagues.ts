@@ -65,7 +65,15 @@ export async function seedPublicLeagues(db: Db, clock: Clock): Promise<{ leagues
       .values({ leagueId: plan.leagueId, ...PPR_SCORING })
       .onConflictDoNothing({ target: scoringSettings.leagueId });
 
-    const seats = ownerIds.slice(0, plan.filled);
+    // `skipOwnerIndexZero` (Phase 3 Plan D, Task 10): `dev_public_tier_demo` alone starts its
+    // seats at index 1, so the seed's own veteran identity (index 0, `claimUserId` when one is
+    // set — never used here, see below) never already holds a team in the one league Task 10's
+    // block-join step needs it REFUSED from. A brand-new leagueId only, never a retrofit onto an
+    // existing entry: shifting an ALREADY-seeded league's seats collides `teams_league_user_idx`
+    // on any database this seed already ran against under the old mapping (found running `npm
+    // run seed` against the shared dev database while building this task).
+    const skip = "skipOwnerIndexZero" in plan && plan.skipOwnerIndexZero ? 1 : 0;
+    const seats = ownerIds.slice(skip, skip + plan.filled);
     if (seats.length > 0) {
       await db
         .insert(teams)

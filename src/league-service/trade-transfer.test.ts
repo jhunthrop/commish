@@ -531,7 +531,20 @@ describe("applyTradeInTx", () => {
     // implementation. `applyTradeInTx` remains the only writer that ever moves an ALREADY-
     // OWNED player between two rosters; this file's own trade fixtures are proposed and accepted
     // through that same, real function, not through a shortcut this list would need to catch.
-    expect(writers).toEqual(["src/data/seed/seed-season-league.ts", "src/data/seed/seed-trades.ts", "src/draft-service/commit.ts", "src/league-service/trade-transfer.ts"]);
+    // `seed-enforcement.ts` (Phase 3 Plan D, Task 10) is a FOURTH seeder in the identical shape —
+    // its own `dealRosterIfAbsent` deals fresh draft rosters (a `rosterSlots` INSERT, never a
+    // transfer) for its held-trade and lineup-auto-set leagues, the same "snake order over
+    // `rankedPlayers`" discipline the other three seeders already use. Its held trade itself
+    // NEVER reaches `applyTradeInTx` at all: the auto-hold gate refuses to execute it, so
+    // `acceptTrade`'s own `holdTradeInTx` branch runs instead — this file's presence here is
+    // entirely its dealing code, not its trade.
+    expect(writers).toEqual([
+      "src/data/seed/seed-enforcement.ts",
+      "src/data/seed/seed-season-league.ts",
+      "src/data/seed/seed-trades.ts",
+      "src/draft-service/commit.ts",
+      "src/league-service/trade-transfer.ts",
+    ]);
   });
 });
 

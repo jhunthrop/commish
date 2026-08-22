@@ -1,5 +1,6 @@
+import { DEV_SEED } from "../src/data/seed/config";
 import { expect, SEEDED_SEASON_LEAGUE_ID, test } from "./support/fixtures";
-import { MANAGER_A_STATE } from "./global-setup";
+import { E2E_HELD_TRADE_LEAGUE_ID, MANAGER_A_STATE } from "./global-setup";
 
 /**
  * The 360px baseline, which nothing in this suite had ever rendered at.
@@ -14,6 +15,10 @@ import { MANAGER_A_STATE } from "./global-setup";
  * a second copy of the lifecycle spec. What it proves is that each surface fits — the page body
  * never scrolls sideways — and that the control a manager needs on each one is actually on
  * screen rather than pushed off the edge.
+ *
+ * Phase 3 Plan D, Task 10 adds the two newest long-sentence-in-a-bordered-panel surfaces: the
+ * held-trade banner (`HeldTradeBanner`) and the tier-blocked join refusal — both flagged by name
+ * in that task's own brief as the surfaces most likely to overflow at this width.
  */
 const VIEWPORT = { width: 360, height: 740 };
 
@@ -143,6 +148,33 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await expect(page.getByRole("heading", { name: "Trades" })).toBeVisible();
     await expectNoHorizontalScroll(page, "the trades page");
 
+    // --- Phase 3 Plan D, Task 10: the held-trade banner — a long sentence inside a bordered
+    // panel, and one of the two new surfaces this task adds to this spec's own 360px walk.
+    // `e2e/enforcement.spec.ts` sorts alphabetically before this file and already held a real
+    // trade between manager A and manager B here (`e2e_held_trade_league`) — reused, never
+    // re-proposed: a second identical offer between the same two teams is exactly the
+    // accumulation the reuse-if-exists discipline exists to avoid, and this section only READS
+    // what that spec already made real. -------------------------------------------------------
+    await page.goto(`/app/leagues/${E2E_HELD_TRADE_LEAGUE_ID}/trades`);
+    await expect(page.getByRole("heading", { name: "Trades" })).toBeVisible();
+    await expect(page.getByText("Your trade is waiting on a fairness review").first()).toBeVisible();
+    await expectNoHorizontalScroll(page, "the trades page with a held trade's own banner");
+
+    // --- Phase 3 Plan D, Task 10: the blocked-join refusal — the other long sentence inside a
+    // bordered panel this task adds. Manager A is the platform's own real veteran by this point
+    // in the seed (`VETERAN_SEASON_LEAGUES`), so pressing Join on a seeded `beginner` public
+    // league is the real `publicJoinPrecondition` gate refusing for real, never a synthesized
+    // 409 this spec typed in by hand. --------------------------------------------------------
+    const tierBlockTarget = DEV_SEED.publicLeagues.find((plan) => plan.leagueId === "dev_public_tier_demo")!;
+    await page.goto("/browse");
+    await expect(page.getByRole("heading", { name: "Open leagues" })).toBeVisible();
+    const tierBlockCard = page.locator("li").filter({ has: page.getByRole("heading", { name: tierBlockTarget.name }) });
+    await tierBlockCard.getByRole("button", { name: `Join ${tierBlockTarget.name}` }).click();
+    await expect(
+      tierBlockCard.getByText("This league is reserved for newer players so everyone starts on a level footing. Browse the open leagues to find one you can join."),
+    ).toBeVisible();
+    await expectNoHorizontalScroll(page, "/browse with the tier-blocked refusal open");
+
     // --- Task 5: the operator's dispute queue -----------------------------------------------
     // Manager A IS the operator in this environment, DETERMINISTICALLY: `global-setup.ts`'s
     // `ensureE2eOperator` grants it through the real `grantAdmin` writer, idempotently and
@@ -151,22 +183,24 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // that race silently on a shared, reused database, which is exactly what made this section
     // read as passing while never actually reaching the queue. An operator triaging on a phone
     // at 11pm is the realistic case this spec exists to check, not an exotic second identity to
-    // mint. The queue is NOT empty here — `npm run seed`'s own multi-account fixture
-    // (`dev_league_integrity`) raises one real, permanently-open flag Task 9's detector found,
-    // and `league-lifecycle.spec.ts` (which runs before this spec, alphabetically, under this
-    // suite's single worker) resolves its own — so exactly that one row remained before this
-    // task. Task 9's own seed (`seedTrades`, `dev_league_trades`) raises a SECOND real,
-    // permanently-open flag from a real, seeded-through-the-real-routes grotesque trade — two
-    // rows now, both real, neither decorative. `e2e/trades.spec.ts` runs its own trade AND
-    // resolves its own flag within its own test (alphabetically after this spec), so it never
-    // adds a third row here.
+    // mint. FOUR real, permanently-open flags sit here now, none of them decorative: `npm run
+    // seed`'s own multi-account fixture (`dev_league_integrity`); Task 9's own trade-fairness
+    // fixture (`seedTrades`, `dev_league_trades`); and (Phase 3 Plan D, Task 10) TWO real
+    // `trade_hold` flags — one from `npm run seed` itself (`seed-enforcement.ts`,
+    // `dev_public_trade_hold`) and one from `e2e/enforcement.spec.ts`'s own held trade above.
+    // `league-lifecycle.spec.ts` (which runs before this spec, alphabetically, under this
+    // suite's single worker) resolves its own report flag within its own test, so it never adds
+    // a fifth row here. `e2e/trades.spec.ts` runs its own trade AND resolves its own fairness
+    // flag within its own test (alphabetically after this spec), so it never adds a sixth.
     await page.goto("/app/admin/queue");
     await expect(page.getByRole("heading", { name: "Dispute queue" })).toBeVisible();
     const queueRows = page.getByRole("list", { name: "Open flags" }).getByRole("listitem");
-    await expect(queueRows).toHaveCount(2);
+    await expect(queueRows).toHaveCount(4);
     await expect(queueRows.getByText("The platform flagged two accounts that may be the same person")).toBeVisible();
     const tradeFlagRow = queueRows.filter({ hasText: "The platform flagged a trade for a fairness review" });
     await expect(tradeFlagRow).toBeVisible();
+    const tradeHoldRows = queueRows.filter({ hasText: "The platform held a trade until an operator decides" });
+    await expect(tradeHoldRows).toHaveCount(2);
     await expectNoHorizontalScroll(page, "the dispute queue");
 
     // --- Task 5/9: one flag's own detail page — the admin field set, raw scores included,

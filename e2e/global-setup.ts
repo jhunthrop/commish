@@ -5,7 +5,7 @@ import { chromium, type FullConfig } from "@playwright/test";
 import { eq, sql } from "drizzle-orm";
 import { assembleAdvisorContext } from "../src/ai-advisor/context";
 import { createDb, type Db } from "../src/db/client";
-import { drafts, leagues, matchups, rosterSlots, scoringSettings, statWeeks, teams, users } from "../src/db/schema";
+import { drafts, leagueInvites, leagues, matchups, rosterSlots, scoringSettings, statWeeks, teams, users } from "../src/db/schema";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotType } from "../src/domain/roster";
 import { PPR_SCORING } from "../src/domain/scoring";
 import { assignSlot, snakeTeamForPick, totalRosterSlots } from "../src/draft-engine";
@@ -13,7 +13,9 @@ import { rankedPlayers } from "../src/draft-service/pool";
 import { BOOTSTRAP_ACTOR, grantAdmin } from "../src/integrity-service/grant-admin";
 import { INTEGRITY_CONFIG } from "../src/integrity/config";
 import { LEAGUE_CONFIG } from "../src/league";
+import { createInvite } from "../src/league-service/invites";
 import { createRedisConnection } from "../src/lib/realtime/redis";
+import { TRADE_CONFIG } from "../src/trades/config";
 import { mintLabSession, SESSION_COOKIE_NAME } from "../scripts/lib/lab-session";
 
 export const AUTH_DIR = resolve(process.cwd(), "e2e/.auth");
@@ -435,6 +437,235 @@ async function writeTradesFixture(db: Db): Promise<void> {
   console.log(`[e2e] trades fixture: give [${fixture.giveNames.join(", ")}] for [${fixture.getNames.join(", ")}], gap ${best.gap.toFixed(1)}`);
 }
 
+// ---------------------------------------------------------------------------------------------
+// `e2e/enforcement.spec.ts`'s own two leagues (Phase 3 Plan D, Task 10) — the same per-spec-
+// seeding idiom `ensureTradesLeague` above already established, never bolted onto that spec's own
+// league: journey 3 needs a trade that crosses `INTEGRITY_CONFIG.trade.autoHoldThreshold` (35),
+// well past `E2E_TRADES_LEAGUE_ID`'s own `fairnessFlagThreshold`-only fixture, and journey 2 needs
+// a league nobody has drafted yet so a real commissioner can reschedule and start it live.
+// ---------------------------------------------------------------------------------------------
+
+export const E2E_HELD_TRADE_LEAGUE_ID = "e2e_held_trade_league";
+const E2E_HELD_TRADE_DRAFT_ID = "e2e_held_trade_draft";
+export const E2E_HELD_TRADE_TEAM_A_ID = "e2e_held_trade_team_a";
+export const E2E_HELD_TRADE_TEAM_B_ID = "e2e_held_trade_team_b";
+/** Same reasoning as `E2E_TRADES_WEEK_NUMBER`'s own docblock, verbatim: past `regularSeasonWeeks`
+ *  so `tickUntilLiveWeekReached`'s own repeated ticking can never lock it, and inside the
+ *  committed mock dataset's real last week (17) so the advisor's trend window has real numbers
+ *  to value players from. A SEPARATE league from `E2E_TRADES_LEAGUE_ID` needs its own matchup row
+ *  at this same week for the identical reason that file's does. */
+export const E2E_HELD_TRADE_WEEK_NUMBER = LEAGUE_CONFIG.maxWeeks;
+export const E2E_HELD_TRADE_FIXTURE_STATE = resolve(AUTH_DIR, "held-trade-fixture.json");
+
+export interface HeldTradeFixture {
+  readonly giveNames: readonly string[];
+  readonly getNames: readonly string[];
+}
+
+/** `STANDARD_ROSTER_SLOTS` minus `BENCH` — the identical bench-empty trick `ensureTradesLeague`
+ *  uses, so ANY equal-count starter swap always finds room on both sides without simulating
+ *  `plannedTransfer`. Bench-only packages top out well under `autoHoldThreshold` for a league
+ *  this size (measured directly against the committed dataset) — reaching the auto-hold gate
+ *  needs starters, the same reason `seed-enforcement.ts`'s own held-trade league deals this way. */
+const HELD_TRADE_STARTER_SLOTS = STANDARD_ROSTER_SLOTS.filter((slot) => slot.slot !== "BENCH");
+
+/**
+ * Deals both teams full starter rosters (bench empty, idempotent the same way `ensureTradesLeague`
+ * is) and writes the widest-gap combination of manager A's and manager B's real starters that
+ * crosses `INTEGRITY_CONFIG.trade.autoHoldThreshold` — never a hand-picked pair that could drift
+ * the moment the committed dataset or the snake draft's own order changed. The spec itself
+ * proposes and accepts this pair live, through the real UI; `acceptTrade`'s own auto-hold branch
+ * (Plan D, Task 5) is what turns that acceptance into a `held` trade, never a direct write here.
+ */
+async function ensureHeldTradeLeague(db: Db, managerAUserId: string, managerBUserId: string): Promise<void> {
+  const teamIds: readonly string[] = [E2E_HELD_TRADE_TEAM_A_ID, E2E_HELD_TRADE_TEAM_B_ID];
+  const owners: readonly string[] = [managerAUserId, managerBUserId];
+
+  await db
+    .insert(leagues)
+    .values({
+      id: E2E_HELD_TRADE_LEAGUE_ID,
+      name: "E2E Held Trade League",
+      format: "snake",
+      teamCount: teamIds.length,
+      isPublicMatchmade: true,
+      commissionerUserId: managerAUserId,
+      rosterSlots: [...STANDARD_ROSTER_SLOTS],
+    })
+    .onConflictDoUpdate({ target: leagues.id, set: { isPublicMatchmade: true, commissionerUserId: managerAUserId } });
+
+  await db.insert(scoringSettings).values({ leagueId: E2E_HELD_TRADE_LEAGUE_ID, ...PPR_SCORING }).onConflictDoNothing({ target: scoringSettings.leagueId });
+
+  await db
+    .insert(teams)
+    .values(teamIds.map((id, i) => ({ id, leagueId: E2E_HELD_TRADE_LEAGUE_ID, userId: owners[i], name: `E2E Held Trade Team ${i + 1}` })))
+    .onConflictDoUpdate({ target: teams.id, set: { userId: sql`excluded.user_id` } });
+
+  await db
+    .insert(drafts)
+    .values({ id: E2E_HELD_TRADE_DRAFT_ID, leagueId: E2E_HELD_TRADE_LEAGUE_ID, format: "snake", status: "complete", kickoffAt: new Date(), auctionBudget: null })
+    .onConflictDoNothing({ target: drafts.id });
+
+  await db
+    .insert(matchups)
+    .values({ leagueId: E2E_HELD_TRADE_LEAGUE_ID, weekNumber: E2E_HELD_TRADE_WEEK_NUMBER, homeTeamId: E2E_HELD_TRADE_TEAM_A_ID, awayTeamId: E2E_HELD_TRADE_TEAM_B_ID })
+    .onConflictDoNothing();
+
+  const [existingRoster] = await db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(eq(rosterSlots.teamId, E2E_HELD_TRADE_TEAM_A_ID)).limit(1);
+  if (existingRoster === undefined) {
+    const pool = await rankedPlayers(db, E2E_HELD_TRADE_LEAGUE_ID);
+    const taken = new Set<string>();
+    const rosters = new Map(teamIds.map((id) => [id, [] as { slot: RosterSlotType; slotIndex: number; playerId: string }[]]));
+    const totalPicks = teamIds.length * totalRosterSlots(HELD_TRADE_STARTER_SLOTS);
+
+    for (let pickNumber = 1; pickNumber <= totalPicks; pickNumber++) {
+      const teamId = snakeTeamForPick(teamIds, pickNumber);
+      const roster = rosters.get(teamId)!;
+      const sizeBefore = roster.length;
+      for (const player of pool) {
+        if (taken.has(player.id)) continue;
+        const assignment = assignSlot({ position: player.position, roster, slotConfig: HELD_TRADE_STARTER_SLOTS });
+        if (!assignment.ok) continue;
+        taken.add(player.id);
+        roster.push({ slot: assignment.slot, slotIndex: assignment.slotIndex, playerId: player.id });
+        break;
+      }
+      if (roster.length === sizeBefore) {
+        throw new Error(`[e2e] ensureHeldTradeLeague: no eligible player left in the pool for pick ${pickNumber} (team ${teamId}).`);
+      }
+    }
+
+    const slotRows = [...rosters.entries()].flatMap(([teamId, slots]) => slots.map((slot) => ({ teamId, ...slot })));
+    await db.insert(rosterSlots).values(slotRows);
+  }
+
+  const [contextA, contextB] = await Promise.all([
+    assembleAdvisorContext(db, { leagueId: E2E_HELD_TRADE_LEAGUE_ID, teamId: E2E_HELD_TRADE_TEAM_A_ID, weekNumber: E2E_HELD_TRADE_WEEK_NUMBER }),
+    assembleAdvisorContext(db, { leagueId: E2E_HELD_TRADE_LEAGUE_ID, teamId: E2E_HELD_TRADE_TEAM_B_ID, weekNumber: E2E_HELD_TRADE_WEEK_NUMBER }),
+  ]);
+  if (contextA === null || contextB === null) {
+    throw new Error("[e2e] ensureHeldTradeLeague: manager A or B's team doesn't resolve in the held-trade league yet.");
+  }
+  const teamAPlayers = contextA.me.players;
+  const teamBPlayers = contextB.me.players;
+
+  function combinationsOfSize<T>(items: readonly T[], size: number): readonly (readonly T[])[] {
+    if (size === 0) return [[]];
+    if (size > items.length) return [];
+    const [head, ...rest] = items;
+    return [...combinationsOfSize(rest, size - 1).map((combo) => [head!, ...combo]), ...combinationsOfSize(rest, size)];
+  }
+
+  const autoHoldThreshold = INTEGRITY_CONFIG.trade.autoHoldThreshold;
+  if (autoHoldThreshold === null) {
+    throw new Error("[e2e] ensureHeldTradeLeague: INTEGRITY_CONFIG.trade.autoHoldThreshold is null — the auto-hold gate is switched off, so no trade this league proposes could ever hold.");
+  }
+
+  let best: { readonly give: readonly string[]; readonly get: readonly string[]; readonly gap: number } | null = null;
+  const maxSize = Math.min(TRADE_CONFIG.maxAssetsPerSide, teamAPlayers.length, teamBPlayers.length);
+  for (let size = 1; size <= maxSize; size++) {
+    for (const give of combinationsOfSize(teamAPlayers, size)) {
+      const giveSum = give.reduce((total, player) => total + player.averagePoints, 0);
+      for (const get of combinationsOfSize(teamBPlayers, size)) {
+        const getSum = get.reduce((total, player) => total + player.averagePoints, 0);
+        const gap = Math.abs(giveSum - getSum);
+        if (gap < autoHoldThreshold) continue;
+        if (best === null || gap > best.gap) best = { give: give.map((p) => p.name), get: get.map((p) => p.name), gap };
+      }
+    }
+  }
+  if (best === null) {
+    throw new Error("[e2e] ensureHeldTradeLeague: no combination of manager A and B's starters crosses the auto-hold threshold — the dealt rosters are too even.");
+  }
+
+  const fixture: HeldTradeFixture = { giveNames: best.give, getNames: best.get };
+  mkdirSync(AUTH_DIR, { recursive: true });
+  writeFileSync(E2E_HELD_TRADE_FIXTURE_STATE, JSON.stringify(fixture, null, 2), { mode: 0o600 });
+  console.log(`[e2e] held-trade fixture: give [${fixture.giveNames.join(", ")}] for [${fixture.getNames.join(", ")}], gap ${best.gap.toFixed(1)}`);
+}
+
+export const E2E_DRAFT_SCHEDULE_LEAGUE_ID = "e2e_draft_schedule_league";
+const E2E_DRAFT_SCHEDULE_DRAFT_ID = "e2e_draft_schedule_draft";
+export const E2E_DRAFT_SCHEDULE_TEAM_A_ID = "e2e_draft_schedule_team_a";
+export const E2E_DRAFT_SCHEDULE_TEAM_B_ID = "e2e_draft_schedule_team_b";
+export const E2E_DRAFT_SCHEDULE_INVITE_STATE = resolve(AUTH_DIR, "draft-schedule-invite.json");
+
+export interface DraftScheduleInvite {
+  readonly code: string;
+}
+
+/** Unpredictable, the same "not `Math.random`" discipline `POST /api/leagues/[leagueId]/invites`
+ *  itself keeps (that route's own `cryptoRandom`, not exported — this is scaffolding calling the
+ *  real `createInvite` service directly, never the HTTP route, so it needs its own copy). */
+function cryptoRandom(): number {
+  const buf = new Uint32Array(1);
+  crypto.getRandomValues(buf);
+  return buf[0]! / 2 ** 32;
+}
+
+/**
+ * A league nobody has drafted yet, two real managers already seated (so `store.startDraft`'s own
+ * `draftOrder.length >= 2` precondition is met the moment the commissioner presses the button —
+ * journey 2 never drives a live "accept invite" through the browser; the invite it mints below is
+ * read-only scaffolding for the SIGNED-OUT preview read), and a real, reusable invite code.
+ * Deliberately `isPublicMatchmade: false`: journey 2 needs the commissioner's OWN press
+ * (`POST /api/drafts/[draftId]/start`, "the first time any browser in this product's history has
+ * called that route") to be what starts it, and a public league whose kickoff this file set
+ * anywhere in the past would race that press against Task 7's own auto-start ticker running
+ * inside the dev server this suite drives.
+ */
+async function ensureDraftScheduleLeague(db: Db, managerAUserId: string, managerBUserId: string): Promise<void> {
+  const teamIds: readonly string[] = [E2E_DRAFT_SCHEDULE_TEAM_A_ID, E2E_DRAFT_SCHEDULE_TEAM_B_ID];
+  const owners: readonly string[] = [managerAUserId, managerBUserId];
+
+  await db
+    .insert(leagues)
+    .values({
+      id: E2E_DRAFT_SCHEDULE_LEAGUE_ID,
+      name: "E2E Draft Schedule League",
+      format: "snake",
+      teamCount: teamIds.length,
+      isPublicMatchmade: false,
+      commissionerUserId: managerAUserId,
+      rosterSlots: [...STANDARD_ROSTER_SLOTS],
+    })
+    .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: managerAUserId } });
+
+  await db.insert(scoringSettings).values({ leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, ...PPR_SCORING }).onConflictDoNothing({ target: scoringSettings.leagueId });
+
+  await db
+    .insert(teams)
+    .values(teamIds.map((id, i) => ({ id, leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, userId: owners[i], name: `E2E Draft Schedule Team ${i + 1}` })))
+    .onConflictDoUpdate({ target: teams.id, set: { userId: sql`excluded.user_id` } });
+
+  // A re-run must never re-schedule a draft the previous run already started — a bare re-insert
+  // with `onConflictDoUpdate` on `kickoffAt` alone leaves `status` untouched either way, the same
+  // "never touch status on a re-run" discipline `seedPublicLeagues`/`seed-enforcement.ts`'s own
+  // auto-start league keep.
+  const kickoffAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
+  await db
+    .insert(drafts)
+    .values({ id: E2E_DRAFT_SCHEDULE_DRAFT_ID, leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, format: "snake", status: "scheduled", kickoffAt, auctionBudget: null })
+    .onConflictDoUpdate({ target: drafts.id, set: { kickoffAt } });
+
+  const [existingInvite] = await db.select({ code: leagueInvites.code }).from(leagueInvites).where(eq(leagueInvites.leagueId, E2E_DRAFT_SCHEDULE_LEAGUE_ID)).limit(1);
+  const code =
+    existingInvite?.code ??
+    (await (async () => {
+      const result = await createInvite(
+        { db, clock: { now: () => new Date().toISOString() }, random: cryptoRandom },
+        { leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, createdByUserId: managerAUserId },
+      );
+      if (!result.ok) throw new Error(`[e2e] ensureDraftScheduleLeague: couldn't mint an invite: ${result.reason}`);
+      return result.code;
+    })());
+
+  const invite: DraftScheduleInvite = { code };
+  mkdirSync(AUTH_DIR, { recursive: true });
+  writeFileSync(E2E_DRAFT_SCHEDULE_INVITE_STATE, JSON.stringify(invite, null, 2), { mode: 0o600 });
+  console.log(`[e2e] draft-schedule league ready, invite code ${code}`);
+}
+
 /**
  * Two real managers, one seeded season, its live week ticked into progress, no bypass.
  *
@@ -507,6 +738,10 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
     // Phase 3 Plan C, Task 9: `e2e/trades.spec.ts`'s own league, real WorkOS ids only known
     // here, at Playwright's own runtime — see `ensureTradesLeague`'s own docblock.
     await ensureTradesLeague(operatorDb, a.userId, b.userId, c.userId);
+    // Phase 3 Plan D, Task 10: `e2e/enforcement.spec.ts`'s own two leagues — see each function's
+    // own docblock for why neither reuses `ensureTradesLeague`'s.
+    await ensureHeldTradeLeague(operatorDb, a.userId, b.userId);
+    await ensureDraftScheduleLeague(operatorDb, a.userId, b.userId);
   } finally {
     await operatorDb.$client.end();
   }

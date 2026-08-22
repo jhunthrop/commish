@@ -1,15 +1,20 @@
+import { eq } from "drizzle-orm";
 import { getDb } from "@/db/client";
+import { teams } from "@/db/schema";
 import { getStatsProvider } from "@/stats-pipeline";
 import { getIngestionBudget } from "@/stats-pipeline";
 import { envOrUndefined } from "@/lib/env";
+import { ENFORCEMENT_REFUSALS } from "@/league-service/enforcement";
+import { joinPublicLeague } from "@/league-service/join";
 import { DEV_SEED } from "./config";
 import { assertLocalSeedTarget } from "./guard";
 import { seedDevLeagues } from "./seed-dev-leagues";
+import { seedEnforcement } from "./seed-enforcement";
 import { seedMultiAccountSuspect } from "./seed-integrity";
 import { seedOperator } from "./seed-operator";
 import { seedPlayers } from "./seed-players";
 import { seedPublicLeagues } from "./seed-public-leagues";
-import { seedSeasonLeague } from "./seed-season-league";
+import { seedSeasonLeague, VETERAN_SEASON_LEAGUES } from "./seed-season-league";
 import { seedTrades } from "./seed-trades";
 
 /**
@@ -43,10 +48,45 @@ async function main(): Promise<void> {
   const operator = await seedOperator(db, { now: () => new Date().toISOString() }, claimUserId);
   console.log(operator.ok ? `granted operator access to ${operator.userId}` : `operator grant skipped: ${operator.reason}`);
 
-  const season = await seedSeasonLeague(db, { now: () => new Date().toISOString() }, claimUserId);
-  console.log(`seeded a ${season.teams}-team season league with ${season.weeks} weeks (${season.scoredWeeks} scored)`);
+  // Phase 3 Plan D, Task 10, Step 1: THREE real playthroughs, not one league counted three
+  // times — `DEV_SEED.season` plus the two `VETERAN_SEASON_LEAGUES`, every one of them settled
+  // week by week through the real `finalizeWeekInTx` (ruling 24). Team 1's owner is the SAME
+  // identity across all three (`claimUserId`, or `dev_user_01` when unset), so by the time this
+  // loop finishes that identity has genuinely crossed `INTEGRITY_CONFIG.participation.
+  // veteranSeasonCutoff` (3) — a real veteran, not a stamped one.
+  for (const leagueConfig of [DEV_SEED.season, ...VETERAN_SEASON_LEAGUES]) {
+    const season = await seedSeasonLeague(db, { now: () => new Date().toISOString() }, claimUserId, leagueConfig);
+    console.log(`seeded a ${season.teams}-team season league (${leagueConfig.leagueId}) with ${season.weeks} weeks (${season.scoredWeeks} scored)`);
+  }
   const open = await seedPublicLeagues(db, { now: () => new Date().toISOString() });
   console.log(`seeded ${open.leagues} public matchmaking leagues with ${open.teams} joined managers`);
+
+  // Phase 3 Plan D, Task 10, Step 1's second half: the SAME veteran identity, pointed at a
+  // seeded `beginner` public league it holds no seat in (`seedPublicLeagues` never spends
+  // index 0's own seat — see that file's own docblock) — through the real `joinPublicLeague`
+  // route, never a synthesized refusal. `npm run seed && npm run dev` therefore puts a real
+  // `tier_blocked_join` notice in that account's own inbox, raised by the real precondition.
+  //
+  // READ BACK, never re-derived through `ensureDevUsers(db, claimUserId)`: on a long-lived dev
+  // database, a PAST run's `preserveRealTeamOwner` may already have handed team 1's own chair to
+  // a real claim id under a run THAT had `DEV_SEED_CLAIM_USER_ID` set — `ensureDevUsers` has no
+  // memory of that; it only ever answers `claimUserId` (this run's own, possibly `undefined`) or
+  // the literal placeholder. Re-deriving here found the real bug running this against the shared
+  // dev database: the join "succeeded" because the identity this line guessed was a newcomer who
+  // had never actually played a season, while the REAL veteran (still sitting in team 1) was
+  // never asked at all. The team row itself is the only honest source for who that is.
+  const [team1] = await db.select({ userId: teams.userId }).from(teams).where(eq(teams.id, `${DEV_SEED.season.leagueId}_team_01`));
+  const veteranUserId = team1!.userId;
+  const tierBlockTarget = DEV_SEED.publicLeagues.find((plan) => plan.leagueId === "dev_public_tier_demo")!.leagueId;
+  const blockedJoin = await joinPublicLeague(
+    { db, newId: () => crypto.randomUUID(), clock: { now: () => new Date().toISOString() } },
+    { leagueId: tierBlockTarget, userId: veteranUserId },
+  );
+  console.log(
+    !blockedJoin.ok && blockedJoin.reason === ENFORCEMENT_REFUSALS.join
+      ? `tier segregation: ${veteranUserId} correctly blocked from ${tierBlockTarget}`
+      : `tier segregation: unexpected outcome for ${veteranUserId} against ${tierBlockTarget} — ${JSON.stringify(blockedJoin)}`,
+  );
 
   // The real detector, against real rows — the spec's "seed several flags for manual
   // verification" honored without a decorative row (ruling 29). `npm run seed && npm run dev`
@@ -59,6 +99,16 @@ async function main(): Promise<void> {
   // fairness` flag raised by the real detector — never a decorative row.
   const trades = await seedTrades(db, { now: () => new Date().toISOString() }, claimUserId);
   console.log(`seeded ${trades.tradesAccepted} trade(s) in ${trades.leagueId}, raised ${trades.flagsRaised} fairness flag(s)`);
+
+  // Phase 3 Plan D, Task 10, Step 2: the other three arcs, through the real `proposeTrade`/
+  // `acceptTrade` hold branch, the real `autoSetLineupsForWeek`, and the real ticker action
+  // (`autoStartDueDrafts`) rather than a direct `startDraft` call — see `seed-enforcement.ts`.
+  const enforcement = await seedEnforcement(db, { now: () => new Date().toISOString() });
+  console.log(
+    `enforcement: trade ${enforcement.heldTrade.outcome} (${enforcement.heldTrade.leagueId}), ` +
+      `${enforcement.lineupAutoSet.teamsSet} lineup(s) auto-set in ${enforcement.lineupAutoSet.leagueId}, ` +
+      `draft auto-start ${enforcement.draftAutoStart.started ? "started" : "not started"} (${enforcement.draftAutoStart.draftId})`,
+  );
 }
 
 main().then(() => process.exit(0)).catch((err: unknown) => {
