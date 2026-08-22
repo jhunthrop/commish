@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { DEV_SEED } from "../src/data/seed/config";
 import { createDb } from "../src/db/client";
-import { tradeProposals } from "../src/db/schema";
+import { memberNotices, teams, tradeProposals, users } from "../src/db/schema";
 import { formatDraftTime } from "../src/league";
 import { ENFORCEMENT_REFUSALS } from "../src/league-service/enforcement";
 import { expect, expectNotice, test } from "./support/fixtures";
@@ -11,11 +11,63 @@ import {
   E2E_DRAFT_SCHEDULE_LEAGUE_ID,
   E2E_HELD_TRADE_FIXTURE_STATE,
   E2E_HELD_TRADE_LEAGUE_ID,
+  E2E_HELD_TRADE_TEAM_B_ID,
+  MANAGER_A_EMAIL,
   MANAGER_A_STATE,
   MANAGER_B_STATE,
   type DraftScheduleInvite,
   type HeldTradeFixture,
 } from "./global-setup";
+
+/**
+ * Whether manager A already has a `tier_blocked_join` notice for this league BEFORE this run's
+ * own join attempt — `recordTierBlockedJoin`'s (`@/league-service/join`) own dedupe is per
+ * (user, league), so a rerun against the same long-lived database never writes a second one, and
+ * whether THIS run's own click created the notice or found it already there decides which proof
+ * is fair to ask for below (`assertTierBlockedNoticeRecorded`'s own docblock).
+ */
+async function hasExistingTierBlockedNotice(leagueId: string): Promise<boolean> {
+  const db = createDb();
+  try {
+    const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, MANAGER_A_EMAIL));
+    if (user === undefined) return false;
+    const [existing] = await db
+      .select({ id: memberNotices.id })
+      .from(memberNotices)
+      .where(and(eq(memberNotices.userId, user.id), eq(memberNotices.leagueId, leagueId), eq(memberNotices.noticeType, "tier_blocked_join")))
+      .limit(1);
+    return existing !== undefined;
+  } finally {
+    await db.$client.end();
+  }
+}
+
+/**
+ * The durable twin of `expectNotice`, for a `tier_blocked_join` notice this run's own refusal did
+ * NOT freshly create. Same reasoning as `assertHeldTradeNoticeRecorded` below: a notice deduped
+ * per (user, league) is written once, ever, and ages further behind manager A's own inbox page
+ * every additional run any OTHER spec makes against this shared identity on this long-lived
+ * database — checking the notices PANEL for it would eventually test pagination, not the refusal.
+ */
+async function assertTierBlockedNoticeRecorded(leagueId: string): Promise<void> {
+  const db = createDb();
+  try {
+    const [user] = await db.select({ id: users.id }).from(users).where(eq(users.email, MANAGER_A_EMAIL));
+    if (user === undefined) throw new Error(`[e2e] assertTierBlockedNoticeRecorded: manager A ("${MANAGER_A_EMAIL}") not found.`);
+    const [notice] = await db
+      .select({ title: memberNotices.title })
+      .from(memberNotices)
+      .where(and(eq(memberNotices.userId, user.id), eq(memberNotices.leagueId, leagueId), eq(memberNotices.noticeType, "tier_blocked_join")))
+      .orderBy(desc(memberNotices.createdAt))
+      .limit(1);
+    if (notice === undefined) throw new Error("[e2e] assertTierBlockedNoticeRecorded: no tier_blocked_join notice on record for manager A.");
+    if (notice.title !== "That league is reserved for newer players") {
+      throw new Error(`[e2e] assertTierBlockedNoticeRecorded: unexpected title "${notice.title}".`);
+    }
+  } finally {
+    await db.$client.end();
+  }
+}
 
 /**
  * Phase 3 Plan D, Task 10, Step 3: the three journeys a screenshot cannot fake, walked in a real
@@ -38,6 +90,7 @@ import {
 
 test("a veteran browses, is refused a beginner league, and reads why", async ({ managerA }) => {
   const target = DEV_SEED.publicLeagues.find((plan) => plan.leagueId === "dev_public_tier_demo")!;
+  const noticeAlreadyExisted = await hasExistingTierBlockedNotice(target.leagueId);
   await managerA.goto("/browse");
   await expect(managerA.getByRole("heading", { name: "Open leagues" })).toBeVisible();
 
@@ -58,10 +111,18 @@ test("a veteran browses, is refused a beginner league, and reads why", async ({ 
   await card.getByRole("button", { name: `Join ${target.name}` }).click();
   await expect(card.getByText(ENFORCEMENT_REFUSALS.join)).toBeVisible();
 
-  // The real notice the refused join raised — `tier_blocked_join`, deduped per (user, league) so
-  // a rerun of this very spec against the same database never writes a second one, but the FIRST
-  // run's row is still there for this assertion to find.
-  await expectNotice(managerA, "That league is reserved for newer players");
+  // The real notice the refused join raised — `tier_blocked_join`, deduped per (user, league)
+  // (`recordTierBlockedJoin`'s own dedupe) so a rerun of this very spec against the same database
+  // never writes a second one. The notices PANEL is only a fair check the FIRST time this pair is
+  // ever refused (this run's own click is what created the row, so it is by definition the
+  // newest thing in the inbox); on every later run the row already existed before this test even
+  // opened a browser, and manager A's own inbox has kept moving since — read it directly instead,
+  // the same durable-over-paginated proof `assertHeldTradeNoticeRecorded` uses below.
+  if (noticeAlreadyExisted) {
+    await assertTierBlockedNoticeRecorded(target.leagueId);
+  } else {
+    await expectNotice(managerA, "That league is reserved for newer players");
+  }
 });
 
 test("a commissioner schedules and starts a draft; a signed-out visitor reads the new time first", async ({ browser }) => {
@@ -154,6 +215,40 @@ async function findExistingHeldTradeId(): Promise<string | null> {
   }
 }
 
+/**
+ * The durable twin of `expectNotice`, for the REUSE branch alone. `INTEGRITY_CONFIG.notices
+ * .inboxSize` bounds the notices panel at 20 — a deliberate, documented cap
+ * (`docs/decisions/audit-and-integrity.md`'s own residual), not a bug — and this spec's own held
+ * trade is reused FOREVER once created (this function's own docblock above), which means its
+ * ONE `trade_held_for_review` notice ages further behind manager B's inbox page every additional
+ * run any spec makes against this long-lived database. `expectNotice`'s UI-panel check is the
+ * right proof the FIRST time this trade is ever held (the fresh-propose branch below, where the
+ * notice is by definition the newest thing in the inbox) — it stops being a fair test of the
+ * PRODUCT once repeated runs have pushed the row past page one, and would then be testing inbox
+ * pagination, not this feature. Reads the stored, already-rendered row directly instead — the
+ * same durable, title/body-stored shape `NOTICE_TEMPLATES` renders into on write, never
+ * re-rendered here.
+ */
+async function assertHeldTradeNoticeRecorded(): Promise<void> {
+  const db = createDb();
+  try {
+    const [team] = await db.select({ userId: teams.userId }).from(teams).where(eq(teams.id, E2E_HELD_TRADE_TEAM_B_ID));
+    if (team === undefined) throw new Error(`[e2e] assertHeldTradeNoticeRecorded: team "${E2E_HELD_TRADE_TEAM_B_ID}" not found.`);
+    const [notice] = await db
+      .select({ title: memberNotices.title })
+      .from(memberNotices)
+      .where(and(eq(memberNotices.userId, team.userId), eq(memberNotices.leagueId, E2E_HELD_TRADE_LEAGUE_ID), eq(memberNotices.noticeType, "trade_held_for_review")))
+      .orderBy(desc(memberNotices.createdAt))
+      .limit(1);
+    if (notice === undefined) throw new Error("[e2e] assertHeldTradeNoticeRecorded: no trade_held_for_review notice on record for manager B.");
+    if (notice.title !== "Your trade is waiting on a fairness review") {
+      throw new Error(`[e2e] assertHeldTradeNoticeRecorded: unexpected title "${notice.title}".`);
+    }
+  } finally {
+    await db.$client.end();
+  }
+}
+
 test("a trade past the auto-hold threshold really holds, and the counterparty reads the same sentence the notice sent them", async ({ browser }) => {
   test.setTimeout(60_000);
 
@@ -203,8 +298,16 @@ test("a trade past the auto-hold threshold really holds, and the counterparty re
     await expect(heldCard.getByText(bannerSentence)).toBeVisible();
     await expect(heldCard.getByText("Both rosters changed when this trade was accepted.")).toHaveCount(0);
 
-    // --- The SAME sentence the real notice sent — proven byte-identical, not merely similar --
-    await expectNotice(pageB, "Your trade is waiting on a fairness review");
+    // --- The SAME sentence the real notice sent — proven byte-identical, not merely similar.
+    // Only the FRESH branch checks the notices PANEL: the reuse branch's own trade can be
+    // arbitrarily old by now (`assertHeldTradeNoticeRecorded`'s own docblock), so it reads the
+    // stored, already-rendered row directly — durable proof the notice was really sent, without
+    // depending on it still sitting on the inbox's bounded first page. -------------------------
+    if (existingHeldTradeId === null) {
+      await expectNotice(pageB, "Your trade is waiting on a fairness review");
+    } else {
+      await assertHeldTradeNoticeRecorded();
+    }
   } finally {
     await contextA.close();
     await contextB.close();

@@ -34,7 +34,12 @@ export const MANAGER_SIGNOUT_STATE = resolve(AUTH_DIR, "manager-signout.json");
 // authenticated the browser AS A2, a manager whose session no longer matches the team the
 // seed handed them. `season.spec.ts` then failed to find its own commissioner controls. A
 // stable identity makes every run's claim id the SAME as the one that stuck on run 1.
-const MANAGER_A_EMAIL = "e2e-manager-a@commish-lab.test";
+// Exported (not left module-private like its siblings below): `enforcement.spec.ts`'s own
+// tier-blocked-join test resolves manager A's real userId to read a POSSIBLY-HISTORICAL notice
+// directly from the database — the same durable-read need `E2E_HELD_TRADE_TEAM_B_ID` already
+// serves for manager B's own held-trade notice, and the email is the one identifier this file
+// exposes no other lookup for.
+export const MANAGER_A_EMAIL = "e2e-manager-a@commish-lab.test";
 const MANAGER_B_EMAIL = "e2e-manager-b@commish-lab.test";
 // A third stable identity (Phase 3 Plan C, Task 9): `e2e/trades.spec.ts` needs a genuine
 // third team in its own seeded league — a member who never proposed or answered the trade —
@@ -328,10 +333,23 @@ async function ensureTradesLeague(db: Db, managerAUserId: string, managerBUserId
   // Home vs away, never both directions: `matchups`' own primary key is
   // `(league_id, week_number, home_team_id)`, so this row alone is enough for `leagueHome` and
   // `matchupWeek` to both resolve teams A and B's rosters for the trade page.
+  //
+  // RE-ASSERTED UNSCORED ON EVERY RUN, not `onConflictDoNothing`: a real ingestion tick
+  // (`npm run stats:ingest`, part of the closing battery's own sequence, which runs BEFORE `npm
+  // run e2e` and has no way to know this row is a fixture rather than a real week) settles any
+  // league's unscored matchup it can reach — including this one, on a long-lived database where
+  // this row survives between runs. A settled 0-0 score makes the trade composer read "the
+  // week's matchups aren't set yet" and refuse to show a single player, which is not a flake, it
+  // is this fixture's own invariant silently breaking. `onConflictDoUpdate` restores the
+  // unscored state every time global setup runs, which is the only way "stays unscored" is an
+  // enforced property rather than a one-time hope.
   await db
     .insert(matchups)
     .values({ leagueId: E2E_TRADES_LEAGUE_ID, weekNumber: E2E_TRADES_WEEK_NUMBER, homeTeamId: E2E_TRADES_TEAM_A_ID, awayTeamId: E2E_TRADES_TEAM_B_ID })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: [matchups.leagueId, matchups.weekNumber, matchups.homeTeamId],
+      set: { homeScore: null, awayScore: null },
+    });
 
   const [existingRoster] = await db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(eq(rosterSlots.teamId, E2E_TRADES_TEAM_A_ID)).limit(1);
   if (existingRoster === undefined) {
@@ -506,10 +524,18 @@ async function ensureHeldTradeLeague(db: Db, managerAUserId: string, managerBUse
     .values({ id: E2E_HELD_TRADE_DRAFT_ID, leagueId: E2E_HELD_TRADE_LEAGUE_ID, format: "snake", status: "complete", kickoffAt: new Date(), auctionBudget: null })
     .onConflictDoNothing({ target: drafts.id });
 
+  // Re-asserted unscored on every run, for the identical reason `ensureTradesLeague`'s own
+  // matchup insert now is: a stray `npm run stats:ingest` tick (run before `npm run e2e` in the
+  // closing battery) can settle this fixture's week on a long-lived database exactly as it can
+  // that one's, and this league's own held-trade journey depends on the SAME unscored-week
+  // invariant to price its own proposal.
   await db
     .insert(matchups)
     .values({ leagueId: E2E_HELD_TRADE_LEAGUE_ID, weekNumber: E2E_HELD_TRADE_WEEK_NUMBER, homeTeamId: E2E_HELD_TRADE_TEAM_A_ID, awayTeamId: E2E_HELD_TRADE_TEAM_B_ID })
-    .onConflictDoNothing();
+    .onConflictDoUpdate({
+      target: [matchups.leagueId, matchups.weekNumber, matchups.homeTeamId],
+      set: { homeScore: null, awayScore: null },
+    });
 
   const [existingRoster] = await db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(eq(rosterSlots.teamId, E2E_HELD_TRADE_TEAM_A_ID)).limit(1);
   if (existingRoster === undefined) {
