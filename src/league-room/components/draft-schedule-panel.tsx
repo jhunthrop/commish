@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { DraftScheduleBody } from "../contract";
-import { Button, ErrorState, Input, Skeleton } from "@/components/ui";
+import { Button, Input } from "@/components/ui";
 import { StatePanel } from "@/components/ui/state-panel";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { useNow } from "../hooks/use-now";
@@ -57,18 +57,19 @@ function toDatetimeLocalValue(iso: string): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-type PanelState =
-  | { readonly status: "loading" }
-  | { readonly status: "error"; readonly reason: string }
-  | { readonly status: "ready"; readonly schedule: DraftScheduleBody };
-
 /**
  * The button that has existed since Phase 1 and nobody could ever press on purpose
  * (`POST /api/drafts/[draftId]/start`), plus the time it starts at, plus the commissioner's own
- * control over that time (`PUT /api/leagues/[leagueId]/draft-schedule`). Fetches its own data —
- * the same self-contained shape `JoinForm` uses for the invite preview — rather than riding
- * `LeagueHomeBody`, so this panel's own edits and starts can update its state directly without
- * asking `LeagueHome`'s server-rendered parent to re-fetch the whole page.
+ * control over that time (`PUT /api/leagues/[leagueId]/draft-schedule`).
+ *
+ * Fix round 1 (review MEDIUM): `initialSchedule` arrives as a PROP, from `LeagueHomeBody`
+ * (`leagueHome`, `@/league-service/read.ts`, which already selects the draft row and the
+ * league's `isPublicMatchmade` for its own use), the same props-in idiom this room's other
+ * `LeagueHome` siblings already use (`AdvisorPanel`, `LineupEditor`, `TradeInboxLink`) — no
+ * `useEffect` GET on mount, no loading skeleton on every page view for data the server already
+ * had. `fetchJson` is reached only for the two things that actually write: rescheduling (PUT)
+ * and starting (POST) — local state is seeded from the prop and updated directly from either
+ * write's own response, never re-fetched.
  *
  * Four states, every one designed (Task 6, Step 3): scheduled, scheduled-and-starting-within-
  * the-hour, in progress (a link into the room), and complete. A member who is not the
@@ -79,59 +80,23 @@ type PanelState =
 export function DraftSchedulePanel({
   leagueId,
   isCommissioner,
+  initialSchedule,
 }: {
   readonly leagueId: string;
   readonly isCommissioner: boolean;
+  readonly initialSchedule: DraftScheduleBody;
 }) {
   const { fetchJson } = useLeagueRoomDeps();
-  const [state, setState] = useState<PanelState>({ status: "loading" });
+  const [schedule, setSchedule] = useState<DraftScheduleBody>(initialSchedule);
   const [editing, setEditing] = useState(false);
   const [draftValue, setDraftValue] = useState("");
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
-  const [retryToken, setRetryToken] = useState(0);
   // Ticks the countdown without re-fetching: the schedule itself only changes on a save or a
-  // start, both of which already update `state` directly.
+  // start, both of which already update `schedule` directly.
   const now = useNow(30_000);
-
-  useEffect(() => {
-    let cancelled = false;
-    setState({ status: "loading" });
-    (async (): Promise<void> => {
-      try {
-        const response = await fetchJson(`/api/leagues/${leagueId}/draft-schedule`);
-        const body = (await response.json()) as ApiEnvelope<DraftScheduleBody>;
-        if (cancelled) return;
-        setState(body.ok ? { status: "ready", schedule: body.data } : { status: "error", reason: body.error });
-      } catch {
-        if (!cancelled) {
-          setState({ status: "error", reason: "We couldn't reach the server. Check your connection and try again." });
-        }
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [leagueId, fetchJson, retryToken]);
-
-  if (state.status === "loading") return <Skeleton lines={3} />;
-  if (state.status === "error") {
-    return (
-      <ErrorState
-        title="We couldn't load the draft schedule"
-        description={state.reason}
-        action={
-          <Button size="sm" onClick={() => setRetryToken((token) => token + 1)}>
-            Try again
-          </Button>
-        }
-      />
-    );
-  }
-
-  const { schedule } = state;
 
   const openEditor = (): void => {
     setDraftValue(toDatetimeLocalValue(schedule.kickoffAt));
@@ -158,7 +123,7 @@ export function DraftSchedulePanel({
         setSaveError(body.error);
         return;
       }
-      setState({ status: "ready", schedule: body.data });
+      setSchedule(body.data);
       setEditing(false);
     } catch {
       setSaveError("We couldn't reach the server. Check your connection and try again.");
@@ -181,7 +146,7 @@ export function DraftSchedulePanel({
         setStartError(body.error);
         return;
       }
-      setState({ status: "ready", schedule: { ...schedule, status: "in_progress" } });
+      setSchedule({ ...schedule, status: "in_progress" });
     } catch {
       setStartError("We couldn't reach the server. Check your connection and try again.");
     } finally {

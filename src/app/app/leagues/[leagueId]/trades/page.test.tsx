@@ -45,6 +45,7 @@ const HOME = {
   weekStatus: "in_progress" as const,
   draftId: null,
   draftStatus: "complete" as const,
+  draftSchedule: null,
 };
 
 const WEEK_BODY = {

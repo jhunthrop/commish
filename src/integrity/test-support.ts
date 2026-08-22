@@ -56,13 +56,80 @@ export function renderableSource(source: string): string {
 }
 
 /**
- * Every single-line quoted, single-quoted or interpolation-free templated literal in `code`.
+ * Every static segment of every backtick template literal in `code` — the text between (or
+ * around) `${...}` interpolations.
  *
- * Exactly one of the three alternation groups participates in any match — including for an empty
- * literal, where the group is `""` rather than `undefined` — so the chain always resolves.
+ * Fix round 1 (review HIGH): the extractor this replaced matched a whole backtick literal only
+ * via `` `([^`$\\\n]*)` `` — a character class that EXCLUDES `$` outright, so any template
+ * literal containing so much as one `${...}` interpolation failed to match at all and vanished
+ * from every sweep built on it, whole. That is how `KICKOFF_REFUSALS.tooFar`
+ * (`@/league-service/draft-schedule.ts`) shipped a real em dash in member-facing 422 copy: it is
+ * a template literal with one interpolation (`` `Pick a time within ${...} days...` ``), and
+ * `league-service-copy.source.test.ts` never saw it at all, not even the non-dash parts.
+ *
+ * This walks the source by hand instead of matching it with one regex, because an interpolation
+ * can itself contain nested `{}` (a ternary inside an object literal, a template literal inside
+ * the expression) that a lazy non-greedy regex would stop at the FIRST `}` — silently splitting
+ * one interpolation into two "segments" and corrupting the static text on either side of it. Brace
+ * depth is counted explicitly instead. An escaped character (`` \` ``, `\$`) is skipped rather
+ * than treated as the start of a close or an interpolation, and — unlike the regex it replaced —
+ * a segment may contain a newline: a multi-line template literal is exactly as real a place for
+ * copy to live as a single-line one, and excluding newlines was the SAME class of gap this fix
+ * closes, just a quieter manifestation of it.
+ */
+function templateSegmentsIn(code: string): readonly string[] {
+  const segments: string[] = [];
+  let i = 0;
+  while (i < code.length) {
+    if (code[i] !== "`") {
+      i += 1;
+      continue;
+    }
+    i += 1; // past the opening backtick
+    let segment = "";
+    while (i < code.length && code[i] !== "`") {
+      if (code[i] === "\\") {
+        // Kept in the segment (not dropped): an escaped character is never the start of an
+        // interpolation or the close, but it is still real content of the string — `it\`s fine`
+        // reads as "it`s fine" in the value this literal actually holds at runtime.
+        segment += code[i] + (code[i + 1] ?? "");
+        i += 2;
+        continue;
+      }
+      if (code[i] === "$" && code[i + 1] === "{") {
+        segments.push(segment);
+        segment = "";
+        i += 2;
+        let depth = 1;
+        while (i < code.length && depth > 0) {
+          if (code[i] === "{") depth += 1;
+          else if (code[i] === "}") depth -= 1;
+          i += 1;
+        }
+        continue;
+      }
+      segment += code[i];
+      i += 1;
+    }
+    segments.push(segment);
+    i += 1; // past the closing backtick (or end of input on an unterminated literal — harmless,
+    // since the outer `while` simply stops)
+  }
+  return segments;
+}
+
+/**
+ * Every single-line quoted or single-quoted literal, plus every static segment of every backtick
+ * template literal (`templateSegmentsIn`, above) — including ones with interpolations, which the
+ * fix round 1 rewrite of that function is what makes possible.
+ *
+ * Exactly one of the two quote-style alternation groups participates in any regex match —
+ * including for an empty literal, where the group is `""` rather than `undefined` — so the chain
+ * always resolves; template segments are collected separately and appended.
  */
 function literalsIn(code: string): readonly string[] {
-  return [...code.matchAll(/"([^"\\\n]*)"|'([^'\\\n]*)'|`([^`$\\\n]*)`/g)].map((match) => (match[1] ?? match[2] ?? match[3])!);
+  const quoted = [...code.matchAll(/"([^"\\\n]*)"|'([^'\\\n]*)'/g)].map((match) => (match[1] ?? match[2])!);
+  return [...quoted, ...templateSegmentsIn(code)];
 }
 
 /** Drops whitespace-only and symbol-only fragments — nothing the copy rules could speak to. */

@@ -35,7 +35,7 @@ const signedInAs = (id: string) => {
 /** The route's `PUT` runs `setDraftKickoff` against the real wall clock (no test-injectable
  *  clock crosses the HTTP boundary — see `_shared.ts`'s own `systemClock` idiom), so a
  *  "successful move" case needs a moment that is safely in the future AND safely inside
- *  `LEAGUE_CONFIG.defaults.maxDraftDaysFromCreation` relative to whenever this test actually
+ *  `LEAGUE_CONFIG.defaults.maxDraftDaysAhead` relative to whenever this test actually
  *  runs, rather than a literal that could age past either bound. */
 const NEAR_FUTURE = new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString();
 

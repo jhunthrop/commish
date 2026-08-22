@@ -7,6 +7,7 @@ import type { Clock } from "@/domain/timing";
 import { listTeamCards } from "@/draft-service/teams";
 import { benchOf, LEAGUE_CONFIG, leagueTerms, seasonProgress, startersOf, type WeekStatus } from "@/league";
 import type {
+  DraftScheduleBody,
   LeagueHomeBody,
   LeagueMemberCard,
   LeagueSummary,
@@ -185,6 +186,20 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     now: clock.now(),
   });
 
+  // Fix round 1 (review MEDIUM): `DraftSchedulePanel`'s entire initial read, assembled from rows
+  // this function already selected above (`draft`, `league.isPublicMatchmade`) — zero extra
+  // queries. Null in the same never-true case `draftId`/`draftStatus` below are already null for.
+  const draftSchedule: DraftScheduleBody | null =
+    draft === undefined
+      ? null
+      : {
+          draftId: draft.id,
+          leagueId,
+          status: draft.status,
+          kickoffAt: draft.kickoffAt.toISOString(),
+          isPublicMatchmade: league.isPublicMatchmade,
+        };
+
   return {
     leagueId,
     name: league.name,
@@ -203,6 +218,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     weekStatus,
     draftId: draft?.id ?? null,
     draftStatus: draft?.status ?? null,
+    draftSchedule,
   };
 }
 

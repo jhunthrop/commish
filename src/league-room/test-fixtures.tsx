@@ -4,7 +4,7 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import type { LeagueTerms } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import type { LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
+import type { DraftScheduleBody, LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "./hooks/deps";
 
 /** Server rank order (wins, then points for, then team id) — never re-derived in a test. */
@@ -95,6 +95,17 @@ export const TERMS: LeagueTerms = {
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
 };
 
+/** `DraftSchedulePanel`'s entire initial read, as `leagueHome` (`@/league-service/read.ts`)
+ *  assembles it — matches `HOME.draftId`/`draftStatus` below exactly, since the two are built
+ *  from the same draft row in production. */
+export const DRAFT_SCHEDULE: DraftScheduleBody = {
+  draftId: "d1",
+  leagueId: "l1",
+  status: "complete",
+  kickoffAt: "2026-08-24T12:00:00.000Z",
+  isPublicMatchmade: false,
+};
+
 /** Everything `LeagueHome` needs: a commissioner, mid-season, drafted, `t1` up this week. */
 export const HOME: LeagueHomeBody = {
   leagueId: "l1",
@@ -114,6 +125,7 @@ export const HOME: LeagueHomeBody = {
   weekStatus: "final",
   draftId: "d1",
   draftStatus: "complete",
+  draftSchedule: DRAFT_SCHEDULE,
 };
 
 /** Three managers, an open seat implied by `teamCount`, and `t1`'s owner running the league —

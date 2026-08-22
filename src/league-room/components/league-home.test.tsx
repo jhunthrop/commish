@@ -4,33 +4,13 @@ import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
-import type { DraftScheduleBody } from "../contract";
-import { HOME, LINEUP, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
+import { DRAFT_SCHEDULE, HOME, LINEUP, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { LeagueHome } from "./league-home";
 
-/**
- * `DraftSchedulePanel` (Task 6) fetches its own data on mount, independent of `home` — the
- * ONLY unprompted `fetchJson` call anywhere in `LeagueHome`'s tree (every other panel here acts
- * only on a click). `fixtureLeagueDeps` answers every `fetchJson` call with the SAME envelope
- * regardless of URL, so this is what every test below that doesn't care about the draft panel
- * gets back for it — a real, well-shaped `DraftScheduleBody` rather than `{}`, so the panel
- * renders its ordinary "complete" state (matching `HOME.draftStatus`) instead of chasing
- * `undefined` fields into "Invalid Date".
- */
-const DRAFT_SCHEDULE_FIXTURE: DraftScheduleBody = {
-  draftId: HOME.draftId!,
-  leagueId: HOME.leagueId,
-  status: "complete",
-  kickoffAt: "2026-08-24T12:00:00.000Z",
-  isPublicMatchmade: false,
-};
-const draftScheduleDeps = (overrides: Partial<DraftScheduleBody> = {}) =>
-  fixtureLeagueDeps({ ok: true, data: { ...DRAFT_SCHEDULE_FIXTURE, ...overrides } });
-
 const wrap = (home = HOME, lineup = LINEUP) => (
   <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
-    <LeagueRoomDepsProvider deps={draftScheduleDeps().deps}>
+    <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
       <LeagueHome home={home} lineup={lineup} />
     </LeagueRoomDepsProvider>
   </ChatRoomDepsProvider>
@@ -54,7 +34,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={HOME} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     expect(screen.getByRole("link", { name: "League activity" })).toHaveAttribute("href", `/app/leagues/${HOME.leagueId}/activity`);
     expect(screen.getByRole("link", { name: "All matchups" })).toHaveAttribute(
@@ -82,7 +62,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={{ ...HOME, myTeamId: null }} lineup={null} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     expect(screen.queryByRole("link", { name: /Trades/ })).not.toBeInTheDocument();
   });
@@ -97,7 +77,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={HOME} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     expect(screen.getAllByRole("heading", { name: HOME.name })).toHaveLength(1);
     // The terms panel still shows the name — just not as a second heading.
@@ -109,7 +89,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={HOME} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     expect(screen.getByRole("button", { name: "Create invite link" })).toBeInTheDocument();
   });
@@ -119,7 +99,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={{ ...HOME, isCommissioner: false }} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     expect(screen.queryByRole("button", { name: "Create invite link" })).not.toBeInTheDocument();
   });
@@ -132,7 +112,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={HOME} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     expect(screen.queryByRole("button", { name: /^Score Week/ })).not.toBeInTheDocument();
   });
@@ -154,36 +134,43 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={{ ...HOME, isCommissioner: false }} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     expect(screen.queryByText(/nothing to run by hand/)).not.toBeInTheDocument();
   });
 
-  // Task 6: `DraftSchedulePanel` fetches its own schedule independently of `home.draftStatus`
-  // now, so a "scheduled" draft renders the panel's own scheduled state — the time, the
-  // countdown, and (for the commissioner `HOME` names) the edit and start controls.
-  it("shows the scheduled draft's time and start control while it has not finished", async () => {
+  // Task 6, fix round 1: `home.draftSchedule` is now this panel's whole initial read, riding the
+  // SAME server render as `home.draftStatus` — a "scheduled" draft renders the panel's own
+  // scheduled state, synchronously, the time, the countdown, and (for the commissioner `HOME`
+  // names) the edit and start controls.
+  it("shows the scheduled draft's time and start control while it has not finished", () => {
     renderInLeague(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
-        <LeagueHome home={{ ...HOME, draftStatus: "scheduled" }} lineup={null} />
+        <LeagueHome
+          home={{ ...HOME, draftStatus: "scheduled", draftSchedule: { ...DRAFT_SCHEDULE, status: "scheduled", kickoffAt: "2099-01-01T00:00:00.000Z" } }}
+          lineup={null}
+        />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps({ status: "scheduled", kickoffAt: "2099-01-01T00:00:00.000Z" }).deps,
+      fixtureLeagueDeps().deps,
     );
-    expect(await screen.findByText("Draft scheduled")).toBeInTheDocument();
+    expect(screen.getByText("Draft scheduled")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start the draft" })).toBeInTheDocument();
     expect(screen.queryByText(/hasn't drafted yet/)).not.toBeInTheDocument();
   });
 
   // Task 12 review follow-up: "scheduled" and "in_progress" are different moments. A manager
   // whose draft is live needs "join now", not "hasn't drafted yet".
-  it("switches to live-draft copy while the draft is in progress", async () => {
+  it("switches to live-draft copy while the draft is in progress", () => {
     renderInLeague(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
-        <LeagueHome home={{ ...HOME, draftStatus: "in_progress" }} lineup={null} />
+        <LeagueHome
+          home={{ ...HOME, draftStatus: "in_progress", draftSchedule: { ...DRAFT_SCHEDULE, status: "in_progress" } }}
+          lineup={null}
+        />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps({ status: "in_progress" }).deps,
+      fixtureLeagueDeps().deps,
     );
-    expect(await screen.findByText("The draft is live")).toBeInTheDocument();
+    expect(screen.getByText("The draft is live")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Join the draft" })).toHaveAttribute("href", `/app/drafts/${HOME.draftId}`);
     expect(screen.queryByText(/hasn't drafted yet/)).not.toBeInTheDocument();
   });
@@ -200,7 +187,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={{ ...HOME, myTeamId: null, myMatchup: null }} lineup={null} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     expect(screen.queryByRole("button", { name: "Save lineup" })).not.toBeInTheDocument();
     expect(screen.getByText("League standings")).toBeInTheDocument();
@@ -211,7 +198,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={HOME} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
   });
@@ -225,7 +212,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={HOME} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     const chat = await waitFor(() => screen.getByRole("region", { name: "League chat" }));
     expect(chat.parentElement).toHaveClass("h-96");
@@ -236,7 +223,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={HOME} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     expect(screen.getByRole("region", { name: "Lineup advisor" })).toBeInTheDocument();
   });
@@ -266,7 +253,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={HOME} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     expect(
       screen.queryByText("Joining puts you in the draft and the season that follows. You'll set a lineup every week."),
@@ -281,7 +268,7 @@ describe("LeagueHome", () => {
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome home={{ ...HOME, isCommissioner: false }} lineup={LINEUP} />
       </ChatRoomDepsProvider>,
-      draftScheduleDeps().deps,
+      fixtureLeagueDeps().deps,
     );
     const list = screen.getByRole("list", { name: "Managers" });
     // "Commissioner" is now ambiguous at the page level: the terms panel's own label reads the

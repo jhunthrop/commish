@@ -46,11 +46,14 @@ export function LeagueHome({
       <MatchupCelebration matchup={home.myMatchup} myTeamId={home.myTeamId} clinched={clinched} />
 
       {/* Task 6: the button that has existed since Phase 1 and nobody could ever press on
-          purpose. Fetches its own schedule (`GET /api/leagues/[leagueId]/draft-schedule`) rather
-          than riding this page's own render, so a commissioner's edit or start updates without a
-          full page reload. Renders for every draft state, including `complete` — unlike the
-          static card this replaced, which rendered nothing once a league had drafted. */}
-      {home.draftId === null ? null : <DraftSchedulePanel leagueId={home.leagueId} isCommissioner={home.isCommissioner} />}
+          purpose. `home.draftSchedule` rides THIS render — the same props-in idiom every other
+          panel below uses — and the panel reaches `fetchJson` only for its own writes (a
+          reschedule or a start), never to read its initial state. Renders for every draft
+          state, including `complete` — unlike the static card this replaced, which rendered
+          nothing once a league had drafted. */}
+      {home.draftSchedule === null ? null : (
+        <DraftSchedulePanel leagueId={home.leagueId} isCommissioner={home.isCommissioner} initialSchedule={home.draftSchedule} />
+      )}
 
       <section className="flex flex-col gap-2" aria-label={`${formatWeek(home.currentWeek)} matchup`}>
         <div className="flex flex-wrap items-center justify-between gap-2">

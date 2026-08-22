@@ -27,10 +27,17 @@ export interface LeagueListBody {
 }
 
 /**
- * What `GET /api/leagues/[leagueId]/draft-schedule` answers, and what `PUT` echoes back on
- * success. `draft-schedule-panel.tsx` is this route's only reader — it fetches its own data
- * rather than riding `LeagueHomeBody`, the same self-contained shape `InvitePreviewBody` uses
- * for `JoinForm`.
+ * What `GET /api/leagues/[leagueId]/draft-schedule` and `PUT`'s success response both answer —
+ * and, unchanged, the shape `LeagueHomeBody.draftSchedule` carries below, since it is the SAME
+ * fact read the SAME way whether the caller is the initial page render or a later PUT. Fix round
+ * 1 (review MEDIUM): `DraftSchedulePanel` used to fetch this itself on mount, the wrong sibling
+ * pattern for a component living inside a server-rendered parent that already has the row —
+ * `AdvisorPanel`/`LineupEditor`/`TradeInboxLink` all take their initial read as a prop from
+ * `LeagueHomeBody` and reach `fetchJson` only for a write, and this now matches them: `leagueHome`
+ * (`@/league-service/read.ts`) already selects `drafts.status`/`drafts.kickoffAt` and the whole
+ * `leagues` row (so `isPublicMatchmade` is already in hand) for its own internal use, at zero
+ * extra query cost. The PUT route still calls `draftScheduleView` to build its own response —
+ * that write path has no server-rendered parent to hand it a prop.
  */
 export interface DraftScheduleBody {
   readonly draftId: string;
@@ -170,6 +177,14 @@ export interface LeagueHomeBody {
   readonly weekStatus: WeekStatus;
   readonly draftId: string | null;
   readonly draftStatus: DraftStatus | null;
+  /**
+   * `DraftSchedulePanel`'s entire initial read, as a prop — `null` only in the same never-true
+   * case `draftId`/`draftStatus` above are already null for (a league somehow missing the draft
+   * `createLeague` always writes in the same transaction). Fix round 1: this is what makes the
+   * panel a props-in, fetchJson-for-writes-only component like its siblings, rather than a
+   * `useEffect` GET on mount.
+   */
+  readonly draftSchedule: DraftScheduleBody | null;
 }
 
 export interface MatchupLineupEntry {

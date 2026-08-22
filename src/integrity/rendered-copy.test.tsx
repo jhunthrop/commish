@@ -4,12 +4,18 @@ import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { NoticeInbox } from "@/account-room/components/notice-inbox";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 import type { NoticeView } from "@/account-room/contract";
+import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
+import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
 import type { ActivityRow } from "@/integrity/activity-view";
 import type { TradeProposalView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
-import { fixtureLeagueDeps } from "@/league-room/test-fixtures";
+import { DRAFT_SCHEDULE, HOME, LINEUP, PUBLIC_LEAGUES, TERMS, fixtureLeagueDeps } from "@/league-room/test-fixtures";
+import { DraftSchedulePanel } from "@/league-room/components/draft-schedule-panel";
+import { LeagueHome } from "@/league-room/components/league-home";
+import { LeagueTermsPanel } from "@/league-room/components/league-terms-panel";
+import { PublicLeagueList } from "@/league-room/components/public-league-list";
 import { TradeCard } from "@/league-room/components/trade-card";
 import { TradeComposer } from "@/league-room/components/trade-composer";
 import type { TradeRoomContext } from "@/league-room/contract";
@@ -614,5 +620,91 @@ describe("TradeComposer says nothing that breaks the house copy rules, with and 
 
     fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Rebuilding my TE spot" } });
     expectClean(container, ...TRADE_CONTENT, "Close call.", "Both sides give up similar weekly production.");
+  });
+});
+
+/**
+ * Task 6, fix round 1 (review LOW). `LeagueTermsPanel`, `PublicLeagueList`, `DraftSchedulePanel`
+ * and `LeagueHome` all render `formatDraftTime`'s (`@/league/terms`) COMPOSED output — a string
+ * assembled at runtime from a weekday, a day, a month, a time and a relative clause, never a
+ * literal in the source. `room-copy.source.test.ts`'s own docblock states its blind spot exactly:
+ * it is BLIND TO COMPOSITION, so `{terms.draftAt}` (a JSX expression, not text between `>` and
+ * `<`) was invisible to it, whole. This file is the one sweep that reads what a person actually
+ * SEES, so it is the one that can check the composed string for real — and, deliberately, every
+ * `expectClean` call below leaves that string IN rather than subtracting it, unlike the user
+ * names subtracted alongside it: subtracting `draftAt` would exempt the exact content this block
+ * exists to add coverage for.
+ */
+describe("LeagueTermsPanel says nothing that breaks the house copy rules, including the composed draft time", () => {
+  it("is clean with a real composed draft time rendered", () => {
+    const { container } = render(<LeagueTermsPanel terms={TERMS} />);
+    expectClean(container, TERMS.name, TERMS.commissionerName);
+  });
+});
+
+describe("PublicLeagueList says nothing that breaks the house copy rules, including each card's composed draft time", () => {
+  it("is clean signed in, signed out, and empty", () => {
+    for (const element of [
+      <PublicLeagueList key="signed-in" leagues={PUBLIC_LEAGUES} signedIn={true} />,
+      <PublicLeagueList key="signed-out" leagues={PUBLIC_LEAGUES} signedIn={false} />,
+      <PublicLeagueList key="empty" leagues={[]} signedIn={true} />,
+    ]) {
+      const { container, unmount } = render(element);
+      expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));
+      unmount();
+    }
+  });
+});
+
+describe("DraftSchedulePanel says nothing that breaks the house copy rules, including its own composed countdown", () => {
+  it("is clean scheduled, starting soon, in progress, complete, and with the edit form open", () => {
+    const fixture = fixtureLeagueDeps();
+    const scheduledSoon = { ...DRAFT_SCHEDULE, status: "scheduled" as const, kickoffAt: new Date(Date.now() + 20 * 60 * 1000).toISOString() };
+    const scheduledLater = {
+      ...DRAFT_SCHEDULE,
+      status: "scheduled" as const,
+      kickoffAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+      isPublicMatchmade: true,
+    };
+    for (const schedule of [scheduledLater, scheduledSoon, { ...DRAFT_SCHEDULE, status: "in_progress" as const }, { ...DRAFT_SCHEDULE, status: "complete" as const }]) {
+      const { container, unmount } = render(
+        <LeagueRoomDepsProvider deps={fixture.deps}>
+          <DraftSchedulePanel leagueId="l1" isCommissioner={true} initialSchedule={schedule} />
+        </LeagueRoomDepsProvider>,
+      );
+      expectClean(container);
+      unmount();
+    }
+
+    const { container } = render(
+      <LeagueRoomDepsProvider deps={fixture.deps}>
+        <DraftSchedulePanel leagueId="l1" isCommissioner={true} initialSchedule={scheduledLater} />
+      </LeagueRoomDepsProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit time" }));
+    expectClean(container);
+  });
+});
+
+describe("LeagueHome says nothing that breaks the house copy rules, including every composed date it renders", () => {
+  it("is clean for the commissioner and for an ordinary member", async () => {
+    for (const home of [HOME, { ...HOME, isCommissioner: false }]) {
+      const { container, unmount } = render(
+        <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+          <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
+            <LeagueHome home={home} lineup={LINEUP} />
+          </LeagueRoomDepsProvider>
+        </ChatRoomDepsProvider>,
+      );
+      await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
+      expectClean(
+        container,
+        home.name,
+        home.terms.commissionerName,
+        ...home.teams.map((team) => team.name),
+        ...home.teams.map((team) => team.ownerDisplayName),
+      );
+      unmount();
+    }
   });
 });

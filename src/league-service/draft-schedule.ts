@@ -26,13 +26,24 @@ export const KICKOFF_REFUSALS = {
   alreadyStarted: "This draft has already started, so its time can't change.",
   past: "Pick a time in the future so everyone has a chance to show up.",
   /**
-   * Names `LEAGUE_CONFIG.defaults.maxDraftDaysFromCreation` rather than repeating the number as
-   * a bare literal, so a future change to that config value can never leave this sentence
-   * describing a ceiling that no longer exists.
+   * Names `LEAGUE_CONFIG.defaults.maxDraftDaysAhead` rather than repeating the number as a bare
+   * literal, so a future change to that config value can never leave this sentence describing a
+   * ceiling that no longer exists.
+   *
+   * Fix round 1 (review HIGH): shipped with an em dash until this round — a real 422 reason this
+   * string reaches (`PUT /api/leagues/[leagueId]/draft-schedule`'s error body, rendered verbatim
+   * in `draft-schedule-panel.tsx`'s `role="alert"` element) is member-facing copy, not
+   * engineering prose, and the founder's "no em dash" rule applies to it in full. It escaped
+   * `league-service-copy.source.test.ts`'s sweep specifically because it is a template literal
+   * WITH an interpolation — `literalsIn` (`@/integrity/test-support`) excluded every backtick
+   * literal containing `$` outright, not just the interpolated part. That extractor is fixed in
+   * the same commit as this sentence; see its own docblock for what changed and
+   * `league-service-copy.source.test.ts`'s "catches a dash inside an interpolated template
+   * literal" test for the proof.
    */
   tooFar:
-    `Pick a time within ${LEAGUE_CONFIG.defaults.maxDraftDaysFromCreation} days from now — any further out and the draft ` +
-    "clock would sit at its widest tier for months before draft night got close.",
+    `Pick a time within ${LEAGUE_CONFIG.defaults.maxDraftDaysAhead} days from now. Any further out and the draft clock ` +
+    "would sit at its widest tier for months before draft night got close.",
 } as const;
 
 interface DraftRow {
@@ -133,7 +144,7 @@ export async function setDraftKickoff(
     if (kickoffMs <= nowMs) {
       return { ok: false, status: 422, reason: KICKOFF_REFUSALS.past };
     }
-    if (kickoffMs - nowMs > LEAGUE_CONFIG.defaults.maxDraftDaysFromCreation * MS_PER_DAY) {
+    if (kickoffMs - nowMs > LEAGUE_CONFIG.defaults.maxDraftDaysAhead * MS_PER_DAY) {
       return { ok: false, status: 422, reason: KICKOFF_REFUSALS.tooFar };
     }
 

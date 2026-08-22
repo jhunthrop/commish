@@ -95,4 +95,85 @@ describe("src/league-service writes its user-facing refusals in the house voice"
     const source = 'export const ENFORCEMENT_REFUSALS = {\n  join: "This league is reserved — for newer players.",\n};';
     expect(candidateCopyIn(source).flatMap(copyViolations)).toContainEqual({ rule: "dash", found: "—" });
   });
+
+  /**
+   * THE MACHINERY HOLE, in the exact shape it shipped in and escaped through — fix round 1
+   * (review HIGH). `KICKOFF_REFUSALS.tooFar` (`draft-schedule.ts`) is a template literal WITH an
+   * interpolation, and the extractor this sweep runs on (`literalsIn`, `@/integrity/test-support`)
+   * used to match a whole backtick literal only via `` `([^`$\\\n]*)` `` — a character class that
+   * excludes `$` outright, so this literal never matched at all, whole, dash and all. Reproduced
+   * live before the fix (recorded here, not just asserted): running the OLD `literalsIn` against
+   * this exact source returned only the plain-string half after the `+` — never the interpolated
+   * half carrying the em dash — so `candidateCopyIn(source).flatMap(copyViolations)` was `[]`.
+   * `literalsIn` now walks a template literal's static segments explicitly
+   * (`templateSegmentsIn`), so the interpolated segment is extracted and swept like any other
+   * string. This test reddens on the OLD extractor and is green on the NEW one — the redden proof
+   * for this fix round.
+   */
+  it("catches a dash inside an interpolated template literal's static segment, the exact shape KICKOFF_REFUSALS.tooFar shipped in", () => {
+    const source =
+      "export const KICKOFF_REFUSALS = {\n" +
+      "  tooFar:\n" +
+      "    `Pick a time within ${LEAGUE_CONFIG.defaults.maxDraftDaysAhead} days from now — any further out and the draft ` +\n" +
+      '    "clock would sit at its widest tier for months before draft night got close.",\n' +
+      "};";
+    expect(candidateCopyIn(source).flatMap(copyViolations)).toContainEqual({ rule: "dash", found: "—" });
+  });
+
+  /**
+   * THE REPAIRED EXTRACTOR'S OWN SHAPES, one test per branch `templateSegmentsIn`
+   * (`@/integrity/test-support`) added — every one a real TypeScript source file can contain, so
+   * every one has to extract correctly rather than merely "not crash".
+   */
+  describe("templateSegmentsIn (reached through candidateCopyIn), every branch it added", () => {
+    it("keeps more than one interpolation's surrounding text as separate, correctly split segments", () => {
+      // `meaningful()` (`@/integrity/test-support`) trims every candidate — "Week " and " of "
+      // read back trimmed, the same as every other candidate this sweep collects.
+      const source = "const s = `Week ${week} of ${total}, a bad — dash here`;";
+      expect(candidateCopyIn(source)).toEqual(["Week", "of", ", a bad — dash here"]);
+    });
+
+    it("does not stop at the first `}` inside a nested-brace interpolation, and keeps the text on both sides intact", () => {
+      // `${cond ? { x: 1 } : { y: 2 }}` carries two nested `{`/`}` pairs inside the ONE
+      // interpolation. A lazy, non-brace-counting extractor would treat the FIRST inner `}` as
+      // the interpolation's own close, splitting one interpolation into a false extra segment
+      // and corrupting the text around it — this proves the depth counter instead.
+      const source = "const s = `Total — before ${cond ? { x: 1 } : { y: 2 }} after — done`;";
+      expect(candidateCopyIn(source)).toEqual(["Total — before", "after — done"]);
+    });
+
+    it("treats a lone `$` not followed by `{` as ordinary text, not the start of an interpolation", () => {
+      const source = "const s = `Costs $5 total — no discount`;";
+      expect(candidateCopyIn(source)).toEqual(["Costs $5 total — no discount"]);
+    });
+
+    it("skips an escaped backtick rather than reading it as the literal's close", () => {
+      // Without the escape-skip, this literal's own content would appear to end at `it\`, and
+      // the rest of the line would be read as ordinary code rather than string content.
+      const source = "const s = `it\\`s fine — no dash issue here`;";
+      expect(candidateCopyIn(source)).toEqual(["it\\`s fine — no dash issue here"]);
+    });
+
+    it("carries a newline inside a segment rather than losing the whole multi-line literal", () => {
+      const source = "const s = `Line one\nLine two — with a dash`;";
+      expect(candidateCopyIn(source)).toEqual(["Line one\nLine two — with a dash"]);
+    });
+
+    it("still returns the text collected so far for a template literal with no closing backtick", () => {
+      // Never valid TypeScript, so never a real source file — this is the extractor's own
+      // boundary behavior, not a shape any swept file can actually contain. Proven so a stray
+      // truncation elsewhere can never turn into an infinite loop instead of an empty match.
+      const source = "const s = `unterminated — no closing backtick";
+      expect(candidateCopyIn(source)).toEqual(["unterminated — no closing backtick"]);
+    });
+
+    it("keeps a trailing escape character even when nothing follows it in the source", () => {
+      // `code[i + 1]` is `undefined` when a backslash is the very last character of the scanned
+      // text — another shape only an unterminated literal can produce, and the `?? ""` fallback
+      // on the escape-handling line is what keeps this from appending the literal four-letter
+      // string "undefined" to the segment.
+      const source = "const s = `abc" + "\\";
+      expect(candidateCopyIn(source)).toEqual(["abc\\"]);
+    });
+  });
 });
