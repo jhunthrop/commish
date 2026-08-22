@@ -5,7 +5,6 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
-import { announceDraftAutoStarted } from "@/draft-service/auto-start";
 import { autoSetLineupsForWeek } from "@/league-service/auto-lineup";
 import { joinLeagueInTx, recordTierBlockedJoin } from "@/league-service/join";
 import { setLineup } from "@/league-service/lineups";
@@ -2227,40 +2226,53 @@ describe("autoSetLineupInTx's team-lock order — a parked setLineup queues rath
 });
 
 /**
- * PHASE 3 PLAN D, TASK 7's own transaction: `announceDraftAutoStarted`
- * (`@/draft-service/auto-start`) inserts one `member_notices` row per TEAM in the league — an
- * implicit `FOR KEY SHARE` on `leagues` for every one of them — before its own league-chain
- * anchor, the identical shape `recordTierBlockedJoin`'s own test above proves safe. Driven
- * directly, the same way that test drives `recordTierBlockedJoin` directly, rather than through
- * the whole `autoStartDueDrafts` scan: the scan's own claim (`claimAutoStart`, fused into
- * `store.startDraft`'s existing `applyAction` transaction) takes no lock this function's own
- * shape does not already cover, so there is nothing this proof would gain by going through it.
+ * PHASE 3 PLAN D, TASK 7's own transaction, FUSED (review fix round 1, F1): `startDraft`'s own
+ * `alsoInTransaction` hook (`@/draft-service/store.ts`), given `{ auto: true }`, inserts one
+ * `member_notices` row per TEAM in the league — an implicit `FOR KEY SHARE` on `leagues` for every
+ * one of them — before its own league-chain anchor, all inside the SAME transaction as the
+ * `drafts FOR UPDATE` lock, the claim, and the `START_DRAFT` append. The identical shape
+ * `recordTierBlockedJoin`'s own test above proves safe, now proven for the fused transaction
+ * rather than for a since-removed standalone `announceDraftAutoStarted`.
  */
-describe("announceDraftAutoStarted's notice order", () => {
+describe("startDraft's fused auto-start announcement, { auto: true }", () => {
   it("announces an auto-started draft beside a concurrent join in the same league without deadlocking", async () => {
-    const leagueId = "lg_auto_start_lock";
-    await seedLeagueWith(leagueId, ["u_as_commish", "u_as_alice", "u_as_joiner"]);
-    await joinDb.insert(teams).values([
-      { id: "team_as_commish", leagueId, userId: "u_as_commish", name: "Commish" },
-      { id: "team_as_alice", leagueId, userId: "u_as_alice", name: "Alice" },
-    ]);
+    const { draftId, leagueId, teamIds } = await seedDraftFixture(joinDb, {
+      draftId: "draft_auto_start_lock",
+      leagueId: "lg_auto_start_lock",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+      isPublicMatchmade: true,
+    });
+    await joinDb.insert(players).values(POOL.map((entry) => ({ id: entry.playerId, name: entry.playerId, position: entry.position, nflTeam: "FA" })));
+    // An open seat for the joiner, the identical reason the autopick test above needs one.
+    await joinDb.update(leagues).set({ teamCount: 3 }).where(eq(leagues.id, leagueId));
+    await joinDb.insert(users).values({ id: "u_as_joiner", email: "joiner@test.local", displayName: "Joiner" });
 
     const join = parkedJoin(leagueId, "u_as_joiner", "team_as_joiner");
     await join.leagueLocked;
 
-    // T_announce: the real `announceDraftAutoStarted`, on its own connection, reaching for the
-    // SAME league row through its own notice inserts before its own league-chain anchor.
-    const announcing = announceDraftAutoStarted(resolveDb, { leagueId, leagueName: leagueId, occurredAt: clock.now() });
+    // T_start: the real `startDraft(draftId, { auto: true })`, on its own connection, reaching
+    // for the SAME league row through its fused announcement's notice inserts before its own
+    // league-chain anchor — the exact statement order `alsoInTransaction`'s own docblock states.
+    const store = createDraftStore({ db: resolveDb, publish: async () => "1-0", clock, deliverNotice: async () => {} });
+    const starting = store.startDraft(draftId, { auto: true });
 
     expect(await waitForBlockedBackend()).toBe(true);
     join.release();
 
     expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
-    const notices = await announcing;
+    const started = await starting;
+    expect(started.ok).toBe(true);
+    expect(teamIds).toHaveLength(2); // the two teams the fused announcement notified
+
+    const notices = await joinDb.select().from(memberNotices).where(eq(memberNotices.noticeType, "draft_auto_started"));
     expect(notices).toHaveLength(2);
     for (const notice of notices) expect(notice.auditEventId).not.toBeNull();
 
-    // Both landed on the SAME league chain: the join's own `member_joined`, then the
+    // Both landed on the SAME league chain: the join's own `member_joined`, then the fused
     // announcement's own single `system_action` shared by both notices — one chain, no cycle.
     const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, leagueId));
     expect(anchor!.headSequence).toBe(2);

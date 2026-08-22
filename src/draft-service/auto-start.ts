@@ -1,9 +1,7 @@
 import { and, asc, eq, lte } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
-import { drafts, leagues, teams } from "@/db/schema";
+import { drafts, leagues } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
-import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
-import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { enforcementAppliesTo } from "@/league-service/enforcement";
 import { DRAFT_SERVICE_CONFIG } from "./config";
 import type { DraftStore } from "./store";
@@ -26,13 +24,17 @@ import type { DraftStore } from "./store";
  * Zero rows means another instance already started it (or it was never scheduled in the first
  * place). One row means THIS caller owns the start. `store.startDraft` calls this from INSIDE
  * `applyAction`'s own transaction (its `alsoInTransaction` hook, `./store.ts`) — never as a
- * separate round trip first. That placement is not a style preference: a claim committed on its
- * own, followed later by a separate call that appends `START_DRAFT`, has a real crash window
- * between the two — a process that dies in that gap leaves `drafts.status = 'in_progress'` with an
- * EMPTY action log, a draft no scan will ever find again (`autoStartDueDrafts` only selects
- * `status = 'scheduled'`) and no `applyAction` retry ever reaches. Fused into one transaction, the
- * claim and the append commit together or neither does, so that state is unreachable — there is no
- * half-started draft to heal because there is no gap for a crash to land in.
+ * separate round trip first, and (review fix round 1, F1) `startDraft`'s own auto-start
+ * announcement (the `draft_auto_started` notices and their `system_action` event) is fused into
+ * that SAME transaction too, right after this claim succeeds. That placement is not a style
+ * preference: a claim committed on its own, followed later by a separate call that appends
+ * `START_DRAFT` (or announces it), has a real crash window between the two — a process that dies
+ * in that gap leaves `drafts.status = 'in_progress'` with an EMPTY action log or a real started
+ * draft with no audit trail, either one a draft no scan will ever find again (`autoStartDueDrafts`
+ * only selects `status = 'scheduled'`) and no `applyAction` retry ever reaches. Fused into one
+ * transaction, the claim, the append and the announcement commit together or none of them do, so
+ * that state is unreachable — there is no half-started, half-announced draft to heal because there
+ * is no gap for a crash to land in.
  *
  * This is also why the manual "commissioner presses start" path (`POST
  * /api/drafts/[draftId]/start`) goes through the identical guarded UPDATE rather than the plain one
@@ -69,29 +71,24 @@ export interface AutoStartOutcome {
 export interface AutoStartDeps {
   readonly store: DraftStore;
   readonly clock: Clock;
-  /** Defaults to the process-wide logger (`getAuditLogger()`). */
-  readonly audit?: AuditLogger;
-  /** Defaults to the real `deliverNotice`. Injectable so a test never needs a live Redis
-   *  connection. */
-  readonly deliver?: typeof deliverNotice;
-}
-
-interface DueDraftRow {
-  readonly draftId: string;
-  readonly leagueId: string;
-  readonly leagueName: string;
 }
 
 /**
  * `drafts` where `status = 'scheduled' AND kickoff_at <= now`, joined to `leagues` on
  * `is_public_matchmade` — served by `drafts_status_idx` (`@/db/schema`), the expiry scan's own
- * index and this scan's second reader. Ordered by `id` for the same determinism reason the expiry
- * scan is, and bounded by `DRAFT_SERVICE_CONFIG.maxDraftsPerTick` so one tick can't starve the
- * event loop scanning a backlog.
+ * index and this scan's second reader (measured over a realistic corpus,
+ * `src/db/index-plans.test.ts`'s "auto-start's due-kickoff scan" — review fix round 1, F3).
+ * Ordered by `id` for the same determinism reason the expiry scan is, and bounded by
+ * `DRAFT_SERVICE_CONFIG.maxDraftsPerTick` so one tick can't starve the event loop scanning a
+ * backlog.
+ *
+ * Exported as the query BUILDER (not yet awaited) rather than folded into `dueDraftIds` below, the
+ * same shape `browseQuery`/`chatPageQuery`/`pendingFlagQuery` already use — the one seam an
+ * `EXPLAIN` assertion can wrap without running the query twice or duplicating its shape.
  */
-async function dueDraftRows(db: Db, nowIso: string): Promise<readonly DueDraftRow[]> {
+export function dueDraftsQuery(db: Db, nowIso: string) {
   return db
-    .select({ draftId: drafts.id, leagueId: leagues.id, leagueName: leagues.name })
+    .select({ draftId: drafts.id })
     .from(drafts)
     .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
     .where(and(eq(drafts.status, "scheduled"), lte(drafts.kickoffAt, new Date(nowIso)), eq(leagues.isPublicMatchmade, true)))
@@ -99,103 +96,30 @@ async function dueDraftRows(db: Db, nowIso: string): Promise<readonly DueDraftRo
     .limit(DRAFT_SERVICE_CONFIG.maxDraftsPerTick);
 }
 
-/**
- * The notice half of an auto-start, run in its OWN transaction immediately after
- * `store.startDraft` has already committed the business fact — never inside `applyAction`'s own
- * transaction, because the store has no notion of league membership (a notice-worthy fact this
- * caller alone knows) and no reason to grow one for a single caller-specific announcement.
- *
- * `draft_auto_started` is league-scoped and `SYSTEM_ACTION_VISIBILITY` allows it to everyone
- * (Task 4) — a fact about the league's shared calendar, true for everyone in it, about nobody's
- * conduct — so unlike `draft_auto_picked` (one recipient) this sends ONE notice per TEAM in the
- * league, all referencing the SAME `system_action` event: the identical one-event-many-notices
- * shape `resolveFlag`'s `trade_blocked` branch already uses (`@/integrity-service/flags`).
- *
- * Exported (not folded into `startOneDraft` below) so `lock-order.test.ts` can drive it directly
- * against a real Postgres beside a concurrent join, the same way `recordTierBlockedJoin`
- * (`@/league-service/join`) is driven there — this function's own `member_notices` inserts take an
- * implicit `FOR KEY SHARE` on `leagues` and `users`, before its own league-chain anchor, which is
- * exactly the shape that lock order proves safe.
- */
-export async function announceDraftAutoStarted(
-  db: Db,
-  input: {
-    readonly leagueId: string;
-    readonly leagueName: string;
-    readonly occurredAt: string;
-    readonly audit?: AuditLogger;
-    readonly deliver?: typeof deliverNotice;
-  },
-): Promise<readonly MemberNotice[]> {
-  const audit = input.audit ?? getAuditLogger();
-  const deliver = input.deliver ?? deliverNotice;
-  const teamRows = await db.select({ userId: teams.userId }).from(teams).where(eq(teams.leagueId, input.leagueId)).orderBy(teams.id);
-  // Unreachable through `autoStartDueDrafts` itself — `store.startDraft` already refused any
-  // league with fewer than two teams before this is ever called — but a directly-driven league
-  // with none writes no anchor for nobody to attach it to, the same guard `autoSetLineupInTx`
-  // (`@/league-service/auto-lineup`) keeps for the identical reason.
-  if (teamRows.length === 0) return [];
-
-  const notices = await db.transaction(async (tx) => {
-    const created: MemberNotice[] = [];
-    for (const row of teamRows) {
-      created.push(
-        await notifyAffectedMember(tx, {
-          leagueId: input.leagueId,
-          userId: row.userId,
-          noticeType: "draft_auto_started",
-          context: { leagueName: input.leagueName },
-          occurredAt: input.occurredAt,
-          auditEventId: null,
-        }),
-      );
-    }
-    // THE ANCHOR, LAST — one event, shared by every notice minted above.
-    const event = await audit.record(tx, {
-      eventType: "system_action",
-      actorId: null,
-      actorType: "system",
-      leagueId: input.leagueId,
-      payload: { action: "draft_auto_started" },
-      occurredAt: input.occurredAt,
-    });
-    const attached: MemberNotice[] = [];
-    for (const notice of created) attached.push(await attachAuditEvent(tx, notice, event.eventId));
-    return attached;
-  });
-
-  // Best-effort LIVE frames, after the commit — the durable rows above already carry the delivery.
-  for (const notice of notices) {
-    try {
-      await deliver(notice);
-    } catch {
-      // Never surfaced: the durable notice already committed, and the inbox reads it next load.
-    }
-  }
-  return notices;
+async function dueDraftIds(db: Db, nowIso: string): Promise<readonly string[]> {
+  const rows = await dueDraftsQuery(db, nowIso);
+  return rows.map((row) => row.draftId);
 }
 
 /**
  * Starts one due draft through the REAL start path (`store.startDraft` — the identical seam
- * `POST /api/drafts/[draftId]/start` calls, per `claimAutoStart`'s own docblock), then announces
- * it. `store.startDraft` already refuses a league that cannot draft (an empty league, or one seat
+ * `POST /api/drafts/[draftId]/start` calls, per `claimAutoStart`'s own docblock), with `auto: true`
+ * so `startDraft`'s own `alsoInTransaction` hook fuses the `draft_auto_started` announcement into
+ * the SAME transaction as the claim and the `START_DRAFT` append (`./store.ts`).
+ *
+ * `store.startDraft` already refuses a league that cannot draft (an empty league, or one seat
  * filled) with its own plain-language reason, and already refuses a draft another instance beat
- * this one to (via `claimAutoStart`, fused into its transaction) — this never re-derives either
- * refusal, it only reports the one `store.startDraft` gives back.
+ * this one to (via `claimAutoStart`); this never re-derives either refusal, it only reports the
+ * one `store.startDraft` gives back. And because the announcement is now fused rather than a
+ * second transaction (review fix round 1, F1/F2), EVERY failure path out of `store.startDraft` —
+ * a clean `{ ok: false }` refusal or a thrown error from anywhere inside the fused transaction,
+ * announcement included — leaves `drafts.status` exactly where it started: `'scheduled'`. There is
+ * no longer a way to reach "the draft actually started but this outcome says it didn't."
  */
-async function startOneDraft(
-  db: Db,
-  store: DraftStore,
-  row: DueDraftRow,
-  occurredAt: string,
-  audit: AuditLogger,
-  deliver: typeof deliverNotice,
-): Promise<AutoStartOutcome> {
-  const result = await store.startDraft(row.draftId);
-  if (!result.ok) return { draftId: row.draftId, started: false, reason: result.reason };
-
-  await announceDraftAutoStarted(db, { leagueId: row.leagueId, leagueName: row.leagueName, occurredAt, audit, deliver });
-  return { draftId: row.draftId, started: true };
+async function startOneDraft(store: DraftStore, draftId: string): Promise<AutoStartOutcome> {
+  const result = await store.startDraft(draftId, { auto: true });
+  if (!result.ok) return { draftId, started: false, reason: result.reason };
+  return { draftId, started: true };
 }
 
 /**
@@ -211,26 +135,27 @@ async function startOneDraft(
  * means this scan does not run at all, not merely that every row it would have found gets refused
  * one at a time.
  *
- * Never throws: one draft's failure (a real DB error, an unexpected rejection) is caught, logged
- * and reported as an `{ started: false }` outcome — the scan continues for every other due draft,
- * and a failed draft is retried on the next tick since its status never left `scheduled`. The exact
- * "never an exception that stops the scan" discipline `ticker.tick()` already holds itself to.
+ * Never throws: one draft's failure (a real DB error, an unexpected rejection, or — fix round 1 —
+ * the fused announcement itself failing and rolling the whole transaction back) is caught, logged
+ * and reported as a `{ started: false }` outcome — the scan continues for every other due draft,
+ * and a failed draft is retried on the next tick because its status LITERALLY never left
+ * `scheduled`: `startOneDraft`'s own docblock is what makes that claim true rather than aspirational.
+ * The exact "never an exception that stops the scan" discipline `ticker.tick()` already holds
+ * itself to.
  */
 export async function autoStartDueDrafts(db: Db, deps: AutoStartDeps): Promise<readonly AutoStartOutcome[]> {
   if (!enforcementAppliesTo({ isPublicMatchmade: true })) return [];
 
-  const audit = deps.audit ?? getAuditLogger();
-  const deliver = deps.deliver ?? deliverNotice;
   const now = deps.clock.now();
-  const rows = await dueDraftRows(db, now);
+  const draftIds = await dueDraftIds(db, now);
 
   const outcomes: AutoStartOutcome[] = [];
-  for (const row of rows) {
+  for (const draftId of draftIds) {
     try {
-      outcomes.push(await startOneDraft(db, deps.store, row, now, audit, deliver));
+      outcomes.push(await startOneDraft(deps.store, draftId));
     } catch (error: unknown) {
-      console.error("[draft] auto-start failed for draft", row.draftId, error);
-      outcomes.push({ draftId: row.draftId, started: false, reason: "Something went wrong starting this draft." });
+      console.error("[draft] auto-start failed for draft", draftId, error);
+      outcomes.push({ draftId, started: false, reason: "Something went wrong starting this draft." });
     }
   }
   return outcomes;

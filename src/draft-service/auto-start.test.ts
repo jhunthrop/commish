@@ -5,8 +5,10 @@ import { DB_POOL_CONFIG } from "@/db/config";
 import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
 import { drafts, draftActions, memberNotices, players } from "@/db/schema";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
+import type { AuditEvent, AuditEventInput } from "@/domain/audit";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import type { MemberNotice } from "@/integrity-service/notify";
-import { announceDraftAutoStarted, autoStartDueDrafts, claimAutoStart } from "./auto-start";
+import { autoStartDueDrafts, claimAutoStart } from "./auto-start";
 import { createDraftStore, type DraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -179,10 +181,11 @@ describe("autoStartDueDrafts", () => {
       { id: "rb3", name: "RB Three", position: "RB", nflTeam: "DAL" },
       { id: "wr3", name: "WR Three", position: "WR", nflTeam: "DAL" },
     ]);
-    // `announceDraftAutoStarted`'s own delivery — separate from the store's own `deliverNotice`
-    // override (`newStore()`), which only ever fires for the store's OWN pick-related notices.
+    // The announcement's own delivery now rides the STORE's own `deliverNotice` — it is fused
+    // into `startDraft`'s transaction (fix round 1, F1), not a second caller-supplied `deliver`.
     const announced: MemberNotice[] = [];
-    await autoStartDueDrafts(db, { store: newStore(), clock, deliver: async (n) => void announced.push(n) });
+    const store = createDraftStore({ db, publish: async () => "1-0", clock, deliverNotice: async (n) => void announced.push(n) });
+    await autoStartDueDrafts(db, { store, clock });
     expect(await draftStatus(draftId)).toBe("in_progress");
 
     const notices = await db.select().from(memberNotices).where(eq(memberNotices.noticeType, "draft_auto_started"));
@@ -233,17 +236,61 @@ describe("claimAutoStart", () => {
   });
 });
 
-describe("announceDraftAutoStarted", () => {
-  it("notifies every team in the league from a real system_action event, driven directly", async () => {
-    const { leagueId, userIds } = await seededDraft({ kickoffAt: MINUTE_AGO, isPublicMatchmade: true, teamCount: 2 });
-    const notices = await announceDraftAutoStarted(db, { leagueId, leagueName: "league_auto", occurredAt: now });
-    expect(notices).toHaveLength(2);
-    expect(notices.map((n) => n.userId).sort()).toEqual([...userIds].sort());
-    expect(new Set(notices.map((n) => n.auditEventId)).size).toBe(1);
+/**
+ * FIX ROUND 1, F1/F2: the announcement is fused into `startDraft`'s own transaction, so an
+ * announce-side failure is no longer a separate post-commit step that can leave a started draft
+ * unannounced — it is a failure INSIDE the one transaction that also claims the draft and appends
+ * `START_DRAFT`, so the whole thing rolls back. These tests inject that failure for real (a
+ * throwing `AuditLogger`, the exact write `startDraft`'s fused announcement makes its own anchor
+ * through) rather than assert the property by inspection.
+ */
+describe("a failure in the fused announcement rolls back the whole start (fix round 1, F1/F2)", () => {
+  /** Fails only the auto-start announcement's own `system_action` write — every other audit
+   *  call (there are none, for a fresh START_DRAFT) would pass through untouched. */
+  function auditThatFailsAnnouncements(): AuditLogger {
+    const real = getAuditLogger();
+    return {
+      recordAll: (tx, inputs) => real.recordAll(tx, inputs),
+      record: async (tx, input: AuditEventInput): Promise<AuditEvent> => {
+        if (input.eventType === "system_action" && (input.payload as { action?: string }).action === "draft_auto_started") {
+          throw new Error("audit chain unreachable");
+        }
+        return real.record(tx, input);
+      },
+    };
+  }
+
+  it("store.startDraft(draftId, { auto: true }) itself rejects, and claims nothing", async () => {
+    const { draftId } = await seededDraft({ kickoffAt: MINUTE_AGO, isPublicMatchmade: true, teamCount: 2 });
+    const store = createDraftStore({ db, publish: async () => "1-0", clock, audit: auditThatFailsAnnouncements(), deliverNotice: async () => {} });
+
+    await expect(store.startDraft(draftId, { auto: true })).rejects.toThrow("audit chain unreachable");
+
+    // The WHOLE transaction rolled back: the claim, the START_DRAFT append and the notices
+    // that were about to be minted are all gone — not merely the anchor write that threw.
+    expect(await draftStatus(draftId)).toBe("scheduled");
+    expect(await startDraftActionCount(draftId)).toBe(0);
+    expect(await db.select().from(memberNotices).where(eq(memberNotices.noticeType, "draft_auto_started"))).toEqual([]);
   });
 
-  it("returns nothing for a league with no teams, and writes no anchor", async () => {
-    const notices = await announceDraftAutoStarted(db, { leagueId: "league_ghost", leagueName: "Ghost League", occurredAt: now });
-    expect(notices).toEqual([]);
+  it("autoStartDueDrafts reports it honestly, and the draft is genuinely retryable — the docblock's claim, proven rather than assumed", async () => {
+    const { draftId } = await seededDraft({ kickoffAt: MINUTE_AGO, isPublicMatchmade: true, teamCount: 2 });
+    const store = createDraftStore({ db, publish: async () => "1-0", clock, audit: auditThatFailsAnnouncements(), deliverNotice: async () => {} });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    let outcomes: readonly { draftId: string; started: boolean; reason?: string }[];
+    try {
+      outcomes = await autoStartDueDrafts(db, { store, clock });
+    } finally {
+      errorSpy.mockRestore();
+    }
+    expect(outcomes).toEqual([{ draftId, started: false, reason: "Something went wrong starting this draft." }]);
+    // The outcome's own claim is now true, not just plausible: status really did stay scheduled.
+    expect(await draftStatus(draftId)).toBe("scheduled");
+
+    // Genuinely retryable: a second tick, with a healthy audit logger, starts it cleanly.
+    const healthyStore = createDraftStore({ db, publish: async () => "1-0", clock, deliverNotice: async () => {} });
+    expect(await autoStartDueDrafts(db, { store: healthyStore, clock })).toEqual([{ draftId, started: true }]);
+    expect(await draftStatus(draftId)).toBe("in_progress");
   });
 });

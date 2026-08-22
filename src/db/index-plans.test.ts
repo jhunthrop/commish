@@ -3,9 +3,10 @@ import { sql } from "drizzle-orm";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
 import { draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
-import { explainPlan, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
+import { explainPlan, findNode, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
 import { seedRealisticCorpus, seedTradeCorpus } from "./test-corpus";
 import { chatPageQuery } from "@/chat-service/chat";
+import { dueDraftsQuery } from "@/draft-service/auto-start";
 import { pendingFlagQuery } from "@/integrity-service/flags";
 import { signalsForUsersQuery } from "@/integrity-service/session-signals";
 import { completedSeasonsQuery } from "@/league-service/participation";
@@ -107,6 +108,42 @@ describe("hot read paths use indexes", () => {
   it("a user's teams are found by index, not by scanning every team", async () => {
     const query = db.select({ leagueId: teams.leagueId, teamId: teams.id }).from(teams).where(eq(teams.userId, "u7"));
     expect(sequentiallyScannedRelations(await explainPlan(db, query))).not.toContain("teams");
+  });
+
+  /**
+   * PHASE 3 PLAN D, TASK 7 REVIEW FIX ROUND 1 (F3). `autoStartDueDrafts`'s (`@/draft-service/
+   * auto-start`) own scan, `dueDraftsQuery` — the ticker's SECOND reader of `drafts_status_idx`
+   * (`schema.ts`), run on every instance every tick whether or not a draft is due. Measured over
+   * the SAME corpus every other assertion in this block builds from, now that `seedRealisticCorpus`
+   * gives `drafts.status` a real split (`DRAFT_LIVE_INTERVAL`/`DRAFT_SCHEDULED_INTERVAL`,
+   * `@/db/test-corpus`) instead of every row reading `scheduled` — a corpus with zero selectivity
+   * on the column under test would have measured nothing.
+   *
+   * THE MEASUREMENT DECIDED, per the standing rule (`drizzle/0029_draft_due_scan_index.sql` has
+   * the full account): with the ORIGINAL single-column `drafts_status_idx`, this query's plan was
+   * a Bitmap Index Scan finding every `scheduled` row, then a Bitmap Heap Scan applying
+   * `kickoff_at <= now()` as a `Filter` AFTER the fetch — discarding 450 of 495 rows (91%) in this
+   * corpus, uncapped by `maxDraftsPerTick` because the `ORDER BY id` sorts the full result before
+   * the `LIMIT` ever applies. `kickoff_at` shipped as the index's second column, so this
+   * assertion pins the FIXED shape: the composite `Index Cond` covers both predicates and nothing
+   * is fetched only to be thrown away.
+   */
+  it("the auto-start due-kickoff scan seeks on (status, kickoff_at) together, discarding nothing", async () => {
+    const plan = await explainPlan(db, dueDraftsQuery(db, new Date().toISOString()));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("drafts");
+    const usedIndex = indexScanNode(plan, "drafts_status_idx");
+    expect(usedIndex).toBeDefined();
+    // Both predicates are ONE index condition, not a narrow-then-filter — the composite key
+    // doing its job, not merely present in the plan by name.
+    expect(usedIndex?.["Index Cond"]).toContain("status");
+    expect(usedIndex?.["Index Cond"]).toContain("kickoff_at");
+    // And the node that actually touches `drafts` heap pages (the Bitmap Heap Scan one level up
+    // from the Bitmap Index Scan `indexScanNode` found) carries no `Filter` at all: every row the
+    // index returned was one of the 45 genuinely due rows, none fetched only to be discarded.
+    const draftsNode = findNode(plan, (node) => node["Relation Name"] === "drafts");
+    expect(draftsNode).toBeDefined();
+    expect(draftsNode?.Filter).toBeUndefined();
+    expect(draftsNode?.["Rows Removed by Filter"] ?? 0).toBe(0);
   });
 
   /**

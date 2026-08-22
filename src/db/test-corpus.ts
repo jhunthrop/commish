@@ -53,6 +53,25 @@ export const UNSETTLED_LEAGUE_INTERVAL = 500;
  * platform has completed one at launch (`schema.ts`'s own note on `leagues.season_completed_at`).
  */
 export const SEASON_COMPLETED_INTERVAL = 20;
+/**
+ * `drafts.status`'s own realistic split (Phase 3 Plan D, Task 7 review fix round 1, F3), the
+ * two-index-reader table `drafts_status_idx` (`schema.ts`) exists for: `DRAFT_LIVE_INTERVAL`
+ * (1 in 1,000) is a draft actually mid-clock RIGHT NOW — the ticker's own expiry scan's target,
+ * genuinely rare across a whole platform at any single instant. `DRAFT_SCHEDULED_INTERVAL` (1 in
+ * 10, nested so every live draft is excluded first) is a league that has not drafted yet — the
+ * balance, ~90%, is `complete`, which is what a status column with real history behind it looks
+ * like, unlike the corpus's earlier "every draft is scheduled" shape that gave `drafts_status_idx`
+ * zero selectivity to measure against for either of its readers.
+ */
+export const DRAFT_LIVE_INTERVAL = 1_000;
+export const DRAFT_SCHEDULED_INTERVAL = 10;
+/**
+ * Within the scheduled slice, 1 in 10 is OVERDUE — a public matchmade league whose commissioner
+ * never pressed the button before kickoff, `autoStartDueDrafts`'s (`@/draft-service/auto-start`)
+ * own target. ~1% of the whole table, the "small realistic fraction of a rare state" ratio this
+ * file's own docblock already uses for `UNSETTLED_LEAGUE_INTERVAL` and `OPEN_FLAG_INTERVAL`.
+ */
+export const DRAFT_DUE_INTERVAL = 100;
 /** Distinct synthetic player ids spread across the corpus, so `p-1`..`p-3` stay a small, selective slice. */
 export const PLAYER_POOL_SIZE = 5_000;
 /**
@@ -101,12 +120,27 @@ export async function seedRealisticCorpus(db: Db): Promise<void> {
            CASE WHEN g % ${SEASON_COMPLETED_INTERVAL} = 0 THEN now() - (g || ' days')::interval ELSE NULL END
     FROM generate_series(1, ${LEAGUE_COUNT}) g
   `);
+  // Status: mostly complete (a status column with real history behind it), a scheduled slice,
+  // and a rare live slice — see DRAFT_LIVE_INTERVAL/DRAFT_SCHEDULED_INTERVAL's own docblock above
+  // for the exact ratios. Kickoff time follows the same branching: live drafts kicked off
+  // recently, the scheduled-and-overdue slice (DRAFT_DUE_INTERVAL) in the past, every other
+  // scheduled draft comfortably in the future, and a completed draft's kickoff proportional to
+  // the league's own synthetic age (mirrors SEASON_COMPLETED_INTERVAL's own shape above).
   await db.execute(sql`
     INSERT INTO drafts (id, league_id, format, status, kickoff_at)
     SELECT 'df' || g, 'lg' || g,
            (ARRAY['snake','auction'])[1 + (g % 2)]::draft_format,
-           'scheduled'::draft_status,
-           now() + interval '1 day'
+           (CASE
+              WHEN g % ${DRAFT_LIVE_INTERVAL} = 0 THEN 'in_progress'
+              WHEN g % ${DRAFT_SCHEDULED_INTERVAL} = 0 THEN 'scheduled'
+              ELSE 'complete'
+            END)::draft_status,
+           CASE
+             WHEN g % ${DRAFT_LIVE_INTERVAL} = 0 THEN now() - interval '5 minutes'
+             WHEN g % ${DRAFT_SCHEDULED_INTERVAL} = 0 AND g % ${DRAFT_DUE_INTERVAL} = 0 THEN now() - interval '10 minutes'
+             WHEN g % ${DRAFT_SCHEDULED_INTERVAL} = 0 THEN now() + interval '1 day'
+             ELSE now() - (g || ' days')::interval
+           END
     FROM generate_series(1, ${LEAGUE_COUNT}) g
   `);
   await db.execute(sql`

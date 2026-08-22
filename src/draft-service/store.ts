@@ -62,8 +62,13 @@ export interface ApplyOptions {
    * lock at all, and ruling 3 makes the anchor the last lock a transaction takes. Running it
    * after the append would put an unknown lock on the far side of the anchor and reopen exactly
    * the cycle `src/integrity-service/lock-order.test.ts` exists to keep closed.
+   *
+   * May return notices it wrote and already attached to its OWN audit event (Task 7's
+   * auto-start announcement, `startDraft` below) — merged into `createdNotices` for the SAME
+   * post-commit best-effort delivery every other notice in this function gets. A callback with
+   * nothing to announce returns nothing.
    */
-  readonly alsoInTransaction?: (tx: DbTx) => Promise<void>;
+  readonly alsoInTransaction?: (tx: DbTx) => Promise<readonly MemberNotice[] | void>;
   /** Who submitted this action. Absent means the clock acted (a `TIMER_EXPIRE`, never a person). */
   readonly actor?: { readonly id: string };
 }
@@ -72,11 +77,23 @@ export type CommitResult =
   | { readonly ok: true; readonly picks: number; readonly teams: number; readonly alreadyCommitted: boolean }
   | { readonly ok: false; readonly reason: string };
 
+export interface StartDraftOptions {
+  /**
+   * Set ONLY by `autoStartDueDrafts` (`./auto-start.ts`) — never by the manual
+   * `POST /api/drafts/[draftId]/start` route, whose call stays a bare `startDraft(draftId)` and
+   * whose behavior this flag leaves byte-identical. `true` fuses the `draft_auto_started`
+   * notice-and-audit write into THIS SAME transaction, right after the claim succeeds — see
+   * `startDraft`'s own implementation for why fusion (not a second, post-commit transaction) is
+   * what makes a started-but-unannounced draft unrepresentable rather than merely unlikely.
+   */
+  readonly auto?: boolean;
+}
+
 export interface DraftStore {
   getDraftState(draftId: string): Promise<DraftState | null>;
   applyAction(draftId: string, action: DraftAction, options?: ApplyOptions): Promise<ApplyResult>;
   invalidate(draftId: string): void;
-  startDraft(draftId: string): Promise<ApplyResult>;
+  startDraft(draftId: string, options?: StartDraftOptions): Promise<ApplyResult>;
   commitDraftResults(draftId: string): Promise<CommitResult>;
 }
 
@@ -323,7 +340,10 @@ export function createDraftStore({
               pending.push({ notice, pickIndex: i });
             }
 
-            if (options?.alsoInTransaction !== undefined) await options.alsoInTransaction(tx);
+            if (options?.alsoInTransaction !== undefined) {
+              const extraNotices = await options.alsoInTransaction(tx);
+              if (extraNotices !== undefined) createdNotices.push(...extraNotices);
+            }
             // A completed draft becomes a season in the same transaction that completed it.
             // `commitDraftState` writes `draft_picks`/`roster_slots` and the schedule, every one
             // of which takes an FK lock on `leagues`/`teams`/`players` — so it runs here, before
@@ -395,7 +415,7 @@ export function createDraftStore({
       });
     },
 
-    async startDraft(draftId) {
+    async startDraft(draftId, options?: StartDraftOptions) {
       // Reads happen OUTSIDE the mutex — applyAction (below) takes it once. Acquiring it
       // here too would deadlock, since the mutex is not reentrant.
       const config = await loadDraftConfig(db, draftId);
@@ -413,15 +433,29 @@ export function createDraftStore({
         if (existingActions.length === 0) return { ok: false, reason: "This draft has already finished." };
       }
 
-      const teamRows = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, config.leagueId));
+      // `userId`/`leagueName` ride along with `id` on this ONE read (rather than a second query
+      // inside the transaction below): `draftOrder.length < 2` is `reduceStart`'s own precondition,
+      // checked against exactly this array's derived order, so if `applyAction` ever reaches
+      // `alsoInTransaction` these rows are already provably >= 2 — there is nothing an inner
+      // re-query could learn that this one has not already established.
+      const teamRows = await db
+        .select({ id: teams.id, userId: teams.userId, leagueName: leagues.name })
+        .from(teams)
+        .innerJoin(leagues, eq(leagues.id, teams.leagueId))
+        .where(eq(teams.leagueId, config.leagueId))
+        .orderBy(teams.id);
       const pool = await buildDraftPool(db, config.leagueId);
       if (pool.length === 0) return { ok: false, reason: "There are no players to draft yet." };
+      // One instant for both the action's own timestamp and (when `auto`) the announcement's
+      // `occurredAt` — read once here rather than twice, which could otherwise disagree by
+      // however long the transaction below takes to reach the second read.
+      const now = clock.now();
       return store.applyAction(
         draftId,
         {
           v: DRAFT_ACTION_VERSION,
           type: "START_DRAFT",
-          timestamp: clock.now(),
+          timestamp: now,
           draftOrder: draftOrderFor(draftId, teamRows.map((t) => t.id)),
           pool,
           // Command time is the ONE place the tunable is read — it rides the persisted
@@ -443,6 +477,60 @@ export function createDraftStore({
             // surface loudly, not a rejection to hand back quietly.
             const claimed = await claimAutoStart(tx, draftId);
             if (!claimed) throw new Error(`Draft "${draftId}" was not "scheduled" when its own start transaction tried to claim it.`);
+            if (options?.auto !== true) return;
+
+            // TASK 7'S ANNOUNCEMENT, FUSED HERE rather than in a second, post-commit transaction
+            // (review fix round 1, F1): a crash between "the draft started" and "the league was
+            // told" would otherwise leave a real started draft with no audit trail and no
+            // notices, permanently — `autoStartDueDrafts`'s own scan only ever finds a draft
+            // whose status is still `'scheduled'`, so nothing would ever revisit it. Fused into
+            // this one transaction, that state is not merely unlikely, it is UNREPRESENTABLE:
+            // either both halves commit or neither does, the identical property `claimAutoStart`
+            // above already gives the start itself.
+            //
+            // `draft_auto_started` is league-scoped and `SYSTEM_ACTION_VISIBILITY` allows it to
+            // everyone (Task 4) — a fact about the league's shared calendar, true for everyone in
+            // it, about nobody's conduct — so this sends ONE notice per TEAM in the league, all
+            // referencing the SAME `system_action` event: the identical one-event-many-notices
+            // shape `resolveFlag`'s `trade_blocked` branch uses (`@/integrity-service/flags`).
+            //
+            // ONE-TRANSACTION DISCIPLINE, held to the same order as the rest of this function:
+            // business rows (the claim above) -> notices -> audit.record -> attachAuditEvent ->
+            // anchor last. `picked` is empty for a fresh `START_DRAFT` (no picks exist yet), so
+            // the anchor `audit.recordAll(tx, picked)` below this callback's return is a no-op —
+            // THIS event is the transaction's only anchor write, and nothing after it takes a
+            // lock this callback's own `audit.record` has not already accounted for.
+            //
+            // `teamRows` is the OUTER read above (`id`/`userId`/`leagueName` together, taken once
+            // before this transaction opened) — never re-queried here. `reduceDraft`/`reduceStart`
+            // already admitted `draftOrder` (built from this exact array) as >= 2 teams before
+            // `alsoInTransaction` ever runs, under the SAME `drafts FOR UPDATE` lock this
+            // transaction has held since before that check, so by the time this line runs
+            // `teamRows.length >= 2` is not assumed, it is ALREADY PROVEN.
+            const created: MemberNotice[] = [];
+            for (const teamRow of teamRows) {
+              created.push(
+                await notifyAffectedMember(tx, {
+                  leagueId: config.leagueId,
+                  userId: teamRow.userId,
+                  noticeType: "draft_auto_started",
+                  context: { leagueName: teamRow.leagueName },
+                  occurredAt: now,
+                  auditEventId: null,
+                }),
+              );
+            }
+            const event = await audit.record(tx, {
+              eventType: "system_action",
+              actorId: null,
+              actorType: "system",
+              leagueId: config.leagueId,
+              payload: { action: "draft_auto_started" },
+              occurredAt: now,
+            });
+            const attached: MemberNotice[] = [];
+            for (const notice of created) attached.push(await attachAuditEvent(tx, notice, event.eventId));
+            return attached;
           },
         },
       );

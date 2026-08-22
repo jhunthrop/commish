@@ -296,9 +296,21 @@ export const drafts = pgTable(
     // This converts that invariant-by-convention into an invariant-by-constraint before any
     // Phase 1 data exists to violate it.
     uniqueIndex("drafts_league_id_idx").on(t.leagueId),
-    // The ticker scans every in_progress draft on a fixed interval — this is what makes
-    // that scan an index lookup instead of a sequential scan as the table grows.
-    index("drafts_status_idx").on(t.status),
+    // TWO READERS, MEASURED (Phase 3 Plan D, Task 7 review fix round 1, F3;
+    // src/db/index-plans.test.ts's "hot read paths" over `seedRealisticCorpus`,
+    // `@/db/test-corpus`). The ticker's expiry scan (`ticker.ts`) reads `status = 'in_progress'`
+    // alone, which a leading `status` column serves identically whether or not a second column
+    // follows it. `autoStartDueDrafts`'s (`@/draft-service/auto-start`) due-kickoff scan reads
+    // `status = 'scheduled' AND kickoff_at <= now()`, every tick, on every instance, whether or
+    // not any draft is actually due — with `status` alone, that scan's own EXPLAIN measured a
+    // real, unbounded-with-growth cost: a bitmap heap fetch across the WHOLE `scheduled`
+    // population (91% of it discarded by a `kickoff_at` filter applied AFTER the fetch, in this
+    // corpus) that a `LIMIT` cannot short-circuit, because `ORDER BY id` sorts the join's full
+    // result before the limit ever applies. `kickoff_at` appended as the index's second column
+    // lets that same scan seek straight to the due rows instead, at zero cost to the first
+    // reader — the measurement `drizzle/0029_draft_due_scan_index.sql` records is what decided
+    // this rather than reasoning about it in the abstract.
+    index("drafts_status_idx").on(t.status, t.kickoffAt),
   ],
 );
 

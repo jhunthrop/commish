@@ -83,6 +83,22 @@ export function indexScanNode(plan: PlanNode, indexName: string): PlanNode | und
 }
 
 /**
+ * The first node anywhere in the plan `predicate` matches, or `undefined` if none does. General
+ * where `indexScanNode` is specific: e.g. finding the node that actually touches a relation's heap
+ * pages (a Bitmap Heap Scan, which carries `Relation Name` but no `Index Name` of its own — the
+ * `Index Name` lives one level down, on its child Bitmap Index Scan) to check what `Filter`, if
+ * any, ran on the rows an index scan already narrowed.
+ */
+export function findNode(plan: PlanNode, predicate: (node: PlanNode) => boolean): PlanNode | undefined {
+  if (predicate(plan)) return plan;
+  for (const child of plan.Plans ?? []) {
+    const found = findNode(child, predicate);
+    if (found !== undefined) return found;
+  }
+  return undefined;
+}
+
+/**
  * Every `Node Type` in the plan tree, in encounter order, duplicates included.
  *
  * The assertion this exists for is an inverted one: a plan that reaches the right index and
