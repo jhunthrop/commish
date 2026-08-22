@@ -10,6 +10,7 @@ import {
   contentRemovalIsWiredFor,
   decisionIsOperatorChoosable,
   decisionIsWiredFor,
+  LEAGUE_QUESTION_FLAG_TYPES,
   RESOLUTION_DECISIONS,
   TRADE_FAIRNESS_BASES,
   type FlagSubjectType,
@@ -21,6 +22,7 @@ import type { NoticeType } from "@/integrity/notices";
 import {
   flagDetailFor,
   flagTrailRowFor,
+  noLongerHeldExplanationFor,
   queueRowFor,
   tradeFairnessBasisPhrase,
   tradeFairnessGapPhrase,
@@ -44,6 +46,7 @@ import { removeReviewInTx } from "@/review-service/reviews";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
 import { assetPlayerIds } from "@/trades/assets";
+import type { TradeStatus } from "@/trades/lifecycle";
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "./notify";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
 import { raiseFlag, type IntegrityFlag, type RaiseFlagInput, type RaiseFlagResult } from "./raise-flag";
@@ -1028,6 +1031,9 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
         fairnessGapSummary,
         proposerManager: missing,
         counterpartyManager: missing,
+        // The row is gone entirely (cascaded away with its league or a team). Neither decision can
+        // land, so neither is offered — final review F4.
+        noLongerHeldExplanation: noLongerHeldExplanationFor(null),
       };
     }
     const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(inArray(teams.id, [row.proposerTeamId, row.counterpartyTeamId]));
@@ -1045,6 +1051,12 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
       fairnessGapSummary,
       proposerManager: await heldTradeManagerViewFor(db, row.leagueId, teamOf(row.proposerTeamId)),
       counterpartyManager: await heldTradeManagerViewFor(db, row.leagueId, teamOf(row.counterpartyTeamId)),
+      // The LIVE status column, the one field this subject view never carried (final review F4).
+      // `null` while the row is genuinely still `held`; a sentence the operator reads in place of
+      // Release and Block once it is not. A PREVIEW, not a guarantee, the identical honesty
+      // `playersMovedAgain` keeps below: a supersede can still land between this read and the
+      // click, and the guarded `UPDATE ... WHERE status = 'held'` stays the authoritative one.
+      noLongerHeldExplanation: noLongerHeldExplanationFor(row.status as TradeStatus),
     };
   }
 
@@ -1402,7 +1414,8 @@ function laterOf(a: Date | string | null, b: Date | string | null): string | nul
  *    definition that keeps this a bounded, indexed join rather than a scan of every review on the
  *    platform: `teams_league_user_idx`'s own uniqueness means this join can never double-count an
  *    account across two seats in the same league.
- *  - `integrity_flags` filtered to `league_id = X AND resolved_at IS NULL`. No index carries
+ *  - `integrity_flags` filtered to `league_id = X AND resolved_at IS NULL AND flag_type IN
+ *    (the league-question types)`. No index carries
  *    `league_id` on its own, but the WHERE clause is a strict superset of TWO indexes' own
  *    partial predicate (`resolved_at IS NULL`) — `integrity_flags_queue_idx` and
  *    `integrity_flags_open_subject_idx` — so Postgres can still walk one of them rather than the
@@ -1437,7 +1450,17 @@ export async function leagueModerationSummary(db: Db, input: LeagueModerationSum
     db
       .select({ count: sql<number>`count(*)::int` })
       .from(integrityFlags)
-      .where(and(eq(integrityFlags.leagueId, input.leagueId), isNull(integrityFlags.resolvedAt))),
+      .where(
+        and(
+          eq(integrityFlags.leagueId, input.leagueId),
+          isNull(integrityFlags.resolvedAt),
+          // F5: `trade_hold` is league-SCOPED on the row and is not league NEWS — see
+          // `FLAG_IS_LEAGUE_QUESTION`'s own docblock (`@/integrity/flags`) for the whole
+          // accounting. Read from that table rather than a `ne(flagType, "trade_hold")` here, so
+          // the next flag type has to decide rather than default into a commissioner's counter.
+          inArray(integrityFlags.flagType, LEAGUE_QUESTION_FLAG_TYPES),
+        ),
+      ),
   ]);
 
   return {

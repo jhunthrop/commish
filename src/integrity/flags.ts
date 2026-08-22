@@ -50,6 +50,35 @@ export const SUBJECT_OF: Readonly<Record<FlagType, FlagSubjectType>> = {
   trade_hold: "held_trade",
 };
 
+/**
+ * Whether a flag of this type counts toward the COMMISSIONER's own open-questions number
+ * (`leagueModerationSummary`, `@/integrity-service/flags`). Exhaustive: a new flag type must
+ * decide, at declaration, whether a commissioner learns that one exists in their league.
+ *
+ * Final review F5, a Task 8 × Task 5 interaction. The count shipped with no flag-type filter at
+ * all, which was correct when Task 8's brief sanctioned it: every flag type then in the queue was
+ * about league CONTENT — a removed message, a reported review, a multi-account pair inside this
+ * league, a completed trade the league can already see in its own activity feed. Plan D then added
+ * `trade_hold`, which is league-scoped on the row (`holdTradeInTx` writes the trade's own
+ * `leagueId`) but is emphatically NOT league news: the hold design's own invariant, written four
+ * lines below the raise, is "platform chain — nothing about a hold is league news (ruling 12)",
+ * and Task 5's fix round shipped the matching privacy at the wire. An unfiltered count then told a
+ * third party that two of their managers are under a fairness question, which is the one fact the
+ * whole hold design keeps from them. A count and not a list caps the harm; it does not make it
+ * something the commissioner is entitled to.
+ */
+export const FLAG_IS_LEAGUE_QUESTION: Readonly<Record<FlagType, boolean>> = {
+  multi_account: true,
+  review_report: true,
+  chat_report: true,
+  trade_fairness: true,
+  trade_hold: false,
+};
+
+/** The flag types a commissioner's own open-questions count is allowed to see — derived from
+ *  `FLAG_IS_LEAGUE_QUESTION` rather than hand-listed, so the table stays the single answer. */
+export const LEAGUE_QUESTION_FLAG_TYPES: readonly FlagType[] = FLAG_TYPES.filter((flagType) => FLAG_IS_LEAGUE_QUESTION[flagType]);
+
 export const RESOLUTION_DECISIONS = [
   /** The operator looked and nothing needs to happen. Notices nobody, on purpose (ruling 6). */
   "no_action",

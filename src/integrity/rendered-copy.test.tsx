@@ -9,6 +9,7 @@ import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
 import type { ActivityRow } from "@/integrity/activity-view";
+import { noLongerHeldExplanationFor } from "@/integrity/queue-view";
 import type { TradeProposalView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
@@ -296,6 +297,7 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
       fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
       proposerManager: { userId: "u_bb", name: "Bay Bandits Owner", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
       counterpartyManager: { userId: "u_io", name: "Iron Owls Owner", joinedAt: null, completedSeasons: 0 },
+      noLongerHeldExplanation: null,
     };
     const HELD_DETAIL = {
       ...FLAG_DETAIL,
@@ -310,6 +312,16 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
     for (const detail of [
       HELD_DETAIL,
       { ...HELD_DETAIL, trail: [] },
+      // Final review F4: the open-flag-but-no-decision-left state, each of the three sentences it
+      // can render. Swept here because the state is reachable in production (a superseded held
+      // trade before the closing sweep runs; a decision whose flag stamp failed after the trade
+      // transaction committed) and the copy is server-composed, which the source scans are blind
+      // to by construction.
+      ...(["superseded", "accepted", "blocked"] as const).map((status) => ({
+        ...HELD_DETAIL,
+        subject: { ...HELD_TRADE_SUBJECT, noLongerHeldExplanation: noLongerHeldExplanationFor(status) },
+        decisions: [] as const,
+      })),
       {
         ...HELD_DETAIL,
         resolution: { decision: "trade_blocked" as const, note: "Both teams belong to one person.", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op", resolvedByName: "Op Erator" },
@@ -354,6 +366,7 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
         fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
         proposerManager: { userId: "u_bb", name: "Bay Bandits Owner", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
         counterpartyManager: { userId: "u_io", name: "Iron Owls Owner", joinedAt: null, completedSeasons: 0 },
+        noLongerHeldExplanation: null,
       },
       reporters: [],
       trail: [],
@@ -416,8 +429,10 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
             fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
             proposerManager: { userId: "u_bb", name: "Bay Bandits Owner", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
             counterpartyManager: { userId: "u_io", name: "Iron Owls Owner", joinedAt: null, completedSeasons: 0 },
+            noLongerHeldExplanation: null,
           }}
           trail={[]}
+          decisions={["trade_released", "trade_blocked"]}
           noteMaxLength={500}
         />
       </AdminRoomDepsProvider>,

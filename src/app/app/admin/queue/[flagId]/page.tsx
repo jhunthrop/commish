@@ -273,7 +273,15 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
                 <ResolutionSummary resolution={detail.resolution} />
               </Card>
             ) : (
-              <HeldTradeDetail flagId={detail.flagId} subject={heldSubject} trail={detail.trail} noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength} />
+              <HeldTradeDetail
+                flagId={detail.flagId}
+                subject={heldSubject}
+                trail={detail.trail}
+                // The SAME offered set every other subject's form reads (final review F4) — this
+                // surface renders its two buttons out of it rather than assuming both are live.
+                decisions={detail.decisions}
+                noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength}
+              />
             )}
           </main>
         </>

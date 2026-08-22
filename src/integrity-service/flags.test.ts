@@ -8,7 +8,7 @@ import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import type { AuditEventType, JsonObject } from "@/domain/audit";
 import { copyViolations } from "@/integrity/copy-rules";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import type { FlagType } from "@/integrity/flags";
+import { LEAGUE_QUESTION_FLAG_TYPES, type FlagType } from "@/integrity/flags";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { listLeagueActivity } from "./activity";
 import { createLeague } from "@/league-service/creation";
@@ -2659,10 +2659,10 @@ describe("leagueModerationSummary", () => {
     }
   }
 
-  async function seedOpenFlag(leagueId: string, subjectId: string): Promise<void> {
+  async function seedOpenFlag(leagueId: string, subjectId: string, flagType: FlagType = "chat_report"): Promise<void> {
     await db.transaction((tx) =>
       raiseFlag(tx, {
-        flagType: "chat_report",
+        flagType,
         subjectId,
         leagueId,
         evidence: {},
@@ -2735,6 +2735,33 @@ describe("leagueModerationSummary", () => {
     await db.update(integrityFlags).set({ resolvedAt: new Date(NOW), resolvedByUserId: "u_mod_commish5", resolution: "no_action", resolutionNote: "n" }).where(eq(integrityFlags.leagueId, "lg_mod_5"));
 
     expect((await leagueModerationSummary(db, { leagueId: "lg_mod_5", userId: "u_mod_commish5" }))!.openQuestions).toBe(0);
+  });
+
+  /**
+   * Final review F5, a Task 8 × Task 5 interaction neither task's review could see. Task 8's brief
+   * sanctioned an unfiltered count, and correctly so — it predates `trade_hold` flags being
+   * league-scoped. A hold is platform business by the hold design's own invariant ("nothing about
+   * a hold is league news", ruling 12), so counting it told a third party that two of their
+   * managers are under a fairness question.
+   */
+  it("never counts a trade hold: a question about two managers is not league news, however scoped the row is", async () => {
+    await seedLeagueWith("lg_mod_hold", "u_mod_commish_hold");
+    await seedOpenFlag("lg_mod_hold", "subject_chat", "chat_report");
+    await seedOpenFlag("lg_mod_hold", "subject_held_trade", "trade_hold");
+
+    // The chat report counts; the hold, raised in the same league and open at the same moment,
+    // does not move the number at all.
+    expect((await leagueModerationSummary(db, { leagueId: "lg_mod_hold", userId: "u_mod_commish_hold" }))!.openQuestions).toBe(1);
+  });
+
+  it("counts every OTHER flag type, so the exclusion stays narrow to the one type it is about", async () => {
+    await seedLeagueWith("lg_mod_types", "u_mod_commish_types");
+    for (const flagType of LEAGUE_QUESTION_FLAG_TYPES) await seedOpenFlag("lg_mod_types", `subject_${flagType}`, flagType);
+
+    expect((await leagueModerationSummary(db, { leagueId: "lg_mod_types", userId: "u_mod_commish_types" }))!.openQuestions).toBe(
+      LEAGUE_QUESTION_FLAG_TYPES.length,
+    );
+    expect(LEAGUE_QUESTION_FLAG_TYPES).not.toContain("trade_hold");
   });
 
   it("never counts an open flag raised against a DIFFERENT league", async () => {

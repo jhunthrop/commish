@@ -394,6 +394,7 @@ describe("AdminFlagDetailPage — the held_trade subject arm (Plan D, Task 5, fi
     fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
     proposerManager: { userId: "u_alice", name: "Alice", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
     counterpartyManager: { userId: "u_bob", name: "Bob", joinedAt: null, completedSeasons: 0 },
+    noLongerHeldExplanation: null,
   };
 
   it("renders the two-button held-trade surface while the flag is still open", async () => {

@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { AuditEvent, AuditEventType, JsonObject } from "@/domain/audit";
 import { TRADE_FAIRNESS_BASES } from "@/integrity/flags";
+import { TRADE_STATUSES } from "@/trades/lifecycle";
 import { ACTIVITY_VISIBILITY, activityRowFor } from "./activity-view";
 import {
   flagDetailFor,
   flagTrailRowFor,
   formatFlagCursor,
+  noLongerHeldExplanationFor,
   parseFlagCursor,
   queueRowFor,
   subjectIsAlreadyReversed,
+  subjectIsNoLongerHeld,
   subjectPlayersMovedAgain,
   TRADE_FAIRNESS_BASIS_PHRASE,
   tradeFairnessBasisPhrase,
@@ -310,11 +313,50 @@ describe("flagDetailFor's decisions narrow on the SUBJECT, Task 7", () => {
     fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
     proposerManager: { userId: "u_alice", name: "Alice", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
     counterpartyManager: { userId: "u_bob", name: "Bob", joinedAt: "2026-02-01T00:00:00.000Z", completedSeasons: 0 },
+    noLongerHeldExplanation: null,
   };
 
   it("offers exactly trade_released and trade_blocked for a held_trade subject — no no_action, no warned_user, no reversal", () => {
     const detail = flagDetailFor({ ...flag, flagType: "trade_hold" }, heldTradeSubject, [], []);
     expect(detail.decisions).toEqual(["trade_released", "trade_blocked"]);
+  });
+
+  /**
+   * Final review F4: the M8 promise ("never offer a decision that 409s") reaches Plan D's own
+   * subject. Every state but `held` withholds BOTH decisions, which are the only two wired for
+   * this subject, so the offered set is empty and the page has an explanation to render instead.
+   */
+  it.each(TRADE_STATUSES.filter((status) => status !== "held"))("offers NOTHING for a held_trade whose row has moved to %s", (status) => {
+    const moved: FlagSubjectView = { ...heldTradeSubject, noLongerHeldExplanation: noLongerHeldExplanationFor(status) };
+    const detail = flagDetailFor({ ...flag, flagType: "trade_hold" }, moved, [], []);
+    expect(detail.decisions).toEqual([]);
+    expect(subjectIsNoLongerHeld(moved)).toBe(true);
+  });
+
+  it("still offers both while the row is genuinely held", () => {
+    expect(noLongerHeldExplanationFor("held")).toBeNull();
+    expect(subjectIsNoLongerHeld(heldTradeSubject)).toBe(false);
+  });
+
+  it("answers false for subjectIsNoLongerHeld on every other subject kind", () => {
+    expect(subjectIsNoLongerHeld(tradeSubject)).toBe(false);
+    expect(subjectIsNoLongerHeld({ kind: "chat_message", messageId: "5", body: "hi", authorName: "Bob", removedAt: null })).toBe(false);
+  });
+
+  it("explains a trade that is gone entirely rather than leaving the operator a blank card", () => {
+    // The `row === undefined` branch of `subjectFor` — the trade cascaded away with its league.
+    expect(noLongerHeldExplanationFor(null)).toBe("This trade is no longer here, so there is nothing left to release or block.");
+  });
+
+  it("names every trade status, so a ninth one cannot ship without an operator sentence", () => {
+    // Totality over the runtime array, the same shape `system-actions.test.ts` holds the
+    // visibility table to. The `Record<TradeStatus, …>` type already makes a missing key a
+    // compile error; this catches the other direction, a key that no longer names a real status.
+    for (const status of TRADE_STATUSES) {
+      const phrase = noLongerHeldExplanationFor(status);
+      if (status === "held") expect(phrase).toBeNull();
+      else expect(phrase).toMatch(/\S/);
+    }
   });
 
   it("never offers trade_released/trade_blocked on any other subject kind", () => {
@@ -337,6 +379,7 @@ describe("FlagSubjectView's held_trade arm (Plan D, Task 5)", () => {
       fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
       proposerManager: { userId: "u_alice", name: "Alice", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
       counterpartyManager: { userId: "u_bob", name: "Bob", joinedAt: null, completedSeasons: 0 },
+      noLongerHeldExplanation: null,
     };
     const detail = flagDetailFor({ ...flag, flagType: "trade_hold" }, subject, [], []);
     expect(detail.subject).toBe(subject);

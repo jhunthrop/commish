@@ -20,6 +20,16 @@ export interface HeldTradeDetailProps {
    *  everything an operator needs and nothing else, in one place, not split across two cards that
    *  happen to sit on the same page. */
   readonly trail: readonly ActivityRow[];
+  /**
+   * `flagDetailFor`'s own offered set (`@/integrity/queue-view`), passed down rather than assumed
+   * — final review F4. This surface used to render Release and Block unconditionally whenever the
+   * flag was unresolved, which is the one place in the product that broke the page's standing
+   * promise that an operator is never offered a decision that fails on submit: a held trade
+   * superseded while its flag was still open (the crash window `closeSupersededHoldFlag`
+   * documents) offered two buttons that both answered 409. When this set is empty,
+   * `subject.noLongerHeldExplanation` says why, in that state's own words.
+   */
+  readonly decisions: readonly ResolutionDecision[];
   /** `INTEGRITY_CONFIG.moderation.noteMaxLength` — passed as a prop, never imported directly:
    *  `@/integrity` is blocked for room code (the client boundary, `eslint.config.mjs`). */
   readonly noteMaxLength: number;
@@ -127,7 +137,7 @@ function ConfirmModal({
  * An operator surface is a user-visible surface (Plan B ruling 27): it gets the full state
  * coverage, the axe pass, the keyboard walkthrough and 360px every other room surface does.
  */
-export function HeldTradeDetail({ flagId, subject, trail, noteMaxLength }: HeldTradeDetailProps) {
+export function HeldTradeDetail({ flagId, subject, trail, decisions, noteMaxLength }: HeldTradeDetailProps) {
   const { fetchJson } = useAdminRoomDeps();
   const router = useRouter();
   const [note, setNote] = useState("");
@@ -210,6 +220,17 @@ export function HeldTradeDetail({ flagId, subject, trail, noteMaxLength }: HeldT
         )}
       </Card>
 
+      {decisions.length === 0 ? (
+        <Card>
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
+          {/* F4: no decision can land on this trade any more, so none is offered and the state
+              explains itself. The flag stays OPEN on purpose — closing it is the sweep's job
+              (`sweepSupersededHoldFlags`), not a button this page could invent. */}
+          <p role="status" className="text-sm text-text-primary">
+            {subject.noLongerHeldExplanation}
+          </p>
+        </Card>
+      ) : (
       <Card>
         <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
         <Textarea
@@ -230,14 +251,19 @@ export function HeldTradeDetail({ flagId, subject, trail, noteMaxLength }: HeldT
         {/* `gap-4`, matching `TradeCard`'s own Accept/Decline row — the only other irreversible
             button pair in this product. */}
         <div className="mt-4 flex flex-wrap gap-4">
-          <Button onClick={() => setConfirming("trade_released")} disabled={submitting}>
-            Release the trade
-          </Button>
-          <Button variant="destructive" onClick={() => setConfirming("trade_blocked")} disabled={submitting}>
-            Block the trade
-          </Button>
+          {decisions.includes("trade_released") ? (
+            <Button onClick={() => setConfirming("trade_released")} disabled={submitting}>
+              Release the trade
+            </Button>
+          ) : null}
+          {decisions.includes("trade_blocked") ? (
+            <Button variant="destructive" onClick={() => setConfirming("trade_blocked")} disabled={submitting}>
+              Block the trade
+            </Button>
+          ) : null}
         </div>
       </Card>
+      )}
 
       <ConfirmModal
         open={confirming === "trade_released"}

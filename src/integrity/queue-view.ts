@@ -3,6 +3,7 @@ import type { AuditEvent, JsonObject } from "@/domain/audit";
 import type { Position } from "@/domain/player";
 import { decisionIsOperatorChoosable, decisionIsWiredFor, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision, type TradeFairnessBasis } from "@/integrity/flags";
 import type { ActivityRow } from "@/integrity/activity-view";
+import type { TradeStatus } from "@/trades/lifecycle";
 
 /**
  * What an operator sees. The deliberate opposite number of `activity-view.ts`, which decides what
@@ -127,6 +128,18 @@ export type FlagSubjectView =
       readonly fairnessGapSummary: string;
       readonly proposerManager: HeldTradeManagerView;
       readonly counterpartyManager: HeldTradeManagerView;
+      /**
+       * Final review F4. `null` while the trade is genuinely still `held` and both decisions are
+       * live; a rendered sentence the moment it is not, naming the state in plain words.
+       *
+       * ONE FIELD CARRIES BOTH the predicate and its explanation, so the two can never drift:
+       * `subjectIsNoLongerHeld` reads it to withhold `trade_released`/`trade_blocked`, and
+       * `HeldTradeDetail` renders it in place of the two buttons. The precedent is
+       * `valuationBasis`/`fairnessGapSummary` directly above — a raw column, turned server-side
+       * into one sentence over a bounded set (`TRADE_STATUSES`), never a raw enum shipped to a
+       * component to switch on.
+       */
+      readonly noLongerHeldExplanation: string | null;
     }
   | {
       readonly kind: "trade";
@@ -211,6 +224,65 @@ export function subjectIsAlreadyReversed(subject: FlagSubjectView): boolean {
  */
 export function subjectPlayersMovedAgain(subject: FlagSubjectView): boolean {
   return subject.kind === "trade" && subject.playersMovedAgain;
+}
+
+/**
+ * The sentence an operator reads in place of Release and Block, one per state a held trade's row
+ * can be in while its own flag is still open. `null` for `held`, which is the state both decisions
+ * are FOR.
+ *
+ * Exhaustive over `TRADE_STATUSES` (final review F4), so a ninth status is a compile error here
+ * rather than a held trade rendering two buttons that 409. Two of the eight are genuinely
+ * reachable with an open flag, and both are crash windows this codebase already documents:
+ *
+ *  - `superseded` — a different trade moved one of these players before an operator decided this
+ *    one. `closeSupersededHoldFlag`'s own after-commit call closes the flag, and `npm run
+ *    trades:sweep` re-closes it if that call never landed; until then the flag sits open over an
+ *    inert trade, for an arbitrarily long window since the sweep is hand-run.
+ *  - `accepted`/`blocked` — a decision's own trade transaction committed and `resolveFlag`'s
+ *    platform-chain stamp then failed (ruling 13's execute-first ordering, whose asymmetry is
+ *    exactly this). The decision is real; only the flag is still open.
+ *
+ * The rest are unreachable for a `held_trade` subject (nothing moves a `held` row back to `open`,
+ * `rejected`, `withdrawn` or `expired` — `transitionIsLegal`, `@/trades/lifecycle`), and they get
+ * an honest sentence rather than a lie or a crash, the same "degrade honestly" discipline every
+ * other read in this file keeps.
+ */
+const NO_LONGER_HELD_EXPLANATION: Readonly<Record<TradeStatus, string | null>> = {
+  held: null,
+  superseded: "A different trade moved one of these players first, so there is nothing left to release or block. This flag closes on its own the next time the trade sweep runs.",
+  accepted: "This trade already went through, so there is nothing left to decide. The record of who released it is on this flag's own history above.",
+  blocked: "This trade was already blocked, so there is nothing left to decide. The record of who blocked it is on this flag's own history above.",
+  open: "This trade is no longer waiting on a decision.",
+  rejected: "This trade is no longer waiting on a decision.",
+  withdrawn: "This trade is no longer waiting on a decision.",
+  expired: "This trade is no longer waiting on a decision.",
+};
+
+/** The trade behind a `held_trade` subject is gone entirely — cascaded away with a league or a
+ *  team. Nothing to release and nothing to block, and the operator is told so plainly. */
+const HELD_TRADE_GONE_EXPLANATION = "This trade is no longer here, so there is nothing left to release or block.";
+
+/**
+ * `NO_LONGER_HELD_EXPLANATION[status]`, with the same honest fallback for a row that is gone
+ * entirely that every other subject branch keeps. `subjectFor` (`@/integrity-service/flags`) is
+ * the one caller, and it passes the trade's own live `status` column — the one field the
+ * `held_trade` subject view never carried, which is why `HeldTradeDetail` was offering both
+ * decisions unconditionally (final review F4).
+ */
+export function noLongerHeldExplanationFor(status: TradeStatus | null): string | null {
+  return status === null ? HELD_TRADE_GONE_EXPLANATION : NO_LONGER_HELD_EXPLANATION[status];
+}
+
+/**
+ * Whether this held trade has moved on since its flag was raised — `subjectIsRemoved`'s and
+ * `subjectIsAlreadyReversed`'s own twin for Plan D's subject, and the last of the four to exist
+ * (final review F4). `flagDetailFor` reads it to withhold BOTH `trade_released` and
+ * `trade_blocked`, which are the only two decisions wired for this subject, so the offered set for
+ * a superseded held trade is empty rather than two buttons that answer 409.
+ */
+export function subjectIsNoLongerHeld(subject: FlagSubjectView): boolean {
+  return subject.kind === "held_trade" && subject.noLongerHeldExplanation !== null;
 }
 
 /** One reporter's own account of it — who, why, and when. Derived at read time from
@@ -299,6 +371,12 @@ export interface FlagDetailInput {
  * back (`subjectIsAlreadyReversed`) never offers a second one, and a trade whose players have
  * moved on since (`subjectPlayersMovedAgain`, fix round 1) never offers one that would 409 on
  * submit.
+ *
+ * Final review F4 extends the identical promise to Plan D's `held_trade` subject, the one subject
+ * it had never been extended to: a held trade whose row has moved on (`subjectIsNoLongerHeld`)
+ * offers NEITHER `trade_released` NOR `trade_blocked` — the only two decisions wired for it — so
+ * the set is empty and `HeldTradeDetail` renders that state's own explanation in place of two
+ * buttons that would both answer "This trade is no longer waiting on a decision."
  */
 export function flagDetailFor(
   flag: FlagDetailInput,
@@ -327,7 +405,10 @@ export function flagDetailFor(
               // for — `superseded_before_review` is wired `true` for `held_trade` (the product
               // does carry it out), but no operator ever chooses it from this list.
               decisionIsOperatorChoosable(decision) &&
-              (decision !== "trade_reversed" || (!subjectIsAlreadyReversed(subject) && !subjectPlayersMovedAgain(subject))),
+              (decision !== "trade_reversed" || (!subjectIsAlreadyReversed(subject) && !subjectPlayersMovedAgain(subject))) &&
+              // F4: both of the held trade's own decisions, withheld together, because the row
+              // they act on has already moved past `held` and each would 409 on submit.
+              !subjectIsNoLongerHeld(subject),
           )
         : [],
   };

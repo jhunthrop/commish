@@ -354,6 +354,24 @@ claim to distinguish collusion from an ordinary, if unusual, agreement between t
 understand what they are doing. That is exactly why the resolution is usually `trade_released`: an
 operator's job is to look once, not to presume guilt from a number.
 
+**Who may learn a hold exists, enumerated.** The two managers in the trade, and operators. Not the
+commissioner, and not the league. `holdTradeInTx` writes the trade's own `leagueId` onto the
+`trade_hold` flag row, and that is provenance rather than an audience: the audit event goes on the
+PLATFORM chain, `ACTIVITY_VISIBILITY` never surfaces it, and Task 5's fix round took the hold off
+the league-facing trade wire entirely.
+
+The final review (F5) found the one place that enumeration had a hole. `leagueModerationSummary`'s
+`openQuestions` counted every unresolved flag scoped to the league with no flag-type filter, so
+every auto-hold between any two managers incremented a third party's counter. That count was
+sanctioned by Task 8's own brief, correctly, at a time when every flag type in the queue was about
+league CONTENT: a removed message, a reported review, a multi-account pair inside this league, a
+completed trade the league can already see in its own activity feed. `trade_hold` is the first flag
+type that is league-scoped without being league news. **`openQuestions` now counts the four content
+types and excludes `trade_hold`**, read from `FLAG_IS_LEAGUE_QUESTION` (`@/integrity/flags`) so the
+next flag type has to decide at declaration rather than default into a commissioner's counter. A
+count and not a list capped the harm; it did not make the existence of a hold something the
+commissioner is entitled to.
+
 ## 9. The clock, and the two schedulers
 
 **A commissioner-chosen kickoff.** `drafts.kickoff_at` has existed since Phase 1, computed but
