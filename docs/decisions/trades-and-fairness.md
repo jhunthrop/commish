@@ -265,6 +265,15 @@ every accepted trade with no `trade_fairness` flag at all and re-raises. `raiseF
 open-subject unique index makes a re-run idempotent by construction — a second raise for a trade
 that already has a flag returns the existing one and writes no second event.
 
+A `trade_hold` flag disqualifies a trade from that sweep just as a `trade_fairness` one does, open
+or resolved (final review F1). The two thresholds are ordered on one axis and pinned that way (20 ≤
+35), and the hold flag carries the identical `evidenceFor` payload, so an operator who released a
+held trade answered this detector's question at the stricter threshold on the same numbers before
+the rosters ever moved. Without that exclusion the sweep raised a fresh open flag over the released
+trade and offered **Reverse this trade** — the inverse of the decision just made, with no trail of
+it, because `trailFor`'s trade branch reads the league chain and the release's `flag_resolved` lives
+on the platform one.
+
 This is the SAME after-commit exception, with the SAME operator remedy, that Plan B's own
 multi-account sweep already carries (`sweepLeagueForMultiAccounts` / `sweepQuietly`), and it is
 recorded here beside that precedent so the two read as one pattern rather than two separate

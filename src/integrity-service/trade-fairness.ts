@@ -247,15 +247,53 @@ interface UnflaggedAcceptedTrade {
 }
 
 /**
- * Every ACCEPTED trade with no `trade_fairness` flag at all — open OR resolved, never just open —
- * scoped to one league when `leagueId` is supplied, every league otherwise. `NOT EXISTS` rather
- * than a `LEFT JOIN … IS NULL`: `integrity_flags` has no foreign key onto `trade_proposals` (a
- * flag's `subject_id` is plain text, matching every other subject type), so this is a correlated
- * subquery, not an index-backed join. Bounded at `INTEGRITY_CONFIG.trade.sweepBatchSize` for the
- * same "an operator script that reads an unbounded set is a script nobody runs twice" reason that
- * field's own docblock states.
+ * Every ACCEPTED trade whose fairness question NOTHING has answered yet — scoped to one league
+ * when `leagueId` is supplied, every league otherwise.
+ *
+ * TWO dispositions disqualify a trade, and both count open OR resolved, never just open:
+ *
+ * 1. A `trade` flag — this detector's own `trade_fairness` verdict, already raised (by the
+ *    after-commit call or an earlier sweep) and possibly already answered.
+ * 2. A `held_trade` flag — the AUTO-HOLD's verdict, raised INSIDE the accept transaction by
+ *    `holdTradeInTx` (`@/league-service/trades`) and answered by an operator pressing Release or
+ *    Block. Final review F1: a released trade is stamped back to `status = "accepted"`
+ *    (`trades.ts`, `releaseHeldTradeInTx`) and carries no `trade` flag, so without this it
+ *    matched, and the sweep raised a fresh OPEN `trade_fairness` flag over a trade an operator had
+ *    just explicitly approved — offering **Reverse this trade**, the inverse of the decision just
+ *    made, with no trail of it (`trailFor`'s `trade` branch reads the LEAGUE chain, and the
+ *    release's `flag_resolved` lives on the PLATFORM one).
+ *
+ * WHY A HOLD IS A FAIRNESS DISPOSITION AND NOT A DIFFERENT QUESTION. The two thresholds are
+ * ordered on one axis and pinned that way (`fairnessFlagThreshold` 20 ≤ `autoHoldThreshold` 35,
+ * `src/integrity/config.test.ts`), so every trade that held would also have flagged; and the hold
+ * flag carries the IDENTICAL `evidenceFor` payload a fairness flag would have — same balance, same
+ * gap, both sides valued. An operator answering a hold has answered this detector's question at a
+ * STRICTER threshold, on the same evidence, before the rosters ever moved. Re-asking it is not a
+ * second opinion, it is re-litigating a decision.
+ *
+ * The other two hold outcomes need no separate arm: a BLOCKED trade never executed and is stamped
+ * `status = "blocked"`, so it never matched `status = 'accepted'` in the first place, and a
+ * SUPERSEDED one is `status = "superseded"` for the same reason.
+ *
+ * `NOT EXISTS` rather than a `LEFT JOIN … IS NULL`: `integrity_flags` has no foreign key onto
+ * `trade_proposals` (a flag's `subject_id` is plain text, matching every other subject type), so
+ * this is a correlated subquery, not an index-backed join. Two of them rather than one that
+ * ignores `subject_type`, because `subject_id` is plain text shared across every subject
+ * vocabulary and a predicate that names neither type would silently widen the day some future
+ * subject reuses an id shape. Bounded at `INTEGRITY_CONFIG.trade.sweepBatchSize` for the same "an
+ * operator script that reads an unbounded set is a script nobody runs twice" reason that field's
+ * own docblock states — and a disqualified trade costs no slot of that bound, because it is
+ * excluded HERE rather than skipped after `reDeriveAcceptedTradeValue` has already paid for it.
  */
 async function unflaggedAcceptedTrades(db: Db, leagueId: string | undefined, limit: number): Promise<readonly UnflaggedAcceptedTrade[]> {
+  const noFlagOfSubjectType = (subjectType: "trade" | "held_trade") =>
+    notExists(
+      db
+        .select({ one: sql`1` })
+        .from(integrityFlags)
+        .where(and(eq(integrityFlags.subjectType, subjectType), eq(integrityFlags.subjectId, tradeProposals.id))),
+    );
+
   const rows = await db
     .select()
     .from(tradeProposals)
@@ -263,12 +301,8 @@ async function unflaggedAcceptedTrades(db: Db, leagueId: string | undefined, lim
       and(
         eq(tradeProposals.status, "accepted"),
         leagueId === undefined ? undefined : eq(tradeProposals.leagueId, leagueId),
-        notExists(
-          db
-            .select({ one: sql`1` })
-            .from(integrityFlags)
-            .where(and(eq(integrityFlags.subjectType, "trade"), eq(integrityFlags.subjectId, tradeProposals.id))),
-        ),
+        noFlagOfSubjectType("trade"),
+        noFlagOfSubjectType("held_trade"),
       ),
     )
     .limit(limit);
@@ -338,9 +372,10 @@ export interface SweepTradeFairnessInput {
 }
 
 export interface SweepTradeFairnessResult {
-  /** Accepted trades with no `trade_fairness` flag this sweep examined — bounded at
-   *  `INTEGRITY_CONFIG.trade.sweepBatchSize`, never every unflagged trade this league has ever
-   *  had. */
+  /** Accepted trades whose fairness question nothing has answered yet — no `trade` flag and no
+   *  `held_trade` one (`unflaggedAcceptedTrades`' own docblock for why a hold counts) — that this
+   *  sweep examined. Bounded at `INTEGRITY_CONFIG.trade.sweepBatchSize`, never every unflagged
+   *  trade this league has ever had. */
   readonly tradesChecked: number;
   readonly flagsRaised: number;
 }

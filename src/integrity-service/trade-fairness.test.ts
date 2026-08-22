@@ -395,6 +395,9 @@ describe("sweepUnflaggedTrades", () => {
       readonly weekNumber: number;
       readonly give: readonly string[];
       readonly get: readonly string[];
+      /** Defaults to `accepted`. Named only by the final-review F1 regression pair below, whose
+       *  whole subject is which STATUSES the candidate query may and may not reach. */
+      readonly status?: string;
     },
   ): Promise<void> {
     const now = new Date(NOW);
@@ -408,12 +411,38 @@ describe("sweepUnflaggedTrades", () => {
       counterpartyAssets: opts.get.map((playerId) => ({ kind: "player" as const, playerId })),
       fingerprint: `fp_${opts.id}`,
       note: null,
-      status: "accepted",
+      status: opts.status ?? "accepted",
       proposedAt: now,
       expiresAt: new Date(now.getTime() + 72 * 60 * 60 * 1000),
       settledAt: now,
       settledByUserId: null,
     });
+  }
+
+  /** The `trade_hold` flag `holdTradeInTx` (`@/league-service/trades`) raises inside the accept
+   *  transaction, then the stamp an operator's own Release or Block decision leaves on it. Built
+   *  through `raiseFlag` and a guarded stamp rather than a raw insert, so the row this asserts
+   *  against is the row production writes. */
+  async function insertResolvedHoldFlag(
+    db: Db,
+    opts: { readonly tradeId: string; readonly flagId: string; readonly leagueId: string; readonly resolution: "trade_released" | "trade_blocked" },
+  ): Promise<void> {
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_hold",
+        subjectId: opts.tradeId,
+        leagueId: opts.leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: NOW,
+        newId: () => opts.flagId,
+        audit: logger,
+      }),
+    );
+    await db
+      .update(integrityFlags)
+      .set({ resolvedAt: new Date(NOW), resolvedByUserId: null, resolution: opts.resolution, resolutionNote: null })
+      .where(eq(integrityFlags.id, opts.flagId));
   }
 
   it("catches a trade whose after-commit flag write never landed", async () => {
@@ -577,6 +606,104 @@ describe("sweepUnflaggedTrades", () => {
     const result = await sweepUnflaggedTrades(db, { leagueId: leagueA.leagueId, newId: nextFlagId, audit: logger, clock: { now: () => NOW } });
 
     expect(result).toEqual({ tradesChecked: 1, flagsRaised: 0 });
+    expect(await openFlags(db)).toEqual([]);
+  });
+
+  // -----------------------------------------------------------------------------------------
+  // Final review F1 (HIGH): the sweep re-litigated every operator-RELEASED trade as a fresh open
+  // question, and offered a REVERSAL of the decision just made. The reviewer's live reproduction,
+  // kept here as the regression: before the fix this pair produced `flagsRaised: 1` and a new
+  // open `subjectType: "trade"` flag.
+  // -----------------------------------------------------------------------------------------
+
+  it("never re-litigates a trade an operator RELEASED — the hold's own flag is the fairness disposition", async () => {
+    await truncateAll(db);
+    const league = await fairnessLeague(db);
+    // Exactly what `releaseHeldTradeInTx` leaves behind: the row stamped back to `accepted`, and
+    // its `trade_hold` flag resolved `trade_released`. Grotesquely lopsided on purpose — this
+    // trade WOULD flag on its own numbers, which is the whole point: the operator already said
+    // yes to those numbers, at the stricter of the two thresholds.
+    await insertAcceptedTrade(db, {
+      id: "trade_released",
+      leagueId: league.leagueId,
+      proposerTeamId: league.teamA,
+      counterpartyTeamId: league.teamB,
+      weekNumber: 4,
+      give: ["p_star"],
+      get: ["p_scrub"],
+    });
+    await insertResolvedHoldFlag(db, { tradeId: "trade_released", flagId: "flag_released_hold", leagueId: league.leagueId, resolution: "trade_released" });
+
+    const result = await sweepUnflaggedTrades(db, { leagueId: league.leagueId, newId: nextFlagId, audit: logger, clock: { now: () => NOW } });
+
+    // Excluded by the CANDIDATE query, not skipped after re-derivation — a decided trade costs no
+    // slot of the batch bound (`unflaggedAcceptedTrades`' own docblock).
+    expect(result).toEqual({ tradesChecked: 0, flagsRaised: 0 });
+    expect(await openFlags(db)).toEqual([]);
+    // No second flag of ANY kind over this trade: the released hold is still the only one.
+    const all = await db.select().from(integrityFlags).where(eq(integrityFlags.subjectId, "trade_released"));
+    expect(all).toHaveLength(1);
+    expect(all[0]).toMatchObject({ subjectType: "held_trade", resolution: "trade_released" });
+  });
+
+  it("never re-litigates a trade whose hold is still OPEN either — an unanswered question is not a second one", async () => {
+    await truncateAll(db);
+    const league = await fairnessLeague(db);
+    // The reachable variant the released case does not cover: `closeSupersededHoldFlag`'s own
+    // crash window can leave an OPEN `trade_hold` flag over a row a later path stamped back to
+    // `accepted`. The disposition is the flag's existence, never its resolution state.
+    await insertAcceptedTrade(db, {
+      id: "trade_open_hold",
+      leagueId: league.leagueId,
+      proposerTeamId: league.teamA,
+      counterpartyTeamId: league.teamB,
+      weekNumber: 4,
+      give: ["p_star"],
+      get: ["p_scrub"],
+    });
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_hold",
+        subjectId: "trade_open_hold",
+        leagueId: league.leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: NOW,
+        newId: () => "flag_open_hold",
+        audit: logger,
+      }),
+    );
+
+    const result = await sweepUnflaggedTrades(db, { leagueId: league.leagueId, newId: nextFlagId, audit: logger, clock: { now: () => NOW } });
+
+    expect(result).toEqual({ tradesChecked: 0, flagsRaised: 0 });
+    const open = await openFlags(db);
+    expect(open).toHaveLength(1);
+    expect(open[0]).toMatchObject({ subjectType: "held_trade", subjectId: "trade_open_hold" });
+  });
+
+  it("never sees a BLOCKED trade at all — it never executed, so it was never sweepable", async () => {
+    await truncateAll(db);
+    const league = await fairnessLeague(db);
+    // `blockHeldTradeInTx` stamps `status = "blocked"` and moves nothing. The rosters never
+    // changed, so there is no completed trade here for a fairness verdict to be about — the
+    // candidate query's own `status = 'accepted'` is what keeps it out, one layer earlier than
+    // the flag exclusion above.
+    await insertAcceptedTrade(db, {
+      id: "trade_blocked",
+      leagueId: league.leagueId,
+      proposerTeamId: league.teamA,
+      counterpartyTeamId: league.teamB,
+      weekNumber: 4,
+      give: ["p_star"],
+      get: ["p_scrub"],
+      status: "blocked",
+    });
+    await insertResolvedHoldFlag(db, { tradeId: "trade_blocked", flagId: "flag_blocked_hold", leagueId: league.leagueId, resolution: "trade_blocked" });
+
+    const result = await sweepUnflaggedTrades(db, { leagueId: league.leagueId, newId: nextFlagId, audit: logger, clock: { now: () => NOW } });
+
+    expect(result).toEqual({ tradesChecked: 0, flagsRaised: 0 });
     expect(await openFlags(db)).toEqual([]);
   });
 });

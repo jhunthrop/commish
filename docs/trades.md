@@ -195,7 +195,10 @@ to reach an operator and usually resolve `trade_released`.
    queue with the analyzer's own reasoning stored verbatim. If that write never lands (the process
    dies between the two transactions), `npm run trades:sweep` re-raises every accepted trade over
    the threshold with no flag — idempotent by construction, off the same open-subject unique index
-   every other flag type uses.
+   every other flag type uses. A trade carrying a `trade_hold` flag is never a candidate, open flag
+   or resolved one: the auto-hold asked this same question at a stricter threshold on the same
+   evidence, so an operator who released one has already answered it and the sweep does not reopen
+   the decision (final review F1).
 5. **Reverse.** An operator resolving a `trade_fairness` flag `trade_reversed` runs
    `reverseTradeInTx` — a compensating transfer, not an undo: it runs the same transfer machinery
    with the two sides swapped, and stamps `reversedAt`/`reversedByFlagId` on the ORIGINAL row
