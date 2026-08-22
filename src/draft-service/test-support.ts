@@ -20,6 +20,10 @@ interface SeedDraftInput {
   readonly slotConfig: readonly RosterSlotConfig[];
   readonly kickoffAt: Date;
   readonly auctionBudget: number | null;
+  /** Defaults to `false` (a private league) — matches `leagues.is_public_matchmade`'s own
+   *  default, so every existing caller keeps seeding a private league without change. Task 7's
+   *  own tests are the first to pass `true`. */
+  readonly isPublicMatchmade?: boolean;
 }
 
 /** Module-private — see `SeedDraftInput` above. */
@@ -43,6 +47,7 @@ export async function seedDraftFixture(db: Db, input: SeedDraftInput): Promise<D
     teamCount: input.teamCount,
     commissionerUserId: userIds[0]!,
     rosterSlots: [...input.slotConfig],
+    isPublicMatchmade: input.isPublicMatchmade ?? false,
   });
   await db.insert(teams).values(
     teamIds.map((id, i) => ({ id, leagueId: input.leagueId, userId: userIds[i]!, name: `Team ${i + 1}` })),

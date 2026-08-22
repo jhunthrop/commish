@@ -19,6 +19,7 @@ import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotic
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { auditEventsForPicks, ownerIdsForContestedPicks } from "./audit";
+import { claimAutoStart } from "./auto-start";
 import { commitDraftState } from "./commit";
 import { createKeyedMutex } from "./mutex";
 import { draftOrderFor } from "./order";
@@ -429,7 +430,19 @@ export function createDraftStore({
         },
         {
           alsoInTransaction: async (tx) => {
-            await tx.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, draftId));
+            // `claimAutoStart` (`./auto-start.ts`), not a plain `UPDATE`: one start implementation
+            // for both a commissioner's manual press and the platform's own auto-start, on the
+            // SAME guarded transition. Under today's invariants this can never return `false`
+            // here — `admitCommand`/`reduceStart` above already refused a second `START_DRAFT`
+            // against a log that already has one, under the `drafts FOR UPDATE` lock this
+            // transaction has held since before either check ran — so a `false` here is a real
+            // invariant violation (the status column disagreeing with the action log it is
+            // supposed to mirror), not a race either caller needs to plan for. Thrown, not
+            // swallowed, for the same reason `lockAnchor`'s own "vanished between insert and
+            // lock" throw is: a state this codebase's own locking makes unreachable is a bug to
+            // surface loudly, not a rejection to hand back quietly.
+            const claimed = await claimAutoStart(tx, draftId);
+            if (!claimed) throw new Error(`Draft "${draftId}" was not "scheduled" when its own start transaction tried to claim it.`);
           },
         },
       );

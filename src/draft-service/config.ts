@@ -1,7 +1,13 @@
 export const DRAFT_SERVICE_CONFIG = {
   /** How often the server checks live drafts for an expired clock (ms). */
   tickIntervalMs: 1_000,
-  /** Ceiling on drafts examined per tick, so one tick can't starve the event loop. */
+  /**
+   * Ceiling on drafts examined per tick, so one tick can't starve the event loop. Shared by both
+   * of the ticker's scans (the in-progress expiry scan, and Task 7's `autoStartDueDrafts` —
+   * `@/draft-service/auto-start`) rather than each getting its own number: both run on the same
+   * cadence against the same connection pool, and a second ceiling to keep in step with this one
+   * would be a config value with no independent reason to differ.
+   */
   maxDraftsPerTick: 50,
   /**
    * Minimum gap between two `onOutcome` logs for the same stuck draft (ms). A draft whose

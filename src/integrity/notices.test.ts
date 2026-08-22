@@ -164,6 +164,16 @@ describe("NOTICE_TEMPLATES", () => {
     expect(blocked.body).not.toContain("Iron Owls");
   });
 
+  it("says what happened when a draft auto-starts, verbatim (Plan D, Task 7)", () => {
+    const started = renderNotice("draft_auto_started", NOTICE_SAMPLES.draft_auto_started);
+    expect(started.title).toBe("Your draft in Sunday Money has started");
+    expect(started.body).toBe(
+      "The draft reached its scheduled time, so we started it. Head to the draft room now, or let the clock queue your picks if you cannot make it. We will tell you when it is your turn.",
+    );
+    // Not a sanction — nothing about any member's own conduct, so no "no reply" line.
+    expect(started.body).not.toContain("There is no reply to this message.");
+  });
+
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
@@ -171,6 +181,7 @@ describe("NOTICE_TEMPLATES", () => {
       "admin_granted",
       "chat_message_removed",
       "draft_auto_picked",
+      "draft_auto_started",
       "lineup_auto_set",
       "operator_warning",
       "review_removed",

@@ -245,6 +245,18 @@ export interface NoticeContexts {
     readonly leagueName: string;
     readonly note: string;
   };
+  /**
+   * `autoStartDueDrafts`'s own notice (`@/draft-service/auto-start`, Plan D Task 7) — the platform
+   * pressing the button Task 6 built when nobody else did. Sent to EVERY team in the league, all
+   * referencing the SAME `system_action` event (`announceDraftAutoStarted`'s own docblock), never
+   * to a subject alone: `SYSTEM_ACTION_VISIBILITY.draft_auto_started` (`@/integrity/system-actions`)
+   * is `"everyone"`, on `stat_week_corrected`'s reasoning exactly — a fact about the league's
+   * shared calendar, true for everyone in it, about nobody's conduct. A PRIVATE league's draft
+   * never reaches this at all: `enforcementAppliesTo` gates the scan before any row is even read.
+   */
+  readonly draft_auto_started: {
+    readonly leagueName: string;
+  };
 }
 
 /**
@@ -397,6 +409,13 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   trade_blocked: ({ leagueName }) => ({
     title: "Your trade will not go through",
     body: `After the fairness review, your trade in ${leagueName} will not go ahead, and both rosters stay exactly as they were. You can put together a different offer any time.`,
+  }),
+  // No "no reply to this message" line: this is not a sanction, and there is nothing about any
+  // member's own conduct to appeal — it explains a fact about the league's shared calendar, the
+  // identical framing `stat_week_corrected`'s own template already carries.
+  draft_auto_started: ({ leagueName }) => ({
+    title: `Your draft in ${leagueName} has started`,
+    body: `The draft reached its scheduled time, so we started it. Head to the draft room now, or let the clock queue your picks if you cannot make it. We will tell you when it is your turn.`,
   }),
 };
 

@@ -48,7 +48,7 @@ describe("systemActionSummaryAllowed", () => {
     expect(systemActionSummaryAllowed("tier_blocked_join")).toBe(false);
   });
 
-  it("allows draft_auto_started now that it has a visibility decision, even though it has no publisher yet", () => {
+  it("allows draft_auto_started — its visibility decision, held by its Task 7 publisher unchanged", () => {
     expect(systemActionSummaryAllowed("draft_auto_started")).toBe(true);
   });
 });

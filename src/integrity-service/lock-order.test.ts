@@ -5,6 +5,7 @@ import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
+import { announceDraftAutoStarted } from "@/draft-service/auto-start";
 import { autoSetLineupsForWeek } from "@/league-service/auto-lineup";
 import { joinLeagueInTx, recordTierBlockedJoin } from "@/league-service/join";
 import { setLineup } from "@/league-service/lineups";
@@ -2222,5 +2223,46 @@ describe("autoSetLineupInTx's team-lock order — a parked setLineup queues rath
     const [carolNotice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_at_carol"));
     expect(carolNotice).toMatchObject({ leagueId, noticeType: "lineup_auto_set" });
     expect(carolNotice?.auditEventId).not.toBeNull();
+  });
+});
+
+/**
+ * PHASE 3 PLAN D, TASK 7's own transaction: `announceDraftAutoStarted`
+ * (`@/draft-service/auto-start`) inserts one `member_notices` row per TEAM in the league — an
+ * implicit `FOR KEY SHARE` on `leagues` for every one of them — before its own league-chain
+ * anchor, the identical shape `recordTierBlockedJoin`'s own test above proves safe. Driven
+ * directly, the same way that test drives `recordTierBlockedJoin` directly, rather than through
+ * the whole `autoStartDueDrafts` scan: the scan's own claim (`claimAutoStart`, fused into
+ * `store.startDraft`'s existing `applyAction` transaction) takes no lock this function's own
+ * shape does not already cover, so there is nothing this proof would gain by going through it.
+ */
+describe("announceDraftAutoStarted's notice order", () => {
+  it("announces an auto-started draft beside a concurrent join in the same league without deadlocking", async () => {
+    const leagueId = "lg_auto_start_lock";
+    await seedLeagueWith(leagueId, ["u_as_commish", "u_as_alice", "u_as_joiner"]);
+    await joinDb.insert(teams).values([
+      { id: "team_as_commish", leagueId, userId: "u_as_commish", name: "Commish" },
+      { id: "team_as_alice", leagueId, userId: "u_as_alice", name: "Alice" },
+    ]);
+
+    const join = parkedJoin(leagueId, "u_as_joiner", "team_as_joiner");
+    await join.leagueLocked;
+
+    // T_announce: the real `announceDraftAutoStarted`, on its own connection, reaching for the
+    // SAME league row through its own notice inserts before its own league-chain anchor.
+    const announcing = announceDraftAutoStarted(resolveDb, { leagueId, leagueName: leagueId, occurredAt: clock.now() });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    const notices = await announcing;
+    expect(notices).toHaveLength(2);
+    for (const notice of notices) expect(notice.auditEventId).not.toBeNull();
+
+    // Both landed on the SAME league chain: the join's own `member_joined`, then the
+    // announcement's own single `system_action` shared by both notices — one chain, no cycle.
+    const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, leagueId));
+    expect(anchor!.headSequence).toBe(2);
   });
 });

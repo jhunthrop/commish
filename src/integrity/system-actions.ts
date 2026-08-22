@@ -11,14 +11,11 @@ export const SYSTEM_ACTION_CODES = [
   "trade_held_for_review",
   "tier_blocked_join",
   /**
-   * Vocabulary only, ahead of its own publisher — the same shape `trade_held_for_review` and
-   * `tier_blocked_join` shipped in before this plan's Tasks 5 and 3 gave them writers. The
-   * scheduler that actually starts a draft for a league whose commissioner never pressed the
-   * button is TASK 7's (`src/draft-service/auto-start.ts`, per the plan doc's own Step 4:
-   * "`SYSTEM_ACTION_CODES` gains `draft_auto_started`") — no `NoticeContexts.draft_auto_started`
-   * entry and no publisher exist yet; `SYSTEM_ACTION_VISIBILITY` below still has to decide this
-   * code's visibility NOW, because it is a `Record` over the whole union and a code without a
-   * decision does not compile.
+   * The scheduler that starts a draft for a public matchmade league whose commissioner never
+   * pressed the button — Task 7's own (`src/draft-service/auto-start.ts`, `autoStartDueDrafts` /
+   * `announceDraftAutoStarted`). Vocabulary and visibility shipped ahead of the writer in Task 4;
+   * this is the code's publisher, and `NoticeContexts.draft_auto_started` (`@/integrity/notices`)
+   * is its own notice.
    */
   "draft_auto_started",
 ] as const;
