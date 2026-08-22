@@ -1461,7 +1461,12 @@ describe("createIngestionWorker", () => {
       return { fn, calls };
     }
 
-    it("fires once, on the tick that moves the week out of scheduled, and not on the ticks after it", async () => {
+    it("fires on EVERY tick the week is locked, not only the tick that locked it — the level-derived trigger", async () => {
+      // Final review F2: the old edge condition (`priorStatus === "scheduled" && status !==
+      // "scheduled"`) fired exactly once and could never refire, so a league whose own transaction
+      // rolled back never got a second attempt. The re-fire is what makes the auto-set
+      // self-healing; `autoSetLineupsForWeek`'s own candidate query is what makes the re-fire free
+      // once every league is done.
       const script: FakeStatsProviderScript = {
         games: { 1: [{ gameId: "g_trigger", week: 1, status: "in_progress", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
       };
@@ -1472,7 +1477,39 @@ describe("createIngestionWorker", () => {
       await worker.tick(); // week 1 flips scheduled -> in_progress
       await worker.tick(); // and stays there
 
-      expect(calls).toEqual([{ weekNumber: 1, occurredAt: now }]);
+      expect(calls).toEqual([
+        { weekNumber: 1, occurredAt: now },
+        { weekNumber: 1, occurredAt: now },
+      ]);
+    });
+
+    it("reports the leagues whose own transaction rolled back, through the same operator surface every other tick failure uses", async () => {
+      // The second half of F2: `leaguesFailed` does not throw, so a caller that ignores the return
+      // value drops it silently — which is exactly what the sole production call site did.
+      const script: FakeStatsProviderScript = {
+        games: { 1: [{ gameId: "g_rollback", week: 1, status: "in_progress", homeNflTeam: "KC", awayNflTeam: "DEN", lines: [] }] },
+      };
+      const provider = fakeStatsProvider(script);
+      const autoSet: typeof import("@/league-service/auto-lineup").autoSetLineupsForWeek = async (_db, input) => ({
+        week: input.weekNumber,
+        teamsSet: 0,
+        leaguesFailed: [{ leagueId: "lg_rolled_back", reason: "deadlock detected" }],
+      });
+      const onOutcome = vi.fn();
+      const spyError = vi.spyOn(console, "error").mockImplementation(() => {});
+      const worker = createIngestionWorker({ db, provider, redis, publish: publishRecorder().fn, clock, budget, autoSet, onOutcome });
+
+      const outcomes = await worker.tick();
+
+      // The week's own outcome is untouched — a rolled-back league is not a failed tick.
+      expect(outcomes.some((outcome) => outcome.week === 1 && outcome.applied === true)).toBe(true);
+      expect(onOutcome).toHaveBeenCalledWith(
+        expect.objectContaining({ week: 1, applied: false, reason: expect.stringContaining("1 league(s)") }),
+      );
+      expect(spyError).toHaveBeenCalledWith("[stats-pipeline] auto-set lineup rolled back for week", 1, [
+        { leagueId: "lg_rolled_back", reason: "deadlock detected" },
+      ]);
+      spyError.mockRestore();
     });
 
     it("never fires while a week's games stay scheduled — there is no transition to observe", async () => {

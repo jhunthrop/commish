@@ -433,15 +433,24 @@ the one afternoon the number matters. `setLineup`'s invalidation deleted a key t
 and `finalizeWeek` now invalidates too — the cached value was computed from a week in progress, and
 after settlement the numbers that stand live in `matchups`.
 
-## 14. The worker's new post-transition trigger (Phase 3 Plan D)
+## 14. The worker's new locked-week trigger (Phase 3 Plan D)
 
 `runTick` (`src/stats-pipeline/worker.ts`) gained a second thing it does after `persistTick`
 commits: the missed-deadline lineup auto-set (`autoSetLineupsForWeek`, `@/league-service/
-auto-lineup`), fired on the tick that moves a week's `stat_weeks.status` OUT of `scheduled` — the
-lock transition every lineup deadline hangs off. `plan.priorStatus` is the status `runTick`'s own
-opening read found BEFORE this tick's write, so the condition is `plan.priorStatus === "scheduled"
-&& status !== "scheduled"`: a week already `in_progress` or `final` on entry never refires it, and
-a week that stays `scheduled` this tick never fires it early.
+auto-lineup`), fired on every tick a week's `stat_weeks.status` is locked — the condition is
+`isLineupLocked(status)`, the same predicate `autoSetLineupInTx` itself re-checks under its
+`stat_weeks FOR SHARE`.
+
+**It is level-derived, and the final review is why.** The trigger shipped edge-derived
+(`plan.priorStatus === "scheduled" && status !== "scheduled"`) and therefore fired exactly once per
+week, ever: `priorStatus` reads `in_progress` or `final` on every later tick. A league whose
+auto-set transaction rolled back got no lineup, no notice, no audit row, no operator signal and no
+second attempt — permanently and invisibly (F2). The fix is not a retry counter. The candidate
+query inside `autoSetLineupsForWeek` now asks which leagues STILL have a team with no
+`lineup_slots` row for the week, bounded at `AUTO_SET_CONFIG.maxLeaguesPerRun`, so a rolled-back
+league is simply still in the set next tick and a finished one is not. Self-healing falls out of
+asking the question the right way round, and re-running costs a single bounded scan once the set
+empties.
 
 **Placement, and why it is not inside `persistTick`.** `stat_weeks` is keyed on the week alone and
 is not league-scoped, so `persistTick`'s own transaction already commits before any per-league work
@@ -455,16 +464,20 @@ one chain).
 **Failure isolation, the same asymmetry §7 already documents for degradation.** A thrown error from
 `autoSet` is caught, logged, and reported through the worker's own due-report channel — NEVER
 rethrown. The tick that just settled real scores for every league in the product must not fail
-because one league's missed-deadline lineup write had a bug; a broken auto-set is safe to leave for
-the next tick because its own idempotency comes from the per-team existence guard inside
-`autoSetLineupInTx` (a team with a saved row for the week is left entirely alone), never from firing
-exactly once. The score cache eviction auto-set performs reuses the SAME `ScoreCache` instance this
-worker already writes live scores into (`scoreCache`, passed through as `cache`), the identical
-"the worker supplies the real cache" idiom `setLineup`/`acceptTrade` use from the route layer.
+because one league's missed-deadline lineup write had a bug. A per-league rollback does NOT throw,
+so it reaches an operator by a second route: `AutoSetOutcome.leaguesFailed` is read at the call
+site and reported through the same `reportIfDue` channel, on its own stable rate-limit key. That is
+the contract `AutoSetOutcome` always stated ("never silently dropped") and the call site did not
+keep until F2. The score cache eviction auto-set performs reuses the SAME `ScoreCache` instance
+this worker already writes live scores into (`scoreCache`, passed through as `cache`), the
+identical "the worker supplies the real cache" idiom `setLineup`/`acceptTrade` use from the route
+layer.
 
 **What this trigger does NOT do.** It never runs for a private league, or for a public league with
-`INTEGRITY_CONFIG.participation.enforceTierSegregation` switched off at deploy —
-`autoSetLineupsForWeek` asks `enforcementAppliesTo` (`@/league-service/enforcement`) per league
-before opening a transaction for it, the identical predicate the join gate, the creation gate and
-the trade auto-hold all ask. See `docs/decisions/enforcement-and-tiers.md` §6 for the full account
-of the strategy this trigger applies and why only one strategy is declared.
+`INTEGRITY_CONFIG.participation.enforceTierSegregation` switched off at deploy. The two halves are
+asked in the two places that cost least: the deploy switch first, before any query runs at all, and
+the per-league `is_public_matchmade` axis as a predicate inside the candidate query — the same
+split `autoStartDueDrafts` uses, and the same `enforcementAppliesTo` (`@/league-service/
+enforcement`) the join gate, the creation gate and the trade auto-hold all ask. See
+`docs/decisions/enforcement-and-tiers.md` §6 for the full account of the strategy this trigger
+applies and why only one strategy is declared.

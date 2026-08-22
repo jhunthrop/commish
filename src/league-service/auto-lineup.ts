@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq, exists, notExists, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { leagues, lineupSlots, matchups, players, rosterSlots, statWeeks, teams } from "@/db/schema";
 import type { Position } from "@/domain/player";
@@ -8,6 +8,7 @@ import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logg
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
 import { toRosterSlots } from "./lineups";
+import { AUTO_SET_CONFIG } from "./config";
 import { enforcementAppliesTo } from "./enforcement";
 
 /**
@@ -320,12 +321,64 @@ export async function autoSetLineupInTx(
   return { teamsSet: planned.length, notices: notified.map(({ notice }) => notice) };
 }
 
-/** Every league fielding this week, from `matchups` — the same "matchups is the source of truth
- *  for which leagues are in season" `correction.ts`'s own `leaguesInWeek` uses, sorted for a
- *  deterministic per-league transaction order. */
-async function leaguesInWeek(db: Db, weekNumber: number): Promise<readonly string[]> {
-  const rows = await db.selectDistinct({ leagueId: matchups.leagueId }).from(matchups).where(eq(matchups.weekNumber, weekNumber));
-  return rows.map((row) => row.leagueId).sort();
+/**
+ * THE LEVEL PREDICATE (final review F2): every public matchmade league fielding this week that
+ * STILL has at least one team with no `lineup_slots` row for it.
+ *
+ * Not "every league fielding this week" — that read was EDGE-shaped, and it was only ever correct
+ * because the trigger above it fired exactly once. The candidate set is now derived from the state
+ * the auto-set exists to reach, so a league whose transaction rolled back is simply still in the
+ * set on the next tick and a league that succeeded is not. No retry counter, no failed-league
+ * table, no bookkeeping of any kind: self-healing falls out of asking the question the right way
+ * round. The identical shape both trade sweeps use — a candidate query that names the work still
+ * outstanding, run again, bounded.
+ *
+ * THE PER-LEAGUE AXIS IS IN THE SQL, not a per-row re-read after the scan. F8: the old shape paid
+ * for the whole scan and then discarded private leagues one at a time, while `dueDraftsQuery`
+ * (`@/draft-service/auto-start`) — the sibling automation — filters `is_public_matchmade` in the
+ * query. The deploy half of `enforcementAppliesTo` is checked by the caller BEFORE this runs, for
+ * the same reason `autoStartDueDrafts` checks it first: enforcement being off means the scan does
+ * not happen, not that every row it found gets refused.
+ *
+ * Bounded at `AUTO_SET_CONFIG.maxLeaguesPerRun` and ordered by league id, the same determinism the
+ * expiry and due-kickoff scans keep. Exported as the query BUILDER (not yet awaited), the shape
+ * `browseQuery`/`dueDraftsQuery`/`pendingFlagQuery` already use — the one seam an `EXPLAIN`
+ * assertion can wrap without duplicating the query's shape (`src/db/index-plans.test.ts`).
+ */
+export function leaguesNeedingAutoSetQuery(db: Db, weekNumber: number) {
+  return db
+    .selectDistinct({ leagueId: matchups.leagueId })
+    .from(matchups)
+    .innerJoin(leagues, eq(leagues.id, matchups.leagueId))
+    .where(
+      and(
+        eq(matchups.weekNumber, weekNumber),
+        eq(leagues.isPublicMatchmade, true),
+        exists(
+          db
+            .select({ one: sql`1` })
+            .from(teams)
+            .where(
+              and(
+                eq(teams.leagueId, matchups.leagueId),
+                notExists(
+                  db
+                    .select({ one: sql`1` })
+                    .from(lineupSlots)
+                    .where(and(eq(lineupSlots.teamId, teams.id), eq(lineupSlots.weekNumber, weekNumber))),
+                ),
+              ),
+            ),
+        ),
+      ),
+    )
+    .orderBy(asc(matchups.leagueId))
+    .limit(AUTO_SET_CONFIG.maxLeaguesPerRun);
+}
+
+async function leaguesNeedingAutoSet(db: Db, weekNumber: number): Promise<readonly string[]> {
+  const rows = await leaguesNeedingAutoSetQuery(db, weekNumber);
+  return rows.map((row) => row.leagueId);
 }
 
 export interface AutoSetInput {
@@ -346,18 +399,32 @@ export interface AutoSetInput {
 }
 
 /**
- * The missed-deadline lineup, applied to every public matchmade league at the moment a week
- * locks. ONE TRANSACTION PER LEAGUE, and the reason is Plan A's ruling 3 read literally: a
+ * The missed-deadline lineup, applied to every public matchmade league that is missing one for a
+ * LOCKED week. ONE TRANSACTION PER LEAGUE, and the reason is Plan A's ruling 3 read literally: a
  * transaction appends to at most one chain, and this runs across every affected league at once.
  * `correctSettledWeek` reached the identical shape for the identical reason and this follows it
  * rather than inventing a second answer — including its failure semantics, where a partial run
- * names the leagues it could not finish by id and reason and is safe to re-run because the
- * per-team guard is the state the first run left.
+ * names the leagues it could not finish by id and reason.
+ *
+ * SAFE AND USEFUL TO RE-RUN, WHICH IS THE POINT (final review F2). The candidate query is LEVEL-
+ * derived (`leaguesNeedingAutoSetQuery`, above): it names the leagues whose work is still
+ * outstanding, so re-running is how a rolled-back league heals rather than merely a thing that
+ * does no harm. The worker calls this on every tick a week is locked, not on the one tick it
+ * locked — before F2 the trigger was edge-shaped and a league that failed its transaction got no
+ * lineup, no notice, no audit row and no second attempt, permanently and invisibly.
+ *
+ * `leaguesFailed` IS THE CALLER'S TO CONSUME, and `AutoSetOutcome`'s own contract says so. The
+ * failures below do not throw, so a caller that ignores the return value is a caller that has
+ * silently dropped them — `src/stats-pipeline/worker.ts`'s trigger reports a non-empty
+ * `leaguesFailed` through `reportIfDue`, the same operator surface every other tick failure uses,
+ * and `scripts/correct-stat-week.ts` does the identical thing with `correctSettledWeek`'s.
  *
  * A PRIVATE league, or a public one with segregation switched off at deploy, is never touched:
  * `enforcementAppliesTo` (`@/league-service/enforcement`) is the SAME predicate the join and
  * creation gates use, so "is the platform this league's commissioner" is one answer everywhere in
- * this plan rather than a promise repeated per writer.
+ * this plan rather than a promise repeated per writer. The deploy half is asked FIRST, before any
+ * query runs at all, and the per-league half is a predicate inside the candidate query — the
+ * split `autoStartDueDrafts` (`@/draft-service/auto-start`) already uses.
  */
 export async function autoSetLineupsForWeek(db: Db, input: AutoSetInput): Promise<AutoSetOutcome> {
   const audit = input.audit ?? getAuditLogger();
@@ -366,14 +433,13 @@ export async function autoSetLineupsForWeek(db: Db, input: AutoSetInput): Promis
   const cache = input.cache ?? NOOP_SCORE_CACHE;
   const deps: AutoSetDeps = { audit, notify };
 
-  const leagueIds = await leaguesInWeek(db, input.weekNumber);
+  if (!enforcementAppliesTo({ isPublicMatchmade: true })) return { week: input.weekNumber, teamsSet: 0, leaguesFailed: [] };
+
+  const leagueIds = await leaguesNeedingAutoSet(db, input.weekNumber);
   let teamsSet = 0;
   const leaguesFailed: FailedLeagueAutoSet[] = [];
 
   for (const leagueId of leagueIds) {
-    const [row] = await db.select({ isPublicMatchmade: leagues.isPublicMatchmade }).from(leagues).where(eq(leagues.id, leagueId));
-    if (row === undefined || !enforcementAppliesTo(row)) continue;
-
     let result: LeagueAutoSetResult;
     try {
       result = await db.transaction((tx) => autoSetLineupInTx(tx, leagueId, input.weekNumber, input.occurredAt, deps));

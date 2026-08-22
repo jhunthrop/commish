@@ -75,10 +75,14 @@ calendar, true for everyone in it, about nobody's conduct.
 
 ### 3. Lineup auto-set
 
-**Trigger:** a stat week locks (`isLineupLocked`) and a manager in a public matchmade league never
-saved a lineup for it. Fired once, on the ingestion worker's own tick that moves the week OUT of
-`scheduled` (`runTick`, `src/stats-pipeline/worker.ts`) — never re-fired for a week already past
-that transition.
+**Trigger:** a stat week is locked (`isLineupLocked`) and a manager in a public matchmade league
+never saved a lineup for it. LEVEL-derived, not edge-derived: the ingestion worker fires it on
+every tick the week is locked (`runTick`, `src/stats-pipeline/worker.ts`), and the candidate query
+names only the leagues that still have a team missing a row for that week, bounded at
+`AUTO_SET_CONFIG.maxLeaguesPerRun` (**100**). A league whose own transaction rolled back is
+therefore set on the next tick, with no retry counter and no bookkeeping anywhere; a league that is
+already done costs nothing. Any rollbacks the run does report reach an operator through the
+worker's own due-report channel.
 
 **What it does:** materializes a lineup through `MISSED_DEADLINE_LINEUP_STRATEGY` — today, the
 ONLY declared strategy, `repeat_previous_week` — carrying the manager's own last saved choice

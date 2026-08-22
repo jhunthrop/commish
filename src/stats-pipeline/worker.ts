@@ -5,7 +5,7 @@ import type { Db } from "@/db/client";
 import { matchups, statWeeks } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
 import type { Clock } from "@/domain/timing";
-import { weekStatusFromGames } from "@/league";
+import { isLineupLocked, weekStatusFromGames } from "@/league";
 import { autoSetLineupsForWeek } from "@/league-service/auto-lineup";
 import type { PublishFn } from "@/lib/realtime/publish";
 import type { GameSummary, StatsProvider } from "@/stats/provider";
@@ -573,24 +573,53 @@ export function createIngestionWorker({
     // settling, which would spend requests to re-confirm numbers the same tick just wrote.
     if ((correction && plan.complete) || status === "final") await markSwept(week, nowIso);
 
-    // Task 4's own trigger: the missed-deadline lineup runs on the tick that moves THIS week out
-    // of `scheduled`, and only that tick — `plan.priorStatus` is the status `runTick`'s opening
-    // read found BEFORE this tick's write, so a week that was already `in_progress` or `final`
-    // never refires it. AFTER `persistTick` commits, never inside it: `stat_weeks` is keyed on
-    // week alone and is not league-scoped, the same reason `correctSettledWeek` runs its own
-    // global `persistTick` before and outside every per-league transaction. A failure here is
-    // logged and swallowed — never rethrown — so a broken auto-set can never fail the tick that
-    // just settled real scores; it is safe to repeat on the next tick because its own idempotency
-    // comes from the per-team guard inside `autoSetLineupsForWeek`, not from firing exactly once.
-    if (plan.priorStatus === "scheduled" && status !== "scheduled") {
+    // Task 4's own trigger, made LEVEL-derived by final review F2: the missed-deadline lineup runs
+    // on EVERY tick this week is locked, not on the one tick it locked. The old condition
+    // (`plan.priorStatus === "scheduled" && status !== "scheduled"`) fired exactly once and could
+    // never fire again, because `priorStatus` reads `in_progress`/`final` on every later tick — so
+    // a league whose auto-set transaction rolled back got no lineup, no notice, no audit row, no
+    // operator signal and no second attempt, permanently and invisibly.
+    //
+    // Re-running is cheap and self-healing rather than merely harmless: the candidate query inside
+    // `autoSetLineupsForWeek` names only leagues that STILL have a team missing a row for this
+    // week, so a settled league is not in the set and a rolled-back one is. `isLineupLocked`
+    // (`@/league`) is the same predicate `autoSetLineupInTx` itself re-checks under its
+    // `stat_weeks FOR SHARE`, so the trigger and the writer agree on what "locked" means.
+    //
+    // AFTER `persistTick` commits, never inside it: `stat_weeks` is keyed on week alone and is not
+    // league-scoped, the same reason `correctSettledWeek` runs its own global `persistTick` before
+    // and outside every per-league transaction. A failure here is logged and swallowed — never
+    // rethrown — so a broken auto-set can never fail the tick that just settled real scores.
+    if (isLineupLocked(status)) {
       try {
         // The SAME score cache this worker already writes live scores into — `autoSetLineupsForWeek`
         // evicts it for any league it actually touched, on the identical "route/worker supplies the
         // real cache" idiom `setLineup`/`acceptTrade` use.
-        await autoSet(db, { weekNumber: week, occurredAt: nowIso, cache: scoreCache });
+        const outcome = await autoSet(db, { weekNumber: week, occurredAt: nowIso, cache: scoreCache });
+        // The per-league rollbacks `AutoSetOutcome`'s own contract says are "never silently
+        // dropped". They do not throw, so the `catch` below never sees them and only this branch
+        // can report them — the identical consumption `scripts/correct-stat-week.ts` gives
+        // `correctSettledWeek`'s own `leaguesFailed`. The count varies per tick, so the rate-limit
+        // key is passed explicitly and stably (see `reportIfDue`).
+        if (outcome.leaguesFailed.length > 0) {
+          console.error("[stats-pipeline] auto-set lineup rolled back for week", week, outcome.leaguesFailed);
+          reportIfDue(
+            {
+              week,
+              applied: false,
+              reason: `Couldn't auto-set lineups in ${outcome.leaguesFailed.length} league(s) for week ${week}. The next tick tries them again.`,
+            },
+            nowMs,
+            `auto-set-rollback:${week}`,
+          );
+        }
       } catch (error: unknown) {
         console.error("[stats-pipeline] auto-set lineup failed for week", week, error);
-        reportIfDue({ week, applied: false, reason: "Couldn't auto-set lineups for managers who missed this week's deadline." }, nowMs);
+        reportIfDue(
+          { week, applied: false, reason: "Couldn't auto-set lineups for managers who missed this week's deadline." },
+          nowMs,
+          `auto-set:${week}`,
+        );
       }
     }
 

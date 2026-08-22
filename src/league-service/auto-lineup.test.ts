@@ -463,6 +463,84 @@ describe("autoSetLineupsForWeek", () => {
     expect(await noticesFor("u_alice")).toHaveLength(0);
   });
 
+  /**
+   * FINAL REVIEW F2, the failure injection the ruling asks for: a league that failed run N is set
+   * on run N+1, with no bookkeeping anywhere. Nothing records that this league failed — no retry
+   * counter, no failed-league table, no flag. The candidate query asks "which leagues still have a
+   * team with no lineup row for this week", and a rolled-back league answers yes, so it heals by
+   * being asked the question again. Before F2 the trigger above this could never fire a second
+   * time, so this second run never happened in production at all.
+   */
+  it("heals on the next run: a league whose transaction rolled back is set the second time, with no bookkeeping", async () => {
+    await seedPlayers();
+    const { leagueId, alice, bob, carol } = await publicLeague();
+    const aliceWeek3: readonly LineupSlotInput[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    await setLineup(db, { leagueId, teamId: alice, weekNumber: 3, slots: aliceWeek3, userId: "u_alice" });
+    await lockWeek(4);
+
+    const brokenAudit: AuditLogger = {
+      record: async () => {
+        throw new Error("simulated audit append failure");
+      },
+      recordAll: async () => {
+        throw new Error("simulated audit append failure");
+      },
+    };
+    const first = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW, audit: brokenAudit });
+    expect(first.leaguesFailed).toEqual([{ leagueId, reason: "simulated audit append failure" }]);
+    expect(await savedLineup(alice, 4)).toBeNull();
+
+    // Tick N+1. Identical call, healthy dependencies, nothing else done in between.
+    const second = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: LATER });
+
+    expect(second.leaguesFailed).toEqual([]);
+    expect(second.teamsSet).toBe(3);
+    expect(await savedLineup(alice, 4)).not.toBeNull();
+    expect(await savedLineup(bob, 4)).not.toBeNull();
+    expect(await savedLineup(carol, 4)).not.toBeNull();
+    expect(await noticesFor("u_alice")).toHaveLength(1);
+  });
+
+  it("drops a finished league out of the candidate set entirely — the re-run costs no transaction at all", async () => {
+    // The other half of the level derivation: re-running is not merely harmless, it is CHEAP,
+    // because a league every team now has a row for is no longer a candidate. Proven by injecting
+    // a dependency that throws the moment a per-league transaction reaches it: a second run that
+    // still opened one would report this league as failed, and it reports nothing.
+    await seedPlayers();
+    const { leagueId, alice } = await publicLeague();
+    await setLineup(db, {
+      leagueId,
+      teamId: alice,
+      weekNumber: 3,
+      slots: [
+        { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+        { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+        { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+        { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+      ],
+      userId: "u_alice",
+    });
+    await lockWeek(4);
+    await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+
+    const brokenAudit: AuditLogger = {
+      record: async () => {
+        throw new Error("a transaction was opened for a league that needed nothing");
+      },
+      recordAll: async () => {
+        throw new Error("a transaction was opened for a league that needed nothing");
+      },
+    };
+    const second = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: LATER, audit: brokenAudit });
+
+    expect(second).toEqual({ week: 4, teamsSet: 0, leaguesFailed: [] });
+  });
+
   it("stringifies a non-Error thrown value for the failure reason", async () => {
     await seedPlayers();
     const { leagueId, alice } = await publicLeague();
