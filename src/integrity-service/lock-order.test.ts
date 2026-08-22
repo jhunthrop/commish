@@ -2467,12 +2467,20 @@ describe("setDraftKickoff's row lock", () => {
     // what is under test is the RESCHEDULE's behaviour when it loses the row, not the start's.
     await schedulableDraft("lg_kickoff_race", "u_kickoff_race_commish");
 
+    let holdsDraftRow: () => void = () => {};
+    const draftRowLocked = new Promise<void>((resolve) => (holdsDraftRow = resolve));
     let releaseStart: () => void = () => {};
     const startCommitted = new Promise<void>((resolve) => (releaseStart = resolve));
     const starting = joinDb.transaction(async (tx) => {
       await tx.update(drafts).set({ status: "in_progress" }).where(eq(drafts.leagueId, "lg_kickoff_race"));
+      holdsDraftRow();
       await startCommitted;
     });
+    // The RENDEZVOUS, not a hopeful ordering: the reschedule must not start until the winner
+    // genuinely holds the row, or on a fast machine it can take the row first and this proves
+    // nothing in either direction — the same discipline `waitForBlockedBackend`'s own docblock
+    // states for the other half of every pairing in this file.
+    await draftRowLocked;
 
     const rescheduling = setDraftKickoff(
       pickDb,
