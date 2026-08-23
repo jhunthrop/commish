@@ -1,4 +1,4 @@
-export { DRAFT_CLOCK_SCHEDULE, AUCTION_CONFIG, DRAFT_QUEUE_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier } from "./config";
+export { DRAFT_CLOCK_SCHEDULE, DRAFT_PAUSE_WINDOW, AUCTION_CONFIG, DRAFT_QUEUE_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type PauseWindow } from "./config";
 export {
   initialDraftState, totalRosterSlots, totalPickCount, rosterFor, auctionOf,
   type DraftConfig, type DraftState, type CompletedPick, type AuctionLot, type AuctionState, type DraftReduceResult,
@@ -13,7 +13,7 @@ export { draftEventsFor, type DraftEventEnvelope, type DraftEventType } from "./
 export { clockTierFor, tierIndexFor, nextTighteningAfter, hoursUntil, type Tightening } from "./clock-schedule";
 export {
   draftedPlayerIds, availablePool, openSlotCount, isComplete, teamOnClock, upcomingOnClock, nextNominator, bestAvailableFor, queueFor, nudgeDeadline,
-  remainingBudget, minBidFor, maxBidFor, maxBidsFor, currentTier, currentClockSeconds, currentDeadline, nextTightening,
+  remainingBudget, minBidFor, maxBidFor, maxBidsFor, currentTier, currentClockSeconds, currentDeadline, nextTightening, isPaused,
   draftClockView, draftStateView, type DraftClockView, type DraftStateView,
 } from "./selectors";
 export {

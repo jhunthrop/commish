@@ -4,8 +4,9 @@ import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
 import { auctionOf, rosterFor, totalPickCount, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
 import { assignSlot } from "./slotting";
-import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier } from "./config";
+import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type PauseWindow } from "./config";
 import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
+import { deadlineAfter, pausedUntil as pauseWindowEndAt } from "./pause";
 import { queuedEntriesFor } from "./queue";
 
 export function draftedPlayerIds(state: DraftState): ReadonlySet<string> {
@@ -174,10 +175,27 @@ function currentTurnClock(state: DraftState): { readonly seconds: number; readon
   return { seconds, startedAt };
 }
 
+/**
+ * `config.pauseWindow`, but only when the CURRENT tier is slow enough for it to apply — the
+ * 90-second (and 10-minute) floor a draft runs at near kickoff never freezes, so a deploy's
+ * freeze window is simply not consulted for those turns at all. Null (no config'd window, or a
+ * tier too fast for it) means every caller below skips the pause arithmetic entirely, which is
+ * also what keeps `currentDeadline` a plain, un-extended addition for the common case: no
+ * window configured, no `deadlineAfter` call, no behavior change from before this task.
+ */
+function effectivePauseWindow(state: DraftState): PauseWindow | null {
+  const window = state.config.pauseWindow ?? null;
+  const tier = currentTier(state);
+  if (window === null || tier === null) return null;
+  return tier.pickSeconds >= window.appliesAtOrAbovePickSeconds ? window : null;
+}
+
 export function currentDeadline(state: DraftState): string | null {
   const turn = currentTurnClock(state);
   if (turn === null) return null;
-  return new Date(Date.parse(turn.startedAt) + turn.seconds * MS_PER_SECOND).toISOString();
+  const window = effectivePauseWindow(state);
+  if (window === null) return new Date(Date.parse(turn.startedAt) + turn.seconds * MS_PER_SECOND).toISOString();
+  return deadlineAfter(turn.startedAt, turn.seconds, window);
 }
 
 /**
@@ -185,11 +203,52 @@ export function currentDeadline(state: DraftState): string | null {
  * `turnStartedAt` to the deadline. The percentage is an INPUT (the service's
  * `DRAFT_NUDGE_CONFIG.thresholdPct`) so the engine stays free of service configuration and
  * of any ambient clock. Null whenever no turn is running.
+ *
+ * Routed through the SAME `deadlineAfter` fixpoint `currentDeadline` uses, over the
+ * threshold's own share of the clock rather than the full length — a flat `thresholdPct` of an
+ * UN-paused clock could still land inside the freeze even though `currentDeadline` itself lands
+ * safely past it, which would mean the moderator speaking up in the middle of the night. This is
+ * what keeps `draft-service/nudge.ts` correct without it ever reading `pauseWindow` itself: both
+ * `dueAt` and `deadlineAt` it reads are already pushed past the freeze by the time it sees them.
  */
 export function nudgeDeadline(state: DraftState, thresholdPct: number): string | null {
   const turn = currentTurnClock(state);
   if (turn === null) return null;
-  return new Date(Date.parse(turn.startedAt) + turn.seconds * MS_PER_SECOND * (thresholdPct / 100)).toISOString();
+  const thresholdSeconds = turn.seconds * (thresholdPct / 100);
+  const window = effectivePauseWindow(state);
+  if (window === null) return new Date(Date.parse(turn.startedAt) + thresholdSeconds * MS_PER_SECOND).toISOString();
+  return deadlineAfter(turn.startedAt, thresholdSeconds, window);
+}
+
+/**
+ * The instant picks resume, if the CURRENT turn started while the freeze was already running —
+ * null otherwise, including while no turn is running at all. Purely a function of
+ * `turnStartedAt` (never an ambient "now": the engine reads no clock of its own), which is
+ * exactly right for what emits it: `draftClockView` is recomputed fresh the moment a turn
+ * starts, so `turnStartedAt` IS "now" at the instant this field is produced, and it rides every
+ * `draft.*` payload from there — the same freshness model `deadlineAt` already uses.
+ */
+function pausedUntilFor(state: DraftState): string | null {
+  if (state.turnStartedAt === null) return null;
+  const window = effectivePauseWindow(state);
+  return window === null ? null : pauseWindowEndAt(state.turnStartedAt, window);
+}
+
+/**
+ * Whether the room is frozen at `atIso` — the current turn's tier qualifies for the freeze AND
+ * `atIso` itself falls inside an occurrence of it. This is what `draft-service/nudge.ts` calls
+ * against the ticker's live "now": `currentDeadline`/`nudgeDeadline` each push their OWN instant
+ * past the freeze, but the open interval BETWEEN an extended due time and an extended deadline
+ * still spans the freeze itself (a due time that already sits at the window's open, for
+ * instance, never moves at all), so a range check against those two alone is not enough — the
+ * moderator needs a direct answer to "is right now inside the freeze," which is exactly this.
+ * Reading `pauseWindow` against a caller-supplied instant, outside `admitCommand`, is the one
+ * other place the reducer-purity ruling (`pause.ts`'s own docblock) allows: `nudge.ts` never
+ * applies an action, so nothing here can ever change what a replay decides.
+ */
+export function isPaused(state: DraftState, atIso: string): boolean {
+  const window = effectivePauseWindow(state);
+  return window !== null && pauseWindowEndAt(atIso, window) !== null;
 }
 
 /** When the clock next tightens and to what — null before/after the draft, or on the final tier. */
@@ -213,6 +272,13 @@ export interface DraftClockView {
    * of a turn-order rule of its own.
    */
   readonly upcoming: readonly string[];
+  /**
+   * When picks resume, if the current turn started during the overnight freeze — null the rest
+   * of the time. Optional so a hand-built `DraftClockView` elsewhere in this codebase's own test
+   * suite (predating Task 4) still type-checks without it; `draftClockView` below always sets it
+   * explicitly, one way or the other, so no real payload this engine produces ever omits it.
+   */
+  readonly pausedUntil?: string | null;
 }
 
 /**
@@ -230,6 +296,7 @@ export function draftClockView(state: DraftState): DraftClockView {
     clockSeconds: currentClockSeconds(state),
     nextTightening: nextTightening(state),
     upcoming: upcomingOnClock(state, DRAFT_VIEW_CONFIG.upcomingCount),
+    pausedUntil: pausedUntilFor(state),
   };
 }
 

@@ -57,6 +57,7 @@ describe("draftClockView", () => {
       clockSeconds: null,
       nextTightening: null,
       upcoming: [],
+      pausedUntil: null,
     });
   });
 

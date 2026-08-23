@@ -71,6 +71,7 @@ describe("draftEventsFor", () => {
             nextTightening: expect.anything(),
             // Two teams, two roster spots each: the whole board, current turn first.
             upcoming: ["t1", "t2", "t2", "t1"],
+            pausedUntil: null,
           },
         },
       },
@@ -96,6 +97,7 @@ describe("draftEventsFor", () => {
             clockSeconds: expect.any(Number),
             nextTightening: expect.anything(),
             upcoming: ["t2", "t2", "t1"],
+            pausedUntil: null,
           },
         },
       },
@@ -128,6 +130,7 @@ describe("draftEventsFor", () => {
           clockSeconds: 8 * 60 * 60,
           nextTightening: { at: "2026-09-03T17:00:00.000Z", pickSeconds: 4 * 60 * 60 },
           upcoming: ["t2", "t2", "t1"],
+          pausedUntil: null,
         },
       },
     });
@@ -159,6 +162,7 @@ describe("draftEventsFor", () => {
       nextTightening: { at: "2026-09-03T17:00:00.000Z", pickSeconds: 4 * 60 * 60 },
       // The lot's nominator has already acted, so the rotation ahead starts with the other team.
       upcoming: ["t2", "t1", "t2", "t1", "t2", "t1", "t2", "t1", "t2", "t1", "t2", "t1"],
+      pausedUntil: null,
     };
 
     const nominated = step(opened, { v: 1, type: "NOMINATE", timestamp: T, teamId: "t1", playerId: "qb1", openingBid: 2 });

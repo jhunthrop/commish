@@ -6,7 +6,7 @@ import type { DraftStateView } from "@/draft-engine";
 import { Avatar, Badge, EYEBROW, InfoTip } from "@/components/ui";
 import type { TermKey } from "@/help/glossary";
 import type { HelpLevel } from "@/identity/preferences";
-import { formatClockLength, formatTightening } from "../state/format";
+import { formatClockLength, formatPausedUntil, formatTightening } from "../state/format";
 import { playerName, teamName, teamsById } from "../lib/lookups";
 import type { ConnectionStatus } from "../hooks/use-draft-room";
 import { ConnectionBanner } from "./connection-banner";
@@ -178,7 +178,14 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
   // same wall-clock reading `remainingMs` came from, so the tightening line shares this one
   // ticking interval instead of running a second `useNow` beside it.
   const { remainingMs, now } = useCountdown(view.deadlineAt);
-  const tightening = formatTightening(view.nextTightening, now);
+  const pausedUntil = view.pausedUntil ?? null;
+  // Live, not a one-shot read of the payload: `now` ticks every second (the same `useCountdown`
+  // reading `remainingMs` came from), so a turn that started BEFORE the freeze but runs into it
+  // — the common case — still shows this once the clock actually crosses in, and "the countdown
+  // resumes on the next frame" (Task 4) falls out of this same comparison flipping back once
+  // `now` passes `pausedUntil`, with no new event required.
+  const paused = pausedUntil !== null && now < Date.parse(pausedUntil);
+  const tightening = formatTightening(view.nextTightening, now, pausedUntil);
   const myTeamName = personalId === null ? null : teamName(teamsById(teams), personalId, "Your team");
   const turnWhere = turnLabel(view);
 
@@ -224,7 +231,13 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
               </div>
             </div>
             <div className="flex flex-col items-end">
-              {remainingMs === null ? null : <Countdown remainingMs={remainingMs} size="lg" tone={turn.mine ? "hot" : "default"} data-testid="countdown" />}
+              {paused ? (
+                <span data-testid="paused-message" className="text-sm font-medium text-warning">
+                  {formatPausedUntil(pausedUntil!)}
+                </span>
+              ) : remainingMs === null ? null : (
+                <Countdown remainingMs={remainingMs} size="lg" tone={turn.mine ? "hot" : "default"} data-testid="countdown" />
+              )}
               {tightening === null ? null : <span className="text-xs text-warning">{tightening}</span>}
             </div>
             {/* The digits above are `aria-hidden`; this is the same turn stated once, in words. */}

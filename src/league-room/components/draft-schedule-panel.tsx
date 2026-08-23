@@ -203,6 +203,19 @@ export function DraftSchedulePanel({
   const startingSoon = msUntil <= MS_PER_HOUR;
   const countdown = `${formatLocal(schedule.kickoffAt)} (${formatCountdown(msUntil)})`;
 
+  // Task 4's overnight freeze. `startingSoon` already draws the line this panel needs: a draft
+  // more than an hour out picks at a tier of an hour or longer once it opens (the same
+  // `DRAFT_PAUSE_WINDOW.appliesAtOrAbovePickSeconds` floor the engine itself enforces), and a
+  // draft that slow can run straight through 2-5 AM Eastern. The literal times below are
+  // deliberately not imported from `@/draft-engine` — client room code goes through the
+  // HTTP/SSE boundary only (`eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`), the same
+  // constraint `RoomRail`'s own `formatTightening`/`formatYourTurn` note.
+  const overnightPauseNotice = schedule.status !== "scheduled" || startingSoon ? null : (
+    <p className="text-sm text-text-muted">
+      Picks pause automatically between 2:00 AM and 5:00 AM Eastern once the clock reaches an hour or longer, and resume right after.
+    </p>
+  );
+
   const commissionerControls = isCommissioner ? (
     editing ? (
       <form
@@ -254,6 +267,7 @@ export function DraftSchedulePanel({
         action={commissionerControls}
       />
       {autoStartNotice}
+      {overnightPauseNotice}
       {startError === null ? null : (
         <p role="alert" className="text-sm text-negative">
           {startError}

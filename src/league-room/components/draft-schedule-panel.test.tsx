@@ -76,6 +76,40 @@ describe("DraftSchedulePanel", () => {
     expect(screen.getByText(/in (29|30) minutes/)).toBeInTheDocument();
   });
 
+  // Task 4. `SCHEDULED` (a week out) is a slow draft: once it opens it picks at a tier of an
+  // hour or longer, which is exactly what the overnight freeze applies to.
+  it("mentions the overnight freeze for a draft scheduled to run more than an hour out", () => {
+    renderInLeague(
+      <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={SCHEDULED} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText(/pause automatically between 2:00 AM and 5:00 AM Eastern/)).toBeInTheDocument();
+  });
+
+  it("drops the overnight-freeze notice once kickoff is within the hour — that draft never reaches a slow enough tier", () => {
+    const startingSoon = { ...SCHEDULED, kickoffAt: new Date(Date.now() + 30 * 60 * 1000).toISOString() };
+    renderInLeague(
+      <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={startingSoon} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByText(/pause automatically/)).not.toBeInTheDocument();
+  });
+
+  it("says nothing about the overnight freeze once the draft is live or complete", async () => {
+    const fixture = fixtureLeagueDeps();
+    const { rerender } = renderInLeague(
+      <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={{ ...SCHEDULED, status: "in_progress" }} />,
+      fixture.deps,
+    );
+    expect(screen.queryByText(/pause automatically/)).not.toBeInTheDocument();
+    rerender(
+      <LeagueRoomDepsProvider deps={fixture.deps}>
+        <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={{ ...SCHEDULED, status: "complete" }} />
+      </LeagueRoomDepsProvider>,
+    );
+    expect(screen.queryByText(/pause automatically/)).not.toBeInTheDocument();
+  });
+
   it("tells everyone the platform has a fallback, only for a scheduled public league", () => {
     renderInLeague(
       <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={{ ...SCHEDULED, isPublicMatchmade: true }} />,

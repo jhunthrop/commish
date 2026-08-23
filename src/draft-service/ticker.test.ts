@@ -52,7 +52,11 @@ describe("draft ticker", () => {
 
   it("submits TIMER_EXPIRE once the deadline has passed, producing an autopick", async () => {
     const { ticker, store, fixture } = await liveDraft();
-    now = "2026-09-01T09:00:00.000Z";
+    // The raw 8h deadline would be 08:00Z, but `loadDraftConfig` attaches the real overnight
+    // freeze (2-5 AM ET) and this turn's start (8 PM ET, 8/31) runs straight into it, pushing
+    // the true deadline to 11:00Z — proof, in passing, that the ticker's own expiry sweep
+    // inherits the pause for free by reading `currentDeadline` and nothing else.
+    now = "2026-09-01T12:00:00.000Z";
     expect(await ticker.tick()).toEqual([{ draftId: fixture.draftId, applied: true }]);
     const state = await store.getDraftState(fixture.draftId);
     expect(state?.picks).toHaveLength(1);
@@ -73,7 +77,7 @@ describe("draft ticker", () => {
       draftId: "draft_tick_scheduled", leagueId: "league_tick_scheduled", format: "snake", teamCount: 2,
       slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
     });
-    now = "2026-09-01T09:00:00.000Z"; // past the in-progress draft's deadline
+    now = "2026-09-01T12:00:00.000Z"; // past the in-progress draft's (pause-extended) deadline
     expect(await ticker.tick()).toEqual([{ draftId: fixture.draftId, applied: true }]);
   });
 
@@ -102,7 +106,7 @@ describe("draft ticker", () => {
     now = "2026-09-01T07:00:00.000Z"; // inside the turn
     expect(await ticking.tick()).toEqual([]);
     expect(calls).toEqual(["nudged"]);
-    now = "2026-09-01T09:00:00.000Z"; // past the deadline
+    now = "2026-09-01T12:00:00.000Z"; // past the (pause-extended) deadline
     expect(await ticking.tick()).toEqual([{ draftId: fixture.draftId, applied: true }]);
     expect(calls).toEqual(["nudged"]);
   });
@@ -230,8 +234,8 @@ describe("draft ticker", () => {
 describe("draft ticker — onOutcome logging (I5)", () => {
   it("logs the first applied:false outcome for a draft, then rate-limits further logs until tickWarnIntervalMs has passed", async () => {
     const { fixture, store: realStore } = await liveDraft();
-    // Past the initial deadline, so tickOne always attempts an expiry.
-    now = "2026-09-01T09:00:00.000Z";
+    // Past the (pause-extended) initial deadline, so tickOne always attempts an expiry.
+    now = "2026-09-01T12:00:00.000Z";
     // Warm the real store's cache with the actual (past-deadline) draft state, then hand the
     // ticker a store whose applyAction always rejects — deterministic repeated failures,
     // without depending on the exact shape of a real race.
@@ -251,19 +255,19 @@ describe("draft ticker — onOutcome logging (I5)", () => {
     expect(onOutcome).toHaveBeenCalledTimes(1);
 
     // Just under the interval — still rate-limited.
-    now = "2026-09-01T09:00:59.999Z";
+    now = "2026-09-01T12:00:59.999Z";
     await ticker.tick();
     expect(onOutcome).toHaveBeenCalledTimes(1);
 
     // At/after the interval — logs again.
-    now = "2026-09-01T09:01:00.000Z";
+    now = "2026-09-01T12:01:00.000Z";
     await ticker.tick();
     expect(onOutcome).toHaveBeenCalledTimes(2);
   });
 
   it("defaults onOutcome to a rate-limited console.warn", async () => {
     const { fixture, store: realStore } = await liveDraft();
-    now = "2026-09-01T09:00:00.000Z";
+    now = "2026-09-01T12:00:00.000Z"; // past the (pause-extended) deadline
     await realStore.getDraftState(fixture.draftId);
     const store = { ...realStore, applyAction: async () => ({ ok: false as const, reason: "boom" }) };
     const ticker = createDraftTicker({ db, store, clock });
@@ -309,7 +313,7 @@ describe("draft ticker — R-B4 store-level regression (check-then-act race)", (
 describe("draft ticker — auto-start (Task 7)", () => {
   it("runs auto-start FIRST, mapping its outcomes ahead of the expiry scan's own", async () => {
     const { store, fixture } = await liveDraft();
-    now = "2026-09-01T09:00:00.000Z"; // past the live draft's own deadline, so it also expires this tick
+    now = "2026-09-01T12:00:00.000Z"; // past the live draft's own (pause-extended) deadline, so it also expires this tick
     const calls: string[] = [];
     const autoStart = async (): Promise<readonly AutoStartOutcome[]> => {
       calls.push("auto-start");
@@ -363,7 +367,7 @@ describe("draft ticker — auto-start (Task 7)", () => {
     // it ever produces a row, which must not skip the expiry scan below it any more than one
     // in-progress draft's DB error skips the rest of THAT scan.
     const { store, fixture } = await liveDraft();
-    now = "2026-09-01T09:00:00.000Z"; // past the live draft's own deadline
+    now = "2026-09-01T12:00:00.000Z"; // past the live draft's own (pause-extended) deadline
     const autoStart = async (): Promise<never> => {
       throw new Error("auto-start connection reset");
     };

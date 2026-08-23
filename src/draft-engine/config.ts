@@ -24,6 +24,37 @@ export const DRAFT_CLOCK_SCHEDULE: readonly ClockTier[] = [
   { untilHoursBeforeKickoff: 0, pickSeconds: 90 },
 ];
 
+/**
+ * The overnight freeze: while the current tier's pick clock is `appliesAtOrAbovePickSeconds`
+ * or longer, a deadline that would land between `startHour` and `endHour` LOCAL time in `zone`
+ * is pushed past it (`pause.ts`'s `deadlineAfter`) — the courtesy FFPC and Underdog both give a
+ * slow draft, applied only where a deadline is COMPUTED (selectors, never the reducer; see
+ * `pause.ts`'s own docblock for why).
+ */
+export interface PauseWindow {
+  /** IANA zone name. Every hour below is read in this zone, never the host's own. */
+  readonly zone: string;
+  /** Local hour the freeze starts, inclusive. */
+  readonly startHour: number;
+  /** Local hour the freeze ends, exclusive. */
+  readonly endHour: number;
+  /** The room is awake below this tier's pick length, so the freeze never applies to it —
+   *  the 90-second (or 10-minute) floor never strands eleven managers to protect one asleep. */
+  readonly appliesAtOrAbovePickSeconds: number;
+}
+
+/**
+ * Underdog's ladder, which `DRAFT_CLOCK_SCHEDULE` above already mirrors — 2 AM to 5 AM ET,
+ * and only once a pick clock has reached an hour or longer (the 1h/4h/8h tiers; never the
+ * 10m/90s floor a draft runs at near kickoff).
+ */
+export const DRAFT_PAUSE_WINDOW: PauseWindow = {
+  zone: "America/New_York",
+  startHour: 2,
+  endHour: 5,
+  appliesAtOrAbovePickSeconds: 60 * 60,
+};
+
 export const DRAFT_QUEUE_CONFIG = {
   /**
    * Longest queue a team may store. Bounds both the jsonb action row and the reorder UI;

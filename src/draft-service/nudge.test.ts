@@ -12,10 +12,24 @@ const db = createTestDb();
 const START = "2026-09-01T00:00:00.000Z";
 const clock = { now: () => START };
 // The 8-hour tier is in force nine days from kickoff: the turn is 28,800s long, so the 75%
-// mark is +6h and the deadline is +8h.
+// mark is +6h (2026-09-01T06:00:00.000Z, which happens to land exactly at the overnight
+// freeze's own open — 2 AM ET — and so is not itself pushed any further by it; see the
+// "does not extend a deadline that starts exactly at the window's open" reasoning in
+// `pause.test.ts`). The raw, un-paused deadline would be +8h; `loadDraftConfig` (via
+// `store.startDraft`, which every fixture below runs through) attaches the REAL
+// `DRAFT_PAUSE_WINDOW`, so this fixture's true deadline is pushed to +11h instead, past the
+// 2-5 AM ET freeze the turn's own start (8 PM ET, 8/31) runs straight into.
 const BEFORE_THRESHOLD = "2026-09-01T05:00:00.000Z";
-const AFTER_THRESHOLD = "2026-09-01T07:00:00.000Z";
-const AFTER_DEADLINE = "2026-09-01T09:00:00.000Z";
+// After the threshold (06:00Z), past the freeze's own close (09:00Z) and well before the
+// pause-extended deadline (11:00Z) — the ordinary "yes, nudge" instant every existing test
+// below already assumed, just moved off 07:00Z now that 07:00Z sits inside the freeze itself.
+const AFTER_THRESHOLD = "2026-09-01T09:30:00.000Z";
+// Inside the freeze itself (3 AM ET) — after the (unmoved) threshold and before the
+// (pause-extended) deadline, which is exactly the gap `isPaused` exists to close: a due time
+// that sits at the window's own open and a deadline pushed past its close still leave the whole
+// freeze inside the "nudge now" range, so the range check alone is not enough.
+const DURING_THE_FREEZE = "2026-09-01T07:00:00.000Z";
+const AFTER_DEADLINE = "2026-09-01T12:00:00.000Z";
 
 beforeEach(async () => {
   await truncateAll(db);
@@ -140,6 +154,18 @@ describe("nudge scheduler", () => {
     const draft = await liveDraft();
     const { scheduler, published } = schedulerWith();
     expect(await scheduler.nudge(draft.state, AFTER_DEADLINE)).toBe("skipped");
+    expect(published).toEqual([]);
+  });
+
+  it("says nothing during the overnight freeze, even though the un-extended threshold and deadline would otherwise bracket it", async () => {
+    // Task 4. `dueAt` for this fixture sits exactly at the freeze's own open (2 AM ET) and never
+    // moves — a deadline landing exactly on a window's boundary is not itself inside it — while
+    // `deadlineAt` gets pushed all the way to 11 AM UTC. That leaves the ENTIRE 2-5 AM ET freeze
+    // sitting inside `[dueAt, deadlineAt)`, so a bare range check would nudge right through it;
+    // `isPaused` is what actually closes the gap.
+    const draft = await liveDraft();
+    const { scheduler, published } = schedulerWith();
+    expect(await scheduler.nudge(draft.state, DURING_THE_FREEZE)).toBe("skipped");
     expect(published).toEqual([]);
   });
 

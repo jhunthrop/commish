@@ -7,7 +7,7 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
  */
 // eslint-disable-next-line @typescript-eslint/no-restricted-imports
 import { totalRosterSlots } from "@/draft-engine";
-import { formatCountdown, formatClockLength, formatCoarseRemaining, formatGap, formatTightening, formatYourTurn, rosterSpots } from "./format";
+import { formatCountdown, formatClockLength, formatCoarseRemaining, formatGap, formatPausedUntil, formatTightening, formatYourTurn, rosterSpots } from "./format";
 
 describe("formatCountdown", () => {
   it.each([
@@ -76,6 +76,35 @@ describe("formatTightening", () => {
     const now = Date.parse("2026-09-01T00:00:00.000Z");
     expect(formatTightening({ at: "2026-09-01T02:14:00.000Z", pickSeconds: 600 }, now)).toBe("Picks shorten to 10 minutes in 2h 14m");
   });
+
+  it("routes an ETA that would land inside the freeze out to when picks resume instead", () => {
+    const now = Date.parse("2026-09-01T00:00:00.000Z");
+    // The threshold itself (02:14 UTC) falls before `pausedUntil` (09:00 UTC) — an ETA that
+    // ignored the freeze would undercount by nearly seven hours.
+    expect(
+      formatTightening({ at: "2026-09-01T02:14:00.000Z", pickSeconds: 600 }, now, "2026-09-01T09:00:00.000Z"),
+    ).toBe("Picks shorten to 10 minutes in 9h 0m");
+  });
+
+  it("leaves the ETA alone when the threshold already lands after the freeze lifts", () => {
+    const now = Date.parse("2026-09-01T00:00:00.000Z");
+    expect(
+      formatTightening({ at: "2026-09-01T10:00:00.000Z", pickSeconds: 600 }, now, "2026-09-01T09:00:00.000Z"),
+    ).toBe("Picks shorten to 10 minutes in 10h 0m");
+  });
+});
+
+describe("formatPausedUntil", () => {
+  it("says when picks resume, in Eastern time, regardless of the reader's own zone", () => {
+    // 09:00 UTC in September is 5:00 AM EDT.
+    expect(formatPausedUntil("2026-09-15T09:00:00.000Z")).toBe("Picks are paused until 5:00 AM Eastern. You can still make yours.");
+  });
+
+  it("reads correctly across a DST boundary too, since it always asks Eastern time, not a fixed offset", () => {
+    // 2026-03-08T09:30:00.000Z is 5:30 AM EDT — spring-forward morning, after the shortened
+    // freeze window pin in `pause.test.ts`.
+    expect(formatPausedUntil("2026-03-08T09:30:00.000Z")).toBe("Picks are paused until 5:30 AM Eastern. You can still make yours.");
+  });
 });
 
 describe("formatYourTurn", () => {
@@ -106,6 +135,16 @@ describe("formatYourTurn", () => {
 
   it("counts the picks without estimating a wait when there is no clock to estimate from", () => {
     expect(formatYourTurn(["t2", "t1"], "t1", null)).toBe("You're up in 1 pick.");
+  });
+
+  it("gives an honest, qualitative answer instead of a wrong number while the room is paused", () => {
+    // An ETA that ignores a six-hour freeze is worse than no ETA — the flat estimate would say
+    // "~10m" here, which is not what actually happens next.
+    expect(formatYourTurn(UPCOMING, "t1", 600, "2026-09-15T09:00:00.000Z")).toBe("You're up in 2 picks, once picks resume.");
+  });
+
+  it("still says nothing to a spectator, even while the room is paused", () => {
+    expect(formatYourTurn(UPCOMING, null, 600, "2026-09-15T09:00:00.000Z")).toBeNull();
   });
 });
 

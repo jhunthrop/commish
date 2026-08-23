@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { draftNudges, teams } from "@/db/schema";
-import { currentDeadline, draftClockView, nudgeDeadline, teamOnClock, type DraftState } from "@/draft-engine";
+import { currentDeadline, draftClockView, isPaused, nudgeDeadline, teamOnClock, type DraftState } from "@/draft-engine";
 import { MS_PER_SECOND } from "@/domain/duration";
 import { DRAFT_NUDGE_CONFIG } from "./config";
 import type { NudgeCopyFn } from "./nudge-copy";
@@ -63,6 +63,16 @@ export function createNudgeScheduler({
         if (teamId === null || dueAt === null || deadlineAt === null) return "skipped";
         const nowMs = Date.parse(now);
         if (nowMs < Date.parse(dueAt) || nowMs >= Date.parse(deadlineAt)) return "skipped";
+        // Task 4's overnight freeze. `dueAt`/`deadlineAt` are each already pushed past it
+        // (`nudgeDeadline`/`currentDeadline` route through `deadlineAfter` whenever
+        // `config.pauseWindow` and the current tier call for it), but the OPEN INTERVAL between
+        // two extended instants still spans the freeze itself — a due time that already sits
+        // exactly at the window's open never moves at all, for instance — so the range check
+        // above is not sufficient on its own. `isPaused` is the direct answer to "is right now
+        // inside the freeze," and is the one other place besides `admitCommand` the
+        // reducer-purity ruling (`pause.ts`'s own docblock) allows a live read of `pauseWindow`:
+        // this function never applies an action, so nothing here can ever change a replay.
+        if (isPaused(state, now)) return "skipped";
 
         const claimed = await db
           .insert(draftNudges)

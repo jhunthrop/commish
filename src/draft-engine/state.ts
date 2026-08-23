@@ -1,7 +1,7 @@
 import type { DraftFormat } from "@/domain/league";
 import type { DraftPoolEntry, DraftStatus } from "@/domain/draft";
 import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/roster";
-import type { ClockTier } from "./config";
+import type { ClockTier, PauseWindow } from "./config";
 
 /** Static, DB-derived setup. Never changes during a draft. */
 export interface DraftConfig {
@@ -14,6 +14,15 @@ export interface DraftConfig {
   readonly auctionBudget: number | null;
   readonly slotConfig: readonly RosterSlotConfig[];
   readonly clockSchedule: readonly ClockTier[];
+  /**
+   * The overnight freeze (Task 4), injected by `loadDraftConfig` beside `clockSchedule` — the
+   * two travel together because they are the same kind of thing: a deploy-flippable clock rule
+   * consumed at command time and at view time. Optional (rather than matching `clockSchedule`'s
+   * always-required shape) so the many `DraftConfig` literals this engine's own test suite
+   * already hand-writes stay untouched by this addition; every one of them means "no freeze",
+   * exactly what an absent field and an explicit `null` both mean to every reader of it.
+   */
+  readonly pauseWindow?: PauseWindow | null;
 }
 
 export interface CompletedPick {

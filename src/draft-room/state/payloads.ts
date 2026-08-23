@@ -18,6 +18,13 @@ const clockSchema = z.object({
   // `readonly string[]`, and a mutable `string[]` is not assignable to it in BOTH directions,
   // so a plain `z.array` would fail the bidirectional shape assertion below.
   upcoming: z.array(z.string()).readonly(),
+  // Task 4's overnight freeze. `.optional()` matches `DraftClockView.pausedUntil` being an
+  // optional field (the engine's own test suite predates this task and hand-builds plenty of
+  // `DraftClockView` literals that never set it) — the server always sends it in a real payload,
+  // but the schema itself only needs to say what's ALLOWED, and stripping it silently (the
+  // default for a key `z.object` doesn't know about) would have been the actual bug here: the
+  // room would never see a paused turn at all.
+  pausedUntil: z.string().nullable().optional(),
 });
 
 /**

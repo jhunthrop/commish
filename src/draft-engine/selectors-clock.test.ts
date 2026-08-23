@@ -2,9 +2,9 @@ import { describe, it, expect } from "vitest";
 import type { DraftPoolEntry, StartDraftAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
-import { DRAFT_CLOCK_SCHEDULE } from "./config";
+import { DRAFT_CLOCK_SCHEDULE, type PauseWindow } from "./config";
 import { reduceDraft } from "./reduce";
-import { currentClockSeconds, currentDeadline, currentTier, draftStateView, nextTightening } from "./selectors";
+import { currentClockSeconds, currentDeadline, currentTier, draftClockView, draftStateView, nextTightening, nudgeDeadline } from "./selectors";
 
 const SLOTS: readonly RosterSlotConfig[] = [
   { slot: "QB", count: 1, eligiblePositions: ["QB"] },
@@ -94,5 +94,90 @@ describe("draftStateView", () => {
     });
     expect(view.availablePlayerIds).toEqual(["qb1", "rb1", "qb2", "rb2"]);
     expect(view.rosters).toEqual({ t1: [], t2: [] });
+  });
+});
+
+describe("the overnight pause, seen through the state", () => {
+  const ET: PauseWindow = { zone: "America/New_York", startHour: 2, endHour: 5, appliesAtOrAbovePickSeconds: 60 * 60 };
+  const MS_PER_MINUTE = 60_000;
+  const MS_PER_DAY = 24 * 60 * MS_PER_MINUTE;
+
+  function minutes(n: number): number {
+    return n * MS_PER_MINUTE;
+  }
+  function days(n: number): number {
+    return n * MS_PER_DAY;
+  }
+  function plusSeconds(iso: string, seconds: number): string {
+    return new Date(Date.parse(iso) + seconds * 1_000).toISOString();
+  }
+  function days3After(iso: string): string {
+    return new Date(Date.parse(iso) + days(3)).toISOString();
+  }
+
+  /** A snake draft, freshly started at `turnStartedAt`, whose kickoff sits `kickoffIn`
+   *  milliseconds later — the two team draft order the pause tests need, on the pause-window
+   *  config the rest of this file's `CONFIG` never carries. */
+  function draftAt({ kickoffIn, turnStartedAt }: { readonly kickoffIn: number; readonly turnStartedAt: string }): DraftState {
+    const config: DraftConfig = { ...CONFIG, kickoffAt: new Date(Date.parse(turnStartedAt) + kickoffIn).toISOString(), pauseWindow: ET };
+    const start: StartDraftAction = {
+      v: 1,
+      type: "START_DRAFT",
+      minBid: 1,
+      timestamp: turnStartedAt,
+      draftOrder: ["t_alice", "t_bob"],
+      pool: POOL,
+    };
+    const result = reduceDraft(initialDraftState(config), start);
+    if (!result.ok) throw new Error(result.reason);
+    return result.state;
+  }
+
+  function makePick(teamId: string, playerId: string) {
+    return { v: 1 as const, type: "MAKE_PICK" as const, timestamp: "2026-09-15T06:31:00.000Z", teamId, playerId };
+  }
+
+  it("does not pause the 90-second clock, because that room is awake", () => {
+    // `appliesAtOrAbovePickSeconds` is one hour. At the 10-minute and 90-second tiers the draft
+    // is within two hours of kickoff and everybody in it is at their keyboard; freezing them at
+    // 2 AM would strand eleven managers to protect the one who is asleep.
+    const state = draftAt({ kickoffIn: minutes(30), turnStartedAt: "2026-09-15T06:00:00.000Z" });
+    expect(currentDeadline(state)).toBe(plusSeconds(state.turnStartedAt!, 90));
+    expect(draftClockView(state).pausedUntil).toBeNull();
+  });
+
+  it("tells the room when picks come back, without stopping anybody picking now", () => {
+    const state = draftAt({ kickoffIn: days(5), turnStartedAt: "2026-09-15T06:30:00.000Z" });
+    expect(draftClockView(state).pausedUntil).toBe("2026-09-15T09:00:00.000Z");
+    expect(reduceDraft(state, makePick("t_alice", "qb1")).ok).toBe(true);
+  });
+
+  it("pushes the moderator's nudge threshold past the freeze too, not just the deadline", () => {
+    // Same 4h-tier turn, started at 2:30 AM ET. A naive 12.5% threshold (30 minutes) would land
+    // at 3:00 AM ET — squarely inside the freeze — which is exactly what would have the
+    // moderator speaking up in the middle of the night if `nudgeDeadline` did not route through
+    // the same `deadlineAfter` fixpoint `currentDeadline` uses.
+    const state = draftAt({ kickoffIn: days(5), turnStartedAt: "2026-09-15T06:30:00.000Z" });
+    expect(nudgeDeadline(state, 12.5)).toBe("2026-09-15T09:30:00.000Z");
+  });
+
+  it("never extends a deadline when no pause window is configured at all", () => {
+    // The optional field's other value: omitted entirely, exactly like every `DraftConfig`
+    // this suite's OTHER describe blocks build. Behavior must be identical to before this task.
+    const start: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: "2026-09-15T03:30:00.000Z", draftOrder: ["t1", "t2"], pool: POOL };
+    // 11:30 PM ET, more than 48h from kickoff, so the 4h tier would otherwise straddle the freeze.
+    const config: DraftConfig = { ...CONFIG, kickoffAt: days3After("2026-09-15T03:30:00.000Z") };
+    const result = reduceDraft(initialDraftState(config), start);
+    if (!result.ok) throw new Error(result.reason);
+    expect(currentDeadline(result.state)).toBe(plusSeconds(result.state.turnStartedAt!, 4 * 60 * 60));
+    expect(draftClockView(result.state).pausedUntil).toBeNull();
+  });
+
+  it("never extends a deadline when the configured window is explicitly null", () => {
+    const start: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: "2026-09-15T03:30:00.000Z", draftOrder: ["t1", "t2"], pool: POOL };
+    const config: DraftConfig = { ...CONFIG, kickoffAt: days3After("2026-09-15T03:30:00.000Z"), pauseWindow: null };
+    const result = reduceDraft(initialDraftState(config), start);
+    if (!result.ok) throw new Error(result.reason);
+    expect(currentDeadline(result.state)).toBe(plusSeconds(result.state.turnStartedAt!, 4 * 60 * 60));
   });
 });
