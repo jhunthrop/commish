@@ -5,6 +5,7 @@ import { computeStandings, LEAGUE_CONFIG, nextAction, seasonProgress, type WeekS
 import type { HomeBody, HomeLeagueCard, MatchupSummary } from "@/league-room/contract";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import type { ScoreCache, ScoreCacheBatchRequest } from "@/stats-pipeline/score-cache";
+import { isCommissionerOf } from "./authority";
 import { myLeaguesOverview, toSummary } from "./read";
 
 /** No Redis connection needed: every existing caller of `crossLeagueHome` keeps working
@@ -160,7 +161,7 @@ export async function crossLeagueHome(
       format: league.format,
       teamCount: league.teamCount,
       filledTeams,
-      isCommissioner: league.commissionerUserId === userId,
+      isCommissioner: isCommissionerOf(league, userId),
       myTeamId: phase.myTeamId,
       draftId: draft?.id ?? null,
       draftStatus: draft?.status ?? null,
@@ -169,7 +170,7 @@ export async function crossLeagueHome(
       weekStatus,
       matchup,
       nextAction: nextAction({
-        isCommissioner: league.commissionerUserId === userId,
+        isCommissioner: isCommissionerOf(league, userId),
         filledTeams,
         teamCount: league.teamCount,
         myTeamId: phase.myTeamId,

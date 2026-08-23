@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { draftActions, drafts, teams, users } from "@/db/schema";
+import { draftActions, drafts, leagues, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import { DRAFT_SKIP_POLICY } from "@/draft-engine";
 import { setSlotPreference } from "@/draft-service/slot-preference";
 import { LEAGUE_CONFIG } from "@/league";
+import { HOUSE_AUTHORITY_REFUSALS } from "./authority";
 import { createLeague } from "./creation";
 import { draftScheduleView, setDraftKickoff, KICKOFF_REFUSALS } from "./draft-schedule";
 
@@ -66,6 +67,25 @@ async function seedLeague(input: {
   });
   if (!created.ok) throw new Error(created.reason);
   return { leagueId: created.leagueId, commissioner };
+}
+
+/**
+ * A house league, hand-inserted rather than through `createLeague`: Task 13's `LeagueOwner`
+ * house branch is what teaches `createLeague` to write one, and this task (12) only needs a row
+ * shaped the way the CHECK constraint requires it — `commissionerUserId: null`, `houseRung` set —
+ * to prove `setDraftKickoff` refuses every member of it the same true way.
+ */
+async function seedHouseLeague(leagueId: string, memberUserId: string): Promise<void> {
+  await db.insert(users).values({ id: memberUserId, email: `${memberUserId}@test.local`, displayName: "House Member" }).onConflictDoNothing();
+  await db.insert(leagues).values({
+    id: leagueId, name: "Open 12", format: "snake", teamCount: LEAGUE_CONFIG.defaults.teamCount,
+    commissionerUserId: null, houseRung: "open_12", rosterSlots: STANDARD_ROSTER_SLOTS,
+  });
+  await db.insert(teams).values({ id: `${leagueId}_team`, leagueId, userId: memberUserId, name: "House Team" });
+  await db.insert(drafts).values({
+    id: `${leagueId}_draft`, leagueId, format: "snake", status: "scheduled",
+    kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+  });
 }
 
 beforeEach(async () => {
@@ -284,5 +304,23 @@ describe("setDraftKickoff", () => {
     const result = await setDraftKickoff(db, { leagueId, userId: commissioner, kickoffAt: LATER }, clock);
     expect(result).toEqual({ ok: false, status: 409, reason: KICKOFF_REFUSALS.whenFull });
     expect(await kickoffOf(leagueId)).toBe(before);
+  });
+
+  // Phase 3.5 addendum, Task 12: the catalog chose this draft's time, not any member — the same
+  // generalization Task 7's `whenFull` made, applied to a league that never had a commissioner
+  // to choose one in the first place. Answered to an ORDINARY member (not a would-be commissioner
+  // who lost a comparison), because a house league has none for the earlier gate to single out.
+  it("refuses to move a house league's draft time, and says why rather than 404ing a real member", async () => {
+    await seedHouseLeague("lg_house_kickoff", "u_house_member");
+    const before = await kickoffOf("lg_house_kickoff");
+    const result = await setDraftKickoff(db, { leagueId: "lg_house_kickoff", userId: "u_house_member", kickoffAt: LATER }, clock);
+    expect(result).toEqual({ ok: false, status: 409, reason: HOUSE_AUTHORITY_REFUSALS.schedule });
+    expect(await kickoffOf("lg_house_kickoff")).toBe(before);
+  });
+
+  it("refuses a house league's draft time for a total stranger too, the same true reason", async () => {
+    await seedHouseLeague("lg_house_kickoff_stranger", "u_house_member2");
+    const result = await setDraftKickoff(db, { leagueId: "lg_house_kickoff_stranger", userId: "u_total_stranger", kickoffAt: LATER }, clock);
+    expect(result).toEqual({ ok: false, status: 409, reason: HOUSE_AUTHORITY_REFUSALS.schedule });
   });
 });

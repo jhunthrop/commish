@@ -155,7 +155,7 @@ describe("the league activity page says nothing that breaks the house copy rules
     });
     vi.mocked(resolveLeagueMembership).mockResolvedValue({
       ok: true,
-      membership: { leagueId: "league_1", teamId: "team_1", isCommissioner: false },
+      membership: { leagueId: "league_1", teamId: "team_1", isCommissioner: false, authority: { kind: "member", userId: "someone_else" } },
     });
     vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
     vi.mocked(listLeagueActivity).mockResolvedValue({ rows: [ROW], nextBefore: null });

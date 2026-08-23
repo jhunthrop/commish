@@ -140,7 +140,7 @@ export function LeagueHome({
       */}
       <LeagueTermsPanel terms={home.terms} helpLevel={helpLevel} titleAs="p" />
 
-      <LeagueMembersPanel teams={home.teams} teamCount={home.teamCount} commissionerUserId={home.commissionerUserId} myTeamId={home.myTeamId} />
+      <LeagueMembersPanel teams={home.teams} teamCount={home.teamCount} authority={home.authority} myTeamId={home.myTeamId} />
 
       {/* `id="invite-managers"`: `WaitingRoom`'s own "Invite someone" link (Task 8, a `when_full`
           league's filling state) points here — the one real invite surface a commissioner has. */}

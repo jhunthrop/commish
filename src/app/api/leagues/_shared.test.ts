@@ -15,6 +15,8 @@ vi.mock("@/lib/leagues/membership", async (importOriginal) => {
 
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { resolveLeagueMembership } from "@/lib/leagues/membership";
+import type { LeagueAuthority } from "@/league-service/authority";
+import { HOUSE_AUTHORITY_REFUSALS } from "@/league-service/authority";
 import { withCommissioner, withCurrentUser, withLeagueActor, withLeagueMemberActor } from "./_shared";
 
 const params = Promise.resolve({ leagueId: "league_1" });
@@ -28,8 +30,10 @@ const signedInAs = (id: string | null) =>
       : { id, email: `${id}@test.local`, displayName: id, experienceTier: "beginner", avatarUrl: null, createdAt: "2026-08-17T12:00:00.000Z", isAdmin: false },
   );
 
-const membership = (teamId: string | null, isCommissioner: boolean) =>
-  vi.mocked(resolveLeagueMembership).mockResolvedValue({ ok: true, membership: { leagueId: "league_1", teamId, isCommissioner } });
+const MEMBER_AUTHORITY: LeagueAuthority = { kind: "member", userId: "u1" };
+
+const membership = (teamId: string | null, isCommissioner: boolean, authority: LeagueAuthority = MEMBER_AUTHORITY) =>
+  vi.mocked(resolveLeagueMembership).mockResolvedValue({ ok: true, membership: { leagueId: "league_1", teamId, isCommissioner, authority } });
 
 beforeEach(() => {
   vi.mocked(getCurrentUser).mockReset();
@@ -67,7 +71,7 @@ describe("withLeagueActor", () => {
     signedInAs("u1");
     membership("team_1", true);
     const response = await withLeagueActor(request(), context, async (actor) => Response.json(actor));
-    expect(await response.json()).toEqual({ userId: "u1", leagueId: "league_1", teamId: "team_1", isCommissioner: true });
+    expect(await response.json()).toEqual({ userId: "u1", leagueId: "league_1", teamId: "team_1", isCommissioner: true, authority: MEMBER_AUTHORITY });
   });
 
   it("surfaces the membership lookup's own status and message", async () => {
@@ -110,5 +114,13 @@ describe("withCommissioner", () => {
     const response = await withCommissioner(request(), context, async () => new Response(null, { status: 200 }));
     expect(response.status).toBe(403);
     expect(await response.json()).toEqual({ ok: false, error: "Only the commissioner can do that." });
+  });
+
+  it("answers the house refusal, not the ordinary commissioner message, for a house league", async () => {
+    signedInAs("u1");
+    membership("team_1", false, { kind: "house", rung: "open_12" });
+    const response = await withCommissioner(request(), context, async () => new Response(null, { status: 200 }));
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ ok: false, error: HOUSE_AUTHORITY_REFUSALS.invite });
   });
 });

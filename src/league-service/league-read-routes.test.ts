@@ -132,10 +132,30 @@ describe("GET /api/leagues/[leagueId]", () => {
     expect(body).toMatchObject({
       leagueId: created.leagueId, name: "Sunday Money", isCommissioner: true,
       myTeamId: created.teamId, draftId: created.draftId, draftStatus: "scheduled",
-      currentWeek: 1, myMatchup: null, commissionerUserId: "u1",
+      currentWeek: 1, myMatchup: null, authority: { kind: "member", userId: "u1" },
     });
     expect(body.standings).toHaveLength(1);
     expect(body.rosterSlots.length).toBeGreaterThan(0);
+  });
+
+  // Phase 3.5 addendum, Task 12: a house league has no `createLeague` path yet (Task 13's
+  // reconciler is what teaches it one) — hand-seeded here, directly through `leagueHome`, to
+  // prove the `authority` union's `house` branch: nobody is commissioner, and `commissionerTeamId`
+  // short-circuits to `undefined` (`read.ts`'s own `leagueAuthority`-gated `find`) rather than
+  // matching some team by accident.
+  it("names the platform as authority for a house league, and marks nobody its commissioner", async () => {
+    await db.insert(leagues).values({
+      id: "lg_house_home", name: "Open 12", format: "snake", teamCount: 12,
+      commissionerUserId: null, houseRung: "open_12", rosterSlots: STANDARD_ROSTER_SLOTS,
+    });
+    await db.insert(teams).values({ id: "lg_house_home_team", leagueId: "lg_house_home", userId: "u1", name: "House Team" });
+    await db.insert(drafts).values({
+      id: "lg_house_home_draft", leagueId: "lg_house_home", format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+    });
+
+    const home = await leagueHome(db, "lg_house_home", "u1");
+    expect(home).toMatchObject({ isCommissioner: false, authority: { kind: "house", rung: "open_12" } });
   });
 
   // Step 15's audit: standings and the members list both need the owner, not just the team —
@@ -408,7 +428,7 @@ describe("the read models' own guards", () => {
     // the fallbacks below `leagueHome`'s own reads are real code, not merely present.
     const REAL_LEAGUE = {
       id: "lg_stub", name: "Stub League", format: "snake" as const, teamCount: 2, stakeTier: 0,
-      isPublicMatchmade: false, experienceTier: "beginner" as const, commissionerUserId: "u1",
+      isPublicMatchmade: false, experienceTier: "beginner" as const, commissionerUserId: "u1", houseRung: null,
       rosterSlots: [], createdAt: new Date(),
     };
     const stubDb = {
@@ -451,7 +471,7 @@ describe("the read models' own guards", () => {
     // `sideFor`'s own `nameById.get(teamId) ?? teamId` fallback in the state it defends.
     const REAL_LEAGUE = {
       id: "lg_stub_wk", name: "Stub League", format: "snake" as const, teamCount: 2, stakeTier: 0,
-      isPublicMatchmade: false, experienceTier: "beginner" as const, commissionerUserId: "u1",
+      isPublicMatchmade: false, experienceTier: "beginner" as const, commissionerUserId: "u1", houseRung: null,
       rosterSlots: [...STANDARD_ROSTER_SLOTS], createdAt: new Date(),
     };
     const MATCHUP_ROW = { leagueId: "lg_stub_wk", weekNumber: 1, homeTeamId: "team_ghost_home", awayTeamId: "team_ghost_away", homeScore: null, awayScore: null };

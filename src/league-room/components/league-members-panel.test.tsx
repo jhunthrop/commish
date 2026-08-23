@@ -2,13 +2,17 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
+import type { LeagueAuthority } from "@/league-service/authority";
 import { THREE_TEAMS } from "../test-fixtures";
 import { LeagueMembersPanel } from "./league-members-panel";
+
+const MEMBER: LeagueAuthority = { kind: "member", userId: "u1" };
+const HOUSE: LeagueAuthority = { kind: "house", rung: "open_12" };
 
 describe("LeagueMembersPanel", () => {
   it("names the commissioner, marks you, and gives every manager a face", async () => {
     await inBothThemes(
-      <LeagueMembersPanel teams={THREE_TEAMS} commissionerUserId="u1" myTeamId="t2" />,
+      <LeagueMembersPanel teams={THREE_TEAMS} authority={MEMBER} myTeamId="t2" />,
       async ({ container }) => {
         expect(screen.getByRole("list", { name: "Managers" })).toBeInTheDocument();
         // The commissioner is named as a fact about the league, not implied by a control only
@@ -32,28 +36,28 @@ describe("LeagueMembersPanel", () => {
   });
 
   it("shows an open seat as an open seat, not as a missing person", () => {
-    render(<LeagueMembersPanel teams={THREE_TEAMS} teamCount={6} commissionerUserId="u1" myTeamId="t2" />);
+    render(<LeagueMembersPanel teams={THREE_TEAMS} teamCount={6} authority={MEMBER} myTeamId="t2" />);
     expect(screen.getByText("3 seats still open")).toBeInTheDocument();
   });
 
   it("says nothing about open seats when the caller doesn't supply a team count", () => {
-    render(<LeagueMembersPanel teams={THREE_TEAMS} commissionerUserId="u1" myTeamId="t2" />);
+    render(<LeagueMembersPanel teams={THREE_TEAMS} authority={MEMBER} myTeamId="t2" />);
     expect(screen.queryByText(/seats? still open/)).not.toBeInTheDocument();
   });
 
   it("marks only the commissioner's own row, not every row", () => {
-    render(<LeagueMembersPanel teams={THREE_TEAMS} commissionerUserId="u1" myTeamId="t2" />);
+    render(<LeagueMembersPanel teams={THREE_TEAMS} authority={MEMBER} myTeamId="t2" />);
     expect(screen.getAllByText("Commissioner")).toHaveLength(1);
   });
 
   it("marks nobody as you for a viewer with no team of their own", () => {
-    render(<LeagueMembersPanel teams={THREE_TEAMS} commissionerUserId="u1" myTeamId={null} />);
+    render(<LeagueMembersPanel teams={THREE_TEAMS} authority={MEMBER} myTeamId={null} />);
     expect(screen.queryByText("You")).not.toBeInTheDocument();
   });
 
   it("shows every manager's name, in both themes, axe-clean", async () => {
     await inBothThemes(
-      <LeagueMembersPanel teams={THREE_TEAMS} commissionerUserId="u1" myTeamId="t2" />,
+      <LeagueMembersPanel teams={THREE_TEAMS} authority={MEMBER} myTeamId="t2" />,
       async ({ container }) => {
         expect(screen.getByText("Alex Rivera")).toBeInTheDocument();
         expect(screen.getByText("Jordan Lee")).toBeInTheDocument();
@@ -65,7 +69,7 @@ describe("LeagueMembersPanel", () => {
 
   it("offers a next step rather than a dead end when a league somehow has no members yet, in both themes", async () => {
     await inBothThemes(
-      <LeagueMembersPanel teams={[]} commissionerUserId="u1" myTeamId={null} />,
+      <LeagueMembersPanel teams={[]} authority={MEMBER} myTeamId={null} />,
       async ({ container }) => {
         expect(screen.getByText("Nobody's here yet")).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
@@ -79,11 +83,36 @@ describe("LeagueMembersPanel", () => {
   // sweep runs over the FULL rendered text of both states rather than pinning one string.
   it("never renders an em-dash, in the filled state or the empty state", () => {
     const { container: filled } = render(
-      <LeagueMembersPanel teams={THREE_TEAMS} teamCount={6} commissionerUserId="u1" myTeamId="t2" />,
+      <LeagueMembersPanel teams={THREE_TEAMS} teamCount={6} authority={MEMBER} myTeamId="t2" />,
     );
     expect(filled.textContent).not.toContain("—");
 
-    const { container: empty } = render(<LeagueMembersPanel teams={[]} commissionerUserId="u1" myTeamId={null} />);
+    const { container: empty } = render(<LeagueMembersPanel teams={[]} authority={MEMBER} myTeamId={null} />);
     expect(empty.textContent).not.toContain("—");
+  });
+
+  // Phase 3.5 addendum, Task 12, Step 5: a house league's authority never matches any team's
+  // `ownerUserId`, so the badge simply never renders — correct but silent without the line
+  // above the roster stating the fact.
+  describe("a house league", () => {
+    it("states who runs it instead of leaving the absent badge to be inferred", async () => {
+      await inBothThemes(
+        <LeagueMembersPanel teams={THREE_TEAMS} authority={HOUSE} myTeamId="t2" />,
+        async ({ container }) => {
+          expect(screen.getByText("Run by Commish")).toBeInTheDocument();
+          expect(await axe(container)).toHaveNoViolations();
+        },
+      );
+    });
+
+    it("marks no member's row as commissioner", () => {
+      render(<LeagueMembersPanel teams={THREE_TEAMS} authority={HOUSE} myTeamId="t2" />);
+      expect(screen.queryByText("Commissioner")).not.toBeInTheDocument();
+    });
+
+    it("never renders an em-dash", () => {
+      const { container } = render(<LeagueMembersPanel teams={THREE_TEAMS} authority={HOUSE} myTeamId="t2" />);
+      expect(container.textContent).not.toContain("—");
+    });
   });
 });

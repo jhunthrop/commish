@@ -12,6 +12,7 @@ import {
   primaryKey,
   index,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
@@ -115,9 +116,24 @@ export const leagues = pgTable(
      * league they run the moment they updated their own profile.
      */
     experienceTier: experienceTierEnum("experience_tier").notNull().default("beginner"),
-    commissionerUserId: text("commissioner_user_id")
-      .notNull()
-      .references(() => users.id),
+    /**
+     * Nullable since Phase 3.5's house-leagues addendum (Task 12, rulings 28-33): `NULL` means
+     * exactly one thing, the platform commissions this league, the same sentence
+     * `audit_events.actor_id` already tells (`@/domain/audit`'s own "Null only when `actorType`
+     * is `"system"`" invariant). `leagues_house_commissioner_ck` below is what makes that true at
+     * the only layer that could make it false — a row where this is null and `houseRung` is also
+     * null does not commit, so `NULL` can never mean "we forgot" or "the row is half written".
+     * `@/league-service/authority.ts`'s `leagueAuthority`/`isCommissionerOf` are the only
+     * sanctioned way to read this column; nothing compares it directly to a user id anymore.
+     */
+    commissionerUserId: text("commissioner_user_id").references(() => users.id),
+    /**
+     * Which catalog rung a house league came from (Task 13's `HOUSE_CATALOG`), or `null` for an
+     * ordinary member league. Tied to `commissionerUserId`'s null-ness by the CHECK below rather
+     * than left as a second, independently-settable fact — a `created_by_house` boolean would
+     * encode the same thing twice and be free to disagree with it.
+     */
+    houseRung: text("house_rung"),
     /** The league's roster shape. The draft reads this to know its rounds and slot rules. */
     rosterSlots: jsonb("roster_slots").$type<readonly RosterSlotConfig[]>().notNull().default([...STANDARD_ROSTER_SLOTS]),
     /**
@@ -166,10 +182,12 @@ export const leagues = pgTable(
      * just list them oldest-first) and this index's payoff is UNCHANGED by that — it was always
      * entirely the filter, never the order, verified in `src/db/index-plans.test.ts`.
      *
-     * There is deliberately NO index on `commissioner_user_id`: every read of it fetches the
-     * league by primary key and compares in application code (`src/lib/leagues/membership.ts`,
-     * `src/league-service/read.ts`). An index on a column nothing filters on is maintenance
-     * cost with no read to pay for it. Add one the day a "leagues I commission" query exists.
+     * There is deliberately NO index on `commissioner_user_id`: every read of it goes through
+     * `@/league-service/authority.ts`'s `leagueAuthority`/`isCommissionerOf`, applied to a league
+     * already fetched by primary key (`src/lib/leagues/membership.ts`, `src/league-service/
+     * read.ts`), never filtered on directly. An index on a column nothing filters on is
+     * maintenance cost with no read to pay for it. Add one the day a "leagues I commission"
+     * query exists.
      */
     index("leagues_public_browse_idx").on(t.createdAt).where(sql`${t.isPublicMatchmade}`),
     /**
@@ -181,6 +199,25 @@ export const leagues = pgTable(
      * definition back out of `pg_indexes` rather than trusting this declaration.
      */
     index("leagues_season_completed_idx").on(t.id).where(sql`${t.seasonCompletedAt} is not null`),
+    /**
+     * PARTIAL for the identical reason `leagues_public_browse_idx` is: `house_rung` is null for
+     * the overwhelming majority of leagues forever. Carries `created_at` as its second column
+     * because the reconciler's count (Task 13) and the shelf's ordering (Task 14) both read house
+     * rows in creation order.
+     */
+    index("leagues_house_rung_idx").on(t.houseRung, t.createdAt).where(sql`${t.houseRung} is not null`),
+    /**
+     * The CHECK that makes a nullable `commissionerUserId` safe (Phase 3.5 addendum, Task 12,
+     * ruling 28): `house_rung` is null exactly when `commissioner_user_id` is NOT null, and vice
+     * versa. A row in neither state, or in both, does not commit — see `commissionerUserId`'s own
+     * docblock above for what that buys. Hand-written in `drizzle/0032_house_leagues.sql`, the one
+     * non-additive statement Phase 3.5 writes: it is also the one statement here that scans every
+     * existing row, because Postgres validates a CHECK before accepting it. The deploy-era form
+     * (`ADD CONSTRAINT ... NOT VALID` then a separate `VALIDATE CONSTRAINT`) is documented in
+     * `docs/conventions.md`'s migration section — today's database holds seed rows only, so the
+     * scan is trivial and the deploy-era split is not needed here.
+     */
+    check("leagues_house_commissioner_ck", sql`(${t.houseRung} IS NULL) = (${t.commissionerUserId} IS NOT NULL)`),
   ],
 );
 

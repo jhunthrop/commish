@@ -6,6 +6,7 @@ import type { Clock } from "@/domain/timing";
 import { draftActionSchema } from "@/draft-engine";
 import { LEAGUE_CONFIG } from "@/league";
 import type { DraftScheduleBody, SlotPreferenceView } from "@/league-room/contract";
+import { HOUSE_AUTHORITY_REFUSALS, isCommissionerOf } from "./authority";
 import { MS_PER_DAY } from "./config";
 
 /** The outermost edge is the only place a wall clock is allowed — see every other service
@@ -58,7 +59,10 @@ interface DraftRow {
   readonly draftId: string;
   readonly status: DraftStatus;
   readonly kickoffAt: Date;
-  readonly commissionerUserId: string;
+  readonly commissionerUserId: string | null;
+  /** Phase 3.5 addendum, Task 12: which catalog rung this league came from, or `null` for a
+   *  member league — the second half of `@/league-service/authority`'s `LeagueAuthorityRow`. */
+  readonly houseRung: string | null;
   readonly isPublicMatchmade: boolean;
   /** Task 6: how many draft slots this league has — the ranking ceiling. */
   readonly teamCount: number;
@@ -75,6 +79,7 @@ async function draftRowForLeague(db: Db, leagueId: string): Promise<DraftRow | u
       status: drafts.status,
       kickoffAt: drafts.kickoffAt,
       commissionerUserId: leagues.commissionerUserId,
+      houseRung: leagues.houseRung,
       isPublicMatchmade: leagues.isPublicMatchmade,
       teamCount: leagues.teamCount,
       startTrigger: drafts.startTrigger,
@@ -179,6 +184,12 @@ export type SetDraftKickoffResult =
  * curl until this task). Moves `drafts.kickoff_at` while the draft is still `scheduled`, and
  * refuses everyone and everything else.
  *
+ * Phase 3.5 addendum, Task 12: a house league answers `HOUSE_AUTHORITY_REFUSALS.schedule`
+ * instead of the ordinary member's 404 — the same generalization Task 7's `KICKOFF_REFUSALS.
+ * whenFull` already makes for a `'when_full'` draft (nobody chose the time, so nobody edits it),
+ * extended to a draft nobody could have chosen because the catalog opened the league around it.
+ *
+
  * Locks the draft row `FOR UPDATE` before checking anything, so two concurrent reschedules (or
  * a reschedule racing `startDraft`) resolve one at a time rather than both reading `scheduled`
  * and both deciding they may proceed. PROVEN, not promised (final review F10 — this docblock
@@ -201,6 +212,7 @@ export async function setDraftKickoff(
         draftId: drafts.id,
         status: drafts.status,
         commissionerUserId: leagues.commissionerUserId,
+        houseRung: leagues.houseRung,
         startTrigger: drafts.startTrigger,
       })
       .from(drafts)
@@ -208,7 +220,19 @@ export async function setDraftKickoff(
       .where(eq(drafts.leagueId, input.leagueId))
       .for("update");
 
-    if (row === undefined || row.commissionerUserId !== input.userId) {
+    if (row === undefined) {
+      return { ok: false, status: 404, reason: DRAFT_NOT_FOUND };
+    }
+    // `withLeagueMemberActor` already refused a stranger before this function was ever called
+    // (`PUT /api/leagues/[leagueId]/draft-schedule`), so every caller reaching this point is a
+    // genuine member of THIS league. A house league's `!isCommissionerOf` is true for every one
+    // of them, with nobody left who could ever see past it — the Task 7 `whenFull` generalization
+    // (ruling 32): the platform's own catalog chose this draft's time, so this answers the true
+    // reason rather than the ordinary member's 404.
+    if (row.houseRung !== null) {
+      return { ok: false, status: 409, reason: HOUSE_AUTHORITY_REFUSALS.schedule };
+    }
+    if (!isCommissionerOf(row, input.userId)) {
       return { ok: false, status: 404, reason: DRAFT_NOT_FOUND };
     }
     if (row.status !== "scheduled") {

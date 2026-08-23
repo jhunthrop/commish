@@ -225,6 +225,13 @@
       "when": 1787469845931,
       "tag": "0031_sit_and_go_and_slots",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1787489574723,
+      "tag": "0032_house_leagues",
+      "breakpoints": true
     }
   ]
 }

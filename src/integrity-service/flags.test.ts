@@ -2710,6 +2710,18 @@ describe("leagueModerationSummary", () => {
     expect(await leagueModerationSummary(db, { leagueId: "lg_mod_3", userId: "u_mod_ordinary" })).toBeNull();
   });
 
+  // Phase 3.5 addendum, Task 12: a house league has no commissioner for this window to open for
+  // — `isCommissionerOf`'s `house` branch answers `false` for every caller, so this collapses
+  // into the SAME null a wrong caller already gets, with no house-specific branch written here.
+  it("answers null for a house league too — nobody, including its own members, has a commissioner's window here", async () => {
+    await seedUser("u_mod_house_member");
+    await db.insert(leagues).values({
+      id: "lg_mod_house", name: "Open 12", format: "snake", teamCount: 12, commissionerUserId: null, houseRung: "open_12",
+    });
+    await db.insert(teams).values({ id: "lg_mod_house_team", leagueId: "lg_mod_house", userId: "u_mod_house_member", name: "House Team" });
+    expect(await leagueModerationSummary(db, { leagueId: "lg_mod_house", userId: "u_mod_house_member" })).toBeNull();
+  });
+
   it("answers null for a league that doesn't exist, the identical shape a non-commissioner gets", async () => {
     await seedUser("u_mod_nobody");
     expect(await leagueModerationSummary(db, { leagueId: "lg_mod_ghost", userId: "u_mod_nobody" })).toBeNull();

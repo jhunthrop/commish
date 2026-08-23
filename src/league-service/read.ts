@@ -6,6 +6,7 @@ import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { listTeamCards } from "@/draft-service/teams";
 import { benchOf, LEAGUE_CONFIG, leagueTerms, medianResultFor, seasonProgress, startersOf, type WeekStatus } from "@/league";
+import { isCommissionerOf, leagueAuthority } from "./authority";
 import type {
   DraftScheduleBody,
   LeagueHomeBody,
@@ -89,7 +90,7 @@ export async function listLeaguesForUser(db: Db, userId: string): Promise<readon
     format: league.format,
     teamCount: league.teamCount,
     filledTeams: filledByLeague.get(league.id) ?? 0,
-    isCommissioner: league.commissionerUserId === userId,
+    isCommissioner: isCommissionerOf(league, userId),
     myTeamId: myTeamByLeague.get(league.id) ?? null,
     draftId: draftByLeague.get(league.id)?.id ?? null,
     draftStatus: draftByLeague.get(league.id)?.status ?? null,
@@ -176,10 +177,14 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     ownerUserId: ownerUserIdByTeamId.get(card.id) ?? card.id,
   }));
 
-  // The commissioner has a team in every league (`createLeague` gives them one in the same
-  // transaction it writes the league itself), so their card is already sitting in `teamCards`
-  // above — no query beyond the one that already ran for the members panel.
-  const commissionerTeamId = teamRows.find((row) => row.userId === league.commissionerUserId)?.id;
+  // A MEMBER league's commissioner has a team in every league (`createLeague` gives them one in
+  // the same transaction it writes the league itself), so their card is already sitting in
+  // `teamCards` above — no query beyond the one that already ran for the members panel. A HOUSE
+  // league has no commissioner row to look up at all — `leagueAuthority`'s `house` branch
+  // short-circuits `commissionerTeamId` to `undefined` before this `find` ever runs, matching
+  // ruling 28: a house league has no commissioner seat for anybody to occupy.
+  const authority = leagueAuthority(league);
+  const commissionerTeamId = authority.kind === "member" ? teamRows.find((row) => row.userId === authority.userId)?.id : undefined;
   const commissionerCard = teamCards.find((card) => card.id === commissionerTeamId);
   const terms = leagueTerms({
     name: league.name,
@@ -241,8 +246,8 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     format: league.format,
     teamCount: league.teamCount,
     rosterSlots: league.rosterSlots,
-    isCommissioner: league.commissionerUserId === userId,
-    commissionerUserId: league.commissionerUserId,
+    isCommissioner: isCommissionerOf(league, userId),
+    authority,
     myTeamId,
     teams: members,
     standings: await leagueStandings(db, leagueId, teamCards, league.medianGame),

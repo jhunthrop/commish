@@ -5,6 +5,7 @@ import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { TradeFlag, TradeVerdict } from "@/trades/fairness";
 import type { FirstRunPlan } from "@/identity";
 import type { LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
+import type { LeagueAuthority } from "@/league-service/authority";
 
 /**
  * TYPES ONLY, no runtime code. Imported by the `/api/leagues/**` routes as their return shape
@@ -129,10 +130,11 @@ export interface TeamStandingsRow extends StandingsRow {
 /**
  * One league member as the members panel (`LeagueMembersPanel`) renders it: `TeamCard` plus
  * the one raw fact needed to find the commissioner among peers. `ownerUserId` is never shown —
- * it is only ever compared against `LeagueHomeBody.commissionerUserId` to mark the single row
- * that runs the league. That comparison, and the display name and face it sits beside, are
- * fair game inside a league by design: the public-browse contract (Task 6) is the one place
- * commissioner identity stays hidden, and this panel is members-only.
+ * it is only ever compared against `LeagueHomeBody.authority`'s member branch to mark the single
+ * row that runs the league (no row is marked at all in a house league's `authority.kind ===
+ * "house"` case). That comparison, and the display name and face it sits beside, are fair game
+ * inside a league by design: the public-browse contract (Task 6) is the one place commissioner
+ * identity stays hidden, and this panel is members-only.
  */
 export interface LeagueMemberCard extends TeamCard {
   readonly ownerUserId: string;
@@ -194,9 +196,11 @@ export interface LeagueHomeBody {
   readonly teamCount: number;
   readonly rosterSlots: readonly RosterSlotConfig[];
   readonly isCommissioner: boolean;
-  /** The commissioner's raw user id — never rendered on its own, only handed to
-   *  `LeagueMembersPanel` so it can mark the one member who runs the league. */
-  readonly commissionerUserId: string;
+  /** Who runs this league — a named member, or the platform for a house league (Phase 3.5
+   *  addendum, Task 12). Never rendered as raw text on its own: `LeagueMembersPanel` reads the
+   *  member branch's `userId` to mark the one row that runs the league, and reads the `house`
+   *  branch to show "Run by Commish" instead of marking any row at all. */
+  readonly authority: LeagueAuthority;
   readonly myTeamId: string | null;
   readonly teams: readonly LeagueMemberCard[];
   readonly standings: readonly TeamStandingsRow[];

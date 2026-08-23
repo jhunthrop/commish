@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { eq, isNull } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, draftActions, integrityFlags, leagueInvites, sessionSignals, teams, users } from "@/db/schema";
+import { auditEvents, draftActions, integrityFlags, leagueInvites, leagues, sessionSignals, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
@@ -433,6 +433,23 @@ describe("acceptInvite", () => {
 describe("invitePreview", () => {
   it("tells you nothing about a league when the code is not valid", async () => {
     const result = await invitePreview(db, "NOPE99");
+    expect(result).toEqual({ ok: false, reason: "That invite link isn't valid. Ask your commissioner for a new one." });
+    expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
+  });
+
+  // Ruling 33: a house league cannot have an invite at all — `createInvite`'s only caller
+  // (`withCommissioner`) refuses one before minting a code, so this code is unreachable through
+  // ordinary use. Proven anyway, by hand-crafting the shape rather than trusting the assertion:
+  // the SAME "tells you nothing" collapse the invalid-code test above proves.
+  it("tells you nothing about a house league either, for a code that could never have named one", async () => {
+    await db.insert(users).values({ id: "u_whoever", email: "u_whoever@test.local", displayName: "Whoever" });
+    await db.insert(leagues).values({
+      id: "lg_house_invite", name: "Open 12", format: "snake", teamCount: 12, commissionerUserId: null, houseRung: "open_12",
+    });
+    const invite = await createInvite(inviteDeps(), { leagueId: "lg_house_invite", createdByUserId: "u_whoever" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await invitePreview(db, invite.code);
     expect(result).toEqual({ ok: false, reason: "That invite link isn't valid. Ask your commissioner for a new one." });
     expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
   });

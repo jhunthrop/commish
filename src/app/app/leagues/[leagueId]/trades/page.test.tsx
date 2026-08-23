@@ -28,7 +28,7 @@ const HOME = {
   teamCount: 2,
   rosterSlots: [],
   isCommissioner: false,
-  commissionerUserId: "u2",
+  authority: { kind: "member" as const, userId: "u2" },
   myTeamId: "t1",
   teams: [
     { id: "t1", name: "Bay Bandits", ownerDisplayName: "Ada Lovelace", ownerAvatarUrl: null, ownerUserId: "u1" },

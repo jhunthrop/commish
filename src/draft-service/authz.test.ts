@@ -14,7 +14,7 @@ function stubDbAnswering(answers: { readonly draftLeagueId?: string; readonly le
       from: (table: unknown) => ({
         where: async () => {
           if (table === drafts) return answers.draftLeagueId === undefined ? [] : [{ leagueId: answers.draftLeagueId }];
-          if (table === leagues) return answers.leagueFound === false ? [] : [{ commissionerUserId: "u_other" }];
+          if (table === leagues) return answers.leagueFound === false ? [] : [{ commissionerUserId: "u_other", houseRung: null }];
           return []; // teams: no team for this user
         },
       }),

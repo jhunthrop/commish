@@ -36,6 +36,7 @@ import {
 } from "@/integrity/queue-view";
 import { removeChatMessageInTx } from "@/chat-service/moderation";
 import { closeSupersededHoldFlagsQuietly } from "./trade-fairness";
+import { isCommissionerOf } from "@/league-service/authority";
 import { completedSeasonsFor } from "@/league-service/participation";
 import { reverseTradeInTx } from "@/league-service/trade-reversal";
 import { TransferRefusedError } from "@/league-service/trade-transfer";
@@ -1471,8 +1472,14 @@ export function openQuestionsQuery(db: Db, leagueId: string) {
 }
 
 export async function leagueModerationSummary(db: Db, input: LeagueModerationSummaryInput): Promise<ModerationSummaryView | null> {
-  const [league] = await db.select({ commissionerUserId: leagues.commissionerUserId }).from(leagues).where(eq(leagues.id, input.leagueId));
-  if (league === undefined || league.commissionerUserId !== input.userId) return null;
+  const [league] = await db
+    .select({ commissionerUserId: leagues.commissionerUserId, houseRung: leagues.houseRung })
+    .from(leagues)
+    .where(eq(leagues.id, input.leagueId));
+  // A house league has no commissioner to answer `null` on behalf of (Phase 3.5 addendum, Task
+  // 12) — `isCommissionerOf`'s `house` branch returns `false` for every caller, collapsing this
+  // into the same `null` a missing league or a wrong caller already answers with.
+  if (league === undefined || !isCommissionerOf(league, input.userId)) return null;
 
   const [[messageRow], [reviewRow], [flagRow]] = await Promise.all([
     db

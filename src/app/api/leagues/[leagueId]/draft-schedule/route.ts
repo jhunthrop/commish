@@ -26,10 +26,13 @@ export async function GET(request: Request, context: LeagueRouteContext) {
  * authorization and validation boundary here — it answers 404 for anyone but the commissioner
  * (never 403: ruling 14's non-oracle discipline, so an ordinary member learns nothing about
  * whether they merely lack permission or the draft doesn't exist), 409 once the draft has left
- * `scheduled`, and 422 for a time that isn't genuinely in the future or sits past the clock
- * schedule's ceiling. This route only parses the body and forwards the caller's session identity
- * — `requireLeagueMember` (`withLeagueMemberActor`) still refuses a complete stranger with the
- * league's ordinary 403 before the service is ever asked.
+ * `scheduled` OR for a house league (Phase 3.5 addendum, Task 12: `HOUSE_AUTHORITY_REFUSALS.
+ * schedule` — every member reaches this branch, not just a would-be commissioner, since a house
+ * league has no commissioner for the earlier check to single out), and 422 for a time that isn't
+ * genuinely in the future or sits past the clock schedule's ceiling. This route only parses the
+ * body and forwards the caller's session identity — `requireLeagueMember`
+ * (`withLeagueMemberActor`) still refuses a complete stranger with the league's ordinary 403
+ * before the service is ever asked.
  */
 export async function PUT(request: Request, context: LeagueRouteContext) {
   return withLeagueMemberActor(request, context, async (actor, req) => {

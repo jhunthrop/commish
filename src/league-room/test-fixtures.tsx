@@ -129,7 +129,7 @@ export const HOME: LeagueHomeBody = {
   teamCount: 12,
   rosterSlots: STANDARD_ROSTER_SLOTS,
   isCommissioner: true,
-  commissionerUserId: "u1",
+  authority: { kind: "member", userId: "u1" },
   myTeamId: "t1",
   teams: TEAMS,
   standings: STANDINGS,
