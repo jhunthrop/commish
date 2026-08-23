@@ -11,4 +11,24 @@ describe("Badge", () => {
     render(<Badge>Bench</Badge>);
     expect(screen.getByText("Bench").className).toMatch(/border/);
   });
+
+  it("adds a tinted ring only when glow is set", () => {
+    render(<Badge tone="accent">Live</Badge>);
+    expect(screen.getByText("Live").className).not.toMatch(/ring-accent-glow/);
+    render(
+      <Badge tone="accent" glow>
+        Live
+      </Badge>,
+    );
+    expect(screen.getAllByText("Live")[1]!.className).toMatch(/ring-accent-glow/);
+  });
+
+  it("ignores glow on a tone with no glow token", () => {
+    render(
+      <Badge tone="neutral" glow>
+        Bench
+      </Badge>,
+    );
+    expect(screen.getByText("Bench").className).not.toMatch(/ring-/);
+  });
 });

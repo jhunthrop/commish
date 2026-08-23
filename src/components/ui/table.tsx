@@ -1,4 +1,24 @@
 import type { ReactNode } from "react";
+import { UI_CONFIG } from "./config";
+
+export type TableDensity = "comfortable" | "dense";
+
+/**
+ * `comfortable` keeps the table's original Tailwind padding class; `dense` is the mocks' own
+ * 11px spec (`UI_CONFIG.table.denseRowPaddingPx`), applied as an inline style rather than a
+ * templated `py-[…px]` class — the same "a dynamic value has to reach the DOM as a style, not a
+ * class" idiom `UI_CONFIG.infoTip.minTargetPx` already uses, since a templated arbitrary-value
+ * class is invisible to Tailwind's static content scanner and would silently ship no rule.
+ */
+const ROW_PADDING_CLASS: Readonly<Record<TableDensity, string>> = {
+  comfortable: "py-2",
+  dense: "",
+};
+
+const ROW_PADDING_STYLE: Readonly<Record<TableDensity, { readonly paddingTop?: string; readonly paddingBottom?: string }>> = {
+  comfortable: {},
+  dense: { paddingTop: `${UI_CONFIG.table.denseRowPaddingPx}px`, paddingBottom: `${UI_CONFIG.table.denseRowPaddingPx}px` },
+};
 
 export interface TableColumn<T> {
   readonly key: string;
@@ -26,6 +46,10 @@ export interface TableProps<T> {
   readonly rowAttributes?: (row: T) => Record<string, string>;
   /** Required: a table with no rows must still offer the reader a next step. */
   readonly empty: ReactNode;
+  /** `dense` is the mocks' 11px vertical cell padding; `comfortable` keeps the table's original,
+   *  more generous padding. Defaults to `comfortable` — a caller under the shell opts into
+   *  `dense` explicitly. */
+  readonly density?: TableDensity;
 }
 
 function columnClass<T>(column: TableColumn<T>): string {
@@ -38,8 +62,21 @@ function columnClass<T>(column: TableColumn<T>): string {
  * horizontally inside its own wrapper so the page body never scrolls sideways at the 360px
  * baseline.
  */
-export function Table<T>({ caption, captionVisible = false, columns, rows, rowKey, rowClassName, rowAttributes, empty }: TableProps<T>) {
+export function Table<T>({
+  caption,
+  captionVisible = false,
+  columns,
+  rows,
+  rowKey,
+  rowClassName,
+  rowAttributes,
+  empty,
+  density = "comfortable",
+}: TableProps<T>) {
   if (rows.length === 0) return <>{empty}</>;
+
+  const cellPaddingClass = ROW_PADDING_CLASS[density];
+  const cellPaddingStyle = ROW_PADDING_STYLE[density];
 
   return (
     <div className="w-full overflow-x-auto">
@@ -48,7 +85,12 @@ export function Table<T>({ caption, captionVisible = false, columns, rows, rowKe
         <thead>
           <tr className="border-b border-line">
             {columns.map((column) => (
-              <th key={column.key} scope="col" className={`${columnClass(column)}px-3 py-2 font-medium text-text-muted`}>
+              <th
+                key={column.key}
+                scope="col"
+                style={cellPaddingStyle}
+                className={`${columnClass(column)}px-3 ${cellPaddingClass} font-medium text-text-muted`}
+              >
                 {column.header}
               </th>
             ))}
@@ -58,7 +100,7 @@ export function Table<T>({ caption, captionVisible = false, columns, rows, rowKe
           {rows.map((row) => (
             <tr key={rowKey(row)} className={`border-b border-line/50 ${rowClassName?.(row) ?? ""}`} {...rowAttributes?.(row)}>
               {columns.map((column) => (
-                <td key={column.key} className={`${columnClass(column)}px-3 py-2`}>
+                <td key={column.key} style={cellPaddingStyle} className={`${columnClass(column)}px-3 ${cellPaddingClass}`}>
                   {column.cell(row)}
                 </td>
               ))}

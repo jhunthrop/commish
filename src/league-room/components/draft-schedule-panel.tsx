@@ -7,12 +7,11 @@ import type { ApiEnvelope } from "@/lib/api/respond";
 import type { DraftScheduleBody } from "../contract";
 import { Button, Input } from "@/components/ui";
 import { StatePanel } from "@/components/ui/state-panel";
-import { useCountdown } from "@/components/ui/countdown";
+import { formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
-const MS_PER_DAY = 24 * MS_PER_HOUR;
 
 /**
  * "Saturday, September 12, 7:00 PM" — the reader's OWN clock, not the fixed UTC zone
@@ -32,21 +31,18 @@ function formatLocal(iso: string): string {
   });
 }
 
-/** "in 3 days" / "in 5 hours" / "in 20 minutes" / "starting any moment" — never negative: once a
- *  kickoff is in the past the draft has either started (a different `status`) or Task 7's own
- *  auto-start is about to catch it, so there is no "3 hours ago" this panel needs to word. */
-function formatCountdown(msUntil: number): string {
+/**
+ * "in 3 days" / "in 5 hours" / "in 20 minutes" / "starting any moment" — never negative: once a
+ * kickoff is in the past the draft has either started (a different `status`) or Task 7's own
+ * auto-start is about to catch it, so there is no "3 hours ago" this panel needs to word.
+ *
+ * Built on the shared `formatCoarseDuration` (`@/components/ui/countdown`) rather than this
+ * panel's own second copy of the same minute/hour/day rounding — the same "in " sentence
+ * `formatCoarseDuration`'s own docblock already generalized itself for (Phase 3.6, Task 3).
+ */
+function formatRelativeCountdown(msUntil: number): string {
   if (msUntil <= 0) return "starting any moment";
-  if (msUntil < MS_PER_HOUR) {
-    const minutes = Math.max(1, Math.round(msUntil / MS_PER_MINUTE));
-    return `in ${minutes} minute${minutes === 1 ? "" : "s"}`;
-  }
-  if (msUntil < MS_PER_DAY) {
-    const hours = Math.round(msUntil / MS_PER_HOUR);
-    return `in ${hours} hour${hours === 1 ? "" : "s"}`;
-  }
-  const days = Math.round(msUntil / MS_PER_DAY);
-  return `in ${days} day${days === 1 ? "" : "s"}`;
+  return `in ${formatCoarseDuration(msUntil)}`;
 }
 
 /** `<input type="datetime-local">`'s own value format — no timezone, read and written in
@@ -219,7 +215,7 @@ export function DraftSchedulePanel({
 
   const msUntil = remainingMs ?? 0;
   const startingSoon = msUntil <= MS_PER_HOUR;
-  const countdown = `${formatLocal(schedule.kickoffAt)} (${formatCountdown(msUntil)})`;
+  const countdown = `${formatLocal(schedule.kickoffAt)} (${formatRelativeCountdown(msUntil)})`;
 
   // Task 4's overnight freeze. `startingSoon` already draws the line this panel needs: a draft
   // more than an hour out picks at a tier of an hour or longer once it opens (the same

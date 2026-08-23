@@ -370,6 +370,7 @@ describe("LeagueHome", () => {
     // "Commissioner" is now ambiguous at the page level: the terms panel's own label reads the
     // same word. Scoped to the members list, this is still the commissioner BADGE.
     expect(within(list).getByText("Commissioner")).toBeInTheDocument();
-    expect(screen.getByText("9 seats still open")).toBeInTheDocument();
+    // F17: the open-seats line is SeatMeter's own sentence now, not a paragraph this panel wrote.
+    expect(screen.getByText("3 of 12 seated")).toBeInTheDocument();
   });
 });

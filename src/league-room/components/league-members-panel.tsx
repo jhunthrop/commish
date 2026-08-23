@@ -1,5 +1,5 @@
 import type { LeagueMemberCard } from "../contract";
-import { Avatar, Badge, Button, EmptyState, InfoTip } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, InfoTip, SeatMeter } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import type { HelpLevel } from "@/identity/preferences";
 import type { LeagueAuthority } from "@/league-service/authority";
@@ -11,8 +11,8 @@ export interface LeagueMembersPanelProps {
    *  row at all and renders the "Run by Commish" line above the roster instead. */
   readonly authority: LeagueAuthority;
   readonly myTeamId: string | null;
-  /** The league's total seat count. Omit to hide the open-seats line entirely (e.g. a context
-   *  that already states it elsewhere) rather than render "0 seats still open" as a fact. */
+  /** The league's total seat count. Omit to hide the `SeatMeter` line entirely (e.g. a context
+   *  that already states it elsewhere) rather than render a claim about seats that count omits. */
   readonly teamCount?: number;
   readonly helpLevel?: HelpLevel;
 }
@@ -26,7 +26,8 @@ export interface LeagueMembersPanelProps {
  *
  * An unfilled seat renders as an open seat, not as a missing person: those read as different
  * facts to a commissioner deciding whether to send another invite, and only one of them is
- * cause for concern.
+ * cause for concern. `SeatMeter` (Phase 3.6, Task 3, F17) owns that sentence now — this panel
+ * no longer composes one of its own.
  *
  * Phase 3.5 addendum, Task 12, Step 5: a house league's `authority.kind === "house"` matches no
  * team's `ownerUserId` — no row would ever earn the "Commissioner" badge, which is correct but
@@ -34,8 +35,6 @@ export interface LeagueMembersPanelProps {
  * an absence.
  */
 export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, helpLevel }: LeagueMembersPanelProps) {
-  const openSeats = teamCount === undefined ? 0 : Math.max(0, teamCount - teams.length);
-
   return (
     <section className="flex flex-col gap-2" aria-label="League members">
       <h2 className="text-sm font-medium text-text-muted">Managers</h2>
@@ -73,9 +72,7 @@ export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, help
           ))}
         </ul>
       )}
-      {openSeats === 0 ? null : (
-        <p className="text-sm text-text-muted">{`${openSeats} seat${openSeats === 1 ? "" : "s"} still open`}</p>
-      )}
+      {teamCount === undefined ? null : <SeatMeter filled={teams.length} total={teamCount} />}
     </section>
   );
 }

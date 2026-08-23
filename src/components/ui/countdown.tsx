@@ -1,12 +1,13 @@
 "use client";
 
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
-import { MINUTES_PER_HOUR, MS_PER_SECOND, SECONDS_PER_HOUR, SECONDS_PER_MINUTE, plural } from "@/domain/duration";
+import { HOURS_PER_DAY, MINUTES_PER_HOUR, MS_PER_SECOND, SECONDS_PER_HOUR, SECONDS_PER_MINUTE, plural } from "@/domain/duration";
 import { UI_CONFIG } from "./config";
 import { useNow } from "./use-now";
 
 const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE;
 const MS_PER_HOUR = MS_PER_MINUTE * MINUTES_PER_HOUR;
+const MS_PER_DAY = MS_PER_HOUR * HOURS_PER_DAY;
 
 export interface CountdownState {
   /** Ms remaining until `deadlineAt`, clamped to zero; null when there is no deadline. */
@@ -64,7 +65,8 @@ export function formatCoarseDuration(msRemaining: number): string {
   const remaining = Math.max(0, msRemaining);
   if (remaining < UI_CONFIG.countdown.coarseRemainingMinuteMs) return "under a minute";
   if (remaining < UI_CONFIG.countdown.coarseRemainingHourMs) return plural(Math.round(remaining / MS_PER_MINUTE), "minute");
-  return plural(Math.round(remaining / MS_PER_HOUR), "hour");
+  if (remaining < UI_CONFIG.countdown.coarseRemainingDayMs) return plural(Math.round(remaining / MS_PER_HOUR), "hour");
+  return plural(Math.round(remaining / MS_PER_DAY), "day");
 }
 
 /**
@@ -79,13 +81,14 @@ export function formatCoarseRemaining(msRemaining: number): string {
   return `About ${formatCoarseDuration(msRemaining)} left`;
 }
 
-export type CountdownSize = "md" | "lg";
+export type CountdownSize = "md" | "lg" | "xl";
 /** `hot` is the rail's my-turn morph: the same digits, in the negative family. */
 export type CountdownTone = "default" | "hot";
 
 export interface CountdownProps {
   readonly remainingMs: number;
-  /** `lg` is the rail's headline clock; `md` is an inline one. */
+  /** `lg` is the rail's headline clock; `md` is an inline one; `xl` is the waiting room's hero
+   *  clock. */
   readonly size?: CountdownSize;
   readonly tone?: CountdownTone;
   readonly "data-testid"?: string;
@@ -94,6 +97,7 @@ export interface CountdownProps {
 const SIZE: Readonly<Record<CountdownSize, string>> = {
   md: "text-2xl",
   lg: "text-3xl",
+  xl: "text-display-xl",
 };
 
 const TONE: Readonly<Record<CountdownTone, string>> = {

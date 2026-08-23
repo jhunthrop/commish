@@ -29,6 +29,12 @@ describe("StandingsTable", () => {
     expect(screen.getByRole("button", { name: "What is a record?" })).toBeInTheDocument();
   });
 
+  it("renders dense, the mocks' own 11px vertical cell padding", () => {
+    render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
+    const headerCell = screen.getByRole("columnheader", { name: "Team" });
+    expect(headerCell).toHaveStyle({ paddingTop: "11px", paddingBottom: "11px" });
+  });
+
   // FIX 1 (HIGH): helpLevel must actually reach a wired InfoTip, not just be accepted and
   // dropped — a guided caller sees the short line without clicking; a standard caller (or one
   // this prop is simply omitted for, the default) only gets the click-to-reveal trigger.

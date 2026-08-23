@@ -1,5 +1,4 @@
 import type { Db } from "@/db/client";
-import type { AvatarTone } from "@/identity/avatars";
 import type { NextActionKind, WeekStatus } from "@/league";
 import { crossLeagueHome } from "@/league-service";
 
@@ -15,18 +14,16 @@ import { crossLeagueHome } from "@/league-service";
 export type RailLeagueState = "needs-you" | "live" | "quiet";
 
 /**
- * One league as the rail renders it: six 40px tiles, never more data than a tile needs.
- * `shortName` is derived by `shortNameFor` below, never stored — a renamed league can never
- * carry a stale initial, and there is no column to migrate (ruling 10). `tone` paints the tile
- * deterministically from the league's own id (`toneFor` below); Task 3's `crestTone` grows
- * `AvatarTone` to six and becomes the shared source for both a league's crest and a member's
- * avatar — this is the five-tone interim until that task lands.
+ * One league as the rail renders it: 40px tiles, never more data than a tile needs. `shortName`
+ * is derived by `shortNameFor` below, never stored — a renamed league can never carry a stale
+ * initial, and there is no column to migrate (ruling 10). The tile's tone is not carried here at
+ * all: `Crest` (`@/components/ui/crest`) derives it deterministically from `id` itself
+ * (`crestTone`, Phase 3.6, Task 3), so there is no second value that could ever disagree with it.
  */
 export interface RailLeague {
   readonly id: string;
   readonly name: string;
   readonly shortName: string;
-  readonly tone: AvatarTone;
   readonly state: RailLeagueState;
 }
 
@@ -44,29 +41,6 @@ export interface LiveState {
 export interface ShellData {
   readonly rail: readonly RailLeague[];
   readonly liveState: LiveState | null;
-}
-
-const AVATAR_TONES: readonly AvatarTone[] = ["accent", "positive", "negative", "warning", "neutral"];
-
-/**
- * FNV-1a — the same small, stable string hash `draftOrderFor`'s own `hashString`
- * (`@/draft-service/order.ts`) uses, copied rather than imported: that module's hash seeds a
- * draft shuffle, and this one only picks an index into a five-entry palette. Task 3's
- * `crestTone` is the real, shared version this local copy exists only until.
- */
-function hashString(value: string): number {
-  let hash = 2166136261;
-  for (let i = 0; i < value.length; i++) {
-    hash ^= value.charCodeAt(i);
-    hash = Math.imul(hash, 16777619);
-  }
-  return hash >>> 0;
-}
-
-/** Deterministic — the same league id paints the same tile forever, with no crest column to
- *  migrate (ruling 10). */
-function toneFor(leagueId: string): AvatarTone {
-  return AVATAR_TONES[hashString(leagueId) % AVATAR_TONES.length]!;
 }
 
 /**
@@ -98,7 +72,6 @@ export async function shellData(db: Db, user: { readonly id: string }): Promise<
     id: league.id,
     name: league.name,
     shortName: shortNameFor(league.name),
-    tone: toneFor(league.id),
     state: stateFor(league.nextAction?.kind, league.weekStatus),
   }));
   return { rail, liveState: null };

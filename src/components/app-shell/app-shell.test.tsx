@@ -19,10 +19,10 @@ function mockPathname(next: string): void {
 }
 
 const RAIL: readonly RailLeague[] = [
-  { id: "lg_bandits", name: "Bay Bandits", shortName: "BB", tone: "accent", state: "quiet" },
+  { id: "lg_bandits", name: "Bay Bandits", shortName: "BB", state: "quiet" },
   // "needs-you" is exactly "join-draft" today — "fix-lineup" does not exist until Task 10 Step
   // 1b (F1). This fixture's accessible name reflects the vocabulary this task actually ships.
-  { id: "lg_volt", name: "Volt Kings", shortName: "VK", tone: "warning", state: "needs-you" },
+  { id: "lg_volt", name: "Volt Kings", shortName: "VK", state: "needs-you" },
 ];
 
 function baseProps(): AppShellProps {

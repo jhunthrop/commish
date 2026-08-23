@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Icon } from "@/components/ui/icon";
+import { Crest } from "@/components/ui/crest";
 import { UI_CONFIG } from "@/components/ui/config";
-import type { AvatarTone } from "@/identity/avatars";
 import { NEXT_ACTION_COPY } from "@/league";
 import type { RailLeague, RailLeagueState } from "./shell-data";
 
@@ -29,20 +29,6 @@ const STATE_LABEL: Readonly<Partial<Record<RailLeagueState, string>>> = {
 const DOT_CLASS: Readonly<Partial<Record<RailLeagueState, string>>> = {
   "needs-you": "bg-warning",
   live: "bg-positive",
-};
-
-/**
- * A tone's tile classes — the same five-role mapping `Avatar`'s own `TONE` const uses for a
- * preset fill, reproduced here rather than imported: Task 3's `Crest` primitive is the real,
- * shared version of this tile (it grows `AvatarTone` to six and becomes the one crest renderer
- * for both a league and a member); this is the interim until that task lands.
- */
-const CREST_TONE_CLASS: Readonly<Record<AvatarTone, string>> = {
-  accent: "bg-accent text-accent-text",
-  negative: "bg-negative text-negative-text",
-  positive: "bg-surface-elevated text-positive",
-  warning: "bg-surface-elevated text-warning",
-  neutral: "bg-surface-elevated text-text-muted",
 };
 
 /** "Bay Bandits" (quiet) → "Bay Bandits". "Volt Kings" (needs-you) → "Volt Kings. Join the
@@ -90,12 +76,7 @@ export function LeagueRail({ leagues, className = "" }: LeagueRailProps) {
             className="relative flex shrink-0 items-center justify-center self-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             style={tileStyle}
           >
-            <span
-              aria-hidden="true"
-              className={`flex size-full items-center justify-center rounded-md border border-line font-display text-xs font-semibold uppercase ${CREST_TONE_CLASS[league.tone]}`}
-            >
-              {league.shortName}
-            </span>
+            <Crest id={league.id} label={league.shortName} size={crestSize} />
             {league.state === "quiet" ? null : (
               <span aria-hidden="true" className={`absolute -right-0.5 -top-0.5 size-2.5 rounded-pill border border-surface ${DOT_CLASS[league.state]}`} />
             )}

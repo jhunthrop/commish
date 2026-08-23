@@ -29,15 +29,20 @@ const ICON_SIZE: Readonly<Record<AvatarSize, number>> = {
 /**
  * Preset tiles reuse the existing token roles rather than inventing a fill for each tone: only
  * `accent` and `negative` have a dedicated `-text` role for a solid fill (see
- * docs/design-system.md, "Semantic-on-fill"), so those two get one; `positive`/`warning`/
+ * docs/design-system.md, "Semantic-on-fill"), so those two get one; `positive`/`warning`/`info`/
  * `neutral` render their icon in the tone's own text color on the same neutral surface the
  * initials fallback already uses — the same choice `Badge` makes for the tones it does not fill.
+ *
+ * Exported because `Crest` (`./crest`) fills its own tile from this SAME map — a league's crest
+ * and its members' avatars share one palette (Phase 3.6, Task 3, Step 4), which means one map,
+ * not two copies that could drift.
  */
-const TONE: Readonly<Record<AvatarTone, string>> = {
+export const AVATAR_TONE_CLASS: Readonly<Record<AvatarTone, string>> = {
   accent: "bg-accent text-accent-text",
   negative: "bg-negative text-negative-text",
   positive: "bg-surface-elevated text-positive",
   warning: "bg-surface-elevated text-warning",
+  info: "bg-surface-elevated text-info",
   neutral: "bg-surface-elevated text-text-muted",
 };
 
@@ -66,7 +71,7 @@ export function Avatar({ name, avatar, size = "md", label, className = "" }: Ava
       }
     >
       {ref.kind === "preset" ? (
-        <span className={`flex size-full items-center justify-center ${TONE[ref.preset.tone]}`}>
+        <span className={`flex size-full items-center justify-center ${AVATAR_TONE_CLASS[ref.preset.tone]}`}>
           <Icon name={ref.preset.icon} size={ICON_SIZE[size]} />
         </span>
       ) : ref.kind === "remote" ? (

@@ -86,6 +86,11 @@ describe("Countdown", () => {
     expect(live.closest('[aria-hidden="true"]')).toBeNull();
   });
 
+  it("sizes xl for the waiting room's hero clock", () => {
+    render(<Countdown remainingMs={125_000} size="xl" data-testid="countdown" />);
+    expect(screen.getByTestId("countdown").className).toMatch(/text-display-xl/);
+  });
+
   it("announces rarely — the coarse text is unchanged by a sub-boundary tick, and updates on a boundary crossing", () => {
     const { rerender } = render(<Countdown remainingMs={2 * 60 * 60 * 1_000 + 15_000} />);
     expect(screen.getByText("About 2 hours left")).toBeInTheDocument();
@@ -123,6 +128,9 @@ describe("formatCoarseDuration", () => {
     [3_599_999, "60 minutes"],
     [3_600_000, "1 hour"],
     [8 * 3_600_000, "8 hours"],
+    [23 * 3_600_000, "23 hours"],
+    [24 * 3_600_000, "1 day"],
+    [7 * 24 * 3_600_000, "7 days"],
   ])("renders %i ms as %s", (ms, expected) => {
     expect(formatCoarseDuration(ms)).toBe(expected);
   });

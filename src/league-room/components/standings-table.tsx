@@ -92,6 +92,7 @@ export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false }
       <Table
         caption="League standings"
         captionVisible
+        density="dense"
         columns={columns}
         rows={ordered}
         rowKey={(row) => row.teamId}

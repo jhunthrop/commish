@@ -40,6 +40,12 @@ export const UI_CONFIG = {
      * `aria-live` region built on it changes on a boundary crossing, not every second.
      */
     coarseRemainingHourMs: 3_600_000,
+    /**
+     * At or above this, `formatCoarseDuration` rounds to the nearest day instead of the nearest
+     * hour — the bucket a schedule days out needs (`DraftSchedulePanel`'s own "in 7 days"), which
+     * the hour bucket alone would render as an unreadable triple-digit hour count.
+     */
+    coarseRemainingDayMs: 86_400_000,
   },
   toast: {
     /** How long a toast stays up, in ms. */
@@ -48,6 +54,21 @@ export const UI_CONFIG = {
     reducedMotionDismissMs: 10_000,
     /** Oldest toasts beyond this are dropped so the stack can never cover the page. */
     maxVisible: 3,
+  },
+  seatMeter: {
+    /**
+     * Below this many remaining seats (and above zero), `SeatMeter` appends its own "{n} seat(s)
+     * left" clause to the seat sentence. At or above it, the raw count is not yet the thing a
+     * reader needs to act on — the base "{filled} of {total} seated" sentence already answers
+     * "how full", and a clause on every render would be noise, not signal.
+     */
+    lowSeatsThreshold: 3,
+  },
+  table: {
+    /** `Table`'s `density="dense"` vertical cell padding, px — the mocks' own spec. `comfortable`
+     *  keeps the table's original, more generous padding for a context that has not adopted the
+     *  shell's density. */
+    denseRowPaddingPx: 11,
   },
   infoTip: {
     /**

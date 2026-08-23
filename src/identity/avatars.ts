@@ -1,7 +1,35 @@
 import type { IconName } from "@/components/ui/icon";
 import { IDENTITY_CONFIG } from "./config";
 
-export type AvatarTone = "accent" | "positive" | "negative" | "warning" | "neutral";
+export type AvatarTone = "accent" | "positive" | "negative" | "warning" | "info" | "neutral";
+
+/** Every `AvatarTone`, in a fixed order — the palette `avatarTone` below hashes into. Order is
+ *  part of the contract: reordering this array reassigns every existing tone. */
+const AVATAR_TONE_ORDER: readonly AvatarTone[] = ["accent", "positive", "negative", "warning", "info", "neutral"];
+
+/**
+ * FNV-1a — the same small, stable string hash `draftOrderFor`'s own `hashString`
+ * (`@/draft-service/order.ts`) uses, copied rather than imported: that module's hash seeds a
+ * draft shuffle, and this one only picks an index into a six-entry palette.
+ */
+function hashSeed(value: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * A deterministic tone for any stable string id — the same id resolves to the same tone forever,
+ * with no column to migrate. `Crest` (`@/components/ui/crest`) is the one caller today: a
+ * league's rail tile and its members' avatars come from this one palette, which is what makes
+ * the rail and the room read as one object rather than two colorways (Phase 3.6, Task 3, Step 4).
+ */
+export function avatarTone(seed: string): AvatarTone {
+  return AVATAR_TONE_ORDER[hashSeed(seed) % AVATAR_TONE_ORDER.length]!;
+}
 
 export type AvatarPresetKey =
   | "shield" | "flame" | "anchor" | "rocket" | "crown" | "bolt" | "trophy" | "clover";

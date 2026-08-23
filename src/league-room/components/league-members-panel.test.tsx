@@ -36,14 +36,14 @@ describe("LeagueMembersPanel", () => {
     );
   });
 
-  it("shows an open seat as an open seat, not as a missing person", () => {
+  it("shows the open seats through SeatMeter, not a sentence of its own (F17)", () => {
     render(<LeagueMembersPanel teams={THREE_TEAMS} teamCount={6} authority={MEMBER} myTeamId="t2" />);
-    expect(screen.getByText("3 seats still open")).toBeInTheDocument();
+    expect(screen.getByText("3 of 6 seated")).toBeInTheDocument();
   });
 
-  it("says nothing about open seats when the caller doesn't supply a team count", () => {
+  it("says nothing about seats when the caller doesn't supply a team count", () => {
     render(<LeagueMembersPanel teams={THREE_TEAMS} authority={MEMBER} myTeamId="t2" />);
-    expect(screen.queryByText(/seats? still open/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/seated/)).not.toBeInTheDocument();
   });
 
   it("marks only the commissioner's own row, not every row", () => {

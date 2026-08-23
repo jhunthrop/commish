@@ -106,11 +106,4 @@ describe("shellData", () => {
     expect(rail[0]!.shortName).toBe("TS");
     expect(rail[0]!.state).toBe("quiet");
   });
-
-  it("gives the same league the same tone every time, deterministically", async () => {
-    await seedLeague("Golden Hawks", "u_tone");
-    const first = await shellData(db, { id: "u_tone" });
-    const second = await shellData(db, { id: "u_tone" });
-    expect(first.rail[0]!.tone).toBe(second.rail[0]!.tone);
-  });
 });

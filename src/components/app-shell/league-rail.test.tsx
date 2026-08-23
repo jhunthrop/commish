@@ -19,9 +19,9 @@ function mockPathname(next: string): void {
 }
 
 const LEAGUES: readonly RailLeague[] = [
-  { id: "lg_bandits", name: "Bay Bandits", shortName: "BB", tone: "accent", state: "quiet" },
-  { id: "lg_thunder", name: "Thunder Squad", shortName: "TS", tone: "positive", state: "needs-you" },
-  { id: "lg_hawks", name: "Golden Hawks", shortName: "GH", tone: "warning", state: "live" },
+  { id: "lg_bandits", name: "Bay Bandits", shortName: "BB", state: "quiet" },
+  { id: "lg_thunder", name: "Thunder Squad", shortName: "TS", state: "needs-you" },
+  { id: "lg_hawks", name: "Golden Hawks", shortName: "GH", state: "live" },
 ];
 
 describe("LeagueRail", () => {

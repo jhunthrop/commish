@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { HomeLeagueCard as HomeLeagueCardData } from "../contract";
-import { Badge, Card, EYEBROW } from "@/components/ui";
+import { Badge, Card, EYEBROW, SeatMeter } from "@/components/ui";
 import { formatRecord, formatWeek } from "../lib/format";
 import { MatchupScoreboard } from "./matchup-scoreboard";
 import { WeekStatusBadge } from "./week-status-badge";
@@ -63,9 +63,10 @@ export function HomeLeagueCard({ league }: { readonly league: HomeLeagueCardData
         </div>
       </div>
       <p className={EYEBROW}>
-        {`${league.format === "auction" ? "Auction" : "Snake"} · ${league.filledTeams} of ${league.teamCount} managers`}
+        {league.format === "auction" ? "Auction" : "Snake"}
         {league.isCommissioner ? " · Commissioner" : ""}
       </p>
+      <SeatMeter filled={league.filledTeams} total={league.teamCount} />
 
       {league.matchup === null ? (
         <div className="flex items-center justify-between gap-2">

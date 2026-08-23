@@ -24,6 +24,11 @@ import { TradeComposer } from "@/league-room/components/trade-composer";
 import type { ModerationSummaryView, TradeRoomContext } from "@/league-room/contract";
 import { ReviewFeed } from "@/account-room/components/review-feed";
 import type { ReviewsPage, ReviewView } from "@/reviews/contract";
+import { Crest } from "@/components/ui/crest";
+import { Meter } from "@/components/ui/meter";
+import { Panel } from "@/components/ui/panel";
+import { SeatMeter } from "@/components/ui/seat-meter";
+import { StatPill } from "@/components/ui/stat-pill";
 import { copyViolations } from "./copy-rules";
 import { renderNotice } from "./notices";
 
@@ -815,5 +820,42 @@ describe("ReviewFeed says nothing that breaks the house copy rules, verified bad
     );
     fireEvent.click(screen.getByRole("button", { name: "What is a verified reviewer?" }));
     expectClean(container, VERIFIED_REVIEW.body, VERIFIED_REVIEW.authorName);
+  });
+});
+
+/**
+ * Phase 3.6, Task 3: the five primitives the mocks repeat join the sweep the same commit that
+ * creates them, per this file's own "one place to add" point. `SeatMeter` is the one that
+ * composes its own sentence at runtime (the rest render whatever a caller passes them), so it is
+ * the one exercised across every branch that changes its wording.
+ */
+describe("SeatMeter says nothing that breaks the house copy rules, in every branch", () => {
+  it("is clean with nothing left to say, with seats left, and with a hold", () => {
+    for (const element of [
+      <SeatMeter key="base" filled={9} total={12} />,
+      <SeatMeter key="left" filled={11} total={12} />,
+      <SeatMeter key="held" filled={9} total={12} heldSeats={1} />,
+    ]) {
+      const { container, unmount } = render(element);
+      expectClean(container);
+      unmount();
+    }
+  });
+});
+
+describe("Panel, Crest, Meter and StatPill say nothing that breaks the house copy rules", () => {
+  it("is clean with the content a real caller passes each", () => {
+    for (const element of [
+      <Panel key="panel" title="Standings" meta="10 managers, 2 open seats">
+        <p>Body content</p>
+      </Panel>,
+      <Crest key="crest" id="league_1" label="BB" />,
+      <Meter key="meter" label="Seats filled" value={10} max={12} />,
+      <StatPill key="pill" label="In progress" tone="accent" glow />,
+    ]) {
+      const { container, unmount } = render(element);
+      expectClean(container);
+      unmount();
+    }
   });
 });

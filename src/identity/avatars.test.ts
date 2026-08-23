@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { AVATAR_PRESETS, avatarRefValue, parseAvatarRef, presetByKey } from "./avatars";
+import { AVATAR_PRESETS, avatarRefValue, avatarTone, parseAvatarRef, presetByKey } from "./avatars";
+
+describe("avatarTone", () => {
+  it("gives the same id the same tone forever", () => {
+    expect(avatarTone("lg_bandits")).toBe(avatarTone("lg_bandits"));
+  });
+
+  it("spreads different ids across more than one tone", () => {
+    const ids = ["lg_bandits", "lg_thunder", "lg_hawks", "lg_owls", "lg_sharks", "lg_wolves"];
+    expect(new Set(ids.map(avatarTone)).size).toBeGreaterThan(1);
+  });
+});
 
 describe("parseAvatarRef", () => {
   it("renders initials when there is nothing stored", () => {
