@@ -101,14 +101,28 @@ test("a veteran browses, is refused a beginner league, and reads why", async ({ 
   // composition label a real query computed SERVER-side (final review F6 moved the reduction off
   // the client, so this text is the bucket the wire actually carried).
   //
-  // "MOSTLY NEWCOMERS", AND THE ARITHMETIC IS THE SEED'S OWN (final review round 2, R1). This read
-  // "All newcomers", with a comment claiming all three seeded placeholders were still newcomers.
-  // They are not: `dev_user_04` holds three completed seasons — exactly
-  // `INTEGRITY_CONFIG.participation.veteranSeasonCutoff` — from `VETERAN_SEASON_LEAGUES`, and it
-  // holds a seat here, so the honest computed bucket is two newcomers against one veteran. A
-  // database seeded before those veteran leagues existed hid the contradiction; a fresh one does
-  // not. The spec catches up to the seed rather than the other way round, and the assertion below
-  // is the one that actually matters here: this league still refuses this veteran.
+  // "MOSTLY NEWCOMERS", AND DURABLY SO (Phase 3.5, Task 7.5 — the ledgered aging class' third
+  // occurrence, root-caused rather than patched a fourth time). This used to read "All
+  // newcomers", then briefly "Mostly newcomers" on the theory that `dev_user_04` — one of the
+  // shared 12-identity dev pool `ensureDevUsers` hands every seeder — had genuinely crossed
+  // `INTEGRITY_CONFIG.participation.veteranSeasonCutoff`. That theory held for exactly as long as
+  // no OTHER shared-pool identity crossed it too: `stampSeasonCompleteInTx`
+  // (`@/league-service/participation`) stamps ANY league's season complete the moment its last
+  // matchup scores, with no notion of which leagues were only ever meant to demo a lineup lock,
+  // and every identity in the shared pool sits in at least one league (`dev_league_snake`) whose
+  // scheduled draft eventually gets started and autopicked by the same ticker every e2e run's dev
+  // server keeps live. `dev_user_02` and `dev_user_03` crossed the cutoff next, on a run this
+  // spec's own author found failing locally, and patching the expected label a third time would
+  // only have bought another few runs before a fourth identity aged out from under it.
+  //
+  // The durable fix is `seedTierDemoIdentities` (`src/data/seed/seed-tier-demo.ts`): this
+  // league's three seats are no longer members of the shared pool at all. Two are dedicated
+  // identities no other seeder ever lists, so they can never accumulate a completed season; the
+  // third already has three REAL completed seasons the moment `npm run seed` finishes, scored at
+  // birth through the identical `seedSeasonLeague` path manager A's own veteran status uses, with
+  // no unscored matchup left for any later ticker to find. "Mostly newcomers" is therefore true by
+  // construction on every run, not merely true today — see that module's own docblock for the
+  // full incident.
   const card = managerA.locator("li").filter({ has: managerA.getByRole("heading", { name: target.name }) });
   await expect(card).toBeVisible();
   await expect(card.getByText("Mostly newcomers")).toBeVisible();

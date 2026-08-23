@@ -5,6 +5,9 @@ import { PPR_SCORING } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { DEV_SEED } from "./config";
 import { ensureDevUsers, preserveRealCommissioner, preserveRealTeamOwner } from "./dev-users";
+import { seedTierDemoIdentities } from "./seed-tier-demo";
+
+const TIER_DEMO_LEAGUE_ID = "dev_public_tier_demo";
 
 const MS_PER_HOUR = 60 * 60 * 1000;
 /** Far enough out that a browsed league's draft clock starts in a slow tier, not at the floor. */
@@ -31,6 +34,10 @@ export async function seedPublicLeagues(db: Db, clock: Clock): Promise<{ leagues
 
   const kickoffAt = new Date(Date.parse(clock.now()) + KICKOFF_HOURS * MS_PER_HOUR);
   const ownerIds = await ensureDevUsers(db);
+  // Task 7.5: the tier-demo league's own three seats never come from the pool above — see
+  // `seedTierDemoIdentities`'s own docblock for why a shared, drift-prone identity can't hold
+  // this composition durably.
+  const tierDemoIdentities = await seedTierDemoIdentities(db, clock);
   let seededTeams = 0;
 
   for (const plan of DEV_SEED.publicLeagues) {
@@ -65,15 +72,15 @@ export async function seedPublicLeagues(db: Db, clock: Clock): Promise<{ leagues
       .values({ leagueId: plan.leagueId, ...PPR_SCORING })
       .onConflictDoNothing({ target: scoringSettings.leagueId });
 
-    // `skipOwnerIndexZero` (Phase 3 Plan D, Task 10): `dev_public_tier_demo` alone starts its
-    // seats at index 1, so the seed's own veteran identity (index 0, `claimUserId` when one is
-    // set — never used here, see below) never already holds a team in the one league Task 10's
-    // block-join step needs it REFUSED from. A brand-new leagueId only, never a retrofit onto an
-    // existing entry: shifting an ALREADY-seeded league's seats collides `teams_league_user_idx`
-    // on any database this seed already ran against under the old mapping (found running `npm
-    // run seed` against the shared dev database while building this task).
-    const skip = "skipOwnerIndexZero" in plan && plan.skipOwnerIndexZero ? 1 : 0;
-    const seats = ownerIds.slice(skip, skip + plan.filled);
+    // Task 7.5: `dev_public_tier_demo` alone never draws its seats from the shared pool above —
+    // `seedTierDemoIdentities`'s own three dedicated identities are what keep this league's
+    // composition ("Mostly newcomers") true forever rather than only until the shared pool's
+    // own drift catches up to it (see that module's own docblock for the incident). A
+    // brand-new leagueId only, never a retrofit onto an existing entry: shifting an
+    // ALREADY-seeded league's seats collides `teams_league_user_idx` on any database this seed
+    // already ran against under an older mapping (found running `npm run seed` against the
+    // shared dev database while building Task 10).
+    const seats = plan.leagueId === TIER_DEMO_LEAGUE_ID ? [...tierDemoIdentities.newcomers, tierDemoIdentities.veteran] : ownerIds.slice(0, plan.filled);
     if (seats.length > 0) {
       await db
         .insert(teams)
