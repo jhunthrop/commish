@@ -103,7 +103,12 @@ export type FireWhenFullOutcome =
  * FK ACQUISITIONS, ENUMERATED (binding controller ruling, Plan C's H2 lesson: a lock-order review
  * must enumerate foreign keys). `UPDATE drafts SET kickoff_at` takes the draft row's own lock plus
  * an implicit `FOR KEY SHARE` on `leagues` (the `drafts.league_id` FK) — already held `FOR UPDATE`
- * by the caller (`joinLeagueInTx`), so this introduces no new edge into the global lock order. The
+ * by the caller (`joinLeagueInTx`). That draft-row lock IS a real edge, `leagues -> drafts`, and
+ * naming it is what the final whole-branch review's F1 turned on: it is the direction the WHOLE
+ * BRANCH now orders on (`setDraftKickoff` and `applyAction` both take the league row before the
+ * draft row), and this call site is the reason that direction, not the other one, is the rule.
+ * `joinLeagueInTx` now runs this function ABOVE its own `member_joined` append, so every one of
+ * these acquisitions precedes the anchor rather than following it. The
  * `member_notices` inserts that follow take the identical `leagues`/`users` `FOR KEY SHARE` every
  * other notice writer in this codebase already takes (`notifyAffectedMember`'s own docblock) —
  * `leagues` already held, and no caller anywhere in this codebase takes a `users` row `FOR UPDATE`

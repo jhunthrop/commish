@@ -57,12 +57,23 @@ import { GENESIS_HASH, linkEvent, scopeFor, type ChainAnchor } from "@/integrity
  * insert. Postgres broke it after `deadlock_timeout` by killing a pick or a join that the user
  * did nothing to deserve.
  *
- * So: `applyAction` (`src/draft-service/store.ts`) holds `drafts FOR UPDATE` first and does every
- * notice insert, every caller-supplied write and the whole season commit BEFORE it reaches this
- * row; `setLineup` holds `stat_weeks FOR SHARE` first; `joinLeagueInTx` holds `league_invites`
- * then `leagues` first; `removeReview` writes its notice before appending. Every one of them
+ * So: `applyAction` (`src/draft-service/store.ts`) holds `leagues FOR KEY SHARE` then `drafts FOR
+ * UPDATE` first and does every notice insert, every caller-supplied write and the whole season
+ * commit BEFORE it reaches this row; `setLineup` holds `stat_weeks FOR SHARE` first;
+ * `joinLeagueInTx` holds `league_invites` then `leagues` first, and runs `fireWhenFullInTx`'s
+ * kickoff `UPDATE` and notices before appending; `setDraftKickoff` holds `leagues` then `drafts`
+ * and appends nothing at all; `removeReview` writes its notice before appending. Every one of them
  * reaches this row afterwards, and nothing reaches any of them from here — so no lock-ordering
- * cycle exists anywhere in the codebase. Because a transaction touches at most one anchor, and
+ * cycle exists anywhere in the codebase.
+ *
+ * THE SECOND GLOBAL RULE, added by the final whole-branch review (F1), because "the anchor is
+ * last" is necessary and was not sufficient: TWO transactions that take the SAME PAIR of business
+ * rows must take them in the same ORDER, and the pair this branch got wrong was
+ * (`leagues`, `drafts`). ANY TRANSACTION THAT TAKES BOTH A `leagues` ROW LOCK AND A `drafts` ROW
+ * LOCK ACQUIRES `leagues` FIRST, AS ITS OWN STATEMENT. See `setDraftKickoff`'s docblock
+ * (`src/league-service/draft-schedule.ts`) for the full account, and
+ * `src/integrity-service/lock-order.test.ts`'s "the leagues-before-drafts rule" block for the
+ * two-connection proofs of both pairs that used to cycle. Because a transaction touches at most one anchor, and
  * the anchor is always taken last, two transactions can never take two anchor locks in opposite
  * orders. `src/integrity-service/lock-order.test.ts` drives the two transactions that used to
  * deadlock against a real Postgres and holds that claim to it.
@@ -99,10 +110,11 @@ export interface AuditLogger {
  *
  * LOCK ORDER (ruling 3): this is always the LAST lock a transaction takes, a transaction appends
  * to at most one chain, and "lock" includes the implicit `FOR KEY SHARE` an INSERT takes on every
- * row it references. `applyAction` holds `drafts`, `setLineup` holds `stat_weeks`,
- * `joinLeagueInTx` holds `league_invites` then `leagues` — every one of them reaches this row
- * afterwards, with every FK-taking write of its own already done, and nothing reaches any of them
- * from here, so no cycle exists. See the interface docblock above for the cycle this rule was
+ * row it references. `applyAction` holds `leagues` then `drafts`, `setLineup` holds `stat_weeks`,
+ * `joinLeagueInTx` holds `league_invites` then `leagues` then (through `fireWhenFullInTx`)
+ * `drafts` — every one of them reaches this row afterwards, with every FK-taking write of its own
+ * already done, and nothing reaches any of them from here, so no cycle exists. See the interface
+ * docblock above for the two cycles this rule and its leagues-before-drafts companion were
  * rewritten to close.
  */
 async function lockAnchor(tx: DbTx, scope: string): Promise<ChainAnchor> {

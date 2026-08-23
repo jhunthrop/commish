@@ -2728,3 +2728,152 @@ describe("autoSetLineupInTx and finalizeWeekInTx serialize on the matchups rows"
  * the reconciler's own other behavior rather than duplicated here — the identical reasoning
  * `fireWhenFullInTx`'s own "added by hand" entry above already gives for the same split.
  */
+
+/**
+ * FINAL WHOLE-BRANCH REVIEW, F1 — THE PAIR NOBODY ORDERED: (`leagues`, `drafts`).
+ *
+ * Ruling 3 ("the audit anchor is the last lock") is necessary and was never sufficient. It says
+ * nothing about the order two transactions take two BUSINESS rows in, and this branch shipped
+ * transactions that took the same two business rows in opposite orders:
+ *
+ *   T_join     `leagues[X] FOR UPDATE` .................> `UPDATE drafts SET kickoff_at`
+ *              (`joinLeagueInTx`, `@/league-service/join`)  (`fireWhenFullInTx`, on the last seat)
+ *
+ *   T_kickoff  `drafts[D]` AND `leagues[X]` in ONE joined `FOR UPDATE`
+ *              (`setDraftKickoff`, `@/league-service/draft-schedule`)
+ *
+ *   T_start    `drafts[D] FOR UPDATE` ..................> `leagues[X] FOR KEY SHARE`
+ *              (`applyAction`, `@/draft-service/store`)     (`claimAutoStart`'s UPDATE, the fused
+ *                                                            announcement's notices, the commit)
+ *
+ * A single statement's `FOR UPDATE` spanning an `innerJoin` locks BOTH tables, in whatever order
+ * the plan happens to produce the rows — so `setDraftKickoff` could and did take the draft row
+ * first. `applyAction` took the draft row first by construction and reached `leagues` only later,
+ * invisibly, through its own inserts' foreign keys. Either one, racing a last-seat join, is a
+ * cycle: the reviewer reproduced it with three real `psql` sessions and Postgres answered 40P01.
+ *
+ * THE FIX IS ONE GLOBAL RULE, not three local ones: ANY TRANSACTION THAT TAKES BOTH A `leagues`
+ * ROW LOCK AND A `drafts` ROW LOCK ACQUIRES `leagues` FIRST, AS ITS OWN STATEMENT.
+ * `joinLeagueInTx` already did. `setDraftKickoff` now locks the league row alone and narrows its
+ * joined lock to `FOR UPDATE OF drafts`. `applyAction` now opens with `FOR KEY SHARE OF leagues` —
+ * the weaker mode deliberately, because that is exactly the lock its own FK-carrying inserts take
+ * later anyway, so the rule reorders the transaction without strengthening anything (escalating to
+ * `FOR UPDATE` would have opened a NEW cycle against `proposeTrade`, which holds `teams FOR
+ * UPDATE` and then takes `leagues FOR KEY SHARE` through its own notice insert).
+ *
+ * DRIVEN, NOT ARGUED. A hand-written "this adds no new edge" claim is exactly what let this
+ * through, so both previously-cyclic pairs are built below on two real connections with the old
+ * order's timing: the join is parked holding `leagues[X]`, the second writer is driven on its own
+ * connection, Postgres is ASKED whether a backend is genuinely blocked, and only then is the park
+ * released. Under the old order the second writer is already holding `drafts[D]` by that moment,
+ * and the join's kickoff `UPDATE` closes the cycle.
+ */
+describe("the leagues-before-drafts rule", () => {
+  /** A `when_full` draft with one seat still open — the only shape in which a join actually
+   *  WRITES to `drafts` (`fireWhenFullInTx` moves `kickoff_at` when the last seat lands), and
+   *  therefore the only shape in which the contended `leagues -> drafts` edge exists at all. */
+  async function sitAndGoWithOneSeatOpen(leagueId: string, draftId: string) {
+    const fixture = await seedDraftFixture(joinDb, {
+      draftId,
+      leagueId,
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+      isPublicMatchmade: true,
+    });
+    // One seat more than the fixture filled, so the joiner below is the LAST seat.
+    await joinDb.update(leagues).set({ teamCount: 3 }).where(eq(leagues.id, leagueId));
+    await joinDb.update(drafts).set({ startTrigger: "when_full" }).where(eq(drafts.id, draftId));
+    await joinDb.insert(users).values({ id: `${leagueId}_joiner`, email: `${leagueId}_joiner@test.local`, displayName: "Joiner" });
+    return fixture;
+  }
+
+  it("lets setDraftKickoff and a last-seat join run concurrently — it takes the LEAGUE row before the draft row", async () => {
+    const { leagueId, draftId, userIds } = await sitAndGoWithOneSeatOpen("lg_lbd_kick", "draft_lbd_kick");
+
+    // T_join: the real function, parked inside its own precondition — after `leagues FOR UPDATE`
+    // and before both the `teams` insert and the kickoff `UPDATE` that follows it.
+    const join = parkedJoin(leagueId, `${leagueId}_joiner`, "team_lbd_kick_joiner");
+    await join.leagueLocked;
+
+    // T_kickoff: the real reschedule, on its own connection. Its FIRST statement is now the league
+    // row, so it blocks HERE — before it can take the draft row the join is about to want.
+    const rescheduling = setDraftKickoff(
+      pickDb,
+      { leagueId, userId: userIds[0]!, kickoffAt: "2026-09-20T17:00:00.000Z" },
+      clock,
+    );
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    // Both finish. The reschedule's own answer is a 409 — a `when_full` draft's time is nobody's
+    // to set by hand (`KICKOFF_REFUSALS.whenFull`) — and that is the honest shape of this proof:
+    // every refusal in `setDraftKickoff` is decided AFTER both row locks are taken, so the order
+    // under test is exercised in full even though no second write ever lands. What is proven here
+    // is that the two transactions cannot cycle, not that both get to write.
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await rescheduling).toMatchObject({ ok: false, status: 409 });
+
+    // The join really did write to `drafts`. Without this the pair shares no `drafts` edge at all,
+    // and the test would prove nothing about the order it exists to pin.
+    const [draftRow] = await joinDb.select().from(drafts).where(eq(drafts.id, draftId));
+    expect(draftRow!.kickoffAt.toISOString()).not.toBe("2026-09-10T17:00:00.000Z");
+  });
+
+  it("lets an auto-start and a last-seat join in the same league run concurrently without deadlocking", async () => {
+    const { leagueId, draftId } = await sitAndGoWithOneSeatOpen("lg_lbd_start", "draft_lbd_start");
+    // `startDraft` builds its pool outside the transaction; an empty `players` table refuses the
+    // start before any lock is taken, and the race under test would never happen at all.
+    await joinDb.insert(players).values(POOL.map((entry) => ({ id: entry.playerId, name: entry.playerId, position: entry.position, nflTeam: "FA" })));
+
+    const join = parkedJoin(leagueId, `${leagueId}_joiner`, "team_lbd_start_joiner");
+    await join.leagueLocked;
+
+    // T_start: the REAL auto-start path — `claimAutoStart`'s guarded `UPDATE drafts`, the fused
+    // `draft_auto_started` announcement and its notices, all inside `applyAction`'s transaction.
+    // Under the old order it would already hold `drafts[D] FOR UPDATE` here while waiting on
+    // `leagues[X] FOR KEY SHARE`, and releasing the join would send the join's own kickoff
+    // `UPDATE` into the other half of the cycle. It now blocks on the league row FIRST, holding
+    // nothing else at all.
+    const starting = pickStore().startDraft(draftId, { auto: true });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    const joined = await join.joining;
+    const started = await starting;
+    expect(joined).toMatchObject({ ok: true, alreadyMember: false });
+    expect(started.ok).toBe(true);
+
+    // Both halves really landed: the seat is taken, the fill trigger moved the kickoff (the
+    // `drafts` write that makes this pair contended at all), and the draft is live.
+    const [draftRow] = await joinDb.select().from(drafts).where(eq(drafts.id, draftId));
+    expect(draftRow!.status).toBe("in_progress");
+    expect(draftRow!.kickoffAt.toISOString()).not.toBe("2026-09-10T17:00:00.000Z");
+  });
+
+  it("survives both races run repeatedly, in both arrival orders", async () => {
+    // The two rendezvous above pin one interleaving each. This one pins that nothing about the
+    // rule depends on which transaction arrives first, over enough runs that a surviving cycle
+    // would have to be lucky many times over rather than once.
+    for (let run = 0; run < 4; run += 1) {
+      await truncateAll(joinDb);
+      const leagueId = `lg_lbd_race_${run}`;
+      const draftId = `draft_lbd_race_${run}`;
+      const { userIds } = await sitAndGoWithOneSeatOpen(leagueId, draftId);
+      await joinDb.insert(players).values(POOL.map((entry) => ({ id: entry.playerId, name: entry.playerId, position: entry.position, nflTeam: "FA" })));
+
+      const joining = joinDb.transaction((tx) =>
+        joinLeagueInTx(tx, { leagueId, userId: `${leagueId}_joiner`, newId: () => `team_lbd_race_${run}`, via: "public_browse", occurredAt: clock.now() }),
+      );
+      const other =
+        run % 2 === 0
+          ? setDraftKickoff(pickDb, { leagueId, userId: userIds[0]!, kickoffAt: "2026-09-20T17:00:00.000Z" }, clock)
+          : pickStore().startDraft(draftId, { auto: true });
+      await expect(Promise.all([joining, other])).resolves.toBeDefined();
+    }
+  });
+});

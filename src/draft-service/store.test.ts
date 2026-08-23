@@ -204,11 +204,18 @@ describe("draft store — persistence", () => {
     // join can never miss for a row the FOR UPDATE select above it just found — through real
     // Postgres, `locked === undefined` and `state === null` are the same event. A stub `DbTx`
     // is the only way to split them and prove `load()`'s own null case is handled too.
+    // TWO statements reach `innerJoin` now (final review F1): the `leagues FOR KEY SHARE` lock
+    // that opens the transaction, which ends in `.for(...)` and must find its row, and
+    // `loadDraftConfig`'s own config join, which is awaited directly and is the empty result this
+    // test exists to drive. A drizzle query builder is itself thenable, so one object standing in
+    // for both is the shape the real API already has.
     const stubTx = {
       select: () => ({
         from: () => ({
           where: () => ({ for: () => Promise.resolve([{ id: "draft_locked_ghost" }]) }),
-          innerJoin: () => ({ where: () => Promise.resolve([]) }),
+          innerJoin: () => ({
+            where: () => Object.assign(Promise.resolve([]), { for: () => Promise.resolve([{ id: "league_locked_ghost" }]) }),
+          }),
         }),
       }),
     } as unknown as DbTx;

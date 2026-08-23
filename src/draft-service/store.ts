@@ -284,6 +284,46 @@ export function createDraftStore({
         try {
           const outcome = await db.transaction(async (tx): Promise<ApplyResult> => {
             /**
+             * THE LEAGUE ROW, FIRST, AS ITS OWN STATEMENT (final whole-branch review, F1 — a
+             * cycle reproduced with real `psql` sessions, SQLSTATE 40P01).
+             *
+             * This transaction was NEVER a leaf, and the docblock below used to claim it was.
+             * Its autopick/skip notices insert into `member_notices`, and `commitDraftState`
+             * inserts `draft_picks`/`roster_slots`/`matchups` — every one of those statements
+             * takes an implicit `FOR KEY SHARE` on the `leagues` row through its own foreign key,
+             * and `FOR KEY SHARE` conflicts with `FOR UPDATE`. So the true order was
+             * drafts-then-leagues, while `joinLeagueInTx` (`@/league-service/join`) holds
+             * `leagues FOR UPDATE` and then reaches `drafts` through `fireWhenFullInTx`'s
+             * `UPDATE drafts SET kickoff_at`. Two transactions, two orders, one cycle — and
+             * Postgres resolves a cycle by killing somebody's draft pick or somebody's join.
+             *
+             * THE GLOBAL RULE this branch now holds everywhere (stated in full in
+             * `setDraftKickoff`'s own docblock, `@/league-service/draft-schedule`): ANY
+             * TRANSACTION THAT TAKES BOTH A `leagues` ROW LOCK AND A `drafts` ROW LOCK ACQUIRES
+             * `leagues` FIRST, AS ITS OWN STATEMENT.
+             *
+             * `FOR KEY SHARE`, not `FOR UPDATE`, and the weaker mode is the point: it is EXACTLY
+             * the lock this transaction's own FK-carrying inserts take later anyway, so acquiring
+             * it up front reorders nothing and strengthens nothing. Escalating to `FOR UPDATE`
+             * here would be a genuine regression — `proposeTrade` (`@/league-service/trades`)
+             * holds `teams FOR UPDATE` and then takes `leagues FOR KEY SHARE` through its own
+             * notice insert, which coexists with this lock today and would start deadlocking
+             * against `commitDraftState`'s `teams FOR KEY SHARE` the moment this row went
+             * exclusive.
+             *
+             * `FOR KEY SHARE OF leagues` scopes the lock to the one row despite the join: the
+             * `drafts` row is only READ here (reading is not locking), and it is locked by the
+             * statement below, in the fixed order.
+             */
+            const [league] = await tx
+              .select({ id: leagues.id })
+              .from(leagues)
+              .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
+              .where(eq(drafts.id, draftId))
+              .for("key share", { of: leagues });
+            if (league === undefined) return { ok: false, reason: "That draft doesn't exist." };
+
+            /**
              * THE CROSS-INSTANCE LOCK. Every accepted action for this draft passes through this
              * one row, so "replay the action log" becomes the single-writer path across any
              * number of app instances rather than only across restarts.
@@ -295,9 +335,8 @@ export function createDraftStore({
              * exactly the property transaction pooling requires and exactly the trap the spec
              * warns about. See docs/decisions/data-layer-hardening.md.
              *
-             * Lock order: this is a leaf. `joinLeagueInTx` takes `league_invites` then `leagues`;
-             * nothing takes `drafts` before either of those, and this function takes nothing
-             * after `drafts`, so no cycle exists.
+             * Lock order: `leagues` (above) then `drafts` then the audit anchor, the same order
+             * `joinLeagueInTx` and `setDraftKickoff` take, so no cycle exists.
              */
             const [locked] = await tx.select({ id: drafts.id }).from(drafts).where(eq(drafts.id, draftId)).for("update");
             if (locked === undefined) return { ok: false, reason: "That draft doesn't exist." };

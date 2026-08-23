@@ -190,16 +190,32 @@ export type SetDraftKickoffResult =
  * extended to a draft nobody could have chosen because the catalog opened the league around it.
  *
 
- * Locks the draft row `FOR UPDATE` before checking anything, so two concurrent reschedules (or
- * a reschedule racing `startDraft`) resolve one at a time rather than both reading `scheduled`
- * and both deciding they may proceed. PROVEN, not promised (final review F10 — this docblock
- * asserted the property and nothing measured it): `src/integrity-service/lock-order.test.ts`'s
- * "setDraftKickoff's row lock" drives both races on two real connections, including the half the
- * call site does not read — the `.for("update")` spans the `innerJoin`, so it locks the `leagues`
- * row as well as the `drafts` one. NO-WRITE-BEFORE-REFUSAL holds here exactly as it does at
- * `createLeague`'s own gate: every refusal branch below returns before the `UPDATE` statement is
- * ever reached, so a refused reschedule commits nothing but the row lock it already had to take
- * to ask the question safely.
+ * Locks the league row and then the draft row `FOR UPDATE` before checking anything, so two
+ * concurrent reschedules (or a reschedule racing `startDraft`) resolve one at a time rather than
+ * both reading `scheduled` and both deciding they may proceed. PROVEN, not promised (final review
+ * F10 — this docblock asserted the property and nothing measured it):
+ * `src/integrity-service/lock-order.test.ts`'s "setDraftKickoff's row lock" drives both races on
+ * two real connections. NO-WRITE-BEFORE-REFUSAL holds here exactly as it does at `createLeague`'s
+ * own gate: every refusal branch below returns before the `UPDATE` statement is ever reached, so a
+ * refused reschedule commits nothing but the row locks it already had to take to ask the question
+ * safely.
+ *
+ * THE GLOBAL LEAGUES-BEFORE-DRAFTS RULE (final whole-branch review, F1 — a cycle reproduced with
+ * three real `psql` sessions, SQLSTATE 40P01). This function used to take BOTH rows in ONE
+ * statement: `.for("update")` spanning the `innerJoin` locks every table in the `FROM` list, and
+ * within a single statement Postgres acquires those row locks in whatever order it happens to
+ * fetch them — which for this plan (`drafts_league_id_idx` first, then the `leagues` lookup) is
+ * DRAFTS BEFORE LEAGUES. `joinLeagueInTx` (`./join.ts`) goes the other way: `leagues FOR UPDATE`,
+ * then `fireWhenFullInTx`'s `UPDATE drafts`. Two transactions, two orders, one cycle.
+ *
+ * The rule this branch now holds everywhere, stated once here and restated at every other site
+ * that obeys it: ANY TRANSACTION THAT TAKES BOTH A `leagues` ROW LOCK AND A `drafts` ROW LOCK
+ * ACQUIRES `leagues` FIRST, AS ITS OWN STATEMENT. So the first statement below locks the league
+ * row alone, and the joined read that follows narrows its lock to `drafts` (`FOR UPDATE OF
+ * drafts`) — the league row it joins through is already held by the statement above it, and the
+ * new-edge-free order is leagues-then-drafts in both directions. Driven, not asserted:
+ * `lock-order.test.ts`'s "the leagues-before-drafts rule" block runs the previously-cyclic pair on
+ * two real connections with the old order's timing.
  */
 export async function setDraftKickoff(
   db: Db,
@@ -207,6 +223,10 @@ export async function setDraftKickoff(
   clock: Clock = systemClock,
 ): Promise<SetDraftKickoffResult> {
   return db.transaction(async (tx) => {
+    // LEAGUES FIRST, ON ITS OWN (F1 — see the docblock above). A league with no `drafts` row is
+    // not a reachable state through this product, but locking a row that exists while the joined
+    // read below finds nothing is harmless: the transaction returns 404 having written nothing.
+    await tx.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, input.leagueId)).for("update");
     const [row] = await tx
       .select({
         draftId: drafts.id,
@@ -218,7 +238,7 @@ export async function setDraftKickoff(
       .from(drafts)
       .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
       .where(eq(drafts.leagueId, input.leagueId))
-      .for("update");
+      .for("update", { of: drafts });
 
     if (row === undefined) {
       return { ok: false, status: 404, reason: DRAFT_NOT_FOUND };
