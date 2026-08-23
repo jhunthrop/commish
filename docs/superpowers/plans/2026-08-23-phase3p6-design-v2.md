@@ -49,7 +49,7 @@ Every task's requirements implicitly include this section. Values are copied ver
 
 - **No raw hex, no raw px, no arbitrary values in feature code.** `src/design/tokens.ts` is the only file in the repo allowed to contain a color literal. **This survives v2 unchanged and is the single most load-bearing rule in this plan** — the three mocks are 900 lines of raw hex between them, and every one of those values lands in `tokens.ts` or it does not land.
 - **Never a dead end.** Empty and error states always offer an action (`StatePanelProps.action` is required, not optional). **This plan's hardest cases are the race loser** (the seat was taken while they were signing in) and **the rolled draft** (the night they planned for is not happening), and each gets a real action rather than an apology.
-- **Both themes are first-class.** **The founder reaffirmed this rule directly on 2026-08-23**, overturning this plan's original dark-only ruling: dark is the flagship identity per the approved mocks, and light is DESIGNED to the same twenty roles and the same thresholds, never derived by inversion (ruling 1, as revised).
+- **Both themes are first-class.** **The founder reaffirmed this rule directly on 2026-08-23**, overturning this plan's original dark-only ruling: dark is the flagship identity per the approved mocks, and light is DESIGNED to the same nineteen roles and the same thresholds, never derived by inversion (ruling 1, as revised).
 - **Mobile-first**, minimum viewport 360px. WCAG 2.2 AA.
 - **Copy.** Plain language, active voice, specific. Errors say what happened and what to do next.
 - **`Icon` is the one icon entry point.** Feature code never imports `lucide-react` directly. The eighteen `IconName`s: `trophy`, `users`, `clock`, `alert-triangle`, `inbox`, `refresh-cw`, `check`, `x`, `chevron-right`, `search`, `info`, `shield`, `flame`, `anchor`, `rocket`, `crown`, `bolt`, `clover`. **This plan adds exactly one** (ruling 22): `plus`, for the rail's "join or create another league" control, which has no honest spelling among the eighteen.
@@ -179,7 +179,7 @@ it("prints a readable label on every fill that carries one", () => {
   expect(contrastRatio(TOKENS.color.negativeText, TOKENS.color.negative)).toBeGreaterThanOrEqual(4.5);
 });
 
-it("carries the same twenty roles in both palettes, so no surface can exist in a theme nobody designed", () => {
+it("carries the same nineteen roles in both palettes, so no surface can exist in a theme nobody designed", () => {
   // REVISED (founder both-themes ruling, 2026-08-23): two palettes, one role set, and every
   // contrast assertion in this file runs against EACH palette. A role present in one palette
   // and missing from the other is a color that silently stops responding to the theme.
@@ -191,7 +191,7 @@ it("carries the same twenty roles in both palettes, so no surface can exist in a
 
 - [ ] **Step 2: The palette**
 
-`ColorRole` keeps its twelve members and gains eight: `surfaceRaised`, `surfaceInset`, `edge`, `textFaint`, `info`, `accentGlow`, `warningGlow` — and `border` is **renamed** to `line`, which is a compile-forced sweep across every `border-border` utility, and that is why it is a rename rather than an addition. The values:
+`ColorRole` keeps its twelve members and gains seven: `surfaceRaised`, `surfaceInset`, `edge`, `textFaint`, `info`, `accentGlow`, `warningGlow` — and `border` is **renamed** to `line`, which is a compile-forced sweep across every `border-border` utility, and that is why it is a rename rather than an addition. The values:
 
 ```ts
 /** v2 — the room at night. One palette, committed (ruling 1). */
@@ -1425,7 +1425,7 @@ Not a mockup review this time: the six personas from the two existing panels (ve
 
 ## Open questions, self-ruled
 
-1. **v2 ships BOTH themes, and the light palette is designed rather than inherited — REVISED by direct founder ruling, 2026-08-23.** This plan originally ruled dark-only (the mocks are dark, no switcher existed, an undesigned light palette is a control wired to nothing). The founder overruled it: the product's core moment is Sunday afternoon in bright rooms, OS-light users deserve their preference respected, and the no-MVP directive's end state has both. The revised shape: **dark is the flagship identity**, exactly the mocks; **light is designed at the token level** to the same twenty roles and the same contrast thresholds (the v2 cool hue bias translated to a near-white ground, the same green family re-derived for light surfaces — never a naive inversion); every contrast test in Task 1 **parameterizes over both palettes** and the token moves, never the threshold; `ThemeProvider` and the both-theme test harness (renamed `renderSurface`, semantics preserved: render per theme, assert each) are KEPT; the "control wired to nothing" objection dies because Task 18 of the addendum ships the real theme switcher in the account room, with OS preference respected from this task forward. **The founder approves a light mock rendered from the shipped light tokens before later tasks apply the light look broadly**; token adjustments from that approval are cheap because they are role-level.
+1. **v2 ships BOTH themes, and the light palette is designed rather than inherited — REVISED by direct founder ruling, 2026-08-23.** This plan originally ruled dark-only (the mocks are dark, no switcher existed, an undesigned light palette is a control wired to nothing). The founder overruled it: the product's core moment is Sunday afternoon in bright rooms, OS-light users deserve their preference respected, and the no-MVP directive's end state has both. The revised shape: **dark is the flagship identity**, exactly the mocks; **light is designed at the token level** to the same nineteen roles and the same contrast thresholds (the v2 cool hue bias translated to a near-white ground, the same green family re-derived for light surfaces — never a naive inversion); every contrast test in Task 1 **parameterizes over both palettes** and the token moves, never the threshold; `ThemeProvider` and the both-theme test harness (renamed `renderSurface`, semantics preserved: render per theme, assert each) are KEPT; the "control wired to nothing" objection dies because Task 18 of the addendum ships the real theme switcher in the account room, with OS preference respected from this task forward. **The founder approves a light mock rendered from the shipped light tokens before later tasks apply the light look broadly**; token adjustments from that approval are cheap because they are role-level.
 
 2. **The token roles are RETONED, not forked, and `border` is renamed to `line`.** One `tokens.ts`, one `ColorRole` union, one generated stylesheet. The rename is deliberate churn: v2 needs two boundary concepts (a decorative hairline at 1.26:1 and an interactive edge at 3:1), and leaving the old name on the decorative one would have every future `border-border` quietly failing WCAG 1.4.11 on a control. A compile error at 200 call sites is the cheapest possible way to ask that question once.
 
