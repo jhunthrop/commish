@@ -22,6 +22,7 @@ const CUSTOM_SCORING_LEAGUE: PublicLeagueSummary = {
   compositionCategory: "all_newcomers",
   draftAt: "Monday 14 September, 6:00 PM UTC (in 5 days)",
   medianGame: false,
+  startTrigger: "scheduled",
 };
 
 // A signed-in list renders `JoinPublicLeagueButton` per card, which navigates via
@@ -147,6 +148,23 @@ describe("PublicLeagueList", () => {
       expect(screen.getByRole("button", { name: "What is a median game?" })).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+
+  // Phase 3.5, Task 8, Step 3: `startTrigger` gains a twelfth field, and the card renders either
+  // the draft time it already renders or "Starts as soon as it fills" — never both, and never a
+  // fabricated date.
+  it("shows the draft time for a scheduled league, and never the when-full sentence", () => {
+    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />);
+    expect(screen.getByText(/Drafts Saturday 12 September/)).toBeInTheDocument();
+    expect(screen.queryByText("Starts as soon as it fills")).not.toBeInTheDocument();
+  });
+
+  it("shows 'Starts as soon as it fills' for a when_full league, never a fabricated date", () => {
+    const whenFullLeague: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "wf1", startTrigger: "when_full" };
+    render(<PublicLeagueList leagues={[whenFullLeague]} signedIn />);
+    expect(screen.getByText("Starts as soon as it fills")).toBeInTheDocument();
+    expect(screen.queryByText(/Drafts /)).not.toBeInTheDocument();
+    expect(screen.queryByText(whenFullLeague.draftAt)).not.toBeInTheDocument();
   });
 
   it("offers a next action when no league matches, rather than a dead end", async () => {

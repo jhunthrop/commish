@@ -195,6 +195,37 @@ describe("LeagueHome", () => {
     expect(screen.queryByText(/hasn't drafted yet/)).not.toBeInTheDocument();
   });
 
+  // Phase 3.5, Task 8: the waiting room replaces the schedule panel outright for a `when_full`
+  // draft — the two never render at once.
+  it("renders the waiting room instead of the draft schedule panel for a when_full draft", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome
+          home={{ ...HOME, draftStatus: "scheduled", draftSchedule: { ...DRAFT_SCHEDULE, status: "scheduled", startTrigger: "when_full" } }}
+          lineup={null}
+        />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText(`${DRAFT_SCHEDULE.filledTeams} of ${HOME.teamCount} seats taken`)).toBeInTheDocument();
+    expect(screen.queryByText("Draft scheduled")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit time" })).not.toBeInTheDocument();
+  });
+
+  it("still renders the ordinary draft schedule panel for the scheduled trigger", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome
+          home={{ ...HOME, draftStatus: "scheduled", draftSchedule: { ...DRAFT_SCHEDULE, status: "scheduled", startTrigger: "scheduled" } }}
+          lineup={null}
+        />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText("Draft scheduled")).toBeInTheDocument();
+    expect(screen.queryByText(/seats taken/)).not.toBeInTheDocument();
+  });
+
   // Task 6, Phase 3.5: NFFC's Kentucky Derby System.
   it("shows the slot-preference panel from the same server render as the draft schedule", () => {
     renderInLeague(

@@ -33,6 +33,10 @@ interface PageProps {
  * existing `home.leagueId`/`home.isCommissioner` — this page hands down no new prop for it, the
  * same "own data layer" shape `TradeInboxLink` (Task 8 of Plan C) already established, so
  * `leagueHome`'s own query budget is unchanged by a surface most of a league's members never see.
+ *
+ * Phase 3.5, Task 8: `WaitingRoom` (a `when_full` draft's own surface) rides `home.draftSchedule`
+ * and `home.teamCount` — both already part of this render — the same way `DraftSchedulePanel`
+ * always has; `LeagueHome` is where the two are told apart, not this page.
  */
 export default async function LeaguePage({ params }: PageProps) {
   const user = await requireCurrentUser();

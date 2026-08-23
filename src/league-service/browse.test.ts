@@ -155,6 +155,9 @@ async function seedPublicLeague(
     draftAt: "Thursday 10 September, 5:00 PM UTC",
     // `seed()` above never sets `medianGame` — the schema default, `false`, always applies here.
     medianGame: false,
+    // `seed()` above never sets a start trigger — the schema default, `'scheduled'`, always
+    // applies here.
+    startTrigger: "scheduled",
   };
 }
 
@@ -180,7 +183,7 @@ describe("listPublicLeagues", () => {
       {
         id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0,
         teamCount: 12, filledTeams: 8, scoringLabel: "Standard", compositionCategory: "all_newcomers",
-        draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)", medianGame: false,
+        draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)", medianGame: false, startTrigger: "scheduled",
       },
     ]);
   });
@@ -200,6 +203,28 @@ describe("listPublicLeagues", () => {
     const byId = new Map(rows.map((row) => [row.id, row.medianGame]));
     expect(byId.get("standard")).toBe(false);
     expect(byId.get("median")).toBe(true);
+  });
+
+  // Phase 3.5, Task 8, Step 3: the twelfth field.
+  it("discloses the start trigger, honestly per league", async () => {
+    await seed({
+      id: "scheduled_one", name: "Scheduled Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    await db.insert(leagues).values({
+      id: "when_full_one", name: "Sit-and-Go Room", format: "snake", teamCount: 12, stakeTier: 0,
+      experienceTier: "beginner", isPublicMatchmade: true, commissionerUserId: "owner",
+    });
+    await db.insert(drafts).values({
+      id: "when_full_one_draft", leagueId: "when_full_one", format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"), startTrigger: "when_full",
+    });
+    await db.insert(scoringSettings).values({ leagueId: "when_full_one", ...STANDARD_SCORING });
+
+    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const byId = new Map(rows.map((row) => [row.id, row.startTrigger]));
+    expect(byId.get("scheduled_one")).toBe("scheduled");
+    expect(byId.get("when_full_one")).toBe("when_full");
   });
 
   it("discloses nothing beyond the named public fields", async () => {
@@ -296,11 +321,36 @@ describe("listPublicLeagues", () => {
     ).toEqual([]);
   });
 
-  it("returns matching leagues oldest-first, per the docblock's own promise", async () => {
-    // Seeded newest-first so a bug that returned insertion order (or any order but createdAt
-    // asc) would show up as a wrong sequence, not just a wrong set. Mutation check: flipping
-    // browse.ts's `asc(leagues.createdAt)` to `asc(leagues.name)` changes this order — see
-    // fix-wave-report.md for the before/after transcript.
+  // PHASE 3.5, TASK 8, STEP 4. `browseQuery` used to order by `created_at` alone; it now orders
+  // by seats-remaining ASC first, `created_at` ASC as the tiebreaker (§4.1's liquidity doctrine —
+  // the lobby's job is to FILL leagues, and a nearly-full one is worth surfacing ahead of a
+  // freshly created one nobody has joined yet).
+  it("returns matching leagues by seats remaining first — the nearly-full league surfaces ahead of the freshly created one", async () => {
+    // Mutation check: flipping `browse.ts`'s seats-remaining expression back to a bare
+    // `asc(leagues.createdAt)` puts "newest" (created last, but with the FEWEST seats left)
+    // first instead of last, reddening this exact assertion.
+    await seed({
+      id: "newest", name: "Newest League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 11, isPublicMatchmade: true,
+      createdAt: new Date("2026-09-03T00:00:00.000Z"),
+    });
+    await seed({
+      id: "oldest", name: "Oldest League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+      createdAt: new Date("2026-09-01T00:00:00.000Z"),
+    });
+    await seed({
+      id: "middle", name: "Middle League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 6, isPublicMatchmade: true,
+      createdAt: new Date("2026-09-02T00:00:00.000Z"),
+    });
+    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    // "newest" has 1 seat left, "middle" has 6, "oldest" has 11 — seats-remaining ASC puts the
+    // nearly-full league first, the opposite of creation order.
+    expect(rows.map((league) => league.id)).toEqual(["newest", "middle", "oldest"]);
+  });
+
+  it("falls back to created_at ASC as the tiebreaker when leagues have the same seats remaining", async () => {
     await seed({
       id: "newest", name: "Newest League", format: "snake", experienceTier: "beginner",
       stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,

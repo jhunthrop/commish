@@ -210,6 +210,18 @@ describe("GET /api/leagues/[leagueId]", () => {
     expect(home!.terms.draftAt).toContain("in 3 days");
   });
 
+  // Phase 3.5, Task 8: the two fields `WaitingRoom` renders from, carried through
+  // `home.draftSchedule` at zero extra query cost — one extra column on the SAME `drafts` select
+  // this function already ran, and `teamCards.length`, already computed for `terms`.
+  it("carries the draft's start trigger and current fill count through to home.draftSchedule", async () => {
+    const created = await createDefaultLeague("u1");
+    await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
+    await db.update(drafts).set({ startTrigger: "when_full" }).where(eq(drafts.leagueId, created.leagueId));
+
+    const home = await leagueHome(db, created.leagueId, "u1");
+    expect(home?.draftSchedule).toMatchObject({ startTrigger: "when_full", filledTeams: 2 });
+  });
+
   // The terms are assembled from rows `leagueHome` already holds — the league, its scoring
   // settings and its teams — not fetched a second time the way a naive "reuse `invitePreview`"
   // implementation would.

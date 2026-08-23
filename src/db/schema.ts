@@ -153,15 +153,18 @@ export const leagues = pgTable(
     /**
      * PARTIAL, on purpose. `is_public_matchmade` is false for the overwhelming majority of
      * leagues (a league is private unless a commissioner opts in), and the only query that
-     * reads this column reads `= true` and then orders by `created_at`. A partial index on
-     * `created_at` over just those rows is therefore the smallest index that serves the
-     * `WHERE is_public_matchmade` filter without a sequential scan of `leagues`.
+     * reads this column reads `= true`. A partial index on `created_at` over just those rows is
+     * therefore the smallest index that serves the `WHERE is_public_matchmade` filter without a
+     * sequential scan of `leagues`.
      *
-     * It does NOT let the browse `LIMIT` stop early on its own: `browseQuery` groups by league
-     * (for the fill-count `HAVING`) before it orders, and the measured plan is
+     * It does NOT let the browse `LIMIT` stop early on its own, and it never has: `browseQuery`
+     * groups by league (for the fill-count `HAVING`) before it orders, and the measured plan is
      * `Limit -> Sort (top-N heapsort) -> HashAggregate -> ...` — the `HashAggregate` destroys
-     * whatever order the index scan produced, so `created_at` is re-sorted afterward regardless.
-     * The index's payoff is entirely the filter, verified in `src/db/index-plans.test.ts`.
+     * whatever order the index scan produced, so the ORDER BY re-sorts afterward regardless of
+     * what it sorts by. Phase 3.5, Task 8, Step 4 changed that sort key from `created_at` alone
+     * to seats-remaining-ASC-then-`created_at`-ASC (§4.1's liquidity doctrine: fill leagues, don't
+     * just list them oldest-first) and this index's payoff is UNCHANGED by that — it was always
+     * entirely the filter, never the order, verified in `src/db/index-plans.test.ts`.
      *
      * There is deliberately NO index on `commissioner_user_id`: every read of it fetches the
      * league by primary key and compares in application code (`src/lib/leagues/membership.ts`,

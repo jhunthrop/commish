@@ -28,6 +28,11 @@ const first = (value: string | readonly string[] | undefined): string | null =>
  * inside `PublicLeagueList`'s empty state: a commissioner arriving to recruit for their own
  * group is a real visitor to this page, and results matching their filters should not be the
  * only way they find their way out of browsing someone else's leagues.
+ *
+ * Phase 3.5, Task 8: `listPublicLeagues` now orders by seats-remaining first (Step 4) and every
+ * `PublicLeagueSummary` carries `startTrigger` (Step 3, `PublicLeagueList`'s own card reads it) —
+ * both land here for free, since this page already renders whatever `listPublicLeagues` answers
+ * with, unfiltered by field.
  */
 export default async function BrowsePage({ searchParams }: PageProps) {
   const params = await searchParams;

@@ -62,6 +62,8 @@ interface DraftRow {
   readonly isPublicMatchmade: boolean;
   /** Task 6: how many draft slots this league has — the ranking ceiling. */
   readonly teamCount: number;
+  /** Phase 3.5, Task 8: which of the two ways this draft's `kickoffAt` comes to be set. */
+  readonly startTrigger: "scheduled" | "when_full";
 }
 
 /** One league's draft row, joined to the one fact about its league every caller here needs:
@@ -75,6 +77,7 @@ async function draftRowForLeague(db: Db, leagueId: string): Promise<DraftRow | u
       commissionerUserId: leagues.commissionerUserId,
       isPublicMatchmade: leagues.isPublicMatchmade,
       teamCount: leagues.teamCount,
+      startTrigger: drafts.startTrigger,
     })
     .from(drafts)
     .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
@@ -127,27 +130,33 @@ export async function slotPreferenceViewFor(
 
 /**
  * What every league member reads: the chosen time, the draft's state, and whether the platform
- * has a fallback (Task 7) — plus, Task 6, the caller's OWN slot ranking and its result. Null for
- * a league that doesn't exist — the route answers 404, the same shape every other league read in
- * this service uses for a missing league.
+ * has a fallback (Task 7) — plus, Task 6, the caller's OWN slot ranking and its result, and,
+ * Task 8, the trigger and the fill count `WaitingRoom` renders from. Null for a league that
+ * doesn't exist — the route answers 404, the same shape every other league read in this service
+ * uses for a missing league.
+ *
+ * ONE read of `teams`, not two: the caller's own team and the league's whole fill count both come
+ * off the SAME `{ id, userId }` select, the same "read once, derive twice" shape `leagueHome`
+ * (`./read`) uses for its own `teamRows` — a second, count-only query here would cost a round
+ * trip this function has never paid.
  */
 export async function draftScheduleView(db: Db, leagueId: string, userId: string): Promise<DraftScheduleBody | null> {
   const row = await draftRowForLeague(db, leagueId);
   if (row === undefined) return null;
-  const [teamRow] = await db
-    .select({ id: teams.id })
-    .from(teams)
-    .where(and(eq(teams.leagueId, leagueId), eq(teams.userId, userId)));
+  const teamRows = await db.select({ id: teams.id, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
+  const myTeam = teamRows.find((team) => team.userId === userId);
   return {
     draftId: row.draftId,
     leagueId,
     status: row.status,
     kickoffAt: row.kickoffAt.toISOString(),
     isPublicMatchmade: row.isPublicMatchmade,
+    startTrigger: row.startTrigger,
+    filledTeams: teamRows.length,
     slotPreference: await slotPreferenceViewFor(db, {
       draftId: row.draftId,
       status: row.status,
-      teamId: teamRow?.id ?? null,
+      teamId: myTeam?.id ?? null,
       slotCount: row.teamCount,
     }),
   };

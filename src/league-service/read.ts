@@ -143,7 +143,10 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
 
   const matchupRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
   const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
-  const [draft] = await db.select({ id: drafts.id, status: drafts.status, kickoffAt: drafts.kickoffAt }).from(drafts).where(eq(drafts.leagueId, leagueId));
+  const [draft] = await db
+    .select({ id: drafts.id, status: drafts.status, kickoffAt: drafts.kickoffAt, startTrigger: drafts.startTrigger })
+    .from(drafts)
+    .where(eq(drafts.leagueId, leagueId));
   // `leagueTerms`'s one input this function did not already hold — every other field it needs
   // (`league`'s own columns, `teamRows`/`teamCards` for filled count and the commissioner's
   // name) rides rows this function reads anyway. Falls back to `PPR_SCORING` for the same
@@ -210,6 +213,13 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
           status: draft.status,
           kickoffAt: draft.kickoffAt.toISOString(),
           isPublicMatchmade: league.isPublicMatchmade,
+          // Phase 3.5, Task 8. `startTrigger` rides the SAME `draft` row this function already
+          // selected above (one extra column, zero extra queries); `filledTeams` is `teamCards
+          // .length`, already computed for `terms` a few lines up — `LeagueHome` reads both to
+          // decide between `WaitingRoom` and `DraftSchedulePanel`, and `WaitingRoom`'s own fill
+          // line.
+          startTrigger: draft.startTrigger,
+          filledTeams: teamCards.length,
           // Task 6: NFFC's Kentucky Derby System. Shared with `draftScheduleView`
           // (`./draft-schedule`, the route's own read) so this page's initial render and a
           // later refetch can never compute the caller's own ranking/result differently.

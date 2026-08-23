@@ -16,6 +16,7 @@ import { ModerationSummary } from "./moderation-summary";
 import { SlotPreferencePanel } from "./slot-preference-panel";
 import { StandingsTable } from "./standings-table";
 import { TradeInboxLink } from "./trade-inbox-link";
+import { WaitingRoom } from "./waiting-room";
 
 /**
  * The league's home screen. Deliberately NOT a client component: it composes, it does not
@@ -52,8 +53,14 @@ export function LeagueHome({
           panel below uses — and the panel reaches `fetchJson` only for its own writes (a
           reschedule or a start), never to read its initial state. Renders for every draft
           state, including `complete` — unlike the static card this replaced, which rendered
-          nothing once a league had drafted. */}
-      {home.draftSchedule === null ? null : (
+          nothing once a league had drafted.
+
+          Task 8: `WaitingRoom` renders instead for a `'when_full'` draft — the two never render
+          at once, keyed on `home.draftSchedule.startTrigger`. `DraftSchedulePanel` keeps the
+          `'scheduled'`-trigger case exactly as it was. */}
+      {home.draftSchedule === null ? null : home.draftSchedule.startTrigger === "when_full" ? (
+        <WaitingRoom league={{ ...home.draftSchedule, teamCount: home.teamCount }} isCommissioner={home.isCommissioner} />
+      ) : (
         <DraftSchedulePanel leagueId={home.leagueId} isCommissioner={home.isCommissioner} initialSchedule={home.draftSchedule} />
       )}
 
@@ -135,7 +142,13 @@ export function LeagueHome({
 
       <LeagueMembersPanel teams={home.teams} teamCount={home.teamCount} commissionerUserId={home.commissionerUserId} myTeamId={home.myTeamId} />
 
-      {home.isCommissioner ? <InvitePanel leagueId={home.leagueId} /> : null}
+      {/* `id="invite-managers"`: `WaitingRoom`'s own "Invite someone" link (Task 8, a `when_full`
+          league's filling state) points here — the one real invite surface a commissioner has. */}
+      {home.isCommissioner ? (
+        <div id="invite-managers">
+          <InvitePanel leagueId={home.leagueId} />
+        </div>
+      ) : null}
 
       {/* Task 8: the commissioner's own window onto platform moderation in their league — a
           member with extra buttons, not an operator, so this sits behind the identical

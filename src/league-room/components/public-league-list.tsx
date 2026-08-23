@@ -156,7 +156,11 @@ export function PublicLeagueList({
                 </p>
                 <p className="inline-flex items-center gap-1 text-sm text-text-muted">
                   <Icon name="clock" size={16} />
-                  {`Drafts ${league.draftAt}`}
+                  {/* Task 8 (Phase 3.5): a `when_full` league's stored kickoff is a placeholder
+                      until the moment it is not (`PublicLeagueSummary.startTrigger`'s own
+                      docblock) — this renders either the draft time or this sentence, never
+                      both, and never that placeholder as though somebody chose it. */}
+                  {league.startTrigger === "when_full" ? "Starts as soon as it fills" : `Drafts ${league.draftAt}`}
                 </p>
                 <p className="inline-flex items-center gap-1 text-sm text-text-muted">
                   <Icon name={COMPOSITION_ICON[compositionCategory]} size={16} />

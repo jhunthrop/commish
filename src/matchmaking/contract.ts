@@ -48,6 +48,15 @@ import type { ParticipationTier } from "@/participation/tier";
  * that a standard league's teams never do, and that difference belongs on the card, not
  * discovered only after joining.
  *
+ * `startTrigger` (Phase 3.5, Task 8) is the twelfth field. A `when_full` league's `draftAt` is
+ * computed from a stored `kickoffAt` that is a PLACEHOLDER, not a chosen time (`browseQuery`'s
+ * own `WHERE drafts.status = 'scheduled'` plus its `HAVING count(teams.id) < teamCount` mean any
+ * `when_full` league browse ever returns is still open — `fireWhenFullInTx` only moves that
+ * placeholder once the league is full, which is exactly the moment it stops being joinable and
+ * so stops being browsable at all). The card reads this field to render "Starts as soon as it
+ * fills" instead of `draftAt`, never both, and never that placeholder date as though somebody
+ * chose it.
+ *
  * A stranger gets what they need to CHOOSE a league and nothing about the people already in it.
  */
 export interface PublicLeagueSummary {
@@ -68,6 +77,9 @@ export interface PublicLeagueSummary {
   readonly draftAt: string;
   /** Whether this league plays a median game (Task 2) — see this interface's own docblock. */
   readonly medianGame: boolean;
+  /** Which of the two ways this draft's kickoff comes to be set (Task 8) — see this interface's
+   *  own docblock for why the card needs this to decide what `draftAt` means. */
+  readonly startTrigger: "scheduled" | "when_full";
 }
 
 /** A normalized browse filter: every field is a concrete value or the "any" sentinel. */

@@ -89,6 +89,22 @@ describe("draftScheduleView", () => {
     expect(await draftScheduleView(db, "nope", "whoever")).toBeNull();
   });
 
+  // Phase 3.5, Task 8: the two new fields `WaitingRoom` renders from.
+  it("carries the start trigger and the current fill count", async () => {
+    const { leagueId, commissioner } = await seedLeague();
+    const view = await draftScheduleView(db, leagueId, commissioner);
+    expect(view).toMatchObject({ startTrigger: "scheduled", filledTeams: 1 });
+  });
+
+  it("reports when_full and the fill count growing as more teams join", async () => {
+    const { leagueId, commissioner } = await seedLeague({ startTrigger: "when_full", isPublicMatchmade: true });
+    await db.insert(users).values({ id: "joiner", email: "joiner@test.local", displayName: "Joiner" }).onConflictDoNothing();
+    await db.insert(teams).values({ id: "extra_team", leagueId, userId: "joiner", name: "Joiner's Team" });
+
+    const view = await draftScheduleView(db, leagueId, commissioner);
+    expect(view).toMatchObject({ startTrigger: "when_full", filledTeams: 2 });
+  });
+
   // Task 6, Phase 3.5: NFFC's Kentucky Derby System.
   describe("slotPreference", () => {
     it("is null for a caller with no team in this league", async () => {

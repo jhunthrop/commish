@@ -69,6 +69,38 @@ describe("hot read paths use indexes", () => {
   });
 
   /**
+   * PHASE 3.5, TASK 8, STEP 4. `browseQuery` used to order by `created_at` alone; it now orders
+   * by seats-remaining ASC first, `created_at` ASC as the tiebreaker — the task's own cost claim,
+   * measured rather than asserted: the plan is `Limit -> Sort -> HashAggregate -> ...` either
+   * way (`leagues.ts`'s `leagues_public_browse_idx` docblock), so the sort runs AFTER the
+   * aggregation regardless of what it sorts by, and changing the sort key costs nothing the
+   * unsorted plan wasn't already paying.
+   *
+   * The `"Sort Key"` assertion is the mutation proof: `nodeTypes` alone can only see THAT a Sort
+   * node exists, not WHAT it sorts by, so a regression back to a bare `asc(leagues.createdAt)`
+   * would leave every OTHER assertion in this file green while silently undoing Step 4. This one
+   * reddens on exactly that mutation.
+   */
+  it("plans the seats-remaining ordering as a Sort after the HashAggregate, and still uses leagues_public_browse_idx", async () => {
+    const plan = await explainPlan(db, browseQuery(db, EMPTY_BROWSE_FILTER));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
+    expect(indexScanNode(plan, "leagues_public_browse_idx")).toBeDefined();
+
+    const outerSort = findNode(plan, (node) => node["Node Type"] === "Sort" && (node["Sort Key"]?.length ?? 0) >= 2);
+    expect(outerSort).toBeDefined();
+    expect(outerSort?.["Sort Key"]?.[0]).toContain("team_count");
+    expect(outerSort?.["Sort Key"]?.[0]).toContain("count(teams.id)");
+    expect(outerSort?.["Sort Key"]?.[1]).toBe("leagues.created_at");
+
+    // The HashAggregate (or, at a corpus small enough for a Sorted strategy, an Aggregate
+    // fed by its own Sort) sits BELOW the outer Sort in the tree — i.e. runs first — which is
+    // the property that makes the sort key free to change at all.
+    const types = nodeTypes(plan);
+    expect(types.indexOf("Limit")).toBeLessThan(types.indexOf("Sort"));
+    expect(types.some((type) => type === "HashAggregate" || type === "Aggregate")).toBe(true);
+  });
+
+  /**
    * A participation-narrowed browse (the `HAVING` predicate built from the SAME composition
    * join) is the query that changed shape the most, so it gets its own measurement rather than
    * inheriting the unnarrowed case's proof by assumption.

@@ -4,13 +4,13 @@ import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { Avatar, Badge, EYEBROW, InfoTip } from "@/components/ui";
+import { Countdown, useCountdown } from "@/components/ui/countdown";
 import type { TermKey } from "@/help/glossary";
 import type { HelpLevel } from "@/identity/preferences";
 import { formatClockLength, formatPausedUntil, formatTightening } from "../state/format";
 import { playerName, teamName, teamsById } from "../lib/lookups";
 import type { ConnectionStatus } from "../hooks/use-draft-room";
 import { ConnectionBanner } from "./connection-banner";
-import { Countdown, useCountdown } from "./countdown";
 
 export type RoomRailVariant = "room" | "tv";
 /** The four states the whole room morphs between. The rail is where the morph is loudest. */

@@ -63,11 +63,25 @@ export interface DraftScheduleBody {
   readonly draftId: string;
   readonly leagueId: string;
   readonly status: DraftStatus;
-  /** ISO instant. */
+  /** ISO instant. For a `'when_full'` draft that hasn't filled yet, this is a PLACEHOLDER
+   *  (`createLeague`'s own default) rather than a chosen time — `startTrigger` is what a reader
+   *  checks before ever displaying it as a scheduled kickoff (`WaitingRoom`'s own reasoning). */
   readonly kickoffAt: string;
   /** Whether the platform will start this draft on its own if nobody presses the button
    *  (Task 7) — read by the panel to decide whether to say so. */
   readonly isPublicMatchmade: boolean;
+  /**
+   * Phase 3.5, Task 8: which of the two ways this draft's `kickoffAt` comes to be set — the
+   * SAME union `setDraftKickoff`'s own refusal already keys on (`KICKOFF_REFUSALS.whenFull`).
+   * `LeagueHome` reads this to decide which of `WaitingRoom`/`DraftSchedulePanel` renders: the
+   * two never render at once.
+   */
+  readonly startTrigger: "scheduled" | "when_full";
+  /** How many seats are taken right now — the same `count(teams.id)` `filledTeams` means
+   *  everywhere else in this codebase (`LeagueSummary`, `PublicLeagueSummary`). `WaitingRoom`'s
+   *  own fill line reads this; `DraftSchedulePanel` (the `'scheduled'`-trigger case) has no use
+   *  for it and does not render it. */
+  readonly filledTeams: number;
   /** `null` only for a caller with no team in this league (a commissioner without one of
    *  their own) — a ranking is scoped to a team, so there is nothing to show them. */
   readonly slotPreference: SlotPreferenceView | null;

@@ -1,25 +1,11 @@
 import type { Tightening } from "@/draft-engine";
 import type { RosterSlotConfig } from "@/domain/roster";
-import { MS_PER_SECOND, MINUTES_PER_HOUR, SECONDS_PER_HOUR, SECONDS_PER_MINUTE, formatClockLength, plural } from "@/domain/duration";
-import { DRAFT_ROOM_CONFIG } from "./config";
+import { UI_CONFIG } from "@/components/ui/config";
+import { MINUTES_PER_HOUR, MS_PER_SECOND, formatClockLength, plural } from "@/domain/duration";
 
 export { formatClockLength };
 
-const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE;
-const MS_PER_HOUR = MS_PER_MINUTE * MINUTES_PER_HOUR;
-
-function pad(value: number): string {
-  return value.toString().padStart(2, "0");
-}
-
-/** "0:09", "2:05", "1:04:09". Clamped at zero — a passed deadline reads 0:00, never negative. */
-export function formatCountdown(msRemaining: number): string {
-  const total = Math.max(0, Math.ceil(msRemaining / MS_PER_SECOND));
-  const hours = Math.floor(total / SECONDS_PER_HOUR);
-  const minutes = Math.floor((total % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
-  const seconds = total % SECONDS_PER_MINUTE;
-  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
-}
+const MS_PER_MINUTE = 60_000;
 
 /** A coarse distance: "2h 14m", "14m", "under a minute". */
 export function formatGap(ms: number): string {
@@ -28,20 +14,6 @@ export function formatGap(ms: number): string {
   const hours = Math.floor(totalMinutes / MINUTES_PER_HOUR);
   const minutes = totalMinutes % MINUTES_PER_HOUR;
   return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-}
-
-/**
- * A coarse, rarely-changing summary of time remaining — "About 8 hours left", "About 2 minutes
- * left", "Under a minute left" — for a screen-reader `aria-live` region paired with
- * `Countdown`'s (`aria-hidden`) ticking digits. Rounds to the nearest whole minute or hour, so
- * it updates on a boundary crossing rather than every second; the boundaries themselves are
- * `DRAFT_ROOM_CONFIG.coarseRemainingMinuteMs` / `coarseRemainingHourMs`, not inline literals.
- */
-export function formatCoarseRemaining(msRemaining: number): string {
-  const remaining = Math.max(0, msRemaining);
-  if (remaining < DRAFT_ROOM_CONFIG.coarseRemainingMinuteMs) return "Under a minute left";
-  if (remaining < DRAFT_ROOM_CONFIG.coarseRemainingHourMs) return `About ${plural(Math.round(remaining / MS_PER_MINUTE), "minute")} left`;
-  return `About ${plural(Math.round(remaining / MS_PER_HOUR), "hour")} left`;
 }
 
 /**
@@ -98,7 +70,9 @@ export function rosterSpots(slotConfig: readonly RosterSlotConfig[]): number {
  * Null when there is nothing to say: a spectator with no team, or a team the lookahead does
  * not reach (a long rotation, or a draft that isn't running). A sub-minute wait reads "any
  * moment" rather than a duration rounded away to nothing — against the same one-minute floor
- * `formatCoarseRemaining` uses, from the same config value rather than a second literal.
+ * `@/components/ui/countdown`'s own `formatCoarseRemaining` uses, from the SAME
+ * `UI_CONFIG.countdown.coarseRemainingMinuteMs` rather than a second literal, so the two
+ * "under a minute"/"any moment" cutoffs can never drift apart.
  *
  * `pausedUntil` is `DraftClockView.pausedUntil` (Task 4's overnight freeze). The flat
  * `picksAway * clockSeconds` estimate below already assumes every intervening turn runs its
@@ -122,6 +96,6 @@ export function formatYourTurn(
   if (clockSeconds === null) return `You're up in ${picks}.`;
   if (pausedUntil !== null) return `You're up in ${picks}, once picks resume.`;
   const waitMs = picksAway * clockSeconds * MS_PER_SECOND;
-  const wait = waitMs < DRAFT_ROOM_CONFIG.coarseRemainingMinuteMs ? "any moment" : `~${formatGap(waitMs)}`;
+  const wait = waitMs < UI_CONFIG.countdown.coarseRemainingMinuteMs ? "any moment" : `~${formatGap(waitMs)}`;
   return `You're up in ${picks} (${wait}).`;
 }

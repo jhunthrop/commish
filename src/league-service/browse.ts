@@ -30,6 +30,7 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "compositionCategory",
   "draftAt",
   "medianGame",
+  "startTrigger",
 ];
 
 /** The league's own seats, aliased a second time so a `LATERAL` join can ask "how many of THIS
@@ -178,6 +179,7 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
       // cardinality (still exactly one draft row per league), purely a functional-dependency
       // proof for the planner.
       kickoffAt: drafts.kickoffAt,
+      startTrigger: drafts.startTrigger,
       newcomers: newcomerSeats,
       veterans: veteranSeats,
     })
@@ -188,7 +190,17 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
     .where(and(eq(leagues.isPublicMatchmade, true), eq(drafts.status, "scheduled"), ...narrowingFor(filter)))
     .groupBy(leagues.id, drafts.id)
     .having(and(sql`count(${teams.id}) < ${leagues.teamCount}`, participationHaving))
-    .orderBy(asc(leagues.createdAt))
+    // PHASE 3.5, TASK 8, STEP 4. Seats remaining ASC, then `created_at` ASC as the tiebreaker
+    // (the ordering this replaced, kept second so ties still resolve oldest-first). §4.1's
+    // liquidity doctrine is concentration — the lobby's job is to FILL leagues, and a nearly-full
+    // one a single join would complete is worth surfacing ahead of a freshly created one nobody
+    // has joined yet. `count(${teams.id})` is the SAME aggregate `filledTeams` already computes
+    // two lines up; this is a second reference to it, not a second query. Cost is measured, not
+    // asserted: this docblock's own claim — the sort runs AFTER the `GROUP BY` either way, so
+    // changing the sort KEY costs nothing the unsorted plan wasn't already paying — is pinned by
+    // `src/db/index-plans.test.ts`'s "plans the seats-remaining ordering" assertion, built from
+    // the SAME 5,000-league realistic corpus every other browse plan assertion uses.
+    .orderBy(sql`(${leagues.teamCount} - count(${teams.id})) asc`, asc(leagues.createdAt))
     .limit(MATCHMAKING_CONFIG.maxResults);
 }
 
