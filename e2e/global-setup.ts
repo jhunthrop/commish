@@ -5,7 +5,7 @@ import { chromium, type FullConfig } from "@playwright/test";
 import { eq, sql } from "drizzle-orm";
 import { assembleAdvisorContext } from "../src/ai-advisor/context";
 import { createDb, type Db } from "../src/db/client";
-import { drafts, leagueInvites, leagues, matchups, rosterSlots, scoringSettings, statWeeks, teams, users } from "../src/db/schema";
+import { drafts, leagues, matchups, rosterSlots, scoringSettings, statWeeks, teams, users } from "../src/db/schema";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotType } from "../src/domain/roster";
 import { PPR_SCORING } from "../src/domain/scoring";
 import { assignSlot, snakeTeamForPick, totalRosterSlots } from "../src/draft-engine";
@@ -639,57 +639,69 @@ function cryptoRandom(): number {
  * called that route") to be what starts it, and a public league whose kickoff this file set
  * anywhere in the past would race that press against Task 7's own auto-start ticker running
  * inside the dev server this suite drives.
+ *
+ * FULL WIPE-AND-RECREATE ON EVERY RUN (interstitial repair, Phase 3.5 Task 1.5). The original
+ * shape here re-inserted onto the SAME row every run, touching `kickoffAt` but deliberately never
+ * `status`, on the theory that once journey 2 started this draft it would stay `in_progress`
+ * forever and every later run could just re-verify "The draft is live". That theory held for
+ * exactly as long as nothing else in the product ever advanced a started draft — which is not
+ * true: a started, two-manager snake draft is picked to completion by the same autopick/nudge
+ * machinery every other draft in this database gets (`@/draft-service`), and once `complete` a
+ * league with real rosters is exactly what `stats:ingest` scores forward, week over week, for as
+ * long as the dev server keeps running against this long-lived database. Days later this "always
+ * `in_progress`" league had quietly become a fully-simulated, fourteen-week-complete SEASON — the
+ * `DraftSchedulePanel` heading was never `in_progress`'s "The draft is live", it was `complete`'s
+ * "Draft complete", and the "already started, stays started" branch this function's old
+ * docblock justified had nothing true left to assert. This is the same class of hazard a
+ * long-lived dev database always poses to a suite that reuses fixture identities across runs
+ * (`MANAGER_A_EMAIL`'s own docblock above), now with a TIME dimension: state that was correct
+ * when written keeps drifting the longer the volume survives, not just across a single re-run.
+ *
+ * The durable fix is not a better "is it still where I left it" check — there is no state this
+ * draft could be caught in that a future tick can't move past before the next suite run reads it.
+ * It is to never depend on a PRIOR run's mutation surviving at all: every setup deletes this
+ * league by id (cascading through `teams`, `scoring_settings`, `league_invites`, `drafts` and,
+ * through `drafts`, `draft_actions`/`draft_nudges`/`draft_picks` — every table this journey or the
+ * autopick/scoring machinery could have touched) and rebuilds it from nothing, scheduled and
+ * un-started, every single run. `e2e/enforcement.spec.ts`'s own journey 2 is simplified to match:
+ * it no longer branches on "did a prior run already start this," because after this reset there
+ * is no such prior run to detect.
  */
 async function ensureDraftScheduleLeague(db: Db, managerAUserId: string, managerBUserId: string): Promise<void> {
   const teamIds: readonly string[] = [E2E_DRAFT_SCHEDULE_TEAM_A_ID, E2E_DRAFT_SCHEDULE_TEAM_B_ID];
   const owners: readonly string[] = [managerAUserId, managerBUserId];
 
-  await db
-    .insert(leagues)
-    .values({
-      id: E2E_DRAFT_SCHEDULE_LEAGUE_ID,
-      name: "E2E Draft Schedule League",
-      format: "snake",
-      teamCount: teamIds.length,
-      isPublicMatchmade: false,
-      commissionerUserId: managerAUserId,
-      rosterSlots: [...STANDARD_ROSTER_SLOTS],
-    })
-    .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: managerAUserId } });
+  // Cascades away every trace of a previous run's draft (picks, nudges, the action log, any
+  // simulated season) along with the league row itself — see the docblock above.
+  await db.delete(leagues).where(eq(leagues.id, E2E_DRAFT_SCHEDULE_LEAGUE_ID));
 
-  await db.insert(scoringSettings).values({ leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, ...PPR_SCORING }).onConflictDoNothing({ target: scoringSettings.leagueId });
+  await db.insert(leagues).values({
+    id: E2E_DRAFT_SCHEDULE_LEAGUE_ID,
+    name: "E2E Draft Schedule League",
+    format: "snake",
+    teamCount: teamIds.length,
+    isPublicMatchmade: false,
+    commissionerUserId: managerAUserId,
+    rosterSlots: [...STANDARD_ROSTER_SLOTS],
+  });
 
-  await db
-    .insert(teams)
-    .values(teamIds.map((id, i) => ({ id, leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, userId: owners[i], name: `E2E Draft Schedule Team ${i + 1}` })))
-    .onConflictDoUpdate({ target: teams.id, set: { userId: sql`excluded.user_id` } });
+  await db.insert(scoringSettings).values({ leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, ...PPR_SCORING });
 
-  // A re-run must never re-schedule a draft the previous run already started — a bare re-insert
-  // with `onConflictDoUpdate` on `kickoffAt` alone leaves `status` untouched either way, the same
-  // "never touch status on a re-run" discipline `seedPublicLeagues`/`seed-enforcement.ts`'s own
-  // auto-start league keep.
+  await db.insert(teams).values(teamIds.map((id, i) => ({ id, leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, userId: owners[i], name: `E2E Draft Schedule Team ${i + 1}` })));
+
   const kickoffAt = new Date(Date.now() + 2 * 60 * 60 * 1000);
-  await db
-    .insert(drafts)
-    .values({ id: E2E_DRAFT_SCHEDULE_DRAFT_ID, leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, format: "snake", status: "scheduled", kickoffAt, auctionBudget: null })
-    .onConflictDoUpdate({ target: drafts.id, set: { kickoffAt } });
+  await db.insert(drafts).values({ id: E2E_DRAFT_SCHEDULE_DRAFT_ID, leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, format: "snake", status: "scheduled", kickoffAt, auctionBudget: null });
 
-  const [existingInvite] = await db.select({ code: leagueInvites.code }).from(leagueInvites).where(eq(leagueInvites.leagueId, E2E_DRAFT_SCHEDULE_LEAGUE_ID)).limit(1);
-  const code =
-    existingInvite?.code ??
-    (await (async () => {
-      const result = await createInvite(
-        { db, clock: { now: () => new Date().toISOString() }, random: cryptoRandom },
-        { leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, createdByUserId: managerAUserId },
-      );
-      if (!result.ok) throw new Error(`[e2e] ensureDraftScheduleLeague: couldn't mint an invite: ${result.reason}`);
-      return result.code;
-    })());
+  const result = await createInvite(
+    { db, clock: { now: () => new Date().toISOString() }, random: cryptoRandom },
+    { leagueId: E2E_DRAFT_SCHEDULE_LEAGUE_ID, createdByUserId: managerAUserId },
+  );
+  if (!result.ok) throw new Error(`[e2e] ensureDraftScheduleLeague: couldn't mint an invite: ${result.reason}`);
 
-  const invite: DraftScheduleInvite = { code };
+  const invite: DraftScheduleInvite = { code: result.code };
   mkdirSync(AUTH_DIR, { recursive: true });
   writeFileSync(E2E_DRAFT_SCHEDULE_INVITE_STATE, JSON.stringify(invite, null, 2), { mode: 0o600 });
-  console.log(`[e2e] draft-schedule league ready, invite code ${code}`);
+  console.log(`[e2e] draft-schedule league ready, invite code ${result.code}`);
 }
 
 /**

@@ -146,51 +146,42 @@ test("a commissioner schedules and starts a draft; a signed-out visitor reads th
   const anonPage = await anonContext.newPage();
 
   try {
+    // `ensureDraftScheduleLeague` (`global-setup.ts`) wipes and recreates this league from
+    // nothing on every setup run — scheduled, never started — so there is no "did a prior run
+    // already walk this journey" branch to detect here any more. Interstitial repair, Phase 3.5
+    // Task 1.5: the old two-branch shape assumed a started draft stayed `in_progress` forever,
+    // which stopped being true once the same autopick/nudge machinery every other draft gets
+    // carried this one all the way to `complete` and stats:ingest scored a season on top of it,
+    // between suite runs, on a long-lived dev database — see that function's own docblock.
     await pageA.goto(`/app/leagues/${E2E_DRAFT_SCHEDULE_LEAGUE_ID}`);
     await expect(pageA.getByRole("heading", { name: "E2E Draft Schedule League" })).toBeVisible();
 
-    const editButton = pageA.getByRole("button", { name: "Edit time" });
-    const alreadyStarted = (await editButton.count()) === 0;
+    // --- The commissioner sets a real draft time, five days out (past the "starting soon"
+    // banner, which this journey has no need to also prove) ----------------------------------
+    const kickoff = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    const pad = (n: number): string => String(n).padStart(2, "0");
+    const localValue = `${kickoff.getFullYear()}-${pad(kickoff.getMonth() + 1)}-${pad(kickoff.getDate())}T${pad(kickoff.getHours())}:${pad(kickoff.getMinutes())}`;
 
-    if (!alreadyStarted) {
-      // --- The commissioner sets a real draft time, five days out (past the "starting soon"
-      // banner, which this journey has no need to also prove) ----------------------------------
-      const kickoff = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-      const pad = (n: number): string => String(n).padStart(2, "0");
-      const localValue = `${kickoff.getFullYear()}-${pad(kickoff.getMonth() + 1)}-${pad(kickoff.getDate())}T${pad(kickoff.getHours())}:${pad(kickoff.getMinutes())}`;
+    await pageA.getByRole("button", { name: "Edit time" }).click();
+    await pageA.getByLabel("Draft time").fill(localValue);
+    await pageA.getByRole("button", { name: "Save time" }).click();
+    await expect(pageA.getByRole("heading", { name: "Draft scheduled" })).toBeVisible();
 
-      await editButton.click();
-      await pageA.getByLabel("Draft time").fill(localValue);
-      await pageA.getByRole("button", { name: "Save time" }).click();
-      await expect(pageA.getByRole("heading", { name: "Draft scheduled" })).toBeVisible();
+    // --- A signed-out visitor reads the NEW time on the invite preview — never sees it from
+    // the commissioner's own session, and never through a dev auth bypass ------------------
+    const expectedAbsolute = formatDraftTime(kickoff.toISOString(), new Date().toISOString()).split(" (")[0]!;
+    await anonPage.goto(`/app/join/${invite.code}`);
+    await expect(anonPage.getByRole("heading", { name: "E2E Draft Schedule League" })).toBeVisible();
+    await expect(anonPage.getByText(expectedAbsolute)).toBeVisible();
+    // The one page under `/app` a signed-out visitor reaches — proven structurally, not just
+    // by the page rendering: the sign-in prompt is what a stranger sees instead of a join
+    // button that would silently assume an identity nobody supplied.
+    await expect(anonPage.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
 
-      // --- A signed-out visitor reads the NEW time on the invite preview — never sees it from
-      // the commissioner's own session, and never through a dev auth bypass ------------------
-      const expectedAbsolute = formatDraftTime(kickoff.toISOString(), new Date().toISOString()).split(" (")[0]!;
-      await anonPage.goto(`/app/join/${invite.code}`);
-      await expect(anonPage.getByRole("heading", { name: "E2E Draft Schedule League" })).toBeVisible();
-      await expect(anonPage.getByText(expectedAbsolute)).toBeVisible();
-      // The one page under `/app` a signed-out visitor reaches — proven structurally, not just
-      // by the page rendering: the sign-in prompt is what a stranger sees instead of a join
-      // button that would silently assume an identity nobody supplied.
-      await expect(anonPage.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
-
-      // --- The commissioner presses Start the draft — the first time any browser in this
-      // product's history has called `POST /api/drafts/[draftId]/start` ------------------------
-      await pageA.getByRole("button", { name: "Start the draft" }).click();
-      await expect(pageA.getByRole("heading", { name: "The draft is live" })).toBeVisible({ timeout: 15_000 });
-    } else {
-      // A prior run of this same spec, against this same long-lived database, already walked
-      // the schedule-and-start half — a draft cannot be un-started, and re-scheduling an
-      // in-progress draft is not a real product action this spec should fake. What is still
-      // real and still worth proving on a rerun: the draft stayed started, and the signed-out
-      // invite preview still resolves a real draft time for it.
-      await expect(pageA.getByRole("heading", { name: "The draft is live" })).toBeVisible();
-      await anonPage.goto(`/app/join/${invite.code}`);
-      await expect(anonPage.getByRole("heading", { name: "E2E Draft Schedule League" })).toBeVisible();
-      await expect(anonPage.getByText("Draft", { exact: true })).toBeVisible();
-      await expect(anonPage.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
-    }
+    // --- The commissioner presses Start the draft — the first time any browser in this
+    // product's history has called `POST /api/drafts/[draftId]/start` ------------------------
+    await pageA.getByRole("button", { name: "Start the draft" }).click();
+    await expect(pageA.getByRole("heading", { name: "The draft is live" })).toBeVisible({ timeout: 15_000 });
   } finally {
     await contextA.close();
     await anonContext.close();
