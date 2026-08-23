@@ -1284,6 +1284,8 @@ The join-flow panel filed the absence as the thing a first-time commissioner lea
 
 `InvitePanel` gains nothing but the retone and the same `SeatMeter` sentence everywhere it counts seats (F17).
 
+- [ ] **Step 3c: Close the density default (P3 review follow-up).** Task 3 shipped `Table.density` defaulting `"comfortable"` with explicit opt-in, because flipping the default then would have silently densified `matchup-panel.tsx` and `budget-table.tsx` before their retone. This task and Task 12 convert those last two `Table` consumers; once both are converged, EITHER flip the default to `"dense"` and drop the now-redundant explicit props, OR record in `docs/decisions/design-v2.md` why comfortable stays the permanent default — one of the two, stated, never left implicit.
+
 - [ ] **Step 4: The lineup editor keeps every behavior it has**
 
 Its select-based slot picker is the sanctioned `PositionBadge` carve-out and stays. Nothing about validation, locking or the week's status changes here.
