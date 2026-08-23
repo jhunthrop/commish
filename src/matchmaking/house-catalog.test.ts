@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { copyViolations } from "@/integrity/copy-rules";
-import { LEAGUE_CONFIG } from "@/league";
+import { LEAGUE_CONFIG } from "@/league/config";
 import {
   HOUSE_CATALOG,
   HOUSE_RUNG_LABEL,

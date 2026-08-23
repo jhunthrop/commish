@@ -2,7 +2,7 @@ import type { DraftFormat } from "@/domain/league";
 import type { RosterShapeName } from "@/domain/roster";
 import type { ScoringPresetName } from "@/domain/scoring";
 import type { ExperienceTier } from "@/domain/user";
-import { LEAGUE_CONFIG } from "@/league";
+import { LEAGUE_CONFIG } from "@/league/config";
 
 /**
  * "View and join like FFPC and Apex": a shelf of canonical leagues with real draft times,
@@ -14,11 +14,16 @@ import { LEAGUE_CONFIG } from "@/league";
  * holds itself to, and for the identical reason: this directory is one of the client
  * boundary's exempt set (`docs/conventions.md`, "Client boundary"), so a room component may
  * value-import `HOUSE_RUNG_LABEL` exactly as `browse-filters.tsx` already value-imports
- * `MATCHMAKING_CONFIG.stakeTiers`. `LEAGUE_CONFIG` (`@/league`) is itself pure data (no
- * Postgres, no `Date.now()`) despite living in a directory the client-boundary lint rule blocks
- * client-ROOM code from importing directly — that rule targets `src/*-room/**`, never this
- * directory, so reading `LEAGUE_CONFIG.defaults` here is legal and is how Task 1's half-PPR
- * canon and its roster-shape default reach the catalog with no second place to restate them.
+ * `MATCHMAKING_CONFIG.stakeTiers`.
+ *
+ * `@/league/config`, NEVER THE `@/league` BARREL (final whole-branch review, F7). The config
+ * module itself is pure data (no Postgres, no `Date.now()`), which is why reading
+ * `LEAGUE_CONFIG.defaults` from a browser-reachable module is legal at all — but this file
+ * value-imported the BARREL, and a barrel is not a module, it is every module behind it: the
+ * schedule generator, the standings and clinch math, the median folds, the lineup rules, the
+ * invite-code generator. All of it followed `HOUSE_RUNG_LABEL` into the client bundle, for one
+ * frozen object. The direct import is the whole fix, and `eslint.config.mjs` now pins it: the
+ * browser-safe exempt directories may reach a `@/league` SUBMODULE and never the barrel.
  */
 
 /** Whether a rung's draft fires at a chosen time or the moment its last seat fills — the same
@@ -60,15 +65,26 @@ export interface HouseRung {
  * The one shared shape every rung spreads. §4.1's concentration doctrine, held to by a test
  * rather than promised in a comment: the rungs differ only in who may sit down and when the
  * draft starts, never in what game gets played, so every joiner is compatible with every open
- * seat on the whole shelf. Read from `LEAGUE_CONFIG.defaults` rather than restated, so Task 1's
- * half-PPR canon and Task 2's median-game toggle reach the catalog with nothing here to
+ * seat on the whole shelf.
+ *
+ * FOUR of the six fields are read from `LEAGUE_CONFIG.defaults` rather than restated, so Task 1's
+ * half-PPR canon and its roster-shape default reach the catalog with nothing here to
  * independently fall out of step with them.
+ *
+ * THE OTHER TWO ARE LITERALS, and this docblock used to claim otherwise (final whole-branch
+ * review, F8): it named Task 2's median-game toggle as one of the values arriving from
+ * `LEAGUE_CONFIG.defaults`, and there is no such field there at all — `medianGame` and
+ * `stakeTier` are decided HERE, by the catalog, for the catalog. `medianGame: false` is the
+ * shelf's own choice (the house rungs play a plain head-to-head week), not a default inherited
+ * from anywhere. Whether `LEAGUE_CONFIG.defaults` should GROW a median-game default is a
+ * separate, parked question; until it does, this comment says what the code does.
  */
 const CANON = {
   format: LEAGUE_CONFIG.defaults.format,
   teamCount: LEAGUE_CONFIG.defaults.teamCount,
   scoringPreset: LEAGUE_CONFIG.defaults.scoringPreset,
   rosterShape: LEAGUE_CONFIG.defaults.rosterShape,
+  /** A literal, decided here — see this object's own docblock. */
   medianGame: false,
   /** Cosmetic only (`MATCHMAKING_CONFIG.stakeDisclosure`) — every rung reads "Free". */
   stakeTier: 0,

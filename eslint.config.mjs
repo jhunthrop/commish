@@ -167,6 +167,44 @@ function aliasOrRelative(moduleWithAlias) {
  * blocks for why a same-glob, same-rule third block would silently replace one of them instead
  * of adding to it.
  */
+/**
+ * The browser-safe exempt set (see the note above `SERVER_ONLY_MODULE_GROUPS`): pure, I/O-free
+ * directories that client room code is allowed to value-import. Named once here because they now
+ * carry a boundary rule of their own, below.
+ */
+const BROWSER_SAFE_MODULE_DIRS = [
+  "src/matchmaking/**/*.{ts,tsx}",
+  "src/chat/**/*.{ts,tsx}",
+  "src/identity/**/*.{ts,tsx}",
+  "src/help/**/*.{ts,tsx}",
+  "src/reviews/**/*.{ts,tsx}",
+  "src/moderation/**/*.{ts,tsx}",
+  "src/trades/**/*.{ts,tsx}",
+  "src/participation/**/*.{ts,tsx}",
+];
+
+/**
+ * A BARREL IS NOT A MODULE (final whole-branch review, F7). `@/league` is on the blocked list
+ * above for client ROOM code, but the browser-safe directories in `BROWSER_SAFE_MODULE_DIRS` are
+ * reached from the browser too — a room component may value-import them — and one of them
+ * (`src/matchmaking/house-catalog.ts`) value-imported `@/league` for a single frozen config
+ * object. `src/league/index.ts` re-exports the schedule generator, the standings and clinch math,
+ * the median folds, the lineup rules and the invite-code generator, so all of it followed into the
+ * client bundle.
+ *
+ * This bans the BARREL SPELLING ONLY: the regex is anchored with `$`, so `@/league/config` (the
+ * pure data module that import actually wanted) stays legal while `@/league` and `../league` do
+ * not. `allowTypeImports` is true because a type import erases and costs the bundle nothing —
+ * the same allowance every other boundary pattern in this file grants.
+ */
+const BROWSER_SAFE_BARREL_PATTERNS = [
+  {
+    regex: "^(?:@/|(?:\\.\\.?/)+)league$",
+    allowTypeImports: true,
+    message: "A browser-safe module must import the specific @/league submodule it needs (e.g. @/league/config), never the @/league barrel, which pulls the whole league rules engine into the client bundle. `import type` is fine.",
+  },
+];
+
 const SRC_ROOT_ESCAPE_PATTERNS = [
   {
     regex: "^(?:\\.\\.?/)+scripts(?:/|$)",
@@ -283,10 +321,43 @@ const eslintConfig = [
     // see the comment there for why a second, separately-scoped block targeting the same rule
     // for those files would silently replace rather than extend it.
     files: ["src/**/*.{ts,tsx}"],
-    ignores: ["src/draft-room/**", "src/league-room/**", "src/chat-room/**", "src/account-room/**", "src/admin-room/**"],
+    ignores: [
+      "src/draft-room/**",
+      "src/league-room/**",
+      "src/chat-room/**",
+      "src/account-room/**",
+      "src/admin-room/**",
+      // The browser-safe directories carry SRC_ROOT_ESCAPE_PATTERNS in their own block below,
+      // merged with the barrel rule — for the same shallow-overwrite reason the five client-room
+      // directories are excluded here rather than covered twice.
+      "src/matchmaking/**",
+      "src/chat/**",
+      "src/identity/**",
+      "src/help/**",
+      "src/reviews/**",
+      "src/moderation/**",
+      "src/trades/**",
+      "src/participation/**",
+    ],
     plugins: { "@typescript-eslint": tseslint },
     rules: {
       "@typescript-eslint/no-restricted-imports": ["error", { patterns: SRC_ROOT_ESCAPE_PATTERNS }],
+    },
+  },
+  {
+    // The browser-safe exempt set's own boundary (final whole-branch review, F7). These
+    // directories are pure and client-reachable, so what they import is what the browser ships —
+    // and `BROWSER_SAFE_BARREL_PATTERNS` is the one rule that catches a barrel import that is
+    // otherwise perfectly legal here. SRC_ROOT_ESCAPE_PATTERNS rides along in the SAME
+    // `patterns` array rather than in a second same-glob block, because flat config merges
+    // same-named rules by shallow overwrite: a separate block would silently replace this one.
+    files: BROWSER_SAFE_MODULE_DIRS,
+    plugins: { "@typescript-eslint": tseslint },
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        { patterns: [...BROWSER_SAFE_BARREL_PATTERNS, ...SRC_ROOT_ESCAPE_PATTERNS] },
+      ],
     },
   },
 ];

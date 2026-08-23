@@ -273,7 +273,7 @@ A source test in `src/design/` walks every `.tsx` under `src/components`, `src/l
 
 ## Task 2: The shell — a rail, a bar, and the whole screen
 
-The founder's "maximize full screen width" is one line of the brief and the largest single change in the plan: fifteen pages currently render their own 896px column. This task builds the frame the mocks are drawn on and moves every page into it.
+The founder's "maximize full screen width" is one line of the brief and the largest single change in the plan: fourteen pages currently render their own 896px column, eleven of them under `/app`. This task builds the frame the mocks are drawn on and moves every page into it.
 
 **Files:**
 - Create: `src/components/app-shell/app-shell.tsx`, `league-rail.tsx`, `shell-data.ts` (+ their tests), `src/app/app/(shell)/layout.tsx` (+ its test)
@@ -1203,13 +1203,34 @@ Crest · league name with record and next opponent · the two scores with the le
 
 **A record is allowed to carry weight** (D5). A streak or a first win is already on the board as a string this product computes (`record`, from `standings.ts`); what this step adds is that the board is permitted to render it at a heavier step of the type scale, and the rule lands in `docs/design-system.md` (Task 14 Step 2) as a **type-scale rule and nothing more**: a record may take one step up the scale and a heavier weight, it may not take a color, a badge, an animation or a second row. That is the whole of it — no new data, no new component, and no celebration on a home screen that a person opens forty times a season.
 
+- [ ] **Step 2b: The pre-draft home, for the manager whose only fact is a future draft (F18c)**
+
+The board is a table of games, and a manager whose leagues have all not drafted yet has no games at all. Today that person gets an empty board with a shelf shouting under it, which is the gauntlet's "somebody else's dashboard" finding in its purest form.
+
+```tsx
+// src/league-room/components/home-board.test.tsx
+it("gives a manager with nothing but a future draft a screen about that draft", () => {
+  renderSurface(<HomeBoard initial={allPreDraft} />, ({ getByTestId, getByText, queryByRole }) => {
+    expect(getByTestId("pre-draft-hero")).toBeInTheDocument();
+    expect(getByText("9 of 12 seated. 3 seats left.")).toBeInTheDocument();
+    expect(queryByRole("table")).toBeNull(); // no board of games that do not exist
+  });
+});
+```
+
+When **every** league on the board is pre-draft, the nearest draft's row is promoted to a hero built entirely from components Task 9 already writes: the `Crest` at `lg`, the `xl` `Countdown` (or the fill `Meter` for a when-full league, on Task 9 Step 2's own branch), the fill `SeatMeter`, and the waiting room's checklist **inlined** rather than linked, so the two or three things this person can actually do are on the screen they landed on. The other pre-draft leagues stay below it as ordinary rows.
+
+**Every element is real data already on the page:** `kickoffAt`, `filledTeams`/`teamCount`, `startTrigger` and `kickoffRolls` come from the same home read the board uses, and the checklist's items are the derived ones Task 9 Step 4 defines. No new query, no new column, and no component that exists only here.
+
 - [ ] **Step 3: The live pill, from the real week**
 
 `SUNDAY · 7 GAMES LIVE` is the top bar's energy and it renders only from the real week state the live-scoring stack already publishes. Off-season, mid-week and pre-kickoff each get their own true sentence, and when nothing is live the pill does not render. A pulsing green pill that says "LIVE" on a Tuesday in July is the definition of a prototype.
 
 - [ ] **Step 4: The open-seats panel, and where it sits**
 
-The house shelf on the home screen is the founder's core-experience ruling made visible, and the gauntlet's finding is that it must not be the loudest thing on a screen belonging to somebody who has not drafted yet. It renders **below** the board always, and for a manager with one league and no completed draft it renders below the fold with a quieter heading. "The house always has a game" ships verbatim; the panel asked to keep it.
+The house shelf on the home screen is the founder's core-experience ruling made visible, and the gauntlet's finding is that it must not be the loudest thing on a screen belonging to somebody who has not drafted yet. It renders **below** the board always, and for a manager with one league and no completed draft it renders below the fold with a quieter heading. "The house always has a game" ships verbatim; the panel asked to keep it. Its seat counts are `SeatMeter`, not a fourth phrasing (F17).
+
+**It does not render at all when `firstRun !== null`** (F18b): `FirstRunPanel`'s own three paths already open with "find an open league", which *is* the shelf, and a manager with zero leagues being shown the shelf twice on one screen is the same offer competing with itself. One offer, in the component that owns first run (the addendum's Task 17).
 
 - [ ] **Step 5: Persona panel — the manager on Sunday**
 
@@ -1224,8 +1245,9 @@ Veteran in eight leagues, casual in one, first-timer with one pending draft, pho
 League home, standings, matchups and activity, moved into the shell and made dense. This is the largest surface area in the plan and the lowest risk, because every one of these surfaces is behavior-complete and only its rendering changes.
 
 **Files:**
-- Modify: `src/league-room/components/league-home.tsx`, `standings-table.tsx`, `matchup-panel.tsx`, `matchup-scoreboard.tsx`, `median-result.tsx`, `lineup-editor.tsx`, `activity-feed.tsx`, `league-terms-panel.tsx`, `trade-inbox.tsx`, `trade-card.tsx`, `week-nav.tsx`, `advisor-panel.tsx`, `moderation-summary.tsx` (+ their tests)
-- Modify: `src/app/app/leagues/[leagueId]/**` and `src/app/app/leagues/page.tsx`
+- Modify: `src/league-room/components/league-home.tsx`, `standings-table.tsx`, `matchup-panel.tsx`, `matchup-scoreboard.tsx`, `median-result.tsx`, `lineup-editor.tsx`, `activity-feed.tsx`, `league-terms-panel.tsx`, `trade-inbox-link.tsx`, `trade-card.tsx`, `week-nav.tsx`, `advisor-panel.tsx`, `moderation-summary.tsx` (+ their tests) — the filename is `trade-inbox-link.tsx`, corrected here (F21)
+- Modify, the eight user components this plan had left in the old palette (F10): `create-league-form.tsx`, `create-league-panel.tsx`, `invite-panel.tsx`, `trade-composer.tsx`, `matchup-celebration.tsx` (D2 — imported by `league-home.tsx:13` and otherwise the last old-palette artifact in the product, inside the celebration), `live-matchup-week.tsx`, `held-trade-banner.tsx`, `join-league-entry.tsx`, `join-public-league-button.tsx` (+ their tests)
+- Modify: `src/app/app/(shell)/leagues/[leagueId]/**` and `src/app/app/(shell)/leagues/page.tsx`
 
 **Interfaces:**
 - Consumes: every primitive from Tasks 1 and 3. Produces: no new interface. This task adds no data and no route.
@@ -1233,6 +1255,8 @@ League home, standings, matchups and activity, moved into the shell and made den
 - [ ] **Step 1: The league header, and the one thing a member always wants**
 
 Crest, league name, record, seed, the next thing on the calendar, and the league's format facts as a single dense line. Everything that was a stacked card becomes a `Panel` row.
+
+**`LineupEditor` carries `id="lineup"`** (F16), which is what makes the board's `/app/leagues/${id}#lineup` land on the editor instead of on the top of a page the manager then scans. The fragment is a real anchor on a real panel, not a scroll script.
 
 - [ ] **Step 2: Standings, dense and tabular**
 
@@ -1242,9 +1266,23 @@ Crest, league name, record, seed, the next thing on the calendar, and the league
 
 The head-to-head block and the median block are visually distinct, per the gauntlet's finding that reusing one for the other reads as a team named LEAGUE MEDIAN.
 
+- [ ] **Step 3b: The commissioner's two forms, and the disclosure the join flow asked for**
+
+`CreateLeagueForm`, `CreateLeaguePanel` and `InvitePanel` are the only surfaces in the product where a person **makes** a league rather than joins one, and neither plan had touched them: they would have been the old palette sitting inside the new one, on the screen a commissioner-curious visitor judges the product on (F10).
+
+The retone is the ordinary one — `Panel`, the dense scale, `edge` on every field boundary and never `line`, the destructive and primary `Button` variants as they already are. The addition is one sentence, at the visibility control, above the submit button, verbatim and tested:
+
+> **"Public leagues appear on the open shelf, where anyone can take a seat. Private leagues are invite only."**
+
+The join-flow panel filed the absence as the thing a first-time commissioner learns *after* their league appears somewhere they did not expect. It is a description of behavior that already exists (`is_public_matchmade` and the browse shelf), placed where the decision is made rather than in a help page nobody opens, and it adds no field and no setting.
+
+`InvitePanel` gains nothing but the retone and the same `SeatMeter` sentence everywhere it counts seats (F17).
+
 - [ ] **Step 4: The lineup editor keeps every behavior it has**
 
 Its select-based slot picker is the sanctioned `PositionBadge` carve-out and stays. Nothing about validation, locking or the week's status changes here.
+
+**The panel order below the header is derived, never hard-coded** (F16): league home reads the league's own `nextAction.kind` and puts the panel that answers it first, which for `fix-lineup` is `LineupEditor`. Every other order is the default order, and there is no per-page list of exceptions to maintain — the same derived-only discipline as the attention queue (ruling 11) and the rail's state (Task 2 Step 3).
 
 - [ ] **Step 5: Re-run the season and live-scoring specs**
 
@@ -1261,6 +1299,7 @@ The draft room is the one surface in this product that already obeys the founder
 **Files:**
 - Modify: `src/draft-room/components/room-rail.tsx`, `room-dock.tsx`, `player-pool.tsx`, `draft-board.tsx`, `tv-board.tsx`, `bid-controls.tsx`, `budget-table.tsx`, `nudge-banner.tsx`, `connection-banner.tsx`, `pick-celebration.tsx`, `room-tour.tsx` (+ their tests)
 - Modify: `src/app/draft/[draftId]/board/page.tsx`, `docs/draft-room.md`
+- Modify: `src/league-room/components/league-home.tsx` (+ its test) — Step 3b's draft-complete arrival, which lands on league home rather than in the room, and runs after Task 11 has retoned that file
 
 - [ ] **Step 1: The board is still the hero**
 
@@ -1273,6 +1312,30 @@ Fixed band heights are re-measured against the dense type scale, because a band 
 - [ ] **Step 3: The TV board goes darker still**
 
 The TV board is the same frame with nobody to talk to and is designed to be read from across a room: it takes the `xl` display scale and the largest countdown, and it is the one surface where `xs` never appears.
+
+- [ ] **Step 3b: The draft is over, and the season starts (D4)**
+
+The draft room's last moment is currently a room emptying out. `commitDraftResults` produces, **in one transaction**, the thing every manager wants next: the roster, and the Week 1 matchup. Both are already written, both are already read by surfaces this plan retones, and nobody ever puts them in front of the person at the moment they mean the most.
+
+```tsx
+// src/league-room/components/league-home.test.tsx
+it("shows a manager who just drafted their roster and who they play first", () => {
+  renderSurface(<LeagueHome home={justDrafted} />, ({ getByTestId, getByText }) => {
+    expect(getByTestId("draft-complete-arrival")).toBeInTheDocument();
+    expect(getByText("Week 1 · Bay Bandits vs Volt Kings")).toBeInTheDocument();
+  });
+});
+
+it("stops rendering the arrival the moment the season has a result", () => {
+  renderSurface(<LeagueHome home={afterWeekOne} />, ({ queryByTestId }) => {
+    expect(queryByTestId("draft-complete-arrival")).toBeNull();
+  });
+});
+```
+
+The moment lands on **league home**, not in the room: the room is where it happened, home is where they go next, and the redirect after a completed draft already goes there. It renders the fifteen players the manager just drafted, grouped by slot through `SlotChip`, beside the Week 1 matchup card.
+
+**Its data honesty, named:** the roster is the `rosters` rows `commitDraftResults` wrote, the fixture is the `matchups` row the same transaction wrote, and the condition is **`draft.status === "complete"` and the season has no settled result yet** — a predicate over rows that already exist, with **no new column, no seen-flag and nothing stored**. It stops being true on its own, exactly like the seating moment (D1) and the attention queue (ruling 11).
 
 - [ ] **Step 4: Re-run the draft specs**
 
@@ -1322,7 +1385,17 @@ The live pill's pulse, the celebration animations and the countdown's tick each 
 
 - [ ] **Step 2: Drift**
 
-`docs/design-system.md` is substantially rewritten (identity, the one theme, the new roles, the type scale, the shell, the five new primitives, the full-bleed-frames-measured-paragraphs rule, the green-is-a-fill-only-for-actions rule). `docs/conventions.md` (the new directories, the gate count unchanged at twenty-one and why), `docs/league.md` (release, roll), `docs/draft-room.md` (the retone), `docs/decisions/enforcement-and-tiers.md` (the platform door's new fullness precondition, which is the fourth thing `kickoff_at` now means), `docs/decisions/formats-and-lobby.md` and `house-leagues.md` (the roll's interaction with sit-and-go and with the house catalog), `README.md`.
+`docs/design-system.md` is substantially rewritten (identity, the one theme, the new roles, the type scale, the shell, the five new primitives, the full-bleed-frames-measured-paragraphs rule, the green-is-a-fill-only-for-actions rule).
+
+**It also becomes the home of the copy rules this plan discovered it needed**, because five surfaces phrasing one promise five ways is a design-system failure and not a writing one:
+
+- **The register is expanded: no contractions** (C1, ruled). "You do not have to wait here", never "You don't". The reason is stated rather than asserted: this product tells people things about money, seats and fairness, and the expanded register is what keeps those sentences from reading as chat. **One named exception** is recorded with it, the just-seated heading `"Half-PPR #241 · You're in"` (Task 9 Step 2b), so the exception is a decision somebody made once rather than a precedent the next writer generalizes from.
+- **The safety net is named once**: **"the room picks for you from your queue"** (C3). Every surface that reassures anybody about missing a draft quotes that phrase, and no surface invents "autopick", "auto-draft" or "we will draft for you".
+- **The when-full promise and the start-timing sentences are `describeStartTiming`'s**, not prose (F9), and the doc says so with the function named, so the next surface that needs the sentence imports it.
+- **Two voice exemplars, quoted in full**, because a register is easier to copy than to define: *"That seat went to someone else while you were signing in. Your spot in this league is gone, and nothing was charged."* and *"Nothing you typed was sent."* Both say what happened, what it means for the reader, and nothing else; both are already load-bearing in Task 6 and in the addendum's Task 16.
+- **A record may carry typographic weight** (D5): one step up the type scale and a heavier weight on a board, never a color, a badge or an animation.
+
+`docs/conventions.md` (the new directories, the gate count unchanged at twenty-one and why), `docs/league.md` (release, roll), `docs/draft-room.md` (the retone), `docs/decisions/enforcement-and-tiers.md` (the platform door's new fullness precondition, which is the fourth thing `kickoff_at` now means), `docs/decisions/formats-and-lobby.md` and `house-leagues.md` (the roll's interaction with sit-and-go and with the house catalog), `README.md`.
 
 - [ ] **Step 3: The roadmap row**
 
@@ -1360,9 +1433,9 @@ Not a mockup review this time: the six personas from the two existing panels (ve
 
 7. **The type scale is emitted twice from one source, and no component writes a responsive size utility.** A dense desktop and a comfortable phone are the same scale at two settings, not two scales; expressing that as `text-sm lg:text-xs` at every call site is the page-local visual mapping rule violated 400 times. The media query lives in the generated stylesheet, where the tokens already live.
 
-8. **The shell is a component, not a route group layout.** Next.js layouts would have been the idiomatic home, and `AppShell` is a component the pages render instead, for one reason: a layout cannot receive the page's own `currentLeagueId`, and the rail's `aria-current` is the difference between navigation and a row of tiles. Every page already computes which league it is about; passing it one prop is cheaper than a context nobody else reads.
+8. **The shell is rendered by a route-group layout, and the rail reads the path it is standing on.** **Revised by the UX coherence review of 2026-08-23 (F8); the original ruling said the opposite.** It had `AppShell` rendered by each page, on the reasoning that a layout cannot receive the page's own `currentLeagueId` and that `aria-current` is the difference between navigation and a row of tiles. That reasoning does not hold: `LeagueRail` is a client component and `usePathname()` gives it the current league id directly, so nothing needs to be passed. The cost of the original was concrete and severe — with the shell inside the page, `loading.tsx` suspends the rail and the top bar along with the content, so **every intra-app navigation blanks the chrome**, which is the opposite of what a shell is for. `src/app/app/(shell)/layout.tsx` therefore calls `shellData` once and renders `AppShell` around `children`; `loading.tsx` inside that group suspends only the content column; and the three surfaces that render no shell (the draft room, the TV board, `/app/join/[code]`) decline the layout by living in sibling route groups, which changes no URL and breaks no link.
 
-9. **The rail's data is one function every page calls, not a context and not a per-page query.** `shellData(db, user)` is one round trip, reusing what `crossLeagueHome` already reads. A context would need a client boundary the shell does not otherwise have; a per-page bespoke query is how two pages start disagreeing about which league is live.
+9. **The rail's data is one function, called once per navigation by the `(shell)` layout, not a context and not a per-page query.** `shellData(db, user)` is one round trip, reusing what `crossLeagueHome` already reads. A context would need a client boundary the shell does not otherwise have; a per-page bespoke query is how two pages start disagreeing about which league is live. (Amended with ruling 8 by the UX coherence review of 2026-08-23: the caller moved from every page to the one layout.)
 
 10. **The league crest is derived initials on a deterministic tone, and there is no crest column.** A stored crest is an asset pipeline, an upload surface and a moderation problem (Phase 4's object store is a founder gate). Derived initials cannot go stale against a rename, need no migration, and reuse `AvatarTone`'s existing deterministic hash so a league and its members are visibly one object.
 
@@ -1448,7 +1521,7 @@ Not a mockup review this time: the six personas from the two existing panels (ve
 | House leagues are the core | Task 5's shelf and Task 10's open-seats panel are the v2 rendering of the house catalog; Task 7's roll makes a house league's stated draft time honest |
 | Design bar | The table above |
 
-**Missing states, all five folded in:** the seat-hold interstitial (Task 6 Step 4), the race loser (Task 6 Step 4), the tier refusal moved before the click (Task 6 Step 4), the when-full waiting variant (Task 9 Step 2), and the missed-draft state (Task 9 Step 1's test and Step 2's variant).
+**Missing states, all nine folded in** (five found by the persona gauntlets, four more by the UX coherence review of 2026-08-23): the seat-hold interstitial (Task 6 Step 4), **the return from sign-in with a live, an expired, or a lost hold** (Task 6 Step 4, F4), the race loser (Task 6 Step 4), the tier refusal moved before the click (Task 6 Step 4), the when-full waiting variant (Task 9 Step 2), the missed-draft state (Task 9 Step 1's test and Step 2's variant), **the just-seated moment** (Task 9 Step 2b, D1), **the pre-draft home for a manager with no games yet** (Task 10 Step 2b, F18c), and **the draft-complete arrival** (Task 12 Step 3b, D4). Each of the four new ones is derived from a column, a timestamp or a boolean that exists today, and each stops rendering when it stops being true.
 
 **Placeholder scan:** no `TODO`, no `TBD`, no "handle errors appropriately", no step whose expected output is unstated. Every file in the File Structure tables appears in a task's Files block. Six places name a helper the executing engineer writes to taste rather than showing it in full — `crestTone`'s hash (copies `avatarTone`), `describeStartTiming`'s branches (copies `formatDraftTime`), the four new component bodies, the correlated seat-count SQL (copies `browseQuery`'s `HAVING`), `shellData`'s grouped read (copies `home.ts`'s existing grouped reads), and the axe-in-Playwright harness (copies `mobile-360.spec.ts`'s page loop) — and each names the existing file in this repo whose shape it copies.
 
@@ -1481,5 +1554,47 @@ The planner flagged six risks. Ruled as follows; each ruling binds execution:
 2. **Commissioner's two-team floor: ACCEPTED.** The dead-end argument holds (no league-settings write path exists; a literal application would strand private leagues with no draft path forever). The warning copy ships. If the founder wants the ruling literal everywhere, a resize-or-cancel path is net-new scope for a later phase.
 3. **Seat release audits as `member_joined` + `payload.outcome`: ACCEPTED.** Plan C's frozen-enum precedent applies; unfreezing the enum is forbidden in writing and this plan is not entitled to relax it.
 4. **Seat hold stays in scope: ACCEPTED.** The no-MVP directive and the copy-without-mechanism rule both require it; cutting it would mean cutting the front door's step 01 promise.
-5. **Sequencing: execution runs Task 6 BEFORE Task 5** (strict dependency order). Plan numbering is unchanged; the executor takes them 1, 2, 3, 4, 6, 5, 7, 8, ...
-6. **Task 2 splits into page-group commits** within the one task (app home / league pages / admin+account / public), each group re-running the e2e specs that walk it, to keep the highest-regression-risk change reviewable.
+5. **Sequencing: execution runs Task 6 BEFORE Task 5** (strict dependency order). Plan numbering is unchanged; the executor takes them 1, 2, 3, 4, 6, 5, 7, 8, ... **Amended by the UX coherence review of 2026-08-23 (F2):** this plan does not execute alone, and the combined order with the addendum is **A15 → P1 → P2 → P3 → P4 → A16 → P6 → P5 → P7..P14 → A17..A22**, recorded in full in the addendum's controller ruling 1. The parent's own 6-before-5 order is preserved inside it; what moved is that the addendum's Task 16 now runs **before** Task 6, because Task 6's interstitial consumes `SignInLink` and cannot return a visitor to a held seat without it (F3, F4).
+6. **Task 2 splits into page-group commits** within the one task (app home / league pages / admin+account / public), each group re-running the e2e specs that walk it, to keep the highest-regression-risk change reviewable. The route-group moves ruling 8 now requires (`(shell)`, `(room)`, `(public)`) ride the same split, one group per commit, with the URL-preserving property asserted by the e2e specs that walk each group.
+
+---
+
+## Amendments from the UX coherence review (2026-08-23)
+
+Every change below traces to a finding in `.superpowers/sdd/2026-08-22-phase3p5-competitiveness/ux-coherence-review.md`, applied in place under the controller's binding rulings. Findings F6, F7, F13, F14 and F15 belong to the addendum and are recorded there.
+
+- **F1** — `lineupSet` derived from the `notExists(lineupSlots)` predicate `auto-lineup.ts` already uses; `fix-lineup` added above `set-lineup`; `COPY["fix-lineup"] = "Fix your lineup"`. Task 10 Files + new Step 1b; Task 2 Step 3's rail state is now exactly `fix-lineup` or `join-draft`.
+- **F2** — Combined execution order A15 → P1 → P2 → P3 → P4 → A16 → P6 → P5 → P7..P14 → A17..A22. Controller ruling 5, pointing at the addendum's controller ruling 1 for the full record.
+- **F3** — The interstitial's way in is `SignInLink` with `intent="/join/[leagueId]/hold"`, and the hold cookie is `Path=/`. Task 6 Step 4 and Task 6's Consumes.
+- **F4** — "The return" added as Task 6 Step 4's fourth screen (seated / expired-but-open / seat taken), with three tests in Step 1.
+- **F5** — `PublicBar` named as the front door's header, with the mock's nav and the **Take a seat** CTA pointing at `/browse`. Task 5 Step 2.
+- **F8** — Ruling 8 reversed (option a): the `(shell)` layout renders `AppShell`, `LeagueRail` derives `aria-current` from `usePathname()`, `loading.tsx` suspends only the content column, the three carve-outs decline the layout through sibling route groups. Ruling 8, ruling 9, Task 2 Steps 1, 2, 3 and 5, Task 2's Files, the File Structure. **One stated adjustment:** the controller named `src/app/app/layout.tsx`; the file lands at `src/app/app/(shell)/layout.tsx`, because a route group is the only way a segment under `/app` can decline an ancestor layout, and no URL changes.
+- **F9** — Task 7 Step 7 is the single authority for every start-timing sentence; Tasks 5 and 9 quote it; the roll sentence comes from `roll.ts` for the notice and the room alike.
+- **F10** — Task 11's Files gains the eight untouched user components and corrects `trade-inbox.tsx` → `trade-inbox-link.tsx`; new Step 3b retones the commissioner's two forms and adds the public/private disclosure at the visibility control.
+- **F11** — `describeStartTiming` takes `authority`; the member branch names the commissioner. Task 7 Steps 6 and 7.
+- **F12** — `rollNoticeSentence` and `describeStartTiming` take `kickoffRolls` and pluralize; the notice gains its release paragraph from the second roll; `ReleaseSeatControl` gains weight after the first. Task 7 Steps 4, 6, 7 and Task 8 Step 4.
+- **F16** — `actionHref` maps `fix-lineup`/`set-lineup` to `/app/leagues/${id}#lineup`; `LineupEditor` carries `id="lineup"` and is promoted by derived panel order. Task 10 Step 2, Task 11 Steps 1 and 4.
+- **F17** — `SeatMeter` owns the seat sentence everywhere, held seats included; Task 3 Step 1's test is the reference; Task 9 Step 1's two strings and Task 6 Step 5's card converge on it; Task 10's Consumes gains it.
+- **F18** — `first-run-panel.tsx` removed from Task 10's Files with a pointer to addendum Task 17; `OpenSeatsPanel` does not render when `firstRun !== null`; new Step 2b builds the pre-draft home.
+- **F19** — "How it works" points at `/league-rules`; the footer becomes `PublicFooter` (addendum Task 16) and the every-target-resolves assertion moves to it. Task 5 Steps 2 and 5.
+- **F20** — "Seat counts as of {time}. A seat being claimed is counted." added verbatim and tested; the mock's "Live seat counts · updated just now" recorded as refused, citing deferral D4. Task 5 Step 3.
+- **F21** — Counts corrected: 14 pages, 11 under `/app`, 9 absorbing the shell, three carve-outs (Task 2 Step 5, the What-is-already-true table, the File Structure); `kickoffRolls` numbered as the seventeenth `PublicLeagueSummary` field (Task 7 Step 4); `trade-inbox-link.tsx` (Task 11).
+- **D1** — The seating moment, Task 9 new Step 2b, derived from `teams.created_at` against an injected `Clock`.
+- **D2** — `matchup-celebration.tsx` retoned, Task 11's Files.
+- **D3** — The room going full, Task 9 Step 2, from `filledTeams === teamCount` and the existing `notice.created` delivery, with the reduced-motion branch.
+- **D4** — The draft-complete arrival, Task 12 new Step 3b, from `commitDraftResults`'s own two writes and a status predicate.
+- **D5** — A record may carry typographic weight; Task 10 Step 2 plus the type-scale rule in Task 14 Step 2.
+- **C1** — The expanded register is the house standard, stated in `docs/design-system.md` (Task 14 Step 2), with the shipped waiting-room contractions converging in Task 9 Step 1 and the one named exception recorded.
+- **C2** — "Fix your lineup" is one string owned by `COPY`; the rail's accessible name and the board cell both read it (Task 2 Step 1, Task 10 Step 1 and Step 1b).
+- **C3** — "the room picks for you from your queue" named once in `docs/design-system.md` and quoted by Task 9 Step 1.
+- **C5** — The when-full sentence keeps both halves with the reassurance second, in Task 7 Step 7's authority and quoted by Tasks 5 and 9.
+
+**Consistency fixes made in the same pass, where an amendment falsified text no finding named:**
+
+- The What-is-already-true table said the `AppHeader` pattern repeats across "all fifteen `page.tsx` files"; the repository has fourteen, eleven under `/app` (F21's count, applied to the row that stated it).
+- Task 2's opening paragraph said "fifteen pages currently render their own 896px column"; corrected to fourteen.
+- The File Structure's shell row said "(ten of them)" for the pages under `src/app/app/**`; corrected to eleven, and it now names the `(shell)` layout.
+- `src/app/app/admin/admin-routes.test.ts` is scanned by path; the route-group move changes that path, so Task 2's Files block updates the glob **in the commit that moves the files**, which keeps the addendum's A3 promise (Task 19 does not edit the tripwire) true.
+- Task 10's Files pointed at `src/app/app/page.tsx` and Task 11's at `src/app/app/leagues/**`; both now point inside the `(shell)` group, since ruling 8's reversal is what moved them.
+- Ruling 9 said the rail's data is "one function every page calls"; with the shell in a layout, the layout is the caller.
+- The self-review's missing-states list named five states; it names nine, since F4, D1, F18c and D4 each added one.
