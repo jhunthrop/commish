@@ -4,6 +4,7 @@ import { drafts, leagues, scoringSettings, teams, users } from "../src/db/schema
 import { STANDARD_ROSTER_SLOTS } from "../src/domain/roster";
 import { HALF_PPR_SCORING } from "../src/domain/scoring";
 import { ensureDevUsers } from "../src/data/seed/dev-users";
+import { isSafeToKeepFillingHouseLeague, staleHouseShelfMessage } from "../src/data/seed/house-fill-safety";
 import { openHouseLeaguesQuery } from "../src/league-service/house-factory";
 import { joinPublicLeague } from "../src/league-service/join";
 import { MEDIAN_DEMO_LEAGUE } from "../src/data/seed/seed-season-league";
@@ -103,28 +104,48 @@ async function fillAllButOneSeat(db: Db, leagueId: string): Promise<void> {
 // Journey 4's own fixture (Phase 3.5 addendum, Task 15, Step 2): the house shelf's own reconciler,
 // proven from a browser rather than only from `npm run seed`. `src/data/seed/index.ts`'s own
 // house arc (Task 15, Step 1) already ran during global setup and left `open_12`'s shelf at its
-// own `openAtOnce` width — this journey borrows the SHELF'S OWN oldest still-open league (never a
-// hardcoded edition, the same "creation order, not a guessed id" discipline that seed arc keeps)
-// and fills every seat but one BACKSTAGE, through the real `joinPublicLeague` transaction — the
-// identical "a bystander seat is real service, never a raw insert" shape `fillAllButOneSeat`
-// above already keeps for the sit-and-go journey. Dedicated, e2e-only filler identities: `open_12`
-// gates on nothing (`tierJoinPrecondition` only ever blocks a `beginner`-tier league), so this
-// never needs the dev pool's own veteran-avoidance discipline, but a dedicated pool still keeps
-// this journey from ever touching a seat another spec depends on.
+// own `openAtOnce` width — this journey borrows the SHELF'S OWN oldest SAFE still-open league
+// (never a hardcoded edition, the same "creation order, not a guessed id" discipline that seed
+// arc keeps) and fills every seat but one BACKSTAGE, through the real `joinPublicLeague`
+// transaction — the identical "a bystander seat is real service, never a raw insert" shape
+// `fillAllButOneSeat` above already keeps for the sit-and-go journey. Dedicated, e2e-only filler
+// identities: `open_12` gates on nothing (`tierJoinPrecondition` only ever blocks a
+// `beginner`-tier league), so this never needs the dev pool's own veteran-avoidance discipline,
+// but a dedicated pool still keeps this journey from ever touching a seat another spec depends on.
+//
+// Fix round 1, F1: "oldest STILL-OPEN" is not automatically SAFE — on a long-lived shared dev
+// database, `open_12`'s earliest still-open league can carry a fixed kickoff (Task 13's own
+// `houseKickoffFor`, never rewritten for a `'scheduled'`-trigger league) that has already aged
+// past "now". Backstage-filling one of those to two-plus seats would arm `autoStartDueDrafts`
+// (no fill-completeness requirement of its own — `@/draft-service/auto-start`) and race the real
+// ticker for whether the live last-seat click below lands before the draft does — an intermittent
+// `DRAFT_ALREADY_STARTED` flake unrelated to the shelf behavior this journey actually tests.
+// `resolveOpenHouseLeague` walks every still-open candidate oldest-first and picks the first with
+// a comfortably-future kickoff, sharing the exact predicate `src/data/seed/index.ts`'s own
+// `resolveSafeFillTarget` uses (`../src/data/seed/house-fill-safety.ts`) rather than a second,
+// hand-typed copy of the same margin.
 // -------------------------------------------------------------------------------------------
 
 const HOUSE_JOIN_FILLER_ID_PREFIX = "e2e_house_filler_";
 
-/** The shelf's own oldest still-open `open_12` league — `openHouseLeaguesQuery`, the EXACT query
- *  `ensureHouseCatalog` itself counts by, never a hand-copied re-derivation of "still open". */
-async function resolveOpenHouseLeague(db: Db): Promise<{ readonly id: string; readonly name: string; readonly teamCount: number; readonly filled: number }> {
-  const [row] = await openHouseLeaguesQuery(db, "open_12");
-  if (row === undefined) {
+/** The shelf's own oldest still-open, SAFE-to-fill `open_12` league — `openHouseLeaguesQuery`,
+ *  the EXACT query `ensureHouseCatalog` itself counts by, never a hand-copied re-derivation of
+ *  "still open". Every row it returns is already short of capacity (that query's own `having`
+ *  clause), so — unlike the seed's own `resolveSafeFillTarget` — there is no "already full, safe
+ *  regardless of kickoff" shortcut here: each candidate is checked on its kickoff alone. */
+async function resolveOpenHouseLeague(db: Db, clock: { readonly now: () => string }): Promise<{ readonly id: string; readonly name: string; readonly teamCount: number; readonly filled: number }> {
+  const rows = await openHouseLeaguesQuery(db, "open_12");
+  if (rows.length === 0) {
     throw new Error("[e2e] formats-and-lobby: no open open_12 house league found — has the shelf's own reconciler run yet?");
   }
-  const [league] = await db.select({ name: leagues.name, teamCount: leagues.teamCount }).from(leagues).where(eq(leagues.id, row.id));
-  const seated = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, row.id));
-  return { id: row.id, name: league!.name, teamCount: league!.teamCount, filled: seated.length };
+  for (const row of rows) {
+    const [draftRow] = await db.select({ kickoffAt: drafts.kickoffAt }).from(drafts).where(eq(drafts.leagueId, row.id));
+    if (draftRow === undefined || !isSafeToKeepFillingHouseLeague(draftRow.kickoffAt, clock.now())) continue;
+    const [league] = await db.select({ name: leagues.name, teamCount: leagues.teamCount }).from(leagues).where(eq(leagues.id, row.id));
+    const seated = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, row.id));
+    return { id: row.id, name: league!.name, teamCount: league!.teamCount, filled: seated.length };
+  }
+  throw new Error(staleHouseShelfMessage("open_12", "[e2e] formats-and-lobby"));
 }
 
 /** Fills every seat but one, through the real join transaction — the last seat is left for the
@@ -259,11 +280,11 @@ test.describe("formats and lobby", () => {
   test("a visitor takes the last open seat in a house league and the shelf shows a replacement", async ({ managerA, managerB }) => {
     test.setTimeout(120_000);
 
-    // --- Backstage: leave exactly one seat open on the shelf's own oldest open_12 league -------
+    // --- Backstage: leave exactly one seat open on the shelf's own oldest SAFE open_12 league ---
     const db = createDb();
     let target: { id: string; name: string; teamCount: number; filled: number };
     try {
-      target = await resolveOpenHouseLeague(db);
+      target = await resolveOpenHouseLeague(db, { now: () => new Date().toISOString() });
       await fillHouseLeagueAllButOneSeat(db, target.id, target.teamCount - target.filled - 1);
     } finally {
       await db.$client.end();

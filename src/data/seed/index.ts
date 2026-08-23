@@ -2,7 +2,7 @@ import { fileURLToPath } from "node:url";
 import { asc, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { getDb } from "@/db/client";
-import { leagues, teams, users } from "@/db/schema";
+import { drafts, leagues, teams, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { AuditLogger } from "@/integrity-service/audit-logger";
 import { getStatsProvider } from "@/stats-pipeline";
@@ -14,6 +14,7 @@ import { joinPublicLeague } from "@/league-service/join";
 import type { HouseRungName } from "@/matchmaking/house-catalog";
 import { DEV_SEED } from "./config";
 import { assertLocalSeedTarget } from "./guard";
+import { isSafeToKeepFillingHouseLeague, staleHouseShelfMessage } from "./house-fill-safety";
 import { seedDevLeagues } from "./seed-dev-leagues";
 import { seedEnforcement } from "./seed-enforcement";
 import { seedFormatDemos } from "./seed-format-demos";
@@ -29,8 +30,9 @@ import { seedTrades } from "./seed-trades";
  * it." No house fixture module — `seedPublicLeagues`/`seedDevLeagues` write their `leagues` row
  * by direct Drizzle upsert so THEIR OWN re-run stays safe, which is also why neither one produces
  * a `league_created` audit event. This arc never upserts a `leagues` row at all: it calls the
- * real `ensureHouseCatalog` (`@/league-service/house-factory`), fills the shelf's own oldest
- * `open_12` league through the real `joinPublicLeague`, then calls `ensureHouseCatalog` again —
+ * real `ensureHouseCatalog` (`@/league-service/house-factory`), fills the shelf's own earliest
+ * SAFE `open_12` league (fix round 1, F1 — see `resolveSafeFillTarget` below) through the real
+ * `joinPublicLeague`, then calls `ensureHouseCatalog` again —
  * re-runnable because `ensureHouseCatalog` is idempotent BY CONSTRUCTION (ruling 35), never
  * because this function upserts anything.
  *
@@ -52,18 +54,22 @@ import { seedTrades } from "./seed-trades";
  * `houseKickoffFor` put it — stable across every later `npm run dev`, and every later `npm run
  * seed` re-run.
  *
- * The FIRST-EVER `open_12` league, addressed by creation order rather than a hardcoded id (this
- * arc has no reason to know `house-factory.ts`'s own `house_${rung}_${edition}` format): a
- * re-run's own `ensureHouseCatalog` call never re-opens a league that already exists, so the
- * earliest-created `open_12` league is the SAME row on every run — full after the first run, still
- * full (and still the earliest) on every run after that, so this arc's own `joinPublicLeague`
- * calls take the `alreadyMember` branch on a re-run rather than reaching for a second league to
- * fill.
+ * The EARLIEST SAFE `open_12` league, addressed by creation order rather than a hardcoded id
+ * (this arc has no reason to know `house-factory.ts`'s own `house_${rung}_${edition}` format):
+ * `resolveSafeFillTarget` (below) walks every `open_12` league oldest-first and stops at the
+ * first one that is either already fully seated (nothing left to join — see fix round 1, F1) or
+ * has a comfortably-future kickoff. A re-run's own `ensureHouseCatalog` call never re-opens a
+ * league that already exists, so on an ordinary re-run (run twice in quick succession, the
+ * standard this arc is verified against) the earliest league is STILL the same fully-seated row
+ * it was after the first run — safe unconditionally, so it is selected again immediately and
+ * `neededSeats` reads back `0`. `fillerIds` is then empty and the join loop below never executes
+ * at all on a re-run — no `joinPublicLeague` call is made, `alreadyMember` or otherwise.
  */
 export interface SeedHouseCatalogDemoResult {
   readonly rung: HouseRungName;
   readonly filledLeagueId: string;
-  /** New seats taken THIS call — `0` on a re-run, whose joins all land on `alreadyMember`. */
+  /** New seats taken THIS call — `0` on a re-run, whose shortfall reads back `0` and skips the
+   *  join loop entirely. */
   readonly seatsJoined: number;
   /** Every league id `ensureHouseCatalog`'s SECOND call actually opened — empty on a re-run that
    *  found the shelf already at `openAtOnce` width. */
@@ -72,6 +78,48 @@ export interface SeedHouseCatalogDemoResult {
 
 const HOUSE_DEMO_RUNG: HouseRungName = "open_12";
 const HOUSE_DEMO_FILLER_ID_PREFIX = "dev_house_demo_";
+
+interface HouseFillTarget {
+  readonly id: string;
+  readonly teamCount: number;
+  readonly existingSeats: number;
+}
+
+/**
+ * Fix round 1, F1: walks every `open_12` league oldest-first (never just the single earliest one
+ * this arc used to assume) and returns the FIRST one safe to touch — already fully seated
+ * (nothing left to join, so no `autoStartDueDrafts` race is possible regardless of its kickoff),
+ * or short of capacity with a kickoff still comfortably in the future
+ * (`isSafeToKeepFillingHouseLeague`, `./house-fill-safety.ts`). A league that is BOTH short of
+ * capacity AND too close to (or past) its own kickoff is skipped — seating a second member into
+ * it risks the real ticker's `autoStartDueDrafts` claiming its draft mid-loop, an intermittent
+ * `DRAFT_ALREADY_STARTED` refusal unrelated to this arc's own reconciler proof (found running
+ * this against a long-lived shared dev database, where an early `open_12` edition's fixed kickoff
+ * had aged well past "now"). Throws, loudly and by name, only if EVERY candidate is unsafe — never
+ * silently proceeds against a stale one, and never hand-stamps a house league's kickoff, which has
+ * no legitimate write path at all (`./house-fill-safety.ts`'s own docblock).
+ */
+async function resolveSafeFillTarget(db: Db, clock: Clock, rung: HouseRungName): Promise<HouseFillTarget> {
+  const candidates = await db
+    .select({ id: leagues.id, teamCount: leagues.teamCount, kickoffAt: drafts.kickoffAt })
+    .from(leagues)
+    .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
+    .where(eq(leagues.houseRung, rung))
+    .orderBy(asc(leagues.createdAt));
+  if (candidates.length === 0) {
+    throw new Error(`seedHouseCatalogDemo: ensureHouseCatalog didn't open any ${rung} league to fill.`);
+  }
+
+  for (const candidate of candidates) {
+    const existingSeats = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, candidate.id));
+    const alreadyFull = existingSeats.length >= candidate.teamCount;
+    if (alreadyFull || isSafeToKeepFillingHouseLeague(candidate.kickoffAt, clock.now())) {
+      return { id: candidate.id, teamCount: candidate.teamCount, existingSeats: existingSeats.length };
+    }
+  }
+
+  throw new Error(staleHouseShelfMessage(rung, "seedHouseCatalogDemo"));
+}
 
 export async function seedHouseCatalogDemo(
   db: Db,
@@ -87,15 +135,7 @@ export async function seedHouseCatalogDemo(
   // assumed already caught up.
   await ensureHouseCatalog(db, { clock, newId, audit: deps.audit });
 
-  const [target] = await db
-    .select({ id: leagues.id, teamCount: leagues.teamCount })
-    .from(leagues)
-    .where(eq(leagues.houseRung, HOUSE_DEMO_RUNG))
-    .orderBy(asc(leagues.createdAt))
-    .limit(1);
-  if (target === undefined) {
-    throw new Error(`seedHouseCatalogDemo: ensureHouseCatalog didn't open any ${HOUSE_DEMO_RUNG} league to fill.`);
-  }
+  const target = await resolveSafeFillTarget(db, clock, HOUSE_DEMO_RUNG);
 
   // The SHORTFALL, read back from the league's own seats — never a hard-coded 12. A long-lived
   // shared dev database can have a REAL developer already sitting in this exact league (found
@@ -103,8 +143,7 @@ export async function seedHouseCatalogDemo(
   // empty seats, and the 12th dedicated filler's own join overflowed it by one). Reading the
   // actual count first is what keeps this arc correct whether the league is genuinely empty or
   // already partly claimed by someone real.
-  const existingSeats = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, target.id));
-  const neededSeats = Math.max(0, target.teamCount - existingSeats.length);
+  const neededSeats = Math.max(0, target.teamCount - target.existingSeats);
   const fillerIds = Array.from({ length: neededSeats }, (_, i) => `${HOUSE_DEMO_FILLER_ID_PREFIX}${String(i + 1).padStart(2, "0")}`);
   if (fillerIds.length > 0) {
     await db
