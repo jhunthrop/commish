@@ -46,7 +46,7 @@ export function Table<T>({ caption, captionVisible = false, columns, rows, rowKe
       <table className="w-full border-collapse text-sm text-text-primary">
         <caption className={captionVisible ? "mb-2 text-left text-sm font-medium text-text-muted" : "sr-only"}>{caption}</caption>
         <thead>
-          <tr className="border-b border-border">
+          <tr className="border-b border-line">
             {columns.map((column) => (
               <th key={column.key} scope="col" className={`${columnClass(column)}px-3 py-2 font-medium text-text-muted`}>
                 {column.header}
@@ -56,7 +56,7 @@ export function Table<T>({ caption, captionVisible = false, columns, rows, rowKe
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={rowKey(row)} className={`border-b border-border/50 ${rowClassName?.(row) ?? ""}`} {...rowAttributes?.(row)}>
+            <tr key={rowKey(row)} className={`border-b border-line/50 ${rowClassName?.(row) ?? ""}`} {...rowAttributes?.(row)}>
               {columns.map((column) => (
                 <td key={column.key} className={`${columnClass(column)}px-3 py-2`}>
                   {column.cell(row)}

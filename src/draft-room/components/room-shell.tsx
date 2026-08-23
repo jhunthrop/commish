@@ -94,7 +94,7 @@ export function RoomShell({
           // anybody has left — so it gets the foot of this column and nowhere else.
           <div className="flex h-full min-h-0 flex-col">
             <div className="min-h-0 flex-1">{pool}</div>
-            <div className="max-h-48 shrink-0 overflow-auto border-t border-border p-3">{poolFooter}</div>
+            <div className="max-h-48 shrink-0 overflow-auto border-t border-line p-3">{poolFooter}</div>
           </div>
         )
       }

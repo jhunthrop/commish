@@ -30,7 +30,7 @@ export interface ToastApi {
 const ToastContext = createContext<ToastApi | null>(null);
 
 const TONE: Readonly<Record<ToastTone, string>> = {
-  info: "border-border",
+  info: "border-line",
   success: "border-positive",
   error: "border-negative",
 };

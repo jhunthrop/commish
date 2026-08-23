@@ -78,7 +78,7 @@ const STICKER_TILT = ["-rotate-1", "rotate-1", "rotate-0", "-rotate-1"] as const
 
 function ShowcaseBoard({ showcase }: { readonly showcase: Showcase }) {
   return (
-    <div aria-hidden="true" className="rotate-1 rounded-lg border border-border bg-surface-elevated p-4 shadow-sticker">
+    <div aria-hidden="true" className="rotate-1 rounded-lg border border-line bg-surface-elevated p-4 shadow-sticker">
       <p className="mb-3 font-display text-sm font-semibold uppercase tracking-widest text-text-muted">
         {showcase.caption}
       </p>
@@ -176,7 +176,7 @@ export default async function Home() {
         {showcase === null ? null : <ShowcaseBoard showcase={showcase} />}
       </section>
 
-      <section aria-label="What you get" className="border-t border-border bg-surface-elevated">
+      <section aria-label="What you get" className="border-t border-line bg-surface-elevated">
         <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-12 sm:grid-cols-3">
           {PROOF.map((item) => (
             <div key={item.title} className="flex flex-col gap-2">

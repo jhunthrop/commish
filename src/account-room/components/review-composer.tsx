@@ -29,7 +29,7 @@ export interface ReviewComposerProps {
  */
 function RemovedNotice({ reason }: { readonly reason: string | null }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-border bg-surface-elevated p-4">
+    <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface-elevated p-4">
       <p className="text-sm font-medium text-text-primary">{removalSentenceFor(reason)}</p>
       <p className="text-sm text-text-muted">
         Everything you wrote is kept on record, and it no longer appears in public.{" "}

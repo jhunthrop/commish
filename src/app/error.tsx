@@ -34,7 +34,7 @@ export default function AppError({
               </Button>
               <Link
                 href="/app"
-                className="inline-flex h-10 items-center justify-center rounded-md border border-border px-4 text-md font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-md font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
               >
                 Go to your leagues
               </Link>

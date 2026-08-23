@@ -16,7 +16,7 @@ import "./globals.css";
  * callable), so those classes would be dead weight copied for parity's own sake.
  *
  * The `<main>...</main>` body is split out as `GlobalErrorContent` so it can be exercised
- * directly by `inBothThemes`/`axe` in the test suite: React treats `<html>`/`<body>` as host
+ * directly by `renderSurface`/`axe` in the test suite: React treats `<html>`/`<body>` as host
  * singletons and always reconciles them onto the real `document.documentElement`/`document.body`
  * rather than nesting them under a test container, which puts the actual accessibility surface
  * (headings, copy, the retry control) out of `axe`'s reach if it is only ever tested through the

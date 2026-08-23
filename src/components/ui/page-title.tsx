@@ -18,11 +18,18 @@ const SIZE: Readonly<Record<PageTitleSize, string>> = {
  * `src/app/**` and `LeagueHome` shared this class string by copy-paste; this is the single
  * definition.
  *
- * `break-words` because a page title is frequently USER CONTENT — a league's name — and display
- * type at 360px has very little room to spare. A single unbroken 36-character league name made
- * the whole league home scroll sideways (607px of document in a 360px viewport). Fixed in the
- * primitive rather than at one call site, so every page title is safe by construction.
+ * `min-w-0 [overflow-wrap:anywhere]`, not `break-words` — the same fix, and the same reasoning,
+ * as `Button`'s `BASE` class docblock: a page title is frequently USER CONTENT (a league's name)
+ * and display type at 360px has very little room to spare. `break-words`
+ * (`overflow-wrap: break-word`) wraps text visually but is explicitly ignored when a browser
+ * computes a box's min-content contribution, so a single unbroken league name could still widen
+ * the box (and the page) to fit the whole word before wrapping it — which is exactly what made
+ * the league home scroll sideways (607px of document in a 360px viewport) before this was first
+ * fixed, and what v2's Geist retone (wider glyphs than the old Barlow Condensed) reopened at a
+ * smaller scale. `anywhere` is the one value that both wraps AND shrinks min-content; it still
+ * only breaks a word that would not otherwise fit, so ordinary titles are untouched. Fixed in
+ * the primitive rather than at one call site, so every page title is safe by construction.
  */
 export function PageTitle({ children, size = "md" }: PageTitleProps) {
-  return <h1 className={`break-words font-display font-bold leading-display text-text-primary ${SIZE[size]}`}>{children}</h1>;
+  return <h1 className={`min-w-0 [overflow-wrap:anywhere] font-display font-bold leading-display text-text-primary ${SIZE[size]}`}>{children}</h1>;
 }

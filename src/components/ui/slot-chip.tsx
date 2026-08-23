@@ -14,7 +14,7 @@ export interface SlotChipProps {
 export function SlotChip({ slot, className = "" }: SlotChipProps) {
   return (
     <span
-      className={`rounded-sm border border-border px-2 text-text-muted ${EYEBROW} ${className}`}
+      className={`rounded-sm border border-line px-2 text-text-muted ${EYEBROW} ${className}`}
     >
       {slot}
     </span>

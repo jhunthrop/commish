@@ -17,7 +17,7 @@ export function Skeleton({ lines = 3, className = "" }: SkeletonProps) {
     <div aria-busy="true" aria-live="polite" className={`flex flex-col gap-2 ${className}`}>
       <span className="sr-only">Loading…</span>
       {Array.from({ length: lineCount }, (_, i) => (
-        <div key={i} aria-hidden="true" className="h-4 animate-pulse rounded-sm bg-border/40" style={{ width: `${lineWidthPct(i)}%` }} />
+        <div key={i} aria-hidden="true" className="h-4 animate-pulse rounded-sm bg-line/40" style={{ width: `${lineWidthPct(i)}%` }} />
       ))}
     </div>
   );

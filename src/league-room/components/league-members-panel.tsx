@@ -58,7 +58,7 @@ export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, help
           {teams.map((team) => (
             <li
               key={team.id}
-              className="flex items-center gap-3 rounded-md border border-border bg-surface-elevated p-2"
+              className="flex items-center gap-3 rounded-md border border-line bg-surface-elevated p-2"
             >
               <Avatar name={team.ownerDisplayName} avatar={team.ownerAvatarUrl} />
               <div className="flex min-w-0 flex-1 flex-col">

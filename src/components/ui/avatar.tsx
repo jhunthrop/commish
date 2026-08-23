@@ -62,7 +62,7 @@ export function Avatar({ name, avatar, size = "md", label, className = "" }: Ava
       {...a11y}
       className={
         "inline-flex shrink-0 items-center justify-center overflow-hidden rounded-pill " +
-        `border border-border bg-surface-elevated font-semibold text-text-primary ${SIZE[size]} ${className}`
+        `border border-line bg-surface-elevated font-semibold text-text-primary ${SIZE[size]} ${className}`
       }
     >
       {ref.kind === "preset" ? (

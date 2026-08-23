@@ -55,9 +55,13 @@ export function LeagueTermsPanel({
 }) {
   return (
     <Card as="section" aria-label="League terms" className="flex flex-col gap-3">
-      {/* `break-words`: the league name is user content, and this panel renders it at display
-          size inside a card — see `PageTitle`, which carries the same rule for the same reason. */}
-      <Title className="break-words font-display text-2xl font-bold uppercase leading-display text-text-primary">{terms.name}</Title>
+      {/* `min-w-0 [overflow-wrap:anywhere]`: the league name is user content, and this panel
+          renders it at display size inside a card — see `PageTitle`, which carries the same
+          rule for the same reason (`break-words` wraps visually but is ignored when a browser
+          computes min-content, so an unbroken name can still widen the card past its container). */}
+      <Title className="min-w-0 [overflow-wrap:anywhere] font-display text-2xl font-bold uppercase leading-display text-text-primary">
+        {terms.name}
+      </Title>
       <dl className="flex flex-col gap-3">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Format</dt>

@@ -14,7 +14,7 @@ export interface StatePanelProps {
 }
 
 const TONE: Readonly<Record<StatePanelTone, { container: string; icon: string }>> = {
-  neutral: { container: "border-dashed border-border", icon: "text-text-muted" },
+  neutral: { container: "border-dashed border-line", icon: "text-text-muted" },
   negative: { container: "border-negative/40 bg-surface-elevated", icon: "text-negative" },
 };
 

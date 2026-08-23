@@ -71,12 +71,12 @@ export function StartOrJoinDisclosure({ experienceTier }: { readonly experienceT
     <details
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
-      className="rounded-lg border border-border"
+      className="rounded-lg border border-line"
     >
       <summary className="cursor-pointer select-none p-4 text-sm font-medium text-text-primary">
         Start or join another league
       </summary>
-      <div className="flex flex-col gap-6 border-t border-border p-4">
+      <div className="flex flex-col gap-6 border-t border-line p-4">
         {firstRunPathOrder(experienceTier).map((key) => SECTIONS[key]())}
       </div>
     </details>

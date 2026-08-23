@@ -63,7 +63,7 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
             clock": the rail above already carries that phrase and the countdown, and saying
             the same thing twice on one screen is what made the old room feel confusing. What
             this panel adds is the FACE — the owner's portrait, readable across a room. */}
-        <section data-testid="spotlight" className="flex shrink-0 items-center gap-4 rounded-lg border border-border bg-surface-elevated p-6 shadow-card">
+        <section data-testid="spotlight" className="flex shrink-0 items-center gap-4 rounded-lg border border-line bg-surface-elevated p-6 shadow-card">
           {onClock === null ? null : <Avatar name={onClock.ownerDisplayName} avatar={onClock.ownerAvatarUrl} size="lg" />}
           <div>
             <p className="font-display text-sm uppercase tracking-wide text-text-muted">Now picking</p>

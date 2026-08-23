@@ -14,7 +14,7 @@ export const dynamic = "force-dynamic";
 /** The signed-out chrome, shared by the feed and the over-the-ceiling refusal below it. */
 function PublicHeader() {
   return (
-    <header className="border-b border-border bg-surface">
+    <header className="border-b border-line bg-surface">
       <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-3">
         <Link
           href="/"

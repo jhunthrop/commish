@@ -206,7 +206,7 @@ export function HeldTradeDetail({ flagId, subject, trail, decisions, noteMaxLeng
         ) : (
           <ul className="mt-2 flex flex-col" aria-label="Held trade history">
             {trail.map((row) => (
-              <li key={row.eventId} className="flex items-start gap-3 border-b border-border py-3 last:border-b-0">
+              <li key={row.eventId} className="flex items-start gap-3 border-b border-line py-3 last:border-b-0">
                 <Icon name={row.icon} size={18} className="mt-0.5 shrink-0 text-text-muted" />
                 <div className="flex min-w-0 flex-col gap-0.5">
                   <p className="break-words text-sm text-text-primary">{row.headline}</p>

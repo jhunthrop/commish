@@ -43,15 +43,19 @@ export interface AppHeaderProps {
  */
 export function AppHeader({ displayName, avatar, isAdmin }: AppHeaderProps) {
   return (
-    <header className="border-b border-border bg-surface">
-      <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-3">
+    <header className="border-b border-line bg-surface">
+      {/* v2's Geist retone widened the wordmark (font-display's own -0.02em tracking cannot claw
+          back a condensed-to-regular font-family swap), which is why the row and the right-hand
+          group's gaps tightened one step each here — the same fix-round-1 problem this header's
+          own docblock names, reopened by the font change rather than by a sixth control. */}
+      <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-3 px-3 py-3">
         <Link
           href="/app"
-          className="font-display text-xl font-bold uppercase tracking-wide text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="font-display text-xl font-bold uppercase text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           Commish
         </Link>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
           {!isAdmin ? null : (
             <Link
               href="/app/admin/queue"

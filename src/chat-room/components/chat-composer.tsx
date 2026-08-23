@@ -61,7 +61,7 @@ export function ChatComposer({ sending, onSend, gifSearchEnabled, onSearchGifs }
 
   return (
     <form
-      className="flex flex-col gap-2 border-t border-border pt-2"
+      className="flex flex-col gap-2 border-t border-line pt-2"
       onSubmit={(event) => {
         event.preventDefault();
         void submit();

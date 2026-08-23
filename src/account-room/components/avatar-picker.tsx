@@ -88,7 +88,7 @@ export function AvatarPicker({ displayName, value, onChange }: AvatarPickerProps
               className={
                 "flex flex-col items-center gap-1 rounded-md border p-2 text-xs font-medium text-text-primary " +
                 "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
-                (checked ? "border-accent bg-surface-elevated" : "border-border")
+                (checked ? "border-accent bg-surface-elevated" : "border-line")
               }
             >
               <Avatar name={displayName} avatar={avatarRefValue(preset.key)} size="lg" />

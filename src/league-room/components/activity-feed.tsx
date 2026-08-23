@@ -22,7 +22,7 @@ function ActivityRowItem({ row }: { readonly row: ActivityRow }) {
   // reader who may never have seen an autopick before.
   const isQueueAutopick = row.icon === "clock";
   return (
-    <li className="flex items-start gap-3 border-b border-border py-4 last:border-b-0">
+    <li className="flex items-start gap-3 border-b border-line py-4 last:border-b-0">
       <Icon name={row.icon} size={20} className="mt-0.5 shrink-0 text-text-muted" />
       {/* `min-w-0` on the flex item plus `break-words` on the text: a headline carries user
           content (a league name, a manager's name, a team name) that can be one long unbroken

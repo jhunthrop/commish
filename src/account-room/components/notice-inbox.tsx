@@ -12,7 +12,7 @@ function formatNoticeDate(iso: string): string {
 
 function NoticeRow({ notice }: { readonly notice: NoticeView }) {
   return (
-    <li className="flex flex-col gap-1 border-b border-border py-3 last:border-b-0">
+    <li className="flex flex-col gap-1 border-b border-line py-3 last:border-b-0">
       <p className="break-words font-medium text-text-primary">{notice.title}</p>
       <p className="break-words text-sm text-text-muted">
         {notice.body}
@@ -24,7 +24,7 @@ function NoticeRow({ notice }: { readonly notice: NoticeView }) {
           `body`'s own sentence (fix round 1, FIX 7). `break-words` because a notice body carries
           user content (a league name, a player name) that has no space in it to wrap at. */}
       {notice.quote === null ? null : (
-        <blockquote className="break-words border-l-2 border-border pl-3 text-sm italic text-text-muted">{`"${notice.quote}"`}</blockquote>
+        <blockquote className="break-words border-l-2 border-line pl-3 text-sm italic text-text-muted">{`"${notice.quote}"`}</blockquote>
       )}
       <time dateTime={notice.createdAt} className="text-xs text-text-muted">
         {formatNoticeDate(notice.createdAt)}
@@ -111,7 +111,7 @@ export function NoticeInbox() {
           id={panelId}
           role="region"
           aria-label="Notices"
-          className="fixed inset-x-4 top-16 z-20 flex max-h-96 flex-col gap-3 overflow-y-auto rounded-lg border border-border bg-surface-elevated p-4 shadow-card sm:inset-x-auto sm:right-4 sm:w-96"
+          className="fixed inset-x-4 top-16 z-20 flex max-h-96 flex-col gap-3 overflow-y-auto rounded-lg border border-line bg-surface-elevated p-4 shadow-card sm:inset-x-auto sm:right-4 sm:w-96"
         >
           {status === "error" ? (
             <ErrorState

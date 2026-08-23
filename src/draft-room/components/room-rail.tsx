@@ -51,10 +51,10 @@ const LEAGUE_TEXT: Readonly<Record<RoomRailVariant, string>> = {
  * moment the room should stop being calm is the sixty seconds that belong to you.
  */
 const MODE_SKIN: Readonly<Record<RoomMode, string>> = {
-  scheduled: "border-border bg-surface-elevated",
-  watching: "border-border bg-surface-elevated",
+  scheduled: "border-line bg-surface-elevated",
+  watching: "border-line bg-surface-elevated",
   hot: "border-negative bg-negative/10",
-  complete: "border-border bg-surface-elevated",
+  complete: "border-line bg-surface-elevated",
 };
 
 interface TurnSummary {

@@ -56,7 +56,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
           "min-h-28 resize-y rounded-md border bg-surface-elevated px-3 py-2 text-md text-text-primary " +
           "placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
           "disabled:opacity-60 disabled:cursor-not-allowed " +
-          (error ? "border-negative " : "border-border ") +
+          (error ? "border-negative " : "border-line ") +
           className
         }
         {...rest}

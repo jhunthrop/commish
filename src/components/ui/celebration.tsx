@@ -21,7 +21,7 @@ export interface CelebrationProps {
 export function Celebration({ title, detail, emphasis, testId }: CelebrationProps) {
   const reduced = usePrefersReducedMotion();
   const motion = reduced ? "" : emphasis === "self" ? "animate-celebrate-self" : "animate-celebrate-peer";
-  const tone = emphasis === "self" ? "border-accent bg-accent/10" : "border-border bg-surface-elevated";
+  const tone = emphasis === "self" ? "border-accent bg-accent/10" : "border-line bg-surface-elevated";
 
   return (
     <div role="status" data-testid={testId} data-emphasis={emphasis} className={`rounded-lg border p-3 text-center ${tone} ${motion}`}>

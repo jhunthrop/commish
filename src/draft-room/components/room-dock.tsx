@@ -109,7 +109,7 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
           return (
             <li
               key={playerId}
-              className="flex shrink-0 items-center gap-1 rounded-pill border border-border bg-surface-elevated py-1 pl-2 pr-1"
+              className="flex shrink-0 items-center gap-1 rounded-pill border border-line bg-surface-elevated py-1 pl-2 pr-1"
             >
               <span className="font-mono text-xs tabular-nums text-text-muted">{index + 1}</span>
               {player === undefined ? null : <PositionBadge position={player.position} size="sm" />}
@@ -228,7 +228,7 @@ export function RoomDock({
     <footer
       data-testid="room-dock"
       data-mode={mode}
-      className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t border-border bg-surface-elevated px-4 py-2 lg:h-24 lg:flex-nowrap"
+      className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-2 border-t border-line bg-surface-elevated px-4 py-2 lg:h-24 lg:flex-nowrap"
     >
       {bidConsole ?? (
         <PrimarySlot

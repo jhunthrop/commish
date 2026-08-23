@@ -44,7 +44,7 @@ function resultSentence(ranking: readonly number[], assignedSlot: number): strin
   return `Slot ${ranking[0]} went to another manager, so you got slot ${assignedSlot}.`;
 }
 
-const CHIP = "flex shrink-0 items-center gap-1 rounded-pill border border-border bg-surface py-1 pl-2 pr-1";
+const CHIP = "flex shrink-0 items-center gap-1 rounded-pill border border-line bg-surface py-1 pl-2 pr-1";
 
 export interface SlotPreferencePanelProps {
   readonly leagueId: string;
@@ -106,7 +106,7 @@ export function SlotPreferencePanel({ leagueId, initialPreference, helpLevel }: 
     // half-true sentence.
     if (preference.assignedSlot === null) return null;
     return (
-      <div className="flex flex-col gap-1 rounded-lg border border-border bg-surface-elevated p-4">
+      <div className="flex flex-col gap-1 rounded-lg border border-line bg-surface-elevated p-4">
         <h2 className={`${EYEBROW} text-text-muted`}>Draft slot</h2>
         <p className="text-sm text-text-primary">{resultSentence(preference.ranking, preference.assignedSlot)}</p>
       </div>
@@ -117,7 +117,7 @@ export function SlotPreferencePanel({ leagueId, initialPreference, helpLevel }: 
   const unranked = allSlots.filter((slot) => !ranking.includes(slot));
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border border-border bg-surface-elevated p-4">
+    <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface-elevated p-4">
       <div className="flex flex-wrap items-center gap-1">
         <h2 className={`${EYEBROW} text-text-muted`}>Draft slot</h2>
         <InfoTip term="draft-slot" helpLevel={helpLevel} />
@@ -159,7 +159,7 @@ export function SlotPreferencePanel({ leagueId, initialPreference, helpLevel }: 
           <h3 className={`${EYEBROW} text-text-muted`}>Not ranked</h3>
           <ul aria-label="Slots not yet ranked" className="flex flex-wrap items-center gap-2">
             {unranked.map((slot) => (
-              <li key={slot} className="flex shrink-0 items-center gap-1 rounded-pill border border-dashed border-border py-1 pl-2 pr-1">
+              <li key={slot} className="flex shrink-0 items-center gap-1 rounded-pill border border-dashed border-line py-1 pl-2 pr-1">
                 <span className="font-display text-text-primary">Slot {slot}</span>
                 <Button size="sm" variant="ghost" disabled={saving} aria-label={`Add slot ${slot} to your ranking`} onClick={() => setRanking((r) => [...r, slot])}>
                   <span aria-hidden="true">+</span>

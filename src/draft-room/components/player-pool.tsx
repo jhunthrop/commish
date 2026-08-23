@@ -143,7 +143,7 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, a
             return (
               <li
                 key={row.player.id}
-                className={`flex h-11 shrink-0 items-center gap-2 rounded-sm border border-border px-2 ${row.drafted ? "opacity-60" : "bg-surface-elevated"}`}
+                className={`flex h-11 shrink-0 items-center gap-2 rounded-sm border border-line px-2 ${row.drafted ? "opacity-60" : "bg-surface-elevated"}`}
               >
                 <span className="w-5 shrink-0 text-right font-mono text-xs tabular-nums text-text-muted">{row.rank}</span>
                 <PositionBadge position={row.player.position} size="sm" />

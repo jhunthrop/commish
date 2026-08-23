@@ -36,7 +36,7 @@ export const Select = forwardRef<HTMLSelectElement, SelectProps>(function Select
           "h-10 rounded-md border bg-surface-elevated px-3 text-md text-text-primary " +
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
           "disabled:opacity-60 disabled:cursor-not-allowed " +
-          (error ? "border-negative " : "border-border ") +
+          (error ? "border-negative " : "border-line ") +
           className
         }
         {...rest}

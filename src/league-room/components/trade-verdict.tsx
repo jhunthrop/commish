@@ -42,7 +42,7 @@ const VERDICT_SUMMARY: Readonly<Record<TradeVerdictUnion, string>> = {
  */
 export function TradeVerdict({ assessment }: TradeVerdictProps) {
   return (
-    <div className="flex flex-col gap-1 rounded-md border border-border bg-surface-elevated p-3">
+    <div className="flex flex-col gap-1 rounded-md border border-line bg-surface-elevated p-3">
       <p className="text-sm font-medium text-text-primary">{VERDICT_SUMMARY[assessment.verdict]}</p>
       <p className="text-sm text-text-muted">
         {`${formatPoints(assessment.givingValue)} points a week going out, ${formatPoints(assessment.receivingValue)} points a week coming back.`}

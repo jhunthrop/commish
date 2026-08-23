@@ -175,7 +175,7 @@ function StickerCell({
     );
     // A pick whose player metadata hasn't loaded yet is the one sticker with no pigment.
     return player === null ? (
-      <div className={`rounded-sm border border-border bg-surface-elevated text-text-primary shadow-sticker ${layout}`}>{body}</div>
+      <div className={`rounded-sm border border-line bg-surface-elevated text-text-primary shadow-sticker ${layout}`}>{body}</div>
     ) : (
       <Sticker position={player.position} className={layout}>
         {body}
@@ -185,7 +185,7 @@ function StickerCell({
 
   if (cell.onClock) {
     return (
-      <div data-onclock-cell="true" className="relative flex h-full items-center justify-center rounded-sm border border-dashed border-border px-2 py-2">
+      <div data-onclock-cell="true" className="relative flex h-full items-center justify-center rounded-sm border border-dashed border-line px-2 py-2">
         <span aria-hidden="true" className={`pointer-events-none absolute inset-0 rounded-sm ring-2 ring-accent ${spotlight ? "animate-spotlight" : ""}`} />
         <span className={`${EYEBROW} text-accent`}>On the clock</span>
       </div>
@@ -198,7 +198,7 @@ function StickerCell({
     // no name (the room already knows whose turn it isn't, from the on-clock cell elsewhere):
     // the same "what happened, not who" restraint every skip notice keeps.
     return (
-      <div data-pending-cell="true" className="flex h-full items-center justify-center rounded-sm border border-dashed border-border px-2 py-2">
+      <div data-pending-cell="true" className="flex h-full items-center justify-center rounded-sm border border-dashed border-line px-2 py-2">
         <span className={`${EYEBROW} text-text-muted`}>Pending</span>
       </div>
     );
@@ -206,7 +206,7 @@ function StickerCell({
 
   // Far-future rounds compress to slivers: the present deserves the space, and the shape of
   // the season is still visible without shouting.
-  return <div aria-hidden="true" className={`h-full rounded-sm border border-dashed ${cell.future ? "min-h-4 border-border/35" : "min-h-12 border-border"}`} />;
+  return <div aria-hidden="true" className={`h-full rounded-sm border border-dashed ${cell.future ? "min-h-4 border-line/35" : "min-h-12 border-line"}`} />;
 }
 
 /**
@@ -337,7 +337,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
           </li>
         ))}
         {listRows.length === 0 ? (
-          <li className="rounded-sm border border-dashed border-border p-4 text-sm text-text-muted">
+          <li className="rounded-sm border border-dashed border-line p-4 text-sm text-text-muted">
             The board fills in as picks land. Nothing has been drafted yet.
           </li>
         ) : null}

@@ -196,7 +196,7 @@ function ResolutionSummary({ resolution }: { readonly resolution: FlagResolution
         <span className="font-medium">{resolution.resolvedByName}</span> {DECISION_PHRASE[resolution.decision]} on {formatWhen(resolution.resolvedAt)}.
       </p>
       {resolution.note.length === 0 ? null : (
-        <blockquote className="border-l-2 border-border pl-3 text-sm italic text-text-muted">{`"${resolution.note}"`}</blockquote>
+        <blockquote className="border-l-2 border-line pl-3 text-sm italic text-text-muted">{`"${resolution.note}"`}</blockquote>
       )}
     </div>
   );
@@ -348,7 +348,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
             ) : (
               <ul className="mt-2 flex flex-col" aria-label="Flag history">
                 {detail.trail.map((row) => (
-                  <li key={row.eventId} className="flex items-start gap-3 border-b border-border py-3 last:border-b-0">
+                  <li key={row.eventId} className="flex items-start gap-3 border-b border-line py-3 last:border-b-0">
                     <Icon name={row.icon} size={18} className="mt-0.5 shrink-0 text-text-muted" />
                     <div className="flex min-w-0 flex-col gap-0.5">
                       <p className="break-words text-sm text-text-primary">{row.headline}</p>

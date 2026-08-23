@@ -30,7 +30,7 @@ export function NotificationSummary() {
           // `<dl>`'s allowed direct children are `<dt>`/`<dd>` pairs, optionally grouped in a
           // `<div>` — the badge lives INSIDE `<dt>` rather than beside it in its own wrapper,
           // so this stays a valid (and axe-clean) description list.
-          <div key={topic.key} className="flex flex-col gap-1 border-b border-border pb-3 last:border-b-0 last:pb-0">
+          <div key={topic.key} className="flex flex-col gap-1 border-b border-line pb-3 last:border-b-0 last:pb-0">
             <dt className="flex flex-wrap items-center justify-between gap-2 font-medium text-text-primary">
               <span>{topic.title}</span>
               {liveChannelLabel.length > 0 && <Badge tone="positive">{liveChannelLabel}</Badge>}

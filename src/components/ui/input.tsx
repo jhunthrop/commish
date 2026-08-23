@@ -24,7 +24,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
           "h-10 rounded-md border bg-surface-elevated px-3 text-md text-text-primary " +
           "placeholder:text-text-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
           "disabled:opacity-60 disabled:cursor-not-allowed " +
-          (error ? "border-negative " : "border-border ") +
+          (error ? "border-negative " : "border-line ") +
           className
         }
         {...rest}

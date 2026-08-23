@@ -40,14 +40,14 @@ export function RoomLayout({ rail, pool, stage, dock, aside }: RoomLayoutProps) 
     <div data-testid="room-layout" className="flex min-h-dvh flex-col lg:h-dvh lg:min-h-0 lg:overflow-hidden">
       <div className="order-1">{rail}</div>
       <div className="order-3 flex min-h-0 flex-1 flex-col lg:order-2 lg:flex-row">
-        <div className="order-2 min-w-0 border-border lg:order-1 lg:w-88 lg:shrink-0 lg:overflow-hidden lg:border-r">{pool}</div>
+        <div className="order-2 min-w-0 border-line lg:order-1 lg:w-88 lg:shrink-0 lg:overflow-hidden lg:border-r">{pool}</div>
         {/* overflow-HIDDEN, not auto: the board grid inside the stage is the one horizontal
             scroller. Two nested auto containers rendered two scrollbars stacked on each other. */}
         <div className="order-1 min-w-0 lg:order-2 lg:min-h-0 lg:flex-1 lg:overflow-hidden">{stage}</div>
         {aside === undefined ? null : (
           <div
             data-testid="room-aside"
-            className="order-3 min-w-0 border-border lg:order-3 lg:shrink-0 lg:overflow-hidden lg:border-l"
+            className="order-3 min-w-0 border-line lg:order-3 lg:shrink-0 lg:overflow-hidden lg:border-l"
           >
             {/* Width lives on the aside CONTENT (lg:w-88 open, slim strip collapsed) so the
                 band can collapse without this frame knowing chat exists. */}

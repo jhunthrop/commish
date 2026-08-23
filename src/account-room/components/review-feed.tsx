@@ -85,7 +85,7 @@ function ReportControl({ reviewId }: { readonly reviewId: string }) {
           <select
             value={reason}
             onChange={(event) => setReason(event.target.value as ReportReasonValue)}
-            className="h-8 rounded-md border border-border bg-surface-elevated px-2 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="h-8 rounded-md border border-line bg-surface-elevated px-2 text-sm text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {REVIEW_CONFIG.reportReasons.map((entry) => (
               <option key={entry.value} value={entry.value}>
@@ -110,7 +110,7 @@ function ReportControl({ reviewId }: { readonly reviewId: string }) {
 function ReviewRow({ review }: { readonly review: ReviewView }) {
   const rating = ratingLabel(review.rating);
   return (
-    <li className="flex flex-col gap-2 border-b border-border py-4 last:border-b-0">
+    <li className="flex flex-col gap-2 border-b border-line py-4 last:border-b-0">
       <div className="flex items-center gap-3">
         <Avatar name={review.authorName} avatar={review.authorAvatar} />
         <div className="flex flex-col">

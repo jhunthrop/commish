@@ -33,7 +33,7 @@ export default async function JoinPage({ params }: PageProps) {
   return (
     <>
       {user === null ? (
-        <header className="border-b border-border bg-surface">
+        <header className="border-b border-line bg-surface">
           <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-3">
             <Link
               href="/"

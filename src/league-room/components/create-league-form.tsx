@@ -167,7 +167,7 @@ function AdvancedSettingsDrawer({
   readonly helpLevel?: HelpLevel;
 }) {
   return (
-    <details className="rounded-md border border-border p-3">
+    <details className="rounded-md border border-line p-3">
       <summary className="cursor-pointer text-sm text-text-muted">{DRAWER_SUMMARY}</summary>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Select label="Draft format" options={FORMATS} value={format} onChange={(event) => onFormatChange(event.target.value)} />

@@ -23,7 +23,7 @@ export default function NotFound() {
             <Link href="/app" className={`${LINK_CLASS} bg-accent text-accent-text hover:brightness-110`}>
               Go to your leagues
             </Link>
-            <Link href="/browse" className={`${LINK_CLASS} border border-border text-text-primary hover:bg-surface-elevated`}>
+            <Link href="/browse" className={`${LINK_CLASS} border border-line text-text-primary hover:bg-surface-elevated`}>
               Browse open leagues
             </Link>
           </div>

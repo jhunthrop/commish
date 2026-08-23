@@ -80,7 +80,7 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
               {leagueNotices.map((notice) => {
                 const quote = quoteFor(notice);
                 return (
-                  <li key={notice.id} className="flex flex-col gap-1 border-b border-border py-3 last:border-b-0">
+                  <li key={notice.id} className="flex flex-col gap-1 border-b border-line py-3 last:border-b-0">
                     <p className="break-words font-medium text-text-primary">{notice.title}</p>
                     <p className="break-words text-sm text-text-muted">
                       {notice.body}
@@ -90,7 +90,7 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
                         reason maps to (`quoteFor`), laid out as a real quotation rather than
                         folded into `body`'s own sentence. Never the stored token. */}
                     {quote === null ? null : (
-                      <blockquote className="break-words border-l-2 border-border pl-3 text-sm italic text-text-muted">{`"${quote}"`}</blockquote>
+                      <blockquote className="break-words border-l-2 border-line pl-3 text-sm italic text-text-muted">{`"${quote}"`}</blockquote>
                     )}
                   </li>
                 );
