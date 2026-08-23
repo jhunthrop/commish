@@ -2,10 +2,13 @@ import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, players } from "@/db/schema";
+import { drafts, leagues, players } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import { currentDeadline } from "@/draft-engine";
+import type { HouseFactoryOutcome } from "@/league-service/house-factory";
+import { HOUSE_CATALOG } from "@/matchmaking/house-catalog";
 import type { AutoStartOutcome } from "./auto-start";
+import { DRAFT_SERVICE_CONFIG } from "./config";
 import { createDraftStore, type DraftStore } from "./store";
 import { createDraftTicker } from "./ticker";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
@@ -13,6 +16,21 @@ import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 const db = createTestDb();
 let now = "2026-09-01T00:00:00.000Z";
 const clock = { now: () => now };
+
+/**
+ * A no-op stand-in for the real `ensureHouseCatalog`, injected into every ticker test below that
+ * has nothing to do with the house-catalog shelf — the same "so a test can stub it without
+ * seeding a fixture for every ticker test that has nothing to do with it" reasoning `autoStart`'s
+ * own default already gets. Unlike `autoStartDueDrafts`, the real `ensureHouseCatalog` is not
+ * passive: it CREATES real, public-matchmade house leagues whose drafts can become due on a later
+ * tick, which would otherwise widen these unrelated tests' `tick()` assertions with outcomes they
+ * were never written to expect. `describe("draft ticker — house reconcile ...")`, further down,
+ * is where the real default is exercised on purpose.
+ */
+const NO_OP_HOUSE_RECONCILE = async (): Promise<HouseFactoryOutcome> => ({
+  opened: [],
+  refused: [],
+});
 
 beforeEach(async () => {
   await truncateAll(db);
@@ -25,8 +43,13 @@ afterAll(async () => {
 
 async function liveDraft() {
   const fixture = await seedDraftFixture(db, {
-    draftId: "draft_tick", leagueId: "league_tick", format: "snake", teamCount: 2,
-    slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    draftId: "draft_tick",
+    leagueId: "league_tick",
+    format: "snake",
+    teamCount: 2,
+    slotConfig: SPRINT_ROSTER_SLOTS,
+    kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+    auctionBudget: null,
   });
   await db.insert(players).values([
     { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },
@@ -38,7 +61,16 @@ async function liveDraft() {
   ]);
   const store = createDraftStore({ db, publish: async () => "1-0", clock });
   await store.startDraft(fixture.draftId);
-  return { fixture, store, ticker: createDraftTicker({ db, store, clock }) };
+  return {
+    fixture,
+    store,
+    ticker: createDraftTicker({
+      db,
+      store,
+      clock,
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+    }),
+  };
 }
 
 describe("draft ticker", () => {
@@ -56,13 +88,21 @@ describe("draft ticker", () => {
     // the clock would be skipped rather than autopicked — this test is about the autopick path.
     const onClockState = await store.getDraftState(fixture.draftId);
     const onClockTeamId = onClockState!.draftOrder[0]!;
-    await store.applyAction(fixture.draftId, { v: DRAFT_ACTION_VERSION, type: "SET_QUEUE", timestamp: now, teamId: onClockTeamId, playerIds: ["qb1"] });
+    await store.applyAction(fixture.draftId, {
+      v: DRAFT_ACTION_VERSION,
+      type: "SET_QUEUE",
+      timestamp: now,
+      teamId: onClockTeamId,
+      playerIds: ["qb1"],
+    });
     // The raw 8h deadline would be 08:00Z, but `loadDraftConfig` attaches the real overnight
     // freeze (2-5 AM ET) and this turn's start (8 PM ET, 8/31) runs straight into it, pushing
     // the true deadline to 11:00Z — proof, in passing, that the ticker's own expiry sweep
     // inherits the pause for free by reading `currentDeadline` and nothing else.
     now = "2026-09-01T12:00:00.000Z";
-    expect(await ticker.tick()).toEqual([{ draftId: fixture.draftId, applied: true }]);
+    expect(await ticker.tick()).toEqual([
+      { draftId: fixture.draftId, applied: true },
+    ]);
     const state = await store.getDraftState(fixture.draftId);
     expect(state?.picks).toHaveLength(1);
     expect(state?.picks[0]?.auto).toBe(true);
@@ -79,11 +119,18 @@ describe("draft ticker", () => {
     // Present in `drafts`, but never started — must never appear in the ticker's SQL scan,
     // not merely be a no-op once loaded.
     await seedDraftFixture(db, {
-      draftId: "draft_tick_scheduled", leagueId: "league_tick_scheduled", format: "snake", teamCount: 2,
-      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+      draftId: "draft_tick_scheduled",
+      leagueId: "league_tick_scheduled",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
     });
     now = "2026-09-01T12:00:00.000Z"; // past the in-progress draft's (pause-extended) deadline
-    expect(await ticker.tick()).toEqual([{ draftId: fixture.draftId, applied: true }]);
+    expect(await ticker.tick()).toEqual([
+      { draftId: fixture.draftId, applied: true },
+    ]);
   });
 
   // A real "applyAction rejected" outcome reaching `ticker.tick()` is covered two ways
@@ -106,13 +153,26 @@ describe("draft ticker", () => {
   it("nudges a live draft instead of expiring it, and expires it without nudging", async () => {
     const { store, fixture } = await liveDraft();
     const calls: string[] = [];
-    const nudger = { nudge: async () => { calls.push("nudged"); return "published" as const; } };
-    const ticking = createDraftTicker({ db, store, clock, nudger });
+    const nudger = {
+      nudge: async () => {
+        calls.push("nudged");
+        return "published" as const;
+      },
+    };
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      nudger,
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+    });
     now = "2026-09-01T07:00:00.000Z"; // inside the turn
     expect(await ticking.tick()).toEqual([]);
     expect(calls).toEqual(["nudged"]);
     now = "2026-09-01T12:00:00.000Z"; // past the (pause-extended) deadline
-    expect(await ticking.tick()).toEqual([{ draftId: fixture.draftId, applied: true }]);
+    expect(await ticking.tick()).toEqual([
+      { draftId: fixture.draftId, applied: true },
+    ]);
     expect(calls).toEqual(["nudged"]);
   });
 
@@ -159,7 +219,12 @@ describe("draft ticker", () => {
       applyAction: async () => ({ ok: false as const, reason: "n/a" }),
       invalidate: () => {},
     } as unknown as DraftStore;
-    const ticker = createDraftTicker({ db, store, clock });
+    const ticker = createDraftTicker({
+      db,
+      store,
+      clock,
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+    });
     expect(await ticker.tick()).toEqual([]);
   });
 
@@ -167,19 +232,35 @@ describe("draft ticker", () => {
     const { fixture } = await liveDraft();
     now = "2026-09-01T09:00:00.000Z";
     const store = {
-      getDraftState: async () => { throw new Error("connection reset"); },
+      getDraftState: async () => {
+        throw new Error("connection reset");
+      },
       applyAction: async () => ({ ok: false as const, reason: "n/a" }),
       invalidate: () => {},
     } as unknown as DraftStore;
     const onOutcome = vi.fn();
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      const ticker = createDraftTicker({ db, store, clock, onOutcome });
+      const ticker = createDraftTicker({
+        db,
+        store,
+        clock,
+        onOutcome,
+        reconcileHouse: NO_OP_HOUSE_RECONCILE,
+      });
       const outcomes = await ticker.tick();
-      const expected = { draftId: fixture.draftId, applied: false, reason: "Something went wrong checking this draft's clock." };
+      const expected = {
+        draftId: fixture.draftId,
+        applied: false,
+        reason: "Something went wrong checking this draft's clock.",
+      };
       expect(outcomes).toEqual([expected]);
       expect(onOutcome).toHaveBeenCalledWith(expected);
-      expect(errorSpy).toHaveBeenCalledWith("[draft] ticker failed for draft", fixture.draftId, expect.any(Error));
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[draft] ticker failed for draft",
+        fixture.draftId,
+        expect.any(Error),
+      );
     } finally {
       errorSpy.mockRestore();
     }
@@ -200,7 +281,10 @@ describe("draft ticker", () => {
             orderBy: () => ({
               limit: () => {
                 callCount += 1;
-                if (callCount === 1) return new Promise((_resolve, reject) => { releaseFirstCall = reject; });
+                if (callCount === 1)
+                  return new Promise((_resolve, reject) => {
+                    releaseFirstCall = reject;
+                  });
                 return Promise.reject(new Error("db down"));
               },
             }),
@@ -214,7 +298,13 @@ describe("draft ticker", () => {
       invalidate: () => {},
     } as unknown as DraftStore;
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const ticker = createDraftTicker({ db: failingDb, store, clock, intervalMs: 5 });
+    const ticker = createDraftTicker({
+      db: failingDb,
+      store,
+      clock,
+      intervalMs: 5,
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+    });
     try {
       ticker.start();
       // Give the interval time to fire several times while the first call is still hanging.
@@ -224,7 +314,10 @@ describe("draft ticker", () => {
       releaseFirstCall?.(new Error("db down"));
       // Let the rejection propagate through start()'s `.catch().finally()`.
       await new Promise((resolve) => setTimeout(resolve, 20));
-      expect(errorSpy).toHaveBeenCalledWith("[draft] ticker failed", expect.any(Error));
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[draft] ticker failed",
+        expect.any(Error),
+      );
 
       // `running` was reset in `.finally()`, so a later interval can fire again.
       await new Promise((resolve) => setTimeout(resolve, 20));
@@ -245,15 +338,30 @@ describe("draft ticker — onOutcome logging (I5)", () => {
     // ticker a store whose applyAction always rejects — deterministic repeated failures,
     // without depending on the exact shape of a real race.
     await realStore.getDraftState(fixture.draftId);
-    const applyAction = vi.fn(async () => ({ ok: false as const, reason: "boom" }));
+    const applyAction = vi.fn(async () => ({
+      ok: false as const,
+      reason: "boom",
+    }));
     const store = { ...realStore, applyAction };
     const onOutcome = vi.fn();
-    const ticker = createDraftTicker({ db, store, clock, onOutcome });
+    const ticker = createDraftTicker({
+      db,
+      store,
+      clock,
+      onOutcome,
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+    });
 
     const first = await ticker.tick();
-    expect(first).toEqual([{ draftId: fixture.draftId, applied: false, reason: "boom" }]);
+    expect(first).toEqual([
+      { draftId: fixture.draftId, applied: false, reason: "boom" },
+    ]);
     expect(onOutcome).toHaveBeenCalledTimes(1);
-    expect(onOutcome).toHaveBeenCalledWith({ draftId: fixture.draftId, applied: false, reason: "boom" });
+    expect(onOutcome).toHaveBeenCalledWith({
+      draftId: fixture.draftId,
+      applied: false,
+      reason: "boom",
+    });
 
     // Same instant, still failing — must NOT log again yet.
     await ticker.tick();
@@ -274,15 +382,24 @@ describe("draft ticker — onOutcome logging (I5)", () => {
     const { fixture, store: realStore } = await liveDraft();
     now = "2026-09-01T12:00:00.000Z"; // past the (pause-extended) deadline
     await realStore.getDraftState(fixture.draftId);
-    const store = { ...realStore, applyAction: async () => ({ ok: false as const, reason: "boom" }) };
-    const ticker = createDraftTicker({ db, store, clock });
+    const store = {
+      ...realStore,
+      applyAction: async () => ({ ok: false as const, reason: "boom" }),
+    };
+    const ticker = createDraftTicker({
+      db,
+      store,
+      clock,
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+    });
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       await ticker.tick();
-      expect(warnSpy).toHaveBeenCalledWith(
-        "[draft] tick not applied",
-        { draftId: fixture.draftId, applied: false, reason: "boom" },
-      );
+      expect(warnSpy).toHaveBeenCalledWith("[draft] tick not applied", {
+        draftId: fixture.draftId,
+        applied: false,
+        reason: "boom",
+      });
     } finally {
       warnSpy.mockRestore();
     }
@@ -302,16 +419,25 @@ describe("draft ticker — R-B4 store-level regression (check-then-act race)", (
     // A legitimate pick — a real HTTP request, in production — lands in the gap between
     // the ticker's read and the applyAction call it hasn't made yet.
     const picked = await store.applyAction(fixture.draftId, {
-      v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp: now, teamId: onClockTeamId, playerId: "qb1",
+      v: DRAFT_ACTION_VERSION,
+      type: "MAKE_PICK",
+      timestamp: now,
+      teamId: onClockTeamId,
+      playerId: "qb1",
     });
     expect(picked.ok).toBe(true);
 
     // The ticker's now-stale TIMER_EXPIRE — computed against the superseded deadline —
     // must not be allowed to autopick for whoever's turn it now is.
     const stale = await store.applyAction(fixture.draftId, {
-      v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: staleDeadline,
+      v: DRAFT_ACTION_VERSION,
+      type: "TIMER_EXPIRE",
+      timestamp: staleDeadline,
     });
-    expect(stale).toEqual({ ok: false, reason: "The clock hasn't run out yet." });
+    expect(stale).toEqual({
+      ok: false,
+      reason: "The clock hasn't run out yet.",
+    });
   });
 });
 
@@ -322,24 +448,45 @@ describe("draft ticker — auto-start (Task 7)", () => {
     const calls: string[] = [];
     const autoStart = async (): Promise<readonly AutoStartOutcome[]> => {
       calls.push("auto-start");
-      return [{ draftId: "draft_other", started: false, reason: "kept for its commissioner" }];
+      return [
+        {
+          draftId: "draft_other",
+          started: false,
+          reason: "kept for its commissioner",
+        },
+      ];
     };
-    const ticking = createDraftTicker({ db, store, clock, autoStart });
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      autoStart,
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+    });
 
     const outcomes = await ticking.tick();
     expect(calls).toEqual(["auto-start"]);
     // Auto-start's own outcome, mapped `started` -> `applied`, comes first — then the expiry
     // scan's own outcome for the live draft it started already.
     expect(outcomes).toEqual([
-      { draftId: "draft_other", applied: false, reason: "kept for its commissioner" },
+      {
+        draftId: "draft_other",
+        applied: false,
+        reason: "kept for its commissioner",
+      },
       { draftId: fixture.draftId, applied: true },
     ]);
   });
 
   it("defaults to the real autoStartDueDrafts and actually starts a due public matchmade draft, same tick", async () => {
     await seedDraftFixture(db, {
-      draftId: "draft_due", leagueId: "league_due", format: "snake", teamCount: 2,
-      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-01T00:00:00.000Z"), auctionBudget: null,
+      draftId: "draft_due",
+      leagueId: "league_due",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-01T00:00:00.000Z"),
+      auctionBudget: null,
       isPublicMatchmade: true,
     });
     await db.insert(players).values([
@@ -350,14 +497,31 @@ describe("draft ticker — auto-start (Task 7)", () => {
       { id: "drb2", name: "DRB Two", position: "RB", nflTeam: "SF" },
       { id: "dwr2", name: "DWR Two", position: "WR", nflTeam: "NYJ" },
     ]);
-    const store = createDraftStore({ db, publish: async () => "1-0", clock, deliverNotice: async () => {} });
-    const ticking = createDraftTicker({ db, store, clock });
+    const store = createDraftStore({
+      db,
+      publish: async () => "1-0",
+      clock,
+      deliverNotice: async () => {},
+    });
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+    });
 
     now = "2026-09-01T00:01:00.000Z"; // past the fixed kickoff, seconds after the draft would open
     const outcomes = await ticking.tick();
-    expect(outcomes).toContainEqual({ draftId: "draft_due", applied: true, reason: undefined });
+    expect(outcomes).toContainEqual({
+      draftId: "draft_due",
+      applied: true,
+      reason: undefined,
+    });
 
-    const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, "draft_due"));
+    const [row] = await db
+      .select({ status: drafts.status })
+      .from(drafts)
+      .where(eq(drafts.id, "draft_due"));
     expect(row?.status).toBe("in_progress");
     // The clock the START_DRAFT itself set only just started — this SAME tick's expiry scan
     // must not treat a draft that is seconds old as already timed out.
@@ -378,13 +542,158 @@ describe("draft ticker — auto-start (Task 7)", () => {
     };
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      const ticking = createDraftTicker({ db, store, clock, autoStart });
+      const ticking = createDraftTicker({
+        db,
+        store,
+        clock,
+        autoStart,
+        reconcileHouse: NO_OP_HOUSE_RECONCILE,
+      });
       const outcomes = await ticking.tick();
       // The expiry scan still ran and expired the live draft, despite auto-start's own failure.
       expect(outcomes).toEqual([{ draftId: fixture.draftId, applied: true }]);
-      expect(errorSpy).toHaveBeenCalledWith("[draft] auto-start scan failed", expect.any(Error));
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[draft] auto-start scan failed",
+        expect.any(Error),
+      );
     } finally {
       errorSpy.mockRestore();
     }
+  });
+});
+
+describe("draft ticker — house reconcile (Phase 3.5 addendum, Task 13)", () => {
+  const noOutcome: HouseFactoryOutcome = { opened: [], refused: [] };
+
+  it("runs house reconcile SECOND: after auto-start, before the expiry scan", async () => {
+    const { store, fixture } = await liveDraft();
+    now = "2026-09-01T12:00:00.000Z"; // past the live draft's own (pause-extended) deadline
+    const calls: string[] = [];
+    const autoStart = async (): Promise<readonly AutoStartOutcome[]> => {
+      calls.push("auto-start");
+      return [];
+    };
+    const reconcileHouse = async (): Promise<HouseFactoryOutcome> => {
+      calls.push("house-reconcile");
+      return noOutcome;
+    };
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      autoStart,
+      reconcileHouse,
+    });
+
+    const outcomes = await ticking.tick();
+    expect(calls).toEqual(["auto-start", "house-reconcile"]);
+    // The expiry scan's own outcome is unaffected — house reconcile contributes nothing to the
+    // returned outcomes array, only to the rate-limited log below.
+    expect(outcomes).toEqual([{ draftId: fixture.draftId, applied: true }]);
+  });
+
+  it("reports a shortfall it could not fill through the same rate-limited onOutcome every expiry failure uses", async () => {
+    const { store } = await liveDraft();
+    const reconcileHouse = async (): Promise<HouseFactoryOutcome> => ({
+      opened: [],
+      refused: [
+        {
+          rung: "open_12",
+          reason: "Something went wrong opening this league.",
+        },
+      ],
+    });
+    const onOutcome = vi.fn();
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      autoStart: async () => [],
+      reconcileHouse,
+      onOutcome,
+    });
+
+    await ticking.tick();
+    expect(onOutcome).toHaveBeenCalledWith({
+      draftId: "house:open_12",
+      applied: false,
+      reason: "Something went wrong opening this league.",
+    });
+  });
+
+  it("calls reconcileHouse on the first tick, then withholds it until houseReconcileIntervalMs has passed", async () => {
+    const { store } = await liveDraft();
+    now = "2026-09-01T12:00:00.000Z";
+    let calls = 0;
+    const reconcileHouse = async (): Promise<HouseFactoryOutcome> => {
+      calls += 1;
+      return noOutcome;
+    };
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      autoStart: async () => [],
+      reconcileHouse,
+    });
+
+    await ticking.tick();
+    expect(calls).toBe(1);
+
+    // Same instant again — still gated.
+    await ticking.tick();
+    expect(calls).toBe(1);
+
+    // Just under the interval — a tick before it does not reconcile.
+    now = "2026-09-01T12:00:29.999Z";
+    await ticking.tick();
+    expect(calls).toBe(1);
+
+    // At/after the interval — a tick after it does.
+    now = new Date(
+      Date.parse("2026-09-01T12:00:00.000Z") +
+        DRAFT_SERVICE_CONFIG.houseReconcileIntervalMs,
+    ).toISOString();
+    await ticking.tick();
+    expect(calls).toBe(2);
+  });
+
+  it("logs and continues to the expiry scan when reconcileHouse itself throws", async () => {
+    const { store, fixture } = await liveDraft();
+    now = "2026-09-01T12:00:00.000Z"; // past the live draft's own (pause-extended) deadline
+    const reconcileHouse = async (): Promise<never> => {
+      throw new Error("house reconcile connection reset");
+    };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const ticking = createDraftTicker({
+        db,
+        store,
+        clock,
+        autoStart: async () => [],
+        reconcileHouse,
+      });
+      const outcomes = await ticking.tick();
+      // The expiry scan still ran and expired the live draft, despite house reconcile's own failure.
+      expect(outcomes).toEqual([{ draftId: fixture.draftId, applied: true }]);
+      expect(errorSpy).toHaveBeenCalledWith(
+        "[draft] house reconcile failed",
+        expect.any(Error),
+      );
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("defaults to the real ensureHouseCatalog and actually opens the shelf on a cold database", async () => {
+    const { store } = await liveDraft();
+    const ticking = createDraftTicker({ db, store, clock });
+
+    await ticking.tick();
+    const rows = await db
+      .select({ id: leagues.id })
+      .from(leagues)
+      .where(eq(leagues.houseRung, "open_12"));
+    expect(rows).toHaveLength(HOUSE_CATALOG.rungs.open_12.openAtOnce);
   });
 });

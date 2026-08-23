@@ -31,10 +31,14 @@ export async function twoTeamLeague(db: Db, { weeks = 2 }: { readonly weeks?: nu
   ]);
   const created = await createLeague({ db, clock, newId }, {
     name: "Duel", format: "snake", teamCount: 2, scoringPreset: "ppr", auctionBudget: null,
-    rosterSlots: SLOTS, commissionerUserId: "u1", teamName: "Team One",
+    rosterSlots: SLOTS, owner: { kind: "member", userId: "u1", teamName: "Team One" },
     experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);
+  // A member owner (above) always gets a team — `createLeague`'s own docblock. Asserted, not
+  // branch-guarded: this file is under the same 100%-branch coverage gate as production code,
+  // and a runtime check for a case this fixture can never hit would be an uncoverable branch.
+  const teamId = created.teamId!;
   await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
   // `finalizeWeek` refuses an undrafted league (Plan B Task 5's guard) — this fixture stands
   // in for a season already underway, so the draft it's built on is done.
@@ -46,13 +50,13 @@ export async function twoTeamLeague(db: Db, { weeks = 2 }: { readonly weeks?: nu
     { id: "rb2", name: "RB Two", position: "RB", nflTeam: "DAL" },
   ]);
   await db.insert(rosterSlots).values([
-    { teamId: created.teamId, slot: "QB", slotIndex: 0, playerId: "qb1" },
-    { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: "rb1" },
-    { teamId: created.teamId, slot: "BENCH", slotIndex: 0, playerId: "qb2" },
-    { teamId: created.teamId, slot: "BENCH", slotIndex: 1, playerId: "rb2" },
+    { teamId, slot: "QB", slotIndex: 0, playerId: "qb1" },
+    { teamId, slot: "RB", slotIndex: 0, playerId: "rb1" },
+    { teamId, slot: "BENCH", slotIndex: 0, playerId: "qb2" },
+    { teamId, slot: "BENCH", slotIndex: 1, playerId: "rb2" },
   ]);
-  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, "team_2"], weeks }));
-  return created;
+  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [teamId, "team_2"], weeks }));
+  return { ...created, teamId };
 }
 
 /**
@@ -137,13 +141,14 @@ export async function advisorFixture(
     scoringPreset,
     auctionBudget: null,
     rosterSlots: ADVISOR_SLOTS,
-    commissionerUserId: commissioner,
-    teamName: "Bay Bandits",
+    owner: { kind: "member", userId: commissioner, teamName: "Bay Bandits" },
     experienceTier: "beginner",
     stakeTier: 0,
     isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);
+  // See `twoTeamLeague`'s identical comment above — a member owner always gets a team.
+  const teamId = created.teamId!;
 
   const opponentTeamId = `team_2${idSuffix}`;
   await db.insert(teams).values({ id: opponentTeamId, leagueId: created.leagueId, userId: rival, name: "Iron Owls" });
@@ -179,10 +184,10 @@ export async function advisorFixture(
     .onConflictDoNothing();
 
   await db.insert(rosterSlots).values([
-    { teamId: created.teamId, slot: "WR", slotIndex: 0, playerId: "wr_deep" },
-    { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: "rb_bell" },
-    { teamId: created.teamId, slot: "BENCH", slotIndex: 0, playerId: "wr_volume" },
-    { teamId: created.teamId, slot: "BENCH", slotIndex: 1, playerId: "rb_change" },
+    { teamId, slot: "WR", slotIndex: 0, playerId: "wr_deep" },
+    { teamId, slot: "RB", slotIndex: 0, playerId: "rb_bell" },
+    { teamId, slot: "BENCH", slotIndex: 0, playerId: "wr_volume" },
+    { teamId, slot: "BENCH", slotIndex: 1, playerId: "rb_change" },
     // The opponent fields the same four players, starters and bench swapped — real enough for
     // the trade route to assemble both sides of an actual proposal, not just reject one.
     { teamId: opponentTeamId, slot: "WR", slotIndex: 0, playerId: "wr_volume" },
@@ -192,10 +197,10 @@ export async function advisorFixture(
   ]);
 
   await db.transaction((tx) =>
-    writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, opponentTeamId], weeks: 4 }),
+    writeSchedule(tx, { leagueId: created.leagueId, teamIds: [teamId, opponentTeamId], weeks: 4 }),
   );
 
-  return { leagueId: created.leagueId, teamId: created.teamId, opponentTeamId };
+  return { leagueId: created.leagueId, teamId, opponentTeamId };
 }
 
 // --- Task 4's fixture: a season with a week already locked -----------------------------------
@@ -252,13 +257,14 @@ export async function seasonThroughWeek(db: Db, opts: SeasonThroughWeekOpts): Pr
     scoringPreset: "ppr",
     auctionBudget: null,
     rosterSlots: TRADE_SEASON_SLOTS,
-    commissionerUserId: "ts_u_a",
-    teamName: "Team A",
+    owner: { kind: "member", userId: "ts_u_a", teamName: "Team A" },
     experienceTier: "beginner",
     stakeTier: 0,
     isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);
+  // See `twoTeamLeague`'s identical comment above — a member owner always gets a team.
+  const teamId = created.teamId!;
   const teamB = "ts_team_b";
   await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: "ts_u_b", name: "Team B" });
   await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
@@ -285,10 +291,10 @@ export async function seasonThroughWeek(db: Db, opts: SeasonThroughWeekOpts): Pr
   // somewhere for the incoming, differently-shaped player to land; a fully packed roster would
   // refuse every such trade regardless of materialization, which is not the property under test.
   await db.insert(rosterSlots).values([
-    { teamId: created.teamId, slot: "QB", slotIndex: 0, playerId: "p_qb_a" },
-    { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: "p_star_rb" },
-    { teamId: created.teamId, slot: "WR", slotIndex: 0, playerId: "p_wr_a" },
-    { teamId: created.teamId, slot: "BENCH", slotIndex: 0, playerId: "p_bench_a1" },
+    { teamId, slot: "QB", slotIndex: 0, playerId: "p_qb_a" },
+    { teamId, slot: "RB", slotIndex: 0, playerId: "p_star_rb" },
+    { teamId, slot: "WR", slotIndex: 0, playerId: "p_wr_a" },
+    { teamId, slot: "BENCH", slotIndex: 0, playerId: "p_bench_a1" },
     { teamId: teamB, slot: "QB", slotIndex: 0, playerId: "p_qb_b" },
     { teamId: teamB, slot: "RB", slotIndex: 0, playerId: "p_rb_b" },
     { teamId: teamB, slot: "WR", slotIndex: 0, playerId: "p_wr_b" },
@@ -314,10 +320,10 @@ export async function seasonThroughWeek(db: Db, opts: SeasonThroughWeekOpts): Pr
 
   if (opts.lineupsSaved) {
     await db.insert(lineupSlots).values([
-      { teamId: created.teamId, weekNumber: opts.week, slot: "QB", slotIndex: 0, playerId: "p_qb_a" },
-      { teamId: created.teamId, weekNumber: opts.week, slot: "RB", slotIndex: 0, playerId: "p_star_rb" },
-      { teamId: created.teamId, weekNumber: opts.week, slot: "WR", slotIndex: 0, playerId: "p_wr_a" },
-      { teamId: created.teamId, weekNumber: opts.week, slot: "BENCH", slotIndex: 0, playerId: "p_bench_a1" },
+      { teamId, weekNumber: opts.week, slot: "QB", slotIndex: 0, playerId: "p_qb_a" },
+      { teamId, weekNumber: opts.week, slot: "RB", slotIndex: 0, playerId: "p_star_rb" },
+      { teamId, weekNumber: opts.week, slot: "WR", slotIndex: 0, playerId: "p_wr_a" },
+      { teamId, weekNumber: opts.week, slot: "BENCH", slotIndex: 0, playerId: "p_bench_a1" },
       { teamId: teamB, weekNumber: opts.week, slot: "QB", slotIndex: 0, playerId: "p_qb_b" },
       { teamId: teamB, weekNumber: opts.week, slot: "RB", slotIndex: 0, playerId: "p_rb_b" },
       { teamId: teamB, weekNumber: opts.week, slot: "WR", slotIndex: 0, playerId: "p_wr_b" },
@@ -325,7 +331,7 @@ export async function seasonThroughWeek(db: Db, opts: SeasonThroughWeekOpts): Pr
     ]);
   }
 
-  return { id: created.leagueId, teamA: created.teamId, teamB, slotConfig: TRADE_SEASON_SLOTS };
+  return { id: created.leagueId, teamA: teamId, teamB, slotConfig: TRADE_SEASON_SLOTS };
 }
 
 export interface ForeignLeague {

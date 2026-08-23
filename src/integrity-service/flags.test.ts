@@ -943,13 +943,13 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
       scoringPreset: "ppr",
       auctionBudget: null,
       rosterSlots: TR_SLOTS,
-      commissionerUserId: userA,
-      teamName: "Team Alice",
+      owner: { kind: "member", userId: userA, teamName: "Team Alice" },
       experienceTier: "beginner",
       stakeTier: 0,
       isPublicMatchmade: false,
     });
     if (!created.ok) throw new Error(created.reason);
+    if (created.teamId === null) throw new Error("expected a team id");
     const teamB = `team_tr_bob_${suffix}`;
     await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
     await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
@@ -1417,13 +1417,13 @@ describe("resolveFlag's trade_released/trade_blocked branches (Plan D, Task 5)",
       scoringPreset: "ppr",
       auctionBudget: null,
       rosterSlots: H_SLOTS,
-      commissionerUserId: userA,
-      teamName: "Team Alice",
+      owner: { kind: "member", userId: userA, teamName: "Team Alice" },
       experienceTier: "beginner",
       stakeTier: 0,
       isPublicMatchmade: true,
     });
     if (!created.ok) throw new Error(created.reason);
+    if (created.teamId === null) throw new Error("expected a team id");
     const teamB = `team_ht_bob_${suffix}`;
     await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
     await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
@@ -1670,13 +1670,13 @@ describe("resolveFlag's trade_released/trade_blocked branches (Plan D, Task 5)",
       scoringPreset: "ppr",
       auctionBudget: null,
       rosterSlots: TIGHT_SLOTS,
-      commissionerUserId: userA,
-      teamName: "Team Alice",
+      owner: { kind: "member", userId: userA, teamName: "Team Alice" },
       experienceTier: "beginner",
       stakeTier: 0,
       isPublicMatchmade: true,
     });
     if (!created.ok) throw new Error(created.reason);
+    if (created.teamId === null) throw new Error("expected a team id");
     const teamB = "team_ht_bob_tight";
     await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
     await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
@@ -1772,13 +1772,13 @@ describe("resolveFlag's trade_released/trade_blocked branches (Plan D, Task 5)",
       scoringPreset: "ppr",
       auctionBudget: null,
       rosterSlots: H_SLOTS,
-      commissionerUserId: userA,
-      teamName: "Team Alice",
+      owner: { kind: "member", userId: userA, teamName: "Team Alice" },
       experienceTier: "beginner",
       stakeTier: 0,
       isPublicMatchmade: true,
     });
     if (!created.ok) throw new Error(created.reason);
+    if (created.teamId === null) throw new Error("expected a team id");
     const teamB = "team_ht_bob_detail";
     await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
     await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
@@ -2485,13 +2485,13 @@ describe("the trade branch's operator trail, end to end (Task 6)", () => {
       scoringPreset: "standard",
       auctionBudget: null,
       rosterSlots: TRAIL_SLOTS,
-      commissionerUserId: "u_trail_alice",
-      teamName: "Team Alice",
+      owner: { kind: "member", userId: "u_trail_alice", teamName: "Team Alice" },
       experienceTier: "beginner",
       stakeTier: 0,
       isPublicMatchmade: false,
     });
     if (!created.ok) throw new Error(created.reason);
+    if (created.teamId === null) throw new Error("expected a team id");
     const teamB = "team_trail_bob";
     await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: "u_trail_bob", name: "Team Bob" });
     await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));

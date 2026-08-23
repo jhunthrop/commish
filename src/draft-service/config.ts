@@ -16,6 +16,22 @@ export const DRAFT_SERVICE_CONFIG = {
    * that, at most one log per interval keeps a stuck draft visible without spamming.
    */
   tickWarnIntervalMs: 60_000,
+  /**
+   * Phase 3.5 addendum, Task 13: the ceiling on house leagues `ensureHouseCatalog`
+   * (`@/league-service/house-factory`) may spawn in one reconcile — following `maxDraftsPerTick`
+   * above and `AUTO_SET_CONFIG.maxLeaguesPerRun` (`@/league-service/config`), the same "no scan
+   * this codebase runs is unbounded" precedent. `HOUSE_CATALOG`'s three rungs sum to 6 open
+   * leagues total, so this ceiling is headroom for a cold-start reconcile plus lost-race
+   * retries, never a limit the shelf is expected to brush against in ordinary operation.
+   */
+  maxHouseSpawnsPerRun: 20,
+  /**
+   * How often `reconcileHouse` (Task 13, Step 6) actually runs, gated against the injected
+   * clock rather than every tick: the ticker fires once a second and a shelf of house leagues
+   * does not change that fast. Comfortably above one tick, comfortably below a minute — long
+   * enough that the reconcile scan is not doing real work 60 times for every once it needs to.
+   */
+  houseReconcileIntervalMs: 30_000,
 } as const;
 
 export const DRAFT_NUDGE_CONFIG = {

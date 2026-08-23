@@ -32,16 +32,17 @@ export async function POST(request: Request) {
       {
         ...parsed.value,
         auctionBudget: parsed.value.format === "auction" ? parsed.value.auctionBudget : null,
-        commissionerUserId: userId,
-        teamName: parsed.value.teamName ?? `${user.displayName}'s team`,
+        owner: { kind: "member", userId, teamName: parsed.value.teamName ?? `${user.displayName}'s team` },
         experienceTier: parsed.value.experienceTier ?? user.experienceTier,
         stakeTier: parsed.value.stakeTier,
         isPublicMatchmade: parsed.value.visibility === "public",
       },
     );
     if (!result.ok) return fail(result.reason, result.status);
+    // A member owner always gets a team (`createLeague`'s own docblock) — this route never
+    // creates a house league, so `result.teamId` is never null here.
     return ok<CreateLeagueBody>(
-      { leagueId: result.leagueId, teamId: result.teamId, draftId: result.draftId },
+      { leagueId: result.leagueId, teamId: result.teamId!, draftId: result.draftId },
       { status: 201 },
     );
   });

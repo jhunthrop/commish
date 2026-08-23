@@ -116,10 +116,12 @@ describe("assembleAdvisorContext — the record", () => {
     ]);
     const created = await createLeague({ db, clock, newId }, {
       name: "Record League", format: "snake", teamCount: 2, scoringPreset: "ppr", auctionBudget: null,
-      rosterSlots: ADVISOR_SLOTS, commissionerUserId: "u_rec1", teamName: "Team One",
+      rosterSlots: ADVISOR_SLOTS, owner: { kind: "member", userId: "u_rec1", teamName: "Team One" },
       experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false, medianGame,
     });
     if (!created.ok) throw new Error(created.reason);
+    const teamId = created.teamId;
+    if (teamId === null) throw new Error("expected a team id");
     await db.insert(teams).values({ id: "team_rec2", leagueId: created.leagueId, userId: "u_rec2", name: "Team Two" });
     await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
     await db.insert(players).values([
@@ -131,11 +133,11 @@ describe("assembleAdvisorContext — the record", () => {
       { playerId: "qb_rec2", week: 1, passingYards: 100, passingTouchdowns: 0 },
     ]);
     await db.insert(rosterSlots).values([
-      { teamId: created.teamId, slot: "QB", slotIndex: 0, playerId: "qb_rec1" },
+      { teamId, slot: "QB", slotIndex: 0, playerId: "qb_rec1" },
       { teamId: "team_rec2", slot: "QB", slotIndex: 0, playerId: "qb_rec2" },
     ]);
-    await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, "team_rec2"], weeks: 1 }));
-    return { leagueId: created.leagueId, teamId: created.teamId, opponentTeamId: "team_rec2" };
+    await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [teamId, "team_rec2"], weeks: 1 }));
+    return { leagueId: created.leagueId, teamId, opponentTeamId: "team_rec2" };
   }
 
   it("reports the SAME record the standings page would, off finished matchups", async () => {

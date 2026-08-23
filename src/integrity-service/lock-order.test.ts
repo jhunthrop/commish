@@ -2700,3 +2700,31 @@ describe("autoSetLineupInTx and finalizeWeekInTx serialize on the matchups rows"
     expect(rows).toEqual([]);
   });
 });
+
+/**
+ * ANOTHER WRITER, added by hand rather than driven again here (Phase 3.5 addendum, Task 13):
+ * `spawnHouseLeagueInTx` / `writeLeagueInTx` (`@/league-service/house-factory.ts`,
+ * `@/league-service/creation.ts`). It never runs beside a second writer contending for the SAME
+ * row, because the row it inserts did not exist a statement earlier — there is no bystander to
+ * park it against, unlike `fireWhenFullInTx`'s own "added by hand" entry above, which runs
+ * inside an ALREADY-locked `leagues` row a caller handed it.
+ *
+ * FK ACQUISITIONS, ENUMERATED. The `leagues` INSERT takes NO parent lock at all: its only FK,
+ * `commissioner_user_id`, is `NULL` for a house league (ruling 28 again — a null FK acquires
+ * nothing). `scoring_settings` and `drafts` each take an implicit `FOR KEY SHARE` on the new
+ * `leagues` row through their own `league_id` FK — nothing else has ever held that row, since it
+ * did not exist before the `leagues` INSERT a moment earlier in the SAME transaction. NO `teams`
+ * INSERT happens at all (Task 13, Step 3-4: a house league seats nobody). The audit append is
+ * last, TWICE: `writeLeagueInTx`'s own `league_created` event, then `spawnHouseLeagueInTx`'s own
+ * `house_league_opened` `system_action` — both on the new league's own chain (`scopeFor(leagueId)`,
+ * a non-null league id, per ruling 3), both after every FK-carrying insert above them.
+ *
+ * THE RACE THIS WOULD OTHERWISE NEED A TWO-CONNECTION PROOF FOR — two reconciler instances
+ * computing the SAME deterministic id (`house_${rung}_${edition}`) for the SAME shortfall slot —
+ * is proven with two real connections in `src/league-service/house-factory.test.ts`'s own
+ * "survives two instances reconciling the same rung on the same tick": that property is about the
+ * WRITE being idempotent under a genuine race (ruling 35, `ON CONFLICT (id) DO NOTHING`), which is
+ * a different claim from the lock-order question this file exists to answer, and belongs beside
+ * the reconciler's own other behavior rather than duplicated here — the identical reasoning
+ * `fireWhenFullInTx`'s own "added by hand" entry above already gives for the same split.
+ */

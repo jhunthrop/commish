@@ -89,11 +89,12 @@ async function league(teamCount = 4) {
   );
   const created = await createLeague(writeDeps(), {
     name: "Sunday Money", format: "snake", teamCount, scoringPreset: "ppr", auctionBudget: null,
-    rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Commish",
+    rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "u1", teamName: "Commish" },
     experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);
-  return created;
+  if (created.teamId === null) throw new Error("expected a team id");
+  return { ...created, teamId: created.teamId };
 }
 
 beforeEach(async () => {
@@ -201,7 +202,7 @@ describe("acceptInvite", () => {
     // A second league with the SAME user pool (league() seeds users once per test).
     const second = await createLeague(writeDeps(), {
       name: "Tuesday Money", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
-      rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Commish B",
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "u1", teamName: "Commish B" },
       experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
     });
     if (!second.ok) throw new Error(second.reason);
@@ -506,7 +507,7 @@ describe("invitePreview", () => {
     );
     const created = await createLeague(writeDeps(), {
       name: "Median League", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
-      rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "mu1", teamName: "Commish",
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "mu1", teamName: "Commish" },
       experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false, medianGame: true,
     });
     if (!created.ok) throw new Error(created.reason);
@@ -526,7 +527,7 @@ describe("invitePreview", () => {
     await db.insert(users).values({ id: "wf1", email: "wf1@test.local", displayName: "Manager wf1" });
     const created = await createLeague(writeDeps(), {
       name: "Sit-and-Go League", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
-      rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "wf1", teamName: "Commish",
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "wf1", teamName: "Commish" },
       experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: true, startTrigger: "when_full",
     });
     if (!created.ok) throw new Error(created.reason);
@@ -544,7 +545,7 @@ describe("invitePreview", () => {
     );
     const created = await createLeague(writeDeps(), {
       name: "Sit-and-Go League Full", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
-      rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "wf2_1", teamName: "Commish",
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "wf2_1", teamName: "Commish" },
       experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: true, startTrigger: "when_full",
     });
     if (!created.ok) throw new Error(created.reason);

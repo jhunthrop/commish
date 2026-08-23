@@ -53,7 +53,7 @@ async function scheduledLeague(): Promise<{ readonly leagueId: string; readonly 
   ]);
   const created = await createLeague({ db, clock, newId }, {
     name: "Sunday Money", format: "snake", teamCount: LEAGUE_CONFIG.defaults.teamCount, scoringPreset: "ppr",
-    auctionBudget: null, rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Team One",
+    auctionBudget: null, rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "u1", teamName: "Team One" },
     experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);

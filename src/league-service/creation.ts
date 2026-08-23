@@ -1,4 +1,4 @@
-import type { Db } from "@/db/client";
+import type { Db, DbTx } from "@/db/client";
 import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
 import type { DraftFormat } from "@/domain/league";
 import type { RosterShapeName, RosterSlotConfig } from "@/domain/roster";
@@ -8,9 +8,25 @@ import type { ExperienceTier } from "@/domain/user";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { LEAGUE_CONFIG } from "@/league";
 import { ROSTER_SHAPES } from "@/league/roster-shape";
+import type { HouseRungName, StartTrigger } from "@/matchmaking/house-catalog";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { MS_PER_DAY } from "./config";
 import { ENFORCEMENT_REFUSALS, tierJoinPrecondition } from "./enforcement";
+
+/**
+ * Who a league answers to. Phase 3.5 addendum, Task 13: a member league is commissioned by the
+ * person who created it and gets that person's own team seated in the same transaction; a house
+ * league is commissioned by nobody (`@/league-service/authority.ts`'s `LeagueAuthority`, Task 12)
+ * and gets no team at all — it opens empty, for a stranger to join later.
+ *
+ * The one type both `createLeague` and `spawnHouseLeagueInTx`
+ * (`@/league-service/house-factory.ts`) share, so "who is this league for" is asked once rather
+ * than reinvented per caller. `rung` is `HouseRungName` — `@/matchmaking/house-catalog.ts`'s own
+ * union, derived from `HOUSE_CATALOG` rather than a second hand-typed one.
+ */
+export type LeagueOwner =
+  | { readonly kind: "member"; readonly userId: string; readonly teamName: string }
+  | { readonly kind: "house"; readonly rung: HouseRungName };
 
 /** No Redis connection needed: every existing caller of `createLeague` keeps working untouched. */
 const NOOP_REFERENCE_CACHE: Pick<ReferenceCache, "invalidateScoringSettings"> = {
@@ -63,8 +79,13 @@ export interface CreateLeagueInput {
    * "every field but the name has a default" shape every other field on this input follows.
    */
   readonly medianGame?: boolean;
-  readonly commissionerUserId: string;
-  readonly teamName: string;
+  /**
+   * Who commissions this league — a member (with their own team seated) or the house (no
+   * commissioner, no team, `@/league-service/authority.ts`'s `LeagueAuthority`). Phase 3.5
+   * addendum, Task 13: this REPLACES the earlier `commissionerUserId`/`teamName` pair, which
+   * could only ever say "a member", the one shape this function used to be able to create.
+   */
+  readonly owner: LeagueOwner;
   /** Who the league is advertised for on public browse. Defaults from the creator at the route. */
   readonly experienceTier: ExperienceTier;
   /** Cosmetic tier index only — no entry fee is charged and no balance exists in this phase. */
@@ -88,18 +109,121 @@ export interface CreateLeagueInput {
    * that boundary is `createLeagueSchema`'s (`./schemas`), the one place a domain rule like this
    * is enforced, the same precedent `teamCount`'s own bounds already set.
    */
-  readonly startTrigger?: "scheduled" | "when_full";
+  readonly startTrigger?: StartTrigger;
 }
 
 export type CreateLeagueResult =
-  | { readonly ok: true; readonly leagueId: string; readonly teamId: string; readonly draftId: string }
+  | { readonly ok: true; readonly leagueId: string; readonly teamId: string | null; readonly draftId: string }
   | { readonly ok: false; readonly status: number; readonly reason: string };
+
+/** The ids `writeLeagueInTx` writes with — `teamId` is `null` for a house owner, since no team
+ *  row is ever inserted for one (Task 13, Step 4). */
+export interface LeagueWriteIds {
+  readonly leagueId: string;
+  readonly teamId: string | null;
+  readonly draftId: string;
+}
+
+/** `claimed` is `false` exactly once in practice: a house owner's deterministic id
+ *  (`house_${rung}_${edition}`, `@/league-service/house-factory.ts`) already exists because
+ *  another reconciler instance won the same race first. A member owner's id is a fresh
+ *  `crypto.randomUUID()` and can never collide, so `claimed` is always `true` for one. */
+export interface LeagueWriteOutcome {
+  readonly claimed: boolean;
+}
+
+/**
+ * The one write shape a league ever gets, run INSIDE a transaction the caller already holds
+ * open. `createLeague` (below) wraps this in its own `db.transaction`, one call per member
+ * league; `spawnHouseLeagueInTx` (`@/league-service/house-factory.ts`) runs it inside the
+ * reconciler's own per-league transaction instead, one call per catalog spawn. Factoring the
+ * writes out to here — rather than the reconciler hand-writing a second `leagues`/
+ * `scoring_settings`/`drafts` insert of its own — is Task 13 Step 3's own argument: "the
+ * alternative is a second league-creation transaction that would drift from the first the day
+ * anything is added to a league at creation."
+ *
+ * `ON CONFLICT (id) DO NOTHING` on the `leagues` insert is what makes a house owner's
+ * deterministic id idempotent (ruling 35, Task 13 Step 5): two reconciler instances racing for
+ * the same edition compute the same id, one INSERT wins the primary key, the other returns zero
+ * rows and this function reports `{ claimed: false }` rather than throwing. A member owner's
+ * fresh UUID never conflicts, so the clause is a no-op for that branch — one insert statement,
+ * not two, for the two owners.
+ *
+ * A conflict short-circuits everything after it: no `scoring_settings`, no `teams`, no `drafts`,
+ * no audit event. The row that already exists was written by whichever transaction actually
+ * claimed it, in full, inside its own commit — writing any of THIS transaction's dependent rows
+ * against an id it does not own would be a scoring-settings row racing its own league.
+ */
+export async function writeLeagueInTx(
+  tx: DbTx,
+  ids: LeagueWriteIds,
+  input: CreateLeagueInput,
+  kickoffAt: Date,
+  clock: Clock,
+  audit: AuditLogger,
+): Promise<LeagueWriteOutcome> {
+  // Explicit rows win when given (the seeds' and the test pipeline's own escape hatch);
+  // otherwise the named shape resolves through `ROSTER_SHAPES`, falling back to the configured
+  // default shape when neither is given — the identical fallback chain `kickoffAt` uses below.
+  const rosterSlots = input.rosterSlots ?? ROSTER_SHAPES[input.rosterShape ?? LEAGUE_CONFIG.defaults.rosterShape];
+
+  const [insertedLeague] = await tx
+    .insert(leagues)
+    .values({
+      id: ids.leagueId,
+      name: input.name,
+      format: input.format,
+      teamCount: input.teamCount,
+      commissionerUserId: input.owner.kind === "member" ? input.owner.userId : null,
+      houseRung: input.owner.kind === "house" ? input.owner.rung : null,
+      rosterSlots: [...rosterSlots],
+      experienceTier: input.experienceTier,
+      stakeTier: input.stakeTier,
+      isPublicMatchmade: input.isPublicMatchmade,
+      medianGame: input.medianGame ?? false,
+    })
+    .onConflictDoNothing()
+    .returning({ id: leagues.id });
+  if (insertedLeague === undefined) return { claimed: false };
+
+  await tx.insert(scoringSettings).values({ leagueId: ids.leagueId, ...SCORING_PRESETS[input.scoringPreset] });
+  if (input.owner.kind === "member") {
+    await tx.insert(teams).values({ id: ids.teamId!, leagueId: ids.leagueId, userId: input.owner.userId, name: input.owner.teamName });
+  }
+  await tx.insert(drafts).values({
+    id: ids.draftId,
+    leagueId: ids.leagueId,
+    format: input.format,
+    status: "scheduled",
+    kickoffAt,
+    auctionBudget: input.format === "auction" ? input.auctionBudget : null,
+    startTrigger: input.startTrigger ?? "scheduled",
+  });
+  await audit.record(tx, {
+    eventType: "league_created",
+    actorId: input.owner.kind === "member" ? input.owner.userId : null,
+    actorType: input.owner.kind === "member" ? "user" : "system",
+    leagueId: ids.leagueId,
+    payload: {
+      name: input.name,
+      format: input.format,
+      teamCount: input.teamCount,
+      stakeTier: input.stakeTier,
+      isPublicMatchmade: input.isPublicMatchmade,
+      experienceTier: input.experienceTier,
+      scoringPreset: input.scoringPreset,
+      medianGame: input.medianGame ?? false,
+    },
+    occurredAt: clock.now(),
+  });
+  return { claimed: true };
+}
 
 /**
  * A league is never half-created: the league row, its scoring settings, the commissioner's own
- * team and the scheduled draft all land in ONE transaction. A commissioner left holding a
- * league they have no team in — or a league with no draft to open — is exactly the dead end
- * the UX review's C5 finding is about.
+ * team (a member owner only) and the scheduled draft all land in ONE transaction. A commissioner
+ * left holding a league they have no team in — or a league with no draft to open — is exactly
+ * the dead end the UX review's C5 finding is about.
  *
  * The draft is scheduled `LEAGUE_CONFIG.defaults.draftDaysFromCreation` out so the
  * auto-tightening clock starts in a slow tier rather than at the 60-second floor.
@@ -112,6 +236,13 @@ export type CreateLeagueResult =
  * the fields THIS request is asking to create rather than a row already in `leagues` — the one
  * predicate, asked before either league exists, the other before a caller may enter one.
  *
+ * Only asked for a MEMBER owner (Task 13, ruling 39): `leagues.experience_tier` is self-declared
+ * by whoever creates the league, and the abuse this predicate exists to catch is a PERSON
+ * declaring a tier they do not belong to in order to sit in it themselves. The platform declares
+ * the catalog and then sits in nothing, so a house owner has no `userId` for this to check —
+ * `spawnHouseLeagueInTx` walks past this gate entirely rather than this function inventing a
+ * vacuous pass for it.
+ *
  * NO-WRITE-BEFORE-COMMITTED-REFUSAL: this check runs BEFORE `db.transaction(...)` is ever opened,
  * not inside it and rolled back — a refused creation writes nothing, ever, not even inside a
  * transaction nobody sees commit.
@@ -120,68 +251,37 @@ export async function createLeague(
   { db, clock, newId, cache = NOOP_REFERENCE_CACHE, audit = getAuditLogger() }: LeagueWriteDeps,
   input: CreateLeagueInput,
 ): Promise<CreateLeagueResult> {
-  if (await tierJoinPrecondition(db, { isPublicMatchmade: input.isPublicMatchmade, experienceTier: input.experienceTier }, input.commissionerUserId)) {
+  if (
+    input.owner.kind === "member" &&
+    (await tierJoinPrecondition(db, { isPublicMatchmade: input.isPublicMatchmade, experienceTier: input.experienceTier }, input.owner.userId))
+  ) {
     return { ok: false, status: 409, reason: ENFORCEMENT_REFUSALS.create };
   }
 
   const leagueId = newId();
-  const teamId = newId();
+  const teamId = input.owner.kind === "member" ? newId() : null;
   const draftId = newId();
   const kickoffAt =
     input.kickoffAt !== undefined
       ? new Date(input.kickoffAt)
       : new Date(Date.parse(clock.now()) + LEAGUE_CONFIG.defaults.draftDaysFromCreation * MS_PER_DAY);
-  // Explicit rows win when given (the seeds' and the test pipeline's own escape hatch);
-  // otherwise the named shape resolves through `ROSTER_SHAPES`, falling back to the configured
-  // default shape when neither is given — the identical fallback chain `kickoffAt` uses above.
-  const rosterSlots = input.rosterSlots ?? ROSTER_SHAPES[input.rosterShape ?? LEAGUE_CONFIG.defaults.rosterShape];
 
+  let outcome: LeagueWriteOutcome | undefined;
   try {
     await db.transaction(async (tx) => {
-      await tx.insert(leagues).values({
-        id: leagueId,
-        name: input.name,
-        format: input.format,
-        teamCount: input.teamCount,
-        commissionerUserId: input.commissionerUserId,
-        rosterSlots: [...rosterSlots],
-        experienceTier: input.experienceTier,
-        stakeTier: input.stakeTier,
-        isPublicMatchmade: input.isPublicMatchmade,
-        medianGame: input.medianGame ?? false,
-      });
-      await tx.insert(scoringSettings).values({ leagueId, ...SCORING_PRESETS[input.scoringPreset] });
-      await tx.insert(teams).values({ id: teamId, leagueId, userId: input.commissionerUserId, name: input.teamName });
-      await tx.insert(drafts).values({
-        id: draftId,
-        leagueId,
-        format: input.format,
-        status: "scheduled",
-        kickoffAt,
-        auctionBudget: input.format === "auction" ? input.auctionBudget : null,
-        startTrigger: input.startTrigger ?? "scheduled",
-      });
-      await audit.record(tx, {
-        eventType: "league_created",
-        actorId: input.commissionerUserId,
-        actorType: "user",
-        leagueId,
-        payload: {
-          name: input.name,
-          format: input.format,
-          teamCount: input.teamCount,
-          stakeTier: input.stakeTier,
-          isPublicMatchmade: input.isPublicMatchmade,
-          experienceTier: input.experienceTier,
-          scoringPreset: input.scoringPreset,
-          medianGame: input.medianGame ?? false,
-        },
-        occurredAt: clock.now(),
-      });
+      outcome = await writeLeagueInTx(tx, { leagueId, teamId, draftId }, input, kickoffAt, clock, audit);
     });
   } catch (error: unknown) {
     // Plain language out, real detail into the logs — never raw driver text to a user.
-    console.error("[league] create failed", { commissionerUserId: input.commissionerUserId }, error);
+    console.error("[league] create failed", { owner: input.owner }, error);
+    return { ok: false, status: 500, reason: "We couldn't create that league. Please try again." };
+  }
+  if (!outcome!.claimed) {
+    // Unreachable for a member owner (a fresh UUID never collides); real only for a house
+    // owner's deterministic id racing another writer, and `createLeague` is never how the
+    // reconciler creates one (`spawnHouseLeagueInTx` calls `writeLeagueInTx` directly, inside
+    // its own transaction, so it can report a clean no-op instead of a 500).
+    console.error("[league] create lost a primary-key race it should never have entered", { leagueId });
     return { ok: false, status: 500, reason: "We couldn't create that league. Please try again." };
   }
 

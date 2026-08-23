@@ -33,6 +33,13 @@ export const SYSTEM_ACTION_CODES = [
    * `draft_auto_started` already uses.
    */
   "draft_fill_triggered",
+  /**
+   * The catalog reconciler (Phase 3.5 addendum, Task 13): a house league the platform opened,
+   * published by `spawnHouseLeagueInTx` (`@/league-service/house-factory.ts`). No notice rides
+   * with it (that module's own docblock) — a league that just opened has no members yet to
+   * notify, and Task 14's shelf-replacement notice is the one this addendum sends a member.
+   */
+  "house_league_opened",
 ] as const;
 
 export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
@@ -82,6 +89,10 @@ export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
  *    reasoning exactly: a fact about the league's shared calendar, true for everyone in it, about
  *    nobody's conduct. A member whose draft is about to start because the room filled up is owed
  *    the sentence that says so.
+ *  - `house_league_opened` is ALLOWED to everyone (Task 13, Phase 3.5 addendum): a league opening
+ *    is a fact about a league nobody is in yet, true for whoever reads the chain, about nobody's
+ *    conduct — the first person to walk in should be able to read that the platform opened it and
+ *    when.
  */
 export type SystemActionVisibility = "everyone" | "subject_only" | "hidden";
 
@@ -94,6 +105,7 @@ export const SYSTEM_ACTION_VISIBILITY: Readonly<Record<SystemActionCode, SystemA
   draft_auto_started: "everyone",
   draft_pick_skipped: "subject_only",
   draft_fill_triggered: "everyone",
+  house_league_opened: "everyone",
 };
 
 /**

@@ -54,10 +54,12 @@ async function twoTeamLeague(
   ]);
   const created = await createLeague({ db, clock, newId }, {
     name: "Duel", format: "snake", teamCount: 2, scoringPreset, auctionBudget: null,
-    rosterSlots: SLOTS, commissionerUserId: "u1", teamName: "Team One",
+    rosterSlots: SLOTS, owner: { kind: "member", userId: "u1", teamName: "Team One" },
     experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false, medianGame,
   });
   if (!created.ok) throw new Error(created.reason);
+  const teamId = created.teamId;
+  if (teamId === null) throw new Error("expected a team id");
   await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
   if (draftStatus === "complete") {
     await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
@@ -74,12 +76,12 @@ async function twoTeamLeague(
     { playerId: "qb3", week: 1, passingYards: 400, passingTouchdowns: 4 },
   ]);
   await db.insert(rosterSlots).values([
-    { teamId: created.teamId, slot: "QB", slotIndex: 0, playerId: "qb1" },
-    { teamId: created.teamId, slot: "BENCH", slotIndex: 0, playerId: "qb3" },
+    { teamId, slot: "QB", slotIndex: 0, playerId: "qb1" },
+    { teamId, slot: "BENCH", slotIndex: 0, playerId: "qb3" },
     { teamId: "team_2", slot: "QB", slotIndex: 0, playerId: "qb2" },
   ]);
-  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, "team_2"], weeks: 2 }));
-  return { ...created, teamIds: [created.teamId, "team_2"] };
+  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [teamId, "team_2"], weeks: 2 }));
+  return { ...created, teamId, teamIds: [teamId, "team_2"] };
 }
 
 describe("finalizeWeek — draft guard", () => {
