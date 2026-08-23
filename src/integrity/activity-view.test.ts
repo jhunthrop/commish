@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { AUDIT_EVENT_TYPES, type AuditEvent, type AuditEventType, type JsonObject } from "@/domain/audit";
 import { ACTIVITY_VISIBILITY, activityRowFor, type ActivityVisibility } from "./activity-view";
 import { copyViolations } from "./copy-rules";
-import { SYSTEM_ACTION_SUMMARY_ALLOWED } from "./system-actions";
+import { systemActionSummaryAllowed } from "./system-actions";
 
 const names = {
   member: (id: string | null) => (id === "user_alice" ? "Alice" : id === "user_bob" ? "Bob" : "A former member"),
@@ -97,8 +97,10 @@ const SAMPLE_PAYLOADS: Readonly<Record<AuditEventType, readonly { readonly paylo
   ],
   draft_completed: [{ payload: { draftId: "d", picks: 120, teams: 10 }, actorId: null }],
   lineup_change: [{ payload: { teamId: "team_2", weekNumber: 3, starters: [] }, actorId: "user_bob" }],
-  // The only action code SYSTEM_ACTION_SUMMARY_ALLOWED currently allows a summary for — see
-  // ./system-actions. A sample using a denied code (e.g. lineup_auto_set) would render null and
+  // TWO shapes out of one renderer, the same `draft_pick` split above: `stat_week_corrected` is
+  // "everyone" in SYSTEM_ACTION_VISIBILITY (see ./system-actions), so it renders for any viewer;
+  // `lineup_auto_set` is "subject_only", so its sample carries `subjectUserId` matching this
+  // file's own `viewer` (`user_bob`) — a sample naming a DIFFERENT subject would render null and
   // fail the "breaks none of the house copy rules" sweep below, which is the point: this sample
   // set is swept for what actually renders, not for what the type union merely contains.
   system_action: [
@@ -107,6 +109,10 @@ const SAMPLE_PAYLOADS: Readonly<Record<AuditEventType, readonly { readonly paylo
         action: "stat_week_corrected",
         summary: "We corrected week 4 scores after our stats provider revised its numbers. Standings now match the update.",
       },
+      actorId: null,
+    },
+    {
+      payload: { action: "lineup_auto_set", subjectUserId: "user_bob", summary: "We set your week 4 lineup." },
       actorId: null,
     },
   ],
@@ -380,10 +386,10 @@ describe("renderRosterMove", () => {
   });
 });
 
-describe("renderSystemAction — the summary allowlist gate", () => {
-  it("renders nothing for an action nobody signed off, even when it carries a summary", () => {
-    const denied = systemActionEvent({ action: "lineup_auto_set", summary: "We set Alice's lineup." });
-    expect(SYSTEM_ACTION_SUMMARY_ALLOWED.lineup_auto_set).toBe(false); // the precondition this test is actually about
+describe("renderSystemAction — the visibility gate", () => {
+  it("renders nothing for a hidden action, even when it carries a summary", () => {
+    const denied = systemActionEvent({ action: "trade_held_for_review", summary: "A trade is on hold." });
+    expect(systemActionSummaryAllowed("trade_held_for_review")).toBe(false); // the precondition this test is actually about
     expect(activityRowFor(denied, viewer, names)).toBeNull();
   });
 
@@ -391,8 +397,40 @@ describe("renderSystemAction — the summary allowlist gate", () => {
     expect(activityRowFor(systemActionEvent({ action: "whatever", summary: "hi" }), viewer, names)).toBeNull();
   });
 
+  it("renders nothing for a payload carrying no action at all", () => {
+    expect(activityRowFor(systemActionEvent({ summary: "hi" }), viewer, names)).toBeNull();
+  });
+
   it("still renders nothing for the verifier's own event, even carrying a summary, which is Plan A's ruling 8 unchanged", () => {
     expect(activityRowFor(chainVerificationFailedEventWithSummary(), viewer, names)).toBeNull();
+  });
+});
+
+/**
+ * The FOURTH deny-by-default dimension's own case: `lineup_auto_set` is `"subject_only"`, not
+ * `"everyone"` and not `"actor_only"` — a system action has no actor, by construction (Plan B's
+ * pre-decided path, corrected by one word). `SYSTEM_ACTION_SUMMARY_ALLOWED` used to deny this code
+ * outright; it is now `"subject_only"` in `SYSTEM_ACTION_VISIBILITY`, so it renders for exactly
+ * the member the payload names as `subjectUserId` and nobody else.
+ */
+describe("renderSystemAction — lineup_auto_set, the subject-scoped case", () => {
+  it("shows an auto-set lineup to the manager it happened to and to nobody else", () => {
+    const alice = { userId: "user_alice" };
+    const autoSet = systemActionEvent({ action: "lineup_auto_set", subjectUserId: "user_alice", summary: "We set your lineup for week 4." });
+    expect(activityRowFor(autoSet, alice, names)).toMatchObject({ icon: "alert-triangle", headline: "We set your lineup for week 4." });
+    expect(activityRowFor(autoSet, viewer, names)).toBeNull();
+  });
+
+  it("renders nothing at all for a subject_only action whose payload names no subject", () => {
+    // Deny by default on a malformed or tampered payload, the same `return null` the rest of this
+    // module holds every renderer to. A missing subject must not mean "show everyone".
+    const noSubject = systemActionEvent({ action: "lineup_auto_set", summary: "We set a lineup." });
+    expect(activityRowFor(noSubject, { userId: "user_alice" }, names)).toBeNull();
+  });
+
+  it("renders nothing when the subject named does not match this viewer, even a close one", () => {
+    const autoSet = systemActionEvent({ action: "lineup_auto_set", subjectUserId: "user_alice", summary: "We set your lineup for week 4." });
+    expect(activityRowFor(autoSet, { userId: "user_bob" }, names)).toBeNull();
   });
 });
 

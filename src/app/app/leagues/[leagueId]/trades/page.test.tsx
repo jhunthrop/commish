@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
 import { fixtureLeagueDeps } from "@/league-room/test-fixtures";
 
@@ -37,6 +38,7 @@ const HOME = {
   terms: {
     name: "Sunday Money", format: "snake" as const, teamCount: 2, filledTeams: 2, scoringLabel: "PPR",
     rosterLine: "", stakeLabel: "Friendly", stakeDisclosure: "", commissionerName: "Grace Hopper", commissionerAvatar: null,
+    draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
   },
   currentWeek: 5,
   totalWeeks: 14,
@@ -44,6 +46,7 @@ const HOME = {
   weekStatus: "in_progress" as const,
   draftId: null,
   draftStatus: "complete" as const,
+  draftSchedule: null,
 };
 
 const WEEK_BODY = {
@@ -85,7 +88,9 @@ async function renderPage(leagueId?: string) {
   const page = await callPage(leagueId);
   return render(
     <AccountRoomDepsProvider deps={accountFixture.deps}>
-      <LeagueRoomDepsProvider deps={leagueFixture.deps}>{page}</LeagueRoomDepsProvider>
+      <NoticesProvider>
+        <LeagueRoomDepsProvider deps={leagueFixture.deps}>{page}</LeagueRoomDepsProvider>
+      </NoticesProvider>
     </AccountRoomDepsProvider>,
   );
 }

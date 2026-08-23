@@ -3,178 +3,26 @@ import { sql } from "drizzle-orm";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { createTestDb, truncateAll } from "./test-db";
 import { draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
-import { explainPlan, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
+import { explainPlan, findNode, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
+import { seedRealisticCorpus, seedTradeCorpus } from "./test-corpus";
 import { chatPageQuery } from "@/chat-service/chat";
-import { pendingFlagQuery } from "@/integrity-service/flags";
+import { dueDraftsQuery } from "@/draft-service/auto-start";
+import { liveDraftsQuery } from "@/draft-service/ticker";
+import { openQuestionsQuery, pendingFlagQuery } from "@/integrity-service/flags";
 import { signalsForUsersQuery } from "@/integrity-service/session-signals";
+import { completedSeasonsQuery } from "@/league-service/participation";
 import { browseQuery } from "@/league-service/browse";
+import { leaguesNeedingAutoSetQuery } from "@/league-service/auto-lineup";
 import { tradesQuery } from "@/league-service/trades";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { AUDIT_EVENT_TYPES } from "@/domain/audit";
 
 const db = createTestDb();
 
-/**
- * Big enough that the planner has a real choice. Postgres will happily sequential-scan a
- * hundred-row table no matter what indexes exist, so a plan assertion against a toy dataset
- * asserts nothing at all. 5,000 leagues with 10% public and three teams each is roughly the
- * shape of a product with a few thousand leagues, which is where these paths start to matter.
- */
-const LEAGUE_COUNT = 5_000;
-const TEAMS_PER_LEAGUE = 3;
-const USER_COUNT = 200;
-
-/**
- * The full 15-slot roster and its 9-slot starting subset, inlined as raw-SQL `VALUES` lists
- * rather than imported from `@/domain/roster`: this file seeds through `db.execute(sql\`...\`)`,
- * not the domain layer, and the shape only needs to produce a realistic row count and column
- * spread, not stay wired to `STANDARD_ROSTER_SLOTS`.
- */
-const LINEUP_STARTER_SLOTS = sql`(VALUES ('QB',0),('RB',0),('RB',1),('WR',0),('WR',1),('TE',0),('FLEX',0),('K',0),('DEF',0)) AS s(slot, idx)`;
-const ROSTER_SLOTS = sql`(VALUES ('QB',0),('RB',0),('RB',1),('WR',0),('WR',1),('TE',0),('FLEX',0),('K',0),('DEF',0),('BENCH',0),('BENCH',1),('BENCH',2),('BENCH',3),('BENCH',4),('BENCH',5)) AS s(slot, idx)`;
-const LINEUP_WEEKS = 3;
-/** A full regular season of fixtures per league, which is what makes `matchups` the largest table here. */
-const SEASON_WEEKS = 14;
-/** One league in every this-many is left unsettled, so the partial index has a realistic slice to hold. */
-const UNSETTLED_LEAGUE_INTERVAL = 500;
-/** Distinct synthetic player ids spread across the corpus, so `p-1`..`p-3` stay a small, selective slice. */
-const PLAYER_POOL_SIZE = 5_000;
-/**
- * Chat's shape, and the numbers a chat-page plan assertion actually depends on. A few leagues
- * hold a real conversation (`lg1`..`lg40`, including the `lg7` every chat assertion below reads)
- * and everybody else holds a handful of messages. `lg7` therefore carries 200 of 40,000 rows —
- * half a percent, which is the order of magnitude one league's chat occupies in a product with
- * thousands of them, and the regime where seeking beats scanning the primary key backward. See
- * `seedCorpus`'s own note.
- */
-const BUSY_CHAT_LEAGUES = 40;
-const MESSAGES_PER_BUSY_LEAGUE = 200;
-const CHAT_TAIL_MESSAGES = 32_000;
-/**
- * The operator queue's population. One flag in every `OPEN_FLAG_INTERVAL` is still open, which
- * is the ratio that makes `integrity_flags_queue_idx`'s partial predicate worth having: a
- * detector plus a report button produce flags forever, and an operator only ever reads the
- * handful nobody has answered yet.
- */
-const FLAG_COUNT = 60_000;
-const OPEN_FLAG_INTERVAL = 50;
-/** Sign-ins on record. `signalsForUsers` reads one league's whole membership at once. */
-const SESSION_SIGNAL_COUNT = 100_000;
-
-async function seedCorpus(): Promise<void> {
-  await db.execute(sql`
-    INSERT INTO users (id, email, display_name)
-    SELECT 'u' || g, 'u' || g || '@example.test', 'Manager ' || g
-    FROM generate_series(1, ${USER_COUNT}) g
-  `);
-  await db.execute(sql`
-    INSERT INTO leagues (id, name, format, team_count, stake_tier, is_public_matchmade, experience_tier, commissioner_user_id, created_at)
-    SELECT 'lg' || g,
-           'League ' || g,
-           (ARRAY['snake','auction'])[1 + (g % 2)]::draft_format,
-           12,
-           g % 4,
-           (g % 10 = 0),
-           (ARRAY['beginner','experienced'])[1 + (g % 2)]::experience_tier,
-           'u' || (1 + (g % ${USER_COUNT})),
-           now() - (g || ' minutes')::interval
-    FROM generate_series(1, ${LEAGUE_COUNT}) g
-  `);
-  await db.execute(sql`
-    INSERT INTO drafts (id, league_id, format, status, kickoff_at)
-    SELECT 'df' || g, 'lg' || g,
-           (ARRAY['snake','auction'])[1 + (g % 2)]::draft_format,
-           'scheduled'::draft_status,
-           now() + interval '1 day'
-    FROM generate_series(1, ${LEAGUE_COUNT}) g
-  `);
-  await db.execute(sql`
-    INSERT INTO teams (id, league_id, user_id, name)
-    SELECT 'tm' || g || '_' || t, 'lg' || g, 'u' || (1 + ((g * 7 + t) % ${USER_COUNT})), 'Team ' || t
-    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${TEAMS_PER_LEAGUE}) t
-  `);
-  // Chat's league spread is the whole point of this corpus, not an incidental detail. The
-  // earlier version put all 20,000 messages into 50 leagues, which gave every league 2% of the
-  // table — a slice big enough that a backward primary-key scan really is the planner's best
-  // plan, and small enough to look realistic. It is not: in a product with thousands of leagues
-  // one league's conversation is a fraction of a percent of all chat, which is exactly when a
-  // `(league_id, id)` seek stops being optional. So the seed is shaped like the real thing —
-  // a handful of busy leagues carrying real conversations, and a long tail of everybody else.
-  await db.execute(sql`
-    INSERT INTO chat_messages (league_id, author_user_id, body)
-    SELECT 'lg' || l, 'u' || (1 + ((l * 13 + g) % ${USER_COUNT})), 'message ' || g
-    FROM generate_series(1, ${BUSY_CHAT_LEAGUES}) l, generate_series(1, ${MESSAGES_PER_BUSY_LEAGUE}) g
-  `);
-  await db.execute(sql`
-    INSERT INTO chat_messages (league_id, author_user_id, body)
-    SELECT 'lg' || (${BUSY_CHAT_LEAGUES} + 1 + (g % ${LEAGUE_COUNT - 40})), 'u' || (1 + (g % ${USER_COUNT})), 'tail ' || g
-    FROM generate_series(1, ${CHAT_TAIL_MESSAGES}) g
-  `);
-  // Every team's full roster — every drafted team has one, so this is the whole population, not
-  // a slice of it. 5,000 leagues x 3 teams x 15 slots = 225,000 rows, comfortably past the
-  // 50,000-row floor a real planner choice needs.
-  await db.execute(sql`
-    INSERT INTO roster_slots (team_id, slot, slot_index, player_id)
-    SELECT 'tm' || g || '_' || t, s.slot, s.idx,
-           'p-' || (1 + ((g * 17 + t * 11 + s.idx * 5) % ${PLAYER_POOL_SIZE}))
-    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${TEAMS_PER_LEAGUE}) t, ${ROSTER_SLOTS}
-  `);
-  // A genuine subset, not the whole population: `lineup_slots`'s own docstring says an absent row
-  // is normal, since `defaultLineup()` derives a legal lineup from the roster for anyone who never
-  // opened the editor. One team per league across 3 weeks of starters: 5,000 x 3 x 9 = 135,000
-  // rows, again well past the floor, while leaving most teams with no lineup row for most weeks —
-  // which is exactly the shape "finds the teams that OWN a changed player" below exists to cover.
-  await db.execute(sql`
-    INSERT INTO lineup_slots (team_id, week_number, slot, slot_index, player_id)
-    SELECT 'tm' || g || '_1', w, s.slot, s.idx,
-           'p-' || (1 + ((g * 31 + w * 13 + s.idx * 7) % ${PLAYER_POOL_SIZE}))
-    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${LINEUP_WEEKS}) w, ${LINEUP_STARTER_SLOTS}
-  `);
-  // A full season of fixtures for every league: 5,000 x 14 = 70,000 rows, nearly all of them
-  // SETTLED. That ratio is the point — the ingestion worker's late-settlement query looks for the
-  // handful that are not, every thirty minutes, and a partial index is only worth having if the
-  // corpus reflects how rare its rows are.
-  await db.execute(sql`
-    INSERT INTO matchups (league_id, week_number, home_team_id, away_team_id, home_score, away_score)
-    SELECT 'lg' || g, w, 'tm' || g || '_1', 'tm' || g || '_2',
-           CASE WHEN g % ${UNSETTLED_LEAGUE_INTERVAL} = 0 THEN NULL ELSE 100 + (g % 40) END,
-           CASE WHEN g % ${UNSETTLED_LEAGUE_INTERVAL} = 0 THEN NULL ELSE 90 + (g % 35) END
-    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${SEASON_WEEKS}) w
-  `);
-  // Without ANALYZE the planner works from empty-table statistics and will choose a sequential
-  // scan for everything, which would make this whole suite a false negative.
-  // The operator queue's own corpus. Mostly RESOLVED, because that ratio is the whole reason the
-  // queue index is partial: an operator's page one must stay proportional to what is still open,
-  // not to every flag the platform ever raised.
-  await db.execute(sql`
-    INSERT INTO integrity_flags (id, flag_type, subject_type, subject_id, evidence, raised_at, resolved_at)
-    SELECT 'flg' || g, 'chat_report', 'chat_message', 'msg' || g, '{}'::jsonb,
-           now() - (g || ' seconds')::interval,
-           CASE WHEN g % ${OPEN_FLAG_INTERVAL} = 0 THEN NULL ELSE now() END
-    FROM generate_series(1, ${FLAG_COUNT}) g
-  `);
-  // Session signals, many per account: `signalsForUsers` reads every row for every member of one
-  // league at once, so the population that matters is "one account's whole sign-in history",
-  // repeated across the user base.
-  await db.execute(sql`
-    INSERT INTO session_signals (id, user_id, occurred_at, user_agent, accept_language, ip_source)
-    SELECT 'sig' || g, 'u' || (1 + (g % ${USER_COUNT})), now() - (g || ' seconds')::interval,
-           'UA/' || (g % 7), 'en-US', 'xff_unverified'
-    FROM generate_series(1, ${SESSION_SIGNAL_COUNT}) g
-  `);
-  await db.execute(sql`ANALYZE users, leagues, drafts, teams, roster_slots, lineup_slots, matchups, integrity_flags, session_signals`);
-  // `chat_messages` is analyzed separately because it is seeded in two passes above and the
-  // planner needs statistics that reflect both. No VACUUM is needed any more: the covering
-  // INCLUDE list this used to exist for is gone (`drizzle/0026_measured_index_shapes.sql` —
-  // the chat page joins two tables and reads eleven columns the index never carried, so an
-  // Index-Only Scan was never reachable and the visibility map never mattered here).
-  await db.execute(sql`ANALYZE chat_messages`);
-}
-
 describe("hot read paths use indexes", () => {
   beforeAll(async () => {
     await truncateAll(db);
-    await seedCorpus();
+    await seedRealisticCorpus(db);
   }, 120_000);
 
   // `teams` is deliberately not asserted here: at this corpus size, the planner's genuine
@@ -192,14 +40,178 @@ describe("hot read paths use indexes", () => {
   it("a narrowed browse also avoids a sequential scan of leagues", async () => {
     const plan = await explainPlan(
       db,
-      browseQuery(db, { format: "auction", experienceTier: "experienced", stakeTier: 3 }),
+      browseQuery(db, { format: "auction", experienceTier: "experienced", stakeTier: 3, participationTier: "any" }),
     );
     expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
+  });
+
+  /**
+   * PHASE 3 PLAN D, TASK 2. The composition join (`newcomers`/`veterans`, folded into
+   * `browseQuery` itself — `browse.ts`'s own docblock) measured over the SAME 5,000-league
+   * realistic corpus every assertion in this `describe` block builds from, per the brief's own
+   * Step 2: "the composition is a `GROUP BY` folded into `browseQuery`'s existing `leftJoin
+   * (teams)`... and that join is the one this task must measure rather than assume."
+   *
+   * `leagues_public_browse_idx` still leads the plan — the `LATERAL` join computing each seat's
+   * own completed-season count is a SCALAR per outer row, not a fan-out, so it changes the shape
+   * of the plan below the `GROUP BY` without changing which index the planner uses to find the
+   * candidate leagues in the first place.
+   */
+  it("plans the browse query with the composition join and still uses leagues_public_browse_idx", async () => {
+    const plan = await explainPlan(db, browseQuery(db, EMPTY_BROWSE_FILTER));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
+    expect(indexScanNode(plan, "leagues_public_browse_idx")).toBeDefined();
+    // The composition join runs on EVERY browse, narrowed or not — `compositionCategory` is a
+    // display field, not only a filter — so the default, unnarrowed path already exercises
+    // `leagues_season_completed_idx` too. See "DOES choose leagues_season_completed_idx" below
+    // for the full account of why.
+    expect(indexScanNode(plan, "leagues_season_completed_idx")).toBeDefined();
+  });
+
+  /**
+   * A participation-narrowed browse (the `HAVING` predicate built from the SAME composition
+   * join) is the query that changed shape the most, so it gets its own measurement rather than
+   * inheriting the unnarrowed case's proof by assumption.
+   */
+  it("a participation-narrowed browse still uses leagues_public_browse_idx, never a sequential scan", async () => {
+    const plan = await explainPlan(db, browseQuery(db, { ...EMPTY_BROWSE_FILTER, participationTier: "veteran" }));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
+    expect(indexScanNode(plan, "leagues_public_browse_idx")).toBeDefined();
+  });
+
+  /**
+   * THE MEASUREMENT THE CONTROLLER RULING TURNS ON, and the surprise in it. Task 1's review
+   * flagged `leagues_season_completed_idx` as an index with no consumer named anywhere in the
+   * plan, and predicted Task 2's composition join would reach `leagues` by PRIMARY KEY and never
+   * choose it — the same reasoning `completedSeasonsQuery`'s own plan proves for the per-account
+   * read (a plain `INNER JOIN … WHERE season_completed_at IS NOT NULL`, filtered AFTER the join
+   * rather than as part of it).
+   *
+   * `seatCompletedSeasonsQuery` (`browse.ts`) is shaped differently, and the difference is what
+   * flips the answer: `season_completed_at IS NOT NULL` rides in the `LEFT JOIN`'s own `ON`
+   * clause (`and(eq(seatLeagues.id, seatTeams.leagueId), isNotNull(seatLeagues.seasonCompletedAt))`
+   * — the SAME shape Task 1's now-deleted `memberCompletedSeasonsQuery` used for the per-league
+   * `leagueTierComposition` this task's fix round removed as a dead, never-called helper), not a
+   * `WHERE` applied after. That is EXACTLY the partial index's own predicate, so the planner
+   * answers "does a completed league with this id exist"
+   * with an `Index Only Scan` on `leagues_season_completed_idx` rather than a primary-key lookup
+   * plus a heap fetch to check the column — measured here at 4,500 loops (one per candidate seat
+   * before the `HAVING`/`LIMIT` ever runs), each an index-only point lookup rather than a heap
+   * fetch. The index has a real consumer after all: not the per-account read Task 1 shipped it
+   * beside, but the composition join this task adds. No drop migration ships.
+   */
+  it("DOES choose leagues_season_completed_idx — the composition join's ON clause matches the partial predicate exactly", async () => {
+    const plan = await explainPlan(db, browseQuery(db, { ...EMPTY_BROWSE_FILTER, participationTier: "veteran" }));
+    const usedIndex = indexScanNode(plan, "leagues_season_completed_idx");
+    expect(usedIndex).toBeDefined();
+    expect(usedIndex?.["Node Type"]).toBe("Index Only Scan");
   });
 
   it("a user's teams are found by index, not by scanning every team", async () => {
     const query = db.select({ leagueId: teams.leagueId, teamId: teams.id }).from(teams).where(eq(teams.userId, "u7"));
     expect(sequentiallyScannedRelations(await explainPlan(db, query))).not.toContain("teams");
+  });
+
+  /**
+   * PHASE 3 PLAN D, TASK 7 REVIEW FIX ROUND 1 (F3). `autoStartDueDrafts`'s (`@/draft-service/
+   * auto-start`) own scan, `dueDraftsQuery` — the ticker's SECOND reader of `drafts_status_idx`
+   * (`schema.ts`), run on every instance every tick whether or not a draft is due. Measured over
+   * the SAME corpus every other assertion in this block builds from, now that `seedRealisticCorpus`
+   * gives `drafts.status` a real split (`DRAFT_LIVE_INTERVAL`/`DRAFT_SCHEDULED_INTERVAL`,
+   * `@/db/test-corpus`) instead of every row reading `scheduled` — a corpus with zero selectivity
+   * on the column under test would have measured nothing.
+   *
+   * THE MEASUREMENT DECIDED, per the standing rule (`drizzle/0029_draft_due_scan_index.sql` has
+   * the full account): with the ORIGINAL single-column `drafts_status_idx`, this query's plan was
+   * a Bitmap Index Scan finding every `scheduled` row, then a Bitmap Heap Scan applying
+   * `kickoff_at <= now()` as a `Filter` AFTER the fetch — discarding 450 of 495 rows (91%) in this
+   * corpus, uncapped by `maxDraftsPerTick` because the `ORDER BY id` sorts the full result before
+   * the `LIMIT` ever applies. `kickoff_at` shipped as the index's second column, so this
+   * assertion pins the FIXED shape: the composite `Index Cond` covers both predicates and nothing
+   * is fetched only to be thrown away.
+   */
+  it("the auto-start due-kickoff scan seeks on (status, kickoff_at) together, discarding nothing", async () => {
+    const plan = await explainPlan(db, dueDraftsQuery(db, new Date().toISOString()));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("drafts");
+    const usedIndex = indexScanNode(plan, "drafts_status_idx");
+    expect(usedIndex).toBeDefined();
+    // Both predicates are ONE index condition, not a narrow-then-filter — the composite key
+    // doing its job, not merely present in the plan by name.
+    expect(usedIndex?.["Index Cond"]).toContain("status");
+    expect(usedIndex?.["Index Cond"]).toContain("kickoff_at");
+    // And the node that actually touches `drafts` heap pages (the Bitmap Heap Scan one level up
+    // from the Bitmap Index Scan `indexScanNode` found) carries no `Filter` at all: every row the
+    // index returned was one of the 45 genuinely due rows, none fetched only to be discarded.
+    const draftsNode = findNode(plan, (node) => node["Relation Name"] === "drafts");
+    expect(draftsNode).toBeDefined();
+    expect(draftsNode?.Filter).toBeUndefined();
+    expect(draftsNode?.["Rows Removed by Filter"] ?? 0).toBe(0);
+  });
+
+  /**
+   * FINAL REVIEW F16 — THE SECOND READER, NOW ACTUALLY MEASURED. `src/db/schema.ts` opened the
+   * `drafts_status_idx` comment with "TWO READERS, MEASURED" and
+   * `docs/decisions/enforcement-and-tiers.md` §9 said the other reader "measures unchanged", but
+   * only the due-kickoff scan above had an assertion behind it. Against this branch's own standard
+   * that is an overclaim, and the cheaper of the two fixes is the honest one: measure it.
+   *
+   * `liveDraftsQuery` (`@/draft-service/ticker`) is the ticker's expiry scan, run on every tick.
+   * It reads `status = 'in_progress'` alone, which is equality on the index's LEADING column, so
+   * widening the index to `(status, kickoff_at)` in migration 0029 could not have changed its plan
+   * — the argument the migration comment made carefully and this assertion now makes measured.
+   * Imported as the real builder, never a hand copy (F9's lesson).
+   */
+  it("the ticker's expiry scan still seeks on the leading status column alone — 0029's widening left it untouched", async () => {
+    const plan = await explainPlan(db, liveDraftsQuery(db));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("drafts");
+    const usedIndex = indexScanNode(plan, "drafts_status_idx");
+    expect(usedIndex).toBeDefined();
+    expect(usedIndex?.["Index Cond"]).toContain("status");
+    // The second column takes no part: this reader names only `status`, so a plan that had begun
+    // seeking on `kickoff_at` too would mean the index change reached a query it should not have.
+    expect(usedIndex?.["Index Cond"]).not.toContain("kickoff_at");
+  });
+
+  /**
+   * FINAL REVIEW F8 — the auto-set's driving scan, the one new scan on this branch that shipped
+   * with no measurement while its sibling automation's smaller scan got migration 0029.
+   *
+   * `leaguesNeedingAutoSetQuery` (`@/league-service/auto-lineup`) is the LEVEL-derived candidate
+   * query F2 replaced `leaguesInWeek` with: public matchmade leagues fielding this week that still
+   * have a team with no `lineup_slots` row for it, bounded at `AUTO_SET_CONFIG.maxLeaguesPerRun`.
+   * The old read was `SELECT DISTINCT league_id FROM matchups WHERE week_number = $1` with no
+   * `LIMIT`, which the primary key (leading with `league_id`) cannot serve and
+   * `matchups_unsettled_idx` (partial on `home_score IS NULL`) does not imply.
+   *
+   * THE MEASUREMENT DECIDED, and it decided NO NEW INDEX — stated because the opposite outcome is
+   * what this file usually records. Over the 5,000-league corpus nothing is sequentially scanned
+   * and the plan DRIVES off `matchups_unsettled_idx` as an Index Only Scan: the partial index
+   * built for exactly this question, `(week_number, league_id) WHERE home_score IS NULL`, whose
+   * predicate this query matches because of F11's settled-week guard. That guard's job is
+   * correctness; matching the partial index is its side effect, and it is a large one (the
+   * measured plan cost falls by an order of magnitude, because a settled league is never a
+   * candidate to begin with). `leagues` is then a primary-key probe per candidate rather than a
+   * walk, `teams` rides `teams_league_id_idx`, and `lineup_slots` its own primary key, index-only
+   * — no heap page is touched to discover that a team already has a row for the week.
+   *
+   * Because the ordering comes from an index walk rather than a Sort, the `LIMIT` genuinely
+   * short-circuits — the exact property `dueDraftsQuery` lacked before 0029, where `ORDER BY id`
+   * sorted the whole result first. So a bound was the fix here, and an index was not; adding one
+   * would be a write cost paid for a plan that is already index-only.
+   */
+  it("the auto-set's candidate scan drives off matchups_unsettled_idx, and its LIMIT short-circuits", async () => {
+    const plan = await explainPlan(db, leaguesNeedingAutoSetQuery(db, 1));
+    expect(sequentiallyScannedRelations(plan)).toEqual([]);
+    // No Sort anywhere: the `ORDER BY` is served by the index walk, which is what lets the LIMIT
+    // stop early instead of materializing every candidate league in the product first.
+    expect(nodeTypes(plan)).not.toContain("Sort");
+    expect(nodeTypes(plan)).toContain("Limit");
+    // The partial index earns a second reader — it shipped for `settleMissedWeeks` alone.
+    expect(indexScanNode(plan, "matchups_unsettled_idx")?.["Node Type"]).toBe("Index Only Scan");
+    // The two probes that answer "does this league still owe a lineup" are index-only: no heap
+    // page is touched to discover that a team already has a row for the week.
+    expect(indexScanNode(plan, "lineup_slots_team_id_week_number_slot_slot_index_pk")?.["Node Type"]).toBe("Index Only Scan");
+    expect(indexScanNode(plan, "teams_league_id_idx")).toBeDefined();
   });
 
   /**
@@ -324,6 +336,43 @@ describe("hot read paths use indexes", () => {
   });
 
   /**
+   * PHASE 3 PLAN D, TASK 11 — THE TASK 8 CARRY. `leagueModerationSummary`'s
+   * (`@/integrity-service/flags`) third read — the open-question count a commissioner's own
+   * moderation window shows — filters `integrity_flags` on `league_id = X AND resolved_at IS
+   * NULL`. Neither column LEADS `integrity_flags_queue_idx` OR `integrity_flags_open_subject_idx`
+   * — both are partial on the IDENTICAL predicate, `resolved_at IS NULL` — and MEASUREMENT, not
+   * the docblock's own prediction, decides which one the planner actually reaches for: over this
+   * corpus it is `integrity_flags_open_subject_idx`, chosen for its own cost reasons over the
+   * queue index that named-reasoning assumed, which is why this asserts "some partial-on-open
+   * index" rather than pinning either name — the property that matters is that `league_id` is
+   * applied as a `Filter` over the BOUNDED open-flag population, never a scan of the platform's
+   * whole flag history. The function itself awaits three inline reads with no exported query
+   * builder, so this is the identical shape hand-built, the same "a simple single-table WHERE
+   * reproduced by hand" pattern "a user's teams are found by index" above already uses.
+   * `seedRealisticCorpus` spreads `league_id` one flag per league per `FLAG_COUNT`/`LEAGUE_COUNT`
+   * cycle (Task 11 addition — every flag's `league_id` was `NULL` before this, which would have
+   * proven nothing about a real league's own read) so this measures against a corpus where a real
+   * league's flags are a real, bounded slice.
+   *
+   * FINAL REVIEW F9: this used to hand-rebuild the query. Five of the six assertions this branch
+   * added imported the real builder and this one did not, so a filter added to production (F5's
+   * own `flag_type` predicate, as it turned out) would have left this green while measuring a
+   * query production no longer runs. `openQuestionsQuery` is now exported from `flags.ts` and
+   * imported here, which is the fix this file already applies five times.
+   */
+  it("a commissioner's moderation window counts one league's open flags by index, never by scanning the flag table", async () => {
+    const plan = await explainPlan(db, openQuestionsQuery(db, "lg7"));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("integrity_flags");
+    const usedIndex = indexScanNode(plan, "integrity_flags_queue_idx") ?? indexScanNode(plan, "integrity_flags_open_subject_idx");
+    expect(usedIndex).toBeDefined();
+    // The heap scan carries the `Filter`, one level above the `Index Name` (`findNode`'s own
+    // docblock): `league_id` is applied to the bounded set the partial index already narrowed to,
+    // never to every row `integrity_flags` holds.
+    const heapScan = findNode(plan, (node) => node["Relation Name"] === "integrity_flags");
+    expect(heapScan?.Filter).toContain("league_id");
+  });
+
+  /**
    * `session_signals`' index, measured rather than assumed (final review, MEDIUM 10 and LOW 11).
    * The Sort here is UNAVOIDABLE and is not the failure: `signalsForUsers` orders globally across
    * every requested user, which no per-user index ordering can serve. What is asserted is the
@@ -438,86 +487,20 @@ async function healTradeProposalsIndexes(): Promise<void> {
  * history, and open proposals held UNDER the per-team cap (`TRADE_CONFIG.maxOpenProposalsPerTeam`
  * is 10) for every team, not a handful of leagues carrying the whole table between them.
  *
- * A separate corpus and a separate `beforeAll` from `seedCorpus` above, on purpose: reusing the
- * 5,000-league/3-teams-per-league shape above would either give every league too few teams to
- * hold a realistic trade history, or force every OTHER plan assertion in this file to carry
- * `trade_proposals` rows it has no use for. `truncateAll` in this block's own `beforeAll` clears
- * the corpus above before this one is written, and nothing after this block depends on either.
+ * A separate corpus and a separate `beforeAll` from `seedRealisticCorpus` above, on purpose:
+ * reusing the 5,000-league/3-teams-per-league shape above would either give every league too few
+ * teams to hold a realistic trade history, or force every OTHER plan assertion in this file to
+ * carry `trade_proposals` rows it has no use for. `truncateAll` in this block's own `beforeAll`
+ * clears the corpus above before this one is written, and nothing after this block depends on
+ * either. `seedTradeCorpus`'s own density contract is documented on it directly, in
+ * `@/db/test-corpus`.
  */
 describe("trade proposals: inbox and outbox serve from their own partial indexes, over a realistic corpus", () => {
-  const TRADE_LEAGUE_COUNT = 200;
-  const TRADE_TEAMS_PER_LEAGUE = 12;
-  /** Settled (TERMINAL) offers behind every team — the ratio that makes the partial index
-   *  worth having: most of a team's history is not something the inbox/outbox ever reads again. */
-  const SETTLED_PROPOSALS_PER_TEAM = 8;
-  /** Held under the cap, not at it — `TRADE_CONFIG.maxOpenProposalsPerTeam` is 10, and a corpus
-   *  where every team sits at the ceiling would not be the shape a real league is usually in. */
-  const OPEN_PROPOSALS_PER_TEAM = 3;
   const CORPUS_LEAGUE = "tlg1";
   /** League 1's team 1. Every league's team `t` proposes to team `1 + (t % TEAMS_PER_LEAGUE)`,
    *  so team 1 is the one team in every league that receives from the LAST team rather than the
    *  one before it — team 1's inbox is exactly this league's `ttm1_12` offers, nothing more. */
   const CORPUS_TEAM = "ttm1_1";
-
-  async function seedTradeCorpus(): Promise<void> {
-    await db.execute(sql`
-      INSERT INTO users (id, email, display_name)
-      SELECT 'tu' || g, 'tu' || g || '@example.test', 'Trade Manager ' || g
-      FROM generate_series(1, ${TRADE_LEAGUE_COUNT * TRADE_TEAMS_PER_LEAGUE}) g
-    `);
-    await db.execute(sql`
-      INSERT INTO leagues (id, name, format, team_count, commissioner_user_id)
-      SELECT 'tlg' || g, 'Trade League ' || g, 'snake'::draft_format, ${TRADE_TEAMS_PER_LEAGUE},
-             'tu' || (((g - 1) * ${TRADE_TEAMS_PER_LEAGUE}) + 1)
-      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g
-    `);
-    await db.execute(sql`
-      INSERT INTO teams (id, league_id, user_id, name)
-      SELECT 'ttm' || g || '_' || t, 'tlg' || g, 'tu' || (((g - 1) * ${TRADE_TEAMS_PER_LEAGUE}) + t), 'Team ' || t
-      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g, generate_series(1, ${TRADE_TEAMS_PER_LEAGUE}) t
-    `);
-    await db.execute(sql`
-      INSERT INTO trade_proposals
-        (id, league_id, proposer_team_id, counterparty_team_id, week_number,
-         proposer_assets, counterparty_assets, fingerprint, status, proposed_at, expires_at, settled_at)
-      SELECT
-        'tpr_s_' || g || '_' || t || '_' || n,
-        'tlg' || g,
-        'ttm' || g || '_' || t,
-        'ttm' || g || '_' || (1 + (t % ${TRADE_TEAMS_PER_LEAGUE})),
-        1,
-        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-' || g || '-' || t || '-' || n || '-a')),
-        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-' || g || '-' || t || '-' || n || '-b')),
-        md5('settled-' || g || '-' || t || '-' || n),
-        'rejected',
-        now() - (n || ' days')::interval,
-        now() + interval '3 days',
-        now() - (n || ' days')::interval + interval '1 hour'
-      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g, generate_series(1, ${TRADE_TEAMS_PER_LEAGUE}) t,
-           generate_series(1, ${SETTLED_PROPOSALS_PER_TEAM}) n
-    `);
-    await db.execute(sql`
-      INSERT INTO trade_proposals
-        (id, league_id, proposer_team_id, counterparty_team_id, week_number,
-         proposer_assets, counterparty_assets, fingerprint, status, proposed_at, expires_at)
-      SELECT
-        'tpr_o_' || g || '_' || t || '_' || n,
-        'tlg' || g,
-        'ttm' || g || '_' || t,
-        'ttm' || g || '_' || (1 + (t % ${TRADE_TEAMS_PER_LEAGUE})),
-        1,
-        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-open-' || g || '-' || t || '-' || n || '-a')),
-        jsonb_build_array(jsonb_build_object('kind', 'player', 'playerId', 'p-open-' || g || '-' || t || '-' || n || '-b')),
-        md5('open-' || g || '-' || t || '-' || n),
-        'open',
-        now() - (n || ' hours')::interval,
-        now() + interval '3 days'
-      FROM generate_series(1, ${TRADE_LEAGUE_COUNT}) g, generate_series(1, ${TRADE_TEAMS_PER_LEAGUE}) t,
-           generate_series(1, ${OPEN_PROPOSALS_PER_TEAM}) n
-    `);
-    await db.execute(sql`ANALYZE users, leagues, teams`);
-    await db.execute(sql`VACUUM ANALYZE trade_proposals`);
-  }
 
   /** Set by the first test, read by the mutation-proof test — the same "measure once, compare
    *  later" shape the corpus's own docblock argues for: a regression is a claim about a DELTA,
@@ -530,7 +513,7 @@ describe("trade proposals: inbox and outbox serve from their own partial indexes
     // alone cannot be trusted to have run.
     await healTradeProposalsIndexes();
     await truncateAll(db);
-    await seedTradeCorpus();
+    await seedTradeCorpus(db);
   }, 120_000);
 
   // The mutation-proof test below DROPs and recreates `trade_proposals_inbox_idx` without its
@@ -596,7 +579,7 @@ describe("trade proposals: inbox and outbox serve from their own partial indexes
 });
 
 /**
- * A STRUCTURAL guard, independent of `seedCorpus`/the planner. It used to assert the opposite of
+ * A STRUCTURAL guard, independent of `seedRealisticCorpus`/the planner. It used to assert the opposite of
  * what it asserts now, and the reversal is the finding.
  *
  * From 0018 through 0024 this index physically carried an INCLUDE list (`body`, later widened
@@ -725,5 +708,85 @@ describe("trade_proposals carries exactly the indexes it declares", () => {
     for (const [name, expected] of Object.entries(EXPECTED_TRADE_PROPOSALS_INDEXDEFS)) {
       expect(byName.get(name)).toBe(expected);
     }
+  });
+});
+
+/**
+ * PHASE 3 PLAN D, TASK 1. The completed-season count (`completedSeasonsFor`,
+ * `@/league-service/participation`) is the read the whole participation tier is built on — the
+ * production builder itself, `completedSeasonsQuery`, EXPLAINed over the SAME realistic corpus
+ * every "hot read paths" assertion above builds from. A separate `beforeAll` re-seeds it (the
+ * trade corpus block above truncated and replaced it), rather than reordering `describe` blocks —
+ * this file's execution order already carries meaning (`fileParallelism: false`, the trade block's
+ * own closing catalog check runs deliberately last today), and reseeding is cheap next to
+ * reasoning about a reordering that could silently break that.
+ */
+describe("the completed-season count uses an account's own team index, never a leagues scan", () => {
+  beforeAll(async () => {
+    await truncateAll(db);
+    await seedRealisticCorpus(db);
+  }, 120_000);
+
+  it("serves the completed-season count from teams_user_id_idx, not a leagues scan", async () => {
+    const plan = await explainPlan(db, completedSeasonsQuery(db, "u1"));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
+    expect(indexScanNode(plan, "teams_user_id_idx")).toBeDefined();
+  });
+});
+
+/**
+ * `leagues_season_completed_idx`'s own catalog proof (`drizzle/0028_season_completion.sql`) — the
+ * SAME "read the definition back out of `pg_indexes`" discipline `chat_messages_league_id_idx`,
+ * `integrity_flags` and `trade_proposals` all use above, chosen here over an EXPLAIN-based cost
+ * mutation proof for a specific reason: no query in this task's own scope drives the planner to
+ * CHOOSE this index over the primary key — a per-account completed-season count is a handful of
+ * point lookups by `leagues.id` (proven above: `teams_user_id_idx` then a primary-key join, never
+ * this index), which always wins a cost comparison against any secondary index. The risk this
+ * partial index actually guards against is `drizzle-kit generate` silently dropping the clause
+ * (Plan B ruling 17's `INCLUDE` trap turning a partial index into a full one nobody notices), not
+ * the planner declining to use a clause it never needed — so the assertion that can actually
+ * redden for the right reason is the catalog comparison, not a cost estimate that would never
+ * move regardless of whether the predicate survived.
+ *
+ * THE MUTATION PROOF: drop and recreate the index WITHOUT its partial predicate, and the catalog
+ * comparison reddens deterministically — the predicate is part of `indexdef`'s own text, not a
+ * heuristic that might or might not move. An index test that cannot fail is a comment.
+ *
+ * CONTROLLER RULING, RESOLVED (Phase 3 Plan D, Task 2). Task 1's review flagged this index as
+ * having no consumer anywhere in the plan and asked Task 2 to measure rather than assume. It
+ * does have one, just not in Task 1's own scope: "DOES choose leagues_season_completed_idx" in
+ * the "hot read paths use indexes" `describe` block above EXPLAINs `browseQuery`'s composition
+ * join (`@/league-service/browse`) and finds an `Index Only Scan` on this exact index — the
+ * `LEFT JOIN`'s `ON` clause carries `season_completed_at IS NOT NULL` alongside the id equality,
+ * which matches this partial index's predicate exactly, unlike `completedSeasonsQuery`'s plain
+ * `WHERE` below. No drop migration ships; this catalog proof stays as the mutation guard against
+ * `drizzle-kit generate` silently widening the predicate, and the EXPLAIN proof above is the
+ * cost-based confirmation that the index earns its keep.
+ */
+describe("leagues_season_completed_idx carries its partial predicate", () => {
+  const EXPECTED_INDEXDEF = "CREATE INDEX leagues_season_completed_idx ON public.leagues USING btree (id) WHERE (season_completed_at IS NOT NULL)";
+
+  async function indexDef(): Promise<string | undefined> {
+    const rows = await db.execute<{ indexdef: string }>(sql`SELECT indexdef FROM pg_indexes WHERE indexname = 'leagues_season_completed_idx'`);
+    return rows[0]?.indexdef;
+  }
+
+  afterAll(async () => {
+    // Restores the real index — a real DDL change against the shared, long-lived test database,
+    // not something `truncateAll` undoes. Left broken, every later run would measure the
+    // corrupted index as its own baseline, the same crash-safety discipline
+    // `healTradeProposalsIndexes` exists for above.
+    await db.execute(sql`DROP INDEX IF EXISTS leagues_season_completed_idx`);
+    await db.execute(sql.raw(`${EXPECTED_INDEXDEF};`));
+  });
+
+  it("matches the migration's own definition, byte for byte", async () => {
+    expect(await indexDef()).toBe(EXPECTED_INDEXDEF);
+  });
+
+  it("reddens when the partial predicate is dropped and the index is recreated without it", async () => {
+    await db.execute(sql`DROP INDEX leagues_season_completed_idx`);
+    await db.execute(sql`CREATE INDEX leagues_season_completed_idx ON leagues (id)`);
+    expect(await indexDef()).not.toBe(EXPECTED_INDEXDEF);
   });
 });

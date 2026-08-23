@@ -432,3 +432,72 @@ through to `matchups.home_score` (null until settlement), and every live league 
 the one afternoon the number matters. `setLineup`'s invalidation deleted a key that never existed,
 and `finalizeWeek` now invalidates too — the cached value was computed from a week in progress, and
 after settlement the numbers that stand live in `matchups`.
+
+## 14. The worker's new locked-week trigger (Phase 3 Plan D)
+
+`runTick` (`src/stats-pipeline/worker.ts`) gained a second thing it does after `persistTick`
+commits: the missed-deadline lineup auto-set (`autoSetLineupsForWeek`, `@/league-service/
+auto-lineup`), fired on every tick a week's `stat_weeks.status` is locked — the condition is
+`isLineupLocked(status)`, the same predicate `autoSetLineupInTx` itself re-checks under its
+`stat_weeks FOR SHARE`.
+
+**It is level-derived, and the final review is why.** The trigger shipped edge-derived
+(`plan.priorStatus === "scheduled" && status !== "scheduled"`) and therefore fired exactly once per
+week, ever: `priorStatus` reads `in_progress` or `final` on every later tick. A league whose
+auto-set transaction rolled back got no lineup, no notice, no audit row, no operator signal and no
+second attempt — permanently and invisibly (F2). The fix is not a retry counter. The candidate
+query inside `autoSetLineupsForWeek` now asks which leagues STILL have a team with no
+`lineup_slots` row for the week, bounded at `AUTO_SET_CONFIG.maxLeaguesPerRun`, so a rolled-back
+league is simply still in the set next tick and a finished one is not. Self-healing falls out of
+asking the question the right way round, and re-running costs a single bounded scan once the set
+empties.
+
+**Placement, and why it is not inside `persistTick`.** `stat_weeks` is keyed on the week alone and
+is not league-scoped, so `persistTick`'s own transaction already commits before any per-league work
+starts — the identical reason `correctSettledWeek` runs its own global `persistTick` before, and
+outside, every per-league transaction it drives (§10). Auto-set follows that precedent rather than
+inventing a second one: one small, week-scoped write lands first, then a fan-out over however many
+leagues are actually affected runs after it, each in its OWN transaction (`autoSetLineupsForWeek`'s
+own per-league loop, one transaction per league — Plan A ruling 3, a transaction appends to at most
+one chain).
+
+**The lock the two writers now share (final review F11).** Within one leased worker the ordering
+is sequential and correct: `tickWeek` awaits the auto-set before `finalizeDrafted`. The exposure is
+that the lease is best-effort by explicit design (§7 — an unreachable Redis runs the tick
+UNLEASED), so two instances can put `finalizeWeekInTx` for week W beside `autoSetLineupInTx` for
+week W. They shared no lock at all: the auto-set writes `lineup_slots` and finalize reads it
+through `getLineup` with a plain unlocked `SELECT`, while the auto-set's `stat_weeks FOR SHARE` is
+aimed at `persistTick`, which finalize never touches. Under read-committed, finalize could score a
+team from the roster-derived default while the auto-set's carried-forward lineup committed a moment
+later, leaving the stored lineup disagreeing with the score it supposedly produced.
+
+`autoSetLineupInTx` now takes `matchups[league, week] FOR UPDATE`, ordered by `home_team_id`
+exactly the way `finalizeWeekInTx` orders its own row locks over the same rows, so the two queue
+and cannot deadlock. The lock goes on `matchups` rather than on `lineup_slots` because `matchups`
+is the row finalize actually WRITES: a share lock on a table finalize only reads is a lock finalize
+never queues behind. The same statement is the SETTLED-WEEK GUARD the auto-set never had
+(`isLineupLocked` answers `true` for `"final"`), and that guard is only safe because the trigger is
+level-derived: a league that failed at the lock heals thirty minutes later, days before the week
+settles, so refusing a settled week refuses work that has already had every chance to happen.
+`src/integrity-service/lock-order.test.ts` drives both sides on two connections.
+
+**Failure isolation, the same asymmetry §7 already documents for degradation.** A thrown error from
+`autoSet` is caught, logged, and reported through the worker's own due-report channel — NEVER
+rethrown. The tick that just settled real scores for every league in the product must not fail
+because one league's missed-deadline lineup write had a bug. A per-league rollback does NOT throw,
+so it reaches an operator by a second route: `AutoSetOutcome.leaguesFailed` is read at the call
+site and reported through the same `reportIfDue` channel, on its own stable rate-limit key. That is
+the contract `AutoSetOutcome` always stated ("never silently dropped") and the call site did not
+keep until F2. The score cache eviction auto-set performs reuses the SAME `ScoreCache` instance
+this worker already writes live scores into (`scoreCache`, passed through as `cache`), the
+identical "the worker supplies the real cache" idiom `setLineup`/`acceptTrade` use from the route
+layer.
+
+**What this trigger does NOT do.** It never runs for a private league, or for a public league with
+`INTEGRITY_CONFIG.participation.enforceTierSegregation` switched off at deploy. The two halves are
+asked in the two places that cost least: the deploy switch first, before any query runs at all, and
+the per-league `is_public_matchmade` axis as a predicate inside the candidate query — the same
+split `autoStartDueDrafts` uses, and the same `enforcementAppliesTo` (`@/league-service/
+enforcement`) the join gate, the creation gate and the trade auto-hold all ask. See
+`docs/decisions/enforcement-and-tiers.md` §6 for the full account of the strategy this trigger
+applies and why only one strategy is declared.

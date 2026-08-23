@@ -1,14 +1,26 @@
 import { describe, it, expect } from "vitest";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import type { NoticesBody } from "../contract";
 import { fixtureAccountDeps } from "../test-fixtures";
 import { AccountRoomDepsProvider, type AccountRoomDeps } from "./deps";
 import { useNotices } from "./use-notices";
 
+/** Every case below renders through a real `NoticesProvider` — Plan D Task 9 fix round 1 deleted
+ *  `useNotices`' standalone fallback (it was unreachable in production, confirmed by the review
+ *  that ordered its removal), so this is now the ONLY way to render `useNotices()` at all. The
+ *  provider's own lifetime guarantees (one fetch across many navigations, one stream never
+ *  closed, no fetch until a real subscriber exists) are `notices-provider.test.tsx`'s job; this
+ *  file covers the hook's CONTRACT — the state shape, the `notice.created`/`open` refetches, the
+ *  `generationRef` race with `markRead` — through the one path that now reaches it. */
 function wrapper(deps: AccountRoomDeps) {
   return function Wrapper({ children }: { readonly children: ReactNode }) {
-    return <AccountRoomDepsProvider deps={deps}>{children}</AccountRoomDepsProvider>;
+    return (
+      <AccountRoomDepsProvider deps={deps}>
+        <NoticesProvider>{children}</NoticesProvider>
+      </AccountRoomDepsProvider>
+    );
   };
 }
 
@@ -28,6 +40,14 @@ const NOTICE_B: NoticesBody["notices"][number] = { ...NOTICE_A, id: "n2", title:
 const PAGE: NoticesBody = { notices: [NOTICE_A], unreadCount: 1 };
 
 describe("useNotices", () => {
+  it("throws a clear error when rendered outside a NoticesProvider — no silent standalone fallback", () => {
+    // The same "no ambient default, fail loudly" idiom `useTheme`/`useToast` already use in this
+    // codebase. `renderHook`'s default wrapper is `undefined` — no `AccountRoomDepsProvider`
+    // either, but that one degrades gracefully to `BROWSER_DEPS`; only the missing
+    // `NoticesProvider` is what this test is about, so the assertion is on the thrown message.
+    expect(() => renderHook(() => useNotices())).toThrow("useNotices must be used inside <NoticesProvider>.");
+  });
+
   it("loads the caller's own page on mount and derives the unread count from it", async () => {
     const fixture = fixtureAccountDeps({ ok: true, data: PAGE });
     const { result } = renderHook(() => useNotices(), { wrapper: wrapper(fixture.deps) });
@@ -149,5 +169,15 @@ describe("useNotices", () => {
 
     expect(result.current.notices.find((notice) => notice.id === NOTICE_A.id)?.readAt).not.toBeNull();
     expect(result.current.unreadCount).toBe(0);
+  });
+
+  it("stops subscribing on unmount, without refetching or reopening the stream", async () => {
+    const fixture = fixtureAccountDeps({ ok: true, data: PAGE });
+    const { result, unmount } = renderHook(() => useNotices(), { wrapper: wrapper(fixture.deps) });
+    await waitFor(() => expect(result.current.status).toBe("ready"));
+
+    unmount();
+
+    expect(fixture.calls).toEqual(["GET /api/notices"]);
   });
 });

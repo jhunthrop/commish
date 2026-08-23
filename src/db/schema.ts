@@ -76,8 +76,9 @@ export const users = pgTable(
  *
  * There is deliberately NO notification-channel column here. The catalog in
  * `src/identity/notifications.ts` describes what the product tells you about; email delivery is
- * Plan D's, and a stored preference for a channel with no sender is a switch wired to nothing.
- * The day the sender exists, this table gains the column and the surface gains the toggles.
+ * Phase 2 Plan D's, and a stored preference for a channel with no sender is a switch wired to
+ * nothing. The day the sender exists, this table gains the column and the surface gains the
+ * toggles.
  */
 export const userPreferences = pgTable("user_preferences", {
   userId: text("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
@@ -109,6 +110,21 @@ export const leagues = pgTable(
     /** The league's roster shape. The draft reads this to know its rounds and slot rules. */
     rosterSlots: jsonb("roster_slots").$type<readonly RosterSlotConfig[]>().notNull().default([...STANDARD_ROSTER_SLOTS]),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    /**
+     * Stamped ONCE, by `stampSeasonCompleteInTx` (`@/league-service/participation`), inside the
+     * same transaction as the write that scores the league's LAST week (`finalizeWeekInTx`,
+     * `@/stats-pipeline/finalize`) — never computed at read time by scanning `matchups`, which is
+     * what makes "how many seasons has this account finished?" a bounded, indexed count instead
+     * of an anti-join over every matchup in the product.
+     *
+     * Nullable, no default, no backfill: a league that finished its season before this column
+     * existed does not exist, because no league on this platform has finished one yet. A
+     * ONE-WAY STAMP, matching `reviews.removed_at` and `integrity_flags.resolved_at` — the guard
+     * against re-stamping lives in the UPDATE's own `WHERE season_completed_at IS NULL`, not in a
+     * prior read, so a correction to an already-settled week (`correctSettledWeek`, weeks later)
+     * leaves the original date alone.
+     */
+    seasonCompletedAt: timestamp("season_completed_at", { withTimezone: true }),
   },
   (t) => [
     /**
@@ -130,6 +146,15 @@ export const leagues = pgTable(
      * cost with no read to pay for it. Add one the day a "leagues I commission" query exists.
      */
     index("leagues_public_browse_idx").on(t.createdAt).where(sql`${t.isPublicMatchmade}`),
+    /**
+     * PARTIAL on the same rows the column itself is rare for — a handful of completed leagues
+     * against every league the platform holds. Written BY HAND, not `drizzle-kit generate`
+     * (`drizzle/0028_season_completion.sql`): Plan B ruling 17's `INCLUDE` trap already proved
+     * that generated DDL can silently drop a clause, and a partial index that quietly became a
+     * full one is a bigger table nobody notices. `src/db/index-plans.test.ts` reads the catalog
+     * definition back out of `pg_indexes` rather than trusting this declaration.
+     */
+    index("leagues_season_completed_idx").on(t.id).where(sql`${t.seasonCompletedAt} is not null`),
   ],
 );
 
@@ -272,9 +297,25 @@ export const drafts = pgTable(
     // This converts that invariant-by-convention into an invariant-by-constraint before any
     // Phase 1 data exists to violate it.
     uniqueIndex("drafts_league_id_idx").on(t.leagueId),
-    // The ticker scans every in_progress draft on a fixed interval — this is what makes
-    // that scan an index lookup instead of a sequential scan as the table grows.
-    index("drafts_status_idx").on(t.status),
+    // TWO READERS, BOTH MEASURED (Phase 3 Plan D, Task 7 review fix round 1, F3, plus the final
+    // review's F16 — which caught this comment claiming a measurement for the first reader that
+    // did not exist yet, and was answered by taking it rather than softening the verb). Both
+    // assertions live in src/db/index-plans.test.ts's "hot read paths" over `seedRealisticCorpus`
+    // (`@/db/test-corpus`), and both EXPLAIN the real exported builder rather than a hand copy.
+    // The ticker's expiry scan (`liveDraftsQuery`, `ticker.ts`) reads `status = 'in_progress'`
+    // alone, which a leading `status` column serves identically whether or not a second column
+    // follows it — measured by "the ticker's expiry scan still seeks on the leading status column
+    // alone". `autoStartDueDrafts`'s (`@/draft-service/auto-start`) due-kickoff scan reads
+    // `status = 'scheduled' AND kickoff_at <= now()`, every tick, on every instance, whether or
+    // not any draft is actually due — with `status` alone, that scan's own EXPLAIN measured a
+    // real, unbounded-with-growth cost: a bitmap heap fetch across the WHOLE `scheduled`
+    // population (91% of it discarded by a `kickoff_at` filter applied AFTER the fetch, in this
+    // corpus) that a `LIMIT` cannot short-circuit, because `ORDER BY id` sorts the join's full
+    // result before the limit ever applies. `kickoff_at` appended as the index's second column
+    // lets that same scan seek straight to the due rows instead, at zero cost to the first
+    // reader — the measurement `drizzle/0029_draft_due_scan_index.sql` records is what decided
+    // this rather than reasoning about it in the abstract.
+    index("drafts_status_idx").on(t.status, t.kickoffAt),
   ],
 );
 

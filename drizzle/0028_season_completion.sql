@@ -1,0 +1,2 @@
+ALTER TABLE "leagues" ADD COLUMN "season_completed_at" timestamp with time zone;--> statement-breakpoint
+CREATE INDEX "leagues_season_completed_idx" ON "leagues" USING btree ("id") WHERE "leagues"."season_completed_at" is not null;

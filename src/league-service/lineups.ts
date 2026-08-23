@@ -1,12 +1,12 @@
 import { and, eq } from "drizzle-orm";
 import type { Db, ReadonlyDb } from "@/db/client";
-import { leagues, lineupSlots, matchups, players, rosterSlots, statWeeks } from "@/db/schema";
+import { leagues, lineupSlots, matchups, players, rosterSlots, statWeeks, teams } from "@/db/schema";
 import { validateLineup } from "@/domain/roster-eligibility";
 import { BENCH_SLOT } from "@/domain/roster";
 import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
-import { benchOf, defaultLineup, isLineupLocked, startersOf, type WeekStatus } from "@/league";
+import { benchOf, defaultLineup, deriveBenchSlots, isLineupLocked, startersOf, type WeekStatus } from "@/league";
 import { excludedSetFor } from "@/db/upsert";
 import type { LineupBody, LineupSlotView } from "@/league-room/contract";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
@@ -39,14 +39,19 @@ export interface GetLineupInput {
   readonly slotConfig: readonly RosterSlotConfig[];
 }
 
-interface StoredSlotRow {
+export interface StoredSlotRow {
   readonly slot: string;
   readonly slotIndex: number;
   readonly playerId: string | null;
 }
 
-/** `slot` is a plain text column in both tables; the league's config is what gives it meaning. */
-function toRosterSlots(rows: readonly StoredSlotRow[]): readonly RosterSlot[] {
+/**
+ * `slot` is a plain text column in both `lineup_slots` and `roster_slots`; the league's config is
+ * what gives it meaning. Exported so `autoSetLineupInTx` (`@/league-service/auto-lineup`, Task 4)
+ * reads its own `lineup_slots`/`roster_slots` rows through the identical mapping this module
+ * already uses, rather than a second copy of the same three-field cast.
+ */
+export function toRosterSlots(rows: readonly StoredSlotRow[]): readonly RosterSlot[] {
   return rows.map((row) => ({ slot: row.slot as RosterSlotType, slotIndex: row.slotIndex, playerId: row.playerId }));
 }
 
@@ -163,6 +168,17 @@ export async function setLineup(
   const [league] = await db.select({ rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId));
   if (league === undefined) return { ok: false, status: 404, reason: "That league doesn't exist." };
 
+  // `docs/decisions/audit-and-integrity.md`'s residual, closed: this used to trust `input.teamId`
+  // and `input.leagueId` to agree without ever checking, safe only because the route derives both
+  // from the session actor rather than from the request body. `autoSetLineupInTx`
+  // (`@/league-service/auto-lineup`, Task 4) derives its own `teamId` from the league it is
+  // iterating and cannot be wrong the way a caller-supplied pair can, so this is the assertion the
+  // residual asked the next team-scoped writer to add rather than copy the omission.
+  const [team] = await db.select({ leagueId: teams.leagueId }).from(teams).where(eq(teams.id, input.teamId));
+  if (team === undefined || team.leagueId !== input.leagueId) {
+    return { ok: false, status: 404, reason: "That team isn't part of this league." };
+  }
+
   const week = await db
     .select({ weekNumber: matchups.weekNumber })
     .from(matchups)
@@ -184,11 +200,7 @@ export async function setLineup(
   // value-import `@/league` at all.
   const starterSlots = input.slots.filter((slot) => slot.slot !== BENCH_SLOT);
   const startingIds = new Set(starterSlots.map((slot) => slot.playerId).filter((id): id is string => id !== null));
-  const benched = [...owned].filter((id) => !startingIds.has(id)).sort();
-  const benchConfig = league.rosterSlots.find((config) => config.slot === BENCH_SLOT);
-  const benchSlots = benched
-    .slice(0, benchConfig?.count ?? 0)
-    .map((playerId, slotIndex) => ({ slot: BENCH_SLOT, slotIndex, playerId }));
+  const benchSlots = deriveBenchSlots(owned, startingIds, league.rosterSlots);
 
   const lineup = defaultLineup(league.rosterSlots, [...starterSlots, ...benchSlots]);
   const playerRows = await db.select({ id: players.id, position: players.position }).from(players);

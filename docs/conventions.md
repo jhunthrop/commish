@@ -120,6 +120,18 @@ src/
                           src/matchmaking, src/identity, src/help, src/reviews and
                           src/moderation. See docs/trades.md and
                           docs/decisions/trades-and-fairness.md.
+  participation/          THE THIRD MEANING OF "TIER" (Phase 3 Plan D): participationTier
+                          (tier.ts — newcomer/veteran, participationTierFor), TierComposition +
+                          compositionCategoryFor (composition.ts, the coarse browse-card bucket
+                          the server reduces to before anything ships) and isVerifiedPlayer + the
+                          verified-badge copy (verified.ts) — a computed, enforced participation
+                          fact, compile-distinct from users.experience_tier (self-reported) and
+                          leagues.experience_tier (self-declared). NO I/O, no clock, no database.
+                          100% coverage. Browser-safe: the eighth pure exempt directory, beside
+                          src/chat, src/matchmaking, src/identity, src/help, src/reviews,
+                          src/moderation and src/trades — public-league-list.tsx value-imports
+                          TIER_COMPOSITION_LABEL directly. See docs/enforcement.md and
+                          docs/decisions/enforcement-and-tiers.md.
   scoring/                Pure fantasy-scoring engine: computeFantasyPoints/scoreLineup, every
                           preset (PPR/standard/K-DEF/TE-premium). NO I/O. 100% coverage.
   stats/                  The stats seam. provider.ts (the interface: listPlayers, listGames,
@@ -143,9 +155,11 @@ src/
   integrity/              Pure audit + moderation-queue rules: the hash chain (chain.ts —
                           linkEvent, verifyLinkedRun, computeEventHash, normalizeInstant), the
                           canonical rejecting encoder (canonical.ts), the member-visible activity
-                          allowlist + renderers (activity-view.ts), the system-action summary
-                          allowlist (system-actions.ts — SYSTEM_ACTION_SUMMARY_ALLOWED, a third
-                          deny-by-default dimension), the notice copy registry (notices.ts —
+                          allowlist + renderers (activity-view.ts), the system-action visibility
+                          table (system-actions.ts — SYSTEM_ACTION_VISIBILITY, the fourth
+                          deny-by-default dimension; it subsumed the third,
+                          SYSTEM_ACTION_SUMMARY_ALLOWED, a plain boolean now DERIVED from it —
+                          Phase 3 Plan D), the notice copy registry (notices.ts —
                           NOTICE_TEMPLATES, distinct from identity/notifications.ts's topic
                           catalog), the dispute-queue vocabulary (flags.ts — FlagType,
                           ResolutionDecision, DECISION_OWNER), the admin-only field set
@@ -180,7 +194,8 @@ src/
                           chat report pick from; src/reviews/config.ts re-exports it so the diff
                           at every existing consumer is zero. NO I/O. 100% coverage. See
                           docs/decisions/operators-and-moderation.md §8.
-  db/                     schema.ts (Drizzle, pg-core: users, leagues, teams, league_invites,
+  db/                     schema.ts (Drizzle, pg-core: users, leagues (season_completed_at, the
+                          one-way season-completion stamp, Phase 3 Plan D), teams, league_invites,
                           scoring_settings, roster_slots, lineup_slots, drafts, draft_actions,
                           draft_nudges, draft_picks, weeks, matchups, players,
                           player_stat_lines, chat_messages, chat_reactions, reviews,
@@ -361,9 +376,20 @@ is deliberately **not** part of `@/domain` or `@/league-service` either — `src
 keeps the pure Phase 1 `TradeProposal`/`isBalancedProposal` shapes the advisor already consumed,
 and `src/league-service` stays on the blocked list below, reached only over the wire.
 
+`src/participation/**` joins the exempt set for the same reason (Phase 3 Plan D): it is the
+eighth pure directory on the list, not `src/domain` (which is under
+`eslint-plugin-functional`'s immutability rules and holds types the whole product shares, while a
+participation tier's labels and thresholds are one feature's vocabulary) and not `src/integrity`
+(which is BLOCKED — see below). `TIER_COMPOSITION_LABEL` and `CompositionCategory`
+(`public-league-list.tsx`) are the real browser VALUE-imports, the same "a client label and a
+server-enforced rule must read the identical vocabulary" reason every other exempt directory is
+on this list. It joins `flag-only.test.ts`'s `INTEGRITY_DIRS` in the same commit it joined this
+list, because the directory that decides who is a veteran is exactly the directory somebody would
+one day reach for an account action from.
+
 `src/integrity/**` and `src/integrity-service/**` join the BLOCKED list instead — unlike
-`@/chat`, `@/matchmaking`, `@/identity`, `@/help`, `@/reviews`, `@/moderation` and `@/trades`,
-neither half of the audit spine
+`@/chat`, `@/matchmaking`, `@/identity`, `@/help`, `@/reviews`, `@/moderation`, `@/trades` and
+`@/participation`, neither half of the audit spine
 is exempt, because neither half is actually browser-safe: `src/integrity/**` is pure but reads
 `node:crypto` (`chain.ts`'s `createHash`), which has no browser polyfill in this stack, and
 `src/integrity-service/**` is Postgres-backed outright. Client code needs neither as a value —
@@ -398,7 +424,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**`, `src/integrity-service/**`, `src/league-service/**`, `src/draft-service/**`, `src/moderation/**` and `src/trades/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — twenty gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. `src/league-service` and `src/draft-service` (gates 17 and 18) are gated for the identical service-layer reason; `src/moderation` (gate 19) is pure and gates for the reason every pure directory does; `src/trades` (gate 20) is pure and holds the one fairness function the write path calls inside a transaction, moved out of the coverage-ungated `src/ai-advisor/**` for exactly that reason (`docs/decisions/trades-and-fairness.md` §2). See `docs/decisions/operators-and-moderation.md`. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**`, `src/integrity-service/**`, `src/league-service/**`, `src/draft-service/**`, `src/moderation/**`, `src/trades/**` and `src/participation/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — twenty-one gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. `src/league-service` and `src/draft-service` (gates 17 and 18) are gated for the identical service-layer reason; `src/moderation` (gate 19) is pure and gates for the reason every pure directory does; `src/trades` (gate 20) is pure and holds the one fairness function the write path calls inside a transaction, moved out of the coverage-ungated `src/ai-advisor/**` for exactly that reason (`docs/decisions/trades-and-fairness.md` §2); `src/participation` (gate 21, Phase 3 Plan D) is pure and holds the third tier vocabulary that decides who is a veteran, joining two plans early gated `src/league-service`/`src/draft-service`/`src/integrity`/`src/integrity-service` in covering by construction every directory this plan writes into. See `docs/decisions/operators-and-moderation.md` and `docs/decisions/enforcement-and-tiers.md`. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
 - **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there. `playwright.config.ts` pins `workers: 1` and `fullyParallel: false`, so every run is one worker walking the suite in one deterministic, alphabetical file order — a real cross-spec ordering dependency, not a latent flake: `mobile-360.spec.ts`'s dispute-queue check depends on `league-lifecycle.spec.ts` having already run and resolved its own flag, sorting first only because its filename does. A spec relying on suite order names the file it depends on in its own comment, the way both of these do; running either spec in isolation (`npx playwright test mobile-360.spec.ts` alone) will not reproduce the count that spec asserts.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 
@@ -413,6 +439,8 @@ One rulebook, `src/integrity/copy-rules.ts` (`copyViolations`): no em or en dash
 
 ### Migrations
 `ADD COLUMN … NOT NULL` without a `DEFAULT` is acceptable only while the table is empty (pre-first-deploy, as in `drizzle/0001`); once deployed, add with a DEFAULT or backfill in a separate migration.
+
+**Index rebuilds hold ACCESS EXCLUSIVE, and nothing in this repo uses `CONCURRENTLY`.** A `DROP INDEX` + `CREATE INDEX` pair (as in `drizzle/0029_draft_due_scan_index.sql`) locks the whole table for the duration of the rebuild, blocking every reader — including the draft ticker's every-tick scan. This is a repo-wide property, not a property of any one migration: drizzle-kit runs each migration inside a transaction and `CREATE INDEX CONCURRENTLY` cannot run inside one, so no migration here can express it. Acceptable today because no deploy has happened yet and every table is small. **Named for the deploy era:** once there is production data, an index rebuild on a hot table is a runbook step, applied by hand outside drizzle-kit (`CREATE INDEX CONCURRENTLY` under the new name, then `DROP INDEX CONCURRENTLY` the old one, then a no-op migration to bring the generated SQL back in line), never a migration run against a live database.
 
 ### Commits
 Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`). Commit after every completed step; commit bodies explain *why* and record any deviation from the plan.

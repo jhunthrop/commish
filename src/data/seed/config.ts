@@ -50,5 +50,27 @@ export const DEV_SEED = {
     { leagueId: "dev_public_sharks_auction", draftId: "dev_public_sharks_auction_draft", name: "Sharks Only Auction", format: "auction" as const, experienceTier: "experienced" as const, stakeTier: 3, teamCount: 10, filled: 9 },
     { leagueId: "dev_public_two_slots", draftId: "dev_public_two_slots_draft", name: "Backyard Brawl", format: "snake" as const, experienceTier: "experienced" as const, stakeTier: 2, teamCount: 8, filled: 6 },
     { leagueId: "dev_public_packed", draftId: "dev_public_packed_draft", name: "Packed House", format: "snake" as const, experienceTier: "beginner" as const, stakeTier: 1, teamCount: 8, filled: 8 },
+    /**
+     * Phase 3 Plan D, Task 10, Step 1: the beginner league the seed's own veteran identity
+     * presses "Join" on. `skipOwnerIndexZero` is what makes that press a REFUSAL rather than a
+     * silent re-arrival — every other entry above seats index 0 (`claimUserId`, when one is
+     * set) in its own seat 1, a harmless fact for every league that isn't the join target, but
+     * seating the veteran here would make it already a member of the one league this step needs
+     * it to be REFUSED from. A brand-new league id, never seeded before this task: shifting an
+     * EXISTING league's seat mapping (tried first, reverted) breaks `teams_league_user_idx` on
+     * any database this seed already ran against under the old mapping — see
+     * `seedPublicLeagues`'s own docblock for the incident.
+     */
+    {
+      leagueId: "dev_public_tier_demo",
+      draftId: "dev_public_tier_demo_draft",
+      name: "Fresh Faces Only",
+      format: "snake" as const,
+      experienceTier: "beginner" as const,
+      stakeTier: 0,
+      teamCount: 12,
+      filled: 3,
+      skipOwnerIndexZero: true,
+    },
   ],
 } as const;

@@ -59,6 +59,7 @@ describe("INTEGRITY_CONFIG.trade", () => {
     // Step 5 invariant read the right way round.
     expect(evenDelta).toBeLessThanOrEqual(lopsidedDelta);
     expect(lopsidedDelta).toBeLessThanOrEqual(fairnessFlagThreshold);
+    expect(autoHoldThreshold).not.toBeNull();
     if (autoHoldThreshold !== null) {
       expect(fairnessFlagThreshold).toBeLessThanOrEqual(autoHoldThreshold);
     }
@@ -71,8 +72,9 @@ describe("INTEGRITY_CONFIG.trade", () => {
     }
   });
 
-  it("ships autoHoldThreshold null — Plan D supplies a number, not a code path", () => {
-    expect(INTEGRITY_CONFIG.trade.autoHoldThreshold).toBeNull();
+  it("ships autoHoldThreshold as 35, Plan D's own number, above the fairness flag threshold", () => {
+    expect(INTEGRITY_CONFIG.trade.autoHoldThreshold).toBe(35);
+    expect(INTEGRITY_CONFIG.trade.autoHoldThreshold).toBeGreaterThan(INTEGRITY_CONFIG.trade.fairnessFlagThreshold);
   });
 
   it("bounds sweepBatchSize — an unbounded manual re-run is a script nobody runs twice", () => {
@@ -81,36 +83,67 @@ describe("INTEGRITY_CONFIG.trade", () => {
   });
 });
 
-/**
- * FINAL REVIEW, MEDIUM 6. The notices ceiling is reachable by ORDINARY BROWSING, not by abuse:
- * every page mounts `useNotices` in its own subtree (there is no shared app layout), and each
- * mount costs TWO `GET /api/notices` — the mount fetch and the SSE `open` refetch. At the old 30
- * that was fifteen navigations, and a 429 replaces the member's notices with an error state.
- *
- * The architectural fix is Plan D's (ledgered in the Phase 3 overview). This is the honest
- * stopgap, and the point of pinning it here is that the NUMBER is derived rather than picked: the
- * arithmetic lives in `config.ts`'s own docblock, and this test is what stops a later edit from
- * quietly walking it back below what real navigation costs.
- */
-describe("the notices ceiling is above what real navigation costs", () => {
-  /** What `useNotices` (`@/account-room/hooks/use-notices`) spends per client-side navigation:
-   *  the mount fetch, plus the refcounted stream's `open` refetch after it reopens. */
-  const REQUESTS_PER_NAVIGATION = 2;
-  /** One navigation every two seconds, sustained for the whole window — click, render, look.
-   *  Faster than any real member browses for a full minute. */
-  const NAVIGATION_INTERVAL_MS = 2_000;
+describe("INTEGRITY_CONFIG.participation", () => {
+  it("keeps the verified cutoff at or below the veteran cutoff", () => {
+    // An inversion would mean an account the platform segregates as experienced and refuses to
+    // call verified, which is two statements about one person that contradict each other.
+    expect(INTEGRITY_CONFIG.participation.verifiedSeasonCutoff).toBeLessThanOrEqual(INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+  });
 
-  it("lets a member navigate every two seconds for a whole window without a 429", () => {
+  it("keeps both cutoffs positive and finite", () => {
+    for (const value of [INTEGRITY_CONFIG.participation.veteranSeasonCutoff, INTEGRITY_CONFIG.participation.verifiedSeasonCutoff]) {
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThan(0);
+    }
+  });
+
+  it("ships enforceTierSegregation true — this task computes the tier; the join gate that reads this switch is a later task's", () => {
+    expect(INTEGRITY_CONFIG.participation.enforceTierSegregation).toBe(true);
+  });
+});
+
+/**
+ * PLAN D TASK 9, FIX ROUND 1. `NoticesProvider` (`@/components/app-shell/notices-provider`)
+ * fixed the architecture the P3C stopgap was covering for: navigation no longer remounts
+ * `useNotices`, so it no longer spends a request per page. What is left is a real stress case —
+ * a member receiving notices continuously and opening the bell every time — not ordinary
+ * browsing, and the point of pinning it here is unchanged from the stopgap it replaced: the
+ * NUMBER is derived rather than picked, the arithmetic lives in `config.ts`'s own docblock, and
+ * this test is what stops a later edit from quietly walking it back below what that stress case
+ * costs.
+ *
+ * `createRateLimiter` (`@/lib/api/rate-limit`) is a FIXED window per key, started at that key's
+ * first request — not a sliding window — so the worst case for one window is not "the
+ * notice-driven steady state" in isolation. It is that steady state PLUS the two requests
+ * session start itself spends (the mount fetch and the stream's own first `open`, which
+ * refetches on every `open` including the initial connection — see `config.ts`'s own docblock
+ * for why that request is not the one to cut) landing inside the SAME still-open window, which
+ * happens whenever a member opens the app straight into a burst of notices.
+ */
+describe("the notices ceiling matches NoticesProvider's real cost under the fixed-window limiter", () => {
+  /** A notice arriving every four seconds, sustained for the whole window — far faster than any
+   *  real member receives notices, and each one is a `notice.created` refetch plus, if the bell
+   *  is open, a `POST /api/notices/read` right behind it. */
+  const NOTICE_INTERVAL_MS = 4_000;
+  const REQUESTS_PER_NOTICE = 2;
+  /** The mount fetch plus the stream's own first `open` refetch — spent once, at session start,
+   *  inside the SAME fixed window a burst-on-open stress case also spends its notice-driven
+   *  requests in. */
+  const SESSION_START_REQUESTS = 2;
+
+  it("lets a member open the app straight into a notice every four seconds for a whole window, reading each one, without a 429", () => {
     const { maxRequests, windowMs } = INTEGRITY_CONFIG.notices.rateLimit;
-    const navigationsPerWindow = windowMs / NAVIGATION_INTERVAL_MS;
-    // Plus the shared `POST /api/notices/read`, at most one per navigation when the bell is
-    // opened with unread notices — the two routes spend one budget on purpose.
-    const worstCaseRequests = navigationsPerWindow * (REQUESTS_PER_NAVIGATION + 1);
+    const noticesPerWindow = windowMs / NOTICE_INTERVAL_MS;
+    const worstCaseRequests = SESSION_START_REQUESTS + noticesPerWindow * REQUESTS_PER_NOTICE;
     expect(maxRequests).toBeGreaterThanOrEqual(worstCaseRequests);
   });
 
   it("keeps the ceiling finite and the window a real minute", () => {
     expect(Number.isFinite(INTEGRITY_CONFIG.notices.rateLimit.maxRequests)).toBe(true);
     expect(INTEGRITY_CONFIG.notices.rateLimit.windowMs).toBe(60_000);
+  });
+
+  it("is the restored, fully re-derived ceiling — the P3C 120 is gone with the render tree that needed it", () => {
+    expect(INTEGRITY_CONFIG.notices.rateLimit.maxRequests).toBe(32);
   });
 });

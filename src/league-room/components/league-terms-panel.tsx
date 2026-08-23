@@ -93,6 +93,10 @@ export function LeagueTermsPanel({
           <dt className={`${EYEBROW} text-text-muted`}>Roster</dt>
           <dd className="text-text-primary">{terms.rosterLine}</dd>
         </div>
+        <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+          <dt className={`${EYEBROW} text-text-muted`}>Draft</dt>
+          <dd className="text-text-primary">{terms.draftAt}</dd>
+        </div>
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Commissioner</dt>
           <dd className="inline-flex items-center gap-2 text-text-primary">

@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import { decisionIsAvailable, RESOLUTION_DECISIONS } from "@/integrity/flags";
+import { decisionIsAvailable, decisionIsOperatorChoosable, RESOLUTION_DECISIONS } from "@/integrity/flags";
 
 /**
  * `POST /api/notices/read`'s body. Named `noticeIds`, not `ids`, so a rejection names the exact
@@ -30,8 +30,9 @@ export const markNoticesReadSchema = z.object({
  *
  * `decision` is narrowed past the closed `RESOLUTION_DECISIONS` enum by `decisionIsAvailable`, so
  * a request naming a decision wired for NO subject at all (none, today — every declared decision
- * is wired for at least one, since Task 7 turned `trade_reversed` on) is refused HERE, at the
- * boundary, as a 400 naming the exact field — `parseJson`'s usual shape — rather than reaching
+ * is wired for at least one, since Task 7 turned `trade_reversed` on and Plan D Task 5 landed
+ * `trade_released`/`trade_blocked` wired the same commit they were declared) is refused HERE, at
+ * the boundary, as a 400 naming the exact field — `parseJson`'s usual shape — rather than reaching
  * `resolveFlag` and being told the same thing a second time. WHICH subjects a wired decision
  * actually applies to is a narrower, per-request question this schema cannot answer without the
  * flag row itself — `resolveFlag`'s own `decisionIsWiredFor` check (`@/integrity/flags`) is where
@@ -41,9 +42,20 @@ export const markNoticesReadSchema = z.object({
  * a second number that could drift from it — `resolveFlag` still enforces it itself too, the same
  * "the service is the real boundary" discipline `removeReview`'s `REVIEW_CONFIG.removalReason`
  * check uses, so a future caller of the service directly cannot hand it an unbounded string.
+ *
+ * `decision` is ALSO narrowed by `decisionIsOperatorChoosable` (Plan D, Task 5, fix round 1,
+ * Finding 1) — a SEPARATE question from `decisionIsAvailable`: a system-only decision (today,
+ * `superseded_before_review`) is available (the product genuinely carries it out) but never
+ * operator-choosable, so a direct `POST` naming it is refused HERE, at the boundary, in the exact
+ * shape every other unwired-decision refusal already takes — never reaching `resolveFlag` to be
+ * told the same thing a second time. `resolveFlag` still re-checks this itself too, the same
+ * "the service is the real boundary" discipline this file's own docblock states one line up.
  */
 export const resolveFlagSchema = z.object({
-  decision: z.enum(RESOLUTION_DECISIONS).refine(decisionIsAvailable, { message: "This product can't carry out that decision yet." }),
+  decision: z
+    .enum(RESOLUTION_DECISIONS)
+    .refine(decisionIsAvailable, { message: "This product can't carry out that decision yet." })
+    .refine(decisionIsOperatorChoosable, { message: "This decision is the platform's own, and cannot be chosen by an operator." }),
   note: z
     .string()
     .max(INTEGRITY_CONFIG.moderation.noteMaxLength, `Keep the note to ${INTEGRITY_CONFIG.moderation.noteMaxLength} characters or fewer. The member reads it.`),

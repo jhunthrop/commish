@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 
 vi.mock("@/lib/auth/current-user", () => ({ requireAdmin: vi.fn() }));
@@ -46,7 +47,11 @@ function callPage(flagId = "flag_1") {
 async function renderPage(flagId?: string) {
   const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
   const page = await callPage(flagId);
-  return render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+  return render(
+    <AccountRoomDepsProvider deps={fixture.deps}>
+      <NoticesProvider>{page}</NoticesProvider>
+    </AccountRoomDepsProvider>,
+  );
 }
 
 beforeEach(() => {
@@ -74,7 +79,9 @@ describe("AdminFlagDetailPage — the read", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const page = await callPage();
     await inBothThemes(
-      <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <NoticesProvider>{page}</NoticesProvider>
+      </AccountRoomDepsProvider>,
       async ({ container }) => {
         expect(await screen.findByText("Great season overall.")).toBeInTheDocument();
         expect(screen.getByText("By Ada")).toBeInTheDocument();
@@ -197,7 +204,9 @@ describe("AdminFlagDetailPage — the read", () => {
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
       const page = await callPage();
       await inBothThemes(
-        <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <NoticesProvider>{page}</NoticesProvider>
+        </AccountRoomDepsProvider>,
         async ({ container }) => {
           expect(await screen.findByText("Team Alice and Team Bob")).toBeInTheDocument();
           expect(screen.getByText(/Star RB \(RB\), 22.4 points per week/)).toBeInTheDocument();
@@ -327,7 +336,9 @@ describe("AdminFlagDetailPage — the read", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const page = await callPage();
     await inBothThemes(
-      <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <NoticesProvider>{page}</NoticesProvider>
+      </AccountRoomDepsProvider>,
       async ({ container }) => {
         expect(await screen.findByText("Ada Operator", { exact: false })).toBeInTheDocument();
         expect(screen.getByText(/sent the member a warning/)).toBeInTheDocument();
@@ -358,5 +369,89 @@ describe("AdminFlagDetailPage — the read", () => {
     expect(await screen.findByText("Nobody reported this. The platform raised it on its own.")).toBeInTheDocument();
     expect(screen.getByText("No recorded history for this flag yet.")).toBeInTheDocument();
     expect(screen.getByText("No evidence recorded for this flag.")).toBeInTheDocument();
+  });
+});
+
+/**
+ * Plan D, Task 5, fix round 1 (Finding 1) — the detail page's own rendered state, the exact
+ * scenario the review's own bug trace names: an operator with this flag's URL open (a stale tab,
+ * a bookmark, a browser-back after the world moved on) refreshes once the SYSTEM has already
+ * closed it. Before this fix, `flagDetail` reported `resolution: null` for a system-closed flag
+ * (`resolvedByUserId: null` collided with the "all four fields non-null" convention), so this
+ * page rendered `HeldTradeDetail` — live Release/Block buttons — for a trade that had already
+ * been decided. This asserts the honest render on both sides of that fix: OPEN still offers the
+ * two buttons, CLOSED offers neither and says who (the platform), why, and when.
+ */
+describe("AdminFlagDetailPage — the held_trade subject arm (Plan D, Task 5, fix round 1)", () => {
+  const HELD_TRADE_SUBJECT = {
+    kind: "held_trade" as const,
+    tradeId: "trade_1",
+    proposerTeamName: "Team Alice",
+    counterpartyTeamName: "Team Bob",
+    gave: [{ playerId: "p1", name: "Star RB", position: "RB" as const, averagePoints: 22.4 }],
+    got: [{ playerId: "p2", name: "Bench WR", position: "WR" as const, averagePoints: 3.1 }],
+    valuationBasis: "The platform valued this trade the moment it was accepted.",
+    fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
+    proposerManager: { userId: "u_alice", name: "Alice", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
+    counterpartyManager: { userId: "u_bob", name: "Bob", joinedAt: null, completedSeasons: 0 },
+    noLongerHeldExplanation: null,
+  };
+
+  it("renders the two-button held-trade surface while the flag is still open", async () => {
+    vi.mocked(flagDetail).mockResolvedValue({
+      flagId: "flag_1",
+      flagType: "trade_hold",
+      raisedAt: "2026-08-20T00:00:00.000Z",
+      leagueId: "l1",
+      subject: HELD_TRADE_SUBJECT,
+      evidence: {},
+      reporters: [],
+      trail: [{ eventId: "evt_1", occurredAt: "2026-08-20T00:00:00.000Z", icon: "alert-triangle", headline: "The platform held this trade for a fairness review.", detail: null }],
+      resolution: null,
+      decisions: ["trade_released", "trade_blocked"],
+    });
+    await renderPage();
+
+    expect(await screen.findByRole("button", { name: "Release the trade" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Block the trade" })).toBeInTheDocument();
+  });
+
+  it("renders the honest closed state once the SYSTEM has resolved it — who, why, when, and NO decision buttons", async () => {
+    vi.mocked(flagDetail).mockResolvedValue({
+      flagId: "flag_1",
+      flagType: "trade_hold",
+      raisedAt: "2026-08-20T00:00:00.000Z",
+      leagueId: "l1",
+      subject: HELD_TRADE_SUBJECT,
+      evidence: {},
+      reporters: [],
+      trail: [
+        { eventId: "evt_1", occurredAt: "2026-08-20T00:00:00.000Z", icon: "alert-triangle", headline: "The platform held this trade for a fairness review.", detail: null },
+        { eventId: "evt_2", occurredAt: "2026-08-21T00:00:00.000Z", icon: "check", headline: "The platform closed this flag once a different trade superseded it.", detail: null },
+      ],
+      // `resolvedByUserId: null`, exactly what `closeSupersededHoldFlag`
+      // (`@/integrity-service/trade-fairness`) stamps — the SAME shape `flagDetail`'s own fix
+      // now reports as resolved rather than open.
+      resolution: {
+        decision: "superseded_before_review",
+        note: "A different trade moved one of these players before an operator could decide this one.",
+        resolvedAt: "2026-08-21T00:00:00.000Z",
+        resolvedByUserId: null,
+        resolvedByName: "The platform",
+      },
+      decisions: [],
+    });
+    await renderPage();
+
+    // "The platform" is its own `<span>` (`ResolutionSummary`'s actor-name styling), so it and the
+    // phrase that follows it are separate text nodes — matched as two assertions, the same split
+    // this file's own `"Ada Operator", { exact: false }` / `/sent the member a warning/` pair uses.
+    expect(await screen.findByText("The platform", { exact: false })).toBeInTheDocument();
+    expect(screen.getByText(/closed this flag once a different trade superseded it/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Release the trade" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Block the trade" })).not.toBeInTheDocument();
+    // The note is still on the record, quoted — the same "keep the words on file" treatment
+    // every other resolution summary already gives.
+    expect(screen.getByText('"A different trade moved one of these players before an operator could decide this one."')).toBeInTheDocument();
   });
 });

@@ -184,6 +184,18 @@ describe("GET /api/leagues/[leagueId]", () => {
     expect(asMember!.isCommissioner).toBe(false);
   });
 
+  // Task 6: the terms' new `draftAt` field, formatted against the caller's own injected clock —
+  // never `leagueHome`'s default `systemClock`, so the relative half ("in 3 days") is
+  // deterministic here rather than measured against the real wall clock.
+  it("formats the draft's terms against the injected clock, not the default one", async () => {
+    const created = await createDefaultLeague("u1");
+    const [draft] = await db.select().from(drafts).where(eq(drafts.leagueId, created.leagueId));
+    const threeDaysBefore = new Date(draft!.kickoffAt.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString();
+
+    const home = await leagueHome(db, created.leagueId, "u1", { now: () => threeDaysBefore });
+    expect(home!.terms.draftAt).toContain("in 3 days");
+  });
+
   // The terms are assembled from rows `leagueHome` already holds — the league, its scoring
   // settings and its teams — not fetched a second time the way a naive "reuse `invitePreview`"
   // implementation would.

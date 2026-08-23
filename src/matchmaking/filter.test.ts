@@ -18,15 +18,23 @@ const league = (over: Partial<PublicLeagueSummary> = {}): PublicLeagueSummary =>
   teamCount: 12,
   filledTeams: 8,
   scoringLabel: "Standard",
+  compositionCategory: "all_newcomers",
+  draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
   ...over,
 });
 
+const newcomerLeague = league({ id: "l_newcomer", compositionCategory: "all_newcomers" });
+const veteranLeague = league({ id: "l_veteran", compositionCategory: "open" });
+
 describe("normalizeBrowseFilter", () => {
   it("reads every supported value off a query string", () => {
-    expect(normalizeBrowseFilter({ format: "auction", experienceTier: "experienced", stakeTier: "2" })).toEqual({
+    expect(
+      normalizeBrowseFilter({ format: "auction", experienceTier: "experienced", stakeTier: "2", participationTier: "veteran" }),
+    ).toEqual({
       format: "auction",
       experienceTier: "experienced",
       stakeTier: 2,
+      participationTier: "veteran",
     });
   });
 
@@ -48,6 +56,23 @@ describe("normalizeBrowseFilter", () => {
     expect(normalizeBrowseFilter({ stakeTier: "9" }).stakeTier).toBe(MATCHMAKING_CONFIG.anyValue);
     expect(normalizeBrowseFilter({ stakeTier: "1.5" }).stakeTier).toBe(MATCHMAKING_CONFIG.anyValue);
     expect(normalizeBrowseFilter({ stakeTier: "not-a-number" }).stakeTier).toBe(MATCHMAKING_CONFIG.anyValue);
+  });
+
+  it("reads participation tier as a first-class filter, beside the two that already exist", () => {
+    expect(normalizeBrowseFilter({ participationTier: "newcomer" }).participationTier).toBe("newcomer");
+    expect(normalizeBrowseFilter({ participationTier: "veteran" }).participationTier).toBe("veteran");
+  });
+
+  it("defaults participation tier to any, so the filter is visible by default without being applied by default", () => {
+    // Step 6 says "default, always-visible", and those are two different properties. Always
+    // visible is a rendering decision (the control is on the page with no disclosure to open);
+    // defaulting to `any` is what keeps a browse page from hiding leagues from a visitor who
+    // never touched the control.
+    expect(normalizeBrowseFilter({}).participationTier).toBe("any");
+  });
+
+  it("refuses an unknown participation tier by falling back to any, never by throwing at a stranger", () => {
+    expect(normalizeBrowseFilter({ participationTier: "expert" }).participationTier).toBe("any");
   });
 });
 
@@ -72,9 +97,23 @@ describe("matchesBrowseFilter", () => {
   });
 
   it("requires every narrowed field at once", () => {
-    const filter = { format: "snake" as const, experienceTier: "experienced" as const, stakeTier: 0 };
+    const filter = { format: "snake" as const, experienceTier: "experienced" as const, stakeTier: 0, participationTier: "any" as const };
     expect(matchesBrowseFilter(league(), filter)).toBe(false);
     expect(matchesBrowseFilter(league({ experienceTier: "experienced" }), filter)).toBe(true);
+  });
+
+  it("filters on participation tier as a first-class filter, beside the two that already exist", () => {
+    const filter = normalizeBrowseFilter({ participationTier: "newcomer" });
+    expect(filter.participationTier).toBe("newcomer");
+    expect(matchesBrowseFilter(newcomerLeague, filter)).toBe(true);
+    expect(matchesBrowseFilter(veteranLeague, filter)).toBe(false);
+  });
+
+  it("matches the veteran filter against everything that is not newcomer-leaning, including a tie", () => {
+    const filter = normalizeBrowseFilter({ participationTier: "veteran" });
+    expect(matchesBrowseFilter(veteranLeague, filter)).toBe(true);
+    expect(matchesBrowseFilter(newcomerLeague, filter)).toBe(false);
+    expect(matchesBrowseFilter(league({ compositionCategory: "open" }), filter)).toBe(true);
   });
 });
 
@@ -106,5 +145,9 @@ describe("MATCHMAKING_CONFIG", () => {
   it("says plainly that stake tiers are cosmetic, with no em-dash in the copy", () => {
     expect(MATCHMAKING_CONFIG.stakeDisclosure).toContain("No money changes hands");
     expect(MATCHMAKING_CONFIG.stakeDisclosure).not.toContain("—");
+  });
+
+  it("offers the same two participation tiers the platform computes, and no third one", () => {
+    expect([...MATCHMAKING_CONFIG.participationTiers]).toEqual(["newcomer", "veteran"]);
   });
 });

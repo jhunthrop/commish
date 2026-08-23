@@ -1,0 +1,27 @@
+-- Phase 3 Plan D, Task 7 review fix round 1 (F3): `drafts_status_idx` widened from `(status)`
+-- to `(status, kickoff_at)`, measured against `seedRealisticCorpus` rather than reasoned about
+-- (`src/db/index-plans.test.ts`'s "the auto-start due-kickoff scan..." — re-run against the real
+-- `dueDraftsQuery` export on every build, so a regression reddens instead of waiting to be
+-- rediscovered).
+--
+-- THE MEASUREMENT. With the single-column index, `autoStartDueDrafts`'s scan (`status =
+-- 'scheduled' AND kickoff_at <= now()`, joined to `leagues` on `is_public_matchmade`, ordered by
+-- `id`, limited) plans as a Bitmap Index Scan on `drafts_status_idx` finding every `scheduled`
+-- row (495 of 5,000 in the corpus), then a Bitmap Heap Scan applying `kickoff_at <= now()` as a
+-- Filter AFTER the fetch — discarding 450 of those 495 rows (91%) to leave the 45 that are
+-- actually due. That discard is not bounded by `DRAFT_SERVICE_CONFIG.maxDraftsPerTick`: the plan
+-- sorts on `drafts.id` before the `LIMIT` is applied (`ORDER BY id` for the same determinism
+-- reason the ticker's own expiry scan uses it), so the full `scheduled` population is fetched and
+-- filtered every time regardless of how few rows are actually due. This runs every tick
+-- (`DRAFT_SERVICE_CONFIG.tickIntervalMs`), on every instance, whether or not any draft is due —
+-- exactly the "hot path" class this file's sibling migrations already measure rather than assume.
+--
+-- THE FIX. `kickoff_at` appended as the index's second column lets the SAME query seek directly
+-- to `status = 'scheduled' AND kickoff_at <= now()` as one Index Cond, touching only the rows
+-- that are genuinely due rather than fetching and discarding the much larger not-yet-due
+-- majority. The ticker's OTHER reader (`ticker.ts`'s expiry scan, `status = 'in_progress'` alone)
+-- is unaffected: a composite B-tree index serves an equality query on its LEADING column exactly
+-- as well as a single-column index on that column would, so this widening costs that reader
+-- nothing.
+DROP INDEX "drafts_status_idx";--> statement-breakpoint
+CREATE INDEX "drafts_status_idx" ON "drafts" USING btree ("status","kickoff_at");

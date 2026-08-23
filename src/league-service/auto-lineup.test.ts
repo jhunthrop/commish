@@ -1,0 +1,852 @@
+import { and, eq } from "drizzle-orm";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { auditEvents, leagues, lineupSlots, matchups, memberNotices, players, rosterSlots, statWeeks, teams, users } from "@/db/schema";
+import { createTestDb, truncateAll } from "@/db/test-db";
+import type { RosterSlot } from "@/domain/roster";
+import { validateLineup } from "@/domain/roster-eligibility";
+import { startersOf } from "@/league";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
+import { copyViolations } from "@/integrity/copy-rules";
+import { renderNotice } from "@/integrity/notices";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
+import type { ScoreCache } from "@/stats-pipeline/score-cache";
+import {
+  autoSetLineupInTx,
+  autoSetLineupsForWeek,
+  changedPlayersClauseFor,
+  leaguesNeedingAutoSetQuery,
+  plannedAutoLineup,
+  readPlayerIndex,
+  type PlannedAutoLineupInput,
+} from "./auto-lineup";
+import { setLineup, toRosterSlots, type LineupSlotInput } from "./lineups";
+import { writeSchedule } from "./schedule";
+import { SLOTS } from "./test-support";
+import { materializeLockedLineupsInTx } from "./trade-transfer";
+
+const db = createTestDb();
+const NOW = "2026-09-14T17:00:00.000Z";
+const LATER = "2026-09-14T17:05:00.000Z";
+
+const STARTER_CONFIG = SLOTS.filter((config) => config.slot !== "BENCH");
+const PLAYER_POSITIONS: Readonly<Record<string, string>> = {
+  qb_alice_1: "QB", qb_alice_2: "QB", rb_alice_1: "RB", rb_alice_2: "RB",
+  qb_bob_1: "QB", qb_bob_2: "QB", rb_bob_1: "RB", rb_bob_2: "RB",
+  qb_carol_1: "QB", qb_carol_2: "QB", rb_carol_1: "RB", rb_carol_2: "RB",
+  qb_priv_1: "QB", qb_priv_2: "QB", rb_priv_1: "RB", rb_priv_2: "RB",
+};
+
+/** Every player any fixture below can name, so a single `players` insert covers the whole file. */
+async function seedPlayers(): Promise<void> {
+  await db.insert(players).values(
+    Object.entries(PLAYER_POSITIONS).map(([id, position]) => ({ id, name: id, position: position as "QB" | "RB", nflTeam: "FA" })),
+  );
+}
+
+/**
+ * A public matchmade league with three teams (alice, bob, carol), each holding a legal QB/RB
+ * starting pair plus a QB/RB bench pair — the same `SLOTS` shape `lineups.test.ts` builds off,
+ * widened to three teams and `isPublicMatchmade: true` so `enforcementAppliesTo` reaches it.
+ */
+async function publicLeague(weeks = 4): Promise<{ readonly leagueId: string; readonly alice: string; readonly bob: string; readonly carol: string }> {
+  const leagueId = "league_auto";
+  await db.insert(users).values([
+    { id: "u_alice", email: "alice@test.local", displayName: "Alice" },
+    { id: "u_bob", email: "bob@test.local", displayName: "Bob" },
+    { id: "u_carol", email: "carol@test.local", displayName: "Carol" },
+  ]);
+  await db.insert(leagues).values({
+    id: leagueId, name: "Auto League", format: "snake", teamCount: 3, commissionerUserId: "u_alice",
+    rosterSlots: SLOTS, isPublicMatchmade: true, experienceTier: "experienced",
+  });
+  await db.insert(teams).values([
+    { id: "team_alice", leagueId, userId: "u_alice", name: "Alice's Team" },
+    { id: "team_bob", leagueId, userId: "u_bob", name: "Bob's Team" },
+    { id: "team_carol", leagueId, userId: "u_carol", name: "Carol's Team" },
+  ]);
+  await db.insert(rosterSlots).values([
+    { teamId: "team_alice", slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+    { teamId: "team_alice", slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+    { teamId: "team_alice", slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+    { teamId: "team_alice", slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    { teamId: "team_bob", slot: "QB", slotIndex: 0, playerId: "qb_bob_1" },
+    { teamId: "team_bob", slot: "RB", slotIndex: 0, playerId: "rb_bob_1" },
+    { teamId: "team_bob", slot: "BENCH", slotIndex: 0, playerId: "qb_bob_2" },
+    { teamId: "team_bob", slot: "BENCH", slotIndex: 1, playerId: "rb_bob_2" },
+    { teamId: "team_carol", slot: "QB", slotIndex: 0, playerId: "qb_carol_1" },
+    { teamId: "team_carol", slot: "RB", slotIndex: 0, playerId: "rb_carol_1" },
+    { teamId: "team_carol", slot: "BENCH", slotIndex: 0, playerId: "qb_carol_2" },
+    { teamId: "team_carol", slot: "BENCH", slotIndex: 1, playerId: "rb_carol_2" },
+  ]);
+  await db.transaction((tx) => writeSchedule(tx, { leagueId, teamIds: ["team_alice", "team_bob", "team_carol"], weeks }));
+  return { leagueId, alice: "team_alice", bob: "team_bob", carol: "team_carol" };
+}
+
+/** A PRIVATE league (the default `isPublicMatchmade: false`), same shape, one team — Step 5's
+ *  matched pair on the lineup half: enforcement must never reach it. */
+async function privateLeagueTeam(weeks = 4): Promise<{ readonly leagueId: string; readonly teamId: string }> {
+  const leagueId = "league_private";
+  await db.insert(users).values({ id: "u_priv", email: "priv@test.local", displayName: "Priv" });
+  await db.insert(users).values({ id: "u_priv_2", email: "priv2@test.local", displayName: "Priv Two" });
+  await db.insert(leagues).values({
+    id: leagueId, name: "Private League", format: "snake", teamCount: 2, commissionerUserId: "u_priv",
+    rosterSlots: SLOTS, isPublicMatchmade: false,
+  });
+  await db.insert(teams).values([
+    { id: "team_priv", leagueId, userId: "u_priv", name: "Priv Team" },
+    { id: "team_priv_2", leagueId, userId: "u_priv_2", name: "Priv Team Two" },
+  ]);
+  await db.insert(rosterSlots).values([
+    { teamId: "team_priv", slot: "QB", slotIndex: 0, playerId: "qb_priv_1" },
+    { teamId: "team_priv", slot: "RB", slotIndex: 0, playerId: "rb_priv_1" },
+    { teamId: "team_priv", slot: "BENCH", slotIndex: 0, playerId: "qb_priv_2" },
+    { teamId: "team_priv", slot: "BENCH", slotIndex: 1, playerId: "rb_priv_2" },
+  ]);
+  await db.transaction((tx) => writeSchedule(tx, { leagueId, teamIds: ["team_priv", "team_priv_2"], weeks }));
+  return { leagueId, teamId: "team_priv" };
+}
+
+async function lockWeek(week: number): Promise<void> {
+  await db.insert(statWeeks).values({ week, status: "in_progress" }).onConflictDoUpdate({ target: statWeeks.week, set: { status: "in_progress" } });
+}
+
+async function savedLineup(teamId: string, week: number): Promise<readonly RosterSlot[] | null> {
+  const rows = await db.select().from(lineupSlots).where(and(eq(lineupSlots.teamId, teamId), eq(lineupSlots.weekNumber, week)));
+  return rows.length === 0 ? null : toRosterSlots(rows);
+}
+
+/** Sorted by playerId so a comparison against a hand-written expectation is order-independent
+ *  without either side having to guess `lineup_slots`' own row order. */
+function bySlot(lineup: readonly RosterSlot[]): readonly RosterSlot[] {
+  return [...lineup].sort((a, b) => (a.slot === b.slot ? a.slotIndex - b.slotIndex : a.slot < b.slot ? -1 : 1));
+}
+
+async function noticesFor(userId: string): Promise<readonly (typeof memberNotices.$inferSelect)[]> {
+  return db.select().from(memberNotices).where(eq(memberNotices.userId, userId));
+}
+
+async function auditEventsFor(leagueId: string): Promise<readonly (typeof auditEvents.$inferSelect)[]> {
+  return db.select().from(auditEvents).where(eq(auditEvents.chainScope, leagueId));
+}
+
+async function tradeAway(teamId: string, playerId: string): Promise<void> {
+  await db.update(rosterSlots).set({ playerId: null }).where(and(eq(rosterSlots.teamId, teamId), eq(rosterSlots.playerId, playerId)));
+}
+
+/** The default `deliver` for every test that isn't itself about delivery — `deliverNotice`'s own
+ *  default publisher needs a live Redis connection, the same reason `trades.test.ts` injects a
+ *  fake for every call that could reach it. */
+const noopDeliver = async (): Promise<void> => {};
+
+/** A recording stand-in for the injected score cache, so a test can assert exactly what was
+ *  invalidated — the same shape `lineups.test.ts`'s own `recordingScoreCache` uses. */
+function recordingScoreCache(): Pick<ScoreCache, "invalidate"> & { invalidate: ReturnType<typeof vi.fn> } {
+  return { invalidate: vi.fn(async () => {}) };
+}
+
+/** Flips `INTEGRITY_CONFIG.participation.enforceTierSegregation` for one call — the SAME
+ *  deploy-wide switch `enforcementAppliesTo` (`./enforcement`) already reads, and every automated
+ *  action in this plan is documented to ask it rather than a second flag of its own. Mirrors
+ *  `enforcement.test.ts`'s own `withEnforcement` helper. */
+async function withEnforcementOff<T>(fn: () => Promise<T>): Promise<T> {
+  const config = INTEGRITY_CONFIG.participation as { enforceTierSegregation: boolean };
+  const original = config.enforceTierSegregation;
+  config.enforceTierSegregation = false;
+  try {
+    return await fn();
+  } finally {
+    config.enforceTierSegregation = original;
+  }
+}
+
+beforeEach(async () => {
+  await truncateAll(db);
+});
+
+afterAll(async () => {
+  await truncateAll(db);
+});
+
+describe("plannedAutoLineup", () => {
+  const base: PlannedAutoLineupInput = {
+    strategy: "repeat_previous_week",
+    slotConfig: SLOTS,
+    roster: [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ],
+    previousLineup: null,
+    playerPositions: PLAYER_POSITIONS,
+  };
+
+  it("falls back to the roster's own default lineup when there is no previous week", () => {
+    expect(bySlot(plannedAutoLineup(base))).toEqual(bySlot(base.roster));
+  });
+
+  it("repeats the previous week's starters exactly when the roster hasn't changed", () => {
+    const previousLineup: readonly RosterSlot[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    const planned = plannedAutoLineup({ ...base, previousLineup });
+    expect(bySlot(planned)).toEqual(bySlot(previousLineup));
+  });
+
+  it("drops a player no longer on the roster and refills the slot from the bench, legally", () => {
+    const previousLineup: readonly RosterSlot[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    // rb_alice_1 left the roster (a trade); rb_alice_2 is still owned, sitting on the bench.
+    const roster: readonly RosterSlot[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: null },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    const planned = plannedAutoLineup({ ...base, roster, previousLineup });
+    const starters = startersOf(planned);
+    expect(starters.map((slot) => slot.playerId)).not.toContain("rb_alice_1");
+    expect(starters.find((slot) => slot.slot === "RB")?.playerId).toBe("rb_alice_2");
+    const playerPositions = base.playerPositions;
+    expect(validateLineup({ slotConfig: STARTER_CONFIG, roster: starters, playerPositions })).toEqual({ valid: true });
+  });
+
+  it("leaves a starter slot empty when no eligible replacement is available anywhere on the roster", () => {
+    const previousLineup: readonly RosterSlot[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    // Every RB-eligible player is gone from the roster — nobody is left to fill the RB slot.
+    const roster: readonly RosterSlot[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: null },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: null },
+    ];
+    const planned = plannedAutoLineup({ ...base, roster, previousLineup });
+    expect(startersOf(planned).find((slot) => slot.slot === "RB")?.playerId).toBeNull();
+  });
+
+  it("leaves a starter slot alone when the current roster config no longer declares its slot type", () => {
+    // A stale slot from before a commissioner reshaped the league's roster — `FLEX` no longer
+    // exists in this league's own `slotConfig` (`base.slotConfig` is QB/RB/BENCH only).
+    const previousLineup: readonly RosterSlot[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "FLEX" as RosterSlot["slot"], slotIndex: 0, playerId: null },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    expect(() => plannedAutoLineup({ ...base, previousLineup })).not.toThrow();
+  });
+
+  it("is deterministic: the same inputs always plan the same lineup", () => {
+    const previousLineup: readonly RosterSlot[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    const input = { ...base, previousLineup };
+    expect(bySlot(plannedAutoLineup(input))).toEqual(bySlot(plannedAutoLineup(input)));
+  });
+});
+
+describe("changedPlayersClauseFor", () => {
+  it("says nothing changed when nothing did", () => {
+    expect(changedPlayersClauseFor([])).toBe("");
+  });
+
+  it("names the one player who left, copy-clean", () => {
+    const clause = changedPlayersClauseFor(["Christian McCaffrey"]);
+    expect(clause).toBe(" Christian McCaffrey is no longer on your roster, so we filled that spot from your bench.");
+    expect(copyViolations(clause)).toEqual([]);
+  });
+
+  it("names every player who left when there is more than one, copy-clean", () => {
+    const clause = changedPlayersClauseFor(["Christian McCaffrey", "Justin Jefferson"]);
+    expect(clause).toBe(" Christian McCaffrey and Justin Jefferson are no longer on your roster, so we filled those spots from your bench.");
+    expect(copyViolations(clause)).toEqual([]);
+  });
+
+  it("stays copy-clean once folded into the real notice template, for all three shapes", () => {
+    for (const dropped of [[], ["Christian McCaffrey"], ["Christian McCaffrey", "Justin Jefferson"]] as const) {
+      const notice = renderNotice("lineup_auto_set", {
+        leagueName: "Sunday Money", week: 4, carriedFrom: 3, changedPlayers: changedPlayersClauseFor(dropped),
+      });
+      expect(copyViolations(`${notice.title} ${notice.body}`)).toEqual([]);
+    }
+  });
+});
+
+describe("autoSetLineupsForWeek", () => {
+  it("carries last week's chosen lineup into a locked week the manager never opened", async () => {
+    await seedPlayers();
+    const { leagueId, alice } = await publicLeague();
+    const aliceWeek3: readonly LineupSlotInput[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    const set = await setLineup(db, { leagueId, teamId: alice, weekNumber: 3, slots: aliceWeek3, userId: "u_alice" });
+    expect(set.ok).toBe(true);
+    const week3Saved = await savedLineup(alice, 3);
+
+    await lockWeek(4);
+    const outcome = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+    expect(outcome.leaguesFailed).toEqual([]);
+
+    expect(bySlot((await savedLineup(alice, 4))!)).toEqual(bySlot(week3Saved!));
+    const notices = await noticesFor("u_alice");
+    expect(notices).toHaveLength(1);
+    expect(notices[0]!.noticeType).toBe("lineup_auto_set");
+    expect(notices[0]!.leagueId).toBe(leagueId);
+
+    const events = await auditEventsFor(leagueId);
+    const autoSetEvent = events.find((event) => (event.payload as { action?: string }).action === "lineup_auto_set");
+    expect(autoSetEvent).toBeDefined();
+    expect(autoSetEvent!.actorId).toBeNull();
+    expect((autoSetEvent!.payload as { subjectUserId?: string }).subjectUserId).toBe("u_alice");
+  });
+
+  it("leaves a manager who already set their lineup completely alone", async () => {
+    await seedPlayers();
+    const { leagueId, bob } = await publicLeague();
+    const bobWeek4: readonly LineupSlotInput[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_bob_2" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_bob_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_bob_1" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_bob_2" },
+    ];
+    await setLineup(db, { leagueId, teamId: bob, weekNumber: 4, slots: bobWeek4, userId: "u_bob" });
+    const bobSavedBefore = await savedLineup(bob, 4);
+
+    await lockWeek(4);
+    await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+
+    expect(bySlot((await savedLineup(bob, 4))!)).toEqual(bySlot(bobSavedBefore!));
+    expect(await noticesFor("u_bob")).toHaveLength(0);
+  });
+
+  it("writes exactly what the fallback would have derived when there is no previous week, and sends no notice", async () => {
+    await seedPlayers();
+    const { carol } = await publicLeague();
+    await lockWeek(1);
+    const wouldHaveBeen = await savedLineup(carol, 1); // null: nothing saved yet, nothing to compare
+    expect(wouldHaveBeen).toBeNull();
+
+    await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 1, occurredAt: NOW });
+
+    const written = await savedLineup(carol, 1);
+    expect(written).not.toBeNull();
+    expect(bySlot(written!).map((slot) => slot.playerId).sort()).toEqual(["qb_carol_1", "qb_carol_2", "rb_carol_1", "rb_carol_2"].sort());
+    // A materialization, not a decision: nothing was carried FORWARD from an earlier choice, so
+    // there is nothing to tell this manager.
+    expect(await noticesFor("u_carol")).toHaveLength(0);
+  });
+
+  it("drops a player who is no longer on the roster and refills the slot legally", async () => {
+    await seedPlayers();
+    const { leagueId, alice } = await publicLeague();
+    const aliceWeek3: readonly LineupSlotInput[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    await setLineup(db, { leagueId, teamId: alice, weekNumber: 3, slots: aliceWeek3, userId: "u_alice" });
+    await tradeAway(alice, "rb_alice_1");
+    await lockWeek(4);
+    await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+
+    const lineup = (await savedLineup(alice, 4))!;
+    expect(lineup.map((slot) => slot.playerId)).not.toContain("rb_alice_1");
+    expect(validateLineup({ slotConfig: STARTER_CONFIG, roster: startersOf(lineup), playerPositions: PLAYER_POSITIONS })).toEqual({ valid: true });
+
+    const notices = await noticesFor("u_alice");
+    expect(notices).toHaveLength(1);
+    expect((notices[0]!.context as { changedPlayers?: string }).changedPlayers).toContain("no longer on your roster");
+  });
+
+  it("never touches a private league, for the identical unset lineup", async () => {
+    await seedPlayers();
+    const { teamId: privateTeam } = await privateLeagueTeam();
+    await lockWeek(4);
+    await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+    expect(await savedLineup(privateTeam, 4)).toBeNull();
+  });
+
+  it("does nothing at all while enforcement is off, and leaves no partial state behind", async () => {
+    await seedPlayers();
+    const { leagueId, alice } = await publicLeague();
+    await lockWeek(4);
+    const outcome = await withEnforcementOff(() => autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW }));
+    expect(outcome.teamsSet).toBe(0);
+    expect(await savedLineup(alice, 4)).toBeNull();
+    expect(await noticesFor("u_alice")).toHaveLength(0);
+    expect(await auditEventsFor(leagueId)).toEqual([]);
+  });
+
+  it("is idempotent: a second run over the same week writes nothing and notices nobody again", async () => {
+    await seedPlayers();
+    const { leagueId, alice } = await publicLeague();
+    const aliceWeek3: readonly LineupSlotInput[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    await setLineup(db, { leagueId, teamId: alice, weekNumber: 3, slots: aliceWeek3, userId: "u_alice" });
+    await lockWeek(4);
+    const first = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+    expect(first.teamsSet).toBeGreaterThan(0);
+    const savedAfterFirst = await savedLineup(alice, 4);
+
+    const second = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: LATER });
+    expect(second.teamsSet).toBe(0);
+
+    expect(bySlot((await savedLineup(alice, 4))!)).toEqual(bySlot(savedAfterFirst!));
+    expect(await noticesFor("u_alice")).toHaveLength(1);
+  });
+
+  /**
+   * FINAL REVIEW F11: the settled-week guard this function never had. `isLineupLocked` answers
+   * `true` for `"final"`, so nothing stopped an auto-set materializing a lineup for a week whose
+   * scores already stand — and the correction sweep would then re-score from it, making the
+   * standings a function of a lineup invented after the fact.
+   *
+   * Safe only BECAUSE the trigger is level-derived (F2): a league that failed at the lock heals
+   * on the next tick, thirty minutes later and days before the week settles.
+   */
+  it("leaves a SETTLED week entirely alone, at both layers — the candidate query and the transaction's own guard", async () => {
+    await seedPlayers();
+    const { leagueId, alice } = await publicLeague();
+    await setLineup(db, {
+      leagueId,
+      teamId: alice,
+      weekNumber: 3,
+      slots: [
+        { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+        { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+        { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+        { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+      ],
+      userId: "u_alice",
+    });
+    await lockWeek(4);
+    // `finalizeWeekInTx`'s own write, standing in: week 4's matchups carry scores that stand.
+    await db.update(matchups).set({ homeScore: 101, awayScore: 98 }).where(eq(matchups.weekNumber, 4));
+
+    // Layer 1: the candidate query no longer offers this league at all, so no transaction opens.
+    expect(await leaguesNeedingAutoSetQuery(db, 4)).toEqual([]);
+
+    const outcome = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+    expect(outcome).toEqual({ week: 4, teamsSet: 0, leaguesFailed: [] });
+    expect(await savedLineup(alice, 4)).toBeNull();
+
+    // Layer 2: called DIRECTLY, past the candidate query, the transaction refuses on its own.
+    const index = await readPlayerIndex(db);
+    const direct = await db.transaction((tx) =>
+      autoSetLineupInTx(tx, leagueId, 4, NOW, { audit: getAuditLogger(), notify: notifyAffectedMember, players: index }),
+    );
+    expect(direct).toEqual({ teamsSet: 0, notices: [] });
+    expect(await savedLineup(alice, 4)).toBeNull();
+  });
+
+  it("does nothing while the week is still scheduled — the trigger's own precondition, defended a second time", async () => {
+    await seedPlayers();
+    const { alice } = await publicLeague();
+    // No `lockWeek` call: `stat_weeks` has no row at all for week 4, which reads as `"scheduled"`.
+    const outcome = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+    expect(outcome.teamsSet).toBe(0);
+    expect(await savedLineup(alice, 4)).toBeNull();
+  });
+
+  /**
+   * `attemptLeague`'s own precedent (`@/stats-pipeline/correction`): a league whose OWN
+   * transaction throws is reported by id and reason, never lost to an unhandled rejection, and
+   * never stops any other league examined the same run — asserted here by seeding a SECOND,
+   * unrelated public league in the same week and proving it still gets set.
+   */
+  it("reports a league whose own transaction fails, by id and reason, without stopping the rest of the run", async () => {
+    await seedPlayers();
+    const { leagueId, alice } = await publicLeague();
+    const aliceWeek3: readonly LineupSlotInput[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    // `previousLineup !== null` is what makes this league actually reach `notify`/`audit`, which
+    // is where the injected failure below lives.
+    await setLineup(db, { leagueId, teamId: alice, weekNumber: 3, slots: aliceWeek3, userId: "u_alice" });
+    await lockWeek(4);
+
+    const brokenAudit: AuditLogger = {
+      record: async () => {
+        throw new Error("simulated audit append failure");
+      },
+      recordAll: async () => {
+        throw new Error("simulated audit append failure");
+      },
+    };
+    const outcome = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW, audit: brokenAudit });
+
+    expect(outcome.leaguesFailed).toEqual([{ leagueId, reason: "simulated audit append failure" }]);
+    // The whole per-league transaction rolled back — no partial write survives the failure.
+    expect(await savedLineup(alice, 4)).toBeNull();
+    expect(await noticesFor("u_alice")).toHaveLength(0);
+  });
+
+  /**
+   * FINAL REVIEW F2, the failure injection the ruling asks for: a league that failed run N is set
+   * on run N+1, with no bookkeeping anywhere. Nothing records that this league failed — no retry
+   * counter, no failed-league table, no flag. The candidate query asks "which leagues still have a
+   * team with no lineup row for this week", and a rolled-back league answers yes, so it heals by
+   * being asked the question again. Before F2 the trigger above this could never fire a second
+   * time, so this second run never happened in production at all.
+   */
+  it("heals on the next run: a league whose transaction rolled back is set the second time, with no bookkeeping", async () => {
+    await seedPlayers();
+    const { leagueId, alice, bob, carol } = await publicLeague();
+    const aliceWeek3: readonly LineupSlotInput[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    await setLineup(db, { leagueId, teamId: alice, weekNumber: 3, slots: aliceWeek3, userId: "u_alice" });
+    await lockWeek(4);
+
+    const brokenAudit: AuditLogger = {
+      record: async () => {
+        throw new Error("simulated audit append failure");
+      },
+      recordAll: async () => {
+        throw new Error("simulated audit append failure");
+      },
+    };
+    const first = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW, audit: brokenAudit });
+    expect(first.leaguesFailed).toEqual([{ leagueId, reason: "simulated audit append failure" }]);
+    expect(await savedLineup(alice, 4)).toBeNull();
+
+    // Tick N+1. Identical call, healthy dependencies, nothing else done in between.
+    const second = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: LATER });
+
+    expect(second.leaguesFailed).toEqual([]);
+    expect(second.teamsSet).toBe(3);
+    expect(await savedLineup(alice, 4)).not.toBeNull();
+    expect(await savedLineup(bob, 4)).not.toBeNull();
+    expect(await savedLineup(carol, 4)).not.toBeNull();
+    expect(await noticesFor("u_alice")).toHaveLength(1);
+  });
+
+  it("drops a finished league out of the candidate set entirely — the re-run costs no transaction at all", async () => {
+    // The other half of the level derivation: re-running is not merely harmless, it is CHEAP,
+    // because a league every team now has a row for is no longer a candidate. Proven by injecting
+    // a dependency that throws the moment a per-league transaction reaches it: a second run that
+    // still opened one would report this league as failed, and it reports nothing.
+    await seedPlayers();
+    const { leagueId, alice } = await publicLeague();
+    await setLineup(db, {
+      leagueId,
+      teamId: alice,
+      weekNumber: 3,
+      slots: [
+        { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+        { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+        { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+        { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+      ],
+      userId: "u_alice",
+    });
+    await lockWeek(4);
+    await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+
+    const brokenAudit: AuditLogger = {
+      record: async () => {
+        throw new Error("a transaction was opened for a league that needed nothing");
+      },
+      recordAll: async () => {
+        throw new Error("a transaction was opened for a league that needed nothing");
+      },
+    };
+    const second = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: LATER, audit: brokenAudit });
+
+    expect(second).toEqual({ week: 4, teamsSet: 0, leaguesFailed: [] });
+  });
+
+  it("stringifies a non-Error thrown value for the failure reason", async () => {
+    await seedPlayers();
+    const { leagueId, alice } = await publicLeague();
+    const aliceWeek3: readonly LineupSlotInput[] = [
+      { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+      { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ];
+    await setLineup(db, { leagueId, teamId: alice, weekNumber: 3, slots: aliceWeek3, userId: "u_alice" });
+    await lockWeek(4);
+
+    const brokenAudit: AuditLogger = {
+      record: async () => {
+        throw "simulated non-Error failure";
+      },
+      recordAll: async () => {
+        throw "simulated non-Error failure";
+      },
+    };
+    const outcome = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW, audit: brokenAudit });
+
+    expect(outcome.leaguesFailed).toEqual([{ leagueId, reason: "simulated non-Error failure" }]);
+  });
+
+  it("names a dropped player 'A player who is no longer listed' when its own row can no longer resolve a name", async () => {
+    await seedPlayers();
+    const { alice } = await publicLeague();
+    // A "ghost" player: owned by alice and started in week 3, but with no `players` row at all —
+    // the same "resolved at read time, falls back for an id that no longer resolves" property
+    // `activity-view.ts`'s own name resolvers document, exercised here for the notice's own
+    // dropped-player clause. Written directly (never through `setLineup`, which validates every
+    // starter against the real `players` table and would refuse a name it cannot resolve) — the
+    // same "a row from before a guard existed" class `activity-view.test.ts`'s own hostile-name
+    // fixtures already stand in for.
+    await db.insert(rosterSlots).values({ teamId: alice, slot: "BENCH", slotIndex: 2, playerId: "ghost_player" });
+    await db.insert(lineupSlots).values([
+      { teamId: alice, weekNumber: 3, slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { teamId: alice, weekNumber: 3, slot: "RB", slotIndex: 0, playerId: "ghost_player" },
+      { teamId: alice, weekNumber: 3, slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { teamId: alice, weekNumber: 3, slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ]);
+    // The ghost leaves the roster before week 4 locks, and a real RB is available to replace it.
+    await tradeAway(alice, "ghost_player");
+    await lockWeek(4);
+
+    await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+
+    const notices = await noticesFor("u_alice");
+    expect(notices).toHaveLength(1);
+    expect((notices[0]!.context as { changedPlayers?: string }).changedPlayers).toContain("A player who is no longer listed");
+  });
+
+  /**
+   * FINAL REVIEW F8: the `players` read is HOISTED out of the per-league transaction. It has no
+   * `WHERE` (a carried-forward lineup can name any player in the pool), so a run over L leagues
+   * used to pay L full table scans held inside L open transactions, for a reference table that
+   * cannot change meaningfully between two leagues examined a second apart.
+   *
+   * Proven by DISAGREEMENT rather than by counting queries: the injected index is handed a name
+   * the real `players` row contradicts, and the notice reads the injected one. A transaction that
+   * still read the table for itself would render "Star RB" here.
+   */
+  it("reads player names and positions ONLY from the run's own index, never from inside the transaction", async () => {
+    await seedPlayers();
+    await db.insert(players).values({ id: "real_rb", name: "Star RB", position: "RB", nflTeam: "KC" });
+    const { alice } = await publicLeague();
+    await db.insert(rosterSlots).values({ teamId: alice, slot: "BENCH", slotIndex: 2, playerId: "real_rb" });
+    await db.insert(lineupSlots).values([
+      { teamId: alice, weekNumber: 3, slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+      { teamId: alice, weekNumber: 3, slot: "RB", slotIndex: 0, playerId: "real_rb" },
+      { teamId: alice, weekNumber: 3, slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+      { teamId: alice, weekNumber: 3, slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+    ]);
+    await tradeAway(alice, "real_rb");
+    await lockWeek(4);
+
+    // The real function, the real driver, one index read before the first transaction opens.
+    const index = await readPlayerIndex(db);
+    expect(index.names.real_rb).toBe("Star RB");
+    // And the SAME function, called directly with an index that omits the player entirely: the
+    // notice must fall back, because the transaction has no second source to consult.
+    const result = await db.transaction((tx) =>
+      autoSetLineupInTx(tx, "league_auto", 4, NOW, {
+        audit: getAuditLogger(),
+        notify: notifyAffectedMember,
+        players: { positions: index.positions, names: {} },
+      }),
+    );
+
+    expect(result.teamsSet).toBe(3);
+    const notices = await noticesFor("u_alice");
+    expect(notices).toHaveLength(1);
+    expect((notices[0]!.context as { changedPlayers?: string }).changedPlayers).toContain("A player who is no longer listed");
+    expect((notices[0]!.context as { changedPlayers?: string }).changedPlayers).not.toContain("Star RB");
+  });
+
+  it("returns 0 without writing anything when the league row is gone by the time the transaction opens", async () => {
+    await lockWeek(4);
+    const result = await db.transaction((tx) =>
+      autoSetLineupInTx(tx, "league_missing", 4, NOW, { audit: getAuditLogger(), notify: notifyAffectedMember, players: { positions: {}, names: {} } }),
+    );
+    expect(result).toEqual({ teamsSet: 0, notices: [] });
+  });
+
+  /**
+   * Review fix round 1, F3: `lineup_slots` carries no origin column, so a row
+   * `materializeLockedLineupsInTx` (`@/league-service/trade-transfer`) froze for a trade reads
+   * identically to a manager's own save — both leave a team entirely alone here, on purpose (see
+   * `autoSetLineupInTx`'s own docblock). Pinned directly: materialize alice's and bob's week-4
+   * rows via the real function, then prove the auto-set run skips both.
+   */
+  it("leaves a team alone whose only row for the week came from a trade's materialization, not a manual save", async () => {
+    await seedPlayers();
+    const { leagueId, alice, bob } = await publicLeague();
+    await lockWeek(4);
+
+    const materialized = await db.transaction((tx) =>
+      materializeLockedLineupsInTx(tx, { leagueId, teamIds: [alice, bob], slotConfig: SLOTS }),
+    );
+    expect(materialized).toBeGreaterThan(0);
+    const aliceMaterialized = await savedLineup(alice, 4);
+    const bobMaterialized = await savedLineup(bob, 4);
+    expect(aliceMaterialized).not.toBeNull();
+    expect(bobMaterialized).not.toBeNull();
+
+    const outcome = await autoSetLineupsForWeek(db, { deliver: noopDeliver, weekNumber: 4, occurredAt: NOW });
+
+    // Carol (the third team `publicLeague` seeds) has no row at all and IS auto-set — the count
+    // proves the run actually examined this league rather than skipping it wholesale, while
+    // alice and bob (materialized, not manually saved) are the ones left untouched below.
+    expect(outcome.teamsSet).toBe(1);
+    expect(bySlot((await savedLineup(alice, 4))!)).toEqual(bySlot(aliceMaterialized!));
+    expect(bySlot((await savedLineup(bob, 4))!)).toEqual(bySlot(bobMaterialized!));
+    expect(await noticesFor("u_alice")).toHaveLength(0);
+    expect(await noticesFor("u_bob")).toHaveLength(0);
+  });
+
+  /**
+   * Review fix round 1, F1 (HIGH): "commit, then `deliverNotice` and the score-cache eviction,
+   * both best-effort and both outside the transaction" (brief's Step 3), the exact pattern
+   * `setLineup`/`acceptTrade`/`settleProposal` already follow. These four tests wire and pin it.
+   */
+  describe("delivery and the score-cache eviction", () => {
+    it("delivers a notice for each auto-set manager who was actually notified, and not for a skipped or materialization-only one", async () => {
+      await seedPlayers();
+      const { leagueId, alice, bob } = await publicLeague();
+      const aliceWeek3: readonly LineupSlotInput[] = [
+        { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+        { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+        { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+        { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+      ];
+      // Alice carries forward (gets notified); bob already set his own (skipped entirely); carol
+      // (the fixture's third team) has no previous week either (materialized, no notice).
+      await setLineup(db, { leagueId, teamId: alice, weekNumber: 3, slots: aliceWeek3, userId: "u_alice" });
+      const bobWeek4: readonly LineupSlotInput[] = [
+        { slot: "QB", slotIndex: 0, playerId: "qb_bob_1" },
+        { slot: "RB", slotIndex: 0, playerId: "rb_bob_1" },
+        { slot: "BENCH", slotIndex: 0, playerId: "qb_bob_2" },
+        { slot: "BENCH", slotIndex: 1, playerId: "rb_bob_2" },
+      ];
+      await setLineup(db, { leagueId, teamId: bob, weekNumber: 4, slots: bobWeek4, userId: "u_bob" });
+      await lockWeek(4);
+
+      const delivered: MemberNotice[] = [];
+      const deliver = vi.fn(async (notice: MemberNotice) => {
+        delivered.push(notice);
+      });
+      const outcome = await autoSetLineupsForWeek(db, { weekNumber: 4, occurredAt: NOW, deliver });
+
+      expect(outcome.leaguesFailed).toEqual([]);
+      expect(deliver).toHaveBeenCalledTimes(1);
+      expect(delivered[0]).toMatchObject({ userId: "u_alice", noticeType: "lineup_auto_set", leagueId });
+    });
+
+    it("evicts the score cache once for the league and week it actually touched, never for a league it never wrote to", async () => {
+      await seedPlayers();
+      const { leagueId, alice } = await publicLeague();
+      const aliceWeek3: readonly LineupSlotInput[] = [
+        { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+        { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+        { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+        { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+      ];
+      await setLineup(db, { leagueId, teamId: alice, weekNumber: 3, slots: aliceWeek3, userId: "u_alice" });
+      await lockWeek(4);
+
+      const cache = recordingScoreCache();
+      await autoSetLineupsForWeek(db, { weekNumber: 4, occurredAt: NOW, deliver: noopDeliver, cache });
+
+      expect(cache.invalidate).toHaveBeenCalledTimes(1);
+      expect(cache.invalidate).toHaveBeenCalledWith(leagueId, 4);
+    });
+
+    it("never evicts the score cache for a private league — enforcement skips it before any write", async () => {
+      await seedPlayers();
+      await privateLeagueTeam();
+      await lockWeek(4);
+
+      const cache = recordingScoreCache();
+      await autoSetLineupsForWeek(db, { weekNumber: 4, occurredAt: NOW, deliver: noopDeliver, cache });
+
+      expect(cache.invalidate).not.toHaveBeenCalled();
+    });
+
+    it("still commits and reports the league as succeeded when notice delivery fails", async () => {
+      await seedPlayers();
+      const { leagueId, alice } = await publicLeague();
+      const aliceWeek3: readonly LineupSlotInput[] = [
+        { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+        { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+        { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+        { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+      ];
+      await setLineup(db, { leagueId, teamId: alice, weekNumber: 3, slots: aliceWeek3, userId: "u_alice" });
+      await lockWeek(4);
+
+      const brokenDeliver = vi.fn(async () => {
+        throw new Error("simulated push failure");
+      });
+      const cache = recordingScoreCache();
+      const outcome = await autoSetLineupsForWeek(db, { weekNumber: 4, occurredAt: NOW, deliver: brokenDeliver, cache });
+
+      // The failed push never fails the sweep — the writes already committed.
+      expect(outcome.leaguesFailed).toEqual([]);
+      expect(outcome.teamsSet).toBeGreaterThan(0);
+      expect(await savedLineup(alice, 4)).not.toBeNull();
+      // The eviction still ran — a broken push must not skip an unrelated best-effort step.
+      expect(cache.invalidate).toHaveBeenCalledWith(leagueId, 4);
+    });
+
+    it("still commits and reports the league as succeeded when the score-cache eviction fails", async () => {
+      await seedPlayers();
+      const { leagueId, alice } = await publicLeague();
+      const aliceWeek3: readonly LineupSlotInput[] = [
+        { slot: "QB", slotIndex: 0, playerId: "qb_alice_1" },
+        { slot: "RB", slotIndex: 0, playerId: "rb_alice_1" },
+        { slot: "BENCH", slotIndex: 0, playerId: "qb_alice_2" },
+        { slot: "BENCH", slotIndex: 1, playerId: "rb_alice_2" },
+      ];
+      await setLineup(db, { leagueId, teamId: alice, weekNumber: 3, slots: aliceWeek3, userId: "u_alice" });
+      await lockWeek(4);
+
+      const delivered: MemberNotice[] = [];
+      const deliver = vi.fn(async (notice: MemberNotice) => {
+        delivered.push(notice);
+      });
+      const brokenCache: Pick<ScoreCache, "invalidate"> = {
+        invalidate: async () => {
+          throw new Error("simulated redis failure");
+        },
+      };
+      const outcome = await autoSetLineupsForWeek(db, { weekNumber: 4, occurredAt: NOW, deliver, cache: brokenCache });
+
+      expect(outcome.leaguesFailed).toEqual([]);
+      expect(outcome.teamsSet).toBeGreaterThan(0);
+      expect(await savedLineup(alice, 4)).not.toBeNull();
+      // Delivery still ran — a broken eviction must not skip an unrelated best-effort step.
+      expect(delivered).toHaveLength(1);
+    });
+  });
+});

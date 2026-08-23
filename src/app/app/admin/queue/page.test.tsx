@@ -4,6 +4,7 @@ import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 
 // Route-level: proves the page's own gate and its two states without a real Postgres
 // connection — every read the page makes is mocked, and `notFound()` is the real
@@ -26,7 +27,11 @@ function callPage(searchParams: Record<string, string | undefined> = {}) {
 async function renderPage(searchParams?: Record<string, string | undefined>) {
   const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
   const page = await callPage(searchParams);
-  return render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+  return render(
+    <AccountRoomDepsProvider deps={fixture.deps}>
+      <NoticesProvider>{page}</NoticesProvider>
+    </AccountRoomDepsProvider>,
+  );
 }
 
 const TWO_ROWS = [
@@ -53,7 +58,9 @@ describe("AdminQueuePage — the two states", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const page = await callPage();
     await inBothThemes(
-      <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <NoticesProvider>{page}</NoticesProvider>
+      </AccountRoomDepsProvider>,
       async ({ container }) => {
         expect(await screen.findByText("The queue is clear.")).toBeInTheDocument();
         expect(screen.getByRole("link", { name: "Go to your leagues" })).toHaveAttribute("href", "/app");
@@ -67,7 +74,9 @@ describe("AdminQueuePage — the two states", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const page = await callPage();
     await inBothThemes(
-      <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>,
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <NoticesProvider>{page}</NoticesProvider>
+      </AccountRoomDepsProvider>,
       async ({ container }) => {
         const oldLink = await screen.findByRole("link", { name: /A member reported a review/ });
         const newLink = screen.getByRole("link", { name: /The platform flagged two accounts/ });

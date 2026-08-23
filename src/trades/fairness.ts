@@ -93,7 +93,10 @@ export function fairnessGap(balance: TradeBalance): number {
  * `threshold` is passed rather than read, so the spec's exit criterion ("a test proves changing
  * the config changes flagging outcomes with no code change") is a test that passes a different
  * number rather than a test that rewrites a module. A `null` threshold means the caller has no
- * ceiling configured and nothing crosses it, which is how Plan D's auto-hold ships inert.
+ * ceiling configured and nothing crosses it — the shape `INTEGRITY_CONFIG.trade.autoHoldThreshold`
+ * shipped in before Phase 3 Plan D supplied its own number (35, live in production today; `null`
+ * survives only as `evaluateTradeBeforeExecute`'s own test seam, `EvaluateTradeInput
+ * .autoHoldThreshold`).
  */
 export function crossesFairnessThreshold(balance: TradeBalance, threshold: number | null): boolean {
   return threshold !== null && fairnessGap(balance) >= threshold;

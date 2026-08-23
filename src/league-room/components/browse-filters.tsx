@@ -1,22 +1,45 @@
 import { Button, Select } from "@/components/ui";
+import { LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter } from "@/matchmaking/contract";
 
 const ANY = MATCHMAKING_CONFIG.anyValue;
 const FORMAT_LABELS: Readonly<Record<string, string>> = { snake: "Snake", auction: "Auction" };
-const TIER_LABELS: Readonly<Record<string, string>> = { beginner: "New to fantasy", experienced: "Played before" };
 
 const FORMAT_OPTIONS = [
   { value: ANY, label: "Any format" },
   ...MATCHMAKING_CONFIG.formats.map((value) => ({ value, label: FORMAT_LABELS[value] ?? value })),
 ];
+/**
+ * `experienceTier` here narrows by the LEAGUE's own declared tier (`league.experienceTier` in
+ * `matchesBrowseFilter`, `@/matchmaking/filter`), the same axis `CreateLeagueForm`'s `Who it's
+ * for` control writes — so this control reads `LEAGUE_EXPERIENCE_TIER_LABEL` (`@/identity/config`)
+ * rather than the person-facing `EXPERIENCE_TIER_LABEL` a private copy here used to duplicate
+ * word-for-word: a visitor filtering leagues is choosing "open" vs. "reserved", not describing
+ * their own football history.
+ */
 const EXPERIENCE_OPTIONS = [
   { value: ANY, label: "Any experience" },
-  ...MATCHMAKING_CONFIG.experienceTiers.map((value) => ({ value, label: TIER_LABELS[value] ?? value })),
+  ...MATCHMAKING_CONFIG.experienceTiers.map((value) => ({ value, label: LEAGUE_EXPERIENCE_TIER_LABEL[value] ?? value })),
 ];
 const STAKE_OPTIONS = [
   { value: ANY, label: "Any stake tier" },
   ...MATCHMAKING_CONFIG.stakeTiers.map((entry) => ({ value: String(entry.tier), label: entry.label })),
+];
+/**
+ * A default, always-visible control (Step 6) — not an opt-in disclosure — narrowing on
+ * `participationTier`, a DIFFERENT axis from `experienceTier` above: that one is a
+ * commissioner's self-declared label for who a league is FOR, this is a computed fact about who
+ * is already IN it (`BrowseFilter`'s own docblock, `@/matchmaking/contract`). Options read
+ * "Newcomer-friendly"/"Veteran-heavy" rather than the bare tier words — a visitor is choosing a
+ * KIND OF ROOM, not the tier vocabulary itself. That is also why no shared account-facing tier
+ * label table exists: the one it would have served writes its own copy on purpose (final review
+ * F13 deleted `PARTICIPATION_TIER_LABEL`/`_BLURB`, which had no production reader at all).
+ */
+const PARTICIPATION_OPTIONS = [
+  { value: ANY, label: "Any experience level" },
+  { value: "newcomer" as const, label: "Newcomer-friendly" },
+  { value: "veteran" as const, label: "Veteran-heavy" },
 ];
 
 /**
@@ -36,7 +59,7 @@ const STAKE_OPTIONS = [
  */
 export function BrowseFilters({ filter }: { readonly filter: BrowseFilter }) {
   return (
-    <form method="get" action="/browse" className="grid gap-3 sm:grid-cols-4 sm:items-start">
+    <form method="get" action="/browse" className="grid gap-3 sm:grid-cols-5 sm:items-start">
       <Select label="Draft format" name="format" options={FORMAT_OPTIONS} defaultValue={String(filter.format)} />
       <Select label="Experience" name="experienceTier" options={EXPERIENCE_OPTIONS} defaultValue={String(filter.experienceTier)} />
       <Select
@@ -45,6 +68,12 @@ export function BrowseFilters({ filter }: { readonly filter: BrowseFilter }) {
         options={STAKE_OPTIONS}
         defaultValue={String(filter.stakeTier)}
         hint={MATCHMAKING_CONFIG.stakeDisclosure}
+      />
+      <Select
+        label="Who's playing"
+        name="participationTier"
+        options={PARTICIPATION_OPTIONS}
+        defaultValue={String(filter.participationTier)}
       />
       <Button type="submit" variant="secondary">
         Show leagues

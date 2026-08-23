@@ -19,6 +19,8 @@ const CUSTOM_SCORING_LEAGUE: PublicLeagueSummary = {
   teamCount: 12,
   filledTeams: 5,
   scoringLabel: "Custom",
+  compositionCategory: "all_newcomers",
+  draftAt: "Monday 14 September, 6:00 PM UTC (in 5 days)",
 };
 
 // A signed-in list renders `JoinPublicLeagueButton` per card, which navigates via
@@ -38,6 +40,8 @@ describe("PublicLeagueList", () => {
         expect(screen.getByText(/9 of 10 joined/)).toBeInTheDocument();
         expect(screen.getByText("9 spots left")).toBeInTheDocument();
         expect(screen.getByText("1 spot left")).toBeInTheDocument();
+        expect(screen.getByText("All newcomers")).toBeInTheDocument();
+        expect(screen.getByText("Open to everyone")).toBeInTheDocument();
         expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
@@ -46,6 +50,21 @@ describe("PublicLeagueList", () => {
     // fixture's deps were never provided to this render, so `calls` could not have been anything
     // else. `PublicLeagueList` renders server-shaped data and fetches nothing of its own — the
     // one interactive child (`JoinPublicLeagueButton`) owns its own request and its own test.
+  });
+
+  it("tells a visitor a beginner-tier card is reserved for newer players, with somewhere else to go", () => {
+    // `PUBLIC_LEAGUES` has exactly one beginner-tier card (`p1`) and one experienced-tier card
+    // (`p2`) — proactive, not reactive: this renders on the card itself, before anyone presses
+    // Join, so a veteran self-selects away rather than discovering the gate only after a refusal.
+    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />);
+    expect(screen.getByText(/Reserved for players newer to Commish/)).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "Browse leagues open to everyone" });
+    expect(link).toHaveAttribute("href", "/browse?experienceTier=experienced");
+  });
+
+  it("says nothing extra on an experienced-tier card", () => {
+    render(<PublicLeagueList leagues={[PUBLIC_LEAGUES[1]!]} signedIn />);
+    expect(screen.queryByText(/Reserved for players newer to Commish/)).not.toBeInTheDocument();
   });
 
   it("shows the scoring label beside the format, each with its own InfoTip", () => {
@@ -86,6 +105,30 @@ describe("PublicLeagueList", () => {
     expect(screen.queryByRole("button", { name: /^Join / })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Sign in to join Rookie Snake Room" })).toHaveAttribute("href", "/sign-in");
     expect(screen.getByRole("link", { name: "Sign in to join Sharks Only Auction" })).toHaveAttribute("href", "/sign-in");
+  });
+
+  it("labels the composition honestly, in the three phrases the brief names and no others", () => {
+    const allNewcomers: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_all", compositionCategory: "all_newcomers" };
+    const mostlyNewcomers: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_mostly", compositionCategory: "mostly_newcomers" };
+    const open: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_open", compositionCategory: "open" };
+    render(<PublicLeagueList leagues={[allNewcomers, mostlyNewcomers, open]} signedIn />);
+    expect(screen.getByText("All newcomers")).toBeInTheDocument();
+    expect(screen.getByText("Mostly newcomers")).toBeInTheDocument();
+    expect(screen.getByText("Open to everyone")).toBeInTheDocument();
+    // Never a raw ratio or a percentage — a browse card is a decision aid, not a statistic.
+    expect(screen.queryByText(/\d+ of \d+ (veteran|newcomer)/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
+  });
+
+  it("marks the newcomer-leaning composition with a clover and everything else with a crown", () => {
+    const newcomerLeaning: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_clover", compositionCategory: "all_newcomers" };
+    const notNewcomerLeaning: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_crown", compositionCategory: "open" };
+    const { container } = render(<PublicLeagueList leagues={[newcomerLeaning, notNewcomerLeaning]} signedIn />);
+    // `Icon` is decorative here (no `label`), so it renders `aria-hidden` — the adjacent text
+    // already carries the meaning for a screen reader, which is also what keeps this axe-clean.
+    const svgs = [...container.querySelectorAll("svg[aria-hidden='true']")];
+    expect(svgs.some((svg) => svg.classList.contains("lucide-clover"))).toBe(true);
+    expect(svgs.some((svg) => svg.classList.contains("lucide-crown"))).toBe(true);
   });
 
   it("offers a next action when no league matches, rather than a dead end", async () => {

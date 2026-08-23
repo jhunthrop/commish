@@ -1,11 +1,13 @@
 import { and, eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
-import { drafts, leagues, teams, users } from "@/db/schema";
+import { drafts, leagues, memberNotices, teams, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { defaultSweepDeps, sweepQuietly, type SweepDeps } from "@/integrity-service/multi-account";
+import { attachAuditEvent, notifyAffectedMember } from "@/integrity-service/notify";
 import { hasOpenSeat } from "@/matchmaking/filter";
+import { ENFORCEMENT_REFUSALS, tierJoinPrecondition } from "./enforcement";
 
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
 const TEAM_MEMBERSHIP_UNIQUE_INDEX = "teams_league_user_idx";
@@ -23,8 +25,14 @@ export type JoinLeagueOutcome =
  * A path-specific gate, run INSIDE the join transaction and only for a caller who is not
  * already a member. Returning a failure short-circuits the join; returning null lets it
  * proceed. See `joinLeagueInTx` for why it runs where it does.
+ *
+ * Carries the joining `userId` (Task 3): a precondition that could not ask a question about a
+ * PERSON, only about the league, could never enforce `@/league-service/enforcement`'s tier rule.
+ * `invitePrecondition` (`./invites.ts`) ignores it — fewer parameters than a type declares is
+ * legal TypeScript, and that is the matched pair expressed as a type rather than as a test: an
+ * invite's own two bounds (expiry, use count) are never a question about who is asking.
  */
-export type JoinPrecondition = (tx: DbTx, leagueId: string) => Promise<JoinLeagueOutcome | null>;
+export type JoinPrecondition = (tx: DbTx, leagueId: string, userId: string) => Promise<JoinLeagueOutcome | null>;
 
 export interface JoinLeagueInput {
   readonly leagueId: string;
@@ -84,7 +92,7 @@ export async function joinLeagueInTx(
   if (existing !== undefined) return { ok: true, leagueId: league.id, teamId: existing.id, alreadyMember: true };
 
   if (precondition !== undefined) {
-    const denied = await precondition(tx, league.id);
+    const denied = await precondition(tx, league.id, input.userId);
     if (denied !== null) return denied;
   }
 
@@ -142,9 +150,11 @@ export async function triggerMultiAccountSweep(db: Db, outcome: JoinLeagueOutcom
 }
 
 /**
- * The public browse page's gate: a league must still be LISTED and still be PRE-DRAFT. Both are
- * re-checked here rather than trusted from the card the visitor clicked, because a browse page
- * is a snapshot and a league can fill or start between the render and the press.
+ * The public browse page's gate: a league must still be LISTED, still be PRE-DRAFT, and (Task 3)
+ * this account must not be tier-segregated out of it. Every clause is re-checked here rather than
+ * trusted from the card the visitor clicked, because a browse page is a snapshot and a league can
+ * fill, start or (for the third clause) a caller's own participation tier can cross a threshold
+ * between the render and the press.
  *
  * Answers 404, not 403, for "not public": `acceptInvite` deliberately collapses "the league is
  * gone" into "the invite is invalid" rather than confirming a league id is real to a stranger
@@ -153,10 +163,27 @@ export async function triggerMultiAccountSweep(db: Db, outcome: JoinLeagueOutcom
  * existence oracle a signed-in stranger posting an id should not get. `joinPublicLeague`, below,
  * remaps `joinLeagueInTx`'s own LEAGUE_MISSING 404 to this same shape so the two cases (no such
  * league; a real but private one) answer byte-identically.
+ *
+ * THE TIER CLAUSE (`tierJoinPrecondition`, `@/league-service/enforcement`) runs LAST — after the
+ * public check and after the draft-status check — so a caller who has not yet proved the league is
+ * public and open never reaches a tier answer at all. That ordering is what keeps this refusal from
+ * becoming a second existence oracle: a 409 here can only ever follow a league this caller already
+ * knows is public, listed and pre-draft.
+ *
+ * FK LOCK ENUMERATION (Plan C's H2 lesson, binding). This precondition runs inside `joinLeagueInTx`'s
+ * transaction, AFTER its `leagues[id] FOR UPDATE`. Its own reads take:
+ *   - `leagues` + `drafts`: plain SELECT, no lock beyond the one already held (this statement now
+ *     also selects `experienceTier`, the same row, no second query).
+ *   - `teams` + `leagues` (the completed-season count, `tierJoinPrecondition` -> `completedSeasonsFor`):
+ *     plain SELECT.
+ * It takes NO new lock and writes nothing. The block's own notice, audit event and refusal are
+ * written by `joinPublicLeague`, below, AFTER the transaction has rolled back, in a SEPARATE
+ * platform-scoped transaction (`recordTierBlockedJoin`) — because a refused join must not leave a
+ * league-chain row behind, and because the refusal itself is what the caller is waiting for.
  */
-const publicJoinPrecondition: JoinPrecondition = async (tx, leagueId) => {
+export const publicJoinPrecondition: JoinPrecondition = async (tx, leagueId, userId) => {
   const [row] = await tx
-    .select({ isPublicMatchmade: leagues.isPublicMatchmade, draftStatus: drafts.status })
+    .select({ isPublicMatchmade: leagues.isPublicMatchmade, draftStatus: drafts.status, experienceTier: leagues.experienceTier })
     .from(leagues)
     .leftJoin(drafts, eq(drafts.leagueId, leagues.id))
     .where(eq(leagues.id, leagueId));
@@ -164,8 +191,69 @@ const publicJoinPrecondition: JoinPrecondition = async (tx, leagueId) => {
   if (row.draftStatus !== null && row.draftStatus !== "scheduled") {
     return { ok: false, status: 409, reason: DRAFT_ALREADY_STARTED };
   }
+  if (await tierJoinPrecondition(tx, row, userId)) {
+    return { ok: false, status: 409, reason: ENFORCEMENT_REFUSALS.join };
+  }
   return null;
 };
+
+/**
+ * The tier block's own record, written by `joinPublicLeague` AFTER `joinLeagueInTx`'s transaction
+ * has already rolled back — never inside it. A refused join writes NOTHING to the league it
+ * refused (that transaction is gone, and `joinLeagueInTx` never queued a write for a precondition
+ * denial in the first place); this is a wholly separate platform-scoped transaction, on the
+ * PLATFORM chain (`leagueId: null`), because a league nobody joined is not told about it
+ * (`SYSTEM_ACTION_SUMMARY_ALLOWED.tier_blocked_join` is `false`, and this event carries no
+ * `summary` field at all).
+ *
+ * DEDUPED, once per `(userId, leagueId)`: a bounded read against `member_notices` filtered on
+ * `(user_id, league_id, notice_type)` — the same "derive over a bounded set" rule `listNotices`
+ * already follows — before either the notice or the audit event is written, so a visitor who
+ * presses "Join" on the same reserved league five times gets five identical refusals but exactly
+ * one notice and one platform-chain event, not five.
+ *
+ * Best-effort: a failure here is logged and swallowed, never surfaced as the join's own response.
+ * The refusal the caller receives (`ENFORCEMENT_REFUSALS.join`) is already correct and complete
+ * without this write succeeding — the account did nothing wrong, and a broken notice pipe must not
+ * turn an honest 409 into a scary 500, the same reasoning `triggerMultiAccountSweep` swallows for.
+ */
+export async function recordTierBlockedJoin(
+  db: Db,
+  input: { readonly leagueId: string; readonly userId: string; readonly occurredAt: string; readonly audit?: AuditLogger },
+): Promise<void> {
+  await db.transaction(async (tx) => {
+    const [already] = await tx
+      .select({ id: memberNotices.id })
+      .from(memberNotices)
+      .where(and(eq(memberNotices.userId, input.userId), eq(memberNotices.leagueId, input.leagueId), eq(memberNotices.noticeType, "tier_blocked_join")))
+      .limit(1);
+    if (already !== undefined) return;
+
+    // `leagues.id` is the row `publicJoinPrecondition` just read moments ago inside the now-rolled-
+    // back join transaction — it can only be gone here if the league was deleted in the interim,
+    // which this product has no path to do; a defensive `undefined` check costs one branch.
+    const [league] = await tx.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, input.leagueId));
+    if (league === undefined) return;
+
+    const notice = await notifyAffectedMember(tx, {
+      leagueId: input.leagueId,
+      userId: input.userId,
+      noticeType: "tier_blocked_join",
+      context: { leagueName: league.name },
+      occurredAt: input.occurredAt,
+      auditEventId: null,
+    });
+    const event = await (input.audit ?? getAuditLogger()).record(tx, {
+      eventType: "system_action",
+      actorId: null,
+      actorType: "system",
+      leagueId: null,
+      payload: { action: "tier_blocked_join", subjectUserId: input.userId },
+      occurredAt: input.occurredAt,
+    });
+    await attachAuditEvent(tx, notice, event.eventId);
+  });
+}
 
 export interface JoinPublicLeagueInput {
   readonly leagueId: string;
@@ -191,6 +279,18 @@ export async function joinPublicLeague(
     // with, so a caller cannot tell "no such league" apart from "a league that exists but isn't
     // public" (see `publicJoinPrecondition`'s docblock, and `acceptInvite`'s identical collapse).
     if (!outcome.ok && outcome.status === 404) return { ok: false, status: 404, reason: NOT_PUBLIC };
+    // The tier block: the join transaction above has already rolled back with nothing written.
+    // This is the ONLY branch that reaches `recordTierBlockedJoin` — a string-equality check
+    // against the one shared constant `publicJoinPrecondition` and this function both import,
+    // never a second copy of the refusal text to drift out of step with it.
+    if (!outcome.ok && outcome.reason === ENFORCEMENT_REFUSALS.join) {
+      try {
+        await recordTierBlockedJoin(db, { leagueId: input.leagueId, userId: input.userId, occurredAt: clock.now(), audit });
+      } catch (error: unknown) {
+        console.error("[league] tier-blocked join notice failed", { leagueId: input.leagueId, userId: input.userId }, error);
+      }
+      return outcome;
+    }
     await triggerMultiAccountSweep(db, outcome);
     return outcome;
   } catch (error: unknown) {

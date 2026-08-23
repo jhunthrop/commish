@@ -1,3 +1,5 @@
+import { VERIFIED_BADGE_TOOLTIP } from "@/participation/verified";
+
 /**
  * The registry: every piece of jargon this product shows a manager, defined exactly once.
  *
@@ -22,7 +24,8 @@ export type TermKey =
   | "stake-tier"
   | "matchup"
   | "standings-record"
-  | "queue";
+  | "queue"
+  | "verified-reviewer";
 
 export interface GlossaryTerm {
   readonly key: TermKey;
@@ -136,6 +139,19 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     short: "The list of players you ranked to auto-draft if you're away when it's your pick.",
     detail:
       "Your draft queue is the ranked list of players you'd want if you can't pick in person. If the clock runs out on your turn, the room drafts the highest-ranked player still available from your queue instead of skipping you.",
+  },
+  /**
+   * Founder decision #8, verbatim (`VERIFIED_BADGE_TOOLTIP`, `@/participation/verified`) — read
+   * from there rather than restated here, so the badge and its own explanation can never drift
+   * apart. `short` and `detail` are the identical sentence on purpose: it already states the
+   * claim rather than implying a broader one, and a shortened version would only invite a reader
+   * to guess what got cut.
+   */
+  "verified-reviewer": {
+    key: "verified-reviewer",
+    term: "a verified reviewer",
+    short: VERIFIED_BADGE_TOOLTIP,
+    detail: VERIFIED_BADGE_TOOLTIP,
   },
 };
 

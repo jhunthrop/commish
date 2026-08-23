@@ -6,8 +6,10 @@ import {
   FLAG_TYPES,
   RESOLUTION_DECISIONS,
   SUBJECT_OF,
+  SYSTEM_ONLY_DECISIONS,
   contentRemovalIsWiredFor,
   decisionIsAvailable,
+  decisionIsOperatorChoosable,
   decisionIsWiredFor,
 } from "./flags";
 
@@ -16,8 +18,23 @@ describe("the resolution vocabulary", () => {
     // `decisionIsAvailable` used to be `DECISION_OWNER[d] === "plan-b"`, which was the right
     // question while those two facts agreed. Plan C is where they part: `trade_reversed` is
     // still owned by plan-c and is now wired, so ownership stops being able to answer.
-    expect(RESOLUTION_DECISIONS.filter(decisionIsAvailable)).toEqual(["no_action", "warned_user", "content_removed", "trade_reversed"]);
+    // `superseded_before_review` (Plan D, fix round 1) is wired for `held_trade` too — available
+    // is "does the product carry this out at all", true for a system-only decision — the
+    // narrower "can an OPERATOR choose it" question belongs to `decisionIsOperatorChoosable`,
+    // covered below.
+    expect(RESOLUTION_DECISIONS.filter(decisionIsAvailable)).toEqual([
+      "no_action",
+      "warned_user",
+      "content_removed",
+      "trade_reversed",
+      "trade_released",
+      "trade_blocked",
+      "superseded_before_review",
+    ]);
     expect(DECISION_OWNER.trade_reversed).toBe("plan-c"); // provenance survives the wiring
+    expect(DECISION_OWNER.trade_released).toBe("plan-d");
+    expect(DECISION_OWNER.trade_blocked).toBe("plan-d");
+    expect(DECISION_OWNER.superseded_before_review).toBe("plan-d");
   });
 
   it("says which subjects each decision can actually be carried out against, in one table", () => {
@@ -25,9 +42,21 @@ describe("the resolution vocabulary", () => {
     // ANY flag, and a direct POST against an `account_pair` reached an unwired branch and became
     // a 500. A 500 is not a refusal. One table, exhaustive on both axes, so a new decision or a
     // new subject without a wiring row fails to compile.
-    expect(DECISION_WIRED_FOR.content_removed).toEqual({ review: true, chat_message: true, account_pair: false, trade: false });
-    expect(DECISION_WIRED_FOR.trade_reversed).toEqual({ review: false, chat_message: false, account_pair: false, trade: true });
-    expect(DECISION_WIRED_FOR.no_action).toEqual({ review: true, chat_message: true, account_pair: true, trade: true });
+    expect(DECISION_WIRED_FOR.content_removed).toEqual({ review: true, chat_message: true, account_pair: false, trade: false, held_trade: false });
+    expect(DECISION_WIRED_FOR.trade_reversed).toEqual({ review: false, chat_message: false, account_pair: false, trade: true, held_trade: false });
+    expect(DECISION_WIRED_FOR.no_action).toEqual({ review: true, chat_message: true, account_pair: true, trade: true, held_trade: false });
+  });
+
+  it("wires trade_released and trade_blocked for held_trade alone — Plan D's two ways out, and nothing else", () => {
+    expect(DECISION_WIRED_FOR.trade_released).toEqual({ review: false, chat_message: false, account_pair: false, trade: false, held_trade: true });
+    expect(DECISION_WIRED_FOR.trade_blocked).toEqual({ review: false, chat_message: false, account_pair: false, trade: false, held_trade: true });
+  });
+
+  it("wires trade_released/trade_blocked/superseded_before_review for held_trade — no_action and warned_user would strand a waiting trade", () => {
+    for (const decision of RESOLUTION_DECISIONS) {
+      const shouldBeWired = decision === "trade_released" || decision === "trade_blocked" || decision === "superseded_before_review";
+      expect(decisionIsWiredFor(decision, "held_trade")).toBe(shouldBeWired);
+    }
   });
 
   it("keeps contentRemovalIsWiredFor answering exactly what it answered before", () => {
@@ -67,11 +96,45 @@ describe("the resolution vocabulary", () => {
   });
 });
 
+describe("the system-only decisions (Plan D, Task 5, fix round 1, Finding 1)", () => {
+  it("names superseded_before_review as the one and only system-only decision, today", () => {
+    expect(SYSTEM_ONLY_DECISIONS).toEqual(["superseded_before_review"]);
+  });
+
+  it("refuses the operator superseded_before_review while leaving every other declared decision speakable", () => {
+    for (const decision of RESOLUTION_DECISIONS) {
+      const isSystemOnly = (SYSTEM_ONLY_DECISIONS as readonly string[]).includes(decision);
+      expect(decisionIsOperatorChoosable(decision)).toBe(!isSystemOnly);
+    }
+    expect(decisionIsOperatorChoosable("superseded_before_review")).toBe(false);
+    expect(decisionIsOperatorChoosable("trade_released")).toBe(true);
+    expect(decisionIsOperatorChoosable("trade_blocked")).toBe(true);
+    expect(decisionIsOperatorChoosable("no_action")).toBe(true);
+  });
+
+  it("keeps a system-only decision available (the product runs it) even though no operator may choose it", () => {
+    // The two questions this fix round split apart: `decisionIsAvailable` is "does the product
+    // implement this at all" (true — `closeSupersededHoldFlag` really does write it), and
+    // `decisionIsOperatorChoosable` is the narrower "can a human ask for it" (false). Collapsing
+    // them back into one boolean is exactly the hole this fix round closed.
+    expect(decisionIsAvailable("superseded_before_review")).toBe(true);
+    expect(decisionIsOperatorChoosable("superseded_before_review")).toBe(false);
+  });
+});
+
 describe("the flag vocabulary", () => {
   it("names one flag type per detector, with its subject", () => {
-    expect(FLAG_TYPES).toEqual(["multi_account", "review_report", "chat_report", "trade_fairness"]);
+    expect(FLAG_TYPES).toEqual(["multi_account", "review_report", "chat_report", "trade_fairness", "trade_hold"]);
     expect(SUBJECT_OF.multi_account).toBe("account_pair");
     expect(SUBJECT_OF.trade_fairness).toBe("trade");
+    expect(SUBJECT_OF.trade_hold).toBe("held_trade");
+  });
+
+  it("keeps trade_hold's subject distinct from trade_fairness's own, even naming the same trade id", () => {
+    // A held trade never executed; a fairness-flagged one already did. Two subject types, so the
+    // open-flag uniqueness index and every reader's exhaustive Record say which is which without
+    // re-deriving it from context.
+    expect(SUBJECT_OF.trade_hold).not.toBe(SUBJECT_OF.trade_fairness);
   });
 
   it("assigns every flag type a declared subject type, or fails to compile", () => {

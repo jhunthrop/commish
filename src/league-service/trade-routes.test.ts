@@ -11,11 +11,12 @@ vi.mock("@/lib/auth/current-user", () => ({
 
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { leagues, players, rosterSlots, teams, tradeProposals, users } from "@/db/schema";
+import { leagues, players, playerStatLines, rosterSlots, teams, tradeProposals, users } from "@/db/schema";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { TRADE_CONFIG } from "@/trades/config";
 import { proposalFingerprint } from "./trades";
+import { seasonCurrentWeek } from "./test-support";
 import { GET, POST } from "@/app/api/leagues/[leagueId]/trades/route";
 import { POST as POST_DECISION } from "@/app/api/leagues/[leagueId]/trades/[tradeId]/route";
 import { resetTradeRateLimit } from "@/app/api/leagues/[leagueId]/trades/_shared";
@@ -250,6 +251,25 @@ describe("POST /api/leagues/[leagueId]/trades/[tradeId]", () => {
     const teamBRoster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, "team_b"));
     expect(teamARoster.some((row) => row.playerId === "p_rb_b")).toBe(true);
     expect(teamBRoster.some((row) => row.playerId === "p_rb_a")).toBe(true);
+  });
+
+  it("answers a held status, on the wire, when the accept holds rather than executes (Plan D, Task 5)", async () => {
+    await seedRouteLeague();
+    await db.update(leagues).set({ isPublicMatchmade: true }).where(eq(leagues.id, "lg_1"));
+    // Well past INTEGRITY_CONFIG.trade.autoHoldThreshold (35) — the same fixture shape
+    // `trades.test.ts`'s own `seedLopsidedStatLines` uses.
+    await db.insert(playerStatLines).values([1, 2, 3].map((week) => ({ playerId: "p_rb_a", week, rushingYards: 300, rushingTouchdowns: 5 })));
+    await seasonCurrentWeek(db, { leagueId: "lg_1", homeTeamId: "team_a", awayTeamId: "team_b", week: 4 });
+    const trade = await openTrade();
+    signedInAs("u_bob");
+    const response = await postDecision("lg_1", trade.id, { action: "accept" });
+    expect(response.status).toBe(200);
+    const body = (await response.json()).data;
+    expect(body).toEqual({ tradeId: trade.id, status: "held" });
+
+    // Nothing moved.
+    const teamARoster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, "team_a"));
+    expect(teamARoster.some((row) => row.playerId === "p_rb_a")).toBe(true);
   });
 
   it("passes a service-level refusal straight through when the wrong party tries to accept", async () => {

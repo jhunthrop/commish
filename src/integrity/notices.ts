@@ -179,6 +179,84 @@ export interface NoticeContexts {
     readonly gaveBackSummary: string;
     readonly note: string;
   };
+  /**
+   * `recordTierBlockedJoin`'s own notice (`@/league-service/join`, Task 3) — the join-side half of
+   * the enforcement predicate in `@/league-service/enforcement`. Sent to the member who was turned
+   * away, and to nobody else: `SYSTEM_ACTION_VISIBILITY`'s (`@/integrity/system-actions`) entry for
+   * `tier_blocked_join` is `hidden`, because nobody else in the league needs to know a stranger was
+   * refused at the door, and telling them would publish a stranger's inexperience to twelve people
+   * who never met them. `leagueName` is the only context this notice carries — no mention of WHY
+   * the account was refused (no completed-season count, no tier label): the no-oracle discipline
+   * that keeps a private league's existence unconfirmed applies here too, one level down — this
+   * notice explains what happened, not a scorecard of the account that triggered it.
+   */
+  readonly tier_blocked_join: {
+    readonly leagueName: string;
+  };
+  /**
+   * `autoSetLineupInTx`'s own notice (`@/league-service/auto-lineup`, Task 4) — the personal half
+   * of the `lineup_auto_set` `system_action` the same write appends (`SYSTEM_ACTION_VISIBILITY`
+   * is `"subject_only"` for it, `@/integrity/system-actions`), sent only to the manager whose
+   * lineup was set. `carriedFrom` is the week whose saved choice was copied forward
+   * (`MISSED_DEADLINE_LINEUP_STRATEGY`'s `repeat_previous_week`, the only strategy this plan
+   * declares) — always a real earlier week, because the one week with no earlier week to copy
+   * (a league's first) is a materialization of the roster's own default rather than a copy of a
+   * choice, and that case sends no notice at all (nothing was carried forward to report).
+   *
+   * `changedPlayers` is a rendered clause from a FIXED set (nothing changed; one player named;
+   * several named), produced by `changedPlayersClauseFor` — never free text, so `notices.test.ts`
+   * sweeps every sentence this notice can produce rather than one sample of it, the discipline
+   * `correctionOutcome` established in Plan B.
+   */
+  readonly lineup_auto_set: {
+    readonly leagueName: string;
+    readonly week: number;
+    readonly carriedFrom: number;
+    readonly changedPlayers: string;
+  };
+  /**
+   * `acceptTrade`'s own notice for its hold branch (`@/league-service/trades`, Plan D Task 5),
+   * sent to BOTH parties inside the SAME platform-scoped transaction that raises the `trade_hold`
+   * flag — never after commit, because nothing about a hold is league news (ruling 12). Deliberately
+   * not "under review" or "suspicious": founder decision #10 as shipped asks for "somebody at
+   * Commish looks at it" and "this lopsided" so the held-trade banner on the trades page
+   * (`held-trade-banner.tsx`) can say the identical sentence a member reads here, and a member who
+   * read two different sentences about one fact would read one of them as a euphemism.
+   */
+  readonly trade_held_for_review: {
+    readonly leagueName: string;
+    readonly counterpartyTeamName: string;
+  };
+  /**
+   * `resolveFlag`'s `trade_blocked` decision (`@/integrity-service/flags`, Plan D Task 5), sent to
+   * BOTH parties, BYTE-IDENTICAL — deliberately WITHOUT a `counterpartyTeamName` the way
+   * `trade_executed`/`trade_reversed` both carry one, because "your trade with X" reads as a
+   * different sentence to each side (X is the OTHER manager, so the two recipients' own sentences
+   * would differ by exactly the one word that makes them provably the same notice). Neither
+   * manager is told which of them, if either, the review was actually about — the same "the
+   * product never signals which of the two was under suspicion" discipline `trade_reversed`
+   * already keeps, held to more strictly here. `note` is the OPERATOR's own words, carried the
+   * same way `trade_reversed`'s `note` is — unused by the template below, read by `quoteFor`
+   * (`@/integrity-service/notify`) instead, and bound by `NOTE_REACHES_SOMEONE_ELSE.trade_blocked`
+   * (`@/integrity-service/flags`) being `true`: this note reaches two real people, so the
+   * accusatory-language guard runs on it exactly as it runs on `trade_reversed`'s own.
+   */
+  readonly trade_blocked: {
+    readonly leagueName: string;
+    readonly note: string;
+  };
+  /**
+   * `autoStartDueDrafts`'s own notice (`@/draft-service/auto-start`, Plan D Task 7) — the platform
+   * pressing the button Task 6 built when nobody else did. Sent to EVERY team in the league, all
+   * referencing the SAME `system_action` event (`startDraft`'s fused auto-announce), never
+   * to a subject alone: `SYSTEM_ACTION_VISIBILITY.draft_auto_started` (`@/integrity/system-actions`)
+   * is `"everyone"`, on `stat_week_corrected`'s reasoning exactly — a fact about the league's
+   * shared calendar, true for everyone in it, about nobody's conduct. A PRIVATE league's draft
+   * never reaches this at all: `enforcementAppliesTo` gates the scan before any row is even read.
+   */
+  readonly draft_auto_started: {
+    readonly leagueName: string;
+  };
 }
 
 /**
@@ -292,6 +370,52 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   trade_reversed: ({ leagueName, counterpartyTeamName, gotBackSummary, gaveBackSummary }) => ({
     title: "An operator reversed your trade",
     body: `An operator reversed the trade you and ${counterpartyTeamName} completed in ${leagueName}. You have ${gotBackSummary} again, and ${counterpartyTeamName} has ${gaveBackSummary}. Scores from weeks you have already played stay as they were. There is no reply to this message.`,
+  }),
+  // No "no reply to this message" line: this is not a sanction and there is nothing about the
+  // member's own conduct to appeal — it explains a rule about the LEAGUE, not a decision about
+  // the person. Deliberately does not name the account's own completed-season count or tier: the
+  // no-oracle discipline that keeps a private league's existence unconfirmed to a stranger applies
+  // here too, one level down — the notice says what happened, not a scorecard of why.
+  tier_blocked_join: ({ leagueName }) => ({
+    title: "That league is reserved for newer players",
+    body: `You asked to join ${leagueName}, which keeps its seats for players who are new to Commish so everyone starts on a level footing. Plenty of leagues are open to everyone, and the browse page lists the ones with seats left right now.`,
+  }),
+  // Three properties, each deliberate (Task 4, Step 6). It says what the platform did and which
+  // week it copied, so the manager can check it. It ends with the thing they control, because a
+  // notice about something they did not choose should close on something they can. And it never
+  // uses the word "missed": a sentence that opens with what somebody failed to do is the failure
+  // mode `INTEGRITY_CONFIG.notices.accusatoryTerms` exists to approximate, even where the
+  // denylist itself would pass either word. No "no reply to this message" line: this is not a
+  // sanction, and there is nothing about the member's own conduct to appeal.
+  lineup_auto_set: ({ leagueName, week, carriedFrom, changedPlayers }) => ({
+    title: `We set your week ${week} lineup for you`,
+    body: `Week ${week} kicked off in ${leagueName} before you set a lineup, so we started the same team you started in week ${carriedFrom}.${changedPlayers} You can set your own lineup any week before kickoff, and we will leave it alone when you do.`,
+  }),
+  // Founder decision #10's own words, verbatim (Task 5's brief): "somebody at Commish looks at
+  // it" rather than "is under investigation", "this lopsided" rather than "suspicious". No "no
+  // reply to this message" line: this is not a sanction, there is nothing about either member's
+  // own conduct to appeal, and the review is still open — closing that door here would be
+  // premature. `held-trade-banner.tsx` says the identical sentence.
+  trade_held_for_review: ({ leagueName, counterpartyTeamName }) => ({
+    title: "Your trade is waiting on a fairness review",
+    body: `Your trade with ${counterpartyTeamName} in ${leagueName} is on hold while somebody at Commish looks at it. Public leagues get a second pair of eyes on trades this lopsided, and neither roster changes until that finishes. We will tell you both as soon as there is an answer.`,
+  }),
+  // The same founder decision #4 every other sanction-adjacent notice in this file states: there
+  // is no appeal path. Deliberately no "no reply to this message" line, though — a blocked trade
+  // is not a sanction against either manager (`resolveFlag`'s own `NOTE_REACHES_SOMEONE_ELSE`
+  // guard still runs on the operator's note, the same accusatory-language check `trade_reversed`'s
+  // note already passes through), and both sentences below already say what a member needs: it
+  // will not go through, and they are free to try again.
+  trade_blocked: ({ leagueName }) => ({
+    title: "Your trade will not go through",
+    body: `After the fairness review, your trade in ${leagueName} will not go ahead, and both rosters stay exactly as they were. You can put together a different offer any time.`,
+  }),
+  // No "no reply to this message" line: this is not a sanction, and there is nothing about any
+  // member's own conduct to appeal — it explains a fact about the league's shared calendar, the
+  // identical framing `stat_week_corrected`'s own template already carries.
+  draft_auto_started: ({ leagueName }) => ({
+    title: `Your draft in ${leagueName} has started`,
+    body: `The draft reached its scheduled time, so we started it. Head to the draft room now, or let the clock queue your picks if you cannot make it. We will tell you when it is your turn.`,
   }),
 };
 

@@ -165,6 +165,27 @@ describe("startDraft", () => {
     expect(await db.select().from(draftActions).where(eq(draftActions.draftId, draftId))).toHaveLength(0);
   });
 
+  it("throws loudly (Task 7) when drafts.status disagrees with the log for a value OTHER than 'complete'", async () => {
+    // The "complete-with-empty-log" booby trap above is guarded explicitly, by value. This is
+    // its sibling for every OTHER value `drafts.status` could be written to directly, outside
+    // this reducer's own control — proven here with `in_progress`, the one `claimAutoStart`
+    // (`./auto-start.ts`) itself writes. With an EMPTY action log, `admitCommand`/`reduceStart`
+    // sees phase "scheduled" (correctly, by the log's own evidence) and admits `START_DRAFT` —
+    // there is no early guard for this value the way there is for `complete` — so the disagreement
+    // is only caught inside `applyAction`'s own transaction, by `claimAutoStart`'s guarded UPDATE
+    // finding `status` no longer `'scheduled'` and returning zero rows. That is the exact
+    // "invariant violation" `alsoInTransaction`'s own docblock names, and it throws rather than
+    // silently drafting over a status the log never produced.
+    const { draftId } = await fixture("snake");
+    await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, draftId));
+
+    await expect(store.startDraft(draftId)).rejects.toThrow(
+      `Draft "${draftId}" was not "scheduled" when its own start transaction tried to claim it.`,
+    );
+    // The whole transaction rolled back — no action was appended over the disagreement.
+    expect(await db.select().from(draftActions).where(eq(draftActions.draftId, draftId))).toHaveLength(0);
+  });
+
   it("falls through to the reducer's own rejection for a REAL completed draft — one with an action log, not the seeded-season-league booby trap", async () => {
     // `drafts.status = 'complete'` with a non-empty action log is what a real, honestly-drafted
     // league looks like once it finishes. The booby-trap guard above exists for the OTHER

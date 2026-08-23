@@ -5,7 +5,8 @@ import type { Db } from "@/db/client";
 import { matchups, statWeeks } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
 import type { Clock } from "@/domain/timing";
-import { weekStatusFromGames } from "@/league";
+import { isLineupLocked, weekStatusFromGames } from "@/league";
+import { autoSetLineupsForWeek } from "@/league-service/auto-lineup";
 import type { PublishFn } from "@/lib/realtime/publish";
 import type { GameSummary, StatsProvider } from "@/stats/provider";
 import { affectedTeams } from "./affected";
@@ -66,6 +67,14 @@ interface WorkerDeps {
    * `onOutcome`. Defaults to `console.warn`.
    */
   readonly onOutcome?: (outcome: TickOutcome) => void;
+  /**
+   * Task 4's own trigger: the missed-deadline lineup, fired on the tick that moves a week's
+   * `stat_weeks.status` OUT of `scheduled` and never again for that week — see `tickWeek`'s own
+   * call site for why AFTER `persistTick` commits is the only place this can run. Defaults to the
+   * real `autoSetLineupsForWeek` (`@/league-service/auto-lineup`); injectable so a test can spy on
+   * it or force its failure without a real transaction underneath.
+   */
+  readonly autoSet?: typeof autoSetLineupsForWeek;
 }
 
 const defaultOnOutcome = (outcome: TickOutcome): void => {
@@ -212,6 +221,15 @@ interface WeekPlan {
    * spending `maxGamesPerTick` on the live week would otherwise burn a third of them.
    */
   readonly complete: boolean;
+  /**
+   * This week's `stat_weeks.status` as `runTick`'s own opening read found it, BEFORE this tick's
+   * `persistTick` can move it — `"scheduled"` for a week with no row at all, matching
+   * `weekStatusFor`'s own convention. Task 4's trigger fires exactly when this was `"scheduled"`
+   * and the tick's own freshly-computed status is not: the transition is only ever observable by
+   * comparing a snapshot taken before the write to the write's own result, never by re-reading
+   * `stat_weeks` afterwards (a second tick would see the same "not scheduled" value and refire).
+   */
+  readonly priorStatus: WeekStatus;
 }
 
 /**
@@ -240,6 +258,7 @@ export function createIngestionWorker({
   intervalMs = STATS_INGESTION_CONFIG.pollIntervalMs,
   wedgedWeekTicks = STATS_INGESTION_CONFIG.wedgedWeekTicks,
   onOutcome = defaultOnOutcome,
+  autoSet = autoSetLineupsForWeek,
 }: WorkerDeps): IngestionWorker {
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
@@ -554,6 +573,56 @@ export function createIngestionWorker({
     // settling, which would spend requests to re-confirm numbers the same tick just wrote.
     if ((correction && plan.complete) || status === "final") await markSwept(week, nowIso);
 
+    // Task 4's own trigger, made LEVEL-derived by final review F2: the missed-deadline lineup runs
+    // on EVERY tick this week is locked, not on the one tick it locked. The old condition
+    // (`plan.priorStatus === "scheduled" && status !== "scheduled"`) fired exactly once and could
+    // never fire again, because `priorStatus` reads `in_progress`/`final` on every later tick — so
+    // a league whose auto-set transaction rolled back got no lineup, no notice, no audit row, no
+    // operator signal and no second attempt, permanently and invisibly.
+    //
+    // Re-running is cheap and self-healing rather than merely harmless: the candidate query inside
+    // `autoSetLineupsForWeek` names only leagues that STILL have a team missing a row for this
+    // week, so a settled league is not in the set and a rolled-back one is. `isLineupLocked`
+    // (`@/league`) is the same predicate `autoSetLineupInTx` itself re-checks under its
+    // `stat_weeks FOR SHARE`, so the trigger and the writer agree on what "locked" means.
+    //
+    // AFTER `persistTick` commits, never inside it: `stat_weeks` is keyed on week alone and is not
+    // league-scoped, the same reason `correctSettledWeek` runs its own global `persistTick` before
+    // and outside every per-league transaction. A failure here is logged and swallowed — never
+    // rethrown — so a broken auto-set can never fail the tick that just settled real scores.
+    if (isLineupLocked(status)) {
+      try {
+        // The SAME score cache this worker already writes live scores into — `autoSetLineupsForWeek`
+        // evicts it for any league it actually touched, on the identical "route/worker supplies the
+        // real cache" idiom `setLineup`/`acceptTrade` use.
+        const outcome = await autoSet(db, { weekNumber: week, occurredAt: nowIso, cache: scoreCache });
+        // The per-league rollbacks `AutoSetOutcome`'s own contract says are "never silently
+        // dropped". They do not throw, so the `catch` below never sees them and only this branch
+        // can report them — the identical consumption `scripts/correct-stat-week.ts` gives
+        // `correctSettledWeek`'s own `leaguesFailed`. The count varies per tick, so the rate-limit
+        // key is passed explicitly and stably (see `reportIfDue`).
+        if (outcome.leaguesFailed.length > 0) {
+          console.error("[stats-pipeline] auto-set lineup rolled back for week", week, outcome.leaguesFailed);
+          reportIfDue(
+            {
+              week,
+              applied: false,
+              reason: `Couldn't auto-set lineups in ${outcome.leaguesFailed.length} league(s) for week ${week}. The next tick tries them again.`,
+            },
+            nowMs,
+            `auto-set-rollback:${week}`,
+          );
+        }
+      } catch (error: unknown) {
+        console.error("[stats-pipeline] auto-set lineup failed for week", week, error);
+        reportIfDue(
+          { week, applied: false, reason: "Couldn't auto-set lineups for managers who missed this week's deadline." },
+          nowMs,
+          `auto-set:${week}`,
+        );
+      }
+    }
+
     if (changed.length > 0) {
       await publishAffected(week, status, gamesFinal, gamesTotal, persisted.version, changed, nowMs);
     }
@@ -703,7 +772,11 @@ export function createIngestionWorker({
           if (await needsBoxScore(game, correction)) toFetch.push(game);
         }
         gamesBudgetRemaining -= toFetch.length;
-        plans.push({ week, games, toFetch, correction, complete: !truncated });
+        // `rows` is `runTick`'s own opening read, taken before this tick's `persistTick` can move
+        // anything — an absent row reads as `"scheduled"`, the same convention `weekStatusFor`
+        // uses, so a week the worker has never reached is a legitimate transition source too.
+        const priorStatus: WeekStatus = rows.find((row) => row.week === week)?.status ?? "scheduled";
+        plans.push({ week, games, toFetch, correction, complete: !truncated, priorStatus });
       } catch (error: unknown) {
         // One week's failure (a dropped connection, an upstream 500) must not stop the other
         // week examined this tick from being checked.

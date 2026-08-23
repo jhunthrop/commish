@@ -15,6 +15,7 @@ const REVIEW_A: ReviewView = {
   updatedAt: "2026-08-02T00:00:00.000Z",
   authorName: "Grace Hopper",
   authorAvatar: null,
+  verified: false,
 };
 
 const REVIEW_B: ReviewView = {
@@ -25,6 +26,7 @@ const REVIEW_B: ReviewView = {
   updatedAt: "2026-08-01T00:00:00.000Z",
   authorName: "Ada Lovelace",
   authorAvatar: "preset:shield",
+  verified: true,
 };
 
 const PAGE: ReviewsPage = { reviews: [REVIEW_A, REVIEW_B], hasMore: false, nextBefore: null };
@@ -45,6 +47,28 @@ describe("ReviewFeed", () => {
         expect(await axe(container)).toHaveNoViolations();
       },
     );
+  });
+
+  it("shows the verified badge only for a reviewer who has actually finished a season here", () => {
+    renderInAccount(<ReviewFeed initialPage={PAGE} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
+    // REVIEW_B (Ada Lovelace) is verified; REVIEW_A (Grace Hopper) is not.
+    expect(screen.getByText("Verified")).toBeInTheDocument();
+    expect(screen.getAllByText("Verified")).toHaveLength(1);
+  });
+
+  it("renders no badge at all for an unverified reviewer — the inverted case shows nothing, not a negative badge", () => {
+    const unverifiedOnly: ReviewsPage = { reviews: [REVIEW_A], hasMore: false, nextBefore: null };
+    renderInAccount(<ReviewFeed initialPage={unverifiedOnly} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
+    expect(screen.queryByText("Verified")).not.toBeInTheDocument();
+  });
+
+  it("states the claim behind the verified badge, one click away, through InfoTip — never a title attribute", () => {
+    const verifiedOnly: ReviewsPage = { reviews: [REVIEW_B], hasMore: false, nextBefore: null };
+    renderInAccount(<ReviewFeed initialPage={verifiedOnly} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
+    const trigger = screen.getByRole("button", { name: "What is a verified reviewer?" });
+    expect(trigger).not.toHaveAttribute("title");
+    fireEvent.click(trigger);
+    expect(screen.getByRole("note")).toHaveTextContent("This reviewer finished at least one full season on Commish.");
   });
 
   it("shows a one-star review in the same list as a five-star one — nothing is hidden by rating", () => {

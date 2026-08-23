@@ -124,6 +124,56 @@ describe("NOTICE_TEMPLATES", () => {
     expect(reversed.body).toContain("There is no reply to this message.");
   });
 
+  it("says what happened when a join is refused for tier segregation, verbatim (Task 3)", () => {
+    const blocked = renderNotice("tier_blocked_join", NOTICE_SAMPLES.tier_blocked_join);
+    expect(blocked.title).toBe("That league is reserved for newer players");
+    expect(blocked.body).toBe(
+      "You asked to join Rookie Snake Room, which keeps its seats for players who are new to Commish so everyone starts on a level footing. Plenty of leagues are open to everyone, and the browse page lists the ones with seats left right now.",
+    );
+    // Not a sanction — nothing about this member's own conduct, and no "no reply" line: there is
+    // nothing to appeal, only a rule about the league they asked to join.
+    expect(blocked.body).not.toContain("There is no reply to this message.");
+  });
+
+  it("says what happened when a trade is held for a fairness review, verbatim (Plan D, Task 5)", () => {
+    const held = renderNotice("trade_held_for_review", NOTICE_SAMPLES.trade_held_for_review);
+    expect(held.title).toBe("Your trade is waiting on a fairness review");
+    expect(held.body).toBe(
+      "Your trade with Iron Owls in Sunday Money is on hold while somebody at Commish looks at it. Public leagues get a second pair of eyes on trades this lopsided, and neither roster changes until that finishes. We will tell you both as soon as there is an answer.",
+    );
+    // Founder decision #10's own words: "somebody at Commish looks at it", never "under
+    // investigation"; "this lopsided", never "suspicious" — the accusatory-terms denylist would
+    // catch the latter, but the WORDS matter beyond what the denylist happens to enforce.
+    expect(held.body).not.toContain("investigation");
+    expect(held.body).not.toContain("suspicious");
+  });
+
+  it("says what happened when an operator blocks a held trade, verbatim (Plan D, Task 5)", () => {
+    const blocked = renderNotice("trade_blocked", NOTICE_SAMPLES.trade_blocked);
+    expect(blocked.title).toBe("Your trade will not go through");
+    expect(blocked.body).toBe(
+      "After the fairness review, your trade in Sunday Money will not go ahead, and both rosters stay exactly as they were. You can put together a different offer any time.",
+    );
+    // Not a sanction against either named manager, so — unlike trade_reversed's own note — no
+    // "no reply to this message" line: neither party is accused of anything, only told a rule
+    // this trade ran into.
+    expect(blocked.body).not.toContain("There is no reply to this message.");
+    // No counterparty name either — deliberately, so the SAME body reaches both managers
+    // byte-identical (`resolveFlag`'s own `trade_blocked` branch sends this exact context to
+    // both), never a sentence that names "the other manager" and therefore differs by recipient.
+    expect(blocked.body).not.toContain("Iron Owls");
+  });
+
+  it("says what happened when a draft auto-starts, verbatim (Plan D, Task 7)", () => {
+    const started = renderNotice("draft_auto_started", NOTICE_SAMPLES.draft_auto_started);
+    expect(started.title).toBe("Your draft in Sunday Money has started");
+    expect(started.body).toBe(
+      "The draft reached its scheduled time, so we started it. Head to the draft room now, or let the clock queue your picks if you cannot make it. We will tell you when it is your turn.",
+    );
+    // Not a sanction — nothing about any member's own conduct, so no "no reply" line.
+    expect(started.body).not.toContain("There is no reply to this message.");
+  });
+
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
@@ -131,10 +181,15 @@ describe("NOTICE_TEMPLATES", () => {
       "admin_granted",
       "chat_message_removed",
       "draft_auto_picked",
+      "draft_auto_started",
+      "lineup_auto_set",
       "operator_warning",
       "review_removed",
       "stat_week_corrected",
+      "tier_blocked_join",
+      "trade_blocked",
       "trade_executed",
+      "trade_held_for_review",
       "trade_proposed",
       "trade_rejected",
       "trade_reversed",
@@ -167,5 +222,31 @@ describe("NOTICE_TEMPLATES", () => {
   it("is informational, not a sanction, so it states no appeal path the way removal notices do", () => {
     const notice = renderNotice("stat_week_corrected", NOTICE_SAMPLES.stat_week_corrected);
     expect(notice.body).not.toContain("There is no reply to this message.");
+  });
+
+  /**
+   * Task 4, Step 6: says what happened and which week it copied, ends on what the manager
+   * controls, and never uses the word "missed" — the failure mode a sentence opening with what
+   * somebody failed to do would be, even where the denylist itself would pass either word.
+   */
+  it("says what happened when a lineup is auto-set, verbatim, with no changed-players clause", () => {
+    const notice = renderNotice("lineup_auto_set", NOTICE_SAMPLES.lineup_auto_set);
+    expect(notice.title).toBe("We set your week 4 lineup for you");
+    expect(notice.body).toBe(
+      "Week 4 kicked off in Sunday Money before you set a lineup, so we started the same team you started in week 3. You can set your own lineup any week before kickoff, and we will leave it alone when you do.",
+    );
+    expect(notice.body).not.toContain("missed");
+    expect(notice.body).not.toContain("There is no reply to this message.");
+  });
+
+  it("folds a non-empty changedPlayers clause into the sentence right after the carried-from week, still copy-clean", () => {
+    const withOneChange = renderNotice("lineup_auto_set", {
+      ...NOTICE_SAMPLES.lineup_auto_set,
+      changedPlayers: " Christian McCaffrey is no longer on your roster, so we filled that spot from your bench.",
+    });
+    expect(withOneChange.body).toBe(
+      "Week 4 kicked off in Sunday Money before you set a lineup, so we started the same team you started in week 3. Christian McCaffrey is no longer on your roster, so we filled that spot from your bench. You can set your own lineup any week before kickoff, and we will leave it alone when you do.",
+    );
+    expect(copyViolations(`${withOneChange.title} ${withOneChange.body}`)).toEqual([]);
   });
 });

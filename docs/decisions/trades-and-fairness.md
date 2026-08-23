@@ -78,9 +78,10 @@ identity-pinned re-export is what proves the split cost nothing at every call si
 deliberately lenient boundaries — a gap of exactly 3 still reads `"even"`
 (`tradeBalance`'s own `gap <= evenDelta`), and a gap of exactly 12 is NOT called lopsided (the flag
 only fires on `gap > lopsidedDelta`). `INTEGRITY_CONFIG.trade.fairnessFlagThreshold` (20) and
-`.autoHoldThreshold` (`null` on merge) use `crossesFairnessThreshold`'s `>=` instead — a threshold
-whose exact value can never be reached is a threshold nobody can configure precisely, and
-leniency is a kindness to a member reading a verdict that has no meaning at all to a detector.
+`.autoHoldThreshold` (**35**, Phase 3 Plan D — `null` on this plan's own merge) use
+`crossesFairnessThreshold`'s `>=` instead — a threshold whose exact value can never be reached is a
+threshold nobody can configure precisely, and leniency is a kindness to a member reading a verdict
+that has no meaning at all to a detector.
 
 `src/integrity/config.test.ts` orders all four on one axis, not just the two the original spec
 named, because every adjacent pair guards a real property an inversion would break:
@@ -88,8 +89,11 @@ named, because every adjacent pair guards a real property an inversion would bre
 - `even > lopsided` makes a verdict unreachable — nothing could ever be neither.
 - `lopsided > fairnessFlagThreshold` fills the operator queue with trades the advisor itself calls
   fine to a member's face.
-- `fairnessFlagThreshold > autoHoldThreshold` (once a hold threshold is a real number) holds trades
-  nobody flagged — a trade would freeze before anyone ever asked a question about it.
+- `fairnessFlagThreshold > autoHoldThreshold` holds trades nobody flagged — a trade would freeze
+  before anyone ever asked a question about it. No longer a parenthetical "once a hold threshold is
+  a real number": Phase 3 Plan D supplied 35, the ordering test's fourth arm stopped being partially
+  skipped, and the invariant is live over all four thresholds today. See
+  `docs/decisions/enforcement-and-tiers.md` §8 for the reasoning behind the specific number.
 
 ## 3. The proposal's shape
 
@@ -261,6 +265,15 @@ every accepted trade with no `trade_fairness` flag at all and re-raises. `raiseF
 open-subject unique index makes a re-run idempotent by construction — a second raise for a trade
 that already has a flag returns the existing one and writes no second event.
 
+A `trade_hold` flag disqualifies a trade from that sweep just as a `trade_fairness` one does, open
+or resolved (final review F1). The two thresholds are ordered on one axis and pinned that way (20 ≤
+35), and the hold flag carries the identical `evidenceFor` payload, so an operator who released a
+held trade answered this detector's question at the stricter threshold on the same numbers before
+the rosters ever moved. Without that exclusion the sweep raised a fresh open flag over the released
+trade and offered **Reverse this trade** — the inverse of the decision just made, with no trail of
+it, because `trailFor`'s trade branch reads the league chain and the release's `flag_resolved` lives
+on the platform one.
+
 This is the SAME after-commit exception, with the SAME operator remedy, that Plan B's own
 multi-account sweep already carries (`sweepLeagueForMultiAccounts` / `sweepQuietly`), and it is
 recorded here beside that precedent so the two read as one pattern rather than two separate
@@ -299,6 +312,20 @@ already exists — a branch in a result a later plan reads, not a re-opened desi
 not flip `SYSTEM_ACTION_SUMMARY_ALLOWED.trade_held_for_review` for the identical reason Plan B
 denied it: no publisher exists (`autoHoldThreshold` is `null`, no trade is ever held), and flipping
 a flag for an event nobody emits would be a control wired to nothing.
+
+**AS SHIPPED (Phase 3 Plan D).** The seam this plan scaffolded is filled: `autoHoldThreshold` is
+**35**, `acceptTrade` branches on `fairness.hold && enforcementAppliesTo(league)` (Plan D
+Task 5), and a trade crossing it is held — a real seventh `TradeStatus` (`held`), not the veto
+window this section's own "what would actually change" analysis below still describes correctly
+as unbuilt. `SYSTEM_ACTION_SUMMARY_ALLOWED.trade_held_for_review` was NOT flipped open, though —
+Plan D found a stronger reason to keep it denied than "no publisher exists": the hold's own
+`system_action` is written on the PLATFORM chain (hold and flag commit in one transaction, since
+nothing happens in the league), and a platform-chain event is never read by `listLeagueActivity`
+at all, so the denial stopped being a decision anybody has to keep making. See
+`docs/decisions/enforcement-and-tiers.md` §§7–8 for the number's own reasoning and the hold's full
+shape, including why it applies only inside a platform-enforced public league — the veto window
+this section refuses stays refused; what shipped is narrower and automatic, not the commissioner
+approval step described above.
 
 **What a commissioner-approval step would actually change:** not a UI addition, but a third party
 inserted into what has been, throughout this design, a two-party transaction — every lock-order

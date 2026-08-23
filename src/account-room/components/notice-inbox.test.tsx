@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import type { NoticesBody, NoticeView } from "../contract";
 import { fixtureAccountDeps, renderInAccount } from "../test-fixtures";
 import { AccountRoomDepsProvider } from "../hooks/deps";
@@ -28,7 +29,9 @@ describe("NoticeInbox", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: EMPTY_PAGE });
     await inBothThemes(
       <AccountRoomDepsProvider deps={fixture.deps}>
-        <NoticeInbox />
+        <NoticesProvider>
+          <NoticeInbox />
+        </NoticesProvider>
       </AccountRoomDepsProvider>,
       async ({ container }) => {
         expect(await screen.findByRole("button", { name: "Notices" })).toBeInTheDocument();

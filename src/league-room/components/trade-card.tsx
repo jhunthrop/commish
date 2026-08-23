@@ -9,6 +9,7 @@ import { isExpired } from "@/trades/lifecycle";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useNow } from "../hooks/use-now";
 import { daysUntil, formatExpired, formatExpiry, formatWeek } from "../lib/format";
+import { HeldTradeBanner } from "./held-trade-banner";
 import { TradeVerdict, type TradeAssessmentSummary } from "./trade-verdict";
 
 export interface TradeCardProps {
@@ -21,6 +22,11 @@ export interface TradeCardProps {
    *  function this codebase permits to switch on `TradeAssetKind` at all. Built once, upstream,
    *  from the same read `TradeComposer`'s pickers use (`TradeRoomContext.rostersByTeamId`). */
   readonly playersById: Readonly<Record<string, ValuedPlayer>>;
+  /** The league's own name — Plan D's `held-trade-banner.tsx` needs it, and only it: every other
+   *  status renders with no league name at all. Optional so every OTHER existing caller of this
+   *  card is unaffected; `TradeInbox` (the one production caller) always supplies it via
+   *  `TradeRoomContext.leagueName`. */
+  readonly leagueName?: string;
   /** The viewer's own advisory read on an OPEN, answerable offer. `"idle"` (the default) until
    *  the manager asks for it — fix round 1, F4: an inbox that fetched every card's verdict on
    *  mount could burst the shared advisor rate limiter (`ADVISOR_CONFIG`, 20 requests/60s across
@@ -67,9 +73,16 @@ function AssetList({ heading, assets, playersById }: { readonly heading: string;
 }
 
 /** What the card says about a trade that is no longer answerable, and whether "Accept"/"Decline"
- *  belong on it at all. `null` copy means the open, answerable band below renders instead. */
+ *  belong on it at all. `null` copy means the open, answerable band below renders instead — the
+ *  SAME `null` a `held` trade returns, deliberately (Plan D, Task 5): a held trade is neither
+ *  "open, answerable" nor "settled" (`TRADE_STATUSES.held`'s own docblock, `@/trades/lifecycle`),
+ *  and its own words come from `HeldTradeBanner` instead, rendered directly by `TradeCard` rather
+ *  than folded into this settled-state sentence. */
 function settledCopy(trade: TradeProposalView, meTeamId: string): string | null {
-  if (trade.status === "open") return null;
+  if (trade.status === "open" || trade.status === "held") return null;
+  if (trade.status === "blocked") {
+    return "After a fairness review, this trade was blocked. Both rosters stayed exactly as they were.";
+  }
   if (trade.status === "accepted") {
     // "Reversed", never "put back" — the one action verb Task 7's own panel fixed everywhere
     // else in this arc (the notice title/body, the operator queue trail). Fix round 1, F3: this
@@ -105,6 +118,7 @@ export function TradeCard({
   trade,
   meTeamId,
   playersById,
+  leagueName,
   assessmentStatus = "idle",
   assessment,
   onRequestAssessment,
@@ -171,6 +185,14 @@ export function TradeCard({
         {trade.note === null ? null : <p className="break-words text-sm italic text-text-muted">{`"${trade.note}"`}</p>}
 
         {settled === null ? null : <p className="text-sm text-text-primary">{settled}</p>}
+
+        {/* Plan D, Task 5: the ONE place a held trade's own words live — the two managers see it
+            honestly (`counterpartyName` is always resolvable here, since a held trade is only
+            ever visible to its own two parties, `tradesQuery`'s own privacy rule), and nobody
+            else in the league ever renders this card in a `held` state at all. */}
+        {trade.status === "held" ? (
+          <HeldTradeBanner leagueName={leagueName ?? ""} counterpartyTeamName={counterpartyName ?? "your counterparty"} />
+        ) : null}
 
         {isAnswerable ? (
           <div className="flex flex-col gap-3">

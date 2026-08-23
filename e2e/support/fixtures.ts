@@ -49,3 +49,28 @@ export const expect = test.expect;
 
 /** The already-played league `npm run seed` hands manager A the commissioner's chair in. */
 export const SEEDED_SEASON_LEAGUE_ID = DEV_SEED.season.leagueId;
+
+/**
+ * Opens the header's notice inbox and waits for `text` to appear in it — real retries, through
+ * the product's own real mechanism, never a click that only toggles visibility. Extracted from
+ * `e2e/trades.spec.ts` (Phase 3 Plan C, Task 9) so `e2e/enforcement.spec.ts` (Phase 3 Plan D,
+ * Task 10) reads the identical helper rather than a second, drifting copy — both specs share the
+ * same real constraint this docblock states: `useNotices` fetches exactly once per page mount,
+ * so a `toPass` that only re-clicks the bell against an already-failed mount fetch is retrying
+ * the wrong thing forever, and `INTEGRITY_CONFIG.notices.rateLimit` (32 requests/60s, PER USER)
+ * is real and shared across every spec's own page loads — a transient 429 here is a genuine,
+ * expected shape this helper answers with the panel's own "Try again" button
+ * (`NoticeInbox`'s `refetch()`), never a page reload that would cost this budget a second mount
+ * fetch for nothing.
+ */
+export async function expectNotice(page: Page, text: string): Promise<void> {
+  await page.getByRole("button", { name: /^Notices/ }).click();
+  const region = page.getByRole("region", { name: "Notices" });
+  await expect(region).toBeVisible({ timeout: 5_000 });
+  await expect(async () => {
+    const tryAgain = region.getByRole("button", { name: "Try again" });
+    if (await tryAgain.isVisible().catch(() => false)) await tryAgain.click();
+    await expect(region.getByText(text).first()).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 45_000 });
+  await page.keyboard.press("Escape");
+}

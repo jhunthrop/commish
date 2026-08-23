@@ -26,6 +26,30 @@ export interface LeagueListBody {
   readonly leagues: readonly LeagueSummary[];
 }
 
+/**
+ * What `GET /api/leagues/[leagueId]/draft-schedule` and `PUT`'s success response both answer —
+ * and, unchanged, the shape `LeagueHomeBody.draftSchedule` carries below, since it is the SAME
+ * fact read the SAME way whether the caller is the initial page render or a later PUT. Fix round
+ * 1 (review MEDIUM): `DraftSchedulePanel` used to fetch this itself on mount, the wrong sibling
+ * pattern for a component living inside a server-rendered parent that already has the row —
+ * `AdvisorPanel`/`LineupEditor`/`TradeInboxLink` all take their initial read as a prop from
+ * `LeagueHomeBody` and reach `fetchJson` only for a write, and this now matches them: `leagueHome`
+ * (`@/league-service/read.ts`) already selects `drafts.status`/`drafts.kickoffAt` and the whole
+ * `leagues` row (so `isPublicMatchmade` is already in hand) for its own internal use, at zero
+ * extra query cost. The PUT route still calls `draftScheduleView` to build its own response —
+ * that write path has no server-rendered parent to hand it a prop.
+ */
+export interface DraftScheduleBody {
+  readonly draftId: string;
+  readonly leagueId: string;
+  readonly status: DraftStatus;
+  /** ISO instant. */
+  readonly kickoffAt: string;
+  /** Whether the platform will start this draft on its own if nobody presses the button
+   *  (Task 7) — read by the panel to decide whether to say so. */
+  readonly isPublicMatchmade: boolean;
+}
+
 export interface CreateLeagueBody {
   readonly leagueId: string;
   readonly teamId: string;
@@ -153,6 +177,14 @@ export interface LeagueHomeBody {
   readonly weekStatus: WeekStatus;
   readonly draftId: string | null;
   readonly draftStatus: DraftStatus | null;
+  /**
+   * `DraftSchedulePanel`'s entire initial read, as a prop — `null` only in the same never-true
+   * case `draftId`/`draftStatus` above are already null for (a league somehow missing the draft
+   * `createLeague` always writes in the same transaction). Fix round 1: this is what makes the
+   * panel a props-in, fetchJson-for-writes-only component like its siblings, rather than a
+   * `useEffect` GET on mount.
+   */
+  readonly draftSchedule: DraftScheduleBody | null;
 }
 
 export interface MatchupLineupEntry {
@@ -263,9 +295,38 @@ export interface TradeCounterpartyOption {
  * one read, two consumers, rather than a second fetch for display that the picker already paid
  * for.
  */
+/**
+ * `GET /api/leagues/[leagueId]/moderation`'s whole response — Plan B's Task 6 persona-panel MEDIUM
+ * ("league-commissioner moderation visibility"), landed here (Task 8) as the narrow window the
+ * brief specifies: counts and a date, never who, what, or why. `leagueModerationSummary`
+ * (`@/integrity-service/flags`) is the one function that builds it, and it answers `null` — never
+ * this shape with zeros baked in — for anyone but the league's own commissioner, so a route
+ * mapping `null` to 404 never has to branch on WHY the read came back empty.
+ */
+export interface ModerationSummaryView {
+  /** Chat messages in this league the platform removed. Never who wrote them. */
+  readonly removedMessages: number;
+  /** Reviews the platform removed, written by someone who has (or had) a team in this league.
+   *  Reviews are platform-scoped, not league-scoped — see that function's own docblock for how
+   *  "in their league" is read for a table with no `league_id` column. */
+  readonly removedReviews: number;
+  /** The later of the two counts' own most recent removal, or `null` when neither count is
+   *  above zero — the healthy-league state, designed first because it is the common one. */
+  readonly mostRecentAt: string | null;
+  /** Unresolved `integrity_flags` scoped to this league — a count, never a list (ruling 6's own
+   *  reasoning: an open flag is a question about a person, and that question is nobody's business
+   *  but the person under it and the operator looking into it). */
+  readonly openQuestions: number;
+}
+
 export interface TradeRoomContext {
   readonly weekNumber: number;
   readonly myTeamId: string;
   readonly counterparties: readonly TradeCounterpartyOption[];
   readonly rostersByTeamId: Readonly<Record<string, readonly TradeRosterPlayer[]>>;
+  /** The league's own name — `held-trade-banner.tsx` (Plan D, Task 5) needs it to say the
+   *  identical sentence `trade_held_for_review`'s own notice already says
+   *  (`@/integrity/notices`), and a room component may never import that module as a value (the
+   *  client boundary, `eslint.config.mjs`), so the page hands the name down as plain data. */
+  readonly leagueName: string;
 }

@@ -8,17 +8,18 @@ import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import type { AuditEventType, JsonObject } from "@/domain/audit";
 import { copyViolations } from "@/integrity/copy-rules";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import type { FlagType } from "@/integrity/flags";
+import { LEAGUE_QUESTION_FLAG_TYPES, type FlagType } from "@/integrity/flags";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { listLeagueActivity } from "./activity";
 import { createLeague } from "@/league-service/creation";
 import { currentWeekOf } from "@/league-service/schedule";
 import { seasonCurrentWeek } from "@/league-service/test-support";
-import { acceptTrade, proposeTrade } from "@/league-service/trades";
+import { acceptTrade, proposeTrade, releaseHeldTradeInTx } from "@/league-service/trades";
 import { createAuditLogger, type AuditLogger } from "./audit-logger";
 import { notifyAffectedMember } from "./notify";
-import { flagDetail, listPendingFlags, pendingFlagQuery, raiseFlag, removeSubject, resolveFlag } from "./flags";
+import { flagDetail, leagueModerationSummary, listPendingFlags, MODERATION_SUMMARY_FIELDS, pendingFlagQuery, raiseFlag, removeSubject, resolveFlag } from "./flags";
 import { raiseFlag as raiseFlagReExported } from "./raise-flag";
+import { closeSupersededHoldFlag } from "./trade-fairness";
 
 const db = createTestDb();
 const NOW = "2026-08-20T18:00:00.000Z";
@@ -1378,6 +1379,525 @@ describe("resolveFlag's trade_reversed branch (Task 7)", () => {
   });
 });
 
+describe("resolveFlag's trade_released/trade_blocked branches (Plan D, Task 5)", () => {
+  const hClock = { now: () => "2026-08-26T00:00:00.000Z" };
+  const H_SLOTS = [
+    { slot: "RB" as const, count: 1, eligiblePositions: ["RB" as const] },
+    { slot: "WR" as const, count: 1, eligiblePositions: ["WR" as const] },
+    { slot: "BENCH" as const, count: 1, eligiblePositions: ["RB" as const, "WR" as const] },
+  ];
+
+  /**
+   * A real HELD trade (Alice's RB for Bob's WR), plus its own `trade_hold` flag — the exact state
+   * `holdTradeInTx` (`@/league-service/trades`) produces, built directly rather than through a
+   * real lopsided `acceptTrade`: this suite holds the trade it wants without also re-proving the
+   * threshold math Task 5's own `trades.test.ts` already covers end to end.
+   */
+  async function heldTradeWithFlag(suffix: string): Promise<{
+    readonly leagueId: string;
+    readonly teamA: string;
+    readonly teamB: string;
+    readonly userA: string;
+    readonly userB: string;
+    readonly tradeId: string;
+    readonly flagId: string;
+    readonly gavePlayerId: string;
+    readonly gotPlayerId: string;
+  }> {
+    const userA = `u_ht_alice_${suffix}`;
+    const userB = `u_ht_bob_${suffix}`;
+    await db.insert(users).values([
+      { id: userA, email: `${userA}@test.local`, displayName: "Alice" },
+      { id: userB, email: `${userB}@test.local`, displayName: "Bob" },
+    ]);
+    const created = await createLeague({ db, clock: hClock, newId: () => `lg_ht_${suffix}_${crypto.randomUUID()}` }, {
+      name: "Held Trade Integration League",
+      format: "snake",
+      teamCount: 2,
+      scoringPreset: "ppr",
+      auctionBudget: null,
+      rosterSlots: H_SLOTS,
+      commissionerUserId: userA,
+      teamName: "Team Alice",
+      experienceTier: "beginner",
+      stakeTier: 0,
+      isPublicMatchmade: true,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const teamB = `team_ht_bob_${suffix}`;
+    await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
+    const gavePlayerId = `p_ht_rb_${suffix}`;
+    const gotPlayerId = `p_ht_wr_${suffix}`;
+    await db
+      .insert(players)
+      .values([
+        { id: gavePlayerId, name: "Star RB", position: "RB", nflTeam: "KC" },
+        { id: gotPlayerId, name: "Bench WR", position: "WR", nflTeam: "SF" },
+      ])
+      .onConflictDoNothing();
+    await db.insert(rosterSlots).values([
+      { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: gavePlayerId },
+      { teamId: teamB, slot: "WR", slotIndex: 0, playerId: gotPlayerId },
+    ]);
+
+    const tradeId = `trade_ht_${suffix}`;
+    const proposedAt = new Date(hClock.now());
+    await db.insert(tradeProposals).values({
+      id: tradeId,
+      leagueId: created.leagueId,
+      proposerTeamId: created.teamId,
+      counterpartyTeamId: teamB,
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: gavePlayerId }],
+      counterpartyAssets: [{ kind: "player", playerId: gotPlayerId }],
+      fingerprint: `fp_${tradeId}`,
+      note: null,
+      status: "held",
+      proposedAt,
+      expiresAt: new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000),
+    });
+
+    const flagId = `flag_ht_${suffix}`;
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_hold",
+        subjectId: tradeId,
+        leagueId: created.leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: hClock.now(),
+        newId: () => flagId,
+        audit: logger,
+      }),
+    );
+
+    return { leagueId: created.leagueId, teamA: created.teamId, teamB, userA, userB, tradeId, flagId, gavePlayerId, gotPlayerId };
+  }
+
+  async function tradeRow(tradeId: string) {
+    const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, tradeId));
+    return row!;
+  }
+
+  async function ownerTeamOf(playerId: string): Promise<string | undefined> {
+    const [row] = await db.select({ teamId: rosterSlots.teamId }).from(rosterSlots).where(eq(rosterSlots.playerId, playerId));
+    return row?.teamId;
+  }
+
+  async function noticeBody(userId: string, noticeType: string): Promise<string | undefined> {
+    const rows = await db.select().from(memberNotices).where(eq(memberNotices.userId, userId));
+    return rows.find((n) => n.noticeType === noticeType)?.body;
+  }
+
+  async function ensureOperator(id: string): Promise<void> {
+    await db.insert(users).values({ id, email: `${id}@test.local`, displayName: id }).onConflictDoNothing();
+  }
+
+  it("closes any superseded-hold flags with the default system clock when the caller supplies none", async () => {
+    // Every OTHER trade_released test in this suite passes `clock: hClock`, which left this one
+    // `??` branch (`(input.clock ?? systemClock).now()` feeding `closeSupersededHoldFlagsQuietly`)
+    // uncovered — a production call really can omit `clock` (`@/app/api/admin/flags/[flagId]/
+    // resolve/route.ts` never supplies one), and this is that path, proven directly rather than
+    // inferred from the equivalent fallback elsewhere in this function.
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("default-clock");
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op" });
+    expect(result).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_released" });
+    expect((await tradeRow(fx.tradeId)).status).toBe("accepted");
+  });
+
+  it("releases a held trade by executing it, then resolves the flag, in that order", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("release");
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock });
+    expect(result).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_released" });
+
+    expect((await tradeRow(fx.tradeId)).status).toBe("accepted");
+    expect(await ownerTeamOf(fx.gavePlayerId)).toBe(fx.teamB);
+    expect(await ownerTeamOf(fx.gotPlayerId)).toBe(fx.teamA);
+    const aliceExecuted = (await db.select().from(memberNotices).where(eq(memberNotices.userId, fx.userA))).find((n) => n.noticeType === "trade_executed");
+    expect(aliceExecuted).toBeDefined();
+  });
+
+  it("blocks a held trade without moving anything, and tells both managers in the same words", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("block");
+    const result = await resolveFlag(db, {
+      flagId: fx.flagId,
+      decision: "trade_blocked",
+      note: "Both teams belong to one person.",
+      operatorUserId: "u_op",
+      clock: hClock,
+    });
+    expect(result).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_blocked" });
+
+    expect((await tradeRow(fx.tradeId)).status).toBe("blocked");
+    expect(await ownerTeamOf(fx.gavePlayerId)).toBe(fx.teamA);
+    expect(await ownerTeamOf(fx.gotPlayerId)).toBe(fx.teamB);
+    const aliceBody = await noticeBody(fx.userA, "trade_blocked");
+    const bobBody = await noticeBody(fx.userB, "trade_blocked");
+    expect(aliceBody).toBe(bobBody);
+    expect(aliceBody).toBeDefined();
+  });
+
+  it("refuses to release a trade the world has moved past, and says what changed", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("moved");
+    // The world moves on WITHOUT going through the trade system — a raw write standing in for
+    // whatever OTHER mechanism could move it. The supersede sweep already covers the "another
+    // trade moved it" case (Task 5's own `trades.test.ts`); this is the second way a release can
+    // refuse, the identical ownership re-check `acceptTrade`'s own STEP 4 makes.
+    await db.update(rosterSlots).set({ playerId: null }).where(eq(rosterSlots.playerId, fx.gavePlayerId));
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock });
+    expect(result).toMatchObject({ ok: false, status: 409 });
+    if (!result.ok) expect(result.reason).toContain("has already moved to another team");
+    expect((await tradeRow(fx.tradeId)).status).toBe("held");
+    // Nothing about the flag changed either — the refusal happened before this function's own
+    // transaction ever opened.
+    const [flag] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flag!.resolvedAt).toBeNull();
+  });
+
+  it("carries the operator's own words to both managers when a trade is blocked, and refuses an accusatory one before any write", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("cheat");
+    const result = await resolveFlag(db, {
+      flagId: fx.flagId,
+      decision: "trade_blocked",
+      note: "This looks like a violation.",
+      operatorUserId: "u_op",
+      clock: hClock,
+    });
+    // The SAME accusatory-note guard `trade_reversed`'s own note already passes through
+    // (`NOTE_REACHES_SOMEONE_ELSE.trade_blocked` is `true`) — refused here, at 400, matching the
+    // exact status/shape that guard answers with everywhere else in this file.
+    expect(result).toMatchObject({ ok: false, status: 400 });
+    if (!result.ok) expect(result.reason).toContain("violation");
+    // Refused before any write: the trade stays held.
+    expect((await tradeRow(fx.tradeId)).status).toBe("held");
+  });
+
+  it("refuses trade_released for a subject that isn't a held trade, before any write", async () => {
+    await ensureOperator("u_op");
+    await seedUser("u_pr_author");
+    await db.insert(reviews).values({ id: "review_pr_1", userId: "u_pr_author", rating: 4, body: "meh", createdAt: new Date(NOW), updatedAt: new Date(NOW) });
+    const flagId = "flag_pr_wrong_subject";
+    await db.transaction((tx) =>
+      raiseFlag(tx, { flagType: "review_report", subjectId: "review_pr_1", leagueId: null, evidence: {}, raisedByUserId: null, occurredAt: NOW, newId: () => flagId, audit: logger }),
+    );
+    const result = await resolveFlag(db, { flagId, decision: "trade_released", note: "n", operatorUserId: "u_op" });
+    expect(result).toMatchObject({ ok: false, status: 400 });
+  });
+
+  // Plan D, Task 5, fix round 1 (Finding 1) — the operator-cannot-speak-the-system-word refusal,
+  // at the ONE layer that matters most: `resolveFlag` itself, the function every write actually
+  // goes through (`resolveFlagSchema`'s own refusal, `src/integrity-service/schemas.test.ts`, is
+  // the HTTP boundary in front of this; this is the backstop behind it, per `resolveFlag`'s own
+  // first statement).
+  it("refuses superseded_before_review from an operator, before any write — it is the platform's own word", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("system-word");
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "superseded_before_review", note: "n", operatorUserId: "u_op", clock: hClock });
+    expect(result).toEqual({ ok: false, status: 400, reason: "This decision is the platform's own, and cannot be chosen by an operator." });
+    // Nothing moved and nothing was stamped — the refusal happened before this function's own
+    // transaction ever opened, the same "before any write" discipline every other pre-write
+    // refusal in this suite keeps.
+    expect((await tradeRow(fx.tradeId)).status).toBe("held");
+    const [flag] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flag!.resolvedAt).toBeNull();
+  });
+
+  it("heals a retry once the release already committed but the flag's own stamp never ran", async () => {
+    // Mirrors `reverseTradeInTx`'s own healing-branch test: a process dying between the two
+    // transactions leaves the trade genuinely released with the flag still open, and a second
+    // attempt on the SAME flag must succeed rather than fail on "no longer held". Simulated
+    // directly here — `releaseHeldTradeInTx` is exercised on its own, real and successful,
+    // standing in for the first attempt's own execution half having already committed.
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("heal");
+    const firstAttempt = await db.transaction((tx) =>
+      releaseHeldTradeInTx(tx, { tradeId: fx.tradeId, leagueId: fx.leagueId, operatorUserId: "u_op", clock: hClock, audit: logger }),
+    );
+    expect(firstAttempt).toMatchObject({ ok: true });
+    expect((await tradeRow(fx.tradeId)).status).toBe("accepted");
+    // The flag itself is still open — this is exactly the gap `resolveFlag`'s own docblock
+    // describes: the process died before its own (platform-chain) stamp transaction ever opened.
+    const [flagBeforeRetry] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flagBeforeRetry!.resolvedAt).toBeNull();
+
+    const retry = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock });
+    expect(retry).toMatchObject({ ok: true, flagId: fx.flagId, decision: "trade_released" });
+    const [flagAfterRetry] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flagAfterRetry!.resolvedAt).not.toBeNull();
+  });
+
+  it("rolls the whole transaction back, flag stamp included, when the block dispatch itself refuses", async () => {
+    // The world moved on WITHOUT going through `resolveFlag` at all — the trade is no longer
+    // held by the time the block dispatch runs, even though the flag is still open (a raw write
+    // standing in for the crash window `sweepSupersededHoldFlags`, `@/integrity-service/trade-
+    // fairness`, exists to re-close; simulated directly here to prove `resolveFlag`'s OWN stamp
+    // rolls back with it rather than committing a lie).
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("refused");
+    await db.update(tradeProposals).set({ status: "accepted", settledAt: new Date(hClock.now()) }).where(eq(tradeProposals.id, fx.tradeId));
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_blocked", note: "", operatorUserId: "u_op", clock: hClock });
+    expect(result).toEqual({ ok: false, status: 409, reason: "This trade is no longer waiting on a decision." });
+    // The flag's own stamp UPDATE rolled back too — still open.
+    const [flag] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flag!.resolvedAt).toBeNull();
+  });
+
+  it("passes a TransferRefusedError from the release's own transaction straight through as a 409", async () => {
+    // A slot config with no bench and no flex — releasing a trade that swaps an RB for a WR
+    // leaves the receiving side with nowhere legal to put the incoming asset, the identical
+    // `TransferRefusedError` `acceptTrade`'s own catch already handles.
+    await ensureOperator("u_op");
+    const TIGHT_SLOTS = [
+      { slot: "RB" as const, count: 1, eligiblePositions: ["RB" as const] },
+      { slot: "WR" as const, count: 1, eligiblePositions: ["WR" as const] },
+    ];
+    const userA = "u_ht_alice_tight";
+    const userB = "u_ht_bob_tight";
+    await db.insert(users).values([
+      { id: userA, email: `${userA}@test.local`, displayName: "Alice" },
+      { id: userB, email: `${userB}@test.local`, displayName: "Bob" },
+    ]);
+    const created = await createLeague({ db, clock: hClock, newId: () => `lg_ht_tight_${crypto.randomUUID()}` }, {
+      name: "Tight Slots League",
+      format: "snake",
+      teamCount: 2,
+      scoringPreset: "ppr",
+      auctionBudget: null,
+      rosterSlots: TIGHT_SLOTS,
+      commissionerUserId: userA,
+      teamName: "Team Alice",
+      experienceTier: "beginner",
+      stakeTier: 0,
+      isPublicMatchmade: true,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const teamB = "team_ht_bob_tight";
+    await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
+    await db
+      .insert(players)
+      .values([
+        { id: "p_ht_rb_tight", name: "Star RB", position: "RB", nflTeam: "KC" },
+        { id: "p_ht_wr_tight", name: "Bench WR", position: "WR", nflTeam: "SF" },
+        // Each side's OTHER slot is already occupied by a player not in this trade, so the slot
+        // the incoming asset would need is genuinely full, not merely empty-and-eligible.
+        { id: "p_ht_other_wr", name: "Other WR", position: "WR", nflTeam: "DAL" },
+        { id: "p_ht_other_rb", name: "Other RB", position: "RB", nflTeam: "MIA" },
+      ])
+      .onConflictDoNothing();
+    await db.insert(rosterSlots).values([
+      { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: "p_ht_rb_tight" },
+      { teamId: created.teamId, slot: "WR", slotIndex: 0, playerId: "p_ht_other_wr" },
+      { teamId: teamB, slot: "WR", slotIndex: 0, playerId: "p_ht_wr_tight" },
+      { teamId: teamB, slot: "RB", slotIndex: 0, playerId: "p_ht_other_rb" },
+    ]);
+    const tradeId = "trade_ht_tight";
+    const proposedAt = new Date(hClock.now());
+    await db.insert(tradeProposals).values({
+      id: tradeId,
+      leagueId: created.leagueId,
+      proposerTeamId: created.teamId,
+      counterpartyTeamId: teamB,
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_ht_rb_tight" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_ht_wr_tight" }],
+      fingerprint: "fp_trade_ht_tight",
+      note: null,
+      status: "held",
+      proposedAt,
+      expiresAt: new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000),
+    });
+    const flagId = "flag_ht_tight";
+    await db.transaction((tx) =>
+      raiseFlag(tx, { flagType: "trade_hold", subjectId: tradeId, leagueId: created.leagueId, evidence: {}, raisedByUserId: null, occurredAt: hClock.now(), newId: () => flagId, audit: logger }),
+    );
+
+    const result = await resolveFlag(db, { flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(409);
+    // Nothing moved, and the flag stays open — the whole release transaction rolled back.
+    expect((await tradeRow(tradeId)).status).toBe("held");
+    const [flag] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, flagId));
+    expect(flag!.resolvedAt).toBeNull();
+  });
+
+  it("logs and swallows a failed score-cache eviction after a release commits, never failing the decision itself", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("cache-fail");
+    const throwingCache = { invalidate: async () => { throw new Error("redis unreachable"); } };
+    const result = await resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock, cache: throwingCache });
+    expect(result).toMatchObject({ ok: true, decision: "trade_released" });
+    expect((await tradeRow(fx.tradeId)).status).toBe("accepted"); // the release itself still landed
+  });
+
+  it("falls through to the ordinary 404 for a flagId that names nothing at all, even for trade_released", async () => {
+    await ensureOperator("u_op");
+    const result = await resolveFlag(db, { flagId: "flag_rl_ghost", decision: "trade_released", note: "n", operatorUserId: "u_op", clock: hClock });
+    expect(result).toEqual({ ok: false, status: 404, reason: 'No flag with id "flag_rl_ghost".' });
+  });
+
+  it("re-throws a non-TransferRefusedError from the release's own transaction rather than swallowing it", async () => {
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("notify-fails");
+    const throwingNotify: typeof notifyAffectedMember = async () => {
+      throw new Error("notify exploded");
+    };
+    await expect(
+      resolveFlag(db, { flagId: fx.flagId, decision: "trade_released", note: "", operatorUserId: "u_op", clock: hClock, notify: throwingNotify }),
+    ).rejects.toThrow("notify exploded");
+    // The whole release transaction rolled back — still held, and nothing this function's own
+    // stamp transaction never reached.
+    expect((await tradeRow(fx.tradeId)).status).toBe("held");
+    const [flag] = await db.select({ resolvedAt: integrityFlags.resolvedAt }).from(integrityFlags).where(eq(integrityFlags.id, fx.flagId));
+    expect(flag!.resolvedAt).toBeNull();
+  });
+
+  it("carries a held trade's own subject through flagDetail — both managers' standing, both sides valued", async () => {
+    const userA = "u_ht_alice_detail";
+    const userB = "u_ht_bob_detail";
+    await db.insert(users).values([
+      { id: userA, email: `${userA}@test.local`, displayName: "Alice" },
+      { id: userB, email: `${userB}@test.local`, displayName: "Bob" },
+    ]);
+    const created = await createLeague({ db, clock: hClock, newId: () => `lg_ht_detail_${crypto.randomUUID()}` }, {
+      name: "Held Detail League",
+      format: "snake",
+      teamCount: 2,
+      scoringPreset: "ppr",
+      auctionBudget: null,
+      rosterSlots: H_SLOTS,
+      commissionerUserId: userA,
+      teamName: "Team Alice",
+      experienceTier: "beginner",
+      stakeTier: 0,
+      isPublicMatchmade: true,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const teamB = "team_ht_bob_detail";
+    await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
+    await db
+      .insert(players)
+      .values([
+        { id: "p_ht_rb_detail", name: "Star RB", position: "RB", nflTeam: "KC" },
+        { id: "p_ht_wr_detail", name: "Bench WR", position: "WR", nflTeam: "SF" },
+      ])
+      .onConflictDoNothing();
+    await db.insert(rosterSlots).values([
+      { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: "p_ht_rb_detail" },
+      { teamId: teamB, slot: "WR", slotIndex: 0, playerId: "p_ht_wr_detail" },
+    ]);
+    // A real `member_joined` event for ALICE ONLY — Bob's own `joinedAt` reads honestly as
+    // unknown, the same "malformed or missing reads as absent" discipline every other evidence
+    // reader in this file holds to.
+    await db.transaction((tx) =>
+      logger.record(tx, { eventType: "member_joined", actorId: userA, actorType: "user", leagueId: created.leagueId, payload: {}, occurredAt: hClock.now() }),
+    );
+    const tradeId = "trade_ht_detail";
+    const proposedAt = new Date(hClock.now());
+    await db.insert(tradeProposals).values({
+      id: tradeId,
+      leagueId: created.leagueId,
+      proposerTeamId: created.teamId,
+      counterpartyTeamId: teamB,
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_ht_rb_detail" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_ht_wr_detail" }],
+      fingerprint: "fp_trade_ht_detail",
+      note: null,
+      status: "held",
+      proposedAt,
+      expiresAt: new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000),
+    });
+    const flagId = "flag_ht_detail";
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_hold",
+        subjectId: tradeId,
+        leagueId: created.leagueId,
+        evidence: { verdict: "lopsided", flags: [], givingValue: 40, receivingValue: 5, gap: 35, threshold: 35, basis: "accept_evaluation" },
+        raisedByUserId: null,
+        occurredAt: hClock.now(),
+        newId: () => flagId,
+        audit: logger,
+      }),
+    );
+
+    const detail = await flagDetail(db, flagId);
+    expect(detail).not.toBeNull();
+    expect(detail!.subject.kind).toBe("held_trade");
+    if (detail!.subject.kind === "held_trade") {
+      expect(detail!.subject.proposerTeamName).toBe("Team Alice");
+      expect(detail!.subject.counterpartyTeamName).toBe("Team Bob");
+      expect(detail!.subject.proposerManager.joinedAt).not.toBeNull();
+      expect(detail!.subject.counterpartyManager.joinedAt).toBeNull();
+      expect(detail!.subject.proposerManager.completedSeasons).toBe(0);
+    }
+
+    // Once released, the trail carries a real actor-named row too — `trade_accepted`/
+    // `roster_move`, both stamped with the operator's own id — proving `trailFor`'s held_trade
+    // branch resolves a real name rather than leaving an id unresolved.
+    await db.insert(users).values({ id: "u_op_detail", email: "u_op_detail@test.local", displayName: "Op Detail" }).onConflictDoNothing();
+    const released = await resolveFlag(db, { flagId, decision: "trade_released", note: "", operatorUserId: "u_op_detail", clock: hClock });
+    expect(released).toMatchObject({ ok: true, decision: "trade_released" });
+
+    const afterRelease = await flagDetail(db, flagId);
+    const acceptedRow = afterRelease!.trail.find((row) => row.headline === "Op Detail accepted it.");
+    expect(acceptedRow).toBeDefined();
+  });
+
+  it("flagDetail reads a SYSTEM resolution honestly — resolvedByName is 'The platform', never a lookup with nothing to find", async () => {
+    // Plan D, Task 5, fix round 1 (Finding 1) — the review's own bug trace, proved directly:
+    // `closeSupersededHoldFlag` (`@/integrity-service/trade-fairness`) stamps
+    // `resolvedByUserId: null`, and this is the read that must recognize that as RESOLVED, with an
+    // honest actor, rather than the collision that used to render live Release/Block buttons over
+    // an already-superseded trade.
+    await ensureOperator("u_op");
+    const fx = await heldTradeWithFlag("system-detail");
+    await db.update(tradeProposals).set({ status: "superseded" }).where(eq(tradeProposals.id, fx.tradeId));
+    const closed = await closeSupersededHoldFlag(db, { tradeId: fx.tradeId, leagueId: fx.leagueId, occurredAt: hClock.now(), audit: logger });
+    expect(closed).toBe(true);
+
+    const detail = await flagDetail(db, fx.flagId);
+    expect(detail).not.toBeNull();
+    expect(detail!.decisions).toEqual([]); // no live decision — nothing left for an operator to choose
+    expect(detail!.resolution).toMatchObject({
+      decision: "superseded_before_review",
+      resolvedByUserId: null,
+      resolvedByName: "The platform",
+    });
+  });
+
+  it("reads a held_trade subject honestly when the named trade row is somehow gone", async () => {
+    // Trade rows are never deleted in this product, so this is defensive — the identical
+    // "FK-guaranteed, but read honestly anyway" discipline the `trade` branch's own fallback
+    // above already keeps.
+    await seedUser("u_ht_ghost_commish");
+    await seedLeague("lg_ht_ghost", "u_ht_ghost_commish");
+    const flagId = "flag_ht_ghost";
+    await db.transaction((tx) =>
+      raiseFlag(tx, { flagType: "trade_hold", subjectId: "trade_ht_nonexistent", leagueId: "lg_ht_ghost", evidence: {}, raisedByUserId: null, occurredAt: NOW, newId: () => flagId, audit: logger }),
+    );
+    const detail = await flagDetail(db, flagId);
+    expect(detail).not.toBeNull();
+    expect(detail!.subject).toMatchObject({
+      kind: "held_trade",
+      tradeId: "trade_ht_nonexistent",
+      proposerTeamName: "A former team",
+      counterpartyTeamName: "A former team",
+    });
+    if (detail!.subject.kind === "held_trade") {
+      expect(detail!.subject.proposerManager).toEqual({ userId: "", name: "A former member", joinedAt: null, completedSeasons: 0 });
+    }
+  });
+});
+
 describe("pendingFlagQuery / listPendingFlags — the queue's own read model", () => {
   const ALL_TABLE_NAMES = ["integrity_flags", "reviews", "chat_messages", "users", "audit_events", "review_reports", "leagues"] as const;
   function tablesIn(sqlText: string): readonly string[] {
@@ -2086,5 +2606,237 @@ describe("the trade branch's operator trail, end to end (Task 6)", () => {
     expect(JSON.stringify(page.rows)).not.toMatch(/fairness|lopsided|flag/i);
     // …while the trade itself IS there, because a trade is league news and a flag is not.
     expect(page.rows.some((row) => row.headline.includes("trade"))).toBe(true);
+  });
+});
+
+/**
+ * Plan D, Task 8 step 2: the commissioner's own window onto platform moderation in their league.
+ * Plan B's Task 6 persona panel raised it as a MEDIUM and ruled it out of its own scope by name —
+ * see `leagueModerationSummary`'s own docblock for the exact ruling. Every test here builds its
+ * own league from scratch rather than sharing one across `it` blocks, so a count in one test can
+ * never be a fixture another test half-seeded.
+ */
+describe("leagueModerationSummary", () => {
+  // Every fixture's own remover, seeded once per test — `beforeEach` at the top of this file
+  // already truncated everything, so one seed per test is enough even for the tests that build
+  // more than one league (`seedLeagueWith` no longer seeds it, to stay safe against being called
+  // twice in one test).
+  beforeEach(async () => {
+    await seedUser("u_mod_operator", true);
+  });
+
+  async function seedLeagueWith(leagueId: string, commissionerUserId: string, memberUserIds: readonly string[] = []): Promise<void> {
+    await seedUser(commissionerUserId);
+    await seedLeague(leagueId, commissionerUserId);
+    for (const userId of memberUserIds) {
+      await seedUser(userId);
+      await db.insert(teams).values({ id: `${leagueId}_${userId}_team`, leagueId, userId, name: userId });
+    }
+  }
+
+  /** A chat message in `leagueId`, removed at `removedAt` (or never, if omitted). Every caller
+   *  goes through `seedLeagueWith` first, which seeds the operator this stamps as the remover. */
+  async function seedChatMessage(leagueId: string, authorUserId: string, opts: { readonly removedAt?: string } = {}): Promise<void> {
+    const [message] = await db.insert(chatMessages).values({ leagueId, authorUserId, body: "message body" }).returning({ id: chatMessages.id });
+    if (opts.removedAt !== undefined) {
+      await db
+        .update(chatMessages)
+        .set({ removedAt: new Date(opts.removedAt), removedByUserId: "u_mod_operator", removalReason: "spam" })
+        .where(eq(chatMessages.id, message!.id));
+    }
+  }
+
+  /** A review by `authorUserId` (a real, platform-scoped review — no `leagueId` of its own),
+   *  removed at `removedAt` (or never, if omitted). Every caller goes through `seedLeagueWith`
+   *  first, which seeds the operator this stamps as the remover. */
+  async function seedReview(id: string, authorUserId: string, opts: { readonly removedAt?: string } = {}): Promise<void> {
+    await db.insert(reviews).values({ id, userId: authorUserId, rating: 3, body: `review body ${id}`, createdAt: new Date(NOW), updatedAt: new Date(NOW) });
+    if (opts.removedAt !== undefined) {
+      await db
+        .update(reviews)
+        .set({ removedAt: new Date(opts.removedAt), removedByUserId: "u_mod_operator", removalReason: "spam" })
+        .where(eq(reviews.id, id));
+    }
+  }
+
+  async function seedOpenFlag(leagueId: string, subjectId: string, flagType: FlagType = "chat_report"): Promise<void> {
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType,
+        subjectId,
+        leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: NOW,
+        newId: () => `flag_mod_${subjectId}`,
+        audit: logger,
+      }),
+    );
+  }
+
+  it("tells the commissioner how many messages and reviews the platform removed in their league, and when", async () => {
+    await seedLeagueWith("lg_mod_1", "u_mod_commish", ["u_mod_bob"]);
+    await seedChatMessage("lg_mod_1", "u_mod_bob", { removedAt: "2026-08-18T09:00:00.000Z" });
+    await seedChatMessage("lg_mod_1", "u_mod_bob", { removedAt: "2026-08-19T14:02:00.000Z" });
+    await seedChatMessage("lg_mod_1", "u_mod_bob"); // never removed — not counted
+    await seedOpenFlag("lg_mod_1", "some_subject");
+
+    expect(await leagueModerationSummary(db, { leagueId: "lg_mod_1", userId: "u_mod_commish" })).toEqual({
+      removedMessages: 2,
+      removedReviews: 0,
+      mostRecentAt: "2026-08-19T14:02:00.000Z",
+      openQuestions: 1,
+    });
+  });
+
+  it("never names who was moderated, what they said, or why", async () => {
+    // The boundary. A commissioner is a member with extra buttons, not an operator: Plan B's
+    // founder decision #3 shipped "operator only" for removal and this does not reopen it. The
+    // removal reason reaches the author's own notice and nobody else (Plan B's wire-level HIGH),
+    // and a count is what tells a commissioner their league is being looked after without
+    // publishing a member's worst afternoon to the person who runs their league.
+    await seedLeagueWith("lg_mod_2", "u_mod_commish2", ["u_bob"]);
+    await seedChatMessage("lg_mod_2", "u_bob", { removedAt: "2026-08-18T09:00:00.000Z" });
+    await db.update(chatMessages).set({ removalReason: "harassed another manager" }).where(eq(chatMessages.leagueId, "lg_mod_2"));
+
+    const summary = await leagueModerationSummary(db, { leagueId: "lg_mod_2", userId: "u_mod_commish2" });
+    expect(JSON.stringify(summary)).not.toContain("u_bob");
+    expect(JSON.stringify(summary)).not.toContain("harassed");
+    expect(Object.keys(summary!)).toEqual([...MODERATION_SUMMARY_FIELDS]);
+  });
+
+  it("answers null (the route's 404) to an ordinary member of the same league", async () => {
+    await seedLeagueWith("lg_mod_3", "u_mod_commish3", ["u_mod_ordinary"]);
+    expect(await leagueModerationSummary(db, { leagueId: "lg_mod_3", userId: "u_mod_ordinary" })).toBeNull();
+  });
+
+  it("answers null for a league that doesn't exist, the identical shape a non-commissioner gets", async () => {
+    await seedUser("u_mod_nobody");
+    expect(await leagueModerationSummary(db, { leagueId: "lg_mod_ghost", userId: "u_mod_nobody" })).toBeNull();
+  });
+
+  it("counts open questions without saying what they are about", async () => {
+    // `openQuestions` is the number of unresolved `integrity_flags` scoped to this league. It is
+    // a count and never a list, for the identical reason: an open flag is a question about a
+    // person and `ACTIVITY_VISIBILITY.flag_raised` is `hidden` on that basis. What the
+    // commissioner gains is the knowledge that something is in hand, which is the entire
+    // complaint the panel raised.
+    await seedLeagueWith("lg_mod_4", "u_mod_commish4");
+    await seedOpenFlag("lg_mod_4", "subject_a");
+    await seedOpenFlag("lg_mod_4", "subject_b");
+    await seedOpenFlag("lg_mod_4", "subject_c");
+
+    expect((await leagueModerationSummary(db, { leagueId: "lg_mod_4", userId: "u_mod_commish4" }))!.openQuestions).toBe(3);
+  });
+
+  it("never counts a resolved flag as an open question", async () => {
+    await seedLeagueWith("lg_mod_5", "u_mod_commish5");
+    await seedOpenFlag("lg_mod_5", "subject_resolved");
+    await db.update(integrityFlags).set({ resolvedAt: new Date(NOW), resolvedByUserId: "u_mod_commish5", resolution: "no_action", resolutionNote: "n" }).where(eq(integrityFlags.leagueId, "lg_mod_5"));
+
+    expect((await leagueModerationSummary(db, { leagueId: "lg_mod_5", userId: "u_mod_commish5" }))!.openQuestions).toBe(0);
+  });
+
+  /**
+   * Final review F5, a Task 8 × Task 5 interaction neither task's review could see. Task 8's brief
+   * sanctioned an unfiltered count, and correctly so — it predates `trade_hold` flags being
+   * league-scoped. A hold is platform business by the hold design's own invariant ("nothing about
+   * a hold is league news", ruling 12), so counting it told a third party that two of their
+   * managers are under a fairness question.
+   */
+  it("never counts a trade hold: a question about two managers is not league news, however scoped the row is", async () => {
+    await seedLeagueWith("lg_mod_hold", "u_mod_commish_hold");
+    await seedOpenFlag("lg_mod_hold", "subject_chat", "chat_report");
+    await seedOpenFlag("lg_mod_hold", "subject_held_trade", "trade_hold");
+
+    // The chat report counts; the hold, raised in the same league and open at the same moment,
+    // does not move the number at all.
+    expect((await leagueModerationSummary(db, { leagueId: "lg_mod_hold", userId: "u_mod_commish_hold" }))!.openQuestions).toBe(1);
+  });
+
+  it("counts every OTHER flag type, so the exclusion stays narrow to the one type it is about", async () => {
+    await seedLeagueWith("lg_mod_types", "u_mod_commish_types");
+    for (const flagType of LEAGUE_QUESTION_FLAG_TYPES) await seedOpenFlag("lg_mod_types", `subject_${flagType}`, flagType);
+
+    expect((await leagueModerationSummary(db, { leagueId: "lg_mod_types", userId: "u_mod_commish_types" }))!.openQuestions).toBe(
+      LEAGUE_QUESTION_FLAG_TYPES.length,
+    );
+    expect(LEAGUE_QUESTION_FLAG_TYPES).not.toContain("trade_hold");
+  });
+
+  it("never counts an open flag raised against a DIFFERENT league", async () => {
+    await seedLeagueWith("lg_mod_6", "u_mod_commish6");
+    await seedLeagueWith("lg_mod_6_other", "u_mod_commish6_other");
+    await seedOpenFlag("lg_mod_6_other", "subject_elsewhere");
+
+    expect((await leagueModerationSummary(db, { leagueId: "lg_mod_6", userId: "u_mod_commish6" }))!.openQuestions).toBe(0);
+  });
+
+  it("counts a removed review authored by a member of this league, and reads 'in their league' by membership since reviews carry no league id of their own", async () => {
+    // `reviews.user_id` is UNIQUE (one review per account, ever — `reviews_user_idx`), so proving
+    // "the live one is not counted" needs a SECOND league member, not a second review from the
+    // one who was removed.
+    await seedLeagueWith("lg_mod_7", "u_mod_commish7", ["u_mod_reviewer", "u_mod_live_reviewer"]);
+    await seedReview("r_mod_1", "u_mod_reviewer", { removedAt: "2026-08-10T00:00:00.000Z" });
+    await seedReview("r_mod_2", "u_mod_live_reviewer"); // live — not counted
+
+    const summary = await leagueModerationSummary(db, { leagueId: "lg_mod_7", userId: "u_mod_commish7" });
+    expect(summary).toMatchObject({ removedReviews: 1, mostRecentAt: "2026-08-10T00:00:00.000Z" });
+  });
+
+  it("never counts a removed review from someone who has never fielded a team in this league", async () => {
+    await seedLeagueWith("lg_mod_8", "u_mod_commish8");
+    await seedUser("u_mod_stranger");
+    await seedReview("r_mod_stranger", "u_mod_stranger", { removedAt: "2026-08-10T00:00:00.000Z" });
+
+    const summary = await leagueModerationSummary(db, { leagueId: "lg_mod_8", userId: "u_mod_commish8" });
+    expect(summary).toMatchObject({ removedReviews: 0, mostRecentAt: null });
+  });
+
+  it("reports the later of a removed message and a removed review as mostRecentAt — the review wins", async () => {
+    await seedLeagueWith("lg_mod_9", "u_mod_commish9", ["u_mod_member9"]);
+    await seedChatMessage("lg_mod_9", "u_mod_member9", { removedAt: "2026-08-01T00:00:00.000Z" });
+    await seedReview("r_mod_9", "u_mod_member9", { removedAt: "2026-08-15T00:00:00.000Z" });
+
+    const summary = await leagueModerationSummary(db, { leagueId: "lg_mod_9", userId: "u_mod_commish9" });
+    expect(summary).toMatchObject({ removedMessages: 1, removedReviews: 1, mostRecentAt: "2026-08-15T00:00:00.000Z" });
+  });
+
+  it("reports the later of a removed message and a removed review as mostRecentAt — the message wins", async () => {
+    // `laterOf`'s own other branch — a removed chat message strictly newer than a removed
+    // review, so this is not the same comparison outcome as the test just above.
+    await seedLeagueWith("lg_mod_9b", "u_mod_commish9b", ["u_mod_member9b"]);
+    await seedChatMessage("lg_mod_9b", "u_mod_member9b", { removedAt: "2026-08-20T00:00:00.000Z" });
+    await seedReview("r_mod_9b", "u_mod_member9b", { removedAt: "2026-08-05T00:00:00.000Z" });
+
+    const summary = await leagueModerationSummary(db, { leagueId: "lg_mod_9b", userId: "u_mod_commish9b" });
+    expect(summary).toMatchObject({ removedMessages: 1, removedReviews: 1, mostRecentAt: "2026-08-20T00:00:00.000Z" });
+  });
+
+  it("reports null for mostRecentAt on a healthy league — nothing has ever needed attention", async () => {
+    await seedLeagueWith("lg_mod_10", "u_mod_commish10", ["u_mod_member10"]);
+    await seedChatMessage("lg_mod_10", "u_mod_member10"); // live — not counted
+
+    expect(await leagueModerationSummary(db, { leagueId: "lg_mod_10", userId: "u_mod_commish10" })).toEqual({
+      removedMessages: 0,
+      removedReviews: 0,
+      mostRecentAt: null,
+      openQuestions: 0,
+    });
+  });
+
+  it("costs a small, constant number of queries regardless of how much this league's own history holds", async () => {
+    await seedLeagueWith("lg_mod_11", "u_mod_commish11", ["u_mod_member11"]);
+    for (let i = 0; i < 8; i += 1) {
+      await seedChatMessage("lg_mod_11", "u_mod_member11", { removedAt: `2026-08-0${(i % 9) + 1}T00:00:00.000Z` });
+    }
+    await seedOpenFlag("lg_mod_11", "subject_bounded");
+
+    const counting = countingDb(db);
+    await leagueModerationSummary(counting.db, { leagueId: "lg_mod_11", userId: "u_mod_commish11" });
+    // The commissioner lookup, plus the three bounded counts (messages, reviews, open flags) —
+    // never one query per removed row, and never a query whose cost scales with the PLATFORM's
+    // own history rather than this league's own.
+    expect(counting.selectCount()).toBe(4);
   });
 });

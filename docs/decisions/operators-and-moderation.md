@@ -524,15 +524,28 @@ review comment somebody could miss:
 |---|---|---|
 | `stat_week_corrected` | **true** | A fact about the league's shared scoreboard, true for everyone in it, about nobody's conduct. A member who is not told is a member reading standings that changed under them. |
 | `chain_verification_failed` | **false** | Restates Plan A's ruling 8: telling a league its record may have been altered, before a human has read the output, is the accusatory failure mode this phase spends a denylist preventing. |
-| `lineup_auto_set` | **false**, denied in advance | The competitive-sensitivity argument that makes `lineup_change` `actor_only` (Plan A ruling 15) applies at least as hard to a system-authored sentence describing one manager's lineup — broadcasting the lapse publicly while a manual change stays private would be worse than either. |
-| `trade_held_for_review` | **false** | Reserved and undecided, not defaulted open. Phase 3 Plan C shipped the trade-fairness work this row anticipated and deliberately did NOT flip it: `evaluateTradeBeforeExecute` already computes `hold` and `INTEGRITY_CONFIG.trade.autoHoldThreshold` already exists, but the threshold ships `null` — no trade is ever held, so no publisher exists yet either. Plan D is the plan that supplies a number (see `docs/decisions/trades-and-fairness.md` §7); denying by default until then means whoever writes it inherits a real decision to argue with rather than a silent gap to rediscover. |
+| `lineup_auto_set` | **DECIDED** — `subject_only` | Phase 3 Plan D shipped the publisher (`autoSetLineupInTx`, `@/league-service/auto-lineup`) and, with it, the answer this section's own pre-decided note got half right: the competitive-sensitivity argument is correct, but the delivery path is `subject_only`, not `actor_only` — a `system_action` has `actorType: "system"` and therefore `actorId: null` by construction, so `ACTIVITY_VISIBILITY`'s own `actor_only` branch (which compares `event.actorId` to the viewer) can never match one. The member an auto-set concerns is the SUBJECT, carried on `payload.subjectUserId`. See `docs/decisions/enforcement-and-tiers.md` §5. |
+| `trade_held_for_review` | **DECIDED** — still denied, now structurally | Phase 3 Plan D supplied the number this row was waiting on (`INTEGRITY_CONFIG.trade.autoHoldThreshold` is `35`, `docs/decisions/trades-and-fairness.md` §7) and the denial survives it, for a reason stronger than "undecided": a hold's `system_action` is written on the PLATFORM chain, and a platform-chain event is never read by `listLeagueActivity` at all. The denial stopped being a decision anybody has to keep making. See `docs/decisions/enforcement-and-tiers.md` §5 and §7. |
 
-**The pre-decided answer for Plan D's `lineup_auto_set`.** Plan D should not simply flip the table
-entry. What it needs is an **actor-scoped** delivery path — a new visibility, not a new summary —
-the same shape `lineup_change` itself already uses (`ACTIVITY_VISIBILITY.lineup_change:
-"actor_only"`, denying the row to anyone but the acting member before the renderer ever runs). This
-is written down here, rather than left as a question, precisely so Plan D inherits a decided answer
-instead of rediscovering the argument this plan already had.
+**The pre-decided answer, and what it got right and wrong.** This section originally told Plan D
+not to simply flip the table entry, and to build an **actor-scoped** delivery path instead — a new
+visibility, not a new summary. Plan D's own re-review (`docs/decisions/enforcement-and-tiers.md`
+§5) took the "a new visibility, not a new summary" half whole and corrected the one word this
+section could not have tested without the code in front of it: the path that means something for
+an actorless event is `subject_only`, not `actor_only`. That correction is Plan D's to own — this
+section stays as the record of the question Plan D inherited, not the last word on the answer.
+
+**Where the dimension lives now.** `SYSTEM_ACTION_SUMMARY_ALLOWED` above is HISTORICAL as a
+hand-maintained table: `src/integrity/system-actions.ts` now exports `SYSTEM_ACTION_VISIBILITY`
+(`Record<SystemActionCode, "everyone" | "subject_only" | "hidden">`), the fourth deny-by-default
+dimension, and `systemActionSummaryAllowed(code)` derives the old boolean from it (`=== "everyone"`)
+rather than the codebase carrying two tables that could disagree the first time somebody edited
+one — the same collapse this plan performed on `CONTENT_REMOVAL_WIRED_FOR` in Plan C. Every
+`SystemActionCode` this codebase has, including the two Phase 3 Plan D added
+(`tier_blocked_join`, `draft_auto_started`), is decided there now. `docs/decisions/
+enforcement-and-tiers.md` §5 is the section that owns the dimension going forward; this section
+stays for its own history, `stat_week_corrected` and `chain_verification_failed` included, both
+unchanged by the subsumption.
 
 **Where the check runs.** `renderSystemAction` (`src/integrity/activity-view.ts`) checks
 `SYSTEM_ACTION_SUMMARY_ALLOWED[action] === true` *and* `typeof payload.summary === "string"` before

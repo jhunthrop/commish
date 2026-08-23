@@ -1,10 +1,11 @@
 # Commish — Trades
 
-Read this with `docs/conventions.md`, `docs/advisor.md` and `docs/decisions/trades-and-fairness.md`
-before touching anything under `src/trades/`, `src/league-service/trades.ts`,
-`src/league-service/trade-transfer.ts`, `src/league-service/trade-reversal.ts` or
-`src/integrity-service/trade-fairness.ts`. This is the one place the whole sequence — propose,
-analyze, accept, flag, reverse — is described end to end.
+Read this with `docs/conventions.md`, `docs/advisor.md`, `docs/decisions/trades-and-fairness.md`
+and `docs/decisions/enforcement-and-tiers.md` before touching anything under `src/trades/`,
+`src/league-service/trades.ts`, `src/league-service/trade-transfer.ts`,
+`src/league-service/trade-reversal.ts` or `src/integrity-service/trade-fairness.ts`. This is the
+one place the whole sequence — propose, analyze, accept, hold, flag, reverse — is described end to
+end.
 
 ## What the surfaces are
 
@@ -40,10 +41,18 @@ a guessed id names a real negotiation between two named managers).
 | `withdrawn` | yes | The proposer took it back. |
 | `expired` | yes | Declared in the vocabulary, and NEVER WRITTEN. Expiry has no event moment without a scheduler, so it is DERIVED, not stored: `isExpired` (`src/trades/lifecycle.ts`) answers it from `expiresAt`, and a dead offer sits in the table still `open`. See "How expiry actually works" below. |
 | `superseded` | yes | A DIFFERENT trade moved a player this offer named. Distinct from `rejected` because nobody declined it, and the notice says so ("Nobody declined it") so a manager does not draw a false conclusion about a leaguemate. |
+| `held` | no | Phase 3 Plan D. Both managers agreed, but the gap crossed `INTEGRITY_CONFIG.trade.autoHoldThreshold` in a public, platform-enforced league, so NOTHING executed — no roster moved, no other offer superseded — and a `trade_hold` flag waits on an operator. Deliberately not `accepted` with a nullable timestamp beside it (nothing has happened yet, unlike a reversal) and not `open` either (nobody may accept, reject or withdraw it the ordinary way — it is a question for an operator now, not the two managers). See "The auto-hold" below. |
+| `blocked` | yes | Phase 3 Plan D. An operator's `trade_blocked` decision on a `held` trade. Reachable ONLY from `held`. Distinct from `rejected` for the identical reason `superseded` is: neither manager declined it, and "declined" would be a false word for what actually happened. |
 
-Every transition is legal from `open` and from nowhere else — enforced in SQL, by the guarded
-`UPDATE`'s own `WHERE status = 'open'`, not by a prior read: a losing concurrent caller matches
-zero rows, never a stale "yes".
+Every ordinary lifecycle transition (`accept`/`reject`/`withdraw`/`expire`) is legal from `open` and
+from nowhere else — enforced in SQL, by the guarded `UPDATE`'s own `WHERE status = 'open'`, not by a
+prior read: a losing concurrent caller matches zero rows, never a stale "yes". `hold` is the same
+`open`-only guard (`acceptTrade`'s own branch, replacing an ordinary accept). `supersede` is the one
+verb the world can still apply to a `held` trade — a DIFFERENT trade moving one of its players is
+the world moving on, not the fairness review's own answer — so it runs from `open` OR `held`.
+`release`/`block` are the two ways out of `held`, and only of `held`: an operator has no decision
+that reaches an `open` offer. `src/trades/lifecycle.ts`'s `SOURCE_OF`/`TARGET_OF` declare every one
+of these exhaustively, and `transitionIsLegal` restates the SQL guard so a test can ask it directly.
 
 ## How expiry actually works
 
@@ -89,15 +98,46 @@ numbers, on the SAME points-per-week axis `ADVISOR_CONFIG.evenDelta`/`.lopsidedD
 | Field | Value | What it does |
 |---|---|---|
 | `fairnessFlagThreshold` | 20 | A COMPLETED trade whose per-week gap reaches this raises a `trade_fairness` flag into the operator queue. Deliberately above `lopsidedDelta` (12) — a flag is a question about collusion, not a review of somebody's judgment. |
-| `autoHoldThreshold` | `null` | No trade is ever held on merge. The seam exists (`evaluateTradeBeforeExecute`'s `hold` field) but nothing supplies a number — that is a later plan's decision, not a code path this one leaves half-built. |
+| `autoHoldThreshold` | **35** (Phase 3 Plan D) | A trade whose gap reaches this, in a public platform-enforced league, is HELD before it executes rather than flagged after — see "The auto-hold" below. Nearly twice `fairnessFlagThreshold`, on purpose: a flag costs an operator ten seconds and costs the members nothing, while a hold costs two members their agreement and their time, so its bar sits well past the flag's own. |
 | `sweepBatchSize` | 100 | `sweepUnflaggedTrades`'s page size — bounded for the same reason every operator-script read in this codebase is. |
 
 All four thresholds — `evenDelta`, `lopsidedDelta`, `fairnessFlagThreshold`, `autoHoldThreshold` —
-are ordered by one test (`even <= lopsided <= fairnessFlagThreshold <= autoHoldThreshold` where
-each is set), because an inversion silently breaks a real property: `even > lopsided` makes a
+are ordered by one test (`even <= lopsided <= fairnessFlagThreshold <= autoHoldThreshold`, all four
+live today), because an inversion silently breaks a real property: `even > lopsided` makes a
 verdict unreachable, `lopsided > fairnessFlagThreshold` fills the operator queue with trades the
-advisor itself calls fine, and `fairnessFlagThreshold > autoHoldThreshold` (once a hold threshold
-exists) would hold trades nobody flagged.
+advisor itself calls fine, and `fairnessFlagThreshold > autoHoldThreshold` would hold trades nobody
+flagged — a trade frozen before anyone ever asked a question about it. See
+`docs/decisions/enforcement-and-tiers.md` §8 for the number's own reasoning.
+
+## The auto-hold (Phase 3 Plan D)
+
+`acceptTrade` branches on `fairness.hold && enforcementAppliesTo({ isPublicMatchmade })` — the
+IDENTICAL platform-enforcement predicate the tier-segregation join gate reads
+(`@/league-service/enforcement`), so a private league's trade is never held however lopsided. When
+both are true, nothing executes: `applyTradeInTx` is never called, no roster moves, no other offer
+is superseded, and the row moves `open` → `held` instead of `open` → `accepted`. In the SAME
+transaction (nothing happens in the league, so nothing crosses into a second chain — see Plan A's
+one-transaction-one-chain rule), a `trade_hold` flag is raised on the platform chain and both
+managers are notified (`trade_held_for_review`) with the identical sentence founder decision #10
+asks for: "somebody at Commish looks at it," never "under review" or "suspicious."
+
+An operator resolves the flag one of two ways, both new `ResolutionDecision`s scoped to a
+`held_trade` subject:
+
+- **`trade_released`** runs `releaseHeldTradeInTx` — the trade the two managers agreed to actually
+  executes, re-validated against the CURRENT rosters (which may have moved while the trade sat
+  held) rather than trusted from propose time. Moves the row to `accepted`.
+- **`trade_blocked`** runs `blockHeldTradeInTx` — the trade never happens, both rosters stay exactly
+  as they were, and both managers get the identical notice (byte-for-byte, with no
+  `counterpartyTeamName`, since "your trade with X" would read as two different sentences to two
+  different recipients). Moves the row to `blocked`.
+
+A held trade can still be superseded by a different trade moving one of its players — the world
+moving on is not a review outcome, and the superseded flag closes itself honestly rather than being
+left open over a trade nothing can execute or block any more. See
+`docs/decisions/enforcement-and-tiers.md` §§7–8 for the full reasoning, including the known false
+positives (a rebuilding manager, a genuine salary dump, two friends) and why all three are expected
+to reach an operator and usually resolve `trade_released`.
 
 ## The sequence, as a numbered walk
 
@@ -136,12 +176,16 @@ exists) would hold trades nobody flagged.
    accept-time week is the one that governs the valuation, the lock and the cache eviction, and it
    is re-stamped onto the row so the sweep re-derives at the week the trade actually happened in),
    locks both teams' rows in canonical sorted-by-id order, re-checks ownership against the
-   CURRENT roster (not the roster at propose time), computes the fairness evaluation, freezes
-   every already-locked week's actual lineup for both teams (`materializeLockedLineupsInTx` —
-   see below), moves both rosters (`applyTradeInTx`), supersedes every other open offer the move
-   just invalidated, notices everyone owed a word, and appends `trade_accepted` and `roster_move`
-   to the league chain in one batch. Immediate execution, no veto window, no commissioner
-   approval, no league vote (founder decision #6) — an accepted trade that should not have
+   CURRENT roster (not the roster at propose time), computes the fairness evaluation. **Phase 3
+   Plan D's branch happens here, before anything else moves**: if the gap crosses
+   `autoHoldThreshold` in a public, platform-enforced league, none of the rest of this paragraph
+   runs — the row moves to `held` instead, and a flag goes to an operator (see "The auto-hold"
+   above). Otherwise, execution continues: freezes every already-locked week's actual lineup for
+   both teams (`materializeLockedLineupsInTx` — see below), moves both rosters
+   (`applyTradeInTx`), supersedes every other open offer the move just invalidated, notices
+   everyone owed a word, and appends `trade_accepted` and `roster_move` to the league chain in one
+   batch. Immediate execution, no veto window, no commissioner approval, no league vote (founder
+   decision #6) for a trade under the hold threshold — an accepted trade that should not have
    happened is undone by an operator's reversal (step 5), which is a strictly better answer than
    a delay every honest trade pays for.
 4. **Flag.** After the accept transaction commits — in its OWN, separate transaction, because a
@@ -151,7 +195,10 @@ exists) would hold trades nobody flagged.
    queue with the analyzer's own reasoning stored verbatim. If that write never lands (the process
    dies between the two transactions), `npm run trades:sweep` re-raises every accepted trade over
    the threshold with no flag — idempotent by construction, off the same open-subject unique index
-   every other flag type uses.
+   every other flag type uses. A trade carrying a `trade_hold` flag is never a candidate, open flag
+   or resolved one: the auto-hold asked this same question at a stricter threshold on the same
+   evidence, so an operator who released one has already answered it and the sweep does not reopen
+   the decision (final review F1).
 5. **Reverse.** An operator resolving a `trade_fairness` flag `trade_reversed` runs
    `reverseTradeInTx` — a compensating transfer, not an undo: it runs the same transfer machinery
    with the two sides swapped, and stamps `reversedAt`/`reversedByFlagId` on the ORIGINAL row
@@ -186,6 +233,11 @@ with a commissioner decision and a browse-visible term behind it, not a constant
 is refused only while the CURRENT week is locked (`isLineupLocked`, the same rule `setLineup`
 reads), never by a season-wide cutoff.
 
-**There is no commissioner approval step.** Two managers agree; the trade executes. No veto
-window, no third party, no vote. See `docs/decisions/trades-and-fairness.md` §7 for the reasoning
-and what would have to change for it to be wrong.
+**There is no commissioner approval step, and the auto-hold is not one.** Two managers agree; the
+trade executes. No veto window, no third party, no vote — a commissioner has exactly the same
+power over a trade as any other member: none. Phase 3 Plan D's auto-hold does not change this: it
+is a PLATFORM review, not a commissioner's, it applies only in a public platform-enforced league
+(never a private one, however lopsided the trade), and it fires on a fixed configured threshold
+rather than anybody's discretion. See `docs/decisions/trades-and-fairness.md` §7 and
+`docs/decisions/enforcement-and-tiers.md` §§7–8 for the reasoning and what would have to change for
+either to be wrong.

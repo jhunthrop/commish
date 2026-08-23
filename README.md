@@ -88,6 +88,14 @@ in-product path) that stamps a review's `removedAt`/`removedByUserId`/`removalRe
 deleting the row, refusing a review that is already removed; `npm run infra:down` stops the local
 stack.
 
+Two facts about the shared local stack worth knowing before a long verification session: the dev
+database's named volume PERSISTS across `infra:down`/`infra:up` (by Compose design), so a database
+that has lived through several phases of seeds and e2e runs carries state a fresh checkout would
+not — sweeps and hardcoded test expectations can both be surprised by it, and `docker compose -p
+fantasy down -v` (this stack's volumes only, never a blanket prune) is the reset when they are.
+And if Docker itself runs out of disk mid-run, prune dangling volumes BY NAME after checking whose
+they are — a blanket prune reaches every project on the machine.
+
 Chat's "Add a GIF" button reads `GIF_PROVIDER` (default `none`, no button rendered, chat stays
 text-and-emoji) and, when set to `giphy`, `GIPHY_API_KEY` (developers.giphy.com) — see
 `.env.example`. Same fail-fast contract as `STATS_PROVIDER`: an unrecognized `GIF_PROVIDER` value

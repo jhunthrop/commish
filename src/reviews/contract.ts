@@ -24,6 +24,16 @@ export interface ReviewView {
   readonly authorName: string;
   /** The STORED avatar ref (`users.avatar_url`): `Avatar`'s `avatar` prop takes this directly. */
   readonly authorAvatar: string | null;
+  /**
+   * Founder decision #8's residual: whether THIS reviewer has finished at least one full season
+   * on Commish, derived at read time from `@/participation`'s bounded machinery (Task 1) — never
+   * a stored flag, so it can never drift from the record it describes. One boolean, deliberately:
+   * it never carries the count, because "3 seasons" on a public feed is a fact about a stranger
+   * nobody asked them to publish. `false` renders no badge at all — there is no negative badge,
+   * only the absence of a positive one — and `VERIFIED_BADGE_TOOLTIP` (`@/participation/verified`)
+   * is the one sentence any reader who clicks the badge's `InfoTip` reads about what it means.
+   */
+  readonly verified: boolean;
 }
 
 /**

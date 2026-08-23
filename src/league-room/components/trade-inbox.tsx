@@ -36,6 +36,7 @@ function Band({
   trades,
   meTeamId,
   playersById,
+  leagueName,
   assessmentStatusById,
   assessments,
   onRequestAssessment,
@@ -48,6 +49,7 @@ function Band({
   readonly trades: readonly TradeProposalView[];
   readonly meTeamId: string;
   readonly playersById: Readonly<Record<string, ValuedPlayer>>;
+  readonly leagueName: string;
   readonly assessmentStatusById: Readonly<Record<string, AssessmentStatus>>;
   readonly assessments: Readonly<Record<string, TradeAssessmentSummary>>;
   readonly onRequestAssessment: (tradeId: string) => void;
@@ -67,6 +69,7 @@ function Band({
             trade={trade}
             meTeamId={meTeamId}
             playersById={playersById}
+            leagueName={leagueName}
             assessmentStatus={assessmentStatusById[trade.id] ?? "idle"}
             assessment={assessments[trade.id]}
             onRequestAssessment={onRequestAssessment}
@@ -176,6 +179,7 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
   const bandProps = {
     meTeamId: meTeamId ?? "",
     playersById,
+    leagueName: context.leagueName,
     assessmentStatusById,
     assessments,
     onRequestAssessment: requestAssessment,

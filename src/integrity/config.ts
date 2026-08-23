@@ -70,41 +70,46 @@ export const INTEGRITY_CONFIG = {
      */
     passiveConstructions: ["was made", "was removed", "is kept", "was kept", "were made", "were removed"],
     /**
-     * `GET /api/notices` and `POST /api/notices/read`'s shared ceiling — sibling parity with
-     * `advisorRateLimited`'s "one budget across both routes" (`src/app/api/leagues/[leagueId]/
-     * advisor/_shared.ts`): both spend the same scarce resource, a Postgres round trip for this
-     * user's own notices, so splitting the ceiling per route would double what a single caller
-     * can spend for no product reason.
+     * 32 requests per 60 seconds, restored and re-derived to hold together under the real
+     * limiter semantics — see the fix-round correction below before trusting a smaller number.
      *
-     * 120, AND THAT NUMBER IS A STOPGAP WITH ITS ARITHMETIC WRITTEN DOWN (final review, MEDIUM 6).
+     * THE STOPGAP IS OVER. Plan C raised this to 120 from an observed cost of two `GET /api/notices`
+     * per client-side navigation (the mount fetch, plus the refcounted stream's `open` refetch after
+     * it reopened), and wrote the arithmetic here so the number would be honest rather than
+     * comfortable. Phase 3 Plan D removed the cause: `NoticesProvider` lives in the root layout,
+     * survives every navigation, and holds one stream and one page of notices for the life of the
+     * tab.
      *
-     * THE REAL DEFECT IS ARCHITECTURAL AND BELONGS TO PLAN D: there is no shared
-     * `src/app/app/layout.tsx`, so every page renders `AppHeader` -> `NoticeInbox` -> `useNotices`
-     * in its OWN subtree and the hook REMOUNTS on every client-side navigation. Each mount costs
-     * TWO `GET /api/notices` — the mount fetch, and the SSE `open` refetch, because the stream is
-     * refcounted and `useNotices` is its only subscriber, so navigating away drops refs to zero,
-     * closes the connection, and the next page opens a fresh one that fires a fresh `open`. The
-     * fix is the shared layout (and/or suppressing the `open` refetch when it immediately follows
-     * a mount fetch); that changes the render tree of every page in the product, which is not a
-     * change to land at the final gate of a 22-commit branch. It is ledgered in the Phase 3
-     * overview's carried-items table, marked as the stopgap this is.
+     * FIX ROUND 1 CORRECTION: the first cut of this arithmetic (30) counted only the
+     * notice-driven steady state and silently dropped the two requests session start itself
+     * spends — `createRateLimiter` (`@/lib/api/rate-limit`) is a FIXED window per key, started at
+     * that key's first request, not a sliding one. A member who opens the app straight into a
+     * burst of activity spends the session-start pair AND the full notice-driven stress case
+     * inside that SAME still-open window, so leaving the pair out understated the ceiling by
+     * exactly the two requests it takes to reach it.
      *
-     * THE ARITHMETIC, from the observed cost above:
+     * THE ARITHMETIC, complete:
      *
-     *     2 requests per navigation
-     *   x 30 navigations per minute   (one every 2 seconds, sustained — click, render, look:
-     *                                  faster than any real member browses for a whole minute)
-     *   = 60 GETs per 60s window
-     *   + 30                          (the shared `POST /api/notices/read`, at most one per
-     *                                  navigation, when the bell is opened with unread notices)
-     *   = 90 requests per window
+     *     1 GET  at session start          (the first subscriber's mount fetch)
+     *   + 1 GET  at session start          (the stream's OWN first `open` — it refetches on every
+     *                                       `open`, the initial connection included, not only a
+     *                                       later reconnect: `useLiveScores`' identical `onOpen`
+     *                                       refetch exists for the SAME mount-to-listener gap a
+     *                                       notice could otherwise land in unseen, and that gap is
+     *                                       just as real on the first connection as on a later
+     *                                       one, so this was never going to be the thing to cut)
+     *   + 1 GET  per notice received       (`notice.created` still refetches, ruling 13)
+     *   + 1 POST /api/notices/read         per bell-open with unread notices
+     *   ---------------------------------------------------------------------------------------
+     *   = 2 + (notices in the window x 2)
      *
-     * 120 is that number with a third of the budget left over as headroom for a burst faster than
-     * sustained. The old ceiling of 30 was reachable in FIFTEEN navigations — ordinary engaged
-     * browsing — and a 429 renders an error state in place of the member's notices, which is the
-     * surface carrying trade offers, executed trades and operator reversals.
+     * A member receiving a notice every four seconds for a minute, opening the bell each time,
+     * spends 2 + (15 x 2) = 32 inside one fixed window if that burst starts right as the session
+     * does. That is not browsing, it is a stress case, and 32 — not 30 — is the honest ceiling
+     * for it. The old 30 was reachable in FIFTEEN navigations; 32 is not reachable by navigation
+     * at all, still an order of magnitude tighter than the P3C-era 120.
      */
-    rateLimit: { maxRequests: 120, windowMs: 60_000 },
+    rateLimit: { maxRequests: 32, windowMs: 60_000 },
   },
   moderation: {
     /**
@@ -189,16 +194,71 @@ export const INTEGRITY_CONFIG = {
      */
     fairnessFlagThreshold: 20,
     /**
-     * The spec's `TRADE_AUTO_HOLD_THRESHOLD`, and **Plan D owns it**. `null` means no trade is
-     * ever held, which is what ships here: `evaluateTradeBeforeExecute` already reads this field
-     * and already has the hold branch (Task 5), so Plan D supplies a NUMBER rather than a code
-     * path. `src/integrity-service/reserved.test.ts`'s grep proves nothing in this plan reads it
-     * for a real decision, the same way it proves a reserved event type has no publisher.
+     * The spec's `TRADE_AUTO_HOLD_THRESHOLD`. Plan C left this `null` (no trade ever held) and
+     * shipped only the seam: `evaluateTradeBeforeExecute` already read this field and already had
+     * the hold branch, waiting on a number. Plan D (Task 5) is that number.
+     *
+     * **35.** Above `fairnessFlagThreshold` (20) by the same "reachable, not trivial" logic that
+     * separates `fairnessFlagThreshold` from `ADVISOR_CONFIG.lopsidedDelta` (12) one step down:
+     * a 20-point gap is a fairness QUESTION worth an operator's queue, but flagging every trade
+     * that crosses it and freezing it outright would hold the same trades the advisor calls
+     * merely "lopsided" to a member's face. A hold is not a question — it is a trade that does
+     * not happen until an operator says so — so its bar sits well past the flag's own, at a gap
+     * `src/trades/fairness.test.ts`'s own fixtures show as genuinely one-sided rather than a
+     * shrewd-but-defensible offer. `INTEGRITY_CONFIG.trade`'s own test orders all four thresholds
+     * on one axis and this is the number that keeps `fairnessFlagThreshold <= autoHoldThreshold`
+     * true.
      */
-    autoHoldThreshold: null as number | null,
+    autoHoldThreshold: 35 as number | null,
     /** `sweepUnflaggedTrades`' page size — the manual re-run for a trade whose after-commit flag
      *  write did not land (Task 6). Bounded for the same reason `INTEGRITY_CONFIG.queue.pageSize`
      *  is: an operator script that reads an unbounded set is a script nobody runs twice. */
     sweepBatchSize: 100,
+  },
+  /**
+   * The third meaning of "tier" (`@/participation`) reads its two cutoffs from here, never from a
+   * hardcoded number of its own — `participationTierFor`/`isVerifiedPlayer` both take the cutoff
+   * as a parameter for exactly the reason `crossesFairnessThreshold` does: a test proves changing
+   * the config changes the outcome with no code change.
+   */
+  participation: {
+    /**
+     * The spec's `EXPERIENCE_TIER_CONTEST_COUNT_CUTOFF`. Completed seasons at or past this and an
+     * account is a `veteran` for public-league segregation.
+     *
+     * THREE (founder decision #7's default, a conservative single-digit number). It is deliberately
+     * NOT any state's statutory figure: Tennessee separates under-51 from 500-plus contests and
+     * Mississippi marks 1,000-plus, and strategy §4.1 asks for one platform-wide default rather
+     * than a state toggle. Those numbers count CONTESTS (a daily-fantasy entry); this product's
+     * unit is a season-long league, and three finished seasons is a real fantasy history by any
+     * reading. It is config-driven for exactly the reason the spec says: this is the number most
+     * likely to need tuning once the platform has a history to tune against.
+     *
+     * THE GRANDFATHERING RULE IS STRUCTURAL, NOT A SPECIAL CASE. Segregation is enforced at the
+     * JOIN, and nowhere else, so nobody already sitting in a league is ever reclassified out of it.
+     * No league on this platform has completed a season yet, which means every account is a
+     * `newcomer` today and no join is blocked today. That is the mechanism being CORRECT and not
+     * yet firing.
+     */
+    veteranSeasonCutoff: 3,
+    /**
+     * Founder decision #8's default: one completed season in one league is what the review feed's
+     * "verified" badge claims, and the badge's own tooltip says so in those words
+     * (`VERIFIED_BADGE_TOOLTIP`, `@/participation/verified`). Necessarily at or below
+     * `veteranSeasonCutoff` — an account cannot be experienced enough to segregate and too
+     * inexperienced to have played here.
+     */
+    verifiedSeasonCutoff: 1,
+    /**
+     * Step 6's rollback, as the spec words it: "tier computed but inert." `false` leaves every
+     * label, filter and badge exactly as they are and stops all four automated actions at once.
+     *
+     * Read through `enforcementAppliesTo` (`@/league-service/enforcement`) and nowhere else, by
+     * the join gate (`publicJoinPrecondition`), the creation gate (`createLeague`), the trade
+     * auto-hold (`acceptTrade`), the missed-deadline auto-set (`autoSetLineupsForWeek`) and the
+     * draft auto-start (`autoStartDueDrafts`). The invite door is exempt by design and asks
+     * neither this switch nor the predicate — `docs/decisions/enforcement-and-tiers.md` §4.
+     */
+    enforceTierSegregation: true,
   },
 } as const;

@@ -60,6 +60,13 @@ const COVERAGE_GATED_DIRS = [
   // plan writes into (`src/league-service`, `src/integrity-service`, `src/integrity`) was already
   // gated one plan early, so this is the last piece of the plan's own logic to join.
   "src/trades",
+  // Gate 21 (Phase 3 Plan D, ruling 21). `src/participation` is pure, browser-safe and holds
+  // the third vocabulary this plan is careful to keep compile-distinct from `experience_tier`
+  // (ruling 1) — the directory that decides who is a veteran, and exactly the directory
+  // somebody would one day reach for an account action from. Every other directory this plan
+  // writes into was already gated two plans early, so this is the plan's own last piece to
+  // join.
+  "src/participation",
 ] as const;
 /**
  * The three service directories' `schemas.ts` files are named explicitly alongside the `**` glob
@@ -235,6 +242,15 @@ export default defineConfig({
         // inside its own transaction, moved here from the coverage-ungated `src/ai-advisor/**`
         // for exactly that reason — see `docs/decisions/trades-and-fairness.md` §2.
         "src/trades/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        // Gate 21. Pure and gates for the same reason every pure directory does; an `include`
+        // entry with no `thresholds` block measures nothing, the defect a Phase 2 fix wave
+        // caught in `src/stats` — both halves ship in the same commit.
+        "src/participation/**": {
           branches: 100,
           functions: 100,
           lines: 100,

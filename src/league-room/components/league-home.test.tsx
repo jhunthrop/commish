@@ -4,7 +4,7 @@ import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
-import { HOME, LINEUP, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
+import { DRAFT_SCHEDULE, HOME, LINEUP, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { LeagueHome } from "./league-home";
 
@@ -104,6 +104,29 @@ describe("LeagueHome", () => {
     expect(screen.queryByRole("button", { name: "Create invite link" })).not.toBeInTheDocument();
   });
 
+  // Task 8: the commissioner's own window onto platform moderation in their league — a member
+  // with extra buttons, not an operator, so it sits behind the identical `isCommissioner` gate
+  // `InvitePanel` already does, right beside it.
+  it("shows the commissioner's moderation window only to the commissioner", async () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(await screen.findByRole("region", { name: "Platform moderation in this league" })).toBeInTheDocument();
+  });
+
+  it("hides the moderation window from everybody else", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, isCommissioner: false }} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByRole("region", { name: "Platform moderation in this league" })).not.toBeInTheDocument();
+  });
+
   // The commissioner's "Score Week" control is retired — a feed that finalizes a week when the
   // games end makes manual scoring not a control but the ability to stamp a week the games have
   // not finished. The week's state now reads honestly off WeekStatusBadge instead.
@@ -139,15 +162,23 @@ describe("LeagueHome", () => {
     expect(screen.queryByText(/nothing to run by hand/)).not.toBeInTheDocument();
   });
 
-  it("points at the draft room while the draft has not finished", () => {
+  // Task 6, fix round 1: `home.draftSchedule` is now this panel's whole initial read, riding the
+  // SAME server render as `home.draftStatus` — a "scheduled" draft renders the panel's own
+  // scheduled state, synchronously, the time, the countdown, and (for the commissioner `HOME`
+  // names) the edit and start controls.
+  it("shows the scheduled draft's time and start control while it has not finished", () => {
     renderInLeague(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
-        <LeagueHome home={{ ...HOME, draftStatus: "scheduled" }} lineup={null} />
+        <LeagueHome
+          home={{ ...HOME, draftStatus: "scheduled", draftSchedule: { ...DRAFT_SCHEDULE, status: "scheduled", kickoffAt: "2099-01-01T00:00:00.000Z" } }}
+          lineup={null}
+        />
       </ChatRoomDepsProvider>,
       fixtureLeagueDeps().deps,
     );
-    expect(screen.getByRole("link", { name: /draft room/i })).toHaveAttribute("href", `/app/drafts/${HOME.draftId}`);
-    expect(screen.getByText(/hasn't drafted yet/)).toBeInTheDocument();
+    expect(screen.getByText("Draft scheduled")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start the draft" })).toBeInTheDocument();
+    expect(screen.queryByText(/hasn't drafted yet/)).not.toBeInTheDocument();
   });
 
   // Task 12 review follow-up: "scheduled" and "in_progress" are different moments. A manager
@@ -155,11 +186,14 @@ describe("LeagueHome", () => {
   it("switches to live-draft copy while the draft is in progress", () => {
     renderInLeague(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
-        <LeagueHome home={{ ...HOME, draftStatus: "in_progress" }} lineup={null} />
+        <LeagueHome
+          home={{ ...HOME, draftStatus: "in_progress", draftSchedule: { ...DRAFT_SCHEDULE, status: "in_progress" } }}
+          lineup={null}
+        />
       </ChatRoomDepsProvider>,
       fixtureLeagueDeps().deps,
     );
-    expect(screen.getByText("Your draft is live right now.")).toBeInTheDocument();
+    expect(screen.getByText("The draft is live")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Join the draft" })).toHaveAttribute("href", `/app/drafts/${HOME.draftId}`);
     expect(screen.queryByText(/hasn't drafted yet/)).not.toBeInTheDocument();
   });

@@ -16,6 +16,19 @@ export const LEAGUE_CONFIG = {
     rosterSlots: STANDARD_ROSTER_SLOTS,
     /** How far out a new league's draft is scheduled, so the clock starts in a slow tier. */
     draftDaysFromCreation: 7,
+    /**
+     * The furthest out a commissioner may schedule (or reschedule) a draft's kickoff, measured
+     * from `now` AT THE MOMENT THEY SET IT — never from the league's creation, unlike this
+     * object's sibling `draftDaysFromCreation` above, which is why this field has its own name
+     * (fix round 1, LOW: renamed from `maxDraftDaysFromCreation`, which claimed the wrong
+     * anchor — `setDraftKickoff`, `@/league-service/draft-schedule.ts`, measures it against
+     * `clock.now()` at reschedule time, which can be long after creation). `DRAFT_CLOCK_SCHEDULE`'s
+     * widest tier (`@/draft-engine/config`) is 168 hours (7 days) before kickoff — a draft
+     * scheduled a year out is not wrong, but the pick clock would sit at its slowest tier for
+     * months before draft night got close, describing a tier nobody experiences. 60 days is
+     * generous room to plan a season around without letting the clock schedule become decorative.
+     */
+    maxDraftDaysAhead: 60,
   },
   minTeams: 4,
   maxTeams: 16,

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Badge, Card, EmptyState, EYEBROW, InfoTip } from "@/components/ui";
+import { Icon, type IconName } from "@/components/ui/icon";
 import type { DraftFormat } from "@/domain/league";
 import type { TermKey } from "@/help/glossary";
 import { EXPERIENCE_TIER_LABEL } from "@/identity/config";
@@ -7,6 +8,7 @@ import type { HelpLevel } from "@/identity/preferences";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
+import { TIER_COMPOSITION_LABEL, type CompositionCategory } from "@/participation/composition";
 import { JoinPublicLeagueButton } from "./join-public-league-button";
 
 const FORMAT_LABEL: Readonly<Record<string, string>> = { snake: "Snake", auction: "Auction" };
@@ -33,6 +35,20 @@ const SCORING_LABEL_TERM: Readonly<Record<string, TermKey>> = {
   "Half PPR": "half-ppr",
   "PPR, TE premium": "te-premium",
   Custom: "custom-scoring",
+};
+
+/**
+ * `clover` for newcomer, `crown` for veteran — the same two glyphs `browse-filters.tsx`'s
+ * participation control names in its own copy, matching what the tier means rather than
+ * inventing a third glyph. `all_newcomers`/`mostly_newcomers` both read `clover` (the league
+ * leans newcomer either way); `open` reads `crown` — the bucket that holds a tie, a veteran
+ * majority AND an empty roster alike, per `compositionCategoryFor`'s own docblock
+ * (`@/participation/composition`).
+ */
+const COMPOSITION_ICON: Readonly<Record<CompositionCategory, IconName>> = {
+  all_newcomers: "clover",
+  mostly_newcomers: "clover",
+  open: "crown",
 };
 
 /**
@@ -91,52 +107,75 @@ export function PublicLeagueList({
       {/* `min-w-0`: see `HomeBoard`'s identical grid — a grid item's default `min-width: auto`
           otherwise lets a long league name widen the item past its column at 360px. */}
       <ul className="grid gap-3 sm:grid-cols-2">
-        {leagues.map((league) => (
-          <li key={league.id} className="min-w-0">
-            <Card as="article" className="flex h-full flex-col gap-3">
-              <div className="flex items-start justify-between gap-2">
-                {/* `min-w-0 break-words`: see `HomeLeagueCard`'s identical heading. */}
-                <h3 className="min-w-0 break-words font-display text-2xl font-bold uppercase leading-display text-text-primary">
-                  {league.name}
-                </h3>
-                <Badge tone="neutral">{stakeTierLabel(league.stakeTier)}</Badge>
-              </div>
-              <p className={`${EYEBROW} flex flex-wrap items-center gap-x-1 gap-y-1`}>
-                <span className="inline-flex items-center gap-1">
-                  {FORMAT_LABEL[league.format] ?? league.format}
-                  <InfoTip term={FORMAT_TERM[league.format]} helpLevel={BROWSE_HELP_LEVEL} />
-                </span>
-                <span>·</span>
-                <span>{EXPERIENCE_TIER_LABEL[league.experienceTier] ?? league.experienceTier}</span>
-                <span>·</span>
-                <span className="inline-flex items-center gap-1">
-                  {league.scoringLabel}
-                  {SCORING_LABEL_TERM[league.scoringLabel] === undefined ? null : (
-                    <InfoTip term={SCORING_LABEL_TERM[league.scoringLabel]!} helpLevel={BROWSE_HELP_LEVEL} />
+        {leagues.map((league) => {
+          // Read, never derived (final review F6): `listPublicLeagues` reduces the two counts to
+          // this bucket server-side, and the counts themselves never cross the public wire.
+          const compositionCategory = league.compositionCategory;
+          return (
+            <li key={league.id} className="min-w-0">
+              <Card as="article" className="flex h-full flex-col gap-3">
+                <div className="flex items-start justify-between gap-2">
+                  {/* `min-w-0 break-words`: see `HomeLeagueCard`'s identical heading. */}
+                  <h3 className="min-w-0 break-words font-display text-2xl font-bold uppercase leading-display text-text-primary">
+                    {league.name}
+                  </h3>
+                  <Badge tone="neutral">{stakeTierLabel(league.stakeTier)}</Badge>
+                </div>
+                <p className={`${EYEBROW} flex flex-wrap items-center gap-x-1 gap-y-1`}>
+                  <span className="inline-flex items-center gap-1">
+                    {FORMAT_LABEL[league.format] ?? league.format}
+                    <InfoTip term={FORMAT_TERM[league.format]} helpLevel={BROWSE_HELP_LEVEL} />
+                  </span>
+                  <span>·</span>
+                  <span>{EXPERIENCE_TIER_LABEL[league.experienceTier] ?? league.experienceTier}</span>
+                  <span>·</span>
+                  <span className="inline-flex items-center gap-1">
+                    {league.scoringLabel}
+                    {SCORING_LABEL_TERM[league.scoringLabel] === undefined ? null : (
+                      <InfoTip term={SCORING_LABEL_TERM[league.scoringLabel]!} helpLevel={BROWSE_HELP_LEVEL} />
+                    )}
+                  </span>
+                </p>
+                <p className="text-sm text-text-muted">
+                  {`${league.filledTeams} of ${league.teamCount} joined`}
+                  {" · "}
+                  <span className="font-medium">{spotsLeftLabel(league)}</span>
+                </p>
+                <p className="inline-flex items-center gap-1 text-sm text-text-muted">
+                  <Icon name="clock" size={16} />
+                  {`Drafts ${league.draftAt}`}
+                </p>
+                <p className="inline-flex items-center gap-1 text-sm text-text-muted">
+                  <Icon name={COMPOSITION_ICON[compositionCategory]} size={16} />
+                  {TIER_COMPOSITION_LABEL[compositionCategory]}
+                </p>
+                {league.experienceTier === "beginner" ? (
+                  <p className="text-sm text-text-muted">
+                    Reserved for players newer to Commish so everyone starts even. Played here
+                    before?{" "}
+                    <Link href="/browse?experienceTier=experienced" className="font-medium text-accent underline">
+                      Browse leagues open to everyone
+                    </Link>
+                    .
+                  </p>
+                ) : null}
+                <div className="mt-auto">
+                  {signedIn ? (
+                    <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} />
+                  ) : (
+                    <Link
+                      href="/sign-in"
+                      aria-label={`Sign in to join ${league.name}`}
+                      className="inline-flex h-10 min-w-0 items-center justify-center [overflow-wrap:anywhere] rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                    >
+                      Sign in to join
+                    </Link>
                   )}
-                </span>
-              </p>
-              <p className="text-sm text-text-muted">
-                {`${league.filledTeams} of ${league.teamCount} joined`}
-                {" · "}
-                <span className="font-medium">{spotsLeftLabel(league)}</span>
-              </p>
-              <div className="mt-auto">
-                {signedIn ? (
-                  <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} />
-                ) : (
-                  <Link
-                    href="/sign-in"
-                    aria-label={`Sign in to join ${league.name}`}
-                    className="inline-flex h-10 min-w-0 items-center justify-center [overflow-wrap:anywhere] rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-                  >
-                    Sign in to join
-                  </Link>
-                )}
-              </div>
-            </Card>
-          </li>
-        ))}
+                </div>
+              </Card>
+            </li>
+          );
+        })}
       </ul>
       <p className="text-sm text-text-muted">{MATCHMAKING_CONFIG.stakeDisclosure}</p>
     </div>

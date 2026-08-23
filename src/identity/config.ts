@@ -5,8 +5,9 @@ export const IDENTITY_CONFIG = {
     /** The stored-value prefix that marks a built-in preset. */
     presetPrefix: "preset:",
     /**
-     * Custom avatar UPLOAD needs an object store, which is Plan D's table (phase overview:
-     * "Step 15's custom avatar upload needs an object store"). The ref scheme is what makes
+     * Custom avatar UPLOAD needs an object store, which is Phase 2 Plan D's table (phase
+     * overview: "Step 15's custom avatar upload needs an object store"; spelled out in full
+     * because "Plan D" alone is ambiguous across two phases). The ref scheme is what makes
      * turning it on a new `AvatarRef` case and a new writer, not a schema change: an uploaded
      * avatar is stored as its https URL, which `parseAvatarRef` already renders today.
      */
@@ -37,6 +38,34 @@ export const EXPERIENCE_TIER_LABEL: Readonly<Record<string, string>> = {
   beginner: "New to fantasy",
   experienced: "Played before",
 };
+
+/**
+ * The SAME `experienceTier` values, said about a LEAGUE rather than about a person — the words a
+ * commissioner reads while choosing who their league is for (`CreateLeagueForm`,
+ * `@/league-room/components/create-league-form`).
+ *
+ * A SECOND map and not a second spelling of the first, because the subject genuinely differs.
+ * `EXPERIENCE_TIER_LABEL` above answers "how much fantasy football has this PERSON played", which
+ * is why a profile select reads "Played before". A league is not experienced; a league is OPEN to
+ * people or RESERVED for some of them, and that is the decision the creation gate enforces
+ * (`tierJoinPrecondition`, `@/league-service/enforcement`). Telling a commissioner their league is
+ * "Played before" would describe nobody.
+ *
+ * THE ORDER MATTERS AND IS FIXED BY THE GATE. `experienced` is the choice that refuses nobody, so
+ * it leads the control and is its default: a veteran picking the default creates a league
+ * successfully, and only a deliberate choice of `beginner` can reach
+ * `ENFORCEMENT_REFUSALS.create`. Before this control existed that refusal named a remedy the form
+ * had no way to carry out.
+ */
+export const LEAGUE_EXPERIENCE_TIER_LABEL: Readonly<Record<string, string>> = {
+  experienced: "Open to everyone",
+  beginner: "Reserved for players newer to Commish",
+};
+
+/** The sentence under that control, saying what the reserved choice actually does. Named here
+ *  beside its own labels for the reason every other copy constant in this file is: one place
+ *  decides the words, and the copy sweeps read that place. */
+export const LEAGUE_EXPERIENCE_TIER_HINT = "A reserved league only accepts managers who are newer to Commish. Open leagues accept everyone.";
 
 /**
  * The one copy vocabulary for `helpLevel`, the same way `EXPERIENCE_TIER_LABEL` is for the tier.

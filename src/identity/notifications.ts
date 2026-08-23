@@ -3,7 +3,8 @@ import type { RealtimeEventType } from "@/lib/realtime/events";
 /**
  * Where a notification can land. `in_app` is real today — the toast/banner surfaces already
  * wired to the realtime stream. `email` is modeled and named so the catalog can describe what
- * it will one day carry, but Plan D owns the sender: see `channelStatus`.
+ * it will one day carry, but Phase 2 Plan D owns the sender: see `channelStatus`. Spelled out in
+ * full because "Plan D" alone is ambiguous across two phases (Phase 3 also has one).
  */
 export type NotificationChannel = "in_app" | "email";
 
@@ -41,8 +42,8 @@ export const NOTIFICATION_CATALOG: readonly NotificationTopic[] = [
 
 /**
  * Single source of truth for what each channel can do today. `in_app` is live because the
- * realtime stream already delivers it; `email` is not-connected because Plan D has not yet
- * built the sender. Nothing reads or writes an email preference anywhere in this product — a
+ * realtime stream already delivers it; `email` is not-connected because Phase 2 Plan D has not
+ * yet built the sender. Nothing reads or writes an email preference anywhere in this product — a
  * stored preference for a channel with no sender is a switch wired to nothing, which the
  * no-MVP directive rules out. The day the sender exists, this map (and only this map) changes.
  */

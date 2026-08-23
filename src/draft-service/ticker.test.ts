@@ -1,9 +1,11 @@
+import { eq } from "drizzle-orm";
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { players } from "@/db/schema";
+import { drafts, players } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import { currentDeadline } from "@/draft-engine";
+import type { AutoStartOutcome } from "./auto-start";
 import { createDraftStore, type DraftStore } from "./store";
 import { createDraftTicker } from "./ticker";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
@@ -301,5 +303,79 @@ describe("draft ticker — R-B4 store-level regression (check-then-act race)", (
       v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: staleDeadline,
     });
     expect(stale).toEqual({ ok: false, reason: "The clock hasn't run out yet." });
+  });
+});
+
+describe("draft ticker — auto-start (Task 7)", () => {
+  it("runs auto-start FIRST, mapping its outcomes ahead of the expiry scan's own", async () => {
+    const { store, fixture } = await liveDraft();
+    now = "2026-09-01T09:00:00.000Z"; // past the live draft's own deadline, so it also expires this tick
+    const calls: string[] = [];
+    const autoStart = async (): Promise<readonly AutoStartOutcome[]> => {
+      calls.push("auto-start");
+      return [{ draftId: "draft_other", started: false, reason: "kept for its commissioner" }];
+    };
+    const ticking = createDraftTicker({ db, store, clock, autoStart });
+
+    const outcomes = await ticking.tick();
+    expect(calls).toEqual(["auto-start"]);
+    // Auto-start's own outcome, mapped `started` -> `applied`, comes first — then the expiry
+    // scan's own outcome for the live draft it started already.
+    expect(outcomes).toEqual([
+      { draftId: "draft_other", applied: false, reason: "kept for its commissioner" },
+      { draftId: fixture.draftId, applied: true },
+    ]);
+  });
+
+  it("defaults to the real autoStartDueDrafts and actually starts a due public matchmade draft, same tick", async () => {
+    await seedDraftFixture(db, {
+      draftId: "draft_due", leagueId: "league_due", format: "snake", teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS, kickoffAt: new Date("2026-09-01T00:00:00.000Z"), auctionBudget: null,
+      isPublicMatchmade: true,
+    });
+    await db.insert(players).values([
+      { id: "dqb1", name: "DQB One", position: "QB", nflTeam: "KC" },
+      { id: "drb1", name: "DRB One", position: "RB", nflTeam: "SF" },
+      { id: "dwr1", name: "DWR One", position: "WR", nflTeam: "NYJ" },
+      { id: "dqb2", name: "DQB Two", position: "QB", nflTeam: "KC" },
+      { id: "drb2", name: "DRB Two", position: "RB", nflTeam: "SF" },
+      { id: "dwr2", name: "DWR Two", position: "WR", nflTeam: "NYJ" },
+    ]);
+    const store = createDraftStore({ db, publish: async () => "1-0", clock, deliverNotice: async () => {} });
+    const ticking = createDraftTicker({ db, store, clock });
+
+    now = "2026-09-01T00:01:00.000Z"; // past the fixed kickoff, seconds after the draft would open
+    const outcomes = await ticking.tick();
+    expect(outcomes).toContainEqual({ draftId: "draft_due", applied: true, reason: undefined });
+
+    const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, "draft_due"));
+    expect(row?.status).toBe("in_progress");
+    // The clock the START_DRAFT itself set only just started — this SAME tick's expiry scan
+    // must not treat a draft that is seconds old as already timed out.
+    const state = await store.getDraftState("draft_due");
+    expect(state?.pickNumber).toBe(1);
+    expect(state?.picks).toHaveLength(0);
+  });
+
+  it("logs and continues to the expiry scan when the auto-start SCAN itself throws", async () => {
+    // Distinct from a single due draft's own failure (already isolated inside
+    // `autoStartDueDrafts`, per its own docblock) — this is the scan's OWN query failing before
+    // it ever produces a row, which must not skip the expiry scan below it any more than one
+    // in-progress draft's DB error skips the rest of THAT scan.
+    const { store, fixture } = await liveDraft();
+    now = "2026-09-01T09:00:00.000Z"; // past the live draft's own deadline
+    const autoStart = async (): Promise<never> => {
+      throw new Error("auto-start connection reset");
+    };
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const ticking = createDraftTicker({ db, store, clock, autoStart });
+      const outcomes = await ticking.tick();
+      // The expiry scan still ran and expired the live draft, despite auto-start's own failure.
+      expect(outcomes).toEqual([{ draftId: fixture.draftId, applied: true }]);
+      expect(errorSpy).toHaveBeenCalledWith("[draft] auto-start scan failed", expect.any(Error));
+    } finally {
+      errorSpy.mockRestore();
+    }
   });
 });

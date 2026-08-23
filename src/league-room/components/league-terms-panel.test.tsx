@@ -17,10 +17,11 @@ const TERMS: LeagueTerms = {
   stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
   commissionerName: "Alex Rivera",
   commissionerAvatar: "preset:crown",
+  draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
 };
 
 describe("LeagueTermsPanel", () => {
-  it("names the league, its format, size, scoring, roster, stake and commissioner, in both themes, axe-clean", async () => {
+  it("names the league, its format, size, scoring, roster, stake, draft time and commissioner, in both themes, axe-clean", async () => {
     await inBothThemes(<LeagueTermsPanel terms={TERMS} />, async ({ container }) => {
       expect(screen.getByRole("heading", { name: "Sunday Money" })).toBeInTheDocument();
       expect(screen.getByText("Snake")).toBeInTheDocument();
@@ -29,6 +30,7 @@ describe("LeagueTermsPanel", () => {
       expect(screen.getByText(TERMS.rosterLine)).toBeInTheDocument();
       expect(screen.getByText("Friendly")).toBeInTheDocument();
       expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
+      expect(screen.getByText(TERMS.draftAt)).toBeInTheDocument();
       expect(screen.getByText("Alex Rivera")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -63,7 +65,7 @@ describe("LeagueTermsPanel", () => {
   it("puts Stake right after Format — the money fact a real-money decision reads first", () => {
     render(<LeagueTermsPanel terms={TERMS} />);
     const labels = screen.getAllByRole("term").map((node) => node.textContent);
-    expect(labels).toEqual(["Format", "Stake", "Size", "Scoring", "Roster", "Commissioner"]);
+    expect(labels).toEqual(["Format", "Stake", "Size", "Scoring", "Roster", "Draft", "Commissioner"]);
   });
 
   // Task 9 e2e regression (league-lifecycle.spec.ts): on the invite page there is no other

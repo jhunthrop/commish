@@ -171,7 +171,7 @@ async function correctLeagueInTx(
   notify: typeof notifyAffectedMember,
 ): Promise<boolean> {
   const before = await teamStatesFor(tx, leagueId, week);
-  await finalizeWeekInTx(tx, leagueId, week);
+  await finalizeWeekInTx(tx, leagueId, week, clock.now());
   const after = await teamStatesFor(tx, leagueId, week);
 
   const moved: { readonly teamId: string; readonly before: TeamState; readonly after: TeamState }[] = [];

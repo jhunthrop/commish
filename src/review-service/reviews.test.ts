@@ -1,16 +1,18 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq, getTableName, is, isNull, Table } from "drizzle-orm";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import type { Db } from "@/db/client";
 import * as schema from "@/db/schema";
-import { auditEvents, integrityFlags, memberNotices, reviewReports, reviews, users } from "@/db/schema";
+import { auditEvents, integrityFlags, leagues, memberNotices, reviewReports, reviews, teams, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { notifyAffectedMember, quoteFor, type MemberNotice } from "@/integrity-service/notify";
 import { renderNotice } from "@/integrity/notices";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { REMOVAL_REASON_VALUES, REVIEW_CONFIG, removalPhraseFor, removalSentenceFor } from "@/reviews/config";
+import type { ReviewView } from "@/reviews/contract";
 import { parseReviewCursor } from "@/reviews/cursor";
-import { feedQuery, listReviews, myReview, removeReview, reportReview, submitReview } from "./reviews";
+import { feedQuery, listReviews, myReview, removeReview, reportReview, REVIEW_VIEW_FIELDS, submitReview } from "./reviews";
 
 const db = createTestDb();
 
@@ -40,6 +42,24 @@ function tablesIn(sql: string): readonly string[] {
 
 async function seedUser(id: string): Promise<void> {
   await db.insert(users).values({ id, email: `${id}@test.local`, displayName: id });
+}
+
+/** The same `giveCompletedSeasons` idiom `join.test.ts`/`browse.test.ts`/`creation.test.ts` each
+ *  already establish: one completed league per season, this account the sole team in it. */
+async function giveCompletedSeasons(userId: string, count: number): Promise<void> {
+  await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: userId }).onConflictDoNothing();
+  for (let i = 0; i < count; i += 1) {
+    const leagueId = `${userId}_history_${i}`;
+    await db.insert(leagues).values({
+      id: leagueId,
+      name: leagueId,
+      format: "snake",
+      teamCount: 1,
+      commissionerUserId: userId,
+      seasonCompletedAt: new Date("2025-01-01T00:00:00.000Z"),
+    });
+    await db.insert(teams).values({ id: `${leagueId}_team`, leagueId, userId, name: "Team" });
+  }
 }
 
 beforeEach(async () => {
@@ -168,11 +188,67 @@ describe("listReviews / feedQuery — the curation proof", () => {
   });
 });
 
+describe("listReviews — the verified badge", () => {
+  it("marks a reviewer verified when they have finished a season here", async () => {
+    await giveCompletedSeasons("u_alice", 1);
+    await submitReview(db, { userId: "u_alice", rating: 5, body: LONG_ENOUGH, clock: at("2026-08-01T00:00:00Z"), newId: () => "r-alice" });
+
+    const [review] = (await listReviews(db, {})).reviews;
+    expect(review!.verified).toBe(true);
+  });
+
+  it("marks a signed-in account that has never played here unverified, and says nothing else about them", async () => {
+    // The badge's whole content is one boolean. It never carries the count, because "3 seasons"
+    // on a public feed is a fact about a stranger that nobody asked them to publish.
+    await seedUser("u_stranger");
+    await submitReview(db, { userId: "u_stranger", rating: 3, body: LONG_ENOUGH, clock: at("2026-08-01T00:00:00Z"), newId: () => "r-stranger" });
+
+    const [review] = (await listReviews(db, {})).reviews;
+    expect(review!.verified).toBe(false);
+    expect(Object.keys(review!)).toEqual([...REVIEW_VIEW_FIELDS]);
+  });
+
+  it("costs one extra query for a whole page of reviews, never one per review", async () => {
+    // `listReviews` already makes two round trips (the page, then the display-only rating
+    // lookup). This is a third, batched over the page's distinct author ids — the same shape
+    // `listLeagueActivity`'s three batched name lookups use, and for the same reason.
+    await giveCompletedSeasons("u_page_a", INTEGRITY_CONFIG.participation.verifiedSeasonCutoff);
+    await seedUser("u_page_b");
+    await submitReview(db, { userId: "u_page_a", rating: 5, body: LONG_ENOUGH, clock: at("2026-08-01T00:00:00Z"), newId: () => "r-page-a" });
+    await submitReview(db, { userId: "u_page_b", rating: 4, body: REVISED, clock: at("2026-08-02T00:00:00Z"), newId: () => "r-page-b" });
+
+    const counting = countingDb(db);
+    const page = await listReviews(counting.db, {});
+    expect(page.reviews).toHaveLength(2);
+    expect(counting.selectCount()).toBe(3);
+  });
+
+  it("never shows a negative badge — an unverified reviewer's row has no verified marker at all beyond the false boolean", async () => {
+    await seedUser("u_none");
+    await submitReview(db, { userId: "u_none", rating: 2, body: LONG_ENOUGH, clock: at("2026-08-01T00:00:00Z"), newId: () => "r-none" });
+
+    const [review] = (await listReviews(db, {})).reviews;
+    const fields: readonly (keyof ReviewView)[] = Object.keys(review!) as (keyof ReviewView)[];
+    expect(fields).toEqual([...REVIEW_VIEW_FIELDS]);
+    expect(review!.verified).toBe(false);
+  });
+});
+
 describe("submitReview", () => {
   it("returns the author's name and stored avatar ref", async () => {
     await db.insert(users).values({ id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", avatarUrl: "preset:shield" });
     const result = await submitReview(db, { userId: "u1", rating: 5, body: LONG_ENOUGH, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
     expect(result.ok && result.review).toMatchObject({ authorName: "Ada Lovelace", authorAvatar: "preset:shield" });
+  });
+
+  it("carries the verified badge on the writer's own copy of what they just posted", async () => {
+    await giveCompletedSeasons("u_verified_writer", INTEGRITY_CONFIG.participation.verifiedSeasonCutoff);
+    const result = await submitReview(db, { userId: "u_verified_writer", rating: 5, body: LONG_ENOUGH, clock: at("2026-08-01T00:00:00Z"), newId: () => "r-verified" });
+    expect(result.ok && result.review.verified).toBe(true);
+
+    await seedUser("u_unverified_writer");
+    const second = await submitReview(db, { userId: "u_unverified_writer", rating: 3, body: REVISED, clock: at("2026-08-02T00:00:00Z"), newId: () => "r-unverified" });
+    expect(second.ok && second.review.verified).toBe(false);
   });
 
   it("refuses a removed author's write and leaves the removed row byte-unchanged", async () => {
@@ -213,10 +289,18 @@ describe("submitReview", () => {
  * to put the code in the state it defends against.
  */
 describe("submitReview — the impossible-state guard", () => {
+  // Table-aware: `submitReview` now also reads `completedSeasonsFor` (via `@/league-service/
+  // participation`) to compute the badge's own `verified` field, and that query joins `teams` to
+  // `leagues` rather than `reviews`/`users` — a stub that answered every `select()` identically
+  // would hand it `existingRows` (a review or removal row) where it expects a `count(*)` row.
+  // Every real caller sees exactly one grouped row for `count(*)` with no `GROUP BY`; `0` here is
+  // what an author with no completed seasons anywhere else actually reads as.
   const stubWith = (existingRows: readonly unknown[], written: readonly unknown[] = []): Db =>
     ({
       insert: () => ({ values: () => ({ onConflictDoUpdate: () => ({ returning: async () => written }) }) }),
-      select: () => ({ from: () => ({ where: async () => existingRows }) }),
+      select: () => ({
+        from: (table: unknown) => (table === teams ? { innerJoin: () => ({ where: async () => [{ count: 0 }] }) } : { where: async () => existingRows }),
+      }),
     }) as unknown as Db;
 
   it("throws when the upsert writes nothing and there is no removed row to explain it", async () => {
@@ -256,19 +340,23 @@ describe("listReviews — a rating that vanishes between the two round trips", (
   it("renders the review with no rating rather than inventing one", async () => {
     const feedRow = {
       id: "r1",
+      userId: "u1",
       body: LONG_ENOUGH,
       createdAt: new Date("2026-08-01T00:00:00Z"),
       updatedAt: new Date("2026-08-01T00:00:00Z"),
       authorName: "Ada Lovelace",
       authorAvatar: null,
     };
-    const responses: readonly (readonly unknown[])[] = [[feedRow], []];
+    // Three round trips: the feed page, the rating lookup that misses, and the verified-badge
+    // lookup — which also comes back empty here, so `u1` reads as never having completed a
+    // season and the review renders unverified.
+    const responses: readonly (readonly unknown[])[] = [[feedRow], [], []];
     const calls = { made: 0 };
     const chain = (rows: readonly unknown[]): unknown => {
       const self: Record<string, unknown> = {
         then: (resolve: (value: readonly unknown[]) => unknown) => resolve(rows),
       };
-      for (const method of ["from", "innerJoin", "where", "orderBy", "limit"]) self[method] = () => self;
+      for (const method of ["from", "innerJoin", "where", "orderBy", "limit", "groupBy"]) self[method] = () => self;
       return self;
     };
     const stub = {
@@ -289,6 +377,7 @@ describe("listReviews — a rating that vanishes between the two round trips", (
         updatedAt: "2026-08-01T00:00:00.000Z",
         authorName: "Ada Lovelace",
         authorAvatar: null,
+        verified: false,
       },
     ]);
   });
@@ -299,7 +388,13 @@ describe("myReview", () => {
     await seedUser("u1");
     expect(await myReview(db, "u1")).toEqual({ state: "none" });
     await submitReview(db, { userId: "u1", rating: 4, body: LONG_ENOUGH, clock: at("2026-08-01T00:00:00Z"), newId: () => "r1" });
-    expect(await myReview(db, "u1")).toMatchObject({ state: "live", review: { id: "r1", rating: 4 } });
+    expect(await myReview(db, "u1")).toMatchObject({ state: "live", review: { id: "r1", rating: 4, verified: false } });
+  });
+
+  it("carries the verified badge on the caller's own live review", async () => {
+    await giveCompletedSeasons("u_my_verified", INTEGRITY_CONFIG.participation.verifiedSeasonCutoff);
+    await submitReview(db, { userId: "u_my_verified", rating: 5, body: LONG_ENOUGH, clock: at("2026-08-01T00:00:00Z"), newId: () => "r-my-verified" });
+    expect(await myReview(db, "u_my_verified")).toMatchObject({ state: "live", review: { verified: true } });
   });
 
   it("reports the removed state with the operator's reason, never an editable-looking review", async () => {

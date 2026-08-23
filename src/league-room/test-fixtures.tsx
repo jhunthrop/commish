@@ -4,7 +4,7 @@ import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import type { LeagueTerms } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import type { LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
+import type { DraftScheduleBody, LeagueHomeBody, LeagueMemberCard, LineupBody, MatchupDetail, MatchupSummary, TeamStandingsRow } from "./contract";
 import { LeagueRoomDepsProvider, type LeagueRoomDeps } from "./hooks/deps";
 
 /** Server rank order (wins, then points for, then team id) — never re-derived in a test. */
@@ -92,6 +92,18 @@ export const TERMS: LeagueTerms = {
   stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
   commissionerName: "Alex Rivera",
   commissionerAvatar: null,
+  draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
+};
+
+/** `DraftSchedulePanel`'s entire initial read, as `leagueHome` (`@/league-service/read.ts`)
+ *  assembles it — matches `HOME.draftId`/`draftStatus` below exactly, since the two are built
+ *  from the same draft row in production. */
+export const DRAFT_SCHEDULE: DraftScheduleBody = {
+  draftId: "d1",
+  leagueId: "l1",
+  status: "complete",
+  kickoffAt: "2026-08-24T12:00:00.000Z",
+  isPublicMatchmade: false,
 };
 
 /** Everything `LeagueHome` needs: a commissioner, mid-season, drafted, `t1` up this week. */
@@ -113,6 +125,7 @@ export const HOME: LeagueHomeBody = {
   weekStatus: "final",
   draftId: "d1",
   draftStatus: "complete",
+  draftSchedule: DRAFT_SCHEDULE,
 };
 
 /** Three managers, an open seat implied by `teamCount`, and `t1`'s owner running the league —
@@ -193,8 +206,10 @@ export function renderInLeague(ui: ReactElement, deps: LeagueRoomDeps): RenderRe
   return render(<LeagueRoomDepsProvider deps={deps}>{ui}</LeagueRoomDepsProvider>);
 }
 
-/** Open leagues as `listPublicLeagues` hands them back: one nearly empty, one nearly full. */
+/** Open leagues as `listPublicLeagues` hands them back: one nearly empty, one nearly full — and
+ *  one all-newcomer composition, one veteran-leaning composition, so a consumer's rendering of
+ *  BOTH `TIER_COMPOSITION_LABEL` buckets it is likely to show has real fixture data to render. */
 export const PUBLIC_LEAGUES: readonly PublicLeagueSummary[] = [
-  { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 3, scoringLabel: "Standard" },
-  { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 10, filledTeams: 9, scoringLabel: "PPR" },
+  { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 3, scoringLabel: "Standard", compositionCategory: "all_newcomers", draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)" },
+  { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 10, filledTeams: 9, scoringLabel: "PPR", compositionCategory: "open", draftAt: "Sunday 13 September, 1:00 PM UTC (in 4 days)" },
 ];

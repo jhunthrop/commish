@@ -35,6 +35,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
     format: first(params.format),
     experienceTier: first(params.experienceTier),
     stakeTier: first(params.stakeTier),
+    participationTier: first(params.participationTier),
   });
   const user = await getCurrentUser();
   const leagues = await listPublicLeagues(getDb(), filter);

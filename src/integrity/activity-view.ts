@@ -1,7 +1,7 @@
 import type { IconName } from "@/components/ui/icon";
 import { type AuditEvent, type AuditEventType, type JsonObject } from "@/domain/audit";
 import { stripHiddenCharacters } from "@/identity/display-name";
-import { SYSTEM_ACTION_SUMMARY_ALLOWED } from "./system-actions";
+import { SYSTEM_ACTION_VISIBILITY, type SystemActionVisibility } from "./system-actions";
 
 /**
  * Who may see an event type on the member-facing activity feed. `"everyone"` (any league member),
@@ -217,30 +217,34 @@ function renderLineupChange(event: AuditEvent): Rendered | null {
 }
 
 /**
- * The contract Plan D writes against: a system action explains itself with its own `summary`
- * string, AND its `action` code has to be one `SYSTEM_ACTION_SUMMARY_ALLOWED` (`./system-actions`)
- * says may say anything to a whole league — or it does not appear at all. No renderer here
- * interprets `action` codes it was not written for — that would be exactly the kind of guess
- * `ACTIVITY_VISIBILITY`'s doc comment warns against, just moved one level down.
+ * The contract this module writes against: a system action explains itself with its own `summary`
+ * string, AND its `action` code's `SYSTEM_ACTION_VISIBILITY` (`./system-actions`) entry has to
+ * actually reach this viewer — `"everyone"` unconditionally, `"subject_only"` only when
+ * `payload.subjectUserId` names them, never `"hidden"` — or the row does not appear at all. No
+ * renderer here interprets `action` codes it was not written for — that would be exactly the kind
+ * of guess `ACTIVITY_VISIBILITY`'s doc comment warns against, just moved one level down.
  *
- * THE ALLOWLIST CHECK RUNS BEFORE `summary` IS EVEN READ. Task 10 closed the pre-wiring gate this
- * docblock used to describe by itself: `renderSystemAction` rendering `payload.summary` verbatim
- * was safe only by accident of what existed (the sole publisher wrote no `summary` at all), and
- * Plan A's own residual required a re-review before anything emitted a league-scoped one.
- * `SYSTEM_ACTION_SUMMARY_ALLOWED` is that re-review's answer, and this is where it is enforced —
- * an action code missing from the table, or present as `false`, denies before `summary` is ever
- * looked at, so a payload carrying a summary for an action nobody signed off cannot render one.
+ * THE VISIBILITY CHECK RUNS BEFORE `summary` IS EVEN READ, and it is the FOURTH deny-by-default
+ * dimension (`SYSTEM_ACTION_VISIBILITY` itself is the third's replacement, not an addition beside
+ * it — see that module's own docblock). Task 10 closed the pre-wiring gate this docblock used to
+ * describe by itself: `renderSystemAction` rendering `payload.summary` verbatim was safe only by
+ * accident of what existed (the sole publisher wrote no `summary` at all), and Plan A's own
+ * residual required a re-review before anything emitted a league-scoped one.
+ * `SYSTEM_ACTION_VISIBILITY` is that re-review's answer, extended for the subject-scoped case Plan
+ * B named in advance, and this is where it is enforced — an action code missing from the table, or
+ * present as `"hidden"`, denies before `summary` is ever looked at; `"subject_only"` denies too
+ * unless this viewer IS the subject, so a payload carrying a summary for an action nobody signed
+ * off, or for a subject who is not reading, cannot render one.
  *
  * The verifier's own event (`scripts/verify-audit-chain.ts`'s `recordDetection`, writing
  * `{ action: "chain_verification_failed", scopes, checkedAt }`, no `summary`) is denied on BOTH
  * grounds today — it has no `summary` to read, and even if it grew one `chain_verification_failed`
- * is `false` in the table (ruling 8: telling a league its record may have been tampered with,
+ * is `"hidden"` in the table (ruling 8: telling a league its record may have been tampered with,
  * before a human has read the output, is the accusation this phase spends a denylist preventing).
  *
- * A Plan D author reading this: the renderer is INERT until an action is both ALLOWED in
- * `SYSTEM_ACTION_SUMMARY_ALLOWED` and carries a `summary`. `activity-view.test.ts` pins all three
- * denial states, and the mutation proof is that deleting this guard reddens a test rather than
- * nothing.
+ * A reader of this module: the renderer is INERT until an action's visibility actually reaches
+ * this viewer and carries a `summary`. `activity-view.test.ts` pins every denial state, and the
+ * mutation proof is that deleting either guard reddens a test rather than nothing.
  */
 /**
  * `acceptTrade`'s own event (`@/league-service/trades`, Task 5). "A trade the league can see
@@ -291,10 +295,16 @@ function renderRosterMove(event: AuditEvent, names: ActivityNames): Rendered | n
     : { icon: "refresh-cw", headline: `${proposerTeamName} and ${counterpartyTeamName}'s roster swap was reversed.`, detail: null };
 }
 
-function renderSystemAction(event: AuditEvent): Rendered | null {
+function renderSystemAction(event: AuditEvent, viewer: { readonly userId: string }): Rendered | null {
   const action = str(event.payload, "action");
-  const allowed = action !== undefined && (SYSTEM_ACTION_SUMMARY_ALLOWED as Readonly<Record<string, boolean | undefined>>)[action] === true;
-  if (!allowed) return null;
+  const visibility = action === undefined ? undefined : (SYSTEM_ACTION_VISIBILITY as Readonly<Record<string, SystemActionVisibility | undefined>>)[action];
+  if (visibility !== "everyone" && visibility !== "subject_only") return null;
+  if (visibility === "subject_only") {
+    // Deny by default on a malformed or tampered payload, the same `return null` the rest of
+    // this module holds every renderer to: a missing subject must not mean "show everyone".
+    const subjectUserId = str(event.payload, "subjectUserId");
+    if (subjectUserId === undefined || subjectUserId !== viewer.userId) return null;
+  }
   const summary = str(event.payload, "summary");
   if (summary === undefined) return null;
   return { icon: "alert-triangle", headline: summary, detail: null };
@@ -307,7 +317,7 @@ function renderSystemAction(event: AuditEvent): Rendered | null {
  * fails to match the union (a row from a future migration a running process hasn't reloaded types
  * for) denies rather than throws, the same "not a crash" guarantee the allowlist itself commits to.
  */
-function renderPayload(event: AuditEvent, names: ActivityNames): Rendered | null {
+function renderPayload(event: AuditEvent, names: ActivityNames, viewer: { readonly userId: string }): Rendered | null {
   switch (event.eventType) {
     case "league_created":
       return renderLeagueCreated(event, names);
@@ -324,7 +334,7 @@ function renderPayload(event: AuditEvent, names: ActivityNames): Rendered | null
     case "trade_accepted":
       return renderTradeAccepted(event, names);
     case "system_action":
-      return renderSystemAction(event);
+      return renderSystemAction(event, viewer);
     default:
       return null;
   }
@@ -347,7 +357,7 @@ export function activityRowFor(event: AuditEvent, viewer: { readonly userId: str
   if (visibility !== "everyone" && visibility !== "actor_only") return null;
   if (visibility === "actor_only" && event.actorId !== viewer.userId) return null;
 
-  const rendered = renderPayload(event, printableNames(names));
+  const rendered = renderPayload(event, printableNames(names), viewer);
   if (rendered === null) return null;
   return { eventId: event.eventId, occurredAt: event.occurredAt, ...rendered };
 }

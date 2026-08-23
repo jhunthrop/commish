@@ -3,7 +3,7 @@ import type { Page } from "@playwright/test";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { createDb } from "../src/db/client";
 import { integrityFlags, tradeProposals } from "../src/db/schema";
-import { expect, test } from "./support/fixtures";
+import { expect, expectNotice, test } from "./support/fixtures";
 import {
   E2E_TRADES_FIXTURE_STATE,
   E2E_TRADES_LEAGUE_ID,
@@ -46,30 +46,6 @@ async function checkPlayers(fieldset: ReturnType<Page["locator"]>, names: readon
   for (const name of names) {
     await fieldset.locator("li").filter({ hasText: name }).getByRole("checkbox").check();
   }
-}
-
-/**
- * Opens the header's notice inbox and waits for `text` to appear in it — real retries, through
- * the product's own real mechanism, never a click that only toggles visibility. `useNotices`
- * (`src/account-room/hooks/use-notices.ts`) fetches exactly once per page mount; clicking the
- * bell again does not re-fetch, so a `toPass` that only re-clicks the bell against an
- * already-failed mount fetch is retrying the wrong thing forever. `INTEGRITY_CONFIG.notices
- * .rateLimit` is real (30 requests/60s, PER USER) and this whole suite shares manager A's and
- * B's identities across ten other specs' worth of page loads — every one an `AppHeader` mount,
- * every one a notices fetch — so a transient 429 here is a genuine, expected shape this helper
- * answers with the panel's OWN "Try again" button (`NoticeInbox`'s `refetch()`), not a page
- * reload that would cost this budget a second mount fetch for nothing.
- */
-async function expectNotice(page: Page, text: string): Promise<void> {
-  await page.getByRole("button", { name: /^Notices/ }).click();
-  const region = page.getByRole("region", { name: "Notices" });
-  await expect(region).toBeVisible({ timeout: 5_000 });
-  await expect(async () => {
-    const tryAgain = region.getByRole("button", { name: "Try again" });
-    if (await tryAgain.isVisible().catch(() => false)) await tryAgain.click();
-    await expect(region.getByText(text).first()).toBeVisible({ timeout: 2_000 });
-  }).toPass({ timeout: 45_000 });
-  await page.keyboard.press("Escape");
 }
 
 /**

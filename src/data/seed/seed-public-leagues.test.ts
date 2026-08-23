@@ -5,6 +5,7 @@ import { drafts, leagues, teams } from "@/db/schema";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { listPublicLeagues } from "@/league-service/browse";
 import { DEV_SEED } from "./config";
+import { ensureDevUsers } from "./dev-users";
 import { seedPublicLeagues } from "./seed-public-leagues";
 
 const db = createTestDb();
@@ -65,5 +66,23 @@ describe("seedPublicLeagues", () => {
 
   it("uses no em-dash in any league name a person will read", async () => {
     for (const plan of DEV_SEED.publicLeagues) expect(plan.name).not.toContain("—");
+  });
+
+  it("never seats index 0 in the tier-demo league (Phase 3 Plan D, Task 10)", async () => {
+    await seedPublicLeagues(db, clock);
+    const ownerIds = await ensureDevUsers(db);
+
+    const plan = DEV_SEED.publicLeagues.find((p) => p.leagueId === "dev_public_tier_demo")!;
+    expect("skipOwnerIndexZero" in plan && plan.skipOwnerIndexZero).toBe(true);
+
+    const teamRows = await db.select().from(teams).where(eq(teams.leagueId, plan.leagueId));
+    expect(teamRows).toHaveLength(plan.filled);
+    expect(teamRows.some((row) => row.userId === ownerIds[0])).toBe(false);
+    // Every OTHER seeded public league still starts at index 0 — this is the ONE exception.
+    for (const other of DEV_SEED.publicLeagues) {
+      if (other.leagueId === plan.leagueId) continue;
+      const rows = await db.select().from(teams).where(eq(teams.leagueId, other.leagueId));
+      if (rows.length > 0) expect(rows.some((row) => row.userId === ownerIds[0])).toBe(true);
+    }
   });
 });

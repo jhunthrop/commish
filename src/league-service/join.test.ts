@@ -1,12 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
-import { eq, isNull } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, draftActions, drafts, integrityFlags, leagues, sessionSignals, teams, users } from "@/db/schema";
+import { auditEvents, draftActions, drafts, integrityFlags, leagues, memberNotices, sessionSignals, teams, users } from "@/db/schema";
+import type { AuditEventType } from "@/domain/audit";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { canonicalPairId, defaultSweepDeps, type SweepDeps } from "@/integrity-service/multi-account";
-import { DRAFT_ALREADY_STARTED, joinPublicLeague, LEAGUE_FULL, NOT_PUBLIC, triggerMultiAccountSweep, type JoinLeagueOutcome } from "./join";
+import { ENFORCEMENT_REFUSALS } from "./enforcement";
+import { acceptInvite, createInvite } from "./invites";
+import {
+  DRAFT_ALREADY_STARTED,
+  joinPublicLeague,
+  LEAGUE_FULL,
+  NOT_PUBLIC,
+  recordTierBlockedJoin,
+  triggerMultiAccountSweep,
+  type JoinLeagueOutcome,
+} from "./join";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-20T17:00:00.000Z" };
@@ -45,6 +56,7 @@ async function seedLeague(over: {
   readonly filled?: number;
   readonly isPublicMatchmade?: boolean;
   readonly draftStatus?: "scheduled" | "in_progress" | "complete";
+  readonly experienceTier?: "beginner" | "experienced";
 } = {}): Promise<string> {
   const id = over.id ?? "open";
   await db.insert(leagues).values({
@@ -53,7 +65,7 @@ async function seedLeague(over: {
     format: "snake",
     teamCount: over.teamCount ?? 12,
     stakeTier: 0,
-    experienceTier: "beginner",
+    experienceTier: over.experienceTier ?? "beginner",
     isPublicMatchmade: over.isPublicMatchmade ?? true,
     commissionerUserId: "owner",
   });
@@ -71,6 +83,33 @@ async function seedLeague(over: {
     await db.insert(teams).values({ id: `${id}_t${i}`, leagueId: id, userId, name: `Team ${i}` });
   }
   return id;
+}
+
+/** Gives `userId` `count` OTHER completed leagues — a one-team league apiece, matching
+ *  `browse.test.ts`'s and `enforcement.test.ts`'s own identical helper — so their seat in
+ *  whatever league the caller seeds them into next reads as a veteran's. */
+async function giveCompletedSeasons(userId: string, count: number): Promise<void> {
+  await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: userId }).onConflictDoNothing();
+  for (let i = 0; i < count; i++) {
+    const leagueId = `${userId}_history_${i}`;
+    await db.insert(leagues).values({
+      id: leagueId,
+      name: leagueId,
+      format: "snake",
+      teamCount: 1,
+      commissionerUserId: userId,
+      seasonCompletedAt: new Date("2025-01-01T00:00:00.000Z"),
+    });
+    await db.insert(teams).values({ id: `${leagueId}_team`, leagueId, userId, name: "Team" });
+  }
+}
+
+async function noticesFor(userId: string) {
+  return db.select().from(memberNotices).where(eq(memberNotices.userId, userId));
+}
+
+async function auditEventsOn(scope: string, eventType: AuditEventType) {
+  return db.select().from(auditEvents).where(and(eq(auditEvents.chainScope, scope), eq(auditEvents.eventType, eventType)));
 }
 
 beforeEach(async () => {
@@ -294,6 +333,162 @@ describe("joinPublicLeague", () => {
       // the log which of the two dropped a sweep.
       expect(spy).toHaveBeenCalledWith("[integrity] multi-account sweep failed", { leagueId: "lg_broken", trigger: "league_join" }, expect.any(Error));
       spy.mockRestore();
+    });
+  });
+});
+
+/**
+ * Flips the deploy-wide switch for the duration of one test, then restores it — see
+ * `enforcement.test.ts`'s identical helper for why a cast-and-mutate is safe here: the config is
+ * a plain object at runtime despite its `as const` typing, and every caller restores it.
+ */
+async function withEnforcement<T>(enabled: boolean, fn: () => Promise<T>): Promise<T> {
+  const config = INTEGRITY_CONFIG.participation as { enforceTierSegregation: boolean };
+  const original = config.enforceTierSegregation;
+  config.enforceTierSegregation = enabled;
+  try {
+    return await fn();
+  } finally {
+    config.enforceTierSegregation = original;
+  }
+}
+
+describe("joinPublicLeague — tier enforcement (Task 3, ruling 6)", () => {
+  it("blocks a veteran from a beginner public league, and says why without saying what they did wrong", async () => {
+    const leagueId = await seedLeague({ id: "lg_beginner" });
+    await giveCompletedSeasons("u_vet", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    expect(await joinPublicLeague(deps(), { leagueId, userId: "u_vet" })).toEqual({
+      ok: false,
+      status: 409,
+      reason: ENFORCEMENT_REFUSALS.join,
+    });
+  });
+
+  it("lets the same account into the same league the moment segregation is off", async () => {
+    // Step 6's rollback, exercised rather than described. The tier is still computed, only the
+    // refusal stops firing.
+    const leagueId = await seedLeague({ id: "lg_beginner_off" });
+    await giveCompletedSeasons("u_vet_off", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    await withEnforcement(false, async () => {
+      expect(await joinPublicLeague(deps(), { leagueId, userId: "u_vet_off" })).toMatchObject({ ok: true });
+    });
+  });
+
+  it("leaves private leagues completely alone, for the identical account and the identical tier", async () => {
+    // The spec's matched pair for Step 6: two leagues, identical in every field but
+    // `is_public_matchmade`, one account, two outcomes. Driven through `acceptInvite`
+    // (`./invites`), the invite door, whose `invitePrecondition` never asks this question at all.
+    const created = await seedLeague({ id: "lg_private_beginner", isPublicMatchmade: false });
+    await giveCompletedSeasons("u_vet_private", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    const invite = await createInvite({ db, clock, random: () => 0.5 }, { leagueId: created, createdByUserId: "owner" });
+    if (!invite.ok) throw new Error(invite.reason);
+    expect(await acceptInvite({ db, clock, newId }, { code: invite.code, userId: "u_vet_private" })).toMatchObject({ ok: true });
+  });
+
+  /**
+   * THE THIRD DOOR, PINNED IN BOTH DIRECTIONS (final review F3). `invitePrecondition`
+   * (`./invites`) checks expiry and use count and never calls `tierJoinPrecondition`, so an invite
+   * exempts a veteran from segregation into a PUBLIC beginner league exactly as much as into a
+   * private one. Task 3's review adjudicated that deliberate and this test exists to keep it
+   * deliberate: the exemption is about the MECHANISM ("an invite is always a human handing a
+   * specific code to a specific person"), not about the league's visibility flag, so a change that
+   * narrows it to private leagues reddens here rather than passing quietly.
+   *
+   * Both directions over ONE league and ONE account, which is what makes it a pin rather than two
+   * unrelated assertions: the public join door refuses, the invite door admits.
+   */
+  it("admits a veteran to a PUBLIC beginner league through the invite door, and refuses the same account at the public join door", async () => {
+    const leagueId = await seedLeague({ id: "lg_public_beginner_invite", isPublicMatchmade: true, experienceTier: "beginner" });
+    await giveCompletedSeasons("u_vet_public_invite", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+
+    // Direction 1: the door the segregation covers.
+    expect(await joinPublicLeague(deps(), { leagueId, userId: "u_vet_public_invite" })).toEqual({
+      ok: false,
+      status: 409,
+      reason: ENFORCEMENT_REFUSALS.join,
+    });
+
+    // Direction 2: the door it deliberately does not. Same league, same account, same tier.
+    const invite = await createInvite({ db, clock, random: () => 0.5 }, { leagueId, createdByUserId: "owner" });
+    if (!invite.ok) throw new Error(invite.reason);
+    expect(await acceptInvite({ db, clock, newId }, { code: invite.code, userId: "u_vet_public_invite" })).toMatchObject({ ok: true });
+  });
+
+  it("answers 404 and not 409 for a league that is not public, exactly as it did before", async () => {
+    // The no-oracle discipline, unchanged. The tier clause runs AFTER the public check, so a
+    // private league's existence is never confirmed to a stranger by a tier refusal.
+    const leagueId = await seedLeague({ id: "lg_private_stranger", isPublicMatchmade: false });
+    await giveCompletedSeasons("u_vet_stranger", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    expect(await joinPublicLeague(deps(), { leagueId, userId: "u_vet_stranger" })).toEqual({
+      ok: false, status: 404, reason: NOT_PUBLIC,
+    });
+  });
+
+  it("tells the blocked member once, and not again on a second attempt at the same league", async () => {
+    const leagueId = await seedLeague({ id: "lg_beginner_twice" });
+    await giveCompletedSeasons("u_vet_twice", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    await joinPublicLeague(deps(), { leagueId, userId: "u_vet_twice" });
+    await joinPublicLeague(deps(), { leagueId, userId: "u_vet_twice" });
+    expect((await noticesFor("u_vet_twice")).filter((n) => n.noticeType === "tier_blocked_join")).toHaveLength(1);
+  });
+
+  it("writes the block on the PLATFORM chain, because a league nobody joined is not told about it", async () => {
+    const leagueId = await seedLeague({ id: "lg_beginner_audit" });
+    await giveCompletedSeasons("u_vet_audit", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    await joinPublicLeague(deps(), { leagueId, userId: "u_vet_audit" });
+
+    expect(await auditEventsOn(leagueId, "system_action")).toHaveLength(0);
+    const [event] = await auditEventsOn("platform", "system_action");
+    expect(event).toMatchObject({ actorId: null, actorType: "system", leagueId: null });
+    expect(event!.payload).toMatchObject({ action: "tier_blocked_join", subjectUserId: "u_vet_audit" });
+    expect((event!.payload as { readonly summary?: unknown }).summary).toBeUndefined();
+
+    const [notice] = await noticesFor("u_vet_audit");
+    expect(notice).toMatchObject({ leagueId, noticeType: "tier_blocked_join" });
+    expect(notice!.auditEventId).toBe(event!.eventId);
+  });
+
+  it("logs and swallows a failure to record the block, rather than turning an honest refusal into a 500", async () => {
+    const leagueId = await seedLeague({ id: "lg_beginner_broken_notice" });
+    await giveCompletedSeasons("u_vet_broken", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const brokenAudit = {
+      record: async () => {
+        throw new Error("audit boom");
+      },
+      recordAll: async () => {
+        throw new Error("audit boom");
+      },
+    };
+    try {
+      const outcome = await joinPublicLeague({ db, newId, clock, audit: brokenAudit }, { leagueId, userId: "u_vet_broken" });
+      expect(outcome).toEqual({ ok: false, status: 409, reason: ENFORCEMENT_REFUSALS.join });
+      expect(spy).toHaveBeenCalledWith(
+        "[league] tier-blocked join notice failed",
+        { leagueId, userId: "u_vet_broken" },
+        expect.any(Error),
+      );
+      expect(await noticesFor("u_vet_broken")).toEqual([]);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  describe("recordTierBlockedJoin", () => {
+    it("is a no-op the second time for the same (userId, leagueId) pair, driven directly", async () => {
+      const leagueId = await seedLeague({ id: "lg_direct_dedupe" });
+      await db.insert(users).values({ id: "u_direct", email: "u_direct@test.local", displayName: "Direct" });
+      await recordTierBlockedJoin(db, { leagueId, userId: "u_direct", occurredAt: clock.now() });
+      await recordTierBlockedJoin(db, { leagueId, userId: "u_direct", occurredAt: clock.now() });
+      expect(await noticesFor("u_direct")).toHaveLength(1);
+      expect(await auditEventsOn("platform", "system_action")).toHaveLength(1);
+    });
+
+    it("writes nothing when the named league no longer exists", async () => {
+      await db.insert(users).values({ id: "u_ghost", email: "u_ghost@test.local", displayName: "Ghost" });
+      await recordTierBlockedJoin(db, { leagueId: "does_not_exist", userId: "u_ghost", occurredAt: clock.now() });
+      expect(await noticesFor("u_ghost")).toEqual([]);
+      expect(await auditEventsOn("platform", "system_action")).toEqual([]);
     });
   });
 });

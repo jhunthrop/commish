@@ -1,24 +1,30 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, chatMessages, drafts, integrityFlags, leagues, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
+import { auditChains, chatMessages, drafts, integrityFlags, leagues, lineupSlots, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
-import { joinLeagueInTx } from "@/league-service/join";
+import { autoSetLineupInTx, autoSetLineupsForWeek } from "@/league-service/auto-lineup";
+import { setDraftKickoff } from "@/league-service/draft-schedule";
+import { joinLeagueInTx, recordTierBlockedJoin } from "@/league-service/join";
+import { setLineup } from "@/league-service/lineups";
 import { writeSchedule } from "@/league-service/schedule";
 import { seasonCurrentWeek } from "@/league-service/test-support";
-import { acceptTrade, proposeTrade, rejectTrade } from "@/league-service/trades";
+import { acceptTrade, blockHeldTradeInTx, proposeTrade, rejectTrade, releaseHeldTradeInTx } from "@/league-service/trades";
 import { reverseTradeInTx } from "@/league-service/trade-reversal";
 import type { StatLine } from "@/domain/player";
+import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
+import { notifyAffectedMember } from "@/integrity-service/notify";
 import { correctSettledWeek } from "@/stats-pipeline/correction";
-import { finalizeWeek } from "@/stats-pipeline/finalize";
+import { finalizeWeek, finalizeWeekInTx } from "@/stats-pipeline/finalize";
 import { fakeStatsProvider } from "@/stats-pipeline/test-support";
 import { syncUserFromWorkOS } from "@/lib/auth/user-sync";
 import { toggleReaction } from "@/chat-service/chat";
 import { reportMessage } from "@/chat-service/moderation";
 import { reportReview } from "@/review-service/reviews";
 import { raiseFlag, resolveFlag } from "./flags";
+import { closeSupersededHoldFlag } from "./trade-fairness";
 import { grantAdmin } from "./grant-admin";
 import type { DraftPoolEntry } from "@/domain/draft";
 import { players } from "@/db/schema";
@@ -76,6 +82,8 @@ const joinDb = createTestDb();
 const pickDb = createTestDb();
 const flagDb = createTestDb();
 const resolveDb = createTestDb();
+const blockDb = createTestDb();
+const releaseDb = createTestDb();
 
 /**
  * Waits until some backend on this database is genuinely blocked on a lock.
@@ -1463,6 +1471,64 @@ describe("correctLeagueInTx's notice order", () => {
   });
 });
 
+/**
+ * PHASE 3 PLAN D, TASK 1's own transaction: `stampSeasonCompleteInTx`
+ * (`@/league-service/participation`), the LAST statement `finalizeWeekInTx` runs. Its own docblock
+ * argues that a settlement transaction never inverts against `joinLeagueInTx`'s `leagues FOR
+ * UPDATE` because a league whose last week is being scored has a complete draft, and a league
+ * with a complete draft refuses joins before it locks anything — a claim about PRODUCTION
+ * behavior, not about what this lower-level `joinLeagueInTx` proof (which drives the real function
+ * with its OWN precondition override, bypassing `publicJoinPrecondition` on purpose, exactly like
+ * every sibling above) can be made to do.
+ *
+ * So this proves the narrower, structural claim directly: EVEN WHEN a join is parked holding
+ * `leagues[id] FOR UPDATE`, a concurrent `finalizeWeek` call whose stamp genuinely fires (the
+ * league's only week, about to become its last) blocks BEHIND the join rather than cycling with
+ * it — a one-directional wait, the same shape `recordSessionSignals`' proof above uses, because
+ * the join transaction never reaches for anything the settlement transaction holds.
+ */
+describe("stampSeasonCompleteInTx's lock, inside finalizeWeekInTx", () => {
+  it("blocks behind a concurrent join holding the same league row, and still stamps the season complete once it releases", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_stamp_commish", email: "stamp_commish@test.local", displayName: "Commish" },
+      { id: "u_stamp_away", email: "stamp_away@test.local", displayName: "Away" },
+      { id: "u_stamp_joiner", email: "stamp_joiner@test.local", displayName: "Joiner" },
+    ]);
+    // teamCount 3, not 2: the join under test needs an open seat, and `writeSchedule` below only
+    // schedules the two REAL teams — the third seat is what the joiner fills.
+    await joinDb.insert(leagues).values({
+      id: "lg_stamp_lock", name: "lg_stamp_lock", format: "snake", teamCount: 3, commissionerUserId: "u_stamp_commish",
+    });
+    await joinDb.insert(teams).values([
+      { id: "team_stamp_home", leagueId: "lg_stamp_lock", userId: "u_stamp_commish", name: "Home" },
+      { id: "team_stamp_away", leagueId: "lg_stamp_lock", userId: "u_stamp_away", name: "Away" },
+    ]);
+    await joinDb.insert(drafts).values({
+      id: "draft_stamp_lock", leagueId: "lg_stamp_lock", format: "snake", status: "complete",
+      kickoffAt: new Date("2026-09-01T00:00:00.000Z"), auctionBudget: null,
+    });
+    // A one-week season: this league's ONLY week is also its LAST, so finalizing it is exactly
+    // the call whose stamp UPDATE reaches for `leagues[id]`.
+    await joinDb.transaction((tx) => writeSchedule(tx, { leagueId: "lg_stamp_lock", teamIds: ["team_stamp_home", "team_stamp_away"], weeks: 1 }));
+
+    const join = parkedJoin("lg_stamp_lock", "u_stamp_joiner", "team_stamp_joiner");
+    await join.leagueLocked;
+
+    // T_finalize: the real finalizeWeek, on its own connection, reaching for the SAME league row
+    // through the stamp's UPDATE — a lock `finalizeWeekInTx` never took before this task.
+    const finalizing = finalizeWeek(pickDb, "lg_stamp_lock", 1);
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await finalizing).toMatchObject({ ok: true, weekNumber: 1, matchupsScored: 1 });
+
+    const [league] = await joinDb.select().from(leagues).where(eq(leagues.id, "lg_stamp_lock"));
+    expect(league!.seasonCompletedAt).not.toBeNull();
+  });
+});
+
 // ---------------------------------------------------------------------------------------------
 // FINAL REVIEW, HIGH 2 (second half): the suite covered 4 of Plan C's 7 new writers. The three
 // below close it to 7/7. Each follows the identical rendezvous every proof above does — park the
@@ -1533,6 +1599,284 @@ describe("raiseTradeFairnessFlag's after-commit position", () => {
     expect(platformAnchor!.headSequence).toBe(1); // flag_raised, alone
     const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_fair_lock"));
     expect(leagueAnchor!.headSequence).toBe(4); // trade_proposed, member_joined, trade_accepted + roster_move
+  });
+});
+
+/**
+ * Plan D, Task 5 — the hold transaction. Unlike EVERY other writer above, this one never touches
+ * the league chain at all: `acceptTrade`'s hold branch (`holdTradeInTx`) appends its `trade_hold`
+ * flag (`raiseFlag`'s own insert, `FOR KEY SHARE` on `leagues` through its FK) and its
+ * `system_action` event both to the PLATFORM chain, in the SAME transaction. This drives a real
+ * hold beside a concurrent join in the SAME league — the join's own `leagues[X] FOR UPDATE` is
+ * exactly the row the flag's FK reaches for — and proves both the absence of a deadlock AND that
+ * the split is real: the league chain carries only the join's `member_joined` (and the trade's own
+ * `trade_proposed`, from setup), never anything about the hold.
+ */
+describe("acceptTrade's hold branch — the flag's own leagues FK, against a concurrent join", () => {
+  it("holds a trade beside a concurrent join in the same league without deadlocking, and never touches the league chain for the hold itself", async () => {
+    await seedLeagueWith("lg_hold_lock", ["u_hl_commish", "u_hl_alice", "u_hl_bob", "u_hl_joiner"]);
+    await joinDb.update(leagues).set({ isPublicMatchmade: true }).where(eq(leagues.id, "lg_hold_lock"));
+    await joinDb.insert(teams).values([
+      { id: "team_hl_alice", leagueId: "lg_hold_lock", userId: "u_hl_alice", name: "Alice's Team" },
+      { id: "team_hl_bob", leagueId: "lg_hold_lock", userId: "u_hl_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_hl_star", name: "Hold Star", position: "RB", nflTeam: "KC" },
+      { id: "p_hl_scrub", name: "Hold Scrub", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_hl_alice", slot: "BENCH", slotIndex: 0, playerId: "p_hl_star" },
+      { teamId: "team_hl_bob", slot: "BENCH", slotIndex: 0, playerId: "p_hl_scrub" },
+    ]);
+    // Well past `INTEGRITY_CONFIG.trade.autoHoldThreshold` (35) — the same fixture shape
+    // `raiseTradeFairnessFlag's after-commit position` uses above, for the same reason.
+    await joinDb.insert(playerStatLines).values([1, 2, 3].map((week) => ({ playerId: "p_hl_star", week, rushingYards: 300, rushingTouchdowns: 5 })));
+    await seasonCurrentWeek(joinDb, { leagueId: "lg_hold_lock", homeTeamId: "team_hl_alice", awayTeamId: "team_hl_bob", week: 4 });
+
+    const proposed = await proposeTrade(pickDb, {
+      leagueId: "lg_hold_lock",
+      userId: "u_hl_alice",
+      counterpartyTeamId: "team_hl_bob",
+      proposerAssets: [{ kind: "player", playerId: "p_hl_star" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_hl_scrub" }],
+      note: null,
+      clock,
+      deliver: async () => {},
+    });
+    if (!proposed.ok) throw new Error(proposed.reason);
+
+    const join = parkedJoin("lg_hold_lock", "u_hl_joiner", "team_hl_joiner");
+    await join.leagueLocked;
+
+    // T_hold: the real acceptTrade, on its own connection, reaching for the SAME league row
+    // through `raiseFlag`'s own `integrity_flags` insert (the `leagueId` FK -> `leagues FOR KEY
+    // SHARE`) before it reaches the platform anchor — twice, in fact (the flag's own append, then
+    // the `system_action` append re-entering the same anchor row).
+    const holding = acceptTrade(resolveDb, { tradeId: proposed.tradeId, leagueId: "lg_hold_lock", userId: "u_hl_bob", clock, deliver: async () => {} });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await holding).toMatchObject({ ok: true, outcome: "held" });
+
+    // The league chain carries the join and the PROPOSAL only — nothing about the hold itself.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_hold_lock"));
+    expect(leagueAnchor!.headSequence).toBe(2); // trade_proposed, member_joined
+    // The platform chain carries both hold writes: flag_raised, then system_action.
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(2);
+    const flags = await joinDb.select().from(integrityFlags).where(eq(integrityFlags.subjectId, proposed.tradeId));
+    expect(flags).toHaveLength(1);
+    expect(flags[0]!.flagType).toBe("trade_hold");
+  });
+});
+
+/**
+ * Plan D, Task 5 — `resolveFlag`'s `trade_released` branch, the SECOND resolution shaped as two
+ * transactions. `releaseHeldTradeInTx` re-enters `applyTradeInTx`'s FULL lock set — already proved
+ * by `acceptTrade`'s own week-lock and mirror-accept tests above — commits FIRST on the LEAGUE
+ * chain, and only then does `resolveFlag` open its own PLATFORM-chain `flag_resolved` stamp. This
+ * drives a real release beside a concurrent join in the SAME league, the identical shape the
+ * `trade_reversed` proof above uses.
+ */
+describe("resolveFlag's trade_released branch — two transactions, two chains", () => {
+  it("releases a held trade beside a concurrent join in the same league without deadlocking", async () => {
+    await seedLeagueWith("lg_rl_res", ["u_rlr_commish", "u_rlr_alice", "u_rlr_bob", "u_rlr_joiner", "u_rlr_op"]);
+    await joinDb.insert(teams).values([
+      { id: "team_rlr_alice", leagueId: "lg_rl_res", userId: "u_rlr_alice", name: "Alice's Team" },
+      { id: "team_rlr_bob", leagueId: "lg_rl_res", userId: "u_rlr_bob", name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_rlr_a", name: "Player A", position: "RB", nflTeam: "KC" },
+      { id: "p_rlr_b", name: "Player B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_rlr_alice", slot: "BENCH", slotIndex: 0, playerId: "p_rlr_a" },
+      { teamId: "team_rlr_bob", slot: "BENCH", slotIndex: 0, playerId: "p_rlr_b" },
+    ]);
+
+    // A HELD trade, inserted directly — this proof is about the two-transaction lock order, not
+    // about re-proving the threshold math `acceptTrade's hold branch` above already drives.
+    const proposedAt = new Date(clock.now());
+    await joinDb.insert(tradeProposals).values({
+      id: "trade_rlr_1",
+      leagueId: "lg_rl_res",
+      proposerTeamId: "team_rlr_alice",
+      counterpartyTeamId: "team_rlr_bob",
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: "p_rlr_a" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_rlr_b" }],
+      fingerprint: "fp_trade_rlr_1",
+      note: null,
+      status: "held",
+      proposedAt,
+      expiresAt: new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000),
+    });
+    const flag = await joinDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_hold",
+        subjectId: "trade_rlr_1",
+        leagueId: "lg_rl_res",
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => "flag_rlr_1",
+      }),
+    );
+
+    const join = parkedJoin("lg_rl_res", "u_rlr_joiner", "team_rlr_joiner");
+    await join.leagueLocked;
+
+    const resolving = resolveFlag(resolveDb, {
+      flagId: flag.id,
+      decision: "trade_released",
+      note: "",
+      operatorUserId: "u_rlr_op",
+      clock,
+    });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await resolving).toMatchObject({ ok: true, decision: "trade_released" });
+
+    // Both transactions landed: the release really moved both rosters, and the flag closed.
+    const aliceRows = await joinDb.select({ playerId: rosterSlots.playerId }).from(rosterSlots).where(eq(rosterSlots.teamId, "team_rlr_bob"));
+    expect(aliceRows.some((row) => row.playerId === "p_rlr_a")).toBe(true);
+    const [resolved] = await joinDb.select().from(integrityFlags).where(eq(integrityFlags.id, flag.id));
+    expect(resolved!.resolvedAt).not.toBeNull();
+  });
+});
+
+/**
+ * Plan D, Task 5 — the guarded UPDATE both `releaseHeldTradeInTx` and `blockHeldTradeInTx` share
+ * (`WHERE status = 'held'`), driven to a genuine loss on BOTH sides. `release` takes both teams'
+ * rows `FOR UPDATE` before it ever reaches the guarded update; `block` takes no lock beyond the
+ * row itself. A bystander holds `trade_proposals[id] FOR UPDATE` first, so both writers queue at
+ * the SAME row, in the order they arrive — Postgres grants a contested row lock FIFO, so starting
+ * one, confirming it is genuinely blocked, THEN starting the other, pins which one wins.
+ */
+describe("releaseHeldTradeInTx and blockHeldTradeInTx — the guarded UPDATE race, both directions", () => {
+  /** `waitForBlockedBackend`'s own `> 0` check is ambiguous once a FIRST waiter is already
+   *  parked — it would report "blocked" the instant the FIRST one queues, before the SECOND has
+   *  necessarily reached its own wait. This waits for `count >= n`, so confirming the SECOND
+   *  contender is used only once BOTH are genuinely queued (and therefore queued in the order
+   *  each was started, which is what pins the winner deterministically). */
+  async function waitForBlockedCount(n: number, timeoutMs = 5_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const rows = await joinDb.execute<{ count: string }>(
+        sql`SELECT count(*) AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()`,
+      );
+      if (Number(rows[0]?.count ?? 0) >= n) return true;
+      if (Date.now() > deadline) return false;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+
+  async function seedHeldTrade(leagueId: string, suffix: string): Promise<{ readonly tradeId: string; readonly teamA: string; readonly teamB: string }> {
+    await seedLeagueWith(leagueId, [`u_race_commish_${suffix}`, `u_race_alice_${suffix}`, `u_race_bob_${suffix}`, `u_race_op_${suffix}`]);
+    const teamA = `team_race_alice_${suffix}`;
+    const teamB = `team_race_bob_${suffix}`;
+    await joinDb.insert(teams).values([
+      { id: teamA, leagueId, userId: `u_race_alice_${suffix}`, name: "Alice's Team" },
+      { id: teamB, leagueId, userId: `u_race_bob_${suffix}`, name: "Bob's Team" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: `p_race_a_${suffix}`, name: "Player A", position: "RB", nflTeam: "KC" },
+      { id: `p_race_b_${suffix}`, name: "Player B", position: "RB", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: teamA, slot: "BENCH", slotIndex: 0, playerId: `p_race_a_${suffix}` },
+      { teamId: teamB, slot: "BENCH", slotIndex: 0, playerId: `p_race_b_${suffix}` },
+    ]);
+    const proposedAt = new Date(clock.now());
+    const tradeId = `trade_race_${suffix}`;
+    await joinDb.insert(tradeProposals).values({
+      id: tradeId,
+      leagueId,
+      proposerTeamId: teamA,
+      counterpartyTeamId: teamB,
+      weekNumber: 1,
+      proposerAssets: [{ kind: "player", playerId: `p_race_a_${suffix}` }],
+      counterpartyAssets: [{ kind: "player", playerId: `p_race_b_${suffix}` }],
+      fingerprint: `fp_${tradeId}`,
+      note: null,
+      status: "held",
+      proposedAt,
+      expiresAt: new Date(proposedAt.getTime() + 72 * 60 * 60 * 1000),
+    });
+    return { tradeId, teamA, teamB };
+  }
+
+  it("block wins a race that starts first — release loses the guarded update, cleanly", async () => {
+    const { tradeId } = await seedHeldTrade("lg_race_block_wins", "bw");
+
+    let holdsTradeLock: () => void = () => {};
+    const tradeLocked = new Promise<void>((resolve) => (holdsTradeLock = resolve));
+    let releaseBystander: () => void = () => {};
+    const bystanderParked = new Promise<void>((resolve) => (releaseBystander = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM trade_proposals WHERE id = ${tradeId} FOR UPDATE`);
+      holdsTradeLock();
+      await bystanderParked;
+    });
+    await tradeLocked;
+
+    // T_block reaches the wait queue first — no team locks in its way, straight to the row.
+    const blocking = blockDb.transaction((tx) => blockHeldTradeInTx(tx, { tradeId, leagueId: "lg_race_block_wins", operatorUserId: "u_race_op_bw", note: "" }));
+    expect(await waitForBlockedBackend()).toBe(true);
+
+    // T_release queues second, behind both the bystander AND (once released) block's own commit.
+    const releasing = releaseDb.transaction((tx) => releaseHeldTradeInTx(tx, { tradeId, leagueId: "lg_race_block_wins", operatorUserId: "u_race_op_bw" }));
+    expect(await waitForBlockedCount(2)).toBe(true);
+
+    releaseBystander();
+    await expect(holding).resolves.toBeUndefined();
+
+    const blockResult = await blocking;
+    const releaseResult = await releasing;
+    expect(blockResult).toMatchObject({ ok: true });
+    expect(releaseResult).toEqual({ ok: false, status: 409, reason: "This trade is no longer waiting on a decision." });
+
+    const [row] = await joinDb.select().from(tradeProposals).where(eq(tradeProposals.id, tradeId));
+    expect(row!.status).toBe("blocked");
+  });
+
+  it("release wins a race that starts first — block loses the guarded update, cleanly", async () => {
+    const { tradeId } = await seedHeldTrade("lg_race_release_wins", "rw");
+
+    let holdsTradeLock: () => void = () => {};
+    const tradeLocked = new Promise<void>((resolve) => (holdsTradeLock = resolve));
+    let releaseBystander: () => void = () => {};
+    const bystanderParked = new Promise<void>((resolve) => (releaseBystander = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM trade_proposals WHERE id = ${tradeId} FOR UPDATE`);
+      holdsTradeLock();
+      await bystanderParked;
+    });
+    await tradeLocked;
+
+    // T_release queues first this time — its own team locks are uncontended, so it still reaches
+    // the trade row's own guarded update ahead of T_block.
+    const releasing = releaseDb.transaction((tx) => releaseHeldTradeInTx(tx, { tradeId, leagueId: "lg_race_release_wins", operatorUserId: "u_race_op_rw" }));
+    expect(await waitForBlockedBackend()).toBe(true);
+
+    const blocking = blockDb.transaction((tx) => blockHeldTradeInTx(tx, { tradeId, leagueId: "lg_race_release_wins", operatorUserId: "u_race_op_rw", note: "" }));
+    expect(await waitForBlockedCount(2)).toBe(true);
+
+    releaseBystander();
+    await expect(holding).resolves.toBeUndefined();
+
+    const releaseResult = await releasing;
+    const blockResult = await blocking;
+    expect(releaseResult).toMatchObject({ ok: true });
+    expect(blockResult).toEqual({ ok: false, status: 409, reason: "This trade is no longer waiting on a decision." });
+
+    const [row] = await joinDb.select().from(tradeProposals).where(eq(tradeProposals.id, tradeId));
+    expect(row!.status).toBe("accepted");
   });
 });
 
@@ -1658,5 +2002,583 @@ describe("toggleReaction's reaction insert", () => {
     // ever cycle on the two rows above — which is the whole reason it is safe, proved rather than
     // asserted.
     expect(await joinDb.select().from(auditChains)).toEqual([]);
+  });
+});
+
+/**
+ * Task 3's own transaction, and the last one this file adds. `recordTierBlockedJoin`
+ * (`@/league-service/join`) writes a `member_notices` row carrying a foreign key to `leagues` —
+ * the SAME implicit `FOR KEY SHARE` every notice-writing transaction in this file already takes —
+ * BEFORE it reaches the platform chain's own anchor, exactly like `raiseFlag`'s and `grantAdmin`'s
+ * own shape above. It runs in a WHOLLY SEPARATE transaction from the join it explains, always
+ * AFTER that join's own transaction has already rolled back (`join.ts`'s own docblock), so the
+ * question this proof answers is narrower than "does it deadlock against the join that triggered
+ * it" (that join is long gone by the time this runs in production) and exactly the one the brief
+ * asks for: does this write cycle against ANY OTHER concurrent join to the SAME league, the
+ * ordinary case of one visitor being refused while somebody else is mid-join next to them.
+ *
+ * Driven against a parked `joinLeagueInTx` holding `leagues[X] FOR UPDATE`, the same rendezvous
+ * every pair above uses: `recordTierBlockedJoin` blocks behind it (a real, observed block — Postgres
+ * genuinely holds this connection on the row, not a skipped-past read), and completes the moment
+ * the hold releases, on the PLATFORM chain, never the league's own — proof that the block's own
+ * write costs a concurrent join nothing but an ordinary row-lock wait, never a cycle.
+ */
+describe("recordTierBlockedJoin's notice order", () => {
+  it("blocks behind a concurrent join holding the SAME league row, and completes on the platform chain once it releases", async () => {
+    await seedLeagueWith("lg_tier_block_lock", ["u_tb_commish", "u_tb_joiner", "u_tb_blocked"]);
+
+    const join = parkedJoin("lg_tier_block_lock", "u_tb_joiner", "team_tb_joiner");
+    await join.leagueLocked;
+
+    // T_block: the real `recordTierBlockedJoin`, on its own connection, reaching for the SAME
+    // league row through its notice insert (`leagues` FOR KEY SHARE) before it reaches the
+    // platform anchor.
+    const blocking = recordTierBlockedJoin(resolveDb, {
+      leagueId: "lg_tier_block_lock",
+      userId: "u_tb_blocked",
+      occurredAt: clock.now(),
+    });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    await expect(blocking).resolves.toBeUndefined();
+
+    // The league chain holds only the join's own `member_joined` — the tier block never reaches it.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_tier_block_lock"));
+    expect(leagueAnchor!.headSequence).toBe(1);
+    // The platform chain holds only the block's own `system_action` — proof the two really did
+    // land on separate chains despite reaching for the same league row on the way there.
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(1);
+
+    const [notice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_tb_blocked"));
+    expect(notice).toMatchObject({ leagueId: "lg_tier_block_lock", noticeType: "tier_blocked_join" });
+    expect(notice?.auditEventId).not.toBeNull();
+  });
+});
+
+/**
+ * PHASE 3 PLAN D, TASK 4's own transaction (Step 7): `autoSetLineupInTx`
+ * (`@/league-service/auto-lineup`) takes `stat_weeks[week] FOR SHARE` FIRST, matching `setLineup`
+ * and `acceptTrade` — all THREE roster-adjacent writers in the same position — but doing the
+ * opposite job it does there: this writer REQUIRES the week to be locked, so it is the one whose
+ * own read can genuinely block behind a concurrent WRITE to that row (the ingestion worker's own
+ * `persistTick`, matched here by a real transaction taking the identical row-exclusive lock
+ * `persistTick`'s own upsert would).
+ */
+describe("autoSetLineupInTx's week lock", () => {
+  it("blocks a concurrent run behind a real stat-week write, and proceeds once it sees the flip", async () => {
+    const leagueId = "lg_auto_week_lock";
+    await seedLeagueWith(leagueId, ["u_aw_commish", "u_aw_alice"]);
+    await joinDb.update(leagues).set({ isPublicMatchmade: true }).where(eq(leagues.id, leagueId));
+    await joinDb.insert(teams).values([
+      { id: "team_aw_commish", leagueId, userId: "u_aw_commish", name: "Commish" },
+      { id: "team_aw_alice", leagueId, userId: "u_aw_alice", name: "Alice" },
+    ]);
+    await joinDb.transaction((tx) => writeSchedule(tx, { leagueId, teamIds: ["team_aw_commish", "team_aw_alice"], weeks: 4 }));
+    // An EXISTING row, matching `persistTick`'s own upsert shape — a `SELECT … FOR SHARE` against
+    // a row still being INSERTED (never committed, so not yet visible) would not block at all.
+    await joinDb.insert(statWeeks).values({ week: 4, status: "scheduled" });
+
+    let releaseFlip: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseFlip = resolve));
+    const flipping = joinDb.transaction(async (tx) => {
+      await tx.update(statWeeks).set({ status: "in_progress" }).where(eq(statWeeks.week, 4));
+      await released;
+    });
+
+    // T_autoset: the real `autoSetLineupsForWeek`, on its own connection, reaching for the SAME
+    // week row through `autoSetLineupInTx`'s own FOR SHARE re-check.
+    const settingLineups = autoSetLineupsForWeek(pickDb, { weekNumber: 4, occurredAt: clock.now() });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFlip();
+    await flipping;
+
+    const outcome = await settingLineups;
+    expect(outcome.leaguesFailed).toEqual([]);
+    // Blocked on the WEEK, never on the anchor: neither team has a previous week's saved lineup
+    // (their first week touched), so nothing is notified and no `system_action` is ever written —
+    // the anchor is never even created.
+    expect(outcome.teamsSet).toBe(2);
+    const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, leagueId));
+    expect(anchor).toBeUndefined();
+  });
+});
+
+/**
+ * Step 7's second proof: a real `setLineup` and a real `autoSetLineupsForWeek` in the SAME
+ * league, overlapping in time, reaching for the SAME chain anchor from two different teams —
+ * proving they QUEUE on it rather than cycle. `setLineup` is parked with the SAME technique
+ * `notify.ts`'s own docblock describes for `attachAuditEvent`: paused AFTER its real
+ * `audit.record` call returns (the anchor row is `FOR UPDATE`, held by the still-open
+ * transaction) and BEFORE the transaction commits, via an injected `AuditLogger` whose `record`
+ * delegates to the real one and then waits — `setLineup`'s own dependency-injection seam, the
+ * same one `lineups.test.ts` already uses to force an audit failure.
+ *
+ * DELIBERATELY TWO DIFFERENT WEEKS. Alice's parked save targets week 3, which is untouched by
+ * `stat_weeks` and so reads as `"scheduled"` — `setLineup` REFUSES a locked week outright, so a
+ * save aimed at the SAME locked week 4 `autoSetLineupInTx` requires would never reach its own
+ * `audit.record` call at all, and the two writers could never contend for anything. Alice's row
+ * for week 4 is created and COMMITTED in a setup step BEFORE the concurrent phase instead, so
+ * `autoSetLineupInTx`'s own per-team existence check excludes her from its week-4 run entirely —
+ * the two writers never touch the same `lineup_slots` row, which is what makes this a proof about
+ * the ANCHOR (the one thing they still share: one league, one chain) and not an accidental proof
+ * about something else.
+ */
+describe("autoSetLineupInTx's team-lock order — a parked setLineup queues rather than cycles with it", () => {
+  it("lets a manual save and an auto-set run in the same league both complete without deadlocking", async () => {
+    const leagueId = "lg_auto_team_lock";
+    await seedLeagueWith(leagueId, ["u_at_commish", "u_at_alice", "u_at_carol"]);
+    await joinDb
+      .update(leagues)
+      .set({ isPublicMatchmade: true, rosterSlots: SPRINT_ROSTER_SLOTS })
+      .where(eq(leagues.id, leagueId));
+    await joinDb.insert(teams).values([
+      { id: "team_at_alice", leagueId, userId: "u_at_alice", name: "Alice" },
+      { id: "team_at_carol", leagueId, userId: "u_at_carol", name: "Carol" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_at_alice_qb", name: "Alice QB", position: "QB", nflTeam: "KC" },
+      { id: "p_at_alice_rb", name: "Alice RB", position: "RB", nflTeam: "KC" },
+      { id: "p_at_alice_wr", name: "Alice WR", position: "WR", nflTeam: "KC" },
+      { id: "p_at_carol_qb", name: "Carol QB", position: "QB", nflTeam: "SF" },
+      { id: "p_at_carol_rb", name: "Carol RB", position: "RB", nflTeam: "SF" },
+      { id: "p_at_carol_wr", name: "Carol WR", position: "WR", nflTeam: "SF" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_at_alice", slot: "QB", slotIndex: 0, playerId: "p_at_alice_qb" },
+      { teamId: "team_at_alice", slot: "RB", slotIndex: 0, playerId: "p_at_alice_rb" },
+      { teamId: "team_at_alice", slot: "WR", slotIndex: 0, playerId: "p_at_alice_wr" },
+      { teamId: "team_at_carol", slot: "QB", slotIndex: 0, playerId: "p_at_carol_qb" },
+      { teamId: "team_at_carol", slot: "RB", slotIndex: 0, playerId: "p_at_carol_rb" },
+      { teamId: "team_at_carol", slot: "WR", slotIndex: 0, playerId: "p_at_carol_wr" },
+    ]);
+    await joinDb.transaction((tx) => writeSchedule(tx, { leagueId, teamIds: ["team_at_alice", "team_at_carol"], weeks: 4 }));
+
+    const aliceStarters = [
+      { slot: "QB" as const, slotIndex: 0, playerId: "p_at_alice_qb" },
+      { slot: "RB" as const, slotIndex: 0, playerId: "p_at_alice_rb" },
+      { slot: "WR" as const, slotIndex: 0, playerId: "p_at_alice_wr" },
+    ];
+    // Carol's WEEK 3 save is what gives her a `previousLineup` to carry forward — without it the
+    // auto-set materializes her roster silently and never reaches for the anchor at all.
+    await setLineup(joinDb, { leagueId, teamId: "team_at_carol", weekNumber: 3, slots: [
+      { slot: "QB", slotIndex: 0, playerId: "p_at_carol_qb" },
+      { slot: "RB", slotIndex: 0, playerId: "p_at_carol_rb" },
+      { slot: "WR", slotIndex: 0, playerId: "p_at_carol_wr" },
+    ], userId: "u_at_carol" });
+    // Alice's week 4 row, created and COMMITTED before the concurrent phase, and before week 4
+    // locks — see this `describe` block's own docblock for why this is what keeps the race honest.
+    await setLineup(joinDb, { leagueId, teamId: "team_at_alice", weekNumber: 4, slots: aliceStarters, userId: "u_at_alice" });
+    // NOW week 4 locks — after both setup saves, which `setLineup` would otherwise refuse.
+    await joinDb.insert(statWeeks).values({ week: 4, status: "in_progress" });
+
+    const realAudit = getAuditLogger();
+    let holdsAnchor: () => void = () => {};
+    const anchorHeld = new Promise<void>((resolve) => (holdsAnchor = resolve));
+    let releaseSave: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseSave = resolve));
+    const pausingAudit: AuditLogger = {
+      record: async (tx, input) => {
+        const event = await realAudit.record(tx, input);
+        holdsAnchor();
+        await parked;
+        return event;
+      },
+      recordAll: (tx, inputs) => realAudit.recordAll(tx, inputs),
+    };
+
+    // T_save: alice's FIRST save of week 3 (still `"scheduled"`, so `setLineup` accepts it),
+    // parked right after its own `lineup_change` event mints — the anchor row is `FOR UPDATE` for
+    // as long as this transaction stays open.
+    const saving = setLineup(
+      joinDb,
+      { leagueId, teamId: "team_at_alice", weekNumber: 3, slots: aliceStarters, userId: "u_at_alice" },
+      undefined,
+      { audit: pausingAudit, clock },
+    );
+    await anchorHeld;
+
+    // T_autoset: the real `autoSetLineupsForWeek`, on its own connection, processing ONLY carol
+    // at week 4 (alice already has a committed week-4 row) and reaching for the SAME chain's
+    // anchor through her own `system_action`.
+    const settingLineups = autoSetLineupsForWeek(pickDb, { weekNumber: 4, occurredAt: clock.now() });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseSave();
+
+    const saved = await saving;
+    expect(saved.ok).toBe(true);
+    const outcome = await settingLineups;
+    expect(outcome.leaguesFailed).toEqual([]);
+    expect(outcome.teamsSet).toBe(1); // carol only — alice was left entirely alone at week 4
+
+    // Both landed on the SAME chain: carol's week-3 save, alice's week-4 save, alice's parked
+    // week-3 save, and carol's own `lineup_auto_set` system_action — four events, one batch, no
+    // cycle.
+    const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, leagueId));
+    expect(anchor!.headSequence).toBe(4);
+
+    const [carolNotice] = await joinDb.select().from(memberNotices).where(eq(memberNotices.userId, "u_at_carol"));
+    expect(carolNotice).toMatchObject({ leagueId, noticeType: "lineup_auto_set" });
+    expect(carolNotice?.auditEventId).not.toBeNull();
+  });
+});
+
+/**
+ * PHASE 3 PLAN D, TASK 7's own transaction, FUSED (review fix round 1, F1): `startDraft`'s own
+ * `alsoInTransaction` hook (`@/draft-service/store.ts`), given `{ auto: true }`, inserts one
+ * `member_notices` row per TEAM in the league — an implicit `FOR KEY SHARE` on `leagues` for every
+ * one of them — before its own league-chain anchor, all inside the SAME transaction as the
+ * `drafts FOR UPDATE` lock, the claim, and the `START_DRAFT` append. The identical shape
+ * `recordTierBlockedJoin`'s own test above proves safe, now proven for the fused transaction
+ * rather than for a since-removed standalone `announceDraftAutoStarted`.
+ */
+describe("startDraft's fused auto-start announcement, { auto: true }", () => {
+  it("announces an auto-started draft beside a concurrent join in the same league without deadlocking", async () => {
+    const { draftId, leagueId, teamIds } = await seedDraftFixture(joinDb, {
+      draftId: "draft_auto_start_lock",
+      leagueId: "lg_auto_start_lock",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+      isPublicMatchmade: true,
+    });
+    await joinDb.insert(players).values(POOL.map((entry) => ({ id: entry.playerId, name: entry.playerId, position: entry.position, nflTeam: "FA" })));
+    // An open seat for the joiner, the identical reason the autopick test above needs one.
+    await joinDb.update(leagues).set({ teamCount: 3 }).where(eq(leagues.id, leagueId));
+    await joinDb.insert(users).values({ id: "u_as_joiner", email: "joiner@test.local", displayName: "Joiner" });
+
+    const join = parkedJoin(leagueId, "u_as_joiner", "team_as_joiner");
+    await join.leagueLocked;
+
+    // T_start: the real `startDraft(draftId, { auto: true })`, on its own connection, reaching
+    // for the SAME league row through its fused announcement's notice inserts before its own
+    // league-chain anchor — the exact statement order `alsoInTransaction`'s own docblock states.
+    const store = createDraftStore({ db: resolveDb, publish: async () => "1-0", clock, deliverNotice: async () => {} });
+    const starting = store.startDraft(draftId, { auto: true });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    const started = await starting;
+    expect(started.ok).toBe(true);
+    expect(teamIds).toHaveLength(2); // the two teams the fused announcement notified
+
+    const notices = await joinDb.select().from(memberNotices).where(eq(memberNotices.noticeType, "draft_auto_started"));
+    expect(notices).toHaveLength(2);
+    for (const notice of notices) expect(notice.auditEventId).not.toBeNull();
+
+    // Both landed on the SAME league chain: the join's own `member_joined`, then the fused
+    // announcement's own single `system_action` shared by both notices — one chain, no cycle.
+    const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, leagueId));
+    expect(anchor!.headSequence).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------
+// FINAL REVIEW F10 — LOCK-ORDER COVERAGE FROM 7 OF 9 TO 9 OF 9. The two writers no describe block
+// above drives: `closeSupersededHoldFlag` (an `integrity_flags` guarded UPDATE plus a
+// platform-chain append, the exact ordering four other blocks exist to prove, opened N times in
+// sequence from two after-commit callers) and `setDraftKickoff` — the interesting one, because its
+// own docblock PROMISES a concurrency property that nothing measured.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * `closeSupersededHoldFlag` (`./trade-fairness`) takes exactly two locks, in this order: the
+ * `integrity_flags` row its guarded `UPDATE ... WHERE resolved_at IS NULL` matches, then the
+ * PLATFORM chain anchor through `audit.record`. Anchor last, the rule this whole suite exists for.
+ *
+ * NO FK LOCK HIDES IN THAT UPDATE, which is the half a reader has to enumerate rather than assume
+ * (this file's own lesson): `integrity_flags.league_id` does carry a foreign key onto `leagues`,
+ * but Postgres takes `FOR KEY SHARE` on a referenced row only when a statement writes the
+ * referencing key column, and this UPDATE writes `resolved_at`/`resolved_by_user_id`/`resolution`/
+ * `resolution_note` and never `league_id`. So this transaction never touches `leagues` at all and
+ * cannot be half of the join-versus-append cycle the blocks above defend against.
+ */
+describe("closeSupersededHoldFlag's lock order", () => {
+  async function heldTradeReadyToClose(flagId: string, tradeId: string, leagueId: string): Promise<void> {
+    await seedLeagueWith(leagueId, [`${leagueId}_a`, `${leagueId}_b`]);
+    await joinDb.insert(teams).values([
+      { id: `${tradeId}_home`, leagueId, userId: `${leagueId}_a`, name: "Home" },
+      { id: `${tradeId}_away`, leagueId, userId: `${leagueId}_b`, name: "Away" },
+    ]);
+    const now = new Date(clock.now());
+    await joinDb.insert(tradeProposals).values({
+      id: tradeId,
+      leagueId,
+      proposerTeamId: `${tradeId}_home`,
+      counterpartyTeamId: `${tradeId}_away`,
+      weekNumber: 4,
+      proposerAssets: [],
+      counterpartyAssets: [],
+      fingerprint: `fp_${tradeId}`,
+      note: null,
+      // Already superseded — the crash-window state this function exists to clean up.
+      status: "superseded",
+      proposedAt: now,
+      expiresAt: new Date(now.getTime() + 72 * 60 * 60 * 1000),
+    });
+    await joinDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "trade_hold",
+        subjectId: tradeId,
+        leagueId,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => flagId,
+      }),
+    );
+  }
+
+  /** Parks a `closeSupersededHoldFlag` call inside its own `audit.record` — after the guarded
+   *  UPDATE has taken the `integrity_flags` row and BEFORE the anchor is taken. The same
+   *  injected-logger technique this file already uses for `setLineup`, delaying BEFORE delegating
+   *  rather than after, because the lock under test is the one the delegate acquires. */
+  function parkedClose(db: typeof joinDb, tradeId: string, leagueId: string) {
+    let holdsFlagRow: () => void = () => {};
+    const flagRowLocked = new Promise<void>((resolve) => (holdsFlagRow = resolve));
+    let release: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (release = resolve));
+    const real = getAuditLogger();
+    const audit: AuditLogger = {
+      ...real,
+      record: async (tx, event) => {
+        holdsFlagRow();
+        await parked;
+        return real.record(tx, event);
+      },
+    };
+    const closing = closeSupersededHoldFlag(db, { tradeId, leagueId, occurredAt: clock.now(), audit });
+    return { closing, flagRowLocked, release: () => release() };
+  }
+
+  it("takes the platform anchor LAST: a concurrent platform append runs straight past it while it holds the flag row", async () => {
+    await heldTradeReadyToClose("flag_close_order", "trade_close_order", "lg_close_order");
+    const close = parkedClose(joinDb, "trade_close_order", "lg_close_order");
+    await close.flagRowLocked;
+
+    // T_raise: a real platform-chain append on a DIFFERENT subject, on its own connection. Had
+    // `closeSupersededHoldFlag` taken the anchor before the flag row, this would block behind it.
+    const raised = await pickDb.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "multi_account",
+        subjectId: "u_x|u_y",
+        leagueId: null,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: clock.now(),
+        newId: () => "flag_close_order_other",
+      }),
+    );
+    expect(raised.id).toBe("flag_close_order_other");
+
+    close.release();
+    expect(await close.closing).toBe(true);
+
+    // Three appends on the ONE platform chain, in commit order: the setup's own raise, T_raise,
+    // and this close's `flag_resolved`.
+    const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(anchor!.headSequence).toBe(3);
+  });
+
+  it("resolves one at a time when two after-commit callers close the same flag at once", async () => {
+    // The reviewer's own framing: this is opened N times in sequence from two after-commit
+    // callers (`acceptTrade`'s post-commit step and `resolveFlag`'s `trade_released` branch), so
+    // two of them landing on one flag is a real interleaving rather than a hypothetical one.
+    await heldTradeReadyToClose("flag_close_race", "trade_close_race", "lg_close_race");
+    const first = parkedClose(joinDb, "trade_close_race", "lg_close_race");
+    await first.flagRowLocked;
+
+    // The second caller's guarded UPDATE blocks on the row the first already holds — it cannot
+    // read a stale "still open" and write a second resolution.
+    const second = closeSupersededHoldFlag(pickDb, {
+      tradeId: "trade_close_race",
+      leagueId: "lg_close_race",
+      occurredAt: clock.now(),
+    });
+    expect(await waitForBlockedBackend()).toBe(true);
+    first.release();
+
+    expect(await first.closing).toBe(true);
+    // Released, its UPDATE re-evaluates `resolved_at IS NULL` against the committed row and
+    // matches nothing: no second stamp, and no second event.
+    expect(await second).toBe(false);
+    const events = await joinDb.execute<{ count: string }>(sql`SELECT count(*) AS count FROM audit_events WHERE event_type = 'flag_resolved'`);
+    expect(Number(events[0]!.count)).toBe(1);
+  });
+});
+
+/**
+ * `setDraftKickoff` (`@/league-service/draft-schedule`) is the one writer on this branch whose own
+ * docblock PROMISES a concurrency property — "two concurrent reschedules, or a reschedule racing
+ * `startDraft`, resolve one at a time rather than both reading `scheduled` and both deciding they
+ * may proceed" — that nothing measured (final review F10). The promise gets its proof here.
+ *
+ * THE LOCK IS WIDER THAN THE CALL SITE READS, which is exactly the class of thing this file exists
+ * to make visible: the `.for("update")` spans an `innerJoin`, so it locks the `drafts` row AND the
+ * `leagues` row it joined through — the same two rows `startDraft`'s fused auto-start announcement
+ * takes. It takes NO audit anchor at all (a reschedule appends nothing), so it can never be half
+ * of an anchor cycle; the whole question is whether it serializes, and against what.
+ */
+describe("setDraftKickoff's row lock", () => {
+  async function schedulableDraft(leagueId: string, commissionerUserId: string): Promise<void> {
+    await joinDb.insert(users).values({ id: commissionerUserId, email: `${commissionerUserId}@test.local`, displayName: commissionerUserId });
+    await joinDb.insert(leagues).values({ id: leagueId, name: leagueId, format: "snake", teamCount: 3, commissionerUserId });
+    await joinDb.insert(drafts).values({
+      id: `${leagueId}_draft`, leagueId, format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
+  }
+
+  it("locks the LEAGUE row too, not only the draft row — it blocks behind a concurrent join and then reschedules", async () => {
+    await schedulableDraft("lg_kickoff_lock", "u_kickoff_commish");
+    await joinDb.insert(users).values({ id: "u_kickoff_joiner", email: "kickoff_joiner@test.local", displayName: "Joiner" });
+
+    const join = parkedJoin("lg_kickoff_lock", "u_kickoff_joiner", "team_kickoff_joiner");
+    await join.leagueLocked;
+
+    // T_reschedule: the real function, on its own connection. Nothing in its source names
+    // `leagues` as a locked row; the `innerJoin` under `.for("update")` is what takes it.
+    const rescheduling = setDraftKickoff(
+      pickDb,
+      { leagueId: "lg_kickoff_lock", userId: "u_kickoff_commish", kickoffAt: "2026-09-20T17:00:00.000Z" },
+      clock,
+    );
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await rescheduling).toEqual({ ok: true, kickoffAt: "2026-09-20T17:00:00.000Z" });
+  });
+
+  it("refuses a reschedule that raced a start, rather than rescheduling a draft that is already live", async () => {
+    // THE PROMISE, EXACTLY AS THE DOCBLOCK WORDS IT. The starting side is stood in for by a real
+    // transaction taking the identical row-exclusive lock `startDraft`'s own claim takes — the
+    // same technique the `autoSetLineupInTx` week-lock case above uses for `persistTick` — because
+    // what is under test is the RESCHEDULE's behaviour when it loses the row, not the start's.
+    await schedulableDraft("lg_kickoff_race", "u_kickoff_race_commish");
+
+    let holdsDraftRow: () => void = () => {};
+    const draftRowLocked = new Promise<void>((resolve) => (holdsDraftRow = resolve));
+    let releaseStart: () => void = () => {};
+    const startCommitted = new Promise<void>((resolve) => (releaseStart = resolve));
+    const starting = joinDb.transaction(async (tx) => {
+      await tx.update(drafts).set({ status: "in_progress" }).where(eq(drafts.leagueId, "lg_kickoff_race"));
+      holdsDraftRow();
+      await startCommitted;
+    });
+    // The RENDEZVOUS, not a hopeful ordering: the reschedule must not start until the winner
+    // genuinely holds the row, or on a fast machine it can take the row first and this proves
+    // nothing in either direction — the same discipline `waitForBlockedBackend`'s own docblock
+    // states for the other half of every pairing in this file.
+    await draftRowLocked;
+
+    const rescheduling = setDraftKickoff(
+      pickDb,
+      { leagueId: "lg_kickoff_race", userId: "u_kickoff_race_commish", kickoffAt: "2026-09-20T17:00:00.000Z" },
+      clock,
+    );
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseStart();
+    await starting;
+
+    // It waited, re-read the row the winner committed, and refused — never read a stale
+    // `scheduled` and decided it could proceed.
+    expect(await rescheduling).toMatchObject({ ok: false, status: 409 });
+    const [row] = await joinDb.select().from(drafts).where(eq(drafts.leagueId, "lg_kickoff_race"));
+    expect(row!.status).toBe("in_progress");
+    expect(row!.kickoffAt.toISOString()).toBe("2026-09-10T17:00:00.000Z"); // untouched
+  });
+});
+
+/**
+ * FINAL REVIEW F11 — the pairing that did not exist, over the race that was real.
+ *
+ * Within one leased worker `tickWeek` awaits the auto-set before `finalizeDrafted`, so that
+ * ordering is sequential and correct. The exposure is that the Redis lease is best-effort BY
+ * DESIGN (`worker.ts` — an unreachable Redis runs the tick UNLEASED), so two instances can put
+ * `finalizeWeekInTx` for week W beside `autoSetLineupInTx` for week W. They shared NO lock: the
+ * auto-set writes `lineup_slots` and finalize reads it through `getLineup` with a plain unlocked
+ * `SELECT`, and the auto-set's `stat_weeks FOR SHARE` is aimed at `persistTick`, which finalize
+ * never touches. Under read-committed, finalize could score a team from the roster-derived default
+ * while the auto-set's carried-forward lineup committed a moment later.
+ *
+ * The auto-set now takes `matchups[league, week] FOR UPDATE`, ordered by `home_team_id` exactly
+ * the way `finalizeWeekInTx` orders its own row locks over the same rows. `matchups` is the row
+ * finalize actually WRITES, which is why the lock goes there rather than on `lineup_slots`: a
+ * share lock on a table finalize only reads is a lock finalize never queues behind.
+ */
+describe("autoSetLineupInTx and finalizeWeekInTx serialize on the matchups rows", () => {
+  it("blocks behind a concurrent settlement, and then declines to touch the week it just settled", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_fin_home", email: "fin_home@test.local", displayName: "Home" },
+      { id: "u_fin_away", email: "fin_away@test.local", displayName: "Away" },
+    ]);
+    await joinDb.insert(leagues).values({
+      id: "lg_fin_lock", name: "lg_fin_lock", format: "snake", teamCount: 2, commissionerUserId: "u_fin_home",
+      rosterSlots: SPRINT_ROSTER_SLOTS, isPublicMatchmade: true,
+    });
+    await joinDb.insert(teams).values([
+      { id: "team_fin_home", leagueId: "lg_fin_lock", userId: "u_fin_home", name: "Home" },
+      { id: "team_fin_away", leagueId: "lg_fin_lock", userId: "u_fin_away", name: "Away" },
+    ]);
+    await joinDb.insert(players).values([
+      { id: "p_fin_qb", name: "Fin QB", position: "QB", nflTeam: "KC" },
+      { id: "p_fin_rb", name: "Fin RB", position: "RB", nflTeam: "KC" },
+      { id: "p_fin_wr", name: "Fin WR", position: "WR", nflTeam: "KC" },
+    ]);
+    await joinDb.insert(rosterSlots).values([
+      { teamId: "team_fin_home", slot: "QB", slotIndex: 0, playerId: "p_fin_qb" },
+      { teamId: "team_fin_home", slot: "RB", slotIndex: 0, playerId: "p_fin_rb" },
+      { teamId: "team_fin_home", slot: "WR", slotIndex: 0, playerId: "p_fin_wr" },
+    ]);
+    await joinDb.transaction((tx) => writeSchedule(tx, { leagueId: "lg_fin_lock", teamIds: ["team_fin_home", "team_fin_away"], weeks: 1 }));
+    await joinDb.insert(statWeeks).values({ week: 1, status: "final" });
+
+    // T_finalize: the REAL settlement write, parked after its own matchup UPDATEs have taken the
+    // row locks and before its transaction commits.
+    let settled: () => void = () => {};
+    const written = new Promise<void>((resolve) => (settled = resolve));
+    let releaseFinalize: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseFinalize = resolve));
+    const finalizing = joinDb.transaction(async (tx) => {
+      const write = await finalizeWeekInTx(tx, "lg_fin_lock", 1, clock.now());
+      settled();
+      await parked;
+      return write;
+    });
+    await written;
+
+    // T_autoset: the real auto-set for the SAME league and week, on its own connection, called
+    // directly so the candidate query's own settled-week predicate cannot short-circuit the
+    // proof — this is about the LOCK, and the transaction is what holds it.
+    const setting = pickDb.transaction((tx) =>
+      autoSetLineupInTx(tx, "lg_fin_lock", 1, clock.now(), {
+        audit: getAuditLogger(),
+        notify: notifyAffectedMember,
+        players: { positions: { p_fin_qb: "QB", p_fin_rb: "RB", p_fin_wr: "WR" }, names: {} },
+      }),
+    );
+
+    // Before F11 the two shared no lock at all, and this would never block.
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFinalize();
+
+    expect(await finalizing).toMatchObject({ weekNumber: 1, matchupsScored: 1 });
+    // Released, it re-reads the rows the settlement committed and declines: the week's scores
+    // stand, so materializing a lineup now would be a lineup the correction sweep re-scores from.
+    expect(await setting).toEqual({ teamsSet: 0, notices: [] });
+    const rows = await joinDb.select().from(lineupSlots).where(eq(lineupSlots.weekNumber, 1));
+    expect(rows).toEqual([]);
   });
 });

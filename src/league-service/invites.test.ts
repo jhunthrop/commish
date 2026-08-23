@@ -442,7 +442,7 @@ describe("invitePreview", () => {
     const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
     if (!invite.ok) throw new Error(invite.reason);
 
-    const result = await invitePreview(db, invite.code);
+    const result = await invitePreview(db, invite.code, clock);
     expect(result).toEqual({
       ok: true,
       terms: {
@@ -456,6 +456,9 @@ describe("invitePreview", () => {
         stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
         commissionerName: "Manager 1",
         commissionerAvatar: null,
+        // `league()` creates with `clock` (`nowIso`, "2026-08-17T12:00:00.000Z"), so the draft
+        // is scheduled 7 days out — `LEAGUE_CONFIG.defaults.draftDaysFromCreation`.
+        draftAt: "Monday 24 August, 12:00 PM UTC (in 7 days)",
       },
     });
   });
@@ -570,5 +573,20 @@ describe("invitePreview", () => {
     const result = await invitePreview(dbWithNthSelectEmpty(4), invite.code);
     if (!result.ok) throw new Error(result.reason);
     expect(result.terms.scoringLabel).toBe("PPR");
+  });
+
+  it("falls back to the clock's own reading when a league's draft row is somehow gone", async () => {
+    // `drafts` is written in the SAME transaction as `leagues` (`createLeague`) — a missing row
+    // here never happens in production, the same never-true case `leagueHome`'s own
+    // `draft?.kickoffAt.toISOString() ?? clock.now()` fallback defends against (`read.ts`).
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await invitePreview(dbWithNthSelectEmpty(6), invite.code, clock);
+    if (!result.ok) throw new Error(result.reason);
+    // `formatDraftTime(clock.now(), clock.now())` — the same instant for both, so the relative
+    // half reads "starting now" rather than any real duration.
+    expect(result.terms.draftAt).toContain("starting now");
   });
 });

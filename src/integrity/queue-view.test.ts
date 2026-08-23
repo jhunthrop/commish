@@ -1,14 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { AuditEvent, AuditEventType, JsonObject } from "@/domain/audit";
 import { TRADE_FAIRNESS_BASES } from "@/integrity/flags";
+import { TRADE_STATUSES } from "@/trades/lifecycle";
 import { ACTIVITY_VISIBILITY, activityRowFor } from "./activity-view";
 import {
   flagDetailFor,
   flagTrailRowFor,
   formatFlagCursor,
+  noLongerHeldExplanationFor,
   parseFlagCursor,
   queueRowFor,
   subjectIsAlreadyReversed,
+  subjectIsNoLongerHeld,
   subjectPlayersMovedAgain,
   TRADE_FAIRNESS_BASIS_PHRASE,
   tradeFairnessBasisPhrase,
@@ -62,7 +65,7 @@ describe("queueRowFor", () => {
   });
 
   it("has a question and an icon for every flag type — exhaustive by construction", () => {
-    for (const flagType of ["multi_account", "review_report", "chat_report", "trade_fairness"] as const) {
+    for (const flagType of ["multi_account", "review_report", "chat_report", "trade_fairness", "trade_hold"] as const) {
       const row = queueRowFor({ flagId: "f", flagType, raisedAt: "2026-08-01T00:00:00.000Z", about: "Someone" });
       expect(row.question.length).toBeGreaterThan(0);
       expect(row.icon).toBeTruthy();
@@ -121,6 +124,12 @@ describe("flagTrailRowFor", () => {
     const noAction = flagTrailRowFor(event("flag_resolved", { flagId: "flag_1", decision: "no_action" }));
     expect(noAction?.headline).toBe("An operator closed this flag with no action.");
 
+    const released = flagTrailRowFor(event("flag_resolved", { flagId: "flag_1", decision: "trade_released" }));
+    expect(released?.headline).toBe("An operator released the trade.");
+
+    const blocked = flagTrailRowFor(event("flag_resolved", { flagId: "flag_1", decision: "trade_blocked" }));
+    expect(blocked?.headline).toBe("An operator blocked the trade.");
+
     const malformed = flagTrailRowFor(event("flag_resolved", { flagId: "flag_1", decision: "not_a_real_decision" }));
     expect(malformed?.headline).toBe("An operator resolved this flag.");
 
@@ -128,6 +137,14 @@ describe("flagTrailRowFor", () => {
     // honest fallback as an unrecognized string — `payloadStr`'s own `undefined` branch.
     const missing = flagTrailRowFor(event("flag_resolved", { flagId: "flag_1" }));
     expect(missing?.headline).toBe("An operator resolved this flag.");
+  });
+
+  it("reads a SYSTEM resolution as the platform's own, never an operator's (Plan D, fix round 1)", () => {
+    // `actorId: null` is the exact construction `closeSupersededHoldFlag` writes
+    // (`@/integrity-service/trade-fairness`) — the same "no human decided this" shape every other
+    // system-authored event in this product carries.
+    const systemResolved = flagTrailRowFor({ ...event("flag_resolved", { flagId: "flag_1", decision: "superseded_before_review" }), actorId: null });
+    expect(systemResolved?.headline).toBe("The platform closed this flag once a different trade superseded it.");
   });
 
   it("renders a review's removal", () => {
@@ -193,6 +210,19 @@ describe("flagTrailRowFor", () => {
     it("denies a roster_move with no reason at all, the same malformed-payload discipline every other renderer holds to", () => {
       const row = event("roster_move", { tradeId: "trade_1" }, "league_1");
       expect(flagTrailRowFor(row)).toBeNull();
+    });
+  });
+
+  describe("the held-trade branch (Plan D, Task 5)", () => {
+    it("renders the hold itself, off the platform chain", () => {
+      const row = event("system_action", { action: "trade_held_for_review", tradeId: "trade_1" }, "platform");
+      expect(flagTrailRowFor(row)).toMatchObject({ headline: "The platform held this trade for a fairness review." });
+    });
+
+    it("denies every other system_action code, deny-by-default", () => {
+      expect(flagTrailRowFor(event("system_action", { action: "tier_blocked_join", subjectUserId: "u1" }))).toBeNull();
+      expect(flagTrailRowFor(event("system_action", { action: "lineup_auto_set", subjectUserId: "u1" }))).toBeNull();
+      expect(flagTrailRowFor(event("system_action", {}))).toBeNull();
     });
   });
 });
@@ -270,6 +300,89 @@ describe("flagDetailFor's decisions narrow on the SUBJECT, Task 7", () => {
   it("answers false for subjectPlayersMovedAgain on any non-trade subject and on an unaffected trade", () => {
     expect(subjectPlayersMovedAgain(tradeSubject)).toBe(false);
     expect(subjectPlayersMovedAgain({ kind: "chat_message", messageId: "5", body: "hi", authorName: "Bob", removedAt: null })).toBe(false);
+  });
+
+  const heldTradeSubject: FlagSubjectView = {
+    kind: "held_trade",
+    tradeId: "trade_1",
+    proposerTeamName: "Team Alice",
+    counterpartyTeamName: "Team Bob",
+    gave: [],
+    got: [],
+    valuationBasis: "The platform valued this trade the moment it was accepted.",
+    fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
+    proposerManager: { userId: "u_alice", name: "Alice", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
+    counterpartyManager: { userId: "u_bob", name: "Bob", joinedAt: "2026-02-01T00:00:00.000Z", completedSeasons: 0 },
+    noLongerHeldExplanation: null,
+  };
+
+  it("offers exactly trade_released and trade_blocked for a held_trade subject — no no_action, no warned_user, no reversal", () => {
+    const detail = flagDetailFor({ ...flag, flagType: "trade_hold" }, heldTradeSubject, [], []);
+    expect(detail.decisions).toEqual(["trade_released", "trade_blocked"]);
+  });
+
+  /**
+   * Final review F4: the M8 promise ("never offer a decision that 409s") reaches Plan D's own
+   * subject. Every state but `held` withholds BOTH decisions, which are the only two wired for
+   * this subject, so the offered set is empty and the page has an explanation to render instead.
+   */
+  it.each(TRADE_STATUSES.filter((status) => status !== "held"))("offers NOTHING for a held_trade whose row has moved to %s", (status) => {
+    const moved: FlagSubjectView = { ...heldTradeSubject, noLongerHeldExplanation: noLongerHeldExplanationFor(status) };
+    const detail = flagDetailFor({ ...flag, flagType: "trade_hold" }, moved, [], []);
+    expect(detail.decisions).toEqual([]);
+    expect(subjectIsNoLongerHeld(moved)).toBe(true);
+  });
+
+  it("still offers both while the row is genuinely held", () => {
+    expect(noLongerHeldExplanationFor("held")).toBeNull();
+    expect(subjectIsNoLongerHeld(heldTradeSubject)).toBe(false);
+  });
+
+  it("answers false for subjectIsNoLongerHeld on every other subject kind", () => {
+    expect(subjectIsNoLongerHeld(tradeSubject)).toBe(false);
+    expect(subjectIsNoLongerHeld({ kind: "chat_message", messageId: "5", body: "hi", authorName: "Bob", removedAt: null })).toBe(false);
+  });
+
+  it("explains a trade that is gone entirely rather than leaving the operator a blank card", () => {
+    // The `row === undefined` branch of `subjectFor` — the trade cascaded away with its league.
+    expect(noLongerHeldExplanationFor(null)).toBe("This trade is no longer here, so there is nothing left to release or block.");
+  });
+
+  it("names every trade status, so a ninth one cannot ship without an operator sentence", () => {
+    // Totality over the runtime array, the same shape `system-actions.test.ts` holds the
+    // visibility table to. The `Record<TradeStatus, …>` type already makes a missing key a
+    // compile error; this catches the other direction, a key that no longer names a real status.
+    for (const status of TRADE_STATUSES) {
+      const phrase = noLongerHeldExplanationFor(status);
+      if (status === "held") expect(phrase).toBeNull();
+      else expect(phrase).toMatch(/\S/);
+    }
+  });
+
+  it("never offers trade_released/trade_blocked on any other subject kind", () => {
+    const detail = flagDetailFor({ ...flag, flagType: "trade_fairness" }, tradeSubject, [], []);
+    expect(detail.decisions).not.toContain("trade_released");
+    expect(detail.decisions).not.toContain("trade_blocked");
+  });
+});
+
+describe("FlagSubjectView's held_trade arm (Plan D, Task 5)", () => {
+  it("carries both managers' own standing beside the players changing hands", () => {
+    const subject: FlagSubjectView = {
+      kind: "held_trade",
+      tradeId: "trade_1",
+      proposerTeamName: "Team Alice",
+      counterpartyTeamName: "Team Bob",
+      gave: [{ playerId: "p1", name: "Star RB", position: "RB", averagePoints: 22.4 }],
+      got: [{ playerId: "p2", name: "Bench WR", position: "WR", averagePoints: 3.1 }],
+      valuationBasis: "The platform valued this trade the moment it was accepted.",
+      fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
+      proposerManager: { userId: "u_alice", name: "Alice", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
+      counterpartyManager: { userId: "u_bob", name: "Bob", joinedAt: null, completedSeasons: 0 },
+      noLongerHeldExplanation: null,
+    };
+    const detail = flagDetailFor({ ...flag, flagType: "trade_hold" }, subject, [], []);
+    expect(detail.subject).toBe(subject);
   });
 });
 

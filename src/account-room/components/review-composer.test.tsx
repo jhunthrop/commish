@@ -16,6 +16,7 @@ const EXISTING: ReviewView = {
   updatedAt: "2026-08-01T00:00:00.000Z",
   authorName: "Ada Lovelace",
   authorAvatar: null,
+  verified: false,
 };
 
 const NONE: MyReviewState = { state: "none" };

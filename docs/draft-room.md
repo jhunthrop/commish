@@ -180,6 +180,36 @@ ticker's job, and `TIMER_EXPIRE` has no HTTP path a client could use. `Countdown
 `deadlineAt`, clamped to zero, ticking on `DRAFT_ROOM_CONFIG.countdownTickMs`". `RoomRail`
 is now its only caller: there is one clock in the room, on one surface.
 
+## The commissioner's clock, and the platform's (Phase 3 Plan D)
+
+The `scheduled`-mode room (the state before anyone has drafted a single pick) waits on
+`drafts.kickoff_at` — a column that has existed since Phase 1 but, until this plan, was never
+chosen, never shown and never compared to the clock by anything. Two things changed, both outside
+this directory:
+
+- **The commissioner can choose it.** `PUT /api/leagues/[leagueId]/draft-schedule`
+  (`src/league-service/draft-schedule.ts`, `setDraftKickoff`) moves `kickoffAt` while the draft is
+  still `scheduled`, refusing a caller who is not the league's commissioner with the same 404 (never
+  403) `publicJoinPrecondition` and `withAdmin` already answer for an unauthorized caller — a
+  schedule route that told a member "no" with a 403 would confirm which member holds the chair to
+  anybody who could reach the league. The control itself lives on the league home page
+  (`draft-schedule-panel.tsx`, `src/league-room/**`), not in this room — a draft that has not
+  started yet has no room to control it from.
+- **The platform presses start if nobody does.** `autoStartDueDrafts`
+  (`src/draft-service/auto-start.ts`) starts any public matchmade league's draft whose scheduled
+  kickoff has passed, through the IDENTICAL start path a commissioner's own button calls
+  (`store.startDraft`) — one start implementation, not two. **The room cannot tell the difference,
+  and is not meant to.** Whether `scheduled` mode gives way to `watching` because a human clicked or
+  because the ticker claimed the guarded status transition first, `useDraftRoom` sees the same
+  `draft.status` frame and the same resync path; `RoomRail`'s `data-mode` morph reads `view.phase`
+  alone. A private league's draft is never auto-started, however late its commissioner runs —
+  `enforcementAppliesTo({ isPublicMatchmade: true })` gates the scan before any row is even read,
+  the identical platform-wide switch every other automated action in this plan asks.
+
+See `docs/decisions/enforcement-and-tiers.md` §9 for the two schedulers this reasoning depends on
+(the commissioner-chosen kickoff and the platform's own ticker) and why the audit-chain walk is a
+different scheduler entirely, owned by a different phase.
+
 ## The two-mode room
 
 A draft has two emotional modes, and the room morphs between them rather than making anyone

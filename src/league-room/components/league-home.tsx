@@ -1,16 +1,18 @@
 import Link from "next/link";
 import type { LeagueHomeBody, LineupBody } from "../contract";
-import { Card, PageTitle } from "@/components/ui";
+import { PageTitle } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import type { HelpLevel } from "@/identity/preferences";
 import { formatWeek } from "../lib/format";
 import { AdvisorPanel } from "./advisor-panel";
+import { DraftSchedulePanel } from "./draft-schedule-panel";
 import { InvitePanel } from "./invite-panel";
 import { LeagueMembersPanel } from "./league-members-panel";
 import { LeagueTermsPanel } from "./league-terms-panel";
 import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupScoreboard } from "./matchup-scoreboard";
+import { ModerationSummary } from "./moderation-summary";
 import { StandingsTable } from "./standings-table";
 import { TradeInboxLink } from "./trade-inbox-link";
 
@@ -32,8 +34,6 @@ export function LeagueHome({
   readonly helpLevel?: HelpLevel;
 }) {
   const clinched = home.standings.some((row) => row.teamId === home.myTeamId && row.clinched);
-  const drafted = home.draftStatus === "complete";
-  const draftLive = home.draftStatus === "in_progress";
 
   return (
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
@@ -46,17 +46,14 @@ export function LeagueHome({
 
       <MatchupCelebration matchup={home.myMatchup} myTeamId={home.myTeamId} clinched={clinched} />
 
-      {drafted ? null : (
-        <Card>
-          <p className="text-text-primary">
-            {draftLive ? "Your draft is live right now." : "This league hasn't drafted yet."}
-          </p>
-          {home.draftId === null ? null : (
-            <Link className="text-accent underline" href={`/app/drafts/${home.draftId}`}>
-              {draftLive ? "Join the draft" : "Open the draft room"}
-            </Link>
-          )}
-        </Card>
+      {/* Task 6: the button that has existed since Phase 1 and nobody could ever press on
+          purpose. `home.draftSchedule` rides THIS render — the same props-in idiom every other
+          panel below uses — and the panel reaches `fetchJson` only for its own writes (a
+          reschedule or a start), never to read its initial state. Renders for every draft
+          state, including `complete` — unlike the static card this replaced, which rendered
+          nothing once a league had drafted. */}
+      {home.draftSchedule === null ? null : (
+        <DraftSchedulePanel leagueId={home.leagueId} isCommissioner={home.isCommissioner} initialSchedule={home.draftSchedule} />
       )}
 
       <section className="flex flex-col gap-2" aria-label={`${formatWeek(home.currentWeek)} matchup`}>
@@ -131,6 +128,11 @@ export function LeagueHome({
       <LeagueMembersPanel teams={home.teams} teamCount={home.teamCount} commissionerUserId={home.commissionerUserId} myTeamId={home.myTeamId} />
 
       {home.isCommissioner ? <InvitePanel leagueId={home.leagueId} /> : null}
+
+      {/* Task 8: the commissioner's own window onto platform moderation in their league — a
+          member with extra buttons, not an operator, so this sits behind the identical
+          `isCommissioner` gate `InvitePanel` already does, right beside it. */}
+      {home.isCommissioner ? <ModerationSummary leagueId={home.leagueId} /> : null}
     </main>
   );
 }

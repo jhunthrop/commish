@@ -12,6 +12,7 @@ import { Card, PageTitle } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { ResolutionForm, type DecisionPreview } from "@/admin-room/components/resolution-form";
+import { HeldTradeDetail, type HeldTradeSubject } from "@/admin-room/components/held-trade-detail";
 
 export const dynamic = "force-dynamic";
 
@@ -38,7 +39,13 @@ function AlreadyRemovedNote() {
   return <p className="mt-2 text-sm text-text-muted">We already removed this content. You can still close this flag or warn the member.</p>;
 }
 
-function SubjectCard({ subject }: { readonly subject: FlagSubjectView }) {
+/** Every subject kind EXCEPT `held_trade` — `held-trade-detail.tsx` is its own whole surface
+ *  (Task 5's brief: "shows what the operator needs and nothing else"), not a card plus the
+ *  generic decision form every OTHER flag type shares. `AdminFlagDetailPage` dispatches to it
+ *  directly rather than routing it through `SubjectCard`. */
+type OrdinarySubject = Exclude<FlagSubjectView, { readonly kind: "held_trade" }>;
+
+function SubjectCard({ subject }: { readonly subject: OrdinarySubject }) {
   if (subject.kind === "review") {
     return (
       <Card>
@@ -244,10 +251,48 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
     const detail = await flagDetail(getDb(), flagId);
     if (detail === null) notFound();
 
+    // `held_trade` (Plan D, Task 5) is its own whole surface — `held-trade-detail.tsx` shows
+    // what the operator needs and nothing else, never the generic Evidence/Reporters cards every
+    // OTHER flag type gets (a held trade has no reporters, and its evidence is already the
+    // friendly card in full). Dispatched before any of the generic-subject machinery below runs.
+    if (detail.subject.kind === "held_trade") {
+      const heldSubject: HeldTradeSubject = detail.subject;
+      return (
+        <>
+          <AppHeader displayName={operator.displayName} avatar={operator.avatarUrl} isAdmin={operator.isAdmin} />
+          <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
+            <header className="flex flex-col gap-1">
+              <PageTitle>Held trade</PageTitle>
+              <time dateTime={detail.raisedAt} className="text-sm text-text-muted">
+                Held {formatWhen(detail.raisedAt)}
+              </time>
+            </header>
+            {detail.resolution !== null ? (
+              <Card>
+                <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
+                <ResolutionSummary resolution={detail.resolution} />
+              </Card>
+            ) : (
+              <HeldTradeDetail
+                flagId={detail.flagId}
+                subject={heldSubject}
+                trail={detail.trail}
+                // The SAME offered set every other subject's form reads (final review F4) — this
+                // surface renders its two buttons out of it rather than assuming both are live.
+                decisions={detail.decisions}
+                noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength}
+              />
+            )}
+          </main>
+        </>
+      );
+    }
+
+    const subject: Exclude<FlagSubjectView, { readonly kind: "held_trade" }> = detail.subject;
     const leagueName = detail.leagueId === null ? "your league" : await leagueNameFor(getDb(), detail.leagueId);
-    const previews = noticePreviewsFor(leagueName, detail.subject);
-    const decisions = decisionsFor(detail.decisions, detail.subject);
-    const evidenceEntries = nonDuplicatedEvidenceEntries(detail.evidence, detail.subject);
+    const previews = noticePreviewsFor(leagueName, subject);
+    const decisions = decisionsFor(detail.decisions, subject);
+    const evidenceEntries = nonDuplicatedEvidenceEntries(detail.evidence, subject);
 
     return (
       <>
@@ -260,7 +305,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
             </time>
           </header>
 
-          <SubjectCard subject={detail.subject} />
+          <SubjectCard subject={subject} />
 
           <Card>
             <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Evidence</p>
@@ -327,7 +372,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
                 decisions={decisions}
                 noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength}
                 previews={previews}
-                isChatSubject={detail.subject.kind === "chat_message"}
+                isChatSubject={subject.kind === "chat_message"}
               />
             )}
           </Card>

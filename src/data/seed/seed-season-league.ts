@@ -15,6 +15,52 @@ import { ensureDevUsers, preserveRealCommissioner, preserveRealTeamOwner } from 
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
+/** The fields every season-league playthrough is keyed by — `DEV_SEED.season` is the first of
+ *  them; `VETERAN_SEASON_LEAGUES` (below) names the other two Task 10 adds so ONE seeded
+ *  identity can cross `INTEGRITY_CONFIG.participation.veteranSeasonCutoff` by finishing three
+ *  real, separately-played seasons rather than one league counted three times. */
+export interface SeasonLeagueConfig {
+  readonly leagueId: string;
+  readonly draftId: string;
+  readonly name: string;
+  /**
+   * Which of `ensureDevUsers`' fixed 12-identity pool sit in this league's teams, index 0 first
+   * (team 1, always the veteran-in-progress identity — `claimUserId` when one is given).
+   * Defaults to every index (`DEV_SEED.season`'s own twelve-team shape, the original behavior
+   * every existing caller and test relies on).
+   *
+   * THE TWO `VETERAN_SEASON_LEAGUES` ENTRIES MUST STAY DISJOINT PAST INDEX 0. `ensureDevUsers`
+   * returns the IDENTICAL 12 ids in the IDENTICAL order for every league that calls it — a
+   * second and third season league that both mapped team 2 to index 1 would hand `dev_user_02` a
+   * THIRD completed season too, right alongside the one identity this step means to promote. Two
+   * small, four-team leagues with mutually exclusive non-veteran slices (indices 1-3 and 4-6)
+   * cap every OTHER dev placeholder at two completed seasons — safely below the cutoff (3) — so
+   * `dev_public_rookie_snake`'s own seeded seats (indices 1-3, `seed-public-leagues.ts`) still
+   * read `all_newcomers` on the browse page Task 10's own e2e walk checks.
+   */
+  readonly ownerIndices?: readonly number[];
+}
+
+const ALL_TWELVE_OWNER_INDICES = Array.from({ length: 12 }, (_, i) => i);
+
+/**
+ * Phase 3 Plan D, Task 10, Step 1. `completedSeasonsFor` (`@/league-service/participation`)
+ * counts one row per TEAM in a season-completed LEAGUE — never a multiplier on one league — so
+ * the only honest way to hand team 1's owner a THIRD completed season is a third league that
+ * really plays through `finalizeWeekInTx` the same way `DEV_SEED.season` itself does (ruling 24:
+ * `season_completed_at` may never come from anything but that transaction). Local constants,
+ * not `DEV_SEED` fields: every OTHER seeder in this directory (`seed-trades.ts`,
+ * `seed-integrity.ts`) already keys its own extra leagues this way rather than growing the
+ * shared config for a single caller.
+ *
+ * FOUR teams each, not twelve: `ownerIndices`' own docblock explains why a smaller, disjoint
+ * roster of non-veteran teammates is what keeps every OTHER dev placeholder below the cutoff.
+ */
+export const VETERAN_SEASON_LEAGUES: readonly [SeasonLeagueConfig, SeasonLeagueConfig] = [
+  { leagueId: "dev_league_season_2", draftId: "dev_draft_season_2", name: "Dev Season League II", ownerIndices: [0, 1, 2, 3] },
+  { leagueId: "dev_league_season_3", draftId: "dev_draft_season_3", name: "Dev Season League III", ownerIndices: [0, 4, 5, 6] },
+];
+
 /**
  * A league that has already played: twelve teams, complete legal rosters, a full generated
  * schedule and every week scored — so standings, matchup pages and the win/clinch moment all
@@ -29,18 +75,26 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  *
  * Idempotent in the row-count sense, like `seedDevLeagues`: re-running upserts rather than
  * duplicating, and re-scoring a week recomputes the same numbers.
+ *
+ * `leagueConfig` defaults to `DEV_SEED.season` (the original, single-league behavior every
+ * existing caller and test relies on) — Task 10's `index.ts` calls this THREE times, once per
+ * entry in `[DEV_SEED.season, ...VETERAN_SEASON_LEAGUES]`, passing the SAME `claimUserId` every
+ * time so team 1's owner is identical across all three and really crosses the veteran cutoff.
  */
 export async function seedSeasonLeague(
   db: Db,
   clock: Clock,
   claimUserId?: string,
+  leagueConfig: SeasonLeagueConfig = DEV_SEED.season,
 ): Promise<{ teams: number; weeks: number; scoredWeeks: number }> {
   if (process.env.NODE_ENV === "production") {
     throw new Error("seedSeasonLeague creates placeholder users and must never run in production.");
   }
 
-  const { leagueId, draftId, name } = DEV_SEED.season;
-  const ownerIds = await ensureDevUsers(db, claimUserId);
+  const { leagueId, draftId, name } = leagueConfig;
+  const ownerIndices = leagueConfig.ownerIndices ?? ALL_TWELVE_OWNER_INDICES;
+  const allOwnerIds = await ensureDevUsers(db, claimUserId);
+  const ownerIds = ownerIndices.map((index) => allOwnerIds[index]!);
   const teamIds = ownerIds.map((_, i) => `${leagueId}_team_${String(i + 1).padStart(2, "0")}`);
 
   await db
@@ -49,7 +103,7 @@ export async function seedSeasonLeague(
       id: leagueId,
       name,
       format: "snake",
-      teamCount: DEV_SEED.teamCount,
+      teamCount: ownerIds.length,
       commissionerUserId: ownerIds[0]!,
       rosterSlots: [...STANDARD_ROSTER_SLOTS],
     })

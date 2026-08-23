@@ -16,28 +16,74 @@ export const TRADE_STATUSES = [
    *  TERMINAL, set by `acceptTrade`'s supersede sweep, and distinct from `rejected` because
    *  nobody rejected it and the copy a manager reads has to say so. */
   "superseded",
+  /**
+   * Plan D's auto-hold (Task 5). Both managers agreed, but the gap between what they are
+   * trading crossed `INTEGRITY_CONFIG.trade.autoHoldThreshold` in a public, platform-enforced
+   * league, so NOTHING executed: no roster moved, no other offer was superseded, and a
+   * `trade_hold` flag is waiting on an operator. NOT TERMINAL, and deliberately not `accepted`
+   * with a nullable "held" timestamp beside it — a reversal's `reversed_at` pattern works
+   * because the acceptance genuinely happened; here nothing has happened yet, and a status that
+   * claimed otherwise would tell rosters a lie the database itself does not carry. `held` is
+   * also not `open`: nobody may answer it (accept, reject or withdraw) the ordinary way, because
+   * the offer is no longer a question between the two managers — it is a question for an
+   * operator. Two ways out, both operator decisions (`resolveFlag`'s `trade_released`/
+   * `trade_blocked`): released moves this row to `accepted` (the trade the two managers agreed
+   * to actually executes), blocked moves it to `blocked` (it never will). A held trade can still
+   * be `superseded` the same way an open one can — the world moving on is not a review outcome.
+   */
+  "held",
+  /**
+   * An operator's `trade_blocked` decision on a `held` trade (Plan D, Task 5). TERMINAL, and
+   * distinct from `rejected` for the same reason `superseded` is distinct from it: neither
+   * manager declined this trade, and a manager who read "declined" would draw a false
+   * conclusion about their counterparty. Reachable ONLY from `held` — an operator has no
+   * decision that blocks an `open` offer, because an unanswered offer was never Plan D's
+   * business in the first place.
+   */
+  "blocked",
 ] as const;
 export type TradeStatus = (typeof TRADE_STATUSES)[number];
 
 export const TERMINAL_STATUSES: Readonly<Record<TradeStatus, boolean>> = {
   open: false, accepted: true, rejected: true, withdrawn: true, expired: true, superseded: true,
+  held: false, blocked: true,
 };
 
-export type TradeTransition = "accept" | "reject" | "withdraw" | "expire" | "supersede";
+export type TradeTransition = "accept" | "reject" | "withdraw" | "expire" | "supersede" | "hold" | "release" | "block";
 
 /** Which status each transition produces. Exhaustive: a new transition without a target will
  *  not compile. */
 const TARGET_OF: Readonly<Record<TradeTransition, TradeStatus>> = {
   accept: "accepted", reject: "rejected", withdraw: "withdrawn", expire: "expired", supersede: "superseded",
+  // Plan D (Task 5): `hold` is `acceptTrade`'s own branch when the gap crosses the auto-hold
+  // threshold in an enforced public league; `release` is `resolveFlag`'s `trade_released`
+  // decision (the trade the two managers agreed to actually executes); `block` is its
+  // `trade_blocked` decision.
+  hold: "held", release: "accepted", block: "blocked",
 };
 
 /**
- * Every transition is legal from `open` and from nowhere else. Stated as a function rather than
- * left implicit because the guard that actually enforces it is in SQL (`WHERE status = 'open'`),
- * and a rule enforced only in SQL is a rule no test can read.
+ * Which status each transition may run FROM — declared once, exhaustively, rather than implied
+ * by a single "is this terminal" question. `supersede` is the one verb the world can still apply
+ * to a `held` trade: a held trade dies the same way an open one does when a DIFFERENT trade moves
+ * one of its players, and that is the world moving on, not the fairness review's own answer.
+ * Every other ordinary lifecycle verb (`accept`/`reject`/`withdraw`/`expire`) requires `open`,
+ * unchanged from before this task — a held trade is no longer a question between the two
+ * managers, so none of them may answer it the ordinary way. `release`/`block` are the two ways
+ * out of `held`, and only of `held`: an operator has no decision that reaches an `open` offer.
  */
-export function transitionIsLegal(from: TradeStatus): boolean {
-  return !TERMINAL_STATUSES[from];
+const SOURCE_OF: Readonly<Record<TradeTransition, readonly TradeStatus[]>> = {
+  accept: ["open"], reject: ["open"], withdraw: ["open"], expire: ["open"], supersede: ["open", "held"],
+  hold: ["open"], release: ["held"], block: ["held"],
+};
+
+/**
+ * Whether `transition` may run from `from` — the guard that actually enforces this is in SQL
+ * (a guarded `UPDATE`'s own `WHERE`), and a rule enforced only in SQL is a rule no test can
+ * read. This function is that rule, restated so a test — and a reviewer — can ask it directly.
+ */
+export function transitionIsLegal(from: TradeStatus, transition: TradeTransition): boolean {
+  return SOURCE_OF[transition].includes(from);
 }
 
 export function nextStatusFor(transition: TradeTransition): TradeStatus {

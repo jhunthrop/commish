@@ -48,6 +48,15 @@ export function getDraftStore(): DraftStore {
   return store;
 }
 
+/**
+ * Task 7's auto-start rides this same ticker rather than a third `setInterval` — see
+ * `ticker.ts`'s own `tick()` docblock. Its `autoStart` dependency is left at `createDraftTicker`'s
+ * default (the real `autoStartDueDrafts`, `./auto-start`), which needs only `{ store, clock }`:
+ * the `draft_auto_started` announcement is fused into `getDraftStore()`'s own `startDraft`
+ * transaction (`store.ts`), so it inherits that store's `audit`/`deliverNotice` wiring — already
+ * the process-wide logger and publisher, by `createDraftStore`'s own defaults above — with nothing
+ * new to wire here.
+ */
 export function getDraftTicker(): DraftTicker {
   if (ticker === undefined) {
     ticker = createDraftTicker({

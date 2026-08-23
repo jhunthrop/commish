@@ -3,17 +3,29 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/rea
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { NoticeInbox } from "@/account-room/components/notice-inbox";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
+import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import type { NoticeView } from "@/account-room/contract";
+import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
+import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
 import type { ActivityRow } from "@/integrity/activity-view";
+import { noLongerHeldExplanationFor } from "@/integrity/queue-view";
 import type { TradeProposalView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
-import { fixtureLeagueDeps } from "@/league-room/test-fixtures";
+import { DRAFT_SCHEDULE, HOME, LINEUP, PUBLIC_LEAGUES, TERMS, fixtureLeagueDeps } from "@/league-room/test-fixtures";
+import { DraftSchedulePanel } from "@/league-room/components/draft-schedule-panel";
+import { LeagueHome } from "@/league-room/components/league-home";
+import { LeagueTermsPanel } from "@/league-room/components/league-terms-panel";
+import { ModerationSummary } from "@/league-room/components/moderation-summary";
+import { PublicLeagueList } from "@/league-room/components/public-league-list";
 import { TradeCard } from "@/league-room/components/trade-card";
 import { TradeComposer } from "@/league-room/components/trade-composer";
-import type { TradeRoomContext } from "@/league-room/contract";
+import type { ModerationSummaryView, TradeRoomContext } from "@/league-room/contract";
+import { ReviewFeed } from "@/account-room/components/review-feed";
+import type { ReviewsPage, ReviewView } from "@/reviews/contract";
 import { copyViolations } from "./copy-rules";
+import { renderNotice } from "./notices";
 
 /**
  * THE HOUSE COPY RULES, APPLIED TO WHAT A PERSON ACTUALLY SEES.
@@ -92,7 +104,9 @@ describe("NoticeInbox says nothing that breaks the house copy rules", () => {
       const fixture = fixtureAccountDeps(page);
       const { container, unmount } = render(
         <AccountRoomDepsProvider deps={fixture.deps}>
-          <NoticeInbox />
+          <NoticesProvider>
+            <NoticeInbox />
+          </NoticesProvider>
         </AccountRoomDepsProvider>,
       );
       const trigger = await within(container).findByRole("button", { name: /^Notices/ });
@@ -157,7 +171,11 @@ describe("the league activity page says nothing that breaks the house copy rules
       vi.mocked(listNotices).mockResolvedValue({ notices, unreadCount: notices.length });
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
       const page = await LeagueActivityPage({ params: Promise.resolve({ leagueId: "league_1" }), searchParams: Promise.resolve({}) });
-      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      const { container, unmount } = render(
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <NoticesProvider>{page}</NoticesProvider>
+        </AccountRoomDepsProvider>,
+      );
       await screen.findByText("League activity");
       expectClean(container, NOTICE.title, NOTICE.body, ROW.headline, ROW.detail ?? "");
       unmount();
@@ -199,7 +217,11 @@ describe("the admin queue page says nothing that breaks the house copy rules", (
       vi.mocked(listPendingFlags).mockResolvedValue({ rows, nextBefore: null });
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
       const page = await AdminQueuePage({ searchParams: Promise.resolve({}) });
-      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      const { container, unmount } = render(
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <NoticesProvider>{page}</NoticesProvider>
+        </AccountRoomDepsProvider>,
+      );
       await screen.findByText("Dispute queue");
       expectClean(container, QUEUE_ROW.question, QUEUE_ROW.about);
       unmount();
@@ -242,11 +264,184 @@ describe("the admin flag detail page says nothing that breaks the house copy rul
       vi.mocked(flagDetail).mockResolvedValue(detail);
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
       const page = await AdminFlagDetailPage({ params: Promise.resolve({ flagId: "flag_1" }) });
-      const { container, unmount } = render(<AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>);
+      const { container, unmount } = render(
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <NoticesProvider>{page}</NoticesProvider>
+        </AccountRoomDepsProvider>,
+      );
       await screen.findByText("Flag detail");
       expectClean(container, detail.subject.kind === "review" ? detail.subject.body : "", ROW.headline, ROW.detail ?? "");
       unmount();
     }
+  });
+});
+
+describe("the admin flag detail page's held-trade surface says nothing that breaks the house copy rules (Plan D, Task 5)", () => {
+  it("is clean open (with the two decisions offered) and resolved", async () => {
+    const { requireAdmin } = await import("@/lib/auth/current-user");
+    const { flagDetail } = await import("@/integrity-service/flags");
+    const { leagueNameFor } = await import("@/draft-service/teams");
+    const { default: AdminFlagDetailPage } = await import("@/app/app/admin/queue/[flagId]/page");
+
+    vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
+    vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
+
+    const HELD_TRADE_SUBJECT = {
+      kind: "held_trade" as const,
+      tradeId: "trade_1",
+      proposerTeamName: "Bay Bandits",
+      counterpartyTeamName: "Iron Owls",
+      gave: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" as const, averagePoints: 22.4 }],
+      got: [{ playerId: "p2", name: "Justin Jefferson", position: "WR" as const, averagePoints: 18.1 }],
+      valuationBasis: "The platform valued this trade the moment it was accepted.",
+      fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
+      proposerManager: { userId: "u_bb", name: "Bay Bandits Owner", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
+      counterpartyManager: { userId: "u_io", name: "Iron Owls Owner", joinedAt: null, completedSeasons: 0 },
+      noLongerHeldExplanation: null,
+    };
+    const HELD_DETAIL = {
+      ...FLAG_DETAIL,
+      leagueId: "l1",
+      flagType: "trade_hold" as const,
+      subject: HELD_TRADE_SUBJECT,
+      reporters: [],
+      trail: [{ eventId: "e2", occurredAt: "2026-08-18T20:00:00.000Z", icon: "alert-triangle" as const, headline: "The platform held this trade for a fairness review.", detail: null }],
+      decisions: ["trade_released", "trade_blocked"] as const,
+    };
+
+    for (const detail of [
+      HELD_DETAIL,
+      { ...HELD_DETAIL, trail: [] },
+      // Final review F4: the open-flag-but-no-decision-left state, each of the three sentences it
+      // can render. Swept here because the state is reachable in production (a superseded held
+      // trade before the closing sweep runs; a decision whose flag stamp failed after the trade
+      // transaction committed) and the copy is server-composed, which the source scans are blind
+      // to by construction.
+      ...(["superseded", "accepted", "blocked"] as const).map((status) => ({
+        ...HELD_DETAIL,
+        subject: { ...HELD_TRADE_SUBJECT, noLongerHeldExplanation: noLongerHeldExplanationFor(status) },
+        decisions: [] as const,
+      })),
+      {
+        ...HELD_DETAIL,
+        resolution: { decision: "trade_blocked" as const, note: "Both teams belong to one person.", resolvedAt: "2026-08-02T00:00:00.000Z", resolvedByUserId: "u_op", resolvedByName: "Op Erator" },
+        decisions: [],
+      },
+    ]) {
+      vi.mocked(flagDetail).mockResolvedValue(detail);
+      const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+      const page = await AdminFlagDetailPage({ params: Promise.resolve({ flagId: "flag_1" }) });
+      const { container, unmount } = render(
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <NoticesProvider>{page}</NoticesProvider>
+        </AccountRoomDepsProvider>,
+      );
+      await screen.findByText("Held trade");
+      expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner", "Both teams belong to one person.");
+      unmount();
+    }
+  });
+
+  it("is clean with a note typed and on both confirmation dialogs", async () => {
+    const { requireAdmin } = await import("@/lib/auth/current-user");
+    const { flagDetail } = await import("@/integrity-service/flags");
+    const { leagueNameFor } = await import("@/draft-service/teams");
+    const { default: AdminFlagDetailPage } = await import("@/app/app/admin/queue/[flagId]/page");
+
+    vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
+    vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
+
+    const detail = {
+      ...FLAG_DETAIL,
+      leagueId: "l1",
+      flagType: "trade_hold" as const,
+      subject: {
+        kind: "held_trade" as const,
+        tradeId: "trade_1",
+        proposerTeamName: "Bay Bandits",
+        counterpartyTeamName: "Iron Owls",
+        gave: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" as const, averagePoints: 22.4 }],
+        got: [{ playerId: "p2", name: "Justin Jefferson", position: "WR" as const, averagePoints: 18.1 }],
+        valuationBasis: "The platform valued this trade the moment it was accepted.",
+        fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
+        proposerManager: { userId: "u_bb", name: "Bay Bandits Owner", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
+        counterpartyManager: { userId: "u_io", name: "Iron Owls Owner", joinedAt: null, completedSeasons: 0 },
+        noLongerHeldExplanation: null,
+      },
+      reporters: [],
+      trail: [],
+      decisions: ["trade_released", "trade_blocked"] as const,
+    };
+    vi.mocked(flagDetail).mockResolvedValue(detail);
+    const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+    const page = await AdminFlagDetailPage({ params: Promise.resolve({ flagId: "flag_1" }) });
+    const { container } = render(
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <NoticesProvider>{page}</NoticesProvider>
+      </AccountRoomDepsProvider>,
+    );
+    await screen.findByText("Held trade");
+
+    fireEvent.change(screen.getByLabelText("Your note"), { target: { value: "Looks like the same person on both sides." } });
+    expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner", "Looks like the same person on both sides.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Release the trade" }));
+    expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner", "Looks like the same person on both sides.");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Block the trade" }));
+    expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner", "Looks like the same person on both sides.");
+  });
+
+  /**
+   * THE SWEEP GAP THIS FIX ROUND CLOSED (F4): every test above stops at the confirmation DIALOG —
+   * none of them ever clicked "Confirm", so `HeldTradeDetail`'s own DONE state (the sentence
+   * rendered once a decision actually lands) never mounted here, which is exactly how the em dash
+   * in that sentence (`held-trade-detail.tsx`, "This cannot be changed here — a different
+   * decision is a new flag.") escaped this file's own reason for existing (this describe block's
+   * own docblock, restated: "it renders FIRST PAINT ... copy behind an interaction never
+   * mounts"). Driven through `HeldTradeDetail` directly, mirroring `ResolutionForm`'s own "is
+   * clean once a decision is recorded" test just above, rather than through the full page — the
+   * done state needs a REAL `AdminRoomDepsProvider` fetch to succeed, and the full-page tests
+   * above only ever wrap `AccountRoomDepsProvider` and `NoticesProvider` (for `AppHeader`'s own
+   * notice inbox), never `AdminRoomDepsProvider` — so a click-to-Confirm through the full page
+   * would have hit a REAL network call and landed on the ERROR state, not the done one, proving
+   * nothing about this sentence either way.
+   */
+  it.each(["Release the trade", "Block the trade"] as const)("is clean once %s is confirmed and the decision is recorded", async (buttonLabel) => {
+    const { AdminRoomDepsProvider } = await import("@/admin-room/hooks/deps");
+    const { fixtureAdminDeps } = await import("@/admin-room/test-fixtures");
+    const { HeldTradeDetail } = await import("@/admin-room/components/held-trade-detail");
+
+    const fixture = fixtureAdminDeps({ ok: true, data: { flagId: "flag_1", decision: "trade_released" } });
+    const { container } = render(
+      <AdminRoomDepsProvider deps={fixture.deps}>
+        <HeldTradeDetail
+          flagId="flag_1"
+          subject={{
+            kind: "held_trade",
+            tradeId: "trade_1",
+            proposerTeamName: "Bay Bandits",
+            counterpartyTeamName: "Iron Owls",
+            gave: [{ playerId: "p1", name: "Bijan Robinson", position: "RB", averagePoints: 22.4 }],
+            got: [{ playerId: "p2", name: "Justin Jefferson", position: "WR", averagePoints: 18.1 }],
+            valuationBasis: "The platform valued this trade the moment it was accepted.",
+            fairnessGapSummary: "The two sides differ by 40 points per week, at or past the 35-point threshold that raised this flag.",
+            proposerManager: { userId: "u_bb", name: "Bay Bandits Owner", joinedAt: "2026-01-01T00:00:00.000Z", completedSeasons: 3 },
+            counterpartyManager: { userId: "u_io", name: "Iron Owls Owner", joinedAt: null, completedSeasons: 0 },
+            noLongerHeldExplanation: null,
+          }}
+          trail={[]}
+          decisions={["trade_released", "trade_blocked"]}
+          noteMaxLength={500}
+        />
+      </AdminRoomDepsProvider>,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: buttonLabel }));
+    fireEvent.click(screen.getByRole("button", { name: "Confirm" }));
+    await waitFor(() => expect(screen.getByRole("status")).toBeInTheDocument());
+    expectClean(container, "Bijan Robinson", "Justin Jefferson", "Bay Bandits Owner", "Iron Owls Owner");
   });
 });
 
@@ -380,11 +575,22 @@ describe("TradeCard says nothing that breaks the house copy rules, in every stat
       { label: "open, past its expiry, seen by the proposer", trade: { ...TRADE_BASE, expiresAt: PAST_EXPIRY }, meTeamId: "them" },
       { label: "superseded", trade: { ...TRADE_BASE, status: "superseded", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
       { label: "with a note", trade: { ...TRADE_BASE, note: "Rebuilding my TE spot" }, meTeamId: "me" },
+      // Plan D, Task 5: the auto-hold's own two new statuses.
+      { label: "held", trade: { ...TRADE_BASE, status: "held" }, meTeamId: "me" },
+      { label: "held, seen by the other side", trade: { ...TRADE_BASE, status: "held" }, meTeamId: "them" },
+      { label: "blocked", trade: { ...TRADE_BASE, status: "blocked", settledAt: "2026-08-19T00:00:00.000Z" }, meTeamId: "me" },
     ];
 
     for (const { trade, meTeamId } of states) {
       const { container, unmount } = render(
-        <TradeCard trade={trade} meTeamId={meTeamId} playersById={TRADE_PLAYERS} assessmentStatus="ready" assessment={{ verdict: "lopsided", givingValue: 5, receivingValue: 40 }} />,
+        <TradeCard
+          trade={trade}
+          meTeamId={meTeamId}
+          playersById={TRADE_PLAYERS}
+          leagueName="Sunday Money"
+          assessmentStatus="ready"
+          assessment={{ verdict: "lopsided", givingValue: 5, receivingValue: 40 }}
+        />,
       );
       expectClean(container, ...TRADE_CONTENT, '"Rebuilding my TE spot"');
       unmount();
@@ -395,6 +601,19 @@ describe("TradeCard says nothing that breaks the house copy rules, in every stat
     const { container } = render(<TradeCard trade={TRADE_BASE} meTeamId="me" playersById={TRADE_PLAYERS} />);
     fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     expectClean(container, ...TRADE_CONTENT);
+  });
+
+  /**
+   * Plan D, Task 5's own binding requirement: a member reading two different sentences about one
+   * fact reads one of them as a euphemism, so `held-trade-banner.tsx` says the SAME sentence
+   * `trade_held_for_review`'s own notice says — copied by necessity (`@/integrity` is blocked as
+   * a value import from room code), kept honest here by rendering both and comparing the text
+   * directly rather than trusting the two authors to never drift.
+   */
+  it("says the identical sentence a held trade's own notice says — the banner and the notice must never drift", () => {
+    render(<TradeCard trade={{ ...TRADE_BASE, status: "held" }} meTeamId="me" playersById={TRADE_PLAYERS} leagueName="Sunday Money" />);
+    const notice = renderNotice("trade_held_for_review", { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls" });
+    expect(screen.getByText(notice.body)).toBeInTheDocument();
   });
 
   // Fix round 1, F4: three more interaction states this card can be in — idle (nobody has asked
@@ -417,6 +636,7 @@ const TRADE_CONTEXT: TradeRoomContext = {
     me: [{ playerId: "p1", name: "Bijan Robinson", position: "RB" }],
     them: [{ playerId: "p2", name: "Puka Nacua", position: "WR" }],
   },
+  leagueName: "Sunday Money",
 };
 
 describe("TradeComposer says nothing that breaks the house copy rules, with and without a note", () => {
@@ -441,5 +661,159 @@ describe("TradeComposer says nothing that breaks the house copy rules, with and 
 
     fireEvent.change(screen.getByLabelText("Note (optional)"), { target: { value: "Rebuilding my TE spot" } });
     expectClean(container, ...TRADE_CONTENT, "Close call.", "Both sides give up similar weekly production.");
+  });
+});
+
+/**
+ * Task 6, fix round 1 (review LOW). `LeagueTermsPanel`, `PublicLeagueList`, `DraftSchedulePanel`
+ * and `LeagueHome` all render `formatDraftTime`'s (`@/league/terms`) COMPOSED output — a string
+ * assembled at runtime from a weekday, a day, a month, a time and a relative clause, never a
+ * literal in the source. `room-copy.source.test.ts`'s own docblock states its blind spot exactly:
+ * it is BLIND TO COMPOSITION, so `{terms.draftAt}` (a JSX expression, not text between `>` and
+ * `<`) was invisible to it, whole. This file is the one sweep that reads what a person actually
+ * SEES, so it is the one that can check the composed string for real — and, deliberately, every
+ * `expectClean` call below leaves that string IN rather than subtracting it, unlike the user
+ * names subtracted alongside it: subtracting `draftAt` would exempt the exact content this block
+ * exists to add coverage for.
+ */
+describe("LeagueTermsPanel says nothing that breaks the house copy rules, including the composed draft time", () => {
+  it("is clean with a real composed draft time rendered", () => {
+    const { container } = render(<LeagueTermsPanel terms={TERMS} />);
+    expectClean(container, TERMS.name, TERMS.commissionerName);
+  });
+});
+
+describe("PublicLeagueList says nothing that breaks the house copy rules, including each card's composed draft time", () => {
+  it("is clean signed in, signed out, and empty", () => {
+    for (const element of [
+      <PublicLeagueList key="signed-in" leagues={PUBLIC_LEAGUES} signedIn={true} />,
+      <PublicLeagueList key="signed-out" leagues={PUBLIC_LEAGUES} signedIn={false} />,
+      <PublicLeagueList key="empty" leagues={[]} signedIn={true} />,
+    ]) {
+      const { container, unmount } = render(element);
+      expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));
+      unmount();
+    }
+  });
+});
+
+describe("DraftSchedulePanel says nothing that breaks the house copy rules, including its own composed countdown", () => {
+  it("is clean scheduled, starting soon, in progress, complete, and with the edit form open", () => {
+    const fixture = fixtureLeagueDeps();
+    const scheduledSoon = { ...DRAFT_SCHEDULE, status: "scheduled" as const, kickoffAt: new Date(Date.now() + 20 * 60 * 1000).toISOString() };
+    const scheduledLater = {
+      ...DRAFT_SCHEDULE,
+      status: "scheduled" as const,
+      kickoffAt: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+      isPublicMatchmade: true,
+    };
+    for (const schedule of [scheduledLater, scheduledSoon, { ...DRAFT_SCHEDULE, status: "in_progress" as const }, { ...DRAFT_SCHEDULE, status: "complete" as const }]) {
+      const { container, unmount } = render(
+        <LeagueRoomDepsProvider deps={fixture.deps}>
+          <DraftSchedulePanel leagueId="l1" isCommissioner={true} initialSchedule={schedule} />
+        </LeagueRoomDepsProvider>,
+      );
+      expectClean(container);
+      unmount();
+    }
+
+    const { container } = render(
+      <LeagueRoomDepsProvider deps={fixture.deps}>
+        <DraftSchedulePanel leagueId="l1" isCommissioner={true} initialSchedule={scheduledLater} />
+      </LeagueRoomDepsProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Edit time" }));
+    expectClean(container);
+  });
+});
+
+describe("LeagueHome says nothing that breaks the house copy rules, including every composed date it renders", () => {
+  it("is clean for the commissioner and for an ordinary member", async () => {
+    for (const home of [HOME, { ...HOME, isCommissioner: false }]) {
+      const { container, unmount } = render(
+        <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+          <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
+            <LeagueHome home={home} lineup={LINEUP} />
+          </LeagueRoomDepsProvider>
+        </ChatRoomDepsProvider>,
+      );
+      await waitFor(() => expect(screen.getByRole("region", { name: "League chat" })).toBeInTheDocument());
+      expectClean(
+        container,
+        home.name,
+        home.terms.commissionerName,
+        ...home.teams.map((team) => team.name),
+        ...home.teams.map((team) => team.ownerDisplayName),
+      );
+      unmount();
+    }
+  });
+});
+
+/**
+ * Task 8. `ModerationSummary` composes its own sentence and (on the populated branch) a
+ * formatted date from `mostRecentAt` — the exact kind of runtime composition
+ * `room-copy.source.test.ts` cannot see, so this is the sweep that actually checks it.
+ */
+describe("ModerationSummary says nothing that breaks the house copy rules", () => {
+  const POPULATED: ModerationSummaryView = { removedMessages: 2, removedReviews: 1, mostRecentAt: "2026-08-19T14:02:00.000Z", openQuestions: 1 };
+  const HEALTHY: ModerationSummaryView = { removedMessages: 0, removedReviews: 0, mostRecentAt: null, openQuestions: 0 };
+
+  it("is clean loading, healthy, populated with a composed date, and on a failed fetch", async () => {
+    for (const response of [{ ok: true as const, data: POPULATED }, { ok: true as const, data: HEALTHY }, { ok: false as const, error: "unreachable" }]) {
+      const fixture = fixtureLeagueDeps(response);
+      const { container, unmount } = render(
+        <LeagueRoomDepsProvider deps={fixture.deps}>
+          <ModerationSummary leagueId="league_1" />
+        </LeagueRoomDepsProvider>,
+      );
+      await waitFor(() => expect(screen.getByRole("region", { name: "Platform moderation in this league" })).toBeInTheDocument());
+      expectClean(container);
+      unmount();
+    }
+  });
+});
+
+/**
+ * Task 8's other half. `account-room` carries no directory-derived source sweep at all
+ * (`room-copy.source.test.ts`'s own `ROOM_DIRS` names only the four client-room directories that
+ * predate it), so `ReviewFeed` — the one component in this task that gained new rendered text,
+ * the verified badge — gets its coverage here instead, the same "one place to add" shape this
+ * file's own docblock describes.
+ */
+const VERIFIED_REVIEW: ReviewView = {
+  id: "r_sweep",
+  rating: 5,
+  body: "This league runs itself.",
+  createdAt: "2026-08-01T00:00:00.000Z",
+  updatedAt: "2026-08-01T00:00:00.000Z",
+  authorName: "Ada Lovelace",
+  authorAvatar: null,
+  verified: true,
+};
+
+describe("ReviewFeed says nothing that breaks the house copy rules, verified badge included", () => {
+  it("is clean with an unverified review, a verified one, and the badge's own InfoTip opened", () => {
+    const unverifiedPage: ReviewsPage = { reviews: [{ ...VERIFIED_REVIEW, id: "r_unverified", verified: false }], hasMore: false, nextBefore: null };
+    const verifiedPage: ReviewsPage = { reviews: [VERIFIED_REVIEW], hasMore: false, nextBefore: null };
+
+    for (const page of [unverifiedPage, verifiedPage]) {
+      const fixture = fixtureAccountDeps();
+      const { container, unmount } = render(
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <ReviewFeed initialPage={page} emptyAction={<span>Write the first review</span>} />
+        </AccountRoomDepsProvider>,
+      );
+      expectClean(container, VERIFIED_REVIEW.body, VERIFIED_REVIEW.authorName);
+      unmount();
+    }
+
+    const { container } = render(
+      <AccountRoomDepsProvider deps={fixtureAccountDeps().deps}>
+        <ReviewFeed initialPage={verifiedPage} emptyAction={<span>Write the first review</span>} />
+      </AccountRoomDepsProvider>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "What is a verified reviewer?" }));
+    expectClean(container, VERIFIED_REVIEW.body, VERIFIED_REVIEW.authorName);
   });
 });

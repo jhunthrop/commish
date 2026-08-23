@@ -1,10 +1,10 @@
-import { and, eq, notExists, sql } from "drizzle-orm";
+import { and, eq, isNull, notExists, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { integrityFlags, tradeProposals } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { assembleAdvisorContext, valuePlayers, type AdvisorTeamContext } from "@/ai-advisor/context";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import type { TradeFairnessBasis } from "@/integrity/flags";
+import type { ResolutionDecision, TradeFairnessBasis } from "@/integrity/flags";
 import { assetPlayerIds } from "@/trades/assets";
 import { crossesFairnessThreshold, fairnessGap, tradeBalance, type TradeBalance, type ValuedPlayer } from "@/trades/fairness";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
@@ -42,8 +42,10 @@ export interface TradeFairnessEvaluation {
   readonly gap: number;
   /** At or past `INTEGRITY_CONFIG.trade.fairnessFlagThreshold`. Task 6 acts on it AFTER commit. */
   readonly flagWorthy: boolean;
-  /** At or past `INTEGRITY_CONFIG.trade.autoHoldThreshold`. Always `false` while that is `null`.
-   *  Plan D acts on it, INSIDE the accept transaction, by not executing. */
+  /** At or past `INTEGRITY_CONFIG.trade.autoHoldThreshold`. `false` whenever that config is
+   *  `null` (a test seam only — production ships `35`). `acceptTrade` acts on it, INSIDE the
+   *  accept transaction, by not executing — see that function's own docblock for the second gate
+   *  (`enforcementAppliesTo`) that decides whether a crossed threshold actually holds anything. */
   readonly hold: boolean;
   /**
    * Both sides, valued, from the SAME read `balance` came from — the rosters a moment before the
@@ -70,8 +72,15 @@ export interface TradeFairnessEvaluation {
  * this function's own result. Plan D supplies a number for `INTEGRITY_CONFIG.trade
  * .autoHoldThreshold`; it does not reopen this transaction to add a code path.
  *
- * `autoHoldThreshold` is `null` on merge, so `hold` is `false` for every trade this plan
- * executes.
+ * Plan D (Task 5) supplied the number: `INTEGRITY_CONFIG.trade.autoHoldThreshold` is `35`, so
+ * `hold` is `true` for a trade whose gap reaches it — this function's own contract did not change
+ * at all, only the config value a real caller now reads through it. `acceptTrade`
+ * (`@/league-service/trades`) is the one production caller that acts on `hold`, and only when
+ * `enforcementAppliesTo` also says the platform is this league's commissioner (a public,
+ * platform-enforced league) — a private league's manager never has a trade held, however lopsided,
+ * because the platform is never that league's commissioner. That second gate lives in
+ * `acceptTrade` itself, not here: this function answers "how lopsided", never "whose business is
+ * it".
  *
  * FLAG-ONLY, and provably so: this function returns a verdict and writes nothing.
  * `src/integrity/flag-only.test.ts` covers the directory it lives in.
@@ -152,7 +161,14 @@ export interface RaiseTradeFairnessInput {
   readonly audit?: AuditLogger;
 }
 
-function evidenceFor(input: Pick<RaiseTradeFairnessInput, "balance" | "gap" | "giving" | "receiving" | "basis">, threshold: number) {
+/**
+ * Exported for `acceptTrade`'s own hold branch (`@/league-service/trades`, Plan D Task 5): the
+ * `trade_hold` flag's evidence is the SAME shape a `trade_fairness` flag's is — both sides valued,
+ * the balance, the gap, the threshold that raised it — computed from the SAME `TradeFairnessEvaluation`
+ * `evaluateTradeBeforeExecute` already returned, so a held trade's evidence is read back from real
+ * numbers rather than restated by a second copy of this function.
+ */
+export function evidenceFor(input: Pick<RaiseTradeFairnessInput, "balance" | "gap" | "giving" | "receiving" | "basis">, threshold: number) {
   return {
     verdict: input.balance.verdict,
     // Stored VERBATIM — the analyzer's own machine-readable reasons, never re-summarized.
@@ -231,15 +247,53 @@ interface UnflaggedAcceptedTrade {
 }
 
 /**
- * Every ACCEPTED trade with no `trade_fairness` flag at all — open OR resolved, never just open —
- * scoped to one league when `leagueId` is supplied, every league otherwise. `NOT EXISTS` rather
- * than a `LEFT JOIN … IS NULL`: `integrity_flags` has no foreign key onto `trade_proposals` (a
- * flag's `subject_id` is plain text, matching every other subject type), so this is a correlated
- * subquery, not an index-backed join. Bounded at `INTEGRITY_CONFIG.trade.sweepBatchSize` for the
- * same "an operator script that reads an unbounded set is a script nobody runs twice" reason that
- * field's own docblock states.
+ * Every ACCEPTED trade whose fairness question NOTHING has answered yet — scoped to one league
+ * when `leagueId` is supplied, every league otherwise.
+ *
+ * TWO dispositions disqualify a trade, and both count open OR resolved, never just open:
+ *
+ * 1. A `trade` flag — this detector's own `trade_fairness` verdict, already raised (by the
+ *    after-commit call or an earlier sweep) and possibly already answered.
+ * 2. A `held_trade` flag — the AUTO-HOLD's verdict, raised INSIDE the accept transaction by
+ *    `holdTradeInTx` (`@/league-service/trades`) and answered by an operator pressing Release or
+ *    Block. Final review F1: a released trade is stamped back to `status = "accepted"`
+ *    (`trades.ts`, `releaseHeldTradeInTx`) and carries no `trade` flag, so without this it
+ *    matched, and the sweep raised a fresh OPEN `trade_fairness` flag over a trade an operator had
+ *    just explicitly approved — offering **Reverse this trade**, the inverse of the decision just
+ *    made, with no trail of it (`trailFor`'s `trade` branch reads the LEAGUE chain, and the
+ *    release's `flag_resolved` lives on the PLATFORM one).
+ *
+ * WHY A HOLD IS A FAIRNESS DISPOSITION AND NOT A DIFFERENT QUESTION. The two thresholds are
+ * ordered on one axis and pinned that way (`fairnessFlagThreshold` 20 ≤ `autoHoldThreshold` 35,
+ * `src/integrity/config.test.ts`), so every trade that held would also have flagged; and the hold
+ * flag carries the IDENTICAL `evidenceFor` payload a fairness flag would have — same balance, same
+ * gap, both sides valued. An operator answering a hold has answered this detector's question at a
+ * STRICTER threshold, on the same evidence, before the rosters ever moved. Re-asking it is not a
+ * second opinion, it is re-litigating a decision.
+ *
+ * The other two hold outcomes need no separate arm: a BLOCKED trade never executed and is stamped
+ * `status = "blocked"`, so it never matched `status = 'accepted'` in the first place, and a
+ * SUPERSEDED one is `status = "superseded"` for the same reason.
+ *
+ * `NOT EXISTS` rather than a `LEFT JOIN … IS NULL`: `integrity_flags` has no foreign key onto
+ * `trade_proposals` (a flag's `subject_id` is plain text, matching every other subject type), so
+ * this is a correlated subquery, not an index-backed join. Two of them rather than one that
+ * ignores `subject_type`, because `subject_id` is plain text shared across every subject
+ * vocabulary and a predicate that names neither type would silently widen the day some future
+ * subject reuses an id shape. Bounded at `INTEGRITY_CONFIG.trade.sweepBatchSize` for the same "an
+ * operator script that reads an unbounded set is a script nobody runs twice" reason that field's
+ * own docblock states — and a disqualified trade costs no slot of that bound, because it is
+ * excluded HERE rather than skipped after `reDeriveAcceptedTradeValue` has already paid for it.
  */
 async function unflaggedAcceptedTrades(db: Db, leagueId: string | undefined, limit: number): Promise<readonly UnflaggedAcceptedTrade[]> {
+  const noFlagOfSubjectType = (subjectType: "trade" | "held_trade") =>
+    notExists(
+      db
+        .select({ one: sql`1` })
+        .from(integrityFlags)
+        .where(and(eq(integrityFlags.subjectType, subjectType), eq(integrityFlags.subjectId, tradeProposals.id))),
+    );
+
   const rows = await db
     .select()
     .from(tradeProposals)
@@ -247,12 +301,8 @@ async function unflaggedAcceptedTrades(db: Db, leagueId: string | undefined, lim
       and(
         eq(tradeProposals.status, "accepted"),
         leagueId === undefined ? undefined : eq(tradeProposals.leagueId, leagueId),
-        notExists(
-          db
-            .select({ one: sql`1` })
-            .from(integrityFlags)
-            .where(and(eq(integrityFlags.subjectType, "trade"), eq(integrityFlags.subjectId, tradeProposals.id))),
-        ),
+        noFlagOfSubjectType("trade"),
+        noFlagOfSubjectType("held_trade"),
       ),
     )
     .limit(limit);
@@ -322,9 +372,10 @@ export interface SweepTradeFairnessInput {
 }
 
 export interface SweepTradeFairnessResult {
-  /** Accepted trades with no `trade_fairness` flag this sweep examined — bounded at
-   *  `INTEGRITY_CONFIG.trade.sweepBatchSize`, never every unflagged trade this league has ever
-   *  had. */
+  /** Accepted trades whose fairness question nothing has answered yet — no `trade` flag and no
+   *  `held_trade` one (`unflaggedAcceptedTrades`' own docblock for why a hold counts) — that this
+   *  sweep examined. Bounded at `INTEGRITY_CONFIG.trade.sweepBatchSize`, never every unflagged
+   *  trade this league has ever had. */
   readonly tradesChecked: number;
   readonly flagsRaised: number;
 }
@@ -366,4 +417,193 @@ export async function sweepUnflaggedTrades(db: Db, input: SweepTradeFairnessInpu
   }
 
   return { tradesChecked: candidates.length, flagsRaised };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Plan D, Task 5, fix round 1 (Finding 1): a held trade's own `trade_hold` flag closes HONESTLY
+// once the world supersedes it — a real `flag_resolved` event, a real `superseded_before_review`
+// resolution, never a raw table write.
+// ---------------------------------------------------------------------------------------------
+
+const SUPERSEDED_BEFORE_REVIEW_NOTE = "A different trade moved one of these players before an operator could decide this one.";
+
+export interface CloseSupersededHoldFlagInput {
+  readonly tradeId: string;
+  readonly leagueId: string;
+  readonly occurredAt: string;
+  /** Defaults to the process-wide logger (`getAuditLogger()`). */
+  readonly audit?: AuditLogger;
+}
+
+/**
+ * Closes a held trade's own `trade_hold` flag once `acceptTrade`'s or `releaseHeldTradeInTx`'s
+ * own supersede sweep has already moved that trade to `superseded` — the question this flag was
+ * asking no longer has an answer to give, and closing it HONESTLY means the same three things
+ * every other resolution in this product means: a real audit event, a real (system) decision, and
+ * a stamp `resolveFlag`'s own detail read recognizes as resolved.
+ *
+ * IT IS A SEPARATE TRANSACTION, AND THAT IS NOT A CONVENIENCE — the identical reasoning
+ * `raiseTradeFairnessFlag`'s own docblock states, restated for the RESOLUTION side of the same
+ * constraint: the supersede sweep that discovers a held trade needs closing runs INSIDE the
+ * accepting (or releasing) trade's own LEAGUE-scoped transaction, and `flag_resolved` is
+ * PLATFORM-scoped (ruling 1: a record about a review is not the league's business). One
+ * transaction may append to at most one chain (Plan A ruling 3), so this cannot run inside that
+ * transaction and does not try to.
+ *
+ * THE CONSEQUENCE, STATED, the identical shape `raiseTradeFairnessFlag`'s own docblock states: a
+ * process that dies between the superseding trade's own commit and this call leaves an open
+ * `trade_hold` flag over a trade that is already `superseded`. This is SAFELY INERT, never
+ * corrupting — `releaseHeldTradeInTx`/`blockHeldTradeInTx` both already refuse a non-`held` row
+ * with a clean 409 (`"This trade is no longer waiting on a decision."`), so the worst this window
+ * produces is a queue entry with no possible operator resolution until it closes. `npm run
+ * trades:sweep` (`sweepSupersededHoldFlags`, below) is the re-run — the same operator remedy
+ * `raiseTradeFairnessFlag`'s own after-commit gap already carries.
+ *
+ * SYSTEM-AUTHORED, NEVER AN OPERATOR'S: `resolvedByUserId: null`, `actorId: null`,
+ * `actorType: "system"` — the identical construction every other system-authored write in this
+ * product carries (`raiseFlag`'s own `raisedByUserId: null` when the platform's own sweep raises
+ * a flag). `resolution: "superseded_before_review"` is declared `SYSTEM_ONLY` in
+ * `@/integrity/flags` for exactly this reason: an operator must never be able to speak this word.
+ *
+ * IDEMPOTENT: a flag that is already closed (a previous call already landed, the trade was never
+ * held at all, or there is no open `trade_hold` flag for this trade for any other reason) answers
+ * `false` and writes nothing — the same "no second event" shape `raiseFlag`'s own open-subject
+ * index gives its callers, achieved here with a guarded `UPDATE` (`WHERE resolved_at IS NULL`)
+ * rather than a unique index, since resolving (unlike raising) has no conflict to catch. Under
+ * real CONCURRENCY too, not only in sequence: the second caller's UPDATE blocks on the row the
+ * first holds and then re-evaluates its own guard against the committed value.
+ *
+ * LOCK ORDER, and the FK acquisitions enumerated (final review F10 — this was the last of this
+ * plan's nine writers with no proof in `src/integrity-service/lock-order.test.ts`, which now
+ * drives it on two connections):
+ *   1. the `integrity_flags` row, taken by the guarded UPDATE itself. No `FOR KEY SHARE` on
+ *      `leagues` comes with it: `integrity_flags.league_id` does carry a foreign key, but Postgres
+ *      locks a referenced row only when a statement WRITES the referencing key column, and this
+ *      one writes the four resolution columns and never `league_id`.
+ *   2. `audit.record` — the PLATFORM anchor, ALWAYS last. This transaction touches `leagues` at no
+ *      point, so it cannot be half of the join-versus-append cycle ruling 3 exists for.
+ */
+export async function closeSupersededHoldFlag(db: Db, input: CloseSupersededHoldFlagInput): Promise<boolean> {
+  const audit = input.audit ?? getAuditLogger();
+  const decision: ResolutionDecision = "superseded_before_review";
+
+  return db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(integrityFlags)
+      .set({ resolvedAt: new Date(input.occurredAt), resolvedByUserId: null, resolution: decision, resolutionNote: SUPERSEDED_BEFORE_REVIEW_NOTE })
+      .where(and(eq(integrityFlags.subjectType, "held_trade"), eq(integrityFlags.subjectId, input.tradeId), isNull(integrityFlags.resolvedAt)))
+      .returning();
+    if (row === undefined) return false;
+
+    // THE AUDIT EVENT IS THE RECORD — `resolveFlag`'s own docblock, restated: a `flag_resolved`
+    // event, on the PLATFORM chain, is what makes this a real resolution and not a silent stamp.
+    await audit.record(tx, {
+      eventType: "flag_resolved",
+      actorId: null,
+      actorType: "system",
+      leagueId: null, // platform chain — ruling 1
+      payload: { flagId: row.id, flagType: "trade_hold", decision, subjectType: "held_trade", subjectId: input.tradeId, leagueId: input.leagueId },
+      occurredAt: input.occurredAt,
+    });
+    return true;
+  });
+}
+
+export interface CloseSupersededHoldFlagsQuietlyInput {
+  readonly tradeIds: readonly string[];
+  readonly leagueId: string;
+  readonly occurredAt: string;
+  readonly audit?: AuditLogger;
+}
+
+/**
+ * Closes every one of `tradeIds`' own `trade_hold` flags and swallows each failure individually,
+ * with a log — the identical discipline `raiseFairnessFlagQuietly` (`@/league-service/trades`)
+ * keeps for its own after-commit trigger, and for the identical reason: the superseding trade
+ * already committed, its own supersede sweep already ran, and a failure here leaves nothing but
+ * an open flag over an already-inert trade (`closeSupersededHoldFlag`'s own docblock). The two
+ * callers this exists for — `acceptTrade`'s own post-commit step and `resolveFlag`'s
+ * `trade_released` branch, after `releaseHeldTradeInTx`'s own transaction commits — both run a
+ * supersede sweep that can name more than one held trade at once, so this loops rather than
+ * making each caller loop its own copy.
+ */
+export async function closeSupersededHoldFlagsQuietly(db: Db, input: CloseSupersededHoldFlagsQuietlyInput): Promise<void> {
+  for (const tradeId of input.tradeIds) {
+    try {
+      await closeSupersededHoldFlag(db, { tradeId, leagueId: input.leagueId, occurredAt: input.occurredAt, audit: input.audit });
+    } catch (error: unknown) {
+      console.error("[integrity-service] superseded-hold flag close failed", { tradeId, leagueId: input.leagueId }, error);
+    }
+  }
+}
+
+/** One open `trade_hold` flag this sweep still owes a look — its own id and the trade it names. */
+interface OpenHeldFlagOverSupersededTrade {
+  readonly tradeId: string;
+  readonly leagueId: string;
+}
+
+/**
+ * Every OPEN `trade_hold` flag whose named trade has ALREADY moved to `superseded` — the
+ * crash-window candidates `closeSupersededHoldFlag`'s own after-commit call missed. `leagueId` is
+ * read off the FLAG row, never the trade — a `trade_hold` flag's own `leagueId` is required at
+ * raise time (`holdTradeInTx`, `@/league-service/trades`) and is never null, the same "FK-
+ * guaranteed" reasoning `subjectFor`'s own trade branch uses for a comparable lookup. Bounded at
+ * `INTEGRITY_CONFIG.trade.sweepBatchSize`, the identical "an operator script that reads an
+ * unbounded set is a script nobody runs twice" reason that field's own docblock states.
+ */
+async function openHeldFlagsOverSupersededTrades(db: Db, leagueId: string | undefined, limit: number): Promise<readonly OpenHeldFlagOverSupersededTrade[]> {
+  const rows = await db
+    .select({ tradeId: integrityFlags.subjectId, leagueId: integrityFlags.leagueId })
+    .from(integrityFlags)
+    .innerJoin(tradeProposals, eq(tradeProposals.id, integrityFlags.subjectId))
+    .where(
+      and(
+        eq(integrityFlags.flagType, "trade_hold"),
+        isNull(integrityFlags.resolvedAt),
+        eq(tradeProposals.status, "superseded"),
+        leagueId === undefined ? undefined : eq(integrityFlags.leagueId, leagueId),
+      ),
+    )
+    .limit(limit);
+  return rows.map((row) => ({ tradeId: row.tradeId, leagueId: row.leagueId! }));
+}
+
+export interface SweepSupersededHoldFlagsInput {
+  /** All leagues when omitted — the manual re-run has no single trigger to scope it to. */
+  readonly leagueId?: string;
+  readonly clock?: Clock;
+  /** Defaults to the process-wide logger (`getAuditLogger()`). */
+  readonly audit?: AuditLogger;
+}
+
+export interface SweepSupersededHoldFlagsResult {
+  /** Open `trade_hold` flags over an already-superseded trade this sweep examined — bounded at
+   *  `INTEGRITY_CONFIG.trade.sweepBatchSize`, never every such flag this league has ever had. */
+  readonly flagsChecked: number;
+  readonly flagsClosed: number;
+}
+
+/**
+ * The manual re-run for `closeSupersededHoldFlag`'s own after-commit call (fix round 1, ruling 22
+ * restated): `scripts/sweep-trade-fairness.ts` runs this ALONGSIDE `sweepUnflaggedTrades`, the
+ * same script, because both are re-runs of the identical class of after-commit gap on the
+ * identical trade-flag machinery — an operator asking "did every trade-flag write that should
+ * have landed actually land" gets one answer, not two commands to remember.
+ *
+ * FLAGS ONLY, in the sense that matters here: this RESOLVES a flag it did not raise and moves no
+ * roster and touches no account — `src/integrity/flag-only.test.ts` covers the directory this
+ * function lives in.
+ */
+export async function sweepSupersededHoldFlags(db: Db, input: SweepSupersededHoldFlagsInput = {}): Promise<SweepSupersededHoldFlagsResult> {
+  const clock = input.clock ?? systemClock;
+  const candidates = await openHeldFlagsOverSupersededTrades(db, input.leagueId, INTEGRITY_CONFIG.trade.sweepBatchSize);
+
+  let flagsClosed = 0;
+  for (const candidate of candidates) {
+    const closed = await closeSupersededHoldFlag(db, { tradeId: candidate.tradeId, leagueId: candidate.leagueId, occurredAt: clock.now(), audit: input.audit });
+    if (closed) flagsClosed += 1;
+  }
+
+  return { flagsChecked: candidates.length, flagsClosed };
 }

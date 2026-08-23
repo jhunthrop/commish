@@ -1,13 +1,16 @@
-import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { auditEvents, chatMessageReports, chatMessages, integrityFlags, leagues, reviewReports, reviews, rosterSlots, teams, tradeProposals, users } from "@/db/schema";
 import type { AuditEvent, AuditEventType, JsonObject } from "@/domain/audit";
 import type { Clock } from "@/domain/timing";
 import type { Position } from "@/domain/player";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
+import type { ModerationSummaryView } from "@/league-room/contract";
 import {
   contentRemovalIsWiredFor,
+  decisionIsOperatorChoosable,
   decisionIsWiredFor,
+  LEAGUE_QUESTION_FLAG_TYPES,
   RESOLUTION_DECISIONS,
   TRADE_FAIRNESS_BASES,
   type FlagSubjectType,
@@ -19,26 +22,32 @@ import type { NoticeType } from "@/integrity/notices";
 import {
   flagDetailFor,
   flagTrailRowFor,
+  noLongerHeldExplanationFor,
   queueRowFor,
   tradeFairnessBasisPhrase,
   tradeFairnessGapPhrase,
   type FlagCursor,
   type FlagDetail,
   type FlagSubjectView,
+  type HeldTradeManagerView,
   type QueueRow,
   type ReporterView,
   type TradedPlayerView,
 } from "@/integrity/queue-view";
 import { removeChatMessageInTx } from "@/chat-service/moderation";
+import { closeSupersededHoldFlagsQuietly } from "./trade-fairness";
+import { completedSeasonsFor } from "@/league-service/participation";
 import { reverseTradeInTx } from "@/league-service/trade-reversal";
 import { TransferRefusedError } from "@/league-service/trade-transfer";
+import { blockHeldTradeInTx, releaseHeldTradeInTx } from "@/league-service/trades";
 import { getPublisher } from "@/lib/realtime/publisher";
 import type { PublishFn } from "@/lib/realtime/publish";
 import { removeReviewInTx } from "@/review-service/reviews";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import type { ScoreCache } from "@/stats-pipeline/score-cache";
 import { assetPlayerIds } from "@/trades/assets";
-import { attachAuditEvent, notifyAffectedMember } from "./notify";
+import type { TradeStatus } from "@/trades/lifecycle";
+import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "./notify";
 import { getAuditLogger, type AuditLogger } from "./audit-logger";
 import { raiseFlag, type IntegrityFlag, type RaiseFlagInput, type RaiseFlagResult } from "./raise-flag";
 
@@ -124,12 +133,30 @@ export type ResolveFlagResult =
  * `trade_reversed` notice to BOTH parties, inside its own (earlier, already-committed)
  * transaction — a third, generic notice from here would tell one of them twice, and this map has
  * no way to notice two people from one entry anyway.
+ *
+ * `trade_released` is `null` for the identical reason (Plan D, Task 5): the execution sends
+ * `trade_executed` to both parties, exactly as `acceptTrade` does — `releaseHeldTradeInTx`
+ * (`@/league-service/trades`) is that execution, run before this function's own transaction ever
+ * opens. `trade_blocked` is ALSO `null`, for the same shape one more time: `blockHeldTradeInTx`
+ * sends its own `trade_blocked` notice to both parties, from INSIDE this function's own
+ * transaction rather than a separate one (a block moves nothing, so there is no second chain to
+ * cross) — see this function's own `trade_blocked` branch below.
+ *
+ * `superseded_before_review` is `null` too (Plan D, fix round 1): the supersede sweep's own
+ * `trade_superseded` notice already told both parties their offer died, at the moment it died —
+ * a second notice from here, potentially days later when this decision actually lands, would be
+ * the same double-telling every other `null` entry on this map already avoids. This decision
+ * never reaches `resolveFlag` through the operator route at all (`decisionIsOperatorChoosable`),
+ * so this entry exists only for the exhaustive `Record`'s own sake.
  */
 const NOTICE_FOR_DECISION: Readonly<Record<ResolutionDecision, NoticeType | null>> = {
   no_action: null,
   warned_user: "operator_warning",
   content_removed: null,
   trade_reversed: null,
+  trade_released: null,
+  trade_blocked: null,
+  superseded_before_review: null,
 };
 
 /**
@@ -146,12 +173,27 @@ const NOTICE_FOR_DECISION: Readonly<Record<ResolutionDecision, NoticeType | null
  * becomes the permanent removal `reason` stored on the row (mapped to a generic phrase for the
  * removed author today, but the raw words persist as a written record about them regardless);
  * `trade_reversed`'s note quotes VERBATIM to BOTH managers (`reverseTradeInTx`'s own notice).
+ *
+ * `trade_released` is `false` (Plan D, Task 5): the release executes the trade the two managers
+ * already agreed to, through the SAME `trade_executed` template `acceptTrade` sends for an
+ * ordinary acceptance, which interpolates no operator note at all — this note is operator-to-
+ * operator only, the identical reasoning `no_action`'s own entry states. `trade_blocked` is
+ * `true`, for the identical reason `trade_reversed` is: `blockHeldTradeInTx`'s own notice quotes
+ * it VERBATIM to both managers.
+ *
+ * `superseded_before_review` is `false`: this decision never carries an operator's own words at
+ * all — `closeSupersededHoldFlag` (`@/integrity-service/trade-fairness`) writes a fixed,
+ * platform-authored `resolutionNote`, never free text, and no operator can reach this branch to
+ * type one (`decisionIsOperatorChoosable`).
  */
 const NOTE_REACHES_SOMEONE_ELSE: Readonly<Record<ResolutionDecision, boolean>> = {
   no_action: false,
   warned_user: true,
   content_removed: true,
   trade_reversed: true,
+  trade_released: false,
+  trade_blocked: true,
+  superseded_before_review: false,
 };
 
 /**
@@ -181,6 +223,9 @@ const DECISION_LABEL: Readonly<Record<ResolutionDecision, string>> = {
   warned_user: "a warning",
   content_removed: "content removed",
   trade_reversed: "a trade reversal",
+  trade_released: "released",
+  trade_blocked: "blocked",
+  superseded_before_review: "superseded before review",
 };
 
 /**
@@ -219,6 +264,22 @@ async function alreadyResolvedOrMissing(tx: DbTx, flagId: string): Promise<Resol
  * promise rather than becoming a normal `{ ok: false }` result.
  */
 class ContentRemovalRefused extends Error {
+  constructor(
+    readonly status: number,
+    reason: string,
+  ) {
+    super(reason);
+  }
+}
+
+/**
+ * `ContentRemovalRefused`'s own twin for `trade_blocked` (Plan D, Task 5): `blockHeldTradeInTx`
+ * answers a graceful `{ ok: false }` for an ordinary, expected refusal (the trade is no longer
+ * held — a race, or a second attempt on an already-blocked one), and that refusal must roll
+ * `resolveFlag`'s WHOLE transaction back, the flag's own stamp `UPDATE` included, not just skip a
+ * step. Throwing is the only way to force that rollback from inside a `db.transaction` callback.
+ */
+class HeldTradeDecisionRefused extends Error {
   constructor(
     readonly status: number,
     reason: string,
@@ -387,6 +448,15 @@ async function leagueNameForFlag(tx: DbTx, leagueId: string | null): Promise<str
  * if this function's OWN transaction is the one that fails afterward.
  */
 export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<ResolveFlagResult> {
+  // THE SYSTEM-ONLY GATE (Plan D, Task 5, fix round 1, Finding 1) — checked FIRST, before any
+  // other refusal and before any write. `resolveFlagSchema` already refuses this at the HTTP
+  // boundary (`decisionIsOperatorChoosable`, `@/integrity/flags`); this is the SAME "the service
+  // is the real boundary, not only the schema" discipline every other check in this function
+  // holds to — a caller of `resolveFlag` directly (a script, a test, a future route) must never
+  // be able to speak `superseded_before_review` and have it stick.
+  if (!decisionIsOperatorChoosable(input.decision)) {
+    return { ok: false, status: 400, reason: "This decision is the platform's own, and cannot be chosen by an operator." };
+  }
   // `content_removed`'s note becomes a REMOVAL REASON (`removeSubject` passes it straight through
   // as `removeReviewInTx`'s `reason`), not an `operator_warning` notice body — so it is bound by
   // `REVIEW_CONFIG.removalReason.maxLength` (200), the tighter cap `removeReviewInTx` itself
@@ -502,6 +572,78 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
     // `alreadyResolvedOrMissing` answers the same 404 every other unknown flagId gets.
   }
 
+  // SUBJECT-AWARE, and before ANY transaction opens — Plan D's own version of `trade_reversed`'s
+  // check just above. A `trade_hold` flag always names a real `held_trade` subject; a direct POST
+  // of `trade_released` against any other flag type is refused here, in product copy, rather than
+  // reaching `releaseHeldTradeInTx` with a subject it was never built for.
+  if (input.decision === "trade_released") {
+    const [flag] = await db
+      .select({ subjectType: integrityFlags.subjectType, subjectId: integrityFlags.subjectId, leagueId: integrityFlags.leagueId })
+      .from(integrityFlags)
+      .where(eq(integrityFlags.id, input.flagId));
+    if (flag !== undefined) {
+      if (!decisionIsWiredFor("trade_released", flag.subjectType as FlagSubjectType)) {
+        return { ok: false, status: 400, reason: "There is no held trade on this flag to release. Close it with a block instead." };
+      }
+      // A `held_trade` subject's flag ALWAYS carries a real `leagueId` — `raiseFlag`'s own call
+      // from `holdTradeInTx` (`@/league-service/trades`) passes the trade's own league, never
+      // `null` — so this is never actually null here.
+      const leagueId = flag.leagueId!;
+
+      // THE EXECUTION, IN ITS OWN TRANSACTION, COMMITTED BEFORE THIS FUNCTION'S OWN EVER OPENS —
+      // see `releaseHeldTradeInTx`'s own docblock and `resolveFlag`'s own docblock above for why.
+      // A refusal here (`{ ok: false }`) is returned straight through: this function's own
+      // transaction never opens, so the flag stays open with nothing written at all.
+      let release: Awaited<ReturnType<typeof releaseHeldTradeInTx>>;
+      try {
+        release = await db.transaction((tx) =>
+          releaseHeldTradeInTx(tx, {
+            tradeId: flag.subjectId,
+            leagueId,
+            operatorUserId: input.operatorUserId,
+            clock: input.clock,
+            audit: input.audit,
+            notify: input.notify,
+          }),
+        );
+      } catch (error: unknown) {
+        if (error instanceof TransferRefusedError) {
+          return { ok: false, status: 409, reason: error.message };
+        }
+        throw error;
+      }
+      if (!release.ok) return release;
+
+      // THE SCORE-CACHE EVICTION, after the execution's own transaction has committed and before
+      // this function's own opens — `acceptTrade`'s post-commit scope, mirrored exactly, the same
+      // way `trade_reversed`'s own branch already mirrors it above. `release.weekNumber` is the
+      // week `releaseHeldTradeInTx` itself re-derived (the C1 lesson, a third time in this arc).
+      try {
+        await (input.cache ?? NOOP_SCORE_CACHE).invalidate(leagueId, release.weekNumber);
+      } catch (error: unknown) {
+        console.error("[integrity-service] score cache invalidation failed after a held-trade release", { leagueId, week: release.weekNumber }, error);
+      }
+
+      // THE SUPERSEDED-HOLD FLAG CLOSURE(S), fix round 1, Finding 1 — the identical after-commit
+      // shape as the eviction just above: any OTHER held offer THIS release superseded gets its
+      // own `trade_hold` flag closed honestly, in its own platform-scoped transaction
+      // (`closeSupersededHoldFlagsQuietly`, `@/integrity-service/trade-fairness`), never inside
+      // `releaseHeldTradeInTx`'s own league-scoped one — the identical "one transaction, one
+      // chain" constraint `acceptTrade`'s own supersede sweep already carries.
+      await closeSupersededHoldFlagsQuietly(db, {
+        tradeIds: release.supersededHeldTradeIds,
+        leagueId,
+        occurredAt: (input.clock ?? systemClock).now(),
+      });
+
+      // Fall through to this function's own transaction below: the PLATFORM-chain record of the
+      // decision that ordered the release which just committed. `trade_released`'s own notices
+      // were already sent, inside the transaction above — `NOTICE_FOR_DECISION.trade_released`
+      // stays `null` so nothing here sends a third, generic one.
+    }
+    // `flag === undefined`: fall through, same reasoning `trade_reversed`'s own branch states.
+  }
+
   const clock = input.clock ?? systemClock;
   const audit = input.audit ?? getAuditLogger();
   const notify = input.notify ?? notifyAffectedMember;
@@ -534,6 +676,26 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
         });
       }
 
+      // trade_blocked performs the block INSIDE this transaction too (Plan D, Task 5) — a block
+      // moves nothing, so unlike `trade_released` it needs no second transaction and no second
+      // chain, and belongs beside `content_removed` here rather than beside `trade_reversed`
+      // above. An ORDINARY refusal (the trade is no longer held) throws `HeldTradeDecisionRefused`,
+      // caught below and turned into this function's own `{ ok: false }` — the identical
+      // rollback-the-stamp discipline `ContentRemovalRefused` already established.
+      let tradeBlockNotices: readonly MemberNotice[] = [];
+      if (input.decision === "trade_blocked") {
+        const blocked = await blockHeldTradeInTx(tx, {
+          tradeId: row.subjectId,
+          leagueId: row.leagueId!, // a `held_trade` subject's flag always carries a real leagueId
+          operatorUserId: input.operatorUserId,
+          note: input.note,
+          clock,
+          notify,
+        });
+        if (!blocked.ok) throw new HeldTradeDecisionRefused(blocked.status, blocked.reason);
+        tradeBlockNotices = blocked.notices;
+      }
+
       const noticeType = NOTICE_FOR_DECISION[input.decision];
       const notice =
         noticeType === "operator_warning"
@@ -556,10 +718,12 @@ export async function resolveFlag(db: Db, input: ResolveFlagInput): Promise<Reso
         occurredAt: clock.now(),
       });
       if (notice !== null) await attachAuditEvent(tx, notice, event.eventId);
+      for (const blockNotice of tradeBlockNotices) await attachAuditEvent(tx, blockNotice, event.eventId);
       return { ok: true, flagId: row.id, decision: input.decision };
     });
   } catch (err: unknown) {
     if (err instanceof ContentRemovalRefused) return { ok: false, status: err.status, reason: err.message };
+    if (err instanceof HeldTradeDecisionRefused) return { ok: false, status: err.status, reason: err.message };
     throw err;
   }
 }
@@ -632,7 +796,10 @@ async function aboutFor(db: Db, rows: readonly PendingFlagRow[]): Promise<Readon
   const reviewIds = [...new Set(rows.filter((r) => r.subjectType === "review").map((r) => r.subjectId))];
   const chatIds = [...new Set(rows.filter((r) => r.subjectType === "chat_message").map((r) => r.subjectId))];
   const pairUserIds = [...new Set(rows.filter((r) => r.subjectType === "account_pair").flatMap((r) => r.subjectId.split(PAIR_ID_SEPARATOR)))];
-  const tradeIds = [...new Set(rows.filter((r) => r.subjectType === "trade").map((r) => r.subjectId))];
+  // `held_trade` (Plan D, Task 5) joins `trade` here: both name a real `trade_proposals` row by
+  // the identical id, and "about" reads the same either way — which of the two flag types raised
+  // the question is the queue row's own `flagType`, not something `about` needs to restate.
+  const tradeIds = [...new Set(rows.filter((r) => r.subjectType === "trade" || r.subjectType === "held_trade").map((r) => r.subjectId))];
 
   const [reviewRows, chatRows, pairRows, tradeRows] = await Promise.all([
     reviewIds.length === 0
@@ -677,7 +844,8 @@ async function aboutFor(db: Db, rows: readonly PendingFlagRow[]): Promise<Readon
       const [a, b] = row.subjectId.split(PAIR_ID_SEPARATOR);
       about.set(row.id, `${pairName.get(a) ?? "A former member"} and ${pairName.get(b ?? "") ?? "a former member"}`);
     } else {
-      // "trade" — the only remaining `FlagSubjectType`. A trade row this old (or never
+      // "trade" or "held_trade" — the only two remaining `FlagSubjectType`s, and both point at
+      // the same `trade_proposals` table by the same id. A trade row this old (or never
       // committed, for a test fixture pinning the honest fallback) still names itself by its
       // bare id rather than crash the queue over a subject that has moved on. Once the row IS
       // found, its two team names are never missing — `trade_proposals`' own foreign keys onto
@@ -772,10 +940,35 @@ function numberFromEvidence(evidence: JsonObject, key: "gap" | "threshold"): num
   return typeof value === "number" && Number.isFinite(value) ? value : null;
 }
 
+/**
+ * One manager's own standing, for `held-trade-detail.tsx` (Plan D, Task 5) — see
+ * `HeldTradeManagerView`'s own docblock (`@/integrity/queue-view`) for why this exists at all.
+ * `joinedAt` is read off the league chain's own `member_joined` event for this user (the SAME
+ * fact `member_joined`'s own trail row already renders for an `account_pair` investigation),
+ * bounded to one row since a team's own owner joins a league exactly once. `null` for a member
+ * whose join predates this chain (there is none), never a crash: an operator reads "unknown" as
+ * an honest answer, the same "malformed or missing reads as absent" discipline every other
+ * evidence reader in this file holds to. `completedSeasons` is the SAME count
+ * `participationTierFor`/`isVerifiedPlayer` both read through (`@/league-service/participation`) —
+ * this account's whole platform history, not just this one league's.
+ */
+async function heldTradeManagerViewFor(db: Db, leagueId: string, team: { readonly userId: string; readonly name: string }): Promise<HeldTradeManagerView> {
+  const [joined, completedSeasons] = await Promise.all([
+    db
+      .select({ occurredAt: auditEvents.occurredAt })
+      .from(auditEvents)
+      .where(and(eq(auditEvents.chainScope, leagueId), eq(auditEvents.eventType, "member_joined"), eq(auditEvents.actorId, team.userId)))
+      .limit(1),
+    completedSeasonsFor(db, team.userId),
+  ]);
+  return { userId: team.userId, name: team.name, joinedAt: joined[0]?.occurredAt.toISOString() ?? null, completedSeasons };
+}
+
 /** The reported content, or the account pair, as an operator needs to see it — one query per
  *  subject type, dispatched by `flagDetail`'s own single lookup of the flag row. `evidence` is
- *  that same lookup's own `evidence` column, threaded through for the `trade` branch only
- *  (Task 6) — every other branch ignores it, unused parameters costing nothing here. */
+ *  that same lookup's own `evidence` column, threaded through for the `trade`/`held_trade`
+ *  branches only (Task 6, and Plan D Task 5) — every other branch ignores it, unused parameters
+ *  costing nothing here. */
 async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: string, evidence: JsonObject): Promise<FlagSubjectView> {
   if (subjectType === "review") {
     const [row] = await db
@@ -811,9 +1004,10 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
     return { kind: "account_pair", userIds: [idA, idB ?? ""], names: [nameOf(idA), nameOf(idB)] };
   }
 
-  // "trade" — the only remaining `FlagSubjectType`. `gave`/`got` come straight from `evidence`
-  // (Task 6, `tradedPlayersFromEvidence`) — never re-priced from a live roster read, the same
-  // "what was true when it was raised" discipline every other field on this row already keeps.
+  // "trade" or "held_trade" — the two remaining `FlagSubjectType`s. `gave`/`got` come straight
+  // from `evidence` (Task 6, `tradedPlayersFromEvidence`) either way — never re-priced from a
+  // live roster read, the same "what was true when it was raised" discipline every other field on
+  // this row already keeps.
   const gave = tradedPlayersFromEvidence(evidence, "giving");
   const got = tradedPlayersFromEvidence(evidence, "receiving");
   // Task 6 fix round 1 (review MEDIUM 1): plain words for WHICH evaluation priced `gave`/`got` —
@@ -821,6 +1015,50 @@ async function subjectFor(db: Db, subjectType: FlagSubjectType, subjectId: strin
   const valuationBasis = tradeFairnessBasisPhrase(basisFromEvidence(evidence));
   // Fix round 2, F3: plain words for the number that actually raised this flag.
   const fairnessGapSummary = tradeFairnessGapPhrase(numberFromEvidence(evidence, "gap"), numberFromEvidence(evidence, "threshold"));
+
+  if (subjectType === "held_trade") {
+    const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, subjectId));
+    if (row === undefined) {
+      const missing: HeldTradeManagerView = { userId: "", name: FALLBACK_SUBJECT_MEMBER, joinedAt: null, completedSeasons: 0 };
+      return {
+        kind: "held_trade",
+        tradeId: subjectId,
+        proposerTeamName: FALLBACK_SUBJECT_TEAM,
+        counterpartyTeamName: FALLBACK_SUBJECT_TEAM,
+        gave,
+        got,
+        valuationBasis,
+        fairnessGapSummary,
+        proposerManager: missing,
+        counterpartyManager: missing,
+        // The row is gone entirely (cascaded away with its league or a team). Neither decision can
+        // land, so neither is offered — final review F4.
+        noLongerHeldExplanation: noLongerHeldExplanationFor(null),
+      };
+    }
+    const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(inArray(teams.id, [row.proposerTeamId, row.counterpartyTeamId]));
+    // No fallback here — the identical "FK-guaranteed" reasoning the `trade` branch below states
+    // for the same lookup.
+    const teamOf = (id: string) => teamRows.find((t) => t.id === id)!;
+    return {
+      kind: "held_trade",
+      tradeId: subjectId,
+      proposerTeamName: teamOf(row.proposerTeamId).name,
+      counterpartyTeamName: teamOf(row.counterpartyTeamId).name,
+      gave,
+      got,
+      valuationBasis,
+      fairnessGapSummary,
+      proposerManager: await heldTradeManagerViewFor(db, row.leagueId, teamOf(row.proposerTeamId)),
+      counterpartyManager: await heldTradeManagerViewFor(db, row.leagueId, teamOf(row.counterpartyTeamId)),
+      // The LIVE status column, the one field this subject view never carried (final review F4).
+      // `null` while the row is genuinely still `held`; a sentence the operator reads in place of
+      // Release and Block once it is not. A PREVIEW, not a guarantee, the identical honesty
+      // `playersMovedAgain` keeps below: a supersede can still land between this read and the
+      // click, and the guarded `UPDATE ... WHERE status = 'held'` stays the authoritative one.
+      noLongerHeldExplanation: noLongerHeldExplanationFor(row.status as TradeStatus),
+    };
+  }
 
   const [row] = await db.select().from(tradeProposals).where(eq(tradeProposals.id, subjectId));
   if (row === undefined) {
@@ -950,18 +1188,28 @@ const TRADE_TRAIL_EVENT_TYPES: readonly AuditEventType[] = ["trade_proposed", "t
  * `member_joined` context for the two accounts named — the investigation an operator actually
  * needs.
  *
- * `trade` (Task 6) is the one EXCEPTION, deliberately: it answers the league chain's own
+ * `trade` (Task 6) is one EXCEPTION, deliberately: it answers the league chain's own
  * propose/accept/roster-move sequence for this trade (`payload.tradeId`, never by actor — the
  * proposer and the accepter are two different people) and NOTHING from the platform chain. The
  * `flag_raised`/`flag_resolved` story is already told elsewhere on `FlagDetail` (`raisedAt`,
  * `resolution`) — the trade's own trail is the *"full propose → accept audit sequence for that
  * trade"* the spec asks for by name, not a merged timeline of both.
  *
- * Bounded at two queries for `trade` (the trail read plus its own batched actor-name lookup) and
- * for `account_pair` (the platform read plus the league read), one otherwise.
+ * `held_trade` (Plan D, Task 5) is the SECOND exception, and shares `trade`'s own league-chain
+ * read (the SAME `TRADE_TRAIL_EVENT_TYPES`, filtered by the identical `payload.tradeId`) PLUS one
+ * more: the PLATFORM chain's own `system_action` event for the hold itself (`payload.tradeId`,
+ * `eventType = 'system_action'`) — the one platform-chain fact this trade's own trail needs, since
+ * the hold never touched the league chain at all. `flagTrailRowFor` (`@/integrity/queue-view`) is
+ * what turns that event into "The platform held this trade for a fairness review." Still never the
+ * generic `flag_raised`/`flag_resolved` platform rows every OTHER subject type reads — those tell
+ * the SAME story `FlagDetail.resolution` already does.
+ *
+ * Bounded at two queries for `trade` (the trail read plus its own batched actor-name lookup),
+ * three for `held_trade` (one more for the hold's own `system_action` row), and two for
+ * `account_pair` (the platform read plus the league read); one otherwise.
  */
 async function trailFor(db: Db, flagId: string, leagueId: string | null, subjectType: FlagSubjectType, subjectId: string): Promise<TrailResult> {
-  if (leagueId !== null && subjectType === "trade") {
+  if (leagueId !== null && (subjectType === "trade" || subjectType === "held_trade")) {
     const tradeRows = await db
       .select()
       .from(auditEvents)
@@ -975,11 +1223,28 @@ async function trailFor(db: Db, flagId: string, leagueId: string | null, subject
       .orderBy(asc(auditEvents.occurredAt))
       .limit(INTEGRITY_CONFIG.queue.trailLimit);
 
-    const actorIds = [...new Set(tradeRows.flatMap((row) => (row.actorId === null ? [] : [row.actorId])))];
+    const holdRows =
+      subjectType !== "held_trade"
+        ? []
+        : await db
+            .select()
+            .from(auditEvents)
+            .where(
+              and(
+                eq(auditEvents.chainScope, INTEGRITY_CONFIG.chain.platformScope),
+                eq(auditEvents.eventType, "system_action"),
+                sql`${auditEvents.payload} ->> 'tradeId' = ${subjectId}`,
+              ),
+            )
+            .orderBy(asc(auditEvents.occurredAt))
+            .limit(INTEGRITY_CONFIG.queue.trailLimit);
+
+    const combinedRows = [...tradeRows, ...holdRows].sort((a, b) => a.occurredAt.getTime() - b.occurredAt.getTime());
+    const actorIds = [...new Set(combinedRows.flatMap((row) => (row.actorId === null ? [] : [row.actorId])))];
     const nameRows = actorIds.length === 0 ? [] : await db.select({ id: users.id, name: users.displayName }).from(users).where(inArray(users.id, actorIds));
 
     return {
-      events: tradeRows.map(toEvent),
+      events: combinedRows.map(toEvent),
       actorNames: new Map(nameRows.map((row) => [row.id, row.name])),
     };
   }
@@ -1056,20 +1321,31 @@ export async function flagDetail(db: Db, flagId: string): Promise<FlagDetail | n
     .map((event) => flagTrailRowFor(event, trailResult.actorNames))
     .filter((row): row is NonNullable<typeof row> => row !== null);
 
-  // `resolveFlag`'s stamp UPDATE sets `resolved_at`, `resolved_by_user_id`, `resolution` and
-  // `resolution_note` together, in the one statement — a row where the first three are non-null
-  // but `resolution_note` is somehow still null cannot come from that write, so it is folded
-  // into the same "not resolved" guard rather than given its own fallback (`?? ""`) to defend a
-  // state this table's one writer cannot produce.
+  // `resolveFlag`'s own stamp UPDATE sets `resolved_at`, `resolved_by_user_id`, `resolution` and
+  // `resolution_note` together, in the one statement, so a row where `resolved_at`/`resolution`/
+  // `resolution_note` are non-null but `resolved_by_user_id` is somehow still null cannot come
+  // from THAT write — but `closeSupersededHoldFlag` (`@/integrity-service/trade-fairness`, fix
+  // round 1, Finding 1) is a SECOND writer, and it stamps exactly that: a real resolution with no
+  // operator behind it (`resolvedByUserId: null`, `resolution: "superseded_before_review"`). This
+  // check no longer requires `resolvedByUserId` non-null for that reason — requiring it made a
+  // system-closed flag misrender as still open, offering an operator two live decision buttons
+  // for a trade that had already been decided by the world. `resolution_note` stays in the guard:
+  // BOTH writers set it in the same statement as the other three fields, so it is still true that
+  // no writer can produce a row where it alone is null.
   const resolution =
-    flagRow.resolvedAt === null || flagRow.resolvedByUserId === null || flagRow.resolution === null || flagRow.resolutionNote === null
+    flagRow.resolvedAt === null || flagRow.resolution === null || flagRow.resolutionNote === null
       ? null
       : {
           decision: flagRow.resolution as ResolutionDecision,
           note: flagRow.resolutionNote,
           resolvedAt: flagRow.resolvedAt.toISOString(),
           resolvedByUserId: flagRow.resolvedByUserId,
-          resolvedByName: await resolverNameFor(db, flagRow.resolvedByUserId),
+          // "The platform" for a SYSTEM resolution (`resolvedByUserId: null`) rather than a
+          // lookup with nothing to find — `resolverNameFor`'s own docblock is why this branch,
+          // not a fallback inside that function, is the honest place for this: a real, non-null
+          // `resolved_by_user_id` is still an FK-guaranteed row every time, with no legitimate
+          // "missing" case of its own to degrade from.
+          resolvedByName: flagRow.resolvedByUserId === null ? "The platform" : await resolverNameFor(db, flagRow.resolvedByUserId),
         };
 
   return flagDetailFor(
@@ -1078,4 +1354,143 @@ export async function flagDetail(db: Db, flagId: string): Promise<FlagDetail | n
     reporters,
     trail,
   );
+}
+
+/**
+ * `ModerationSummaryView`'s (`@/league-room/contract`) own exact key order, exported so
+ * `flags.test.ts`'s `Object.keys(summary)` assertion checks against THIS rather than a
+ * hand-copied list — the same disclosure-allowlist idiom `REVIEW_VIEW_FIELDS`
+ * (`@/review-service/reviews`) and `PUBLIC_LEAGUE_FIELDS` (`@/league-service/browse`) already use
+ * for their own wire shapes.
+ */
+export const MODERATION_SUMMARY_FIELDS: readonly (keyof ModerationSummaryView)[] = ["removedMessages", "removedReviews", "mostRecentAt", "openQuestions"];
+
+export interface LeagueModerationSummaryInput {
+  readonly leagueId: string;
+  readonly userId: string;
+}
+
+/**
+ * The later of two nullable removal timestamps, as an ISO string — `null` only when both are,
+ * which is the healthy-league state (`ModerationSummaryView.mostRecentAt`'s own docblock).
+ * Accepts either shape a raw `max(...)` aggregate can hand back: postgres.js parses a plain
+ * column read into a `Date`, but a `sql<...>`-typed aggregate is a runtime string underneath the
+ * compile-time cast, and this is the one place that gap is closed rather than trusted away.
+ */
+function laterOf(a: Date | string | null, b: Date | string | null): string | null {
+  const dateA = a === null ? null : new Date(a);
+  const dateB = b === null ? null : new Date(b);
+  if (dateA === null) return dateB === null ? null : dateB.toISOString();
+  if (dateB === null) return dateA.toISOString();
+  return (dateA > dateB ? dateA : dateB).toISOString();
+}
+
+/**
+ * Plan B's Task 6 persona panel raised a commissioner's own blindness to platform moderation in
+ * their league as a MEDIUM, and Plan B ruled it out of its own scope by name (this function's own
+ * docblock in `ModerationSummaryView`, `@/league-room/contract`, restates the ruling). This is
+ * that window, and it is deliberately narrow: four facts, never who, what, or why.
+ *
+ * GATES ON COMMISSIONER-OF-THIS-LEAGUE, ANSWERING `null` FOR EVERYONE ELSE — the identical
+ * no-oracle shape `setDraftKickoff` (`@/league-service/draft-schedule`) already established for a
+ * commissioner-only surface: a nonexistent league and an ordinary member both come back `null`,
+ * so `GET /api/leagues/[leagueId]/moderation` can map that to one 404 without ever telling a
+ * caller which of the two is true. `withLeagueMemberActor` still refuses a complete stranger (no
+ * team, not the commissioner) with the league's ordinary 403 before this function is ever asked
+ * — a signed-in league MEMBER who isn't the commissioner is the caller this `null` is actually
+ * for.
+ *
+ * THREE BOUNDED READS, after the one commissioner check:
+ *
+ *  - `chat_messages` filtered to `league_id = X` (served by `chat_messages_league_id_idx`, the
+ *    same index `chatPageQuery` already reads this table by) and `removed_at IS NOT NULL` — the
+ *    scan is bounded by this league's own message count, never the platform's, the identical
+ *    "narrowed by an indexed league id" shape every other per-league read in this codebase holds
+ *    to.
+ *  - `reviews` INNER JOIN `teams` ON `teams.user_id = reviews.user_id`, filtered to
+ *    `teams.league_id = X` (served by `teams_league_id_idx`) and `reviews.removed_at IS NOT
+ *    NULL`. Reviews carry no `league_id` at all — they review Commish itself, not a league — so
+ *    "in their league" is read as "written by someone who has (or had) a team here", the one
+ *    definition that keeps this a bounded, indexed join rather than a scan of every review on the
+ *    platform: `teams_league_user_idx`'s own uniqueness means this join can never double-count an
+ *    account across two seats in the same league.
+ *  - `integrity_flags` filtered to `league_id = X AND resolved_at IS NULL AND flag_type IN
+ *    (the league-question types)`. No index carries
+ *    `league_id` on its own, but the WHERE clause is a strict superset of TWO indexes' own
+ *    partial predicate (`resolved_at IS NULL`) — `integrity_flags_queue_idx` and
+ *    `integrity_flags_open_subject_idx` — so Postgres can still walk one of them rather than the
+ *    whole table, `league_id` applied as a `Filter` over the bounded result. MEASURED
+ *    (`src/db/index-plans.test.ts`, "a commissioner's moderation window counts one league's open
+ *    flags by index"), not assumed: over the realistic corpus the planner reaches for
+ *    `integrity_flags_open_subject_idx`, its own cost reasons choosing between two equally
+ *    eligible partial indexes — the property this read depends on is "some partial-on-open
+ *    index", never a specific one, and is bounded by the platform's current OPEN queue, which by
+ *    design (ruling 30, an operator resolves flags rather than lets them accumulate) stays small,
+ *    never by the platform's all-time flag history. Built by `openQuestionsQuery` below and
+ *    IMPORTED by that measurement (final review F9), so the assertion can no longer measure a
+ *    lookalike this function has since moved on from.
+ *
+ * NEVER NAMES WHO, WHAT, OR WHY: no `select` here reaches `user_id`, `author_user_id`, `body`, or
+ * `removal_reason` on any of the three tables — a stronger guarantee than "not returned", the
+ * same "the column simply is not here to leak" discipline `feedQuery`'s own docblock states for
+ * `rating`.
+ */
+/**
+ * The open-question count, as the query BUILDER (not yet awaited) — the shape
+ * `browseQuery`/`dueDraftsQuery`/`pendingFlagQuery`/`completedSeasonsQuery` already use, and now
+ * this read too (final review F9).
+ *
+ * WHY IT IS EXPORTED AT ALL: `src/db/index-plans.test.ts` measures this read, and five of its six
+ * new EXPLAIN assertions import the real builder while this one hand-rebuilt the query. The shapes
+ * matched character-for-character and the test's own docblock disclosed it honestly, but nothing
+ * BOUND them: a join or a filter added to the production read would leave the assertion green
+ * while measuring a query production no longer runs — which is exactly what F5's `flag_type`
+ * predicate would have done. One builder, imported by both, is the fix the file already applies
+ * five times.
+ *
+ * `resolved_at IS NULL` is the predicate two partial indexes share
+ * (`integrity_flags_queue_idx`, `integrity_flags_open_subject_idx`), so the planner narrows to the
+ * open population by index and applies `league_id` and `flag_type` as filters over that bounded
+ * set — measured, never assumed.
+ */
+export function openQuestionsQuery(db: Db, leagueId: string) {
+  return db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(integrityFlags)
+    .where(
+      and(
+        eq(integrityFlags.leagueId, leagueId),
+        isNull(integrityFlags.resolvedAt),
+        // F5: `trade_hold` is league-SCOPED on the row and is not league NEWS — see
+        // `FLAG_IS_LEAGUE_QUESTION`'s own docblock (`@/integrity/flags`) for the whole
+        // accounting. Read from that table rather than a `ne(flagType, "trade_hold")` here, so
+        // the next flag type has to decide rather than default into a commissioner's counter.
+        inArray(integrityFlags.flagType, LEAGUE_QUESTION_FLAG_TYPES),
+      ),
+    );
+}
+
+export async function leagueModerationSummary(db: Db, input: LeagueModerationSummaryInput): Promise<ModerationSummaryView | null> {
+  const [league] = await db.select({ commissionerUserId: leagues.commissionerUserId }).from(leagues).where(eq(leagues.id, input.leagueId));
+  if (league === undefined || league.commissionerUserId !== input.userId) return null;
+
+  const [[messageRow], [reviewRow], [flagRow]] = await Promise.all([
+    db
+      .select({ count: sql<number>`count(*)::int`, mostRecentAt: sql<string | null>`max(${chatMessages.removedAt})` })
+      .from(chatMessages)
+      .where(and(eq(chatMessages.leagueId, input.leagueId), isNotNull(chatMessages.removedAt))),
+    db
+      .select({ count: sql<number>`count(*)::int`, mostRecentAt: sql<string | null>`max(${reviews.removedAt})` })
+      .from(reviews)
+      .innerJoin(teams, eq(teams.userId, reviews.userId))
+      .where(and(eq(teams.leagueId, input.leagueId), isNotNull(reviews.removedAt))),
+    openQuestionsQuery(db, input.leagueId),
+  ]);
+
+  return {
+    removedMessages: messageRow!.count,
+    removedReviews: reviewRow!.count,
+    mostRecentAt: laterOf(messageRow!.mostRecentAt, reviewRow!.mostRecentAt),
+    openQuestions: flagRow!.count,
+  };
 }

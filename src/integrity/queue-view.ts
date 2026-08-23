@@ -1,8 +1,9 @@
 import type { IconName } from "@/components/ui/icon";
 import type { AuditEvent, JsonObject } from "@/domain/audit";
 import type { Position } from "@/domain/player";
-import { decisionIsWiredFor, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision, type TradeFairnessBasis } from "@/integrity/flags";
+import { decisionIsOperatorChoosable, decisionIsWiredFor, RESOLUTION_DECISIONS, type FlagType, type ResolutionDecision, type TradeFairnessBasis } from "@/integrity/flags";
 import type { ActivityRow } from "@/integrity/activity-view";
+import type { TradeStatus } from "@/trades/lifecycle";
 
 /**
  * What an operator sees. The deliberate opposite number of `activity-view.ts`, which decides what
@@ -50,12 +51,17 @@ export interface FlagDetail {
  * caller resolve `resolvedByUserId` a second time — `resolvedByUserId` stays on the shape too,
  * for the same "keep the id alongside the derived name" provenance discipline `ReporterView`
  * already follows.
+ *
+ * `resolvedByUserId` is `null` for a SYSTEM resolution (Plan D, Task 5, fix round 1, Finding 1) —
+ * `closeSupersededHoldFlag` (`@/integrity-service/trade-fairness`) stamps a real `resolvedAt`/
+ * `resolution`/`resolutionNote` with no operator behind them, and `resolvedByName` still answers
+ * something a person can read ("The platform") rather than making the caller special-case it.
  */
 export interface FlagResolutionView {
   readonly decision: ResolutionDecision;
   readonly note: string;
   readonly resolvedAt: string;
-  readonly resolvedByUserId: string;
+  readonly resolvedByUserId: string | null;
   readonly resolvedByName: string;
 }
 
@@ -82,10 +88,59 @@ export interface TradedPlayerView {
   readonly averagePoints: number;
 }
 
+/**
+ * One manager's own standing, as `held-trade-detail.tsx` (Plan D, Task 5) needs it beside the
+ * players changing hands: WHO they are, HOW LONG they have been a Commish member (`joinedAt`,
+ * from the league chain's own `member_joined` event — `null` for a member who joined before this
+ * plan started recording it, or whose event this bounded read did not reach), and their whole
+ * platform history (`completedSeasons`, the SAME count `participationTierFor`/`isVerifiedPlayer`
+ * both read through). An operator deciding whether to overrule two adults about their own teams
+ * is deciding on the strength of a number; this is the context that number sits beside.
+ */
+export interface HeldTradeManagerView {
+  readonly userId: string;
+  readonly name: string;
+  readonly joinedAt: string | null;
+  readonly completedSeasons: number;
+}
+
 export type FlagSubjectView =
   | { readonly kind: "review"; readonly reviewId: string; readonly body: string; readonly authorName: string; readonly removedAt: string | null }
   | { readonly kind: "chat_message"; readonly messageId: string; readonly body: string | null; readonly authorName: string; readonly removedAt: string | null }
   | { readonly kind: "account_pair"; readonly userIds: readonly [string, string]; readonly names: readonly [string, string] }
+  | {
+      /**
+       * Plan D's own subject (Task 5), deliberately NOT the `trade` arm below even though both
+       * can name the identical trade id — see `SUBJECT_OF.trade_hold`'s own docblock
+       * (`@/integrity/flags`) for why two subject types exist. A `trade_fairness` flag's `trade`
+       * describes something that already happened; this describes something that has NOT, and
+       * carries the two managers' own standing (`proposerManager`/`counterpartyManager`) because
+       * the operator surface built for it (`held-trade-detail.tsx`) is a different question from
+       * the one `TradeSubjectCard` answers: not "was this fair", but "should this go through".
+       */
+      readonly kind: "held_trade";
+      readonly tradeId: string;
+      readonly proposerTeamName: string;
+      readonly counterpartyTeamName: string;
+      readonly gave: readonly TradedPlayerView[];
+      readonly got: readonly TradedPlayerView[];
+      readonly valuationBasis: string;
+      readonly fairnessGapSummary: string;
+      readonly proposerManager: HeldTradeManagerView;
+      readonly counterpartyManager: HeldTradeManagerView;
+      /**
+       * Final review F4. `null` while the trade is genuinely still `held` and both decisions are
+       * live; a rendered sentence the moment it is not, naming the state in plain words.
+       *
+       * ONE FIELD CARRIES BOTH the predicate and its explanation, so the two can never drift:
+       * `subjectIsNoLongerHeld` reads it to withhold `trade_released`/`trade_blocked`, and
+       * `HeldTradeDetail` renders it in place of the two buttons. The precedent is
+       * `valuationBasis`/`fairnessGapSummary` directly above — a raw column, turned server-side
+       * into one sentence over a bounded set (`TRADE_STATUSES`), never a raw enum shipped to a
+       * component to switch on.
+       */
+      readonly noLongerHeldExplanation: string | null;
+    }
   | {
       readonly kind: "trade";
       readonly tradeId: string;
@@ -171,6 +226,65 @@ export function subjectPlayersMovedAgain(subject: FlagSubjectView): boolean {
   return subject.kind === "trade" && subject.playersMovedAgain;
 }
 
+/**
+ * The sentence an operator reads in place of Release and Block, one per state a held trade's row
+ * can be in while its own flag is still open. `null` for `held`, which is the state both decisions
+ * are FOR.
+ *
+ * Exhaustive over `TRADE_STATUSES` (final review F4), so a ninth status is a compile error here
+ * rather than a held trade rendering two buttons that 409. Two of the eight are genuinely
+ * reachable with an open flag, and both are crash windows this codebase already documents:
+ *
+ *  - `superseded` — a different trade moved one of these players before an operator decided this
+ *    one. `closeSupersededHoldFlag`'s own after-commit call closes the flag, and `npm run
+ *    trades:sweep` re-closes it if that call never landed; until then the flag sits open over an
+ *    inert trade, for an arbitrarily long window since the sweep is hand-run.
+ *  - `accepted`/`blocked` — a decision's own trade transaction committed and `resolveFlag`'s
+ *    platform-chain stamp then failed (ruling 13's execute-first ordering, whose asymmetry is
+ *    exactly this). The decision is real; only the flag is still open.
+ *
+ * The rest are unreachable for a `held_trade` subject (nothing moves a `held` row back to `open`,
+ * `rejected`, `withdrawn` or `expired` — `transitionIsLegal`, `@/trades/lifecycle`), and they get
+ * an honest sentence rather than a lie or a crash, the same "degrade honestly" discipline every
+ * other read in this file keeps.
+ */
+const NO_LONGER_HELD_EXPLANATION: Readonly<Record<TradeStatus, string | null>> = {
+  held: null,
+  superseded: "A different trade moved one of these players first, so there is nothing left to release or block. This flag closes on its own the next time the trade sweep runs.",
+  accepted: "This trade already went through, so there is nothing left to decide. The record of who released it is on this flag's own history above.",
+  blocked: "This trade was already blocked, so there is nothing left to decide. The record of who blocked it is on this flag's own history above.",
+  open: "This trade is no longer waiting on a decision.",
+  rejected: "This trade is no longer waiting on a decision.",
+  withdrawn: "This trade is no longer waiting on a decision.",
+  expired: "This trade is no longer waiting on a decision.",
+};
+
+/** The trade behind a `held_trade` subject is gone entirely — cascaded away with a league or a
+ *  team. Nothing to release and nothing to block, and the operator is told so plainly. */
+const HELD_TRADE_GONE_EXPLANATION = "This trade is no longer here, so there is nothing left to release or block.";
+
+/**
+ * `NO_LONGER_HELD_EXPLANATION[status]`, with the same honest fallback for a row that is gone
+ * entirely that every other subject branch keeps. `subjectFor` (`@/integrity-service/flags`) is
+ * the one caller, and it passes the trade's own live `status` column — the one field the
+ * `held_trade` subject view never carried, which is why `HeldTradeDetail` was offering both
+ * decisions unconditionally (final review F4).
+ */
+export function noLongerHeldExplanationFor(status: TradeStatus | null): string | null {
+  return status === null ? HELD_TRADE_GONE_EXPLANATION : NO_LONGER_HELD_EXPLANATION[status];
+}
+
+/**
+ * Whether this held trade has moved on since its flag was raised — `subjectIsRemoved`'s and
+ * `subjectIsAlreadyReversed`'s own twin for Plan D's subject, and the last of the four to exist
+ * (final review F4). `flagDetailFor` reads it to withhold BOTH `trade_released` and
+ * `trade_blocked`, which are the only two decisions wired for this subject, so the offered set for
+ * a superseded held trade is empty rather than two buttons that answer 409.
+ */
+export function subjectIsNoLongerHeld(subject: FlagSubjectView): boolean {
+  return subject.kind === "held_trade" && subject.noLongerHeldExplanation !== null;
+}
+
 /** One reporter's own account of it — who, why, and when. Derived at read time from
  *  `review_reports` (ruling 5): this row is never stored on the flag itself. */
 export interface ReporterView {
@@ -204,6 +318,7 @@ const QUESTION_FOR_FLAG_TYPE: Readonly<Record<FlagType, string>> = {
   review_report: "A member reported a review",
   chat_report: "A member reported a message",
   trade_fairness: "The platform flagged a trade for a fairness review",
+  trade_hold: "The platform held a trade until an operator decides",
 };
 
 const ICON_FOR_FLAG_TYPE: Readonly<Record<FlagType, IconName>> = {
@@ -211,6 +326,7 @@ const ICON_FOR_FLAG_TYPE: Readonly<Record<FlagType, IconName>> = {
   review_report: "alert-triangle",
   chat_report: "alert-triangle",
   trade_fairness: "refresh-cw",
+  trade_hold: "refresh-cw",
 };
 
 export interface QueueRowInput {
@@ -255,6 +371,12 @@ export interface FlagDetailInput {
  * back (`subjectIsAlreadyReversed`) never offers a second one, and a trade whose players have
  * moved on since (`subjectPlayersMovedAgain`, fix round 1) never offers one that would 409 on
  * submit.
+ *
+ * Final review F4 extends the identical promise to Plan D's `held_trade` subject, the one subject
+ * it had never been extended to: a held trade whose row has moved on (`subjectIsNoLongerHeld`)
+ * offers NEITHER `trade_released` NOR `trade_blocked` — the only two decisions wired for it — so
+ * the set is empty and `HeldTradeDetail` renders that state's own explanation in place of two
+ * buttons that would both answer "This trade is no longer waiting on a decision."
  */
 export function flagDetailFor(
   flag: FlagDetailInput,
@@ -279,7 +401,14 @@ export function flagDetailFor(
         ? RESOLUTION_DECISIONS.filter(
             (decision) =>
               decisionIsWiredFor(decision, subject.kind) &&
-              (decision !== "trade_reversed" || (!subjectIsAlreadyReversed(subject) && !subjectPlayersMovedAgain(subject))),
+              // Plan D, fix round 1: a system-only decision is never OFFERED, whatever it is wired
+              // for — `superseded_before_review` is wired `true` for `held_trade` (the product
+              // does carry it out), but no operator ever chooses it from this list.
+              decisionIsOperatorChoosable(decision) &&
+              (decision !== "trade_reversed" || (!subjectIsAlreadyReversed(subject) && !subjectPlayersMovedAgain(subject))) &&
+              // F4: both of the held trade's own decisions, withheld together, because the row
+              // they act on has already moved past `held` and each would 409 on submit.
+              !subjectIsNoLongerHeld(subject),
           )
         : [],
   };
@@ -304,6 +433,13 @@ export const DECISION_PHRASE: Readonly<Record<ResolutionDecision, string>> = {
   warned_user: "sent the member a warning",
   content_removed: "removed the reported content",
   trade_reversed: "reversed the trade",
+  trade_released: "released the trade",
+  trade_blocked: "blocked the trade",
+  // Plan D, fix round 1. Reads correctly in BOTH sentence shapes this phrase fills: the trail's
+  // own "{who} {phrase}." (`flagTrailRowFor`, below, always renders "The platform" for this one,
+  // never "An operator") and the detail page's own "{name} {phrase} on {date}." (`resolvedByName`
+  // is "The platform" too, `@/integrity-service/flags`).
+  superseded_before_review: "closed this flag once a different trade superseded it",
 };
 
 function isResolutionDecision(value: string): value is ResolutionDecision {
@@ -393,7 +529,12 @@ export function flagTrailRowFor(event: AuditEvent, actorNames: ReadonlyMap<strin
   if (event.eventType === "flag_resolved") {
     const decision = payloadStr(event.payload, "decision");
     const phrase = decision !== undefined && isResolutionDecision(decision) ? DECISION_PHRASE[decision] : "resolved this flag";
-    return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "check", headline: `An operator ${phrase}.`, detail: null };
+    // Plan D, fix round 1: a SYSTEM resolution (`actorType: "system"`, `actorId: null` — the same
+    // construction every other system-authored event in this product carries,
+    // `@/integrity/system-actions.ts`'s own docblock) reads "The platform", never "An operator" —
+    // an operator did not decide this one, and the trail must not claim one did.
+    const who = event.actorId === null ? "The platform" : "An operator";
+    return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "check", headline: `${who} ${phrase}.`, detail: null };
   }
   if (event.eventType === "review_removed") {
     return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "x", headline: "The reported review was removed.", detail: null };
@@ -435,6 +576,18 @@ export function flagTrailRowFor(event: AuditEvent, actorNames: ReadonlyMap<strin
     // trade" and the notice title both use for the identical action.
     if (reason === "trade_reversed") {
       return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "refresh-cw", headline: "An operator reversed the trade.", detail: null };
+    }
+    return null;
+  }
+  // Plan D (Task 5): the hold itself. Written on the PLATFORM chain (`acceptTrade`'s own
+  // docblock, `@/league-service/trades`), so a `held_trade` subject's trail is the one place this
+  // event type is ever rendered — `trailFor`'s `trade` branch (a `trade_fairness` flag) reads the
+  // league chain alone and never reaches it. Deny-by-default for every OTHER `system_action`
+  // code: this trail only knows how to explain the one this plan owns.
+  if (event.eventType === "system_action") {
+    const action = payloadStr(event.payload, "action");
+    if (action === "trade_held_for_review") {
+      return { eventId: event.eventId, occurredAt: event.occurredAt, icon: "alert-triangle", headline: "The platform held this trade for a fairness review.", detail: null };
     }
     return null;
   }

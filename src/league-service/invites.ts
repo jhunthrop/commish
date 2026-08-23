@@ -1,7 +1,7 @@
 import { and, eq, sql } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { isUniqueViolation } from "@/db/errors";
-import { leagueInvites, leagues, scoringSettings, teams, users } from "@/db/schema";
+import { drafts, leagueInvites, leagues, scoringSettings, teams, users } from "@/db/schema";
 import { PPR_SCORING } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { generateInviteCode, leagueTerms, LEAGUE_CONFIG, type LeagueTerms } from "@/league";
@@ -21,6 +21,10 @@ const TEAM_MEMBERSHIP_UNIQUE_INDEX = "teams_league_user_idx";
 const INVALID = "That invite link isn't valid. Ask your commissioner for a new one.";
 const EXPIRED = "That invite link has expired. Ask your commissioner for a new one.";
 const EXHAUSTED = "That invite link has already been used up. Ask your commissioner for a new one.";
+
+/** The outermost edge is the only place a wall clock is allowed — see every other service
+ *  module's identical constant (`creation.ts`, `read.ts`, ...). */
+const systemClock: Clock = { now: () => new Date().toISOString() };
 
 export interface InviteDeps {
   readonly db: Db;
@@ -174,10 +178,10 @@ export type InvitePreviewResult = { readonly ok: true; readonly terms: LeagueTer
  * that — exactly like `acceptInvite` itself, the code is the capability. This is a read, not a
  * write, so it deliberately does not run inside `acceptInvite`'s transaction or its row locks.
  */
-export async function invitePreview(db: Db, code: string): Promise<InvitePreviewResult> {
+export async function invitePreview(db: Db, code: string, clock: Clock = systemClock): Promise<InvitePreviewResult> {
   const [invite] = await db.select().from(leagueInvites).where(eq(leagueInvites.code, code));
   if (invite === undefined) return { ok: false, reason: INVALID };
-  if (Date.now() >= invite.expiresAt.getTime()) return { ok: false, reason: EXPIRED };
+  if (Date.parse(clock.now()) >= invite.expiresAt.getTime()) return { ok: false, reason: EXPIRED };
   if (invite.uses >= invite.maxUses) return { ok: false, reason: EXHAUSTED };
 
   const [league] = await db.select().from(leagues).where(eq(leagues.id, invite.leagueId));
@@ -191,6 +195,7 @@ export async function invitePreview(db: Db, code: string): Promise<InvitePreview
   );
   const [weights] = await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, league.id));
   const filledTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, league.id));
+  const [draft] = await db.select({ kickoffAt: drafts.kickoffAt }).from(drafts).where(eq(drafts.leagueId, league.id));
 
   return {
     ok: true,
@@ -210,6 +215,10 @@ export async function invitePreview(db: Db, code: string): Promise<InvitePreview
         displayName: commissioner?.displayName ?? "Commissioner",
         avatarUrl: commissioner?.avatarUrl ?? null,
       },
+      // Same never-true-in-production fallback as `league-service/read.ts`'s own `leagueHome`:
+      // `drafts` is written in the same transaction as `leagues`.
+      kickoffAt: draft?.kickoffAt.toISOString() ?? clock.now(),
+      now: clock.now(),
     }),
   };
 }
