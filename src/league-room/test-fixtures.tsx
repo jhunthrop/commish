@@ -115,6 +115,8 @@ export const DRAFT_SCHEDULE: DraftScheduleBody = {
   status: "complete",
   kickoffAt: "2026-08-24T12:00:00.000Z",
   isPublicMatchmade: false,
+  // Task 6, Phase 3.5: NFFC's Kentucky Derby System. `t1` ranked slot 3 first and got it.
+  slotPreference: { slotCount: 12, ranking: [3, 1], assignedSlot: 3, canEdit: false },
 };
 
 /** Everything `LeagueHome` needs: a commissioner, mid-season, drafted, `t1` up this week. */

@@ -27,6 +27,7 @@ import { createKeyedMutex } from "./mutex";
 import { draftOrderFor } from "./order";
 import { buildDraftPool } from "./pool";
 import { loadDraftConfig } from "./setup";
+import { slotPreferencesFor } from "./slot-preference";
 
 export type { PublishFn } from "@/lib/realtime/publish";
 
@@ -521,6 +522,12 @@ export function createDraftStore({
         .orderBy(teams.id);
       const pool = await buildDraftPool(db, config.leagueId);
       if (pool.length === 0) return { ok: false, reason: "There are no players to draft yet." };
+      // Task 6: NFFC's Kentucky Derby System. Read once, here, at command time — the exact same
+      // discipline `minBid`/`skipPolicy` below already follow: the draw's OUTPUT is what rides
+      // the persisted action from here on (`draftOrder` itself), so replay never re-reads this
+      // table and a preference saved or changed after this instant can never change history
+      // (ruling 27 — see `draft_slot_preferences`'s own docblock in `@/db/schema`).
+      const preferences = await slotPreferencesFor(db, draftId);
       // One instant for both the action's own timestamp and (when `auto`) the announcement's
       // `occurredAt` — read once here rather than twice, which could otherwise disagree by
       // however long the transaction below takes to reach the second read.
@@ -531,7 +538,7 @@ export function createDraftStore({
           v: DRAFT_ACTION_VERSION,
           type: "START_DRAFT",
           timestamp: now,
-          draftOrder: draftOrderFor(draftId, teamRows.map((t) => t.id)),
+          draftOrder: draftOrderFor(draftId, teamRows.map((t) => t.id), preferences),
           pool,
           // Command time is the ONE place the tunable is read — it rides the persisted
           // action from here on, so replay never consults AUCTION_CONFIG.

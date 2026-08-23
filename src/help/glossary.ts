@@ -27,6 +27,7 @@ export type TermKey =
   | "standings-record"
   | "median-game"
   | "queue"
+  | "draft-slot"
   | "verified-reviewer";
 
 export interface GlossaryTerm {
@@ -155,6 +156,13 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     short: "The list of players you ranked to auto-draft if you're away when it's your pick.",
     detail:
       "Your draft queue is the ranked list of players you'd want if you can't pick in person. If the clock runs out on your turn, the room drafts the highest-ranked player still available from your queue instead of skipping you.",
+  },
+  "draft-slot": {
+    key: "draft-slot",
+    term: "a draft slot",
+    short: "Your position in the draft order, from 1st pick to last.",
+    detail:
+      "A draft slot is your position in the draft order, from slot 1 (the first pick of the draft) to the last slot. You can rank the slots you want before the draft starts. We draw managers in a random order and give each one their highest-ranked slot that is still free, so a good rank still beats pure luck without anybody being able to pick their exact spot outright.",
   },
   /**
    * Founder decision #8, verbatim (`VERIFIED_BADGE_TOOLTIP`, `@/participation/verified`) — read

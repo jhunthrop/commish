@@ -1,8 +1,11 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, users } from "@/db/schema";
+import { draftActions, drafts, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { DRAFT_ACTION_VERSION } from "@/domain/draft";
+import { DRAFT_SKIP_POLICY } from "@/draft-engine";
+import { setSlotPreference } from "@/draft-service/slot-preference";
 import { LEAGUE_CONFIG } from "@/league";
 import { createLeague } from "./creation";
 import { draftScheduleView, setDraftKickoff, KICKOFF_REFUSALS } from "./draft-schedule";
@@ -70,14 +73,128 @@ afterAll(async () => {
 
 describe("draftScheduleView", () => {
   it("reads the draft's own scheduling facts", async () => {
-    const { leagueId } = await seedLeague();
-    const view = await draftScheduleView(db, leagueId);
+    const { leagueId, commissioner } = await seedLeague();
+    const view = await draftScheduleView(db, leagueId, commissioner);
     expect(view).toMatchObject({ leagueId, status: "scheduled", isPublicMatchmade: false });
     expect(view?.kickoffAt).toBe(await kickoffOf(leagueId));
   });
 
   it("answers null for a league that doesn't exist", async () => {
-    expect(await draftScheduleView(db, "nope")).toBeNull();
+    expect(await draftScheduleView(db, "nope", "whoever")).toBeNull();
+  });
+
+  // Task 6, Phase 3.5: NFFC's Kentucky Derby System.
+  describe("slotPreference", () => {
+    it("is null for a caller with no team in this league", async () => {
+      const { leagueId } = await seedLeague();
+      const view = await draftScheduleView(db, leagueId, "a_total_stranger");
+      expect(view?.slotPreference).toBeNull();
+    });
+
+    it("carries an empty ranking, editable, and no assigned slot yet, before anyone has ranked anything", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      const view = await draftScheduleView(db, leagueId, commissioner);
+      expect(view?.slotPreference).toEqual({
+        slotCount: LEAGUE_CONFIG.defaults.teamCount,
+        ranking: [],
+        assignedSlot: null,
+        canEdit: true,
+      });
+    });
+
+    it("carries the caller's own saved ranking, and nobody else's", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      await setSlotPreference(db, { leagueId, userId: commissioner, ranking: [1, 5] });
+      const view = await draftScheduleView(db, leagueId, commissioner);
+      expect(view?.slotPreference?.ranking).toEqual([1, 5]);
+    });
+
+    it("stops being editable and reports the caller's own drafted slot, once the draft starts", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      const before = await draftScheduleView(db, leagueId, commissioner);
+      const draftId = before!.draftId;
+      const [commissionerTeam] = await db.select({ id: teams.id }).from(teams).where(eq(teams.userId, commissioner));
+
+      // The draw's own snapshot — `resolvedSlotFor`'s ONLY source of truth (ruling 27), written
+      // here directly rather than through a full `store.startDraft()` run, which would need a
+      // real player pool sized for `LEAGUE_CONFIG.defaults.teamCount` (12) teams' worth of
+      // rosters. Slot 3 (index 2): the commissioner's team drafted third.
+      await db.insert(draftActions).values({
+        draftId,
+        sequence: 1,
+        timestamp: new Date(FIXED_NOW),
+        action: {
+          v: DRAFT_ACTION_VERSION,
+          type: "START_DRAFT",
+          timestamp: FIXED_NOW,
+          draftOrder: ["some_other_team", "another_team", commissionerTeam!.id],
+          pool: [{ playerId: "p1", position: "QB" }],
+          minBid: 1,
+          skipPolicy: DRAFT_SKIP_POLICY,
+        },
+      });
+      await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, draftId));
+
+      const after = await draftScheduleView(db, leagueId, commissioner);
+
+      expect(after?.slotPreference?.canEdit).toBe(false);
+      expect(after?.slotPreference?.assignedSlot).toBe(3);
+    });
+
+    // `resolvedSlotFor`'s own defensive branches — every one "cannot happen through ordinary
+    // use" per its docblock, and every one still worth a real assertion rather than a comment.
+    it("reports no assigned slot when the draft has started but its own snapshot row is missing", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      const before = await draftScheduleView(db, leagueId, commissioner);
+      await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, before!.draftId));
+
+      const after = await draftScheduleView(db, leagueId, commissioner);
+
+      expect(after?.slotPreference?.canEdit).toBe(false);
+      expect(after?.slotPreference?.assignedSlot).toBeNull();
+    });
+
+    it("reports no assigned slot when the sequence-1 row isn't a START_DRAFT action", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      const before = await draftScheduleView(db, leagueId, commissioner);
+      const draftId = before!.draftId;
+      await db.insert(draftActions).values({
+        draftId,
+        sequence: 1,
+        timestamp: new Date(FIXED_NOW),
+        action: { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp: FIXED_NOW, teamId: "whoever", playerId: "p1" },
+      });
+      await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, draftId));
+
+      const after = await draftScheduleView(db, leagueId, commissioner);
+
+      expect(after?.slotPreference?.assignedSlot).toBeNull();
+    });
+
+    it("reports no assigned slot when the caller's team is missing from the draw's own snapshot", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      const before = await draftScheduleView(db, leagueId, commissioner);
+      const draftId = before!.draftId;
+      await db.insert(draftActions).values({
+        draftId,
+        sequence: 1,
+        timestamp: new Date(FIXED_NOW),
+        action: {
+          v: DRAFT_ACTION_VERSION,
+          type: "START_DRAFT",
+          timestamp: FIXED_NOW,
+          draftOrder: ["some_other_team", "another_team"],
+          pool: [{ playerId: "p1", position: "QB" }],
+          minBid: 1,
+          skipPolicy: DRAFT_SKIP_POLICY,
+        },
+      });
+      await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, draftId));
+
+      const after = await draftScheduleView(db, leagueId, commissioner);
+
+      expect(after?.slotPreference?.assignedSlot).toBeNull();
+    });
   });
 });
 

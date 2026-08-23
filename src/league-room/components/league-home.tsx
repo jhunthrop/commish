@@ -13,6 +13,7 @@ import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupScoreboard } from "./matchup-scoreboard";
 import { ModerationSummary } from "./moderation-summary";
+import { SlotPreferencePanel } from "./slot-preference-panel";
 import { StandingsTable } from "./standings-table";
 import { TradeInboxLink } from "./trade-inbox-link";
 
@@ -54,6 +55,13 @@ export function LeagueHome({
           nothing once a league had drafted. */}
       {home.draftSchedule === null ? null : (
         <DraftSchedulePanel leagueId={home.leagueId} isCommissioner={home.isCommissioner} initialSchedule={home.draftSchedule} />
+      )}
+
+      {/* Task 6: NFFC's Kentucky Derby System. `null` only for a caller with no team here (a
+          commissioner without one of their own) — a ranking is scoped to a team, so there is
+          nothing for the panel to show them. */}
+      {home.draftSchedule === null || home.draftSchedule.slotPreference === null ? null : (
+        <SlotPreferencePanel leagueId={home.leagueId} initialPreference={home.draftSchedule.slotPreference} helpLevel={helpLevel} />
       )}
 
       <section className="flex flex-col gap-2" aria-label={`${formatWeek(home.currentWeek)} matchup`}>

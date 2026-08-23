@@ -195,6 +195,34 @@ describe("LeagueHome", () => {
     expect(screen.queryByText(/hasn't drafted yet/)).not.toBeInTheDocument();
   });
 
+  // Task 6, Phase 3.5: NFFC's Kentucky Derby System.
+  it("shows the slot-preference panel from the same server render as the draft schedule", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome
+          home={{ ...HOME, draftStatus: "scheduled", draftSchedule: { ...DRAFT_SCHEDULE, status: "scheduled", slotPreference: { slotCount: 12, ranking: [], assignedSlot: null, canEdit: true } } }}
+          lineup={null}
+        />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText(/Rank the slots you want/)).toBeInTheDocument();
+  });
+
+  it("says nothing about a slot preference for a caller with no team in this league", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome
+          home={{ ...HOME, myTeamId: null, draftSchedule: { ...DRAFT_SCHEDULE, slotPreference: null } }}
+          lineup={null}
+        />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByText(/Rank the slots you want/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Draft slot/)).not.toBeInTheDocument();
+  });
+
   // Task 12 review follow-up: "scheduled" and "in_progress" are different moments. A manager
   // whose draft is live needs "join now", not "hasn't drafted yet".
   it("switches to live-draft copy while the draft is in progress", () => {

@@ -15,7 +15,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(request: Request, context: LeagueRouteContext) {
   return withLeagueMemberActor(request, context, async (actor) => {
-    const view = await draftScheduleView(getDb(), actor.leagueId);
+    const view = await draftScheduleView(getDb(), actor.leagueId, actor.userId);
     if (view === null) return fail("That league doesn't exist.", 404);
     return ok<DraftScheduleBody>(view);
   });
@@ -43,7 +43,7 @@ export async function PUT(request: Request, context: LeagueRouteContext) {
     });
     if (!result.ok) return fail(result.reason, result.status);
 
-    const view = await draftScheduleView(getDb(), actor.leagueId);
+    const view = await draftScheduleView(getDb(), actor.leagueId, actor.userId);
     if (view === null) return fail("That league doesn't exist.", 404);
     return ok<DraftScheduleBody>(view);
   });

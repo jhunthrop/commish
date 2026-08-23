@@ -6,6 +6,8 @@ import { auditEvents, draftActions, memberNotices, players, teams } from "@/db/s
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
 import { currentDeadline, DRAFT_SKIP_POLICY, initialDraftState, type DraftConfig } from "@/draft-engine";
 import type { MemberNotice } from "@/integrity-service/notify";
+import { draftOrderFor } from "./order";
+import { setSlotPreference, slotPreferencesFor } from "./slot-preference";
 import { createDraftStore, isSequenceConflict, type ApplyResult, type DraftStore, type DraftStoreDeps, type PublishFn } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -772,5 +774,65 @@ describe("draft store — notices", () => {
     expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "system_action"))).toHaveLength(0);
     expect(await db.select().from(memberNotices)).toHaveLength(0);
     expect(deliveredNotices).toHaveLength(0);
+  });
+});
+
+describe("draft store — slot preferences (Task 6)", () => {
+  it("feeds saved slot preferences into the draw when the draft actually starts", async () => {
+    const { draftId, leagueId, teamIds, userIds } = await seedDraftFixture(db, {
+      draftId: "draft_kds",
+      leagueId: "league_kds",
+      format: "snake",
+      teamCount: 3,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+    });
+    // Three teams x three roster slots each — `reduceStart` refuses a pool smaller than that,
+    // and `beforeEach`'s own six-player POOL was sized for the two-team `fixture()` above.
+    await db.insert(players).values([
+      { id: "qb3", name: "QB Three", position: "QB", nflTeam: "FA" },
+      { id: "rb3", name: "RB Three", position: "RB", nflTeam: "FA" },
+      { id: "wr3", name: "WR Three", position: "WR", nflTeam: "FA" },
+    ]);
+    // The BARE shuffle for this exact draft id/team set (proven by the next test in this
+    // block, and independently below) draws `[team_3, team_2, team_1]` and — with nobody
+    // ranking anything — would seat `team_1` in slot 3. Ranking `team_3` (drawn FIRST) for
+    // slot 3 instead is what actually changes the outcome: an assertion that only ever
+    // reproduced the bare shuffle's own result would pass whether or not `startDraft` reads
+    // preferences at all.
+    const preferred = await setSlotPreference(db, { leagueId, userId: userIds[2]!, ranking: [3] });
+    expect(preferred.ok).toBe(true);
+
+    const store = newStore();
+    const result = await store.startDraft(draftId);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable — asserted above");
+    // The exact same draw `draftOrderFor` produces from this draft's id, its teams, and
+    // whatever `slotPreferencesFor` reads back — proving `startDraft` actually consults the
+    // saved preference rather than falling back to the bare shuffle.
+    const expectedOrder = draftOrderFor(draftId, teamIds, await slotPreferencesFor(db, draftId));
+    expect(result.state.draftOrder).toEqual(expectedOrder);
+    expect(result.state.draftOrder).not.toEqual(draftOrderFor(draftId, teamIds));
+    expect(result.state.draftOrder[2]).toBe(teamIds[2]);
+  });
+
+  it("drafts in exactly the bare shuffle's order when nobody ever ranked anything — additive by construction", async () => {
+    const { draftId, teamIds } = await seedDraftFixture(db, {
+      draftId: "draft_no_kds",
+      leagueId: "league_no_kds",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+    });
+
+    const result = await newStore().startDraft(draftId);
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error("unreachable — asserted above");
+    expect(result.state.draftOrder).toEqual(draftOrderFor(draftId, teamIds));
   });
 });

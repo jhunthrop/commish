@@ -39,6 +39,26 @@ export interface LeagueListBody {
  * extra query cost. The PUT route still calls `draftScheduleView` to build its own response —
  * that write path has no server-rendered parent to hand it a prop.
  */
+/**
+ * Task 6 (Phase 3.5): NFFC's Kentucky Derby System. The caller's OWN slot ranking and its
+ * result, never anybody else's — Plan A's notice-privacy reasoning applies to a ranking whole,
+ * because it is a preference a person expressed privately (`slotPreference.ts`'s own docblock).
+ */
+export interface SlotPreferenceView {
+  /** How many draft slots this league has — the league's own `teamCount`, the ceiling every
+   *  ranked slot number must fall within. */
+  readonly slotCount: number;
+  /** 1-based slot numbers, most-wanted first. Empty means "I do not mind" — a real answer, not
+   *  an unset one. */
+  readonly ranking: readonly number[];
+  /** The slot this manager actually drafted from, once the draw has run. `null` before the
+   *  draft starts — there is nothing to report yet. */
+  readonly assignedSlot: number | null;
+  /** True only while the draft is still `scheduled` — the preference window closes at the
+   *  draw, on both start doors (a commissioner's press and the platform's own auto-start). */
+  readonly canEdit: boolean;
+}
+
 export interface DraftScheduleBody {
   readonly draftId: string;
   readonly leagueId: string;
@@ -48,6 +68,9 @@ export interface DraftScheduleBody {
   /** Whether the platform will start this draft on its own if nobody presses the button
    *  (Task 7) — read by the panel to decide whether to say so. */
   readonly isPublicMatchmade: boolean;
+  /** `null` only for a caller with no team in this league (a commissioner without one of
+   *  their own) — a ranking is scoped to a team, so there is nothing to show them. */
+  readonly slotPreference: SlotPreferenceView | null;
 }
 
 export interface CreateLeagueBody {

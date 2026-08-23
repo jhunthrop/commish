@@ -20,6 +20,7 @@ import type {
 } from "@/league-room/contract";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
+import { slotPreferenceViewFor } from "./draft-schedule";
 import { getLineup, weekStatusFor } from "./lineups";
 import { leagueStandings } from "./results";
 
@@ -116,14 +117,20 @@ export function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyM
 /**
  * Every read `leagueHome` runs, whichever league is asked: `leagues`, `matchups`, `teams`
  * (plain), `drafts`, `scoring_settings`, `stat_weeks` (`weekStatusFor`), the one team+owner
- * join (`listTeamCards`), `leagueStandings`'s own `matchups` read, and (Phase 3.5, Task 2)
- * `leagueStandings`'s `weeks` read for the league's stored medians — nine, bounded regardless
- * of team count. `leagueStandings` is handed `league.medianGame` straight from the row this
- * function already selected above, rather than re-querying `leagues` for it, which is what keeps
- * this at nine and not ten. Pinned here, not just in the test, so a future caller who adds a
- * tenth read trips the same assertion `invitePreview`'s neighboring test would if it grew one.
+ * join (`listTeamCards`), `leagueStandings`'s own `matchups` read, `leagueStandings`'s `weeks`
+ * read for the league's stored medians (Phase 3.5, Task 2), and (Phase 3.5, Task 6)
+ * `slotPreferenceViewFor`'s own `draft_slot_preferences` read — ten, bounded regardless of team
+ * count. That tenth read only fires for a caller WITH a team here (`myTeamId !== null`); a
+ * caller with none (a commissioner without one of their own) short-circuits to `null` before
+ * any query, the same "no team, no query" shape `myMatchup`'s own lookup already has. This test
+ * signs in as a manager with a team, so it pays the full ten. `leagueStandings` is handed
+ * `league.medianGame` straight from the row this function already selected above, rather than
+ * re-querying `leagues` for it, which is what keeps this bounded rather than growing with every
+ * later read that also wants a `leagues` column. Pinned here, not just in the test, so a future
+ * caller who adds an eleventh read trips the same assertion `invitePreview`'s neighboring test
+ * would if it grew one.
  */
-export const BASELINE_LEAGUE_HOME_QUERIES = 9;
+export const BASELINE_LEAGUE_HOME_QUERIES = 10;
 
 /**
  * Everything the league home page renders, assembled once on the server. `listTeamCards` is
@@ -203,6 +210,15 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
           status: draft.status,
           kickoffAt: draft.kickoffAt.toISOString(),
           isPublicMatchmade: league.isPublicMatchmade,
+          // Task 6: NFFC's Kentucky Derby System. Shared with `draftScheduleView`
+          // (`./draft-schedule`, the route's own read) so this page's initial render and a
+          // later refetch can never compute the caller's own ranking/result differently.
+          slotPreference: await slotPreferenceViewFor(db, {
+            draftId: draft.id,
+            status: draft.status,
+            teamId: myTeamId,
+            slotCount: league.teamCount,
+          }),
         };
 
   return {

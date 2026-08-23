@@ -21,6 +21,17 @@ import type { TradeAsset } from "@/trades/assets";
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
 export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
 export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress", "complete"]);
+/**
+ * Phase 3.5, Task 7 (the sit-and-go trigger): which of the two ways this draft's `kickoff_at`
+ * came to be set. `'scheduled'` is a time a commissioner chose; `'when_full'` is a time
+ * `fireWhenFullInTx` wrote the instant the league's last seat filled. Lives beside
+ * `kickoff_at` on `drafts` for the same reason `kickoff_at` itself does — it answers a question
+ * about THIS draft's schedule, not about the league's identity. Authored here, in migration
+ * 0031, alongside Task 6's slot-preference table (the binding controller ruling for that
+ * migration: an applied migration is never edited, so both tasks' schema needs are authored
+ * together, in the one migration file, even though Task 7's own read/write code lands later).
+ */
+export const draftStartTriggerEnum = pgEnum("draft_start_trigger", ["scheduled", "when_full"]);
 export const playerPositionEnum = pgEnum("player_position", ["QB", "RB", "WR", "TE", "K", "DEF"]);
 export const weekStatusEnum = pgEnum("week_status", ["scheduled", "in_progress", "final"]);
 export const helpLevelEnum = pgEnum("help_level", ["guided", "standard"]);
@@ -300,6 +311,9 @@ export const drafts = pgTable(
     status: draftStatusEnum("status").notNull().default("scheduled"),
     kickoffAt: timestamp("kickoff_at", { withTimezone: true }).notNull(),
     auctionBudget: integer("auction_budget"),
+    /** Task 7. Defaults `'scheduled'` — every draft before this column existed, and every
+     *  draft a commissioner schedules by hand today, keeps that default. */
+    startTrigger: draftStartTriggerEnum("start_trigger").notNull().default("scheduled"),
   },
   (t) => [
     // UNIQUE, not a plain index: nothing else in the schema enforces "one draft per league",
@@ -329,6 +343,34 @@ export const drafts = pgTable(
     // this rather than reasoning about it in the abstract.
     index("drafts_status_idx").on(t.status, t.kickoffAt),
   ],
+);
+
+/**
+ * Phase 3.5, Task 6: NFFC's Kentucky Derby System. One row per team that has ranked the draft
+ * slots it wants, keyed by `(draft_id, team_id)` — a TABLE, not a `SET_QUEUE`-style draft
+ * action (ruling 27, the same reason the player pool is a table): a ranking is an *input* to
+ * the one-time draw `assignDraftSlots` (`@/draft-service/order`) runs at `START_DRAFT`, and the
+ * draw's *output* is what gets snapshotted into that action's own `draftOrder` — replay
+ * determinism lives in the snapshot, never in this row, so editing or deleting a preference
+ * after the draw cannot change history, and a preference may be read with an ordinary query
+ * instead of a replay.
+ *
+ * `ranking` is a JSON array of 1-based slot numbers, most-wanted first — partial and even empty
+ * (mind either way) are both valid: most managers care about two slots, not twelve.
+ */
+export const draftSlotPreferences = pgTable(
+  "draft_slot_preferences",
+  {
+    draftId: text("draft_id")
+      .notNull()
+      .references(() => drafts.id, { onDelete: "cascade" }),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    ranking: jsonb("ranking").$type<readonly number[]>().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.draftId, t.teamId] })],
 );
 
 // Durable, replay-based draft action log — the source of truth for in-progress

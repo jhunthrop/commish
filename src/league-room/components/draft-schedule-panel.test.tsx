@@ -20,6 +20,7 @@ const SCHEDULED: DraftScheduleBody = {
   // runs with no fake timers at all.
   kickoffAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   isPublicMatchmade: false,
+  slotPreference: { slotCount: 12, ranking: [], assignedSlot: null, canEdit: true },
 };
 
 /** `<input type="datetime-local">` carries no timezone, so `new Date(EDITED_LOCAL_VALUE)`

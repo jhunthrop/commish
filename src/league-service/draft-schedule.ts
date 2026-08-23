@@ -1,10 +1,11 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues } from "@/db/schema";
+import { draftActions, draftSlotPreferences, drafts, leagues, teams } from "@/db/schema";
 import type { DraftStatus } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
+import { draftActionSchema } from "@/draft-engine";
 import { LEAGUE_CONFIG } from "@/league";
-import type { DraftScheduleBody } from "@/league-room/contract";
+import type { DraftScheduleBody, SlotPreferenceView } from "@/league-room/contract";
 import { MS_PER_DAY } from "./config";
 
 /** The outermost edge is the only place a wall clock is allowed — see every other service
@@ -52,6 +53,8 @@ interface DraftRow {
   readonly kickoffAt: Date;
   readonly commissionerUserId: string;
   readonly isPublicMatchmade: boolean;
+  /** Task 6: how many draft slots this league has — the ranking ceiling. */
+  readonly teamCount: number;
 }
 
 /** One league's draft row, joined to the one fact about its league every caller here needs:
@@ -64,6 +67,7 @@ async function draftRowForLeague(db: Db, leagueId: string): Promise<DraftRow | u
       kickoffAt: drafts.kickoffAt,
       commissionerUserId: leagues.commissionerUserId,
       isPublicMatchmade: leagues.isPublicMatchmade,
+      teamCount: leagues.teamCount,
     })
     .from(drafts)
     .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
@@ -72,19 +76,73 @@ async function draftRowForLeague(db: Db, leagueId: string): Promise<DraftRow | u
 }
 
 /**
- * What every league member reads: the chosen time, the draft's state, and whether the platform
- * has a fallback (Task 7). Null for a league that doesn't exist — the route answers 404, the
- * same shape every other league read in this service uses for a missing league.
+ * The slot this team actually drafted from, read straight off the `START_DRAFT` action's own
+ * `draftOrder` (sequence 1) — the draw's snapshot, per ruling 27, never a replay. `null` for a
+ * draft that hasn't started (no such row yet) or, in principle, a team missing from that
+ * snapshot, which cannot happen through ordinary use: every team row present when `startDraft`
+ * ran is in `draftOrder` by construction (`@/draft-service/store`).
  */
-export async function draftScheduleView(db: Db, leagueId: string): Promise<DraftScheduleBody | null> {
+async function resolvedSlotFor(db: Db, draftId: string, teamId: string): Promise<number | null> {
+  const [row] = await db
+    .select({ action: draftActions.action })
+    .from(draftActions)
+    .where(and(eq(draftActions.draftId, draftId), eq(draftActions.sequence, 1)));
+  if (row === undefined) return null;
+  const parsed = draftActionSchema.safeParse(row.action);
+  if (!parsed.success || parsed.data.type !== "START_DRAFT") return null;
+  const index = parsed.data.draftOrder.indexOf(teamId);
+  return index === -1 ? null : index + 1;
+}
+
+/**
+ * `DraftScheduleBody.slotPreference` for one team — `null` only for a caller with no team in
+ * this league (`teamId === null`), since a ranking is scoped to a team. Shared by
+ * `draftScheduleView` below (the route's own read) and `leagueHome` (`./read`, the page's
+ * initial render), so the two can never compute this differently.
+ */
+export async function slotPreferenceViewFor(
+  db: Db,
+  params: { readonly draftId: string; readonly status: DraftStatus; readonly teamId: string | null; readonly slotCount: number },
+): Promise<SlotPreferenceView | null> {
+  if (params.teamId === null) return null;
+  const [row] = await db
+    .select({ ranking: draftSlotPreferences.ranking })
+    .from(draftSlotPreferences)
+    .where(and(eq(draftSlotPreferences.draftId, params.draftId), eq(draftSlotPreferences.teamId, params.teamId)));
+  const assignedSlot = params.status === "scheduled" ? null : await resolvedSlotFor(db, params.draftId, params.teamId);
+  return {
+    slotCount: params.slotCount,
+    ranking: row?.ranking ?? [],
+    assignedSlot,
+    canEdit: params.status === "scheduled",
+  };
+}
+
+/**
+ * What every league member reads: the chosen time, the draft's state, and whether the platform
+ * has a fallback (Task 7) — plus, Task 6, the caller's OWN slot ranking and its result. Null for
+ * a league that doesn't exist — the route answers 404, the same shape every other league read in
+ * this service uses for a missing league.
+ */
+export async function draftScheduleView(db: Db, leagueId: string, userId: string): Promise<DraftScheduleBody | null> {
   const row = await draftRowForLeague(db, leagueId);
   if (row === undefined) return null;
+  const [teamRow] = await db
+    .select({ id: teams.id })
+    .from(teams)
+    .where(and(eq(teams.leagueId, leagueId), eq(teams.userId, userId)));
   return {
     draftId: row.draftId,
     leagueId,
     status: row.status,
     kickoffAt: row.kickoffAt.toISOString(),
     isPublicMatchmade: row.isPublicMatchmade,
+    slotPreference: await slotPreferenceViewFor(db, {
+      draftId: row.draftId,
+      status: row.status,
+      teamId: teamRow?.id ?? null,
+      slotCount: row.teamCount,
+    }),
   };
 }
 

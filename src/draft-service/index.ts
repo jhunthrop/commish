@@ -83,3 +83,4 @@ export function getDraftTicker(): DraftTicker {
 // coverage gate, so it is trimmed to what is actually used.
 export { resolveDraftActor, type DraftActor } from "./authz";
 export { setTeamQueue, getTeamQueue } from "./queue";
+export { setSlotPreference, setSlotPreferenceSchema, SLOT_PREFERENCE_REFUSALS } from "./slot-preference";
