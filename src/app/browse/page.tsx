@@ -2,7 +2,8 @@ import Link from "next/link";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
-import { TopBar } from "@/components/app-shell/top-bar";
+import { AppShell } from "@/components/app-shell/app-shell";
+import { shellData } from "@/components/app-shell/shell-data";
 import { listPublicLeagues } from "@/league-service/browse";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { BrowseFilters } from "@/league-room/components/browse-filters";
@@ -37,6 +38,12 @@ const first = (value: string | readonly string[] | undefined): string | null =>
  * Phase 3.5 addendum, Task 14: `listPublicLeagues` now answers `BrowseBody` — `leagues` AND
  * `house` — and §4.1's hybrid lobby means the house shelf renders FIRST, above the filters and
  * the member list, the founder's "view and join like FFPC and Apex" made literal page order.
+ *
+ * Task 2: this page sits outside `/app`, so it is never wrapped by `(shell)/layout.tsx` — it
+ * calls `shellData` and renders `AppShell` ITSELF, and only when there is a user (`/browse` is
+ * reachable signed out by design, and a signed-in shell around a stranger would be chrome they
+ * cannot use). Signed out, the inline header below is unchanged; it becomes `PublicBar` once the
+ * addendum's Task 16 ships.
  */
 export default async function BrowsePage({ searchParams }: PageProps) {
   const params = await searchParams;
@@ -49,9 +56,32 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   const user = await getCurrentUser();
   const { leagues, house } = await listPublicLeagues(getDb(), filter);
 
-  return (
+  const content = (
     <>
-      {user === null ? (
+      <PageTitle>Open leagues</PageTitle>
+      <p className="max-w-prose text-text-muted">
+        Leagues looking for managers, with a draft still to come. Pick one that matches how you
+        like to play. Recruiting your own group instead?{" "}
+        {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
+            first rather than an error, exactly like the empty state's identical link. */}
+        <Link href="/app#create-league" className="font-medium text-accent underline">
+          Start your own league
+        </Link>
+        .
+      </p>
+      {/* Phase 3.5 addendum, Task 14: §4.1's hybrid lobby — the house shelf leads, the member
+          list follows. `HouseLeagueShelf` renders nothing at all when the shelf is empty, so
+          an unreconciled database (or a rung mid-restock) never shows an apology above a
+          member list that is doing just fine on its own. */}
+      <HouseLeagueShelf leagues={house} signedIn={user !== null} />
+      <BrowseFilters filter={filter} />
+      <PublicLeagueList leagues={leagues} signedIn={user !== null} />
+    </>
+  );
+
+  if (user === null) {
+    return (
+      <>
         <header className="border-b border-line bg-surface">
           <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-3">
             <Link
@@ -65,29 +95,15 @@ export default async function BrowsePage({ searchParams }: PageProps) {
             </Link>
           </div>
         </header>
-      ) : (
-        <TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
-      )}
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
-        <PageTitle>Open leagues</PageTitle>
-        <p className="max-w-prose text-text-muted">
-          Leagues looking for managers, with a draft still to come. Pick one that matches how you
-          like to play. Recruiting your own group instead?{" "}
-          {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
-              first rather than an error, exactly like the empty state's identical link. */}
-          <Link href="/app#create-league" className="font-medium text-accent underline">
-            Start your own league
-          </Link>
-          .
-        </p>
-        {/* Phase 3.5 addendum, Task 14: §4.1's hybrid lobby — the house shelf leads, the member
-            list follows. `HouseLeagueShelf` renders nothing at all when the shelf is empty, so
-            an unreconciled database (or a rung mid-restock) never shows an apology above a
-            member list that is doing just fine on its own. */}
-        <HouseLeagueShelf leagues={house} signedIn={user !== null} />
-        <BrowseFilters filter={filter} />
-        <PublicLeagueList leagues={leagues} signedIn={user !== null} />
-      </main>
-    </>
+        <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">{content}</main>
+      </>
+    );
+  }
+
+  const { rail, liveState } = await shellData(getDb(), user);
+  return (
+    <AppShell user={{ displayName: user.displayName, avatar: user.avatarUrl, isAdmin: user.isAdmin }} rail={rail} liveState={liveState}>
+      {content}
+    </AppShell>
   );
 }

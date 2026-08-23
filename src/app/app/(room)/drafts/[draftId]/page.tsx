@@ -19,6 +19,12 @@ interface PageProps {
  * its own `<h1>` (the league name, in `RoomRail`) — so there is no page heading here to say
  * "Draft room" above a board that already says which draft this is.
  *
+ * Lives in the `(room)` route group (Task 2) rather than `(shell)`: this segment DECLINES
+ * `(shell)/layout.tsx`'s `AppShell` entirely, which is what "renders no shell" means in App
+ * Router terms — `RoomRail`'s own full-height header IS this room's chrome, and two chromes
+ * stacked would break its no-page-scroll contract. A route group changes no URL, so every link
+ * into `/app/drafts/[draftId]` keeps working unchanged.
+ *
  * Reads preferences server-side (`readPreferences`, which seeds the row on a caller's first
  * read anywhere in the product) so `DraftRoom` knows on its very first render whether to show
  * `RoomTour` — no client-side fetch sits on the room's critical path just to answer that. The

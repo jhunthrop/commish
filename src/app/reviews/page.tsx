@@ -3,7 +3,8 @@ import { headers } from "next/headers";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { ErrorState, PageTitle } from "@/components/ui";
-import { TopBar } from "@/components/app-shell/top-bar";
+import { AppShell } from "@/components/app-shell/app-shell";
+import { shellData } from "@/components/app-shell/shell-data";
 import { listReviews, myReview } from "@/review-service/reviews";
 import { ReviewComposer } from "@/account-room/components/review-composer";
 import { ReviewFeed } from "@/account-room/components/review-feed";
@@ -46,6 +47,12 @@ function PublicHeader() {
  * query the API route does; guarding only the API door would mean the documented defense for an
  * unauthenticated read is bypassed by choosing the other one. Over the ceiling, nothing is read
  * at all — the refusal renders instead of the feed.
+ *
+ * Task 2: this page sits outside `/app`, so it is never wrapped by `(shell)/layout.tsx` — it
+ * calls `shellData` and renders `AppShell` ITSELF, and only when there is a user (`/reviews` is
+ * reachable signed out by design). The rate-limit refusal below runs before `getCurrentUser()`
+ * ever resolves, so it always renders `PublicHeader` — content-neutral either way, and not worth
+ * a `shellData` round trip for a request this page is about to refuse.
  */
 export default async function ReviewsPage() {
   if (!browseAllowed((await headers()).get("x-forwarded-for"))) {
@@ -79,19 +86,31 @@ export default async function ReviewsPage() {
       <ReviewComposer myReview={mine} />
     );
 
-  return (
+  const content = (
     <>
-      {user === null ? <PublicHeader /> : <TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />}
-
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
-        <div className="flex flex-col gap-1">
-          <PageTitle>What managers are saying</PageTitle>
-          <p className="text-sm text-text-muted">
-            Every review, ordered by when it was written. Nothing here is filtered by rating.
-          </p>
-        </div>
-        <ReviewFeed initialPage={page} emptyAction={emptyAction} />
-      </main>
+      <div className="flex flex-col gap-1">
+        <PageTitle>What managers are saying</PageTitle>
+        <p className="text-sm text-text-muted">
+          Every review, ordered by when it was written. Nothing here is filtered by rating.
+        </p>
+      </div>
+      <ReviewFeed initialPage={page} emptyAction={emptyAction} />
     </>
+  );
+
+  if (user === null) {
+    return (
+      <>
+        <PublicHeader />
+        <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">{content}</main>
+      </>
+    );
+  }
+
+  const { rail, liveState } = await shellData(getDb(), user);
+  return (
+    <AppShell user={{ displayName: user.displayName, avatar: user.avatarUrl, isAdmin: user.isAdmin }} rail={rail} liveState={liveState}>
+      {content}
+    </AppShell>
   );
 }
