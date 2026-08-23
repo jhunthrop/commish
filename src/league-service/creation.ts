@@ -56,6 +56,13 @@ export interface CreateLeagueInput {
    * "the preset name was never stored" treatment `scoringPreset` gets above.
    */
   readonly rosterShape?: RosterShapeName;
+  /**
+   * The league median game (Phase 3.5, Task 2): every team also plays the league's own median
+   * score each week, and that result counts a real win/loss/tie in the standings. Optional and
+   * defaults to `false` — a season-structure toggle nobody is required to opt into, the same
+   * "every field but the name has a default" shape every other field on this input follows.
+   */
+  readonly medianGame?: boolean;
   readonly commissionerUserId: string;
   readonly teamName: string;
   /** Who the league is advertised for on public browse. Defaults from the creator at the route. */
@@ -132,6 +139,7 @@ export async function createLeague(
         experienceTier: input.experienceTier,
         stakeTier: input.stakeTier,
         isPublicMatchmade: input.isPublicMatchmade,
+        medianGame: input.medianGame ?? false,
       });
       await tx.insert(scoringSettings).values({ leagueId, ...SCORING_PRESETS[input.scoringPreset] });
       await tx.insert(teams).values({ id: teamId, leagueId, userId: input.commissionerUserId, name: input.teamName });
@@ -156,6 +164,7 @@ export async function createLeague(
           isPublicMatchmade: input.isPublicMatchmade,
           experienceTier: input.experienceTier,
           scoringPreset: input.scoringPreset,
+          medianGame: input.medianGame ?? false,
         },
         occurredAt: clock.now(),
       });

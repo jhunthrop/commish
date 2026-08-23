@@ -109,6 +109,18 @@ export const leagues = pgTable(
       .references(() => users.id),
     /** The league's roster shape. The draft reads this to know its rounds and slot rules. */
     rosterSlots: jsonb("roster_slots").$type<readonly RosterSlotConfig[]>().notNull().default([...STANDARD_ROSTER_SLOTS]),
+    /**
+     * The league median game (Phase 3.5, Task 2): every team also plays the league's own median
+     * score each week, and that result counts a real win/loss/tie in the ONE record alongside
+     * the head-to-head result — no second matchup row, because the schema's FK/PK shape (one
+     * row per `(league_id, week_number, home_team_id)`) has no room for a pseudo-opponent.
+     *
+     * Lives here, on `leagues`, and NOT on `scoring_settings`: a median game is a season
+     * STRUCTURE choice (does a week produce one result per team or two), never a scoring
+     * weight — `scoring_settings` is fifteen `real` columns that answer "what is a catch
+     * worth", and `describeScoring` derives its label from exactly those, unaffected by this.
+     */
+    medianGame: boolean("median_game").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /**
      * Stamped ONCE, by `stampSeasonCompleteInTx` (`@/league-service/participation`), inside the
@@ -395,6 +407,18 @@ export const weeks = pgTable(
       .notNull()
       .references(() => leagues.id, { onDelete: "cascade" }),
     weekNumber: integer("week_number").notNull(),
+    /**
+     * The league's median score for this week, written by `finalizeWeekInTx`
+     * (`@/stats-pipeline/finalize`) in the SAME transaction as the matchup scores it was
+     * computed from — null for a league with `leagues.median_game` off, and for a week not yet
+     * settled. An OVERWRITE, not a one-way stamp like `leagues.season_completed_at`: a stat
+     * correction (`correctSettledWeek`) re-settles a week's scores and must re-derive its median
+     * too, or this column would describe a week that no longer exists.
+     *
+     * `weeks`' primary key is already `(league_id, week_number)` — one row per league week is
+     * exactly the cardinality of one median per league week, so no new table is needed for it.
+     */
+    medianScore: real("median_score"),
   },
   (t) => [primaryKey({ columns: [t.leagueId, t.weekNumber] })],
 );

@@ -1,22 +1,47 @@
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { matchups } from "@/db/schema";
+import { leagues, matchups, weeks } from "@/db/schema";
 import type { TeamCard } from "@/domain/league";
 import { clinchedTeamIds, computeStandings, LEAGUE_CONFIG, seasonProgress } from "@/league";
 import type { TeamStandingsRow } from "@/league-room/contract";
+
+/** Every week this league already has a stored median for, keyed by week number — a week absent
+ *  from the map has no median yet (unsettled, or the toggle is off), matching `weeks.median_score`
+ *  itself, which is nullable for exactly those cases. */
+async function medianByWeekFor(db: Db, leagueId: string): Promise<ReadonlyMap<number, number>> {
+  const rows = await db.select({ weekNumber: weeks.weekNumber, medianScore: weeks.medianScore }).from(weeks).where(eq(weeks.leagueId, leagueId));
+  return new Map(rows.flatMap((row) => (row.medianScore === null ? [] : [[row.weekNumber, row.medianScore] as const])));
+}
 
 /**
  * The standings table, with the display names, the owner's face, and the clinch flag the page
  * renders. `teamCards` is the SAME "team + owner's public profile" row set `leagueHome`
  * (`@/league-service/read.ts`) already reads via `listTeamCards` — passed in rather than
  * re-queried, so a page that already paid for that join does not pay for it twice.
+ *
+ * `medianGame`, likewise, is passed in when the caller already holds it — `leagueHome` selects
+ * the full `leagues` row for its own purposes before it ever calls this, so a second `leagues`
+ * query here for the one column this function needs would be the identical wasted round trip
+ * `teamCards` already exists to avoid. Omitted only by this function's OWN tests, which query it
+ * themselves rather than assembling a whole `leagueHome`-shaped fixture just to get it.
  */
-export async function leagueStandings(db: Db, leagueId: string, teamCards: readonly TeamCard[]): Promise<readonly TeamStandingsRow[]> {
+export async function leagueStandings(
+  db: Db,
+  leagueId: string,
+  teamCards: readonly TeamCard[],
+  medianGame?: boolean,
+): Promise<readonly TeamStandingsRow[]> {
+  const knownMedianGame =
+    medianGame ?? (await db.select({ medianGame: leagues.medianGame }).from(leagues).where(eq(leagues.id, leagueId)))[0]?.medianGame ?? false;
   const matchupRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
-  const standings = computeStandings({ teamIds: teamCards.map((card) => card.id), matchups: matchupRows });
+  const medianByWeek = await medianByWeekFor(db, leagueId);
+  const standings = computeStandings({ teamIds: teamCards.map((card) => card.id), matchups: matchupRows, medianByWeek });
 
   const { weeksRemaining } = seasonProgress(matchupRows, LEAGUE_CONFIG.regularSeasonWeeks);
-  const clinched = new Set(clinchedTeamIds({ standings, weeksRemaining, playoffTeams: LEAGUE_CONFIG.playoffTeams }));
+  // A median game is worth a second win every remaining week (Task 2's clinch correction) — the
+  // caller's job, never `clinchedTeamIds`' own, per that parameter's own docblock.
+  const gamesRemaining = weeksRemaining * (knownMedianGame ? 2 : 1);
+  const clinched = new Set(clinchedTeamIds({ standings, gamesRemaining, playoffTeams: LEAGUE_CONFIG.playoffTeams }));
   const cardById = new Map(teamCards.map((card) => [card.id, card]));
 
   return standings.map((row) => {

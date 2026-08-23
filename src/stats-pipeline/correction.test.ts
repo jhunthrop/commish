@@ -2,9 +2,10 @@ import { describe, expect, it, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import type { DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, drafts, leagues, matchups, memberNotices, players, playerStatLines, rosterSlots, statWeeks, teams, users } from "@/db/schema";
+import { auditEvents, drafts, leagues, matchups, memberNotices, players, playerStatLines, rosterSlots, statWeeks, teams, users, weeks } from "@/db/schema";
 import type { AuditEvent, AuditEventInput } from "@/domain/audit";
 import type { StatLine } from "@/domain/player";
+import { leagueMedian } from "@/league/median";
 import { writeSchedule } from "@/league-service/schedule";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { copyViolations } from "@/integrity/copy-rules";
@@ -74,11 +75,12 @@ async function seedLeagueShell(
   leagueId: string,
   teamSpecs: readonly { readonly teamId: string; readonly userId: string }[],
   draftStatus: "scheduled" | "complete",
+  medianGame = false,
 ): Promise<void> {
   await db.insert(users).values(teamSpecs.map((t) => ({ id: t.userId, email: `${t.userId}@test.local`, displayName: t.userId })));
   await db.insert(leagues).values({
     id: leagueId, name: leagueId, format: "snake", teamCount: teamSpecs.length,
-    commissionerUserId: teamSpecs[0]!.userId, rosterSlots: SLOTS,
+    commissionerUserId: teamSpecs[0]!.userId, rosterSlots: SLOTS, medianGame,
   });
   await db.insert(teams).values(teamSpecs.map((t) => ({ id: t.teamId, leagueId, userId: t.userId, name: t.teamId })));
   await db.insert(drafts).values({
@@ -113,6 +115,11 @@ async function auditEventsOn(leagueId: string): Promise<readonly unknown[]> {
 
 async function noticesFor(userId: string): Promise<readonly (typeof memberNotices.$inferSelect)[]> {
   return db.select().from(memberNotices).where(and(eq(memberNotices.userId, userId), eq(memberNotices.noticeType, "stat_week_corrected")));
+}
+
+async function medianOf(leagueId: string, weekNumber: number): Promise<number | null> {
+  const [row] = await db.select({ medianScore: weeks.medianScore }).from(weeks).where(and(eq(weeks.leagueId, leagueId), eq(weeks.weekNumber, weekNumber)));
+  return row?.medianScore ?? null;
 }
 
 /** Grants every reservation without touching Redis at all. */
@@ -285,6 +292,47 @@ describe("correctSettledWeek", () => {
     expect(result).toMatchObject({ leaguesResettled: 2, leaguesChanged: 2, leaguesFailed: [] });
     expect(await auditEventsOn("lg_a")).toHaveLength(1);
     expect(await auditEventsOn("lg_b")).toHaveLength(1);
+  });
+
+  it("recomputes the median when a stat correction re-settles the week", async () => {
+    // `correctSettledWeek` re-runs settlement inside the three-day correction window and
+    // OVERWRITES scores. A median left at its first value would describe a week that no longer
+    // exists, so the write is an overwrite, not a one-way stamp — see `weeks.median_score`'s own
+    // docblock in `@/db/schema` for why that is the opposite of `leagues.season_completed_at`.
+    await db.insert(players).values([
+      { id: "qb_a", name: "QB A", position: "QB", nflTeam: "KC" },
+      { id: "qb_b", name: "QB B", position: "QB", nflTeam: "SF" },
+    ]);
+    await seedLeagueShell("lg_median", [{ teamId: "team_a", userId: "u_manager" }, { teamId: "team_b", userId: "u_rival" }], "complete", true);
+    await addRoster("team_a", "qb_a");
+    await addRoster("team_b", "qb_b");
+    await db.insert(playerStatLines).values([
+      { playerId: "qb_a", week: WEEK, passingYards: 300, passingTouchdowns: 3 },
+      { playerId: "qb_b", week: WEEK, passingYards: 200, passingTouchdowns: 1 },
+    ]);
+    await finalizeWeek(db, "lg_median", WEEK);
+    await markWeekSettled(WEEK, NOW);
+
+    const before = await medianOf("lg_median", WEEK);
+    expect(before).not.toBeNull();
+
+    const provider = fakeStatsProvider({
+      games: {
+        [WEEK]: [
+          {
+            gameId: "g_median", week: WEEK, status: "final", homeNflTeam: "KC", awayNflTeam: "SF",
+            lines: [statLine("qb_a", WEEK, { passingYards: 500, passingTouchdowns: 6 })],
+          },
+        ],
+      },
+    });
+    const result = expectOk(await correctSettledWeek(db, { week: WEEK, by: "u_op", provider, budget: grantedBudget }));
+    expect(result.leaguesChanged).toBe(1);
+
+    const [row] = await db.select().from(matchups).where(and(eq(matchups.leagueId, "lg_median"), eq(matchups.weekNumber, WEEK)));
+    const recomputed = leagueMedian([row!.homeScore!, row!.awayScore!]);
+    expect(recomputed).not.toBe(before);
+    expect(await medianOf("lg_median", WEEK)).toBe(recomputed);
   });
 
   /**

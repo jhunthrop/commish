@@ -265,7 +265,7 @@ describe("createLeague", () => {
     });
     expect(rows[0]!.payload).toEqual({
       name: "Sunday Money", format: "snake", teamCount: 12, stakeTier: 0,
-      isPublicMatchmade: false, experienceTier: "beginner", scoringPreset: "ppr",
+      isPublicMatchmade: false, experienceTier: "beginner", scoringPreset: "ppr", medianGame: false,
     });
     expect(rows[0]!.occurredAt.toISOString()).toBe(clock.now());
   });

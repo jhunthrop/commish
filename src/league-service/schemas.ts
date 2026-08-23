@@ -48,6 +48,14 @@ export const createLeagueSchema = z.object({
    * `ROSTER_SHAPES` (`@/league/roster-shape`) when no explicit `rosterSlots` are given.
    */
   rosterShape: z.enum(["standard", "superflex"]).default(LEAGUE_CONFIG.defaults.rosterShape),
+  /**
+   * The league median game (Phase 3.5, Task 2): opt-in, off by default — a season-structure
+   * choice, not a scoring weight, which is why it lives beside `rosterShape` here rather than
+   * inside `scoringPreset`. `createLeague` (`./creation`) writes it straight to `leagues.median_
+   * game`; `finalizeWeekInTx` (`@/stats-pipeline/finalize`) is the only writer of the weekly
+   * number this toggle switches on.
+   */
+  medianGame: z.boolean().default(false),
   auctionBudget: z
     .number()
     .int()

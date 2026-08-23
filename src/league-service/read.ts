@@ -115,11 +115,14 @@ export function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyM
 /**
  * Every read `leagueHome` runs, whichever league is asked: `leagues`, `matchups`, `teams`
  * (plain), `drafts`, `scoring_settings`, `stat_weeks` (`weekStatusFor`), the one team+owner
- * join (`listTeamCards`), and `leagueStandings`'s own `matchups` read — eight, bounded
- * regardless of team count. Pinned here, not just in the test, so a future caller who adds a
- * ninth read trips the same assertion `invitePreview`'s neighboring test would if it grew one.
+ * join (`listTeamCards`), `leagueStandings`'s own `matchups` read, and (Phase 3.5, Task 2)
+ * `leagueStandings`'s `weeks` read for the league's stored medians — nine, bounded regardless
+ * of team count. `leagueStandings` is handed `league.medianGame` straight from the row this
+ * function already selected above, rather than re-querying `leagues` for it, which is what keeps
+ * this at nine and not ten. Pinned here, not just in the test, so a future caller who adds a
+ * tenth read trips the same assertion `invitePreview`'s neighboring test would if it grew one.
  */
-export const BASELINE_LEAGUE_HOME_QUERIES = 8;
+export const BASELINE_LEAGUE_HOME_QUERIES = 9;
 
 /**
  * Everything the league home page renders, assembled once on the server. `listTeamCards` is
@@ -210,7 +213,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     commissionerUserId: league.commissionerUserId,
     myTeamId,
     teams: members,
-    standings: await leagueStandings(db, leagueId, teamCards),
+    standings: await leagueStandings(db, leagueId, teamCards, league.medianGame),
     terms,
     currentWeek,
     totalWeeks,

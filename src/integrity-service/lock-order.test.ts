@@ -1529,6 +1529,22 @@ describe("stampSeasonCompleteInTx's lock, inside finalizeWeekInTx", () => {
   });
 });
 
+/**
+ * PHASE 3.5, TASK 2 — the league median write's own entry, named rather than assumed.
+ *
+ * `finalizeWeekInTx` gained one more statement between the matchup loop and
+ * `stampSeasonCompleteInTx` above: `UPDATE weeks SET median_score = … WHERE league_id = …`. Its
+ * own foreign key (`weeks.league_id` references `leagues.id`) takes `FOR KEY SHARE` on
+ * `leagues[leagueId]` — the SAME acquisition, on the SAME row, that the matchup UPDATE loop
+ * immediately above it already took via `matchups.league_id`'s identical foreign key. This is a
+ * RE-acquisition of a lock the transaction is already holding, not a new edge: Postgres does not
+ * queue a transaction behind its own held lock, so nothing about the interleaving proven above
+ * (or anywhere else in this file) changes by this statement's presence. No new two-connection
+ * proof is added for it — there is no new order to prove, only an existing one to name, which is
+ * the whole discipline this file's own header argues for: reasoned about explicitly, in writing,
+ * rather than left for a reviewer to notice was never checked.
+ */
+
 // ---------------------------------------------------------------------------------------------
 // FINAL REVIEW, HIGH 2 (second half): the suite covered 4 of Plan C's 7 new writers. The three
 // below close it to 7/7. Each follows the identical rendezvous every proof above does — park the

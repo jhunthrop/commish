@@ -54,6 +54,10 @@ export interface CountingDb {
   readonly db: Db;
   /** How many queries have actually gone over the wire since this was built. */
   readonly selectCount: () => number;
+  /** How many of those queries' own SQL text matched `pattern` — for a caller proving not just
+   *  "a bounded number of queries total" but "this ONE table was read exactly once", the sharper
+   *  claim an N+1 regression on a single join can hide behind a merely-bounded total count. */
+  readonly queriesMatching: (pattern: RegExp) => number;
 }
 
 /**
@@ -71,12 +75,14 @@ export interface CountingDb {
  */
 export function countingDb(base: Db): CountingDb {
   let executions = 0;
+  const queryTexts: string[] = [];
   const countedClient = new Proxy(base.$client, {
     get(target, prop, receiver) {
       const value: unknown = Reflect.get(target, prop, receiver);
       if (prop === "unsafe" && typeof value === "function") {
         return (...args: unknown[]) => {
           executions += 1;
+          if (typeof args[0] === "string") queryTexts.push(args[0]);
           return (value as (...a: unknown[]) => unknown).apply(target, args);
         };
       }
@@ -84,5 +90,9 @@ export function countingDb(base: Db): CountingDb {
     },
   });
   const countedDb = drizzle(countedClient, { schema });
-  return { db: countedDb, selectCount: () => executions };
+  return {
+    db: countedDb,
+    selectCount: () => executions,
+    queriesMatching: (pattern: RegExp) => queryTexts.filter((text) => pattern.test(text)).length,
+  };
 }

@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { and, eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, leagues, lineupSlots, matchups, players, playerStatLines, rosterSlots, statWeeks, teams, users } from "@/db/schema";
+import { drafts, leagues, lineupSlots, matchups, players, playerStatLines, rosterSlots, statWeeks, teams, users, weeks } from "@/db/schema";
 import type { ScoringPresetName } from "@/domain/scoring";
 import { HALF_PPR_SCORING, PPR_SCORING } from "@/domain/scoring";
 import { computeFantasyPoints } from "@/scoring";
+import { leagueMedian } from "@/league/median";
 import { createLeague } from "@/league-service/creation";
 import { writeSchedule } from "@/league-service/schedule";
 import { correctSettledWeek } from "./correction";
@@ -42,7 +43,11 @@ afterAll(async () => {
  * regression test passes its own preset so `finalizeWeek` is proven to read the league's own
  * `scoring_settings` row rather than a hardcoded fallback.
  */
-async function twoTeamLeague(scoringPreset: ScoringPresetName = "ppr", draftStatus: "scheduled" | "complete" = "complete") {
+async function twoTeamLeague(
+  scoringPreset: ScoringPresetName = "ppr",
+  draftStatus: "scheduled" | "complete" = "complete",
+  medianGame = false,
+) {
   await db.insert(users).values([
     { id: "u1", email: "u1@test.local", displayName: "Manager 1" },
     { id: "u2", email: "u2@test.local", displayName: "Manager 2" },
@@ -50,7 +55,7 @@ async function twoTeamLeague(scoringPreset: ScoringPresetName = "ppr", draftStat
   const created = await createLeague({ db, clock, newId }, {
     name: "Duel", format: "snake", teamCount: 2, scoringPreset, auctionBudget: null,
     rosterSlots: SLOTS, commissionerUserId: "u1", teamName: "Team One",
-    experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
+    experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false, medianGame,
   });
   if (!created.ok) throw new Error(created.reason);
   await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
@@ -234,6 +239,48 @@ describe("finalizeWeek", () => {
     expect(halfPprExpected).not.toBe(pprExpected);
     expect(ourScore).toBe(halfPprExpected);
     expect(ourScore).not.toBe(pprExpected);
+  });
+});
+
+describe("finalizeWeek — the league median", () => {
+  async function medianOf(leagueId: string, weekNumber: number): Promise<number | null> {
+    const [row] = await db.select({ medianScore: weeks.medianScore }).from(weeks).where(and(eq(weeks.leagueId, leagueId), eq(weeks.weekNumber, weekNumber)));
+    return row?.medianScore ?? null;
+  }
+
+  it("writes the week's median beside the scores it was computed from", async () => {
+    const league = await twoTeamLeague("ppr", "complete", true);
+    await finalizeWeek(db, league.leagueId, 1);
+
+    const [row] = await db.select().from(matchups).where(and(eq(matchups.leagueId, league.leagueId), eq(matchups.weekNumber, 1)));
+    const scores = [row!.homeScore!, row!.awayScore!];
+    expect(await medianOf(league.leagueId, 1)).toBe(leagueMedian(scores));
+  });
+
+  it("writes no median for a league that has the toggle off", async () => {
+    const league = await twoTeamLeague("ppr", "complete", false);
+    await finalizeWeek(db, league.leagueId, 1);
+    expect(await medianOf(league.leagueId, 1)).toBeNull();
+  });
+
+  it("recomputes the median when a stat correction re-settles the week", async () => {
+    const league = await twoTeamLeague("ppr", "complete", true);
+    await finalizeWeek(db, league.leagueId, 1);
+    const first = await medianOf(league.leagueId, 1);
+    expect(first).not.toBeNull();
+
+    // A revised stat line changes the home team's score, which must move the median too — an
+    // un-refreshed median at this point would still be describing the week's original scores.
+    await db.insert(playerStatLines).values({ playerId: "qb1", week: 1, passingYards: 500, passingTouchdowns: 6 }).onConflictDoUpdate({
+      target: [playerStatLines.playerId, playerStatLines.week],
+      set: { passingYards: 500, passingTouchdowns: 6 },
+    });
+    await finalizeWeek(db, league.leagueId, 1);
+
+    const [row] = await db.select().from(matchups).where(and(eq(matchups.leagueId, league.leagueId), eq(matchups.weekNumber, 1)));
+    const recomputed = leagueMedian([row!.homeScore!, row!.awayScore!]);
+    expect(recomputed).not.toBe(first);
+    expect(await medianOf(league.leagueId, 1)).toBe(recomputed);
   });
 });
 

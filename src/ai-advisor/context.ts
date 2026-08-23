@@ -1,8 +1,9 @@
 import { and, eq, gte, lt } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
-import { leagues, matchups, players, playerStatLines, scoringSettings, teams } from "@/db/schema";
+import { leagues, matchups, players, playerStatLines, scoringSettings, teams, weeks } from "@/db/schema";
 import { ADVISOR_CONFIG } from "@/domain/advisor";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
+import { computeStandings, type StandingsRow } from "@/league";
 import { getLineup } from "@/league-service/lineups";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
 import type { StartSitCandidate, ValuedPlayer } from "./valuation";
@@ -46,21 +47,16 @@ function scoringWithoutLeagueId(row: ScoringSettings): Omit<ScoringSettings, "le
   >;
 }
 
-function recordOf(rows: readonly (typeof matchups.$inferSelect)[], teamId: string): string {
-  let wins = 0;
-  let losses = 0;
-  let ties = 0;
-  for (const row of rows) {
-    if (row.homeScore === null || row.awayScore === null) continue;
-    const isHome = row.homeTeamId === teamId;
-    if (!isHome && row.awayTeamId !== teamId) continue;
-    const mine = isHome ? row.homeScore : row.awayScore;
-    const theirs = isHome ? row.awayScore : row.homeScore;
-    if (mine > theirs) wins += 1;
-    else if (mine < theirs) losses += 1;
-    else ties += 1;
-  }
-  return ties === 0 ? `${wins}-${losses}` : `${wins}-${losses}-${ties}`;
+/**
+ * "7-4-1", or "0-0" before a week has been scored. Delegates the actual win/loss/tie count to
+ * `computeStandings` (`@/league`) — the SAME function `leagueStandings` and `crossLeagueHome`
+ * read — rather than re-deriving it from `matchups` by hand: a hand-rolled head-to-head tally
+ * here used to disagree with the standings page the moment a league turned its median game on,
+ * because it only ever counted the ONE result a matchup row can hold and had no way to fold in
+ * the second, medianByWeek-derived result every other record consumer already does.
+ */
+function formatTeamRecord(row: StandingsRow): string {
+  return row.ties === 0 ? `${row.wins}-${row.losses}` : `${row.wins}-${row.losses}-${row.ties}`;
 }
 
 /**
@@ -100,6 +96,14 @@ export async function assembleAdvisorContext(db: ReadonlyDb, input: AssembleCont
   );
   const opponentTeamId =
     thisWeek === undefined ? null : thisWeek.homeTeamId === input.teamId ? thisWeek.awayTeamId : thisWeek.homeTeamId;
+
+  // The SAME record `leagueStandings` and `crossLeagueHome` show, median game included: a
+  // league's own stored medians, folded into one win/loss/tie count per team by the one function
+  // every other record consumer already goes through.
+  const weekRows = await db.select({ weekNumber: weeks.weekNumber, medianScore: weeks.medianScore }).from(weeks).where(eq(weeks.leagueId, input.leagueId));
+  const medianByWeek = new Map(weekRows.flatMap((row) => (row.medianScore === null ? [] : [[row.weekNumber, row.medianScore] as const])));
+  const standings = computeStandings({ teamIds: [...nameById.keys()], matchups: allMatchups, medianByWeek });
+  const standingsByTeam = new Map(standings.map((row) => [row.teamId, row]));
 
   // Recent form is BOUNDED: `trendWeeks` completed weeks before this one, never the season.
   const firstTrendWeek = Math.max(1, input.weekNumber - ADVISOR_CONFIG.trendWeeks);
@@ -145,7 +149,12 @@ export async function assembleAdvisorContext(db: ReadonlyDb, input: AssembleCont
         },
       ];
     });
-    return { teamId, teamName: nameById.get(teamId) ?? teamId, record: recordOf(allMatchups, teamId), players: roster };
+    // `standingsByTeam` has a row for every id `nameById` does (`computeStandings` tallies every
+    // team it's given, whether or not it has ever played a matchup), and `teamContext` is only
+    // ever called with `input.teamId` (checked against `nameById` above) or an `opponentTeamId`
+    // drawn from this same league's own matchup rows — so this is never missing.
+    const record = formatTeamRecord(standingsByTeam.get(teamId)!);
+    return { teamId, teamName: nameById.get(teamId) ?? teamId, record, players: roster };
   }
 
   const [me, opponent] = await Promise.all([

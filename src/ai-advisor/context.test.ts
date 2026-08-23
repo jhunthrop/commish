@@ -1,9 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
+import { drafts, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
 import { ADVISOR_CONFIG } from "@/domain/advisor";
+import { createLeague } from "@/league-service/creation";
+import { writeSchedule } from "@/league-service/schedule";
+import { finalizeWeek } from "@/stats-pipeline/finalize";
 import { assembleAdvisorContext, valuePlayers } from "./context";
 import { advisorFixture } from "@/league-service/test-support";
+
+const ADVISOR_SLOTS = [{ slot: "QB" as const, count: 1, eligiblePositions: ["QB" as const] }];
 
 const db: Db = createTestDb();
 
@@ -67,6 +74,64 @@ describe("assembleAdvisorContext", () => {
 
   it("returns null for a league that doesn't exist", async () => {
     expect(await assembleAdvisorContext(db, { leagueId: "nope", teamId: "nope", weekNumber: 1 })).toBeNull();
+  });
+});
+
+describe("assembleAdvisorContext — the record", () => {
+  const clock = { now: () => "2026-08-17T12:00:00.000Z" };
+  let nextId = 0;
+  const newId = () => `id_rec_${++nextId}`;
+
+  /** Two teams, one QB slot each, a week-1 stat line per quarterback, and the median toggle the
+   *  caller asks for — enough for `finalizeWeek` to produce a real, scored record. */
+  async function twoTeamLeague(medianGame: boolean) {
+    await db.insert(users).values([
+      { id: "u_rec1", email: "u_rec1@test.local", displayName: "Manager 1" },
+      { id: "u_rec2", email: "u_rec2@test.local", displayName: "Manager 2" },
+    ]);
+    const created = await createLeague({ db, clock, newId }, {
+      name: "Record League", format: "snake", teamCount: 2, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: ADVISOR_SLOTS, commissionerUserId: "u_rec1", teamName: "Team One",
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false, medianGame,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    await db.insert(teams).values({ id: "team_rec2", leagueId: created.leagueId, userId: "u_rec2", name: "Team Two" });
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
+    await db.insert(players).values([
+      { id: "qb_rec1", name: "QB One", position: "QB", nflTeam: "KC" },
+      { id: "qb_rec2", name: "QB Two", position: "QB", nflTeam: "SF" },
+    ]);
+    await db.insert(playerStatLines).values([
+      { playerId: "qb_rec1", week: 1, passingYards: 300, passingTouchdowns: 3 },
+      { playerId: "qb_rec2", week: 1, passingYards: 100, passingTouchdowns: 0 },
+    ]);
+    await db.insert(rosterSlots).values([
+      { teamId: created.teamId, slot: "QB", slotIndex: 0, playerId: "qb_rec1" },
+      { teamId: "team_rec2", slot: "QB", slotIndex: 0, playerId: "qb_rec2" },
+    ]);
+    await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, "team_rec2"], weeks: 1 }));
+    return { leagueId: created.leagueId, teamId: created.teamId, opponentTeamId: "team_rec2" };
+  }
+
+  it("reports the SAME record the standings page would, off finished matchups", async () => {
+    const league = await twoTeamLeague(false);
+    await finalizeWeek(db, league.leagueId, 1);
+    const context = await assembleAdvisorContext(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 2 });
+    expect(context!.me.record).toBe("1-0");
+    const opponentContext = await assembleAdvisorContext(db, { leagueId: league.leagueId, teamId: league.opponentTeamId, weekNumber: 2 });
+    expect(opponentContext!.me.record).toBe("0-1");
+  });
+
+  it("folds the league median's own result into the record for a league with the toggle on", async () => {
+    // Two teams, so the median is the average of both scores: the head-to-head winner also
+    // clears it and the loser also misses it, doubling both records rather than leaving them
+    // exactly where the head-to-head-only computation used to freeze them.
+    const league = await twoTeamLeague(true);
+    await finalizeWeek(db, league.leagueId, 1);
+    const context = await assembleAdvisorContext(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 2 });
+    expect(context!.me.record).toBe("2-0");
+    const opponentContext = await assembleAdvisorContext(db, { leagueId: league.leagueId, teamId: league.opponentTeamId, weekNumber: 2 });
+    expect(opponentContext!.me.record).toBe("0-2");
   });
 });
 
