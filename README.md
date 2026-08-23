@@ -119,7 +119,7 @@ playoff spot all have real data to show the moment you sign in. Re-running the s
 every seeder upserts rather than duplicating. Set `DEV_SEED_CLAIM_USER_ID` to your own signed-in
 user id first to take over team 1 and the commissioner's chair in all three leagues.
 
-The seed also runs `seedFormats` (Phase 3.5, Task 10), which fires all five of this phase's new
+The seed also runs `seedFormatDemos` (Phase 3.5, Task 10), which fires all five of this phase's new
 mechanisms through their real paths rather than hand-stamping the columns they write: a superflex
 league, a slow-tier draft that skips and owes a pick, a draft drawn through the KDS slot-preference
 step, and a sit-and-go league whose last seat fills and whose fill trigger sets a real kickoff —

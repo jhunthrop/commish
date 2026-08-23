@@ -391,17 +391,21 @@ not run the league. A 403 would confirm which member holds the commissioner's ch
 can reach the league — small, and exactly the kind of small thing that is free to get right and
 awkward to fix later.
 
-**A third writer of `kickoff_at` (Phase 3.5, Task 7).** `fireWhenFullInTx`
-(`src/league-service/fill-trigger.ts`) joins `setDraftKickoff` (a commissioner's own choice) and
-`startDraft` (which stamps it implicitly the instant a draft actually starts, auto or not) as the
-third place `drafts.kickoff_at` is written. It writes ONLY when a public matchmade league's
-`start_trigger` is `'when_full'` and its last seat has just filled, moving the column to
+**A second writer of `kickoff_at` (Phase 3.5, Task 7).** `fireWhenFullInTx`
+(`src/league-service/fill-trigger.ts`) joins `setDraftKickoff` (`src/league-service/draft-schedule.ts`,
+a commissioner's own choice) as the second and only other place `drafts.kickoff_at` is written —
+there are exactly two `.set({ kickoffAt })` call sites in this codebase, and no third. Starting a
+draft, whether by a commissioner's press or by `autoStartDueDrafts`, changes `drafts.status`
+through `startDraft`'s guarded transition; neither that path nor `claimAutoStart` ever touches
+`kickoff_at` itself, so a draft's kickoff is exactly what one of these two writers last set it to,
+never something a start implicitly stamps. `fireWhenFullInTx` writes ONLY when a public matchmade
+league's `start_trigger` is `'when_full'` and its last seat has just filled, moving the column to
 `now + MATCHMAKING_CONFIG.sitAndGo.graceSeconds` — never earlier than that grace period, and never
 on a league whose kickoff a human already set by hand. It does not call `startDraft`: the value it
-writes is picked up by the same `autoStartDueDrafts` scan `kickoff_at`'s second writer already
+writes is picked up by the same `autoStartDueDrafts` scan the commissioner-set value already
 drives, so a sit-and-go draft starts through the identical guarded status transition a
 commissioner-scheduled one does — see `docs/decisions/formats-and-lobby.md` §6 for the full
-argument against a fourth start path.
+argument against a third start path.
 
 **A platform that presses start when nobody trustworthy is there to.** `autoStartDueDrafts`
 (`src/draft-service/auto-start.ts`) starts a public matchmade league's overdue draft through the
