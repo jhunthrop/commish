@@ -192,10 +192,36 @@ describe("draft store — persistence", () => {
   });
 
   it("refuses to apply an action against a draft that doesn't exist, inside the transaction's own lock", async () => {
-    // The FOR UPDATE lock itself is what proves this: distinct from getDraftState's read-only
+    // The row locks themselves are what prove this: distinct from getDraftState's read-only
     // load(), applyAction's own "the row isn't there" check runs INSIDE the transaction, before
-    // any action can be admitted or replayed against it.
+    // any action can be admitted or replayed against it. Since the final review's F1 the FIRST of
+    // those locks is the league row, joined through `drafts.id`, so a missing draft is answered
+    // there — one statement earlier than it used to be, and with the same sentence.
     const result = await newStore().applyAction("nope", start(["team_a", "team_b"]));
+    expect(result).toEqual({ ok: false, reason: "That draft doesn't exist." });
+  });
+
+  it("refuses an action when the league lock finds its row but the draft row is gone, inside the same transaction", async () => {
+    // The gap the F1 ordering opened: two statements now stand between "does this draft exist"
+    // and "is its row locked", and a draft deleted in between (nothing in this product does that
+    // outside a league cascade, which would take the league row too) must not fall through to a
+    // replay. Real Postgres cannot split the two events any more than it can split the config
+    // join below, so a stub `DbTx` is again the only way to drive the branch — the identical
+    // technique, for the identical reason, as the case immediately after this one.
+    const stubTx = {
+      select: () => ({
+        from: () => ({
+          where: () => ({ for: () => Promise.resolve([]) }),
+          innerJoin: () => ({
+            where: () => Object.assign(Promise.resolve([]), { for: () => Promise.resolve([{ id: "league_vanished" }]) }),
+          }),
+        }),
+      }),
+    } as unknown as DbTx;
+    const stubDb = { transaction: (fn: (tx: DbTx) => Promise<ApplyResult>) => fn(stubTx) } as unknown as Db;
+    const store = createDraftStore({ db: stubDb, publish, clock });
+
+    const result = await store.applyAction("draft_vanished", start(["team_a", "team_b"]));
     expect(result).toEqual({ ok: false, reason: "That draft doesn't exist." });
   });
 

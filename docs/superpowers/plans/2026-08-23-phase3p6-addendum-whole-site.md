@@ -72,7 +72,7 @@ Only what is **new** is stated here.
 | `sign-in-link.tsx` | `SignInLink` — the ONE way to render "sign in" anywhere in this product. Takes `intent` (the path to come back to) and renders `/sign-in?returnTo=…`. There is no other spelling after this task. |
 | `session-watch.ts` | `fetchWithSessionWatch`, `onSessionLost`, `SESSION_LOST_EVENT`. A module-level emitter every room's `fetchJson` routes through, so one 401 reaches one recovery. Pure browser, no imports from `@/lib`. |
 | `session-notice.tsx` | `SessionNotice` — the quiet top-bar strip that says the session ended, escalating to a `Modal` only when a user-initiated write is what failed. |
-| `app-shell-skeleton.tsx` | `AppShellSkeleton` — the shell's geometry with no data, `aria-busy`, used by both `loading.tsx` files and never by a page. |
+| `app-shell-skeleton.tsx` | `AppShellSkeleton` — skeleton geometry with no data and `aria-busy`, in the three shapes the four `loading.tsx` files need: the shell's **content column** (the rail and the top bar are the layout's and do not suspend, F8), the public bar's band, and the room's bands. Never rendered by a page. |
 
 **New — routes and pages:**
 
@@ -128,6 +128,8 @@ Founder directive 2, first half. This runs **before every other task in this add
 - [ ] **Step 1: Walk every module, mechanically, and write down what you find**
 
 Fourteen modules, in this order: `src/league-service`, `src/draft-service`, `src/chat-service`, `src/review-service`, `src/identity-service`, `src/integrity-service`, `src/trades`, `src/participation`, `src/moderation`, `src/ai-advisor`, `src/stats` + `src/stats-pipeline`, `src/help`, `src/matchmaking`, `src/chat` + `src/identity` + `src/reviews` + `src/gifs`.
+
+**The walk covers `src/*-room/components/**` as well as the fourteen service modules** (F10): the parent plan named fourteen components in one task and left eight more untouched, and an inventory that only walks services cannot find a component nobody renders or a component nobody retoned. For each component directory, the same question in its own terms: what renders this, and if nothing does, is that a deferral with a sentence or a GAP.
 
 The method, so two people doing this get the same answer: for each module, list every `export` that is a **capability** (a function or a const table that decides product behavior — not a Zod schema, not a `*Input`/`*Result` type, not a `test-support.ts` export). For each capability, `rg` for consumers **outside its own directory and outside `*.test.*`**. Then classify:
 
@@ -230,17 +232,18 @@ The front of the funnel, and the largest hole in the parent plan: a visitor's in
 
 **Files:**
 - Create: `src/lib/auth/return-to.ts` (+ its test)
-- Create: `src/components/app-shell/sign-in-link.tsx`, `public-bar.tsx`, `session-watch.ts`, `session-notice.tsx` (+ their tests)
+- Create: `src/components/app-shell/sign-in-link.tsx`, `public-bar.tsx`, `public-footer.tsx`, `session-watch.ts`, `session-notice.tsx` (+ their tests)
 - Create: `src/app/sign-in/problem/page.tsx` (+ its test)
 - Modify: `src/app/sign-in/route.ts`, `src/app/sign-up/route.ts` (+ new tests), `src/app/callback/route.ts`
-- Modify: `src/app/reviews/page.tsx`, `src/app/app/join/[code]/page.tsx` (the two verbatim header copies die here)
+- Modify: `src/app/reviews/page.tsx`, `src/app/app/(public)/join/[code]/page.tsx` (the two verbatim header copies die here)
+- Modify, the other four sign-in call sites the count missed (F6): `src/app/browse/page.tsx`, `src/league-room/components/public-league-list.tsx` (two of them), `src/league-room/components/join-form.tsx` (+ their tests)
 - Modify: `src/account-room/hooks/deps.tsx`, `src/league-room/hooks/deps.tsx`, `src/chat-room/hooks/deps.tsx`, `src/draft-room/hooks/deps.tsx`
-- Modify: `src/components/app-shell/top-bar.tsx` (the session strip's slot), `src/integrity/rendered-copy.test.tsx`
+- Modify: `src/components/app-shell/top-bar.tsx` (the session strip's slot), `src/draft-room/components/room-rail.tsx` (the room's session strip, beside `ConnectionBanner`, F13), `src/integrity/rendered-copy.test.tsx`
 - Create: `e2e/auth.spec.ts`
 
 **Interfaces:**
-- Consumes: `getSignInUrl`, `getSignUpUrl`, `handleAuth`, `signOut` (`@workos-inc/authkit-nextjs`), `TopBar`, `Modal`, `StatPill`.
-- Produces: `safeReturnTo`, `SignInLink`, `PublicBar`, `fetchWithSessionWatch`, `onSessionLost`, `SessionNotice`.
+- Consumes: `getSignInUrl`, `getSignUpUrl`, `handleAuth`, `signOut` (`@workos-inc/authkit-nextjs`), `TopBar`, `RoomRail`, `Modal`, `StatPill`.
+- Produces: `safeReturnTo`, `SignInLink`, `PublicBar`, `PublicFooter`, `fetchWithSessionWatch`, `onSessionLost`, `SessionNotice`.
 
 - [ ] **Step 1: Write the failing tests, starting with the one that is an open-redirect test**
 
@@ -311,9 +314,17 @@ export async function GET(request: Request) {
 
 **One cross-task constraint, and it is load-bearing for the parent's Task 6:** the seat-hold cookie must still be sent when the browser lands back on `/join/[leagueId]/hold` from WorkOS. `SameSite=Lax` allows it (a top-level GET navigation), but a `Path` scoped to the hold's API route would not be readable by the interstitial page or by the join door. **The hold cookie's `Path` must cover `/join` and `/api/public/leagues`, and the simplest correct answer is `Path=/`.** Path is a scoping convenience, never a security boundary; `httpOnly`, `SameSite=Lax` and the token's opacity are what carry the security, exactly as the parent's Task 6 Step 3 already argues. This step writes that sentence into the parent task's ledger note and asserts it in `e2e/auth.spec.ts`'s hold journey.
 
-- [ ] **Step 3: One sign-in link and one signed-out bar, and the copies die**
+- [ ] **Step 3: One sign-in link, one signed-out bar, one signed-out footer, and the copies die**
 
-`SignInLink` is the only way to render a sign-in entry point after this step; the three hand-written `<Link href="/sign-in">` call sites (`reviews/page.tsx:25` and `:75`, `app/join/[code]/page.tsx:44`) are refactored onto it **in this commit**, each passing the page's own path as `intent`, and the front door's own entry points (the parent's Task 5) are handed the same component by name. `PublicBar` absorbs the two verbatim headers. Both are added to `rendered-copy.test.tsx`'s roster here.
+**The count was wrong and the correction is the point of this step** (F6). There are **six** hand-written `<Link href="/sign-in">` call sites, not three — `reviews/page.tsx:25`, `reviews/page.tsx:75`, `app/join/[code]/page.tsx:44`, `public-league-list.tsx:140`, `public-league-list.tsx:283`, `join-form.tsx:125` — and **three** copy-pasted signed-out headers, not two: `reviews/page.tsx:14-31`, `browse/page.tsx:54-67`, `app/join/[code]/page.tsx:35-49`. All six links are refactored onto `SignInLink` **in this commit**, each passing an `intent`, and all three headers are absorbed by `PublicBar`.
+
+**The two shelf-card links matter most and get the intent that matters most:** `public-league-list.tsx`'s links are the highest-traffic entry into the funnel, and they pass **`/join/${leagueId}/hold`** as their intent, so a stranger who clicks a card, signs in, and comes back lands on the hold interstitial for *that league* rather than on a generic `/app` (the parent's Task 6 Step 4, "The return"). The others pass their own page's path.
+
+**`PublicBar` takes its nav and its action as props** (F5): `nav?: readonly NavLink[]` and `action?: ReactNode`, both defaulting to nothing. `/reviews`, `/browse` and `/app/join/[code]` render it bare; the front door renders it with the approved mock's three links (Open leagues → `/browse`, How it works → `/league-rules`, Reviews → `/reviews`) and the green **Take a seat** CTA pointing at `/browse` (the parent's Task 5 Step 2). A header component that could not carry the approved front door's own header would have been a primitive that fails at its most important caller.
+
+**`PublicFooter` is created here too** (F19), for the same reason and in the same commit: the four trust links are promised on all four public surfaces, and a footer written four times is the duplication this task exists to end. **Its own test carries the every-footer-target-resolves assertion**, moved up from the addendum's Task 21 Step 4 — the assertion belongs to the component that names the targets, not to the task that happens to write the pages behind them, and keeping it here means it runs even if a later task edits a page.
+
+All four new components are added to `rendered-copy.test.tsx`'s roster here.
 
 - [ ] **Step 4: The arrival, and the failure**
 
@@ -322,6 +333,12 @@ A successful callback is a redirect and has no screen; what it must not do is du
 - [ ] **Step 5: The session that died under a page that is still open**
 
 `fetchWithSessionWatch` wraps `fetch` once, and the four rooms' `BROWSER_DEPS.fetchJson` become one-line delegates to it. On a `401` with our own envelope shape it emits `SESSION_LOST_EVENT` and hands the response back unchanged, so every existing error path keeps working exactly as it does today.
+
+**`SessionNotice` is placed by chrome, and the room is the case that decides the rule** (F13). The strip cannot live "in the top bar" as a single home, because the surface where a dead session hurts most — the draft room, mid-pick — renders no top bar at all:
+
+- **Under `AppShell`:** `TopBar` renders it, above the content column, where the shell's own state already lives.
+- **In the draft room:** `RoomRail` renders it, in the **existing banner slot beside `ConnectionBanner`**, which is the slot this room already uses to say "the connection is not what you think it is". Two banners in one slot is a stack the room already handles; a second floating strip over a live board is not.
+- **Under `PublicBar`:** not at all. A signed-out visitor cannot lose a session they do not have, and a strip telling a stranger they are signed out is noise on the one surface that must feel calm.
 
 `SessionNotice` listens, and the escalation is deliberate:
 
@@ -344,6 +361,8 @@ Personas: the seat-hold visitor mid-signup, the returning manager on a new devic
 
 UX questions: does leaving our site for a WorkOS page read as a handoff or as a hijack; does a returning visitor land where they were; does the session strip feel like a courtesy or a scold; does anybody think they need a password before they can look around.
 
+**The walk includes the draft room** (F13): the persona whose session died during a draft opens the room, loses the session under a live board, and the panel judges the `RoomRail` placement specifically — whether a strip beside `ConnectionBanner` reads as one honest status area or as two systems shouting, and whether the escalation to a `Modal` on a failed pick is a rescue or an ambush.
+
 **Backend gap flags:** what did each persona try that nothing supports (changing the email they sign in with, seeing their active sessions, signing out everywhere, deleting the account)?
 
 - [ ] **Step 8: Commit**
@@ -355,7 +374,7 @@ UX questions: does leaving our site for a WorkOS page read as a handoff or as a 
 The journey the product has never designed as a journey: a brand new account lands on `/app` and gets a fork, and the two facts that decide what leagues they can even see are set silently.
 
 **Files:**
-- Modify: `src/app/app/page.tsx`, `src/league-room/components/first-run-panel.tsx` (+ its test)
+- Modify: `src/app/app/(shell)/page.tsx`, `src/league-room/components/first-run-panel.tsx` (+ its test)
 - Modify: `src/account-room/components/profile-form.tsx` (+ its test) — a compact variant, not a second form
 - Modify: `e2e/onboarding.spec.ts`, `src/integrity/rendered-copy.test.tsx`
 
@@ -403,7 +422,7 @@ A visitor who came through the parent's hold interstitial does **not** land here
 
 - [ ] **Step 4: The arrival for everybody else, in the shell**
 
-`/app`'s first-run branch renders inside `AppShell` with an empty rail (there are no leagues yet), which is the one state the rail must not render as a broken row of nothing: it renders its "join or create" control alone, with the accessible name saying so. The parent's Task 2 owns the rail; this step owns its zero-league state and asserts it.
+`/app`'s first-run branch renders inside the shell the `(shell)` layout is already holding (the parent's ruling 8, as amended), with an **empty rail** — the one state the rail must not render as a broken row of nothing: it renders its "join or create" control alone, with the accessible name saying so. The parent's Task 2 owns the rail; this step owns its zero-league state and asserts it, and asserts it at the layout's own boundary rather than in this page, since the page no longer renders the shell.
 
 - [ ] **Step 5: Persona panel — the first ninety seconds (dual mandate)**
 
@@ -426,7 +445,7 @@ Two tests today. The fork's structure moves (the identity card is first), so the
 `/app/profile` is the only write path this product has to who a person is, and it is a stack of five sections in an 896px column. It becomes a room, and it gains the one fact about themselves the product has been keeping from them.
 
 **Files:**
-- Modify: `src/app/app/profile/page.tsx`
+- Modify: `src/app/app/(shell)/profile/page.tsx`
 - Modify: `src/account-room/components/profile-form.tsx`, `avatar-picker.tsx`, `help-level-form.tsx`, `notification-summary.tsx`, `review-composer.tsx`, `notice-inbox.tsx` (+ their tests)
 - Create: `src/account-room/components/standing-panel.tsx` (+ its test)
 - Modify: `src/integrity/rendered-copy.test.tsx`
@@ -503,7 +522,7 @@ UX questions: is anything here a control that does not do what it says; does the
 Phase 3 Plan B's queue is where this product keeps its promises about fairness, and it currently looks like a list of index cards. It becomes dense and readable, and not one authorization check moves.
 
 **Files:**
-- Modify: `src/app/app/admin/queue/page.tsx`, `src/app/app/admin/queue/[flagId]/page.tsx` (+ their tests)
+- Modify: `src/app/app/(shell)/admin/queue/page.tsx`, `src/app/app/(shell)/admin/queue/[flagId]/page.tsx` (+ their tests)
 - Create: `src/admin-room/components/queue-table.tsx` (+ its test)
 - Modify: `src/admin-room/components/held-trade-detail.tsx`, `resolution-form.tsx` (+ their tests)
 - Modify: `src/integrity/rendered-copy.test.tsx`
@@ -515,7 +534,8 @@ Phase 3 Plan B's queue is where this product keeps its promises about fairness, 
 - [ ] **Step 1: Write the failing console tests, starting with the authorization one**
 
 ```ts
-// src/app/app/admin/admin-routes.test.ts — the existing tripwire, re-run
+// src/app/app/(shell)/admin/admin-routes.test.ts — the existing tripwire, re-run (the parent's
+// Task 2 moved it with the pages it scans; this task does not edit it)
 it("still routes every admin surface through the one gate, after the redesign", async () => {
   // A rendering task that touched an authz check would fail here. This test existed before this
   // plan; this step's job is to keep it green WITHOUT EDITING IT, which is the actual acceptance
@@ -574,12 +594,12 @@ Both are surfaces a stranger judges the product on before they have an account, 
 
 **Files:**
 - Modify: `src/app/reviews/page.tsx`, `src/account-room/components/review-feed.tsx` (+ its test)
-- Modify: `src/app/app/join/[code]/page.tsx`, `src/league-room/components/join-form.tsx` (+ its test)
+- Modify: `src/app/app/(public)/join/[code]/page.tsx`, `src/league-room/components/join-form.tsx` (+ its test)
 - Create: `src/league-room/components/invite-landing.tsx` (+ its test)
 - Modify: `src/integrity/rendered-copy.test.tsx`
 
 **Interfaces:**
-- Consumes: `listReviews`, `myReview`, `browseAllowed`, `invitePreview`, `LeagueTerms`, `PublicBar`, `SignInLink`, `Panel`, `Crest`, `SeatMeter`.
+- Consumes: `listReviews`, `myReview`, `browseAllowed`, `invitePreview`, `LeagueTerms`, `PublicBar`, `PublicFooter`, `SignInLink`, `SeatTakenPanel` (the parent's Task 6), `Panel`, `Crest`, `SeatMeter`.
 - Produces: `InviteLanding`. No new route, no new service function.
 
 - [ ] **Step 1: Write the failing tests**
@@ -595,8 +615,20 @@ it("offers no way to reorder or filter what people said", () => {
 });
 
 it("says what reporting a review does and does not do", () => {
+  // C1 (ruled): the expanded register is the house standard, stated in docs/design-system.md by
+  // the parent's Task 14 Step 2. "isn't" becomes "is not" here, in the task that owns the string.
   renderSurface(<ReviewFeed initialPage={page} emptyAction={null} />, ({ getByText }) => {
-    expect(getByText("Report reviews that break the rules. Disagreeing with a rating isn't a reason to report it.")).toBeInTheDocument();
+    expect(getByText("Report reviews that break the rules. Disagreeing with a rating is not a reason to report it.")).toBeInTheDocument();
+  });
+});
+
+it("renders the same taken panel the shelf does when the league filled first", () => {
+  // F15: an invited friend who arrives one minute late was getting a second, worse copy of the
+  // race loser. `SeatTakenPanel` takes its two actions as props precisely so this landing can
+  // give a private league's invitee the actions that make sense HERE.
+  renderSurface(<InviteLanding state={{ kind: "league-full", name: "Bay Bandits" }} />, ({ getByTestId, getByRole }) => {
+    expect(getByTestId("seat-taken-panel")).toBeInTheDocument();
+    expect(getByRole("link", { name: "Browse open leagues" })).toBeInTheDocument();
   });
 });
 
@@ -630,6 +662,10 @@ it("shows a signed-out visitor the terms and one way in, with their place kept",
 
 `InviteLanding` takes a discriminated state and renders one of: **open** (the league's terms, its seats through `SeatMeter`, and either `JoinForm` or a `SignInLink` carrying `/app/join/[code]` as intent), **invalid**, **expired**, **exhausted**, **already a member**, **league full**, **draft already started**, **tier refused**, and **signed out on any of the above**. The three refusal sentences come from `src/league-service/invites.ts` unchanged. Every state carries an action, and for the five dead codes the action is the shelf, because a stranger who wanted into a league is one click from a league that wants them.
 
+**The two losing states reuse the parent's panel rather than copying it** (F15): **league full** and **draft already started** render `SeatTakenPanel` (the parent's Task 6 Step 4), which **takes its two actions as props** for exactly this reason. The invited friend and the shelf visitor lose the same thing and are owed the same care, and a second hand-written "sorry, it filled" screen is how one of the two ends up worse maintained than the other. The actions this landing passes are the ones that make sense from an invite: **browse open leagues**, and — when the code named a house rung — **the same league's next open edition**, which the house factory guarantees exists.
+
+**The invite path takes no seat hold, and the reason is stated rather than left as an asymmetry** (F15, per the controller's ruling): a code is not a public shelf card. The shelf is an open door where strangers race each other for the last seat, which is what the hold exists to make fair; **a member league's commissioner controls who is coming**, the code was sent to a person, and holding capacity in someone's private league on behalf of whoever opened a link would take a seat away from the invitee the commissioner actually meant. The landing therefore says what is true right now and refuses to promise a hold this product deliberately does not place.
+
 A code naming a house league cannot exist (house leagues take no invites), so there is no tenth branch for it: it is `invalid`, which is also the non-oracle answer.
 
 - [ ] **Step 4: Persona panel — the stranger holding a link (dual mandate)**
@@ -650,7 +686,8 @@ Error, not-found, loading, and the four pages the footer promises. These are the
 
 **Files:**
 - Modify: `src/app/error.tsx`, `src/app/not-found.tsx`, `src/app/global-error.tsx`, `src/app/error-surfaces.test.tsx`
-- Create: `src/components/app-shell/app-shell-skeleton.tsx` (+ its test), `src/app/loading.tsx`, `src/app/app/loading.tsx`, `src/app/app/drafts/[draftId]/loading.tsx`
+- Create: `src/components/app-shell/app-shell-skeleton.tsx` (+ its test), `src/app/loading.tsx`, `src/app/app/(shell)/loading.tsx`, `src/app/app/(room)/drafts/[draftId]/loading.tsx`, `src/app/app/(public)/join/[code]/loading.tsx` (F7)
+- Create: `src/app/app/(room)/drafts/[draftId]/error.tsx` (+ its test) — the room's own error boundary (F14)
 - Create or modify (whichever the parent's Task 5 left): `src/app/legal/terms/page.tsx`, `src/app/legal/privacy/page.tsx`, `src/app/support/page.tsx`, `src/app/league-rules/page.tsx`
 - Modify: `src/components/ui/config.ts` (skeleton geometry), `src/integrity/rendered-copy.test.tsx`
 
@@ -678,15 +715,25 @@ it("still never prints the raw exception, after the retone", () => { /* the exis
 
 ```tsx
 // src/components/app-shell/app-shell-skeleton.test.tsx
-it("holds the shell's exact geometry, so nothing jumps when the real page arrives", () => {
-  renderSurface(<AppShellSkeleton />, ({ getByTestId }) => {
-    expect(getByTestId("shell-skeleton")).toHaveAttribute("aria-busy", "true");
+it("holds each chrome's exact geometry, so nothing jumps when the real page arrives", () => {
+  for (const shape of ["content", "public", "room"] as const) {
+    renderSurface(<AppShellSkeleton shape={shape} />, ({ getByTestId }) => {
+      expect(getByTestId("shell-skeleton")).toHaveAttribute("aria-busy", "true");
+    });
+  }
+});
+
+it("never draws the rail, because the layout is still holding it", () => {
+  // F8: the shell is a layout's render now, so the content column is the only thing that
+  // suspends. A skeleton rail under a real rail would be two rails for 400ms.
+  renderSurface(<AppShellSkeleton shape="content" />, ({ queryByTestId }) => {
+    expect(queryByTestId("league-rail")).toBeNull();
   });
 });
 
 it("announces nothing it cannot know, and names no league", () => {
   // A skeleton rail with fake crests is mock data on a real surface.
-  renderSurface(<AppShellSkeleton />, ({ container }) => {
+  renderSurface(<AppShellSkeleton shape="content" />, ({ container }) => {
     expect(container.textContent?.trim()).toBe("Loading");
   });
 });
@@ -694,25 +741,34 @@ it("announces nothing it cannot know, and names no league", () => {
 
 - [ ] **Step 2: The loading strategy, argued against what the App Router actually does**
 
-Three facts decide it. **(a)** There is no `loading.tsx` anywhere today, so every navigation holds on the old page and swaps. **(b)** The parent's ruling 8 makes `AppShell` a **component the page renders**, not a route-group layout, because a layout cannot receive `currentLeagueId`. That means a route-level `loading.tsx` renders **without** the shell unless it draws one itself. **(c)** `loading.tsx` applies to its own segment and every segment nested under it, until a deeper one overrides.
+Three facts decide it. **(a)** There is no `loading.tsx` anywhere today, so every navigation holds on the old page and swaps. **(b)** The parent's ruling 8, **as amended by the UX coherence review of 2026-08-23 (F8)**, makes `AppShell` a **route-group layout's** render rather than a page's: `src/app/app/(shell)/layout.tsx` calls `shellData` and renders the rail and the top bar, and a layout does not suspend. A `loading.tsx` inside that group therefore replaces **only the content column**, which is the entire point — the earlier page-rendered version would have blanked the rail and the top bar on every intra-app navigation. **(c)** `loading.tsx` applies to its own segment and every segment nested under it, until a deeper one overrides, and route-group siblings do not inherit each other's.
 
-The ruling is therefore: **one `loading.tsx` per chrome, three in total, all rendering the same `AppShellSkeleton` or its room-shaped sibling, and Suspense inside a page only where a single region is genuinely slower than the rest of it.**
+The ruling is therefore: **one `loading.tsx` per chrome, four in total, and Suspense inside a page only where a single region is genuinely slower than the rest of it.**
 
-- `src/app/app/loading.tsx` renders the signed-in shell's geometry (rail column, top bar band, content) with no data at all. It is inherited by profile, leagues, admin, join and matchups, which is the whole point: one file, not ten.
-- `src/app/app/drafts/[draftId]/loading.tsx` overrides it with the room's bands, because the room renders no shell and inheriting one would show a rail for 400ms that the room then deletes.
-- `src/app/loading.tsx` renders the public bar's geometry for the front door, browse, reviews, the invite landing and the hold interstitial.
+- `src/app/app/(shell)/loading.tsx` renders the **content column's** skeleton only, inside the shell the layout is already holding. It is inherited by the locker room, leagues, matchups, trades, activity, profile and admin, which is the whole point: one file, not nine.
+- `src/app/app/(room)/drafts/[draftId]/loading.tsx` renders the room's bands, because the room renders no shell and inheriting one would show a rail for 400ms that the room then deletes.
+- `src/app/app/(public)/join/[code]/loading.tsx` renders the **public** geometry (F7). `/app/join/[code]` sits under `/app` but is **signed-out reachable through the middleware's exemption for the invite landing**, so the signed-in skeleton would draw a rail and a profile control for somebody with neither, and then swap them for a `PublicBar` — a skeleton that lies about who is looking. Its own file is the fix.
+- `src/app/loading.tsx` renders the public bar's geometry for the front door, browse, reviews and the hold interstitial.
+
+**The alternative for the invite landing was moving the route to `/join/[code]`** so it would sit beside the other public surfaces, and it is **REJECTED and recorded as rejected**: every invite ever sent points at `/app/join/[code]`, the onboarding spec's own prefix aesthetic is built on it, and breaking live links to save one file is a bad trade. A route **group** (`(public)`) gets the same separation with no URL change, which is what this plan does instead.
 
 Per-page skeletons are **refused**: a skeleton that mimics a specific page's content is a second copy of that page's layout, maintained by nobody, wrong within a phase. Route handlers (`/sign-in`, `/callback`, `/sign-out`) are unaffected by `loading.tsx` and get nothing.
 
 - [ ] **Step 3: Error and not-found, in the product**
 
-Both keep every behavior `error-surfaces.test.tsx` asserts (no raw exception text, the digest as a quiet reference, `role="alert"` on the error and **not** on the not-found, a real action) and gain the v2 ground, the `PublicBar` for a visitor with no session, and a second action that does not require an account. `global-error.tsx` keeps rendering its own `<html>`/`<body>` and importing `globals.css` directly; its docblock's reference to `ThemeProvider` is corrected in this commit, because the parent's Task 1 deleted it.
+Both keep every behavior `error-surfaces.test.tsx` asserts (no raw exception text, the digest as a quiet reference, `role="alert"` on the error and **not** on the not-found, a real action) and gain the v2 ground and a second action that does not require an account.
+
+**`error.tsx` renders `PublicBar` unconditionally** (F14). It is a client component and it cannot know whether there is a session: `getCurrentUser()` is server-side, and an error boundary that guesses gets it wrong exactly when the thing it guessed with is what broke. The `PublicBar` is the **honest chrome for an unknown session** — a wordmark home link and one sign-in link, both of which work for a member and for a stranger — where a rail with no leagues in it would be a lie and a rail with somebody's leagues in it is data this boundary does not have. `not-found.tsx` renders the same, for the same reason.
+
+**The draft room gets its own boundary** (F14): `src/app/app/(room)/drafts/[draftId]/error.tsx`, because a room that throws inside the shell-less group would otherwise fall all the way up to the root boundary and hand a person mid-draft a page with no way back into the room. Its frame is the room's, not the shell's; its **primary action is `reset()`, labelled "Try the room again"**, because a re-render is the fix most of the time and re-entering by URL costs a reconnect; **"Go to your leagues" is second**. It prints no exception text and no digest beyond the quiet reference the other two surfaces already use, and it never claims a pick was or was not made.
+
+`global-error.tsx` keeps rendering its own `<html>`/`<body>` and importing `globals.css` directly; its docblock's reference to `ThemeProvider` is corrected in this commit, because the parent's Task 1 deleted it.
 
 - [ ] **Step 4: The four pages the footer promises**
 
-Terms, Privacy, Support and League rules, each a real page at measured-paragraph width with the product's chrome. **Support is where the operator dispute path finally gets its user-facing entry** (the thing the 3.5 loop deferred): what the queue is, what gets reviewed, what a report does and does not do, what to expect and how long it takes, and the two report paths that actually exist today (a review, a chat message) named honestly, with the things that have no path today named as things that have no path today rather than implied. League rules is where the format vocabulary lands, and it is where Task 15 Step 4's orphan glossary terms (`ppr`, `half-ppr`, `te-premium`, `custom-scoring`, `flex`, `snake-draft`, `auction-draft`) get their first real caller.
+Terms, Privacy, Support and League rules, each a real page at measured-paragraph width with the product's chrome (`PublicBar` and `PublicFooter`, Task 16). **League rules is also the front door nav's "How it works" destination** (F19): the mock's nav promised an explanation, no task created a page for it, and this is the page that answers the question, so the nav points here rather than at a route nobody writes. **Support is where the operator dispute path finally gets its user-facing entry** (the thing the 3.5 loop deferred): what the queue is, what gets reviewed, what a report does and does not do, what to expect and how long it takes, and the two report paths that actually exist today (a review, a chat message) named honestly, with the things that have no path today named as things that have no path today rather than implied. League rules is where the format vocabulary lands, and it is where Task 15 Step 4's orphan glossary terms (`ppr`, `half-ppr`, `te-premium`, `custom-scoring`, `flex`, `snake-draft`, `auction-draft`) get their first real caller.
 
-**A footer link to a 404 is worse than no footer**, so this task's own step asserts every footer target resolves.
+**A footer link to a 404 is worse than no footer**, and the assertion that every footer target resolves now lives on `PublicFooter` itself (Task 16 Step 3, F19), where it runs against the component that names the targets rather than against the task that happens to write the pages. This task's job is to make sure each target is a page worth arriving at; the link-resolution guard is already standing when it starts.
 
 - [ ] **Step 5: Persona panel — the person having a bad moment (dual mandate)**
 
@@ -776,7 +832,7 @@ The backlog is the deliverable of founder directive 2's second half. It is prese
 
 30. **A manager may see their own participation standing; nobody may see anybody else's.** The parent's ruling 19 refuses per-manager history tags in a room list because an aggregate over N=1 is not an aggregate and `compositionCategory`'s coarse reduction exists to hide exactly that. `StandingPanel` discloses a person's own count to themselves, which is the fact they already have and the axis that is already deciding what they can join. **This does not reopen D6** and the panel's own test asserts it says nothing about anyone else.
 
-31. **The loading strategy is three `loading.tsx` files and no per-page skeleton.** Argued in Task 21 Step 2 from what the App Router actually does plus the parent's ruling 8. The alternative that looks idiomatic (a route-group layout owning the shell, so `loading.tsx` inherits it for free) is the thing ruling 8 already refused for `aria-current`, and reversing it inside an addendum would be a design phase overturning an architecture ruling in a footnote.
+31. **The loading strategy is four `loading.tsx` files, one per chrome, and no per-page skeleton.** **Revised by the UX coherence review of 2026-08-23 (F8 and F7); the original said three files and rested on the parent's original ruling 8.** That ruling has been reversed: the shell is now a route-group layout (`src/app/app/(shell)/layout.tsx`), because a page-rendered shell means `loading.tsx` blanks the rail and the top bar on every navigation, and `usePathname()` gives the rail the `aria-current` the original ruling thought only a page could supply. So the idiomatic arrangement is also the correct one: the shell group's `loading.tsx` suspends **only the content column**, the room keeps its own, and `/app/join/[code]` gets a **fourth** file in the public geometry because it is signed-out reachable and the signed-in skeleton would promise it a rail (F7). Moving that route to `/join/[code]` was considered and rejected: it would break every invite link already sent. Per-page skeletons stay refused for the original reason.
 
 32. **The session-expired recovery escalates by what failed, not by what died.** A background poll's 401 is a strip; a user-initiated write's 401 is a modal. Treating them the same means either interrupting somebody mid-sentence over a poll, or silently swallowing the fact that the thing they just pressed did nothing. This is wrong if a strip is missed often enough that people keep working into a dead session, which the escalation is precisely designed to catch at the next write.
 
@@ -816,7 +872,8 @@ The backlog is the deliverable of founder directive 2's second half. It is prese
 
 | Screen | Where |
 |---|---|
-| Sign-in entry points, everywhere they appear | Task 16 Steps 2 and 3 (`SignInLink`, `PublicBar`, three call sites refactored) |
+| Sign-in entry points, everywhere they appear | Task 16 Steps 2 and 3 (`SignInLink`, `PublicBar`, **six** call sites and **three** headers refactored, F6) |
+| The signed-out footer, on all four public surfaces | Task 16 Step 3 (`PublicFooter`, which also owns the every-target-resolves assertion, F19) |
 | The hosted AuthKit screen | Task 16 (what we control from code) plus Task 22 Step 3 (the dashboard runbook), never a form of ours (A1, ruling 28) |
 | The callback moment, success and failure | Task 16 Step 4 (`/sign-in/problem`, `onError`) |
 | Redirect back to intent, including a held seat | Task 16 Step 2, plus the cookie-path constraint the parent's Task 6 needs |
@@ -827,8 +884,9 @@ The backlog is the deliverable of founder directive 2's second half. It is prese
 | `/app/admin/queue` and `/app/admin/queue/[flagId]` | Task 19 |
 | `/reviews` | Task 20 |
 | `/app/join/[code]` | Task 20 |
-| `error.tsx`, `not-found.tsx`, `global-error.tsx` | Task 21 Step 3 |
-| Loading states (none existed) | Task 21 Step 2 |
+| `error.tsx`, `not-found.tsx`, `global-error.tsx` | Task 21 Step 3, each rendering `PublicBar` unconditionally (F14) |
+| An error inside the draft room, where the shell is not | Task 21 Step 3 (`src/app/app/(room)/drafts/[draftId]/error.tsx`, `reset()` first, F14) |
+| Loading states (none existed) | Task 21 Step 2, four files including the invite landing's public skeleton (F7) |
 | Terms, Privacy, Support, League rules | Task 21 Step 4 |
 | `/app/drafts/[draftId]`, `/app/leagues/**`, `/`, `/browse` | **Parent Tasks 11, 12, 5, 2. Not duplicated here.** |
 
@@ -836,7 +894,7 @@ The backlog is the deliverable of founder directive 2's second half. It is prese
 
 **Constraint coverage:** A1/A2 are honored by every auth assertion stopping at the boundary and by no credential input existing anywhere in the file. A3 is Task 19's acceptance criterion, not a note. A4 has its own test in Task 20 Step 1. A5 enumerates nine states and refuses a house-league branch on the non-oracle rule. A6 is Task 16 Step 5, with the escalation argued. A7 appears as a marked step in six tasks. A8 is checked in the File Structure (one new pure module, in the directory the identity seam already occupies, with its gate read off the config).
 
-**Parent-plan collisions, checked one at a time:** the shell, primitives, palette and type scale are **consumed**, never re-decided. `src/app/app/page.tsx` is touched by the parent's Task 10 (the board) and by Task 17 here (the first-run branch only) — different regions of the same file, and Task 17 runs after Task 10 in the addendum's sequence. `src/app/reviews/page.tsx` and every `/app` page are moved into the shell by the parent's Task 2 Step 5; Tasks 18, 19 and 20 here change their **contents**, after that move. The four trust pages are created as stubs by the parent's Task 5 Step 5 and **filled in** by Task 21 Step 4, which explicitly does not create a second route for a path that already resolves. `rendered-copy.test.tsx`'s roster gains this addendum's components in the tasks that create them, per the parent's rule.
+**Parent-plan collisions, checked one at a time:** the shell, primitives, palette and type scale are **consumed**, never re-decided. `src/app/app/(shell)/page.tsx` is touched by the parent's Task 10 (the board) and by Task 17 here (the first-run branch only) — different regions of the same file, and Task 17 runs after Task 10 in the combined sequence. `first-run-panel.tsx` belongs to **Task 17 alone**: the parent's Task 10 listed it in a Files block with no step behind it, and the UX coherence review (F18a) removed it from there. `src/app/reviews/page.tsx` renders the shell for a signed-in reader; every `/app` page is moved into its route group and put under the `(shell)` layout by the parent's Task 2 Step 5 (ruling 8, as amended), and Tasks 18, 19 and 20 here change their **contents**, after that move, at the group-qualified paths this file uses throughout. `top-bar.tsx` is edited by Task 16 Step 5 **after** the parent's Task 2 has created it under that name (controller ruling 1), and `room-rail.tsx` by the same step, which is safe in either order because that file exists today: Task 16 adds the session strip to its existing banner slot, and the parent's Task 12 retones it afterwards. The four trust pages are created as stubs by the parent's Task 5 Step 5 and **filled in** by Task 21 Step 4, which explicitly does not create a second route for a path that already resolves. `rendered-copy.test.tsx`'s roster gains this addendum's components in the tasks that create them, per the parent's rule.
 
 **Placeholder scan:** no TODO, no TBD, no step whose expected output is unstated. Every file in the File Structure appears in a task's Files block. Five places name a helper the executing engineer writes to taste rather than showing it in full — `AppShellSkeleton`'s markup (copies the shell's own grid), `QueueTable`'s columns (copies `StandingsTable`'s dense idiom), `InviteLanding`'s state switch (copies `SeatTakenPanel`'s shape from the parent's Task 6), `StandingPanel`'s body (copies `NotificationSummary`'s description-list idiom), and `readerFor` in the system-action test (copies `activity-view.ts`'s own dispatch) — and each names the existing file whose shape it copies.
 
@@ -852,9 +910,36 @@ The backlog is the deliverable of founder directive 2's second half. It is prese
 
 The planner flagged six risks. Ruled as follows; each ruling binds execution:
 
-1. **Sequencing: ACCEPTED as recommended.** Execution order for the combined Phase 3.6: addendum Task 15 first (its findings can reorder everything), then addendum Task 16 (the parent's Task 6 hard-depends on it), then the parent plan in full in its own ruled order (1, 2, 3, 4, 6, 5, 7-14), then addendum Tasks 17-22.
+1. **Sequencing: ACCEPTED, and REVISED by the UX coherence review of 2026-08-23 (F2).** The original order ran addendum Task 16 immediately after Task 15 and before the whole parent plan, which is impossible in three ways: **A16 edits `top-bar.tsx`, which exists only after the parent's Task 2 Step 4 performs the `app-header.tsx` → `top-bar.tsx` rename**; A16 consumes `StatPill` (parent Task 3) and `renderSurface` (parent Task 1 Step 4); and it would write components in a palette parent Task 1 has not retoned yet, using `border-border` utilities Task 1 is about to rename. The only real forward dependency in the other direction is the parent's Task 6 needing `safeReturnTo` and `SignInLink`.
+
+**The combined execution order is therefore: A15 → P1 → P2 → P3 → P4 → A16 → P6 → P5 → P7..P14 → A17..A22.** A15 still runs first because its findings can reorder everything after it. The parent's palette, shell, primitives and proof land next, so **A16's edit to `top-bar.tsx` is legal only because P2 already performed the rename** — an executor who runs A16 earlier will be editing a file that does not exist. A16 then lands before P6, which is what lets the seat-hold interstitial return a visitor to their held seat. The parent's own 6-before-5 order (its controller ruling 5) is preserved inside this sequence.
 2. **The seat-hold cookie's Path: ACCEPTED as written here** (`Path=/`; httpOnly + SameSite=Lax + token opacity carry the security). The constraint is recorded in this file and carried into the parent's Task 6 dispatch as a ledger note at execution; the parent file is not edited.
 3. **The WorkOS dashboard runbook: ACCEPTED.** Control names read off the live dashboard at execution; the custom auth domain (auth.commish.ly) is founder-gated (DNS + plan tier) and joins the founder-gated bucket.
 4. **StandingPanel: ACCEPTED under ruling 30's line** (about the reader only, never anybody else, with the absence test-asserted). It does not reopen D6.
 5. **The notices cap: sentence now, cursor as backlog HIGH — ACCEPTED.** A design addendum does not make service changes; the founder can promote the cursor from the backlog into 3.6 scope if they want it sooner.
 6. **The four trust pages: fill-in-never-duplicate rule ACCEPTED.** If the parent's execution ships them with real content, Task 21 Step 4 shrinks to a retone and says so in its commit body.
+
+---
+
+## Amendments from the UX coherence review (2026-08-23)
+
+Every change below traces to a finding in `.superpowers/sdd/2026-08-22-phase3p5-competitiveness/ux-coherence-review.md`, applied in place under the controller's binding rulings. The findings that landed in the parent plan (F1, F3, F4, F5, F9 to F12, F16 to F18, F20, F21, D1 to D5, C2, C3, C5) are recorded there.
+
+- **F2** — Controller ruling 1 rewritten: the combined order is A15 → P1 → P2 → P3 → P4 → A16 → P6 → P5 → P7..P14 → A17..A22, with the sentence that A16's `top-bar.tsx` edit is legal only because P2 already performed the rename. The Depends-on paragraph and the collisions paragraph follow it.
+- **F5** — `PublicBar` takes `nav?` and `action?`, both defaulting to nothing, so the front door can render the approved header and the other three public surfaces stay bare. File Structure entry and Task 16 Step 3.
+- **F6** — Six sign-in call sites and three copy-pasted headers, not three and two; `browse/page.tsx`, `public-league-list.tsx` and `join-form.tsx` added to Task 16's Files; the two shelf-card links carry `/join/${leagueId}/hold` as their intent. Task 16 Step 3.
+- **F7** — A fourth `loading.tsx` at `src/app/app/(public)/join/[code]/loading.tsx` in the public geometry, with the middleware exemption named and the `/join/[code]` route move recorded as rejected. Task 21 Files and Step 2; the File Structure's routes table.
+- **F8** — Ruling 31 rewritten onto the parent's amended ruling 8: the shell is a route-group layout, the shell group's `loading.tsx` suspends only the content column, and the file count is four. Task 21 Step 2's fact (b), the routes table, A3, and every `/app` path in this file now written group-qualified.
+- **F13** — `SessionNotice` is placed by chrome: `TopBar` under `AppShell`, `RoomRail` in the draft room's existing banner slot beside `ConnectionBanner`, `PublicBar` not at all. `room-rail.tsx` added to Task 16's Files, and the room added to Step 7's walk.
+- **F14** — `error.tsx` and `not-found.tsx` render `PublicBar` unconditionally (a client boundary cannot know the session); `src/app/app/(room)/drafts/[draftId]/error.tsx` added with `reset()` as "Try the room again" and "Go to your leagues" second. Task 21 Files and Step 3.
+- **F15** — The invite landing's **league full** and **draft already started** branches render `SeatTakenPanel` with their own actions as props, and the no-hold asymmetry is explained rather than left unstated (a code is not a public shelf card; a member league's commissioner controls who is coming). The hold is **not** extended to the invite path. Task 20 Step 1's test and Step 3.
+- **F19** — `PublicFooter` added beside `PublicBar` in the File Structure and in Task 16's Files, rendered by all four public surfaces; the every-footer-target-resolves assertion moved up to it from Task 21 Step 4; "How it works" points at `/league-rules`, which Task 21 Step 4 now names as that nav item's destination.
+- **C1** — `review-feed.tsx`'s "isn't" becomes "is not" in Task 20 Step 1's test, converging on the expanded register the parent's Task 14 Step 2 states in `docs/design-system.md`.
+
+**Consistency fixes made in the same pass, where an amendment falsified text no finding named:**
+
+- The What-is-already-true table called the profile page "one of the fifteen the shell absorbs"; the shell absorbs nine (the parent's Task 2 Step 5, as amended by F21).
+- Every `/app` path in the File Structure, the task Files blocks and the collisions paragraph is now written with its route group, because ruling 8's reversal is what moved them and a plan that names a path Task 2 has already changed sends its executor to a missing file.
+- A3 said the admin tripwire is edited by nobody in this phase; the parent's Task 2 must update its path glob when it moves the pages, so A3 now names that one edit and keeps its real promise (Task 19 does not touch it).
+- The Depends-on paragraph said the parent executes first, whole; controller ruling 1 interleaves them, so it now names the two directions of dependency instead.
+- The screen-by-screen table gained the two surfaces the amendments created: `PublicFooter` and the draft room's error boundary.
