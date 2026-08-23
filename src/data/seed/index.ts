@@ -10,11 +10,12 @@ import { DEV_SEED } from "./config";
 import { assertLocalSeedTarget } from "./guard";
 import { seedDevLeagues } from "./seed-dev-leagues";
 import { seedEnforcement } from "./seed-enforcement";
+import { seedFormatDemos } from "./seed-format-demos";
 import { seedMultiAccountSuspect } from "./seed-integrity";
 import { seedOperator } from "./seed-operator";
 import { seedPlayers } from "./seed-players";
 import { seedPublicLeagues } from "./seed-public-leagues";
-import { seedSeasonLeague, VETERAN_SEASON_LEAGUES } from "./seed-season-league";
+import { MEDIAN_DEMO_LEAGUE, seedSeasonLeague, VETERAN_SEASON_LEAGUES } from "./seed-season-league";
 import { seedTrades } from "./seed-trades";
 
 /**
@@ -54,7 +55,11 @@ async function main(): Promise<void> {
   // identity across all three (`claimUserId`, or `dev_user_01` when unset), so by the time this
   // loop finishes that identity has genuinely crossed `INTEGRITY_CONFIG.participation.
   // veteranSeasonCutoff` (3) — a real veteran, not a stamped one.
-  for (const leagueConfig of [DEV_SEED.season, ...VETERAN_SEASON_LEAGUES]) {
+  // `MEDIAN_DEMO_LEAGUE` (Phase 3.5, Task 10): the SAME claimUserId-threaded loop, one more
+  // entry — a median-game league settled the identical way, so manager A's own identity (a real
+  // developer's claimed account, or `e2e/global-setup.ts`'s own manager A) lands on a league
+  // with a real second (median) result in its standings, not a stamped one.
+  for (const leagueConfig of [DEV_SEED.season, ...VETERAN_SEASON_LEAGUES, MEDIAN_DEMO_LEAGUE]) {
     const season = await seedSeasonLeague(db, { now: () => new Date().toISOString() }, claimUserId, leagueConfig);
     console.log(`seeded a ${season.teams}-team season league (${leagueConfig.leagueId}) with ${season.weeks} weeks (${season.scoredWeeks} scored)`);
   }
@@ -108,6 +113,18 @@ async function main(): Promise<void> {
     `enforcement: trade ${enforcement.heldTrade.outcome} (${enforcement.heldTrade.leagueId}), ` +
       `${enforcement.lineupAutoSet.teamsSet} lineup(s) auto-set in ${enforcement.lineupAutoSet.leagueId}, ` +
       `draft auto-start ${enforcement.draftAutoStart.started ? "started" : "not started"} (${enforcement.draftAutoStart.draftId})`,
+  );
+
+  // Phase 3.5, Task 10, Step 1: the four remaining arcs — superflex through the real draft
+  // engine, the slow-draft skip-and-owe and its own redemption, an order really drawn from real
+  // preference rows, and a sit-and-go league that really fills through the real
+  // `joinPublicLeague` transaction. See `seed-format-demos.ts`'s own docblock.
+  const formats = await seedFormatDemos(db, { now: () => new Date().toISOString() });
+  console.log(
+    `format demos: superflex second-QB slotted ${formats.superflex.secondQuarterbackSlotted} (${formats.superflex.leagueId}), ` +
+      `skip-and-owe redeemed ${formats.skipAndOwe.redeemed} for ${formats.skipAndOwe.skippedTeamId} (${formats.skipAndOwe.leagueId}), ` +
+      `slot preference matched the real draw ${formats.slotPreference.matchedRealDraw} (${formats.slotPreference.leagueId}), ` +
+      `sit-and-go kickoff rewritten ${formats.sitAndGo.kickoffRewritten} (${formats.sitAndGo.leagueId})`,
   );
 }
 
