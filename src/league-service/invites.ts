@@ -211,6 +211,7 @@ export async function invitePreview(db: Db, code: string, clock: Clock = systemC
       scoring: weights ?? PPR_SCORING,
       rosterSlots: league.rosterSlots,
       stakeTier: league.stakeTier,
+      medianGame: league.medianGame,
       commissioner: {
         displayName: commissioner?.displayName ?? "Commissioner",
         avatarUrl: commissioner?.avatarUrl ?? null,

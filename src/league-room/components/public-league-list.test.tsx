@@ -21,6 +21,7 @@ const CUSTOM_SCORING_LEAGUE: PublicLeagueSummary = {
   scoringLabel: "Custom",
   compositionCategory: "all_newcomers",
   draftAt: "Monday 14 September, 6:00 PM UTC (in 5 days)",
+  medianGame: false,
 };
 
 // A signed-in list renders `JoinPublicLeagueButton` per card, which navigates via
@@ -129,6 +130,23 @@ describe("PublicLeagueList", () => {
     const svgs = [...container.querySelectorAll("svg[aria-hidden='true']")];
     expect(svgs.some((svg) => svg.classList.contains("lucide-clover"))).toBe(true);
     expect(svgs.some((svg) => svg.classList.contains("lucide-crown"))).toBe(true);
+  });
+
+  // Task 3 (Phase 3.5): the disclosure decision `PublicLeagueSummary.medianGame`'s own docblock
+  // names — a visitor can't tell what game they'd be joining without it. Inverted first: none
+  // of `PUBLIC_LEAGUES` opts in, so the label never appears on the base render.
+  it("shows no Median label for a standard league", () => {
+    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />);
+    expect(screen.queryByText("Median")).not.toBeInTheDocument();
+  });
+
+  it("labels a median league right on the card, with its own InfoTip, in both themes, axe-clean", async () => {
+    const medianLeague = { ...CUSTOM_SCORING_LEAGUE, id: "median_1", medianGame: true };
+    await inBothThemes(<PublicLeagueList leagues={[medianLeague]} signedIn />, async ({ container }) => {
+      expect(screen.getByText("Median")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "What is a median game?" })).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
   });
 
   it("offers a next action when no league matches, rather than a dead end", async () => {

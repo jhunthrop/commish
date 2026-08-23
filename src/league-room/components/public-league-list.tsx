@@ -135,6 +135,19 @@ export function PublicLeagueList({
                       <InfoTip term={SCORING_LABEL_TERM[league.scoringLabel]!} helpLevel={BROWSE_HELP_LEVEL} />
                     )}
                   </span>
+                  {/* Deciding a week is a fact about the league, not about anyone in it — the
+                      same reasoning `PublicLeagueSummary.medianGame`'s own docblock carries.
+                      A short noun, matching `FORMAT_LABEL`/`scoringLabel`'s own words, inline
+                      with them rather than a separate line: high density, not a bolted-on box. */}
+                  {league.medianGame ? (
+                    <>
+                      <span>·</span>
+                      <span className="inline-flex items-center gap-1">
+                        Median
+                        <InfoTip term="median-game" helpLevel={BROWSE_HELP_LEVEL} />
+                      </span>
+                    </>
+                  ) : null}
                 </p>
                 <p className="text-sm text-text-muted">
                   {`${league.filledTeams} of ${league.teamCount} joined`}

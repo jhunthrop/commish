@@ -20,6 +20,7 @@ const league = (over: Partial<PublicLeagueSummary> = {}): PublicLeagueSummary =>
   scoringLabel: "Standard",
   compositionCategory: "all_newcomers",
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
+  medianGame: false,
   ...over,
 });
 

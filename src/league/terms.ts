@@ -1,8 +1,9 @@
 import type { DraftFormat } from "@/domain/league";
-import { BENCH_SLOT, type RosterSlotConfig } from "@/domain/roster";
+import { BENCH_SLOT, ROSTER_SHAPE_LABEL, type RosterSlotConfig } from "@/domain/roster";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { stakeTierLabel } from "@/matchmaking/filter";
 import { describeScoring, type ScoringRules } from "@/scoring";
+import { describeRosterShape } from "./roster-shape";
 
 /**
  * Everything a person decides whether to join with, in one pure value. Rendered by
@@ -40,6 +41,15 @@ export interface LeagueTerms {
    * way — one function, called once per render, not three copies that could drift.
    */
   readonly draftAt: string;
+  /**
+   * Facts about how this league plays that a stakes/scoring/roster line alone doesn't say —
+   * every note derived from a STORED column, never a remembered preset name, mirroring
+   * `scoringLabel`'s and `rosterLine`'s own honesty. Empty for a league that opted into neither:
+   * `LeagueTermsPanel` renders nothing at all rather than an empty "Notes" row. Order is fixed
+   * (median first, roster shape second) so the invite preview and league home can never list the
+   * same two facts in two different orders.
+   */
+  readonly formatNotes: readonly string[];
 }
 
 export interface LeagueTermsInput {
@@ -51,6 +61,9 @@ export interface LeagueTermsInput {
   readonly rosterSlots: readonly RosterSlotConfig[];
   /** Cosmetic tier index only — see `MATCHMAKING_CONFIG.stakeTiers`. Never an amount of money. */
   readonly stakeTier: number;
+  /** `leagues.median_game` (Task 2), straight through — every caller already has the league's
+   *  own row in hand by the time it builds this input. */
+  readonly medianGame: boolean;
   readonly commissioner: { readonly displayName: string; readonly avatarUrl: string | null };
   /** ISO instant — `drafts.kickoffAt`. */
   readonly kickoffAt: string;
@@ -67,6 +80,36 @@ export interface LeagueTermsInput {
  */
 function rosterLine(slots: readonly RosterSlotConfig[]): string {
   return slots.map((slot) => `${slot.count} ${slot.slot === BENCH_SLOT ? "bench" : slot.slot}`).join(", ");
+}
+
+/**
+ * The two sentences `formatNotesFor` can produce, verbatim per the brief — and the ONE place
+ * either is written. `src/league-room/components/public-league-list.tsx` cannot import this
+ * constant (the client boundary: `@/league` is server-only, `eslint.config.mjs`'s
+ * `SERVER_ONLY_MODULE_GROUPS`), so its browse-card label is a short noun ("Median") rather than
+ * this full sentence — the two surfaces name the same fact in the words each one's own contract
+ * affords, the identical reasoning `SCORING_LABEL_TERM`'s deliberate duplication between this
+ * panel and that list already documents.
+ */
+const MEDIAN_GAME_NOTE = "Every team also plays the league median each week.";
+const SUPERFLEX_NOTE = "Superflex: you can start a second quarterback.";
+
+/**
+ * Every fact this league's format doesn't already say through `scoringLabel`/`rosterLine` alone.
+ * Median first, roster shape second — a fixed order, not an accident of which `if` runs first,
+ * so the invite preview and league home render the identical list in the identical order.
+ *
+ * `describeRosterShape` (`./roster-shape`) is Task 1's fix-round adjudication landing exactly
+ * where its own docblock named: the superflex note fires off the SAME slot-row comparison
+ * `rosterLine` above already reads its words from, never a remembered preset name — a
+ * commissioner who edits a superflex league's slots away from the shipped shape loses the note
+ * the same honest way `rosterLine` itself would stop reading "Superflex".
+ */
+function formatNotesFor(medianGame: boolean, rosterSlots: readonly RosterSlotConfig[]): readonly string[] {
+  const notes: string[] = [];
+  if (medianGame) notes.push(MEDIAN_GAME_NOTE);
+  if (describeRosterShape(rosterSlots) === ROSTER_SHAPE_LABEL.superflex) notes.push(SUPERFLEX_NOTE);
+  return notes;
 }
 
 const MS_PER_MINUTE = 60 * 1000;
@@ -137,5 +180,6 @@ export function leagueTerms(input: LeagueTermsInput): LeagueTerms {
     commissionerName: input.commissioner.displayName,
     commissionerAvatar: input.commissioner.avatarUrl,
     draftAt: formatDraftTime(input.kickoffAt, input.now),
+    formatNotes: formatNotesFor(input.medianGame, input.rosterSlots),
   };
 }

@@ -1,11 +1,11 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, teams } from "@/db/schema";
+import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, teams, weeks } from "@/db/schema";
 import type { DraftStatus } from "@/domain/draft";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { listTeamCards } from "@/draft-service/teams";
-import { benchOf, LEAGUE_CONFIG, leagueTerms, seasonProgress, startersOf, type WeekStatus } from "@/league";
+import { benchOf, LEAGUE_CONFIG, leagueTerms, medianResultFor, seasonProgress, startersOf, type WeekStatus } from "@/league";
 import type {
   DraftScheduleBody,
   LeagueHomeBody,
@@ -13,6 +13,7 @@ import type {
   LeagueSummary,
   MatchupDetail,
   MatchupLineupEntry,
+  MatchupMedian,
   MatchupSide,
   MatchupSummary,
   MatchupWeekBody,
@@ -178,6 +179,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     scoring: weights ?? PPR_SCORING,
     rosterSlots: league.rosterSlots,
     stakeTier: league.stakeTier,
+    medianGame: league.medianGame,
     commissioner: {
       displayName: commissionerCard?.ownerDisplayName ?? "Commissioner",
       avatarUrl: commissionerCard?.ownerAvatarUrl ?? null,
@@ -214,6 +216,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     myTeamId,
     teams: members,
     standings: await leagueStandings(db, leagueId, teamCards, league.medianGame),
+    medianGame: league.medianGame,
     terms,
     currentWeek,
     totalWeeks,
@@ -253,6 +256,13 @@ export async function matchupWeek(
   const weekStatus = await weekStatusFor(db, weekNumber);
   if (week.length === 0) return { leagueId, weekNumber, totalWeeks, myTeamId: null, matchups: [], weekStatus };
 
+  // `null` for a non-median league (`leagues.median_game` off) and for a week that hasn't
+  // settled yet — `finalizeWeekInTx` (`@/stats-pipeline/finalize`) only ever writes this column
+  // when the toggle is on, so a single read answers both cases without a second `leagues.median_
+  // game` check here.
+  const [weekRow] = await db.select({ medianScore: weeks.medianScore }).from(weeks).where(and(eq(weeks.leagueId, leagueId), eq(weeks.weekNumber, weekNumber)));
+  const leagueMedianScore = weekRow?.medianScore ?? null;
+
   const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
   const nameById = new Map(teamRows.map((row) => [row.id, row.name]));
   const myTeamId = teamRows.find((row) => row.userId === userId)?.id ?? null;
@@ -291,12 +301,32 @@ export async function matchupWeek(
     };
   }
 
+  // Never true alongside a non-null `leagueMedianScore`: `finalizeWeekInTx` derives the median
+  // from the SAME `scores` map it writes both matchup rows from, in the same transaction — but
+  // guarded rather than asserted, the same defensive posture `nameById.get(teamId) ?? teamId`
+  // takes two independent reads above.
+  const medianFor = (homeScore: number | null, awayScore: number | null): MatchupMedian | null =>
+    leagueMedianScore === null || homeScore === null || awayScore === null
+      ? null
+      : {
+          score: leagueMedianScore,
+          homeResult: medianResultFor(homeScore, leagueMedianScore),
+          awayResult: medianResultFor(awayScore, leagueMedianScore),
+        };
+
   // Every matchup's two sides are independent `getLineup` round trips — run the whole week's
   // worth in parallel rather than awaiting each side, one matchup at a time.
   const details: MatchupDetail[] = await Promise.all(
     week.map(async (row): Promise<MatchupDetail> => {
       const [home, away] = await Promise.all([sideFor(row.homeTeamId, row.homeScore), sideFor(row.awayTeamId, row.awayScore)]);
-      return { weekNumber, home, away, final: row.homeScore !== null && row.awayScore !== null, weekStatus };
+      return {
+        weekNumber,
+        home,
+        away,
+        final: row.homeScore !== null && row.awayScore !== null,
+        weekStatus,
+        median: medianFor(row.homeScore, row.awayScore),
+      };
     }),
   );
 

@@ -25,6 +25,7 @@ export type TermKey =
   | "stake-tier"
   | "matchup"
   | "standings-record"
+  | "median-game"
   | "queue"
   | "verified-reviewer";
 
@@ -140,6 +141,13 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     short: "Wins, losses, and ties so far this season.",
     detail:
       "A record shows how many weeks a team has won, lost, and tied so far this season, written as wins-losses or wins-losses-ties. Standings rank every team in the league by that record first.",
+  },
+  "median-game": {
+    key: "median-game",
+    term: "a median game",
+    short: "Every week, your record also counts how you scored against the league median.",
+    detail:
+      "This league plays a median game: every week, on top of your head-to-head matchup, your score is compared to the league's median score that week. Beat the median and you get a second win added to your record; miss it and you get a second loss. Both results fold into the same wins-losses-ties record shown here, so a team can go 2-0 or 0-2 in a single week.",
   },
   queue: {
     key: "queue",

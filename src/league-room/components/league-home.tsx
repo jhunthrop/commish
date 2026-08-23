@@ -88,7 +88,7 @@ export function LeagueHome({
         ) : null}
       </section>
 
-      <StandingsTable rows={home.standings} myTeamId={home.myTeamId} helpLevel={helpLevel} />
+      <StandingsTable rows={home.standings} myTeamId={home.myTeamId} helpLevel={helpLevel} medianGame={home.medianGame} />
 
       {/*
         Unlike the draft room's `aside` band, this section sits in ordinary document flow, so

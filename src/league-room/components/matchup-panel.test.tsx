@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
-import { fixtureLeagueDeps, MATCHUP, renderInLeague } from "../test-fixtures";
+import { fixtureLeagueDeps, MATCHUP, MATCHUP_WITH_MEDIAN, renderInLeague } from "../test-fixtures";
 import { MatchupPanel } from "./matchup-panel";
 
 /** Same matchup, mid-games: `final` and `weekStatus` both say so, independent of each other. */
@@ -36,6 +36,51 @@ describe("MatchupPanel", () => {
       expect(screen.getByText("Not started")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+
+  // Non-median league: `matchup.median` is `null`, the same "nothing to say" state a week with
+  // no scores reads as — no median residue anywhere on the page.
+  it("shows no median line at all for a non-median league", () => {
+    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+    expect(screen.queryByText(/league median/)).not.toBeInTheDocument();
+  });
+
+  it("shows each team's own median result, second person for the viewer's own team, third person for the other, in both themes, axe-clean", async () => {
+    await inBothThemes(
+      <MatchupPanel matchup={MATCHUP_WITH_MEDIAN} myTeamId="t1" weekStatus="final" />,
+      async ({ container }) => {
+        // `t1` (home, myTeamId) beat the median; `t2` (away) missed it.
+        expect(
+          screen.getByText("You scored 112.50. The league median was 104.20, so you won that one too."),
+        ).toBeInTheDocument();
+        expect(
+          screen.getByText("Iron Owls scored 98.25. The league median was 104.20, so they lost that one too."),
+        ).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+  });
+
+  // The exact same matchup, viewed by nobody in it (a bye-week spectator, or a commissioner
+  // browsing another pairing) — both sides read in the third person, and neither says "You".
+  it("reads both sides in the third person for a viewer with no team in this matchup", () => {
+    render(<MatchupPanel matchup={MATCHUP_WITH_MEDIAN} myTeamId={null} weekStatus="final" />);
+    expect(
+      screen.getByText("Bay Bandits scored 112.50. The league median was 104.20, so they won that one too."),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Iron Owls scored 98.25. The league median was 104.20, so they lost that one too."),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/^You /)).not.toBeInTheDocument();
+  });
+
+  // The same "no median yet" state a week with no scores reads as (the brief's own equivalence):
+  // a median exists for the week, but this particular side has no score to compare it to.
+  it("shows no median line for a side with no score yet, even when the week's median is known", () => {
+    const halfScored = { ...MATCHUP_WITH_MEDIAN, home: { ...MATCHUP_WITH_MEDIAN.home, score: null } };
+    render(<MatchupPanel matchup={halfScored} myTeamId="t1" weekStatus="in_progress" />);
+    expect(screen.queryByText(/Bay Bandits scored|You scored/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Iron Owls scored 98.25/)).toBeInTheDocument();
   });
 
   it("renders a starter's position as a PositionBadge sticker, not a bare string", () => {

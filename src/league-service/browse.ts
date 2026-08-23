@@ -29,6 +29,7 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "scoringLabel",
   "compositionCategory",
   "draftAt",
+  "medianGame",
 ];
 
 /** The league's own seats, aliased a second time so a `LATERAL` join can ask "how many of THIS
@@ -169,6 +170,7 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
       experienceTier: leagues.experienceTier,
       stakeTier: leagues.stakeTier,
       teamCount: leagues.teamCount,
+      medianGame: leagues.medianGame,
       filledTeams: sql<number>`count(${teams.id})::int`,
       // A plain column, not an aggregate. Postgres accepts an ungrouped column only when the
       // `GROUP BY` covers ITS OWN table's primary key, so `drafts.id` joins `leagues.id` in the

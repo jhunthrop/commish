@@ -41,6 +41,13 @@ import type { ParticipationTier } from "@/participation/tier";
  * calls for `LeagueTerms.draftAt`, so the sentence a stranger reads on a browse card and the one
  * a prospect reads on the invite preview can only ever agree.
  *
+ * `medianGame` (Phase 3.5, Task 3) is the eleventh field, and the same kind of disclosure
+ * decision `draftAt` and `scoringLabel` already are: how a league decides a week is a fact about
+ * the LEAGUE, never about any person in it, and a visitor who cannot see it cannot tell what
+ * game they would be joining — every team in a median league plays a second result each week
+ * that a standard league's teams never do, and that difference belongs on the card, not
+ * discovered only after joining.
+ *
  * A stranger gets what they need to CHOOSE a league and nothing about the people already in it.
  */
 export interface PublicLeagueSummary {
@@ -59,6 +66,8 @@ export interface PublicLeagueSummary {
   /** Absolute-plus-relative, e.g. "Saturday 12 September, 7:00 PM UTC (in 3 days)" — see this
    *  interface's own docblock. */
   readonly draftAt: string;
+  /** Whether this league plays a median game (Task 2) — see this interface's own docblock. */
+  readonly medianGame: boolean;
 }
 
 /** A normalized browse filter: every field is a concrete value or the "any" sentinel. */

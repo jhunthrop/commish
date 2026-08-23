@@ -18,6 +18,7 @@ const TERMS: LeagueTerms = {
   commissionerName: "Alex Rivera",
   commissionerAvatar: "preset:crown",
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
+  formatNotes: [],
 };
 
 describe("LeagueTermsPanel", () => {
@@ -84,6 +85,27 @@ describe("LeagueTermsPanel", () => {
     await inBothThemes(<LeagueTermsPanel terms={TERMS} titleAs="p" />, async ({ container }) => {
       expect(screen.queryByRole("heading", { name: "Sunday Money" })).not.toBeInTheDocument();
       expect(screen.getByText("Sunday Money").tagName).toBe("P");
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  // Task 3 (Phase 3.5): a prospect reading the invite, or a member reading league home, learns
+  // any facts `scoringLabel`/`rosterLine` alone don't already say. Inverted assertion first —
+  // `TERMS.formatNotes` is `[]`, the plain-league default, and no "Notes" row renders at all.
+  it("shows no Notes row for a league with nothing extra to say", () => {
+    render(<LeagueTermsPanel terms={TERMS} />);
+    expect(screen.queryByText("Notes")).not.toBeInTheDocument();
+  });
+
+  it("lists every format note, in the order the league sent them, in both themes, axe-clean", async () => {
+    const withNotes = {
+      ...TERMS,
+      formatNotes: ["Every team also plays the league median each week.", "Superflex: you can start a second quarterback."],
+    };
+    await inBothThemes(<LeagueTermsPanel terms={withNotes} />, async ({ container }) => {
+      expect(screen.getByText("Notes")).toBeInTheDocument();
+      expect(screen.getByText("Every team also plays the league median each week.")).toBeInTheDocument();
+      expect(screen.getByText("Superflex: you can start a second quarterback.")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
   });

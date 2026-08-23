@@ -185,6 +185,19 @@ describe("GET /api/leagues/[leagueId]", () => {
     expect(asMember!.isCommissioner).toBe(false);
   });
 
+  // Task 3 (Phase 3.5): `StandingsTable`'s caption note needs the league's own toggle stated,
+  // not inferred from a record it can't tell apart from a plain one.
+  it("carries the league's own median-game toggle straight through to the home body", async () => {
+    signedInAs("u1");
+    const response = await postLeague(post("http://test/api/leagues", { name: "Median League", medianGame: true }));
+    const created = (await response.json()).data as { leagueId: string };
+    const home = await leagueHome(db, created.leagueId, "u1");
+    expect(home?.medianGame).toBe(true);
+
+    const plain = await createDefaultLeague("u1");
+    expect((await leagueHome(db, plain.leagueId, "u1"))?.medianGame).toBe(false);
+  });
+
   // Task 6: the terms' new `draftAt` field, formatted against the caller's own injected clock —
   // never `leagueHome`'s default `systemClock`, so the relative half ("in 3 days") is
   // deterministic here rather than measured against the real wall clock.
@@ -238,6 +251,46 @@ describe("GET /api/leagues/[leagueId]/matchups/[week]", () => {
     expect(scoringQb).toMatchObject({ slot: "QB", playerName: "QB One", position: "QB", points: 24 });
     // The league's default roster shape has a bench, and it is reported separately.
     expect(detail.home.bench.length).toBeGreaterThan(0);
+    // Task 3's inverted assertion: this league never turned the median game on, so there is no
+    // median residue on the matchup page even once the week has settled.
+    expect(detail.median).toBeNull();
+  });
+
+  // Task 3 (Phase 3.5): the second result a median league adds, read straight off the matchup
+  // page. Two teams means the median is the average of both scores — 24 and 4 → 14 — so one
+  // side clears it and the other doesn't, whichever drew home.
+  it("computes each side's own median result once a median league's week has settled", async () => {
+    signedInAs("u1");
+    const response = await postLeague(post("http://test/api/leagues", { name: "Median League", medianGame: true }));
+    expect(response.status).toBe(201);
+    const created = (await response.json()).data as { leagueId: string; teamId: string; draftId: string };
+    await playableSeason(created.leagueId, created.teamId);
+
+    const scored = await finalizeWeek(db, created.leagueId, 1);
+    expect(scored).toEqual({ ok: true, weekNumber: 1, matchupsScored: 1 });
+
+    const body = (await (await getMatchups(new Request(`http://test/api/leagues/${created.leagueId}/matchups/1`), {
+      params: Promise.resolve({ leagueId: created.leagueId, week: "1" }),
+    })).json()).data;
+    const [detail] = body.matchups;
+    expect(detail.median).toMatchObject({ score: 14 });
+    const homeWon = detail.home.score > detail.away.score;
+    expect(detail.median.homeResult).toBe(homeWon ? "win" : "loss");
+    expect(detail.median.awayResult).toBe(homeWon ? "loss" : "win");
+  });
+
+  // The SAME "no median yet" state a week with no scores reads as — a median league whose week
+  // hasn't been scored has nothing to fold into either side yet.
+  it("is null for a median league's week that hasn't settled yet", async () => {
+    signedInAs("u1");
+    const response = await postLeague(post("http://test/api/leagues", { name: "Median League", medianGame: true }));
+    const created = (await response.json()).data as { leagueId: string; teamId: string };
+    await playableSeason(created.leagueId, created.teamId);
+
+    const body = (await (await getMatchups(new Request(`http://test/api/leagues/${created.leagueId}/matchups/1`), {
+      params: Promise.resolve({ leagueId: created.leagueId, week: "1" }),
+    })).json()).data;
+    expect(body.matchups[0].median).toBeNull();
   });
 
   it("answers 400 for a matchup week that isn't a number, and an empty week outside the season", async () => {

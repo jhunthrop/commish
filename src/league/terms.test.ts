@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { SCORING_PRESETS } from "@/domain/scoring";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import { SUPERFLEX_ROSTER_SLOTS } from "./roster-shape";
 import { formatDraftTime, leagueTerms, type LeagueTermsInput } from "./terms";
 
 /** A small custom roster shape — distinct from `STANDARD_ROSTER_SLOTS` so a test that swaps one
@@ -19,6 +20,7 @@ const BASE: LeagueTermsInput = {
   scoring: SCORING_PRESETS.ppr,
   rosterSlots: SMALL_ROSTER,
   stakeTier: 1,
+  medianGame: false,
   commissioner: { displayName: "Alex Rivera", avatarUrl: "preset:crown" },
   kickoffAt: "2026-09-12T23:00:00.000Z",
   now: "2026-09-09T23:00:00.000Z",
@@ -60,6 +62,29 @@ describe("leagueTerms", () => {
     // somebody decides to enter a league, and two hand-written versions of "no money changes
     // hands" is exactly how one of them ends up out of date the week money starts changing hands.
     expect(leagueTerms(BASE).stakeDisclosure).toBe(MATCHMAKING_CONFIG.stakeDisclosure);
+  });
+
+  it("carries no format notes for a plain standard-shape, non-median league", () => {
+    expect(leagueTerms(BASE).formatNotes).toEqual([]);
+  });
+
+  it("notes the median game, derived from the stored toggle, not a remembered preset", () => {
+    expect(leagueTerms({ ...BASE, medianGame: true }).formatNotes).toEqual([
+      "Every team also plays the league median each week.",
+    ]);
+  });
+
+  it("notes superflex, derived from the stored roster slots, not a remembered preset name", () => {
+    expect(leagueTerms({ ...BASE, rosterSlots: SUPERFLEX_ROSTER_SLOTS }).formatNotes).toEqual([
+      "Superflex: you can start a second quarterback.",
+    ]);
+  });
+
+  it("lists both notes, median first, when a league opts into both", () => {
+    expect(leagueTerms({ ...BASE, medianGame: true, rosterSlots: SUPERFLEX_ROSTER_SLOTS }).formatNotes).toEqual([
+      "Every team also plays the league median each week.",
+      "Superflex: you can start a second quarterback.",
+    ]);
   });
 
   it("names the commissioner", () => {

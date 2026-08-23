@@ -27,6 +27,20 @@ describe("LeagueHome", () => {
     });
   });
 
+  // Task 3 (Phase 3.5): `LeagueHome` threads `home.medianGame` through to `StandingsTable`
+  // rather than the table silently defaulting to `false` on the one page that actually renders
+  // real data — `HOME`'s own default is `false`, so the base render above already proves the
+  // note is ABSENT by default; this proves it appears once the flag is on.
+  it("shows the standings' median-game note once the league's own toggle is on", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, medianGame: true }} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText(/Records include each week's median game\./)).toBeInTheDocument();
+  });
+
   // Task 10: reachable from where a member already is, beside the existing matchup link,
   // rather than only by typing the url directly.
   it("links to the league's activity feed beside the matchups link", () => {

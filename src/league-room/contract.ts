@@ -4,7 +4,7 @@ import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { TradeFlag, TradeVerdict } from "@/trades/fairness";
 import type { FirstRunPlan } from "@/identity";
-import type { LeagueTerms, NextAction, StandingsRow, WeekStatus } from "@/league";
+import type { LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
 
 /**
  * TYPES ONLY, no runtime code. Imported by the `/api/leagues/**` routes as their return shape
@@ -164,6 +164,14 @@ export interface LeagueHomeBody {
   readonly teams: readonly LeagueMemberCard[];
   readonly standings: readonly TeamStandingsRow[];
   /**
+   * Whether this league plays a median game (Task 2) — the same `leagues.median_game` flag
+   * `standings` above already folded into every row's record. `StandingsTable` reads this,
+   * never the rows themselves, to decide whether the record it renders is a two-games-a-week
+   * one: the fold is invisible from a `TeamStandingsRow` alone (it is one `wins`/`losses`/`ties`
+   * tally either way), so the page needs the flag stated, not inferred.
+   */
+  readonly medianGame: boolean;
+  /**
    * The SAME `LeagueTerms` the invite preview renders (`InvitePreviewBody`, above), assembled by
    * the SAME pure `leagueTerms` — every member sees this, not just the commissioner: the terms
    * are what everybody in the league is playing under, and gating them on `isCommissioner` would
@@ -204,6 +212,19 @@ export interface MatchupSide {
   readonly bench: readonly MatchupLineupEntry[];
 }
 
+/**
+ * One week's league median, as `matchupWeek` (`@/league-service/read.ts`) computes it for a
+ * single matchup: the median score itself, plus each side's own result against it
+ * (`medianResultFor`, `@/league/median`) — the SAME three-way split (win/loss/tie) the
+ * head-to-head score already gets, just against the league's middle score instead of an
+ * opponent.
+ */
+export interface MatchupMedian {
+  readonly score: number;
+  readonly homeResult: MedianResult;
+  readonly awayResult: MedianResult;
+}
+
 export interface MatchupDetail {
   readonly weekNumber: number;
   readonly home: MatchupSide;
@@ -211,6 +232,13 @@ export interface MatchupDetail {
   /** True once the settlement write has happened — see `MatchupSummary.final`'s docblock. */
   readonly final: boolean;
   readonly weekStatus: WeekStatus;
+  /**
+   * `null` for a non-median league (the toggle is off), and `null` for a median league whose
+   * week hasn't settled yet — the same "no median yet" state a week with no scores reads as.
+   * Read from `weeks.median_score` (Task 2), never recomputed here: `finalizeWeekInTx` already
+   * derived it once, in the transaction that scored these same matchups.
+   */
+  readonly median: MatchupMedian | null;
 }
 
 export interface MatchupWeekBody {

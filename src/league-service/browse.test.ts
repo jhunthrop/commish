@@ -23,6 +23,8 @@ interface SeedLeague {
   readonly filled: number;
   readonly isPublicMatchmade: boolean;
   readonly draftStatus?: "scheduled" | "in_progress" | "complete";
+  /** Defaults to `false` (the schema default) — set explicitly to prove the disclosure. */
+  readonly medianGame?: boolean;
   /** Defaults to `${id}_u${index}` per seat. Set explicitly so a caller can give a specific seat
    *  a completed-season history (`giveCompletedSeasons`) before seating them here. */
   readonly seatUserIds?: readonly string[];
@@ -43,6 +45,7 @@ async function seed(league: SeedLeague): Promise<void> {
     isPublicMatchmade: league.isPublicMatchmade,
     commissionerUserId: "owner",
     ...(league.createdAt === undefined ? {} : { createdAt: league.createdAt }),
+    ...(league.medianGame === undefined ? {} : { medianGame: league.medianGame }),
   });
   await db.insert(drafts).values({
     id: `${league.id}_draft`,
@@ -150,6 +153,8 @@ async function seedPublicLeague(
     // fixture compares `draftAt` (they compare against `matchesBrowseFilter`/`.id`, neither of
     // which reads it), so this only needs to satisfy `PublicLeagueSummary`'s shape.
     draftAt: "Thursday 10 September, 5:00 PM UTC",
+    // `seed()` above never sets `medianGame` — the schema default, `false`, always applies here.
+    medianGame: false,
   };
 }
 
@@ -175,9 +180,26 @@ describe("listPublicLeagues", () => {
       {
         id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0,
         teamCount: 12, filledTeams: 8, scoringLabel: "Standard", compositionCategory: "all_newcomers",
-        draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)",
+        draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)", medianGame: false,
       },
     ]);
+  });
+
+  // Task 3 (Phase 3.5): the eleventh field, the same disclosure decision `draftAt` and
+  // `scoringLabel` already are — a stranger who can't see it can't tell what game they'd join.
+  it("discloses whether the league plays a median game, honestly per league", async () => {
+    await seed({
+      id: "standard", name: "Standard Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    await seed({
+      id: "median", name: "Median Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true, medianGame: true,
+    });
+    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const byId = new Map(rows.map((row) => [row.id, row.medianGame]));
+    expect(byId.get("standard")).toBe(false);
+    expect(byId.get("median")).toBe(true);
   });
 
   it("discloses nothing beyond the named public fields", async () => {

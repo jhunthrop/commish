@@ -459,6 +459,8 @@ describe("invitePreview", () => {
         // `league()` creates with `clock` (`nowIso`, "2026-08-17T12:00:00.000Z"), so the draft
         // is scheduled 7 days out — `LEAGUE_CONFIG.defaults.draftDaysFromCreation`.
         draftAt: "Monday 24 August, 12:00 PM UTC (in 7 days)",
+        // `league()` seeds a plain, standard-shape league — no median game, no superflex.
+        formatNotes: [],
       },
     });
   });
@@ -477,6 +479,26 @@ describe("invitePreview", () => {
     const home = await leagueHome(db, created.leagueId, "u1");
 
     expect(home!.terms).toEqual(preview.terms);
+  });
+
+  // Task 3 (Phase 3.5): the invite preview is one of the two surfaces a prospect reads before
+  // committing — `formatNotes` must carry the median note here too, not just on league home.
+  it("notes the median game on the invite preview, for a league that plays one", async () => {
+    await db.insert(users).values(
+      Array.from({ length: 2 }, (_, i) => ({ id: `mu${i + 1}`, email: `mu${i + 1}@test.local`, displayName: `Manager ${i + 1}` })),
+    );
+    const created = await createLeague(writeDeps(), {
+      name: "Median League", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "mu1", teamName: "Commish",
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false, medianGame: true,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "mu1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const preview = await invitePreview(db, invite.code);
+    if (!preview.ok) throw new Error(preview.reason);
+    expect(preview.terms.formatNotes).toEqual(["Every team also plays the league median each week."]);
   });
 
   it("counts every seated team, not just the commissioner's", async () => {
