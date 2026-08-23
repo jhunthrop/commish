@@ -62,11 +62,15 @@ src/
   league-service/         League read/write service layer over Postgres: creation, invites,
                           schedule, lineups, results/standings, fill-trigger.ts (the sit-and-go
                           fill trigger, Phase 3.5 Task 7 — writes drafts.kickoff_at, never starts
-                          a draft itself; runs inside join.ts's own transaction), and trades
-                          (trades.ts — propose/withdraw/reject/accept, trade-transfer.ts — the
-                          roster move + locked-week materialization, trade-reversal.ts — the
-                          operator's compensating transfer). Consumed directly by app/api/leagues/**
-                          route handlers and by app/**/*.tsx Server Components.
+                          a draft itself; runs inside join.ts's own transaction), authority.ts (the
+                          LeagueAuthority discriminated union — member | house — and
+                          isCommissionerOf, Phase 3.5 addendum Task 12), house-factory.ts (the
+                          catalog reconciler — ensureHouseCatalog, spawnHouseLeagueInTx — Phase 3.5
+                          addendum Task 13), and trades (trades.ts — propose/withdraw/reject/accept,
+                          trade-transfer.ts — the roster move + locked-week materialization,
+                          trade-reversal.ts — the operator's compensating transfer). Consumed
+                          directly by app/api/leagues/** route handlers and by app/**/*.tsx Server
+                          Components.
   league-room/            The browser half of the league: the create/join/invite client
                           components and the trade surface (components/ — trade-composer.tsx,
                           trade-inbox.tsx, trade-card.tsx, reusing AdvisorPanel's shape), the
@@ -76,11 +80,14 @@ src/
                           browser-safe) for TRADE_CONFIG, describeAsset and isExpired.
   matchmaking/            Pure public-matchmaking rules: the browse filter, the cosmetic stake
                           tiers, MATCHMAKING_CONFIG.sitAndGo (the fill-trigger grace period,
-                          Phase 3.5 Task 7), and PublicLeagueSummary, the field-by-field privacy
-                          boundary of the app's ONE unauthenticated league read — twelve fields as
-                          of Phase 3.5 (medianGame, startTrigger joined draftAt). NO I/O. 100%
-                          coverage. Browser-safe, so src/league-room/** value-imports it directly,
-                          the same way src/chat-room/** value-imports @/chat.
+                          Phase 3.5 Task 7), house-catalog.ts (HOUSE_CATALOG, HouseRungName,
+                          HOUSE_RUNG_LABEL, houseKickoffFor — the house-league shelf's own
+                          declared vocabulary, Phase 3.5 addendum Task 13), and
+                          PublicLeagueSummary, the field-by-field privacy boundary of the app's ONE
+                          unauthenticated league read — thirteen fields as of the Phase 3.5
+                          addendum (medianGame, startTrigger, houseRung joined draftAt). NO I/O.
+                          100% coverage. Browser-safe, so src/league-room/** value-imports it
+                          directly, the same way src/chat-room/** value-imports @/chat.
   identity/               Pure identity rules: AvatarRef parsing over the three ref cases
                           (avatars.ts, eight code presets — no upload, no object store),
                           HelpLevel + the two-field PreferenceState (preferences.ts), the
@@ -244,7 +251,9 @@ docs/                     conventions.md (this), design-system.md, draft-engine.
                           decision records — audit-and-integrity.md, operators-and-moderation.md,
                           enforcement-and-tiers.md, formats-and-lobby.md — Phase 3.5's toggles,
                           the median's storage split, the pause/skip asymmetry, the KDS snapshot
-                          argument and the fill trigger, …)
+                          argument and the fill trigger, house-leagues.md — the Phase 3.5 addendum:
+                          the nullable-commissioner schema, the authority union, the catalog
+                          reconciler, …)
 scripts/                  Operator-run CLIs, never imported by src/**: seed (npm run seed),
                           audit:verify (verify-audit-chain.ts), reviews:remove
                           (remove-review.ts), admin:grant (grant-admin.ts, the only door
@@ -443,6 +452,8 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
 - Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**`, `src/integrity-service/**`, `src/league-service/**`, `src/draft-service/**`, `src/moderation/**`, `src/trades/**` and `src/participation/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — twenty-one gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. `src/league-service` and `src/draft-service` (gates 17 and 18) are gated for the identical service-layer reason; `src/moderation` (gate 19) is pure and gates for the reason every pure directory does; `src/trades` (gate 20) is pure and holds the one fairness function the write path calls inside a transaction, moved out of the coverage-ungated `src/ai-advisor/**` for exactly that reason (`docs/decisions/trades-and-fairness.md` §2); `src/participation` (gate 21, Phase 3 Plan D) is pure and holds the third tier vocabulary that decides who is a veteran, joining two plans early gated `src/league-service`/`src/draft-service`/`src/integrity`/`src/integrity-service` in covering by construction every directory this plan writes into. See `docs/decisions/operators-and-moderation.md` and `docs/decisions/enforcement-and-tiers.md`. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+
+**The gate count stays twenty-one through the Phase 3.5 addendum (house leagues) too.** Every module the addendum adds — `src/league-service/authority.ts`, `src/league-service/house-factory.ts`, `src/matchmaking/house-catalog.ts` — lands inside a directory already on the list above; `src/matchmaking` and `src/league-service` were both gated before this addendum existed, for reasons unrelated to it. No ninth pure-exempt directory and no twenty-second gate were needed because nothing new here is a directory-level concern — see `docs/decisions/house-leagues.md`.
 
 **Phase 3.5 added no gate — the count stays twenty-one.** Every pure module this phase wrote lands inside a directory already gated: `src/league/roster-shape.ts`, `src/league/median.ts` (gate 4); `src/draft-engine/pause.ts` (gate 2); `src/draft-service/slot-preference.ts` and `order.ts`'s KDS extension (gate 18); `src/league-service/fill-trigger.ts` (gate 17). `src/domain` gained one union member (`SUPERFLEX` on `RosterSlotType`) but stays ungated on the same standing reasoning it always has (`docs/decisions/formats-and-lobby.md`'s cross-cutting section): it holds types the whole product shares, a 100% claim over it is separate work, and this phase's one addition there is pinned by tests in the gated directories that actually consume it.
 - **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there. `playwright.config.ts` pins `workers: 1` and `fullyParallel: false`, so every run is one worker walking the suite in one deterministic, alphabetical file order — a real cross-spec ordering dependency, not a latent flake: `mobile-360.spec.ts`'s dispute-queue check depends on `league-lifecycle.spec.ts` having already run and resolved its own flag, sorting first only because its filename does. A spec relying on suite order names the file it depends on in its own comment, the way both of these do; running either spec in isolation (`npx playwright test mobile-360.spec.ts` alone) will not reproduce the count that spec asserts.

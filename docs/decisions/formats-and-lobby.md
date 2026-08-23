@@ -225,6 +225,41 @@ the two answers eventually disagree; asking it once, at the write boundary, is h
 **This is wrong only if** a private commissioner would rather the platform started their draft than
 press the button they already have — a preference no research behind this phase evidences.
 
+## 7. The house shelf (Phase 3.5 addendum, Task 14)
+
+The fill trigger above is one mechanism a member-created sit-and-go league can opt into.
+`docs/decisions/house-leagues.md` covers the addendum in full — the nullable-commissioner schema,
+the reconciler that keeps a catalog of platform-run leagues stocked, and the two commissioner doors
+a house league closes — but the shelf itself is the lobby surface this document already owns, so it
+gets a section here rather than only there.
+
+`listPublicLeagues` (`src/league-service/browse.ts`) now returns `{ leagues, house }`: `house` is a
+second query (`houseShelfQuery`), not a sort key folded into the first, because the member list and
+the house shelf answer different questions (`isNull(leagues.houseRung)` vs. `isNotNull`) and the
+shelf's own ordering rule differs from the member list's. `HouseLeagueShelf`
+(`public-league-list.tsx`) renders it above both the filters and the member list — "the house lobby
+is the front door," per the founder's own ruling, restated by this addendum's Task 14 step 2 and
+kept un-filterable on the identical §1 reasoning above: `houseShelfQuery` takes no `BrowseFilter`
+parameter at all, so there is no filter axis to loosen later by mistake.
+
+**The shelf's ordering corrects a claim this addendum's own plan made about itself.** Both
+`leagues_house_rung_idx`'s own docblock and `house-factory.ts`'s `openHouseLeaguesQuery` docblock
+originally assumed the shelf would read its order straight off that index's `(house_rung,
+created_at)` shape. That is true WITHIN one rung — a `scheduled` rung's kickoff is itself
+creation-ordered by its own stagger — but false ACROSS rungs, since `open_12` and `beginner_12`
+stagger on independent clocks. The shipped shelf orders `ORDER BY drafts.kickoff_at ASC` instead, a
+`Sort` node after the index's own filtering scan, and both docblocks were corrected in the same
+commit rather than left to describe a shelf that does not match what ships. `src/db/
+index-plans.test.ts` pins both the index scan and a mutation-proof `"Sort Key"` assertion, seeded
+with `kickoff_at` in the exact reverse of `created_at` so a regression back to trusting the index's
+own column order reddens the id-order assertion directly, not just the plan string.
+
+**No new filter axis, on the identical §1 reasoning: a house league's rung is a badge, not a
+narrowing control.** Every house league shares one canonical format, scoring preset and roster
+shape (`docs/decisions/house-leagues.md` §5), so the only fact worth stating per card is which rung
+and when it drafts — never a second copy of the format/scoring line the member card already
+carries, which would be identical on every house card and not worth printing twelve times.
+
 ## Cross-cutting: no new realtime event, no new coverage gate, no new config file
 
 **No new realtime event type.** The pause and the owed picks ride `DraftClockView`, which is
@@ -259,3 +294,13 @@ different default depending on which path set it, but the value itself is not ce
 every other default in this section is. Worth fixing the next time either file is touched for an
 unrelated reason; not fixed here, because Task 11 documents what shipped rather than quietly
 patching it mid-closeout.
+
+**Updated (Phase 3.5 addendum, Task 16): checked directly rather than assumed, this carry was not
+resolved by the addendum, and grew by one site rather than shrinking.** `creation.ts`'s
+`writeLeagueInTx` (Task 13's rewrite of `createLeague`'s write body) still falls back to `input.
+medianGame ?? false` twice — once for the `leagues` insert, once for the audit payload — and
+`HOUSE_CATALOG`'s own `CANON` (`src/matchmaking/house-catalog.ts:72`) hardcodes a third literal
+`medianGame: false` directly, because there is nothing centralized in `LEAGUE_CONFIG.defaults` for
+it to spread the way `format`, `teamCount`, `scoringPreset` and `rosterShape` all are. All three
+still agree, so no behavior bug exists, but the carry is now three literal `false`s rather than
+two. See `docs/decisions/house-leagues.md` §12.

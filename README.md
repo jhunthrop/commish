@@ -128,6 +128,15 @@ same `finalizeWeek` loop the other season leagues already run. Every one of
 these leagues stays small and immediately full on purpose: they are backstage proofs that a
 mechanism fires for real, not additional demo rooms meant to be browsed or joined.
 
+The seed's LAST step is `seedHouseCatalogDemo` (Phase 3.5 addendum, Task 15): it calls the real
+`ensureHouseCatalog` reconciler to stock the house shelf, fills one `open_12` league's actual
+shortfall through the real `joinPublicLeague` door with dedicated `dev_house_demo_NN` identities,
+then calls the reconciler again so a real replacement league opens with a fresh edition — the same
+"lobby is never empty" mechanism the running server's own ticker keeps proving, backstage rather
+than left to happen on its own the first time someone opens `/browse`. Re-running the seed is safe
+here too: the arc reads back each league's actual seat count rather than assuming an empty shelf,
+so a second `npm run seed` reports `0 new seat(s)` and an identical shelf width.
+
 The seed also grants **operator (dispute-queue) access** to that same account — team 1's owner,
 `DEV_SEED_CLAIM_USER_ID` if you set it, else the seed's first placeholder user — through the real
 `grantAdmin` writer, exactly what running `npm run admin:grant` by hand would produce (a real

@@ -25,6 +25,19 @@ and a `drafts` row already scheduled. A commissioner left holding a league they 
 in — or a league with no draft to open — is exactly the dead end this closes; there is no
 partial-league state to clean up after.
 
+**A league may have no member commissioner (Phase 3.5 addendum).** `CreateLeagueInput.owner` is a
+discriminated union, `{ kind: "member"; userId; teamName }` or `{ kind: "house"; rung }`, and the
+shared write body (`writeLeagueInTx`) both `createLeague` and the house catalog's own reconciler
+call handles both: a `house` owner gets no `teams` row at all (`teamId` is `null` in the result),
+and `leagues.commissioner_user_id` stays `NULL` while `leagues.house_rung` names the catalog rung
+instead — the two columns are mutually exclusive by a database CHECK, never by convention alone.
+What this changes for a member: nobody is ever the commissioner of a house league, including an
+operator — `isCommissionerOf` (`src/league-service/authority.ts`) returns `false` on a house
+league before comparing anything. The two doors that assumption used to gate — inviting someone,
+and moving the draft's scheduled time — both refuse instead, with their own sentences, rather than
+silently doing nothing or erroring generically. See `docs/decisions/house-leagues.md` for the full
+reasoning and `docs/decisions/formats-and-lobby.md` for the shelf a house league appears on.
+
 Every field but the name is defaulted from `LEAGUE_CONFIG.defaults` (`src/league/config.ts`):
 12 teams, snake format, half-PPR scoring, the standard roster shape, a draft scheduled
 `draftDaysFromCreation` (7) days out. Half-PPR, not full PPR, is the founder-decided canon
@@ -158,12 +171,23 @@ is in a league and who runs it, stated as a fact to every member who opens it ra
 inferred from which controls a particular viewer happens to see — before this panel there was no
 members list at all, only names scattered across standings, chat and the invite panel, none of
 which said who the commissioner was. It renders `LeagueHomeBody`'s `teams` (each carrying its raw
-`ownerUserId`) against `commissionerUserId`, doing the comparison client-side rather than trusting
-a server-computed `isCommissioner` boolean — see `docs/decisions/identity-and-trust.md`'s ruling on
-why a raw id is the right shape for this members-only wire. An unfilled seat reports as "N seats
-still open" (from `teamCount`), never as an absent row, because a commissioner deciding whether to
-send another invite needs that distinction. See `docs/decisions/identity-and-trust.md` for the full
-audit of where identity renders across the product, including this panel.
+`ownerUserId`) against the league's `authority: LeagueAuthority` (`src/league-service/
+authority.ts`), doing the comparison client-side rather than trusting a server-computed
+`isCommissioner` boolean — see `docs/decisions/identity-and-trust.md`'s ruling on why a raw id is
+the right shape for this members-only wire. An unfilled seat reports as "N seats still open" (from
+`teamCount`), never as an absent row, because a commissioner deciding whether to send another
+invite needs that distinction. See `docs/decisions/identity-and-trust.md` for the full audit of
+where identity renders across the product, including this panel.
+
+**When `authority.kind === "house"` (Phase 3.5 addendum), no row ever earns the "Commissioner"
+badge** — that follows from `isCommissionerOf` returning `false` for every caller, not from a
+special case in this component. Left silent, that would read as a bug (where did the commissioner
+go?) rather than a fact, so the panel states it instead: a "Run by Commish" line renders above the
+roster, with the shield icon this product already uses for "the platform acted on its own," plus an
+`InfoTip` opening the `house-league` glossary entry. What this changes for a member: there is no
+peer to ask for an invite code (the door refuses instead — see `docs/decisions/house-leagues.md`
+§6) and no peer who can move the draft's scheduled time — Commish sets it once, at the league's
+creation, on the same stagger every other league on that rung's shelf uses.
 
 ## The schedule
 
@@ -374,16 +398,31 @@ place. See `docs/decisions/formats-and-lobby.md` §6 for the full reasoning.
 
 **The privacy boundary.** `GET /api/public/leagues` is the one unauthenticated read in this
 application. What a stranger may learn is `PublicLeagueSummary` (`src/matchmaking/contract.ts`)
-and nothing else — twelve fields as of Phase 3.5: id, name, format, experience tier, stake tier,
-team count, filled count, `scoringLabel` (derived, never the raw weights), `compositionCategory`
-(the coarse participation-mix bucket), `draftAt` (an absolute-plus-relative sentence), `medianGame`
-(whether this league plays the median game) and `startTrigger` (`"scheduled" | "when_full"` — see
-below). No commissioner identity, no team or owner names, no invite code, no draft id, no
-standings, no rosters, no chat, no scoring settings. Three things enforce it: `is_public_matchmade`
-is opt-in and false by default, `listPublicLeagues` selects exactly the contract's columns, and a
-key-set test fails if the wire body ever grows a field the contract does not name. A league that
-is full, or whose draft has already started, is not listed at all: a card a visitor cannot act on
-is a dead end wearing a badge.
+and nothing else — thirteen fields as of the Phase 3.5 addendum: id, name, format, experience
+tier, stake tier, team count, filled count, `scoringLabel` (derived, never the raw weights),
+`compositionCategory` (the coarse participation-mix bucket), `draftAt` (an absolute-plus-relative
+sentence), `medianGame` (whether this league plays the median game), `startTrigger`
+(`"scheduled" | "when_full"` — see below) and `houseRung` (`HouseRungName | null` — non-null only
+on the house shelf's own rows, see below). No commissioner identity, no team or owner names, no
+invite code, no draft id, no standings, no rosters, no chat, no scoring settings. Three things
+enforce it: `is_public_matchmade` is opt-in and false by default, `listPublicLeagues` selects
+exactly the contract's columns, and a key-set test fails if the wire body ever grows a field the
+contract does not name. A league that is full, or whose draft has already started, is not listed
+at all: a card a visitor cannot act on is a dead end wearing a badge.
+
+**The house shelf (Phase 3.5 addendum, Task 14) is a second query, not a sort key on the first.**
+`listPublicLeagues` returns `{ leagues, house }`: `browseQuery`'s own `WHERE` excludes house
+leagues (`isNull(leagues.houseRung)`), and `houseShelfQuery` runs the mirror `isNotNull` predicate
+with its own ordering and takes no `BrowseFilter` parameter at all — not merely unfiltered by
+default, structurally unable to be narrowed. The shelf orders **soonest-draft-first across every
+rung** (`ORDER BY drafts.kickoff_at ASC`), not by `leagues_house_rung_idx`'s own `created_at`
+column — the two coincide within one rung, since a `scheduled` rung's kickoff is itself
+creation-ordered by its stagger, but not across rungs, since `open_12` and `beginner_12` stagger on
+independent clocks. `HouseLeagueShelf` (`public-league-list.tsx`) renders it above the filters and
+the member list, one card per open house league, and prints "A new league opens as soon as one
+fills, so there is always a seat." beneath the shelf once — a promise `HOUSE_CATALOG`'s own
+reconciler (`ensureHouseCatalog`, `src/league-service/house-factory.ts`) is what makes true by
+construction. See `docs/decisions/house-leagues.md` for the schema and reconciler this shelf reads.
 
 **A `when_full` league shows a sentence, not a date.** Its stored `kickoff_at` is a placeholder
 until the sit-and-go fill trigger rewrites it (below), and rendering that placeholder as a real

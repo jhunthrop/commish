@@ -32,6 +32,14 @@ phase, or move a dependency edge. A reader who finds a "3.5" in a commit message
 full story reads that plan file directly; this line exists so they know where to look without
 reading it first.
 
+`docs/superpowers/plans/2026-08-22-phase3p5-addendum-house-leagues.md` is that pass's own addendum:
+a founder-ordered "view and join, like FFPC and Apex" house-league lobby — a catalog of
+platform-run leagues on a nullable-commissioner schema, kept stocked by a reconciler, always with a
+seat open. Same non-renumbering rule as its parent: no phase, no dependency edge, nothing else in
+this table moves. `docs/decisions/house-leagues.md` is the addendum's own decision doc, for a
+reader who finds "house league" in a commit message and wants the full story without reading the
+plan file first.
+
 ## Cross-phase dependency graph
 
 ```
