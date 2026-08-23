@@ -193,7 +193,11 @@ test.describe("formats and lobby", () => {
     // The commissioner's own press — the real `POST /api/drafts/[draftId]/start` route, exactly
     // `league-lifecycle.spec.ts`'s own "Start the draft" journey.
     await managerA.getByRole("button", { name: "Start the draft" }).click();
-    await expect(managerA.getByRole("link", { name: "Join the draft" })).toBeVisible();
+    // Scoped to `main` (Task 2's shell): the rail's own crest for every needs-you league on this
+    // account also carries "Join the draft" as a substring of its accessible name (Step 1's own
+    // requirement), so on an account with more than one such league the bare locator matches
+    // more than this page's own link.
+    await expect(managerA.locator("main").getByRole("link", { name: "Join the draft" })).toBeVisible();
 
     // The panel's own initial props are seeded once, server-side, and starting the draft never
     // pushes a fresh `assignedSlot` down to it — a reload is what re-fetches the now-drawn

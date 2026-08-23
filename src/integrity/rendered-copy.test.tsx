@@ -147,7 +147,7 @@ describe("the league activity page says nothing that breaks the house copy rules
     const { leagueNameFor } = await import("@/draft-service/teams");
     const { listLeagueActivity } = await import("@/integrity-service/activity");
     const { listNotices } = await import("@/integrity-service/notify");
-    const { default: LeagueActivityPage } = await import("@/app/app/leagues/[leagueId]/activity/page");
+    const { default: LeagueActivityPage } = await import("@/app/app/(shell)/leagues/[leagueId]/activity/page");
 
     vi.mocked(requireCurrentUser).mockResolvedValue({
       id: "u1", email: "u1@test.local", displayName: "Ada Lovelace", experienceTier: "beginner", avatarUrl: null,

@@ -18,7 +18,7 @@ export const dynamic = "force-dynamic";
  * caller, never a redirect, and the same error boundary every other gated route gets.
  *
  * `HomeBoard` (`@/league-room/components/home-board.tsx`) polls this on an interval, so it
- * answers the exact same `HomeBody` shape `AppHome` (`@/app/app/page.tsx`) server-renders —
+ * answers the exact same `HomeBody` shape `AppHome` (`@/app/app/(shell)/page.tsx`) server-renders —
  * one shape, whichever path produced it, `firstRun` included: this route computes it the same
  * way `AppHome` does, from the SAME two inputs (`readPreferences`, the caller's own league
  * count), rather than trusting `crossLeagueHome` to know about preferences it was never given.

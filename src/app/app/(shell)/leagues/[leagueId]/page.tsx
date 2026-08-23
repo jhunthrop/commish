@@ -4,7 +4,6 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
 import { leagueHome, lineupView } from "@/league-service";
 import { LeagueHome } from "@/league-room/components/league-home";
-import { TopBar } from "@/components/app-shell/top-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +36,9 @@ interface PageProps {
  * Phase 3.5, Task 8: `WaitingRoom` (a `when_full` draft's own surface) rides `home.draftSchedule`
  * and `home.teamCount` — both already part of this render — the same way `DraftSchedulePanel`
  * always has; `LeagueHome` is where the two are told apart, not this page.
+ *
+ * Renders no `TopBar` of its own (Task 2 Step 5) — `(shell)/layout.tsx` renders `AppShell`,
+ * which supplies it once for every page in this route group.
  */
 export default async function LeaguePage({ params }: PageProps) {
   const user = await requireCurrentUser();
@@ -50,10 +52,5 @@ export default async function LeaguePage({ params }: PageProps) {
       ? null
       : await lineupView(getDb(), { leagueId, teamId: home.myTeamId, weekNumber: home.currentWeek });
 
-  return (
-    <>
-      <TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
-      <LeagueHome home={home} lineup={lineup} helpLevel={preferences.helpLevel} />
-    </>
-  );
+  return <LeagueHome home={home} lineup={lineup} helpLevel={preferences.helpLevel} />;
 }

@@ -7,7 +7,6 @@ import { listLeagueActivity } from "@/integrity-service/activity";
 import { listNotices, quoteFor } from "@/integrity-service/notify";
 import { InfoTip, PageTitle } from "@/components/ui";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
-import { TopBar } from "@/components/app-shell/top-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -39,6 +38,9 @@ function parseBefore(raw: string | null): number | undefined {
  * (`@/league-service/join.ts`) and `LeaguePage` already use. A 403 would confirm that a guessed
  * league id names a real league; a 404 means the same thing whether the id is wrong or the
  * caller just isn't a member of a real league.
+ *
+ * Renders no `TopBar` and no `<main>` of its own (Task 2 Step 5) — `(shell)/layout.tsx` supplies
+ * both, once, for every page in this route group.
  */
 export default async function LeagueActivityPage({ params, searchParams }: PageProps) {
   const user = await requireCurrentUser();
@@ -66,46 +68,43 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
 
   return (
     <>
-      <TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
-        <header className="flex flex-col gap-1">
-          <PageTitle>League activity</PageTitle>
-          <p className="text-sm text-text-muted">{leagueName}</p>
-        </header>
+      <header className="flex flex-col gap-1">
+        <PageTitle>League activity</PageTitle>
+        <p className="text-sm text-text-muted">{leagueName}</p>
+      </header>
 
-        {leagueNotices.length === 0 ? null : (
-          <section className="flex flex-col gap-2" aria-label="What the platform did">
-            <h2 className="text-lg font-medium text-text-primary">What the platform did</h2>
-            <ul className="flex flex-col">
-              {leagueNotices.map((notice) => {
-                const quote = quoteFor(notice);
-                return (
-                  <li key={notice.id} className="flex flex-col gap-1 border-b border-line py-3 last:border-b-0">
-                    <p className="break-words font-medium text-text-primary">{notice.title}</p>
-                    <p className="break-words text-sm text-text-muted">
-                      {notice.body}
-                      {notice.noticeType === "draft_auto_picked" ? <InfoTip term="queue" className="ml-1" /> : null}
-                    </p>
-                    {/* Fix round 1, FIX 7, as corrected: the author-facing PHRASE the stored
-                        reason maps to (`quoteFor`), laid out as a real quotation rather than
-                        folded into `body`'s own sentence. Never the stored token. */}
-                    {quote === null ? null : (
-                      <blockquote className="break-words border-l-2 border-line pl-3 text-sm italic text-text-muted">{`"${quote}"`}</blockquote>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-        )}
+      {leagueNotices.length === 0 ? null : (
+        <section className="flex flex-col gap-2" aria-label="What the platform did">
+          <h2 className="text-lg font-medium text-text-primary">What the platform did</h2>
+          <ul className="flex flex-col">
+            {leagueNotices.map((notice) => {
+              const quote = quoteFor(notice);
+              return (
+                <li key={notice.id} className="flex flex-col gap-1 border-b border-line py-3 last:border-b-0">
+                  <p className="break-words font-medium text-text-primary">{notice.title}</p>
+                  <p className="break-words text-sm text-text-muted">
+                    {notice.body}
+                    {notice.noticeType === "draft_auto_picked" ? <InfoTip term="queue" className="ml-1" /> : null}
+                  </p>
+                  {/* Fix round 1, FIX 7, as corrected: the author-facing PHRASE the stored
+                      reason maps to (`quoteFor`), laid out as a real quotation rather than
+                      folded into `body`'s own sentence. Never the stored token. */}
+                  {quote === null ? null : (
+                    <blockquote className="break-words border-l-2 border-line pl-3 text-sm italic text-text-muted">{`"${quote}"`}</blockquote>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
 
-        {/* Fix round 1, FIX 5: the persona panel's high-stakes-veteran question, answered
-            plainly rather than left implicit in `lineup_change` simply never appearing here for
-            anyone but its own actor. */}
-        <p className="text-sm text-text-muted">Lineup changes appear only in your own history. Nobody else in this league can see them.</p>
+      {/* Fix round 1, FIX 5: the persona panel's high-stakes-veteran question, answered
+          plainly rather than left implicit in `lineup_change` simply never appearing here for
+          anyone but its own actor. */}
+      <p className="text-sm text-text-muted">Lineup changes appear only in your own history. Nobody else in this league can see them.</p>
 
-        <ActivityFeed rows={activity.rows} leagueId={leagueId} nextBefore={activity.nextBefore} />
-      </main>
+      <ActivityFeed rows={activity.rows} leagueId={leagueId} nextBefore={activity.nextBefore} />
     </>
   );
 }

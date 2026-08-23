@@ -86,7 +86,12 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // the way a commissioner would, no direct API call.
   await managerA.goto(`/app/leagues/${leagueId}`);
   await managerA.getByRole("button", { name: "Start the draft" }).click();
-  const draftHref = await managerA.getByRole("link", { name: "Join the draft" }).getAttribute("href");
+  // Scoped to `main` (Task 2's shell): the rail's own crest for a needs-you league now ALSO
+  // carries "Join the draft" as a substring of its accessible name (Step 1's own requirement —
+  // the crest names the league AND the action), so on an account with several such leagues the
+  // bare locator below matches every one of them plus this page's own link. `main` is the
+  // content column the shell renders this page's own content into; the rail is a sibling `<nav>`.
+  const draftHref = await managerA.locator("main").getByRole("link", { name: "Join the draft" }).getAttribute("href");
   const draftId = draftHref!.split("/").pop()!;
 
   // --- Both managers watch the same board -------------------------------------------------

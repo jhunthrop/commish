@@ -6,7 +6,6 @@ import { leagueHome, matchupWeek } from "@/league-service";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import type { MatchupLineupEntry, MatchupWeekBody, TradeCounterpartyOption, TradeRoomContext, TradeRosterPlayer } from "@/league-room/contract";
 import { TradeInbox } from "@/league-room/components/trade-inbox";
-import { TopBar } from "@/components/app-shell/top-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -47,6 +46,9 @@ function rostersByTeamId(week: MatchupWeekBody): Readonly<Record<string, readonl
  * `TradeComposer`'s counterparty picker needs. `matchupWeek` is read second, for the SAME roster
  * data `MatchupWeekPage` already assembles — this task reuses it rather than adding a new roster
  * route (Task 8's own docblock: "it reuses rather than invents").
+ *
+ * Renders no `TopBar` and no `<main>` of its own (Task 2 Step 5) — `(shell)/layout.tsx` supplies
+ * both, once, for every page in this route group.
  */
 export default async function TradesPage({ params }: PageProps) {
   const user = await requireCurrentUser();
@@ -71,19 +73,16 @@ export default async function TradesPage({ params }: PageProps) {
 
   return (
     <>
-      <TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
-        <header className="flex flex-col gap-1">
-          <PageTitle>Trades</PageTitle>
-          <p className="text-sm text-text-muted">{home.name}</p>
-          {/* Persona panel (commissioner, step 4): founder decision #6 ships immediate execution
-              with no approval step and no veto window, a real departure from platforms where a
-              commissioner can deny a trade. Said plainly, here, rather than left for a
-              commissioner to discover the first time they try to stop one and can't. */}
-          <p className="text-sm text-text-muted">Trades complete as soon as both sides agree. There&apos;s no review step, for anyone.</p>
-        </header>
-        <TradeInbox leagueId={leagueId} context={context} />
-      </main>
+      <header className="flex flex-col gap-1">
+        <PageTitle>Trades</PageTitle>
+        <p className="text-sm text-text-muted">{home.name}</p>
+        {/* Persona panel (commissioner, step 4): founder decision #6 ships immediate execution
+            with no approval step and no veto window, a real departure from platforms where a
+            commissioner can deny a trade. Said plainly, here, rather than left for a
+            commissioner to discover the first time they try to stop one and can't. */}
+        <p className="text-sm text-text-muted">Trades complete as soon as both sides agree. There&apos;s no review step, for anyone.</p>
+      </header>
+      <TradeInbox leagueId={leagueId} context={context} />
     </>
   );
 }

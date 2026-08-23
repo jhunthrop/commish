@@ -23,6 +23,10 @@ import { WaitingRoom } from "./waiting-room";
  * fetch, and every value it renders (`currentWeek`, `myMatchup`, `standings`, `clinched`,
  * `locked`) arrives already computed by `src/league/**` on the server. Keeping the
  * composition here rather than inside `page.tsx` is what makes it testable.
+ *
+ * Renders no `<main>` of its own (Task 2 Step 5) — `(shell)/layout.tsx`'s `AppShell` already
+ * supplies the one `<main>` (full-bleed, `flex flex-col gap-6`) every page in this route group
+ * renders into; this component's own top-level wrapper would be a second, redundant one.
  */
 export function LeagueHome({
   home,
@@ -38,7 +42,7 @@ export function LeagueHome({
   const clinched = home.standings.some((row) => row.teamId === home.myTeamId && row.clinched);
 
   return (
-    <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
+    <>
       <header className="flex flex-col gap-1">
         <PageTitle>{home.name}</PageTitle>
         <p className="text-sm text-text-muted">
@@ -163,6 +167,6 @@ export function LeagueHome({
           member with extra buttons, not an operator, so this sits behind the identical
           `isCommissioner` gate `InvitePanel` already does, right beside it. */}
       {home.isCommissioner ? <ModerationSummary leagueId={home.leagueId} /> : null}
-    </main>
+    </>
   );
 }
