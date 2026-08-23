@@ -3,10 +3,14 @@ import { fail } from "@/lib/api/respond";
 import { requireAdmin, type CurrentUser } from "@/lib/auth/current-user";
 
 type AdminHandler = (operatorUserId: string, request: Request) => Promise<Response>;
-/** The FULL operator, not just an id: a page needs `displayName`/`avatarUrl` for `TopBar`
- *  the same way every other page under `/app` does, and `withAdmin` already paid for the one
- *  `getCurrentUser` round trip `requireAdmin` makes — a second lookup for the same row would be
- *  the N+1 every batched-lookup discipline in this codebase exists to avoid. */
+/** The FULL operator, not just an id: Task 2's shell means neither of today's two callers
+ *  (`AdminQueuePage`, `AdminFlagDetailPage`) reads a field of it themselves anymore —
+ *  `(shell)/layout.tsx` renders `TopBar` now, off its own `requireCurrentUser` call, not off
+ *  this one. This stays the full row rather than narrowing to an id because a future admin page
+ *  that DOES need an operator field (a name on an audit line, an avatar beside a decision) gets
+ *  it for free from the same `getCurrentUser` round trip `requireAdmin` already paid for —
+ *  narrowing now and widening again the first time one is needed would be exactly the kind of
+ *  churn the batched-lookup discipline in this codebase exists to avoid. */
 type AdminPageRender<T> = (operator: CurrentUser) => Promise<T>;
 
 /**

@@ -184,17 +184,40 @@ Shadows are theme-independent on purpose: a shadow is cast light, and on the dar
   source of truth without being one. If either scale ever needs to diverge from Tailwind's
   default, it belongs in `TOKENS` AND in `@theme inline`'s alias block at the same time.
 
-## Layout: pages vs. rooms
+## Layout: shell pages, rooms, public pages, and prose
 
-Two shapes, and a surface is one or the other — never a blend.
+Four shapes. A surface is exactly one of them — never a blend.
 
-**A page is a document.** Centered `max-w-*` container, normal page scroll, one `<h1>`,
-content flowing down it. Everything under `/app/**` except the draft room is a page.
+**A `(shell)` page is full-bleed.** `AppShell` (`src/components/app-shell/app-shell.tsx`),
+rendered once by `src/app/app/(shell)/layout.tsx`, supplies the one `<main>` every page in that
+route group renders into: a `px` gutter from the spacing scale, normal page scroll, and **no
+`max-w-*` at all** — the founder's brief in one deletion. A page drops its own chrome and its
+own container entirely; it returns its content alone. Nine pages live here today (the locker
+room, `/app/leagues`, a league's home, its activity, its trades, a week's matchups, the profile,
+the operator queue, a flag's detail).
 
 **A room is a frame.** A `100dvh`, `overflow-hidden` grid of fixed bands and scrolling
 regions; the page itself never scrolls, every region that can outgrow its band scrolls inside
-itself, and nothing reflows when state changes. The draft room and the TV board are the only
-rooms today (`RoomLayout`, `docs/draft-room.md`).
+itself, and nothing reflows when state changes. A room renders no shell at all — the draft room
+(`src/app/app/(room)/drafts/[draftId]`) and the TV board decline `(shell)/layout.tsx` by living
+outside its route group entirely, because `RoomRail`'s own full-height header IS the room's
+chrome, and two chromes stacked would break the no-page-scroll contract (`RoomLayout`,
+`docs/draft-room.md`).
+
+**A signed-out public page carries its own slim chrome, not the shell.** `/browse`,
+`/reviews` and `/app/join/[code]` are reachable without a session; a signed-in shell around a
+page a stranger can land on would be chrome nobody signed out can use, and the rail's leagues
+would be somebody's private list drawn beside a link anyone with the URL can open. Signed out,
+these three render their own plain header (`PublicBar`, once the addendum's Task 16 ships) —
+never `AppShell`. `/browse` and `/reviews` sit outside `/app` entirely, so when there IS a user
+they call `shellData` and render `AppShell` themselves, the same function `(shell)/layout.tsx`
+calls, never a second bespoke read.
+
+**Long-form reading is full-bleed frames, measured paragraphs.** A `(shell)` page's `<main>`
+has no `max-w-*`, but a 2000px line of body text is not density — it is a defect. A surface
+whose job is prose (the review feed, the glossary, a legal page) keeps a `max-w-prose` on its
+own paragraph column only, never on the frame around it. The frame is always full-bleed; only
+the words a person reads line-by-line ever get measured.
 
 Three rules any future room follows:
 
