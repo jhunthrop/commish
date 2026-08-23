@@ -1,4 +1,5 @@
 import { TOKENS, type ColorRole, type PositionColorRole, type ThemeName } from "./tokens";
+import { UI_CONFIG } from "@/components/ui/config";
 
 /** Namespace for every generated CSS custom property, so `@theme inline` aliases in
  * globals.css can reference a distinct source variable instead of aliasing a name to itself. */
@@ -41,7 +42,17 @@ function scaleVars(prefix: string, obj: Readonly<Record<string, number | string>
     .join("\n");
 }
 
-/** Renders TOKENS as CSS custom properties. Deterministic: same TOKENS → identical text. */
+/**
+ * Renders TOKENS as CSS custom properties. Deterministic: same TOKENS → identical text.
+ *
+ * Both themes are first-class (founder ruling, 2026-08-23 — revised ruling 1): light values on
+ * `:root`, dark values under `:root[data-theme="dark"]` AND under `prefers-color-scheme: dark`
+ * guarded by `:not([data-theme="light"])` — an explicit choice always wins, and with no choice
+ * the OS preference does. The dense type scale is the one thing that varies by viewport rather
+ * than by theme: it lands in its own `:root` block inside
+ * `@media (min-width: UI_CONFIG.shell.denseFromPx)`, so a component never writes
+ * `text-sm lg:text-xs` — density is a property of the viewport, expressed once, here.
+ */
 export function renderTokensCss(): string {
   const i = "  ";
   return [
@@ -64,6 +75,12 @@ export function renderTokensCss(): string {
     "@media (prefers-color-scheme: dark) {",
     '  :root:not([data-theme="light"]) {',
     themeVars("dark", i + i),
+    "  }",
+    "}",
+    "",
+    `@media (min-width: ${UI_CONFIG.shell.denseFromPx}px) {`,
+    "  :root {",
+    scaleVars("font-size", TOKENS.font.sizeDense, "px", i + i),
     "  }",
     "}",
     "",

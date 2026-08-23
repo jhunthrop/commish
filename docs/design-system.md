@@ -2,16 +2,29 @@
 
 **Read this before building any user-visible surface**, alongside `docs/conventions.md`. Everything here is enforced by tests where it can be, and by review where it can't.
 
-## Identity: the Poster Board
+## Identity: the room, not the poster
 
-Commish looks like **the draft board** — the physical draft-kit poster taped to a wall, with a colored sticker for every pick. That is the product's one visual idea, and everything else follows from it:
+v2 (Phase 3.6) retones the product: dark is now the flagship identity, a room at night rather
+than a poster in daylight — a near-black ground, cool-neutral panels stepping up in depth, one
+green that means both "live" and "good," six re-derived position pigments. **Both themes are
+still first-class** (founder ruling, 2026-08-23): the plan that shipped v2 briefly ruled the
+product dark-only, and the founder overruled it directly — dark is the approved mocks' identity,
+and light is **designed** to the same nineteen roles and the same contrast thresholds, never
+inverted from dark by formula. `ThemeProvider` (`system | light | dark`) is unchanged by any of
+this; only the palette each theme paints with is new.
 
-- **Light is the identity.** Off-white poster stock, near-black ink, a pencil hairline rule. The color in the interface comes almost entirely from the position stickers; the chrome stays quiet so they can shout.
-- **Dark is the same board at night.** A warm-neutral charcoal wall, chalk lettering, the same six markers brightened until they read against it. Not an inversion — the same object under different light.
-- **The board is the hero.** `DraftBoard` is the largest, loudest thing in the draft room. Everything else (pool, rosters, history) is support.
-- **Condensed display type is the board's voice.** Barlow Condensed for anything that would be hand-lettered on a poster: board headers, sticker names, the clock, page and team titles.
+- **The room is the hero.** Depth comes from four surface steps (`surface` → `surfaceElevated` →
+  `surfaceRaised` → `surfaceInset`) rather than from a single card border; a panel earns its
+  place by sitting at a different depth, not by drawing a heavier line around itself.
+- **One green, two jobs.** `accent` (an action) and `positive` (a good outcome) are the exact
+  same hex in both themes, deliberately — see "One pigment, two jobs" below for the rule that
+  keeps the doubling from becoming a bug.
+- **A hairline separates; an edge bounds.** `line` is decorative (<3:1, never the boundary of a
+  control) and `edge` is interactive (≥3:1, WCAG 1.4.11) — two roles where v1 only had one.
+- **One type family, two roles.** Geist for both `font-sans` and `font-display`; the display
+  face is distinguished by a tighter letter-spacing, not a different typeface. See "Type" below.
 
-Default theme is still `system`; both themes are first-class and both are tested.
+Default theme is still `system`; both themes are designed and tested.
 
 ## Principles
 - **Delightful, not merely functional.** The product thesis (strategy doc §4) is that this category feels flat and we won't. Optimistic UI, celebration moments, motion with intent.
@@ -28,7 +41,9 @@ This two-layer scheme (generated `--commish-*` source vars → `@theme inline` T
 
 **No raw hex, no raw px, no arbitrary values in feature code.** `src/design/tokens.ts` is the only file in the repo allowed to contain a color literal. The one sanctioned exception: `draft-room.tsx`'s collapsed chat toggle uses `lg:[writing-mode:vertical-rl]` to rotate its "Show chat" label — Tailwind has no `writing-mode` utility, so there is no non-arbitrary spelling available, and the rest of that button's classes still come from the spacing scale.
 
-### One pigment, two jobs
+The rule has been enforced by review since Phase 1; `src/design/no-raw-color.source.test.ts` (Phase 3.6, Task 1) is what enforces it by test — a directory-derived sweep of every `.tsx` under `src/components`, `src/league-room`, `src/draft-room`, `src/chat-room`, `src/account-room`, `src/admin-room` and `src/app`, failing on a hex literal, an `rgb(`/`rgba(` literal, or a Tailwind arbitrary-value bracket that contains one (the last is caught for free, since the first two patterns match inside a bracket exactly as they do anywhere else).
+
+### One pigment, two (or three) jobs
 
 The palette is **six pigments**, and four of them carry a semantic role as well as a position.
 Values live in exactly one place, `src/design/tokens.ts` (`lightPigments`/`darkPigments`) — this
@@ -37,36 +52,61 @@ doc names the roles, not the hexes, so a palette tune never leaves it stale:
 | pigment | position | semantic role |
 |---|---|---|
 | whistle | QB | `negative` |
-| leaf | RB | `positive` |
-| marker | WR | `accent` |
+| leaf | RB | `positive` (== `accent`) |
+| marker | WR | `info` |
 | clay | TE | `warning` |
 | grape | K | — |
 | slate | DEF | — |
 
+**v2 retone:** `accent` and `positive` became the same green, deliberately (see "Color roles"
+below) — the product's identity is that a live game and a live action are the same energy. That
+collapse is what moved `marker` (WR) off `accent`: sharing one hex between `leaf` (RB) and
+`marker` (WR) would make the two stickers indistinguishable, which the pairwise sticker test
+exists to catch. `marker` doubles as `info` instead — still one pigment with a semantic job,
+just a different one than before.
+
 The doubling is deliberate: a real draft kit has one pack of markers, and reusing them is what makes the board and the chrome look like one object. It is safe only because **the two uses never share a context** — a position color appears exclusively inside a `PositionBadge` or a draft-board sticker, and a semantic color never appears inside either. Breaking that rule (a red "Drafted" chip next to a red QB sticker) is what would make the doubling a bug instead of a system.
+
+**Green is a fill only when it is an action.** The `accent`/`positive` doubling has its own
+sharper rule, because unlike the position doubling, `accent` and `positive` CAN appear in the
+same view: a positive outcome is green as text, a glow (`accentGlow`) or a meter fill — never as
+a solid button-shaped block. A `bg-positive` chip beside a `bg-accent` button is exactly the bug
+this rule exists to prevent, because a viewer would read both as the same action.
 
 ### Color roles
 
 Values live in `src/design/tokens.ts` (`light`/`dark` palettes) — read them there, not here;
 this table is the meaning of each role, which is the part a doc can keep true across a
-palette tune.
+palette tune. v2 (Phase 3.6, Task 1) retoned every role and added seven: `surfaceRaised`,
+`surfaceInset`, `edge`, `textFaint`, `accentGlow`, `warningGlow`, `info`. **`border` is renamed
+to `line`** — a compile-forced sweep across every `border-border` utility, because v2 needs two
+boundary concepts a single name could not carry: a decorative hairline (`line`, <3:1) and an
+interactive edge (`edge`, ≥3:1, WCAG 1.4.11). Leaving the old name on the decorative role would
+have every future control's boundary quietly fail contrast.
 
 | role | used for |
 |---|---|
-| `surface` | the page — poster stock / board wall |
-| `surfaceElevated` | cards, tables, panels |
-| `border` | the pencil hairline (≥3:1 vs `surface`) |
-| `textPrimary` | ink / chalk |
+| `surface` | the page — the ground |
+| `surfaceElevated` | a panel |
+| `surfaceRaised` | a row hover, a field, a nested tile |
+| `surfaceInset` | a track, a slot well, an unfilled meter |
+| `line` | the decorative hairline between two surfaces (<3:1 vs `surface` — NOT a control boundary) |
+| `edge` | the boundary of a control a user must find (≥3:1 vs every surface) |
+| `textPrimary` | primary text |
 | `textMuted` | secondary text |
-| `accent` | interactive: links, primary buttons, focus rings |
+| `textFaint` | tertiary text — card meta, step captions, table subs |
+| `accent` | interactive: links, primary buttons, focus rings. **Same hex as `positive`** |
 | `accentText` | the label ON an accent fill |
-| `positive` | good outcome (never the brand color) |
+| `accentGlow` | a translucent accent tint — a live-state ring, a highlighted row |
+| `positive` | good outcome, as text/glow/meter fill only — **never a solid fill** (see "One pigment, two jobs") |
 | `negative` | failure, destructive |
 | `negativeText` | the label ON a negative fill |
 | `warning` | caution — e.g. the clock tightening |
+| `warningGlow` | a translucent warning tint |
+| `info` | informational — neutral notices, the WR sticker's semantic pairing |
 | `scrim` | modal backdrop (used at `bg-scrim/50`) |
 
-Tailwind aliases: `bg-surface`, `bg-surface-elevated`, `border-border`, `text-text-primary`, `text-text-muted`, `bg-accent text-accent-text`, `text-accent`, `text-positive` / `text-negative` / `text-warning`, `bg-scrim`.
+Tailwind aliases: `bg-surface`, `bg-surface-elevated`, `bg-surface-raised`, `bg-surface-inset`, `border-line`, `border-edge`, `text-text-primary`, `text-text-muted`, `text-text-faint`, `bg-accent text-accent-text`, `text-accent`, `bg-accent-glow`, `text-positive` / `text-negative` / `text-warning` / `text-info`, `bg-warning-glow`, `bg-scrim`.
 
 **Semantic-on-fill:** when a semantic color is used as a fill (`bg-negative`), pair it with its `-text` role (`text-negative-text`) for the label — never a raw white or black.
 
@@ -82,7 +122,7 @@ Tailwind aliases: `bg-surface`, `bg-surface-elevated`, `border-border`, `text-te
 
 `<role>` is `qb | rb | wr | te | k | def`.
 
-In light, every sticker is a dark marker with a white label, and `text` equals `sticker`. In dark, five stickers are bright with a near-black label — but **DEF stays dark** (chalk label, and a brightened steel for its `text` variant — see `darkPositions.def` in `src/design/tokens.ts`), because DEF's meaning is "no color of its own" and a bright slate would be indistinguishable from the WR blue beside it.
+In light, five stickers are dark, saturated markers with a white label, and `text` equals `sticker`. In dark, the same five are bright with a near-black label. **DEF is the quiet one in both, inverted:** in dark it stays a dark, muted fill with a chalk label and a separate brightened `text` variant (raw fill too dark to read as text); in light it is a pale, muted fill with a dark label and a separate darkened `text` variant (raw fill too light to read as text) — see `darkPositions.def`/`lightPositions.def` in `src/design/tokens.ts`. DEF's meaning is "no color of its own," and giving it the same treatment as the other five would make it indistinguishable from whichever sticker sits beside it.
 
 **`PositionBadge` is the only way to render a position label; `Sticker` is the only way to render a position-pigmented tile.** `Sticker` (`src/components/ui/sticker.tsx`) owns the sticker look — rounded corner, `shadow-sticker`, fill via `positionStickerClass` — and is what `DraftBoard`'s pick cells and the landing page's showcase board both build on. Nothing else may reach for `bg-pos-*` directly. A bare `"QB"` string in a table cell is a bug.
 
@@ -92,18 +132,40 @@ In light, every sticker is a dark marker with a white label, and `text` equals `
 
 ### Type
 
-Two faces, one rule.
+Two faces, one family (v2, Task 1: `Barlow_Condensed` is removed — the condensed poster face was
+the single strongest "this is a prototype" signal in the pre-v2 product).
 
 | face | variable | Tailwind | for |
 |---|---|---|---|
 | body | `--font-geist-sans` | `font-sans` (default) | everything you read in sentences |
-| display | `--font-barlow-condensed` | `font-display` | board headers, sticker names, the clock, page titles, team names |
+| display | `--font-geist-sans` | `font-display` | board headers, sticker names, the clock, page titles, team names |
 | mono | `--font-geist-mono` | `font-mono` | clock digits, tabular numbers |
 
-**Never set the display face on a paragraph.** It is a lettering face, not a reading face.
+`font-display` **keeps its name and every call site** from before the retone — it now resolves to
+the same Geist family as `font-sans`, distinguished only by `letter-spacing: -0.02em` (a plain
+CSS rule on `.font-display` in `globals.css`, since Tailwind's generated font-family utility
+carries no tracking of its own). **Never set the display face on a paragraph.** It is a
+lettering face, not a reading face.
 
-Body scale (`--text-*`): `xs 12 · sm 14 · md 16 · lg 18 · xl 22 · 2xl 28 · 3xl 36`.
-Display scale (`--text-display-*`), a deliberately separate scale: `sm 20 · md 28 · lg 40 · xl 64`, with `leading-display` (1.05). A display size is never a substitute for a body size at the same px.
+`font-mono` gained one rule the mocks apply everywhere and the pre-v2 product applied nowhere:
+`font-variant-numeric: tabular-nums` is on `.font-mono` itself, so a score that changes never
+shifts the column beside it.
+
+**The type scale has two emissions from one source of truth**, `TOKENS.font.size` /
+`TOKENS.font.sizeDense` — the mocks are 13–14px dense on desktop, and that density is deliberate,
+but a 13px body on a 360px phone is not. `renderTokensCss` emits `size` on `:root` and
+`sizeDense` a second time inside `@media (min-width: UI_CONFIG.shell.denseFromPx)`, so a
+component never writes `text-sm lg:text-xs` — density is a property of the viewport, expressed
+once, in the generated stylesheet. Both scales carry the same keys; a key present in one and
+missing from the other is a size that silently stops responding, and `generate-css.test.ts`
+asserts they match.
+
+Body scale (`--text-*`): `xs 12 · sm 13.5 · md 15 · lg 17 · xl 20 · 2xl 26 · 3xl 34`, densifying
+at `UI_CONFIG.shell.denseFromPx` to `xs 11 · sm 12.5 · md 13.5 · lg 15 · xl 17 · 2xl 22 · 3xl 30`.
+**`xs` is for letter-spaced uppercase eyebrows only, never a sentence** — the rule joins the
+display-face rule it resembles.
+
+Display scale (`--text-display-*`), a deliberately separate scale: `sm 20 · md 28 · lg 44 · xl 64`, with `leading-display` (1.06). A display size is never a substitute for a body size at the same px.
 
 ### Depth
 
@@ -112,7 +174,7 @@ Display scale (`--text-display-*`), a deliberately separate scale: `sm 20 · md 
 | `shadow.card` | `shadow-card` | `Card`, `Modal`, toasts — paper lifted a hair off the page |
 | `shadow.sticker` | `shadow-sticker` | a filled board cell — a sticker sitting proud of the board |
 
-Shadows are theme-independent on purpose: a shadow is cast light, and on the dark wall the border does the separating instead — a lightened "shadow" would read as a glow.
+Shadows are theme-independent on purpose: a shadow is cast light, and on the dark surface the `line`/`edge` roles do the separating instead — a lightened "shadow" would read as a glow.
 
 ### Other scales
 - Radii: `rounded-sm|md|lg|pill`. Stickers are `rounded-sm` — a sticker is a rectangle, not a pill.

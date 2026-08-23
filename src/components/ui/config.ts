@@ -1,5 +1,15 @@
 /** Tunables shared by the UI primitives. No component may inline one of these values. */
 export const UI_CONFIG = {
+  shell: {
+    /**
+     * The viewport width, px, at and above which `TOKENS.font.sizeDense` replaces
+     * `TOKENS.font.size` (`src/design/generate-css.ts`'s `@media (min-width: …)` block) — the
+     * mocks' 13–14px desktop density is deliberate, a 13px body on a 360px phone is not.
+     * Matches Tailwind's `lg` breakpoint, the same width the shell's rail grid switches on
+     * (Task 2), so density and layout change together rather than at two different widths.
+     */
+    denseFromPx: 1024,
+  },
   countdown: {
     /** How often `useCountdown` re-renders, ms. One second is the smallest unit `Countdown`
      *  displays. Phase 3.5, Task 8: moved from `DRAFT_ROOM_CONFIG.countdownTickMs` when the hook
