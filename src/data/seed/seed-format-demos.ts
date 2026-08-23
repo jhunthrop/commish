@@ -11,7 +11,8 @@ import type { DraftStore } from "@/draft-service/store";
 import { setSlotPreference } from "@/draft-service/slot-preference";
 import type { AuditLogger } from "@/integrity-service/audit-logger";
 import { SUPERFLEX_ROSTER_SLOTS } from "@/league/roster-shape";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
+import type { ExperienceTier } from "@/domain/user";
 import { joinPublicLeague } from "@/league-service/join";
 import { ensureDevUsers, preserveRealCommissioner, preserveRealTeamOwner } from "./dev-users";
 
@@ -97,6 +98,76 @@ async function ensureStarted(store: DraftStore, draftId: string): Promise<DraftS
   return started.state;
 }
 
+/**
+ * Fix round 1, F1 (DRY): the league/scoringSettings/teams/drafts insert shape all four arcs
+ * below share, extracted once. Every arc still writes its OWN rows (different ids, roster
+ * shapes, visibility and team counts) — this only names the shape, never the per-arc content.
+ * `experienceTier` defaults to `"beginner"`, the identical value the `leagues.experience_tier`
+ * column itself defaults to, so a caller that omits it (every arc but sit-and-go) writes exactly
+ * what it always has. `isPublicMatchmade` rides the `onConflictDoUpdate` set too, harmlessly
+ * idempotent for the three arcs whose value is always `false`.
+ */
+interface DemoLeagueShellInput {
+  readonly leagueId: string;
+  readonly draftId: string;
+  readonly name: string;
+  readonly teamIds: readonly string[];
+  readonly teamOwners: readonly string[];
+  readonly teamNamePrefix: string;
+  readonly rosterSlots: readonly RosterSlotConfig[];
+  readonly isPublicMatchmade: boolean;
+  readonly experienceTier?: ExperienceTier;
+  readonly kickoffAt: Date;
+  readonly startTrigger?: "scheduled" | "when_full";
+  /**
+   * The league's own full capacity, when it differs from how many of `teamIds` this call seats
+   * directly — the sit-and-go arc's own case: one team seated here, one more seat left for a
+   * real `joinPublicLeague` call to fill. Defaults to `teamIds.length`, which is every OTHER
+   * arc's own shape (every team seated directly, nobody left to join later).
+   */
+  readonly teamCount?: number;
+}
+
+async function insertDemoLeagueShell(db: Db, input: DemoLeagueShellInput): Promise<void> {
+  await db
+    .insert(leagues)
+    .values({
+      id: input.leagueId,
+      name: input.name,
+      format: "snake",
+      teamCount: input.teamCount ?? input.teamIds.length,
+      isPublicMatchmade: input.isPublicMatchmade,
+      experienceTier: input.experienceTier ?? "beginner",
+      commissionerUserId: input.teamOwners[0]!,
+      rosterSlots: [...input.rosterSlots],
+    })
+    .onConflictDoUpdate({ target: leagues.id, set: { isPublicMatchmade: input.isPublicMatchmade, commissionerUserId: preserveRealCommissioner() } });
+
+  await db.insert(scoringSettings).values({ leagueId: input.leagueId, ...HALF_PPR_SCORING }).onConflictDoNothing({ target: scoringSettings.leagueId });
+
+  await db
+    .insert(teams)
+    .values(input.teamIds.map((id, i) => ({ id, leagueId: input.leagueId, userId: input.teamOwners[i]!, name: `${input.teamNamePrefix} ${i + 1}` })))
+    .onConflictDoUpdate({ target: teams.id, set: { userId: preserveRealTeamOwner() } });
+
+  await db
+    .insert(drafts)
+    .values({
+      id: input.draftId,
+      leagueId: input.leagueId,
+      format: "snake",
+      status: "scheduled",
+      kickoffAt: input.kickoffAt,
+      auctionBudget: null,
+      startTrigger: input.startTrigger ?? "scheduled",
+    })
+    // Never `onConflictDoUpdate`: a re-run that reset `kickoffAt` back to a fresh placeholder
+    // would erase whatever a PRIOR run's own real machinery already did to it (the sit-and-go
+    // arc's own fill-trigger rewrite is the sharpest example, but every arc's kickoff is a
+    // fixture, not something a re-run should ever move).
+    .onConflictDoNothing({ target: drafts.id });
+}
+
 // -------------------------------------------------------------------------------------------
 // Arc A: superflex, through the real engine. A real second quarterback lands in the real
 // SUPERFLEX slot because `assignSlot` (`@/draft-engine/slotting`) fills the first eligible slot
@@ -120,31 +191,17 @@ async function seedSuperflexLeague(db: Db, clock: Clock, store: DraftStore): Pro
   const teamIds = [SUPERFLEX_TEAM_1, SUPERFLEX_TEAM_2];
   const teamOwners = [owners[1]!, owners[2]!];
 
-  await db
-    .insert(leagues)
-    .values({
-      id: SUPERFLEX_LEAGUE_ID,
-      name: "Dev Superflex Demo",
-      format: "snake",
-      teamCount: teamIds.length,
-      isPublicMatchmade: false,
-      commissionerUserId: teamOwners[0]!,
-      rosterSlots: [...SUPERFLEX_ROSTER_SLOTS],
-    })
-    .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: preserveRealCommissioner() } });
-
-  await db.insert(scoringSettings).values({ leagueId: SUPERFLEX_LEAGUE_ID, ...HALF_PPR_SCORING }).onConflictDoNothing({ target: scoringSettings.leagueId });
-
-  await db
-    .insert(teams)
-    .values(teamIds.map((id, i) => ({ id, leagueId: SUPERFLEX_LEAGUE_ID, userId: teamOwners[i]!, name: `Superflex Demo ${i + 1}` })))
-    .onConflictDoUpdate({ target: teams.id, set: { userId: preserveRealTeamOwner() } });
-
-  const kickoffAt = new Date(Date.parse(clock.now()) + 48 * 60 * 60 * 1000);
-  await db
-    .insert(drafts)
-    .values({ id: SUPERFLEX_DRAFT_ID, leagueId: SUPERFLEX_LEAGUE_ID, format: "snake", status: "scheduled", kickoffAt, auctionBudget: null })
-    .onConflictDoNothing({ target: drafts.id });
+  await insertDemoLeagueShell(db, {
+    leagueId: SUPERFLEX_LEAGUE_ID,
+    draftId: SUPERFLEX_DRAFT_ID,
+    name: "Dev Superflex Demo",
+    teamIds,
+    teamOwners,
+    teamNamePrefix: "Superflex Demo",
+    rosterSlots: SUPERFLEX_ROSTER_SLOTS,
+    isPublicMatchmade: false,
+    kickoffAt: new Date(Date.parse(clock.now()) + 48 * 60 * 60 * 1000),
+  });
 
   let qbPicksForTeam1 = 0;
   const initial = await ensureStarted(store, SUPERFLEX_DRAFT_ID);
@@ -186,51 +243,20 @@ export interface SkipAndOweResult {
   readonly redeemed: boolean;
 }
 
-async function seedSkipAndOweLeague(db: Db, clock: Clock, store: DraftStore): Promise<SkipAndOweResult> {
-  const owners = await ensureDevUsers(db);
-  const teamOwners = [owners[1]!, owners[2]!, owners[3]!];
-
-  await db
-    .insert(leagues)
-    .values({
-      id: SKIP_LEAGUE_ID,
-      name: "Dev Skip-and-Owe Demo",
-      format: "snake",
-      teamCount: SKIP_TEAM_IDS.length,
-      isPublicMatchmade: false,
-      commissionerUserId: teamOwners[0]!,
-      rosterSlots: [...STANDARD_ROSTER_SLOTS],
-    })
-    .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: preserveRealCommissioner() } });
-
-  await db.insert(scoringSettings).values({ leagueId: SKIP_LEAGUE_ID, ...HALF_PPR_SCORING }).onConflictDoNothing({ target: scoringSettings.leagueId });
-
-  await db
-    .insert(teams)
-    .values(SKIP_TEAM_IDS.map((id, i) => ({ id, leagueId: SKIP_LEAGUE_ID, userId: teamOwners[i]!, name: `Skip Demo ${i + 1}` })))
-    .onConflictDoUpdate({ target: teams.id, set: { userId: preserveRealTeamOwner() } });
-
-  // 200 hours out: past `DRAFT_CLOCK_SCHEDULE`'s 168-hour threshold, so the draft opens at the
-  // 8-hour tier — well at or above `DRAFT_SKIP_POLICY.appliesAtOrAbovePickSeconds` (one hour).
-  const kickoffAt = new Date(Date.parse(clock.now()) + 200 * 60 * 60 * 1000);
-  await db
-    .insert(drafts)
-    .values({ id: SKIP_DRAFT_ID, leagueId: SKIP_LEAGUE_ID, format: "snake", status: "scheduled", kickoffAt, auctionBudget: null })
-    .onConflictDoNothing({ target: drafts.id });
-
-  const started = await ensureStarted(store, SKIP_DRAFT_ID);
-  if (started.phase === "complete") {
-    // Already fully driven by a prior run — `draftOrder[0]` is always the team pick 1 (and
-    // therefore this arc's own skip target) belonged to, whether or not this run replays it.
-    return { leagueId: SKIP_LEAGUE_ID, skippedTeamId: started.draftOrder[0]!, redeemed: true };
-  }
-
+/**
+ * The expiry-and-redeem walk (fix round 1, F2): a real `TIMER_EXPIRE` past the deadline (the
+ * skip), asserted to have really skipped rather than autopicked, then a real out-of-band
+ * `MAKE_PICK` (the redemption), asserted to have cleared it. Split out of `seedSkipAndOweLeague`
+ * purely to bring that function back under the 50-line guideline — identical actions, identical
+ * assertions, identical thrown messages.
+ */
+async function skipThenRedeem(store: DraftStore, draftId: string, started: DraftState): Promise<{ readonly skippedTeamId: string }> {
   // The FIRST team on the clock never queues (Task 5's own consent rule: no queue is what makes
   // a queueless team eligible to be skipped rather than autopicked) — its turn's own real
   // `TIMER_EXPIRE`, past the 8-hour deadline, is what the skip is made of.
   const skippedTeamId = teamOnClock(started)!;
   const expireTimestamp = laterTimestamp(started.turnStartedAt!);
-  const expireResult = await store.applyAction(SKIP_DRAFT_ID, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: expireTimestamp });
+  const expireResult = await store.applyAction(draftId, { v: DRAFT_ACTION_VERSION, type: "TIMER_EXPIRE", timestamp: expireTimestamp });
   if (!expireResult.ok) throw new Error(`seedFormatDemos: skip-and-owe arc's own TIMER_EXPIRE was rejected: ${expireResult.reason}`);
 
   const owedAfterExpiry = expireResult.state.owedPicks[skippedTeamId] ?? [];
@@ -244,7 +270,7 @@ async function seedSkipAndOweLeague(db: Db, clock: Clock, store: DraftStore): Pr
   const redemption = bestAvailableFor(expireResult.state, skippedTeamId);
   if (redemption === null) throw new Error("seedFormatDemos: no eligible player left for the skip-and-owe arc's own redemption.");
   const redeemTimestamp = laterTimestamp(expireResult.state.turnStartedAt ?? expireTimestamp);
-  const redeemResult = await store.applyAction(SKIP_DRAFT_ID, {
+  const redeemResult = await store.applyAction(draftId, {
     v: DRAFT_ACTION_VERSION,
     type: "MAKE_PICK",
     timestamp: redeemTimestamp,
@@ -256,8 +282,36 @@ async function seedSkipAndOweLeague(db: Db, clock: Clock, store: DraftStore): Pr
     throw new Error("seedFormatDemos: skip-and-owe arc's redemption didn't clear the owed pick.");
   }
 
-  await driveToCompletion(store, SKIP_DRAFT_ID, redeemResult.state, async () => null);
+  await driveToCompletion(store, draftId, redeemResult.state, async () => null);
+  return { skippedTeamId };
+}
 
+async function seedSkipAndOweLeague(db: Db, clock: Clock, store: DraftStore): Promise<SkipAndOweResult> {
+  const owners = await ensureDevUsers(db);
+  const teamOwners = [owners[1]!, owners[2]!, owners[3]!];
+
+  await insertDemoLeagueShell(db, {
+    leagueId: SKIP_LEAGUE_ID,
+    draftId: SKIP_DRAFT_ID,
+    name: "Dev Skip-and-Owe Demo",
+    teamIds: [...SKIP_TEAM_IDS],
+    teamOwners,
+    teamNamePrefix: "Skip Demo",
+    rosterSlots: STANDARD_ROSTER_SLOTS,
+    isPublicMatchmade: false,
+    // 200 hours out: past `DRAFT_CLOCK_SCHEDULE`'s 168-hour threshold, so the draft opens at
+    // the 8-hour tier — well at or above `DRAFT_SKIP_POLICY.appliesAtOrAbovePickSeconds` (one hour).
+    kickoffAt: new Date(Date.parse(clock.now()) + 200 * 60 * 60 * 1000),
+  });
+
+  const started = await ensureStarted(store, SKIP_DRAFT_ID);
+  if (started.phase === "complete") {
+    // Already fully driven by a prior run — `draftOrder[0]` is always the team pick 1 (and
+    // therefore this arc's own skip target) belonged to, whether or not this run replays it.
+    return { leagueId: SKIP_LEAGUE_ID, skippedTeamId: started.draftOrder[0]!, redeemed: true };
+  }
+
+  const { skippedTeamId } = await skipThenRedeem(store, SKIP_DRAFT_ID, started);
   return { leagueId: SKIP_LEAGUE_ID, skippedTeamId, redeemed: true };
 }
 
@@ -289,31 +343,17 @@ async function seedSlotPreferenceLeague(db: Db, clock: Clock, store: DraftStore)
   const teamIds = [PREF_TEAM_1, PREF_TEAM_2];
   const teamOwners = [owners[1]!, owners[2]!];
 
-  await db
-    .insert(leagues)
-    .values({
-      id: PREF_LEAGUE_ID,
-      name: "Dev Slot Preference Demo",
-      format: "snake",
-      teamCount: teamIds.length,
-      isPublicMatchmade: false,
-      commissionerUserId: teamOwners[0]!,
-      rosterSlots: [...STANDARD_ROSTER_SLOTS],
-    })
-    .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: preserveRealCommissioner() } });
-
-  await db.insert(scoringSettings).values({ leagueId: PREF_LEAGUE_ID, ...HALF_PPR_SCORING }).onConflictDoNothing({ target: scoringSettings.leagueId });
-
-  await db
-    .insert(teams)
-    .values(teamIds.map((id, i) => ({ id, leagueId: PREF_LEAGUE_ID, userId: teamOwners[i]!, name: `Slot Pref Demo ${i + 1}` })))
-    .onConflictDoUpdate({ target: teams.id, set: { userId: preserveRealTeamOwner() } });
-
-  const kickoffAt = new Date(Date.parse(clock.now()) + 48 * 60 * 60 * 1000);
-  await db
-    .insert(drafts)
-    .values({ id: PREF_DRAFT_ID, leagueId: PREF_LEAGUE_ID, format: "snake", status: "scheduled", kickoffAt, auctionBudget: null })
-    .onConflictDoNothing({ target: drafts.id });
+  await insertDemoLeagueShell(db, {
+    leagueId: PREF_LEAGUE_ID,
+    draftId: PREF_DRAFT_ID,
+    name: "Dev Slot Preference Demo",
+    teamIds,
+    teamOwners,
+    teamNamePrefix: "Slot Pref Demo",
+    rosterSlots: STANDARD_ROSTER_SLOTS,
+    isPublicMatchmade: false,
+    kickoffAt: new Date(Date.parse(clock.now()) + 48 * 60 * 60 * 1000),
+  });
 
   const existing = await store.getDraftState(PREF_DRAFT_ID);
   if (existing !== null && existing.phase === "scheduled") {
@@ -359,56 +399,19 @@ export interface SitAndGoResult {
   readonly kickoffRewritten: boolean;
 }
 
-async function seedSitAndGoLeague(db: Db, clock: Clock, deps: SeedFormatDemosDeps): Promise<SitAndGoResult> {
-  const owners = await ensureDevUsers(db);
-  const commissioner = owners[1]!;
-  const joiner = owners[2]!;
-
-  await db
-    .insert(leagues)
-    .values({
-      id: SIT_AND_GO_LEAGUE_ID,
-      name: "Dev Sit-and-Go Demo",
-      format: "snake",
-      teamCount: 2,
-      isPublicMatchmade: true,
-      experienceTier: "experienced",
-      commissionerUserId: commissioner,
-      rosterSlots: [...STANDARD_ROSTER_SLOTS],
-    })
-    .onConflictDoUpdate({ target: leagues.id, set: { isPublicMatchmade: true, commissionerUserId: preserveRealCommissioner() } });
-
-  await db.insert(scoringSettings).values({ leagueId: SIT_AND_GO_LEAGUE_ID, ...HALF_PPR_SCORING }).onConflictDoNothing({ target: scoringSettings.leagueId });
-
-  await db
-    .insert(teams)
-    .values([{ id: SIT_AND_GO_TEAM_1, leagueId: SIT_AND_GO_LEAGUE_ID, userId: commissioner, name: "Sit-and-Go Demo 1" }])
-    .onConflictDoUpdate({ target: teams.id, set: { userId: preserveRealTeamOwner() } });
-
-  // The un-fired placeholder (`LEAGUE_CONFIG.defaults.draftDaysFromCreation`'s own 7-day shape,
-  // `@/league-service/creation.ts`) — a time nobody chose, which is exactly what
-  // `fireWhenFullInTx` below is supposed to overwrite for real.
-  const placeholderKickoffAt = new Date(Date.parse(clock.now()) + 7 * 24 * 60 * 60 * 1000);
-  await db
-    .insert(drafts)
-    .values({
-      id: SIT_AND_GO_DRAFT_ID,
-      leagueId: SIT_AND_GO_LEAGUE_ID,
-      format: "snake",
-      status: "scheduled",
-      kickoffAt: placeholderKickoffAt,
-      auctionBudget: null,
-      startTrigger: "when_full",
-    })
-    // Never `onConflictDoUpdate`: a re-run that reset `kickoffAt` back to this placeholder
-    // would erase a PRIOR run's own real fill-trigger rewrite, which is exactly the property
-    // this arc exists to prove stays true. Absent on the first run only, like every other
-    // dedicated fixture draft this file inserts.
-    .onConflictDoNothing({ target: drafts.id });
-
+/** The real, LAST-seat join, and whether it rewrote the kickoff — split out of
+ *  `seedSitAndGoLeague` purely to bring that function back under the 50-line guideline
+ *  (fix round 1, F2). Identical call, identical assertions, identical thrown messages. */
+async function joinLastSeatAndCheckKickoff(
+  db: Db,
+  clock: Clock,
+  deps: SeedFormatDemosDeps,
+  joinerUserId: string,
+  placeholderKickoffAt: Date,
+): Promise<boolean> {
   const outcome = await joinPublicLeague(
     { db, newId: () => crypto.randomUUID(), clock, audit: deps.audit },
-    { leagueId: SIT_AND_GO_LEAGUE_ID, userId: joiner },
+    { leagueId: SIT_AND_GO_LEAGUE_ID, userId: joinerUserId },
   );
   if (!outcome.ok) {
     throw new Error(`seedFormatDemos: sit-and-go arc's own last-seat join was refused: ${outcome.reason}`);
@@ -416,14 +419,41 @@ async function seedSitAndGoLeague(db: Db, clock: Clock, deps: SeedFormatDemosDep
 
   const [draftRow] = await db.select({ kickoffAt: drafts.kickoffAt }).from(drafts).where(eq(drafts.id, SIT_AND_GO_DRAFT_ID));
   const kickoffRewritten = draftRow!.kickoffAt.getTime() !== placeholderKickoffAt.getTime();
-  if (!kickoffRewritten) {
-    // A re-run against an already-filled league takes the `alreadyMember` branch above and
-    // writes nothing new — the FIRST run is the one this assertion actually guards.
-    if (!outcome.alreadyMember) {
-      throw new Error("seedFormatDemos: sit-and-go arc's last-seat join didn't rewrite the draft's kickoff.");
-    }
+  // A re-run against an already-filled league takes the `alreadyMember` branch above and writes
+  // nothing new — the FIRST run is the one this assertion actually guards.
+  if (!kickoffRewritten && !outcome.alreadyMember) {
+    throw new Error("seedFormatDemos: sit-and-go arc's last-seat join didn't rewrite the draft's kickoff.");
   }
+  return kickoffRewritten;
+}
 
+async function seedSitAndGoLeague(db: Db, clock: Clock, deps: SeedFormatDemosDeps): Promise<SitAndGoResult> {
+  const owners = await ensureDevUsers(db);
+  const commissioner = owners[1]!;
+  const joiner = owners[2]!;
+
+  // The un-fired placeholder (`LEAGUE_CONFIG.defaults.draftDaysFromCreation`'s own 7-day shape,
+  // `@/league-service/creation.ts`) — a time nobody chose, which is exactly what
+  // `fireWhenFullInTx` (inside `joinLastSeatAndCheckKickoff`, below) overwrites for real.
+  const placeholderKickoffAt = new Date(Date.parse(clock.now()) + 7 * 24 * 60 * 60 * 1000);
+  await insertDemoLeagueShell(db, {
+    leagueId: SIT_AND_GO_LEAGUE_ID,
+    draftId: SIT_AND_GO_DRAFT_ID,
+    name: "Dev Sit-and-Go Demo",
+    teamIds: [SIT_AND_GO_TEAM_1],
+    teamOwners: [commissioner],
+    teamNamePrefix: "Sit-and-Go Demo",
+    rosterSlots: STANDARD_ROSTER_SLOTS,
+    isPublicMatchmade: true,
+    experienceTier: "experienced",
+    kickoffAt: placeholderKickoffAt,
+    startTrigger: "when_full",
+    // Two seats total — this call seats only the commissioner directly; the second is left for
+    // `joinLastSeatAndCheckKickoff`'s own real join, below.
+    teamCount: 2,
+  });
+
+  const kickoffRewritten = await joinLastSeatAndCheckKickoff(db, clock, deps, joiner, placeholderKickoffAt);
   return { leagueId: SIT_AND_GO_LEAGUE_ID, filled: true, kickoffRewritten };
 }
 
