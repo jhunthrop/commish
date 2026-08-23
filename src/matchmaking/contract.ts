@@ -65,7 +65,7 @@ import type { ParticipationTier } from "@/participation/tier";
  * `string`, the narrowed union `@/matchmaking/house-catalog` (Task 13) declares, so a caller that
  * switches on it exhaustively is a compile error away from ever falling silently out of step with
  * the catalog. `null` for every ordinary member league; one of the catalog's own rung names for a
- * league the platform runs. This field never appears on `BrowseFilter` (`filter.test.ts`'s own
+ * league the platform runs. This field never appears on `BrowseFilter` (`browse.test.ts`'s own
  * "refuses to let a filter hide the shelf" pins that) — it is a fact a CARD renders, never an axis
  * a visitor can narrow the shelf by, because a shelf a filter could empty is not "always a seat".
  *

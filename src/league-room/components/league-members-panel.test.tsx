@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import { GLOSSARY } from "@/help/glossary";
 import { inBothThemes } from "@/components/ui/test-utils";
 import type { LeagueAuthority } from "@/league-service/authority";
 import { THREE_TEAMS } from "../test-fixtures";
@@ -114,5 +115,32 @@ describe("LeagueMembersPanel", () => {
       const { container } = render(<LeagueMembersPanel teams={THREE_TEAMS} authority={HOUSE} myTeamId="t2" />);
       expect(container.textContent).not.toContain("—");
     });
+
+    // Fix round 1, F1: Step 5's own InfoTip beside "Run by Commish" had zero test coverage —
+    // the one rendering claim in Task 14's diff nothing pinned. `helpLevel` is threaded through
+    // from `league-home.tsx`; both the click-to-reveal trigger and the guided inline line get
+    // their own assertion, matching `public-league-list.test.tsx`'s identical shelf-heading test.
+    it("opens an InfoTip beside 'Run by Commish', defining a house league", () => {
+      render(<LeagueMembersPanel teams={THREE_TEAMS} authority={HOUSE} myTeamId="t2" />);
+      expect(screen.getByRole("button", { name: "What is a house league?" })).toBeInTheDocument();
+    });
+
+    it("prints the glossary's short line inline when helpLevel is guided", () => {
+      render(<LeagueMembersPanel teams={THREE_TEAMS} authority={HOUSE} myTeamId="t2" helpLevel="guided" />);
+      expect(screen.getByText(GLOSSARY["house-league"].short)).toBeInTheDocument();
+    });
+
+    it("does not print the short line inline when helpLevel is not guided", () => {
+      render(<LeagueMembersPanel teams={THREE_TEAMS} authority={HOUSE} myTeamId="t2" />);
+      expect(screen.queryByText(GLOSSARY["house-league"].short)).not.toBeInTheDocument();
+    });
+  });
+
+  // The InfoTip is a house-only fact — a member-run league already answers "who runs this" via
+  // the "Commissioner" badge on the right row, and a second explanation beside it would be noise.
+  it("shows no house-league InfoTip for a member-run league", () => {
+    render(<LeagueMembersPanel teams={THREE_TEAMS} authority={MEMBER} myTeamId="t2" helpLevel="guided" />);
+    expect(screen.queryByRole("button", { name: "What is a house league?" })).not.toBeInTheDocument();
+    expect(screen.queryByText(GLOSSARY["house-league"].short)).not.toBeInTheDocument();
   });
 });

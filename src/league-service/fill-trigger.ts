@@ -4,8 +4,24 @@ import { drafts, leagues, memberNotices, teams } from "@/db/schema";
 import { formatClockLength, MS_PER_SECOND } from "@/domain/duration";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
+import type { NoticeContexts } from "@/integrity/notices";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { hasOpenSeat } from "@/matchmaking/filter";
+
+/**
+ * The two shapes `fireWhenFullInTx`'s own house/member branch can send, PAIRED — `noticeType` and
+ * `context` can never mismatch, because this is a union of two fully-known object types rather
+ * than `{ noticeType: NoticeType; context: NoticeContexts[NoticeType] }` (which would let a
+ * `house_league_filled` type carry a `draft_fill_triggered` context and vice versa). Fix round 1
+ * (F3): a single `notifyAffectedMember` call site, spreading one of these into its input, type-
+ * checks WITHOUT a cast — TypeScript matches each union member against `NotifyInput<T>`
+ * separately, so `T` infers correctly per branch rather than widening to the bare `NoticeType`
+ * union a naive single shape would. Verified by deliberately mismatching the two fields once
+ * during review and confirming `tsc` refuses it.
+ */
+type FillNoticeInput =
+  | { readonly noticeType: "house_league_filled"; readonly context: NoticeContexts["house_league_filled"] }
+  | { readonly noticeType: "draft_fill_triggered"; readonly context: NoticeContexts["draft_fill_triggered"] };
 
 /**
  * The league-wide sentence `draft_fill_triggered`'s `system_action` carries.
@@ -151,33 +167,23 @@ export async function fireWhenFullInTx(
   // either way, and `SYSTEM_ACTION_CODES` gains no second code for a distinction that only ever
   // shows up in the PERSONAL notice's own wording.
   const graceLabel = formatClockLength(MATCHMAKING_CONFIG.sitAndGo.graceSeconds);
+  // `FillNoticeInput`'s own docblock: computed ONCE (it is loop-invariant), the union keeps
+  // `noticeType` and `context` paired, so the single loop below cannot send a house league's
+  // notice type with a member league's context or vice versa.
+  const fillNotice: FillNoticeInput = isHouse
+    ? { noticeType: "house_league_filled", context: { leagueName: row.leagueName } }
+    : { noticeType: "draft_fill_triggered", context: { leagueName: row.leagueName, graceLabel } };
   const created: MemberNotice[] = [];
-  if (isHouse) {
-    for (const member of seated) {
-      created.push(
-        await notifyAffectedMember(tx, {
-          leagueId,
-          userId: member.userId,
-          noticeType: "house_league_filled",
-          context: { leagueName: row.leagueName },
-          occurredAt: nowIso,
-          auditEventId: null,
-        }),
-      );
-    }
-  } else {
-    for (const member of seated) {
-      created.push(
-        await notifyAffectedMember(tx, {
-          leagueId,
-          userId: member.userId,
-          noticeType: "draft_fill_triggered",
-          context: { leagueName: row.leagueName, graceLabel },
-          occurredAt: nowIso,
-          auditEventId: null,
-        }),
-      );
-    }
+  for (const member of seated) {
+    created.push(
+      await notifyAffectedMember(tx, {
+        leagueId,
+        userId: member.userId,
+        ...fillNotice,
+        occurredAt: nowIso,
+        auditEventId: null,
+      }),
+    );
   }
   const event = await audit.record(tx, {
     eventType: "system_action",

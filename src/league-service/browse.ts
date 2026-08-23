@@ -239,7 +239,7 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
  *
  * TAKES NO `BrowseFilter`, unlike `browseQuery` — not merely unfiltered by default, but
  * structurally unable to be. `houseRung` is deliberately not a `BrowseFilter` field
- * (`filter.test.ts`'s "refuses to let a filter hide the shelf"), and every catalog rung already
+ * (`browse.test.ts`'s "refuses to let a filter hide the shelf"), and every catalog rung already
  * shares one canonical format/roster/scoring shape (`HOUSE_CATALOG`'s own `CANON`) — so a filter
  * axis narrowing the shelf could only ever empty it for some visitor, never sort it, which is
  * exactly the failure "there is always a seat" promises against.
