@@ -198,6 +198,21 @@ describe("hot read paths use indexes", () => {
    * short-circuits — the exact property `dueDraftsQuery` lacked before 0029, where `ORDER BY id`
    * sorted the whole result first. So a bound was the fix here, and an index was not; adding one
    * would be a write cost paid for a plan that is already index-only.
+   *
+   * TASK 6.5 (Phase 3.5) — THE `Sort` ASSERTION WAS A GENUINE FLAKE, ROOT-CAUSED. Statistics were
+   * never stale: `seedRealisticCorpus`'s own `ANALYZE` already covers every table this query reads.
+   * The real cause is cost-boundary bistability — at the corpus's PRIOR candidate count (10 leagues
+   * matching `week_number`/`home_score IS NULL`/`is_public_matchmade` at once), the Nested Loop
+   * shape this test pins (probing `leagues_pkey` once per candidate) and a competing Hash Join
+   * shape (scanning all ~500 `is_public_matchmade` leagues through `leagues_public_browse_idx`
+   * first) land within ~15% of each other in the planner's own cost estimate. `ANALYZE`'s sampling
+   * is a genuine random reservoir sample, not a bug, so ordinary sampling noise could — rarely —
+   * tip the estimate toward the Hash Join, which cannot preserve `matchups.league_id` order and so
+   * adds the `Sort` this assertion refuses. `UNSETTLED_LEAGUE_INTERVAL` (`@/db/test-corpus`) is now
+   * 1000 rather than 500, halving the candidate count to 5 and, with it, the Nested Loop side's
+   * cost — verified decisive (never observed to cross) across 100 repeated ANALYZE/EXPLAIN cycles
+   * at 100x this database's real sampling noise. See `UNSETTLED_LEAGUE_INTERVAL`'s own docblock for
+   * the full account.
    */
   it("the auto-set's candidate scan drives off matchups_unsettled_idx, and its LIMIT short-circuits", async () => {
     const plan = await explainPlan(db, leaguesNeedingAutoSetQuery(db, 1));

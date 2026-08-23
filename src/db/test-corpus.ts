@@ -44,8 +44,33 @@ const ROSTER_SLOTS = sql`(VALUES ('QB',0),('RB',0),('RB',1),('WR',0),('WR',1),('
 export const LINEUP_WEEKS = 3;
 /** A full regular season of fixtures per league, which is what makes `matchups` the largest table here. */
 export const SEASON_WEEKS = 14;
-/** One league in every this-many is left unsettled, so the partial index has a realistic slice to hold. */
-export const UNSETTLED_LEAGUE_INTERVAL = 500;
+/**
+ * One league in every this-many is left unsettled, so the partial index has a realistic slice to
+ * hold.
+ *
+ * WAS 500 (10 candidate leagues at any single week). Task 6.5 (Phase 3.5) root-caused an
+ * intermittent flake in "the auto-set's candidate scan drives off matchups_unsettled_idx, and its
+ * LIMIT short-circuits" (`src/db/index-plans.test.ts`) to genuine cost-boundary bistability at
+ * that candidate count, not to stale or missing statistics — `seedRealisticCorpus`'s own `ANALYZE`
+ * already covers every table `leaguesNeedingAutoSetQuery` reads (`matchups`, `leagues`, `teams`,
+ * `lineup_slots`). With 10 candidate `matchups` rows, the planner's two live strategies for joining
+ * `leagues` — a Nested Loop probing `leagues_pkey` once per candidate (cost roughly
+ * `4 + candidates * 8`, ~80-95 here) versus a Hash Join that first scans all ~500
+ * `is_public_matchmade` leagues through `leagues_public_browse_idx` (a fixed cost of ~82
+ * regardless of candidate count) — land close enough (within ~15%) that ordinary `ANALYZE`
+ * sampling noise (a real, randomized reservoir sample, not a bug) can tip the estimate either way.
+ * The Hash Join alternative cannot preserve `matchups.league_id` order, so a flip adds a `Sort`
+ * node the assertion pins against. Repeated ANALYZE/EXPLAIN cycles over the unchanged corpus
+ * reproduced the flip directly (`.scratch/repro2.ts` during that investigation, not shipped).
+ *
+ * Halving the candidate count to 5 (1000) roughly halves the Nested Loop side's cost to ~40-70,
+ * which stays decisively — never observed to cross, across 100 repeated ANALYZE/EXPLAIN cycles at
+ * `default_statistics_target = 1` (100x noisier sampling than this database's real
+ * `default_statistics_target = 100`) — below the Hash Join alternative's ~82-96 floor. 5 unsettled
+ * leagues out of 5,000 (0.1%) is still a realistic slice for the partial index to hold; the
+ * property under test was never the exact count, only that it stays small and decisive.
+ */
+export const UNSETTLED_LEAGUE_INTERVAL = 1000;
 /**
  * One league in every this-many has already completed its season (Phase 3 Plan D, Task 1) — a
  * 5% slice, selective enough that `leagues_season_completed_idx`'s partial predicate is worth

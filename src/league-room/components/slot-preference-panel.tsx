@@ -13,7 +13,7 @@ import { useLeagueRoomDeps } from "../hooks/deps";
  * it without hand-retyping a second copy that could drift from what actually renders.
  */
 export const SLOT_PREFERENCE_EXPLAINER =
-  "Rank the slots you want. We draw in random order and give each manager their highest choice that is still free.";
+  "Rank the slots you want. At draft start we draw a random order and give each manager their highest choice that is still free.";
 
 /** Moves `slot` one position within `ranking` — the same "swap with a neighbor, clamp at the
  *  ends" shape `moveInQueue` (`@/draft-room/state/queue`) uses for player ids, kept as its own
