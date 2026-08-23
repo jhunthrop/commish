@@ -6,24 +6,51 @@ import { GLOSSARY } from "@/help/glossary";
 import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
-import { CreateLeagueForm } from "./create-league-form";
+import { CreateLeagueForm, DRAWER_SUMMARY, START_TRIGGER_HINT, START_TRIGGERS, VISIBILITIES, VISIBILITY_HINT } from "./create-league-form";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 
 describe("CreateLeagueForm", () => {
-  it("shows one visible field with the advanced settings closed, in both themes, axe-clean", async () => {
+  /**
+   * Phase 3.5, Task 9 — the promotion. `screen.getByLabelText(...).toBeVisible()`, not merely
+   * `.toBeInTheDocument()`: the whole defect the gauntlet named was a control that technically
+   * EXISTED, two disclosures deep, while being unreachable to a beginner who never opened
+   * anything. `toBeVisible` fails for a control sitting inside a closed `<details>`, which is
+   * exactly the assertion the old placement could never have passed.
+   */
+  it("shows who can join and who it's for without opening anything, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps();
     await inBothThemes(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <CreateLeagueForm onCreated={vi.fn()} />
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
-        expect(screen.getByLabelText("League name")).toBeInTheDocument();
+        expect(screen.getByLabelText("League name")).toBeVisible();
+        expect(screen.getByLabelText("Who can join")).toBeVisible();
+        expect(screen.getByLabelText("Who it's for")).toBeVisible();
         expect(screen.getByRole("group")).toBeInTheDocument(); // the <details> disclosure
-        expect(screen.getByText(/Advanced settings/)).toBeInTheDocument();
+        expect(screen.getByText(DRAWER_SUMMARY)).toBeInTheDocument();
         expect(container.querySelector("details")).not.toHaveAttribute("open");
         expect(await axe(container)).toHaveNoViolations();
       },
     );
+  });
+
+  /**
+   * The drawer's own summary, checked against what it actually contains rather than a hand
+   * count: the old summary named three of the seven fields the drawer held ("draft format, team
+   * count, scoring"), silently omitting roster shape, auction budget, start trigger and stake
+   * tier. A summary that under-describes its own contents is how a control becomes unfindable
+   * while still technically being present — this is the assertion that closes that gap for good,
+   * not just for today's seven fields.
+   */
+  it("names everything the drawer actually contains, roster shape included", () => {
+    renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
+    const summary = screen.getByText(DRAWER_SUMMARY);
+    expect(summary.tagName).toBe("SUMMARY");
+    expect(summary).toHaveTextContent(/roster shape/i);
+    for (const named of ["draft format", "team count", "scoring", "auction budget", "draft start", "stake tier"]) {
+      expect(summary.textContent!.toLowerCase()).toContain(named);
+    }
   });
 
   it("creates a league from just a name, and reports the ids back", async () => {
@@ -168,18 +195,136 @@ describe("CreateLeagueForm", () => {
       expect((screen.getByLabelText("Who it's for") as HTMLSelectElement).value).toBe("beginner");
     });
 
-    it("renders inside the open disclosure, keyboard-reachable and axe-clean in both themes, at 360px", async () => {
+    /**
+     * No `<details>` to open any more (Task 9's own promotion) — the whole point is that this
+     * control is keyboard-reachable WITHOUT that step now, unlike the roster-shape select below,
+     * which still lives in the drawer and still needs it opened first.
+     */
+    it("is keyboard-reachable and axe-clean in both themes, at 360px, without opening anything", async () => {
       const fixture = fixtureLeagueDeps();
       await inBothThemes(
         <LeagueRoomDepsProvider deps={fixture.deps}>
           <CreateLeagueForm onCreated={vi.fn()} />
         </LeagueRoomDepsProvider>,
         async ({ container }) => {
-          const details = container.querySelector("details")!;
-          details.setAttribute("open", "");
           const select = screen.getByLabelText("Who it's for");
           // A native `<select>` through the shared `Select` primitive: focusable, labelled, and in
           // the tab order without a `tabIndex` of its own.
+          expect(select.tagName).toBe("SELECT");
+          expect(select).not.toHaveAttribute("tabindex");
+          select.focus();
+          expect(select).toHaveFocus();
+          expect(await axe(container)).toHaveNoViolations();
+        },
+      );
+    });
+  });
+
+  /**
+   * "Who can join" — the control that decides FIRST, and the near homonym `EXPERIENCE_TIERS`'
+   * own docblock names. Both promoted out of the drawer together (Task 9); this describes what
+   * makes "Who can join" its own thing rather than a rename of "Who it's for".
+   */
+  describe("who can join", () => {
+    it("offers invite-only FIRST and defaults to it, with its own distinct hint", () => {
+      renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
+      const select = screen.getByLabelText("Who can join") as HTMLSelectElement;
+      expect(select.value).toBe("invite_only");
+      expect([...select.options].map((option) => option.value)).toEqual(VISIBILITIES.map((option) => option.value));
+      expect([...select.options].map((option) => option.textContent)).toEqual(VISIBILITIES.map((option) => option.label));
+      expect(screen.getByText(VISIBILITY_HINT)).toBeInTheDocument();
+      // Distinct sentences, not distinct-sounding labels — the near homonymy is the defect the
+      // gauntlet named, and renaming either label would only move it.
+      expect(VISIBILITY_HINT).not.toBe(LEAGUE_EXPERIENCE_TIER_HINT);
+    });
+
+    it("is visible and keyboard-reachable without opening anything, axe-clean in both themes, at 360px", async () => {
+      const fixture = fixtureLeagueDeps();
+      await inBothThemes(
+        <LeagueRoomDepsProvider deps={fixture.deps}>
+          <CreateLeagueForm onCreated={vi.fn()} />
+        </LeagueRoomDepsProvider>,
+        async ({ container }) => {
+          const select = screen.getByLabelText("Who can join");
+          expect(select.tagName).toBe("SELECT");
+          expect(select).not.toHaveAttribute("tabindex");
+          select.focus();
+          expect(select).toHaveFocus();
+          expect(await axe(container)).toHaveNoViolations();
+        },
+      );
+    });
+  });
+
+  /**
+   * "Draft start" — the sit-and-go trigger's own creation-time control (Phase 3.5, Task 9).
+   * PUBLIC-MATCHMADE ONLY: a private league's fill would otherwise write a time nobody pressed
+   * (the same rule `createLeagueSchema`'s own refine enforces server-side), so this control does
+   * not exist on screen at all until "Who can join" is set to public.
+   */
+  describe("when it drafts", () => {
+    it("stays out of the drawer entirely for an invite-only league", () => {
+      renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
+      expect(screen.queryByLabelText("Draft start")).not.toBeInTheDocument();
+    });
+
+    it("appears in the drawer, defaulted to scheduled, once the league is public", () => {
+      renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
+      fireEvent.change(screen.getByLabelText("Who can join"), { target: { value: "public" } });
+      const select = screen.getByLabelText("Draft start") as HTMLSelectElement;
+      expect(select.value).toBe("scheduled");
+      expect([...select.options].map((option) => option.value)).toEqual(START_TRIGGERS.map((option) => option.value));
+      expect(screen.getByText(START_TRIGGER_HINT)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "What is a sit-and-go league?" })).toBeInTheDocument();
+    });
+
+    it("resets to scheduled, invisibly, if a commissioner picks it then backs out of public", () => {
+      // The remedy points at something visible (the same discipline the creation-gate refusal
+      // control holds): a commissioner can never be left holding `when_full` on a field they can
+      // no longer see, which would otherwise surface as an unexplained refusal from a hidden field.
+      renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
+      fireEvent.change(screen.getByLabelText("Who can join"), { target: { value: "public" } });
+      fireEvent.change(screen.getByLabelText("Draft start"), { target: { value: "when_full" } });
+      fireEvent.change(screen.getByLabelText("Who can join"), { target: { value: "invite_only" } });
+      expect(screen.queryByLabelText("Draft start")).not.toBeInTheDocument();
+      fireEvent.change(screen.getByLabelText("Who can join"), { target: { value: "public" } });
+      expect((screen.getByLabelText("Draft start") as HTMLSelectElement).value).toBe("scheduled");
+    });
+
+    it("sends the chosen trigger, and defaults to scheduled when nothing changed it", async () => {
+      const fixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "l1", teamId: "t1", draftId: "d1" } });
+      const bodies: unknown[] = [];
+      fixture.deps = {
+        ...fixture.deps,
+        fetchJson: async (_url, init) => {
+          bodies.push(JSON.parse(String(init?.body)));
+          return { json: async () => fixture.response } as unknown as Response;
+        },
+      };
+      renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixture.deps);
+      fireEvent.change(screen.getByLabelText("League name"), { target: { value: "Sit and Go Room" } });
+      fireEvent.click(screen.getByRole("button", { name: "Create league" }));
+      await waitFor(() => expect(bodies).toHaveLength(1));
+      expect(bodies[0]).toMatchObject({ startTrigger: "scheduled" });
+
+      fireEvent.change(screen.getByLabelText("Who can join"), { target: { value: "public" } });
+      fireEvent.change(screen.getByLabelText("Draft start"), { target: { value: "when_full" } });
+      fireEvent.click(screen.getByRole("button", { name: "Create league" }));
+      await waitFor(() => expect(bodies).toHaveLength(2));
+      expect(bodies[1]).toMatchObject({ visibility: "public", startTrigger: "when_full" });
+    });
+
+    it("is keyboard-reachable and axe-clean inside the open drawer, in both themes, at 360px", async () => {
+      const fixture = fixtureLeagueDeps();
+      await inBothThemes(
+        <LeagueRoomDepsProvider deps={fixture.deps}>
+          <CreateLeagueForm onCreated={vi.fn()} />
+        </LeagueRoomDepsProvider>,
+        async ({ container }) => {
+          fireEvent.change(screen.getByLabelText("Who can join"), { target: { value: "public" } });
+          const details = container.querySelector("details")!;
+          details.setAttribute("open", "");
+          const select = screen.getByLabelText("Draft start");
           expect(select.tagName).toBe("SELECT");
           expect(select).not.toHaveAttribute("tabindex");
           select.focus();

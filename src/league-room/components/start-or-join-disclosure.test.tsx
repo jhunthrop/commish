@@ -61,6 +61,20 @@ describe("StartOrJoinDisclosure", () => {
     expect(screen.getByLabelText("League name")).toBeInTheDocument();
   });
 
+  /**
+   * Phase 3.5, Task 9's promotion, proven through the SAME nesting a returning manager actually
+   * reaches it through: this outer disclosure wraps `CreateLeaguePanel`, which wraps
+   * `CreateLeagueForm`. Neither control needs the outer disclosure's own `<details>` marked
+   * `open` to be present in the DOM (`render` mounts it regardless, same as every other section
+   * here), and it needs no INNER "Advanced settings" disclosure opened at all — the property this
+   * whole task exists to prove.
+   */
+  it("carries who-can-join and who-it's-for straight through into the create section, unopened", () => {
+    render(<StartOrJoinDisclosure experienceTier="beginner" />);
+    expect(screen.getByLabelText("Who can join")).toBeInTheDocument();
+    expect(screen.getByLabelText("Who it's for")).toBeInTheDocument();
+  });
+
   it("orders browse and join ahead of create for a beginner, the same rule firstRunPlan uses", () => {
     render(<StartOrJoinDisclosure experienceTier="beginner" />);
     expect(sectionHeadingOrder()).toEqual(["No group to play with yet?", "Invited by a friend?", "Start a league"]);

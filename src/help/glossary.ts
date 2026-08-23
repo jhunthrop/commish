@@ -1,4 +1,10 @@
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { VERIFIED_BADGE_TOOLTIP } from "@/participation/verified";
+
+/** `MATCHMAKING_CONFIG.sitAndGo.graceSeconds` in words, computed rather than typed a second
+ *  time, so the glossary entry below can never drift from the number `fireWhenFullInTx`
+ *  actually waits. */
+const SIT_AND_GO_GRACE_MINUTES = MATCHMAKING_CONFIG.sitAndGo.graceSeconds / 60;
 
 /**
  * The registry: every piece of jargon this product shows a manager, defined exactly once.
@@ -28,6 +34,7 @@ export type TermKey =
   | "median-game"
   | "queue"
   | "draft-slot"
+  | "sit-and-go"
   | "verified-reviewer";
 
 export interface GlossaryTerm {
@@ -163,6 +170,12 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     short: "Your position in the draft order, from 1st pick to last.",
     detail:
       "A draft slot is your position in the draft order, from slot 1 (the first pick of the draft) to the last slot. You can rank the slots you want before the draft starts. We draw managers in a random order and give each one their highest-ranked slot that is still free, so a good rank still beats pure luck without anybody being able to pick their exact spot outright.",
+  },
+  "sit-and-go": {
+    key: "sit-and-go",
+    term: "a sit-and-go league",
+    short: "Drafts on its own the moment every seat fills, no scheduled time.",
+    detail: `A sit-and-go league has no draft time on the calendar. Instead, its draft starts on its own about ${SIT_AND_GO_GRACE_MINUTES} minutes after the last open seat fills, giving everyone a chance to open the room before it begins.`,
   },
   /**
    * Founder decision #8, verbatim (`VERIFIED_BADGE_TOOLTIP`, `@/participation/verified`) — read
