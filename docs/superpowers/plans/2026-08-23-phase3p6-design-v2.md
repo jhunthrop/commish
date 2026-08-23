@@ -1030,6 +1030,8 @@ it("speaks the house register, with no contractions anywhere on the screen", () 
   // C1 (ruled): the expanded register is the house standard. `waiting-room.tsx:117` ships
   // "You don't have to wait here. We'll let you know the moment it fills." today; it converges
   // here on the one sentence Task 7 Step 7 owns, expanded, and the two shipped contractions die.
+  // The one named exception in the product is the just-seated heading (Step 2b), which is why
+  // this assertion renders the waiting variant rather than sweeping the component's every state.
   renderSurface(<WaitingRoom league={whenFullAndFilling} />, ({ container }) => {
     expect(container.textContent).not.toMatch(/\b\w+'(t|ll|re|ve|s|d|m)\b/);
     expect(container.textContent).toContain("You do not have to wait here.");
@@ -1048,6 +1050,33 @@ it("puts the room tour first for a manager who has never drafted", () => {
 Scheduled: the `xl` `Countdown` beside the fill `Meter`, with the local-time line under it. When-full: the fill `Meter` **promoted to hero**, no countdown at all, and the honest sentence about what joining committed them to, **quoted from `describeStartTiming`** and not typed here (F9): *"This one drafts the moment the last seat is taken. We tell you as soon as it fills, and the room opens a few minutes after that. You do not have to wait here."* The gauntlet's sit-and-go finding was that the two are different commitments told in the same words; they now differ in the largest element on the screen.
 
 **The room going full is a moment, and it is drawn** (D3). `filledTeams === teamCount` is already on the page and the transition already arrives: the last seat lands, `fireWhenFullInTx` publishes, and the notice reaches this screen on `notice.created` (no new event type, ruling 21). What this step specifies is what the screen *does* with it: the fill `Meter` animates to complete, the seat sentence settles to **"12 of 12 seated"**, and the `xl` `Countdown` to the grace-window kickoff **replaces** the meter as the hero, in that order, so the room visibly changes state rather than quietly rerendering a different number. Under `prefers-reduced-motion` the meter completes and the countdown appears with no transition at all, on Task 13 Step 5's branch, and both sides are asserted. Nothing here is a new fact: it is the two facts the page already has, sequenced.
+
+- [ ] **Step 2b: The seating moment (D1)**
+
+The first thing a person sees after signing in for a seat should be **the seat**, and today it is a waiting room that looks identical to the one they will see on day four. This step adds one variant of the hero this task is already rewriting: the **just-seated** state, which the return flow (Task 6 Step 4, outcome a) redirects into.
+
+```tsx
+// src/league-room/components/waiting-room.test.tsx
+it("shows a manager who just sat down that they are in, and which seat is theirs", () => {
+  renderSurface(<WaitingRoom league={scheduledAndFilling} justSeated />, ({ getByText }) => {
+    expect(getByText("Half-PPR #241 · You're in")).toBeInTheDocument();
+    expect(getByText("You claimed seat 10 of 12 just now.")).toBeInTheDocument();
+  });
+});
+
+it("stops being a moment once it stops being true, with nothing stored and nothing to dismiss", () => {
+  // Derived-only, exactly like the attention queue (ruling 11): `justSeated` is
+  // `clock.now() - team.createdAt < UI_CONFIG.waitingRoom.justSeatedMinutes`, computed on the
+  // server from a column that already exists. There is no seen-flag, no snooze and no column.
+  renderSurface(<WaitingRoom league={scheduledAndFilling} justSeated={false} />, ({ queryByText }) => {
+    expect(queryByText(/You're in/)).toBeNull();
+  });
+});
+```
+
+**Its data honesty, named:** the seat number is `count(teams) at insert`, which is the same ordering `RoomRoster` already renders; the freshness is `teams.created_at` compared against an **injected** `Clock` (`src/domain/timing.ts`), never `Date.now()` in a component; and the league's name and format line are the facts the hero already prints. **No new column, no new query, no new event.**
+
+The rendering: `Crest` at `lg`, the league line as the heading, the seat sentence under it, and **one** line of what happens next — the checklist's first item, promoted, so the moment ends in an action rather than in applause. The heading is the one place in this plan a contraction is deliberate and it stays inside the house rule, because `"You're in"` is the mock's own approved wordmark-adjacent line: it is quoted in `docs/design-system.md` as the single named exception to C1's expanded register, with the reason, rather than being left for the next writer to generalize from.
 
 - [ ] **Step 3: The room, without the tags**
 
@@ -1074,21 +1103,25 @@ First-timer, sit-and-go joiner, skeptic, veteran. The questions: does a first-ti
 The signed-in home, and the screen the founder's "wow" is measured on. Everything the mock draws that this product can compute, and nothing it cannot.
 
 **Files:**
-- Modify: `src/app/app/page.tsx`, `src/league-room/components/home-board.tsx` (+ its test), `home-league-card.tsx` (+ its test), `first-run-panel.tsx` (+ its test), `start-or-join-disclosure.tsx`
+- Modify: `src/app/app/(shell)/page.tsx`, `src/league-room/components/home-board.tsx` (+ its test), `home-league-card.tsx` (+ its test), `start-or-join-disclosure.tsx`
+- Modify: `src/league/next-action.ts` (+ its test) — the `fix-lineup` kind and its `COPY` entry (Step 1b)
 - Create: `src/league-room/components/league-board.tsx`, `attention-queue.tsx`, `open-seats-panel.tsx`, `live-state-pill.tsx` (+ their tests)
-- Modify: `src/league-service/home.ts` (+ its test), `src/league-room/contract.ts`, `src/components/app-shell/top-bar.tsx`, `src/integrity/rendered-copy.test.tsx`
+- Modify: `src/league-service/home.ts` (+ its test) — the `lineupSet` read (Step 1b), `src/league-room/contract.ts`, `src/components/app-shell/top-bar.tsx`, `src/integrity/rendered-copy.test.tsx`
+- **Not here:** `first-run-panel.tsx` was listed in this block with no step behind it (F18a). It belongs to the addendum's **Task 17**, which is the task that actually redesigns it, and this task neither reads nor edits it.
 
 **Interfaces:**
-- Consumes: `crossLeagueHome`, `nextActionFor`, `useLiveScores`, `listPublicLeagues`, `Table` (dense), `Panel`, `Crest`, `StatPill`, `Meter`.
-- Produces: `LeagueBoard`, `AttentionQueue`, `OpenSeatsPanel`, `LiveStatePill`, `HomeBody.liveState`.
+- Consumes: `crossLeagueHome`, `nextActionFor`, `useLiveScores`, `listPublicLeagues`, `Table` (dense), `Panel`, `Crest`, `StatPill`, `Meter`, `SeatMeter` (F17 — the open-seats panel renders the primitive rather than writing a fourth seat sentence).
+- Produces: `LeagueBoard`, `AttentionQueue`, `OpenSeatsPanel`, `LiveStatePill`, `HomeBody.liveState`, `NextActionKind["fix-lineup"]`, `HomeLeagueCard.lineupSet`.
 
 - [ ] **Step 1: Write the failing board tests**
 
 ```tsx
 // src/league-room/components/league-board.test.tsx
 it("puts the league that needs the manager first, and says why in words", () => {
+  // C2: one string, "Fix your lineup", owned by COPY in `src/league/next-action.ts`. The pill
+  // uppercases it in CSS; nothing anywhere renders a second, shorter spelling of it.
   renderSurface(<LeagueBoard leagues={mixed} />, ({ getAllByRole }) => {
-    expect(within(getAllByRole("row")[1]!).getByText("Fix lineup")).toBeInTheDocument();
+    expect(within(getAllByRole("row")[1]!).getByText("Fix your lineup")).toBeInTheDocument();
   });
 });
 
@@ -1136,9 +1169,39 @@ it("degrades to one league without announcing a sort over a list of one", () => 
 });
 ```
 
+- [ ] **Step 1b: `lineupSet`, and the fact under "Fix your lineup" (F1)**
+
+The board's central promise, the rail's needs-you dot and the attention queue's own test all depend on a fact **nothing in this product computes**: whether this manager's lineup for this week is actually set. `nextAction`'s `set-lineup` fires whenever `weekStatus === "scheduled"` and the manager has a team, which is every league, every week, set or not, so the rail lights every league forever and `itemsFor(lineupSet)` in Step 1's queue test cannot pass. The fact does exist and is already queried: `leaguesNeedingAutoSetQuery` (`src/league-service/auto-lineup.ts`) asks `notExists(lineupSlots WHERE teamId AND weekNumber)`.
+
+```ts
+// src/league/next-action.test.ts
+it("asks for a fix only when the lineup is genuinely unset and the week can still be changed", () => {
+  expect(nextAction({ ...base, myTeamId: "t_1", lineupSet: false, isWeekLocked: false }).kind).toBe("fix-lineup");
+  expect(nextAction({ ...base, myTeamId: "t_1", lineupSet: true, isWeekLocked: false }).kind).not.toBe("fix-lineup");
+  expect(nextAction({ ...base, myTeamId: "t_1", lineupSet: false, isWeekLocked: true }).kind).not.toBe("fix-lineup");
+});
+
+it("keeps one string per kind, and they are not the same string", () => {
+  expect(COPY["fix-lineup"]).toBe("Fix your lineup");
+  expect(COPY["set-lineup"]).toBe("Set your lineup");
+});
+```
+
+Three changes, each small:
+
+1. **`HomeLeagueCard` gains `readonly lineupSet: boolean`**, derived in `src/league-service/home.ts` from **the same `notExists(lineupSlots)` predicate `auto-lineup.ts` already uses**, over the leagues the home read is already grouping. One predicate, two callers, no new column and no new table.
+2. **`NextActionKind` gains `"fix-lineup"`, placed directly above `set-lineup` in the precedence ladder**, firing when `myTeamId !== null && !lineupSet && !isWeekLocked`. `set-lineup` keeps its place and its meaning for the week that has not opened yet.
+3. **`COPY["fix-lineup"] = "Fix your lineup"`** (C2), which is the string the board cell, the attention chip, the rail's accessible name and the `StatPill` all read. The pill's capitals are CSS.
+
+At Sunday 1pm the week is `in_progress` and the ladder correctly returns "Watch the scores" — a lineup that can no longer be changed is not an action, and the 4:05 window is a lock time this product does not model per game. That is stated here rather than left to be discovered, and it is the one thing this step does **not** fix.
+
 - [ ] **Step 2: The board's columns, each one a fact this product holds**
 
 Crest · league name with record and next opponent · the two scores with the leader marked · the margin `Meter` · the next action · the state `StatPill`. Sorted by whether the manager is needed, then by how close the game is (margin, which is a subtraction, not a model). The mock's win-probability column, moments column and season projection are **not** rendered; deferrals D1, D2 and D3 name the data each would require. What replaces them is the next-action column, which is real, already computed by `nextActionFor`, and is the single most useful thing on a fantasy home screen: the mock's own best idea (one action that fixes the thing) rendered from something true.
+
+**The action is one click from being done** (F16): `actionHref` maps both `fix-lineup` and `set-lineup` to **`/app/leagues/${id}#lineup`**, which lands on the editor itself rather than on a league home the manager then has to scan. Task 11 Step 1 gives `LineupEditor` the `id="lineup"` that makes the fragment land, and Task 11 Step 4 makes it the first panel below the header when the league's own `nextAction.kind` is `fix-lineup`. Two screens saved, on the action the veteran performs most.
+
+**A record is allowed to carry weight** (D5). A streak or a first win is already on the board as a string this product computes (`record`, from `standings.ts`); what this step adds is that the board is permitted to render it at a heavier step of the type scale, and the rule lands in `docs/design-system.md` (Task 14 Step 2) as a **type-scale rule and nothing more**: a record may take one step up the scale and a heavier weight, it may not take a color, a badge, an animation or a second row. That is the whole of it — no new data, no new component, and no celebration on a home screen that a person opens forty times a season.
 
 - [ ] **Step 3: The live pill, from the real week**
 
