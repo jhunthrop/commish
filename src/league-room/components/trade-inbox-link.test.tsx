@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { TradesPageBody } from "@/trades/contract";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
@@ -12,7 +12,7 @@ const EMPTY_PAGE: TradesPageBody = { leagueId: "l1", meTeamId: "t1", inbox: [], 
 describe("TradeInboxLink", () => {
   it("links to the league's trades page, with no badge when nothing is waiting, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: EMPTY_PAGE });
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <TradeInboxLink leagueId="l1" />
       </LeagueRoomDepsProvider>,

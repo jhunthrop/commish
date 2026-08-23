@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { GLOSSARY } from "@/help/glossary";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { LineupBody } from "../contract";
 import { LINEUP, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LineupEditor } from "./lineup-editor";
@@ -24,7 +24,7 @@ const LINEUP_WITH_SUPERFLEX: LineupBody = {
 describe("LineupEditor", () => {
   it("shows starters and bench with a labelled control per starting slot, in both themes", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: LINEUP });
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} />
       </LeagueRoomDepsProvider>,
@@ -142,7 +142,7 @@ describe("LineupEditor", () => {
 
   it("goes read-only once the week has started, and names when it reopens", async () => {
     const fixture = fixtureLeagueDeps();
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <LineupEditor leagueId="l1" lineup={{ ...LINEUP, locked: true }} totalWeeks={14} />
       </LeagueRoomDepsProvider>,

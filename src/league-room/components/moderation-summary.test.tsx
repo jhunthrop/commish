@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { ModerationSummaryView } from "../contract";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
@@ -13,7 +13,7 @@ const HEALTHY: ModerationSummaryView = { removedMessages: 0, removedReviews: 0, 
 describe("ModerationSummary", () => {
   it("says what the window is and what it deliberately is not, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: POPULATED });
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <ModerationSummary leagueId="l1" />
       </LeagueRoomDepsProvider>,

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { RoomLayout } from "./room-layout";
 
 const slots = {
@@ -16,7 +16,7 @@ const bandFor = (text: string) => screen.getByText(text).closest("div")!;
 
 describe("RoomLayout", () => {
   it("frames all four regions once, in both themes, axe-clean", async () => {
-    await inBothThemes(<RoomLayout {...slots} />, async ({ container }) => {
+    await renderSurface(<RoomLayout {...slots} />, async ({ container }) => {
       for (const text of ["Rail", "Pool", "Stage", "Dock"]) {
         expect(screen.getByText(text)).toBeInTheDocument();
       }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 import { NoticesProvider } from "./notices-provider";
@@ -26,7 +26,7 @@ function renderHeader(displayName: string, avatar: string | null, isAdmin = fals
 describe("AppHeader", () => {
   it("names the signed-in user and links to their profile, with their avatar, in both themes, axe-clean", async () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
-    await inBothThemes(
+    await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
         <NoticesProvider>
           <AppHeader displayName="Ada Lovelace" avatar="preset:shield" isAdmin={false} />
@@ -69,7 +69,7 @@ describe("AppHeader", () => {
 
   it("links an operator to the dispute queue, in both themes, axe-clean", async () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
-    await inBothThemes(
+    await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
         <NoticesProvider>
           <AppHeader displayName="Ada Lovelace" avatar={null} isAdmin={true} />

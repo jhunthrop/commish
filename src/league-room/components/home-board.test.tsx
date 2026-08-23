@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { act, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { firstRunPlan } from "@/identity";
 import type { HomeBody } from "../contract";
 import { LEAGUE_ROOM_CONFIG } from "../config";
@@ -57,14 +57,14 @@ function setVisibility(state: DocumentVisibilityState): void {
 
 describe("HomeBoard", () => {
   it("renders the server's payload immediately, in both themes", async () => {
-    await inBothThemes(<HomeBoard initial={ONE_SCHEDULED} />, async ({ container }) => {
+    await renderSurface(<HomeBoard initial={ONE_SCHEDULED} />, async ({ container }) => {
       expect(screen.getByRole("link", { name: "Sunday Money" })).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
   });
 
   it("shows the first-run fork, not the plain empty state, when the caller has no leagues", async () => {
-    await inBothThemes(<HomeBoard initial={EMPTY} />, async ({ container }) => {
+    await renderSurface(<HomeBoard initial={EMPTY} />, async ({ container }) => {
       expect(screen.getByRole("heading", { name: FIRST_RUN.headline })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Browse open leagues" })).toHaveAttribute("href", "/browse");
       expect(screen.queryByText("No leagues yet")).not.toBeInTheDocument();

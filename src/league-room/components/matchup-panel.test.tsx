@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { fixtureLeagueDeps, MATCHUP, MATCHUP_WITH_MEDIAN, renderInLeague } from "../test-fixtures";
 import { MatchupPanel } from "./matchup-panel";
 
@@ -10,7 +10,7 @@ const inProgressMatchup = { ...MATCHUP, final: false, weekStatus: "in_progress" 
 
 describe("MatchupPanel", () => {
   it("shows both lineups, per-player points and the final score, in both themes, axe-clean", async () => {
-    await inBothThemes(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />, async ({ container }) => {
+    await renderSurface(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />, async ({ container }) => {
       expect(screen.getByRole("heading", { name: "Bay Bandits" })).toBeInTheDocument();
       expect(screen.getByRole("heading", { name: "Iron Owls" })).toBeInTheDocument();
       expect(screen.getByText("112.50")).toBeInTheDocument();
@@ -32,7 +32,7 @@ describe("MatchupPanel", () => {
 
   it("says a week is not scored yet rather than showing a zero", async () => {
     const pending = { ...MATCHUP, final: false, home: { ...MATCHUP.home, score: null }, away: { ...MATCHUP.away, score: null } };
-    await inBothThemes(<MatchupPanel matchup={pending} myTeamId="t1" weekStatus="scheduled" />, async ({ container }) => {
+    await renderSurface(<MatchupPanel matchup={pending} myTeamId="t1" weekStatus="scheduled" />, async ({ container }) => {
       expect(screen.getByText("Not started")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -46,7 +46,7 @@ describe("MatchupPanel", () => {
   });
 
   it("shows each team's own median result, second person for the viewer's own team, third person for the other, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <MatchupPanel matchup={MATCHUP_WITH_MEDIAN} myTeamId="t1" weekStatus="final" />,
       async ({ container }) => {
         // `t1` (home, myTeamId) beat the median; `t2` (away) missed it.

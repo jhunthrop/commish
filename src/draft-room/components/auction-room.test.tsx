@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { screen, waitFor, act, fireEvent, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { AUCTION_VIEW, fixtureDeps, renderInRoom, type FixtureDeps } from "../test-fixtures";
@@ -72,11 +72,11 @@ function mountAuctionWithQueue(over: Partial<Pick<FixtureDeps, "queue" | "queueR
 
 describe("AuctionRoom", () => {
   it("renders the auction layout — rail lot, left pool, budgets, dock — both themes, axe-clean", async () => {
-    // `inBothThemes` does the render itself (once per theme), so the fixture's deps are wired
+    // `renderSurface` does the render itself (once per theme), so the fixture's deps are wired
     // up through the same provider `renderInRoom`/`mountAuction` use elsewhere in this file —
     // the room still exercises the real loading → ready flow, in both themes.
     const fixture = fixtureDeps(AUCTION_VIEW);
-    await inBothThemes(
+    await renderSurface(
       <DraftRoomDepsProvider deps={fixture.deps}>
         <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
           <ToastProvider>

@@ -3,7 +3,7 @@ import { render, screen, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { AUCTION_VIEW, PLAYERS, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
 import { DraftBoard } from "./draft-board";
 
@@ -56,7 +56,7 @@ function grid(): HTMLElement {
 describe("DraftBoard", () => {
   it("draws a column per team and a row per roster spot, axe-clean in both themes", async () => {
     stubMatchMedia(false);
-    await inBothThemes(<DraftBoard {...props} view={SNAKE_VIEW} />, async ({ container }) => {
+    await renderSurface(<DraftBoard {...props} view={SNAKE_VIEW} />, async ({ container }) => {
       const table = within(grid()).getByRole("table", { name: /draft board/i });
       // Header row plus one row per roster spot (SNAKE_VIEW declares QB×1 + RB×2).
       expect(within(table).getAllByRole("row")).toHaveLength(1 + 3);
@@ -194,7 +194,7 @@ describe("DraftBoard", () => {
 
     it("labels it Pending in the wide grid, both themes, axe-clean — never a blank dashed box", async () => {
       stubMatchMedia(false);
-      await inBothThemes(<DraftBoard {...props} view={view} />, async ({ container }) => {
+      await renderSurface(<DraftBoard {...props} view={view} />, async ({ container }) => {
         const rows = within(grid()).getAllByRole("row");
         const roundOne = within(rows[1]!).getAllByRole("cell");
         expect(roundOne[1]).toHaveTextContent("Pending"); // t2's own column

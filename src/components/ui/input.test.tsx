@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Input } from "./input";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 
 describe("Input", () => {
   it("has a visible label associated with the control, both themes, no axe violations", async () => {
-    await inBothThemes(<Input label="League name" />, async ({ container }) => {
+    await renderSurface(<Input label="League name" />, async ({ container }) => {
       expect(screen.getByLabelText("League name")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });

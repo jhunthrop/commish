@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { PLAYERS, SNAKE_VIEW } from "../test-fixtures";
 import { PlayerPool } from "./player-pool";
 
@@ -23,7 +23,7 @@ const rowFor = (name: string) => screen.getByText(name).closest("li")!;
 
 describe("PlayerPool", () => {
   it("lists every player in ranked order and is axe-clean in both themes", async () => {
-    await inBothThemes(<PlayerPool {...props} />, async ({ container }) => {
+    await renderSurface(<PlayerPool {...props} />, async ({ container }) => {
       expect(poolRows().map((row) => within(row).getByRole("button", { name: /queue/i }).closest("li")!.textContent)).toHaveLength(4);
       expect(screen.getByText("Jalen Croft")).toBeInTheDocument();
       expect(screen.getByText("Andre Salas")).toBeInTheDocument();

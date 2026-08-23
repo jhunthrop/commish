@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { AdminRoomDepsProvider } from "../hooks/deps";
 import { fixtureAdminDeps, renderInAdmin } from "../test-fixtures";
 import { ResolutionForm, type DecisionPreview } from "./resolution-form";
@@ -26,7 +26,7 @@ const PREVIEWS: Readonly<Record<"warned_user" | "content_removed", DecisionPrevi
 describe("ResolutionForm", () => {
   it("previews silence for no_action, in both themes, axe-clean", async () => {
     const fixture = fixtureAdminDeps();
-    await inBothThemes(
+    await renderSurface(
       <AdminRoomDepsProvider deps={fixture.deps}>
         <ResolutionForm flagId="flag_1" decisions={["no_action", "warned_user"]} noteMaxLength={500} previews={PREVIEWS} isChatSubject={false} />
       </AdminRoomDepsProvider>,

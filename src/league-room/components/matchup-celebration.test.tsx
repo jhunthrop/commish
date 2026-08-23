@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { LOST, WON } from "../test-fixtures";
 import { MatchupCelebration } from "./matchup-celebration";
 
 describe("MatchupCelebration", () => {
   it("celebrates a win, in both themes, axe-clean", async () => {
-    await inBothThemes(<MatchupCelebration matchup={WON} myTeamId="t1" clinched={false} />, async ({ container }) => {
+    await renderSurface(<MatchupCelebration matchup={WON} myTeamId="t1" clinched={false} />, async ({ container }) => {
       expect(screen.getByRole("status")).toHaveTextContent("You won in Week 3!");
       expect(container.firstElementChild).toHaveAttribute("data-emphasis", "self");
       expect(await axe(container)).toHaveNoViolations();

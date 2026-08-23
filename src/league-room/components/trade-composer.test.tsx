@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { TRADE_CONFIG } from "@/trades/config";
 import type { TradeRoomContext } from "../contract";
 import { TradeComposer } from "./trade-composer";
@@ -31,7 +31,7 @@ describe("TradeComposer", () => {
   it("caps the package at the same number the service does, from the same config, in both themes, axe-clean", async () => {
     const onAssess = vi.fn();
     const onPropose = vi.fn();
-    await inBothThemes(
+    await renderSurface(
       <TradeComposer context={CONTEXT} onAssess={onAssess} onPropose={onPropose} onDone={vi.fn()} onCancel={vi.fn()} />,
       async ({ container }) => {
         expect(screen.getByText(new RegExp(`up to ${TRADE_CONFIG.maxAssetsPerSide} players`))).toBeVisible();

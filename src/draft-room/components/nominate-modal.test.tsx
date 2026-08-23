@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { AUCTION_VIEW } from "../test-fixtures";
 
 import { NominateModal } from "./nominate-modal";
@@ -19,7 +19,7 @@ const props = {
 
 describe("NominateModal", () => {
   it("names the player in the dialog title and states the legal opening range — both themes, axe-clean", async () => {
-    await inBothThemes(<NominateModal {...props} />, async ({ container }) => {
+    await renderSurface(<NominateModal {...props} />, async ({ container }) => {
       expect(screen.getByRole("dialog", { name: "Nominate Jalen Croft" })).toBeInTheDocument();
       expect(screen.getByLabelText("Opening bid")).toHaveAttribute("min", "1");
       expect(screen.getByLabelText("Opening bid")).toHaveAttribute("max", "97");

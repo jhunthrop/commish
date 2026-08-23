@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, waitFor, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { DraftRoomDepsProvider } from "../hooks/deps";
 import { fixtureDeps, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
 import { TvBoard } from "./tv-board";
@@ -24,7 +24,7 @@ describe("TvBoard", () => {
   it("shows the board with no controls at all, axe-clean, both themes, empty grid", async () => {
     stubMatchMedia();
     const fixture = fixtureDeps();
-    await inBothThemes(
+    await renderSurface(
       <DraftRoomDepsProvider deps={fixture.deps}>
         <TvBoard draftId="d1" />
       </DraftRoomDepsProvider>,
@@ -52,7 +52,7 @@ describe("TvBoard", () => {
       ],
       availablePlayerIds: ["rb1", "rb2", "wr1"],
     });
-    await inBothThemes(
+    await renderSurface(
       <DraftRoomDepsProvider deps={fixture.deps}>
         <TvBoard draftId="d1" />
       </DraftRoomDepsProvider>,

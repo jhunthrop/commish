@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 import { Celebration } from "./celebration";
 
 vi.mock("@/design/use-reduced-motion", () => ({ usePrefersReducedMotion: vi.fn(() => false) }));
@@ -9,7 +9,7 @@ import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 
 describe("Celebration", () => {
   it("announces itself politely, in both themes, axe-clean", async () => {
-    await inBothThemes(<Celebration title="You won!" detail="112.50 to 98.25" emphasis="self" />, async ({ container }) => {
+    await renderSurface(<Celebration title="You won!" detail="112.50 to 98.25" emphasis="self" />, async ({ container }) => {
       expect(screen.getByRole("status")).toHaveTextContent("You won!");
       expect(screen.getByText("112.50 to 98.25")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { AUCTION_VIEW } from "../test-fixtures";
 import { BidControls } from "./bid-controls";
 
@@ -14,7 +14,7 @@ const open = {
 
 describe("BidControls", () => {
   it("states the legal range from the server's own numbers, in both themes, axe-clean", async () => {
-    await inBothThemes(<BidControls view={open} myTeamId="t1" submitting={false} onBid={() => {}} />, async ({ container }) => {
+    await renderSurface(<BidControls view={open} myTeamId="t1" submitting={false} onBid={() => {}} />, async ({ container }) => {
       const input = screen.getByLabelText("Your bid");
       expect(input).toHaveAttribute("min", "25");
       expect(input).toHaveAttribute("max", "80");

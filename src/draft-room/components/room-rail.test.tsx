@@ -3,7 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { GLOSSARY } from "@/help/glossary";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { AUCTION_VIEW, LEAGUE_NAME, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
 import { RoomRail } from "./room-rail";
 
@@ -44,7 +44,7 @@ function pick(over: Partial<CompletedPick> = {}): CompletedPick {
 
 describe("RoomRail", () => {
   it("names the league, the format, the turn and your team — both themes, axe-clean", async () => {
-    await inBothThemes(<RoomRail {...props} view={liveView()} myTeamId="t2" />, async ({ container }) => {
+    await renderSurface(<RoomRail {...props} view={liveView()} myTeamId="t2" />, async ({ container }) => {
       expect(screen.getByRole("heading", { level: 1, name: LEAGUE_NAME })).toBeInTheDocument();
       expect(screen.getByText("Snake draft")).toBeInTheDocument();
       expect(screen.getByTestId("turn-label")).toHaveTextContent("Round 1 · Pick 1");
@@ -64,7 +64,7 @@ describe("RoomRail", () => {
     // 3 hours out: well within the freeze right now (real time, not a fake timer — see this
     // file's own top-of-file note on why).
     const resumeAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
-    await inBothThemes(<RoomRail {...props} view={liveView({ pausedUntil: resumeAt })} myTeamId="t2" />, async ({ container }) => {
+    await renderSurface(<RoomRail {...props} view={liveView({ pausedUntil: resumeAt })} myTeamId="t2" />, async ({ container }) => {
       expect(screen.queryByTestId("countdown")).toBeNull();
       const message = screen.getByTestId("paused-message");
       expect(message).toHaveTextContent(/^Picks are paused until \d{1,2}:\d{2} (AM|PM) Eastern\. You can still make yours\.$/);
@@ -198,7 +198,7 @@ describe("RoomRail", () => {
       deadlineAt: new Date(Date.now() + 45_000).toISOString(),
       auction: { minBid: 1, nominatingTeamId: null, lot: { playerId: "qb1", highBid: 12, highBidTeamId: "t2", nominatedByTeamId: "t1", autoNominated: false } },
     };
-    await inBothThemes(<RoomRail {...props} view={lotView} myTeamId="t1" />, async ({ container }) => {
+    await renderSurface(<RoomRail {...props} view={lotView} myTeamId="t1" />, async ({ container }) => {
       expect(screen.getByText("Live bid")).toBeInTheDocument();
       expect(screen.getByText("Jalen Croft · $12")).toBeInTheDocument();
       expect(screen.getByText("Bidding is open on Jalen Croft. High bid $12 by Iron Owls.")).toBeInTheDocument();

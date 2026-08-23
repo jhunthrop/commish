@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { HomeLeagueCard as HomeLeagueCardData } from "../contract";
 import { WON } from "../test-fixtures";
 import { HomeLeagueCard } from "./home-league-card";
@@ -25,7 +25,7 @@ const BASE: HomeLeagueCardData = {
 
 describe("HomeLeagueCard", () => {
   it("renders the league name, record, and this week's matchup, in both themes", async () => {
-    await inBothThemes(<HomeLeagueCard league={BASE} />, async ({ container }) => {
+    await renderSurface(<HomeLeagueCard league={BASE} />, async ({ container }) => {
       expect(screen.getByRole("link", { name: "Sunday Money" })).toHaveAttribute("href", "/app/leagues/l1");
       expect(screen.getByText("5-2")).toBeInTheDocument();
       expect(screen.getByText(/Bay Bandits/)).toBeInTheDocument();
@@ -117,7 +117,7 @@ describe("HomeLeagueCard", () => {
   });
 
   it("stays axe-clean with a live draft badge, the record group, and a named action, in both themes", async () => {
-    await inBothThemes(
+    await renderSurface(
       <HomeLeagueCard league={{ ...BASE, draftStatus: "in_progress", nextAction: { kind: "join-draft", label: "Join the draft" } }} />,
       async ({ container }) => {
         expect(await axe(container)).toHaveNoViolations();

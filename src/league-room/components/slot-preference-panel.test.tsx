@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { SlotPreferenceView } from "../contract";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
@@ -14,7 +14,7 @@ const PARTIAL: SlotPreferenceView = { slotCount: 3, ranking: [2, 1], assignedSlo
 describe("SlotPreferencePanel", () => {
   it("renders the worked-example explainer and an editable empty state, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps();
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <SlotPreferencePanel leagueId="league_1" initialPreference={EMPTY} />
       </LeagueRoomDepsProvider>,
@@ -110,7 +110,7 @@ describe("SlotPreferencePanel", () => {
   describe("once the draft has started", () => {
     it("says the top choice came through, in both themes, axe-clean", async () => {
       const fixture = fixtureLeagueDeps();
-      await inBothThemes(
+      await renderSurface(
         <LeagueRoomDepsProvider deps={fixture.deps}>
           <SlotPreferencePanel leagueId="league_1" initialPreference={{ slotCount: 12, ranking: [3, 1], assignedSlot: 3, canEdit: false }} />
         </LeagueRoomDepsProvider>,

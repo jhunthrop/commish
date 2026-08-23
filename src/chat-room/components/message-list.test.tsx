@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { REASON_FRAGMENTS } from "@/moderation/test-support";
 import { chatMessage, TOUCHDOWN_GIF } from "../test-fixtures";
 import { formatChatTime } from "../lib/format";
@@ -14,7 +14,7 @@ const MESSAGES = [
 
 describe("MessageList", () => {
   it("renders every message with its author and time, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <MessageList leagueId="l1" messages={MESSAGES} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />,
       async ({ container }) => {
         expect(screen.getByText("wheels up")).toBeInTheDocument();
@@ -56,7 +56,7 @@ describe("MessageList", () => {
 
   it("renders a GIF message as an image with its alt text and real dimensions, in both themes, axe-clean", async () => {
     const withGif = [chatMessage("3", { body: TOUCHDOWN_GIF.alt, gif: TOUCHDOWN_GIF })];
-    await inBothThemes(
+    await renderSurface(
       <MessageList leagueId="l1" messages={withGif} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />,
       async ({ container }) => {
         const img = screen.getByRole("img", { name: TOUCHDOWN_GIF.alt });
@@ -103,7 +103,7 @@ describe("MessageList", () => {
     ];
 
     it("renders in place — the author and avatar stay, the words do not", async () => {
-      await inBothThemes(
+      await renderSurface(
         <MessageList leagueId="l1" messages={REMOVED} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />,
         async ({ container }) => {
           expect(screen.getByText("Jordan Lee")).toBeInTheDocument();

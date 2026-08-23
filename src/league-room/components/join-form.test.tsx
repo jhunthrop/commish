@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { LeagueTerms } from "@/league";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
@@ -38,7 +38,7 @@ const TERMS: LeagueTerms = {
 describe("JoinForm", () => {
   it("names the league before asking anyone to join it, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <JoinForm code="SUNDAY12" />
       </LeagueRoomDepsProvider>,

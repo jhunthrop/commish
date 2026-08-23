@@ -2,11 +2,11 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Avatar } from "./avatar";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 
 describe("Avatar", () => {
   it("falls back to initials and stays decorative by default, in both themes", async () => {
-    await inBothThemes(<Avatar name="Dana Whitfield" />, async ({ container }) => {
+    await renderSurface(<Avatar name="Dana Whitfield" />, async ({ container }) => {
       expect(screen.getByText("DW")).toBeInTheDocument();
       expect(container.firstElementChild).toHaveAttribute("aria-hidden", "true");
       expect(await axe(container)).toHaveNoViolations();
@@ -41,7 +41,7 @@ describe("Avatar", () => {
   });
 
   it("renders a chosen preset as an icon, both themes, no axe violations", async () => {
-    await inBothThemes(<Avatar name="Ada Lovelace" avatar="preset:shield" label="Ada Lovelace" />, async ({ container }) => {
+    await renderSurface(<Avatar name="Ada Lovelace" avatar="preset:shield" label="Ada Lovelace" />, async ({ container }) => {
       expect(screen.getByRole("img", { name: "Ada Lovelace" })).toBeInTheDocument();
       expect(container.querySelector("svg")).not.toBeNull();
       expect(await axe(container)).toHaveNoViolations();

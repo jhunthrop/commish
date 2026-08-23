@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
@@ -78,7 +78,7 @@ describe("AdminFlagDetailPage — the read", () => {
     vi.mocked(flagDetail).mockResolvedValue(OPEN_REVIEW_DETAIL);
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const page = await callPage();
-    await inBothThemes(
+    await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
         <NoticesProvider>{page}</NoticesProvider>
       </AccountRoomDepsProvider>,
@@ -203,7 +203,7 @@ describe("AdminFlagDetailPage — the read", () => {
       });
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
       const page = await callPage();
-      await inBothThemes(
+      await renderSurface(
         <AccountRoomDepsProvider deps={fixture.deps}>
           <NoticesProvider>{page}</NoticesProvider>
         </AccountRoomDepsProvider>,
@@ -335,7 +335,7 @@ describe("AdminFlagDetailPage — the read", () => {
     });
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const page = await callPage();
-    await inBothThemes(
+    await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
         <NoticesProvider>{page}</NoticesProvider>
       </AccountRoomDepsProvider>,

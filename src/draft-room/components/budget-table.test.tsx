@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { AUCTION_VIEW, TEAMS } from "../test-fixtures";
 import { BudgetTable } from "./budget-table";
 
 describe("BudgetTable", () => {
   it("shows every team's remaining budget and ceiling straight off the view — both themes, axe-clean", async () => {
-    await inBothThemes(<BudgetTable view={AUCTION_VIEW} teams={TEAMS} myTeamId="t1" />, async ({ container }) => {
+    await renderSurface(<BudgetTable view={AUCTION_VIEW} teams={TEAMS} myTeamId="t1" />, async ({ container }) => {
       const table = screen.getByRole("table", { name: /budgets/i });
       const row = within(table).getByText("Bay Bandits").closest("tr")!;
       expect(row).toHaveTextContent("$100");

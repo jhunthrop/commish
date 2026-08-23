@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { fixtureAccountDeps } from "@/account-room/test-fixtures";
 import { NoticesProvider } from "@/components/app-shell/notices-provider";
@@ -57,7 +57,7 @@ describe("AdminQueuePage — the two states", () => {
     vi.mocked(listPendingFlags).mockResolvedValue({ rows: [], nextBefore: null });
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const page = await callPage();
-    await inBothThemes(
+    await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
         <NoticesProvider>{page}</NoticesProvider>
       </AccountRoomDepsProvider>,
@@ -73,7 +73,7 @@ describe("AdminQueuePage — the two states", () => {
     vi.mocked(listPendingFlags).mockResolvedValue({ rows: TWO_ROWS, nextBefore: null });
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const page = await callPage();
-    await inBothThemes(
+    await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
         <NoticesProvider>{page}</NoticesProvider>
       </AccountRoomDepsProvider>,

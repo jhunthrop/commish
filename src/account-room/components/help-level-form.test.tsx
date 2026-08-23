@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { fixtureAccountDeps, renderInAccount } from "../test-fixtures";
 import { AccountRoomDepsProvider } from "../hooks/deps";
 import { HelpLevelForm } from "./help-level-form";
@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({
 describe("HelpLevelForm", () => {
   it("shows the stored level in plain words, in both themes, axe-clean", async () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { helpLevel: "guided", draftTourDismissedAt: null } });
-    await inBothThemes(
+    await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
         <HelpLevelForm helpLevel="guided" />
       </AccountRoomDepsProvider>,

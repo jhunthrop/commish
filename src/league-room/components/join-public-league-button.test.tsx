@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { JoinPublicLeagueButton } from "./join-public-league-button";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
@@ -12,7 +12,7 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh: vi.fn() }
 describe("JoinPublicLeagueButton", () => {
   it("names the league it joins, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps();
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <JoinPublicLeagueButton leagueId="p1" leagueName="Rookie Snake Room" />
       </LeagueRoomDepsProvider>,

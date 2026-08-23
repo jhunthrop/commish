@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { GLOSSARY } from "@/help/glossary";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { LeagueAuthority } from "@/league-service/authority";
 import { THREE_TEAMS } from "../test-fixtures";
 import { LeagueMembersPanel } from "./league-members-panel";
@@ -12,7 +12,7 @@ const HOUSE: LeagueAuthority = { kind: "house", rung: "open_12" };
 
 describe("LeagueMembersPanel", () => {
   it("names the commissioner, marks you, and gives every manager a face", async () => {
-    await inBothThemes(
+    await renderSurface(
       <LeagueMembersPanel teams={THREE_TEAMS} authority={MEMBER} myTeamId="t2" />,
       async ({ container }) => {
         expect(screen.getByRole("list", { name: "Managers" })).toBeInTheDocument();
@@ -57,7 +57,7 @@ describe("LeagueMembersPanel", () => {
   });
 
   it("shows every manager's name, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <LeagueMembersPanel teams={THREE_TEAMS} authority={MEMBER} myTeamId="t2" />,
       async ({ container }) => {
         expect(screen.getByText("Alex Rivera")).toBeInTheDocument();
@@ -69,7 +69,7 @@ describe("LeagueMembersPanel", () => {
   });
 
   it("offers a next step rather than a dead end when a league somehow has no members yet, in both themes", async () => {
-    await inBothThemes(
+    await renderSurface(
       <LeagueMembersPanel teams={[]} authority={MEMBER} myTeamId={null} />,
       async ({ container }) => {
         expect(screen.getByText("Nobody's here yet")).toBeInTheDocument();
@@ -97,7 +97,7 @@ describe("LeagueMembersPanel", () => {
   // above the roster stating the fact.
   describe("a house league", () => {
     it("states who runs it instead of leaving the absent badge to be inferred", async () => {
-      await inBothThemes(
+      await renderSurface(
         <LeagueMembersPanel teams={THREE_TEAMS} authority={HOUSE} myTeamId="t2" />,
         async ({ container }) => {
           expect(screen.getByText("Run by Commish")).toBeInTheDocument();

@@ -2,14 +2,14 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { BrowseFilters } from "./browse-filters";
 
 describe("BrowseFilters", () => {
   it("offers every filter as a labelled control, in both themes, axe-clean", async () => {
-    await inBothThemes(<BrowseFilters filter={EMPTY_BROWSE_FILTER} />, async ({ container }) => {
+    await renderSurface(<BrowseFilters filter={EMPTY_BROWSE_FILTER} />, async ({ container }) => {
       expect(screen.getByLabelText("Draft format")).toBeInTheDocument();
       expect(screen.getByLabelText("Experience")).toBeInTheDocument();
       expect(screen.getByLabelText("Stake tier")).toBeInTheDocument();

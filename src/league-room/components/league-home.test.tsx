@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { screen, waitFor, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { DRAFT_SCHEDULE, HOME, LINEUP, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
@@ -18,7 +18,7 @@ const wrap = (home = HOME, lineup = LINEUP) => (
 
 describe("LeagueHome", () => {
   it("shows the name, standings, this week's matchup and the lineup editor, in both themes, axe-clean", async () => {
-    await inBothThemes(wrap(), async ({ container }) => {
+    await renderSurface(wrap(), async ({ container }) => {
       expect(screen.getByRole("heading", { level: 1, name: "Sunday Money" })).toBeInTheDocument();
       expect(screen.getByText("League standings")).toBeInTheDocument();
       expect(screen.getByText("Week 3")).toBeInTheDocument();
@@ -158,7 +158,7 @@ describe("LeagueHome", () => {
   // Same visibility the button had — commissioner only — but now a sentence instead of a
   // control, so the absence reads as a designed change rather than a missing feature.
   it("tells the commissioner scores run themselves now, in both themes, axe-clean", async () => {
-    await inBothThemes(wrap(), async ({ container }) => {
+    await renderSurface(wrap(), async ({ container }) => {
       expect(
         screen.getByText("Scores update automatically as games finish. There's nothing to run by hand."),
       ).toBeInTheDocument();
@@ -272,7 +272,7 @@ describe("LeagueHome", () => {
   });
 
   it("says so plainly when this manager has no matchup this week, in both themes", async () => {
-    await inBothThemes(wrap({ ...HOME, myMatchup: null }, LINEUP), async ({ container }) => {
+    await renderSurface(wrap({ ...HOME, myMatchup: null }, LINEUP), async ({ container }) => {
       expect(screen.getByText(/no matchup this week/i)).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -329,7 +329,7 @@ describe("LeagueHome", () => {
   // member — gating it on `isCommissioner` would make the surface pointless, since the terms are
   // what everybody in the league is playing under.
   it("shows the league terms panel, fed from the home body, for every viewer", async () => {
-    await inBothThemes(
+    await renderSurface(
       wrap({ ...HOME, isCommissioner: false }),
       async ({ container }) => {
         const panel = screen.getByRole("region", { name: "League terms" });

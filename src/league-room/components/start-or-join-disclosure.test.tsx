@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { StartOrJoinDisclosure } from "./start-or-join-disclosure";
 
 // `CreateLeaguePanel` and `JoinLeagueEntry`, both embedded here, navigate via `next/navigation`'s
@@ -28,7 +28,7 @@ function sectionHeadingOrder(): string[] {
 
 describe("StartOrJoinDisclosure", () => {
   it("is closed by default, in both themes, with no accessibility violations", async () => {
-    await inBothThemes(<StartOrJoinDisclosure experienceTier="beginner" />, async ({ container }) => {
+    await renderSurface(<StartOrJoinDisclosure experienceTier="beginner" />, async ({ container }) => {
       expect(detailsElement().open).toBe(false);
       expect(await axe(container)).toHaveNoViolations();
     });

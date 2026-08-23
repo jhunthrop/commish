@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { firstRunPlan } from "@/identity";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { FirstRunPanel } from "./first-run-panel";
@@ -23,7 +23,7 @@ function renderPanel(plan = GUIDED_BEGINNER) {
 
 describe("FirstRunPanel", () => {
   it("renders all three paths, in the plan's own order, with real titles and detail", async () => {
-    await inBothThemes(<FirstRunPanel plan={GUIDED_BEGINNER} />, async ({ container }) => {
+    await renderSurface(<FirstRunPanel plan={GUIDED_BEGINNER} />, async ({ container }) => {
       const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
       expect(headings).toEqual(["Find an open league", "Join with an invite", "Start a league"]);
       expect(screen.getByText("Browse leagues that still have seats and join one today.")).toBeInTheDocument();

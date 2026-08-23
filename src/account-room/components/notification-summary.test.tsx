@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { NOTIFICATION_CATALOG } from "@/identity";
 import { NotificationSummary } from "./notification-summary";
 
 describe("NotificationSummary", () => {
   it("lists every catalog topic's title and detail, axe-clean in both themes", async () => {
-    await inBothThemes(<NotificationSummary />, async ({ container }) => {
+    await renderSurface(<NotificationSummary />, async ({ container }) => {
       for (const topic of NOTIFICATION_CATALOG) {
         expect(screen.getByText(topic.title)).toBeInTheDocument();
         expect(screen.getByText(topic.detail)).toBeInTheDocument();

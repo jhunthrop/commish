@@ -2,11 +2,11 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Button } from "./button";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 
 describe("Button", () => {
   it("renders its label and calls onClick, in both themes, with no axe violations", async () => {
-    await inBothThemes(<Button onClick={() => {}}>Draft player</Button>, async ({ container }) => {
+    await renderSurface(<Button onClick={() => {}}>Draft player</Button>, async ({ container }) => {
       expect(screen.getByRole("button", { name: "Draft player" })).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });

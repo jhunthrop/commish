@@ -2,12 +2,12 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { CHAT_CONFIG } from "@/chat/config";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { ReactionBar } from "./reaction-bar";
 
 describe("ReactionBar", () => {
   it("offers every configured reaction, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <ReactionBar messageId="1" reactions={[]} meUserId="u1" disabled={false} onReact={() => {}} />,
       async ({ container }) => {
         for (const emoji of CHAT_CONFIG.reactions) {

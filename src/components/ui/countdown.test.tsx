@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, renderHook, screen, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 import { UI_CONFIG } from "./config";
 import { useCountdown, Countdown, formatCountdown, formatCoarseRemaining, formatCoarseDuration } from "./countdown";
 
@@ -71,7 +71,7 @@ describe("useCountdown", () => {
 
 describe("Countdown", () => {
   it("renders the formatted digits, hidden from assistive tech — both themes, axe-clean", async () => {
-    await inBothThemes(<Countdown remainingMs={125_000} data-testid="countdown" />, async ({ container }) => {
+    await renderSurface(<Countdown remainingMs={125_000} data-testid="countdown" />, async ({ container }) => {
       const el = screen.getByTestId("countdown");
       expect(el).toHaveTextContent("2:05");
       expect(el).toHaveAttribute("aria-hidden", "true");

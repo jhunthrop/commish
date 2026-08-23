@@ -2,13 +2,13 @@ import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { GLOSSARY } from "@/help/glossary";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { ALL_CLINCHED_STANDINGS, STANDINGS } from "../test-fixtures";
 import { StandingsTable } from "./standings-table";
 
 describe("StandingsTable", () => {
   it("shows each team's record and both points columns, in both themes, axe-clean", async () => {
-    await inBothThemes(<StandingsTable rows={STANDINGS} myTeamId="t1" />, async ({ container }) => {
+    await renderSurface(<StandingsTable rows={STANDINGS} myTeamId="t1" />, async ({ container }) => {
       const rows = screen.getAllByRole("row").slice(1);
       expect(within(rows[0]!).getByText("9-4")).toBeInTheDocument();
       expect(within(rows[0]!).getByText("1,412.50".replace(",", ""))).toBeInTheDocument();
@@ -74,7 +74,7 @@ describe("StandingsTable", () => {
   });
 
   it("offers a next action before any week has been scored", async () => {
-    await inBothThemes(<StandingsTable rows={[]} myTeamId={null} />, async ({ container }) => {
+    await renderSurface(<StandingsTable rows={[]} myTeamId={null} />, async ({ container }) => {
       expect(screen.getByText("No results yet")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -84,7 +84,7 @@ describe("StandingsTable", () => {
   // playoff field is as big as the league itself (`playoffTeams >= teamCount`) — a signal with
   // no information in it. Twelve meaningless badges are worse than none.
   it("suppresses the clinched badge for every row when the whole league is (degenerately) clinched", async () => {
-    await inBothThemes(<StandingsTable rows={ALL_CLINCHED_STANDINGS} myTeamId="t1" />, async ({ container }) => {
+    await renderSurface(<StandingsTable rows={ALL_CLINCHED_STANDINGS} myTeamId="t1" />, async ({ container }) => {
       expect(screen.queryByText("Clinched")).not.toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -102,7 +102,7 @@ describe("StandingsTable", () => {
   });
 
   it("names the median game in a caption note and swaps the Record header's InfoTip, in both themes, axe-clean", async () => {
-    await inBothThemes(<StandingsTable rows={STANDINGS} myTeamId="t1" medianGame />, async ({ container }) => {
+    await renderSurface(<StandingsTable rows={STANDINGS} myTeamId="t1" medianGame />, async ({ container }) => {
       expect(screen.getByText(/Records include each week's median game\./)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "What is a median game?" })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: "What is a record?" })).not.toBeInTheDocument();

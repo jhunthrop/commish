@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { CHAT_CONFIG } from "@/chat/config";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { fixtureChatDeps, renderInChat } from "../test-fixtures";
 import { ReportDialog } from "./report-dialog";
 
@@ -16,7 +16,7 @@ describe("ReportDialog", () => {
   it("offers every configured reason, in both themes, axe-clean", async () => {
     // No provider needed: `useChatRoomDeps()` defaults to real browser deps, and this test
     // never submits — see `useChatRoomDeps`'s own docblock.
-    await inBothThemes(<ReportDialog open leagueId="l1" messageId="1" onClose={() => {}} />, async ({ container }) => {
+    await renderSurface(<ReportDialog open leagueId="l1" messageId="1" onClose={() => {}} />, async ({ container }) => {
       for (const entry of CHAT_CONFIG.reportReasons) {
         expect(screen.getByRole("radio", { name: entry.label })).toBeInTheDocument();
       }

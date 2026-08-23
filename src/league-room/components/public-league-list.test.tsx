@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { GLOSSARY } from "@/help/glossary";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { HOUSE_RUNG_LABEL } from "@/matchmaking/house-catalog";
@@ -36,7 +36,7 @@ vi.mock("next/navigation", () => ({
 
 describe("PublicLeagueList", () => {
   it("shows each league's format, tiers and fill status, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />,
       async ({ container }) => {
         expect(screen.getByText("Rookie Snake Room")).toBeInTheDocument();
@@ -145,7 +145,7 @@ describe("PublicLeagueList", () => {
 
   it("labels a median league right on the card, with its own InfoTip, in both themes, axe-clean", async () => {
     const medianLeague = { ...CUSTOM_SCORING_LEAGUE, id: "median_1", medianGame: true };
-    await inBothThemes(<PublicLeagueList leagues={[medianLeague]} signedIn />, async ({ container }) => {
+    await renderSurface(<PublicLeagueList leagues={[medianLeague]} signedIn />, async ({ container }) => {
       expect(screen.getByText("Median")).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "What is a median game?" })).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
@@ -170,7 +170,7 @@ describe("PublicLeagueList", () => {
   });
 
   it("offers a next action when no league matches, rather than a dead end", async () => {
-    await inBothThemes(<PublicLeagueList leagues={[]} signedIn />, async ({ container }) => {
+    await renderSurface(<PublicLeagueList leagues={[]} signedIn />, async ({ container }) => {
       expect(screen.getByText("No open leagues match")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Clear the filters" })).toHaveAttribute("href", "/browse");
       expect(screen.getByRole("link", { name: "Start your own league" })).toHaveAttribute("href", "/app#create-league");
@@ -211,7 +211,7 @@ describe("HouseLeagueShelf", () => {
   });
 
   it("shows each house league's rung label, 'Run by Commish', fill status and draft time, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />,
       async ({ container }) => {
         expect(screen.getByText(HOUSE_RUNG_LABEL.open_12)).toBeInTheDocument();

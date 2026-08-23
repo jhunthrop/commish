@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { RoomTour } from "./room-tour";
 
 describe("RoomTour", () => {
@@ -66,7 +66,7 @@ describe("RoomTour", () => {
   });
 
   it("is a labelled aria-modal dialog, axe-clean in both themes", async () => {
-    await inBothThemes(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Draft" />, async ({ container }) => {
+    await renderSurface(<RoomTour dismissedAt={null} onDismiss={() => {}} actionLabel="Draft" />, async ({ container }) => {
       const dialog = screen.getByRole("dialog", { name: "How this room works" });
       expect(dialog).toHaveAttribute("aria-modal", "true");
       expect(await axe(container)).toHaveNoViolations();

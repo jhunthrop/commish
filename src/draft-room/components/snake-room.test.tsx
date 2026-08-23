@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { LEAGUE_NAME, PLAYERS, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
 import { SnakeRoom } from "./snake-room";
@@ -37,7 +37,7 @@ function renderRoom(over: Partial<DraftRoomState> = {}) {
 
 describe("SnakeRoom", () => {
   it("lays out the four regions — rail, left pool, board stage, dock — both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <ToastProvider>
         <SnakeRoom room={room} playersById={playersById(PLAYERS)} onAct={() => {}} />
       </ToastProvider>,

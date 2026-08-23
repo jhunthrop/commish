@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { MatchupSummary } from "../contract";
 import { MatchupScoreboard } from "./matchup-scoreboard";
 
@@ -19,7 +19,7 @@ const FINAL: MatchupSummary = {
 
 describe("MatchupScoreboard", () => {
   it("shows both names and scores with the winner keeping full ink, in both themes, axe-clean", async () => {
-    await inBothThemes(<MatchupScoreboard matchup={FINAL} myTeamId="t1" />, async ({ container }) => {
+    await renderSurface(<MatchupScoreboard matchup={FINAL} myTeamId="t1" />, async ({ container }) => {
       expect(screen.getByText("121.40")).toBeInTheDocument();
       expect(screen.getByText("98.62")).toBeInTheDocument();
       expect(screen.getByText("Final")).toBeInTheDocument();

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { fixtureDeps, renderInRoom } from "../test-fixtures";
@@ -27,7 +27,7 @@ function mount(fixture = fixtureDeps(), dismissedAt: string | null = TOUR_DISMIS
 describe("DraftRoom", () => {
   it("shows a loading state, then the live snake room — both themes, axe-clean", async () => {
     const fixture = fixtureDeps();
-    await inBothThemes(
+    await renderSurface(
       <DraftRoomDepsProvider deps={fixture.deps}>
         <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
           <ToastProvider>

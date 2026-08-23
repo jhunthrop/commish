@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { TradeProposalView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import type { TradeAssessmentSummary } from "./trade-verdict";
@@ -124,7 +124,7 @@ describe("TradeCard states", () => {
   });
 
   it("shows the verdict beside the accept control, never instead of it, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <TradeCard trade={BASE} meTeamId="me" playersById={PLAYERS} assessmentStatus="ready" assessment={LOPSIDED_ASSESSMENT} />,
       async ({ container }) => {
         expect(screen.getByText(/a long way from even/i)).toBeVisible();

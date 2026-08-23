@@ -2,7 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { PLAYERS, TEAMS, playersById } from "../test-fixtures";
 import { PickCelebration } from "./pick-celebration";
@@ -32,7 +32,7 @@ describe("PickCelebration", () => {
 
   it("announces someone else's pick politely, in both themes, axe-clean", async () => {
     stubMatchMedia(false);
-    await inBothThemes(<PickCelebration lastPick={{ pick, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />, async ({ container }) => {
+    await renderSurface(<PickCelebration lastPick={{ pick, isMine: false }} playersById={playersById(PLAYERS)} teams={TEAMS} />, async ({ container }) => {
       expect(screen.getByRole("status")).toHaveTextContent("Iron Owls drafted Marcus Reed.");
       expect(await axe(container)).toHaveNoViolations();
     });

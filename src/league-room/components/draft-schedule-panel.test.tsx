@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { DraftScheduleBody } from "../contract";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
@@ -35,7 +35,7 @@ const EDITED_ISO = new Date(EDITED_LOCAL_VALUE).toISOString();
 describe("DraftSchedulePanel", () => {
   it("shows the scheduled time and countdown to every viewer, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps();
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={SCHEDULED} />
       </LeagueRoomDepsProvider>,
@@ -144,7 +144,7 @@ describe("DraftSchedulePanel", () => {
 
   it("shows a link into the room while the draft is live, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps();
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <DraftSchedulePanel leagueId="league_1" isCommissioner={true} initialSchedule={{ ...SCHEDULED, status: "in_progress" }} />
       </LeagueRoomDepsProvider>,
@@ -158,7 +158,7 @@ describe("DraftSchedulePanel", () => {
 
   it("shows a designed complete state with a link into the finished board, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps();
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <DraftSchedulePanel leagueId="league_1" isCommissioner={true} initialSchedule={{ ...SCHEDULED, status: "complete" }} />
       </LeagueRoomDepsProvider>,

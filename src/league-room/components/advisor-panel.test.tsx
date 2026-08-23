@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ADVISOR_CONFIG } from "@/domain/advisor";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { AdvisorPanel } from "./advisor-panel";
@@ -17,7 +17,7 @@ const DEGRADED = { ok: true, data: { ...ADVICE.data, degraded: true } };
 describe("AdvisorPanel", () => {
   it("says what it is and offers one action, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps(ADVICE);
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <AdvisorPanel leagueId="l1" weekNumber={4} />
       </LeagueRoomDepsProvider>,

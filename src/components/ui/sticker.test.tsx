@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 import { positionStickerClass } from "./position-badge";
 import { Sticker } from "./sticker";
 
 describe("Sticker", () => {
   it("wears its position's pigment from the one sanctioned source, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <Sticker position="QB" className="px-2">
         <p>Trey Ward</p>
       </Sticker>,

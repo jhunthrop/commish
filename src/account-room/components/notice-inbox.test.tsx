@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { act, fireEvent, screen, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import type { NoticesBody, NoticeView } from "../contract";
 import { fixtureAccountDeps, renderInAccount } from "../test-fixtures";
@@ -27,7 +27,7 @@ const ONE_UNREAD: NoticesBody = { notices: [UNREAD], unreadCount: 1 };
 describe("NoticeInbox", () => {
   it("shows nothing but the control when there is nothing to say, in both themes, axe-clean", async () => {
     const fixture = fixtureAccountDeps({ ok: true, data: EMPTY_PAGE });
-    await inBothThemes(
+    await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
         <NoticesProvider>
           <NoticeInbox />

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { TradeProposalView, TradesPageBody } from "@/trades/contract";
 import type { TradeRoomContext } from "../contract";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
@@ -48,7 +48,7 @@ const INBOUND: TradeProposalView = {
 describe("TradeInbox", () => {
   it("offers the composer from an empty inbox rather than dead ending on it, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: EMPTY_PAGE });
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <TradeInbox leagueId="l1" context={CONTEXT} />
       </LeagueRoomDepsProvider>,

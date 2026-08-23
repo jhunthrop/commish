@@ -3,13 +3,13 @@ import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { Position } from "@/domain/player";
 import { PositionBadge } from "./position-badge";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 
 const ALL: readonly Position[] = ["QB", "RB", "WR", "TE", "K", "DEF"];
 
 describe("PositionBadge", () => {
   it("renders the position on its own sticker color, both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <p>
         Drafted <PositionBadge position="QB" />
       </p>,

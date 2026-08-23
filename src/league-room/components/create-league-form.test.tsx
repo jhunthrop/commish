@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { GLOSSARY } from "@/help/glossary";
 import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
@@ -19,7 +19,7 @@ describe("CreateLeagueForm", () => {
    */
   it("shows who can join and who it's for without opening anything, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps();
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <CreateLeagueForm onCreated={vi.fn()} />
       </LeagueRoomDepsProvider>,
@@ -221,7 +221,7 @@ describe("CreateLeagueForm", () => {
      */
     it("is keyboard-reachable and axe-clean in both themes, at 360px, without opening anything", async () => {
       const fixture = fixtureLeagueDeps();
-      await inBothThemes(
+      await renderSurface(
         <LeagueRoomDepsProvider deps={fixture.deps}>
           <CreateLeagueForm onCreated={vi.fn()} />
         </LeagueRoomDepsProvider>,
@@ -259,7 +259,7 @@ describe("CreateLeagueForm", () => {
 
     it("is visible and keyboard-reachable without opening anything, axe-clean in both themes, at 360px", async () => {
       const fixture = fixtureLeagueDeps();
-      await inBothThemes(
+      await renderSurface(
         <LeagueRoomDepsProvider deps={fixture.deps}>
           <CreateLeagueForm onCreated={vi.fn()} />
         </LeagueRoomDepsProvider>,
@@ -335,7 +335,7 @@ describe("CreateLeagueForm", () => {
 
     it("is keyboard-reachable and axe-clean inside the open drawer, in both themes, at 360px", async () => {
       const fixture = fixtureLeagueDeps();
-      await inBothThemes(
+      await renderSurface(
         <LeagueRoomDepsProvider deps={fixture.deps}>
           <CreateLeagueForm onCreated={vi.fn()} />
         </LeagueRoomDepsProvider>,
@@ -429,7 +429,7 @@ describe("CreateLeagueForm", () => {
 
     it("renders keyboard-reachable and axe-clean in both themes, at 360px", async () => {
       const fixture = fixtureLeagueDeps();
-      await inBothThemes(
+      await renderSurface(
         <LeagueRoomDepsProvider deps={fixture.deps}>
           <CreateLeagueForm onCreated={vi.fn()} />
         </LeagueRoomDepsProvider>,

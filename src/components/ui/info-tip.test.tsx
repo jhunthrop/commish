@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { GLOSSARY } from "@/help/glossary";
 import { UI_CONFIG } from "./config";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 import { InfoTip } from "./info-tip";
 
 describe("InfoTip", () => {
@@ -56,10 +56,10 @@ describe("InfoTip", () => {
   });
 
   it("renders in both themes with no axe violations, closed and open", async () => {
-    await inBothThemes(<InfoTip term="matchup" />, async ({ container }) => {
+    await renderSurface(<InfoTip term="matchup" />, async ({ container }) => {
       expect(await axe(container)).toHaveNoViolations();
     });
-    await inBothThemes(<InfoTip term="matchup" helpLevel="guided" />, async ({ container }) => {
+    await renderSurface(<InfoTip term="matchup" helpLevel="guided" />, async ({ container }) => {
       await userEvent.click(screen.getByRole("button", { name: "What is a matchup?" }));
       expect(await axe(container)).toHaveNoViolations();
     });

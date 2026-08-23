@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { CHAT_ROOM_CONFIG } from "../config";
 import { TOUCHDOWN_GIF } from "../test-fixtures";
 import { GifPicker } from "./gif-picker";
@@ -18,7 +18,7 @@ describe("GifPicker", () => {
   });
 
   it("has a labeled search box and no results before anything is typed, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <GifPicker open onClose={() => {}} search={async () => [TOUCHDOWN_GIF]} onPick={() => {}} />,
       async ({ container }) => {
         expect(screen.getByRole("searchbox", { name: "Search GIFs" })).toBeInTheDocument();

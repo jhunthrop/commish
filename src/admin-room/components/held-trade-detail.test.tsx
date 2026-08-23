@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { AdminRoomDepsProvider } from "../hooks/deps";
 import { fixtureAdminDeps, renderInAdmin } from "../test-fixtures";
 import type { ResolutionDecision } from "@/integrity/flags";
@@ -36,7 +36,7 @@ const TRAIL = [{ eventId: "evt_1", occurredAt: "2026-08-20T00:00:00.000Z", icon:
 describe("HeldTradeDetail", () => {
   it("shows both sides, the gap and basis, both managers' standing and the trail, axe-clean in both themes", async () => {
     const fixture = fixtureAdminDeps();
-    await inBothThemes(
+    await renderSurface(
       <AdminRoomDepsProvider deps={fixture.deps}>
         <HeldTradeDetail flagId="flag_1" subject={SUBJECT} trail={TRAIL} decisions={BOTH_DECISIONS} noteMaxLength={500} />
       </AdminRoomDepsProvider>,
@@ -78,7 +78,7 @@ describe("HeldTradeDetail", () => {
       noLongerHeldExplanation:
         "A different trade moved one of these players first, so there is nothing left to release or block. This flag closes on its own the next time the trade sweep runs.",
     };
-    await inBothThemes(
+    await renderSurface(
       <AdminRoomDepsProvider deps={fixture.deps}>
         <HeldTradeDetail flagId="flag_1" subject={superseded} trail={TRAIL} decisions={[]} noteMaxLength={500} />
       </AdminRoomDepsProvider>,

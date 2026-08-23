@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { WaitingRoom, type WaitingRoomLeague } from "./waiting-room";
 
 const BASE: WaitingRoomLeague = {
@@ -37,7 +37,7 @@ describe("WaitingRoom", () => {
   // Never a dead end, in its hardest form: the member cannot have a draft yet, so the panel
   // offers the two things a half-full league can actually give instead.
   it("offers the thing a half-full league can actually give, in both themes, axe-clean", async () => {
-    await inBothThemes(<WaitingRoom league={BASE} isCommissioner={true} />, async ({ container }) => {
+    await renderSurface(<WaitingRoom league={BASE} isCommissioner={true} />, async ({ container }) => {
       expect(screen.getByText("9 of 12 seats taken")).toBeVisible();
       expect(screen.getByRole("link", { name: "Invite someone" })).toBeVisible();
       expect(screen.getByRole("link", { name: "See leagues closer to filling" })).toBeVisible();
@@ -70,7 +70,7 @@ describe("WaitingRoom", () => {
   // Counts down once the last seat fills, and says who is starting it — the shared `Countdown`
   // primitive's third caller.
   it("counts down once the last seat fills, and says when it starts, in both themes, axe-clean", async () => {
-    await inBothThemes(<WaitingRoom league={fullSitAndGo} isCommissioner={true} />, async ({ container }) => {
+    await renderSurface(<WaitingRoom league={fullSitAndGo} isCommissioner={true} />, async ({ container }) => {
       expect(screen.getByText("All 12 seats are full.")).toBeVisible();
       expect(screen.getByRole("status")).toHaveTextContent(/starts in/i);
       expect(await axe(container)).toHaveNoViolations();
@@ -95,7 +95,7 @@ describe("WaitingRoom", () => {
 
   it("shows a link into the room while the draft is live, in both themes, axe-clean", async () => {
     const live: WaitingRoomLeague = { ...fullSitAndGo, status: "in_progress" };
-    await inBothThemes(<WaitingRoom league={live} isCommissioner={true} />, async ({ container }) => {
+    await renderSurface(<WaitingRoom league={live} isCommissioner={true} />, async ({ container }) => {
       expect(screen.getByText("The draft is live")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Join the draft" })).toHaveAttribute("href", "/app/drafts/draft_1");
       expect(await axe(container)).toHaveNoViolations();
@@ -104,7 +104,7 @@ describe("WaitingRoom", () => {
 
   it("shows a designed complete state with a link into the finished board, in both themes, axe-clean", async () => {
     const complete: WaitingRoomLeague = { ...fullSitAndGo, status: "complete" };
-    await inBothThemes(<WaitingRoom league={complete} isCommissioner={true} />, async ({ container }) => {
+    await renderSurface(<WaitingRoom league={complete} isCommissioner={true} />, async ({ container }) => {
       expect(screen.getByText("Draft complete")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "View the draft board" })).toHaveAttribute("href", "/app/drafts/draft_1");
       expect(await axe(container)).toHaveNoViolations();

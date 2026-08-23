@@ -1,13 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { REASON_FRAGMENTS } from "@/moderation/test-support";
 import { RemovedMessage } from "./removed-message";
 
 describe("RemovedMessage", () => {
   it("keeps the author's name and avatar, and states the neutral fact, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <RemovedMessage authorName="Jordan Lee" authorAvatarUrl={null} removal={{ at: "2026-08-20T00:00:00.000Z" }} />,
       async ({ container }) => {
         expect(screen.getByText("Jordan Lee")).toBeInTheDocument();

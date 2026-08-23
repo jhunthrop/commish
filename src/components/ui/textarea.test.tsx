@@ -4,7 +4,7 @@ import { useState } from "react";
 import { axe } from "vitest-axe";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import { Textarea } from "./textarea";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 
 function ControlledTextarea(props: { readonly maxLength?: number; readonly initial?: string }) {
   const [value, setValue] = useState(props.initial ?? "");
@@ -13,7 +13,7 @@ function ControlledTextarea(props: { readonly maxLength?: number; readonly initi
 
 describe("Textarea", () => {
   it("has a visible label associated with the control, both themes, no axe violations", async () => {
-    await inBothThemes(<Textarea label="Your review" />, async ({ container }) => {
+    await renderSurface(<Textarea label="Your review" />, async ({ container }) => {
       expect(screen.getByLabelText("Your review")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });

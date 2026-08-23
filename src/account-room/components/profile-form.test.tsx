@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { fixtureAccountDeps, renderInAccount, PROFILE } from "../test-fixtures";
 import { AccountRoomDepsProvider } from "../hooks/deps";
 import { ProfileForm } from "./profile-form";
@@ -17,7 +17,7 @@ vi.mock("next/navigation", () => ({
 describe("ProfileForm", () => {
   it("shows the current name, tier and avatar picker, in both themes, axe-clean", async () => {
     const fixture = fixtureAccountDeps();
-    await inBothThemes(
+    await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
         <ProfileForm profile={PROFILE} />
       </AccountRoomDepsProvider>,

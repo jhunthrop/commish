@@ -1,13 +1,13 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { AVATAR_PRESETS } from "@/identity";
 import { AvatarPicker } from "./avatar-picker";
 
 describe("AvatarPicker", () => {
   it("renders all eight presets as a labelled radio group, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <AvatarPicker displayName="Ada Lovelace" value={null} onChange={vi.fn()} />,
       async ({ container }) => {
         expect(screen.getByRole("radiogroup", { name: "Avatar" })).toBeInTheDocument();

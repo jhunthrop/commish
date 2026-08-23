@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { MedianResultLine } from "./median-result";
 
 describe("MedianResultLine", () => {
   it("says the exact sentence for the viewer's own team's win, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <MedianResultLine teamName="Bay Bandits" isMine score={118.4} medianScore={104.2} result="win" />,
       async ({ container }) => {
         expect(

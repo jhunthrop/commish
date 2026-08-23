@@ -5,7 +5,7 @@ import { Skeleton } from "./skeleton";
 import { EmptyState } from "./empty-state";
 import { ErrorState } from "./error-state";
 import { Button } from "./button";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 
 describe("Skeleton", () => {
   it("is aria-busy and announces loading to screen readers", () => {
@@ -34,7 +34,7 @@ describe("Skeleton", () => {
 
 describe("EmptyState", () => {
   it("renders title, description and the required action, both themes, no axe violations", async () => {
-    await inBothThemes(
+    await renderSurface(
       <EmptyState title="No leagues yet" description="Create one or join a public league." action={<Button>Create a league</Button>} icon="inbox" />,
       async ({ container }) => {
         expect(screen.getByRole("heading", { name: "No leagues yet" })).toBeInTheDocument();

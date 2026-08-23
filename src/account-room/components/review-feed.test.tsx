@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import type { ReviewsPage, ReviewView } from "@/reviews/contract";
 import { fixtureAccountDeps, renderInAccount } from "../test-fixtures";
 import { AccountRoomDepsProvider } from "../hooks/deps";
@@ -35,7 +35,7 @@ const EMPTY_PAGE: ReviewsPage = { reviews: [], hasMore: false, nextBefore: null 
 describe("ReviewFeed", () => {
   it("renders reviews newest-first exactly as given, in both themes, axe-clean", async () => {
     const fixture = fixtureAccountDeps();
-    await inBothThemes(
+    await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
         <ReviewFeed initialPage={PAGE} emptyAction={<span>Write the first review</span>} />
       </AccountRoomDepsProvider>,

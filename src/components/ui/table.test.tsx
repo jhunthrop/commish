@@ -4,7 +4,7 @@ import { axe } from "vitest-axe";
 import { Table, type TableColumn } from "./table";
 import { Button } from "./button";
 import { EmptyState } from "./empty-state";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 
 interface Pick {
   readonly id: string;
@@ -26,7 +26,7 @@ const columns: readonly TableColumn<Pick>[] = [
 
 describe("Table", () => {
   it("is a captioned, header-scoped table in both themes with no axe violations", async () => {
-    await inBothThemes(
+    await renderSurface(
       <Table caption="Auction results" columns={columns} rows={rows} rowKey={(r) => r.id} empty={<p>No picks yet.</p>} />,
       async ({ container }) => {
         const table = screen.getByRole("table", { name: "Auction results" });
@@ -49,7 +49,7 @@ describe("Table", () => {
   });
 
   it("renders only the empty node — no header row — and is axe-clean in both themes when there are no rows", async () => {
-    await inBothThemes(
+    await renderSurface(
       <Table
         caption="Auction results"
         columns={columns}

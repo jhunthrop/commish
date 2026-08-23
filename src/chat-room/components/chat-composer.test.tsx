@@ -3,7 +3,7 @@ import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
 import { CHAT_CONFIG } from "@/chat/config";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { TOUCHDOWN_GIF } from "../test-fixtures";
 import { ChatComposer } from "./chat-composer";
 
@@ -11,7 +11,7 @@ const NO_GIFS = { gifSearchEnabled: false, onSearchGifs: async () => [] };
 
 describe("ChatComposer", () => {
   it("has a visible label and a send button, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <ChatComposer sending={false} onSend={async () => ({ ok: true })} {...NO_GIFS} />,
       async ({ container }) => {
         expect(screen.getByLabelText("Message")).toBeInTheDocument();
@@ -57,7 +57,7 @@ describe("ChatComposer", () => {
   });
 
   it("offers a GIF control when the seam is configured, in both themes, axe-clean", async () => {
-    await inBothThemes(
+    await renderSurface(
       <ChatComposer sending={false} onSend={async () => ({ ok: true })} gifSearchEnabled onSearchGifs={async () => [TOUCHDOWN_GIF]} />,
       async ({ container }) => {
         expect(screen.getByRole("button", { name: "Add a GIF" })).toBeInTheDocument();

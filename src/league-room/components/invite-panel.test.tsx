@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { InvitePanel } from "./invite-panel";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
@@ -11,7 +11,7 @@ const INVITE = { ok: true, data: { code: "SUNDAY12", path: "/app/join/SUNDAY12",
 describe("InvitePanel", () => {
   it("offers a single next action before any invite exists, in both themes, axe-clean", async () => {
     const fixture = fixtureLeagueDeps(INVITE);
-    await inBothThemes(
+    await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
         <InvitePanel leagueId="l1" />
       </LeagueRoomDepsProvider>,

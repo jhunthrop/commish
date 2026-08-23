@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { REVIEW_CONFIG } from "@/reviews/config";
 import type { MyReviewState, ReviewView } from "@/reviews/contract";
 import { fixtureAccountDeps, renderInAccount } from "../test-fixtures";
@@ -26,7 +26,7 @@ const LONG_ENOUGH = "This league runs itself. Draft night was smooth and scoring
 describe("ReviewComposer", () => {
   it("has a rating radio group labeled in words and a review textarea, in both themes, axe-clean", async () => {
     const fixture = fixtureAccountDeps({ ok: true, data: EXISTING });
-    await inBothThemes(
+    await renderSurface(
       <AccountRoomDepsProvider deps={fixture.deps}>
         <ReviewComposer myReview={NONE} />
       </AccountRoomDepsProvider>,

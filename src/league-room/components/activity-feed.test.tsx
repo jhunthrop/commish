@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { ActivityRow } from "@/integrity/activity-view";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { ActivityFeed } from "./activity-feed";
 
 const NEWEST: ActivityRow = {
@@ -25,7 +25,7 @@ const rows: readonly ActivityRow[] = [NEWEST, OLDEST];
 
 describe("ActivityFeed", () => {
   it("renders a row per activity entry, newest first, with a readable time, in both themes, axe-clean", async () => {
-    await inBothThemes(<ActivityFeed rows={rows} leagueId="league_1" nextBefore={null} />, async ({ container }) => {
+    await renderSurface(<ActivityFeed rows={rows} leagueId="league_1" nextBefore={null} />, async ({ container }) => {
       const headlines = screen.getAllByText(/Ada Lovelace/).map((node) => node.textContent);
       expect(headlines).toEqual([NEWEST.headline, OLDEST.headline]);
 

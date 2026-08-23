@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "../hooks/deps";
 import { CHAT_PAGE, TOUCHDOWN_GIF, chatMessage, fixtureChatDeps, renderInChat } from "../test-fixtures";
 import { LeagueChat } from "./league-chat";
@@ -10,7 +10,7 @@ import { LeagueChat } from "./league-chat";
 describe("LeagueChat", () => {
   it("shows the loaded conversation, in both themes, axe-clean", async () => {
     const fixture = fixtureChatDeps();
-    await inBothThemes(
+    await renderSurface(
       <ChatRoomDepsProvider deps={fixture.deps}>
         <LeagueChat leagueId="l1" />
       </ChatRoomDepsProvider>,

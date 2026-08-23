@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { TradeVerdict, type TradeAssessmentSummary } from "./trade-verdict";
 
 const LOPSIDED: TradeAssessmentSummary = { verdict: "lopsided", givingValue: 42.5, receivingValue: 12 };
@@ -11,7 +11,7 @@ const FAVORS_RECEIVER: TradeAssessmentSummary = { verdict: "favors_receiver", gi
 
 describe("TradeVerdict", () => {
   it("says the verdict is about points per week and not about whether to do it, in both themes, axe-clean", async () => {
-    await inBothThemes(<TradeVerdict assessment={LOPSIDED} />, async ({ container }) => {
+    await renderSurface(<TradeVerdict assessment={LOPSIDED} />, async ({ container }) => {
       expect(screen.getByText(/weekly production/i)).toBeVisible();
       expect(screen.getByText(/a long way from even/i)).toBeVisible();
       expect(screen.getByText("Advice only. You decide.")).toBeVisible();

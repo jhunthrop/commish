@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { LeagueTerms } from "@/league";
 import { LeagueTermsPanel } from "./league-terms-panel";
@@ -23,7 +23,7 @@ const TERMS: LeagueTerms = {
 
 describe("LeagueTermsPanel", () => {
   it("names the league, its format, size, scoring, roster, stake, draft time and commissioner, in both themes, axe-clean", async () => {
-    await inBothThemes(<LeagueTermsPanel terms={TERMS} />, async ({ container }) => {
+    await renderSurface(<LeagueTermsPanel terms={TERMS} />, async ({ container }) => {
       expect(screen.getByRole("heading", { name: "Sunday Money" })).toBeInTheDocument();
       expect(screen.getByText("Snake")).toBeInTheDocument();
       expect(screen.getByText("8 of 12 managers")).toBeInTheDocument();
@@ -82,7 +82,7 @@ describe("LeagueTermsPanel", () => {
   // broke `league-lifecycle.spec.ts`'s `getByRole("heading", { name })` with a strict-mode
   // ambiguity. `terms.name` still renders, just not as a competing heading.
   it("renders its name as plain text, not a second heading, when embedded on a page with its own heading", async () => {
-    await inBothThemes(<LeagueTermsPanel terms={TERMS} titleAs="p" />, async ({ container }) => {
+    await renderSurface(<LeagueTermsPanel terms={TERMS} titleAs="p" />, async ({ container }) => {
       expect(screen.queryByRole("heading", { name: "Sunday Money" })).not.toBeInTheDocument();
       expect(screen.getByText("Sunday Money").tagName).toBe("P");
       expect(await axe(container)).toHaveNoViolations();
@@ -120,7 +120,7 @@ describe("LeagueTermsPanel", () => {
       ...TERMS,
       formatNotes: ["Every team also plays the league median each week.", "Superflex: you can start a second quarterback."],
     };
-    await inBothThemes(<LeagueTermsPanel terms={withNotes} />, async ({ container }) => {
+    await renderSurface(<LeagueTermsPanel terms={withNotes} />, async ({ container }) => {
       expect(screen.getByText("Notes")).toBeInTheDocument();
       expect(screen.getByText("Every team also plays the league median each week.")).toBeInTheDocument();
       expect(screen.getByText("Superflex: you can start a second quarterback.")).toBeInTheDocument();

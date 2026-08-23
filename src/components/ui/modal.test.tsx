@@ -4,7 +4,7 @@ import { axe } from "vitest-axe";
 import { useState } from "react";
 import { Modal } from "./modal";
 import { Button } from "./button";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 
 function Harness() {
   const [open, setOpen] = useState(false);
@@ -25,7 +25,7 @@ describe("Modal", () => {
   });
 
   it("is a labelled aria-modal dialog, axe-clean in both themes", async () => {
-    await inBothThemes(
+    await renderSurface(
       <Modal open title="Nominate a player" onClose={() => {}}>
         <p>Choose an opening bid.</p>
       </Modal>,

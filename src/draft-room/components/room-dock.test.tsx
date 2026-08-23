@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import type { DraftStateView } from "@/draft-engine";
-import { inBothThemes } from "@/components/ui/test-utils";
+import { renderSurface } from "@/components/ui/test-utils";
 import { SNAKE_VIEW, playersById } from "../test-fixtures";
 import { RoomDock } from "./room-dock";
 
@@ -23,7 +23,7 @@ const waiting: Partial<DraftStateView> = { onClockTeamId: "t2", upcoming: ["t2",
 
 describe("RoomDock", () => {
   it("carries the queue, the roster fill and the wait — both themes, axe-clean", async () => {
-    await inBothThemes(<RoomDock {...props} view={{ ...SNAKE_VIEW, ...waiting }} />, async ({ container }) => {
+    await renderSurface(<RoomDock {...props} view={{ ...SNAKE_VIEW, ...waiting }} />, async ({ container }) => {
       expect(screen.getByRole("list", { name: "Your queue" })).toBeInTheDocument();
       expect(screen.getByRole("list", { name: "Your roster" })).toBeInTheDocument();
       expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("You're up in 2 picks (~16h 0m).");

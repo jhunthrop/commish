@@ -5,7 +5,7 @@ import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
 import { UI_CONFIG } from "./config";
 import { ToastProvider, useToast } from "./toast";
 import { Button } from "./button";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 
 function stubMatchMedia(reduced: boolean) {
   vi.stubGlobal("matchMedia", (query: string) => ({
@@ -37,7 +37,7 @@ afterEach(() => {
 describe("ToastProvider", () => {
   it("announces an error toast as an alert and is axe-clean in both themes", async () => {
     stubMatchMedia(false);
-    await inBothThemes(
+    await renderSurface(
       <ToastProvider>
         <Publisher />
       </ToastProvider>,

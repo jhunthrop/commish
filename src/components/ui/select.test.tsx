@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { Select } from "./select";
-import { inBothThemes } from "./test-utils";
+import { renderSurface } from "./test-utils";
 
 const POSITIONS = [
   { value: "ALL", label: "All positions" },
@@ -12,7 +12,7 @@ const POSITIONS = [
 
 describe("Select", () => {
   it("has a visible label, renders its options, and is axe-clean in both themes", async () => {
-    await inBothThemes(<Select label="Position" options={POSITIONS} defaultValue="ALL" />, async ({ container }) => {
+    await renderSurface(<Select label="Position" options={POSITIONS} defaultValue="ALL" />, async ({ container }) => {
       const select = screen.getByLabelText("Position");
       expect(select.tagName).toBe("SELECT");
       expect(screen.getByRole("option", { name: "Running back" })).toBeInTheDocument();
