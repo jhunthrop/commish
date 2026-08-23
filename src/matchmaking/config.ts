@@ -63,3 +63,13 @@ export const MATCHMAKING_CONFIG = {
    */
   sitAndGo: { graceSeconds: 300 },
 } as const;
+
+/**
+ * `MATCHMAKING_CONFIG.sitAndGo.graceSeconds` in whole minutes — the ONE place that arithmetic
+ * happens, so `CreateLeagueForm`'s own "Draft start" hint (`@/league-room/components/
+ * create-league-form`) and the `sit-and-go` glossary entry (`@/help/glossary`) can never drift
+ * to two different numbers of minutes for the same tunable. Both are pure, browser-safe modules
+ * that already value-import `MATCHMAKING_CONFIG` directly, so this is a third value from the
+ * same import, not a new cross-module dependency.
+ */
+export const SIT_AND_GO_GRACE_MINUTES = MATCHMAKING_CONFIG.sitAndGo.graceSeconds / 60;

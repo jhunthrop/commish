@@ -40,17 +40,36 @@ describe("CreateLeagueForm", () => {
    * count: the old summary named three of the seven fields the drawer held ("draft format, team
    * count, scoring"), silently omitting roster shape, auction budget, start trigger and stake
    * tier. A summary that under-describes its own contents is how a control becomes unfindable
-   * while still technically being present — this is the assertion that closes that gap for good,
-   * not just for today's seven fields.
+   * while still technically being present.
+   *
+   * DERIVED, not hand-typed (fix round 1, LOW 3): the expected list comes from walking the
+   * rendered drawer's own `<label>` elements, the brief's own `drawerControlLabels()`
+   * pseudocode, rather than a second hardcoded list sitting beside `DRAWER_SUMMARY`'s hardcoded
+   * one. Two hardcoded lists can only ever agree with EACH OTHER, never catch a drawer control
+   * added without a matching summary update — this reads what the drawer actually rendered, so a
+   * FUTURE eighth field with no word in the summary fails this test on its own, with no edit
+   * here required.
    */
-  it("names everything the drawer actually contains, roster shape included", () => {
+  it("names, in its own summary, every control label the drawer actually renders", () => {
     renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
+    // Widened to the drawer's fullest shape first: auction budget and draft start are both
+    // conditional (auction format, public visibility), and a check that never turned either
+    // condition on could not catch a summary that silently dropped one of them.
+    fireEvent.change(screen.getByLabelText("Draft format"), { target: { value: "auction" } });
+    fireEvent.change(screen.getByLabelText("Who can join"), { target: { value: "public" } });
+
+    const details = document.querySelector("details")!;
+    const drawerControlLabels = () => [...details.querySelectorAll("label")].map((label) => label.textContent!.trim());
+    // Guards against a broken query silently passing (empty list, `toContain` vacuously true for
+    // every element of nothing) — the same "finds copy to sweep" shape `glossary.test.ts` and
+    // `identity/config.test.ts` both already use for an identical reason.
+    expect(drawerControlLabels().length).toBeGreaterThanOrEqual(7);
+
     const summary = screen.getByText(DRAWER_SUMMARY);
     expect(summary.tagName).toBe("SUMMARY");
     expect(summary).toHaveTextContent(/roster shape/i);
-    for (const named of ["draft format", "team count", "scoring", "auction budget", "draft start", "stake tier"]) {
-      expect(summary.textContent!.toLowerCase()).toContain(named);
-    }
+    const summaryText = summary.textContent!.toLowerCase();
+    for (const label of drawerControlLabels()) expect(summaryText).toContain(label.split(" ")[0]!.toLowerCase());
   });
 
   it("creates a league from just a name, and reports the ids back", async () => {

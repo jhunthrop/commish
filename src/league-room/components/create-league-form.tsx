@@ -7,7 +7,7 @@ import { Button, InfoTip, Input, Select } from "@/components/ui";
 import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import type { HelpLevel } from "@/identity/preferences";
-import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import { MATCHMAKING_CONFIG, SIT_AND_GO_GRACE_MINUTES } from "@/matchmaking/config";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
 const FORMATS = [
@@ -80,14 +80,134 @@ export const START_TRIGGERS = [
   { value: "scheduled", label: "On a schedule I set later" },
   { value: "when_full", label: "Starts as soon as it fills" },
 ];
-const SIT_AND_GO_GRACE_MINUTES = MATCHMAKING_CONFIG.sitAndGo.graceSeconds / 60;
 export const START_TRIGGER_HINT = `A sit-and-go league starts on its own about ${SIT_AND_GO_GRACE_MINUTES} minutes after its last seat fills, so everyone has time to open the room first.`;
 /**
  * Named once, so the drawer's own summary and the fields it actually contains can never say two
  * different things — the defect this task exists to close (the old summary named three of the
  * seven fields the drawer actually held).
  */
-export const DRAWER_SUMMARY = "Advanced settings: draft format, team count, scoring, roster shape, auction budget, draft start, and stake tier.";
+export const DRAWER_SUMMARY = "Advanced settings: draft format, teams, scoring, roster shape, auction budget, draft start, and stake tier.";
+
+/**
+ * The two promoted controls, extracted so `CreateLeagueForm`'s own render stays a plain list of
+ * sections rather than a wall of JSX. Pure presentation plus the two `onChange` callbacks —
+ * `handleVisibilityChange`'s own reset-on-leaving-public logic stays in the parent, since that
+ * rule is about `startTrigger`, a field this component never touches.
+ */
+function WhoCanJoinAndWhoItsFor({
+  visibility,
+  onVisibilityChange,
+  experienceTier,
+  onExperienceTierChange,
+}: {
+  readonly visibility: string;
+  readonly onVisibilityChange: (value: string) => void;
+  readonly experienceTier: string;
+  readonly onExperienceTierChange: (value: string) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Select
+        label="Who can join"
+        options={VISIBILITIES}
+        value={visibility}
+        hint={VISIBILITY_HINT}
+        onChange={(event) => onVisibilityChange(event.target.value)}
+      />
+      <Select
+        label="Who it's for"
+        options={EXPERIENCE_TIERS}
+        value={experienceTier}
+        hint={LEAGUE_EXPERIENCE_TIER_HINT}
+        onChange={(event) => onExperienceTierChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
+/**
+ * Everything still behind the closed disclosure: format, teams, scoring, roster shape, auction
+ * budget (auction only), draft start (public leagues only), and stake tier. Extracted for the
+ * same reason `WhoCanJoinAndWhoItsFor` above is — `CreateLeagueForm`'s render reads as a list of
+ * sections, and this is the one section with real internal conditionals of its own.
+ */
+function AdvancedSettingsDrawer({
+  format,
+  onFormatChange,
+  teamCount,
+  onTeamCountChange,
+  scoringPreset,
+  onScoringPresetChange,
+  rosterShape,
+  onRosterShapeChange,
+  auctionBudget,
+  onAuctionBudgetChange,
+  visibility,
+  startTrigger,
+  onStartTriggerChange,
+  stakeTier,
+  onStakeTierChange,
+  helpLevel,
+}: {
+  readonly format: string;
+  readonly onFormatChange: (value: string) => void;
+  readonly teamCount: string;
+  readonly onTeamCountChange: (value: string) => void;
+  readonly scoringPreset: string;
+  readonly onScoringPresetChange: (value: string) => void;
+  readonly rosterShape: string;
+  readonly onRosterShapeChange: (value: string) => void;
+  readonly auctionBudget: string;
+  readonly onAuctionBudgetChange: (value: string) => void;
+  readonly visibility: string;
+  readonly startTrigger: string;
+  readonly onStartTriggerChange: (value: string) => void;
+  readonly stakeTier: string;
+  readonly onStakeTierChange: (value: string) => void;
+  readonly helpLevel?: HelpLevel;
+}) {
+  return (
+    <details className="rounded-md border border-border p-3">
+      <summary className="cursor-pointer text-sm text-text-muted">{DRAWER_SUMMARY}</summary>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Select label="Draft format" options={FORMATS} value={format} onChange={(event) => onFormatChange(event.target.value)} />
+        <Select label="Teams" options={TEAM_COUNTS} value={teamCount} onChange={(event) => onTeamCountChange(event.target.value)} />
+        <Select label="Scoring" options={PRESETS} value={scoringPreset} onChange={(event) => onScoringPresetChange(event.target.value)} />
+        <div className="flex flex-col gap-1">
+          <Select label="Roster shape" options={ROSTER_SHAPE_OPTIONS} value={rosterShape} onChange={(event) => onRosterShapeChange(event.target.value)} />
+          <span className="flex items-center gap-1">
+            <InfoTip term="superflex" helpLevel={helpLevel} />
+          </span>
+        </div>
+        {format === "auction" ? (
+          <Input
+            label="Auction budget"
+            type="number"
+            value={auctionBudget}
+            hint="Dollars each manager has to spend."
+            onChange={(event) => onAuctionBudgetChange(event.target.value)}
+          />
+        ) : null}
+        {visibility === "public" ? (
+          <div className="flex flex-col gap-1">
+            <Select
+              label="Draft start"
+              options={START_TRIGGERS}
+              value={startTrigger}
+              hint={START_TRIGGER_HINT}
+              onChange={(event) => onStartTriggerChange(event.target.value)}
+            />
+            <span className="flex items-center gap-1">
+              <InfoTip term="sit-and-go" helpLevel={helpLevel} />
+            </span>
+          </div>
+        ) : null}
+        <Select label="Stake tier" options={STAKE_TIERS} value={stakeTier} onChange={(event) => onStakeTierChange(event.target.value)} />
+        <p className="text-sm text-text-muted sm:col-span-2">{MATCHMAKING_CONFIG.stakeDisclosure}</p>
+      </div>
+    </details>
+  );
+}
 
 /**
  * Three visible fields, not one — the league name plus the two questions the gauntlet finding
@@ -123,6 +243,10 @@ export const DRAWER_SUMMARY = "Advanced settings: draft format, team count, scor
  * exactly nothing a casual commissioner needs to touch. Veteran: `DRAWER_SUMMARY` now names
  * every field the drawer holds, roster shape and draft start (the sit-and-go trigger) included,
  * so a veteran hunting for either finds the word in the summary before opening it.
+ *
+ * `WhoCanJoinAndWhoItsFor` and `AdvancedSettingsDrawer` above hold the actual field markup
+ * (fix round 1, LOW 2): this function's own body is state, the visibility-reset rule, and the
+ * submit handler — composition, not a 140-line wall of JSX.
  */
 export function CreateLeagueForm({
   onCreated,
@@ -206,62 +330,31 @@ export function CreateLeagueForm({
     >
       <Input label="League name" value={name} onChange={(event) => setName(event.target.value)} error={error ?? undefined} />
 
-      <div className="grid gap-3 sm:grid-cols-2">
-        <Select
-          label="Who can join"
-          options={VISIBILITIES}
-          value={visibility}
-          hint={VISIBILITY_HINT}
-          onChange={(event) => handleVisibilityChange(event.target.value)}
-        />
-        <Select
-          label="Who it's for"
-          options={EXPERIENCE_TIERS}
-          value={experienceTier}
-          hint={LEAGUE_EXPERIENCE_TIER_HINT}
-          onChange={(event) => setExperienceTier(event.target.value)}
-        />
-      </div>
+      <WhoCanJoinAndWhoItsFor
+        visibility={visibility}
+        onVisibilityChange={handleVisibilityChange}
+        experienceTier={experienceTier}
+        onExperienceTierChange={setExperienceTier}
+      />
 
-      <details className="rounded-md border border-border p-3">
-        <summary className="cursor-pointer text-sm text-text-muted">{DRAWER_SUMMARY}</summary>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Select label="Draft format" options={FORMATS} value={format} onChange={(event) => setFormat(event.target.value)} />
-          <Select label="Teams" options={TEAM_COUNTS} value={teamCount} onChange={(event) => setTeamCount(event.target.value)} />
-          <Select label="Scoring" options={PRESETS} value={scoringPreset} onChange={(event) => setScoringPreset(event.target.value)} />
-          <div className="flex flex-col gap-1">
-            <Select label="Roster shape" options={ROSTER_SHAPE_OPTIONS} value={rosterShape} onChange={(event) => setRosterShape(event.target.value)} />
-            <span className="flex items-center gap-1">
-              <InfoTip term="superflex" helpLevel={helpLevel} />
-            </span>
-          </div>
-          {format === "auction" ? (
-            <Input
-              label="Auction budget"
-              type="number"
-              value={auctionBudget}
-              hint="Dollars each manager has to spend."
-              onChange={(event) => setAuctionBudget(event.target.value)}
-            />
-          ) : null}
-          {visibility === "public" ? (
-            <div className="flex flex-col gap-1">
-              <Select
-                label="Draft start"
-                options={START_TRIGGERS}
-                value={startTrigger}
-                hint={START_TRIGGER_HINT}
-                onChange={(event) => setStartTrigger(event.target.value)}
-              />
-              <span className="flex items-center gap-1">
-                <InfoTip term="sit-and-go" helpLevel={helpLevel} />
-              </span>
-            </div>
-          ) : null}
-          <Select label="Stake tier" options={STAKE_TIERS} value={stakeTier} onChange={(event) => setStakeTier(event.target.value)} />
-          <p className="text-sm text-text-muted sm:col-span-2">{MATCHMAKING_CONFIG.stakeDisclosure}</p>
-        </div>
-      </details>
+      <AdvancedSettingsDrawer
+        format={format}
+        onFormatChange={setFormat}
+        teamCount={teamCount}
+        onTeamCountChange={setTeamCount}
+        scoringPreset={scoringPreset}
+        onScoringPresetChange={setScoringPreset}
+        rosterShape={rosterShape}
+        onRosterShapeChange={setRosterShape}
+        auctionBudget={auctionBudget}
+        onAuctionBudgetChange={setAuctionBudget}
+        visibility={visibility}
+        startTrigger={startTrigger}
+        onStartTriggerChange={setStartTrigger}
+        stakeTier={stakeTier}
+        onStakeTierChange={setStakeTier}
+        helpLevel={helpLevel}
+      />
 
       <Button type="submit" loading={submitting} disabled={submitting}>
         Create league

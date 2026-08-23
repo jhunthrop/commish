@@ -1,10 +1,5 @@
-import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import { SIT_AND_GO_GRACE_MINUTES } from "@/matchmaking/config";
 import { VERIFIED_BADGE_TOOLTIP } from "@/participation/verified";
-
-/** `MATCHMAKING_CONFIG.sitAndGo.graceSeconds` in words, computed rather than typed a second
- *  time, so the glossary entry below can never drift from the number `fireWhenFullInTx`
- *  actually waits. */
-const SIT_AND_GO_GRACE_MINUTES = MATCHMAKING_CONFIG.sitAndGo.graceSeconds / 60;
 
 /**
  * The registry: every piece of jargon this product shows a manager, defined exactly once.
