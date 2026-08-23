@@ -209,7 +209,7 @@ describe("the admin queue page says nothing that breaks the house copy rules", (
   it("is clean empty and clean populated", async () => {
     const { requireAdmin } = await import("@/lib/auth/current-user");
     const { listPendingFlags } = await import("@/integrity-service/flags");
-    const { default: AdminQueuePage } = await import("@/app/app/admin/queue/page");
+    const { default: AdminQueuePage } = await import("@/app/app/(shell)/admin/queue/page");
 
     vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
 
@@ -234,7 +234,7 @@ describe("the admin flag detail page says nothing that breaks the house copy rul
     const { requireAdmin } = await import("@/lib/auth/current-user");
     const { flagDetail } = await import("@/integrity-service/flags");
     const { leagueNameFor } = await import("@/draft-service/teams");
-    const { default: AdminFlagDetailPage } = await import("@/app/app/admin/queue/[flagId]/page");
+    const { default: AdminFlagDetailPage } = await import("@/app/app/(shell)/admin/queue/[flagId]/page");
 
     vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
     vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
@@ -281,7 +281,7 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
     const { requireAdmin } = await import("@/lib/auth/current-user");
     const { flagDetail } = await import("@/integrity-service/flags");
     const { leagueNameFor } = await import("@/draft-service/teams");
-    const { default: AdminFlagDetailPage } = await import("@/app/app/admin/queue/[flagId]/page");
+    const { default: AdminFlagDetailPage } = await import("@/app/app/(shell)/admin/queue/[flagId]/page");
 
     vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
     vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");
@@ -346,7 +346,7 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
     const { requireAdmin } = await import("@/lib/auth/current-user");
     const { flagDetail } = await import("@/integrity-service/flags");
     const { leagueNameFor } = await import("@/draft-service/teams");
-    const { default: AdminFlagDetailPage } = await import("@/app/app/admin/queue/[flagId]/page");
+    const { default: AdminFlagDetailPage } = await import("@/app/app/(shell)/admin/queue/[flagId]/page");
 
     vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
     vi.mocked(leagueNameFor).mockResolvedValue("Sunday Money");

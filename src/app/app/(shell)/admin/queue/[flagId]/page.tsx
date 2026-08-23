@@ -7,7 +7,6 @@ import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { renderNotice } from "@/integrity/notices";
 import { DECISION_PHRASE, subjectIsRemoved, type FlagResolutionView, type FlagSubjectView, type TradedPlayerView } from "@/integrity/queue-view";
 import { contentRemovalIsWiredFor, type ResolutionDecision } from "@/integrity/flags";
-import { TopBar } from "@/components/app-shell/top-bar";
 import { Card, PageTitle } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import { withAdmin } from "@/app/api/admin/_shared";
@@ -243,11 +242,14 @@ function nonDuplicatedEvidenceEntries(evidence: JsonObject, subject: FlagSubject
  * `flagDetail` returning `null` (a flag id that names nothing) is `notFound()` — the same
  * non-oracle discipline the gate itself holds to, so a guessed id and a real-but-inaccessible one
  * read identically.
+ *
+ * Renders no `TopBar` and no `<main>` of its own (Task 2 Step 5) — `(shell)/layout.tsx` supplies
+ * both, once, for every page in this route group.
  */
 export default async function AdminFlagDetailPage({ params }: PageProps) {
   const { flagId } = await params;
 
-  return withAdmin(async (operator) => {
+  return withAdmin(async () => {
     const detail = await flagDetail(getDb(), flagId);
     if (detail === null) notFound();
 
@@ -259,31 +261,28 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
       const heldSubject: HeldTradeSubject = detail.subject;
       return (
         <>
-          <TopBar displayName={operator.displayName} avatar={operator.avatarUrl} isAdmin={operator.isAdmin} />
-          <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
-            <header className="flex flex-col gap-1">
-              <PageTitle>Held trade</PageTitle>
-              <time dateTime={detail.raisedAt} className="text-sm text-text-muted">
-                Held {formatWhen(detail.raisedAt)}
-              </time>
-            </header>
-            {detail.resolution !== null ? (
-              <Card>
-                <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
-                <ResolutionSummary resolution={detail.resolution} />
-              </Card>
-            ) : (
-              <HeldTradeDetail
-                flagId={detail.flagId}
-                subject={heldSubject}
-                trail={detail.trail}
-                // The SAME offered set every other subject's form reads (final review F4) — this
-                // surface renders its two buttons out of it rather than assuming both are live.
-                decisions={detail.decisions}
-                noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength}
-              />
-            )}
-          </main>
+          <header className="flex flex-col gap-1">
+            <PageTitle>Held trade</PageTitle>
+            <time dateTime={detail.raisedAt} className="text-sm text-text-muted">
+              Held {formatWhen(detail.raisedAt)}
+            </time>
+          </header>
+          {detail.resolution !== null ? (
+            <Card>
+              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
+              <ResolutionSummary resolution={detail.resolution} />
+            </Card>
+          ) : (
+            <HeldTradeDetail
+              flagId={detail.flagId}
+              subject={heldSubject}
+              trail={detail.trail}
+              // The SAME offered set every other subject's form reads (final review F4) — this
+              // surface renders its two buttons out of it rather than assuming both are live.
+              decisions={detail.decisions}
+              noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength}
+            />
+          )}
         </>
       );
     }
@@ -296,87 +295,84 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
 
     return (
       <>
-        <TopBar displayName={operator.displayName} avatar={operator.avatarUrl} isAdmin={operator.isAdmin} />
-        <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
-          <header className="flex flex-col gap-1">
-            <PageTitle>Flag detail</PageTitle>
-            <time dateTime={detail.raisedAt} className="text-sm text-text-muted">
-              Raised {formatWhen(detail.raisedAt)}
-            </time>
-          </header>
+        <header className="flex flex-col gap-1">
+          <PageTitle>Flag detail</PageTitle>
+          <time dateTime={detail.raisedAt} className="text-sm text-text-muted">
+            Raised {formatWhen(detail.raisedAt)}
+          </time>
+        </header>
 
-          <SubjectCard subject={subject} />
+        <SubjectCard subject={subject} />
 
-          <Card>
-            <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Evidence</p>
-            {evidenceEntries.length === 0 ? (
-              <p className="mt-2 text-sm text-text-muted">No evidence recorded for this flag.</p>
-            ) : (
-              <dl className="mt-2 flex flex-col gap-1">
-                {evidenceEntries.map(([key, value]) => (
-                  <div key={key} className="flex justify-between gap-3 text-sm">
-                    <dt className="text-text-muted">{key}</dt>
-                    <dd className="break-all text-text-primary">{JSON.stringify(value)}</dd>
+        <Card>
+          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Evidence</p>
+          {evidenceEntries.length === 0 ? (
+            <p className="mt-2 text-sm text-text-muted">No evidence recorded for this flag.</p>
+          ) : (
+            <dl className="mt-2 flex flex-col gap-1">
+              {evidenceEntries.map(([key, value]) => (
+                <div key={key} className="flex justify-between gap-3 text-sm">
+                  <dt className="text-text-muted">{key}</dt>
+                  <dd className="break-all text-text-primary">{JSON.stringify(value)}</dd>
+                </div>
+              ))}
+            </dl>
+          )}
+        </Card>
+
+        <Card>
+          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Reporters</p>
+          {detail.reporters.length === 0 ? (
+            <p className="mt-2 text-sm text-text-muted">Nobody reported this. The platform raised it on its own.</p>
+          ) : (
+            <ul className="mt-2 flex flex-col gap-2">
+              {detail.reporters.map((reporter) => (
+                <li key={reporter.userId} className="text-sm">
+                  <span className="font-medium text-text-primary">{reporter.name}</span>{" "}
+                  <span className="text-text-muted">
+                    reported &ldquo;{reporter.reason}&rdquo; on {formatWhen(reporter.reportedAt)}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+
+        <Card>
+          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">What happened</p>
+          {detail.trail.length === 0 ? (
+            <p className="mt-2 text-sm text-text-muted">No recorded history for this flag yet.</p>
+          ) : (
+            <ul className="mt-2 flex flex-col" aria-label="Flag history">
+              {detail.trail.map((row) => (
+                <li key={row.eventId} className="flex items-start gap-3 border-b border-line py-3 last:border-b-0">
+                  <Icon name={row.icon} size={18} className="mt-0.5 shrink-0 text-text-muted" />
+                  <div className="flex min-w-0 flex-col gap-0.5">
+                    <p className="break-words text-sm text-text-primary">{row.headline}</p>
+                    <time dateTime={row.occurredAt} className="text-xs text-text-muted">
+                      {formatWhen(row.occurredAt)}
+                    </time>
                   </div>
-                ))}
-              </dl>
-            )}
-          </Card>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
 
-          <Card>
-            <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Reporters</p>
-            {detail.reporters.length === 0 ? (
-              <p className="mt-2 text-sm text-text-muted">Nobody reported this. The platform raised it on its own.</p>
-            ) : (
-              <ul className="mt-2 flex flex-col gap-2">
-                {detail.reporters.map((reporter) => (
-                  <li key={reporter.userId} className="text-sm">
-                    <span className="font-medium text-text-primary">{reporter.name}</span>{" "}
-                    <span className="text-text-muted">
-                      reported &ldquo;{reporter.reason}&rdquo; on {formatWhen(reporter.reportedAt)}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          <Card>
-            <p className="text-xs font-medium uppercase tracking-wide text-text-muted">What happened</p>
-            {detail.trail.length === 0 ? (
-              <p className="mt-2 text-sm text-text-muted">No recorded history for this flag yet.</p>
-            ) : (
-              <ul className="mt-2 flex flex-col" aria-label="Flag history">
-                {detail.trail.map((row) => (
-                  <li key={row.eventId} className="flex items-start gap-3 border-b border-line py-3 last:border-b-0">
-                    <Icon name={row.icon} size={18} className="mt-0.5 shrink-0 text-text-muted" />
-                    <div className="flex min-w-0 flex-col gap-0.5">
-                      <p className="break-words text-sm text-text-primary">{row.headline}</p>
-                      <time dateTime={row.occurredAt} className="text-xs text-text-muted">
-                        {formatWhen(row.occurredAt)}
-                      </time>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-
-          <Card>
-            <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
-            {detail.resolution !== null ? (
-              <ResolutionSummary resolution={detail.resolution} />
-            ) : (
-              <ResolutionForm
-                flagId={detail.flagId}
-                decisions={decisions}
-                noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength}
-                previews={previews}
-                isChatSubject={subject.kind === "chat_message"}
-              />
-            )}
-          </Card>
-        </main>
+        <Card>
+          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
+          {detail.resolution !== null ? (
+            <ResolutionSummary resolution={detail.resolution} />
+          ) : (
+            <ResolutionForm
+              flagId={detail.flagId}
+              decisions={decisions}
+              noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength}
+              previews={previews}
+              isChatSubject={subject.kind === "chat_message"}
+            />
+          )}
+        </Card>
       </>
     );
   });

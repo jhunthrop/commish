@@ -473,7 +473,7 @@ export function tradeFairnessBasisPhrase(basis: TradeFairnessBasis | null): stri
 
 /**
  * The operator-facing plain-language restatement of the number that actually raised this flag —
- * fix round 2, F3. The friendly `TradeSubjectCard` (`@/app/app/admin/queue/[flagId]/page`) shows
+ * fix round 2, F3. The friendly `TradeSubjectCard` (`@/app/app/(shell)/admin/queue/[flagId]/page`) shows
  * each player's own average points but, before this fix, never the trade's own `gap`/`threshold`
  * — the values `tradeBalance` computed and `crossesFairnessThreshold` tested against — leaving an
  * operator to do the subtraction themselves or trust an unlabeled JSON number in the raw Evidence

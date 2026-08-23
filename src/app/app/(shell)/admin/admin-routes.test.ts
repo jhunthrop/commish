@@ -59,8 +59,11 @@ function grepSourceTree(pattern: RegExp, { dirs, exclude }: GrepOptions): readon
 describe("the admin route tree is gated", () => {
   it("routes every file under the admin tree through the one gate", () => {
     // Recursive, .test excluded and nothing else — advisory-only.test.ts's shape, whose own
-    // history is that both of its earlier holes were name-based carve-outs.
-    const files = sourceFiles(["src/app/app/admin", "src/app/api/admin"]);
+    // history is that both of its earlier holes were name-based carve-outs. The first root moved
+    // under the `(shell)` route group in Task 2 Step 5 — a route group changes no URL, so this is
+    // a path-glob update ONLY, in the same commit that moves the files (the addendum's A3
+    // promise: Task 19 does not edit this tripwire).
+    const files = sourceFiles(["src/app/app/(shell)/admin", "src/app/api/admin"]);
     expect(files.length).toBeGreaterThan(3); // never vacuous
     const ungated = files.filter((f) => !f.endsWith("_shared.ts") && !/requireAdmin\(|withAdmin\(/.test(read(f)));
     expect(ungated).toEqual([]);

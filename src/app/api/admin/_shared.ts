@@ -10,9 +10,10 @@ type AdminHandler = (operatorUserId: string, request: Request) => Promise<Respon
 type AdminPageRender<T> = (operator: CurrentUser) => Promise<T>;
 
 /**
- * THE ONE GATE, on both sides of the wire. Every route under `src/app/app/admin/**` and
- * `src/app/api/admin/**` goes through this — `admin-routes.test.ts`
- * (`@/app/app/admin/admin-routes.test.ts`) is the tripwire that keeps that true as routes are
+ * THE ONE GATE, on both sides of the wire. Every route under `src/app/app/(shell)/admin/**`
+ * (Task 2 moved it under the `(shell)` route group; no URL changed) and `src/app/api/admin/**`
+ * goes through this — `admin-routes.test.ts`
+ * (`@/app/app/(shell)/admin/admin-routes.test.ts`) is the tripwire that keeps that true as routes are
  * added, the same "enumerate the tree, fail if anything is ungated" discipline
  * `advisory-only.test.ts` and `seed-operator.test.ts`'s `grepSourceTree` use. Its own second
  * check — that `requireAdmin` (`@/lib/auth/current-user`) is called from nowhere else in `src`
