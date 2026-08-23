@@ -24,6 +24,7 @@ const BASE: LeagueTermsInput = {
   commissioner: { displayName: "Alex Rivera", avatarUrl: "preset:crown" },
   kickoffAt: "2026-09-12T23:00:00.000Z",
   now: "2026-09-09T23:00:00.000Z",
+  startTrigger: "scheduled",
 };
 
 describe("leagueTerms", () => {
@@ -100,6 +101,29 @@ describe("leagueTerms", () => {
 
   it("renders the draft's scheduled time absolute-first, then relative", () => {
     expect(leagueTerms(BASE).draftAt).toBe("Saturday 12 September, 11:00 PM UTC (in 3 days)");
+  });
+
+  // Phase 3.5, Task 8 fix round 1 (review HIGH). `BASE` has an open seat (8 of 12) — a `when_full`
+  // league in that state has no chosen kickoff yet, so `draftAt` must never format the stored
+  // `kickoffAt` (a placeholder) as though it were a real time.
+  describe("when_full", () => {
+    it("speaks the fills-truth instead of a fabricated date while a when_full league is still filling", () => {
+      expect(leagueTerms({ ...BASE, startTrigger: "when_full" }).draftAt).toBe("Starts as soon as it fills");
+    });
+
+    it("renders the real date once a when_full league has actually filled — the fill trigger's own kickoff", () => {
+      const full = { ...BASE, startTrigger: "when_full" as const, teamCount: 12, filledTeams: 12 };
+      expect(leagueTerms(full).draftAt).toBe("Saturday 12 September, 11:00 PM UTC (in 3 days)");
+    });
+
+    // Inverted: a `'scheduled'`-trigger league is byte-identical to how this panel has always
+    // rendered it, whether or not it happens to have an open seat.
+    it("never speaks the fills-truth for an ordinary scheduled league, full or not", () => {
+      expect(leagueTerms(BASE).draftAt).toBe("Saturday 12 September, 11:00 PM UTC (in 3 days)");
+      expect(leagueTerms({ ...BASE, teamCount: 12, filledTeams: 12 }).draftAt).toBe(
+        "Saturday 12 September, 11:00 PM UTC (in 3 days)",
+      );
+    });
   });
 });
 

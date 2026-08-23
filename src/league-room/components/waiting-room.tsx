@@ -64,23 +64,29 @@ export function WaitingRoom({ league, isCommissioner }: { readonly league: Waiti
   if (terminal !== null) return terminal;
 
   if (full) {
+    // `terminal` above is `null` only while `league.status === "scheduled"` (`draftTerminalStatePanel`'s
+    // own contract), and `full` is true here, so the ternary feeding `useCountdown` above took its
+    // `league.kickoffAt` branch — `remainingMs` is therefore never `null` at this point. Asserted,
+    // not re-guarded: a dead `remainingMs === null` branch here would be unreachable and, per this
+    // task's own review, exactly the kind of defensive code the gates' 100% coverage would then
+    // demand a test for despite there being no state that reaches it — the same `pausedUntil!`
+    // idiom `RoomRail` (`@/draft-room/components/room-rail`) already uses for an identical
+    // logically-guaranteed-non-null case.
     return (
       <StatePanel
         tone="neutral"
         icon="bolt"
         title={`All ${league.teamCount} seats are full.`}
         action={
-          remainingMs === null ? null : (
-            <div className="flex flex-col items-center gap-1">
-              <Countdown remainingMs={remainingMs} size="lg" data-testid="waiting-room-countdown" />
-              <p role="status" className="text-sm text-text-muted">{`Starts in ${formatCoarseDuration(remainingMs)}.`}</p>
-              {/* First-timer persona question, Step 5: "what happens if I'm not there?" — the
-                  honest answer this room already gives during a live draft (`room-dock.tsx`'s
-                  own copy), stated once here too rather than left for a member to discover only
-                  once the clock is already running. */}
-              <p className="text-sm text-text-muted">Away when it starts? The room autopicks for you if your clock runs out.</p>
-            </div>
-          )
+          <div className="flex flex-col items-center gap-1">
+            <Countdown remainingMs={remainingMs!} size="lg" data-testid="waiting-room-countdown" />
+            <p role="status" className="text-sm text-text-muted">{`Starts in ${formatCoarseDuration(remainingMs!)}.`}</p>
+            {/* First-timer persona question, Step 5: "what happens if I'm not there?" — the
+                honest answer this room already gives during a live draft (`room-dock.tsx`'s
+                own copy), stated once here too rather than left for a member to discover only
+                once the clock is already running. */}
+            <p className="text-sm text-text-muted">Away when it starts? The room autopicks for you if your clock runs out.</p>
+          </div>
         }
       />
     );

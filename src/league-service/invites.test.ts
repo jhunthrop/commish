@@ -501,6 +501,49 @@ describe("invitePreview", () => {
     expect(preview.terms.formatNotes).toEqual(["Every team also plays the league median each week."]);
   });
 
+  // Fix round 1 (review HIGH): the fabricated-date leak's second surface. A stranger reading the
+  // invite preview for a still-filling `when_full` league must see the same fills-truth sentence
+  // `leagueHome` shows a member, never `invitePreview`'s placeholder `kickoffAt` formatted as a
+  // real time — this proves it through the FULL read path, not just `leagueTerms`'s own unit test.
+  it("speaks the fills-truth on the invite preview too, while a when_full league is still filling", async () => {
+    await db.insert(users).values({ id: "wf1", email: "wf1@test.local", displayName: "Manager wf1" });
+    const created = await createLeague(writeDeps(), {
+      name: "Sit-and-Go League", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "wf1", teamName: "Commish",
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: true, startTrigger: "when_full",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "wf1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await invitePreview(db, invite.code);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.terms.draftAt).toBe("Starts as soon as it fills");
+  });
+
+  it("renders the real draft date on the invite preview once a when_full league has actually filled", async () => {
+    await db.insert(users).values(
+      Array.from({ length: 4 }, (_, i) => ({ id: `wf2_${i + 1}`, email: `wf2_${i + 1}@test.local`, displayName: `Manager ${i + 1}` })),
+    );
+    const created = await createLeague(writeDeps(), {
+      name: "Sit-and-Go League Full", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "wf2_1", teamName: "Commish",
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: true, startTrigger: "when_full",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "wf2_1" });
+    if (!invite.ok) throw new Error(invite.reason);
+    await acceptInvite(writeDeps(), { code: invite.code, userId: "wf2_2" });
+    await acceptInvite(writeDeps(), { code: invite.code, userId: "wf2_3" });
+    await acceptInvite(writeDeps(), { code: invite.code, userId: "wf2_4" });
+
+    const result = await invitePreview(db, invite.code);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.terms.filledTeams).toBe(4);
+    expect(result.terms.draftAt).not.toBe("Starts as soon as it fills");
+    expect(result.terms.draftAt).toContain("UTC");
+  });
+
   it("counts every seated team, not just the commissioner's", async () => {
     const created = await league();
     const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });

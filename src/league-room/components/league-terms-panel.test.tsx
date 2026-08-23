@@ -97,6 +97,24 @@ describe("LeagueTermsPanel", () => {
     expect(screen.queryByText("Notes")).not.toBeInTheDocument();
   });
 
+  // Phase 3.5, Task 8 fix round 1 (review HIGH). `LeagueTermsPanel` never reads `startTrigger`
+  // itself — `leagueTerms()` (`@/league`) already decided what `draftAt` says before this panel
+  // ever sees it — so this only has to prove the panel renders WHATEVER `draftAt` carries, for
+  // both the fills-truth sentence and an ordinary date, never a fabricated one.
+  it("renders the fills-truth sentence a when_full league's terms carry, instead of a date", () => {
+    render(<LeagueTermsPanel terms={{ ...TERMS, draftAt: "Starts as soon as it fills" }} />);
+    expect(screen.getByText("Starts as soon as it fills")).toBeInTheDocument();
+    expect(screen.queryByText(TERMS.draftAt)).not.toBeInTheDocument();
+  });
+
+  // Inverted: an ordinary scheduled league's terms render byte-identically to how this panel has
+  // always rendered them — untouched by the fix.
+  it("renders an ordinary scheduled league's real draft date, unchanged", () => {
+    render(<LeagueTermsPanel terms={TERMS} />);
+    expect(screen.getByText(TERMS.draftAt)).toBeInTheDocument();
+    expect(screen.queryByText("Starts as soon as it fills")).not.toBeInTheDocument();
+  });
+
   it("lists every format note, in the order the league sent them, in both themes, axe-clean", async () => {
     const withNotes = {
       ...TERMS,

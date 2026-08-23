@@ -199,6 +199,10 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     // never-true defensive fallback `weights ?? PPR_SCORING` uses two lines above.
     kickoffAt: draft?.kickoffAt.toISOString() ?? clock.now(),
     now: clock.now(),
+    // Phase 3.5, Task 8 fix round 1 (review HIGH): the SAME `draft.startTrigger` this function
+    // already reads for `home.draftSchedule` two lines below, off the SAME select — `leagueTerms`
+    // needs it to know whether `kickoffAt` above is a real time or still the creation placeholder.
+    startTrigger: draft?.startTrigger ?? "scheduled",
   });
 
   // Fix round 1 (review MEDIUM): `DraftSchedulePanel`'s entire initial read, assembled from rows

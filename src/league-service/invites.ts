@@ -195,7 +195,10 @@ export async function invitePreview(db: Db, code: string, clock: Clock = systemC
   );
   const [weights] = await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, league.id));
   const filledTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, league.id));
-  const [draft] = await db.select({ kickoffAt: drafts.kickoffAt }).from(drafts).where(eq(drafts.leagueId, league.id));
+  const [draft] = await db
+    .select({ kickoffAt: drafts.kickoffAt, startTrigger: drafts.startTrigger })
+    .from(drafts)
+    .where(eq(drafts.leagueId, league.id));
 
   return {
     ok: true,
@@ -220,6 +223,10 @@ export async function invitePreview(db: Db, code: string, clock: Clock = systemC
       // `drafts` is written in the same transaction as `leagues`.
       kickoffAt: draft?.kickoffAt.toISOString() ?? clock.now(),
       now: clock.now(),
+      // Phase 3.5, Task 8 fix round 1 (review HIGH): a stranger reading the invite preview for an
+      // unfilled `when_full` league must see the same fills-truth `leagueHome` shows a member,
+      // never the placeholder `kickoffAt` above formatted as though it were a real time.
+      startTrigger: draft?.startTrigger ?? "scheduled",
     }),
   };
 }

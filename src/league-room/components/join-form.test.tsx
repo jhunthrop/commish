@@ -53,6 +53,25 @@ describe("JoinForm", () => {
     expect(fixture.calls).toEqual(["GET /api/invites/SUNDAY12", "GET /api/invites/SUNDAY12"]);
   });
 
+  // Phase 3.5, Task 8 fix round 1 (review HIGH). A stranger deciding whether to join a still-
+  // filling `when_full` league must see the same fills-truth sentence a member sees on league
+  // home, never `invitePreview`'s placeholder `kickoffAt` rendered as though it were real.
+  it("shows the fills-truth sentence, never a fabricated date, for a when_full league still filling", async () => {
+    const fixture = fixtureLeagueDeps({ ok: true, data: { ...TERMS, draftAt: "Starts as soon as it fills" } });
+    renderInLeague(<JoinForm code="SUNDAY12" />, fixture.deps);
+    expect(await screen.findByText("Starts as soon as it fills")).toBeInTheDocument();
+    expect(screen.queryByText(TERMS.draftAt)).not.toBeInTheDocument();
+  });
+
+  // Inverted: an ordinary scheduled league's invite preview is byte-identical to how it has
+  // always rendered — untouched by the fix.
+  it("shows the real draft date for an ordinary scheduled league's invite preview, unchanged", async () => {
+    const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });
+    renderInLeague(<JoinForm code="SUNDAY12" />, fixture.deps);
+    expect(await screen.findByText(TERMS.draftAt)).toBeInTheDocument();
+    expect(screen.queryByText("Starts as soon as it fills")).not.toBeInTheDocument();
+  });
+
   // First-timer persona review, fix round 1: nothing anywhere in the invite flow said what
   // JOINING MEANS. Lives in JoinForm, not the shared `LeagueTermsPanel` — see the sibling
   // assertion in `league-home.test.tsx` that this sentence does NOT appear post-join.

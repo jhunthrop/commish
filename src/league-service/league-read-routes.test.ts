@@ -222,6 +222,42 @@ describe("GET /api/leagues/[leagueId]", () => {
     expect(home?.draftSchedule).toMatchObject({ startTrigger: "when_full", filledTeams: 2 });
   });
 
+  // Fix round 1 (review HIGH): the fabricated-date leak. `home.terms.draftAt` used to format the
+  // stored `kickoffAt` unconditionally — a real, wrong Saturday-evening date beside `WaitingRoom`'s
+  // own honest "9 of 12 seats taken" on the exact same page. `leagueTerms` (`@/league`) is now
+  // `startTrigger`-aware; this proves the fix through the FULL read path, not just the pure
+  // function's own unit test.
+  it("speaks the fills-truth in home.terms.draftAt too, while a when_full league is still filling", async () => {
+    const created = await createDefaultLeague("u1");
+    await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
+    await db.update(drafts).set({ startTrigger: "when_full" }).where(eq(drafts.leagueId, created.leagueId));
+
+    const home = await leagueHome(db, created.leagueId, "u1");
+    expect(home?.terms.draftAt).toBe("Starts as soon as it fills");
+  });
+
+  it("renders the real draft date in home.terms.draftAt once a when_full league has actually filled", async () => {
+    const created = await createDefaultLeague("u1");
+    await db.update(drafts).set({ startTrigger: "when_full" }).where(eq(drafts.leagueId, created.leagueId));
+    for (let i = 2; i <= 12; i += 1) {
+      await db.insert(users).values({ id: `filler_${i}`, email: `filler_${i}@test.local`, displayName: `Filler ${i}` });
+      await db.insert(teams).values({ id: `team_${i}`, leagueId: created.leagueId, userId: `filler_${i}`, name: `Team ${i}` });
+    }
+
+    const home = await leagueHome(db, created.leagueId, "u1");
+    expect(home?.terms.draftAt).not.toBe("Starts as soon as it fills");
+    expect(home?.terms.draftAt).toContain("UTC");
+  });
+
+  // Inverted: an ordinary scheduled league's terms are untouched by the fix, whether or not it
+  // happens to have an open seat.
+  it("never speaks the fills-truth for an ordinary scheduled league", async () => {
+    const created = await createDefaultLeague("u1");
+    const home = await leagueHome(db, created.leagueId, "u1");
+    expect(home?.terms.draftAt).not.toBe("Starts as soon as it fills");
+    expect(home?.terms.draftAt).toContain("UTC");
+  });
+
   // The terms are assembled from rows `leagueHome` already holds — the league, its scoring
   // settings and its teams — not fetched a second time the way a naive "reuse `invitePreview`"
   // implementation would.
