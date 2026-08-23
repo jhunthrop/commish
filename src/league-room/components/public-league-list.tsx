@@ -195,7 +195,14 @@ export function PublicLeagueList({
   }
 
   return (
-    <div className="flex flex-col gap-3">
+    // Phase 3.5 addendum, Task 15: `data-testid`, not a role/name query, is what an e2e spec
+    // scopes its OWN "click the first Join button" to — the house shelf (`HouseLeagueShelf`,
+    // above) renders its own "Join {name}" buttons with the identical accessible-name shape,
+    // ABOVE this list on `/browse`, and now that the shelf is genuinely populated (Task 13's
+    // reconciler, run for real by `npm run seed`'s own house arc), a bare `.first()` over the
+    // WHOLE page can land on a house card instead of this list's own member league — found
+    // running `e2e/season.spec.ts`'s "browse open leagues and join one" against a real shelf.
+    <div className="flex flex-col gap-3" data-testid="public-league-list">
       {/* `min-w-0`: see `HomeBoard`'s identical grid — a grid item's default `min-width: auto`
           otherwise lets a long league name widen the item past its column at 360px. */}
       <ul className="grid gap-3 sm:grid-cols-2">

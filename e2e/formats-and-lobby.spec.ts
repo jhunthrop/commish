@@ -4,6 +4,7 @@ import { drafts, leagues, scoringSettings, teams, users } from "../src/db/schema
 import { STANDARD_ROSTER_SLOTS } from "../src/domain/roster";
 import { HALF_PPR_SCORING } from "../src/domain/scoring";
 import { ensureDevUsers } from "../src/data/seed/dev-users";
+import { openHouseLeaguesQuery } from "../src/league-service/house-factory";
 import { joinPublicLeague } from "../src/league-service/join";
 import { MEDIAN_DEMO_LEAGUE } from "../src/data/seed/seed-season-league";
 import { expect, SEEDED_SEASON_LEAGUE_ID, test } from "./support/fixtures";
@@ -95,6 +96,49 @@ async function fillAllButOneSeat(db: Db, leagueId: string): Promise<void> {
   for (let i = 1; i <= BACKSTAGE_FILL_COUNT; i++) {
     const outcome = await joinPublicLeague({ db, newId: () => crypto.randomUUID(), clock: { now: () => new Date().toISOString() } }, { leagueId, userId: owners[i]! });
     if (!outcome.ok) throw new Error(`[e2e] formats-and-lobby: backstage join ${i} for ${leagueId} was refused: ${outcome.reason}`);
+  }
+}
+
+// -------------------------------------------------------------------------------------------
+// Journey 4's own fixture (Phase 3.5 addendum, Task 15, Step 2): the house shelf's own reconciler,
+// proven from a browser rather than only from `npm run seed`. `src/data/seed/index.ts`'s own
+// house arc (Task 15, Step 1) already ran during global setup and left `open_12`'s shelf at its
+// own `openAtOnce` width — this journey borrows the SHELF'S OWN oldest still-open league (never a
+// hardcoded edition, the same "creation order, not a guessed id" discipline that seed arc keeps)
+// and fills every seat but one BACKSTAGE, through the real `joinPublicLeague` transaction — the
+// identical "a bystander seat is real service, never a raw insert" shape `fillAllButOneSeat`
+// above already keeps for the sit-and-go journey. Dedicated, e2e-only filler identities: `open_12`
+// gates on nothing (`tierJoinPrecondition` only ever blocks a `beginner`-tier league), so this
+// never needs the dev pool's own veteran-avoidance discipline, but a dedicated pool still keeps
+// this journey from ever touching a seat another spec depends on.
+// -------------------------------------------------------------------------------------------
+
+const HOUSE_JOIN_FILLER_ID_PREFIX = "e2e_house_filler_";
+
+/** The shelf's own oldest still-open `open_12` league — `openHouseLeaguesQuery`, the EXACT query
+ *  `ensureHouseCatalog` itself counts by, never a hand-copied re-derivation of "still open". */
+async function resolveOpenHouseLeague(db: Db): Promise<{ readonly id: string; readonly name: string; readonly teamCount: number; readonly filled: number }> {
+  const [row] = await openHouseLeaguesQuery(db, "open_12");
+  if (row === undefined) {
+    throw new Error("[e2e] formats-and-lobby: no open open_12 house league found — has the shelf's own reconciler run yet?");
+  }
+  const [league] = await db.select({ name: leagues.name, teamCount: leagues.teamCount }).from(leagues).where(eq(leagues.id, row.id));
+  const seated = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, row.id));
+  return { id: row.id, name: league!.name, teamCount: league!.teamCount, filled: seated.length };
+}
+
+/** Fills every seat but one, through the real join transaction — the last seat is left for the
+ *  live browser click this journey actually tests. */
+async function fillHouseLeagueAllButOneSeat(db: Db, leagueId: string, seatsToFill: number): Promise<void> {
+  const fillerIds = Array.from({ length: seatsToFill }, (_, i) => `${HOUSE_JOIN_FILLER_ID_PREFIX}${String(i + 1).padStart(2, "0")}`);
+  if (fillerIds.length === 0) return;
+  await db
+    .insert(users)
+    .values(fillerIds.map((id) => ({ id, email: `${id}@commish-lab.test`, displayName: `House Filler ${id.slice(-2)}` })))
+    .onConflictDoNothing({ target: users.id });
+  for (const userId of fillerIds) {
+    const outcome = await joinPublicLeague({ db, newId: () => crypto.randomUUID(), clock: { now: () => new Date().toISOString() } }, { leagueId, userId });
+    if (!outcome.ok) throw new Error(`[e2e] formats-and-lobby: house backstage join for ${userId} against ${leagueId} was refused: ${outcome.reason}`);
   }
 }
 
@@ -210,5 +254,54 @@ test.describe("formats and lobby", () => {
     // scored week contributes 2 to the total, never a hardcoded absolute count.
     expect(totalGames).toBeGreaterThan(0);
     expect(totalGames % 2).toBe(0);
+  });
+
+  test("a visitor takes the last open seat in a house league and the shelf shows a replacement", async ({ managerA, managerB }) => {
+    test.setTimeout(120_000);
+
+    // --- Backstage: leave exactly one seat open on the shelf's own oldest open_12 league -------
+    const db = createDb();
+    let target: { id: string; name: string; teamCount: number; filled: number };
+    try {
+      target = await resolveOpenHouseLeague(db);
+      await fillHouseLeagueAllButOneSeat(db, target.id, target.teamCount - target.filled - 1);
+    } finally {
+      await db.$client.end();
+    }
+
+    // --- BEFORE: the shelf's own open_12 width, read from the hydrated page — never
+    //     `HOUSE_CATALOG.rungs.open_12.openAtOnce` asserted directly. A hardcoded shelf width
+    //     would be asserting the CATALOG, not the behavior: the factory itself changes the row
+    //     count between page loads (Task 13's own reconciler, `ensureHouseCatalog`), so every
+    //     count assertion below is a DELTA against this exact set, read moments ago. -----------
+    const openRungHeading = /^Open 12-team League \d+$/;
+    await managerA.goto("/browse");
+    await expect(managerA.getByRole("heading", { name: target.name })).toBeVisible();
+    const beforeNames = await managerA.getByRole("heading", { name: openRungHeading }).allInnerTexts();
+
+    // --- THE LAST SEAT, live, through the real UI -----------------------------------------------
+    await managerB.goto("/browse");
+    await managerB.getByRole("button", { name: `Join ${target.name}` }).click();
+    await expect(managerB).toHaveURL(new RegExp(`/app/leagues/${target.id}$`));
+    await expect(managerB.getByRole("heading", { name: target.name })).toBeVisible();
+
+    // --- IMMEDIATE DELTA: the filled league drops off the shelf — a real-time read, no ticker
+    //     wait needed, because `houseShelfQuery` (`@/league-service/browse`) only ever lists a
+    //     league `hasOpenSeat` still accepts. -------------------------------------------------
+    await expect(async () => {
+      await managerA.reload();
+      const afterNames = await managerA.getByRole("heading", { name: openRungHeading }).allInnerTexts();
+      expect(afterNames).not.toContain(target.name);
+    }).toPass({ timeout: 15_000 });
+
+    // --- DELAYED DELTA: the reconciler's own next tick opens a real replacement — retried up to
+    //     comfortably past `DRAFT_SERVICE_CONFIG.houseReconcileIntervalMs` (30s), the real ticker
+    //     interval, never a synthesized "tick now" call. -----------------------------------------
+    await expect(async () => {
+      await managerA.reload();
+      const afterNames = await managerA.getByRole("heading", { name: openRungHeading }).allInnerTexts();
+      const replacement = afterNames.filter((name) => !beforeNames.includes(name));
+      expect(replacement.length).toBeGreaterThan(0);
+    }).toPass({ timeout: 45_000 });
   });
 });

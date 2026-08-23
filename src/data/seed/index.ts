@@ -1,11 +1,17 @@
-import { eq } from "drizzle-orm";
+import { fileURLToPath } from "node:url";
+import { asc, eq } from "drizzle-orm";
+import type { Db } from "@/db/client";
 import { getDb } from "@/db/client";
-import { teams } from "@/db/schema";
+import { leagues, teams, users } from "@/db/schema";
+import type { Clock } from "@/domain/timing";
+import type { AuditLogger } from "@/integrity-service/audit-logger";
 import { getStatsProvider } from "@/stats-pipeline";
 import { getIngestionBudget } from "@/stats-pipeline";
 import { envOrUndefined } from "@/lib/env";
 import { ENFORCEMENT_REFUSALS } from "@/league-service/enforcement";
+import { ensureHouseCatalog } from "@/league-service/house-factory";
 import { joinPublicLeague } from "@/league-service/join";
+import type { HouseRungName } from "@/matchmaking/house-catalog";
 import { DEV_SEED } from "./config";
 import { assertLocalSeedTarget } from "./guard";
 import { seedDevLeagues } from "./seed-dev-leagues";
@@ -17,6 +23,113 @@ import { seedPlayers } from "./seed-players";
 import { seedPublicLeagues } from "./seed-public-leagues";
 import { MEDIAN_DEMO_LEAGUE, seedSeasonLeague, VETERAN_SEASON_LEAGUES } from "./seed-season-league";
 import { seedTrades } from "./seed-trades";
+
+/**
+ * Phase 3.5 addendum, Task 15, Step 1: "the factory is a reconciler, so seeding it is running
+ * it." No house fixture module — `seedPublicLeagues`/`seedDevLeagues` write their `leagues` row
+ * by direct Drizzle upsert so THEIR OWN re-run stays safe, which is also why neither one produces
+ * a `league_created` audit event. This arc never upserts a `leagues` row at all: it calls the
+ * real `ensureHouseCatalog` (`@/league-service/house-factory`), fills the shelf's own oldest
+ * `open_12` league through the real `joinPublicLeague`, then calls `ensureHouseCatalog` again —
+ * re-runnable because `ensureHouseCatalog` is idempotent BY CONSTRUCTION (ruling 35), never
+ * because this function upserts anything.
+ *
+ * `open_12`, never `beginner_12`: `tierJoinPrecondition` (`@/league-service/enforcement`) only
+ * ever blocks a `beginner`-tier league, and only against a VETERAN joiner — `open_12`'s
+ * `experienceTier` is `"experienced"`, so it blocks nobody, and this arc's own dedicated
+ * identities (below) never have to prove they aren't veterans to reach it. `beginner_12` would
+ * additionally need the SAME dedicated-identity discipline `seedTierDemoIdentities`
+ * (`./seed-tier-demo.ts`) already keeps for its own aging-class incident — a needless second copy
+ * of that hazard for an arc that doesn't need to touch the tier gate at all.
+ *
+ * `open_12`, never `sitandgo_12`: filling a `'scheduled'`-trigger league never moves its kickoff
+ * (`fireWhenFullInTx` refuses with `FILL_TRIGGER_REFUSALS.notWhenFull` for every non-`when_full`
+ * draft, house or not — read `./fill-trigger.ts`'s own top guard). Filling `sitandgo_12` instead
+ * would rewrite `drafts.kickoff_at` to `now + graceSeconds`, a state the running dev server's own
+ * ticker (`@/draft-service/ticker.ts`) can then advance out from under a later `npm run dev` —
+ * the identical "a seeded league the ticker can move" hazard `seed-tier-demo.ts`'s own docblock
+ * already root-caused once. `open_12` leaves the filled league's kickoff exactly where
+ * `houseKickoffFor` put it — stable across every later `npm run dev`, and every later `npm run
+ * seed` re-run.
+ *
+ * The FIRST-EVER `open_12` league, addressed by creation order rather than a hardcoded id (this
+ * arc has no reason to know `house-factory.ts`'s own `house_${rung}_${edition}` format): a
+ * re-run's own `ensureHouseCatalog` call never re-opens a league that already exists, so the
+ * earliest-created `open_12` league is the SAME row on every run — full after the first run, still
+ * full (and still the earliest) on every run after that, so this arc's own `joinPublicLeague`
+ * calls take the `alreadyMember` branch on a re-run rather than reaching for a second league to
+ * fill.
+ */
+export interface SeedHouseCatalogDemoResult {
+  readonly rung: HouseRungName;
+  readonly filledLeagueId: string;
+  /** New seats taken THIS call — `0` on a re-run, whose joins all land on `alreadyMember`. */
+  readonly seatsJoined: number;
+  /** Every league id `ensureHouseCatalog`'s SECOND call actually opened — empty on a re-run that
+   *  found the shelf already at `openAtOnce` width. */
+  readonly replacementOpened: readonly string[];
+}
+
+const HOUSE_DEMO_RUNG: HouseRungName = "open_12";
+const HOUSE_DEMO_FILLER_ID_PREFIX = "dev_house_demo_";
+
+export async function seedHouseCatalogDemo(
+  db: Db,
+  clock: Clock,
+  deps: { readonly audit?: AuditLogger; readonly newId?: () => string } = {},
+): Promise<SeedHouseCatalogDemoResult> {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("seedHouseCatalogDemo creates placeholder users and must never run in production.");
+  }
+  const newId = deps.newId ?? (() => crypto.randomUUID());
+
+  // Stock the shelf first — the reconciler this arc exists to prove, run for real rather than
+  // assumed already caught up.
+  await ensureHouseCatalog(db, { clock, newId, audit: deps.audit });
+
+  const [target] = await db
+    .select({ id: leagues.id, teamCount: leagues.teamCount })
+    .from(leagues)
+    .where(eq(leagues.houseRung, HOUSE_DEMO_RUNG))
+    .orderBy(asc(leagues.createdAt))
+    .limit(1);
+  if (target === undefined) {
+    throw new Error(`seedHouseCatalogDemo: ensureHouseCatalog didn't open any ${HOUSE_DEMO_RUNG} league to fill.`);
+  }
+
+  // The SHORTFALL, read back from the league's own seats — never a hard-coded 12. A long-lived
+  // shared dev database can have a REAL developer already sitting in this exact league (found
+  // running this against one: a real WorkOS id held the last of what this arc assumed were 12
+  // empty seats, and the 12th dedicated filler's own join overflowed it by one). Reading the
+  // actual count first is what keeps this arc correct whether the league is genuinely empty or
+  // already partly claimed by someone real.
+  const existingSeats = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, target.id));
+  const neededSeats = Math.max(0, target.teamCount - existingSeats.length);
+  const fillerIds = Array.from({ length: neededSeats }, (_, i) => `${HOUSE_DEMO_FILLER_ID_PREFIX}${String(i + 1).padStart(2, "0")}`);
+  if (fillerIds.length > 0) {
+    await db
+      .insert(users)
+      .values(fillerIds.map((id) => ({ id, email: `${id}@${DEV_SEED.emailDomain}`, displayName: `Dev Manager (${id})` })))
+      .onConflictDoNothing({ target: users.id });
+  }
+
+  let seatsJoined = 0;
+  for (const userId of fillerIds) {
+    const outcome = await joinPublicLeague({ db, newId, clock, audit: deps.audit }, { leagueId: target.id, userId });
+    if (!outcome.ok) {
+      throw new Error(`seedHouseCatalogDemo: join for ${userId} against ${target.id} was refused: ${outcome.reason}`);
+    }
+    if (!outcome.alreadyMember) seatsJoined += 1;
+  }
+
+  // THE proof: the filled league just dropped off the shelf's own open count, and a re-run of the
+  // identical reconciler either opens its real replacement (a fresh run) or finds the shelf
+  // already restocked and opens nothing (a re-run) — never a hand-stamped row standing in for
+  // either outcome.
+  const after = await ensureHouseCatalog(db, { clock, newId, audit: deps.audit });
+
+  return { rung: HOUSE_DEMO_RUNG, filledLeagueId: target.id, seatsJoined, replacementOpened: after.opened };
+}
 
 /**
  * The ONE seed entry point (`npm run seed`). Later steps add seeders here — a demo league,
@@ -126,9 +239,27 @@ async function main(): Promise<void> {
       `slot preference matched the real draw ${formats.slotPreference.matchedRealDraw} (${formats.slotPreference.leagueId}), ` +
       `sit-and-go kickoff rewritten ${formats.sitAndGo.kickoffRewritten} (${formats.sitAndGo.leagueId})`,
   );
+
+  // Phase 3.5 addendum, Task 15, Step 1: last, on purpose — every arc above this one seats or
+  // moves an identity this arc doesn't touch, so placing the house arc last leaves the shelf's
+  // own end state (one filled `open_12` league, its replacement standing behind it) the same
+  // regardless of what ran before it, which is what makes it a deterministic base for `npm run
+  // dev` and for the e2e walk (`e2e/formats-and-lobby.spec.ts`) alike.
+  const house = await seedHouseCatalogDemo(db, { now: () => new Date().toISOString() });
+  console.log(
+    `house catalog: filled ${house.filledLeagueId} (${house.seatsJoined} new seat(s)), ` +
+      `replacement(s) opened: ${house.replacementOpened.length === 0 ? "none" : house.replacementOpened.join(", ")}`,
+  );
 }
 
-main().then(() => process.exit(0)).catch((err: unknown) => {
-  console.error(err);
-  process.exit(1);
-});
+// Guarded so `index.test.ts` (Task 15, Step 1) can import `seedHouseCatalogDemo` without running
+// the whole script — `main()` reaches a real database and a real stats provider, neither of which
+// a unit test should touch by the mere act of importing this module. Every other export above is
+// a plain function; this is the one top-level side effect the file has, and it fires only when
+// `tsx src/data/seed/index.ts` (`npm run seed`) is the process's own entry point.
+if (process.argv[1] !== undefined && fileURLToPath(import.meta.url) === process.argv[1]) {
+  main().then(() => process.exit(0)).catch((err: unknown) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

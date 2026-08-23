@@ -74,7 +74,13 @@ test("a signed-in manager can browse open leagues and join one", async ({ manage
   await expect(managerB).toHaveURL(/format=auction/);
   await expect(managerB.getByText("Rookie Snake Room")).toHaveCount(0);
 
-  await managerB.getByRole("button", { name: /^Join / }).first().click();
+  // Scoped to the member list, not the whole page (Phase 3.5 addendum, Task 15): the house
+  // shelf (`HouseLeagueShelf`) renders its OWN "Join {name}" buttons above this list and is
+  // never narrowed by the format filter above (`data-testid="public-league-list"`,
+  // `PublicLeagueList`'s own docblock) — a bare `.first()` over the page can land on a house
+  // card instead, and a house league declared `beginner`-tier would refuse a veteran manager B
+  // has become across this suite's own other specs.
+  await managerB.getByTestId("public-league-list").getByRole("button", { name: /^Join / }).first().click();
   await expect(managerB).toHaveURL(/\/app\/leagues\//);
   await expect(managerB.getByRole("heading", { level: 1 })).toBeVisible();
 });
