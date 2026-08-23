@@ -42,6 +42,12 @@ export const createLeagueSchema = z.object({
     .max(LEAGUE_CONFIG.maxTeams, { message: `A league can have at most ${LEAGUE_CONFIG.maxTeams} teams.` })
     .default(LEAGUE_CONFIG.defaults.teamCount),
   scoringPreset: z.enum(["standard", "ppr", "half_ppr", "te_premium"]).default(LEAGUE_CONFIG.defaults.scoringPreset),
+  /**
+   * A TOGGLE on the canonical format, not a separate browse queue (the liquidity ruling) —
+   * `createLeague` (`@/league-service/creation`) resolves this to slot rows through
+   * `ROSTER_SHAPES` (`@/league/roster-shape`) when no explicit `rosterSlots` are given.
+   */
+  rosterShape: z.enum(["standard", "superflex"]).default(LEAGUE_CONFIG.defaults.rosterShape),
   auctionBudget: z
     .number()
     .int()
@@ -103,7 +109,7 @@ export const setLineupSchema = z.object({
   slots: z
     .array(
       z.object({
-        slot: z.enum(["QB", "RB", "WR", "TE", "FLEX", "K", "DEF", "BENCH"]),
+        slot: z.enum(["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "DEF", "BENCH"]),
         slotIndex: z.number().int().nonnegative(),
         playerId: z.string().min(1).nullable(),
       }),

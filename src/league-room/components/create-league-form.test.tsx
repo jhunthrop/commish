@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { inBothThemes } from "@/components/ui/test-utils";
+import { GLOSSARY } from "@/help/glossary";
 import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
@@ -179,6 +180,99 @@ describe("CreateLeagueForm", () => {
           const select = screen.getByLabelText("Who it's for");
           // A native `<select>` through the shared `Select` primitive: focusable, labelled, and in
           // the tab order without a `tabIndex` of its own.
+          expect(select.tagName).toBe("SELECT");
+          expect(select).not.toHaveAttribute("tabindex");
+          select.focus();
+          expect(select).toHaveFocus();
+          expect(await axe(container)).toHaveNoViolations();
+        },
+      );
+    });
+  });
+
+  /**
+   * Task 1 (superflex + canon defaults). The founder-decided default flip: half-PPR leads the
+   * scoring select now, and a new roster-shape control makes superflex a one-toggle choice on
+   * the canonical format, never a separate browse queue (the liquidity ruling).
+   */
+  describe("roster shape and the half-PPR default", () => {
+    it("defaults the Scoring select to Half PPR, with full PPR one option away", () => {
+      renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
+      const select = screen.getByLabelText("Scoring") as HTMLSelectElement;
+      expect(select.value).toBe("half_ppr");
+      expect([...select.options].map((option) => option.value)).toEqual(["half_ppr", "ppr", "standard", "te_premium"]);
+    });
+
+    it("offers Standard first and defaults to it, with Superflex one option away", () => {
+      renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
+      const select = screen.getByLabelText("Roster shape") as HTMLSelectElement;
+      expect(select.value).toBe("standard");
+      expect([...select.options].map((option) => option.value)).toEqual(["standard", "superflex"]);
+      expect([...select.options].map((option) => option.textContent)).toEqual(["Standard", "Superflex"]);
+    });
+
+    it("sends the default roster shape with a name-only creation", async () => {
+      const fixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "l1", teamId: "t1", draftId: "d1" } });
+      const bodies: unknown[] = [];
+      fixture.deps = {
+        ...fixture.deps,
+        fetchJson: async (_url, init) => {
+          bodies.push(JSON.parse(String(init?.body)));
+          return { json: async () => fixture.response } as unknown as Response;
+        },
+      };
+      renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixture.deps);
+      fireEvent.change(screen.getByLabelText("League name"), { target: { value: "Sunday Money" } });
+      fireEvent.click(screen.getByRole("button", { name: "Create league" }));
+      await waitFor(() => expect(bodies).toHaveLength(1));
+      expect(bodies[0]).toMatchObject({ scoringPreset: "half_ppr", rosterShape: "standard" });
+    });
+
+    it("sends the superflex toggle when a commissioner chooses it", async () => {
+      const fixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "l1", teamId: "t1", draftId: "d1" } });
+      const bodies: unknown[] = [];
+      fixture.deps = {
+        ...fixture.deps,
+        fetchJson: async (_url, init) => {
+          bodies.push(JSON.parse(String(init?.body)));
+          return { json: async () => fixture.response } as unknown as Response;
+        },
+      };
+      renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixture.deps);
+      fireEvent.change(screen.getByLabelText("League name"), { target: { value: "Two QB League" } });
+      fireEvent.change(screen.getByLabelText("Roster shape"), { target: { value: "superflex" } });
+      fireEvent.click(screen.getByRole("button", { name: "Create league" }));
+      await waitFor(() => expect(bodies).toHaveLength(1));
+      expect(bodies[0]).toMatchObject({ rosterShape: "superflex" });
+    });
+
+    it("carries an InfoTip beside the roster shape select", () => {
+      renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
+      expect(screen.getByRole("button", { name: "What is a superflex spot?" })).toBeInTheDocument();
+    });
+
+    it("threads helpLevel into the roster-shape InfoTip: guided shows the short line inline", () => {
+      const fixture = fixtureLeagueDeps();
+      const { rerender } = renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixture.deps);
+      expect(screen.queryByText(GLOSSARY.superflex.short)).not.toBeInTheDocument();
+      rerender(
+        <LeagueRoomDepsProvider deps={fixture.deps}>
+          <CreateLeagueForm onCreated={vi.fn()} helpLevel="guided" />
+        </LeagueRoomDepsProvider>,
+      );
+      expect(screen.getByText(GLOSSARY.superflex.short)).toBeInTheDocument();
+    });
+
+    it("renders keyboard-reachable and axe-clean in both themes, at 360px", async () => {
+      const fixture = fixtureLeagueDeps();
+      await inBothThemes(
+        <LeagueRoomDepsProvider deps={fixture.deps}>
+          <CreateLeagueForm onCreated={vi.fn()} />
+        </LeagueRoomDepsProvider>,
+        async ({ container }) => {
+          const details = container.querySelector("details")!;
+          details.setAttribute("open", "");
+          const select = screen.getByLabelText("Roster shape");
           expect(select.tagName).toBe("SELECT");
           expect(select).not.toHaveAttribute("tabindex");
           select.focus();

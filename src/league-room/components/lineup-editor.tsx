@@ -47,6 +47,10 @@ export function LineupEditor({
   // when the slot it explains is actually on the page, same reasoning as GLOSSARY omitting
   // `waiver` for a feature the product doesn't have.
   const hasFlexSlot = lineup.starters.some((slot) => slot.slot === "FLEX");
+  // SUPERFLEX (Task 1): only a superflex league's lineup ever has this slot, so the caption is
+  // just as conditional as FLEX's own — and carries an InfoTip, since "a flex spot that also
+  // takes a quarterback" is a newer word than FLEX and worth the click-to-learn-more.
+  const hasSuperflexSlot = lineup.starters.some((slot) => slot.slot === "SUPERFLEX");
 
   if (lineup.locked) {
     // Persona review (first-timer, FIX 4): stating the situation without naming what happens
@@ -71,6 +75,15 @@ export function LineupEditor({
           ))}
         </ul>
         {hasFlexSlot ? <p className="text-xs text-text-muted">{term("flex").short}</p> : null}
+        {hasSuperflexSlot ? (
+          <p className="flex items-center gap-1 text-xs text-text-muted">
+            {term("superflex").short}
+            {/* No `helpLevel` here: the short line is already unconditionally on the page (the
+                caption above), so a guided reader gains nothing InfoTip's own inline branch
+                would add — the trigger stays click-only, opening the longer `detail`. */}
+            <InfoTip term="superflex" />
+          </p>
+        ) : null}
       </section>
     );
   }
@@ -131,6 +144,14 @@ export function LineupEditor({
       {/* Persona review (FIX 4): a caption near the slot list, not a tip on every FLEX chip —
           there is only ever one FLEX slot, so one sentence explains it once. */}
       {hasFlexSlot ? <p className="text-xs text-text-muted">{term("flex").short}</p> : null}
+      {hasSuperflexSlot ? (
+        <p className="flex items-center gap-1 text-xs text-text-muted">
+          {term("superflex").short}
+          {/* No `helpLevel`: the short line above is already unconditional, so guided readers
+              gain nothing InfoTip's own inline branch would add. Click still opens `detail`. */}
+          <InfoTip term="superflex" />
+        </p>
+      ) : null}
       <h3 className="flex items-center gap-1 text-sm font-medium text-text-muted">
         Bench
         <InfoTip term="bench" helpLevel={helpLevel} />

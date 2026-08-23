@@ -12,10 +12,13 @@ vi.mock("@/lib/auth/current-user", () => ({
 
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { leagues, teams, users } from "@/db/schema";
+import { leagues, scoringSettings, teams, users } from "@/db/schema";
+import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { getCurrentUser, requireCurrentUser } from "@/lib/auth/current-user";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { ENFORCEMENT_REFUSALS } from "@/league-service/enforcement";
+import { SUPERFLEX_ROSTER_SLOTS } from "@/league/roster-shape";
+import { describeScoring } from "@/scoring/describe";
 import { POST } from "./route";
 
 const db = createTestDb();
@@ -99,6 +102,42 @@ describe("POST /api/leagues", () => {
 
     const [league] = await db.select().from(leagues).where(eq(leagues.id, body.data.leagueId));
     expect(league).toMatchObject({ name: "Sunday Money", commissionerUserId: "u1" });
+  });
+
+  /**
+   * Task 1 (superflex + canon defaults). §4.2's launch canon: "half-PPR default with PPR /
+   * TE-premium / superflex toggles" — proved end to end, from a bare `{ "name": "…" }` request
+   * through the route's own default resolution, not just at `LEAGUE_CONFIG` in isolation.
+   */
+  it("creates a half-PPR, standard-shape league by default, and leaves every toggle reachable", async () => {
+    await db.insert(users).values({ id: "u_defaults", email: "u_defaults@test.local", displayName: "Defaults" });
+    signedInAs("u_defaults");
+
+    const response = await post({ name: "Sunday Money" });
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { readonly ok: true; readonly data: { readonly leagueId: string } };
+
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, body.data.leagueId));
+    expect(league!.rosterSlots).toEqual(STANDARD_ROSTER_SLOTS);
+
+    const [settings] = await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, body.data.leagueId));
+    expect(describeScoring(settings!)).toBe("Half PPR");
+  });
+
+  it("creates a superflex league when the toggle is set, without changing anything else's default", async () => {
+    await db.insert(users).values({ id: "u_superflex", email: "u_superflex@test.local", displayName: "Superflex" });
+    signedInAs("u_superflex");
+
+    const response = await post({ name: "Two QB League", rosterShape: "superflex" });
+    expect(response.status).toBe(201);
+    const body = (await response.json()) as { readonly ok: true; readonly data: { readonly leagueId: string } };
+
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, body.data.leagueId));
+    expect(league!.rosterSlots).toEqual(SUPERFLEX_ROSTER_SLOTS);
+
+    // The toggle sits on the roster shape alone — scoring still defaults to half-PPR.
+    const [settings] = await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, body.data.leagueId));
+    expect(describeScoring(settings!)).toBe("Half PPR");
   });
 
   it("answers 409 with the tier-refusal copy, not a 500, for a veteran creating a public beginner league", async () => {

@@ -1,5 +1,5 @@
 import type { DraftFormat } from "@/domain/league";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { STANDARD_ROSTER_SLOTS, type RosterShapeName } from "@/domain/roster";
 import type { ScoringPresetName } from "@/domain/scoring";
 
 /** Every tunable the season has. No service, route or component may inline one of these. */
@@ -11,9 +11,17 @@ export const LEAGUE_CONFIG = {
   defaults: {
     teamCount: 12,
     format: "snake" as DraftFormat,
-    scoringPreset: "ppr" as ScoringPresetName,
+    /**
+     * Half-PPR, not full PPR (founder decision, §4.2's launch canon: "half-PPR default with PPR
+     * / TE-premium / superflex toggles") — the trend-consensus scoring rule, one tap away from
+     * full PPR in the same select. Every preset stays reachable; only which one is preselected
+     * changed.
+     */
+    scoringPreset: "half_ppr" as ScoringPresetName,
     auctionBudget: 200,
     rosterSlots: STANDARD_ROSTER_SLOTS,
+    /** The roster shape a league gets when nobody names one — superflex stays one toggle away. */
+    rosterShape: "standard" as RosterShapeName,
     /** How far out a new league's draft is scheduled, so the clock starts in a slow tier. */
     draftDaysFromCreation: 7,
     /**

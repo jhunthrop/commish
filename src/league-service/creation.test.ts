@@ -7,6 +7,7 @@ import { PPR_SCORING } from "@/domain/scoring";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { LEAGUE_CONFIG } from "@/league";
+import { SUPERFLEX_ROSTER_SLOTS } from "@/league/roster-shape";
 import { ENFORCEMENT_REFUSALS } from "./enforcement";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { createLeague, type CreateLeagueInput } from "./creation";
@@ -358,6 +359,44 @@ describe("createLeague", () => {
       } finally {
         config.enforceTierSegregation = original;
       }
+    });
+  });
+
+  describe("roster shape resolution (Task 1, superflex)", () => {
+    it("resolves a named shape to its rows when no explicit rosterSlots are given", async () => {
+      const result = await createLeague(deps(), {
+        ...validInput(),
+        rosterSlots: undefined,
+        rosterShape: "superflex",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
+      expect(league!.rosterSlots).toEqual(SUPERFLEX_ROSTER_SLOTS);
+    });
+
+    it("falls back to the configured default shape when neither rosterSlots nor rosterShape is given", async () => {
+      const result = await createLeague(deps(), {
+        ...validInput(),
+        rosterSlots: undefined,
+        rosterShape: undefined,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
+      expect(league!.rosterSlots).toEqual(STANDARD_ROSTER_SLOTS);
+    });
+
+    it("still prefers explicit rosterSlots over a rosterShape given alongside it", async () => {
+      const result = await createLeague(deps(), {
+        ...validInput(),
+        rosterSlots: STANDARD_ROSTER_SLOTS,
+        rosterShape: "superflex",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
+      expect(league!.rosterSlots).toEqual(STANDARD_ROSTER_SLOTS);
     });
   });
 });

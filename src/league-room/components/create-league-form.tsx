@@ -3,8 +3,10 @@
 import { useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { CreateLeagueBody } from "../contract";
-import { Button, Input, Select } from "@/components/ui";
+import { Button, InfoTip, Input, Select } from "@/components/ui";
+import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
+import type { HelpLevel } from "@/identity/preferences";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
@@ -13,12 +15,26 @@ const FORMATS = [
   { value: "auction", label: "Auction" },
 ];
 const TEAM_COUNTS = [8, 10, 12, 14, 16].map((n) => ({ value: String(n), label: `${n} teams` }));
+/**
+ * Half-PPR leads (founder decision, §4.2's launch canon: "half-PPR default with PPR /
+ * TE-premium / superflex toggles") — full PPR stays one tap away, not removed or demoted past
+ * reach, only no longer preselected.
+ */
 const PRESETS = [
-  { value: "ppr", label: "PPR (a point per catch)" },
   { value: "half_ppr", label: "Half PPR" },
+  { value: "ppr", label: "PPR (a point per catch)" },
   { value: "standard", label: "Standard" },
   { value: "te_premium", label: "TE premium" },
 ];
+/**
+ * Superflex is a TOGGLE on the canonical format here, not a separate browse queue (the
+ * liquidity ruling) — one more select beside scoring, words from `ROSTER_SHAPE_LABEL`
+ * (`@/domain/roster`) rather than typed at this call site, the same discipline `EXPERIENCE_TIERS`
+ * below already holds `LEAGUE_EXPERIENCE_TIER_LABEL` to. `@/domain/roster` (not
+ * `@/league/roster-shape`, where the actual slot ROWS live) is what a client component may
+ * value-import at all — the client boundary, `eslint.config.mjs`.
+ */
+const ROSTER_SHAPE_OPTIONS = Object.entries(ROSTER_SHAPE_LABEL).map(([value, label]) => ({ value, label }));
 const VISIBILITIES = [
   { value: "invite_only", label: "Invite only" },
   { value: "public", label: "Anyone can find and join" },
@@ -50,12 +66,20 @@ const STAKE_TIERS = MATCHMAKING_CONFIG.stakeTiers.map((entry) => ({ value: Strin
  * number inputs: there is no such thing as a 13-team league here, and a select cannot
  * produce one.
  */
-export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: CreateLeagueBody) => void }) {
+export function CreateLeagueForm({
+  onCreated,
+  helpLevel,
+}: {
+  readonly onCreated: (created: CreateLeagueBody) => void;
+  /** Forwarded the same way `LineupEditor` takes it — `InfoTip` defaults to click-only when omitted. */
+  readonly helpLevel?: HelpLevel;
+}) {
   const { fetchJson } = useLeagueRoomDeps();
   const [name, setName] = useState("");
   const [format, setFormat] = useState("snake");
   const [teamCount, setTeamCount] = useState("12");
-  const [scoringPreset, setScoringPreset] = useState("ppr");
+  const [scoringPreset, setScoringPreset] = useState("half_ppr");
+  const [rosterShape, setRosterShape] = useState("standard");
   const [auctionBudget, setAuctionBudget] = useState("200");
   const [visibility, setVisibility] = useState("invite_only");
   // `experienced` — the choice that refuses nobody. See `EXPERIENCE_TIERS` above.
@@ -76,6 +100,7 @@ export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: 
           format,
           teamCount: Number(teamCount),
           scoringPreset,
+          rosterShape,
           auctionBudget: Number(auctionBudget),
           visibility,
           experienceTier,
@@ -106,11 +131,17 @@ export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: 
       <Input label="League name" value={name} onChange={(event) => setName(event.target.value)} error={error ?? undefined} />
 
       <details className="rounded-md border border-border p-3">
-        <summary className="cursor-pointer text-sm text-text-muted">Advanced settings: draft format, team count, scoring</summary>
+        <summary className="cursor-pointer text-sm text-text-muted">Advanced settings: draft format, team count, scoring, roster shape</summary>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Select label="Draft format" options={FORMATS} value={format} onChange={(event) => setFormat(event.target.value)} />
           <Select label="Teams" options={TEAM_COUNTS} value={teamCount} onChange={(event) => setTeamCount(event.target.value)} />
           <Select label="Scoring" options={PRESETS} value={scoringPreset} onChange={(event) => setScoringPreset(event.target.value)} />
+          <div className="flex flex-col gap-1">
+            <Select label="Roster shape" options={ROSTER_SHAPE_OPTIONS} value={rosterShape} onChange={(event) => setRosterShape(event.target.value)} />
+            <span className="flex items-center gap-1">
+              <InfoTip term="superflex" helpLevel={helpLevel} />
+            </span>
+          </div>
           {format === "auction" ? (
             <Input
               label="Auction budget"

@@ -1,12 +1,13 @@
 import type { Db } from "@/db/client";
 import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
 import type { DraftFormat } from "@/domain/league";
-import type { RosterSlotConfig } from "@/domain/roster";
+import type { RosterShapeName, RosterSlotConfig } from "@/domain/roster";
 import { SCORING_PRESETS, type ScoringPresetName } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { LEAGUE_CONFIG } from "@/league";
+import { ROSTER_SHAPES } from "@/league/roster-shape";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { MS_PER_DAY } from "./config";
 import { ENFORCEMENT_REFUSALS, tierJoinPrecondition } from "./enforcement";
@@ -40,7 +41,21 @@ export interface CreateLeagueInput {
   readonly scoringPreset: ScoringPresetName;
   /** Stored as null for a snake league, whatever the caller passes. */
   readonly auctionBudget: number | null;
-  readonly rosterSlots: readonly RosterSlotConfig[];
+  /**
+   * Explicit slot rows, taking precedence over `rosterShape` when both are given. The seeds and
+   * the integration test pipeline (`@/league-service/test-support`) pass shapes `ROSTER_SHAPES`
+   * doesn't name — a two-slot fixture roster, say — directly through here, unchanged from
+   * before this field had a named-shape sibling.
+   */
+  readonly rosterSlots?: readonly RosterSlotConfig[];
+  /**
+   * The named shape to resolve through `ROSTER_SHAPES` (`@/league/roster-shape`) when
+   * `rosterSlots` is omitted, falling back to `LEAGUE_CONFIG.defaults.rosterShape` when this is
+   * omitted too. Never stored as a column — `leagues.roster_slots` holds only the resolved
+   * rows, and `describeRosterShape` is what re-derives a name from them later, the identical
+   * "the preset name was never stored" treatment `scoringPreset` gets above.
+   */
+  readonly rosterShape?: RosterShapeName;
   readonly commissionerUserId: string;
   readonly teamName: string;
   /** Who the league is advertised for on public browse. Defaults from the creator at the route. */
@@ -100,6 +115,10 @@ export async function createLeague(
     input.kickoffAt !== undefined
       ? new Date(input.kickoffAt)
       : new Date(Date.parse(clock.now()) + LEAGUE_CONFIG.defaults.draftDaysFromCreation * MS_PER_DAY);
+  // Explicit rows win when given (the seeds' and the test pipeline's own escape hatch);
+  // otherwise the named shape resolves through `ROSTER_SHAPES`, falling back to the configured
+  // default shape when neither is given — the identical fallback chain `kickoffAt` uses above.
+  const rosterSlots = input.rosterSlots ?? ROSTER_SHAPES[input.rosterShape ?? LEAGUE_CONFIG.defaults.rosterShape];
 
   try {
     await db.transaction(async (tx) => {
@@ -109,7 +128,7 @@ export async function createLeague(
         format: input.format,
         teamCount: input.teamCount,
         commissionerUserId: input.commissionerUserId,
-        rosterSlots: [...input.rosterSlots],
+        rosterSlots: [...rosterSlots],
         experienceTier: input.experienceTier,
         stakeTier: input.stakeTier,
         isPublicMatchmade: input.isPublicMatchmade,

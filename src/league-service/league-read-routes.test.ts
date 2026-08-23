@@ -179,7 +179,8 @@ describe("GET /api/leagues/[leagueId]", () => {
     await db.insert(teams).values({ id: "team_2", leagueId: created.leagueId, userId: "u2", name: "Team Two" });
 
     const asMember = await leagueHome(db, created.leagueId, "u2");
-    expect(asMember!.terms.scoringLabel).toBe("PPR");
+    // Task 1: the create route's default scoring preset flipped from PPR to half-PPR.
+    expect(asMember!.terms.scoringLabel).toBe("Half PPR");
     expect(asMember!.terms.commissionerName).toBe("Manager u1");
     expect(asMember!.isCommissioner).toBe(false);
   });

@@ -1,4 +1,5 @@
 export { LEAGUE_CONFIG } from "./config";
+export { ROSTER_SHAPES, SUPERFLEX_ROSTER_SLOTS, describeRosterShape } from "./roster-shape";
 export { generateSchedule, currentWeekNumber, seasonProgress, type GenerateScheduleInput, type ScheduleResult, type SeasonProgress } from "./schedule";
 export { computeStandings, type StandingsRow } from "./standings";
 export { clinchedTeamIds, type ClinchInput } from "./clinch";

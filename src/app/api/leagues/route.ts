@@ -1,7 +1,6 @@
 import { getDb } from "@/db/client";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { requireCurrentUser } from "@/lib/auth/current-user";
-import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { createLeague, createLeagueSchema, listLeaguesForUser } from "@/league-service";
 import type { CreateLeagueBody, LeagueListBody } from "@/league-room/contract";
 import { withCurrentUser } from "./_shared";
@@ -33,7 +32,6 @@ export async function POST(request: Request) {
       {
         ...parsed.value,
         auctionBudget: parsed.value.format === "auction" ? parsed.value.auctionBudget : null,
-        rosterSlots: STANDARD_ROSTER_SLOTS,
         commissionerUserId: userId,
         teamName: parsed.value.teamName ?? `${user.displayName}'s team`,
         experienceTier: parsed.value.experienceTier ?? user.experienceTier,

@@ -264,12 +264,13 @@ describe("GET /api/invites/[code]", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.ok).toBe(true);
+    // Task 1: the create route's default scoring preset flipped from PPR to half-PPR.
     expect(body.data).toMatchObject({
       name: "Sunday Money",
       format: "snake",
       teamCount: 12,
       filledTeams: 1,
-      scoringLabel: "PPR",
+      scoringLabel: "Half PPR",
       commissionerName: "Manager u1",
     });
   });

@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { SUPERFLEX_ROSTER_SLOTS } from "@/league/roster-shape";
+import { totalRosterSlots } from "./state";
 import { assignSlot } from "./slotting";
 
 const filled = (slot: RosterSlot["slot"], slotIndex: number, playerId: string): RosterSlot => ({ slot, slotIndex, playerId });
@@ -59,5 +61,41 @@ describe("assignSlot", () => {
     // leaving indices 0 and 1 both open — the lowest of the two, not the occupant count (1).
     const roster = [filled("RB", 0, "p1"), filled("RB", 1, "p2"), filled("FLEX", 0, "p3"), filled("BENCH", 2, "p_survivor")];
     expect(assignSlot({ position: "RB", roster, slotConfig: STANDARD_ROSTER_SLOTS })).toEqual({ ok: true, slot: "BENCH", slotIndex: 0 });
+  });
+});
+
+/**
+ * SUPERFLEX (Task 1). A config row, no engine work: `eligiblePositions` is data and
+ * `assignSlot` already reads it as data, so a second startable quarterback needs nothing here
+ * but a slot config that names it — `SUPERFLEX_ROSTER_SLOTS` (`@/league/roster-shape`).
+ */
+describe("assignSlot with a superflex shape", () => {
+  it("puts a second quarterback in SUPERFLEX rather than on the bench", () => {
+    const roster = [filled("QB", 0, "qb1")];
+    expect(assignSlot({ position: "QB", roster, slotConfig: SUPERFLEX_ROSTER_SLOTS }))
+      .toEqual({ ok: true, slot: "SUPERFLEX", slotIndex: 0 });
+  });
+
+  it("still benches a second quarterback under the standard shape, so the shape is what changed", () => {
+    const roster = [filled("QB", 0, "qb1")];
+    expect(assignSlot({ position: "QB", roster, slotConfig: STANDARD_ROSTER_SLOTS }))
+      .toEqual({ ok: true, slot: "BENCH", slotIndex: 0 });
+  });
+
+  it("fills FLEX before SUPERFLEX for a running back, because config order is the priority", () => {
+    // SUPERFLEX sits after FLEX and before K in ROSTER_SHAPES.superflex. A running back is
+    // eligible for both, and `assignSlot` takes the first eligible slot in config order, so the
+    // narrower flex fills first and the superflex stays available for the position only it accepts.
+    const roster = [
+      filled("RB", 0, "rb1"), filled("RB", 1, "rb2"),
+      filled("WR", 0, "wr1"), filled("WR", 1, "wr2"),
+      filled("TE", 0, "te1"),
+    ];
+    expect(assignSlot({ position: "RB", roster, slotConfig: SUPERFLEX_ROSTER_SLOTS }))
+      .toEqual({ ok: true, slot: "FLEX", slotIndex: 0 });
+  });
+
+  it("adds exactly one round to the draft, because rounds are the sum of slot counts", () => {
+    expect(totalRosterSlots(SUPERFLEX_ROSTER_SLOTS)).toBe(totalRosterSlots(STANDARD_ROSTER_SLOTS) + 1);
   });
 });

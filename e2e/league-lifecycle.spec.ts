@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./support/fixtures";
 
 /**
@@ -122,12 +122,20 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // `span.font-display` alone also matches the position badge (e.g. "QB") next to the name —
   // `.truncate` is unique to the player-name span (see player-pool.tsx).
   await picker.getByRole("button", { name: "Draft" }).first().waitFor({ timeout: 15_000 });
-  const pickedName = await picker
+  const pickedNameLocator = picker
     .getByRole("listitem")
     .filter({ has: picker.getByRole("button", { name: "Draft" }) })
     .first()
-    .locator("span.truncate.font-display")
-    .innerText();
+    .locator("span.truncate.font-display");
+  const pickedName = await pickedNameLocator.innerText();
+  // The mock dataset (`DATASET_SEED`, fixed) mints its 250 players from a limited first/last
+  // name pool, so two DIFFERENT players can land on the identical name — a name-only match can
+  // then resolve to more than one row. The team abbreviation (the span immediately after the
+  // name, see player-pool.tsx's row markup) is what tells them apart, so both filters below key
+  // on the pair rather than the name alone.
+  const pickedTeam = await pickedNameLocator.locator("xpath=following-sibling::span[1]").innerText();
+  const uniqueRow = (pool: Locator) =>
+    pool.getByRole("listitem").filter({ hasText: pickedName }).filter({ hasText: pickedTeam });
 
   // Scoped to the watcher's OWN available-pool list (player-pool.tsx's `aria-label="Available
   // players, best first"` `<ol>`), not the whole page: every available player's name already
@@ -135,7 +143,7 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // whether or not anything reached the watcher over Redis Streams and SSE. Asserting the row
   // is present here first is what makes the disappearance below unable to pass vacuously.
   const watcherPool = watcher.getByRole("list", { name: "Available players, best first" });
-  await expect(watcherPool.getByRole("listitem").filter({ hasText: pickedName })).toHaveCount(1);
+  await expect(uniqueRow(watcherPool)).toHaveCount(1);
 
   // Click-and-verify, retried: a server-rendered Draft button is visible and "stable" before
   // React attaches its handler, so a click that lands pre-hydration is a silent no-op (trace
@@ -148,19 +156,15 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // player, hand the turn to the other team, and leave every retry dead against a buttonless
   // waiting-mode page.
   await expect(async () => {
-    await pickerPool
-      .getByRole("listitem")
-      .filter({ hasText: pickedName })
-      .getByRole("button", { name: "Draft" })
-      .click();
-    await expect(pickerPool.getByRole("listitem").filter({ hasText: pickedName })).toHaveCount(0, { timeout: 3_000 });
+    await uniqueRow(pickerPool).getByRole("button", { name: "Draft" }).click();
+    await expect(uniqueRow(pickerPool)).toHaveCount(0, { timeout: 3_000 });
   }).toPass({ timeout: 30_000 });
 
   // THE assertion: the pick reached the other browser with no reload and no polling. The row
   // only leaves this list when `view.availablePlayerIds` changes (player-pool.tsx filters
   // `showDrafted || !row.drafted`, and `showDrafted` defaults false) — which only happens when
   // an event arrives over the real-time stream.
-  await expect(watcherPool.getByRole("listitem").filter({ hasText: pickedName })).toHaveCount(0, { timeout: 20_000 });
+  await expect(uniqueRow(watcherPool)).toHaveCount(0, { timeout: 20_000 });
 
   // --- And so does a chat message ----------------------------------------------------------
   // Scoped to the message log region (message-list.tsx's `role="log" aria-label="Messages"`),

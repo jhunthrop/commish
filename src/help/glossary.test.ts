@@ -33,4 +33,10 @@ describe("GLOSSARY", () => {
     // Two different keys never resolve to one entry.
     expect(term("ppr")).not.toBe(term("half-ppr"));
   });
+
+  // Task 1 (superflex): the word a first-timer needs to act on the new roster-shape select.
+  it("defines superflex as a flex spot that also takes a quarterback", () => {
+    expect(term("superflex").term).toBe("a superflex spot");
+    expect(term("superflex").short).toContain("quarterback");
+  });
 });

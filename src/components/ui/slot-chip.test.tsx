@@ -16,4 +16,12 @@ describe("SlotChip", () => {
     render(<SlotChip slot="BENCH" />);
     expect(screen.getByText("BENCH").className).toContain("border-border");
   });
+
+  // Task 1 (superflex): `RosterSlotType` gaining `SUPERFLEX` needs no change here — the chip
+  // already renders whatever slot letter it's given. `PositionBadge` never gets this one,
+  // because superflex is not a position.
+  it("renders SUPERFLEX, the same as any other slot letter", () => {
+    render(<SlotChip slot="SUPERFLEX" />);
+    expect(screen.getByText("SUPERFLEX")).toBeInTheDocument();
+  });
 });

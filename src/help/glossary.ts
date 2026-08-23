@@ -18,6 +18,7 @@ export type TermKey =
   | "te-premium"
   | "custom-scoring"
   | "flex"
+  | "superflex"
   | "bench"
   | "on-the-clock"
   | "lineup-lock"
@@ -90,6 +91,13 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     short: "A lineup spot any running back, receiver, or tight end can fill.",
     detail:
       "A FLEX spot in your lineup can be filled by a running back, a wide receiver, or a tight end, whichever gives your team the most points that week. It is one extra starter without a fixed position of its own.",
+  },
+  superflex: {
+    key: "superflex",
+    term: "a superflex spot",
+    short: "A flex spot that also accepts a quarterback, so most teams start two.",
+    detail:
+      "A superflex spot works like a FLEX, but it also accepts a quarterback alongside running backs, receivers, and tight ends. Quarterbacks are usually worth more than any other position, so most managers in a superflex league use it to start a second one.",
   },
   bench: {
     key: "bench",
