@@ -149,6 +149,66 @@ nominating team's clock runs out before they nominate, `reduceAuctionExpiry` (wi
 (`autoNominated: true` on the resulting lot), exactly the same policy `bestAvailableFor` uses
 for a stalled snake pick. This is what keeps an idle nominator from stalling the whole auction.
 
+## Draft-slot preferences: the KDS input (Task 6, Phase 3.5)
+
+A draft-slot preference — which draft position a manager wants, ranked — is a **table**,
+`draft_slot_preferences`, written and read by `setSlotPreference`/`slotPreferencesFor`
+(`src/draft-service/slot-preference.ts`), never a `SET_QUEUE`-shaped action in the log. The
+distinction is *when* the value is consulted: `SET_QUEUE` is an action because a queue is
+consulted repeatedly, at an arbitrary pick, so replay needs to know what it was AT that moment. A
+slot preference is consulted exactly **once**, at `START_DRAFT`, before any other action exists.
+
+`draftOrderFor` (`src/draft-service/order.ts`) runs two steps: `drawSequenceFor` (unchanged since
+before this phase — the fair, reproducible Fisher-Yates shuffle seeded from the draft id) produces
+the draw order, and `assignDraftSlots` (new) runs NFFC's Kentucky Derby System over it — each team,
+in draw-order turn, takes its highest-ranked still-free slot, falling back to the lowest slot still
+free (the same slot an unranked team would have gotten anyway) if its whole ranking is already
+taken. The RESULT is what gets snapshotted into `START_DRAFT.draftOrder` — the same field that
+already snapshots the shuffled draw and the ranked pool — never the preferences themselves and
+never a second log entry.
+
+**The consequence for a manager who edits a ranking after the draw:** nothing changes.
+`setSlotPreference` refuses to write once `drafts.status` is no longer `'scheduled'`
+(`SLOT_PREFERENCE_REFUSALS.alreadyStarted`), and the panel says so rather than silently accepting
+a write that would have no effect. See `docs/decisions/formats-and-lobby.md` §5 for the full
+argument.
+
+## The overnight pause (Task 4, Phase 3.5)
+
+`DRAFT_PAUSE_WINDOW` (`config.ts` — 2 AM to 5 AM Eastern) extends a deadline that would otherwise
+land inside the freeze, but only at the clock tiers slow enough for it to matter
+(`appliesAtOrAbovePickSeconds`, one hour) — the 90-second and 10-minute floors a draft runs at
+near kickoff never pause, so freezing them would strand eleven awake managers to protect one
+asleep.
+
+**Read only outside the reducer.** `pause.ts`'s three exported functions (`pausedMillisBetween`,
+`pausedUntil`, `deadlineAfter`) are consumed exclusively by `selectors.ts` — `currentDeadline`,
+`nudgeDeadline`, `pausedUntilFor` (the `pausedUntil` field on `DraftClockView`) and `isPaused` —
+and never by `reduce.ts`, `snake.ts`, `auction.ts` or `apply-pick.ts`. This is the same rule
+"Command-time admission vs. reducer guards" states generally, applied to a second tunable: a
+reducer guard is re-adjudicated on every replay, so if `skipEligible`-style code read
+`DRAFT_PAUSE_WINDOW` live, a deploy that moved the window would silently change what an
+already-persisted `TIMER_EXPIRE` did the next time the log replayed — the same failure the 60s to
+90s clock-floor change already caused once for the clock schedule itself. `deadlineAfter` is a
+FIXPOINT, not one addition: adding the paused time can push the candidate deadline into a second
+occurrence of the window (a clock that starts mid-freeze, or one long enough to reach a second
+night), so the overlap is recomputed against the moved candidate until it stops moving.
+
+**Two DST answers, both in `zonedHourToUtcMs`.** Resolving a local wall-clock hour to a UTC
+instant is a two-pass correction: guess the local hour as if it were UTC, correct once by the
+offset at that guess, correct once more by the offset at the corrected instant. On an ordinary
+day both passes agree and the second is a no-op. On the **fall-back** night (the repeated hour),
+the second pass converges past the repeat. On the **spring-forward** night (the hour that never
+happens), the two offsets never agree no matter how many more passes run — the function returns
+the FIRST correction, the instant local clocks actually read the moment they spring forward, the
+same skip-the-gap convention every timezone library uses.
+
+**The asymmetry with Task 5's skip policy.** `DRAFT_PAUSE_WINDOW` is attached fresh to
+`DraftConfig` on every load (`loadDraftConfig`) rather than snapshotted onto `START_DRAFT` — see
+"The snapshot asymmetry" under "Skip and return" below for why the two clock-shaped tunables live
+in different homes despite looking alike. See `docs/decisions/formats-and-lobby.md` §3 for the
+full reasoning.
+
 ## Skip and return: the forgiving timeout (Task 5, Phase 3.5)
 
 Punitive instant-autopick — the clock choosing for a stalled manager the instant it runs out —

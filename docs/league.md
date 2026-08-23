@@ -35,6 +35,63 @@ complete request — everything else, including the advanced disclosure's own fi
 optional. The draft is scheduled a week out rather than immediately so its auto-tightening
 clock starts in a slow tier instead of at the 60-second floor (`docs/draft-engine.md`).
 
+**The median game default is not centralized the same way.** `medianGame` defaults to `false` at
+two places rather than through `LEAGUE_CONFIG.defaults` — `createLeagueSchema`'s own
+`z.boolean().default(false)` (`src/league-service/schemas.ts`) and `createLeague`'s
+`input.medianGame ?? false` (`src/league-service/creation.ts`). Both agree, so no league can end
+up with a different default depending on which one ran, but it is a real drift from how the
+roster-shape default is handled — see `docs/decisions/formats-and-lobby.md`'s cross-cutting
+section.
+
+## Roster shapes (Phase 3.5, Task 1)
+
+`ROSTER_SHAPES` (`src/league/roster-shape.ts`) is the lookup from a shape's name to its rows —
+the `SCORING_PRESETS` of roster shapes. Two ship: `standard` (`STANDARD_ROSTER_SLOTS`, unchanged)
+and `superflex` (`SUPERFLEX_ROSTER_SLOTS`), which adds one `SUPERFLEX` slot — eligible for
+`QB`/`RB`/`WR`/`TE` — on top of the standard `FLEX`. `SUPERFLEX` sits after `FLEX` and before `K`
+in the row order on purpose: `assignSlot` takes the first eligible slot in config order, so a
+running back (eligible for both) fills the narrower `FLEX` first and leaves `SUPERFLEX` open for
+the position only it accepts.
+
+The engine change this needed is exactly one row: `assignSlot`, `validateRosterAdd`,
+`validateLineup` and `defaultLineup` all already treat `RosterSlotConfig` as data, not a
+hardcoded shape, so nothing downstream of the draft has any idea a second shape exists.
+`describeRosterShape` names a league's shape from its stored slot rows alone (`leagues.roster_slots`
+carries the rows; there is no separate shape-name column) — the same reasoning `describeScoring`
+already uses for a commissioner-edited scoring preset: a league whose slots don't match either
+shipped preset exactly is "Custom," never a lie about which preset it started from.
+`leagueTerms` (`src/league/terms.ts`) renders the result on the invite preview and league home
+beside the median-game note, and the create form's roster-shape `<Select>` is generated from
+`ROSTER_SHAPE_LABEL`, so a third shape added later is reachable from the form the moment its
+label exists — nothing to wire by hand.
+
+## The league median game (Phase 3.5, Tasks 2-3)
+
+`leagues.median_game` (boolean, default `false`) is the toggle; `weeks.median_score` (nullable
+`real`) is the value — two different tables for two different questions, chosen over both
+folding the toggle into `scoring_settings` (which is fifteen flat weight columns that
+`describeScoring` reads verbatim, and a median flag is not a weight) and a dedicated
+`median_results` table (which would store one row per team per week to encode a fact the scores
+already stored in `matchups` imply on their own). See `docs/decisions/formats-and-lobby.md` §2
+for the full reasoning, including why no pseudo-matchup row exists for it.
+
+`leagueMedian` (`src/league/median.ts`) is the middle score among every team that actually played
+a given week — never a bye team's absence, never a fabricated zero when nobody played.
+`medianResultFor` compares one team's own score to that median: strictly above wins, strictly
+below loses, exactly at ties. `computeStandings` folds a second result into `wins`/`losses`/`ties`
+for every team in `medianByWeek` — the SAME columns a head-to-head matchup fills — and leaves
+`pointsFor`/`pointsAgainst` untouched, because the median is not an opponent a team actually
+played against; folding it into the points columns would either describe an opponent that does
+not exist or double a team's own score.
+
+`clinchedTeamIds` (`src/league/clinch.ts`) takes `gamesRemaining`, not `weeksRemaining` — renamed
+(Task 2, the same correction `maxDraftDaysFromCreation` already got in Plan D) because a caller
+with the median toggle on must pass `weeksRemaining * 2`, and a parameter that sometimes holds a
+different unit than its name claims is exactly the silent wrongness that earlier rename fixed.
+`seasonProgress` and `currentWeekNumber` are deliberately untouched by the median: both answer
+"how far into the calendar is this league," and a median game adds no week — the one place the
+doubling is real is the clinch ceiling, and that is where the change landed.
+
 **The interaction budget.** `LEAGUE_CONFIG.maxCreateInteractions` (3) is the spec's exit
 criterion made testable: signed in → a created, invitable league in a small number of
 interactions by accepting every default. `src/league-room/create-league-interactions.test.tsx`
@@ -301,15 +358,48 @@ places the same league's fill count can disagree, and the disagreement only ever
 league's listing and draft status) run through a `JoinPrecondition` hook that fires only for a
 caller who is **not** already a member, which is what keeps re-arriving free on both paths.
 
+**The sit-and-go fill trigger (Phase 3.5, Task 7).** `fireWhenFullInTx`
+(`src/league-service/fill-trigger.ts`) runs unconditionally, inside `joinLeagueInTx`'s own
+transaction, after every seat this codebase ever seats — it re-derives fullness itself
+(`hasOpenSeat`, the same predicate the caller just used for its own capacity check) rather than
+trusting a boolean computed a moment earlier, because the function is called directly by its own
+tests too. It fires ONLY for a draft whose `start_trigger` is `'when_full'` (never for an ordinary
+scheduled draft), and it writes exactly one thing: `drafts.kickoff_at`, moved to
+`now + MATCHMAKING_CONFIG.sitAndGo.graceSeconds`. It never calls `startDraft` itself — the
+existing ticker that already scans `drafts` for a passed `kickoff_at` (`autoStartDueDrafts`) picks
+the write up and starts the draft through the same guarded, cross-instance-safe path a
+commissioner's own button uses. `createLeagueSchema` refuses `startTrigger: "when_full"` on
+anything but `visibility: "public"`, so a private league can never reach this trigger in the first
+place. See `docs/decisions/formats-and-lobby.md` §6 for the full reasoning.
+
 **The privacy boundary.** `GET /api/public/leagues` is the one unauthenticated read in this
 application. What a stranger may learn is `PublicLeagueSummary` (`src/matchmaking/contract.ts`)
-and nothing else: id, name, format, experience tier, stake tier, team count, filled count. No
-commissioner identity, no team or owner names, no invite code, no draft id, no standings, no
-rosters, no chat, no scoring settings. Three things enforce it: `is_public_matchmade` is opt-in
-and false by default, `listPublicLeagues` selects exactly the contract's columns, and a key-set
-test fails if the wire body ever grows a field the contract does not name. A league that is
-full, or whose draft has already started, is not listed at all: a card a visitor cannot act on
+and nothing else — twelve fields as of Phase 3.5: id, name, format, experience tier, stake tier,
+team count, filled count, `scoringLabel` (derived, never the raw weights), `compositionCategory`
+(the coarse participation-mix bucket), `draftAt` (an absolute-plus-relative sentence), `medianGame`
+(whether this league plays the median game) and `startTrigger` (`"scheduled" | "when_full"` — see
+below). No commissioner identity, no team or owner names, no invite code, no draft id, no
+standings, no rosters, no chat, no scoring settings. Three things enforce it: `is_public_matchmade`
+is opt-in and false by default, `listPublicLeagues` selects exactly the contract's columns, and a
+key-set test fails if the wire body ever grows a field the contract does not name. A league that
+is full, or whose draft has already started, is not listed at all: a card a visitor cannot act on
 is a dead end wearing a badge.
+
+**A `when_full` league shows a sentence, not a date.** Its stored `kickoff_at` is a placeholder
+until the sit-and-go fill trigger rewrites it (below), and rendering that placeholder as a real
+time would put a specific, wrong evening on a public card. `PublicLeagueList` reads
+`startTrigger` and renders "Starts as soon as it fills" instead of `draftAt` whenever it is
+`"when_full"` — how a league starts is a fact about the league, the same disclosure reasoning
+`draftAt`, `scoringLabel` and `compositionCategory` each already established.
+
+**The card gets an order, not a progress bar.** A nearly-full league needs to be *findable*, which
+`listPublicLeagues` (`src/league-service/browse.ts`) answers by ordering the result — seats
+remaining ascending (`team_count` minus the joined seat count), then oldest first
+(`created_at`) — rather than by showing a fill meter on the card. The card's own docblock already
+ruled a progress bar out (*"the number is the decision a visitor is actually making and a bar
+makes them estimate it"*); this phase measured the ordering (an `EXPLAIN` assertion plus a
+mutation proof, `src/db/index-plans.test.ts`) rather than reopening that decision, and it costs
+nothing extra since the query already aggregates before it sorts.
 
 **Filtering** is `League.experienceTier`, `League.format` and `League.stakeTier`, normalized by
 `normalizeBrowseFilter`, the pure function that turns a query string into a `BrowseFilter`.

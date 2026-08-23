@@ -119,6 +119,15 @@ playoff spot all have real data to show the moment you sign in. Re-running the s
 every seeder upserts rather than duplicating. Set `DEV_SEED_CLAIM_USER_ID` to your own signed-in
 user id first to take over team 1 and the commissioner's chair in all three leagues.
 
+The seed also runs `seedFormats` (Phase 3.5, Task 10), which fires all five of this phase's new
+mechanisms through their real paths rather than hand-stamping the columns they write: a superflex
+league, a slow-tier draft that skips and owes a pick, a draft drawn through the KDS slot-preference
+step, and a sit-and-go league whose last seat fills and whose fill trigger sets a real kickoff —
+the fifth (the median game) is its own already-scored `MEDIAN_DEMO_LEAGUE`, threaded onto the
+same `finalizeWeek` loop the other season leagues already run. Every one of
+these leagues stays small and immediately full on purpose: they are backstage proofs that a
+mechanism fires for real, not additional demo rooms meant to be browsed or joined.
+
 The seed also grants **operator (dispute-queue) access** to that same account — team 1's owner,
 `DEV_SEED_CLAIM_USER_ID` if you set it, else the seed's first placeholder user — through the real
 `grantAdmin` writer, exactly what running `npm run admin:grant` by hand would produce (a real

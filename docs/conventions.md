@@ -40,21 +40,32 @@ src/
   middleware.ts           WorkOS AuthKit session middleware — runs on every non-static request.
   instrumentation.ts      Starts the dev draft ticker singleton once, server-side only.
   domain/                 Pure domain types + pure functions. NO I/O, NO Date.now(). readonly everywhere.
-  draft-engine/           Pure draft reducer (snake + auction), clock schedule, selectors. 100% coverage.
+  draft-engine/           Pure draft reducer (snake + auction), clock schedule, selectors,
+                          pause.ts (the overnight pause window, Phase 3.5 Task 4 — read only at
+                          command/view time in selectors.ts, never by the reducer). 100% coverage.
   draft-service/          Durable replay-based draft store, commit seam, clock ticker, draft authz,
                           queue.ts (SET_QUEUE service seam), nudge.ts/nudge-copy.ts (AI draft
-                          moderator — see docs/draft-moderator.md).
+                          moderator — see docs/draft-moderator.md), order.ts (the draw plus the
+                          Kentucky Derby slot-assignment step, Phase 3.5 Task 6), slot-preference.ts
+                          (the draft-slot-preference table write/read, the KDS input to order.ts's
+                          draw — see docs/draft-engine.md).
   draft-room/             The browser half of the draft: pure view reducer (state/, 100% coverage),
                           the useDraftRoom hook (hooks/), every room component (components/), and
                           id→display-name lookups (lib/). Imports from draft-engine are TYPE-ONLY —
                           no draft rule runs in React. See docs/draft-room.md.
   league/                 Pure league rules: schedule generation, standings, clinch, lineup
-                          eligibility, invite codes, LEAGUE_CONFIG. NO I/O. 100% coverage.
+                          eligibility, invite codes, LEAGUE_CONFIG, roster-shape.ts (superflex,
+                          Phase 3.5 Task 1 — describeRosterShape mirrors describeScoring) and
+                          median.ts (the league median game, Phase 3.5 Tasks 2-3 —
+                          leagueMedian/medianResultFor, folded into standings.ts's win/loss/tie
+                          columns only, never pointsFor/pointsAgainst). NO I/O. 100% coverage.
   league-service/         League read/write service layer over Postgres: creation, invites,
-                          schedule, lineups, results/standings, and trades (trades.ts —
-                          propose/withdraw/reject/accept, trade-transfer.ts — the roster move +
-                          locked-week materialization, trade-reversal.ts — the operator's
-                          compensating transfer). Consumed directly by app/api/leagues/**
+                          schedule, lineups, results/standings, fill-trigger.ts (the sit-and-go
+                          fill trigger, Phase 3.5 Task 7 — writes drafts.kickoff_at, never starts
+                          a draft itself; runs inside join.ts's own transaction), and trades
+                          (trades.ts — propose/withdraw/reject/accept, trade-transfer.ts — the
+                          roster move + locked-week materialization, trade-reversal.ts — the
+                          operator's compensating transfer). Consumed directly by app/api/leagues/**
                           route handlers and by app/**/*.tsx Server Components.
   league-room/            The browser half of the league: the create/join/invite client
                           components and the trade surface (components/ — trade-composer.tsx,
@@ -64,10 +75,12 @@ src/
                           league rule runs in React; value-imports @/trades directly (pure,
                           browser-safe) for TRADE_CONFIG, describeAsset and isExpired.
   matchmaking/            Pure public-matchmaking rules: the browse filter, the cosmetic stake
-                          tiers, and PublicLeagueSummary, the field-by-field privacy boundary of
-                          the app's ONE unauthenticated league read. NO I/O. 100% coverage.
-                          Browser-safe, so src/league-room/** value-imports it directly, the
-                          same way src/chat-room/** value-imports @/chat.
+                          tiers, MATCHMAKING_CONFIG.sitAndGo (the fill-trigger grace period,
+                          Phase 3.5 Task 7), and PublicLeagueSummary, the field-by-field privacy
+                          boundary of the app's ONE unauthenticated league read — twelve fields as
+                          of Phase 3.5 (medianGame, startTrigger joined draftAt). NO I/O. 100%
+                          coverage. Browser-safe, so src/league-room/** value-imports it directly,
+                          the same way src/chat-room/** value-imports @/chat.
   identity/               Pure identity rules: AvatarRef parsing over the three ref cases
                           (avatars.ts, eight code presets — no upload, no object store),
                           HelpLevel + the two-field PreferenceState (preferences.ts), the
@@ -222,11 +235,16 @@ src/
                           hooks — see design-system.md.
   components/ui/          shared primitives (Button, Input, Card, Badge, PositionBadge, SlotChip,
                           PageTitle, Table, Celebration, Avatar, Modal, ToastProvider, Select,
-                          Skeleton, EmptyState, ErrorState, Icon, …) — see design-system.md.
+                          Skeleton, EmptyState, ErrorState, Icon, Countdown — the ticking-clock
+                          primitive, extracted at its third caller, Phase 3.5 Task 8, …) — see
+                          design-system.md.
 drizzle/                  generated SQL migrations (committed)
 docs/                     conventions.md (this), design-system.md, draft-engine.md, draft-room.md,
                           draft-moderator.md, league.md, research/, decisions/ (architecture
-                          decision records — audit-and-integrity.md, operators-and-moderation.md, …)
+                          decision records — audit-and-integrity.md, operators-and-moderation.md,
+                          enforcement-and-tiers.md, formats-and-lobby.md — Phase 3.5's toggles,
+                          the median's storage split, the pause/skip asymmetry, the KDS snapshot
+                          argument and the fill trigger, …)
 scripts/                  Operator-run CLIs, never imported by src/**: seed (npm run seed),
                           audit:verify (verify-audit-chain.ts), reviews:remove
                           (remove-review.ts), admin:grant (grant-admin.ts, the only door
@@ -425,6 +443,8 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
 - Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**`, `src/integrity-service/**`, `src/league-service/**`, `src/draft-service/**`, `src/moderation/**`, `src/trades/**` and `src/participation/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — twenty-one gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. `src/league-service` and `src/draft-service` (gates 17 and 18) are gated for the identical service-layer reason; `src/moderation` (gate 19) is pure and gates for the reason every pure directory does; `src/trades` (gate 20) is pure and holds the one fairness function the write path calls inside a transaction, moved out of the coverage-ungated `src/ai-advisor/**` for exactly that reason (`docs/decisions/trades-and-fairness.md` §2); `src/participation` (gate 21, Phase 3 Plan D) is pure and holds the third tier vocabulary that decides who is a veteran, joining two plans early gated `src/league-service`/`src/draft-service`/`src/integrity`/`src/integrity-service` in covering by construction every directory this plan writes into. See `docs/decisions/operators-and-moderation.md` and `docs/decisions/enforcement-and-tiers.md`. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+
+**Phase 3.5 added no gate — the count stays twenty-one.** Every pure module this phase wrote lands inside a directory already gated: `src/league/roster-shape.ts`, `src/league/median.ts` (gate 4); `src/draft-engine/pause.ts` (gate 2); `src/draft-service/slot-preference.ts` and `order.ts`'s KDS extension (gate 18); `src/league-service/fill-trigger.ts` (gate 17). `src/domain` gained one union member (`SUPERFLEX` on `RosterSlotType`) but stays ungated on the same standing reasoning it always has (`docs/decisions/formats-and-lobby.md`'s cross-cutting section): it holds types the whole product shares, a 100% claim over it is separate work, and this phase's one addition there is pinned by tests in the gated directories that actually consume it.
 - **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there. `playwright.config.ts` pins `workers: 1` and `fullyParallel: false`, so every run is one worker walking the suite in one deterministic, alphabetical file order — a real cross-spec ordering dependency, not a latent flake: `mobile-360.spec.ts`'s dispute-queue check depends on `league-lifecycle.spec.ts` having already run and resolved its own flag, sorting first only because its filename does. A spec relying on suite order names the file it depends on in its own comment, the way both of these do; running either spec in isolation (`npx playwright test mobile-360.spec.ts` alone) will not reproduce the count that spec asserts.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 
