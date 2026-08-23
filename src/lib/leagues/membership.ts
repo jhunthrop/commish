@@ -3,7 +3,7 @@ import type { NextResponse } from "next/server";
 import type { Db } from "@/db/client";
 import { leagues, teams } from "@/db/schema";
 import { fail } from "@/lib/api/respond";
-import { isCommissionerOf, leagueAuthority, type LeagueAuthority } from "@/league-service/authority";
+import { leagueAuthority, type LeagueAuthority } from "@/league-service/authority";
 
 /**
  * The one literal for "you don't field a team here" — shared by `requireLeagueMember` below
@@ -45,13 +45,18 @@ export async function resolveLeagueMembership(db: Db, leagueId: string, userId: 
 
   const [team] = await db.select({ id: teams.id }).from(teams).where(and(eq(teams.leagueId, leagueId), eq(teams.userId, userId)));
 
+  // Fix round 1, F1 (LOW): computed once and read twice, rather than calling `isCommissionerOf`
+  // (which re-derives the same union internally) and `leagueAuthority` separately — the union
+  // resolves the row exactly once per request.
+  const authority = leagueAuthority(league);
+
   return {
     ok: true,
     membership: {
       leagueId,
       teamId: team?.id ?? null,
-      isCommissioner: isCommissionerOf(league, userId),
-      authority: leagueAuthority(league),
+      isCommissioner: authority.kind === "member" && authority.userId === userId,
+      authority,
     },
   };
 }
