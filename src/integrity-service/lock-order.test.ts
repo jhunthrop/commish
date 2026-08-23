@@ -210,6 +210,84 @@ describe("the audit anchor is the last lock, FK locks included", () => {
     expect(notice?.auditEventId).not.toBeNull();
   });
 
+  // Fix round 1 (F5): the report argued this shape by reuse — `skipNoticeContext` joins only
+  // `teams` + `leagues` (no `players`), a strict subset of `autopickNoticeContext`'s own join,
+  // and reuses `notifyAffectedMember` -> `audit.record` -> `attachAuditEvent` verbatim — but
+  // never drove the skip path through a real two-connection race the way the autopick path (just
+  // above) is. This is that proof, on the identical rendezvous: only the QUEUE step is missing,
+  // which is exactly what turns this fixture's TIMER_EXPIRE into a skip instead of an autopick.
+  it("lets a join and a SKIP in the same league run concurrently without deadlocking", async () => {
+    const { draftId, leagueId, teamIds } = await seedDraftFixture(joinDb, {
+      draftId: "draft_lock_skip",
+      leagueId: "league_lock_skip",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+    });
+    // No player rows this time, deliberately: `skipNoticeContext` never joins `players` at all
+    // (a skip never chose anyone), so this test would prove nothing about that narrower join if
+    // it accidentally depended on the autopick fixture's own player seeding.
+    await joinDb.update(leagues).set({ teamCount: 3 }).where(eq(leagues.id, leagueId));
+    await joinDb.insert(users).values({ id: "user_joiner_skip", email: "joiner-skip@test.local", displayName: "Joiner" });
+
+    const store = pickStore();
+    await store.applyAction(draftId, { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: clock.now(), draftOrder: teamIds, pool: POOL });
+    const state = await store.getDraftState(draftId);
+    // No SET_QUEUE here — the one difference from the autopick proof above, and the whole point:
+    // the on-clock team is queueless at a slow (9+ day) tier, so this TIMER_EXPIRE skips.
+
+    let holdsLeagueLock: () => void = () => {};
+    const leagueLocked = new Promise<void>((resolve) => (holdsLeagueLock = resolve));
+    let releaseJoin: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseJoin = resolve));
+
+    // T_join: parked exactly where the autopick proof parks it — after `leagues FOR UPDATE`,
+    // before the append.
+    const joining = joinDb.transaction((tx) =>
+      joinLeagueInTx(
+        tx,
+        { leagueId, userId: "user_joiner_skip", newId: () => "team_joiner_skip", via: "public_browse", occurredAt: clock.now() },
+        async () => {
+          holdsLeagueLock();
+          await parked;
+          return null;
+        },
+      ),
+    );
+    await leagueLocked;
+
+    // T_skip: the real skip path, which must reach `member_notices` (and therefore
+    // `leagues FOR KEY SHARE`, via `skipNoticeContext` + `notifyAffectedMember`) BEFORE it
+    // reaches the anchor. It blocks here, behind T_join, on the identical lock T_pick does above.
+    const skipping = store.applyAction(draftId, { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state!) ?? clock.now() });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseJoin();
+
+    const joined = await joining;
+    const skipped = await skipping;
+    expect(joined).toMatchObject({ ok: true, alreadyMember: false });
+    expect(skipped.ok).toBe(true);
+    // Proof this really was a SKIP, not an autopick that slipped in unnoticed: a pick was owed,
+    // nobody was drafted.
+    if (skipped.ok) {
+      expect(Object.keys(skipped.state.owedPicks)).toHaveLength(1);
+      expect(skipped.state.picks).toHaveLength(0);
+    }
+
+    // Both transactions actually landed their audit work on the same chain, which is what makes
+    // the absence of a deadlock meaningful: they really did contend for this one anchor row.
+    const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, leagueId));
+    expect(anchor!.headSequence).toBe(2); // one `member_joined` and one `system_action` (the skip), on one chain
+
+    // And the skip's own notice, written before the anchor, still names the event minted after it.
+    const [notice] = await joinDb.select().from(memberNotices);
+    expect(notice).toMatchObject({ noticeType: "draft_pick_skipped" });
+    expect(notice?.auditEventId).not.toBeNull();
+  });
+
   it("survives the same race run repeatedly, in both arrival orders", async () => {
     // The rendezvous above pins one interleaving. This one pins that nothing about the fix
     // depends on which transaction arrives first, over enough runs that a surviving cycle would

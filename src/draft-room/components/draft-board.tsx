@@ -27,6 +27,9 @@ interface BoardCell {
   readonly pick: CompletedPick | null;
   readonly onClock: boolean;
   readonly future: boolean;
+  /** True when this row is the SLOT a skip left open (Task 5) — `view.owedPicks[teamId]`
+   *  names the pick numbers, never the round, so this is that number's own round. */
+  readonly pending: boolean;
 }
 
 interface BoardRow {
@@ -83,6 +86,26 @@ function nextRoundByTeam(view: DraftStateView): ReadonlyMap<string, number> {
   return new Map([...counts].map(([teamId, count]) => [teamId, count + 1]));
 }
 
+/**
+ * teamId -> the ROUNDS a skip left open for them (Task 5). `owedPicks` names pick NUMBERS —
+ * the engine's own global counter, not a round — so this is the one place the board converts
+ * between the two.
+ *
+ * `Math.ceil(pickNumber / teamCount)`, byte-identical to `roundForPick` (`@/draft-engine`,
+ * `order.ts`) — not imported, because client room code may only import TYPES from
+ * `@/draft-engine` (the HTTP/SSE boundary rule this whole directory is held to; see this
+ * repo's own `no-restricted-imports` config). A round number is arithmetic on a value the wire
+ * already sent (`pickNumber`), not a turn-order RULE re-derived here — the same distinction
+ * `directionOf` below draws for a round's serpentine direction.
+ */
+function pendingRoundsByTeam(view: DraftStateView): ReadonlyMap<string, ReadonlySet<number>> {
+  const teamCount = view.draftOrder.length;
+  const roundForPick = (pickNumber: number): number => Math.ceil(pickNumber / teamCount);
+  return new Map(
+    Object.entries(view.owedPicks ?? {}).map(([teamId, pickNumbers]) => [teamId, new Set(pickNumbers.map(roundForPick))]),
+  );
+}
+
 function directionOf(picks: readonly CompletedPick[], columnIds: readonly string[]): "forward" | "reverse" | null {
   if (picks.length < 2) return null;
   const first = picks.reduce((min, pick) => (pick.pickNumber < min.pickNumber ? pick : min));
@@ -98,6 +121,7 @@ function buildRows(view: DraftStateView, columnIds: readonly string[]): readonly
   for (const pick of view.picks) byRound.set(pick.round, [...(byRound.get(pick.round) ?? []), pick]);
 
   const nextRound = nextRoundByTeam(view);
+  const pendingRounds = pendingRoundsByTeam(view);
   const onClockTeamId = view.phase === "in_progress" ? view.onClockTeamId : null;
   const isSnake = view.format === "snake";
   const activeRound = Math.max(1, ...view.picks.map((pick) => pick.round), ...(onClockTeamId ? [nextRound.get(onClockTeamId) ?? 1] : []));
@@ -112,6 +136,7 @@ function buildRows(view: DraftStateView, columnIds: readonly string[]): readonly
         pick: byCell.get(pickKey(teamId, round)) ?? null,
         onClock: teamId === onClockTeamId && (nextRound.get(teamId) ?? 1) === round,
         future: round > activeRound + 1,
+        pending: pendingRounds.get(teamId)?.has(round) ?? false,
       })),
     };
   });
@@ -167,6 +192,18 @@ function StickerCell({
     );
   }
 
+  if (cell.pending) {
+    // Task 5's own honesty: a skip leaves a genuine hole in an otherwise-filled round, and a
+    // plain dashed cell reads identically to "not yet reached" — which it is not. Neutral voice,
+    // no name (the room already knows whose turn it isn't, from the on-clock cell elsewhere):
+    // the same "what happened, not who" restraint every skip notice keeps.
+    return (
+      <div data-pending-cell="true" className="flex h-full items-center justify-center rounded-sm border border-dashed border-border px-2 py-2">
+        <span className={`${EYEBROW} text-text-muted`}>Pending</span>
+      </div>
+    );
+  }
+
   // Far-future rounds compress to slivers: the present deserves the space, and the shape of
   // the season is still visible without shouting.
   return <div aria-hidden="true" className={`h-full rounded-sm border border-dashed ${cell.future ? "min-h-4 border-border/35" : "min-h-12 border-border"}`} />;
@@ -211,7 +248,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
   // newest first. A board of empty rounds is a scroll, not information.
   const listRows = [...rows]
     .reverse()
-    .filter((row) => row.cells.some((cell) => cell.pick !== null || cell.onClock));
+    .filter((row) => row.cells.some((cell) => cell.pick !== null || cell.onClock || cell.pending));
 
   return (
     <section aria-label="Draft board" className="flex h-full min-h-0 flex-col gap-3">
@@ -289,7 +326,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
             <h2 className="font-display text-display-sm font-semibold leading-display text-text-primary">Round {row.round}</h2>
             <ul className="flex flex-col gap-2">
               {row.cells
-                .filter((cell) => cell.pick !== null || cell.onClock)
+                .filter((cell) => cell.pick !== null || cell.onClock || cell.pending)
                 .map((cell) => (
                   <li key={cell.teamId} className="flex items-center gap-2">
                     <span className="w-24 shrink-0 truncate font-display font-semibold text-text-muted">{teamName(byId, cell.teamId)}</span>

@@ -2,10 +2,11 @@ import { describe, it, expect } from "vitest";
 import type { DraftPoolEntry, MakePickAction, StartDraftAction, TimerExpireAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, totalPickCount, totalRosterSlots, type DraftConfig, type DraftState } from "./state";
-import { DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY } from "./config";
+import { DRAFT_CLOCK_SCHEDULE, DRAFT_PAUSE_WINDOW, DRAFT_SKIP_POLICY } from "./config";
 import { reduceDraft, type DraftReduceResult } from "./reduce";
-import { isComplete, remainingBudget, teamOnClock } from "./selectors";
-import { expireAt } from "./test-support";
+import { admitCommand } from "./admit";
+import { currentDeadline, currentTier, isComplete, remainingBudget, teamOnClock } from "./selectors";
+import { expireAt, submitCommand } from "./test-support";
 
 const SPRINT_SLOTS: readonly RosterSlotConfig[] = [
   { slot: "QB", count: 1, eligiblePositions: ["QB"] },
@@ -299,6 +300,75 @@ describe("TIMER_EXPIRE — the skip-and-owe consent ruling (Task 5)", () => {
     const next = expectOk(reduceDraft(state, timerExpire()));
     expect(next.auction?.lot).toMatchObject({ autoNominated: true });
     expect(next.owedPicks).toEqual({});
+  });
+
+  // Fix round 1 (F1): every existing fixture used a tier far above (8h/4h, SLOW_START) or two
+  // tiers below (90s, FAST_START) `skipPolicy.appliesAtOrAbovePickSeconds` (3600s) — nothing sat
+  // on the actual edge, so a `<` → `<=` mutation in `skipEligible` would have passed every test
+  // in the suite. These two land exactly on `DRAFT_CLOCK_SCHEDULE`'s only pair of tiers that
+  // straddle the threshold: the 1h tier (3600s, the boundary value itself) and the 10m tier
+  // (600s, the very next one down), with nothing else about the fixture changed.
+  it("skips at the 1h tier — the boundary value itself, not merely 'well above' it", () => {
+    // 20h before kickoff sits inside DRAFT_CLOCK_SCHEDULE's (12h, 48h] band: the 1h tier,
+    // pickSeconds === 3600 === skipPolicy.appliesAtOrAbovePickSeconds exactly.
+    const boundaryTierStart = "2026-09-09T21:00:00.000Z";
+    const state = task5State({ pickNumber: 1, turnStartedAt: boundaryTierStart, queues: {} });
+    expect(currentTier(state)?.pickSeconds).toBe(60 * 60);
+    const next = expectOk(reduceDraft(state, timerExpire()));
+    expect(next.owedPicks).toEqual({ t_alice: [1] });
+    expect(next.picks).toHaveLength(0);
+  });
+
+  it("autopicks at the 10m tier — one tier below the boundary, the flip's other side", () => {
+    // 6h before kickoff sits inside the (2h, 12h] band: the 10m tier, pickSeconds === 600,
+    // strictly less than the threshold — the immediate neighbor of the case just above.
+    const belowBoundaryTierStart = "2026-09-10T11:00:00.000Z";
+    const state = task5State({ pickNumber: 1, turnStartedAt: belowBoundaryTierStart, queues: {} });
+    expect(currentTier(state)?.pickSeconds).toBe(10 * 60);
+    const next = expectOk(reduceDraft(state, timerExpire()));
+    expect(lastPick(next)).toMatchObject({ teamId: "t_alice", auto: true });
+    expect(next.owedPicks).toEqual({});
+  });
+
+  // Fix round 1 (F2): Task 4's pause and Task 5's skip verified only piecewise before this —
+  // this drives ONE fixture through both. `DRAFT_PAUSE_WINDOW` extends a slow-tier deadline
+  // that would otherwise land inside the 2-5 AM ET freeze; `admitCommand` (the same R-B4 gate
+  // every TIMER_EXPIRE goes through) refuses an expiry submitted before that EXTENDED deadline,
+  // so a skip-eligible queueless team can never be skipped mid-window — only once picks resume.
+  it("composes with the overnight pause: no skip mid-window, the skip fires on the post-resume expiry (Task 4 x Task 5)", () => {
+    // 2:30 AM ET (06:30 UTC), 5 days before a kickoff far enough out to keep the 4h tier (well
+    // above the 1h skip floor) in force — `selectors-clock.test.ts`'s own pause fixture, reused
+    // here so the extended-deadline arithmetic is the SAME already-verified value, not a new
+    // hand-derivation: `currentDeadline` pushes the raw 4h deadline (10:30 UTC) past the 2.5h it
+    // overlaps the freeze, landing at 13:00 UTC — an hour past `pausedUntil` (09:00 UTC, the
+    // window's own close), because the clock owed is the FULL 4h, not just "until the window ends".
+    const turnStartedAt = "2026-09-15T06:30:00.000Z";
+    const pausedConfig = task5Config({ kickoffAt: "2026-09-20T06:30:00.000Z", pauseWindow: DRAFT_PAUSE_WINDOW });
+    const state = task5State({ pickNumber: 1, turnStartedAt, queues: {} }, pausedConfig);
+
+    expect(currentTier(state)?.pickSeconds).toBe(4 * 60 * 60); // well above the 1h skip floor
+    const extendedDeadline = currentDeadline(state);
+    expect(extendedDeadline).toBe("2026-09-15T13:00:00.000Z");
+
+    // No TIMER_EXPIRE is possible mid-window: neither at the window's own close (09:00 UTC,
+    // `pausedUntil` — still short of the real, further-extended deadline) nor one second before
+    // the actual deadline itself.
+    expect(admitCommand(state, { v: 1, type: "TIMER_EXPIRE", timestamp: "2026-09-15T09:00:00.000Z" })).toEqual({
+      ok: false,
+      reason: "The clock hasn't run out yet.",
+    });
+    expect(admitCommand(state, { v: 1, type: "TIMER_EXPIRE", timestamp: "2026-09-15T12:59:59.000Z" })).toEqual({
+      ok: false,
+      reason: "The clock hasn't run out yet.",
+    });
+
+    // The post-resume expiry, at the resumed deadline exactly: admitted, and the skip fires —
+    // the pause changed WHEN the clock could run out, never WHETHER a queueless team skips.
+    const result = submitCommand(state, { v: 1, type: "TIMER_EXPIRE", timestamp: extendedDeadline! });
+    const next = expectOk(result);
+    expect(next.owedPicks).toEqual({ t_alice: [1] });
+    expect(next.picks).toHaveLength(0);
+    expect(teamOnClock(next)).toBe("t_bob");
   });
 
   it("autopicks rather than skips when the config predates Task 5 entirely (no skipPolicy at all)", () => {
