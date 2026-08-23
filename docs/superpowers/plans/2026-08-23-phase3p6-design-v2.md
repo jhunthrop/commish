@@ -954,6 +954,8 @@ it("writes nothing on every refusal path", async () => {
 
 - [ ] **Step 2: What a release deletes, enumerated**
 
+**Binding precondition, from the Phase 3.5 fix-wave re-review (2026-08-23): `releaseSeat` may not land before `startDraft`'s `teamRows` and `pool` reads move inside the `DraftActionSource` thunk (the seam Phase 3.5's F9 fix built), in the SAME commit.** Today that out-of-transaction read window is nearly closed by the leagues lock ordering; a seat release committing inside it would persist a departed team's id into `draftOrder`, which the reducer's replay rule then makes permanent. The move is small because the thunk already runs under the draft's own lock.
+
 Deleting a `teams` row is only safe because of what a pre-draft league does not have yet, and the task asserts each rather than assuming it: `draft_picks` and `matchups` reference `teams` **without** `ON DELETE CASCADE` and both are empty before a draft runs (matchups are generated at `commitDraftResults`); rosters, queues and draft actions cascade. The refusal on `status !== 'scheduled'` is therefore not politeness, it is the precondition that makes the delete legal, and a test asserts the two non-cascading tables are empty at the moment of the delete rather than trusting the status check alone.
 
 **FK acquisitions, enumerated:** `releaseSeat` takes `leagues FOR UPDATE` (the same first lock `joinLeagueInTx` takes, so the seat count it frees cannot race a join), then deletes the `teams` row (row-exclusive plus `FOR KEY SHARE` on `leagues` and `users`), then clears `drafts.fill_fired_at` (`FOR KEY SHARE` on `leagues`, already held), then the notice inserts, then the audit anchor. One new entry in `lock-order.test.ts`.
