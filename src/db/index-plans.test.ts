@@ -14,8 +14,10 @@ import { signalsForUsersQuery } from "@/integrity-service/session-signals";
 import { completedSeasonsQuery } from "@/league-service/participation";
 import { browseQuery, houseShelfQuery } from "@/league-service/browse";
 import { leaguesNeedingAutoSetQuery } from "@/league-service/auto-lineup";
+import { draftsNext48hQuery, leaguesFilledQuery } from "@/league-service/proof";
 import { tradesQuery } from "@/league-service/trades";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
+import { reviewAggregateQuery } from "@/review-service/reviews";
 import { AUDIT_EVENT_TYPES } from "@/domain/audit";
 
 const db = createTestDb();
@@ -51,11 +53,48 @@ async function seedHouseShelfSample(db: Db): Promise<void> {
   await db.execute(sql`ANALYZE leagues, drafts`);
 }
 
+/** Only a `reviews`-owning proof-stats read needs this table, so it stays a small, dedicated
+ *  corpus layered on top of `seedRealisticCorpus` rather than a fifth builder in `@/db/
+ *  test-corpus` — the same "small sample beside the big corpus" shape `seedHouseShelfSample`
+ *  above already uses. */
+const REVIEW_COUNT = 5_000;
+/** One review in every this-many is removed — rare, the same "small realistic fraction of a
+ *  rare state" ratio `test-corpus.ts`'s own `OPEN_FLAG_INTERVAL` uses, and selective enough that
+ *  `reviews_feed_idx`'s partial predicate (`removed_at IS NULL`) is worth having. */
+const REMOVED_REVIEW_INTERVAL = 100;
+
+/**
+ * `proofStats`' own rating aggregate needs SOME reviews to measure `reviewAggregateQuery`
+ * against — `seedRealisticCorpus` seeds none, because nothing read `reviews` before this task.
+ * A dedicated `users` slice (`revu1`..`revu{REVIEW_COUNT}`), not `seedRealisticCorpus`'s own
+ * `u1`..`u200`: `reviews_user_idx` is UNIQUE on `user_id`, so 5,000 reviews need 5,000 distinct
+ * authors, comfortably past the 200 the general corpus already holds.
+ */
+async function seedReviewCorpus(db: Db): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO users (id, email, display_name)
+    SELECT 'revu' || g, 'revu' || g || '@example.test', 'Reviewer ' || g
+    FROM generate_series(1, ${REVIEW_COUNT}) g
+  `);
+  await db.execute(sql`
+    INSERT INTO reviews (id, user_id, rating, body, created_at, removed_at, removed_by_user_id, removal_reason)
+    SELECT 'rev' || g, 'revu' || g, 1 + (g % 5),
+           'A generic review body, long enough to clear the twenty character minimum with room to spare.',
+           now() - (g || ' minutes')::interval,
+           CASE WHEN g % ${REMOVED_REVIEW_INTERVAL} = 0 THEN now() ELSE NULL END,
+           CASE WHEN g % ${REMOVED_REVIEW_INTERVAL} = 0 THEN 'revu' || g ELSE NULL END,
+           CASE WHEN g % ${REMOVED_REVIEW_INTERVAL} = 0 THEN 'other' ELSE NULL END
+    FROM generate_series(1, ${REVIEW_COUNT}) g
+  `);
+  await db.execute(sql`ANALYZE reviews`);
+}
+
 describe("hot read paths use indexes", () => {
   beforeAll(async () => {
     await truncateAll(db);
     await seedRealisticCorpus(db);
     await seedHouseShelfSample(db);
+    await seedReviewCorpus(db);
   }, 120_000);
 
   // `teams` is deliberately not asserted here: at this corpus size, the planner's genuine
@@ -548,6 +587,81 @@ describe("hot read paths use indexes", () => {
         .where(inArray(rosterSlots.teamId, ["tm1_1", "tm1_2"])),
     );
     expect(planUsesSeqScanOn(plan, "roster_slots")).toBe(false);
+  });
+
+  /**
+   * PHASE 3.6, TASK 4 — THE FRONT DOOR'S OWN THREE READS. Unauthenticated, hit on every visit,
+   * so each one is measured here rather than trusted to be cheap because the corpus is small.
+   *
+   * `leaguesFilledQuery` (`@/league-service/proof`) MEASURES AS TWO SEQUENTIAL SCANS, and this is
+   * the correct plan, not a missing index: `DRAFTED_STATUSES` (`'in_progress'`/`'complete'`)
+   * matches ~90% of this corpus's `drafts` (`DRAFT_SCHEDULED_INTERVAL`'s own docblock, `@/db/
+   * test-corpus`), and the season window (`LEAGUE_CONFIG.season.startedAt`) matches EVERY league
+   * `seedRealisticCorpus` seeds — every row created within the last `LEAGUE_COUNT` minutes, and
+   * the season boundary in this deployment's single-season history is months wide. Neither
+   * predicate is selective, so no index — existing or new — narrows either side of the join to
+   * fewer rows than a sequential scan already reads; a bitmap index scan over ~90% of a table
+   * costs strictly MORE than reading it in physical order, which is exactly what
+   * `docs/decisions/data-layer-hardening.md`'s own cost-based reasoning already establishes for
+   * `teams` above ("a user's teams are found by index" section intro). Measured at 5,008 leagues:
+   * `Aggregate -> Hash Join -> (Seq Scan on leagues, Seq Scan on drafts)`, total cost ~749,
+   * ~3.4ms wall time. THE REAL FINDING (for the report, not a silent pass): this query has no
+   * index-shaped fix, because it counts most of two tables by design. What bounds its cost as
+   * `leagues`/`drafts` grow over many seasons is not an index but a cache — see the task report.
+   */
+  it("measures the proof strip's leaguesFilled count — two genuinely unselective sequential scans, not a missing index", async () => {
+    const plan = await explainPlan(db, leaguesFilledQuery(db));
+    expect(nodeTypes(plan)).toContain("Aggregate");
+    expect(nodeTypes(plan)).toContain("Hash Join");
+    expect([...sequentiallyScannedRelations(plan)].sort()).toEqual(["drafts", "leagues"]);
+    // The mutation proof, inverted from this file's usual shape: if EITHER side ever measures as
+    // an index scan instead, this corpus's own selectivity assumption (stated above) has
+    // silently stopped holding, and that is worth learning about explicitly.
+    const filterNode = findNode(plan, (node) => node["Relation Name"] === "drafts");
+    expect(filterNode?.Filter).toContain("status");
+  });
+
+  /**
+   * `draftsNext48hQuery` (`@/league-service/proof`) is the SELECTIVE one of the three, and BOTH
+   * halves of the brief's own claim ("served by indexes that exist: `drafts_status_idx`, the
+   * browse index") measure true: `'scheduled'` status narrowed to a 48-hour `kickoff_at` band is
+   * the identical composite seek `dueDraftsQuery`'s own measured assertion above already proves
+   * `drafts_status_idx` serves (a narrower band of the same index, same two-predicate `Index
+   * Cond`), and `ENFORCED_LEAGUE_SQL`'s `is_public_matchmade = true` reaches `leagues` through
+   * `leagues_public_browse_idx` — the SAME partial index `browseQuery` leads every plan with,
+   * because this query's own `WHERE` matches that index's partial predicate exactly. Measured:
+   * `Aggregate -> Hash Join -> (Index Scan using leagues_public_browse_idx, Bitmap Heap Scan on
+   * drafts via Bitmap Index Scan on drafts_status_idx)`.
+   */
+  it("the proof strip's draftsNext48h scan seeks on drafts_status_idx and leagues_public_browse_idx, never a sequential scan of either table", async () => {
+    const plan = await explainPlan(db, draftsNext48hQuery(db, new Date()));
+    expect(sequentiallyScannedRelations(plan)).toEqual([]);
+    const draftsIndex = indexScanNode(plan, "drafts_status_idx");
+    expect(draftsIndex).toBeDefined();
+    expect(draftsIndex?.["Index Cond"]).toContain("status");
+    expect(draftsIndex?.["Index Cond"]).toContain("kickoff_at");
+    expect(indexScanNode(plan, "leagues_public_browse_idx")).toBeDefined();
+  });
+
+  /**
+   * `reviewAggregateQuery` (`@/review-service/reviews`) MEASURES AS A SEQUENTIAL SCAN OF
+   * `reviews`, and — the same reasoning as `leaguesFilledQuery` above — this is correct, not a
+   * gap: `removed_at IS NULL` matches ~99% of this corpus (`REMOVED_REVIEW_INTERVAL` = 1 in 100,
+   * the same "small realistic fraction of a rare state" ratio `test-corpus.ts`'s own
+   * `OPEN_FLAG_INTERVAL` uses), so `reviews_feed_idx` — partial on that identical predicate —
+   * would return nearly the whole table through a bitmap scan, strictly more expensive than
+   * reading it sequentially. Measured at 5,000 reviews: `Aggregate -> Seq Scan on reviews
+   * (Filter: removed_at IS NULL)`, cost ~182, ~0.7ms. Unlike the other two, this table's own
+   * growth is naturally bounded — `reviews_user_idx` is UNIQUE per account, so its ceiling is the
+   * platform's user count, never an unbounded per-visit or per-league table — which is why this
+   * one is NOT flagged as a caching concern in the task report the way `leaguesFilledQuery` is.
+   */
+  it("measures the proof strip's rating aggregate — a genuinely unselective sequential scan of reviews, not a missing index", async () => {
+    const plan = await explainPlan(db, reviewAggregateQuery(db));
+    expect(nodeTypes(plan)).toContain("Aggregate");
+    expect(sequentiallyScannedRelations(plan)).toEqual(["reviews"]);
+    const scan = findNode(plan, (node) => node["Relation Name"] === "reviews");
+    expect(scan?.Filter).toContain("removed_at");
   });
 });
 

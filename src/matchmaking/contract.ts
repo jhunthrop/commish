@@ -129,3 +129,31 @@ export interface BrowseBody {
    *  docblock on `PublicLeagueSummary`. */
   readonly house: readonly PublicLeagueSummary[];
 }
+
+/**
+ * The front door's proof strip (Phase 3.6, Task 4): three numbers a stranger can check, each
+ * gated behind its own credibility floor (`MATCHMAKING_CONFIG.proof.floors`) and produced by
+ * `proofStats` (`@/league-service/proof`).
+ *
+ * EVERY FIELD IS NULLABLE, AND NULL MEANS "DO NOT RENDER THIS ROW" — never a placeholder, never
+ * a rounded-up substitute, never "coming soon". `any` is the strip's own visibility switch: false
+ * exactly when every one of the three is null, so a page never has to re-derive "is there
+ * anything to show" from the three fields itself and risk disagreeing with how each one was
+ * decided.
+ */
+export interface ProofStats {
+  /** Leagues whose draft has actually run (`in_progress` or `complete`) this season — never a
+   *  league merely full and waiting, and never a league from a prior season. `null` below
+   *  `MATCHMAKING_CONFIG.proof.floors.leaguesFilled`. */
+  readonly leaguesFilled: number | null;
+  /** Scheduled drafts a visitor could still join in the next 48 hours, over public leagues only
+   *  (`ENFORCED_LEAGUE_SQL`) — a private league's calendar is never disclosed in aggregate.
+   *  `null` below `MATCHMAKING_CONFIG.proof.floors.draftsNext48h`. */
+  readonly draftsNext48h: number | null;
+  /** The review average, always beside its own count — an average with no `n` is a slogan, not
+   *  a stat. `null` below `MATCHMAKING_CONFIG.proof.floors.reviewCount`, average and count
+   *  together or not at all. */
+  readonly rating: { readonly average: number; readonly count: number } | null;
+  /** `false` exactly when every field above is `null` — the strip's own render switch. */
+  readonly any: boolean;
+}

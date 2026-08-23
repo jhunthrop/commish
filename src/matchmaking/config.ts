@@ -62,6 +62,22 @@ export const MATCHMAKING_CONFIG = {
    * notice to land and a tab to open, short enough that nobody who is present feels stalled.
    */
   sitAndGo: { graceSeconds: 300 },
+  /**
+   * Phase 3.6, Task 4: the front door's proof strip — three numbers a stranger can check, each
+   * hidden below its own credibility floor rather than printed small (`proofStats`,
+   * `@/league-service/proof`). Founder ruling: no fabricated number, no placeholder, no
+   * rounded-up substitute — a stat that has not earned belief yet is absent, not dressed up.
+   */
+  proof: {
+    floors: {
+      /** Below this, "N leagues filled this season" reads as a startup counting its friends. */
+      leaguesFilled: 25,
+      /** Below this, "drafts in the next 48 hours" is a schedule, not a signal. */
+      draftsNext48h: 3,
+      /** Below this, an average rating is one person's mood. */
+      reviewCount: 20,
+    },
+  },
 } as const;
 
 /**

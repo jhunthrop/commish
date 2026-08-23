@@ -67,4 +67,16 @@ export const LEAGUE_CONFIG = {
    * small number of interactions by accepting defaults. Asserted in Task 10.
    */
   maxCreateInteractions: 3,
+  /**
+   * Phase 3.6, Task 4: THE ONE PLACE "this season" means a specific instant. Every league on
+   * this platform today belongs to the single season that started on this date — there is no
+   * season-rollover mechanic yet (`leagues.season_completed_at`'s own docblock in `@/db/schema`:
+   * no league here has finished one), so this is a fixed boundary, not a computed one. `proofStats`
+   * (`@/league-service/proof`) reads it to decide whether "N leagues filled this season" counts a
+   * given league; nothing else may re-derive "this season" from `now()`, a league's own age, or
+   * an NFL calendar rule. When season rollover ships, this becomes the field that rolls.
+   */
+  season: {
+    startedAt: "2026-08-01T00:00:00.000Z",
+  },
 } as const;

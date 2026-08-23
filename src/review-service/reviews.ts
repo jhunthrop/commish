@@ -123,6 +123,47 @@ async function ratingsFor(db: Db, ids: readonly string[]): Promise<ReadonlyMap<s
 }
 
 /**
+ * The proof strip's own aggregate (Phase 3.6, Task 4 — `proofStats`, `@/league-service/proof`):
+ * the average rating and how many reviews it is built from, over exactly the reviews the feed
+ * itself would ever show. Same `removed_at IS NULL` filter `feedQuery` applies, so a removed
+ * review can never nudge the number a stranger reads on the front door — respected exactly, not
+ * re-derived, because `reviews_feed_idx` (`@/db/schema`) is partial on that identical predicate.
+ *
+ * Exported as a builder, not just run inline, mirroring `feedQuery` above — `src/db/
+ * index-plans.test.ts` EXPLAINs this exact statement rather than a hand copy that could drift.
+ *
+ * `avg(...)::float8`, not the bare `numeric` Postgres would otherwise hand back: postgres-js
+ * returns a `numeric` column as a JS STRING to avoid silent precision loss, and a `ProofStats`
+ * field typed `number` that was actually a string would pass every `typeof` check TypeScript
+ * can see and still fail the first `toFixed`/arithmetic a caller ran on it. Casting in SQL, not
+ * in application code, is what keeps `reviewAggregate` honest about the type it hands back.
+ */
+export function reviewAggregateQuery(db: Db) {
+  return db
+    .select({ average: sql<number | null>`avg(${reviews.rating})::float8`, count: sql<number>`count(*)::int` })
+    .from(reviews)
+    .where(isNull(reviews.removedAt));
+}
+
+export interface ReviewAggregate {
+  readonly average: number;
+  readonly count: number;
+}
+
+/**
+ * `average` is `0` only alongside `count: 0` — Postgres' own `avg()` returns `NULL` over zero
+ * rows, and this is the one place that `NULL` is turned into a number a caller can do arithmetic
+ * on without a null check. `proofStats` never actually renders this branch (it gates on `count`
+ * against `MATCHMAKING_CONFIG.proof.floors.reviewCount` first, and that floor is well above
+ * zero), but this function has exactly one caller today and no reason to hand back a type its
+ * own interface disowns.
+ */
+export async function reviewAggregate(db: Db): Promise<ReviewAggregate> {
+  const [row] = await reviewAggregateQuery(db);
+  return { average: row?.average ?? 0, count: row?.count ?? 0 };
+}
+
+/**
  * The verified badge's own read, batched over `userIds`' DISTINCT values — one query for the
  * whole page, never one per review, the same shape `listLeagueActivity`'s three batched name
  * lookups use (`@/integrity-service/activity`) and the same reason `ratingsFor` above is its own
