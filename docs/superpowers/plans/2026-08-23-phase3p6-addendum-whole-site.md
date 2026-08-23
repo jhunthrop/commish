@@ -495,7 +495,7 @@ it("says how much history it keeps, rather than implying it keeps all of it", ()
 
 - [ ] **Step 2: The room's shape**
 
-Full-bleed under `AppShell`, two columns at `lg` and one below: **who you are** (crest-scale `Avatar`, `ProfileForm`, `AvatarPicker`) beside **how the product treats you** (`HelpLevelForm`, `NotificationSummary`, `StandingPanel`), with **what you told the world** (`ReviewComposer` plus the link to the public feed) below both, at measured-paragraph width because it contains prose somebody writes.
+Full-bleed under `AppShell`, two columns at `lg` and one below: **who you are** (crest-scale `Avatar`, `ProfileForm`, `AvatarPicker`) beside **how the product treats you** (`HelpLevelForm`, `NotificationSummary`, `StandingPanel`, and **the theme switcher** — the control the founder's both-themes ruling of 2026-08-23 makes real: a three-way choice over the existing `useTheme` (`system | light | dark`), rendered as a segmented control with the current resolution stated in words ("Matching your device, which is dark right now"), persisted where `ThemeProvider` already persists, and tested in both themes like everything else), with **what you told the world** (`ReviewComposer` plus the link to the public feed) below both, at measured-paragraph width because it contains prose somebody writes.
 
 - [ ] **Step 3: The account facts, stated and not invented**
 

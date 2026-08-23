@@ -4,7 +4,7 @@
 
 **Goal:** The founder rejected the web frontend outright: *"the web frontend isn't close to what I expect. The UX does not meet my standards at all."* The bar, verbatim and binding: *"It should feel like the most premium experience in the fantasy world. It should be sleek, modern, and beautifully simplistic but have high information density. It should maximize full screen width and be responsive. It should have the most efficient workflows possible and make the site a true joy to use. People should leave our app and say that's the best app I've ever seen or used."* Four pain points were named: visual design, layout and navigation, no wow or energy, feels like a prototype. This plan implements the three founder-approved v2 mockups across the product, and it ships the two pieces of **product logic** the mockups' promises depend on: a draft that never fires below a full room, and a proof strip that renders only real numbers.
 
-**Architecture:** Six strands. **(1) One palette, retoned, not a second design system.** `src/design/tokens.ts` stays the only file in the repo with a color literal; v2 is a *retone* of the roles that already exist plus new roles the mocks genuinely need, and the theme axis collapses to one committed look. **(2) A shell, at last.** Today every signed-in page hand-rolls `AppHeader` plus `max-w-4xl`, which is why the product reads as a document and not as a place; v2 is a 64px league rail plus a state-bearing top bar plus a full-bleed content column, rendered once in `AppShell` and consumed by every page under `/app`. **(3) Density is primitives, not utility soup.** Every repeated shape in the three mocks (the panel with an uppercase header and a right-aligned note, the crest, the seat meter, the state pill, the meter bar, the dense table) becomes a primitive in `src/components/ui/` the first time it appears in two places, per the founder's centralization rule, and the existing consumer is refactored onto it in the same commit. **(4) The screens land in founder-priority order:** Front Door, join flow and Waiting Room, Locker Room, league space, draft room. **(5) Roll until full is server-side truth.** `autoStartDueDrafts` today starts any public matchmade draft whose kickoff has passed with as few as two seated teams; the founder's ruling is that no draft ever fires below a full room, so the platform door grows a fullness precondition, an unfilled target **rolls forward** with a guarded write, every seat is told, and a member who no longer wants to wait may **release the seat**, which is what keeps the roll humane instead of a trap. **(6) Every number on the front door is a query or it is not on the page.** Three proof stats, three credibility floors, and a row that hides rather than a number that flatters.
+**Architecture:** Six strands. **(1) One palette, retoned, not a second design system.** `src/design/tokens.ts` stays the only file in the repo with a color literal; v2 is a *retone* of the roles that already exist plus new roles the mocks genuinely need, in BOTH themes: dark is the flagship identity per the approved mocks, and light is designed to the same roles and thresholds (founder ruling, 2026-08-23; ruling 1 as revised). **(2) A shell, at last.** Today every signed-in page hand-rolls `AppHeader` plus `max-w-4xl`, which is why the product reads as a document and not as a place; v2 is a 64px league rail plus a state-bearing top bar plus a full-bleed content column, rendered once in `AppShell` and consumed by every page under `/app`. **(3) Density is primitives, not utility soup.** Every repeated shape in the three mocks (the panel with an uppercase header and a right-aligned note, the crest, the seat meter, the state pill, the meter bar, the dense table) becomes a primitive in `src/components/ui/` the first time it appears in two places, per the founder's centralization rule, and the existing consumer is refactored onto it in the same commit. **(4) The screens land in founder-priority order:** Front Door, join flow and Waiting Room, Locker Room, league space, draft room. **(5) Roll until full is server-side truth.** `autoStartDueDrafts` today starts any public matchmade draft whose kickoff has passed with as few as two seated teams; the founder's ruling is that no draft ever fires below a full room, so the platform door grows a fullness precondition, an unfilled target **rolls forward** with a guarded write, every seat is told, and a member who no longer wants to wait may **release the seat**, which is what keeps the roll humane instead of a trap. **(6) Every number on the front door is a query or it is not on the page.** Three proof stats, three credibility floors, and a row that hides rather than a number that flatters.
 
 **Tech Stack:** Unchanged. TypeScript strict · Next.js 15 App Router · React 19 · Drizzle ORM over Postgres 17 (`drizzle-orm/postgres-js`) through PgBouncer in transaction mode · Redis 7 (Streams → SSE) · WorkOS AuthKit · Zod v4 · Vitest + happy-dom + @testing-library/react + vitest-axe · Playwright. **This plan adds no dependency and removes one font** (`Barlow_Condensed`, ruling 6).
 
@@ -49,7 +49,7 @@ Every task's requirements implicitly include this section. Values are copied ver
 
 - **No raw hex, no raw px, no arbitrary values in feature code.** `src/design/tokens.ts` is the only file in the repo allowed to contain a color literal. **This survives v2 unchanged and is the single most load-bearing rule in this plan** — the three mocks are 900 lines of raw hex between them, and every one of those values lands in `tokens.ts` or it does not land.
 - **Never a dead end.** Empty and error states always offer an action (`StatePanelProps.action` is required, not optional). **This plan's hardest cases are the race loser** (the seat was taken while they were signing in) and **the rolled draft** (the night they planned for is not happening), and each gets a real action rather than an apology.
-- **Both themes are first-class.** **This plan overturns that rule, deliberately and with the argument written down** (ruling 1). It is the only rule in this document that v2 repeals.
+- **Both themes are first-class.** **The founder reaffirmed this rule directly on 2026-08-23**, overturning this plan's original dark-only ruling: dark is the flagship identity per the approved mocks, and light is DESIGNED to the same twenty roles and the same thresholds, never derived by inversion (ruling 1, as revised).
 - **Mobile-first**, minimum viewport 360px. WCAG 2.2 AA.
 - **Copy.** Plain language, active voice, specific. Errors say what happened and what to do next.
 - **`Icon` is the one icon entry point.** Feature code never imports `lucide-react` directly. The eighteen `IconName`s: `trophy`, `users`, `clock`, `alert-triangle`, `inbox`, `refresh-cw`, `check`, `x`, `chevron-right`, `search`, `info`, `shield`, `flame`, `anchor`, `rocket`, `crown`, `bolt`, `clover`. **This plan adds exactly one** (ruling 22): `plus`, for the rail's "join or create another league" control, which has no honest spelling among the eighteen.
@@ -113,7 +113,7 @@ Checked against this worktree at `9437486` (Phase 3.5 base plus the house addend
 | `meter.tsx` | `Meter` — a value bar with a label pair (fill progress, score margin). Never a bare bar: the number is always beside it. |
 | `stat-pill.tsx` | `StatPill` — LIVE / FINAL / FIX LINEUP, the tone-carrying state chip. |
 
-**Modified — the design system:** `src/design/tokens.ts` (the v2 palette, new roles, the dense type scale, retired light palette), `src/design/generate-css.ts` + `tokens.css` (one theme block, a responsive type block), `src/design/tokens.test.ts`, `src/design/test-support.ts`, `src/design/theme-provider.tsx` (**deleted**), `src/app/globals.css`, `src/app/layout.tsx` (fonts), `src/components/ui/test-utils.tsx` (`inBothThemes` → `renderSurface`), `src/components/ui/config.ts`, `src/components/ui/index.ts`, `badge.tsx`, `table.tsx`, `countdown.tsx`, `icon.tsx`, `card.tsx`, `page-title.tsx`, `state-panel.tsx`.
+**Modified — the design system:** `src/design/tokens.ts` (the v2 palettes, BOTH themes — dark per the mocks, light designed to the same roles per the founder's 2026-08-23 ruling — new roles, the dense type scale), `src/design/generate-css.ts` + `tokens.css` (both theme blocks with per-theme `color-scheme`, a responsive type block), `src/design/tokens.test.ts` (contrast assertions parameterized over both palettes), `src/design/test-support.ts`, `src/design/theme-provider.tsx` (**kept**, per the revised ruling 1), `src/app/globals.css`, `src/app/layout.tsx` (fonts), `src/components/ui/test-utils.tsx` (`inBothThemes` → `renderSurface`, both-theme semantics preserved), `src/components/ui/config.ts`, `src/components/ui/index.ts`, `badge.tsx`, `table.tsx`, `countdown.tsx`, `icon.tsx`, `card.tsx`, `page-title.tsx`, `state-panel.tsx`.
 
 **Modified — the shell:** `src/components/app-shell/app-header.tsx` (becomes `top-bar.tsx`), plus new `app-shell.tsx`, `league-rail.tsx`, `shell-data.ts` and the new route-group layout `src/app/app/(shell)/layout.tsx`; every `page.tsx` under `src/app/app/**` (eleven of them, nine of which move into the `(shell)` group) plus `src/app/browse/page.tsx`, `src/app/reviews/page.tsx` and `src/app/page.tsx`.
 
@@ -139,7 +139,7 @@ The retone lands first because everything after it renders in it. This task chan
 
 **Files:**
 - Modify: `src/design/tokens.ts` (+ `tokens.test.ts`), `src/design/generate-css.ts` (+ its test), `src/design/tokens.css` (generated), `src/design/test-support.ts`, `src/app/globals.css`, `src/app/layout.tsx`
-- Delete: `src/design/theme-provider.tsx`, `src/design/theme-provider.test.tsx`
+- Keep (revised ruling 1): `src/design/theme-provider.tsx`, `src/design/theme-provider.test.tsx` — both stay; the addendum's Task 18 ships the switcher that makes the choice real
 - Modify: `src/components/ui/test-utils.tsx` and every `*.test.tsx` that calls `inBothThemes` (100 files, mechanical)
 - Modify: `docs/design-system.md`
 
@@ -179,9 +179,13 @@ it("prints a readable label on every fill that carries one", () => {
   expect(contrastRatio(TOKENS.color.negativeText, TOKENS.color.negative)).toBeGreaterThanOrEqual(4.5);
 });
 
-it("has exactly one palette, so no surface can exist in a theme nobody designed", () => {
-  expect(Object.keys(TOKENS.color).sort()).toEqual([...COLOR_ROLES].sort());
-  expect(TOKENS).not.toHaveProperty("color.light");
+it("carries the same twenty roles in both palettes, so no surface can exist in a theme nobody designed", () => {
+  // REVISED (founder both-themes ruling, 2026-08-23): two palettes, one role set, and every
+  // contrast assertion in this file runs against EACH palette. A role present in one palette
+  // and missing from the other is a color that silently stops responding to the theme.
+  for (const theme of ["light", "dark"] as const) {
+    expect(Object.keys(TOKENS.color[theme]).sort()).toEqual([...COLOR_ROLES].sort());
+  }
 });
 ```
 
@@ -239,9 +243,9 @@ font: {
 
 **`xs` is for letter-spaced uppercase eyebrows only, never a sentence.** That rule joins `docs/design-system.md` beside the display-face rule it resembles.
 
-- [ ] **Step 4: One theme, and the 100 files that stop pretending otherwise**
+- [ ] **Step 4: Two themes, one harness — REVISED by the founder's both-themes ruling (2026-08-23)**
 
-`ThemeProvider` and its test are **deleted**, `layout.tsx` stops rendering it, `renderTokensCss` emits one `:root` block with no `[data-theme]` selector and no `prefers-color-scheme` block, and `inBothThemes` becomes:
+`ThemeProvider` and its test are **KEPT**, `layout.tsx` keeps rendering it, and `renderTokensCss` keeps emitting both theme blocks with their `[data-theme]` guards and the `prefers-color-scheme` structure, now with `color-scheme` emitted per theme. `inBothThemes` is renamed to `renderSurface` with its both-theme semantics preserved — the helper renders the ui once per theme (stamping `data-theme` exactly as today) and runs the assert against each render, so the theme loop lives inside the harness and no call site carries it:
 
 ```tsx
 /** Renders once, in the product's one theme, and unmounts. */
@@ -1369,7 +1373,7 @@ A single spec walks front door → card → hold → sign-in → waiting room �
 
 - [ ] **Step 4: Contrast, in a real browser**
 
-Component tests run without a stylesheet, so `tokens.test.ts` proves the numbers and a Playwright pass proves the pairings actually shipped: a scripted axe run with the color-contrast rule enabled on each of the nine surfaces. This is the check the design-system doc has been promising since Phase 1 ("browser-based visual contrast checks land with the e2e plan").
+Component tests run without a stylesheet, so `tokens.test.ts` proves the numbers and a Playwright pass proves the pairings actually shipped: a scripted axe run with the color-contrast rule enabled on each of the nine surfaces, **run in BOTH themes** (stamp `data-theme` per pass — the founder's both-themes ruling makes the light pairings as load-bearing as the dark ones). This is the check the design-system doc has been promising since Phase 1 ("browser-based visual contrast checks land with the e2e plan").
 
 - [ ] **Step 5: Reduced motion**
 
@@ -1421,7 +1425,7 @@ Not a mockup review this time: the six personas from the two existing panels (ve
 
 ## Open questions, self-ruled
 
-1. **v2 ships as ONE committed theme, dark, and the light palette is deleted rather than left to rot.** Three facts decide it. **(a) Nobody can choose today.** `useTheme` has zero consumers outside its own file: there is no theme switcher in this product, so "both themes are first-class" currently means "the OS picks one of two looks, and only one of them was ever designed." **(b) The approved direction is dark.** All three mockups are dark-first and the founder approved them as the identity, not as a variant; a light theme derived from them by an engineer at 2am is precisely the "feels like a prototype" surface this phase exists to delete. **(c) The codebase has a rule for this exact shape.** A control wired to nothing has been refused five times here; a second palette nobody designed, nobody approved and nobody can select is that control with a color picker on it. This is wrong if a meaningful share of users would abandon a dark-only product, which no evidence in this repo suggests and which the entire premium tier of this category contradicts. **The reversal cost is deliberately kept low:** `TOKENS.color` stays one shape, `generate-css.ts` keeps emitting from it, and re-introducing a second palette later is the same diff run backwards.
+1. **v2 ships BOTH themes, and the light palette is designed rather than inherited — REVISED by direct founder ruling, 2026-08-23.** This plan originally ruled dark-only (the mocks are dark, no switcher existed, an undesigned light palette is a control wired to nothing). The founder overruled it: the product's core moment is Sunday afternoon in bright rooms, OS-light users deserve their preference respected, and the no-MVP directive's end state has both. The revised shape: **dark is the flagship identity**, exactly the mocks; **light is designed at the token level** to the same twenty roles and the same contrast thresholds (the v2 cool hue bias translated to a near-white ground, the same green family re-derived for light surfaces — never a naive inversion); every contrast test in Task 1 **parameterizes over both palettes** and the token moves, never the threshold; `ThemeProvider` and the both-theme test harness (renamed `renderSurface`, semantics preserved: render per theme, assert each) are KEPT; the "control wired to nothing" objection dies because Task 18 of the addendum ships the real theme switcher in the account room, with OS preference respected from this task forward. **The founder approves a light mock rendered from the shipped light tokens before later tasks apply the light look broadly**; token adjustments from that approval are cheap because they are role-level.
 
 2. **The token roles are RETONED, not forked, and `border` is renamed to `line`.** One `tokens.ts`, one `ColorRole` union, one generated stylesheet. The rename is deliberate churn: v2 needs two boundary concepts (a decorative hairline at 1.26:1 and an interactive edge at 3:1), and leaving the old name on the decorative one would have every future `border-border` quietly failing WCAG 1.4.11 on a control. A compile error at 200 call sites is the cheapest possible way to ask that question once.
 
