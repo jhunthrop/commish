@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DRAFT_ACTION_VERSION, type DraftAction, type SetQueueAction } from "@/domain/draft";
-import { AUCTION_CONFIG, DRAFT_QUEUE_CONFIG, DRAFT_SKIP_POLICY, PERSISTED_QUEUE_MAX } from "./config";
+import { AUCTION_CONFIG, DRAFT_QUEUE_CONFIG, PERSISTED_QUEUE_MAX } from "./config";
 
 const version = z.literal(DRAFT_ACTION_VERSION);
 // A strict ISO 8601 datetime (not just any non-empty string) so a malformed stamp can't
@@ -16,15 +16,28 @@ const poolEntry = z.object({
   position: z.enum(["QB", "RB", "WR", "TE", "K", "DEF"]),
 });
 
-// Defaults for logs persisted before Task 5 existed — the one place today's tunable may reach
-// an old draft's replay, and only for those legacy rows (a log written from here on always
-// carries its own value, the same discipline `minBid` below already keeps).
+/**
+ * ABSENT MEANS "NO SKIPPING", not "today's allowance" (final whole-branch review, F3).
+ *
+ * This shipped as `.default(DRAFT_SKIP_POLICY)` — and unlike `minBid` below, where a default is
+ * harmless because a snake draft never reads it and an auction's opening price was the same
+ * number then as now, this one CHANGES WHAT REPLAY PRODUCES. `reduceSnakeExpiry`
+ * (`./snake.ts`) folds a `TIMER_EXPIRE` into either an autopick or a skip depending on this
+ * value, so handing a pre-Task-5 log today's tunable replays a queueless team at a slow tier as
+ * a SKIP where the live draft autopicked — a reconstructed roster that disagrees with the one
+ * actually committed, and a drift that grows every time the tunable is edited.
+ *
+ * `.optional()` sends those legacy rows down the branch `skipEligible` already has for them
+ * (`state.config.skipPolicy ?? null` -> no skip, autopick as before), which was correct and
+ * unreachable until this fix. A log written from here on always carries its own value, so this
+ * branch only ever describes history.
+ */
 const skipPolicy = z
   .object({
     maxOwedPerTeam: z.number().int().positive(),
     appliesAtOrAbovePickSeconds: z.number().int().positive(),
   })
-  .default(DRAFT_SKIP_POLICY);
+  .optional();
 
 /**
  * The persisted-row boundary. `draft_actions.action` is jsonb written by an earlier

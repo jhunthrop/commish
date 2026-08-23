@@ -31,6 +31,12 @@ export interface DraftConfig {
    * `DraftSkipPolicy` docblock explains the asymmetry in full). Null before `START_DRAFT` runs;
    * every hand-written `DraftConfig` literal in this engine's own test suite that never drives a
    * real START_DRAFT can leave it absent, the same allowance `pauseWindow` already gets.
+   *
+   * AND absent AFTER `START_DRAFT` too, for a log that predates Task 5 (final whole-branch review,
+   * F3): `StartDraftAction.skipPolicy` is optional at the persisted-row boundary, so `reduceStart`
+   * copies `undefined` through and `skipEligible`'s `?? null` path takes the no-skip branch — which
+   * is what those drafts actually did. That branch used to be unreachable in production, because
+   * the schema defaulted the field to TODAY's tunable.
    */
   readonly skipPolicy?: DraftSkipPolicy | null;
 }

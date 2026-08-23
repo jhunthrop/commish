@@ -76,7 +76,7 @@ Checked against this worktree at `9437486` (Phase 3.5 base plus the house addend
 
 | The mockups assume | Reality in the code today |
 |---|---|
-| There is a shell to put a rail into | **There is not.** Every page under `/app` hand-renders `<AppHeader …/>` plus `<main className="mx-auto … max-w-4xl p-4">` itself (`src/app/app/page.tsx:49-58` is the pattern, repeated across all fifteen `page.tsx` files). `AppHeader` is a single centered 896px row. There is no layout file below `src/app/layout.tsx`, no shell component, and no place a league rail could live without being pasted fifteen times. Task 2 is therefore not a reskin, it is the first shell this product has had. |
+| There is a shell to put a rail into | **There is not.** Every page under `/app` hand-renders `<AppHeader …/>` plus `<main className="mx-auto … max-w-4xl p-4">` itself (`src/app/app/page.tsx:49-58` is the pattern, repeated across all eleven `page.tsx` files under `/app` and, in its public form, across the three outside it). `AppHeader` is a single centered 896px row. There is no layout file below `src/app/layout.tsx`, no shell component, and no place a league rail could live without being pasted eleven times. Task 2 is therefore not a reskin, it is the first shell this product has had. |
 | The product can be dark | **It can be dark and light, and nobody can choose.** `ThemeProvider` manages `system \| light \| dark` and stamps `data-theme`, but **`useTheme` has zero consumers outside its own file and test** — there is no theme switcher anywhere in the product. The only thing that selects a theme today is the OS. Ruling 1 turns on that fact. |
 | Both-theme test coverage will be expensive to unwind | **It is 331 calls across 100 files, and not one of them uses the theme argument.** `inBothThemes(ui, assert)` passes `(r, theme)`; a grep for a call site that reads the second parameter returns nothing outside the helper's own definition. The collapse is therefore a rename, compiler-enforced. |
 | The board can show a live "moment" and a win probability | **Neither exists and one of them cannot exist yet.** There is no play-by-play feed, no per-player game state on the wire (`MatchupSummary` carries `homeScore`/`awayScore`/`final`/`weekStatus` and nothing per player), and no projection or win-probability model anywhere in `src/`. Deferrals D1, D2 and D3 rule all three out with the data fact that would have to change first. |
@@ -115,7 +115,7 @@ Checked against this worktree at `9437486` (Phase 3.5 base plus the house addend
 
 **Modified — the design system:** `src/design/tokens.ts` (the v2 palette, new roles, the dense type scale, retired light palette), `src/design/generate-css.ts` + `tokens.css` (one theme block, a responsive type block), `src/design/tokens.test.ts`, `src/design/test-support.ts`, `src/design/theme-provider.tsx` (**deleted**), `src/app/globals.css`, `src/app/layout.tsx` (fonts), `src/components/ui/test-utils.tsx` (`inBothThemes` → `renderSurface`), `src/components/ui/config.ts`, `src/components/ui/index.ts`, `badge.tsx`, `table.tsx`, `countdown.tsx`, `icon.tsx`, `card.tsx`, `page-title.tsx`, `state-panel.tsx`.
 
-**Modified — the shell:** `src/components/app-shell/app-header.tsx` (becomes `top-bar.tsx`), plus new `app-shell.tsx`, `league-rail.tsx`, `shell-data.ts`; every `page.tsx` under `src/app/app/**` (ten of them) plus `src/app/browse/page.tsx`, `src/app/reviews/page.tsx` and `src/app/page.tsx`.
+**Modified — the shell:** `src/components/app-shell/app-header.tsx` (becomes `top-bar.tsx`), plus new `app-shell.tsx`, `league-rail.tsx`, `shell-data.ts` and the new route-group layout `src/app/app/(shell)/layout.tsx`; every `page.tsx` under `src/app/app/**` (eleven of them, nine of which move into the `(shell)` group) plus `src/app/browse/page.tsx`, `src/app/reviews/page.tsx` and `src/app/page.tsx`.
 
 **Modified — the lobby and the season:** `src/league-service/browse.ts`, `join.ts`, `fill-trigger.ts`, `draft-schedule.ts`, `read.ts`, `home.ts`, `src/matchmaking/contract.ts` + `config.ts` + `filter.ts`, `src/draft-service/auto-start.ts` + `ticker.ts` + `config.ts`, `src/db/schema.ts`, `src/league-room/contract.ts` and fourteen components under `src/league-room/components/**`, `src/draft-room/components/**` (retone only), `src/help/glossary.ts`.
 
@@ -276,9 +276,11 @@ A source test in `src/design/` walks every `.tsx` under `src/components`, `src/l
 The founder's "maximize full screen width" is one line of the brief and the largest single change in the plan: fifteen pages currently render their own 896px column. This task builds the frame the mocks are drawn on and moves every page into it.
 
 **Files:**
-- Create: `src/components/app-shell/app-shell.tsx`, `league-rail.tsx`, `shell-data.ts` (+ their tests)
+- Create: `src/components/app-shell/app-shell.tsx`, `league-rail.tsx`, `shell-data.ts` (+ their tests), `src/app/app/(shell)/layout.tsx` (+ its test)
 - Modify: `src/components/app-shell/app-header.tsx` → `top-bar.tsx` (+ its test), `src/league-service/read.ts` (+ its test), `src/league-room/contract.ts`
+- Move (route groups, no URL changes): the nine shell pages into `src/app/app/(shell)/**`, the draft room into `src/app/app/(room)/drafts/[draftId]/**`, the invite landing into `src/app/app/(public)/join/[code]/**`
 - Modify: every `page.tsx` under `src/app/app/**`, plus `src/app/browse/page.tsx` and `src/app/reviews/page.tsx`
+- Modify: `src/app/app/admin/admin-routes.test.ts` → `src/app/app/(shell)/admin/admin-routes.test.ts` (its path glob only, in the commit that moves the files; the gate it asserts does not move, and the addendum's Task 19 still does not edit it)
 - Modify: `src/components/ui/config.ts`, `src/components/ui/icon.tsx` (+ its test), `e2e/mobile-360.spec.ts`
 
 **Interfaces:**
@@ -297,8 +299,11 @@ it("renders one banner, one navigation and one main, so a screen reader hears a 
   });
 });
 
-it("marks the league a page belongs to as the current one, by aria-current and not by color", () => {
-  renderSurface(<AppShell {...props} currentLeagueId="lg_bandits" />, ({ getByRole }) => {
+it("marks the league the current URL belongs to, by aria-current and not by color", () => {
+  // The rail reads the path it is standing on rather than being told: `usePathname()` is the
+  // fact, and it is why the shell can live in a layout at all (ruling 8, as amended).
+  mockPathname("/app/leagues/lg_bandits/matchups/3");
+  renderSurface(<LeagueRail {...railProps} />, ({ getByRole }) => {
     expect(getByRole("link", { name: /Bay Bandits/ })).toHaveAttribute("aria-current", "page");
   });
 });
@@ -306,8 +311,9 @@ it("marks the league a page belongs to as the current one, by aria-current and n
 it("gives every crest an accessible name that is the league's real name, never its initials", () => {
   // The rail is six 40px tiles reading "BB", "TS", "GH". Initials are a VISUAL compression and
   // are meaningless read aloud; the accessible name is the league, and the state dot is words.
+  // The action half of the name is the one string COPY owns in `next-action.ts` (C2, F1).
   renderSurface(<AppShell {...props} />, ({ getByRole }) => {
-    expect(getByRole("link", { name: "Volt Kings. Needs your lineup." })).toBeInTheDocument();
+    expect(getByRole("link", { name: "Volt Kings. Fix your lineup." })).toBeInTheDocument();
   });
 });
 
@@ -319,24 +325,29 @@ it("keeps the rail reachable at 360px by becoming a horizontal strip, not by dis
 });
 ```
 
-- [ ] **Step 2: The frame**
+- [ ] **Step 2: The frame, and the layout that renders it**
+
+**Amended by the UX coherence review of 2026-08-23 (F8), which reversed ruling 8.** The shell is rendered **once, by a layout**, not by each page: a page-rendered shell means `/app/loading.tsx` suspends the rail and the top bar too, so every intra-app navigation blanks the chrome the rail exists to provide. The reason ruling 8 gave for the page-rendered version (a layout cannot receive the page's `currentLeagueId`) does not hold: `usePathname()` gives the rail the current league id on the client, which is where `aria-current` is applied anyway.
 
 ```tsx
 export interface AppShellProps {
   readonly user: { readonly displayName: string; readonly avatar: string | null; readonly isAdmin: boolean };
   readonly rail: readonly RailLeague[];
-  readonly currentLeagueId: string | null;
   /** The one live fact the top bar carries. `null` outside a game window (ruling 12). */
   readonly liveState: LiveState | null;
   readonly children: ReactNode;
 }
 ```
 
+There is no `currentLeagueId` prop. `LeagueRail` is a client component that derives the current league from `usePathname()` (every league URL is `/app/leagues/{id}…`), so the shell needs no per-page argument and a layout can own it.
+
+`src/app/app/(shell)/layout.tsx` is an async server component that calls `shellData(db, await requireCurrentUser())` and returns `<AppShell …>{children}</AppShell>`. **Three segments under `/app` render no shell at all** and therefore live in sibling route groups: the draft room (`src/app/app/(room)/drafts/[draftId]/**`) and the invite landing (`src/app/app/(public)/join/[code]/**`), with the TV board already outside `/app` at `src/app/draft/[draftId]/board`. **A route group changes no URL**, so nothing that links into `/app/drafts/…` or `/app/join/…` breaks — which is exactly the difference between this move and the route move the addendum's Task 21 rejects for the invite landing. The controller's ruling names the file `src/app/app/layout.tsx`; it lands at `src/app/app/(shell)/layout.tsx` because a route group is the only way a segment under `/app` can decline an ancestor layout, and declining it is what "the draft room renders no shell" means in App Router terms.
+
 The grid is `grid-cols-[var(--rail)_1fr]` at `lg` and a single column below it, with the rail re-sequenced above the content as a horizontal scrolling strip. The rail width, the crest size and the dense breakpoint are `UI_CONFIG.shell`, never inline. `<main>` is full-bleed with a `px` gutter from the spacing scale and **no `max-w-*` at all** — the founder's brief in one deletion. Long-form reading surfaces (the review feed, the glossary, a legal page) keep a `max-w-prose` on their own paragraph column, because a 2000px line of body text is not density, it is a defect; the rule lands in `docs/design-system.md` as **"full-bleed frames, measured paragraphs."**
 
 - [ ] **Step 3: The rail's data, once**
 
-`shellData(db, user)` returns `{ rail, liveState }` in one round trip, built on the reads `crossLeagueHome` already performs. Every page calls it; the pages that already call `crossLeagueHome` pass their result in rather than reading twice. `RailLeague` is `{ id, name, shortName, tone, state }`, where `state` is `"live" | "needs-you" | "quiet"` derived from the league's existing `nextAction` and week status — **never a colored dot with no sentence behind it**: the dot is `aria-hidden` and the state is in the link's accessible name.
+`shellData(db, user)` returns `{ rail, liveState }` in one round trip, built on the reads `crossLeagueHome` already performs. **The `(shell)` layout calls it once per navigation** (ruling 8, as amended); a page that also needs `crossLeagueHome` for its own body still reads it itself, and nothing reads the rail twice. `RailLeague` is `{ id, name, shortName, tone, state }`, where `state` is derived from `nextAction.kind` and nothing else: **`needs-you` is exactly `fix-lineup` or `join-draft`**, `live` is a league whose week is in progress, and everything else is `quiet` (F1 — before Task 10 Step 1b there is no honest `fix-lineup`, and a needs-you dot on every league every week is a dot that means nothing). **Never a colored dot with no sentence behind it**: the dot is `aria-hidden` and the state is in the link's accessible name, in the words `COPY` owns (`"Volt Kings. Fix your lineup."`).
 
 `shortName` is derived, not stored: the first letter of each of the first two words of the league name, uppercased, falling back to the first two letters of a one-word name. A derived initial cannot go stale against a renamed league, and there is no column to migrate.
 
@@ -344,9 +355,13 @@ The grid is `grid-cols-[var(--rail)_1fr]` at `lg` and a single column below it, 
 
 `AppHeader` becomes `TopBar` and keeps every control it has (wordmark, admin queue, `NoticeInbox`, profile, sign out), gains the live-state pill described in Task 10 Step 3, and stops being centered. The rename is one commit and the old name does not survive it. `e2e/mobile-360.spec.ts` asserts the header's controls are reachable at 360px; it is re-run here and updated in this commit if the structure moved.
 
-- [ ] **Step 5: Fifteen pages stop drawing their own chrome**
+- [ ] **Step 5: Fourteen pages stop drawing their own chrome**
 
-Each `page.tsx` under `/app` drops its `<AppHeader/>` and its `<main className="mx-auto … max-w-4xl">` and returns its content inside `<AppShell …>`. `/browse` and `/reviews` render the shell only when there is a user (they are reachable signed out; the signed-out header stays the slim public bar Task 5 rebuilds). The draft room and the TV board render **no shell at all** — they are rooms, `RoomRail` is their header, and two chromes stacked breaks the room's no-page-scroll contract, exactly as `AppHeader`'s docblock already says.
+**The counts, read off `src/app` in this worktree (F21):** fourteen `page.tsx` files in the product, **eleven of them under `/app`**. **Nine absorb the shell** — the locker room, `/app/leagues`, a league's home, its activity, its trades, a week's matchups, the profile, the operator queue and a flag's detail — and they absorb it by *being moved into the `(shell)` route group*, not by rendering it: each one drops its `<AppHeader/>` and its `<main className="mx-auto … max-w-4xl">` and returns its content alone, because `(shell)/layout.tsx` is now the thing that renders `AppShell` (Step 2). `/browse` and `/reviews` sit outside `/app` and render the shell themselves, only when there is a user (they are reachable signed out; the signed-out header is `PublicBar`, the addendum's Task 16, which Task 5 gives the front door's nav and CTA).
+
+**Three carve-outs render no shell at all:** the draft room, the TV board, and `/app/join/[code]`. The first two are rooms — `RoomRail` is their header, and two chromes stacked breaks the room's no-page-scroll contract, exactly as `AppHeader`'s docblock already says. The third is signed-out reachable through the middleware's exemption, so a signed-in shell around it would be chrome a stranger cannot use; it renders `PublicBar` instead, and it is the reason the addendum's Task 21 gives it its own `loading.tsx` (F7).
+
+The fourteenth page is the front door, which is the whole subject of Task 5.
 
 - [ ] **Step 6: One new icon**
 
@@ -387,6 +402,16 @@ it("names the seats in words, and hides the dots from the accessibility tree", (
 it("says how many are left only when the answer is small enough to matter", () => {
   renderSurface(<SeatMeter filled={11} total={12} />, ({ getByText }) => {
     expect(getByText("11 of 12 seated. 1 seat left.")).toBeInTheDocument();
+  });
+});
+
+it("owns the seat sentence for the whole product, held seats included", () => {
+  // F17. One seat count was being spoken three ways ("9 of 12 seated", "10 of 12 seats filled",
+  // "4 of 12 seats taken") by two primitives. THIS TEST IS THE REFERENCE: `SeatMeter` composes
+  // the sentence, every surface renders `SeatMeter`, and no caller writes a seat sentence of its
+  // own. The held clause renders only when `heldSeats > 0` and says what it knows (Task 6).
+  renderSurface(<SeatMeter filled={9} total={12} heldSeats={1} />, ({ getByText }) => {
+    expect(getByText("9 of 12 seated. 1 seat is being claimed right now.")).toBeInTheDocument();
   });
 });
 
@@ -546,11 +571,13 @@ it("links the rating to the reviews it came from, with its count beside it", () 
 });
 
 // src/league-room/components/open-league-card.test.tsx
-it("tells a when-full joiner what they are actually agreeing to", () => {
+it("tells a when-full joiner what they are actually agreeing to, in the one sentence that owns it", () => {
   // join-flow-panel.md, HIGH: "the moment it fills" is honestly distinct from a date and says
   // nothing about the commitment, which is being reachable on short notice.
+  // F9/C5: this card does not phrase the promise. `describeStartTiming` (Task 7 Step 7) does,
+  // and this card and the waiting room quote the identical string, reassurance second.
   renderSurface(<OpenLeagueCard league={whenFull} />, ({ getByText }) => {
-    expect(getByText("Drafts the moment it fills. We tell you as soon as it does, and the room opens a few minutes later.")).toBeInTheDocument();
+    expect(getByText("This one drafts the moment the last seat is taken. We tell you as soon as it fills, and the room opens a few minutes after that. You do not have to wait here.")).toBeInTheDocument();
   });
 });
 
@@ -562,6 +589,8 @@ it("says who a league is for before the button, not after the refusal", () => {
 ```
 
 - [ ] **Step 2: The hero and the three-step strip**
+
+**The header is `PublicBar`** (the addendum's Task 16), which the front door renders with its `nav` and `action` props filled in while `/reviews`, `/browse` and `/app/join/[code]` render it bare (F5). The nav is the mock's three links — **Open leagues** at `/browse`, **How it works** at `/league-rules` (the addendum's Task 21 Step 4 page; a nav item pointing at a route nobody creates is the footer-to-a-404 failure with a bigger font), **Reviews** at `/reviews` — and the action is the green **Take a seat** CTA, which points at **`/browse`**, because the shelf is where a seat is actually taken and a CTA that scrolls to a hero is a CTA that did nothing. `PublicFooter` (also Task 16, F19) closes every one of those four surfaces.
 
 The mock's hero copy, with the gauntlet's two fixes applied: the em dash in the subhead is gone (it violated the repo's own sweep), and the money question is answered in the sentence that follows. The three-step strip ships verbatim from the mock because the panel asked to keep it verbatim, minus the unverifiable "90 seconds" total, which nobody could reconstruct from the steps and which this plan therefore does not print.
 
@@ -577,6 +606,8 @@ Step 01's promise is real as of Task 6 and **this task depends on Task 6 shippin
 
 `PublicLeagueSummary` gains **two** fields, its fourteenth and fifteenth: `rosterSummary` (a derived sentence from the stored slot rows — "15 slots, 1 flex, superflex", through the existing `describeRosterShape`) and `playoffWeeks` (the two or three week numbers, already stored). Both are the same class of disclosure decision `scoringLabel` and `draftAt` already established: a fact about the league, never about a person in it. The gauntlet's veteran finding was that the card "looks premium, reads shallow", and these are the two cheapest fields that fix it because both are already in the database.
 
+**The shelf header says when its numbers were true** (F20, and the honest half of deferral D4): verbatim and asserted in this task's tests, **"Seat counts as of {time}. A seat being claimed is counted."** The `{time}` is the server render's own instant through the existing formatter, and the second sentence is what makes the first one true once Task 6 ships holds. The mock's **"Live seat counts · updated just now" is refused** and named as refused here: there is no anonymous SSE fan-out for signed-out visitors (D4), "live" would be a claim about a mechanism this product does not have, and "just now" is a claim that ages badly on a cached page.
+
 Waivers, trade deadline and dynasty are **not** added: this product has no waiver engine, no trade deadline and no keeper support, and a card field for a feature that does not exist is a lie with a label on it. The card says what the league is; `LeagueTermsPanel` (reachable before joining) says the rest.
 
 - [ ] **Step 4: The filters, and the one that is not a filter**
@@ -585,7 +616,7 @@ The mock's filter row (All, Drafting soonest, Drafts when full, Newer players, S
 
 - [ ] **Step 5: The trust surfaces the gauntlet found missing**
 
-The footer gains Terms, Privacy, Support and League rules links, and the nav gains Reviews (it exists and is real). The persona gauntlet filed the absence as MEDIUM-HIGH for the burned skeptic, and every one of those pages either exists or is a stub route this task creates with real content pointing at the operator dispute path Phase 3 Plan B shipped. **A footer link to a 404 is worse than no footer.**
+The links are Terms, Privacy, Support and League rules, and the nav gains Reviews (it exists and is real). **They live in `PublicFooter`** (the addendum's Task 16, F19), not in a footer this page writes, because the same four promises are made on `/browse`, `/reviews` and `/app/join/[code]` and a footer copy-pasted four times is the chrome duplication the addendum's Task 16 exists to end. The persona gauntlet filed the absence as MEDIUM-HIGH for the burned skeptic, and every one of those pages either exists or is a stub route this task creates with real content pointing at the operator dispute path Phase 3 Plan B shipped, filled in by the addendum's Task 21 Step 4. **A footer link to a 404 is worse than no footer**, and the assertion that every footer target resolves belongs to `PublicFooter`'s own test in Task 16 rather than to the page that happens to render it (F19).
 
 - [ ] **Step 6: Persona panel — the stranger at the door**
 
@@ -606,7 +637,7 @@ Three states the mocks promise and the product cannot currently reach. All three
 - Modify: `src/db/schema.ts`, `src/league-service/join.ts` (+ its test), `src/league-service/browse.ts` (+ its test), `src/matchmaking/contract.ts` + `config.ts` + `filter.ts` (+ their tests), `src/integrity-service/lock-order.test.ts`, `src/integrity/rendered-copy.test.tsx`
 
 **Interfaces:**
-- Consumes: `joinLeagueInTx`, `hasOpenSeat`, `tierJoinPrecondition`, `ENFORCEMENT_REFUSALS`, `Clock`.
+- Consumes: `joinLeagueInTx`, `hasOpenSeat`, `tierJoinPrecondition`, `ENFORCEMENT_REFUSALS`, `Clock`, `SignInLink` (`src/components/app-shell/sign-in-link.tsx`, the addendum's Task 16 — this task cannot return a visitor to their held seat without it, which is why the combined order runs A16 before P6).
 - Produces: `claimSeatHold`, `consumeSeatHoldInTx`, `liveHoldsFor`, `SEAT_HOLD`, `SEAT_HOLD_REFUSALS`, `PublicLeagueSummary.heldSeats`, `seat_holds`.
 
 - [ ] **Step 1: Write the failing hold tests**
@@ -654,6 +685,26 @@ it("writes nothing at all on every refusal path", async () => {
   for (const call of everyRefusalPath()) await call();
   await expectNoSeatHoldTookPlace(db, before);
 });
+
+// The return: the moment nobody designed until F4 (Step 4's fourth screen).
+it("seats the visitor who comes back from sign-in still holding a live token", async () => {
+  await claimSeatHold(db, { leagueId, token: "hold_a", now: NOW });
+  expect(await returnFromSignIn(db, { leagueId, userId: "u_alice", holdToken: "hold_a", now: NOW }))
+    .toMatchObject({ ok: true, seated: true, justSeated: true });
+});
+
+it("still seats somebody whose hold expired while a seat is open, and says the hold ran out", async () => {
+  await claimSeatHold(db, { leagueId, token: "hold_a", now: NOW });
+  const late = plusMinutes(NOW, SEAT_HOLD.minutes + 2);
+  expect(await returnFromSignIn(db, { leagueId, userId: "u_alice", holdToken: "hold_a", now: late }))
+    .toMatchObject({ ok: true, seated: true, expiredHold: true });
+});
+
+it("shows the race loser the taken panel rather than a refusal code", async () => {
+  await fillLeague(db, leagueId, 12);
+  expect(await returnFromSignIn(db, { leagueId, userId: "u_alice", holdToken: "hold_a", now: NOW }))
+    .toEqual({ ok: false, reason: SEAT_HOLD_REFUSALS.taken });
+});
 ```
 
 - [ ] **Step 2: The table, and why it is a table**
@@ -677,9 +728,19 @@ Not Redis, and the reason is the same one that put `kickoff_at` in Postgres: **a
 
 The token is an opaque random id in an httpOnly, SameSite=Lax, path-scoped cookie set by `POST /api/public/leagues/[leagueId]/hold`. It **is not an identity, does not authenticate anything, and grants nothing except the right to find a seat still there.** The join door still calls `requireCurrentUser()` and still checks `tierJoinPrecondition`; a held seat that a tier refusal rejects is released immediately rather than left to expire, because holding a seat for somebody who was never eligible is the seat count lying to eleven other people.
 
-- [ ] **Step 4: The three screens**
+- [ ] **Step 4: The four screens**
 
-**The interstitial** (`/join/[leagueId]/hold`): the league's own facts, a `Countdown` on the hold, and the sign-in button. The countdown is display only, exactly as the primitive's docblock requires — the server's `expires_at` is what decides, and a clock that ran out on screen re-checks with the server rather than assuming.
+**The interstitial** (`/join/[leagueId]/hold`): the league's own facts, a `Countdown` on the hold, and the way in. The countdown is display only, exactly as the primitive's docblock requires — the server's `expires_at` is what decides, and a clock that ran out on screen re-checks with the server rather than assuming.
+
+**The way in is `SignInLink`** (the addendum's Task 16), rendered with `intent="/join/[leagueId]/hold"`, never a hand-written `<Link href="/sign-in">` — that link is exactly what drops the visitor's intent on the floor and lands them on `/app` with a held seat they can no longer see (F3). `SignInLink` renders `/sign-in?returnTo=…`, the route validates it through `safeReturnTo`, and `getSignInUrl({ returnTo })` seals it into the state so the callback brings them back here rather than to the callback's own `/app` default. **The hold cookie is set with `Path=/`** so it is still sent on the top-level GET back from WorkOS: a `Path` scoped to the hold's API route would not be readable by this page or by the join door. Path is a scoping convenience and never a security boundary; `httpOnly`, `SameSite=Lax` and the token's opacity are what carry the security, exactly as Step 3 argues.
+
+**The return** (`GET /join/[leagueId]/hold` with a session, F4): the moment both documents described the departure of and neither described the arrival at. The page reads the hold cookie and calls the join door with the token, and there are exactly three outcomes:
+
+- **(a) The seat is still theirs.** They are seated and redirected to the waiting room in the just-seated state (Step 2b of Task 9, D1), because the first thing somebody should see after signing in for a seat is the seat.
+- **(b) The hold expired but a seat is still open** (`SEAT_HOLD_REFUSALS.expired`). They are joined anyway and told so, in one line above the waiting room's hero: *"Your ten minutes ran out while you were signing in. A seat was still open, so we put you in it."* Refusing somebody a seat that is sitting empty because our own timer fired would be the mechanism serving itself.
+- **(c) There is no seat.** `SeatTakenPanel`, below, with its two real actions.
+
+A visitor who arrives here with a session and **no** cookie at all is treated as (b) or (c) on the same predicate: what decides is whether the room has room, not whether we still have a receipt.
 
 **The race loser** (`SeatTakenPanel`): *"That seat went to someone else while you were signing in. Your spot in this league is gone, and nothing was charged."* plus two real actions: the same league's next open edition (the house factory guarantees one exists for a house rung) and the shelf filtered to leagues closest to filling. Never a dead end, and never a bare "error".
 
@@ -687,7 +748,7 @@ The token is an opaque random id in an httpOnly, SameSite=Lax, path-scoped cooki
 
 - [ ] **Step 5: The seat count stays honest**
 
-`PublicLeagueSummary` gains `heldSeats` as its sixteenth field, and the card renders **two sentences, never one blended number**: "9 of 12 seated" plus, only when it is non-zero, "1 seat is being claimed right now." The gauntlet's skeptic finding is that "live seat counts" was a label with no mechanism; this is the mechanism, and it says exactly what it knows.
+`PublicLeagueSummary` gains `heldSeats` as its **sixteenth** field, and the card renders **two sentences, never one blended number**: "9 of 12 seated" plus, only when it is non-zero, "1 seat is being claimed right now." **Neither sentence is written here:** the card passes `heldSeats` to `SeatMeter`, which owns the seat sentence for the whole product (Task 3 Step 1, F17), so the shelf, the waiting room, the open-seats panel and this card cannot drift into four phrasings of one count. The gauntlet's skeptic finding is that "live seat counts" was a label with no mechanism; this is the mechanism, and it says exactly what it knows.
 
 - [ ] **Step 6: Persona panel — the ten minutes between wanting and having**
 
@@ -804,7 +865,7 @@ ALTER TABLE "drafts" ADD COLUMN "kickoff_rolls" integer NOT NULL DEFAULT 0;
 ALTER TABLE "drafts" ADD COLUMN "fill_fired_at" timestamptz;
 ```
 
-`kickoff_rolls` is read by the waiting room and the browse card, which say *"This draft moved once because the room was not full"* rather than silently showing a different date than the one a member wrote in their calendar. There is **no cap on the number of rolls** — the founder's ruling is that the time slips until the last seat fills — and Task 8's seat release is what keeps an uncapped roll from being a trap.
+`kickoff_rolls` is read by the waiting room and the browse card as `PublicLeagueSummary`'s **seventeenth** field (F21: `rosterSummary` and `playoffWeeks` are fourteen and fifteen in Task 5, `heldSeats` is sixteen in Task 6, and this is the last field this plan adds), and they say *"This draft moved once because the room was not full"* rather than silently showing a different date than the one a member wrote in their calendar. **The sentence pluralizes honestly and comes from `rollNoticeSentence` in `src/matchmaking/roll.ts`, which takes `kickoffRolls`** (F12): *moved once*, *moved twice*, then *moved 5 times since it was scheduled*. A room on its fifth roll that still says "moved once" is the product lying about the only fact the member is tracking. There is **no cap on the number of rolls** — the founder's ruling is that the time slips until the last seat fills — and Task 8's seat release is what keeps an uncapped roll from being a trap.
 
 - [ ] **Step 5: `fill_fired_at`, and the bug it prevents**
 
@@ -812,13 +873,29 @@ ALTER TABLE "drafts" ADD COLUMN "fill_fired_at" timestamptz;
 
 - [ ] **Step 6: One system-action code, one notice, no new event type**
 
-`draft_kickoff_rolled` joins `SYSTEM_ACTION_CODES` with a compile-forced visibility of `"everyone"`, on `draft_auto_started`'s reasoning exactly: a fact about the league's shared calendar, true for everyone in it, about nobody's conduct. It rides `system_action` because `AUDIT_EVENT_TYPES` is a frozen pg enum. Its notice template is registry-derived so the copy sweeps catch it the commit it lands:
+`draft_kickoff_rolled` joins `SYSTEM_ACTION_CODES` with a compile-forced visibility of `"everyone"`, on `draft_auto_started`'s reasoning exactly: a fact about the league's shared calendar, true for everyone in it, about nobody's conduct. It rides `system_action` because `AUDIT_EVENT_TYPES` is a frozen pg enum. Its notice template is registry-derived so the copy sweeps catch it the commit it lands, and **its last sentence is `describeStartTiming`'s output rather than a string typed here** (F9), which is what makes the notice, the waiting room, the browse card and the schedule panel one promise instead of four:
 
 > *"Half-PPR #241 did not fill by Thursday 8:00 PM, so its draft moves to Friday 8:00 PM. Your seat is still yours. The draft starts as soon as the last seat is taken."*
 
+**In a member league that last sentence is false as written** (F11): members roll too, and their commissioner is holding a button that can start the room at two teams. `describeStartTiming` therefore takes the league's `authority`, and the member branch reads *"The draft starts as soon as the last seat is taken, or when your commissioner starts it."* The house branch is the sentence above, unchanged, because a house league has no commissioner to name.
+
+**From the second roll onward the notice gains a second paragraph** (F12), because a member who has now been moved twice is being asked a different question than a member who was moved once:
+
+> *"If you would rather not wait, you can release your seat and someone else can take it."*
+
+with the link to the waiting room's `ReleaseSeatControl` (Task 8). It does not appear on the first roll: offering the exit the first time something slips reads as the product giving up on its own room.
+
 - [ ] **Step 7: The surfaces stop lying about a time**
 
-`describeStartTiming` (`src/matchmaking/roll.ts`, browser-safe) is the one function that turns `{ startTrigger, kickoffAt, kickoffRolls, filledTeams, teamCount }` into a sentence, and the browse card, the waiting room, the draft-schedule panel and the notice all call it. A time that exists in four places and is phrased in four ways is how a product starts contradicting itself.
+`describeStartTiming` (`src/matchmaking/roll.ts`, browser-safe) is the one function that turns `{ startTrigger, kickoffAt, kickoffRolls, filledTeams, teamCount, authority }` into a sentence, and the browse card, the waiting room, the draft-schedule panel and the notice all call it. A time that exists in four places and is phrased in four ways is how a product starts contradicting itself.
+
+**This step is the authority for every start-timing sentence in the plan** (F9), and the two other tasks that print one **quote it rather than restate it**:
+
+- **The when-full commitment**, which Task 5 Step 1 and Task 9 Step 2 previously phrased two different ways: **"This one drafts the moment the last seat is taken. We tell you as soon as it fills, and the room opens a few minutes after that. You do not have to wait here."** The last sentence is the reassurance C5 keeps, second, where it reads as relief rather than as a caveat.
+- **The scheduled commitment**, house branch: **"The draft starts as soon as the last seat is taken."** Member branch: **"The draft starts as soon as the last seat is taken, or when your commissioner starts it."** (F11.)
+- **The roll's own sentence** is `rollNoticeSentence(kickoffRolls)` from the same file, pluralized (F12), and Task 9's waiting-room test asserts the identical string the notice body carries.
+
+The commissioner's short-room warning in Step 3 is unchanged: it is a warning about a press, not a description of a start.
 
 - [ ] **Step 8: Commit**
 
@@ -887,7 +964,9 @@ Deleting a `teams` row is only safe because of what a pre-draft league does not 
 
 - [ ] **Step 4: The control, where leaving is a decision and not an accident**
 
-`ReleaseSeatControl` lives in the waiting room and on league home while the draft is scheduled, behind a `Modal` confirm that states the consequence in the league's own terms: *"You will lose your seat in Half-PPR #241. Someone else can take it right away, and the league may fill without you."* Destructive `Button` variant, keyboard-operable, focus returns to the opener on cancel — all of which `Modal` already guarantees.
+`ReleaseSeatControl` lives in the waiting room and on league home while the draft is scheduled, and **its weight is derived from `kickoffRolls`** (F12): at zero rolls it is a quiet text control at the bottom of the room, because nothing has gone wrong yet and offering the door first is the product doubting its own league; from the first roll onward it moves up beside the rolled-date sentence and takes a visible secondary button, because a member who has been moved is the member this control was built for. The escalation is a derived rendering of a column that already exists, not a stored state and not a nudge.
+
+It sits behind a `Modal` confirm that states the consequence in the league's own terms: *"You will lose your seat in Half-PPR #241. Someone else can take it right away, and the league may fill without you."* Destructive `Button` variant, keyboard-operable, focus returns to the opener on cancel — all of which `Modal` already guarantees.
 
 - [ ] **Step 5: Commit**
 
@@ -911,9 +990,13 @@ The post-join screen is where a first-timer decides whether this product is comp
 ```tsx
 // src/league-room/components/waiting-room.test.tsx
 it("counts down to a scheduled draft and states the fill in the same breath", () => {
+  // F17: the seat sentence is SeatMeter's, everywhere. "10 of 12 seats filled" and "4 of 12
+  // seats taken" were this screen's own two phrasings of the primitive's own string; both are
+  // gone, and the change to the e2e assertions is named in this task's commit body per the
+  // e2e-under-redesign rule.
   renderSurface(<WaitingRoom league={scheduledAndFilling} />, ({ getByTestId, getByText }) => {
     expect(getByTestId("waiting-room-countdown")).toBeInTheDocument();
-    expect(getByText("10 of 12 seats filled")).toBeInTheDocument();
+    expect(getByText("10 of 12 seated. 2 seats left.")).toBeInTheDocument();
   });
 });
 
@@ -922,7 +1005,7 @@ it("replaces the countdown with the fill meter when there is nothing to count do
   // drew. A clock with nothing behind it is the worst possible thing to show a waiting member.
   renderSurface(<WaitingRoom league={whenFullAndFilling} />, ({ queryByTestId, getByText }) => {
     expect(queryByTestId("waiting-room-countdown")).toBeNull();
-    expect(getByText("4 of 12 seats taken")).toBeInTheDocument();
+    expect(getByText("4 of 12 seated")).toBeInTheDocument();
   });
 });
 
@@ -934,10 +1017,22 @@ it("says why the date moved, rather than quietly showing a different one", () =>
 
 it("tells a member who missed the draft what happened to their team", () => {
   // join-flow-panel.md, HIGH: no autopick answer existed anywhere in the join flow, and "what
-  // if I miss it" is the first-timer's actual question.
+  // if I miss it" is the first-timer's actual question. C3: the safety net has ONE phrasing,
+  // "the room picks for you from your queue", stated once in docs/design-system.md (Task 14
+  // Step 2) and quoted by every surface that reassures anybody about missing a draft.
   renderSurface(<WaitingRoom league={draftedWithoutYou} />, ({ getByText, getByRole }) => {
     expect(getByText("The draft ran on Thursday and the room picked for you from your queue.")).toBeInTheDocument();
     expect(getByRole("link", { name: "See your roster" })).toBeInTheDocument();
+  });
+});
+
+it("speaks the house register, with no contractions anywhere on the screen", () => {
+  // C1 (ruled): the expanded register is the house standard. `waiting-room.tsx:117` ships
+  // "You don't have to wait here. We'll let you know the moment it fills." today; it converges
+  // here on the one sentence Task 7 Step 7 owns, expanded, and the two shipped contractions die.
+  renderSurface(<WaitingRoom league={whenFullAndFilling} />, ({ container }) => {
+    expect(container.textContent).not.toMatch(/\b\w+'(t|ll|re|ve|s|d|m)\b/);
+    expect(container.textContent).toContain("You do not have to wait here.");
   });
 });
 
@@ -950,7 +1045,9 @@ it("puts the room tour first for a manager who has never drafted", () => {
 
 - [ ] **Step 2: The two hero variants**
 
-Scheduled: the `xl` `Countdown` beside the fill `Meter`, with the local-time line under it. When-full: the fill `Meter` **promoted to hero**, no countdown at all, and the honest sentence about what joining committed them to (*"This one drafts the moment the last seat is taken. We tell you as soon as it fills, and the room opens a few minutes after that."*). The gauntlet's sit-and-go finding was that the two are different commitments told in the same words; they now differ in the largest element on the screen.
+Scheduled: the `xl` `Countdown` beside the fill `Meter`, with the local-time line under it. When-full: the fill `Meter` **promoted to hero**, no countdown at all, and the honest sentence about what joining committed them to, **quoted from `describeStartTiming`** and not typed here (F9): *"This one drafts the moment the last seat is taken. We tell you as soon as it fills, and the room opens a few minutes after that. You do not have to wait here."* The gauntlet's sit-and-go finding was that the two are different commitments told in the same words; they now differ in the largest element on the screen.
+
+**The room going full is a moment, and it is drawn** (D3). `filledTeams === teamCount` is already on the page and the transition already arrives: the last seat lands, `fireWhenFullInTx` publishes, and the notice reaches this screen on `notice.created` (no new event type, ruling 21). What this step specifies is what the screen *does* with it: the fill `Meter` animates to complete, the seat sentence settles to **"12 of 12 seated"**, and the `xl` `Countdown` to the grace-window kickoff **replaces** the meter as the hero, in that order, so the room visibly changes state rather than quietly rerendering a different number. Under `prefers-reduced-motion` the meter completes and the countdown appears with no transition at all, on Task 13 Step 5's branch, and both sides are asserted. Nothing here is a new fact: it is the two facts the page already has, sequenced.
 
 - [ ] **Step 3: The room, without the tags**
 

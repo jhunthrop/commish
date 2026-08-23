@@ -19,7 +19,12 @@ describe("draftActionSchema (persisted jsonb boundary)", () => {
     expect(draftActionSchema.parse(row)).toEqual(row);
   });
 
-  it("defaults a persisted START_DRAFT row with no skipPolicy at all — the one place today's allowance may reach an old draft's replay, and only for that legacy row", () => {
+  it("leaves a persisted START_DRAFT row with no skipPolicy WITHOUT one, rather than handing an old draft today's allowance", () => {
+    // Final whole-branch review, F3. This used to assert the opposite — that a pre-Task-5 row
+    // parsed to `DRAFT_SKIP_POLICY` — which is exactly the drift: `reduceSnakeExpiry` folds a
+    // `TIMER_EXPIRE` into an autopick or a skip depending on this value, so defaulting it
+    // replayed a draft that autopicked as one that skipped, and changed the reconstructed roster.
+    // The replay proof itself lives in `replay.test.ts` ("a pre-Task-5 log autopicks").
     const row = {
       v: 1,
       type: "START_DRAFT", minBid: 1,
@@ -27,7 +32,8 @@ describe("draftActionSchema (persisted jsonb boundary)", () => {
       draftOrder: ["t1", "t2"],
       pool: [{ playerId: "p1", position: "QB" }],
     };
-    expect(draftActionSchema.parse(row)).toEqual({ ...row, skipPolicy: DRAFT_SKIP_POLICY });
+    expect(draftActionSchema.parse(row)).toEqual(row);
+    expect(draftActionSchema.parse(row)).not.toHaveProperty("skipPolicy");
   });
 
   it("accepts a v1 SET_QUEUE row", () => {
