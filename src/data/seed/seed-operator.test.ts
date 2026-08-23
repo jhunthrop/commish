@@ -101,15 +101,19 @@ describe("ruling 15 — no in-product way to grant operator access (a drift trip
     // (Task 5's `app-header.tsx`, renamed by Task 2) joins this list too, and is the false
     // positive the docblock above already names: `TopBarProps.isAdmin` is a prop TYPE —
     // `readonly isAdmin: boolean` — not a write, and the regex cannot tell the two spellings
-    // apart. Task 2's shell adds two more of the exact same false positive: `app-shell.tsx`
-    // (`AppShellProps.user.isAdmin`, another prop TYPE) and the `(shell)` layout (`isAdmin: user
-    // .isAdmin`, a plain passthrough READ into that same prop, not a write to the column). Left
-    // in rather than tightened, because narrowing the pattern to dodge a known-safe match is
+    // apart. Task 2's shell adds four more of the exact same false positive: `app-shell.tsx`
+    // (`AppShellProps.user.isAdmin`, another prop TYPE), the `(shell)` layout (`isAdmin: user
+    // .isAdmin`, a plain passthrough READ into that same prop), and `browse/page.tsx` /
+    // `reviews/page.tsx` (the SAME passthrough — both sit outside `/app` and call `shellData`/
+    // render `AppShell` themselves, Task 2 Step 5). None of these WRITE to the column. Left in
+    // rather than tightened, because narrowing the pattern to dodge a known-safe match is
     // exactly the kind of adjustment that quietly widens what this tripwire would miss on a REAL
     // second writer later.
     const writers = grepSourceTree(/\bisAdmin\s*:/, { dirs: ["src", "scripts"], exclude: /\.test\.tsx?$/ });
     expect(writers).toEqual([
       "src/app/app/(shell)/layout.tsx",
+      "src/app/browse/page.tsx",
+      "src/app/reviews/page.tsx",
       "src/components/app-shell/app-shell.tsx",
       "src/components/app-shell/top-bar.tsx",
       "src/db/schema.ts",
