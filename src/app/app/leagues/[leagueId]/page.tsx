@@ -4,7 +4,7 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
 import { leagueHome, lineupView } from "@/league-service";
 import { LeagueHome } from "@/league-room/components/league-home";
-import { AppHeader } from "@/components/app-shell/app-header";
+import { TopBar } from "@/components/app-shell/top-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -52,7 +52,7 @@ export default async function LeaguePage({ params }: PageProps) {
 
   return (
     <>
-      <AppHeader displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
+      <TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
       <LeagueHome home={home} lineup={lineup} helpLevel={preferences.helpLevel} />
     </>
   );

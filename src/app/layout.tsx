@@ -31,7 +31,7 @@ export default function RootLayout({
           {/* Plan D Task 9: the notices hook's state moved here so it outlives every
               client-side navigation instead of remounting per page (ruling 19). Renders no UI
               of its own — every page in the product mounts through this layout, including the
-              draft room (no `AppHeader`) and the invite page's signed-out half, so this can
+              draft room (no `TopBar`) and the invite page's signed-out half, so this can
               only ever be provider logic. See `notices-provider.tsx`'s own docblock. */}
           <NoticesProvider>{children}</NoticesProvider>
         </ThemeProvider>

@@ -89,7 +89,7 @@ export function fixtureAccountDeps(
 
 /** `NoticesProvider` (Plan D Task 9, fix round 1) wraps every case here, not only the notice
  *  ones: `useNotices()` now throws without a provider ancestor, and `NoticeInbox` — reached
- *  through `AppHeader` on several of this file's own callers' pages, and directly by
+ *  through `TopBar` on several of this file's own callers' pages, and directly by
  *  `notice-inbox.test.tsx` — is the one component under `src/account-room/**` that calls it. A
  *  component that never calls `useNotices()` renders identically with or without this wrapper. */
 export function renderInAccount(ui: ReactElement, deps: AccountRoomDeps): RenderResult {

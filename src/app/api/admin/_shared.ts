@@ -3,7 +3,7 @@ import { fail } from "@/lib/api/respond";
 import { requireAdmin, type CurrentUser } from "@/lib/auth/current-user";
 
 type AdminHandler = (operatorUserId: string, request: Request) => Promise<Response>;
-/** The FULL operator, not just an id: a page needs `displayName`/`avatarUrl` for `AppHeader`
+/** The FULL operator, not just an id: a page needs `displayName`/`avatarUrl` for `TopBar`
  *  the same way every other page under `/app` does, and `withAdmin` already paid for the one
  *  `getCurrentUser` round trip `requireAdmin` makes — a second lookup for the same row would be
  *  the N+1 every batched-lookup discipline in this codebase exists to avoid. */

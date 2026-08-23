@@ -47,7 +47,7 @@ const CONNECTION_FAILED_MESSAGE = "We couldn't reach the server. Check your conn
  * is why this lives beside `ThemeProvider` in `src/app/layout.tsx` rather than in a shared
  * `src/app/app/layout.tsx`: the draft room's `RoomRail` IS its header under a no-page-scroll
  * contract, and the invite page is the one page under `/app` a signed-out visitor reaches
- * (`middleware.ts`'s single exemption) — a layout that rendered `AppHeader` would break the
+ * (`middleware.ts`'s single exemption) — a layout that rendered `TopBar` would break the
  * first visually and the second functionally. This component renders NEITHER: it is mounted on
  * EVERY page in the product, including both of those, so it can only be provider logic, never
  * presentation. `NoticeInbox` (`@/account-room/components/notice-inbox`) is unchanged.

@@ -24,7 +24,7 @@ export type { NoticesStatus, UseNoticesResult } from "@/components/app-shell/not
  * REQUIRES a `NoticesProvider` ancestor and throws a clear message if there isn't one — the same
  * "no silent standalone fallback" idiom `useTheme`/`useToast` already use in this codebase
  * (`@/design/theme-provider`, `@/components/ui/toast`). No page in this product reaches
- * `NoticeInbox`/`AppHeader` outside the root layout that mounts `NoticesProvider`:
+ * `NoticeInbox`/`TopBar` outside the root layout that mounts `NoticesProvider`:
  * `src/app/error.tsx`, `src/app/global-error.tsx` and `not-found.tsx` all render neither. A
  * caller with no provider ancestor is a wiring bug, not a state this hook should quietly paper
  * over with a second, competing implementation.

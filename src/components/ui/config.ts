@@ -9,6 +9,13 @@ export const UI_CONFIG = {
      * (Task 2), so density and layout change together rather than at two different widths.
      */
     denseFromPx: 1024,
+    /** `AppShell`'s `grid-cols-[var(--rail)_1fr]` column width, px, at `lg` and above — read
+     *  into a `--rail` custom property (`AppShell`'s own inline style, the same "a dynamic
+     *  value has to reach the DOM as a style, not a class" idiom `UI_CONFIG.infoTip.minTargetPx`
+     *  already uses) rather than a Tailwind arbitrary value hardcoded at the call site. */
+    railWidthPx: 64,
+    /** `LeagueRail`'s crest tile, px — the mocks' own 40px tiles reading "BB", "TS", "GH". */
+    crestSizePx: 40,
   },
   countdown: {
     /** How often `useCountdown` re-renders, ms. One second is the smallest unit `Countdown`

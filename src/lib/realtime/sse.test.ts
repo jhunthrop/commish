@@ -139,7 +139,7 @@ describe("createUserEventStream — shares the same connection ceiling as the le
 
 /**
  * MEDIUM-4. The cap is a number nobody re-derived when the arithmetic under it changed: a league
- * tab used to cost one connection and now costs two, because `NoticeInbox` mounts in `AppHeader`
+ * tab used to cost one connection and now costs two, because `NoticeInbox` mounts in `TopBar`
  * on every signed-in page and opens its own per-user stream (correctly sharing this same
  * ceiling). At 8, that silently became a four-tab budget with no headroom at all. Pinned here so
  * a plan that adds a third stream type has to move the number and say why, rather than halving

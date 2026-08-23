@@ -7,5 +7,5 @@ export { leagueMedian, medianResultFor, type MedianResult } from "./median";
 export { defaultLineup, setSlotPlayer, startersOf, benchOf, deriveBenchSlots } from "./lineup";
 export { generateInviteCode } from "./invite-code";
 export { weekStatusFromGames, isLineupLocked, type WeekStatus } from "./week-status";
-export { nextAction, type NextAction, type NextActionKind, type NextActionInput } from "./next-action";
+export { nextAction, COPY as NEXT_ACTION_COPY, type NextAction, type NextActionKind, type NextActionInput } from "./next-action";
 export { leagueTerms, formatDraftTime, type LeagueTerms, type LeagueTermsInput } from "./terms";

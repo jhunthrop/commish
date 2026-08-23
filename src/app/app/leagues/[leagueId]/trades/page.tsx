@@ -6,7 +6,7 @@ import { leagueHome, matchupWeek } from "@/league-service";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import type { MatchupLineupEntry, MatchupWeekBody, TradeCounterpartyOption, TradeRoomContext, TradeRosterPlayer } from "@/league-room/contract";
 import { TradeInbox } from "@/league-room/components/trade-inbox";
-import { AppHeader } from "@/components/app-shell/app-header";
+import { TopBar } from "@/components/app-shell/top-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +71,7 @@ export default async function TradesPage({ params }: PageProps) {
 
   return (
     <>
-      <AppHeader displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
+      <TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
         <header className="flex flex-col gap-1">
           <PageTitle>Trades</PageTitle>

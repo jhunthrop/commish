@@ -7,7 +7,7 @@ import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { renderNotice } from "@/integrity/notices";
 import { DECISION_PHRASE, subjectIsRemoved, type FlagResolutionView, type FlagSubjectView, type TradedPlayerView } from "@/integrity/queue-view";
 import { contentRemovalIsWiredFor, type ResolutionDecision } from "@/integrity/flags";
-import { AppHeader } from "@/components/app-shell/app-header";
+import { TopBar } from "@/components/app-shell/top-bar";
 import { Card, PageTitle } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import { withAdmin } from "@/app/api/admin/_shared";
@@ -259,7 +259,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
       const heldSubject: HeldTradeSubject = detail.subject;
       return (
         <>
-          <AppHeader displayName={operator.displayName} avatar={operator.avatarUrl} isAdmin={operator.isAdmin} />
+          <TopBar displayName={operator.displayName} avatar={operator.avatarUrl} isAdmin={operator.isAdmin} />
           <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
             <header className="flex flex-col gap-1">
               <PageTitle>Held trade</PageTitle>
@@ -296,7 +296,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
 
     return (
       <>
-        <AppHeader displayName={operator.displayName} avatar={operator.avatarUrl} isAdmin={operator.isAdmin} />
+        <TopBar displayName={operator.displayName} avatar={operator.avatarUrl} isAdmin={operator.isAdmin} />
         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
           <header className="flex flex-col gap-1">
             <PageTitle>Flag detail</PageTitle>

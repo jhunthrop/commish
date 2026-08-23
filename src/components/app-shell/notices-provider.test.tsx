@@ -64,7 +64,7 @@ const EMPTY_PAGE = { ok: true, data: { notices: [], unreadCount: 0 } };
 
 /** Every "page" this file navigates between. Only the ones with a header render `NoticeInbox` —
  *  the thing that actually subscribes — mirroring the real render tree: the draft room and the
- *  landing page render no `AppHeader` at all (ruling 10's whole point). */
+ *  landing page render no `TopBar` at all (ruling 10's whole point). */
 function HomePage() {
   return <NoticeInbox />;
 }

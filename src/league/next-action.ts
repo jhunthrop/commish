@@ -35,7 +35,11 @@ export interface NextActionInput {
   readonly weekStatus: WeekStatus | null;
 }
 
-const COPY: Readonly<Record<Exclude<NextActionKind, "none">, string>> = {
+/** The one sentence-fragment for each next action, owned here and nowhere else (C2) — a caller
+ *  that needs the exact button copy (`action`, below) or a shorter accessible-name fragment
+ *  (`LeagueRail`'s per-league sentence, `@/components/app-shell/league-rail.tsx`) imports this
+ *  rather than typing its own copy of the same words. */
+export const COPY: Readonly<Record<Exclude<NextActionKind, "none">, string>> = {
   "join-draft": "Join the draft",
   "open-draft-room": "Open the draft room",
   "invite-managers": "Invite managers",

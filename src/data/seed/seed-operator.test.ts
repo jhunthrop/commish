@@ -97,14 +97,24 @@ function grepSourceTree(pattern: RegExp, { dirs, exclude }: GrepOptions): readon
 describe("ruling 15 — no in-product way to grant operator access (a drift tripwire, not a proof — see grepSourceTree's docblock)", () => {
   it("gives an ordinary account no way to become an operator through the product's idiomatic write shapes", () => {
     // Every writer of users.isAdmin (the TS/Drizzle spelling), found by grep rather than by
-    // memory: the column's own definition, and the one UPDATE that ever sets it. `app-header.tsx`
-    // (Task 5) joins this list too, and is the false positive the docblock above already names:
-    // `AppHeaderProps.isAdmin` is a prop TYPE — `readonly isAdmin: boolean` — not a write, and the
-    // regex cannot tell the two spellings apart. Left in rather than tightened, because narrowing
-    // the pattern to dodge one known-safe match is exactly the kind of adjustment that quietly
-    // widens what this tripwire would miss on a REAL second writer later.
+    // memory: the column's own definition, and the one UPDATE that ever sets it. `top-bar.tsx`
+    // (Task 5's `app-header.tsx`, renamed by Task 2) joins this list too, and is the false
+    // positive the docblock above already names: `TopBarProps.isAdmin` is a prop TYPE —
+    // `readonly isAdmin: boolean` — not a write, and the regex cannot tell the two spellings
+    // apart. Task 2's shell adds two more of the exact same false positive: `app-shell.tsx`
+    // (`AppShellProps.user.isAdmin`, another prop TYPE) and the `(shell)` layout (`isAdmin: user
+    // .isAdmin`, a plain passthrough READ into that same prop, not a write to the column). Left
+    // in rather than tightened, because narrowing the pattern to dodge a known-safe match is
+    // exactly the kind of adjustment that quietly widens what this tripwire would miss on a REAL
+    // second writer later.
     const writers = grepSourceTree(/\bisAdmin\s*:/, { dirs: ["src", "scripts"], exclude: /\.test\.tsx?$/ });
-    expect(writers).toEqual(["src/components/app-shell/app-header.tsx", "src/db/schema.ts", "src/integrity-service/grant-admin.ts"]);
+    expect(writers).toEqual([
+      "src/app/app/(shell)/layout.tsx",
+      "src/components/app-shell/app-shell.tsx",
+      "src/components/app-shell/top-bar.tsx",
+      "src/db/schema.ts",
+      "src/integrity-service/grant-admin.ts",
+    ]);
 
     // The same claim, in the RAW COLUMN spelling (`is_admin`) rather than the TS property name —
     // this is what catches a hand-written `sql\`UPDATE users SET is_admin = …\`` that never types

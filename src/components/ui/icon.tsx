@@ -9,6 +9,7 @@ import {
   Flame,
   Inbox,
   Info,
+  Plus,
   RefreshCw,
   Rocket,
   Search,
@@ -44,6 +45,11 @@ export const ICONS = {
   crown: Crown,
   bolt: Zap,
   clover: Clover,
+  // The rail's trailing "join or create another league" control (Task 2 Step 6) — the eighteen-
+  // name list's first addition in three phases. None of `chevron-right`, `search` or `inbox`
+  // means "another one of these", and a page-local `+` glyph in a `<span>` is exactly the
+  // page-local visual mapping the founder rule forbids.
+  plus: Plus,
 } as const satisfies Readonly<Record<string, LucideIcon>>;
 
 export type IconName = keyof typeof ICONS;

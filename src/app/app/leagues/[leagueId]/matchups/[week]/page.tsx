@@ -6,7 +6,7 @@ import { leagueHome, matchupWeek } from "@/league-service";
 import { getReferenceCache } from "@/league-service/reference-cache-instance";
 import { LiveMatchupWeek } from "@/league-room/components/live-matchup-week";
 import { WeekNav } from "@/league-room/components/week-nav";
-import { AppHeader } from "@/components/app-shell/app-header";
+import { TopBar } from "@/components/app-shell/top-bar";
 import { liveScoringCopy } from "@/stats/live-scoring-copy";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +35,7 @@ export default async function MatchupWeekPage({ params }: PageProps) {
 
   return (
     <>
-    <AppHeader displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
+    <TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
     <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
       <PageTitle>{`${home.name} · Week ${weekNumber}`}</PageTitle>
       <WeekNav leagueId={leagueId} weekNumber={weekNumber} totalWeeks={body.totalWeeks} />

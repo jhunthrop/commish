@@ -28,9 +28,9 @@ function callPage(leagueId = "league_1") {
   return LeagueActivityPage({ params: Promise.resolve({ leagueId }), searchParams: Promise.resolve({}) });
 }
 
-/** `AppHeader` renders `NoticeInbox` (Task 10), a `"use client"` component that fetches its
+/** `TopBar` renders `NoticeInbox` (Task 10), a `"use client"` component that fetches its
  *  own data — wrapped here so it never reaches the real `fetch`, the same discipline
- *  `app-header.test.tsx` uses. */
+ *  `top-bar.test.tsx` uses. */
 async function renderPage(leagueId?: string) {
   const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
   const page = await callPage(leagueId);

@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
-import { AppHeader } from "@/components/app-shell/app-header";
+import { TopBar } from "@/components/app-shell/top-bar";
 import { listPublicLeagues } from "@/league-service/browse";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { BrowseFilters } from "@/league-room/components/browse-filters";
@@ -22,7 +22,7 @@ const first = (value: string | readonly string[] | undefined): string | null =>
  * league data. `middleware.ts` does not redirect outside `/app`, so this renders for a
  * signed-out visitor by design — `getCurrentUser()` returning null is the expected case, not an
  * error, and the only thing it changes is whether a card offers a join button or a sign-in
- * link. The signed-in chrome (`AppHeader`) appears only when there is a person to name.
+ * link. The signed-in chrome (`TopBar`) appears only when there is a person to name.
  *
  * The intro line always offers a "Start your own league" path alongside the browse, not only
  * inside `PublicLeagueList`'s empty state: a commissioner arriving to recruit for their own
@@ -66,7 +66,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           </div>
         </header>
       ) : (
-        <AppHeader displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
+        <TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
       )}
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
         <PageTitle>Open leagues</PageTitle>

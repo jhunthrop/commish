@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
-import { AppHeader } from "@/components/app-shell/app-header";
+import { TopBar } from "@/components/app-shell/top-bar";
 import { readProfile } from "@/identity-service/profile";
 import { readPreferences } from "@/identity-service/preferences";
 import { myReview } from "@/review-service/reviews";
@@ -32,7 +32,7 @@ export default async function ProfilePage() {
 
   return (
     <>
-      <AppHeader displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
+      <TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
         <PageTitle>Your profile</PageTitle>
         <ProfileForm profile={profile} />

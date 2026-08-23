@@ -403,7 +403,7 @@ describe("the admin flag detail page's held-trade surface says nothing that brea
    * mounts"). Driven through `HeldTradeDetail` directly, mirroring `ResolutionForm`'s own "is
    * clean once a decision is recorded" test just above, rather than through the full page — the
    * done state needs a REAL `AdminRoomDepsProvider` fetch to succeed, and the full-page tests
-   * above only ever wrap `AccountRoomDepsProvider` and `NoticesProvider` (for `AppHeader`'s own
+   * above only ever wrap `AccountRoomDepsProvider` and `NoticesProvider` (for `TopBar`'s own
    * notice inbox), never `AdminRoomDepsProvider` — so a click-to-Confirm through the full page
    * would have hit a REAL network call and landed on the ERROR state, not the done one, proving
    * nothing about this sentence either way.

@@ -43,7 +43,7 @@ function dirtyFields(baseline: ProfileBody, draft: Required<ProfilePatch>): Prof
 
 /**
  * The one place this product writes to who a signed-in user is. On success it calls
- * `router.refresh()` rather than a full reload, so `AppHeader` — a Server Component reading the
+ * `router.refresh()` rather than a full reload, so `TopBar` — a Server Component reading the
  * same `users` row — picks up the new name and face without losing client state elsewhere on
  * the page.
  *

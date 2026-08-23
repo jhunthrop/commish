@@ -3,7 +3,6 @@ import { requireCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
 import { firstRunPlan } from "@/identity";
 import { PageTitle } from "@/components/ui";
-import { AppHeader } from "@/components/app-shell/app-header";
 import { crossLeagueHome } from "@/league-service";
 import { getScoreCache } from "@/league-service/score-cache-instance";
 import type { HomeBody } from "@/league-room/contract";
@@ -31,6 +30,10 @@ export const dynamic = "force-dynamic";
  * again here would just be the wall back under a different name. `firstRun === null` means this
  * manager already has a board full of leagues, so the same three paths collapse behind one
  * disclosure (`StartOrJoinDisclosure`) instead of standing at full weight on every visit.
+ *
+ * Renders no `TopBar` and no `<main>` of its own (Task 2 Step 5) — `(shell)/layout.tsx` is now
+ * the thing that renders `AppShell`, which supplies both, once, for every page in this route
+ * group. This page returns its content alone.
  */
 export default async function AppHome() {
   const user = await requireCurrentUser();
@@ -48,12 +51,9 @@ export default async function AppHome() {
 
   return (
     <>
-      <AppHeader displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
-      <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
-        <PageTitle>Your leagues</PageTitle>
-        <HomeBoard initial={home} />
-        {firstRun === null ? <StartOrJoinDisclosure experienceTier={user.experienceTier} /> : null}
-      </main>
+      <PageTitle>Your leagues</PageTitle>
+      <HomeBoard initial={home} />
+      {firstRun === null ? <StartOrJoinDisclosure experienceTier={user.experienceTier} /> : null}
     </>
   );
 }

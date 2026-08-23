@@ -58,7 +58,12 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     const leagueName = "Mobile360UnbrokenOverlongIdentifierFixture";
     await page.goto("/app");
     await expect(page.getByRole("heading", { name: "Your leagues" })).toBeVisible();
-    const existing = page.getByRole("link", { name: leagueName, exact: true });
+    // Scoped to `main` (Task 2's shell): the league rail's own crest now ALSO carries the
+    // league's real name as its accessible name (Step 1's own requirement — the crest names
+    // the league, never its initials), so the bare `getByRole` below would match both it and
+    // the home board's card link. `main` is the content column the shell renders `HomeBoard`
+    // into; the rail is a sibling `<nav>`, never inside it.
+    const existing = page.locator("main").getByRole("link", { name: leagueName, exact: true });
     if ((await existing.count()) === 0) {
       await page.getByText("Start or join another league").click();
       await page.getByLabel("League name", { exact: true }).fill(leagueName);
@@ -123,8 +128,9 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // --- The home board, NOW carrying that name in its card grid ---------------------------
     await page.goto("/app");
     // `exact`: the card's action link is named "Invite managers for <league name>", which the
-    // default substring match also picks up.
-    await expect(page.getByRole("link", { name: leagueName, exact: true })).toBeVisible();
+    // default substring match also picks up. Scoped to `main`, same reason as above: the rail's
+    // own crest for this league carries the identical accessible name.
+    await expect(page.locator("main").getByRole("link", { name: leagueName, exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page, "/app");
 
     // --- The public browse grid, the second consumer of the same `min-w-0` fix -------------

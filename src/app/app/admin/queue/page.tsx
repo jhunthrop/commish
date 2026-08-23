@@ -2,7 +2,7 @@ import Link from "next/link";
 import { getDb } from "@/db/client";
 import { listPendingFlags } from "@/integrity-service/flags";
 import { formatFlagCursor, parseFlagCursor } from "@/integrity/queue-view";
-import { AppHeader } from "@/components/app-shell/app-header";
+import { TopBar } from "@/components/app-shell/top-bar";
 import { Card, EmptyState, PageTitle } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import { withAdmin } from "@/app/api/admin/_shared";
@@ -60,7 +60,7 @@ export default async function AdminQueuePage({ searchParams }: PageProps) {
 
     return (
       <>
-        <AppHeader displayName={operator.displayName} avatar={operator.avatarUrl} isAdmin={operator.isAdmin} />
+        <TopBar displayName={operator.displayName} avatar={operator.avatarUrl} isAdmin={operator.isAdmin} />
         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
           <header className="flex flex-col gap-1">
             <PageTitle>Dispute queue</PageTitle>

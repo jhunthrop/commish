@@ -7,7 +7,7 @@ import { listLeagueActivity } from "@/integrity-service/activity";
 import { listNotices, quoteFor } from "@/integrity-service/notify";
 import { InfoTip, PageTitle } from "@/components/ui";
 import { ActivityFeed } from "@/league-room/components/activity-feed";
-import { AppHeader } from "@/components/app-shell/app-header";
+import { TopBar } from "@/components/app-shell/top-bar";
 
 export const dynamic = "force-dynamic";
 
@@ -66,7 +66,7 @@ export default async function LeagueActivityPage({ params, searchParams }: PageP
 
   return (
     <>
-      <AppHeader displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
+      <TopBar displayName={user.displayName} avatar={user.avatarUrl} isAdmin={user.isAdmin} />
       <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
         <header className="flex flex-col gap-1">
           <PageTitle>League activity</PageTitle>

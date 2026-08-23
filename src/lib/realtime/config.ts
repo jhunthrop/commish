@@ -26,7 +26,7 @@ export const REALTIME_CONFIG = {
    * THE PER-TAB ARITHMETIC, which is what this number actually has to be derived from. It was 8
    * when a tab cost one connection: `league-stream.ts` exists specifically so a draft room, its
    * chat and its board share ONE league stream. Phase 3 Plan A mounted `NoticeInbox` inside
-   * `AppHeader`, which every signed-in page renders, and `useNotices` opens
+   * `TopBar`, which every signed-in page renders, and `useNotices` opens
    * `/api/notices/stream` on mount — correctly sharing this same ceiling (`sse.ts`), because a
    * per-user stream costs exactly what a league stream costs. So a league page now costs TWO
    * connections, and the old 8 silently became an effective four-tab budget, with the fifth tab
