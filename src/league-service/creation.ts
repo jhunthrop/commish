@@ -80,6 +80,15 @@ export interface CreateLeagueInput {
    * Phase 1 still runs, so every existing caller is unaffected.
    */
   readonly kickoffAt?: string;
+  /**
+   * Phase 3.5, Task 7: which of the two ways this draft's `kickoff_at` will come to be set.
+   * Defaults `'scheduled'` — every existing caller of `createLeague` is unaffected. `'when_full'`
+   * is the sit-and-go trigger: `fireWhenFullInTx` (`./fill-trigger`) moves `kickoffAt` on its own
+   * the moment the league's last seat fills, and nothing here enforces "public leagues only" —
+   * that boundary is `createLeagueSchema`'s (`./schemas`), the one place a domain rule like this
+   * is enforced, the same precedent `teamCount`'s own bounds already set.
+   */
+  readonly startTrigger?: "scheduled" | "when_full";
 }
 
 export type CreateLeagueResult =
@@ -150,6 +159,7 @@ export async function createLeague(
         status: "scheduled",
         kickoffAt,
         auctionBudget: input.format === "auction" ? input.auctionBudget : null,
+        startTrigger: input.startTrigger ?? "scheduled",
       });
       await audit.record(tx, {
         eventType: "league_created",

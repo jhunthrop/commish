@@ -25,6 +25,13 @@ const DRAFT_NOT_FOUND = "That draft doesn't exist.";
  */
 export const KICKOFF_REFUSALS = {
   alreadyStarted: "This draft has already started, so its time can't change.",
+  /**
+   * Phase 3.5, Task 7. A `'when_full'` draft's `kickoff_at` is set by `fireWhenFullInTx`
+   * (`@/league-service/fill-trigger`), not by a commissioner — a time nobody chose is not a time
+   * anybody may edit. Checked before the past/too-far checks below: those are about WHETHER a
+   * chosen time is a reasonable one, and this is about whether there is a time to choose at all.
+   */
+  whenFull: "This draft starts when the league fills, so nobody sets its time by hand.",
   past: "Pick a time in the future so everyone has a chance to show up.",
   /**
    * Names `LEAGUE_CONFIG.defaults.maxDraftDaysAhead` rather than repeating the number as a bare
@@ -185,6 +192,7 @@ export async function setDraftKickoff(
         draftId: drafts.id,
         status: drafts.status,
         commissionerUserId: leagues.commissionerUserId,
+        startTrigger: drafts.startTrigger,
       })
       .from(drafts)
       .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
@@ -196,6 +204,9 @@ export async function setDraftKickoff(
     }
     if (row.status !== "scheduled") {
       return { ok: false, status: 409, reason: KICKOFF_REFUSALS.alreadyStarted };
+    }
+    if (row.startTrigger === "when_full") {
+      return { ok: false, status: 409, reason: KICKOFF_REFUSALS.whenFull };
     }
 
     const kickoffMs = Date.parse(input.kickoffAt);

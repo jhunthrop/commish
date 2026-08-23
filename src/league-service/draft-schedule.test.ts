@@ -32,7 +32,12 @@ async function statusOf(leagueId: string): Promise<string> {
   return row.status;
 }
 
-async function seedLeague(input: { readonly commissionerUserId?: string; readonly otherUserId?: string } = {}): Promise<{
+async function seedLeague(input: {
+  readonly commissionerUserId?: string;
+  readonly otherUserId?: string;
+  readonly startTrigger?: "scheduled" | "when_full";
+  readonly isPublicMatchmade?: boolean;
+} = {}): Promise<{
   readonly leagueId: string;
   readonly commissioner: string;
 }> {
@@ -56,7 +61,8 @@ async function seedLeague(input: { readonly commissionerUserId?: string; readonl
     teamName: "Commissioner's Team",
     experienceTier: "beginner",
     stakeTier: 0,
-    isPublicMatchmade: false,
+    isPublicMatchmade: input.isPublicMatchmade ?? false,
+    startTrigger: input.startTrigger,
   });
   if (!created.ok) throw new Error(created.reason);
   return { leagueId: created.leagueId, commissioner };
@@ -253,5 +259,14 @@ describe("setDraftKickoff", () => {
     await setDraftKickoff(db, { leagueId, userId: commissioner, kickoffAt: YESTERDAY }, clock);
     expect(await kickoffOf(leagueId)).toBe(before);
     expect(await statusOf(leagueId)).toBe("scheduled");
+  });
+
+  // Phase 3.5, Task 7: a time nobody chose is not a time anybody may edit.
+  it("refuses to move a sit-and-go draft's time by hand, and writes nothing", async () => {
+    const { leagueId, commissioner } = await seedLeague({ startTrigger: "when_full", isPublicMatchmade: true });
+    const before = await kickoffOf(leagueId);
+    const result = await setDraftKickoff(db, { leagueId, userId: commissioner, kickoffAt: LATER }, clock);
+    expect(result).toEqual({ ok: false, status: 409, reason: KICKOFF_REFUSALS.whenFull });
+    expect(await kickoffOf(leagueId)).toBe(before);
   });
 });

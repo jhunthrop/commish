@@ -193,6 +193,7 @@ describe("NOTICE_TEMPLATES", () => {
       "chat_message_removed",
       "draft_auto_picked",
       "draft_auto_started",
+      "draft_fill_triggered",
       "draft_pick_skipped",
       "lineup_auto_set",
       "operator_warning",

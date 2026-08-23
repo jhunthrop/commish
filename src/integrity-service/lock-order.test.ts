@@ -561,6 +561,25 @@ describe("recordSessionSignals' insert order", () => {
  * is ASKED whether a backend is genuinely blocked (never a sleep), the park is released, and both
  * sides are required to finish. With an inverted order the writer would already be holding the
  * anchor the parked transaction is about to want, and one of the two would die.
+ *
+ * A SIXTH, added by hand rather than driven again here (Phase 3.5, Task 7):
+ * `fireWhenFullInTx` (`@/league-service/fill-trigger`). It never runs on its own connection in
+ * production — it runs INSIDE `joinLeagueInTx` itself, called unconditionally after every seat,
+ * so every lock it takes is taken while `leagues FOR UPDATE` is ALREADY held by the very
+ * transaction running it, not contended for by a second one. FK ENUMERATION: `UPDATE drafts SET
+ * kickoff_at` takes the draft row's own lock plus an implicit `FOR KEY SHARE` on `leagues` —
+ * already held `FOR UPDATE`, no new edge. Its `member_notices` inserts take the identical
+ * `leagues`/`users` `FOR KEY SHARE` `notifyAffectedMember`'s every other caller in this file
+ * already takes — `leagues` already held, and `users` is never held `FOR UPDATE` anywhere in this
+ * codebase (`recordSessionSignals`' own proof above is the one case a bystander stands in for
+ * that lock, and `fireWhenFullInTx` does not create a second one). Its audit anchor is written
+ * last, per ruling 3, exactly like every writer above it. The property the "Race" ruling actually
+ * asks for — that the trigger itself fires EXACTLY ONCE when two joins race for a league's last
+ * seat — is proven separately, with two real connections, in `src/league-service/fill-trigger
+ * .test.ts`'s own "fires exactly once when two joins race for the league's last seat": that
+ * property is about the WRITE being idempotent under a genuine race, which is a different claim
+ * from the lock-order question this file exists to answer, and belongs beside the trigger's own
+ * other behavior rather than duplicated here.
  */
 
 /** Parks a real join inside its own precondition — after `leagues[X] FOR UPDATE`, before the

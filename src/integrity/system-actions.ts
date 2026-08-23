@@ -25,6 +25,14 @@ export const SYSTEM_ACTION_CODES = [
    * same one-code-two-writers shape `draft_auto_started`/`lineup_auto_set` both already use.
    */
   "draft_pick_skipped",
+  /**
+   * The sit-and-go trigger (Phase 3.5, Task 7): a public matchmade league's draft, set to fire
+   * when it fills rather than at a chosen time, the moment its last seat is taken
+   * (`fireWhenFullInTx`, `@/league-service/fill-trigger`). `NoticeContexts.draft_fill_triggered`
+   * (`@/integrity/notices`) is its own notice, the identical one-code-many-notices shape
+   * `draft_auto_started` already uses.
+   */
+  "draft_fill_triggered",
 ] as const;
 
 export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
@@ -70,6 +78,10 @@ export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
  *    Phase 3.5): the competitive-sensitivity argument that keeps one manager's lapse private
  *    applies here too — a skip is forgiveness, not news the rest of the room needs broadcast to
  *    them, and the board already renders the pick as pending without naming who it is pending on.
+ *  - `draft_fill_triggered` is ALLOWED to everyone (Task 7, Phase 3.5), on `draft_auto_started`'s
+ *    reasoning exactly: a fact about the league's shared calendar, true for everyone in it, about
+ *    nobody's conduct. A member whose draft is about to start because the room filled up is owed
+ *    the sentence that says so.
  */
 export type SystemActionVisibility = "everyone" | "subject_only" | "hidden";
 
@@ -81,6 +93,7 @@ export const SYSTEM_ACTION_VISIBILITY: Readonly<Record<SystemActionCode, SystemA
   tier_blocked_join: "hidden",
   draft_auto_started: "everyone",
   draft_pick_skipped: "subject_only",
+  draft_fill_triggered: "everyone",
 };
 
 /**

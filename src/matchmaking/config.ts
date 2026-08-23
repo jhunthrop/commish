@@ -53,4 +53,13 @@ export const MATCHMAKING_CONFIG = {
    * fixed window) and is not (a distributed, spoof-proof quota).
    */
   browseRateLimit: { maxRequests: 60, windowMs: 60_000 },
+  /**
+   * Phase 3.5, Task 7: the sit-and-go trigger's own tunable. `graceSeconds` is how long after a
+   * public matchmade league's last seat fills its draft's `kickoff_at` is set to
+   * (`fireWhenFullInTx`, `@/league-service/fill-trigger`) — never zero. Underdog fires instantly;
+   * this product does not, because a pod's members joined a MANAGED league possibly hours
+   * earlier and are not necessarily sitting at a lobby screen. Five minutes is long enough for a
+   * notice to land and a tab to open, short enough that nobody who is present feels stalled.
+   */
+  sitAndGo: { graceSeconds: 300 },
 } as const;

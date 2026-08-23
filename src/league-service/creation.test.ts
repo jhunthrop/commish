@@ -228,6 +228,23 @@ describe("createLeague", () => {
     expect(league).toMatchObject({ experienceTier: "experienced", stakeTier: 2, isPublicMatchmade: true });
   });
 
+  // Phase 3.5, Task 7: the sit-and-go trigger's own column.
+  it("defaults the draft's start trigger to 'scheduled', unaffected for every existing caller", async () => {
+    const result = await createLeague(deps(), validInput());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const [draft] = await db.select().from(drafts).where(eq(drafts.id, result.draftId));
+    expect(draft!.startTrigger).toBe("scheduled");
+  });
+
+  it("writes 'when_full' straight through when the caller asks for it", async () => {
+    const result = await createLeague(deps(), { ...validInput(), isPublicMatchmade: true, startTrigger: "when_full" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const [draft] = await db.select().from(drafts).where(eq(drafts.id, result.draftId));
+    expect(draft!.startTrigger).toBe("when_full");
+  });
+
   it("keeps a league private and unlisted unless it is created public on purpose", async () => {
     const result = await createLeague(deps(), {
       name: "Group Chat Only",

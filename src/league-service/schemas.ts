@@ -67,6 +67,14 @@ export const createLeagueSchema = z.object({
    * decision a commissioner makes, not a checkbox default anybody should trip over.
    */
   visibility: z.enum(["invite_only", "public"]).default("invite_only"),
+  /**
+   * Phase 3.5, Task 7: the sit-and-go trigger. `'scheduled'` (the default) keeps today's
+   * behavior — a chosen or computed `kickoffAt`, unchanged. `'when_full'` fires the draft
+   * `MATCHMAKING_CONFIG.sitAndGo.graceSeconds` after the league's last seat fills
+   * (`fireWhenFullInTx`, `@/league-service/fill-trigger`), never a second start path. Refused
+   * below in combination with `visibility: "invite_only"` — see that check's own message.
+   */
+  startTrigger: z.enum(["scheduled", "when_full"]).default("scheduled"),
   /** Cosmetic only. Bounded to the tiers `MATCHMAKING_CONFIG` actually labels. */
   stakeTier: z
     .number()
@@ -78,6 +86,12 @@ export const createLeagueSchema = z.object({
   experienceTier: z.enum(["beginner", "experienced"]).optional(),
   /** Defaults at the route to the creator's display name, which the route knows and the service does not. */
   teamName: name.optional(),
+}).refine((data) => data.startTrigger !== "when_full" || data.visibility === "public", {
+  // `dueDraftsQuery` (`@/draft-service/auto-start`) starts drafts only in public matchmade
+  // leagues (`ENFORCED_LEAGUE_SQL`) — a private league whose fill wrote a time nobody pressed
+  // would be the control wired to nothing this codebase has already refused five times.
+  message: "Leagues that start when they fill are public leagues. Make this one public, or pick a draft time.",
+  path: ["startTrigger"],
 });
 
 export const createInviteSchema = z.object({

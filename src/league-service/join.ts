@@ -8,6 +8,7 @@ import { defaultSweepDeps, sweepQuietly, type SweepDeps } from "@/integrity-serv
 import { attachAuditEvent, notifyAffectedMember } from "@/integrity-service/notify";
 import { hasOpenSeat } from "@/matchmaking/filter";
 import { ENFORCEMENT_REFUSALS, tierJoinPrecondition } from "./enforcement";
+import { fireWhenFullInTx } from "./fill-trigger";
 
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
 const TEAM_MEMBERSHIP_UNIQUE_INDEX = "teams_league_user_idx";
@@ -112,7 +113,8 @@ export async function joinLeagueInTx(
   // Inside the same transaction, after the seat exists and before the caller sees it. Placed
   // here rather than in `acceptInvite` and `joinPublicLeague` separately for exactly the reason
   // the capacity check lives here: two copies of one rule are two places it can disagree.
-  await (input.audit ?? getAuditLogger()).record(tx, {
+  const audit = input.audit ?? getAuditLogger();
+  await audit.record(tx, {
     eventType: "member_joined",
     actorId: input.userId,
     actorType: "user",
@@ -120,6 +122,14 @@ export async function joinLeagueInTx(
     payload: { teamId, via: input.via },
     occurredAt: input.occurredAt,
   });
+  // Phase 3.5, Task 7: "a time, not a button". Called unconditionally, after every seat this
+  // codebase ever takes, through BOTH doors that reach `joinLeagueInTx` (an invite accept and a
+  // public browse join) — `fireWhenFullInTx` (`./fill-trigger`) answers "is this now full, and
+  // does this league's draft even fire on filling" for itself, and no-ops for the overwhelming
+  // majority of joins (a `'scheduled'` draft, or a league with a seat still open) at the cost of
+  // one cheap read. See its own docblock for why it lives here rather than as a second call keyed
+  // to "was this the last seat".
+  await fireWhenFullInTx(tx, league.id, input.occurredAt, audit);
   return { ok: true, leagueId: league.id, teamId, alreadyMember: false };
 }
 

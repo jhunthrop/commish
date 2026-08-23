@@ -269,6 +269,20 @@ export interface NoticeContexts {
   readonly draft_pick_skipped: {
     readonly leagueName: string;
   };
+  /**
+   * `fireWhenFullInTx`'s own notice (`@/league-service/fill-trigger`, Phase 3.5 Task 7), sent to
+   * EVERY team in the league the moment its last seat fills — `SYSTEM_ACTION_VISIBILITY
+   * .draft_fill_triggered` (`@/integrity/system-actions`) is `"everyone"`, on `draft_auto_started`'s
+   * own reasoning: a fact about the league's shared calendar, true for everyone in it, about
+   * nobody's conduct. `graceLabel` is `MATCHMAKING_CONFIG.sitAndGo.graceSeconds`, PRE-RENDERED
+   * through the same `formatClockLength` helper the draft-schedule panel reads that config
+   * through — never a raw number this template would have to phrase itself, so the sentence and
+   * whatever countdown a panel shows can never disagree.
+   */
+  readonly draft_fill_triggered: {
+    readonly leagueName: string;
+    readonly graceLabel: string;
+  };
 }
 
 /**
@@ -457,6 +471,15 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   draft_pick_skipped: ({ leagueName }) => ({
     title: `Your pick passed in ${leagueName}`,
     body: "Your pick passed while you were away. You can still make it, and the draft will wait for it before it finishes.",
+  }),
+  // No "no reply to this message" line: this is not a sanction, and there is nothing about any
+  // member's own conduct to appeal — it explains a fact about the league's shared calendar, the
+  // identical framing `draft_auto_started`'s own template already carries. `graceLabel` arrives
+  // pre-rendered (`fireWhenFullInTx`'s own docblock explains why), so this template never does
+  // its own arithmetic on `MATCHMAKING_CONFIG.sitAndGo.graceSeconds`.
+  draft_fill_triggered: ({ leagueName, graceLabel }) => ({
+    title: `Your league in ${leagueName} just filled up`,
+    body: `The last seat in ${leagueName} just filled, so the draft starts in about ${graceLabel}. Head to the draft room now, or let the clock queue your picks if you cannot make it.`,
   }),
 };
 
