@@ -1,10 +1,14 @@
 /**
- * WCAG contrast/hue math for the design-token GATE — used only by test-support.test.ts and
- * tokens.test.ts to assert the palette meets its contrast and distinguishability rules.
- * Test-only despite living in `src/design`: no production code computes a contrast ratio at
- * runtime, so this follows the repo's `test-support.ts` naming convention rather than reading
- * as a production module (was `contrast.ts`).
+ * Test support for the design-token GATE: the WCAG contrast/hue math `tokens.test.ts` asserts
+ * the palette against, and the source-file walker `no-raw-color.source.test.ts` uses to find
+ * what it sweeps. Test-only despite living in `src/design`: no production code computes a
+ * contrast ratio or walks the filesystem at runtime, so this follows the repo's
+ * `test-support.ts` naming convention rather than reading as a production module (was
+ * `contrast.ts`).
  */
+import { existsSync, readdirSync } from "node:fs";
+import { join } from "node:path";
+
 const HEX = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 
 function parseHex(hex: string): readonly [number, number, number] {
@@ -53,4 +57,28 @@ export function hueDegrees(hex: string): number {
 export function hueDistance(a: number, b: number): number {
   const diff = Math.abs(a - b) % 360;
   return diff > 180 ? 360 - diff : diff;
+}
+
+const REPO_ROOT = process.cwd();
+
+/**
+ * Every non-test source file under the given repo-root-relative directories, recursively, with
+ * the given extension. Paths come back repo-root-relative, so a failure names its own file.
+ *
+ * Directory-derived on purpose, the same reasoning `src/integrity/test-support.ts`'s copy
+ * sweeps already established: a hand-maintained list of files misses the one nobody remembered
+ * to add, and a walker sweeps a new component the moment it exists.
+ */
+export function sourceFilesIn(dirs: readonly string[], extension: string): readonly string[] {
+  function walk(dir: string): readonly string[] {
+    const full = join(REPO_ROOT, dir);
+    if (!existsSync(full)) return [];
+    return readdirSync(full, { withFileTypes: true }).flatMap((entry) => {
+      const path = join(dir, entry.name);
+      if (entry.isDirectory()) return walk(path);
+      if (!entry.name.endsWith(extension) || entry.name.includes(".test.") || entry.name.startsWith("test-")) return [];
+      return [path];
+    });
+  }
+  return dirs.flatMap(walk);
 }
