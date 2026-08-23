@@ -7,8 +7,10 @@ import type { Clock } from "@/domain/timing";
 import {
   admitCommand,
   AUCTION_CONFIG,
+  DRAFT_SKIP_POLICY,
   draftActionSchema,
   draftEventsFor,
+  newlySkippedPick,
   reduceDraft,
   replayDraft,
   type DraftState,
@@ -171,6 +173,29 @@ async function autopickNoticeContext(
     .where(eq(teams.id, teamId));
   return row;
 }
+
+/**
+ * Task 5's own version of the query above, for the ONE thing a skip's notice needs that an
+ * autopick's doesn't: no player, because a skip is precisely the transition where nobody was
+ * chosen. Guarded the identical way `autopickNoticeContext` is — a lookup failure here must
+ * never turn an already-decided skip into a rolled-back transaction over a notification nicety.
+ */
+async function skipNoticeContext(tx: DbTx, teamId: string): Promise<{ readonly userId: string; readonly leagueName: string } | undefined> {
+  const [row] = await tx
+    .select({ userId: teams.userId, leagueName: leagues.name })
+    .from(teams)
+    .innerJoin(leagues, eq(leagues.id, teams.leagueId))
+    .where(eq(teams.id, teamId));
+  return row;
+}
+
+/**
+ * `draft_pick_skipped`'s league-wide (never seen — `SYSTEM_ACTION_VISIBILITY` is `subject_only`)
+ * audit summary, the same "product copy lives where the copy sweeps can find it" discipline
+ * `DRAFT_AUTO_STARTED_SUMMARY` and `LINEUP_AUTO_SET_SUMMARY` (`@/league-service/auto-lineup`)
+ * both keep.
+ */
+export const DRAFT_PICK_SKIPPED_SUMMARY = "A manager's pick passed while they were away, and the draft moved on.";
 
 /**
  * The durable draft session store.
@@ -353,6 +378,28 @@ export function createDraftStore({
               pending.push({ notice, pickIndex: i });
             }
 
+            // Task 5's own telling: a skip records no PICK at all (`picked` above is built from
+            // the picks diff, which a skip never grows), so it needs its own notice rather than
+            // riding the `pending` loop above. `newlySkippedPick` diffs the owed-picks before and
+            // after — the identical diff `draftEventsFor`'s `skipped` flag reads, so the two can
+            // never disagree about which transition this was.
+            const skip = newlySkippedPick(state, result.state);
+            let skipNotice: { readonly notice: MemberNotice; readonly userId: string } | null = null;
+            if (skip !== null) {
+              const context = await skipNoticeContext(tx, skip.teamId);
+              if (context !== undefined) {
+                const notice = await notifyAffectedMember(tx, {
+                  leagueId: result.state.config.leagueId,
+                  userId: context.userId,
+                  noticeType: "draft_pick_skipped",
+                  context: { leagueName: context.leagueName },
+                  occurredAt: action.timestamp,
+                  auditEventId: null,
+                });
+                skipNotice = { notice, userId: context.userId };
+              }
+            }
+
             if (options?.alsoInTransaction !== undefined) {
               const extraNotices = await options.alsoInTransaction(tx);
               if (extraNotices !== undefined) createdNotices.push(...extraNotices);
@@ -381,6 +428,21 @@ export function createDraftStore({
 
             for (const { notice, pickIndex } of pending) {
               createdNotices.push(await attachAuditEvent(tx, notice, pickedEvents[pickIndex]!.eventId));
+            }
+            if (skipNotice !== null) {
+              // `subjectUserId` is what makes this event meaningful under `subject_only`
+              // visibility (`SYSTEM_ACTION_VISIBILITY.draft_pick_skipped`, `@/integrity/system-
+              // actions`) — the identical shape `lineup_auto_set`'s own write uses
+              // (`@/league-service/auto-lineup`).
+              const skipEvent = await audit.record(tx, {
+                eventType: "system_action",
+                actorId: null,
+                actorType: "system",
+                leagueId: result.state.config.leagueId,
+                payload: { action: "draft_pick_skipped", subjectUserId: skipNotice.userId, pickNumber: skip!.pickNumber, summary: DRAFT_PICK_SKIPPED_SUMMARY },
+                occurredAt: action.timestamp,
+              });
+              createdNotices.push(await attachAuditEvent(tx, skipNotice.notice, skipEvent.eventId));
             }
             return { ok: true, state: result.state };
           });
@@ -474,6 +536,10 @@ export function createDraftStore({
           // Command time is the ONE place the tunable is read — it rides the persisted
           // action from here on, so replay never consults AUCTION_CONFIG.
           minBid: AUCTION_CONFIG.minBid,
+          // Task 5's identical discipline: the skip-and-owe allowance rides the action from
+          // here on, so a later deploy that changes `DRAFT_SKIP_POLICY` can never change what
+          // an already-persisted TIMER_EXPIRE did on replay.
+          skipPolicy: DRAFT_SKIP_POLICY,
         },
         {
           alsoInTransaction: async (tx) => {

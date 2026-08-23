@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, draftActions, memberNotices, players } from "@/db/schema";
+import { auditEvents, draftActions, memberNotices, players, teams } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
-import { currentDeadline, initialDraftState, type DraftConfig } from "@/draft-engine";
+import { currentDeadline, DRAFT_SKIP_POLICY, initialDraftState, type DraftConfig } from "@/draft-engine";
 import type { MemberNotice } from "@/integrity-service/notify";
 import { createDraftStore, isSequenceConflict, type ApplyResult, type DraftStore, type DraftStoreDeps, type PublishFn } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
@@ -124,7 +124,7 @@ async function auctionFixture() {
 }
 
 const start = (teamIds: readonly string[]): DraftAction => ({
-  v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: teamIds, pool: POOL,
+  v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: T, draftOrder: teamIds, pool: POOL,
 });
 const pick = (teamId: string, playerId: string): DraftAction => ({ v: 1, type: "MAKE_PICK", timestamp: T, teamId, playerId });
 const nominate = (teamId: string, playerId: string, openingBid: number): DraftAction => ({
@@ -137,6 +137,19 @@ const bid = (teamId: string, amount: number): DraftAction => ({ v: 1, type: "BID
 async function expireOnTheClock(store: DraftStore, draftId: string): Promise<ApplyResult> {
   const state = await store.getDraftState(draftId);
   return store.applyAction(draftId, { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state!) ?? clock.now() });
+}
+
+/**
+ * Queues the team currently on the clock for the pool's own top player (Task 5): this
+ * fixture's kickoff sits 9+ days out, a slow tier, and a queueless team there is now
+ * skip-eligible. The notice tests below are about the AUTOPICK path specifically, so they
+ * queue the exact player the pool would have autopicked anyway — every downstream assertion
+ * (which player, which position) stays byte-identical to what it was before Task 5 existed.
+ */
+async function queueOnClockTeam(store: DraftStore, draftId: string): Promise<void> {
+  const state = await store.getDraftState(draftId);
+  const onClockTeamId = state!.draftOrder[0]!;
+  await store.applyAction(draftId, { v: 1, type: "SET_QUEUE", timestamp: T, teamId: onClockTeamId, playerIds: ["qb1"] });
 }
 
 async function actionRows(draftId: string) {
@@ -559,6 +572,7 @@ describe("draft store — notices", () => {
     const { draftId, leagueId, teamIds, userIds } = await fixture();
     const store = newStore();
     await store.applyAction(draftId, start(teamIds));
+    await queueOnClockTeam(store, draftId);
     const result = await expireOnTheClock(store, draftId);
     expect(result.ok).toBe(true);
 
@@ -610,6 +624,7 @@ describe("draft store — notices", () => {
     await db.delete(players);
     const store = newStore();
     await store.applyAction(draftId, start(teamIds));
+    await queueOnClockTeam(store, draftId);
     const result = await expireOnTheClock(store, draftId);
 
     expect(result.ok).toBe(true);
@@ -657,6 +672,7 @@ describe("draft store — notices", () => {
       onPublishError: (_error, event) => publishFailures.push({ type: event.type, leagueId: event.leagueId }),
     });
     await store.applyAction(draftId, start(teamIds));
+    await queueOnClockTeam(store, draftId);
 
     const result = await expireOnTheClock(store, draftId);
 
@@ -699,5 +715,62 @@ describe("draft store — notices", () => {
     const result = await expireOnTheClock(store, draftId);
     expect(result.ok).toBe(true);
     expect(publishFailures).toEqual([{ type: "notice.created", leagueId: "" }]);
+  });
+
+  it("notifies the skipped manager and writes a subject-scoped system_action, in the same transaction (Task 5)", async () => {
+    // No queue: the 8h tier here is well past the skip floor, so the on-clock team is
+    // skip-eligible and this expiry owes the pick instead of making it.
+    const { draftId, leagueId, teamIds, userIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const before = await store.getDraftState(draftId);
+    const onClockTeamId = before!.draftOrder[0]!;
+    const pickerIndex = teamIds.indexOf(onClockTeamId);
+
+    const result = await expireOnTheClock(store, draftId);
+    expect(result.ok).toBe(true);
+
+    const [skipEvent] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "system_action"));
+    expect(skipEvent).toMatchObject({ chainScope: leagueId, actorId: null, actorType: "system" });
+    expect(skipEvent!.payload).toMatchObject({ action: "draft_pick_skipped", subjectUserId: userIds[pickerIndex], pickNumber: 1 });
+
+    const [notice] = await db.select().from(memberNotices);
+    expect(notice).toMatchObject({
+      userId: userIds[pickerIndex], leagueId, noticeType: "draft_pick_skipped",
+      title: "Your pick passed in league_1", auditEventId: skipEvent!.eventId, readAt: null,
+    });
+    expect(notice!.body).toBe("Your pick passed while you were away. You can still make it, and the draft will wait for it before it finishes.");
+
+    // Ruling 13's guard, the same one every other draft notice keeps: never on the league stream.
+    expect(published.some((e) => e.type === "notice.created")).toBe(false);
+    expect(deliveredNotices).toEqual([expect.objectContaining({ id: notice!.id, userId: userIds[pickerIndex], leagueId, noticeType: "draft_pick_skipped" })]);
+
+    // The pick itself is owed, not made: nobody was drafted, and the draft moved on.
+    const after = await store.getDraftState(draftId);
+    expect(after?.owedPicks[onClockTeamId]).toEqual([1]);
+    expect(after?.picks).toHaveLength(0);
+  });
+
+  it("skips the skip's own notice, without failing the skip, when the team lookup finds no row (Task 5)", async () => {
+    // No queue this time (deliberately NOT `queueOnClockTeam`): the 8h tier here is slow enough
+    // that the on-clock team is skip-eligible, and this test is about THAT path's own notice —
+    // `skipNoticeContext`'s join, the skip's twin of `autopickNoticeContext` above.
+    const { draftId, teamIds } = await fixture();
+    const store = newStore();
+    await store.applyAction(draftId, start(teamIds));
+    const before = await store.getDraftState(draftId);
+    const onClockTeamId = before!.draftOrder[0]!;
+    // Reproducing the gap `skipNoticeContext` guards — a genuine skip must never turn into a
+    // rolled-back transaction over a notification nicety.
+    await db.delete(teams).where(eq(teams.id, onClockTeamId));
+
+    const result = await expireOnTheClock(store, draftId);
+
+    expect(result.ok).toBe(true);
+    const after = await store.getDraftState(draftId);
+    expect(after?.owedPicks[onClockTeamId]).toEqual([1]);
+    expect(await db.select().from(auditEvents).where(eq(auditEvents.eventType, "system_action"))).toHaveLength(0);
+    expect(await db.select().from(memberNotices)).toHaveLength(0);
+    expect(deliveredNotices).toHaveLength(0);
   });
 });

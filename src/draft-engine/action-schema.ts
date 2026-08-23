@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { DRAFT_ACTION_VERSION, type DraftAction, type SetQueueAction } from "@/domain/draft";
-import { AUCTION_CONFIG, DRAFT_QUEUE_CONFIG, PERSISTED_QUEUE_MAX } from "./config";
+import { AUCTION_CONFIG, DRAFT_QUEUE_CONFIG, DRAFT_SKIP_POLICY, PERSISTED_QUEUE_MAX } from "./config";
 
 const version = z.literal(DRAFT_ACTION_VERSION);
 // A strict ISO 8601 datetime (not just any non-empty string) so a malformed stamp can't
@@ -16,6 +16,16 @@ const poolEntry = z.object({
   position: z.enum(["QB", "RB", "WR", "TE", "K", "DEF"]),
 });
 
+// Defaults for logs persisted before Task 5 existed — the one place today's tunable may reach
+// an old draft's replay, and only for those legacy rows (a log written from here on always
+// carries its own value, the same discipline `minBid` below already keeps).
+const skipPolicy = z
+  .object({
+    maxOwedPerTeam: z.number().int().positive(),
+    appliesAtOrAbovePickSeconds: z.number().int().positive(),
+  })
+  .default(DRAFT_SKIP_POLICY);
+
 /**
  * The persisted-row boundary. `draft_actions.action` is jsonb written by an earlier
  * process (possibly an earlier deploy), so replay validates it rather than trusting it.
@@ -24,7 +34,10 @@ const poolEntry = z.object({
 export const draftActionSchema: z.ZodType<DraftAction> = z.discriminatedUnion("type", [
   // `minBid` defaults for logs persisted before it existed — the one place today's tunable
   // may reach an old draft's replay, and only for those legacy rows (new logs carry it).
-  z.object({ v: version, type: z.literal("START_DRAFT"), timestamp, draftOrder: z.array(teamId).min(2), pool: z.array(poolEntry).min(1), minBid: dollars.default(AUCTION_CONFIG.minBid) }),
+  z.object({
+    v: version, type: z.literal("START_DRAFT"), timestamp, draftOrder: z.array(teamId).min(2), pool: z.array(poolEntry).min(1),
+    minBid: dollars.default(AUCTION_CONFIG.minBid), skipPolicy,
+  }),
   z.object({ v: version, type: z.literal("MAKE_PICK"), timestamp, teamId, playerId }),
   z.object({ v: version, type: z.literal("NOMINATE"), timestamp, teamId, playerId, openingBid: dollars }),
   z.object({ v: version, type: z.literal("BID"), timestamp, teamId, amount: dollars }),

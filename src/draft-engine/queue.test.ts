@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { DraftPoolEntry, SetQueueAction, StartDraftAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
-import { DRAFT_CLOCK_SCHEDULE, DRAFT_QUEUE_CONFIG } from "./config";
+import { DRAFT_CLOCK_SCHEDULE, DRAFT_QUEUE_CONFIG, DRAFT_SKIP_POLICY } from "./config";
 import { reduceDraft, type DraftReduceResult } from "./reduce";
 import { bestAvailableFor, nudgeDeadline, queueFor } from "./selectors";
 import { queuedEntriesFor } from "./queue";
@@ -32,7 +32,7 @@ const CONFIG: DraftConfig = {
 
 const START: StartDraftAction = {
   v: 1,
-  type: "START_DRAFT", minBid: 1,
+  type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY,
   timestamp: "2026-09-01T00:00:00.000Z",
   draftOrder: ["t1", "t2"],
   pool: POOL,
@@ -124,7 +124,10 @@ describe("SET_QUEUE", () => {
     // once the clock reaches its final, kickoff-passed tier a reused fixed timestamp would
     // no longer be at-or-past the (now much shorter) deadline and TIMER_EXPIRE would be
     // rejected as premature — see R-B4 in `reduce.ts`.
-    let state = started();
+    // Both teams queued (Task 5): otherwise this far-from-kickoff fixture would skip each
+    // team's first turn instead of completing the draft in exactly four expiries.
+    let state = expectOk(reduceDraft(started(), setQueue("t1", ["qb1"])));
+    state = expectOk(reduceDraft(state, setQueue("t2", ["rb1"])));
     for (let i = 0; i < 4; i++) state = expectOk(reduceDraft(state, expireAt(state)));
     expect(state.phase).toBe("complete");
     expect(reduceDraft(state, setQueue("t1", ["rb2"]))).toEqual({
@@ -142,6 +145,9 @@ describe("queue-first autopick", () => {
 
   it("skips queued players who are already drafted, and those the roster can't take", () => {
     let state = expectOk(reduceDraft(started(), setQueue("t1", ["rb1", "qb2"])));
+    // t2 queued too (Task 5) — its own queue names exactly the player it would have autopicked
+    // from the pool anyway (qb1), so t1's queue-selection story below is unaffected.
+    state = expectOk(reduceDraft(state, setQueue("t2", ["qb1"])));
     // t1 autopicks rb1 (its queue head), t2 autopicks qb1 (the pool head). t1's RB slot is
     // now full, so the queue's remaining entry qb2 is the only legal one left in it.
     // `expireAt(state)` per the pattern above — fixed stamps one minute apart broke the
@@ -175,7 +181,10 @@ describe("queue-first autopick", () => {
   });
 
   it("returns null when nothing in the queue or the pool can be rostered", () => {
-    let state = started();
+    // Both teams queued (Task 5), same reason as the completion test above: a real roster full
+    // of picks is the point of this test, not four expiries that skip instead of filling one.
+    let state = expectOk(reduceDraft(started(), setQueue("t1", ["qb1"])));
+    state = expectOk(reduceDraft(state, setQueue("t2", ["rb1"])));
     // See the "is rejected once the draft is complete" test above for why `expireAt(state)`
     // rather than a fixed timestamp is required across repeated expiries.
     for (let i = 0; i < 4; i++) state = expectOk(reduceDraft(state, expireAt(state)));

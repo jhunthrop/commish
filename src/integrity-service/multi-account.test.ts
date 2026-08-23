@@ -5,7 +5,7 @@ import { auditEvents, draftActions, drafts, integrityFlags, leagues, players, se
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import type { DraftPoolEntry } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
-import { teamOnClock } from "@/draft-engine";
+import { DRAFT_SKIP_POLICY, teamOnClock } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { multiAccountSuspicion } from "@/integrity/similarity";
@@ -608,7 +608,7 @@ describe("the trigger timing that actually ships", () => {
     // existence for the first time, which is exactly the moment the new trigger fires on.
     const store = createDraftStore({ db, publish: async () => "1-0", clock: { now: () => NOW }, audit: logger });
     const teamIds = (await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, LEAGUE))).map((row) => row.id).sort();
-    const started = await store.applyAction(DRAFT, { v: 1, type: "START_DRAFT", minBid: 1, timestamp: NOW, draftOrder: teamIds, pool: [...POOL] });
+    const started = await store.applyAction(DRAFT, { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: NOW, draftOrder: teamIds, pool: [...POOL] });
     expect(started.ok).toBe(true);
 
     for (let taken = 0; taken < POOL.length; taken += 1) {

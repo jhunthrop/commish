@@ -25,6 +25,11 @@ const clockSchema = z.object({
   // default for a key `z.object` doesn't know about) would have been the actual bug here: the
   // room would never see a paused turn at all.
   pausedUntil: z.string().nullable().optional(),
+  // Task 5's owed picks: teamId -> the pick numbers they still owe. `.optional()` matches
+  // `DraftClockView.owedPicks` being optional for the identical reason `pausedUntil` is — the
+  // engine's own test suite predates this task and hand-builds `DraftClockView` literals that
+  // never set it. The server always sends it in a real payload.
+  owedPicks: z.record(z.string(), z.array(z.number()).readonly()).optional(),
 });
 
 /**
@@ -78,7 +83,8 @@ const bidPayloadSchema = z.object({
   minBid: z.number(),
 });
 const statusPayloadSchema = z.object({ ...common, phase: z.enum(["scheduled", "in_progress", "complete"]) });
-const expirePayloadSchema = z.object({ ...common, pickNumber: z.number().int().nonnegative() });
+/** `skipped` is Task 5's own addition: true when this expiry owed the pick instead of making it. */
+const expirePayloadSchema = z.object({ ...common, pickNumber: z.number().int().nonnegative(), skipped: z.boolean() });
 const queuePayloadSchema = z.object({ ...common, teamId: z.string().min(1) });
 
 /** The moderator's prompt. The queue itself is never on the wire — only this sentence. */

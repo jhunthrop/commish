@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { DraftAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
-import { DRAFT_CLOCK_SCHEDULE, AUCTION_CONFIG } from "./config";
+import { DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY, AUCTION_CONFIG } from "./config";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
 import { reduceDraft } from "./reduce";
 import { draftClockView, draftStateView, maxBidsFor } from "./selectors";
@@ -39,7 +39,7 @@ function apply(state: DraftState, action: DraftAction): DraftState {
 function started(format: "snake" | "auction"): DraftState {
   return apply(initialDraftState(configFor(format)), {
     v: 1,
-    type: "START_DRAFT", minBid: 1,
+    type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY,
     timestamp: "2026-09-01T00:00:00.000Z",
     draftOrder: ["t1", "t2"],
     pool: POOL,
@@ -58,6 +58,7 @@ describe("draftClockView", () => {
       nextTightening: null,
       upcoming: [],
       pausedUntil: null,
+      owedPicks: {},
     });
   });
 

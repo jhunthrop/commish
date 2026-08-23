@@ -52,6 +52,11 @@ describe("draft ticker", () => {
 
   it("submits TIMER_EXPIRE once the deadline has passed, producing an autopick", async () => {
     const { ticker, store, fixture } = await liveDraft();
+    // Queued (Task 5): the 8h tier here is well past the 1h skip floor, so a queueless team on
+    // the clock would be skipped rather than autopicked — this test is about the autopick path.
+    const onClockState = await store.getDraftState(fixture.draftId);
+    const onClockTeamId = onClockState!.draftOrder[0]!;
+    await store.applyAction(fixture.draftId, { v: DRAFT_ACTION_VERSION, type: "SET_QUEUE", timestamp: now, teamId: onClockTeamId, playerIds: ["qb1"] });
     // The raw 8h deadline would be 08:00Z, but `loadDraftConfig` attaches the real overnight
     // freeze (2-5 AM ET) and this turn's start (8 PM ET, 8/31) runs straight into it, pushing
     // the true deadline to 11:00Z — proof, in passing, that the ticker's own expiry sweep

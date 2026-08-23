@@ -53,13 +53,47 @@ export function maxBidFor(state: DraftState, teamId: string): number {
 }
 
 /**
- * Whose turn it is. Snake: the team on the clock. Auction: the team due to nominate —
- * null while a lot is live, because during bidding the clock belongs to everyone.
+ * Whether ANY team currently owes a pick (Task 5) — a plain existence check over `owedPicks`,
+ * which is never allowed to hold an empty array for a key (`redeemOwedPick`'s own invariant,
+ * `apply-pick.ts`), so key-presence alone answers it.
+ */
+export function hasOwedPicks(state: DraftState): boolean {
+  return Object.keys(state.owedPicks).length > 0;
+}
+
+/**
+ * The team whose owed pick is FIRST in line, or null when nobody owes one — Task 5's answer to
+ * "how do multiple owed picks order": whichever pick number was missed earliest, across every
+ * team, wins, because pick numbers are unique and monotonic across the whole draft. This is
+ * the CATCH-UP turn's own "on the clock", walked in `draftOrder` for a deterministic scan.
+ */
+export function catchUpTeamId(state: DraftState): string | null {
+  let bestTeam: string | null = null;
+  let bestPick = Infinity;
+  for (const teamId of state.draftOrder) {
+    const first = state.owedPicks[teamId]?.[0];
+    if (first !== undefined && first < bestPick) {
+      bestPick = first;
+      bestTeam = teamId;
+    }
+  }
+  return bestTeam;
+}
+
+/**
+ * Whose turn it is. Snake: the team on the clock, or — once every normal round has run
+ * (`state.pickNumber` past `totalPickCount`) and a pick is still owed — the CATCH-UP arm:
+ * whichever team is first in line for their owed pick (Task 5; `advanceSnake`, `snake.ts`, is
+ * what puts the state into this range in the first place, and only when a pick is actually
+ * owed). Auction: the team due to nominate — null while a lot is live, because during bidding
+ * the clock belongs to everyone.
  */
 export function teamOnClock(state: DraftState): string | null {
   if (state.phase !== "in_progress") return null;
   const auction = auctionOf(state);
-  if (auction === null) return snakeTeamForPick(state.draftOrder, state.pickNumber);
+  if (auction === null) {
+    return state.pickNumber <= totalPickCount(state) ? snakeTeamForPick(state.draftOrder, state.pickNumber) : catchUpTeamId(state);
+  }
   return auction.lot === null ? auction.nominatingTeamId : null;
 }
 
@@ -281,6 +315,15 @@ export interface DraftClockView {
    * explicitly, one way or the other, so no real payload this engine produces ever omits it.
    */
   readonly pausedUntil?: string | null;
+  /**
+   * teamId → the pick numbers that team currently owes (Task 5), the identical shape
+   * `DraftState.owedPicks` carries — so the room can render an owed pick as pending and tell
+   * the owing manager they can still make it, without a second lookup. Optional for the same
+   * reason `pausedUntil` is: this engine's own test suite predates Task 5 and hand-builds
+   * plenty of `DraftClockView` literals that never set it; `draftClockView` below always sets
+   * it explicitly, one way or the other, so no real payload this engine produces ever omits it.
+   */
+  readonly owedPicks?: Readonly<Record<string, readonly number[]>>;
 }
 
 /**
@@ -299,6 +342,7 @@ export function draftClockView(state: DraftState): DraftClockView {
     nextTightening: nextTightening(state),
     upcoming: upcomingOnClock(state, DRAFT_VIEW_CONFIG.upcomingCount),
     pausedUntil: pausedUntilFor(state),
+    owedPicks: state.owedPicks,
   };
 }
 

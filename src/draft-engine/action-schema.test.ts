@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DRAFT_QUEUE_CONFIG, PERSISTED_QUEUE_MAX } from "./config";
+import { DRAFT_QUEUE_CONFIG, DRAFT_SKIP_POLICY, PERSISTED_QUEUE_MAX } from "./config";
 import { clientDraftActionSchema, clientQueueSchema, draftActionSchema, toDraftAction, toSetQueueAction } from "./action-schema";
 
 describe("draftActionSchema (persisted jsonb boundary)", () => {
@@ -11,12 +11,23 @@ describe("draftActionSchema (persisted jsonb boundary)", () => {
   it("accepts a v1 START_DRAFT row with its order and pool", () => {
     const row = {
       v: 1,
-      type: "START_DRAFT", minBid: 1,
+      type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY,
       timestamp: "2026-09-01T00:00:00.000Z",
       draftOrder: ["t1", "t2"],
       pool: [{ playerId: "p1", position: "QB" }],
     };
     expect(draftActionSchema.parse(row)).toEqual(row);
+  });
+
+  it("defaults a persisted START_DRAFT row with no skipPolicy at all — the one place today's allowance may reach an old draft's replay, and only for that legacy row", () => {
+    const row = {
+      v: 1,
+      type: "START_DRAFT", minBid: 1,
+      timestamp: "2026-09-01T00:00:00.000Z",
+      draftOrder: ["t1", "t2"],
+      pool: [{ playerId: "p1", position: "QB" }],
+    };
+    expect(draftActionSchema.parse(row)).toEqual({ ...row, skipPolicy: DRAFT_SKIP_POLICY });
   });
 
   it("accepts a v1 SET_QUEUE row", () => {

@@ -32,6 +32,16 @@ export interface StartDraftAction {
    * never reads `AUCTION_CONFIG` while folding state. Present-but-unused for snake drafts.
    */
   readonly minBid: number;
+  /**
+   * The skip-and-owe allowance in force when this draft started (Task 5), snapshotted here for
+   * the identical reason `minBid` is: `reduceSnakeExpiry` reads it while folding state, so
+   * replaying this log must never depend on `DRAFT_SKIP_POLICY`'s CURRENT value. Present-but-
+   * unused for an auction draft, which never skips a nomination at all.
+   */
+  readonly skipPolicy: {
+    readonly maxOwedPerTeam: number;
+    readonly appliesAtOrAbovePickSeconds: number;
+  };
 }
 
 export interface MakePickAction {

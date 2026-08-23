@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { DraftPoolEntry, StartDraftAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
-import { DRAFT_CLOCK_SCHEDULE, type PauseWindow } from "./config";
+import { DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY, type PauseWindow } from "./config";
 import { reduceDraft } from "./reduce";
 import { currentClockSeconds, currentDeadline, currentTier, draftClockView, draftStateView, nextTightening, nudgeDeadline } from "./selectors";
 
@@ -23,7 +23,7 @@ const CONFIG: DraftConfig = {
 };
 
 function startedAt(timestamp: string, config: DraftConfig = CONFIG): DraftState {
-  const start: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp, draftOrder: ["t1", "t2"], pool: POOL };
+  const start: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp, draftOrder: ["t1", "t2"], pool: POOL };
   const result = reduceDraft(initialDraftState(config), start);
   if (!result.ok) throw new Error(result.reason);
   return result.state;
@@ -124,6 +124,7 @@ describe("the overnight pause, seen through the state", () => {
       v: 1,
       type: "START_DRAFT",
       minBid: 1,
+      skipPolicy: DRAFT_SKIP_POLICY,
       timestamp: turnStartedAt,
       draftOrder: ["t_alice", "t_bob"],
       pool: POOL,
@@ -164,7 +165,7 @@ describe("the overnight pause, seen through the state", () => {
   it("never extends a deadline when no pause window is configured at all", () => {
     // The optional field's other value: omitted entirely, exactly like every `DraftConfig`
     // this suite's OTHER describe blocks build. Behavior must be identical to before this task.
-    const start: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: "2026-09-15T03:30:00.000Z", draftOrder: ["t1", "t2"], pool: POOL };
+    const start: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: "2026-09-15T03:30:00.000Z", draftOrder: ["t1", "t2"], pool: POOL };
     // 11:30 PM ET, more than 48h from kickoff, so the 4h tier would otherwise straddle the freeze.
     const config: DraftConfig = { ...CONFIG, kickoffAt: days3After("2026-09-15T03:30:00.000Z") };
     const result = reduceDraft(initialDraftState(config), start);
@@ -174,7 +175,7 @@ describe("the overnight pause, seen through the state", () => {
   });
 
   it("never extends a deadline when the configured window is explicitly null", () => {
-    const start: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: "2026-09-15T03:30:00.000Z", draftOrder: ["t1", "t2"], pool: POOL };
+    const start: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: "2026-09-15T03:30:00.000Z", draftOrder: ["t1", "t2"], pool: POOL };
     const config: DraftConfig = { ...CONFIG, kickoffAt: days3After("2026-09-15T03:30:00.000Z"), pauseWindow: null };
     const result = reduceDraft(initialDraftState(config), start);
     if (!result.ok) throw new Error(result.reason);

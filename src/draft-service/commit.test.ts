@@ -4,7 +4,7 @@ import type { DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { draftActions, draftPicks, drafts, matchups, players, rosterSlots, weeks } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
-import { DRAFT_CLOCK_SCHEDULE, currentDeadline, initialDraftState, reduceDraft, type DraftConfig, type DraftState } from "@/draft-engine";
+import { DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY, currentDeadline, initialDraftState, reduceDraft, type DraftConfig, type DraftState } from "@/draft-engine";
 import { LEAGUE_CONFIG } from "@/league";
 import { commitDraftState } from "./commit";
 import { createDraftStore } from "./store";
@@ -79,7 +79,7 @@ async function seedCompletedActionLog(draftId: string, leagueId: string, teamIds
     clockSchedule: DRAFT_CLOCK_SCHEDULE,
   };
   const actions: DraftAction[] = [
-    { v: 1, type: "START_DRAFT", minBid: 1, timestamp: clock.now(), draftOrder: teamIds, pool: SPRINT_POOL },
+    { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: clock.now(), draftOrder: teamIds, pool: SPRINT_POOL },
   ];
   let state = initialDraftState(config);
   for (const action of actions) {
@@ -334,6 +334,7 @@ describe("commitDraftState — the empty-rosters branch", () => {
       rosters: {},
       budgets: {},
       queues: {},
+      owedPicks: {},
       auction: null,
       pickNumber: 1,
       turnStartedAt: null,

@@ -2,7 +2,7 @@ import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { auditChains, chatMessages, drafts, integrityFlags, leagues, lineupSlots, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { currentDeadline } from "@/draft-engine";
+import { currentDeadline, DRAFT_SKIP_POLICY } from "@/draft-engine";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { autoSetLineupInTx, autoSetLineupsForWeek } from "@/league-service/auto-lineup";
@@ -155,7 +155,12 @@ describe("the audit anchor is the last lock, FK locks included", () => {
     await joinDb.insert(users).values({ id: "user_joiner", email: "joiner@test.local", displayName: "Joiner" });
 
     const store = pickStore();
-    await store.applyAction(draftId, { v: 1, type: "START_DRAFT", minBid: 1, timestamp: clock.now(), draftOrder: teamIds, pool: POOL });
+    await store.applyAction(draftId, { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: clock.now(), draftOrder: teamIds, pool: POOL });
+    const started = await store.getDraftState(draftId);
+    // Queued (Task 5): this fixture's kickoff is 9+ days out (a slow tier), where a queueless
+    // team is now skip-eligible rather than autopicked — this test is specifically about the
+    // AUTOPICK path's own lock order (its comments below say so throughout).
+    await store.applyAction(draftId, { v: 1, type: "SET_QUEUE", timestamp: clock.now(), teamId: started!.draftOrder[0]!, playerIds: ["qb1"] });
     const state = await store.getDraftState(draftId);
 
     let holdsLeagueLock: () => void = () => {};
@@ -226,7 +231,7 @@ describe("the audit anchor is the last lock, FK locks included", () => {
       await joinDb.insert(users).values({ id: "user_joiner", email: "joiner@test.local", displayName: "Joiner" });
 
       const store = pickStore();
-      await store.applyAction(draftId, { v: 1, type: "START_DRAFT", minBid: 1, timestamp: clock.now(), draftOrder: teamIds, pool: POOL });
+      await store.applyAction(draftId, { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: clock.now(), draftOrder: teamIds, pool: POOL });
       const state = await store.getDraftState(draftId);
 
       const join = joinDb.transaction((tx) =>

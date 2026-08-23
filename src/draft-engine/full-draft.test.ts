@@ -3,7 +3,7 @@ import type { DraftPoolEntry, StartDraftAction } from "@/domain/draft";
 import type { Position } from "@/domain/player";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { initialDraftState, totalRosterSlots, type DraftConfig, type DraftState } from "./state";
-import { DRAFT_CLOCK_SCHEDULE } from "./config";
+import { DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY } from "./config";
 import { snakeTeamForPick } from "./order";
 import { isComplete, remainingBudget } from "./selectors";
 import { expireAt, submitCommand } from "./test-support";
@@ -35,7 +35,7 @@ const POOL: readonly DraftPoolEntry[] = (() => {
 })();
 
 const T = "2026-09-01T00:00:00.000Z";
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: TEAMS, pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: T, draftOrder: TEAMS, pool: POOL };
 
 function apply(state: DraftState, action: Parameters<typeof submitCommand>[1]): DraftState {
   const result = submitCommand(state, action);

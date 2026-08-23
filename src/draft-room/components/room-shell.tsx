@@ -62,6 +62,7 @@ export function RoomShell({
       view={view}
       pendingPlayerId={room.pendingPlayerId}
       canAct={canAct}
+      myTeamId={room.myTeamId}
       actionLabel={actionLabel}
       submitting={room.submitting}
       onAct={onAct}

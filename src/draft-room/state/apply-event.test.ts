@@ -160,7 +160,7 @@ describe("applyDraftEvent — auction lots", () => {
 
 describe("applyDraftEvent — clock-only events", () => {
   it("adopts the clock on a timer expiry", () => {
-    const payload = { draftId: "d1", clock: clock({ onClockTeamId: "t2" }), pickNumber: 1 };
+    const payload = { draftId: "d1", clock: clock({ onClockTeamId: "t2" }), pickNumber: 1, skipped: false };
     const view = (applyDraftEvent(snakeView, frame("draft.timer_expire", payload)) as { view: DraftStateView }).view;
     expect(view.onClockTeamId).toBe("t2");
     expect(view.picks).toEqual([]);

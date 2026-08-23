@@ -18,6 +18,13 @@ export const SYSTEM_ACTION_CODES = [
    * is its own notice.
    */
   "draft_auto_started",
+  /**
+   * The clock skipped a manager instead of autopicking for them (Task 5, Phase 3.5) — NFFC's
+   * forgiveness for a manager who never set a queue, in a tier slow enough for the room to still
+   * be asleep. `NoticeContexts.draft_pick_skipped` (`@/integrity/notices`) is its own notice, the
+   * same one-code-two-writers shape `draft_auto_started`/`lineup_auto_set` both already use.
+   */
+  "draft_pick_skipped",
 ] as const;
 
 export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
@@ -59,6 +66,10 @@ export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
  *    fact about the league's shared calendar, true for everyone in it, about nobody's conduct. A
  *    member whose draft started without a human pressing anything is owed the sentence that says
  *    so.
+ *  - `draft_pick_skipped` is SUBJECT-scoped, on `lineup_auto_set`'s reasoning exactly (Task 5,
+ *    Phase 3.5): the competitive-sensitivity argument that keeps one manager's lapse private
+ *    applies here too — a skip is forgiveness, not news the rest of the room needs broadcast to
+ *    them, and the board already renders the pick as pending without naming who it is pending on.
  */
 export type SystemActionVisibility = "everyone" | "subject_only" | "hidden";
 
@@ -69,6 +80,7 @@ export const SYSTEM_ACTION_VISIBILITY: Readonly<Record<SystemActionCode, SystemA
   trade_held_for_review: "hidden",
   tier_blocked_join: "hidden",
   draft_auto_started: "everyone",
+  draft_pick_skipped: "subject_only",
 };
 
 /**

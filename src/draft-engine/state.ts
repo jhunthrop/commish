@@ -1,7 +1,7 @@
 import type { DraftFormat } from "@/domain/league";
 import type { DraftPoolEntry, DraftStatus } from "@/domain/draft";
 import type { RosterSlot, RosterSlotConfig, RosterSlotType } from "@/domain/roster";
-import type { ClockTier, PauseWindow } from "./config";
+import type { ClockTier, DraftSkipPolicy, PauseWindow } from "./config";
 
 /** Static, DB-derived setup. Never changes during a draft. */
 export interface DraftConfig {
@@ -23,6 +23,16 @@ export interface DraftConfig {
    * exactly what an absent field and an explicit `null` both mean to every reader of it.
    */
   readonly pauseWindow?: PauseWindow | null;
+  /**
+   * The skip-and-owe allowance (Task 5), set from `StartDraftAction.skipPolicy` by `reduceStart`
+   * — never by `loadDraftConfig`, unlike `pauseWindow`/`clockSchedule` above. `reduceSnakeExpiry`
+   * is a REDUCER that reads this field while folding state, so it must be a value frozen into
+   * this draft's own history rather than one re-read fresh on every load (`config.ts`'s
+   * `DraftSkipPolicy` docblock explains the asymmetry in full). Null before `START_DRAFT` runs;
+   * every hand-written `DraftConfig` literal in this engine's own test suite that never drives a
+   * real START_DRAFT can leave it absent, the same allowance `pauseWindow` already gets.
+   */
+  readonly skipPolicy?: DraftSkipPolicy | null;
 }
 
 export interface CompletedPick {
@@ -81,6 +91,16 @@ export interface DraftState {
   readonly budgets: Readonly<Record<string, number>>;
   /** teamId → that team's ranked autopick queue, best first. Absent = no queue. */
   readonly queues: Readonly<Record<string, readonly string[]>>;
+  /**
+   * teamId → the pick NUMBERS that team was skipped at, in the order it owes them (Task 5).
+   * Not a boolean (the pick number is what the board renders, and a redeemed pick has to be
+   * stamped with it) and not a count (a redeemed pick has to know which slot in the draft's own
+   * history it fills). Never holds an empty array for a key — every writer here removes the key
+   * entirely once a team's last owed pick is redeemed, which is the invariant `hasOwedPicks`/
+   * `catchUpTeamId` (`selectors.ts`) both lean on. Auction never populates this at all: a frozen
+   * nomination freezes every bidder, so Task 5 excludes auction entirely.
+   */
+  readonly owedPicks: Readonly<Record<string, readonly number[]>>;
   readonly auction: AuctionState | null;
   /** Snake: the pick about to be made. Auction: the lot about to be awarded. 1-based. */
   readonly pickNumber: number;
@@ -122,6 +142,7 @@ export function initialDraftState(config: DraftConfig): DraftState {
     rosters: {},
     budgets: {},
     queues: {},
+    owedPicks: {},
     auction: null,
     pickNumber: 0,
     turnStartedAt: null,

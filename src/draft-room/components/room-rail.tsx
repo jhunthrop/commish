@@ -91,6 +91,17 @@ function turnLabel(view: DraftStateView): string | null {
 }
 
 /**
+ * How many picks the room currently owes, total across every team (Task 5) — a plain count,
+ * never a name: the board's own pending cells (and each owing manager's own dock) say WHO,
+ * this rail says only THAT, the same "no accusation" restraint `copyViolations` holds every
+ * notice to. Zero for an auction (Task 5 excludes it entirely) and before `owedPicks` rides
+ * the payload at all (this engine's own test suite predates Task 5).
+ */
+function pendingPickCount(view: DraftStateView): number {
+  return Object.values(view.owedPicks ?? {}).reduce((total, owed) => total + owed.length, 0);
+}
+
+/**
  * Whose turn it is, said once. An auction lot has no `onClockTeamId` by design — the clock
  * belongs to everyone while bidding is open — so this branches on `view.format` rather than
  * ever claiming somebody is "on the clock" during a live lot. This is also where the
@@ -188,6 +199,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
   const tightening = formatTightening(view.nextTightening, now, pausedUntil);
   const myTeamName = personalId === null ? null : teamName(teamsById(teams), personalId, "Your team");
   const turnWhere = turnLabel(view);
+  const pending = pendingPickCount(view);
 
   return (
     <header
@@ -205,6 +217,13 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
         <span data-testid="turn-label" className="font-display text-sm font-semibold uppercase tracking-wide text-text-muted">
           {turnWhere}
         </span>
+      )}
+      {pending === 0 ? null : (
+        // No name, no accusation — the board's own pending cells and each owing manager's own
+        // dock already say who; this says only that the draft is waiting on somebody.
+        <Badge tone="neutral" data-testid="pending-picks">
+          {pending === 1 ? "1 pick pending" : `${pending} picks pending`}
+        </Badge>
       )}
 
       <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 lg:flex-nowrap">

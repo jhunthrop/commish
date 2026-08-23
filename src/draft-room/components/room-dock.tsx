@@ -142,6 +142,7 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
  */
 function PrimarySlot({
   canAct,
+  owesPick,
   actionLabel,
   targetId,
   targetName,
@@ -150,6 +151,9 @@ function PrimarySlot({
   yourTurn,
 }: {
   readonly canAct: boolean;
+  /** True when this team owes a pick from an earlier skip (Task 5) — checked only once
+   *  `canAct` (this team's REAL current turn) has already had its say below. */
+  readonly owesPick: boolean;
   readonly actionLabel: string;
   readonly targetId: string | null;
   readonly targetName: string;
@@ -168,6 +172,16 @@ function PrimarySlot({
     return (
       <p data-testid="dock-primary-empty" className="shrink-0 self-center font-display text-display-sm font-bold leading-display text-negative">
         Your pick. Take somebody from the pool.
+      </p>
+    );
+  }
+  if (owesPick) {
+    // The skip's own courtesy (Task 5): no blame, no banner — the same primary slot every
+    // other turn state uses, saying the one thing this manager can do. The pool's own Draft
+    // buttons are what actually makes the pick; this is the standing answer to "what now?".
+    return (
+      <p data-testid="dock-owed-pick" className="shrink-0 self-center font-display text-display-sm font-semibold leading-display text-warning">
+        Your pick passed while you were away. Make it whenever you are ready.
       </p>
     );
   }
@@ -204,6 +218,10 @@ export function RoomDock({
   const preStart = view.phase === "scheduled";
   const draftedIds = new Set(preStart ? [] : queue.filter((playerId) => !available.has(playerId)));
   const targetId = queue.find((playerId) => !draftedIds.has(playerId)) ?? null;
+  // Task 5: does MY team owe a pick from an earlier skip? Checked off `view.owedPicks` (rides
+  // every payload — `DraftClockView`'s own docblock), never a second fetch. Quiet on purpose —
+  // a courtesy is not a hot turn, so it never flips `mode` the way `canAct` does below.
+  const owesPick = myTeamId !== null && (view.owedPicks?.[myTeamId]?.length ?? 0) > 0;
   const mode: DockMode = bidConsole !== null ? "bidding" : canAct ? "acting" : "watching";
 
   return (
@@ -215,6 +233,7 @@ export function RoomDock({
       {bidConsole ?? (
         <PrimarySlot
           canAct={canAct}
+          owesPick={owesPick}
           actionLabel={actionLabel}
           targetId={targetId}
           targetName={targetId === null ? "" : playerName(playersById, targetId)}

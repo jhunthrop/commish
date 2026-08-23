@@ -116,6 +116,31 @@ describe("RoomDock", () => {
     expect(screen.getByRole("list", { name: "Your queue" })).toBeInTheDocument();
   });
 
+  // Task 5, Phase 3.5: the skip's own courtesy. `canAct` stays false (it's genuinely t2's
+  // turn), so this pins that the owed-pick message fires off a DIFFERENT signal (owedPicks)
+  // than the ordinary turn check.
+  it("tells the owing manager their pick passed and they can still make it, even on somebody else's turn", () => {
+    const view: DraftStateView = { ...SNAKE_VIEW, ...waiting, owedPicks: { t1: [1] } };
+    render(<RoomDock {...props} view={view} canAct={false} />);
+    expect(screen.getByTestId("dock-owed-pick")).toHaveTextContent("Your pick passed while you were away. Make it whenever you are ready.");
+    // No accusation, no blame voice — the integrity notices discipline applies to this copy too.
+    expect(screen.queryByText(/missed|failed/i)).toBeNull();
+  });
+
+  it("says nothing about an owed pick that belongs to somebody else", () => {
+    const view: DraftStateView = { ...SNAKE_VIEW, ...waiting, owedPicks: { t2: [1] } };
+    render(<RoomDock {...props} view={view} canAct={false} />);
+    expect(screen.queryByTestId("dock-owed-pick")).toBeNull();
+    expect(screen.getByTestId("dock-your-turn")).toBeInTheDocument();
+  });
+
+  it("puts the real, current turn ahead of an owed-pick courtesy when both are true at once", () => {
+    const view: DraftStateView = { ...SNAKE_VIEW, owedPicks: { t1: [1] } };
+    render(<RoomDock {...props} view={view} canAct queue={[]} />);
+    expect(screen.getByTestId("dock-primary-empty")).toHaveTextContent("Your pick. Take somebody from the pool.");
+    expect(screen.queryByTestId("dock-owed-pick")).toBeNull();
+  });
+
   it("never strikes a queued player through before the draft has started", () => {
     const scheduled: DraftStateView = { ...SNAKE_VIEW, phase: "scheduled", availablePlayerIds: [], onClockTeamId: null, upcoming: [] };
     render(<RoomDock {...props} view={scheduled} />);

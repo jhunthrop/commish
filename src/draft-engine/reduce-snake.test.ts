@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { DraftPoolEntry, StartDraftAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
-import { DRAFT_CLOCK_SCHEDULE } from "./config";
+import { DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY } from "./config";
 import { reduceDraft } from "./reduce";
 import { availablePool, bestAvailableFor, isComplete, openSlotCount, teamOnClock } from "./selectors";
 
@@ -36,7 +36,7 @@ const CONFIG: DraftConfig = {
 
 const START: StartDraftAction = {
   v: 1,
-  type: "START_DRAFT", minBid: 1,
+  type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY,
   timestamp: "2026-09-01T00:00:00.000Z",
   draftOrder: ["t1", "t2"],
   pool: POOL,

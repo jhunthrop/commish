@@ -174,6 +174,17 @@ describe("NOTICE_TEMPLATES", () => {
     expect(started.body).not.toContain("There is no reply to this message.");
   });
 
+  it("says what happened when a pick is skipped instead of penalized, verbatim (Task 5, Phase 3.5)", () => {
+    const skipped = renderNotice("draft_pick_skipped", NOTICE_SAMPLES.draft_pick_skipped);
+    expect(skipped.title).toBe("Your pick passed in Sunday Money");
+    expect(skipped.body).toBe("Your pick passed while you were away. You can still make it, and the draft will wait for it before it finishes.");
+    // A courtesy, not a sanction: nothing about this manager's own conduct to appeal.
+    expect(skipped.body).not.toContain("There is no reply to this message.");
+    // The whole point of a skip is that the pick is still theirs — never "missed", the same
+    // failure mode `lineup_auto_set`'s own copy avoids.
+    expect(skipped.body).not.toContain("missed");
+  });
+
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
@@ -182,6 +193,7 @@ describe("NOTICE_TEMPLATES", () => {
       "chat_message_removed",
       "draft_auto_picked",
       "draft_auto_started",
+      "draft_pick_skipped",
       "lineup_auto_set",
       "operator_warning",
       "review_removed",

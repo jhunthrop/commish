@@ -257,6 +257,18 @@ export interface NoticeContexts {
   readonly draft_auto_started: {
     readonly leagueName: string;
   };
+  /**
+   * `reduceSnakeExpiry`'s skip branch (`@/draft-engine/snake`, Task 5, Phase 3.5), sent ONLY to
+   * the manager the clock skipped instead of penalizing — `SYSTEM_ACTION_VISIBILITY
+   * .draft_pick_skipped` (`@/integrity/system-actions`) is `"subject_only"`, on the identical
+   * competitive-sensitivity reasoning `lineup_auto_set` already carries. Deliberately does NOT
+   * name the player nobody chose (there wasn't one) or accuse the manager of missing anything —
+   * the whole point of a skip, unlike an autopick, is that nothing was decided FOR them: they
+   * still own the pick, whenever they come back to it.
+   */
+  readonly draft_pick_skipped: {
+    readonly leagueName: string;
+  };
 }
 
 /**
@@ -436,6 +448,15 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   draft_auto_started: ({ leagueName }) => ({
     title: `Your draft in ${leagueName} has started`,
     body: `The draft reached its scheduled time, so we started it. Head to the draft room now, or let the clock queue your picks if you cannot make it. We will tell you when it is your turn.`,
+  }),
+  // No "no reply to this message" line: this is a courtesy, not a sanction, and there is
+  // nothing about the member's own conduct to appeal. The persona panel's own question (Task 5
+  // Step 6) is whether a casual manager reading this understands they still own the pick — the
+  // second sentence is what answers that, in the same plain-spoken register `lineup_auto_set`'s
+  // own template closes on.
+  draft_pick_skipped: ({ leagueName }) => ({
+    title: `Your pick passed in ${leagueName}`,
+    body: "Your pick passed while you were away. You can still make it, and the draft will wait for it before it finishes.",
   }),
 };
 

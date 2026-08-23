@@ -88,6 +88,19 @@ describe("RoomRail", () => {
     expect(screen.getByTestId("countdown")).toBeInTheDocument();
   });
 
+  // Task 5, Phase 3.5: a plain count, no name — the board's own pending cells and each owing
+  // manager's own dock say WHO; this says only THAT the room is waiting on somebody.
+  it("shows a neutral pending-picks count when the draft owes one, and none when it owes nothing", () => {
+    const { rerender } = render(<RoomRail {...props} view={liveView({ owedPicks: { t1: [1] } })} myTeamId="t2" />);
+    expect(screen.getByTestId("pending-picks")).toHaveTextContent("1 pick pending");
+
+    rerender(<RoomRail {...props} view={liveView({ owedPicks: { t1: [1], t3: [2] } })} myTeamId="t2" />);
+    expect(screen.getByTestId("pending-picks")).toHaveTextContent("2 picks pending");
+
+    rerender(<RoomRail {...props} view={liveView({ owedPicks: {} })} myTeamId="t2" />);
+    expect(screen.queryByTestId("pending-picks")).toBeNull();
+  });
+
   it("carries an InfoTip on the format name and on the on-the-clock label", () => {
     render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
     expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();

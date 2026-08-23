@@ -286,9 +286,16 @@ describe("an autopicked notice, watched by two SSE clients — the manager's own
       { watcher: leaguemateWatcher, send: () => publisher.publishToUser({ userId: leaguemateUserId, leagueId: fixture.leagueId, type: "chat.message", payload: { probe: true } }) },
     ]);
 
+    // Queued (Task 5): this fixture's kickoff sits 9+ days out, a slow tier, where a queueless
+    // team is now skip-eligible rather than autopicked — this test is about the autopick path.
+    const queued = await draft.applyAction(fixture.draftId, {
+      v: 1, type: "SET_QUEUE", timestamp: clock.now(), teamId: onClock, playerIds: ["p001"],
+    });
+    if (!queued.ok) throw new Error(queued.reason);
+
     // The ticker's own mechanism: the clock ran out, so this autopicks for whoever is on it.
     const result = await draft.applyAction(fixture.draftId, {
-      v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(started.state) ?? clock.now(),
+      v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(queued.state) ?? clock.now(),
     });
     if (!result.ok) throw new Error(result.reason);
 

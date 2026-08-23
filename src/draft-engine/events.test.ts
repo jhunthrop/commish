@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { DRAFT_ACTION_VERSION, type DraftAction, type DraftPoolEntry, type StartDraftAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
-import { AUCTION_CONFIG, DRAFT_CLOCK_SCHEDULE } from "./config";
+import { AUCTION_CONFIG, DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY } from "./config";
 import { reduceDraft, type DraftReduceResult } from "./reduce";
 import { draftEventsFor } from "./events";
 import { draftClockView } from "./selectors";
@@ -23,7 +23,7 @@ const CONFIG: DraftConfig = {
   draftId: "d1", leagueId: "l1", format: "snake", kickoffAt: "2026-09-10T17:00:00.000Z",
   auctionBudget: null, slotConfig: SLOTS, clockSchedule: DRAFT_CLOCK_SCHEDULE,
 };
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
 
 /** Applies an action and returns both the new state and the events it produced. */
 function step(state: DraftState, action: DraftAction) {
@@ -72,6 +72,7 @@ describe("draftEventsFor", () => {
             // Two teams, two roster spots each: the whole board, current turn first.
             upcoming: ["t1", "t2", "t2", "t1"],
             pausedUntil: null,
+            owedPicks: {},
           },
         },
       },
@@ -98,20 +99,30 @@ describe("draftEventsFor", () => {
             nextTightening: expect.anything(),
             upcoming: ["t2", "t2", "t1"],
             pausedUntil: null,
+            owedPicks: {},
           },
         },
       },
     ]);
   });
 
-  it("emits the expiry before the autopick it caused, so clients render them in order", () => {
+  /** t1's queue names the exact player `bestAvailableFor` would have picked anyway (top of
+   *  `POOL`), so every assertion below is byte-identical to a plain autopick — it exists only
+   *  to keep this slow-tier, far-from-kickoff fixture off Task 5's skip path, which a queued
+   *  team is never eligible for. */
+  function queuedOpen(): DraftState {
     const opened = step(initialDraftState(CONFIG), START).state;
+    return expectOk(reduceDraft(opened, { v: 1, type: "SET_QUEUE", timestamp: T, teamId: "t1", playerIds: ["qb1"] }));
+  }
+
+  it("emits the expiry before the autopick it caused, so clients render them in order", () => {
+    const opened = queuedOpen();
     const { events } = step(opened, expireAt(opened));
     expect(events.map((e) => e.type)).toEqual(["draft.timer_expire", "draft.pick"]);
   });
 
   it("carries an exact-shape draft.timer_expire payload: the EXPIRED pick's own number, plus the post-autopick clock", () => {
-    const opened = step(initialDraftState(CONFIG), START).state;
+    const opened = queuedOpen();
     const { events } = step(opened, expireAt(opened));
     const timerExpireEvent = events.find((e) => e.type === "draft.timer_expire");
     expect(timerExpireEvent).toEqual({
@@ -120,9 +131,12 @@ describe("draftEventsFor", () => {
         draftId: "d1",
         // The pick the clock ran out on — the pre-transition pickNumber, not the post-autopick one.
         pickNumber: 1,
+        // Task 5: false because t1's queue means this was a real autopick, never a skip.
+        skipped: false,
         clock: {
           phase: "in_progress",
-          sequence: 2,
+          // START (seq 1) + SET_QUEUE (seq 2, Task 5's own fixture setup) + this expiry (seq 3).
+          sequence: 3,
           // The autopick already advanced to the NEXT pick by the time this event is built.
           pickNumber: 2,
           onClockTeamId: "t2",
@@ -131,13 +145,24 @@ describe("draftEventsFor", () => {
           nextTightening: { at: "2026-09-03T17:00:00.000Z", pickSeconds: 4 * 60 * 60 },
           upcoming: ["t2", "t2", "t1"],
           pausedUntil: null,
+          owedPicks: {},
         },
       },
     });
   });
 
+  it("emits ONLY draft.timer_expire, flagged skipped, for a queueless team at a slow tier (Task 5)", () => {
+    const opened = step(initialDraftState(CONFIG), START).state; // t1 has no queue; the 8h tier is well past the 1h skip floor
+    const { events } = step(opened, expireAt(opened));
+    expect(events.map((e) => e.type)).toEqual(["draft.timer_expire"]);
+    expect(events[0]!.payload).toMatchObject({ pickNumber: 1, skipped: true, clock: { owedPicks: { t1: [1] } } });
+  });
+
   it("emits draft.status when the last pick completes the draft", () => {
-    let state = step(initialDraftState(CONFIG), START).state;
+    // Both teams queued (Task 5): otherwise this far-from-kickoff, no-queue fixture would skip
+    // each team's first turn instead of completing the draft in exactly four expiries.
+    let state = queuedOpen();
+    state = expectOk(reduceDraft(state, { v: 1, type: "SET_QUEUE", timestamp: T, teamId: "t2", playerIds: ["qb2"] }));
     let events: readonly { type: string }[] = [];
     for (let i = 0; i < 4; i++) {
       const next = step(state, expireAt(state));
@@ -163,6 +188,7 @@ describe("draftEventsFor", () => {
       // The lot's nominator has already acted, so the rotation ahead starts with the other team.
       upcoming: ["t2", "t1", "t2", "t1", "t2", "t1", "t2", "t1", "t2", "t1", "t2", "t1"],
       pausedUntil: null,
+      owedPicks: {},
     };
 
     const nominated = step(opened, { v: 1, type: "NOMINATE", timestamp: T, teamId: "t1", playerId: "qb1", openingBid: 2 });
@@ -244,7 +270,7 @@ function moneyConfigFor(format: "snake" | "auction"): DraftConfig {
 function moneyStartedDraft(format: "snake" | "auction"): DraftState {
   return moneyStep(initialDraftState(moneyConfigFor(format)), {
     v: DRAFT_ACTION_VERSION,
-    type: "START_DRAFT", minBid: 1,
+    type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY,
     timestamp: "2026-09-01T00:00:00.000Z",
     draftOrder: ["t1", "t2"],
     pool: MONEY_POOL,

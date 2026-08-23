@@ -55,6 +55,31 @@ export const DRAFT_PAUSE_WINDOW: PauseWindow = {
   appliesAtOrAbovePickSeconds: 60 * 60,
 };
 
+/**
+ * The skip-and-owe allowance (Task 5): NFFC's forgiveness for a manager who never set a
+ * queue. Read ONLY by `reduceSnakeExpiry` (`snake.ts`) — a REDUCER, not a command-time guard
+ * like `DRAFT_PAUSE_WINDOW` — so it cannot travel the way `pauseWindow`/`clockSchedule` do
+ * (re-read fresh from `loadDraftConfig` on every load). A deploy that changed the allowance
+ * mid-draft would otherwise change what an already-persisted TIMER_EXPIRE did the next time
+ * that log replayed. Instead this is snapshotted onto the `START_DRAFT` action itself
+ * (`StartDraftAction.skipPolicy`, `@/domain/draft`), the same way `AUCTION_CONFIG.minBid`
+ * already is, and `reduceStart` copies it into `DraftConfig.skipPolicy` — the value baked into
+ * that one draft's own history, forever.
+ */
+export interface DraftSkipPolicy {
+  /** How many picks a team may owe at once before a further stall autopicks instead of skipping. */
+  readonly maxOwedPerTeam: number;
+  /** The room is awake below this tier's pick length, so a skip never applies to it — the
+   *  90-second (or 10-minute) floor a live room runs at near kickoff always autopicks. */
+  readonly appliesAtOrAbovePickSeconds: number;
+}
+
+/** One owed pick, ever, per team — Underdog's own ceiling — and only at the hour-or-longer tiers. */
+export const DRAFT_SKIP_POLICY: DraftSkipPolicy = {
+  maxOwedPerTeam: 1,
+  appliesAtOrAbovePickSeconds: 60 * 60,
+};
+
 export const DRAFT_QUEUE_CONFIG = {
   /**
    * Longest queue a team may store. Bounds both the jsonb action row and the reorder UI;
