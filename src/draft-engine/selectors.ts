@@ -242,9 +242,11 @@ function pausedUntilFor(state: DraftState): string | null {
  * still spans the freeze itself (a due time that already sits at the window's open, for
  * instance, never moves at all), so a range check against those two alone is not enough — the
  * moderator needs a direct answer to "is right now inside the freeze," which is exactly this.
- * Reading `pauseWindow` against a caller-supplied instant, outside `admitCommand`, is the one
- * other place the reducer-purity ruling (`pause.ts`'s own docblock) allows: `nudge.ts` never
- * applies an action, so nothing here can ever change what a replay decides.
+ * A plain selector like every other function in this file: it reads state and a caller-supplied
+ * instant, decides nothing, and applies no action, so nothing here can ever change what a
+ * replay decides — the reducer-purity ruling (`pause.ts`'s own docblock) is about `reduce.ts`,
+ * `snake.ts`, `auction.ts` and `apply-pick.ts` never reading `pauseWindow`, and this file was
+ * always the one place that does.
  */
 export function isPaused(state: DraftState, atIso: string): boolean {
   const window = effectivePauseWindow(state);

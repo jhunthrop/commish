@@ -68,10 +68,11 @@ export function createNudgeScheduler({
         // `config.pauseWindow` and the current tier call for it), but the OPEN INTERVAL between
         // two extended instants still spans the freeze itself — a due time that already sits
         // exactly at the window's open never moves at all, for instance — so the range check
-        // above is not sufficient on its own. `isPaused` is the direct answer to "is right now
-        // inside the freeze," and is the one other place besides `admitCommand` the
-        // reducer-purity ruling (`pause.ts`'s own docblock) allows a live read of `pauseWindow`:
-        // this function never applies an action, so nothing here can ever change a replay.
+        // above is not sufficient on its own. `isPaused` is `selectors.ts`'s own direct answer
+        // to "is right now inside the freeze": a plain selector, reading `state` and this
+        // caller-supplied `now`, deciding nothing and applying no action — the reducer-purity
+        // ruling (`pause.ts`'s own docblock) is about `reduce.ts`/`snake.ts`/`auction.ts`/
+        // `apply-pick.ts` never reading `pauseWindow`, which this function never does either.
         if (isPaused(state, now)) return "skipped";
 
         const claimed = await db

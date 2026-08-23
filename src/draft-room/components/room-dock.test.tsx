@@ -31,6 +31,21 @@ describe("RoomDock", () => {
     });
   });
 
+  // Task 4 fix round 1 (review F1): `RoomDock`'s call into `formatYourTurn` dropped
+  // `view.pausedUntil` entirely, so a paused draft showed the flat, understated ETA instead of
+  // the honest "once picks resume" copy — this pair pins both sides of that wire-up.
+  it("gives the honest 'once picks resume' answer instead of a flat ETA while the room is paused", () => {
+    const view: DraftStateView = { ...SNAKE_VIEW, ...waiting, pausedUntil: "2026-09-15T09:00:00.000Z" };
+    render(<RoomDock {...props} view={view} />);
+    expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("You're up in 2 picks, once picks resume.");
+  });
+
+  it("keeps the flat ETA when the room isn't paused", () => {
+    const view: DraftStateView = { ...SNAKE_VIEW, ...waiting, pausedUntil: null };
+    render(<RoomDock {...props} view={view} />);
+    expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("You're up in 2 picks (~16h 0m).");
+  });
+
   it("morphs its left edge into one button that drafts the top of the queue", () => {
     const onAct = vi.fn();
     render(<RoomDock {...props} canAct onAct={onAct} />);

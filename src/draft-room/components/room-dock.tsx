@@ -220,7 +220,7 @@ export function RoomDock({
           targetName={targetId === null ? "" : playerName(playersById, targetId)}
           submitting={submitting}
           onAct={onAct}
-          yourTurn={formatYourTurn(view.upcoming, myTeamId, view.clockSeconds)}
+          yourTurn={formatYourTurn(view.upcoming, myTeamId, view.clockSeconds, view.pausedUntil ?? null)}
         />
       )}
       <QueueChips queue={queue} playersById={playersById} draftedIds={draftedIds} busy={submitting} onChange={onQueueChange} />
