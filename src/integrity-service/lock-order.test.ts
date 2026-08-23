@@ -1,8 +1,9 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, chatMessages, drafts, integrityFlags, leagues, lineupSlots, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
+import { auditChains, chatMessages, draftSlotPreferences, drafts, integrityFlags, leagues, lineupSlots, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline, DRAFT_SKIP_POLICY } from "@/draft-engine";
+import { setSlotPreference } from "@/draft-service/slot-preference";
 import { createDraftStore } from "@/draft-service/store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { autoSetLineupInTx, autoSetLineupsForWeek } from "@/league-service/auto-lineup";
@@ -2728,6 +2729,69 @@ describe("autoSetLineupInTx and finalizeWeekInTx serialize on the matchups rows"
  * the reconciler's own other behavior rather than duplicated here — the identical reasoning
  * `fireWhenFullInTx`'s own "added by hand" entry above already gives for the same split.
  */
+
+/**
+ * FINAL WHOLE-BRANCH REVIEW, F4 — THE ENTRY THAT NEVER LANDED, AND THE EDGE IT WOULD HAVE NAMED.
+ *
+ * Task 6's own review mandated a `setSlotPreference` (`@/draft-service/slot-preference`) entry in
+ * this file and it was never written; its docblock meanwhile described the transaction as taking
+ * "the same leaf lock `applyAction` already takes" and stopped there. It takes one more, and it is
+ * the exact class of lock this whole suite exists for: the `draft_slot_preferences` INSERT carries
+ * a foreign key to `teams`, so it takes `FOR KEY SHARE` on the ranking team's row — a
+ * `drafts -> teams` edge that is UNIQUE IN THE GRAPH and that no line of that function's source
+ * mentions.
+ *
+ * It cannot cycle, and the reason is worth stating rather than assuming: nothing anywhere holds a
+ * `teams` row and then reaches for a `drafts` row. The writers that take `teams FOR UPDATE`
+ * (`proposeTrade`, `acceptTrade`, `reverseTradeInTx` — all driven above) go on to
+ * `leagues FOR KEY SHARE` and their own audit anchor, never to `drafts`; `commitDraftState`
+ * reaches `teams FOR KEY SHARE` from INSIDE `applyAction`, which is the same drafts-then-teams
+ * direction, not the opposite one. `setSlotPreference` takes NO `leagues` row lock at all, in any
+ * mode, so the branch-wide leagues-before-drafts rule below has nothing to order for it.
+ *
+ * Driven rather than documented, because the edge is cheap to park: a bystander holds the ranking
+ * team's row `FOR UPDATE` (the same technique `recordSessionSignals`' proof uses for a `users`
+ * row), the real function runs on a second connection, and it must block on a lock its own source
+ * never names. The OTHER half of F4's sibling finding — that a ranking racing a `START_DRAFT` is
+ * refused rather than saved dead (F9) — is driven beside the function's own behavior in
+ * `src/draft-service/slot-preference.test.ts`.
+ */
+describe("setSlotPreference's teams foreign key", () => {
+  it("blocks behind a concurrent hold on the RANKING TEAM's row and completes once it releases", async () => {
+    const { leagueId, teamIds, userIds } = await seedDraftFixture(joinDb, {
+      draftId: "draft_slotpref_lock",
+      leagueId: "lg_slotpref_lock",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+    });
+
+    // The bystander: a real transaction holding the row `draft_slot_preferences.team_id` is about
+    // to reference. Nothing in `setSlotPreference`'s source asks for this row.
+    let holdsTeamRow: () => void = () => {};
+    const teamRowLocked = new Promise<void>((resolve) => (holdsTeamRow = resolve));
+    let releaseHold: () => void = () => {};
+    const held = new Promise<void>((resolve) => (releaseHold = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.select({ id: teams.id }).from(teams).where(eq(teams.id, teamIds[0]!)).for("update");
+      holdsTeamRow();
+      await held;
+    });
+    await teamRowLocked;
+
+    const ranking = setSlotPreference(pickDb, { leagueId, userId: userIds[0]!, ranking: [2, 1] });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseHold();
+    await holding;
+
+    expect(await ranking).toEqual({ ok: true, ranking: [2, 1] });
+    const [row] = await joinDb.select().from(draftSlotPreferences).where(eq(draftSlotPreferences.teamId, teamIds[0]!));
+    expect(row!.ranking).toEqual([2, 1]);
+  });
+});
 
 /**
  * FINAL WHOLE-BRANCH REVIEW, F1 — THE PAIR NOBODY ORDERED: (`leagues`, `drafts`).
