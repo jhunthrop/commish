@@ -26,8 +26,11 @@ in — or a league with no draft to open — is exactly the dead end this closes
 partial-league state to clean up after.
 
 Every field but the name is defaulted from `LEAGUE_CONFIG.defaults` (`src/league/config.ts`):
-12 teams, snake format, PPR scoring, the standard roster shape, a draft scheduled
-`draftDaysFromCreation` (7) days out. `POST /api/leagues` accepts `{ "name": "…" }` as a
+12 teams, snake format, half-PPR scoring, the standard roster shape, a draft scheduled
+`draftDaysFromCreation` (7) days out. Half-PPR, not full PPR, is the founder-decided canon
+default (Phase 3.5 Task 1) — the trend consensus across Underdog's own tournament default; full
+PPR, standard and TE-premium all stay one select away, and superflex is a roster-shape toggle,
+not a separate default. `POST /api/leagues` accepts `{ "name": "…" }` as a
 complete request — everything else, including the advanced disclosure's own fields, is
 optional. The draft is scheduled a week out rather than immediately so its auto-tightening
 clock starts in a slow tier instead of at the 60-second floor (`docs/draft-engine.md`).
@@ -270,7 +273,7 @@ retired was the other). Every response is the same envelope
 | Route | Who | Notes |
 |---|---|---|
 | `GET /api/leagues` | any signed-in user | Every league the caller fields a team in, oldest first, with fill count and draft status. |
-| `POST /api/leagues` | any signed-in user | Body: `{ name, format?, teamCount?, scoringPreset?, auctionBudget?, teamName?, visibility?, stakeTier?, experienceTier? }` — only `name` is required. Creates the league, the caller's team and a scheduled draft in one transaction. `visibility: "public"` (default `"invite_only"`) is what sets `is_public_matchmade` and makes the league eligible for `GET /api/public/leagues`; `stakeTier` (0-3, default 0) and `experienceTier` are the cosmetic/matching fields a public listing shows. |
+| `POST /api/leagues` | any signed-in user | Body: `{ name, format?, teamCount?, scoringPreset?, rosterShape?, auctionBudget?, teamName?, visibility?, stakeTier?, experienceTier? }` — only `name` is required. Creates the league, the caller's team and a scheduled draft in one transaction. `visibility: "public"` (default `"invite_only"`) is what sets `is_public_matchmade` and makes the league eligible for `GET /api/public/leagues`; `stakeTier` (0-3, default 0) and `experienceTier` are the cosmetic/matching fields a public listing shows. |
 | `GET /api/leagues/[leagueId]` | a manager with a team in the league, or the commissioner | `leagueHome`: standings, this week's matchup, the roster shape, the draft's status and the league's terms (`LeagueTerms` — see "League terms" above), in one payload, for every member. |
 | `POST /api/leagues/[leagueId]/invites` | commissioner only | Body: `{ maxUses? }`. Mints a code; randomness is `crypto.getRandomValues`-backed, never `Math.random`, since a code is a membership capability. |
 | `GET /api/invites/[code]` | **anyone holding the code, signed in or not** | `invitePreview`: the same `LeagueTerms` `leagueHome` carries, for whoever holds the code — the code itself is the capability. An invalid, expired or exhausted code returns only the refusal, never a league name, so this cannot be used to enumerate private leagues. |

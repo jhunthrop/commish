@@ -46,6 +46,14 @@ function sameRosterSlots(a: readonly RosterSlotConfig[], b: readonly RosterSlotC
  * (`@/scoring/describe`) exactly, and for the identical reason: a commissioner who edits even
  * one slot has a shape neither shipped preset names, and calling it one anyway would be a lie
  * on the one page a stranger reads to decide whether to join.
+ *
+ * No production caller yet (fix round 1, F3 — adjudicated, not dead code): the plan names its
+ * consumer explicitly. Task 3 step 3 gives `leagueTerms` (`@/league/terms.ts`) a `formatNotes`
+ * line — *"Superflex: you can start a second quarterback," derived from stored columns rather
+ * than a remembered preset name* — which is this function's exact job, rendered by
+ * `LeagueTermsPanel` on the invite preview and league home beside the median-game note. Wiring
+ * it here, ahead of that task's own file list (`src/league/terms.ts` + its test,
+ * `league-terms-panel.tsx`), would duplicate work Task 3 already owns.
  */
 export function describeRosterShape(slots: readonly RosterSlotConfig[]): string {
   if (slots.some((config) => config.slot === "SUPERFLEX")) return ROSTER_SHAPE_LABEL.superflex;
