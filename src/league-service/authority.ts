@@ -1,3 +1,5 @@
+import type { HouseRungName } from "@/matchmaking/house-catalog";
+
 /**
  * The one answer to "who commissions this league", as a discriminated union rather than a
  * nullable-string comparison. Phase 3.5 addendum, Task 12 (ruling 28-33): a house league has
@@ -16,19 +18,24 @@
  */
 
 /**
- * A catalog rung name, as a plain string. `src/matchmaking/house-catalog.ts` (Task 13) is where
- * the real `HouseRungName` literal union (`keyof typeof HOUSE_CATALOG.rungs`) is declared — this
- * task has no catalog to narrow against yet, and a second `HouseRungName` declared here would be
- * exactly the duplicate-declaration this codebase's label-map convention (`ROSTER_SHAPE_LABEL`,
- * `TIER_COMPOSITION_LABEL`, ...) refuses. `LeagueAuthority.rung` widens to the real union the day
- * Task 13's catalog exists to import it from.
+ * A catalog rung name, narrowed to the real union. Fix round 1, F1: `src/matchmaking/
+ * house-catalog.ts` (Task 13) now exists and is the ONE place `HouseRungName` (`keyof typeof
+ * HOUSE_CATALOG.rungs`) is declared — this module imports it as a TYPE ONLY (`import type`),
+ * never a value, so a server module (this one) reading a browser-safe, pure directory's type
+ * costs nothing at runtime and creates no new dependency edge worth worrying about. A second
+ * `HouseRungName` declared here would have been exactly the duplicate-declaration this codebase's
+ * label-map convention (`ROSTER_SHAPE_LABEL`, `TIER_COMPOSITION_LABEL`, ...) refuses; importing
+ * the real one is what that convention actually asks for.
  */
 export type LeagueAuthority =
   | { readonly kind: "member"; readonly userId: string }
-  | { readonly kind: "house"; readonly rung: string };
+  | { readonly kind: "house"; readonly rung: HouseRungName };
 
 /** The two `leagues` columns `leagueAuthority` and `isCommissionerOf` read — every caller already
- *  has these off a plain `leagues` select, house or member. */
+ *  has these off a plain `leagues` select, house or member. `houseRung` stays a plain `string |
+ *  null` here (the column's own Postgres type, `text`, unconstrained to the catalog's own
+ *  vocabulary) — `leagueAuthority` below is the one place a raw row's string is trusted into
+ *  `HouseRungName`, not this row shape itself. */
 export interface LeagueAuthorityRow {
   readonly commissionerUserId: string | null;
   readonly houseRung: string | null;
@@ -39,6 +46,13 @@ export interface LeagueAuthorityRow {
  * have refused before it ever committed — `leagues_house_commissioner_ck` makes both throw
  * branches below unreachable from Postgres, but a unit test can still construct the shape by
  * hand, and a future reader needs the invariant stated here in TypeScript as well as in DDL.
+ *
+ * The `house` branch's `row.houseRung as HouseRungName` is the one cast in this module, and it
+ * is safe for a reason no `CHECK` constraint states: `house_rung` has exactly one writer in this
+ * codebase, `spawnHouseLeagueInTx` (`@/league-service/house-factory.ts`), and it never writes
+ * anything but a real `HOUSE_CATALOG` key. A row bearing a string outside that vocabulary would
+ * mean a second writer exists — a fact worth a loud failure somewhere else, not a silent `string`
+ * leaking past this function's own return type into every caller that trusts `LeagueAuthority`.
  */
 export function leagueAuthority(row: LeagueAuthorityRow): LeagueAuthority {
   if (row.commissionerUserId !== null) {
@@ -54,7 +68,7 @@ export function leagueAuthority(row: LeagueAuthorityRow): LeagueAuthority {
       "A league row named neither a commissioner_user_id nor a house_rung; leagues_house_commissioner_ck should have refused this before it committed.",
     );
   }
-  return { kind: "house", rung: row.houseRung };
+  return { kind: "house", rung: row.houseRung as HouseRungName };
 }
 
 /**

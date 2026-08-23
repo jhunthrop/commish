@@ -1,10 +1,12 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
+import { auditEvents, drafts, leagues, players, scoringSettings, teams, users } from "@/db/schema";
 import type { Db } from "@/db/client";
+import { autoStartDueDrafts } from "@/draft-service/auto-start";
+import { createDraftStore } from "@/draft-service/store";
 import type { AuditLogger } from "@/integrity-service/audit-logger";
-import { HOUSE_CATALOG, type HouseRungName } from "@/matchmaking/house-catalog";
+import { HOUSE_CATALOG, houseKickoffFor, type HouseRungName } from "@/matchmaking/house-catalog";
 import { ensureHouseCatalog, openHouseLeaguesQuery, type HouseFactoryDeps } from "./house-factory";
 import { joinPublicLeague } from "./join";
 
@@ -232,5 +234,61 @@ describe("ensureHouseCatalog", () => {
 describe("openHouseLeaguesQuery", () => {
   it("is empty for a rung with no leagues at all", async () => {
     expect(await openCountOf(db, "open_12")).toBe(0);
+  });
+});
+
+describe("the reconciler -> auto-start -> reconciler loop (fix round 1, F2)", () => {
+  it("drafting a spawned house league closes its shelf slot, and the next reconcile restocks it with a fresh edition", async () => {
+    // Stock the shelf for real.
+    await ensureHouseCatalog(db, deps());
+    const rung = HOUSE_CATALOG.rungs.open_12;
+    const firstLeagueId = "house_open_12_1";
+    expect(await leagueIdsOf(db, "open_12")).toContain(firstLeagueId);
+
+    // Fill it to capacity through the real public-join door — the same door a stranger walks
+    // through, never a hand-inserted `teams` row.
+    await fillLeague(db, firstLeagueId);
+    expect(await openCountOf(db, "open_12")).toBe(rung.openAtOnce - 1);
+
+    const [draftRowBefore] = await db.select({ id: drafts.id, status: drafts.status }).from(drafts).where(eq(drafts.leagueId, firstLeagueId));
+    expect(draftRowBefore?.status).toBe("scheduled");
+
+    // A real pool to draft from — `reduceStart` (`@/draft-engine/reduce.ts`) refuses a pool
+    // smaller than `teamCount * totalRosterSlots(rosterShape)` (12 * 15 = 180 for this rung's
+    // standard shape), not just an empty one.
+    const positions = ["QB", "RB", "WR", "TE", "K", "DEF"] as const;
+    await db.insert(players).values(
+      Array.from({ length: 200 }, (_, i) => ({
+        id: `hf_p_${i}`,
+        name: `Pool Player ${i}`,
+        position: positions[i % positions.length],
+        nflTeam: "KC",
+      })),
+    );
+
+    // A minute past this league's real, staggered kickoff (`houseKickoffFor`'s own index-0
+    // arithmetic) — advanced on a LOCAL clock, never a hand-flipped `status` column, so the real
+    // `autoStartDueDrafts` scan is what starts it.
+    const dueAt = new Date(Date.parse(houseKickoffFor(NOW, rung, 0)) + 60_000).toISOString();
+    const laterClock = { now: () => dueAt };
+    const store = createDraftStore({ db, publish: async () => "1-0", clock: laterClock });
+    const outcomes = await autoStartDueDrafts(db, { store, clock: laterClock });
+    expect(outcomes).toContainEqual({ draftId: draftRowBefore!.id, started: true });
+
+    const [draftRowAfter] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, firstLeagueId));
+    expect(draftRowAfter?.status).toBe("in_progress");
+
+    // Off the shelf for the SECOND reason `openHouseLeaguesQuery` closes a league: the draft
+    // left `scheduled`, not that it filled (already proven above) — a started draft with an
+    // open seat would still have to be closed, and this is the branch that's true here.
+    expect(await openCountOf(db, "open_12")).toBe(rung.openAtOnce - 1);
+
+    // THE ACTUAL PRODUCT LOOP: the next reconcile sees the shortfall this drafted league left
+    // and restocks it — with a FRESH edition, never a resurrection of #1, which just drafted.
+    await ensureHouseCatalog(db, deps());
+    expect(await openCountOf(db, "open_12")).toBe(rung.openAtOnce);
+    const ids = await leagueIdsOf(db, "open_12");
+    expect(ids).toContain(firstLeagueId); // still exists — closed, not deleted
+    expect(new Set(ids).size).toBe(rung.openAtOnce + 1); // the original 3, plus #1's replacement
   });
 });

@@ -94,8 +94,8 @@ export const HOUSE_CATALOG = {
 } as const satisfies { rungs: Record<string, HouseRung> };
 
 /** The one rung-name union, derived from the catalog rather than hand-declared a second time —
- *  `@/league-service/authority.ts`'s `LeagueAuthority.rung` narrows to this the day this module
- *  exists to import it from (Task 12's own docblock says as much). */
+ *  `@/league-service/authority.ts`'s `LeagueAuthority.rung` imports this (type-only) and narrows
+ *  to it (Fix round 1, F1), rather than carrying its own `string`-typed placeholder. */
 export type HouseRungName = keyof typeof HOUSE_CATALOG.rungs;
 
 /**
