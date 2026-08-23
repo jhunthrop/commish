@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { DraftPoolEntry, StartDraftAction, TimerExpireAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
-import { DRAFT_CLOCK_SCHEDULE, DRAFT_QUEUE_CONFIG } from "./config";
+import { DRAFT_CLOCK_SCHEDULE, DRAFT_QUEUE_CONFIG, DRAFT_SKIP_POLICY } from "./config";
 import { admitCommand } from "./admit";
 import { reduceDraft } from "./reduce";
 import { currentDeadline, teamOnClock } from "./selectors";
@@ -28,7 +28,7 @@ const POOL: readonly DraftPoolEntry[] = [
 ];
 
 const T = "2026-09-01T00:00:00.000Z";
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
 
 const snakeConfig: DraftConfig = {
   draftId: "d_s", leagueId: "l1", format: "snake", kickoffAt: "2026-09-10T17:00:00.000Z",

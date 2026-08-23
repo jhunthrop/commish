@@ -1,9 +1,13 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, users } from "@/db/schema";
+import { draftActions, drafts, leagues, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
+import { DRAFT_ACTION_VERSION } from "@/domain/draft";
+import { DRAFT_SKIP_POLICY } from "@/draft-engine";
+import { setSlotPreference } from "@/draft-service/slot-preference";
 import { LEAGUE_CONFIG } from "@/league";
+import { HOUSE_AUTHORITY_REFUSALS } from "./authority";
 import { createLeague } from "./creation";
 import { draftScheduleView, setDraftKickoff, KICKOFF_REFUSALS } from "./draft-schedule";
 
@@ -29,7 +33,12 @@ async function statusOf(leagueId: string): Promise<string> {
   return row.status;
 }
 
-async function seedLeague(input: { readonly commissionerUserId?: string; readonly otherUserId?: string } = {}): Promise<{
+async function seedLeague(input: {
+  readonly commissionerUserId?: string;
+  readonly otherUserId?: string;
+  readonly startTrigger?: "scheduled" | "when_full";
+  readonly isPublicMatchmade?: boolean;
+} = {}): Promise<{
   readonly leagueId: string;
   readonly commissioner: string;
 }> {
@@ -49,14 +58,33 @@ async function seedLeague(input: { readonly commissionerUserId?: string; readonl
     scoringPreset: "ppr",
     auctionBudget: null,
     rosterSlots: STANDARD_ROSTER_SLOTS,
-    commissionerUserId: commissioner,
-    teamName: "Commissioner's Team",
+    owner: { kind: "member", userId: commissioner, teamName: "Commissioner's Team" },
     experienceTier: "beginner",
     stakeTier: 0,
-    isPublicMatchmade: false,
+    isPublicMatchmade: input.isPublicMatchmade ?? false,
+    startTrigger: input.startTrigger,
   });
   if (!created.ok) throw new Error(created.reason);
   return { leagueId: created.leagueId, commissioner };
+}
+
+/**
+ * A house league, hand-inserted rather than through `createLeague`: Task 13's `LeagueOwner`
+ * house branch is what teaches `createLeague` to write one, and this task (12) only needs a row
+ * shaped the way the CHECK constraint requires it — `commissionerUserId: null`, `houseRung` set —
+ * to prove `setDraftKickoff` refuses every member of it the same true way.
+ */
+async function seedHouseLeague(leagueId: string, memberUserId: string): Promise<void> {
+  await db.insert(users).values({ id: memberUserId, email: `${memberUserId}@test.local`, displayName: "House Member" }).onConflictDoNothing();
+  await db.insert(leagues).values({
+    id: leagueId, name: "Open 12", format: "snake", teamCount: LEAGUE_CONFIG.defaults.teamCount,
+    commissionerUserId: null, houseRung: "open_12", rosterSlots: STANDARD_ROSTER_SLOTS,
+  });
+  await db.insert(teams).values({ id: `${leagueId}_team`, leagueId, userId: memberUserId, name: "House Team" });
+  await db.insert(drafts).values({
+    id: `${leagueId}_draft`, leagueId, format: "snake", status: "scheduled",
+    kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+  });
 }
 
 beforeEach(async () => {
@@ -70,14 +98,144 @@ afterAll(async () => {
 
 describe("draftScheduleView", () => {
   it("reads the draft's own scheduling facts", async () => {
-    const { leagueId } = await seedLeague();
-    const view = await draftScheduleView(db, leagueId);
+    const { leagueId, commissioner } = await seedLeague();
+    const view = await draftScheduleView(db, leagueId, commissioner);
     expect(view).toMatchObject({ leagueId, status: "scheduled", isPublicMatchmade: false });
     expect(view?.kickoffAt).toBe(await kickoffOf(leagueId));
   });
 
   it("answers null for a league that doesn't exist", async () => {
-    expect(await draftScheduleView(db, "nope")).toBeNull();
+    expect(await draftScheduleView(db, "nope", "whoever")).toBeNull();
+  });
+
+  // Phase 3.5, Task 8: the two new fields `WaitingRoom` renders from.
+  it("carries the start trigger and the current fill count", async () => {
+    const { leagueId, commissioner } = await seedLeague();
+    const view = await draftScheduleView(db, leagueId, commissioner);
+    expect(view).toMatchObject({ startTrigger: "scheduled", filledTeams: 1 });
+  });
+
+  it("reports when_full and the fill count growing as more teams join", async () => {
+    const { leagueId, commissioner } = await seedLeague({ startTrigger: "when_full", isPublicMatchmade: true });
+    await db.insert(users).values({ id: "joiner", email: "joiner@test.local", displayName: "Joiner" }).onConflictDoNothing();
+    await db.insert(teams).values({ id: "extra_team", leagueId, userId: "joiner", name: "Joiner's Team" });
+
+    const view = await draftScheduleView(db, leagueId, commissioner);
+    expect(view).toMatchObject({ startTrigger: "when_full", filledTeams: 2 });
+  });
+
+  // Task 6, Phase 3.5: NFFC's Kentucky Derby System.
+  describe("slotPreference", () => {
+    it("is null for a caller with no team in this league", async () => {
+      const { leagueId } = await seedLeague();
+      const view = await draftScheduleView(db, leagueId, "a_total_stranger");
+      expect(view?.slotPreference).toBeNull();
+    });
+
+    it("carries an empty ranking, editable, and no assigned slot yet, before anyone has ranked anything", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      const view = await draftScheduleView(db, leagueId, commissioner);
+      expect(view?.slotPreference).toEqual({
+        slotCount: LEAGUE_CONFIG.defaults.teamCount,
+        ranking: [],
+        assignedSlot: null,
+        canEdit: true,
+      });
+    });
+
+    it("carries the caller's own saved ranking, and nobody else's", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      await setSlotPreference(db, { leagueId, userId: commissioner, ranking: [1, 5] });
+      const view = await draftScheduleView(db, leagueId, commissioner);
+      expect(view?.slotPreference?.ranking).toEqual([1, 5]);
+    });
+
+    it("stops being editable and reports the caller's own drafted slot, once the draft starts", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      const before = await draftScheduleView(db, leagueId, commissioner);
+      const draftId = before!.draftId;
+      const [commissionerTeam] = await db.select({ id: teams.id }).from(teams).where(eq(teams.userId, commissioner));
+
+      // The draw's own snapshot — `resolvedSlotFor`'s ONLY source of truth (ruling 27), written
+      // here directly rather than through a full `store.startDraft()` run, which would need a
+      // real player pool sized for `LEAGUE_CONFIG.defaults.teamCount` (12) teams' worth of
+      // rosters. Slot 3 (index 2): the commissioner's team drafted third.
+      await db.insert(draftActions).values({
+        draftId,
+        sequence: 1,
+        timestamp: new Date(FIXED_NOW),
+        action: {
+          v: DRAFT_ACTION_VERSION,
+          type: "START_DRAFT",
+          timestamp: FIXED_NOW,
+          draftOrder: ["some_other_team", "another_team", commissionerTeam!.id],
+          pool: [{ playerId: "p1", position: "QB" }],
+          minBid: 1,
+          skipPolicy: DRAFT_SKIP_POLICY,
+        },
+      });
+      await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, draftId));
+
+      const after = await draftScheduleView(db, leagueId, commissioner);
+
+      expect(after?.slotPreference?.canEdit).toBe(false);
+      expect(after?.slotPreference?.assignedSlot).toBe(3);
+    });
+
+    // `resolvedSlotFor`'s own defensive branches — every one "cannot happen through ordinary
+    // use" per its docblock, and every one still worth a real assertion rather than a comment.
+    it("reports no assigned slot when the draft has started but its own snapshot row is missing", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      const before = await draftScheduleView(db, leagueId, commissioner);
+      await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, before!.draftId));
+
+      const after = await draftScheduleView(db, leagueId, commissioner);
+
+      expect(after?.slotPreference?.canEdit).toBe(false);
+      expect(after?.slotPreference?.assignedSlot).toBeNull();
+    });
+
+    it("reports no assigned slot when the sequence-1 row isn't a START_DRAFT action", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      const before = await draftScheduleView(db, leagueId, commissioner);
+      const draftId = before!.draftId;
+      await db.insert(draftActions).values({
+        draftId,
+        sequence: 1,
+        timestamp: new Date(FIXED_NOW),
+        action: { v: DRAFT_ACTION_VERSION, type: "MAKE_PICK", timestamp: FIXED_NOW, teamId: "whoever", playerId: "p1" },
+      });
+      await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, draftId));
+
+      const after = await draftScheduleView(db, leagueId, commissioner);
+
+      expect(after?.slotPreference?.assignedSlot).toBeNull();
+    });
+
+    it("reports no assigned slot when the caller's team is missing from the draw's own snapshot", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      const before = await draftScheduleView(db, leagueId, commissioner);
+      const draftId = before!.draftId;
+      await db.insert(draftActions).values({
+        draftId,
+        sequence: 1,
+        timestamp: new Date(FIXED_NOW),
+        action: {
+          v: DRAFT_ACTION_VERSION,
+          type: "START_DRAFT",
+          timestamp: FIXED_NOW,
+          draftOrder: ["some_other_team", "another_team"],
+          pool: [{ playerId: "p1", position: "QB" }],
+          minBid: 1,
+          skipPolicy: DRAFT_SKIP_POLICY,
+        },
+      });
+      await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, draftId));
+
+      const after = await draftScheduleView(db, leagueId, commissioner);
+
+      expect(after?.slotPreference?.assignedSlot).toBeNull();
+    });
   });
 });
 
@@ -136,5 +294,32 @@ describe("setDraftKickoff", () => {
     await setDraftKickoff(db, { leagueId, userId: commissioner, kickoffAt: YESTERDAY }, clock);
     expect(await kickoffOf(leagueId)).toBe(before);
     expect(await statusOf(leagueId)).toBe("scheduled");
+  });
+
+  // Phase 3.5, Task 7: a time nobody chose is not a time anybody may edit.
+  it("refuses to move a sit-and-go draft's time by hand, and writes nothing", async () => {
+    const { leagueId, commissioner } = await seedLeague({ startTrigger: "when_full", isPublicMatchmade: true });
+    const before = await kickoffOf(leagueId);
+    const result = await setDraftKickoff(db, { leagueId, userId: commissioner, kickoffAt: LATER }, clock);
+    expect(result).toEqual({ ok: false, status: 409, reason: KICKOFF_REFUSALS.whenFull });
+    expect(await kickoffOf(leagueId)).toBe(before);
+  });
+
+  // Phase 3.5 addendum, Task 12: the catalog chose this draft's time, not any member — the same
+  // generalization Task 7's `whenFull` made, applied to a league that never had a commissioner
+  // to choose one in the first place. Answered to an ORDINARY member (not a would-be commissioner
+  // who lost a comparison), because a house league has none for the earlier gate to single out.
+  it("refuses to move a house league's draft time, and says why rather than 404ing a real member", async () => {
+    await seedHouseLeague("lg_house_kickoff", "u_house_member");
+    const before = await kickoffOf("lg_house_kickoff");
+    const result = await setDraftKickoff(db, { leagueId: "lg_house_kickoff", userId: "u_house_member", kickoffAt: LATER }, clock);
+    expect(result).toEqual({ ok: false, status: 409, reason: HOUSE_AUTHORITY_REFUSALS.schedule });
+    expect(await kickoffOf("lg_house_kickoff")).toBe(before);
+  });
+
+  it("refuses a house league's draft time for a total stranger too, the same true reason", async () => {
+    await seedHouseLeague("lg_house_kickoff_stranger", "u_house_member2");
+    const result = await setDraftKickoff(db, { leagueId: "lg_house_kickoff_stranger", userId: "u_total_stranger", kickoffAt: LATER }, clock);
+    expect(result).toEqual({ ok: false, status: 409, reason: HOUSE_AUTHORITY_REFUSALS.schedule });
   });
 });

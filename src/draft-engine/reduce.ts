@@ -39,6 +39,11 @@ function reduceStart(state: DraftState, action: StartDraftAction): DraftReduceRe
     state: {
       ...state,
       phase: "in_progress",
+      // Snapshotted here, alongside the clock schedule it is measured against — the one
+      // reducer-side read of a tunable this whole file's own rule forbids everywhere else,
+      // made safe because it reads the ACTION (this draft's own frozen history), never a
+      // module-level constant. See `DraftSkipPolicy`'s docblock (`config.ts`) for why.
+      config: { ...state.config, skipPolicy: action.skipPolicy },
       draftOrder: action.draftOrder,
       pool: action.pool,
       rosters,

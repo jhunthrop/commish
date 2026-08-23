@@ -12,6 +12,7 @@ import {
   primaryKey,
   index,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
@@ -21,6 +22,17 @@ import type { TradeAsset } from "@/trades/assets";
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
 export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
 export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress", "complete"]);
+/**
+ * Phase 3.5, Task 7 (the sit-and-go trigger): which of the two ways this draft's `kickoff_at`
+ * came to be set. `'scheduled'` is a time a commissioner chose; `'when_full'` is a time
+ * `fireWhenFullInTx` wrote the instant the league's last seat filled. Lives beside
+ * `kickoff_at` on `drafts` for the same reason `kickoff_at` itself does — it answers a question
+ * about THIS draft's schedule, not about the league's identity. Authored here, in migration
+ * 0031, alongside Task 6's slot-preference table (the binding controller ruling for that
+ * migration: an applied migration is never edited, so both tasks' schema needs are authored
+ * together, in the one migration file, even though Task 7's own read/write code lands later).
+ */
+export const draftStartTriggerEnum = pgEnum("draft_start_trigger", ["scheduled", "when_full"]);
 export const playerPositionEnum = pgEnum("player_position", ["QB", "RB", "WR", "TE", "K", "DEF"]);
 export const weekStatusEnum = pgEnum("week_status", ["scheduled", "in_progress", "final"]);
 export const helpLevelEnum = pgEnum("help_level", ["guided", "standard"]);
@@ -104,11 +116,38 @@ export const leagues = pgTable(
      * league they run the moment they updated their own profile.
      */
     experienceTier: experienceTierEnum("experience_tier").notNull().default("beginner"),
-    commissionerUserId: text("commissioner_user_id")
-      .notNull()
-      .references(() => users.id),
+    /**
+     * Nullable since Phase 3.5's house-leagues addendum (Task 12, rulings 28-33): `NULL` means
+     * exactly one thing, the platform commissions this league, the same sentence
+     * `audit_events.actor_id` already tells (`@/domain/audit`'s own "Null only when `actorType`
+     * is `"system"`" invariant). `leagues_house_commissioner_ck` below is what makes that true at
+     * the only layer that could make it false — a row where this is null and `houseRung` is also
+     * null does not commit, so `NULL` can never mean "we forgot" or "the row is half written".
+     * `@/league-service/authority.ts`'s `leagueAuthority`/`isCommissionerOf` are the only
+     * sanctioned way to read this column; nothing compares it directly to a user id anymore.
+     */
+    commissionerUserId: text("commissioner_user_id").references(() => users.id),
+    /**
+     * Which catalog rung a house league came from (Task 13's `HOUSE_CATALOG`), or `null` for an
+     * ordinary member league. Tied to `commissionerUserId`'s null-ness by the CHECK below rather
+     * than left as a second, independently-settable fact — a `created_by_house` boolean would
+     * encode the same thing twice and be free to disagree with it.
+     */
+    houseRung: text("house_rung"),
     /** The league's roster shape. The draft reads this to know its rounds and slot rules. */
     rosterSlots: jsonb("roster_slots").$type<readonly RosterSlotConfig[]>().notNull().default([...STANDARD_ROSTER_SLOTS]),
+    /**
+     * The league median game (Phase 3.5, Task 2): every team also plays the league's own median
+     * score each week, and that result counts a real win/loss/tie in the ONE record alongside
+     * the head-to-head result — no second matchup row, because the schema's FK/PK shape (one
+     * row per `(league_id, week_number, home_team_id)`) has no room for a pseudo-opponent.
+     *
+     * Lives here, on `leagues`, and NOT on `scoring_settings`: a median game is a season
+     * STRUCTURE choice (does a week produce one result per team or two), never a scoring
+     * weight — `scoring_settings` is fifteen `real` columns that answer "what is a catch
+     * worth", and `describeScoring` derives its label from exactly those, unaffected by this.
+     */
+    medianGame: boolean("median_game").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     /**
      * Stamped ONCE, by `stampSeasonCompleteInTx` (`@/league-service/participation`), inside the
@@ -130,20 +169,25 @@ export const leagues = pgTable(
     /**
      * PARTIAL, on purpose. `is_public_matchmade` is false for the overwhelming majority of
      * leagues (a league is private unless a commissioner opts in), and the only query that
-     * reads this column reads `= true` and then orders by `created_at`. A partial index on
-     * `created_at` over just those rows is therefore the smallest index that serves the
-     * `WHERE is_public_matchmade` filter without a sequential scan of `leagues`.
+     * reads this column reads `= true`. A partial index on `created_at` over just those rows is
+     * therefore the smallest index that serves the `WHERE is_public_matchmade` filter without a
+     * sequential scan of `leagues`.
      *
-     * It does NOT let the browse `LIMIT` stop early on its own: `browseQuery` groups by league
-     * (for the fill-count `HAVING`) before it orders, and the measured plan is
+     * It does NOT let the browse `LIMIT` stop early on its own, and it never has: `browseQuery`
+     * groups by league (for the fill-count `HAVING`) before it orders, and the measured plan is
      * `Limit -> Sort (top-N heapsort) -> HashAggregate -> ...` — the `HashAggregate` destroys
-     * whatever order the index scan produced, so `created_at` is re-sorted afterward regardless.
-     * The index's payoff is entirely the filter, verified in `src/db/index-plans.test.ts`.
+     * whatever order the index scan produced, so the ORDER BY re-sorts afterward regardless of
+     * what it sorts by. Phase 3.5, Task 8, Step 4 changed that sort key from `created_at` alone
+     * to seats-remaining-ASC-then-`created_at`-ASC (§4.1's liquidity doctrine: fill leagues, don't
+     * just list them oldest-first) and this index's payoff is UNCHANGED by that — it was always
+     * entirely the filter, never the order, verified in `src/db/index-plans.test.ts`.
      *
-     * There is deliberately NO index on `commissioner_user_id`: every read of it fetches the
-     * league by primary key and compares in application code (`src/lib/leagues/membership.ts`,
-     * `src/league-service/read.ts`). An index on a column nothing filters on is maintenance
-     * cost with no read to pay for it. Add one the day a "leagues I commission" query exists.
+     * There is deliberately NO index on `commissioner_user_id`: every read of it goes through
+     * `@/league-service/authority.ts`'s `leagueAuthority`/`isCommissionerOf`, applied to a league
+     * already fetched by primary key (`src/lib/leagues/membership.ts`, `src/league-service/
+     * read.ts`), never filtered on directly. An index on a column nothing filters on is
+     * maintenance cost with no read to pay for it. Add one the day a "leagues I commission"
+     * query exists.
      */
     index("leagues_public_browse_idx").on(t.createdAt).where(sql`${t.isPublicMatchmade}`),
     /**
@@ -155,6 +199,34 @@ export const leagues = pgTable(
      * definition back out of `pg_indexes` rather than trusting this declaration.
      */
     index("leagues_season_completed_idx").on(t.id).where(sql`${t.seasonCompletedAt} is not null`),
+    /**
+     * PARTIAL for the identical reason `leagues_public_browse_idx` is: `house_rung` is null for
+     * the overwhelming majority of leagues forever. Carries `created_at` as its second column
+     * because the reconciler's count (Task 13, `openHouseLeaguesQuery`) reads house rows in
+     * creation order to assign each new spawn the next stagger slot.
+     *
+     * The shelf itself (Task 14, `houseShelfQuery`, `@/league-service/browse.ts`) does NOT read
+     * this second column for its own ordering — an earlier draft of this note assumed creation
+     * order and the shelf's soonest-draft order would coincide, true only WITHIN one rung
+     * (`houseKickoffFor`'s own stagger), never ACROSS rungs staggering on independent clocks. The
+     * shelf orders on `drafts.kickoff_at` instead, a `Sort` measured after this index's own scan
+     * in `src/db/index-plans.test.ts` rather than served by the index directly. This index still
+     * serves the shelf query's `WHERE house_rung IS NOT NULL` predicate — that half of the plan,
+     * never the order.
+     */
+    index("leagues_house_rung_idx").on(t.houseRung, t.createdAt).where(sql`${t.houseRung} is not null`),
+    /**
+     * The CHECK that makes a nullable `commissionerUserId` safe (Phase 3.5 addendum, Task 12,
+     * ruling 28): `house_rung` is null exactly when `commissioner_user_id` is NOT null, and vice
+     * versa. A row in neither state, or in both, does not commit — see `commissionerUserId`'s own
+     * docblock above for what that buys. Hand-written in `drizzle/0032_house_leagues.sql`, the one
+     * non-additive statement Phase 3.5 writes: it is also the one statement here that scans every
+     * existing row, because Postgres validates a CHECK before accepting it. The deploy-era form
+     * (`ADD CONSTRAINT ... NOT VALID` then a separate `VALIDATE CONSTRAINT`) is documented in
+     * `docs/conventions.md`'s migration section — today's database holds seed rows only, so the
+     * scan is trivial and the deploy-era split is not needed here.
+     */
+    check("leagues_house_commissioner_ck", sql`(${t.houseRung} IS NULL) = (${t.commissionerUserId} IS NOT NULL)`),
   ],
 );
 
@@ -288,6 +360,9 @@ export const drafts = pgTable(
     status: draftStatusEnum("status").notNull().default("scheduled"),
     kickoffAt: timestamp("kickoff_at", { withTimezone: true }).notNull(),
     auctionBudget: integer("auction_budget"),
+    /** Task 7. Defaults `'scheduled'` — every draft before this column existed, and every
+     *  draft a commissioner schedules by hand today, keeps that default. */
+    startTrigger: draftStartTriggerEnum("start_trigger").notNull().default("scheduled"),
   },
   (t) => [
     // UNIQUE, not a plain index: nothing else in the schema enforces "one draft per league",
@@ -317,6 +392,34 @@ export const drafts = pgTable(
     // this rather than reasoning about it in the abstract.
     index("drafts_status_idx").on(t.status, t.kickoffAt),
   ],
+);
+
+/**
+ * Phase 3.5, Task 6: NFFC's Kentucky Derby System. One row per team that has ranked the draft
+ * slots it wants, keyed by `(draft_id, team_id)` — a TABLE, not a `SET_QUEUE`-style draft
+ * action (ruling 27, the same reason the player pool is a table): a ranking is an *input* to
+ * the one-time draw `assignDraftSlots` (`@/draft-service/order`) runs at `START_DRAFT`, and the
+ * draw's *output* is what gets snapshotted into that action's own `draftOrder` — replay
+ * determinism lives in the snapshot, never in this row, so editing or deleting a preference
+ * after the draw cannot change history, and a preference may be read with an ordinary query
+ * instead of a replay.
+ *
+ * `ranking` is a JSON array of 1-based slot numbers, most-wanted first — partial and even empty
+ * (mind either way) are both valid: most managers care about two slots, not twelve.
+ */
+export const draftSlotPreferences = pgTable(
+  "draft_slot_preferences",
+  {
+    draftId: text("draft_id")
+      .notNull()
+      .references(() => drafts.id, { onDelete: "cascade" }),
+    teamId: text("team_id")
+      .notNull()
+      .references(() => teams.id, { onDelete: "cascade" }),
+    ranking: jsonb("ranking").$type<readonly number[]>().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.draftId, t.teamId] })],
 );
 
 // Durable, replay-based draft action log — the source of truth for in-progress
@@ -395,6 +498,18 @@ export const weeks = pgTable(
       .notNull()
       .references(() => leagues.id, { onDelete: "cascade" }),
     weekNumber: integer("week_number").notNull(),
+    /**
+     * The league's median score for this week, written by `finalizeWeekInTx`
+     * (`@/stats-pipeline/finalize`) in the SAME transaction as the matchup scores it was
+     * computed from — null for a league with `leagues.median_game` off, and for a week not yet
+     * settled. An OVERWRITE, not a one-way stamp like `leagues.season_completed_at`: a stat
+     * correction (`correctSettledWeek`) re-settles a week's scores and must re-derive its median
+     * too, or this column would describe a week that no longer exists.
+     *
+     * `weeks`' primary key is already `(league_id, week_number)` — one row per league week is
+     * exactly the cardinality of one median per league week, so no new table is needed for it.
+     */
+    medianScore: real("median_score"),
   },
   (t) => [primaryKey({ columns: [t.leagueId, t.weekNumber] })],
 );

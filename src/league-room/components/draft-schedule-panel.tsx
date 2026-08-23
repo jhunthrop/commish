@@ -2,12 +2,13 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { DraftScheduleBody } from "../contract";
 import { Button, Input } from "@/components/ui";
 import { StatePanel } from "@/components/ui/state-panel";
+import { useCountdown } from "@/components/ui/countdown";
 import { useLeagueRoomDeps } from "../hooks/deps";
-import { useNow } from "../hooks/use-now";
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
@@ -58,6 +59,50 @@ function toDatetimeLocalValue(iso: string): string {
 }
 
 /**
+ * The `in_progress`/`complete` states, identical regardless of HOW the draft's kickoff came to
+ * be decided — a commissioner's own chosen time or Task 7's sit-and-go fill trigger. `null` for
+ * `scheduled`, the one status this panel does not render on its own.
+ *
+ * `WaitingRoom` (`./waiting-room`, Task 8, `when_full` leagues) renders these exact same two
+ * states through this function rather than a second copy of the same two sentences that could
+ * drift from this one — the identical "centralize at the second/third caller" reasoning
+ * `@/components/ui/countdown` is built on.
+ */
+export function draftTerminalStatePanel(schedule: Pick<DraftScheduleBody, "status" | "draftId">): ReactNode | null {
+  if (schedule.status === "complete") {
+    return (
+      <StatePanel
+        tone="neutral"
+        icon="check"
+        title="Draft complete"
+        description="Every roster is set."
+        action={
+          <Link className="text-sm font-medium text-accent underline" href={`/app/drafts/${schedule.draftId}`}>
+            View the draft board
+          </Link>
+        }
+      />
+    );
+  }
+  if (schedule.status === "in_progress") {
+    return (
+      <StatePanel
+        tone="neutral"
+        icon="users"
+        title="The draft is live"
+        description="Picks are happening right now."
+        action={
+          <Link className="text-sm font-medium text-accent underline" href={`/app/drafts/${schedule.draftId}`}>
+            Join the draft
+          </Link>
+        }
+      />
+    );
+  }
+  return null;
+}
+
+/**
  * The button that has existed since Phase 1 and nobody could ever press on purpose
  * (`POST /api/drafts/[draftId]/start`), plus the time it starts at, plus the commissioner's own
  * control over that time (`PUT /api/leagues/[leagueId]/draft-schedule`).
@@ -95,8 +140,11 @@ export function DraftSchedulePanel({
   const [starting, setStarting] = useState(false);
   const [startError, setStartError] = useState<string | null>(null);
   // Ticks the countdown without re-fetching: the schedule itself only changes on a save or a
-  // start, both of which already update `schedule` directly.
-  const now = useNow(30_000);
+  // start, both of which already update `schedule` directly. Called unconditionally, before any
+  // early return — React's Rules of Hooks — with `null` once there's nothing left to count down
+  // to (Phase 3.5, Task 8: refactored onto the shared `useCountdown`, `@/components/ui/countdown`,
+  // rather than this panel's own `useNow` + `Date.parse` arithmetic).
+  const { remainingMs } = useCountdown(schedule.status === "scheduled" ? schedule.kickoffAt : null);
 
   const openEditor = (): void => {
     setDraftValue(toDatetimeLocalValue(schedule.kickoffAt));
@@ -166,42 +214,25 @@ export function DraftSchedulePanel({
       <p className="text-sm text-text-muted">{"Nothing starts this automatically. Press Start the draft when everyone's ready."}</p>
     ) : null;
 
-  if (schedule.status === "complete") {
-    return (
-      <StatePanel
-        tone="neutral"
-        icon="check"
-        title="Draft complete"
-        description="Every roster is set."
-        action={
-          <Link className="text-sm font-medium text-accent underline" href={`/app/drafts/${schedule.draftId}`}>
-            View the draft board
-          </Link>
-        }
-      />
-    );
-  }
+  const terminal = draftTerminalStatePanel(schedule);
+  if (terminal !== null) return terminal;
 
-  if (schedule.status === "in_progress") {
-    return (
-      <StatePanel
-        tone="neutral"
-        icon="users"
-        title="The draft is live"
-        description="Picks are happening right now."
-        action={
-          <Link className="text-sm font-medium text-accent underline" href={`/app/drafts/${schedule.draftId}`}>
-            Join the draft
-          </Link>
-        }
-      />
-    );
-  }
-
-  const kickoffMs = new Date(schedule.kickoffAt).getTime();
-  const msUntil = kickoffMs - now;
+  const msUntil = remainingMs ?? 0;
   const startingSoon = msUntil <= MS_PER_HOUR;
   const countdown = `${formatLocal(schedule.kickoffAt)} (${formatCountdown(msUntil)})`;
+
+  // Task 4's overnight freeze. `startingSoon` already draws the line this panel needs: a draft
+  // more than an hour out picks at a tier of an hour or longer once it opens (the same
+  // `DRAFT_PAUSE_WINDOW.appliesAtOrAbovePickSeconds` floor the engine itself enforces), and a
+  // draft that slow can run straight through 2-5 AM Eastern. The literal times below are
+  // deliberately not imported from `@/draft-engine` — client room code goes through the
+  // HTTP/SSE boundary only (`eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`), the same
+  // constraint `RoomRail`'s own `formatTightening`/`formatYourTurn` note.
+  const overnightPauseNotice = schedule.status !== "scheduled" || startingSoon ? null : (
+    <p className="text-sm text-text-muted">
+      Picks pause automatically between 2:00 AM and 5:00 AM Eastern once the clock reaches an hour or longer, and resume right after.
+    </p>
+  );
 
   const commissionerControls = isCommissioner ? (
     editing ? (
@@ -254,6 +285,7 @@ export function DraftSchedulePanel({
         action={commissionerControls}
       />
       {autoStartNotice}
+      {overnightPauseNotice}
       {startError === null ? null : (
         <p role="alert" className="text-sm text-negative">
           {startError}

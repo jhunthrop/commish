@@ -58,7 +58,7 @@ describe("audit chain — a full create → join(both doors) → pick lifecycle"
       { db, clock, newId },
       {
         name: "Sunday Money", format: "snake", teamCount: 3, scoringPreset: "ppr", auctionBudget: null,
-        rosterSlots: SPRINT_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Commish",
+        rosterSlots: SPRINT_ROSTER_SLOTS, owner: { kind: "member", userId: "u1", teamName: "Commish" },
         experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: true,
       },
     );

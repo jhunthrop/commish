@@ -162,9 +162,9 @@ describe("GET /api/leagues", () => {
     const responses: (readonly unknown[])[] = [
       [{ leagueId: "lg_real", teamId: "team_real" }], // myLeaguesOverview: "mine"
       [
-        { id: "lg_real", name: "Real League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", rosterSlots: [], createdAt: new Date() },
+        { id: "lg_real", name: "Real League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", houseRung: null, rosterSlots: [], createdAt: new Date() },
         // A league Postgres could never actually return here — its id is absent from `ids`.
-        { id: "lg_phantom", name: "Phantom League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", rosterSlots: [], createdAt: new Date() },
+        { id: "lg_phantom", name: "Phantom League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", houseRung: null, rosterSlots: [], createdAt: new Date() },
       ], // leagueRows
       [{ id: "team_real", leagueId: "lg_real", name: "Real Team" }], // teamRows — none for lg_phantom
       [], // draftRows — none for either league
@@ -264,12 +264,13 @@ describe("GET /api/invites/[code]", () => {
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.ok).toBe(true);
+    // Task 1: the create route's default scoring preset flipped from PPR to half-PPR.
     expect(body.data).toMatchObject({
       name: "Sunday Money",
       format: "snake",
       teamCount: 12,
       filledTeams: 1,
-      scoringLabel: "PPR",
+      scoringLabel: "Half PPR",
       commissionerName: "Manager u1",
     });
   });

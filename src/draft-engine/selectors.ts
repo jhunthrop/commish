@@ -4,8 +4,9 @@ import type { RosterSlot, RosterSlotConfig } from "@/domain/roster";
 import { auctionOf, rosterFor, totalPickCount, totalRosterSlots, type AuctionState, type CompletedPick, type DraftState } from "./state";
 import { snakeTeamForPick } from "./order";
 import { assignSlot } from "./slotting";
-import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier } from "./config";
+import { AUCTION_CONFIG, DRAFT_VIEW_CONFIG, type ClockTier, type PauseWindow } from "./config";
 import { MS_PER_SECOND, clockTierFor, nextTighteningAfter, type Tightening } from "./clock-schedule";
+import { deadlineAfter, pausedUntil as pauseWindowEndAt } from "./pause";
 import { queuedEntriesFor } from "./queue";
 
 export function draftedPlayerIds(state: DraftState): ReadonlySet<string> {
@@ -52,13 +53,47 @@ export function maxBidFor(state: DraftState, teamId: string): number {
 }
 
 /**
- * Whose turn it is. Snake: the team on the clock. Auction: the team due to nominate —
- * null while a lot is live, because during bidding the clock belongs to everyone.
+ * Whether ANY team currently owes a pick (Task 5) — a plain existence check over `owedPicks`,
+ * which is never allowed to hold an empty array for a key (`redeemOwedPick`'s own invariant,
+ * `apply-pick.ts`), so key-presence alone answers it.
+ */
+export function hasOwedPicks(state: DraftState): boolean {
+  return Object.keys(state.owedPicks).length > 0;
+}
+
+/**
+ * The team whose owed pick is FIRST in line, or null when nobody owes one — Task 5's answer to
+ * "how do multiple owed picks order": whichever pick number was missed earliest, across every
+ * team, wins, because pick numbers are unique and monotonic across the whole draft. This is
+ * the CATCH-UP turn's own "on the clock", walked in `draftOrder` for a deterministic scan.
+ */
+export function catchUpTeamId(state: DraftState): string | null {
+  let bestTeam: string | null = null;
+  let bestPick = Infinity;
+  for (const teamId of state.draftOrder) {
+    const first = state.owedPicks[teamId]?.[0];
+    if (first !== undefined && first < bestPick) {
+      bestPick = first;
+      bestTeam = teamId;
+    }
+  }
+  return bestTeam;
+}
+
+/**
+ * Whose turn it is. Snake: the team on the clock, or — once every normal round has run
+ * (`state.pickNumber` past `totalPickCount`) and a pick is still owed — the CATCH-UP arm:
+ * whichever team is first in line for their owed pick (Task 5; `advanceSnake`, `snake.ts`, is
+ * what puts the state into this range in the first place, and only when a pick is actually
+ * owed). Auction: the team due to nominate — null while a lot is live, because during bidding
+ * the clock belongs to everyone.
  */
 export function teamOnClock(state: DraftState): string | null {
   if (state.phase !== "in_progress") return null;
   const auction = auctionOf(state);
-  if (auction === null) return snakeTeamForPick(state.draftOrder, state.pickNumber);
+  if (auction === null) {
+    return state.pickNumber <= totalPickCount(state) ? snakeTeamForPick(state.draftOrder, state.pickNumber) : catchUpTeamId(state);
+  }
   return auction.lot === null ? auction.nominatingTeamId : null;
 }
 
@@ -174,10 +209,27 @@ function currentTurnClock(state: DraftState): { readonly seconds: number; readon
   return { seconds, startedAt };
 }
 
+/**
+ * `config.pauseWindow`, but only when the CURRENT tier is slow enough for it to apply — the
+ * 90-second (and 10-minute) floor a draft runs at near kickoff never freezes, so a deploy's
+ * freeze window is simply not consulted for those turns at all. Null (no config'd window, or a
+ * tier too fast for it) means every caller below skips the pause arithmetic entirely, which is
+ * also what keeps `currentDeadline` a plain, un-extended addition for the common case: no
+ * window configured, no `deadlineAfter` call, no behavior change from before this task.
+ */
+function effectivePauseWindow(state: DraftState): PauseWindow | null {
+  const window = state.config.pauseWindow ?? null;
+  const tier = currentTier(state);
+  if (window === null || tier === null) return null;
+  return tier.pickSeconds >= window.appliesAtOrAbovePickSeconds ? window : null;
+}
+
 export function currentDeadline(state: DraftState): string | null {
   const turn = currentTurnClock(state);
   if (turn === null) return null;
-  return new Date(Date.parse(turn.startedAt) + turn.seconds * MS_PER_SECOND).toISOString();
+  const window = effectivePauseWindow(state);
+  if (window === null) return new Date(Date.parse(turn.startedAt) + turn.seconds * MS_PER_SECOND).toISOString();
+  return deadlineAfter(turn.startedAt, turn.seconds, window);
 }
 
 /**
@@ -185,11 +237,54 @@ export function currentDeadline(state: DraftState): string | null {
  * `turnStartedAt` to the deadline. The percentage is an INPUT (the service's
  * `DRAFT_NUDGE_CONFIG.thresholdPct`) so the engine stays free of service configuration and
  * of any ambient clock. Null whenever no turn is running.
+ *
+ * Routed through the SAME `deadlineAfter` fixpoint `currentDeadline` uses, over the
+ * threshold's own share of the clock rather than the full length — a flat `thresholdPct` of an
+ * UN-paused clock could still land inside the freeze even though `currentDeadline` itself lands
+ * safely past it, which would mean the moderator speaking up in the middle of the night. This is
+ * what keeps `draft-service/nudge.ts` correct without it ever reading `pauseWindow` itself: both
+ * `dueAt` and `deadlineAt` it reads are already pushed past the freeze by the time it sees them.
  */
 export function nudgeDeadline(state: DraftState, thresholdPct: number): string | null {
   const turn = currentTurnClock(state);
   if (turn === null) return null;
-  return new Date(Date.parse(turn.startedAt) + turn.seconds * MS_PER_SECOND * (thresholdPct / 100)).toISOString();
+  const thresholdSeconds = turn.seconds * (thresholdPct / 100);
+  const window = effectivePauseWindow(state);
+  if (window === null) return new Date(Date.parse(turn.startedAt) + thresholdSeconds * MS_PER_SECOND).toISOString();
+  return deadlineAfter(turn.startedAt, thresholdSeconds, window);
+}
+
+/**
+ * The instant picks resume, if the CURRENT turn started while the freeze was already running —
+ * null otherwise, including while no turn is running at all. Purely a function of
+ * `turnStartedAt` (never an ambient "now": the engine reads no clock of its own), which is
+ * exactly right for what emits it: `draftClockView` is recomputed fresh the moment a turn
+ * starts, so `turnStartedAt` IS "now" at the instant this field is produced, and it rides every
+ * `draft.*` payload from there — the same freshness model `deadlineAt` already uses.
+ */
+function pausedUntilFor(state: DraftState): string | null {
+  if (state.turnStartedAt === null) return null;
+  const window = effectivePauseWindow(state);
+  return window === null ? null : pauseWindowEndAt(state.turnStartedAt, window);
+}
+
+/**
+ * Whether the room is frozen at `atIso` — the current turn's tier qualifies for the freeze AND
+ * `atIso` itself falls inside an occurrence of it. This is what `draft-service/nudge.ts` calls
+ * against the ticker's live "now": `currentDeadline`/`nudgeDeadline` each push their OWN instant
+ * past the freeze, but the open interval BETWEEN an extended due time and an extended deadline
+ * still spans the freeze itself (a due time that already sits at the window's open, for
+ * instance, never moves at all), so a range check against those two alone is not enough — the
+ * moderator needs a direct answer to "is right now inside the freeze," which is exactly this.
+ * A plain selector like every other function in this file: it reads state and a caller-supplied
+ * instant, decides nothing, and applies no action, so nothing here can ever change what a
+ * replay decides — the reducer-purity ruling (`pause.ts`'s own docblock) is about `reduce.ts`,
+ * `snake.ts`, `auction.ts` and `apply-pick.ts` never reading `pauseWindow`, and this file was
+ * always the one place that does.
+ */
+export function isPaused(state: DraftState, atIso: string): boolean {
+  const window = effectivePauseWindow(state);
+  return window !== null && pauseWindowEndAt(atIso, window) !== null;
 }
 
 /** When the clock next tightens and to what — null before/after the draft, or on the final tier. */
@@ -213,6 +308,22 @@ export interface DraftClockView {
    * of a turn-order rule of its own.
    */
   readonly upcoming: readonly string[];
+  /**
+   * When picks resume, if the current turn started during the overnight freeze — null the rest
+   * of the time. Optional so a hand-built `DraftClockView` elsewhere in this codebase's own test
+   * suite (predating Task 4) still type-checks without it; `draftClockView` below always sets it
+   * explicitly, one way or the other, so no real payload this engine produces ever omits it.
+   */
+  readonly pausedUntil?: string | null;
+  /**
+   * teamId → the pick numbers that team currently owes (Task 5), the identical shape
+   * `DraftState.owedPicks` carries — so the room can render an owed pick as pending and tell
+   * the owing manager they can still make it, without a second lookup. Optional for the same
+   * reason `pausedUntil` is: this engine's own test suite predates Task 5 and hand-builds
+   * plenty of `DraftClockView` literals that never set it; `draftClockView` below always sets
+   * it explicitly, one way or the other, so no real payload this engine produces ever omits it.
+   */
+  readonly owedPicks?: Readonly<Record<string, readonly number[]>>;
 }
 
 /**
@@ -230,6 +341,8 @@ export function draftClockView(state: DraftState): DraftClockView {
     clockSeconds: currentClockSeconds(state),
     nextTightening: nextTightening(state),
     upcoming: upcomingOnClock(state, DRAFT_VIEW_CONFIG.upcomingCount),
+    pausedUntil: pausedUntilFor(state),
+    owedPicks: state.owedPicks,
   };
 }
 

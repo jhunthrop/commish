@@ -27,9 +27,18 @@ export interface StandingsTableProps {
   /** Forwarded from `LeagueHome`. Omitted only by tests that don't care about this branch —
    *  `InfoTip` itself defaults to the click-only, non-inline behavior when it's absent. */
   readonly helpLevel?: HelpLevel;
+  /**
+   * Whether this league plays a median game (`LeagueHomeBody.medianGame`, Task 2). Defaults to
+   * `false` — every existing caller that doesn't pass it renders exactly as before: the Record
+   * header keeps its plain `standings-record` definition, and no caption note appears. A record
+   * already folds the median game's win/loss/tie into the SAME `wins`/`losses`/`ties` a
+   * head-to-head result uses (`computeStandings`'s own docblock) — invisible from a row alone —
+   * so this table needs the fact stated, not inferred from the numbers it renders.
+   */
+  readonly medianGame?: boolean;
 }
 
-export function StandingsTable({ rows, myTeamId, helpLevel }: StandingsTableProps) {
+export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false }: StandingsTableProps) {
   const [sort, setSort] = useState<SortKey>("rank");
   const ordered = useMemo(() => [...rows].sort((a, b) => ORDER_BY[sort](b) - ORDER_BY[sort](a)), [rows, sort]);
 
@@ -62,7 +71,9 @@ export function StandingsTable({ rows, myTeamId, helpLevel }: StandingsTableProp
       header: (
         <span className="inline-flex items-center gap-1">
           Record
-          <InfoTip term="standings-record" helpLevel={helpLevel} />
+          {/* A median league's record is a two-games-a-week one — the definition changes to
+              say so, rather than sitting a second icon beside the first for the same header. */}
+          <InfoTip term={medianGame ? "median-game" : "standings-record"} helpLevel={helpLevel} />
         </span>
       ),
       cell: (row) => formatRecord(row),
@@ -103,6 +114,7 @@ export function StandingsTable({ rows, myTeamId, helpLevel }: StandingsTableProp
         <p className="text-xs text-text-muted">
           Ties in the standings break on points for.
           {showClinchBadges ? " Clinched means a guaranteed playoff spot." : ""}
+          {medianGame ? " Records include each week's median game." : ""}
         </p>
       )}
     </section>

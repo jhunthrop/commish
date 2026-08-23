@@ -42,7 +42,7 @@ export async function GET(request: Request) {
     participationTier: params.get("participationTier"),
   });
   try {
-    return ok<BrowseBody>({ leagues: await listPublicLeagues(getDb(), filter) });
+    return ok<BrowseBody>(await listPublicLeagues(getDb(), filter));
   } catch (error: unknown) {
     console.error("[public-leagues] route handler failed", { path: new URL(request.url).pathname }, error);
     return fail("Something went wrong on our side. Please try again.", 500);

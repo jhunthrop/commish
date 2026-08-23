@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import type { BidAction, DraftPoolEntry, NominateAction, StartDraftAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { initialDraftState, type DraftConfig, type DraftState } from "./state";
-import { DRAFT_CLOCK_SCHEDULE } from "./config";
+import { DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY } from "./config";
 import { maxBidFor, minBidFor, remainingBudget, teamOnClock } from "./selectors";
 import { expireAt, submitCommand } from "./test-support";
 
@@ -32,7 +32,7 @@ const CONFIG: DraftConfig = {
 };
 
 const T = "2026-09-01T00:00:00.000Z";
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
 
 function apply(state: DraftState, action: Parameters<typeof submitCommand>[1]): DraftState {
   const result = submitCommand(state, action);
@@ -192,7 +192,7 @@ describe("nomination rotation across three teams", () => {
     auctionBudget: 5, slotConfig: THREE_TEAM_SLOTS, clockSchedule: DRAFT_CLOCK_SCHEDULE,
   };
   const threeTeamStart: StartDraftAction = {
-    v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2", "t3"], pool: THREE_TEAM_POOL,
+    v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: T, draftOrder: ["t1", "t2", "t3"], pool: THREE_TEAM_POOL,
   };
 
   it("skips a team whose roster is already full to reach a non-adjacent open one", () => {

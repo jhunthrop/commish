@@ -8,6 +8,7 @@ import { defaultSweepDeps, sweepQuietly, type SweepDeps } from "@/integrity-serv
 import { attachAuditEvent, notifyAffectedMember } from "@/integrity-service/notify";
 import { hasOpenSeat } from "@/matchmaking/filter";
 import { ENFORCEMENT_REFUSALS, tierJoinPrecondition } from "./enforcement";
+import { fireWhenFullInTx } from "./fill-trigger";
 
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
 const TEAM_MEMBERSHIP_UNIQUE_INDEX = "teams_league_user_idx";
@@ -61,6 +62,17 @@ export interface JoinLeagueInput {
  * order in this codebase; this function never takes a lock in the other direction, so nothing
  * here can deadlock against it.
  *
+ * **LOCK ORDER, ENUMERATED (final whole-branch review, F1).** In statement order this transaction
+ * takes: `leagues[X] FOR UPDATE`; the `teams` INSERT (implicit `FOR KEY SHARE` on `leagues` —
+ * already held — and on `users`, a row nothing in this codebase ever takes `FOR UPDATE`);
+ * `fireWhenFullInTx`'s `UPDATE drafts SET kickoff_at` (the draft row, plus `leagues FOR KEY SHARE`
+ * again) and its `member_notices` inserts; then the audit anchor, LAST. That is leagues-then-
+ * drafts-then-anchor, which is the branch-wide rule every transaction touching both rows now
+ * obeys: `setDraftKickoff` (`./draft-schedule`) locks the league before the draft, and
+ * `applyAction` (`@/draft-service/store`) takes `leagues FOR KEY SHARE` before `drafts FOR UPDATE`.
+ * Both previously-cyclic pairs are driven on two real connections in
+ * `src/integrity-service/lock-order.test.ts`'s "the leagues-before-drafts rule" block.
+ *
  * **Why the precondition runs where it does.** Every path-specific gate (an invite's expiry and
  * use cap, a public league's listing and draft status) is checked AFTER the "are you already a
  * member" lookup and BEFORE the capacity check. That ordering is the rule that makes re-arriving
@@ -109,10 +121,31 @@ export async function joinLeagueInTx(
     userId: input.userId,
     name: input.teamName ?? profile?.displayName ?? "New team",
   });
+  const audit = input.audit ?? getAuditLogger();
+  // Phase 3.5, Task 7: "a time, not a button". Called unconditionally, after every seat this
+  // codebase ever takes, through BOTH doors that reach `joinLeagueInTx` (an invite accept and a
+  // public browse join) — `fireWhenFullInTx` (`./fill-trigger`) answers "is this now full, and
+  // does this league's draft even fire on filling" for itself, and no-ops for the overwhelming
+  // majority of joins (a `'scheduled'` draft, or a league with a seat still open) at the cost of
+  // one cheap read. See its own docblock for why it lives here rather than as a second call keyed
+  // to "was this the last seat".
+  //
+  // ABOVE THE `member_joined` APPEND, and that is ruling 3 rather than taste (final whole-branch
+  // review, F1c). This call takes real locks — `UPDATE drafts SET kickoff_at` (the draft row, plus
+  // `leagues FOR KEY SHARE` through its FK) and a `member_notices` insert per seated member — and
+  // it shipped BELOW an `audit.record` that had already taken the chain anchor, which is exactly
+  // the "no FK-carrying write after the anchor" invariant `@/integrity-service/audit-logger`'s own
+  // docblock states and exactly the shape of the cycle that invariant was written to close. The
+  // order is now the same one every other audited writer on this branch holds: business writes
+  // (the `teams` insert, the kickoff `UPDATE`), then notices, then `audit.record`, then
+  // `attachAuditEvent`, ANCHOR LAST. `fireWhenFullInTx` appends to this same league's chain, so
+  // the `member_joined` append below finds the anchor already held by this transaction and takes
+  // no new lock at all.
+  await fireWhenFullInTx(tx, league.id, input.occurredAt, audit);
   // Inside the same transaction, after the seat exists and before the caller sees it. Placed
   // here rather than in `acceptInvite` and `joinPublicLeague` separately for exactly the reason
   // the capacity check lives here: two copies of one rule are two places it can disagree.
-  await (input.audit ?? getAuditLogger()).record(tx, {
+  await audit.record(tx, {
     eventType: "member_joined",
     actorId: input.userId,
     actorType: "user",

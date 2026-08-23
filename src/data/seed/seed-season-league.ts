@@ -39,6 +39,15 @@ export interface SeasonLeagueConfig {
    * read `all_newcomers` on the browse page Task 10's own e2e walk checks.
    */
   readonly ownerIndices?: readonly number[];
+  /**
+   * The league median game (Phase 3.5, Task 2/10): every team also plays the league's own
+   * median score each week, and `finalizeWeek`'s own median branch (`leagues.median_game`,
+   * read fresh at settlement time by `finalizeWeekInTx`) folds a second real win/loss/tie into
+   * standings for every one of this league's weeks — never a stamped or hand-computed number.
+   * Defaults to `false`, the plain head-to-head shape every existing caller (and every existing
+   * test) already relies on.
+   */
+  readonly medianGame?: boolean;
 }
 
 const ALL_TWELVE_OWNER_INDICES = Array.from({ length: 12 }, (_, i) => i);
@@ -60,6 +69,27 @@ export const VETERAN_SEASON_LEAGUES: readonly [SeasonLeagueConfig, SeasonLeagueC
   { leagueId: "dev_league_season_2", draftId: "dev_draft_season_2", name: "Dev Season League II", ownerIndices: [0, 1, 2, 3] },
   { leagueId: "dev_league_season_3", draftId: "dev_draft_season_3", name: "Dev Season League III", ownerIndices: [0, 4, 5, 6] },
 ];
+
+/**
+ * Phase 3.5, Task 10, Step 1's median arc: a league whose weeks are settled by the real
+ * `finalizeWeek` with `median_game` on, so standings carry a real SECOND result (the median
+ * win/loss/tie) for every scored week — never a stamped record. `ownerIndices: [0, 7, 8, 9]`,
+ * disjoint from BOTH `VETERAN_SEASON_LEAGUES` entries' own [1,2,3]/[4,5,6] slices (`ownerIndices`'
+ * own docblock explains why): indices 7-9 land at two completed seasons each (this league plus
+ * `DEV_SEED.season`'s own twelve-team shape), safely under `veteranSeasonCutoff` (3) — reusing
+ * indices 1-6 here would push them to three and flip `dev_public_rookie_snake`'s own "all
+ * newcomers" browse label, the exact hazard `VETERAN_SEASON_LEAGUES`' own docblock already
+ * guards against. Team 1 is `claimUserId` (or `dev_user_01`), same as every other season league
+ * here — the identity `npm run seed && npm run dev` signs a developer in as, and the identity
+ * `e2e/global-setup.ts` mints for manager A, both land on this league's own real median results.
+ */
+export const MEDIAN_DEMO_LEAGUE: SeasonLeagueConfig = {
+  leagueId: "dev_league_median_demo",
+  draftId: "dev_draft_median_demo",
+  name: "Dev Median Demo League",
+  ownerIndices: [0, 7, 8, 9],
+  medianGame: true,
+};
 
 /**
  * A league that has already played: twelve teams, complete legal rosters, a full generated
@@ -92,6 +122,7 @@ export async function seedSeasonLeague(
   }
 
   const { leagueId, draftId, name } = leagueConfig;
+  const medianGame = leagueConfig.medianGame ?? false;
   const ownerIndices = leagueConfig.ownerIndices ?? ALL_TWELVE_OWNER_INDICES;
   const allOwnerIds = await ensureDevUsers(db, claimUserId);
   const ownerIds = ownerIndices.map((index) => allOwnerIds[index]!);
@@ -106,8 +137,9 @@ export async function seedSeasonLeague(
       teamCount: ownerIds.length,
       commissionerUserId: ownerIds[0]!,
       rosterSlots: [...STANDARD_ROSTER_SLOTS],
+      medianGame,
     })
-    .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: preserveRealCommissioner() } });
+    .onConflictDoUpdate({ target: leagues.id, set: { commissionerUserId: preserveRealCommissioner(), medianGame } });
 
   await db.insert(scoringSettings).values({ leagueId, ...PPR_SCORING }).onConflictDoNothing({ target: scoringSettings.leagueId });
 

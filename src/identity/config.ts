@@ -56,6 +56,13 @@ export const EXPERIENCE_TIER_LABEL: Readonly<Record<string, string>> = {
  * successfully, and only a deliberate choice of `beginner` can reach
  * `ENFORCEMENT_REFUSALS.create`. Before this control existed that refusal named a remedy the form
  * had no way to carry out.
+ *
+ * PHASE 3.5, TASK 9. The control this map feeds shipped correct but findable only by a
+ * commissioner who opened a nested "Advanced settings" disclosure that never named it in its own
+ * summary — the re-review's own words, "sound but collapsed". `CreateLeagueForm` now renders it
+ * (beside `VISIBILITIES`' own "Who can join", which decides first) directly under the league
+ * name, no disclosure in the way. This map's words and order are unchanged; only where the form
+ * puts them moved.
  */
 export const LEAGUE_EXPERIENCE_TIER_LABEL: Readonly<Record<string, string>> = {
   experienced: "Open to everyone",

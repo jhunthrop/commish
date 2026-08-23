@@ -42,6 +42,20 @@ export const createLeagueSchema = z.object({
     .max(LEAGUE_CONFIG.maxTeams, { message: `A league can have at most ${LEAGUE_CONFIG.maxTeams} teams.` })
     .default(LEAGUE_CONFIG.defaults.teamCount),
   scoringPreset: z.enum(["standard", "ppr", "half_ppr", "te_premium"]).default(LEAGUE_CONFIG.defaults.scoringPreset),
+  /**
+   * A TOGGLE on the canonical format, not a separate browse queue (the liquidity ruling) —
+   * `createLeague` (`@/league-service/creation`) resolves this to slot rows through
+   * `ROSTER_SHAPES` (`@/league/roster-shape`) when no explicit `rosterSlots` are given.
+   */
+  rosterShape: z.enum(["standard", "superflex"]).default(LEAGUE_CONFIG.defaults.rosterShape),
+  /**
+   * The league median game (Phase 3.5, Task 2): opt-in, off by default — a season-structure
+   * choice, not a scoring weight, which is why it lives beside `rosterShape` here rather than
+   * inside `scoringPreset`. `createLeague` (`./creation`) writes it straight to `leagues.median_
+   * game`; `finalizeWeekInTx` (`@/stats-pipeline/finalize`) is the only writer of the weekly
+   * number this toggle switches on.
+   */
+  medianGame: z.boolean().default(false),
   auctionBudget: z
     .number()
     .int()
@@ -53,6 +67,14 @@ export const createLeagueSchema = z.object({
    * decision a commissioner makes, not a checkbox default anybody should trip over.
    */
   visibility: z.enum(["invite_only", "public"]).default("invite_only"),
+  /**
+   * Phase 3.5, Task 7: the sit-and-go trigger. `'scheduled'` (the default) keeps today's
+   * behavior — a chosen or computed `kickoffAt`, unchanged. `'when_full'` fires the draft
+   * `MATCHMAKING_CONFIG.sitAndGo.graceSeconds` after the league's last seat fills
+   * (`fireWhenFullInTx`, `@/league-service/fill-trigger`), never a second start path. Refused
+   * below in combination with `visibility: "invite_only"` — see that check's own message.
+   */
+  startTrigger: z.enum(["scheduled", "when_full"]).default("scheduled"),
   /** Cosmetic only. Bounded to the tiers `MATCHMAKING_CONFIG` actually labels. */
   stakeTier: z
     .number()
@@ -64,6 +86,12 @@ export const createLeagueSchema = z.object({
   experienceTier: z.enum(["beginner", "experienced"]).optional(),
   /** Defaults at the route to the creator's display name, which the route knows and the service does not. */
   teamName: name.optional(),
+}).refine((data) => data.startTrigger !== "when_full" || data.visibility === "public", {
+  // `dueDraftsQuery` (`@/draft-service/auto-start`) starts drafts only in public matchmade
+  // leagues (`ENFORCED_LEAGUE_SQL`) — a private league whose fill wrote a time nobody pressed
+  // would be the control wired to nothing this codebase has already refused five times.
+  message: "Leagues that start when they fill are public leagues. Make this one public, or pick a draft time.",
+  path: ["startTrigger"],
 });
 
 export const createInviteSchema = z.object({
@@ -103,7 +131,7 @@ export const setLineupSchema = z.object({
   slots: z
     .array(
       z.object({
-        slot: z.enum(["QB", "RB", "WR", "TE", "FLEX", "K", "DEF", "BENCH"]),
+        slot: z.enum(["QB", "RB", "WR", "TE", "FLEX", "SUPERFLEX", "K", "DEF", "BENCH"]),
         slotIndex: z.number().int().nonnegative(),
         playerId: z.string().min(1).nullable(),
       }),

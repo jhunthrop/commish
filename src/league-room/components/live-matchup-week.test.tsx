@@ -17,6 +17,7 @@ const WEEK_BODY: MatchupWeekBody = {
       weekNumber: 5,
       final: false,
       weekStatus: "in_progress",
+      median: null,
       home: {
         teamId: "t1", teamName: "Bay Bandits", score: 10.5,
         starters: [{ slot: "QB", slotIndex: 0, playerId: "qb1", playerName: "Josh Allen", position: "QB", points: 3.5 }],

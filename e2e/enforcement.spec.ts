@@ -101,14 +101,28 @@ test("a veteran browses, is refused a beginner league, and reads why", async ({ 
   // composition label a real query computed SERVER-side (final review F6 moved the reduction off
   // the client, so this text is the bucket the wire actually carried).
   //
-  // "MOSTLY NEWCOMERS", AND THE ARITHMETIC IS THE SEED'S OWN (final review round 2, R1). This read
-  // "All newcomers", with a comment claiming all three seeded placeholders were still newcomers.
-  // They are not: `dev_user_04` holds three completed seasons — exactly
-  // `INTEGRITY_CONFIG.participation.veteranSeasonCutoff` — from `VETERAN_SEASON_LEAGUES`, and it
-  // holds a seat here, so the honest computed bucket is two newcomers against one veteran. A
-  // database seeded before those veteran leagues existed hid the contradiction; a fresh one does
-  // not. The spec catches up to the seed rather than the other way round, and the assertion below
-  // is the one that actually matters here: this league still refuses this veteran.
+  // "MOSTLY NEWCOMERS", AND DURABLY SO (Phase 3.5, Task 7.5 — the ledgered aging class' third
+  // occurrence, root-caused rather than patched a fourth time). This used to read "All
+  // newcomers", then briefly "Mostly newcomers" on the theory that `dev_user_04` — one of the
+  // shared 12-identity dev pool `ensureDevUsers` hands every seeder — had genuinely crossed
+  // `INTEGRITY_CONFIG.participation.veteranSeasonCutoff`. That theory held for exactly as long as
+  // no OTHER shared-pool identity crossed it too: `stampSeasonCompleteInTx`
+  // (`@/league-service/participation`) stamps ANY league's season complete the moment its last
+  // matchup scores, with no notion of which leagues were only ever meant to demo a lineup lock,
+  // and every identity in the shared pool sits in at least one league (`dev_league_snake`) whose
+  // scheduled draft eventually gets started and autopicked by the same ticker every e2e run's dev
+  // server keeps live. `dev_user_02` and `dev_user_03` crossed the cutoff next, on a run this
+  // spec's own author found failing locally, and patching the expected label a third time would
+  // only have bought another few runs before a fourth identity aged out from under it.
+  //
+  // The durable fix is `seedTierDemoIdentities` (`src/data/seed/seed-tier-demo.ts`): this
+  // league's three seats are no longer members of the shared pool at all. Two are dedicated
+  // identities no other seeder ever lists, so they can never accumulate a completed season; the
+  // third already has three REAL completed seasons the moment `npm run seed` finishes, scored at
+  // birth through the identical `seedSeasonLeague` path manager A's own veteran status uses, with
+  // no unscored matchup left for any later ticker to find. "Mostly newcomers" is therefore true by
+  // construction on every run, not merely true today — see that module's own docblock for the
+  // full incident.
   const card = managerA.locator("li").filter({ has: managerA.getByRole("heading", { name: target.name }) });
   await expect(card).toBeVisible();
   await expect(card.getByText("Mostly newcomers")).toBeVisible();
@@ -146,51 +160,42 @@ test("a commissioner schedules and starts a draft; a signed-out visitor reads th
   const anonPage = await anonContext.newPage();
 
   try {
+    // `ensureDraftScheduleLeague` (`global-setup.ts`) wipes and recreates this league from
+    // nothing on every setup run — scheduled, never started — so there is no "did a prior run
+    // already walk this journey" branch to detect here any more. Interstitial repair, Phase 3.5
+    // Task 1.5: the old two-branch shape assumed a started draft stayed `in_progress` forever,
+    // which stopped being true once the same autopick/nudge machinery every other draft gets
+    // carried this one all the way to `complete` and stats:ingest scored a season on top of it,
+    // between suite runs, on a long-lived dev database — see that function's own docblock.
     await pageA.goto(`/app/leagues/${E2E_DRAFT_SCHEDULE_LEAGUE_ID}`);
     await expect(pageA.getByRole("heading", { name: "E2E Draft Schedule League" })).toBeVisible();
 
-    const editButton = pageA.getByRole("button", { name: "Edit time" });
-    const alreadyStarted = (await editButton.count()) === 0;
+    // --- The commissioner sets a real draft time, five days out (past the "starting soon"
+    // banner, which this journey has no need to also prove) ----------------------------------
+    const kickoff = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
+    const pad = (n: number): string => String(n).padStart(2, "0");
+    const localValue = `${kickoff.getFullYear()}-${pad(kickoff.getMonth() + 1)}-${pad(kickoff.getDate())}T${pad(kickoff.getHours())}:${pad(kickoff.getMinutes())}`;
 
-    if (!alreadyStarted) {
-      // --- The commissioner sets a real draft time, five days out (past the "starting soon"
-      // banner, which this journey has no need to also prove) ----------------------------------
-      const kickoff = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000);
-      const pad = (n: number): string => String(n).padStart(2, "0");
-      const localValue = `${kickoff.getFullYear()}-${pad(kickoff.getMonth() + 1)}-${pad(kickoff.getDate())}T${pad(kickoff.getHours())}:${pad(kickoff.getMinutes())}`;
+    await pageA.getByRole("button", { name: "Edit time" }).click();
+    await pageA.getByLabel("Draft time").fill(localValue);
+    await pageA.getByRole("button", { name: "Save time" }).click();
+    await expect(pageA.getByRole("heading", { name: "Draft scheduled" })).toBeVisible();
 
-      await editButton.click();
-      await pageA.getByLabel("Draft time").fill(localValue);
-      await pageA.getByRole("button", { name: "Save time" }).click();
-      await expect(pageA.getByRole("heading", { name: "Draft scheduled" })).toBeVisible();
+    // --- A signed-out visitor reads the NEW time on the invite preview — never sees it from
+    // the commissioner's own session, and never through a dev auth bypass ------------------
+    const expectedAbsolute = formatDraftTime(kickoff.toISOString(), new Date().toISOString()).split(" (")[0]!;
+    await anonPage.goto(`/app/join/${invite.code}`);
+    await expect(anonPage.getByRole("heading", { name: "E2E Draft Schedule League" })).toBeVisible();
+    await expect(anonPage.getByText(expectedAbsolute)).toBeVisible();
+    // The one page under `/app` a signed-out visitor reaches — proven structurally, not just
+    // by the page rendering: the sign-in prompt is what a stranger sees instead of a join
+    // button that would silently assume an identity nobody supplied.
+    await expect(anonPage.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
 
-      // --- A signed-out visitor reads the NEW time on the invite preview — never sees it from
-      // the commissioner's own session, and never through a dev auth bypass ------------------
-      const expectedAbsolute = formatDraftTime(kickoff.toISOString(), new Date().toISOString()).split(" (")[0]!;
-      await anonPage.goto(`/app/join/${invite.code}`);
-      await expect(anonPage.getByRole("heading", { name: "E2E Draft Schedule League" })).toBeVisible();
-      await expect(anonPage.getByText(expectedAbsolute)).toBeVisible();
-      // The one page under `/app` a signed-out visitor reaches — proven structurally, not just
-      // by the page rendering: the sign-in prompt is what a stranger sees instead of a join
-      // button that would silently assume an identity nobody supplied.
-      await expect(anonPage.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
-
-      // --- The commissioner presses Start the draft — the first time any browser in this
-      // product's history has called `POST /api/drafts/[draftId]/start` ------------------------
-      await pageA.getByRole("button", { name: "Start the draft" }).click();
-      await expect(pageA.getByRole("heading", { name: "The draft is live" })).toBeVisible({ timeout: 15_000 });
-    } else {
-      // A prior run of this same spec, against this same long-lived database, already walked
-      // the schedule-and-start half — a draft cannot be un-started, and re-scheduling an
-      // in-progress draft is not a real product action this spec should fake. What is still
-      // real and still worth proving on a rerun: the draft stayed started, and the signed-out
-      // invite preview still resolves a real draft time for it.
-      await expect(pageA.getByRole("heading", { name: "The draft is live" })).toBeVisible();
-      await anonPage.goto(`/app/join/${invite.code}`);
-      await expect(anonPage.getByRole("heading", { name: "E2E Draft Schedule League" })).toBeVisible();
-      await expect(anonPage.getByText("Draft", { exact: true })).toBeVisible();
-      await expect(anonPage.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
-    }
+    // --- The commissioner presses Start the draft — the first time any browser in this
+    // product's history has called `POST /api/drafts/[draftId]/start` ------------------------
+    await pageA.getByRole("button", { name: "Start the draft" }).click();
+    await expect(pageA.getByRole("heading", { name: "The draft is live" })).toBeVisible({ timeout: 15_000 });
   } finally {
     await contextA.close();
     await anonContext.close();

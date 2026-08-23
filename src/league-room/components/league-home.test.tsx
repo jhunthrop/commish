@@ -27,6 +27,20 @@ describe("LeagueHome", () => {
     });
   });
 
+  // Task 3 (Phase 3.5): `LeagueHome` threads `home.medianGame` through to `StandingsTable`
+  // rather than the table silently defaulting to `false` on the one page that actually renders
+  // real data — `HOME`'s own default is `false`, so the base render above already proves the
+  // note is ABSENT by default; this proves it appears once the flag is on.
+  it("shows the standings' median-game note once the league's own toggle is on", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, medianGame: true }} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText(/Records include each week's median game\./)).toBeInTheDocument();
+  });
+
   // Task 10: reachable from where a member already is, beside the existing matchup link,
   // rather than only by typing the url directly.
   it("links to the league's activity feed beside the matchups link", () => {
@@ -179,6 +193,65 @@ describe("LeagueHome", () => {
     expect(screen.getByText("Draft scheduled")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start the draft" })).toBeInTheDocument();
     expect(screen.queryByText(/hasn't drafted yet/)).not.toBeInTheDocument();
+  });
+
+  // Phase 3.5, Task 8: the waiting room replaces the schedule panel outright for a `when_full`
+  // draft — the two never render at once.
+  it("renders the waiting room instead of the draft schedule panel for a when_full draft", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome
+          home={{ ...HOME, draftStatus: "scheduled", draftSchedule: { ...DRAFT_SCHEDULE, status: "scheduled", startTrigger: "when_full" } }}
+          lineup={null}
+        />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText(`${DRAFT_SCHEDULE.filledTeams} of ${HOME.teamCount} seats taken`)).toBeInTheDocument();
+    expect(screen.queryByText("Draft scheduled")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Edit time" })).not.toBeInTheDocument();
+  });
+
+  it("still renders the ordinary draft schedule panel for the scheduled trigger", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome
+          home={{ ...HOME, draftStatus: "scheduled", draftSchedule: { ...DRAFT_SCHEDULE, status: "scheduled", startTrigger: "scheduled" } }}
+          lineup={null}
+        />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText("Draft scheduled")).toBeInTheDocument();
+    expect(screen.queryByText(/seats taken/)).not.toBeInTheDocument();
+  });
+
+  // Task 6, Phase 3.5: NFFC's Kentucky Derby System.
+  it("shows the slot-preference panel from the same server render as the draft schedule", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome
+          home={{ ...HOME, draftStatus: "scheduled", draftSchedule: { ...DRAFT_SCHEDULE, status: "scheduled", slotPreference: { slotCount: 12, ranking: [], assignedSlot: null, canEdit: true } } }}
+          lineup={null}
+        />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText(/Rank the slots you want/)).toBeInTheDocument();
+  });
+
+  it("says nothing about a slot preference for a caller with no team in this league", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome
+          home={{ ...HOME, myTeamId: null, draftSchedule: { ...DRAFT_SCHEDULE, slotPreference: null } }}
+          lineup={null}
+        />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByText(/Rank the slots you want/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Draft slot/)).not.toBeInTheDocument();
   });
 
   // Task 12 review follow-up: "scheduled" and "in_progress" are different moments. A manager

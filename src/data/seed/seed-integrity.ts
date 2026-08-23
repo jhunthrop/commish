@@ -5,7 +5,7 @@ import type { DraftAction } from "@/domain/draft";
 import { STANDARD_ROSTER_SLOTS, type RosterSlot } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
-import { assignSlot, DRAFT_CLOCK_SCHEDULE, replayDraft, snakeTeamForPick, type DraftConfig } from "@/draft-engine";
+import { assignSlot, DRAFT_CLOCK_SCHEDULE, DRAFT_SKIP_POLICY, replayDraft, snakeTeamForPick, type DraftConfig } from "@/draft-engine";
 import { buildDraftPool, rankedPlayers } from "@/draft-service/pool";
 import { defaultSweepDeps, sweepLeagueForMultiAccounts, type SweepResult } from "@/integrity-service/multi-account";
 import { ensureDevUsers } from "./dev-users";
@@ -105,7 +105,7 @@ async function seedDraftLog(db: Db, teamIds: readonly string[], clock: Clock): P
   }
 
   const startAt = new Date(Date.parse(clock.now()) - ROUNDS * teamIds.length * SECONDS_PER_PICK * 1000);
-  const start: DraftAction = { v: 1, type: "START_DRAFT", timestamp: startAt.toISOString(), draftOrder: teamIds, pool, minBid: 1 };
+  const start: DraftAction = { v: 1, type: "START_DRAFT", timestamp: startAt.toISOString(), draftOrder: teamIds, pool, minBid: 1, skipPolicy: DRAFT_SKIP_POLICY };
 
   const taken = new Set<string>();
   const rosters = new Map(teamIds.map((id) => [id, [] as RosterSlot[]]));

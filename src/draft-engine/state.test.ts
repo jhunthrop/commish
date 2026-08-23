@@ -34,6 +34,7 @@ describe("initialDraftState", () => {
     expect(state.rosters).toEqual({});
     expect(state.budgets).toEqual({});
     expect(state.queues).toEqual({});
+    expect(state.owedPicks).toEqual({});
     expect(state.auction).toBeNull();
     expect(state.pickNumber).toBe(0);
     expect(state.turnStartedAt).toBeNull();

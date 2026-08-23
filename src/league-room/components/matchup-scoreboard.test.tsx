@@ -48,4 +48,19 @@ describe("MatchupScoreboard", () => {
     expect(screen.queryByText("Not started")).not.toBeInTheDocument();
     expect(screen.queryByText("Final")).not.toBeInTheDocument();
   });
+
+  // Fix round 1, F2: a regression test for the truncation fix, missing until now. Before `w-full`
+  // was added to the name `<p>`, its `flex-col items-center` parent sized it to its own content
+  // (the cross-axis default for that layout), so `truncate`'s `overflow-hidden`/`ellipsis` never
+  // had a constrained box to clip against and a long name pushed the whole card — and the page —
+  // wider. This name is long enough to have overflowed pre-fix.
+  it("constrains a long team name inside its own half of the card, rather than letting it push the layout wider", () => {
+    const longName = "The Absolutely Unstoppable Championship Dynasty Football Club";
+    render(<MatchupScoreboard matchup={{ ...FINAL, homeTeamName: longName }} myTeamId={null} />);
+    const nameEl = screen.getByText(longName);
+    // `truncate` alone clips nothing without a box to clip against — `w-full` is what gives the
+    // name its parent's already-shrunk (`min-w-0 flex-1`) width, which is the actual fix.
+    expect(nameEl.className).toContain("truncate");
+    expect(nameEl.className).toContain("w-full");
+  });
 });

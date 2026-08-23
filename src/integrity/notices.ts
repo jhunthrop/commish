@@ -257,19 +257,80 @@ export interface NoticeContexts {
   readonly draft_auto_started: {
     readonly leagueName: string;
   };
+  /**
+   * `reduceSnakeExpiry`'s skip branch (`@/draft-engine/snake`, Task 5, Phase 3.5), sent ONLY to
+   * the manager the clock skipped instead of penalizing — `SYSTEM_ACTION_VISIBILITY
+   * .draft_pick_skipped` (`@/integrity/system-actions`) is `"subject_only"`, on the identical
+   * competitive-sensitivity reasoning `lineup_auto_set` already carries. Deliberately does NOT
+   * name the player nobody chose (there wasn't one) or accuse the manager of missing anything —
+   * the whole point of a skip, unlike an autopick, is that nothing was decided FOR them: they
+   * still own the pick, whenever they come back to it.
+   */
+  readonly draft_pick_skipped: {
+    readonly leagueName: string;
+  };
+  /**
+   * `fireWhenFullInTx`'s own notice (`@/league-service/fill-trigger`, Phase 3.5 Task 7), sent to
+   * EVERY team in the league the moment its last seat fills — `SYSTEM_ACTION_VISIBILITY
+   * .draft_fill_triggered` (`@/integrity/system-actions`) is `"everyone"`, on `draft_auto_started`'s
+   * own reasoning: a fact about the league's shared calendar, true for everyone in it, about
+   * nobody's conduct. `graceLabel` is `MATCHMAKING_CONFIG.sitAndGo.graceSeconds`, PRE-RENDERED
+   * through the same `formatClockLength` helper the draft-schedule panel reads that config
+   * through — never a raw number this template would have to phrase itself, so the sentence and
+   * whatever countdown a panel shows can never disagree.
+   */
+  readonly draft_fill_triggered: {
+    readonly leagueName: string;
+    readonly graceLabel: string;
+  };
+  /**
+   * `fireWhenFullInTx`'s own notice for a HOUSE league specifically (Phase 3.5 addendum, Task 14,
+   * Step 4) — the sit-and-go rung's last-seat moment, told with the one fact `draft_fill_
+   * triggered`'s generic sentence cannot: the shelf refills itself, so this is never the last
+   * seat this member can find. Sent to every seat in place of `draft_fill_triggered` when the
+   * filling league is a house league (`leagues.house_rung IS NOT NULL`) — never both, the
+   * identical "one event, one sentence" discipline every other system-triggered notice in this
+   * file holds to. `leagueName` rides along for the audit context even though the template below
+   * does not read it (`review_removed`'s own `reason` is the precedent for a context field a
+   * template leaves unused): the sentence is deliberately generic, because which SPECIFIC house
+   * league just filled is a fact the member already sees on the room they are standing in.
+   */
+  readonly house_league_filled: {
+    readonly leagueName: string;
+  };
 }
 
 /**
- * The three, and only three, sentences `stat_week_corrected`'s `outcome` clause may say — resolved
- * by the caller from a team's before/after matchup result, never free text. A closed union rather
- * than a string is what lets `notices.test.ts` sweep every sentence this notice can actually
- * produce (`NOTICE_SAMPLES` carries one; a dedicated test iterates all three) instead of trusting
- * one sample to represent all of them.
+ * The fixed sentences `stat_week_corrected`'s `outcome` clause may say — resolved by the caller
+ * (`resolveCorrectionOutcome`, `@/stats-pipeline/correction`) from a team's before/after result,
+ * never free text. A closed union rather than a string is what lets `notices.test.ts` sweep
+ * every sentence this notice can actually produce (`NOTICE_SAMPLES` carries one; a dedicated test
+ * iterates all of them) instead of trusting one sample to represent all of them.
+ *
+ * The first three cover a league with no median in play for this correction (the toggle is off,
+ * or the week's median wasn't computed on one side of the before/after comparison) — the
+ * ORIGINAL three-clause set, unchanged, naming only the head-to-head matchup's own movement.
+ *
+ * The remaining nine cover a league where a median genuinely exists both before and after: a
+ * matchup-only clause there would be true about the matchup and SILENT about a median swing that
+ * changed the same team's real record — fix round 1 (F1)'s honesty gap. Each names BOTH games'
+ * movement — matchup and median, each independently "stays the same" / "turns into a win" /
+ * "turns into a loss" — the full 3x3 grid, so a median-only flip while the matchup holds gets
+ * its own truthful sentence rather than falling back to "your matchup result stays the same."
  */
 export type StatWeekCorrectionOutcome =
   | "your matchup result stays the same"
   | "that turns your matchup into a win"
-  | "that turns your matchup into a loss";
+  | "that turns your matchup into a loss"
+  | "your matchup result stays the same, and so does your median result"
+  | "your matchup result stays the same, but that turns your median result into a win"
+  | "your matchup result stays the same, but that turns your median result into a loss"
+  | "that turns your matchup into a win, but your median result stays the same"
+  | "that turns your matchup into a win, and that also turns your median result into a win"
+  | "that turns your matchup into a win, but that turns your median result into a loss"
+  | "that turns your matchup into a loss, but your median result stays the same"
+  | "that turns your matchup into a loss, but that turns your median result into a win"
+  | "that turns your matchup into a loss, and that also turns your median result into a loss";
 
 export type NoticeType = keyof NoticeContexts;
 
@@ -416,6 +477,34 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   draft_auto_started: ({ leagueName }) => ({
     title: `Your draft in ${leagueName} has started`,
     body: `The draft reached its scheduled time, so we started it. Head to the draft room now, or let the clock queue your picks if you cannot make it. We will tell you when it is your turn.`,
+  }),
+  // No "no reply to this message" line: this is a courtesy, not a sanction, and there is
+  // nothing about the member's own conduct to appeal. The persona panel's own question (Task 5
+  // Step 6) is whether a casual manager reading this understands they still own the pick — the
+  // second sentence is what answers that, in the same plain-spoken register `lineup_auto_set`'s
+  // own template closes on.
+  draft_pick_skipped: ({ leagueName }) => ({
+    title: `Your pick passed in ${leagueName}`,
+    body: "Your pick passed while you were away. You can still make it, and the draft will wait for it before it finishes.",
+  }),
+  // No "no reply to this message" line: this is not a sanction, and there is nothing about any
+  // member's own conduct to appeal — it explains a fact about the league's shared calendar, the
+  // identical framing `draft_auto_started`'s own template already carries. `graceLabel` arrives
+  // pre-rendered (`fireWhenFullInTx`'s own docblock explains why), so this template never does
+  // its own arithmetic on `MATCHMAKING_CONFIG.sitAndGo.graceSeconds`.
+  draft_fill_triggered: ({ leagueName, graceLabel }) => ({
+    title: `Your league in ${leagueName} just filled up`,
+    body: `The last seat in ${leagueName} just filled, so the draft starts in about ${graceLabel}. Head to the draft room now, or let the clock queue your picks if you cannot make it.`,
+  }),
+  // No "no reply to this message" line: this is not a sanction, and there is nothing about any
+  // member's own conduct to appeal — it explains a fact about the league's shared calendar, the
+  // identical framing `draft_fill_triggered`'s own template already carries. The second sentence
+  // is the one thing a house league can say that a member-run one cannot (Task 14's own brief,
+  // verbatim): the shelf refills itself, so this was never the last house room this member could
+  // find.
+  house_league_filled: () => ({
+    title: "Your house league is full",
+    body: "Your league is full and the draft is next. A new house league is open if you want a second team.",
   }),
 };
 

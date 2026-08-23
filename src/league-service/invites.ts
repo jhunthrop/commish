@@ -5,6 +5,7 @@ import { drafts, leagueInvites, leagues, scoringSettings, teams, users } from "@
 import { PPR_SCORING } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { generateInviteCode, leagueTerms, LEAGUE_CONFIG, type LeagueTerms } from "@/league";
+import { leagueAuthority } from "./authority";
 import { MS_PER_DAY } from "./config";
 import type { LeagueWriteDeps } from "./creation";
 import { joinLeagueInTx, triggerMultiAccountSweep, type JoinLeagueOutcome, type JoinPrecondition } from "./join";
@@ -190,12 +191,26 @@ export async function invitePreview(db: Db, code: string, clock: Clock = systemC
   // is never told "a real league existed here", only that the link itself doesn't work.
   if (league === undefined) return { ok: false, reason: INVALID };
 
+  // Ruling 33: a house league cannot have an invite at all — `createInvite`'s only caller
+  // (`withCommissioner`) refuses a house league before an invite is ever minted, so a valid
+  // invite code pointing at one is unreachable through ordinary use. Guarded here anyway, by the
+  // authority union rather than assumed: under a nullable `commissioner_user_id` this function's
+  // OLD lookup (`eq(users.id, league.commissionerUserId)`) no longer type-checks at all, which is
+  // the compiler asking the question a reviewer might not have. Collapsed into the same INVALID
+  // the `league === undefined` branch above answers with — a stranger holding the link learns
+  // only that it doesn't work.
+  const authority = leagueAuthority(league);
+  if (authority.kind === "house") return { ok: false, reason: INVALID };
+
   const [commissioner] = await db.select({ displayName: users.displayName, avatarUrl: users.avatarUrl }).from(users).where(
-    eq(users.id, league.commissionerUserId),
+    eq(users.id, authority.userId),
   );
   const [weights] = await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, league.id));
   const filledTeams = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, league.id));
-  const [draft] = await db.select({ kickoffAt: drafts.kickoffAt }).from(drafts).where(eq(drafts.leagueId, league.id));
+  const [draft] = await db
+    .select({ kickoffAt: drafts.kickoffAt, startTrigger: drafts.startTrigger })
+    .from(drafts)
+    .where(eq(drafts.leagueId, league.id));
 
   return {
     ok: true,
@@ -211,6 +226,7 @@ export async function invitePreview(db: Db, code: string, clock: Clock = systemC
       scoring: weights ?? PPR_SCORING,
       rosterSlots: league.rosterSlots,
       stakeTier: league.stakeTier,
+      medianGame: league.medianGame,
       commissioner: {
         displayName: commissioner?.displayName ?? "Commissioner",
         avatarUrl: commissioner?.avatarUrl ?? null,
@@ -219,6 +235,10 @@ export async function invitePreview(db: Db, code: string, clock: Clock = systemC
       // `drafts` is written in the same transaction as `leagues`.
       kickoffAt: draft?.kickoffAt.toISOString() ?? clock.now(),
       now: clock.now(),
+      // Phase 3.5, Task 8 fix round 1 (review HIGH): a stranger reading the invite preview for an
+      // unfilled `when_full` league must see the same fills-truth `leagueHome` shows a member,
+      // never the placeholder `kickoffAt` above formatted as though it were a real time.
+      startTrigger: draft?.startTrigger ?? "scheduled",
     }),
   };
 }

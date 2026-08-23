@@ -1,11 +1,12 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, teams } from "@/db/schema";
+import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, teams, weeks } from "@/db/schema";
 import type { DraftStatus } from "@/domain/draft";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
 import { listTeamCards } from "@/draft-service/teams";
-import { benchOf, LEAGUE_CONFIG, leagueTerms, seasonProgress, startersOf, type WeekStatus } from "@/league";
+import { benchOf, LEAGUE_CONFIG, leagueTerms, medianResultFor, seasonProgress, startersOf, type WeekStatus } from "@/league";
+import { isCommissionerOf, leagueAuthority } from "./authority";
 import type {
   DraftScheduleBody,
   LeagueHomeBody,
@@ -13,12 +14,14 @@ import type {
   LeagueSummary,
   MatchupDetail,
   MatchupLineupEntry,
+  MatchupMedian,
   MatchupSide,
   MatchupSummary,
   MatchupWeekBody,
 } from "@/league-room/contract";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
+import { slotPreferenceViewFor } from "./draft-schedule";
 import { getLineup, weekStatusFor } from "./lineups";
 import { leagueStandings } from "./results";
 
@@ -87,7 +90,7 @@ export async function listLeaguesForUser(db: Db, userId: string): Promise<readon
     format: league.format,
     teamCount: league.teamCount,
     filledTeams: filledByLeague.get(league.id) ?? 0,
-    isCommissioner: league.commissionerUserId === userId,
+    isCommissioner: isCommissionerOf(league, userId),
     myTeamId: myTeamByLeague.get(league.id) ?? null,
     draftId: draftByLeague.get(league.id)?.id ?? null,
     draftStatus: draftByLeague.get(league.id)?.status ?? null,
@@ -115,11 +118,20 @@ export function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyM
 /**
  * Every read `leagueHome` runs, whichever league is asked: `leagues`, `matchups`, `teams`
  * (plain), `drafts`, `scoring_settings`, `stat_weeks` (`weekStatusFor`), the one team+owner
- * join (`listTeamCards`), and `leagueStandings`'s own `matchups` read — eight, bounded
- * regardless of team count. Pinned here, not just in the test, so a future caller who adds a
- * ninth read trips the same assertion `invitePreview`'s neighboring test would if it grew one.
+ * join (`listTeamCards`), `leagueStandings`'s own `matchups` read, `leagueStandings`'s `weeks`
+ * read for the league's stored medians (Phase 3.5, Task 2), and (Phase 3.5, Task 6)
+ * `slotPreferenceViewFor`'s own `draft_slot_preferences` read — ten, bounded regardless of team
+ * count. That tenth read only fires for a caller WITH a team here (`myTeamId !== null`); a
+ * caller with none (a commissioner without one of their own) short-circuits to `null` before
+ * any query, the same "no team, no query" shape `myMatchup`'s own lookup already has. This test
+ * signs in as a manager with a team, so it pays the full ten. `leagueStandings` is handed
+ * `league.medianGame` straight from the row this function already selected above, rather than
+ * re-querying `leagues` for it, which is what keeps this bounded rather than growing with every
+ * later read that also wants a `leagues` column. Pinned here, not just in the test, so a future
+ * caller who adds an eleventh read trips the same assertion `invitePreview`'s neighboring test
+ * would if it grew one.
  */
-export const BASELINE_LEAGUE_HOME_QUERIES = 8;
+export const BASELINE_LEAGUE_HOME_QUERIES = 10;
 
 /**
  * Everything the league home page renders, assembled once on the server. `listTeamCards` is
@@ -132,7 +144,10 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
 
   const matchupRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
   const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
-  const [draft] = await db.select({ id: drafts.id, status: drafts.status, kickoffAt: drafts.kickoffAt }).from(drafts).where(eq(drafts.leagueId, leagueId));
+  const [draft] = await db
+    .select({ id: drafts.id, status: drafts.status, kickoffAt: drafts.kickoffAt, startTrigger: drafts.startTrigger })
+    .from(drafts)
+    .where(eq(drafts.leagueId, leagueId));
   // `leagueTerms`'s one input this function did not already hold — every other field it needs
   // (`league`'s own columns, `teamRows`/`teamCards` for filled count and the commissioner's
   // name) rides rows this function reads anyway. Falls back to `PPR_SCORING` for the same
@@ -162,10 +177,14 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     ownerUserId: ownerUserIdByTeamId.get(card.id) ?? card.id,
   }));
 
-  // The commissioner has a team in every league (`createLeague` gives them one in the same
-  // transaction it writes the league itself), so their card is already sitting in `teamCards`
-  // above — no query beyond the one that already ran for the members panel.
-  const commissionerTeamId = teamRows.find((row) => row.userId === league.commissionerUserId)?.id;
+  // A MEMBER league's commissioner has a team in every league (`createLeague` gives them one in
+  // the same transaction it writes the league itself), so their card is already sitting in
+  // `teamCards` above — no query beyond the one that already ran for the members panel. A HOUSE
+  // league has no commissioner row to look up at all — `leagueAuthority`'s `house` branch
+  // short-circuits `commissionerTeamId` to `undefined` before this `find` ever runs, matching
+  // ruling 28: a house league has no commissioner seat for anybody to occupy.
+  const authority = leagueAuthority(league);
+  const commissionerTeamId = authority.kind === "member" ? teamRows.find((row) => row.userId === authority.userId)?.id : undefined;
   const commissionerCard = teamCards.find((card) => card.id === commissionerTeamId);
   const terms = leagueTerms({
     name: league.name,
@@ -175,6 +194,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     scoring: weights ?? PPR_SCORING,
     rosterSlots: league.rosterSlots,
     stakeTier: league.stakeTier,
+    medianGame: league.medianGame,
     commissioner: {
       displayName: commissionerCard?.ownerDisplayName ?? "Commissioner",
       avatarUrl: commissionerCard?.ownerAvatarUrl ?? null,
@@ -184,6 +204,10 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     // never-true defensive fallback `weights ?? PPR_SCORING` uses two lines above.
     kickoffAt: draft?.kickoffAt.toISOString() ?? clock.now(),
     now: clock.now(),
+    // Phase 3.5, Task 8 fix round 1 (review HIGH): the SAME `draft.startTrigger` this function
+    // already reads for `home.draftSchedule` two lines below, off the SAME select — `leagueTerms`
+    // needs it to know whether `kickoffAt` above is a real time or still the creation placeholder.
+    startTrigger: draft?.startTrigger ?? "scheduled",
   });
 
   // Fix round 1 (review MEDIUM): `DraftSchedulePanel`'s entire initial read, assembled from rows
@@ -198,6 +222,22 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
           status: draft.status,
           kickoffAt: draft.kickoffAt.toISOString(),
           isPublicMatchmade: league.isPublicMatchmade,
+          // Phase 3.5, Task 8. `startTrigger` rides the SAME `draft` row this function already
+          // selected above (one extra column, zero extra queries); `filledTeams` is `teamCards
+          // .length`, already computed for `terms` a few lines up — `LeagueHome` reads both to
+          // decide between `WaitingRoom` and `DraftSchedulePanel`, and `WaitingRoom`'s own fill
+          // line.
+          startTrigger: draft.startTrigger,
+          filledTeams: teamCards.length,
+          // Task 6: NFFC's Kentucky Derby System. Shared with `draftScheduleView`
+          // (`./draft-schedule`, the route's own read) so this page's initial render and a
+          // later refetch can never compute the caller's own ranking/result differently.
+          slotPreference: await slotPreferenceViewFor(db, {
+            draftId: draft.id,
+            status: draft.status,
+            teamId: myTeamId,
+            slotCount: league.teamCount,
+          }),
         };
 
   return {
@@ -206,11 +246,12 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     format: league.format,
     teamCount: league.teamCount,
     rosterSlots: league.rosterSlots,
-    isCommissioner: league.commissionerUserId === userId,
-    commissionerUserId: league.commissionerUserId,
+    isCommissioner: isCommissionerOf(league, userId),
+    authority,
     myTeamId,
     teams: members,
-    standings: await leagueStandings(db, leagueId, teamCards),
+    standings: await leagueStandings(db, leagueId, teamCards, league.medianGame),
+    medianGame: league.medianGame,
     terms,
     currentWeek,
     totalWeeks,
@@ -250,6 +291,13 @@ export async function matchupWeek(
   const weekStatus = await weekStatusFor(db, weekNumber);
   if (week.length === 0) return { leagueId, weekNumber, totalWeeks, myTeamId: null, matchups: [], weekStatus };
 
+  // `null` for a non-median league (`leagues.median_game` off) and for a week that hasn't
+  // settled yet — `finalizeWeekInTx` (`@/stats-pipeline/finalize`) only ever writes this column
+  // when the toggle is on, so a single read answers both cases without a second `leagues.median_
+  // game` check here.
+  const [weekRow] = await db.select({ medianScore: weeks.medianScore }).from(weeks).where(and(eq(weeks.leagueId, leagueId), eq(weeks.weekNumber, weekNumber)));
+  const leagueMedianScore = weekRow?.medianScore ?? null;
+
   const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
   const nameById = new Map(teamRows.map((row) => [row.id, row.name]));
   const myTeamId = teamRows.find((row) => row.userId === userId)?.id ?? null;
@@ -288,12 +336,32 @@ export async function matchupWeek(
     };
   }
 
+  // Never true alongside a non-null `leagueMedianScore`: `finalizeWeekInTx` derives the median
+  // from the SAME `scores` map it writes both matchup rows from, in the same transaction — but
+  // guarded rather than asserted, the same defensive posture `nameById.get(teamId) ?? teamId`
+  // takes two independent reads above.
+  const medianFor = (homeScore: number | null, awayScore: number | null): MatchupMedian | null =>
+    leagueMedianScore === null || homeScore === null || awayScore === null
+      ? null
+      : {
+          score: leagueMedianScore,
+          homeResult: medianResultFor(homeScore, leagueMedianScore),
+          awayResult: medianResultFor(awayScore, leagueMedianScore),
+        };
+
   // Every matchup's two sides are independent `getLineup` round trips — run the whole week's
   // worth in parallel rather than awaiting each side, one matchup at a time.
   const details: MatchupDetail[] = await Promise.all(
     week.map(async (row): Promise<MatchupDetail> => {
       const [home, away] = await Promise.all([sideFor(row.homeTeamId, row.homeScore), sideFor(row.awayTeamId, row.awayScore)]);
-      return { weekNumber, home, away, final: row.homeScore !== null && row.awayScore !== null, weekStatus };
+      return {
+        weekNumber,
+        home,
+        away,
+        final: row.homeScore !== null && row.awayScore !== null,
+        weekStatus,
+        median: medianFor(row.homeScore, row.awayScore),
+      };
     }),
   );
 

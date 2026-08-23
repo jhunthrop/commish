@@ -1,10 +1,12 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, leagues } from "@/db/schema";
+import { draftActions, draftSlotPreferences, drafts, leagues, teams } from "@/db/schema";
 import type { DraftStatus } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
+import { draftActionSchema } from "@/draft-engine";
 import { LEAGUE_CONFIG } from "@/league";
-import type { DraftScheduleBody } from "@/league-room/contract";
+import type { DraftScheduleBody, SlotPreferenceView } from "@/league-room/contract";
+import { HOUSE_AUTHORITY_REFUSALS, isCommissionerOf } from "./authority";
 import { MS_PER_DAY } from "./config";
 
 /** The outermost edge is the only place a wall clock is allowed — see every other service
@@ -24,6 +26,13 @@ const DRAFT_NOT_FOUND = "That draft doesn't exist.";
  */
 export const KICKOFF_REFUSALS = {
   alreadyStarted: "This draft has already started, so its time can't change.",
+  /**
+   * Phase 3.5, Task 7. A `'when_full'` draft's `kickoff_at` is set by `fireWhenFullInTx`
+   * (`@/league-service/fill-trigger`), not by a commissioner — a time nobody chose is not a time
+   * anybody may edit. Checked before the past/too-far checks below: those are about WHETHER a
+   * chosen time is a reasonable one, and this is about whether there is a time to choose at all.
+   */
+  whenFull: "This draft starts when the league fills, so nobody sets its time by hand.",
   past: "Pick a time in the future so everyone has a chance to show up.",
   /**
    * Names `LEAGUE_CONFIG.defaults.maxDraftDaysAhead` rather than repeating the number as a bare
@@ -50,8 +59,15 @@ interface DraftRow {
   readonly draftId: string;
   readonly status: DraftStatus;
   readonly kickoffAt: Date;
-  readonly commissionerUserId: string;
+  readonly commissionerUserId: string | null;
+  /** Phase 3.5 addendum, Task 12: which catalog rung this league came from, or `null` for a
+   *  member league — the second half of `@/league-service/authority`'s `LeagueAuthorityRow`. */
+  readonly houseRung: string | null;
   readonly isPublicMatchmade: boolean;
+  /** Task 6: how many draft slots this league has — the ranking ceiling. */
+  readonly teamCount: number;
+  /** Phase 3.5, Task 8: which of the two ways this draft's `kickoffAt` comes to be set. */
+  readonly startTrigger: "scheduled" | "when_full";
 }
 
 /** One league's draft row, joined to the one fact about its league every caller here needs:
@@ -63,7 +79,10 @@ async function draftRowForLeague(db: Db, leagueId: string): Promise<DraftRow | u
       status: drafts.status,
       kickoffAt: drafts.kickoffAt,
       commissionerUserId: leagues.commissionerUserId,
+      houseRung: leagues.houseRung,
       isPublicMatchmade: leagues.isPublicMatchmade,
+      teamCount: leagues.teamCount,
+      startTrigger: drafts.startTrigger,
     })
     .from(drafts)
     .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
@@ -72,19 +91,79 @@ async function draftRowForLeague(db: Db, leagueId: string): Promise<DraftRow | u
 }
 
 /**
- * What every league member reads: the chosen time, the draft's state, and whether the platform
- * has a fallback (Task 7). Null for a league that doesn't exist — the route answers 404, the
- * same shape every other league read in this service uses for a missing league.
+ * The slot this team actually drafted from, read straight off the `START_DRAFT` action's own
+ * `draftOrder` (sequence 1) — the draw's snapshot, per ruling 27, never a replay. `null` for a
+ * draft that hasn't started (no such row yet) or, in principle, a team missing from that
+ * snapshot, which cannot happen through ordinary use: every team row present when `startDraft`
+ * ran is in `draftOrder` by construction (`@/draft-service/store`).
  */
-export async function draftScheduleView(db: Db, leagueId: string): Promise<DraftScheduleBody | null> {
+async function resolvedSlotFor(db: Db, draftId: string, teamId: string): Promise<number | null> {
+  const [row] = await db
+    .select({ action: draftActions.action })
+    .from(draftActions)
+    .where(and(eq(draftActions.draftId, draftId), eq(draftActions.sequence, 1)));
+  if (row === undefined) return null;
+  const parsed = draftActionSchema.safeParse(row.action);
+  if (!parsed.success || parsed.data.type !== "START_DRAFT") return null;
+  const index = parsed.data.draftOrder.indexOf(teamId);
+  return index === -1 ? null : index + 1;
+}
+
+/**
+ * `DraftScheduleBody.slotPreference` for one team — `null` only for a caller with no team in
+ * this league (`teamId === null`), since a ranking is scoped to a team. Shared by
+ * `draftScheduleView` below (the route's own read) and `leagueHome` (`./read`, the page's
+ * initial render), so the two can never compute this differently.
+ */
+export async function slotPreferenceViewFor(
+  db: Db,
+  params: { readonly draftId: string; readonly status: DraftStatus; readonly teamId: string | null; readonly slotCount: number },
+): Promise<SlotPreferenceView | null> {
+  if (params.teamId === null) return null;
+  const [row] = await db
+    .select({ ranking: draftSlotPreferences.ranking })
+    .from(draftSlotPreferences)
+    .where(and(eq(draftSlotPreferences.draftId, params.draftId), eq(draftSlotPreferences.teamId, params.teamId)));
+  const assignedSlot = params.status === "scheduled" ? null : await resolvedSlotFor(db, params.draftId, params.teamId);
+  return {
+    slotCount: params.slotCount,
+    ranking: row?.ranking ?? [],
+    assignedSlot,
+    canEdit: params.status === "scheduled",
+  };
+}
+
+/**
+ * What every league member reads: the chosen time, the draft's state, and whether the platform
+ * has a fallback (Task 7) — plus, Task 6, the caller's OWN slot ranking and its result, and,
+ * Task 8, the trigger and the fill count `WaitingRoom` renders from. Null for a league that
+ * doesn't exist — the route answers 404, the same shape every other league read in this service
+ * uses for a missing league.
+ *
+ * ONE read of `teams`, not two: the caller's own team and the league's whole fill count both come
+ * off the SAME `{ id, userId }` select, the same "read once, derive twice" shape `leagueHome`
+ * (`./read`) uses for its own `teamRows` — a second, count-only query here would cost a round
+ * trip this function has never paid.
+ */
+export async function draftScheduleView(db: Db, leagueId: string, userId: string): Promise<DraftScheduleBody | null> {
   const row = await draftRowForLeague(db, leagueId);
   if (row === undefined) return null;
+  const teamRows = await db.select({ id: teams.id, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
+  const myTeam = teamRows.find((team) => team.userId === userId);
   return {
     draftId: row.draftId,
     leagueId,
     status: row.status,
     kickoffAt: row.kickoffAt.toISOString(),
     isPublicMatchmade: row.isPublicMatchmade,
+    startTrigger: row.startTrigger,
+    filledTeams: teamRows.length,
+    slotPreference: await slotPreferenceViewFor(db, {
+      draftId: row.draftId,
+      status: row.status,
+      teamId: myTeam?.id ?? null,
+      slotCount: row.teamCount,
+    }),
   };
 }
 
@@ -105,16 +184,38 @@ export type SetDraftKickoffResult =
  * curl until this task). Moves `drafts.kickoff_at` while the draft is still `scheduled`, and
  * refuses everyone and everything else.
  *
- * Locks the draft row `FOR UPDATE` before checking anything, so two concurrent reschedules (or
- * a reschedule racing `startDraft`) resolve one at a time rather than both reading `scheduled`
- * and both deciding they may proceed. PROVEN, not promised (final review F10 — this docblock
- * asserted the property and nothing measured it): `src/integrity-service/lock-order.test.ts`'s
- * "setDraftKickoff's row lock" drives both races on two real connections, including the half the
- * call site does not read — the `.for("update")` spans the `innerJoin`, so it locks the `leagues`
- * row as well as the `drafts` one. NO-WRITE-BEFORE-REFUSAL holds here exactly as it does at
- * `createLeague`'s own gate: every refusal branch below returns before the `UPDATE` statement is
- * ever reached, so a refused reschedule commits nothing but the row lock it already had to take
- * to ask the question safely.
+ * Phase 3.5 addendum, Task 12: a house league answers `HOUSE_AUTHORITY_REFUSALS.schedule`
+ * instead of the ordinary member's 404 — the same generalization Task 7's `KICKOFF_REFUSALS.
+ * whenFull` already makes for a `'when_full'` draft (nobody chose the time, so nobody edits it),
+ * extended to a draft nobody could have chosen because the catalog opened the league around it.
+ *
+
+ * Locks the league row and then the draft row `FOR UPDATE` before checking anything, so two
+ * concurrent reschedules (or a reschedule racing `startDraft`) resolve one at a time rather than
+ * both reading `scheduled` and both deciding they may proceed. PROVEN, not promised (final review
+ * F10 — this docblock asserted the property and nothing measured it):
+ * `src/integrity-service/lock-order.test.ts`'s "setDraftKickoff's row lock" drives both races on
+ * two real connections. NO-WRITE-BEFORE-REFUSAL holds here exactly as it does at `createLeague`'s
+ * own gate: every refusal branch below returns before the `UPDATE` statement is ever reached, so a
+ * refused reschedule commits nothing but the row locks it already had to take to ask the question
+ * safely.
+ *
+ * THE GLOBAL LEAGUES-BEFORE-DRAFTS RULE (final whole-branch review, F1 — a cycle reproduced with
+ * three real `psql` sessions, SQLSTATE 40P01). This function used to take BOTH rows in ONE
+ * statement: `.for("update")` spanning the `innerJoin` locks every table in the `FROM` list, and
+ * within a single statement Postgres acquires those row locks in whatever order it happens to
+ * fetch them — which for this plan (`drafts_league_id_idx` first, then the `leagues` lookup) is
+ * DRAFTS BEFORE LEAGUES. `joinLeagueInTx` (`./join.ts`) goes the other way: `leagues FOR UPDATE`,
+ * then `fireWhenFullInTx`'s `UPDATE drafts`. Two transactions, two orders, one cycle.
+ *
+ * The rule this branch now holds everywhere, stated once here and restated at every other site
+ * that obeys it: ANY TRANSACTION THAT TAKES BOTH A `leagues` ROW LOCK AND A `drafts` ROW LOCK
+ * ACQUIRES `leagues` FIRST, AS ITS OWN STATEMENT. So the first statement below locks the league
+ * row alone, and the joined read that follows narrows its lock to `drafts` (`FOR UPDATE OF
+ * drafts`) — the league row it joins through is already held by the statement above it, and the
+ * new-edge-free order is leagues-then-drafts in both directions. Driven, not asserted:
+ * `lock-order.test.ts`'s "the leagues-before-drafts rule" block runs the previously-cyclic pair on
+ * two real connections with the old order's timing.
  */
 export async function setDraftKickoff(
   db: Db,
@@ -122,22 +223,43 @@ export async function setDraftKickoff(
   clock: Clock = systemClock,
 ): Promise<SetDraftKickoffResult> {
   return db.transaction(async (tx) => {
+    // LEAGUES FIRST, ON ITS OWN (F1 — see the docblock above). A league with no `drafts` row is
+    // not a reachable state through this product, but locking a row that exists while the joined
+    // read below finds nothing is harmless: the transaction returns 404 having written nothing.
+    await tx.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, input.leagueId)).for("update");
     const [row] = await tx
       .select({
         draftId: drafts.id,
         status: drafts.status,
         commissionerUserId: leagues.commissionerUserId,
+        houseRung: leagues.houseRung,
+        startTrigger: drafts.startTrigger,
       })
       .from(drafts)
       .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
       .where(eq(drafts.leagueId, input.leagueId))
-      .for("update");
+      .for("update", { of: drafts });
 
-    if (row === undefined || row.commissionerUserId !== input.userId) {
+    if (row === undefined) {
+      return { ok: false, status: 404, reason: DRAFT_NOT_FOUND };
+    }
+    // `withLeagueMemberActor` already refused a stranger before this function was ever called
+    // (`PUT /api/leagues/[leagueId]/draft-schedule`), so every caller reaching this point is a
+    // genuine member of THIS league. A house league's `!isCommissionerOf` is true for every one
+    // of them, with nobody left who could ever see past it — the Task 7 `whenFull` generalization
+    // (ruling 32): the platform's own catalog chose this draft's time, so this answers the true
+    // reason rather than the ordinary member's 404.
+    if (row.houseRung !== null) {
+      return { ok: false, status: 409, reason: HOUSE_AUTHORITY_REFUSALS.schedule };
+    }
+    if (!isCommissionerOf(row, input.userId)) {
       return { ok: false, status: 404, reason: DRAFT_NOT_FOUND };
     }
     if (row.status !== "scheduled") {
       return { ok: false, status: 409, reason: KICKOFF_REFUSALS.alreadyStarted };
+    }
+    if (row.startTrigger === "when_full") {
+      return { ok: false, status: 409, reason: KICKOFF_REFUSALS.whenFull };
     }
 
     const kickoffMs = Date.parse(input.kickoffAt);

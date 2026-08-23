@@ -1,8 +1,9 @@
-import type { WeekStatus } from "@/league";
+import type { MedianResult, WeekStatus } from "@/league";
 import type { MatchupDetail, MatchupSide } from "../contract";
 import { Card, PositionBadge, SlotChip, Table, type TableColumn } from "@/components/ui";
 import { formatPoints } from "../lib/format";
 import { MatchupScoreboard } from "./matchup-scoreboard";
+import { MedianResultLine } from "./median-result";
 
 const COLUMNS: readonly TableColumn<MatchupSide["starters"][number]>[] = [
   { key: "slot", header: "Slot", cell: (row) => <SlotChip slot={row.slot} /> },
@@ -18,11 +19,41 @@ const COLUMNS: readonly TableColumn<MatchupSide["starters"][number]>[] = [
   { key: "points", header: "Points", cell: (row) => formatPoints(row.points), numeric: true },
 ];
 
-function Side({ side }: { readonly side: MatchupSide }) {
+/** One side's own median line, or `null` when there's nothing to say yet — the toggle is off,
+ *  or this week hasn't settled, or (defensively) this side has no score despite a median
+ *  existing, a combination `finalizeWeekInTx`'s own single transaction never actually produces. */
+function medianLineFor(
+  matchup: MatchupDetail,
+  which: "home" | "away",
+): { readonly score: number; readonly medianScore: number; readonly result: MedianResult } | null {
+  const { median } = matchup;
+  const score = matchup[which].score;
+  if (median === null || score === null) return null;
+  return { score, medianScore: median.score, result: which === "home" ? median.homeResult : median.awayResult };
+}
+
+function Side({
+  side,
+  myTeamId,
+  median,
+}: {
+  readonly side: MatchupSide;
+  readonly myTeamId: string | null;
+  readonly median: { readonly score: number; readonly medianScore: number; readonly result: MedianResult } | null;
+}) {
   // The score lives on the scoreboard above; down here the roster is the story.
   return (
     <Card>
       <h3 className="font-display text-lg font-bold uppercase leading-display text-text-primary">{side.teamName}</h3>
+      {median === null ? null : (
+        <MedianResultLine
+          teamName={side.teamName}
+          isMine={side.teamId === myTeamId}
+          score={median.score}
+          medianScore={median.medianScore}
+          result={median.result}
+        />
+      )}
       <Table
         caption={`${side.teamName} starters`}
         columns={COLUMNS}
@@ -70,8 +101,8 @@ export function MatchupPanel({
         myTeamId={myTeamId}
       />
       <div className="grid gap-3 lg:grid-cols-2">
-        <Side side={matchup.home} />
-        <Side side={matchup.away} />
+        <Side side={matchup.home} myTeamId={myTeamId} median={medianLineFor(matchup, "home")} />
+        <Side side={matchup.away} myTeamId={myTeamId} median={medianLineFor(matchup, "away")} />
       </div>
     </section>
   );

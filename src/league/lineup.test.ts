@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { STANDARD_ROSTER_SLOTS, type RosterSlot } from "@/domain/roster";
 import { validateLineup } from "@/domain/roster-eligibility";
+import { SUPERFLEX_ROSTER_SLOTS } from "./roster-shape";
 import { benchOf, defaultLineup, setSlotPlayer, startersOf } from "./lineup";
 
 const SLOTS = [
@@ -102,5 +103,40 @@ describe("the lineups this module produces", () => {
     expect(check(startersOf(lineup))).toEqual({ valid: true });
     // Swapping the FLEX starter for the benched RB keeps every starting slot legal.
     expect(check(startersOf(setSlotPlayer(lineup, "FLEX", 0, "rb3")))).toEqual({ valid: true });
+  });
+});
+
+/** SUPERFLEX (Task 1) — the season's half of the same eligibility proof `slotting.test.ts` carries for the draft. */
+describe("the lineups this module produces, with a superflex shape", () => {
+  const positions: Readonly<Record<string, string>> = {
+    qb1: "QB", qb2: "QB", rb1: "RB", rb2: "RB", wr1: "WR", wr2: "WR", wr3: "WR", te1: "TE", k1: "K", def1: "DEF",
+  };
+  const superflexStarters = (): readonly RosterSlot[] => [
+    { slot: "QB", slotIndex: 0, playerId: "qb1" },
+    { slot: "RB", slotIndex: 0, playerId: "rb1" },
+    { slot: "RB", slotIndex: 1, playerId: "rb2" },
+    { slot: "WR", slotIndex: 0, playerId: "wr1" },
+    { slot: "WR", slotIndex: 1, playerId: "wr2" },
+    { slot: "TE", slotIndex: 0, playerId: "te1" },
+    { slot: "FLEX", slotIndex: 0, playerId: "wr3" },
+    { slot: "SUPERFLEX", slotIndex: 0, playerId: "qb2" },
+    { slot: "K", slotIndex: 0, playerId: "k1" },
+    { slot: "DEF", slotIndex: 0, playerId: "def1" },
+  ];
+  const withSlot = (starters: readonly RosterSlot[], slot: RosterSlot["slot"], playerId: string): readonly RosterSlot[] =>
+    starters.map((entry) => (entry.slot === slot ? { ...entry, playerId } : entry));
+
+  it("accepts a quarterback started in SUPERFLEX", () => {
+    expect(validateLineup({ slotConfig: SUPERFLEX_ROSTER_SLOTS, roster: superflexStarters(), playerPositions: positions }))
+      .toEqual({ valid: true });
+  });
+
+  it("refuses a kicker in SUPERFLEX, and says which positions it takes", () => {
+    const result = validateLineup({
+      slotConfig: SUPERFLEX_ROSTER_SLOTS,
+      roster: withSlot(superflexStarters(), "SUPERFLEX", "k1"),
+      playerPositions: positions,
+    });
+    expect(result).toMatchObject({ valid: false, reason: expect.stringContaining("SUPERFLEX") });
   });
 });

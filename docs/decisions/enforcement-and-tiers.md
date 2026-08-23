@@ -203,6 +203,24 @@ public join door refuses with `ENFORCEMENT_REFUSALS.join`, and the invite door a
 final review the only invite-path tier test used a private league, so the public combination was
 untested in both directions and a later narrowing of the exemption would have gone unnoticed.
 
+### The creation gate's house branch (Phase 3.5 addendum, Task 13, ruling 39)
+
+`createLeague`'s creation-side gate above only ever ran for a caller who supplies a `userId` — true
+of every caller until the house catalog's reconciler (`spawnHouseLeagueInTx`,
+`src/league-service/house-factory.ts`) became a second one. The gate is now asked "only for a
+MEMBER owner," per `createLeague`'s own docblock: `tierJoinPrecondition` exists to catch a PERSON
+declaring a tier they do not belong to in order to sit in it themselves, and the platform declares
+the catalog and then sits in nothing — there is no person whose tier could be checked and nothing
+the check would prevent. `spawnHouseLeagueInTx` walks past this gate entirely rather than the
+function inventing a vacuous pass for a `userId` that does not exist. This is a walk-past, not a
+bypass, for the same reason the third door above is deliberate rather than a gap: the predicate
+this gate exists to enforce simply does not describe the house case, and the door that does the
+real segregation work — `publicJoinPrecondition`, refusing a veteran joining `beginner_12` — is
+untouched and applies to every joiner of a house league exactly as it applies to a member league's.
+The `owner` discriminant (`LeagueOwner`, `member | house`) is what keeps this from being a flag a
+member league could accidentally set: a `member` branch cannot omit a `userId`, and a `house`
+branch has none to check. See `docs/decisions/house-leagues.md` §7 for the full argument.
+
 **The residual, recorded rather than adjudicated.** A newcomer creates a public beginner league;
 `/browse` honestly labels it as all newcomers; other newcomers join on that label; the commissioner
 then seats veterans through invite codes. The label stays truthful after the fact — the composition
@@ -390,6 +408,36 @@ answer 404 for a manager not party to the trade, and this route answers 404 to a
 not run the league. A 403 would confirm which member holds the commissioner's chair to anybody who
 can reach the league — small, and exactly the kind of small thing that is free to get right and
 awkward to fix later.
+
+**A second writer of `kickoff_at` (Phase 3.5, Task 7).** `fireWhenFullInTx`
+(`src/league-service/fill-trigger.ts`) joins `setDraftKickoff` (`src/league-service/draft-schedule.ts`,
+a commissioner's own choice) as the second and only other place `drafts.kickoff_at` is written —
+there are exactly two `.set({ kickoffAt })` call sites in this codebase, and no third. Starting a
+draft, whether by a commissioner's press or by `autoStartDueDrafts`, changes `drafts.status`
+through `startDraft`'s guarded transition; neither that path nor `claimAutoStart` ever touches
+`kickoff_at` itself, so a draft's kickoff is exactly what one of these two writers last set it to,
+never something a start implicitly stamps. `fireWhenFullInTx` writes ONLY when a public matchmade
+league's `start_trigger` is `'when_full'` and its last seat has just filled, moving the column to
+`now + MATCHMAKING_CONFIG.sitAndGo.graceSeconds` — never earlier than that grace period, and never
+on a league whose kickoff a human already set by hand. It does not call `startDraft`: the value it
+writes is picked up by the same `autoStartDueDrafts` scan the commissioner-set value already
+drives, so a sit-and-go draft starts through the identical guarded status transition a
+commissioner-scheduled one does — see `docs/decisions/formats-and-lobby.md` §6 for the full
+argument against a third start path.
+
+**The house catalog's reconciler does not add a third writer (Phase 3.5 addendum, Task 13,
+verified rather than assumed).** `spawnHouseLeagueInTx` never calls `.set({ kickoffAt })` — a fresh
+grep across `src/**` for this addendum confirms the count above is still exactly two. It calls the
+same `writeLeagueInTx` every member league's creation has always called, supplying
+`houseKickoffFor`'s staggered computation as the value the `drafts` row's own `INSERT` writes at
+creation — the identical insert-time mechanism `createLeague` has used since Phase 1, whether the
+value came from a caller's explicit choice or (the common case) `LEAGUE_CONFIG.defaults.
+draftDaysFromCreation`'s own default arithmetic. What is genuinely new is not a writer but an
+actor: this is the first time that insert-time value is ever computed and committed with **no
+human transaction behind it at all** (`actorType: "system"`, `actorId: null` on the audit event
+that same call produces) — every earlier call, even one whose kickoff was a computed default rather
+than a chosen date, was still triggered by a person pressing "create league." See
+`docs/decisions/house-leagues.md` §8 for the full verification.
 
 **A platform that presses start when nobody trustworthy is there to.** `autoStartDueDrafts`
 (`src/draft-service/auto-start.ts`) starts a public matchmade league's overdue draft through the

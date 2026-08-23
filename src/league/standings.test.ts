@@ -73,4 +73,54 @@ describe("computeStandings", () => {
     expect(y.pointsFor).toBeGreaterThan(x.pointsFor);
     expect(rows.findIndex((r) => r.teamId === "x")).toBeLessThan(rows.findIndex((r) => r.teamId === "y"));
   });
+
+  it("gives every team a second result each week when the median is on", () => {
+    // Twelve teams, one week, scores 1..12. The median is 6.5, so six teams beat it and six do
+    // not: the median game cannot invent wins for the league as a whole, it redistributes them.
+    const teamIds = Array.from({ length: 12 }, (_, i) => `t${i + 1}`);
+    const weekOne: Matchup[] = [
+      m(1, "t1", "t2", 1, 2), m(1, "t3", "t4", 3, 4), m(1, "t5", "t6", 5, 6),
+      m(1, "t7", "t8", 7, 8), m(1, "t9", "t10", 9, 10), m(1, "t11", "t12", 11, 12),
+    ];
+    const rows = computeStandings({ teamIds, matchups: weekOne, medianByWeek: new Map([[1, 6.5]]) });
+    expect(rows.reduce((n, r) => n + r.wins, 0)).toBe(12);
+    expect(rows.reduce((n, r) => n + r.wins + r.losses + r.ties, 0)).toBe(24);
+  });
+
+  it("leaves points for and points against alone, because the median is not an opponent", () => {
+    // The median's own win/loss shifts a team's RANK (byRecord sorts on wins first), so the two
+    // result sets are compared by team id rather than by array position, which the median run
+    // deliberately reorders.
+    const teamIds = ["a", "b", "c", "d"];
+    const weekOne: Matchup[] = [m(1, "a", "b", 100, 90), m(1, "c", "d", 80, 70)];
+    const withMedian = computeStandings({ teamIds, matchups: weekOne, medianByWeek: new Map([[1, 85]]) });
+    const without = computeStandings({ teamIds, matchups: weekOne });
+    const byId = <T extends { readonly teamId: string }>(rows: readonly T[]) => new Map(rows.map((r) => [r.teamId, r]));
+    const withMedianById = byId(withMedian);
+    const withoutById = byId(without);
+    for (const teamId of teamIds) {
+      expect(withMedianById.get(teamId)!.pointsFor).toBe(withoutById.get(teamId)!.pointsFor);
+      expect(withMedianById.get(teamId)!.pointsAgainst).toBe(withoutById.get(teamId)!.pointsAgainst);
+    }
+  });
+
+  it("ignores a week whose median is absent, exactly as it ignores a half-scored matchup", () => {
+    const teamIds = ["a", "b"];
+    const weekOne: Matchup[] = [m(1, "a", "b", 100, 90)];
+    expect(computeStandings({ teamIds, matchups: weekOne, medianByWeek: new Map() })).toEqual(
+      computeStandings({ teamIds, matchups: weekOne }),
+    );
+  });
+
+  it("scores a team's own median result the same three-way split a head-to-head gets", () => {
+    const teamIds = ["a", "b"];
+    // "a" ties the median exactly; "b" beats it.
+    const weekOne: Matchup[] = [m(1, "a", "b", 100, 110)];
+    const rows = computeStandings({ teamIds, matchups: weekOne, medianByWeek: new Map([[1, 100]]) });
+    const a = rows.find((r) => r.teamId === "a")!;
+    const b = rows.find((r) => r.teamId === "b")!;
+    // Head-to-head: a lost to b. Median: a ties it (score === median), b beats it.
+    expect(a).toMatchObject({ wins: 0, losses: 1, ties: 1 });
+    expect(b).toMatchObject({ wins: 2, losses: 0, ties: 0 });
+  });
 });

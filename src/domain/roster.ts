@@ -1,6 +1,6 @@
 import type { Position } from "./player";
 
-export type RosterSlotType = "QB" | "RB" | "WR" | "TE" | "FLEX" | "K" | "DEF" | "BENCH";
+export type RosterSlotType = "QB" | "RB" | "WR" | "TE" | "FLEX" | "SUPERFLEX" | "K" | "DEF" | "BENCH";
 
 export interface RosterSlotConfig {
   readonly slot: RosterSlotType;
@@ -32,3 +32,19 @@ export const STANDARD_ROSTER_SLOTS: readonly RosterSlotConfig[] = [
   { slot: "DEF", count: 1, eligiblePositions: ["DEF"] },
   { slot: BENCH_SLOT, count: 6, eligiblePositions: ["QB", "RB", "WR", "TE", "K", "DEF"] },
 ];
+
+/**
+ * The named roster shapes this product ships. The actual slot ROWS for each (`ROSTER_SHAPES`)
+ * live in `@/league/roster-shape.ts` beside `describeRosterShape` — but the NAME and the WORDS
+ * live here instead, because the create form is browser code that may not value-import
+ * `@/league` at all (the client boundary, `eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`),
+ * the identical reason `LEAGUE_EXPERIENCE_TIER_LABEL` lives in `@/identity/config` rather than
+ * beside the service function that reads it.
+ */
+export type RosterShapeName = "standard" | "superflex";
+
+/** The one map that decides a roster-shape select's words, so a value is never hand-typed at a call site. */
+export const ROSTER_SHAPE_LABEL: Readonly<Record<RosterShapeName, string>> = {
+  standard: "Standard",
+  superflex: "Superflex",
+};

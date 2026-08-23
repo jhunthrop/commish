@@ -56,7 +56,7 @@ describe("LeagueActivityPage — membership gate", () => {
   it("404s a signed-in stranger — no team here and not the commissioner — never 403", async () => {
     vi.mocked(resolveLeagueMembership).mockResolvedValue({
       ok: true,
-      membership: { leagueId: "league_1", teamId: null, isCommissioner: false },
+      membership: { leagueId: "league_1", teamId: null, isCommissioner: false, authority: { kind: "member", userId: "someone_else" } },
     });
 
     await expect(callPage()).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
@@ -74,14 +74,14 @@ describe("LeagueActivityPage — membership gate", () => {
   it("renders for a real member — a team owner — and for the commissioner with no team", async () => {
     vi.mocked(resolveLeagueMembership).mockResolvedValue({
       ok: true,
-      membership: { leagueId: "league_1", teamId: "t1", isCommissioner: false },
+      membership: { leagueId: "league_1", teamId: "t1", isCommissioner: false, authority: { kind: "member", userId: "someone_else" } },
     });
     await renderPage();
     expect(await screen.findByRole("heading", { name: "League activity" })).toBeInTheDocument();
 
     vi.mocked(resolveLeagueMembership).mockResolvedValue({
       ok: true,
-      membership: { leagueId: "league_1", teamId: null, isCommissioner: true },
+      membership: { leagueId: "league_1", teamId: null, isCommissioner: true, authority: { kind: "member", userId: "u1" } },
     });
     await renderPage();
     expect(await screen.findAllByRole("heading", { name: "League activity" })).not.toHaveLength(0);
@@ -92,7 +92,7 @@ describe("LeagueActivityPage — membership gate", () => {
   it("states plainly that lineup changes are private to their own actor", async () => {
     vi.mocked(resolveLeagueMembership).mockResolvedValue({
       ok: true,
-      membership: { leagueId: "league_1", teamId: "t1", isCommissioner: false },
+      membership: { leagueId: "league_1", teamId: "t1", isCommissioner: false, authority: { kind: "member", userId: "someone_else" } },
     });
     await renderPage();
     expect(

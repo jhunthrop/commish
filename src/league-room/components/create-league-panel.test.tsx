@@ -24,4 +24,18 @@ describe("CreateLeaguePanel", () => {
     fireEvent.click(screen.getByRole("button", { name: "Create league" }));
     await waitFor(() => expect(calls).toEqual(["refresh", "push:/app/leagues/l9"]));
   });
+
+  /**
+   * Persona panel, Task 9, Step 5 — the commissioner's own question, asked against the real
+   * composition a commissioner actually reaches (`CreateLeaguePanel`, not the bare form): can
+   * they tell whether strangers can join without opening anything. `toBeVisible`, not
+   * `toBeInTheDocument` — a control sitting inside a closed drawer would satisfy the weaker
+   * assertion while still being exactly the defect this task exists to close.
+   */
+  it("shows who can join and who it's for visibly, with nothing to open first", () => {
+    const fixture = fixtureLeagueDeps();
+    renderInLeague(<CreateLeaguePanel />, fixture.deps);
+    expect(screen.getByLabelText("Who can join")).toBeVisible();
+    expect(screen.getByLabelText("Who it's for")).toBeVisible();
+  });
 });

@@ -21,7 +21,12 @@ export function MatchupScoreboard({ matchup, myTeamId }: MatchupScoreboardProps)
 
   const side = (name: string, score: number | null, teamId: string, won: boolean) => (
     <div className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center">
-      <p className={`truncate font-display text-xl font-bold uppercase leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
+      {/* `w-full`: this `<p>` sits in a `flex-col items-center` parent, whose cross-axis default
+          (`align-items: center`) sizes flex children to their own content instead of stretching
+          them — so `truncate`'s `overflow-hidden`/`ellipsis` never had a constrained box to clip
+          against, and a long team name pushed the page wider at narrow viewports. `w-full` gives
+          it the parent's actual (already-shrunk, `min-w-0 flex-1`) width to truncate against. */}
+      <p className={`w-full truncate font-display text-xl font-bold uppercase leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
         {name}
         {teamId === myTeamId ? <span className="ml-1.5 align-middle text-xs font-semibold text-accent">YOU</span> : null}
       </p>

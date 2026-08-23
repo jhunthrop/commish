@@ -1,15 +1,20 @@
 import type { LeagueMemberCard } from "../contract";
-import { Avatar, Badge, Button, EmptyState } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, InfoTip } from "@/components/ui";
+import { Icon } from "@/components/ui/icon";
+import type { HelpLevel } from "@/identity/preferences";
+import type { LeagueAuthority } from "@/league-service/authority";
 
 export interface LeagueMembersPanelProps {
   readonly teams: readonly LeagueMemberCard[];
-  /** The league's commissioner, by raw user id — compared against each member's
-   *  `ownerUserId` to mark the one row that runs the league. */
-  readonly commissionerUserId: string;
+  /** Who runs this league — a named member, compared against each member's `ownerUserId` to
+   *  mark the one row that runs the league, or the platform for a house league, which marks no
+   *  row at all and renders the "Run by Commish" line above the roster instead. */
+  readonly authority: LeagueAuthority;
   readonly myTeamId: string | null;
   /** The league's total seat count. Omit to hide the open-seats line entirely (e.g. a context
    *  that already states it elsewhere) rather than render "0 seats still open" as a fact. */
   readonly teamCount?: number;
+  readonly helpLevel?: HelpLevel;
 }
 
 /**
@@ -22,13 +27,25 @@ export interface LeagueMembersPanelProps {
  * An unfilled seat renders as an open seat, not as a missing person: those read as different
  * facts to a commissioner deciding whether to send another invite, and only one of them is
  * cause for concern.
+ *
+ * Phase 3.5 addendum, Task 12, Step 5: a house league's `authority.kind === "house"` matches no
+ * team's `ownerUserId` — no row would ever earn the "Commissioner" badge, which is correct but
+ * silent. The line above the roster states the fact instead of leaving it to be inferred from
+ * an absence.
  */
-export function LeagueMembersPanel({ teams, commissionerUserId, myTeamId, teamCount }: LeagueMembersPanelProps) {
+export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, helpLevel }: LeagueMembersPanelProps) {
   const openSeats = teamCount === undefined ? 0 : Math.max(0, teamCount - teams.length);
 
   return (
     <section className="flex flex-col gap-2" aria-label="League members">
       <h2 className="text-sm font-medium text-text-muted">Managers</h2>
+      {authority.kind === "house" ? (
+        <p className="flex items-center gap-2 text-sm text-text-muted">
+          <Icon name="shield" size={16} />
+          Run by Commish
+          <InfoTip term="house-league" helpLevel={helpLevel} />
+        </p>
+      ) : null}
       {teams.length === 0 ? (
         <EmptyState
           title="Nobody's here yet"
@@ -49,7 +66,7 @@ export function LeagueMembersPanel({ teams, commissionerUserId, myTeamId, teamCo
                 <span className="truncate text-sm text-text-muted">{team.name}</span>
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {team.ownerUserId === commissionerUserId ? <Badge tone="accent">Commissioner</Badge> : null}
+                {authority.kind === "member" && team.ownerUserId === authority.userId ? <Badge tone="accent">Commissioner</Badge> : null}
                 {team.id === myTeamId ? <Badge tone="neutral">You</Badge> : null}
               </div>
             </li>

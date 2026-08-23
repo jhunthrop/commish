@@ -1,3 +1,4 @@
+import { SIT_AND_GO_GRACE_MINUTES } from "@/matchmaking/config";
 import { VERIFIED_BADGE_TOOLTIP } from "@/participation/verified";
 
 /**
@@ -18,14 +19,19 @@ export type TermKey =
   | "te-premium"
   | "custom-scoring"
   | "flex"
+  | "superflex"
   | "bench"
   | "on-the-clock"
   | "lineup-lock"
   | "stake-tier"
   | "matchup"
   | "standings-record"
+  | "median-game"
   | "queue"
-  | "verified-reviewer";
+  | "draft-slot"
+  | "sit-and-go"
+  | "verified-reviewer"
+  | "house-league";
 
 export interface GlossaryTerm {
   readonly key: TermKey;
@@ -91,6 +97,13 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     detail:
       "A FLEX spot in your lineup can be filled by a running back, a wide receiver, or a tight end, whichever gives your team the most points that week. It is one extra starter without a fixed position of its own.",
   },
+  superflex: {
+    key: "superflex",
+    term: "a superflex spot",
+    short: "A flex spot that also accepts a quarterback, so most teams start two.",
+    detail:
+      "A superflex spot works like a FLEX, but it also accepts a quarterback alongside running backs, receivers, and tight ends. Quarterbacks are usually worth more than any other position, so most managers in a superflex league use it to start a second one.",
+  },
   bench: {
     key: "bench",
     term: "the bench",
@@ -133,12 +146,32 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     detail:
       "A record shows how many weeks a team has won, lost, and tied so far this season, written as wins-losses or wins-losses-ties. Standings rank every team in the league by that record first.",
   },
+  "median-game": {
+    key: "median-game",
+    term: "a median game",
+    short: "Every week, your record also counts how you scored against the league median.",
+    detail:
+      "This league plays a median game: every week, on top of your head-to-head matchup, your score is compared to the league's median score that week. Beat the median and you get a second win added to your record; miss it and you get a second loss. Both results fold into the same wins-losses-ties record shown here, so a team can go 2-0 or 0-2 in a single week.",
+  },
   queue: {
     key: "queue",
     term: "your draft queue",
     short: "The list of players you ranked to auto-draft if you're away when it's your pick.",
     detail:
       "Your draft queue is the ranked list of players you'd want if you can't pick in person. If the clock runs out on your turn, the room drafts the highest-ranked player still available from your queue instead of skipping you.",
+  },
+  "draft-slot": {
+    key: "draft-slot",
+    term: "a draft slot",
+    short: "Your position in the draft order, from 1st pick to last.",
+    detail:
+      "A draft slot is your position in the draft order, from slot 1 (the first pick of the draft) to the last slot. You can rank the slots you want before the draft starts. We draw managers in a random order and give each one their highest-ranked slot that is still free, so a good rank still beats pure luck without anybody being able to pick their exact spot outright.",
+  },
+  "sit-and-go": {
+    key: "sit-and-go",
+    term: "a sit-and-go league",
+    short: "Drafts on its own the moment every seat fills, no scheduled time.",
+    detail: `A sit-and-go league has no draft time on the calendar. Instead, its draft starts on its own about ${SIT_AND_GO_GRACE_MINUTES} minutes after the last open seat fills, giving everyone a chance to open the room before it begins.`,
   },
   /**
    * Founder decision #8, verbatim (`VERIFIED_BADGE_TOOLTIP`, `@/participation/verified`) — read
@@ -152,6 +185,20 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     term: "a verified reviewer",
     short: VERIFIED_BADGE_TOOLTIP,
     detail: VERIFIED_BADGE_TOOLTIP,
+  },
+  /**
+   * Phase 3.5 addendum, Task 14, Step 5: the word the shelf and the members panel both need.
+   * `detail` is the brief's own sentence, verbatim. `short` is a compliant derivative — the
+   * full sentence runs to 128 characters, past `HELP_CONFIG.maxShortLength` (90) — that keeps
+   * the same two facts (Commish runs it, everyone plays the same game) without the third
+   * (the shelf always has a seat), which `detail` still states in full once a reader opens it.
+   */
+  "house-league": {
+    key: "house-league",
+    term: "a house league",
+    short: "A league Commish runs. Everyone joins the same way and plays the same rules.",
+    detail:
+      "A league Commish runs. Everyone joins the same way, the rules are the same in every one, and a new one opens whenever one fills.",
   },
 };
 

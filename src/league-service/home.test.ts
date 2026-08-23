@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { inArray } from "drizzle-orm";
 import type { DraftFormat } from "@/domain/league";
 import type { DraftStatus } from "@/domain/draft";
-import { drafts, leagues, matchups, statWeeks, teams, users } from "@/db/schema";
+import { drafts, leagues, matchups, statWeeks, teams, users, weeks } from "@/db/schema";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import type { ScoreCache, ScoreCacheBatchRequest } from "@/stats-pipeline/score-cache";
@@ -59,6 +59,12 @@ async function seedLeague(input: SeedLeagueInput): Promise<void> {
     status: input.draftStatus ?? "complete",
     kickoffAt: new Date("2026-09-01T00:00:00.000Z"),
   });
+}
+
+/** Writes one league-week's stored median directly — the same column `finalizeWeekInTx` writes,
+ *  bypassed here since this file seeds matchups by hand rather than through a full settlement. */
+async function seedMedian(leagueId: string, weekNumber: number, medianScore: number): Promise<void> {
+  await db.insert(weeks).values({ leagueId, weekNumber, medianScore });
 }
 
 async function seedMatchup(
@@ -273,9 +279,45 @@ describe("crossLeagueHome", () => {
     const result = await crossLeagueHome(counting.db, "uMany");
     expect(result.leagues).toHaveLength(10);
     // `myLeaguesOverview`'s four queries (membership, leagues, teams, drafts) plus this
-    // function's own matchups and stat_weeks reads: six total, bounded regardless of league
-    // count, never one query per league.
+    // function's own matchups, weeks (medians) and stat_weeks reads: seven total, bounded
+    // regardless of league count, never one query per league.
     expect(counting.selectCount()).toBeLessThanOrEqual(8);
+  });
+
+  it("reads every league's medians in one query, however many leagues a manager is in", async () => {
+    for (let i = 1; i <= 5; i++) {
+      await seedLeague({
+        leagueId: `lgMed${i}`,
+        commissionerUserId: `mowner${i}`,
+        teamCount: 2,
+        teams: [{ teamId: `med${i}_t1`, userId: "uMed" }, { teamId: `med${i}_t2`, userId: `mowner${i}` }],
+      });
+      await seedMatchup(`lgMed${i}`, 1, `med${i}_t1`, `med${i}_t2`, 10, 20);
+    }
+
+    const counting = countingDb(db);
+    await crossLeagueHome(counting.db, "uMed");
+    expect(counting.queriesMatching(/from "weeks"/)).toBe(1);
+  });
+
+  it("folds MULTIPLE weeks' medians into one league's own record, not just its first week", async () => {
+    await seedLeague({
+      leagueId: "lgMedMulti",
+      commissionerUserId: "u_multi_owner",
+      teamCount: 2,
+      teams: [{ teamId: "multi_t1", userId: "uMulti" }, { teamId: "multi_t2", userId: "u_multi_owner" }],
+    });
+    // Week 1: t1 wins head-to-head AND beats the median. Week 2: t2 wins head-to-head AND beats
+    // the median. Two teams, so each week's median is the average of that week's own two scores.
+    await seedMatchup("lgMedMulti", 1, "multi_t1", "multi_t2", 24, 4);
+    await seedMedian("lgMedMulti", 1, 14);
+    await seedMatchup("lgMedMulti", 2, "multi_t1", "multi_t2", 10, 20);
+    await seedMedian("lgMedMulti", 2, 15);
+
+    const result = await crossLeagueHome(db, "uMulti");
+    const card = result.leagues.find((league) => league.id === "lgMedMulti");
+    // Head-to-head: 1 win (week 1), 1 loss (week 2). Median: 1 win (week 1), 1 loss (week 2).
+    expect(card?.record).toEqual({ wins: 2, losses: 2, ties: 0 });
   });
 
   it("a commissioner with an unfilled league sees invite-managers as the next action", async () => {
@@ -331,9 +373,9 @@ describe("crossLeagueHome", () => {
     const responses: (readonly unknown[])[] = [
       [{ leagueId: "lg_real", teamId: "team_real" }], // myLeaguesOverview: "mine"
       [
-        { id: "lg_real", name: "Real League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", rosterSlots: [], createdAt: new Date() },
+        { id: "lg_real", name: "Real League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", houseRung: null, rosterSlots: [], createdAt: new Date() },
         // A league Postgres could never actually return here — its id is absent from `ids`.
-        { id: "lg_phantom", name: "Phantom League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", rosterSlots: [], createdAt: new Date() },
+        { id: "lg_phantom", name: "Phantom League", format: "snake", teamCount: 2, stakeTier: 0, isPublicMatchmade: false, experienceTier: "beginner", commissionerUserId: "u1", houseRung: null, rosterSlots: [], createdAt: new Date() },
       ], // leagueRows
       [{ id: "team_real", leagueId: "lg_real", name: "Real Team" }], // teamRows — none for lg_phantom
       [], // draftRows — none for either league

@@ -45,12 +45,34 @@ same league, which is rare and entirely reachable — `joinLeagueInTx` takes the
 the precondition that would reject a join into a started draft, so even a doomed join holds it.
 
 So every audited transaction now finishes its business writes first: `applyAction`
-(`src/draft-service/store.ts`) holds `drafts FOR UPDATE`, then writes its notice rows, runs any
-`alsoInTransaction` callback and commits the draft to a season, and only then reaches the anchor;
-`setLineup` holds `stat_weeks FOR SHARE` first; `joinLeagueInTx` holds `league_invites` then
-`leagues` first; `removeReview` writes its notice before appending. Every one of them reaches the
+(`src/draft-service/store.ts`) holds `leagues FOR KEY SHARE` then `drafts FOR UPDATE`, then writes
+its notice rows, runs any `alsoInTransaction` callback and commits the draft to a season, and only
+then reaches the anchor; `setLineup` holds `stat_weeks FOR SHARE` first; `joinLeagueInTx` holds
+`league_invites` then `leagues` first and runs the fill trigger's kickoff `UPDATE` and notices
+before appending; `removeReview` writes its notice before appending. Every one of them reaches the
 anchor row afterward, and nothing reaches any of them from the anchor, so no lock-ordering cycle
 exists anywhere in the codebase — the audit spine cannot itself be the cause of a deadlock.
+
+**The second global rule: leagues before drafts (Phase 3.5's final whole-branch review, F1).**
+"The anchor is last" is necessary and is not sufficient. It says nothing about the order two
+transactions take two *business* rows in, and Phase 3.5 shipped a pair that disagreed:
+`joinLeagueInTx` takes `leagues[X] FOR UPDATE` and then, on the last seat, reaches `drafts[D]`
+through `fireWhenFullInTx`'s kickoff `UPDATE`; `setDraftKickoff` took both rows in ONE joined
+`FOR UPDATE` (a single statement's lock spans every table in its `FROM`, in whatever order the plan
+produces the rows, which for that plan was drafts-first); and `applyAction` took `drafts[D]` first
+by construction and reached `leagues[X]` only later, invisibly, through its own inserts' foreign
+keys. Both pairs deadlocked, reproduced with real `psql` sessions and SQLSTATE 40P01.
+
+The rule, stated once and held everywhere: **any transaction that takes both a `leagues` row lock
+and a `drafts` row lock acquires `leagues` first, as its own statement.** `setDraftKickoff` now
+locks the league row alone and narrows its joined lock to `FOR UPDATE OF drafts`; `applyAction`
+opens with `FOR KEY SHARE OF leagues` — deliberately the weaker mode, because that is exactly the
+lock its own FK-carrying inserts take later, so the rule reorders the transaction without
+strengthening anything (escalating to `FOR UPDATE` would have opened a *new* cycle against
+`proposeTrade`, which holds `teams FOR UPDATE` and then takes `leagues FOR KEY SHARE`). Both
+previously-cyclic pairs are driven on two real connections in `lock-order.test.ts`'s "the
+leagues-before-drafts rule" block, and both were confirmed to reproduce 40P01 against the pre-fix
+source.
 
 The single statement any caller may run *after* the anchor is `attachAuditEvent`
 (`src/integrity-service/notify.ts`), which stamps `member_notices.audit_event_id`. It is safe for

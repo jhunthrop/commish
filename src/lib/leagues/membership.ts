@@ -3,6 +3,7 @@ import type { NextResponse } from "next/server";
 import type { Db } from "@/db/client";
 import { leagues, teams } from "@/db/schema";
 import { fail } from "@/lib/api/respond";
+import { leagueAuthority, type LeagueAuthority } from "@/league-service/authority";
 
 /**
  * The one literal for "you don't field a team here" — shared by `requireLeagueMember` below
@@ -17,6 +18,11 @@ export interface LeagueMembership {
   /** The caller's team in this league, or null if they don't have one. */
   readonly teamId: string | null;
   readonly isCommissioner: boolean;
+  /** Who runs this league — a member or the platform (`@/league-service/authority`). Carried
+   *  alongside `isCommissioner` rather than in place of it, so `withCommissioner`
+   *  (`@/app/api/leagues/_shared`) can tell "not the commissioner because a house league has
+   *  none" apart from the ordinary "not the commissioner" case, without a second query. */
+  readonly authority: LeagueAuthority;
 }
 
 export type MembershipResult =
@@ -31,17 +37,26 @@ export type MembershipResult =
  * written once.
  */
 export async function resolveLeagueMembership(db: Db, leagueId: string, userId: string): Promise<MembershipResult> {
-  const [league] = await db.select({ commissionerUserId: leagues.commissionerUserId }).from(leagues).where(eq(leagues.id, leagueId));
+  const [league] = await db
+    .select({ commissionerUserId: leagues.commissionerUserId, houseRung: leagues.houseRung })
+    .from(leagues)
+    .where(eq(leagues.id, leagueId));
   if (league === undefined) return { ok: false, status: 404, error: "That league doesn't exist." };
 
   const [team] = await db.select({ id: teams.id }).from(teams).where(and(eq(teams.leagueId, leagueId), eq(teams.userId, userId)));
+
+  // Fix round 1, F1 (LOW): computed once and read twice, rather than calling `isCommissionerOf`
+  // (which re-derives the same union internally) and `leagueAuthority` separately — the union
+  // resolves the row exactly once per request.
+  const authority = leagueAuthority(league);
 
   return {
     ok: true,
     membership: {
       leagueId,
       teamId: team?.id ?? null,
-      isCommissioner: league.commissionerUserId === userId,
+      isCommissioner: authority.kind === "member" && authority.userId === userId,
+      authority,
     },
   };
 }

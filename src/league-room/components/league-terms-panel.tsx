@@ -104,6 +104,19 @@ export function LeagueTermsPanel({
             {terms.commissionerName}
           </dd>
         </div>
+        {/* Empty for a league that opted into neither the median game nor superflex — no
+            "Notes" row at all, rather than an empty one, the same "nothing to show" idiom
+            `StandingsTable`'s clinch badges already follow. */}
+        {terms.formatNotes.length === 0 ? null : (
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <dt className={`${EYEBROW} text-text-muted`}>Notes</dt>
+            <dd className="flex flex-col gap-1 text-text-primary">
+              {terms.formatNotes.map((note) => (
+                <span key={note}>{note}</span>
+              ))}
+            </dd>
+          </div>
+        )}
       </dl>
     </Card>
   );

@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { eq, isNull } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, draftActions, integrityFlags, leagueInvites, sessionSignals, teams, users } from "@/db/schema";
+import { auditEvents, draftActions, integrityFlags, leagueInvites, leagues, sessionSignals, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
@@ -89,11 +89,12 @@ async function league(teamCount = 4) {
   );
   const created = await createLeague(writeDeps(), {
     name: "Sunday Money", format: "snake", teamCount, scoringPreset: "ppr", auctionBudget: null,
-    rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Commish",
+    rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "u1", teamName: "Commish" },
     experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);
-  return created;
+  if (created.teamId === null) throw new Error("expected a team id");
+  return { ...created, teamId: created.teamId };
 }
 
 beforeEach(async () => {
@@ -201,7 +202,7 @@ describe("acceptInvite", () => {
     // A second league with the SAME user pool (league() seeds users once per test).
     const second = await createLeague(writeDeps(), {
       name: "Tuesday Money", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
-      rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Commish B",
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "u1", teamName: "Commish B" },
       experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
     });
     if (!second.ok) throw new Error(second.reason);
@@ -437,6 +438,23 @@ describe("invitePreview", () => {
     expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
   });
 
+  // Ruling 33: a house league cannot have an invite at all — `createInvite`'s only caller
+  // (`withCommissioner`) refuses one before minting a code, so this code is unreachable through
+  // ordinary use. Proven anyway, by hand-crafting the shape rather than trusting the assertion:
+  // the SAME "tells you nothing" collapse the invalid-code test above proves.
+  it("tells you nothing about a house league either, for a code that could never have named one", async () => {
+    await db.insert(users).values({ id: "u_whoever", email: "u_whoever@test.local", displayName: "Whoever" });
+    await db.insert(leagues).values({
+      id: "lg_house_invite", name: "Open 12", format: "snake", teamCount: 12, commissionerUserId: null, houseRung: "open_12",
+    });
+    const invite = await createInvite(inviteDeps(), { leagueId: "lg_house_invite", createdByUserId: "u_whoever" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await invitePreview(db, invite.code);
+    expect(result).toEqual({ ok: false, reason: "That invite link isn't valid. Ask your commissioner for a new one." });
+    expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
+  });
+
   it("answers the exact terms a member of the league would see", async () => {
     const created = await league();
     const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
@@ -459,6 +477,8 @@ describe("invitePreview", () => {
         // `league()` creates with `clock` (`nowIso`, "2026-08-17T12:00:00.000Z"), so the draft
         // is scheduled 7 days out — `LEAGUE_CONFIG.defaults.draftDaysFromCreation`.
         draftAt: "Monday 24 August, 12:00 PM UTC (in 7 days)",
+        // `league()` seeds a plain, standard-shape league — no median game, no superflex.
+        formatNotes: [],
       },
     });
   });
@@ -477,6 +497,69 @@ describe("invitePreview", () => {
     const home = await leagueHome(db, created.leagueId, "u1");
 
     expect(home!.terms).toEqual(preview.terms);
+  });
+
+  // Task 3 (Phase 3.5): the invite preview is one of the two surfaces a prospect reads before
+  // committing — `formatNotes` must carry the median note here too, not just on league home.
+  it("notes the median game on the invite preview, for a league that plays one", async () => {
+    await db.insert(users).values(
+      Array.from({ length: 2 }, (_, i) => ({ id: `mu${i + 1}`, email: `mu${i + 1}@test.local`, displayName: `Manager ${i + 1}` })),
+    );
+    const created = await createLeague(writeDeps(), {
+      name: "Median League", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "mu1", teamName: "Commish" },
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false, medianGame: true,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "mu1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const preview = await invitePreview(db, invite.code);
+    if (!preview.ok) throw new Error(preview.reason);
+    expect(preview.terms.formatNotes).toEqual(["Every team also plays the league median each week."]);
+  });
+
+  // Fix round 1 (review HIGH): the fabricated-date leak's second surface. A stranger reading the
+  // invite preview for a still-filling `when_full` league must see the same fills-truth sentence
+  // `leagueHome` shows a member, never `invitePreview`'s placeholder `kickoffAt` formatted as a
+  // real time — this proves it through the FULL read path, not just `leagueTerms`'s own unit test.
+  it("speaks the fills-truth on the invite preview too, while a when_full league is still filling", async () => {
+    await db.insert(users).values({ id: "wf1", email: "wf1@test.local", displayName: "Manager wf1" });
+    const created = await createLeague(writeDeps(), {
+      name: "Sit-and-Go League", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "wf1", teamName: "Commish" },
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: true, startTrigger: "when_full",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "wf1" });
+    if (!invite.ok) throw new Error(invite.reason);
+
+    const result = await invitePreview(db, invite.code);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.terms.draftAt).toBe("Starts as soon as it fills");
+  });
+
+  it("renders the real draft date on the invite preview once a when_full league has actually filled", async () => {
+    await db.insert(users).values(
+      Array.from({ length: 4 }, (_, i) => ({ id: `wf2_${i + 1}`, email: `wf2_${i + 1}@test.local`, displayName: `Manager ${i + 1}` })),
+    );
+    const created = await createLeague(writeDeps(), {
+      name: "Sit-and-Go League Full", format: "snake", teamCount: 4, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: STANDARD_ROSTER_SLOTS, owner: { kind: "member", userId: "wf2_1", teamName: "Commish" },
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: true, startTrigger: "when_full",
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "wf2_1" });
+    if (!invite.ok) throw new Error(invite.reason);
+    await acceptInvite(writeDeps(), { code: invite.code, userId: "wf2_2" });
+    await acceptInvite(writeDeps(), { code: invite.code, userId: "wf2_3" });
+    await acceptInvite(writeDeps(), { code: invite.code, userId: "wf2_4" });
+
+    const result = await invitePreview(db, invite.code);
+    if (!result.ok) throw new Error(result.reason);
+    expect(result.terms.filledTeams).toBe(4);
+    expect(result.terms.draftAt).not.toBe("Starts as soon as it fills");
+    expect(result.terms.draftAt).toContain("UTC");
   });
 
   it("counts every seated team, not just the commissioner's", async () => {

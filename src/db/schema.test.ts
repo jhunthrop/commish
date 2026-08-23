@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
+import { unwrapCauseChain } from "./errors";
 import { createTestDb, truncateAll } from "./test-db";
 import { users, leagues, teams, scoringSettings, leagueInvites, lineupSlots, statWeeks, userPreferences, reviews, reviewReports } from "./schema";
 import { PPR_SCORING } from "@/domain/scoring";
@@ -97,6 +98,91 @@ async function seedLeague(): Promise<void> {
   });
   await db.insert(teams).values({ id: TEAM_ID, leagueId: LEAGUE_ID, userId: USER_ID, name: "Fixture Team" });
 }
+
+/**
+ * FINAL WHOLE-BRANCH REVIEW, F5 — THE GUARD NOTHING MEASURED.
+ *
+ * `leagues_house_commissioner_ck` (`drizzle/0032_house_leagues.sql`) is what makes "exactly one of
+ * `commissioner_user_id` and `house_rung`" a fact about the DATABASE rather than a habit of the
+ * two writers. Task 16's own mandate asked for this proof and it never landed: the constraint had
+ * unit coverage only through `leagueAuthority` (`@/league-service/authority`), which THROWS on
+ * either violating shape — and it throws on EVERY league read, for every member of that league,
+ * forever. So the CHECK is the sole thing standing between one bad row and a permanent 500 on a
+ * whole league, and "the DDL says so" is not a test.
+ *
+ * Both shapes, at the database, through drizzle's own insert path (each is type-valid: both
+ * columns are nullable), asserting the CONSTRAINT'S NAME rather than just "it threw" — the same
+ * reason `isUniqueViolation` (`./errors`) keys on a name: 23514 is the generic check-violation
+ * code, and any other check on this table raises it too.
+ */
+describe("leagues_house_commissioner_ck", () => {
+  const CHECK_VIOLATION_SQLSTATE = "23514";
+
+  /** The driver's own error fields sit one level down on `.cause` — `./errors`' own finding,
+   *  reused here rather than re-derived. */
+  function violatedConstraint(error: unknown): { readonly code: unknown; readonly name: unknown } {
+    const fields = (key: string) => {
+      for (const link of unwrapCauseChain(error)) {
+        if (typeof link === "object" && link !== null && key in link) return (link as Record<string, unknown>)[key];
+      }
+      return undefined;
+    };
+    return { code: fields("code"), name: fields("constraint_name") };
+  }
+
+  async function expectRefused(insert: Promise<unknown>): Promise<void> {
+    let caught: unknown;
+    await insert.catch((error: unknown) => {
+      caught = error;
+    });
+    expect(caught, "the row committed — the CHECK constraint is not enforcing").toBeDefined();
+    expect(violatedConstraint(caught)).toEqual({ code: CHECK_VIOLATION_SQLSTATE, name: "leagues_house_commissioner_ck" });
+  }
+
+  it("refuses a league that names BOTH a commissioner and a house rung", async () => {
+    await db.insert(users).values({ id: "user_ck", email: "ck@example.com", displayName: "CK" });
+
+    await expectRefused(
+      db.insert(leagues).values({
+        id: "league_ck_both",
+        name: "Both",
+        format: "snake",
+        teamCount: 12,
+        commissionerUserId: "user_ck",
+        houseRung: "open_12",
+      }),
+    );
+    expect(await db.select().from(leagues)).toEqual([]);
+  });
+
+  it("refuses a league that names NEITHER a commissioner nor a house rung", async () => {
+    await expectRefused(
+      db.insert(leagues).values({
+        id: "league_ck_neither",
+        name: "Neither",
+        format: "snake",
+        teamCount: 12,
+        commissionerUserId: null,
+        houseRung: null,
+      }),
+    );
+    expect(await db.select().from(leagues)).toEqual([]);
+  });
+
+  it("accepts each of the two legal shapes", async () => {
+    // The other half of a constraint test: a rule that refuses everything is not the rule.
+    await db.insert(users).values({ id: "user_ck_ok", email: "ck-ok@example.com", displayName: "CK OK" });
+    await db.insert(leagues).values({
+      id: "league_ck_member", name: "Member", format: "snake", teamCount: 12, commissionerUserId: "user_ck_ok",
+    });
+    await db.insert(leagues).values({
+      id: "league_ck_house", name: "House", format: "snake", teamCount: 12, commissionerUserId: null, houseRung: "open_12",
+    });
+
+    const rows = await db.select({ id: leagues.id }).from(leagues);
+    expect(rows.map((row) => row.id).sort()).toEqual(["league_ck_house", "league_ck_member"]);
+  });
+});
 
 describe("league_invites and lineup_slots", () => {
   it("stores an invite and enforces one row per code", async () => {

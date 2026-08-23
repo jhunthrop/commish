@@ -1,12 +1,16 @@
-import { and, asc, eq, inArray, isNotNull, sql, type SQL } from "drizzle-orm";
+import { and, asc, eq, inArray, isNotNull, isNull, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "@/db/client";
 import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
+import type { DraftFormat } from "@/domain/league";
 import type { Clock } from "@/domain/timing";
+import type { ExperienceTier } from "@/domain/user";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { formatDraftTime } from "@/league";
+import { houseKickoffStillAhead } from "./house-factory";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
-import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
+import type { BrowseBody, BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
+import type { HouseRungName } from "@/matchmaking/house-catalog";
 import { compositionCategoryFor, tierCompositionFor } from "@/participation/composition";
 import { describeScoring, type ScoringRules } from "@/scoring";
 
@@ -29,6 +33,9 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "scoringLabel",
   "compositionCategory",
   "draftAt",
+  "medianGame",
+  "startTrigger",
+  "houseRung",
 ];
 
 /** The league's own seats, aliased a second time so a `LATERAL` join can ask "how many of THIS
@@ -58,6 +65,27 @@ function seatCompletedSeasonsQuery(db: Db) {
     .from(seatTeams)
     .leftJoin(seatLeagues, and(eq(seatLeagues.id, seatTeams.leagueId), isNotNull(seatLeagues.seasonCompletedAt)))
     .where(eq(seatTeams.userId, teams.userId));
+}
+
+/**
+ * The `newcomers`/`veterans` pair, as one shared expression rather than two copies — `browseQuery`
+ * (the member list) and `houseShelfQuery` (Phase 3.5 addendum, Task 14) both fold the identical
+ * composition join into their own `GROUP BY`, and this is the one place the `>=`/`<` split against
+ * `cutoff` is written down. `seatCompletion` is each query's OWN `leftJoinLateral` alias — passed
+ * in rather than built here, because the alias has to be joined into the specific query it feeds,
+ * and this function only ever emits the two `SQL` expressions that read from it.
+ */
+function participationAggregates(
+  seatCompletion: { readonly completedSeasons: SQLWrapper },
+  cutoff: number,
+): { readonly veteranSeats: SQL<number>; readonly newcomerSeats: SQL<number> } {
+  // `teams.id IS NOT NULL` excludes an unfilled seat from both buckets — an empty seat is
+  // neither a newcomer nor a veteran, the same reason `filledTeams` itself is `count(teams.id)`
+  // rather than `count(*)`.
+  return {
+    veteranSeats: sql<number>`count(*) filter (where ${teams.id} is not null and ${seatCompletion.completedSeasons} >= ${cutoff})::int`,
+    newcomerSeats: sql<number>`count(*) filter (where ${teams.id} is not null and ${seatCompletion.completedSeasons} < ${cutoff})::int`,
+  };
 }
 
 /**
@@ -146,11 +174,7 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
   const ANY = MATCHMAKING_CONFIG.anyValue;
   const cutoff = INTEGRITY_CONFIG.participation.veteranSeasonCutoff;
   const seatCompletion = seatCompletedSeasonsQuery(db).as("seat_completion");
-  // `teams.id IS NOT NULL` excludes an unfilled seat from both buckets — an empty seat is
-  // neither a newcomer nor a veteran, the same reason `filledTeams` itself is `count(teams.id)`
-  // rather than `count(*)`.
-  const veteranSeats = sql<number>`count(*) filter (where ${teams.id} is not null and ${seatCompletion.completedSeasons} >= ${cutoff})::int`;
-  const newcomerSeats = sql<number>`count(*) filter (where ${teams.id} is not null and ${seatCompletion.completedSeasons} < ${cutoff})::int`;
+  const { veteranSeats, newcomerSeats } = participationAggregates(seatCompletion, cutoff);
   // The SAME `newcomers > veterans` comparison `compositionCategoryFor` (`@/participation/
   // composition`) renders the label from, expressed once here in SQL rather than reimplemented —
   // `filter.test.ts` cross-checks the two never disagree over one corpus.
@@ -169,6 +193,7 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
       experienceTier: leagues.experienceTier,
       stakeTier: leagues.stakeTier,
       teamCount: leagues.teamCount,
+      medianGame: leagues.medianGame,
       filledTeams: sql<number>`count(${teams.id})::int`,
       // A plain column, not an aggregate. Postgres accepts an ungrouped column only when the
       // `GROUP BY` covers ITS OWN table's primary key, so `drafts.id` joins `leagues.id` in the
@@ -176,6 +201,7 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
       // cardinality (still exactly one draft row per league), purely a functional-dependency
       // proof for the planner.
       kickoffAt: drafts.kickoffAt,
+      startTrigger: drafts.startTrigger,
       newcomers: newcomerSeats,
       veterans: veteranSeats,
     })
@@ -183,10 +209,108 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
     .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
     .leftJoin(teams, eq(teams.leagueId, leagues.id))
     .leftJoinLateral(seatCompletion, sql`true`)
-    .where(and(eq(leagues.isPublicMatchmade, true), eq(drafts.status, "scheduled"), ...narrowingFor(filter)))
+    // `isNull(leagues.houseRung)` (Phase 3.5 addendum, Task 14): the member list's own half of
+    // the shelf/list split — a house league never reaches this query at all, so it can never be
+    // sorted into the member list's seats-remaining ordering. `houseShelfQuery` below is the
+    // house half, over the OPPOSITE predicate, with its own soonest-draft ordering.
+    .where(and(eq(leagues.isPublicMatchmade, true), eq(drafts.status, "scheduled"), isNull(leagues.houseRung), ...narrowingFor(filter)))
     .groupBy(leagues.id, drafts.id)
     .having(and(sql`count(${teams.id}) < ${leagues.teamCount}`, participationHaving))
-    .orderBy(asc(leagues.createdAt))
+    // PHASE 3.5, TASK 8, STEP 4. Seats remaining ASC, then `created_at` ASC as the tiebreaker
+    // (the ordering this replaced, kept second so ties still resolve oldest-first). §4.1's
+    // liquidity doctrine is concentration — the lobby's job is to FILL leagues, and a nearly-full
+    // one a single join would complete is worth surfacing ahead of a freshly created one nobody
+    // has joined yet. `count(${teams.id})` is the SAME aggregate `filledTeams` already computes
+    // two lines up; this is a second reference to it, not a second query. Cost is measured, not
+    // asserted: this docblock's own claim — the sort runs AFTER the `GROUP BY` either way, so
+    // changing the sort KEY costs nothing the unsorted plan wasn't already paying — is pinned by
+    // `src/db/index-plans.test.ts`'s "plans the seats-remaining ordering" assertion, built from
+    // the SAME 5,000-league realistic corpus every other browse plan assertion uses.
+    .orderBy(sql`(${leagues.teamCount} - count(${teams.id})) asc`, asc(leagues.createdAt))
+    .limit(MATCHMAKING_CONFIG.maxResults);
+}
+
+/**
+ * The house shelf's own query (Phase 3.5 addendum, Task 14, Step 2) — a SECOND query against
+ * `leagues_house_rung_idx`, never an `ORDER BY` bolted onto `browseQuery`'s member-list results.
+ * Two reasons, and the second is load-bearing: mechanically, `browseQuery` already orders by
+ * seats-remaining (Task 8), and a house-first sort would fight that ordering for the top rows;
+ * more importantly, a shelf and a list are different promises (`BrowseBody`'s own docblock), and
+ * collapsing them into one ordered array makes the shelf's promise unreadable.
+ *
+ * TAKES NO `BrowseFilter`, unlike `browseQuery` — not merely unfiltered by default, but
+ * structurally unable to be. `houseRung` is deliberately not a `BrowseFilter` field
+ * (`browse.test.ts`'s "refuses to let a filter hide the shelf"), and every catalog rung already
+ * shares one canonical format/roster/scoring shape (`HOUSE_CATALOG`'s own `CANON`) — so a filter
+ * axis narrowing the shelf could only ever empty it for some visitor, never sort it, which is
+ * exactly the failure "there is always a seat" promises against.
+ *
+ * ORDERED BY THE DRAFT A VISITOR CAN ATTEND SOONEST — `drafts.kickoff_at` ascending — a
+ * DIFFERENT rule from the member list's seats-remaining-first, and correct for a different
+ * reason: the member list's job is to fill leagues that are nearly full; the shelf's job is to
+ * hand a visitor the draft they can actually attend tonight.
+ *
+ * NOT `leagues_house_rung_idx`'s own second column. That index is `(house_rung, created_at)`,
+ * carrying `created_at` for the RECONCILER's own count (`openHouseLeaguesQuery`,
+ * `@/league-service/house-factory.ts`, which reads house rows in creation order to assign each
+ * new spawn the next stagger slot) — a documented drift this task closes rather than repeats: an
+ * earlier draft of both that index's own docblock and this module assumed creation order and the
+ * soonest-draft order would coincide, because a `scheduled` rung's kickoff IS creation-ordered
+ * WITHIN one rung (`houseKickoffFor`'s own stagger). They do NOT coincide ACROSS rungs — `open_12`
+ * and `beginner_12` stagger on different clocks, and interleaving them by `created_at` is not the
+ * same order as interleaving them by `kickoff_at`. `leagues_house_rung_idx` still serves this
+ * query's `WHERE house_rung IS NOT NULL` predicate (its partial predicate matches exactly, the
+ * same reasoning `leagues_season_completed_idx`'s own consumer note carries) — the plan is an
+ * index scan for the FILTER, then a `Sort` on `kickoff_at` for the order, measured rather than
+ * assumed in `src/db/index-plans.test.ts`.
+ *
+ * `is_public_matchmade` IS CHECKED HERE (final whole-branch review, F6). This is an
+ * UNAUTHENTICATED read, and `browseQuery` above states the opt-in rule as the first of the three
+ * things that make such a read safe — but the shelf half shipped without it, resting instead on
+ * the convention that `spawnHouseLeagueInTx` (`./house-factory.ts`) always writes `true`. A
+ * privacy boundary held by a convention is held by whoever remembers it; this one is now
+ * structural, so a house row that somehow carried `false` could not reach a stranger even if
+ * something wrote one. `browse.test.ts` seeds exactly that hypothetical row and requires the
+ * shelf to refuse it.
+ *
+ * `houseKickoffStillAhead` (final whole-branch review, F2) retires a stale scheduled-trigger
+ * league from the shelf at the same instant it stops counting toward the reconciler's shelf
+ * width — ONE shared predicate, in `./house-factory.ts`, for exactly that reason. Without it, an
+ * under-filled league whose kickoff had passed rendered FIRST, forever, reading "starting now":
+  * `kickoffAt` ascending puts the most-past time at the top, and nothing could ever start it
+ * (`reduceStart` refuses a draft with fewer than two teams) or repair it (a house kickoff refuses
+ * edits by design). See that predicate's own docblock, and `openHouseLeaguesQuery`'s, for the
+ * whole account and for why no retirement state machine ships with it.
+ */
+export function houseShelfQuery(db: Db, nowIso: string) {
+  const cutoff = INTEGRITY_CONFIG.participation.veteranSeasonCutoff;
+  const seatCompletion = seatCompletedSeasonsQuery(db).as("seat_completion");
+  const { veteranSeats, newcomerSeats } = participationAggregates(seatCompletion, cutoff);
+
+  return db
+    .select({
+      id: leagues.id,
+      name: leagues.name,
+      format: leagues.format,
+      experienceTier: leagues.experienceTier,
+      stakeTier: leagues.stakeTier,
+      teamCount: leagues.teamCount,
+      medianGame: leagues.medianGame,
+      houseRung: leagues.houseRung,
+      filledTeams: sql<number>`count(${teams.id})::int`,
+      kickoffAt: drafts.kickoffAt,
+      startTrigger: drafts.startTrigger,
+      newcomers: newcomerSeats,
+      veterans: veteranSeats,
+    })
+    .from(leagues)
+    .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
+    .leftJoin(teams, eq(teams.leagueId, leagues.id))
+    .leftJoinLateral(seatCompletion, sql`true`)
+    .where(and(eq(leagues.isPublicMatchmade, true), isNotNull(leagues.houseRung), eq(drafts.status, "scheduled"), houseKickoffStillAhead(nowIso)))
+    .groupBy(leagues.id, drafts.id)
+    .having(sql`count(${teams.id}) < ${leagues.teamCount}`)
+    .orderBy(asc(drafts.kickoffAt))
     .limit(MATCHMAKING_CONFIG.maxResults);
 }
 
@@ -229,7 +353,30 @@ async function scoringWeightsByLeagueId(db: Db, leagueIds: readonly string[]): P
   return new Map(rows.map(({ leagueId, ...weights }) => [leagueId, weights]));
 }
 
+/** The fields `browseQuery` and `houseShelfQuery` both project — everything `summarizeRow` needs
+ *  to build a `PublicLeagueSummary` regardless of which of the two queries a row came from. */
+interface SummarizableRow {
+  readonly id: string;
+  readonly name: string;
+  readonly format: DraftFormat;
+  readonly experienceTier: ExperienceTier;
+  readonly stakeTier: number;
+  readonly teamCount: number;
+  readonly medianGame: boolean;
+  readonly filledTeams: number;
+  readonly kickoffAt: Date;
+  readonly startTrigger: "scheduled" | "when_full";
+  readonly newcomers: number;
+  readonly veterans: number;
+}
+
 /**
+ * One row, from either query, to one `PublicLeagueSummary` — the single place `scoringLabel` and
+ * `compositionCategory` get derived, shared by the member list and the house shelf so the two
+ * can never render the same fact two different ways. `houseRung` is passed in rather than read
+ * off `row` (`browseQuery`'s own rows never carry the column at all — a member league has none to
+ * carry) so this function has exactly one signature for both callers.
+ *
  * `scoringLabel` is a deliberate disclosure — see `PublicLeagueSummary`'s docblock — and it is
  * derived HERE, once, from the league's weights, never passed through as the fifteen raw
  * numbers. A league somehow missing its `scoring_settings` row (never true in production —
@@ -237,28 +384,56 @@ async function scoringWeightsByLeagueId(db: Db, leagueIds: readonly string[]): P
  * card is not the place to surface a data-integrity bug to a stranger.
  *
  * `compositionCategory` is assembled the same way, and the reduction to a COARSE bucket happens
- * HERE (final review F6): `browseQuery`'s own `newcomers`/`veterans` columns go through
- * `tierCompositionFor` and then `compositionCategoryFor` (`@/participation/composition`), and only
- * the bucket reaches the return value. The two raw counts are destructured out of `row` and die in
- * this function. Before F6 they shipped on the wire and the client reduced them, which made an
- * aggregate over one filled seat a disclosure of that one manager's tier to anyone holding the
- * URL — `TierComposition`'s own docblock carries the whole argument.
+ * HERE (final review F6): `newcomers`/`veterans` go through `tierCompositionFor` and then
+ * `compositionCategoryFor` (`@/participation/composition`), and only the bucket reaches the
+ * return value — the two raw counts die in this function. Before F6 they shipped on the wire and
+ * the client reduced them, which made an aggregate over one filled seat a disclosure of that one
+ * manager's tier to anyone holding the URL — `TierComposition`'s own docblock carries the whole
+ * argument.
  */
-export async function listPublicLeagues(
-  db: Db,
-  filter: BrowseFilter,
-  clock: Clock = systemClock,
-): Promise<readonly PublicLeagueSummary[]> {
-  const rows = await browseQuery(db, filter);
-  const weightsByLeagueId = await scoringWeightsByLeagueId(db, rows.map((row) => row.id));
+function summarizeRow(
+  row: SummarizableRow,
+  houseRung: HouseRungName | null,
+  weightsByLeagueId: ReadonlyMap<string, ScoringRules>,
+  now: string,
+): PublicLeagueSummary {
+  const weights = weightsByLeagueId.get(row.id);
+  return {
+    id: row.id,
+    name: row.name,
+    format: row.format,
+    experienceTier: row.experienceTier,
+    stakeTier: row.stakeTier,
+    teamCount: row.teamCount,
+    filledTeams: row.filledTeams,
+    scoringLabel: weights === undefined ? "Custom" : describeScoring(weights),
+    compositionCategory: compositionCategoryFor(tierCompositionFor({ newcomers: row.newcomers, veterans: row.veterans })),
+    draftAt: formatDraftTime(row.kickoffAt.toISOString(), now),
+    medianGame: row.medianGame,
+    startTrigger: row.startTrigger,
+    houseRung,
+  };
+}
+
+/**
+ * The whole browse read (Phase 3.5 addendum, Task 14): the member list, off `browseQuery`, and
+ * the house shelf, off `houseShelfQuery` — two queries answering two different promises
+ * (`BrowseBody`'s own docblock), never one list a `houseRung` sort key folds together. Both run
+ * before the ONE scoring lookup, batched over the combined id set, so a page with both a shelf
+ * and a list still costs exactly three queries total — not two-per-half — the same "one extra,
+ * trivially indexed query" discipline `scoringWeightsByLeagueId`'s own docblock already holds
+ * `browseQuery` alone to.
+ */
+export async function listPublicLeagues(db: Db, filter: BrowseFilter, clock: Clock = systemClock): Promise<BrowseBody> {
+  // ONE instant for the shelf's own staleness predicate and for every card's rendered
+  // `draftAt` — read once, so a league cannot be judged not-yet-started by one and
+  // already-past by the other.
   const now = clock.now();
-  return rows.map(({ newcomers, veterans, kickoffAt, ...row }) => {
-    const weights = weightsByLeagueId.get(row.id);
-    return {
-      ...row,
-      scoringLabel: weights === undefined ? "Custom" : describeScoring(weights),
-      compositionCategory: compositionCategoryFor(tierCompositionFor({ newcomers, veterans })),
-      draftAt: formatDraftTime(kickoffAt.toISOString(), now),
-    };
-  });
+  const memberRows = await browseQuery(db, filter);
+  const houseRows = await houseShelfQuery(db, now);
+  const weightsByLeagueId = await scoringWeightsByLeagueId(db, [...memberRows, ...houseRows].map((row) => row.id));
+  return {
+    leagues: memberRows.map((row) => summarizeRow(row, null, weightsByLeagueId, now)),
+    house: houseRows.map((row) => summarizeRow(row, row.houseRung as HouseRungName, weightsByLeagueId, now)),
+  };
 }

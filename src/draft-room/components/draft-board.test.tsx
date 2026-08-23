@@ -178,4 +178,56 @@ describe("DraftBoard", () => {
     const sticker = within(grid()).getAllByText("Jalen Croft")[0]!;
     expect(sticker.className).toContain("text-display-md");
   });
+
+  // Fix round 1 (F3): a skipped pick used to fall through to the same bare dashed `<div>` as a
+  // round nobody has reached yet — indistinguishable in an otherwise-filled round, which is
+  // exactly where it is most confusing. `SKIPPED_SERPENTINE` mirrors `SERPENTINE` with t2's own
+  // round-1 pick (pick 2) never made — owed instead of drafted, `owedPicks: { t2: [2] }`.
+  describe("a skipped pick's own cell (Task 5)", () => {
+    const SKIPPED_SERPENTINE: readonly CompletedPick[] = [
+      pick({ pickNumber: 1, round: 1, teamId: "t1", playerId: "qb1", slot: "QB" }),
+      // pick 2 (t2, round 1) is owed, not drafted — see `owedPicks` below.
+      pick({ pickNumber: 3, round: 2, teamId: "t2", playerId: "rb2", slot: "RB" }),
+      pick({ pickNumber: 4, round: 2, teamId: "t1", playerId: "wr1", slot: "RB" }),
+    ];
+    const view: DraftStateView = { ...SNAKE_VIEW, picks: SKIPPED_SERPENTINE, owedPicks: { t2: [2] } };
+
+    it("labels it Pending in the wide grid, both themes, axe-clean — never a blank dashed box", async () => {
+      stubMatchMedia(false);
+      await inBothThemes(<DraftBoard {...props} view={view} />, async ({ container }) => {
+        const rows = within(grid()).getAllByRole("row");
+        const roundOne = within(rows[1]!).getAllByRole("cell");
+        expect(roundOne[1]).toHaveTextContent("Pending"); // t2's own column
+        expect(roundOne[1]!.querySelector('[data-pending-cell="true"]')).not.toBeNull();
+        // t1's real round-1 pick, and t2's real round-2 pick, are unaffected — a landed pick
+        // renders as its own sticker, never as "Pending".
+        expect(roundOne[0]).not.toHaveTextContent("Pending");
+        expect(await axe(container)).toHaveNoViolations();
+      });
+    });
+
+    it("names no one — the round already shows whose turn it is, elsewhere on the board", () => {
+      stubMatchMedia(false);
+      render(<DraftBoard {...props} view={view} />);
+      const rows = within(grid()).getAllByRole("row");
+      const pendingCell = within(rows[1]!).getAllByRole("cell")[1]!;
+      expect(pendingCell).not.toHaveTextContent("Iron Owls"); // t2's own team name
+      expect(pendingCell).not.toHaveTextContent(/missed|failed/i);
+    });
+
+    it("shows the pending cell in the narrow, 360px list too, not just the wide grid", () => {
+      stubMatchMedia(false);
+      render(<DraftBoard {...props} view={view} />);
+      const list = screen.getByTestId("draft-board-list");
+      const roundOneItem = within(list).getByRole("heading", { name: "Round 1" }).closest("li")!;
+      expect(within(roundOneItem).getByText("Pending")).toBeInTheDocument();
+    });
+
+    it("shares the same Pending cell on the TV board's own board", () => {
+      stubMatchMedia(false);
+      render(<DraftBoard {...props} view={view} variant="tv" />);
+      const rows = within(grid()).getAllByRole("row");
+      expect(within(rows[1]!).getAllByRole("cell")[1]).toHaveTextContent("Pending");
+    });
+  });
 });

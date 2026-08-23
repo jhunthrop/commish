@@ -48,8 +48,12 @@ import type { DraftStore } from "./store";
  *
  * FK LOCK ENUMERATION: this `UPDATE` takes a row-exclusive lock on one `drafts` row (already held
  * `FOR UPDATE` by the caller's transaction) and an implicit `FOR KEY SHARE` on its `leagues`
- * parent. `joinLeagueInTx` takes `leagues FOR UPDATE` first and never touches `drafts`, so the two
- * are ordered leagues-then-drafts in both directions and cannot cycle — see
+ * parent — which `applyAction`, the caller, now takes as its OWN first statement before it ever
+ * reaches `drafts` (final whole-branch review, F1). An earlier version of this note claimed
+ * `joinLeagueInTx` "never touches `drafts`"; it does, through `fireWhenFullInTx`'s kickoff
+ * `UPDATE`, and that is precisely why the branch-wide rule is leagues-before-drafts rather than a
+ * claim that the two writers never meet. Both directions are ordered the same way now, and both
+ * previously-cyclic pairs are driven on two real connections in
  * `src/integrity-service/lock-order.test.ts`.
  */
 export async function claimAutoStart(tx: DbTx, draftId: string): Promise<boolean> {

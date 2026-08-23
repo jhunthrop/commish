@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { DraftAction, DraftPoolEntry, StartDraftAction } from "@/domain/draft";
 import type { RosterSlotConfig } from "@/domain/roster";
+import { draftActionSchema } from "./action-schema";
 import { initialDraftState, type DraftConfig } from "./state";
-import { DRAFT_CLOCK_SCHEDULE, DRAFT_QUEUE_CONFIG } from "./config";
+import { DRAFT_CLOCK_SCHEDULE, DRAFT_QUEUE_CONFIG, DRAFT_SKIP_POLICY } from "./config";
 import { reduceDraft } from "./reduce";
 import { DraftReplayError, replayDraft } from "./replay";
 import { currentDeadline } from "./selectors";
@@ -23,7 +24,7 @@ const CONFIG: DraftConfig = {
   draftId: "d1", leagueId: "l1", format: "snake", kickoffAt: "2026-09-10T17:00:00.000Z",
   auctionBudget: null, slotConfig: SLOTS, clockSchedule: DRAFT_CLOCK_SCHEDULE,
 };
-const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
+const START: StartDraftAction = { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: T, draftOrder: ["t1", "t2"], pool: POOL };
 const LOG: readonly DraftAction[] = [
   START,
   { v: 1, type: "MAKE_PICK", timestamp: T, teamId: "t1", playerId: "qb1" },
@@ -113,5 +114,54 @@ describe("replayDraft survives a tunable changing under it", () => {
 
     const replayed = replayDraft(auctionConfig, [start, stalledNomination]);
     expect(replayed.auction?.lot).toMatchObject({ highBid: 3, autoNominated: true });
+  });
+
+  it("skips a queueless team at the START_DRAFT snapshot's allowance, not today's DRAFT_SKIP_POLICY (Task 5)", () => {
+    // A log recorded when the allowance was 2 owed picks per team. If the fold read
+    // `DRAFT_SKIP_POLICY` ($1) instead of the snapshot, replaying this draft would silently
+    // rewrite an already-decided skip into an autopick (or vice versa) the next time it loaded.
+    const generousStart: StartDraftAction = { ...START, skipPolicy: { maxOwedPerTeam: 2, appliesAtOrAbovePickSeconds: 60 * 60 } };
+    // Slow tier (8h, well past the 1h floor), no queue for either team: t1 owes pick 1, t2 owes
+    // pick 2, under the 2-per-team allowance the ACTION carries — never today's DRAFT_SKIP_POLICY
+    // (1 per team), which would have autopicked both instead.
+    const log: readonly DraftAction[] = [
+      generousStart,
+      { v: 1, type: "TIMER_EXPIRE", timestamp: T },
+      { v: 1, type: "TIMER_EXPIRE", timestamp: T },
+    ];
+    const replayed = replayDraft(CONFIG, log);
+    expect(replayed.owedPicks).toEqual({ t1: [1], t2: [2] });
+    expect(replayed.picks).toEqual([]);
+  });
+
+  it("autopicks a queueless team when the log predates Task 5 entirely, rather than skipping under today's allowance", () => {
+    // FINAL WHOLE-BRANCH REVIEW, F3. A `START_DRAFT` row written before `skipPolicy` existed used
+    // to parse with `.default(DRAFT_SKIP_POLICY)`, which handed a draft that ran under NO skipping
+    // rule whatsoever the rule in force today — and skipping is not a cosmetic difference: this
+    // exact log autopicked in real life and would replay as two owed picks and an empty roster.
+    // Parsed through the REAL persisted-row boundary (`draftActionSchema`), not hand-built with
+    // the field deleted, because the schema is where the drift lived.
+    const legacyRow = {
+      v: 1, type: "START_DRAFT", minBid: 1, timestamp: T,
+      draftOrder: ["t1", "t2"], pool: [...POOL],
+      // `skipPolicy` deliberately absent — this IS the pre-Task-5 shape.
+    };
+    const legacyStart = draftActionSchema.parse(legacyRow);
+    // The identical fixture the test above skips under: a slow tier (this draft's kickoff is 9
+    // days out, well past the 1h floor) with no queue for either team. The ONLY difference is
+    // that the action carries no allowance.
+    const log: readonly DraftAction[] = [
+      legacyStart,
+      { v: 1, type: "TIMER_EXPIRE", timestamp: T },
+      { v: 1, type: "TIMER_EXPIRE", timestamp: T },
+    ];
+
+    const replayed = replayDraft(CONFIG, log);
+
+    expect(replayed.owedPicks).toEqual({});
+    expect(replayed.picks.map((pick) => ({ teamId: pick.teamId, auto: pick.auto }))).toEqual([
+      { teamId: "t1", auto: true },
+      { teamId: "t2", auto: true },
+    ]);
   });
 });

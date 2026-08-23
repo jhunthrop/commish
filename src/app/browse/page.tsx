@@ -6,7 +6,7 @@ import { AppHeader } from "@/components/app-shell/app-header";
 import { listPublicLeagues } from "@/league-service/browse";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { BrowseFilters } from "@/league-room/components/browse-filters";
-import { PublicLeagueList } from "@/league-room/components/public-league-list";
+import { HouseLeagueShelf, PublicLeagueList } from "@/league-room/components/public-league-list";
 
 export const dynamic = "force-dynamic";
 
@@ -28,6 +28,15 @@ const first = (value: string | readonly string[] | undefined): string | null =>
  * inside `PublicLeagueList`'s empty state: a commissioner arriving to recruit for their own
  * group is a real visitor to this page, and results matching their filters should not be the
  * only way they find their way out of browsing someone else's leagues.
+ *
+ * Phase 3.5, Task 8: `listPublicLeagues` now orders by seats-remaining first (Step 4) and every
+ * `PublicLeagueSummary` carries `startTrigger` (Step 3, `PublicLeagueList`'s own card reads it) —
+ * both land here for free, since this page already renders whatever `listPublicLeagues` answers
+ * with, unfiltered by field.
+ *
+ * Phase 3.5 addendum, Task 14: `listPublicLeagues` now answers `BrowseBody` — `leagues` AND
+ * `house` — and §4.1's hybrid lobby means the house shelf renders FIRST, above the filters and
+ * the member list, the founder's "view and join like FFPC and Apex" made literal page order.
  */
 export default async function BrowsePage({ searchParams }: PageProps) {
   const params = await searchParams;
@@ -38,7 +47,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
     participationTier: first(params.participationTier),
   });
   const user = await getCurrentUser();
-  const leagues = await listPublicLeagues(getDb(), filter);
+  const { leagues, house } = await listPublicLeagues(getDb(), filter);
 
   return (
     <>
@@ -71,6 +80,11 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           </Link>
           .
         </p>
+        {/* Phase 3.5 addendum, Task 14: §4.1's hybrid lobby — the house shelf leads, the member
+            list follows. `HouseLeagueShelf` renders nothing at all when the shelf is empty, so
+            an unreconciled database (or a rung mid-restock) never shows an apology above a
+            member list that is doing just fine on its own. */}
+        <HouseLeagueShelf leagues={house} signedIn={user !== null} />
         <BrowseFilters filter={filter} />
         <PublicLeagueList leagues={leagues} signedIn={user !== null} />
       </main>

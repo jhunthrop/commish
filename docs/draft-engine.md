@@ -32,11 +32,16 @@ an explicit upgrade path in `draftActionSchema` — it never reinterprets an old
 - `TIMER_EXPIRE` — no payload. **Server-only**: produced by the ticker, never accepted over HTTP
   (the actions route's Zod schema has no `TIMER_EXPIRE` member a client can submit).
 
+`START_DRAFT` also snapshots `skipPolicy` (Task 5, Phase 3.5 — see "Skip and return" below),
+alongside `draftOrder`, `pool` and `minBid`, for the identical replay-determinism reason.
+
 ## State shape
 
 `DraftState` = static `config` (from the `drafts` + `leagues` rows) + `phase` + `sequence` +
-`draftOrder` + `pool` + `picks` + `rosters` (filled slots only) + `budgets` + `auction` +
-`pickNumber` + `turnStartedAt`. Deadlines are **derived** from `turnStartedAt` and
+`draftOrder` + `pool` + `picks` + `rosters` (filled slots only) + `budgets` + `queues` +
+`owedPicks` (Task 5 — teamId → the pick numbers a skip left them owing, FIFO order; see "Skip and
+return" below) + `auction` + `pickNumber` + `turnStartedAt`. Deadlines are **derived** from
+`turnStartedAt` and
 `config.clockSchedule`, never stored — which means a deadline is only ever meaningful *now*,
 against the schedule in force at this deploy. That is exactly why the deadline check is a
 command-time admission guard (`admit.ts`) and not a reducer guard: see the R-B4 section below.
@@ -81,6 +86,11 @@ clock — every timed decision consumes a timestamp the caller supplied.
    1:30. A tier applies while the draft is more than `untilHoursBeforeKickoff` hours out; the
    last tier is the floor. Live auction bidding uses the shorter of the tier and
    `AUCTION_CONFIG.bidWindowSeconds` (`currentClockSeconds`).
+7. **A snake draft cannot complete while any pick is owed** (Task 5). `advanceSnake` refuses to
+   flip `phase` to `"complete"` past the board's last normal pick if `hasOwedPicks(state)` is
+   true — it opens a CATCH-UP phase instead, and that phase's own expiry (`reduceCatchUpExpiry`)
+   never skips again, which is what guarantees the draft still terminates. See "Skip and return"
+   below.
 
 ## Auto-tightening clock semantics
 
@@ -108,9 +118,13 @@ It grows no third walk of its own:
 
 - **Snake** replays `snakeTeamForPick` forward from `state.pickNumber`, stopping at
   `totalPickCount(state)` — the same ceiling `advanceSnake` completes the draft at, which is
-  why that ceiling now lives in `state.ts` and is called from both places. A snake draft never
-  skips a team: every team owns the same number of roster spots, so they all fill their last
-  one on the last round.
+  why that ceiling now lives in `state.ts` and is called from both places. `snakeTeamForPick`
+  itself never skips a team IN THE TURN-ORDER sense: every team owns the same number of roster
+  spots, so they all fill their last one on the last round of the NORMAL schedule. That is a
+  different claim from "a draft can never skip a PICK" — Task 5's skip-and-owe does exactly
+  that (see "Skip and return" below), which is why `upcomingOnClock` stops walking at
+  `totalPickCount` and never looks into the catch-up phase past it; a client's own "when am I
+  up?" for a catch-up turn reads `owedPicks` instead.
 - **Auction** chains `nextNominator` (which already skips full rosters) and cycles once the
   rotation comes back around — an auction's order repeats, so a 12-deep lookahead in an 8-team
   league legitimately names some teams twice. `nextNominator` moved from `auction.ts` to
@@ -134,6 +148,144 @@ nominating team's clock runs out before they nominate, `reduceAuctionExpiry` (wi
 `auction.lot === null`) auto-nominates their best available player at the minimum bid
 (`autoNominated: true` on the resulting lot), exactly the same policy `bestAvailableFor` uses
 for a stalled snake pick. This is what keeps an idle nominator from stalling the whole auction.
+
+## Draft-slot preferences: the KDS input (Task 6, Phase 3.5)
+
+A draft-slot preference — which draft position a manager wants, ranked — is a **table**,
+`draft_slot_preferences`, written and read by `setSlotPreference`/`slotPreferencesFor`
+(`src/draft-service/slot-preference.ts`), never a `SET_QUEUE`-shaped action in the log. The
+distinction is *when* the value is consulted: `SET_QUEUE` is an action because a queue is
+consulted repeatedly, at an arbitrary pick, so replay needs to know what it was AT that moment. A
+slot preference is consulted exactly **once**, at `START_DRAFT`, before any other action exists.
+
+`draftOrderFor` (`src/draft-service/order.ts`) runs two steps: `drawSequenceFor` (unchanged since
+before this phase — the fair, reproducible Fisher-Yates shuffle seeded from the draft id) produces
+the draw order, and `assignDraftSlots` (new) runs NFFC's Kentucky Derby System over it — each team,
+in draw-order turn, takes its highest-ranked still-free slot, falling back to the lowest slot still
+free (the same slot an unranked team would have gotten anyway) if its whole ranking is already
+taken. The RESULT is what gets snapshotted into `START_DRAFT.draftOrder` — the same field that
+already snapshots the shuffled draw and the ranked pool — never the preferences themselves and
+never a second log entry.
+
+**The consequence for a manager who edits a ranking after the draw:** nothing changes.
+`setSlotPreference` refuses to write once `drafts.status` is no longer `'scheduled'`
+(`SLOT_PREFERENCE_REFUSALS.alreadyStarted`), and the panel says so rather than silently accepting
+a write that would have no effect. See `docs/decisions/formats-and-lobby.md` §5 for the full
+argument.
+
+## The overnight pause (Task 4, Phase 3.5)
+
+`DRAFT_PAUSE_WINDOW` (`config.ts` — 2 AM to 5 AM Eastern) extends a deadline that would otherwise
+land inside the freeze, but only at the clock tiers slow enough for it to matter
+(`appliesAtOrAbovePickSeconds`, one hour) — the 90-second and 10-minute floors a draft runs at
+near kickoff never pause, so freezing them would strand eleven awake managers to protect one
+asleep.
+
+**Read only outside the reducer.** `pause.ts`'s three exported functions (`pausedMillisBetween`,
+`pausedUntil`, `deadlineAfter`) are consumed exclusively by `selectors.ts` — `currentDeadline`,
+`nudgeDeadline`, `pausedUntilFor` (the `pausedUntil` field on `DraftClockView`) and `isPaused` —
+and never by `reduce.ts`, `snake.ts`, `auction.ts` or `apply-pick.ts`. This is the same rule
+"Command-time admission vs. reducer guards" states generally, applied to a second tunable: a
+reducer guard is re-adjudicated on every replay, so if `skipEligible`-style code read
+`DRAFT_PAUSE_WINDOW` live, a deploy that moved the window would silently change what an
+already-persisted `TIMER_EXPIRE` did the next time the log replayed — the same failure the 60s to
+90s clock-floor change already caused once for the clock schedule itself. `deadlineAfter` is a
+FIXPOINT, not one addition: adding the paused time can push the candidate deadline into a second
+occurrence of the window (a clock that starts mid-freeze, or one long enough to reach a second
+night), so the overlap is recomputed against the moved candidate until it stops moving.
+
+**Two DST answers, both in `zonedHourToUtcMs`.** Resolving a local wall-clock hour to a UTC
+instant is a two-pass correction: guess the local hour as if it were UTC, correct once by the
+offset at that guess, correct once more by the offset at the corrected instant. On an ordinary
+day both passes agree and the second is a no-op. On the **fall-back** night (the repeated hour),
+the second pass converges past the repeat. On the **spring-forward** night (the hour that never
+happens), the two offsets never agree no matter how many more passes run — the function returns
+the FIRST correction, the instant local clocks actually read the moment they spring forward, the
+same skip-the-gap convention every timezone library uses.
+
+**The asymmetry with Task 5's skip policy.** `DRAFT_PAUSE_WINDOW` is attached fresh to
+`DraftConfig` on every load (`loadDraftConfig`) rather than snapshotted onto `START_DRAFT` — see
+"The snapshot asymmetry" under "Skip and return" below for why the two clock-shaped tunables live
+in different homes despite looking alike. See `docs/decisions/formats-and-lobby.md` §3 for the
+full reasoning.
+
+## Skip and return: the forgiving timeout (Task 5, Phase 3.5)
+
+Punitive instant-autopick — the clock choosing for a stalled manager the instant it runs out —
+was the single most-complained-about draft-room behavior on legacy hosts. `reduceSnakeExpiry`'s
+`skipEligible` (`snake.ts`) instead adjudicates on **consent**: a team that set a queue has
+already told the room what to take; a team that never set one has not.
+
+**The consent matrix**, evaluated in this order:
+
+| Has a queue? | Tier's `pickSeconds` | Under the owed allowance? | Result |
+|---|---|---|---|
+| Yes | (any) | (n/a) | Autopick — `bestAvailableFor` uses the queue, as always. |
+| No | `< skipPolicy.appliesAtOrAbovePickSeconds` | (n/a) | Autopick — a live room (the fast tiers) can't wait on anybody. |
+| No | `>= skipPolicy.appliesAtOrAbovePickSeconds` | Yes | **Skip.** The pick is owed, not made; the room moves on. |
+| No | `>= skipPolicy.appliesAtOrAbovePickSeconds` | No (already at `maxOwedPerTeam`) | Autopick — one owed pick per team is the whole allowance. |
+
+Auction is excluded entirely: `reduceAuctionExpiry` never reads `owedPicks` or `skipPolicy` at
+all. A skipped NOMINATION would freeze a lot nobody can bid on — a different, worse product
+failure than the one this task fixes — so a stalled auction nominator always auto-nominates,
+exactly as before Task 5.
+
+### The snapshot asymmetry with the overnight pause (ruling 9)
+
+`DRAFT_SKIP_POLICY` (`config.ts`) is snapshotted onto the `START_DRAFT` action and copied
+verbatim into `state.config.skipPolicy` by `reduceStart` — **unlike** `DRAFT_PAUSE_WINDOW`
+(Task 4), which `loadDraftConfig` attaches fresh on every load and is read only outside the
+reducer (`admit.ts`'s deadline guard, `selectors.ts`'s deadline math). The difference is *who
+reads it*: `skipEligible` is a REDUCER guard — replayed on every load — so if it read
+`DRAFT_SKIP_POLICY` live the way `pauseWindow` does, a deploy that changed the allowance
+mid-draft would silently rewrite what an already-persisted `TIMER_EXPIRE` did the next time the
+log replayed (the exact 60s→90s regression the "Command-time admission vs. reducer guards"
+section above already tells the story of, for a different tunable). Snapshotting it onto the
+action — the same discipline `minBid` already uses for auction — makes the allowance part of
+that draft's own frozen history instead. `replay.test.ts` proves this directly: a log recorded
+under a `maxOwedPerTeam: 2` snapshot still owes two picks on replay even though the live
+`DRAFT_SKIP_POLICY` is 1.
+
+### Redeem semantics: who, when, and in what order
+
+A redeemed pick fills the exact slot it was owed — `redeemOwedPick` (`apply-pick.ts`) calls
+`applyPick` with an explicit `pickNumber` override, never `state.pickNumber` — and it may be made
+**any time**: on somebody else's normal turn (mid-draft), or while holding the catch-up clock
+once the normal snake order has run out. `reduceMakePick` only calls `settleCatchUp` (the one
+function that touches `turnStartedAt`/`phase` for a redemption) when the redeeming team IS the
+team currently holding the catch-up clock — redeeming out of band never steals whoever's turn is
+actually running.
+
+Legality is checked at **redemption** time, not at the moment of the skip: `redeemOwedPick` reads
+`draftedPlayerIds(state)` against the state passed in at the call site, so a player somebody else
+took *after* the skip is still caught, with its own message ("Somebody already drafted that
+player. Pick another.") distinct from the ordinary in-turn rejection.
+
+Multiple owed picks resolve **FIFO** — `owed[0]` is always the redeemed slot — and across
+different teams, `catchUpTeamId` (`selectors.ts`) walks `draftOrder` and hands the catch-up clock
+to whichever team's *earliest* owed pick number is lowest, since pick numbers are unique and
+monotonic across the whole draft.
+
+### The terminal rule
+
+`advanceSnake` refuses to complete the draft past the last normal pick while `hasOwedPicks(state)`
+is true (invariant 7, above) — it opens a CATCH-UP phase instead: a fresh clock starts, and
+`teamOnClock`'s own catch-up arm returns `catchUpTeamId(state)` once `state.pickNumber` has moved
+past `totalPickCount(state)` (a sentinel value from then on, never incremented per catch-up turn —
+`settleCatchUp` only ever touches `turnStartedAt`/`phase`). `reduceCatchUpExpiry` **never skips
+again**: every owed pick that reaches it already had its one forgiveness, so it always autopicks
+via `bestAvailableFor` + `redeemOwedPick`. That is what forces resolution — a catch-up phase
+autopicks its way to empty even if nobody ever redeems by hand — and it is what makes the terminal
+state well-defined: every roster ends up exactly as full as every other, whether by a human
+redemption or a catch-up autopick.
+
+### Composing with the overnight pause (Task 4 x Task 5)
+
+A skip can never fire mid-freeze. `reduceSnakeExpiry`'s consent check only ever runs once a
+`TIMER_EXPIRE` has been admitted, and `admitCommand`'s R-B4 gate (below) already refuses an
+expiry submitted before `currentDeadline(state)` — the same fixpoint that absorbs the pause
+window's extension for an ordinary autopick. No second gate exists for skip specifically; it
+composes for free through the one gate every `TIMER_EXPIRE` already goes through.
 
 ## The deadline guard on TIMER_EXPIRE (Ruling R-B4)
 
@@ -293,9 +445,10 @@ roster slots.
 `draftEventsFor(prev, next, action)` derives events from the **state diff**, not the action
 alone. Every payload carries `draftId` and a `clock` block — exactly the `DraftClockView`
 (`phase`, `sequence`, `pickNumber`, `onClockTeamId`, `deadlineAt`, `clockSeconds`,
-`nextTightening`, `upcoming`) that `draftStateView` also embeds. That is what lets a browser fold an
-event into its view and know the new deadline and tier without re-deriving either; the
-sequence number a client uses for gap detection is `payload.clock.sequence`.
+`nextTightening`, `upcoming`, `pausedUntil`, `owedPicks`) that `draftStateView` also embeds. That
+is what lets a browser fold an event into its view and know the new deadline, tier and owed picks
+without re-deriving any of them; the sequence number a client uses for gap detection is
+`payload.clock.sequence`.
 
 | Event | Extra payload | Emitted when |
 |---|---|---|
@@ -303,7 +456,7 @@ sequence number a client uses for gap detection is `payload.clock.sequence`.
 | `draft.pick` | every `CompletedPick` field (`pickNumber`, `round`, `teamId`, `playerId`, `slot`, `slotIndex`, `price`, `timestamp`, `auto`); **auction only:** `budgets`, `maxBids` and `minBid` after the award | Once per new entry in `next.picks`. |
 | `draft.nominate` | `teamId`, `playerId`, `openingBid`, `auto`, `minBid` (the floor for the NEXT bid on this lot) | A new lot opens. |
 | `draft.bid` | `teamId`, `playerId`, `amount`, `minBid` (the floor for the NEXT bid on this lot) | The open lot's high bid changes without a new player. |
-| `draft.timer_expire` | `pickNumber` (the pick the clock ran out on) | Every accepted `TIMER_EXPIRE`, always pushed first. |
+| `draft.timer_expire` | `pickNumber` (the pick the clock ran out on); `skipped` (Task 5 — true when this expiry owed the pick instead of making it; `newlySkippedPick` diffs `prev`/`next` `owedPicks` to decide, the same diff `store.ts` uses to target the skip's own notice) | Every accepted `TIMER_EXPIRE`, always pushed first. |
 | `draft.queue` | `teamId` only — **the ordered list itself is never broadcast**, since a queue is a private draft plan. | Every accepted `SET_QUEUE`. Clock-only on the client: sequence advances, nothing else about the view changes. |
 | `draft.nudge` | `teamId`, `message` (the moderator's one sentence) | **Not emitted by `draftEventsFor`** — published directly by the nudge scheduler (`createNudgeScheduler`, `src/draft-service/nudge.ts`) on the ticker's own schedule, independent of any action. See `docs/draft-moderator.md`. |
 

@@ -52,14 +52,16 @@ export const DEV_SEED = {
     { leagueId: "dev_public_packed", draftId: "dev_public_packed_draft", name: "Packed House", format: "snake" as const, experienceTier: "beginner" as const, stakeTier: 1, teamCount: 8, filled: 8 },
     /**
      * Phase 3 Plan D, Task 10, Step 1: the beginner league the seed's own veteran identity
-     * presses "Join" on. `skipOwnerIndexZero` is what makes that press a REFUSAL rather than a
-     * silent re-arrival — every other entry above seats index 0 (`claimUserId`, when one is
-     * set) in its own seat 1, a harmless fact for every league that isn't the join target, but
-     * seating the veteran here would make it already a member of the one league this step needs
-     * it to be REFUSED from. A brand-new league id, never seeded before this task: shifting an
-     * EXISTING league's seat mapping (tried first, reverted) breaks `teams_league_user_idx` on
-     * any database this seed already ran against under the old mapping — see
-     * `seedPublicLeagues`'s own docblock for the incident.
+     * (manager A, via `claimUserId`) presses "Join" on. Its three seats never come from
+     * `ensureDevUsers`' shared 12-identity pool at all — `seedTierDemoIdentities`
+     * (`./seed-tier-demo.ts`) hands `seedPublicLeagues` three DEDICATED identities instead (two
+     * that can never accumulate a completed season, one that already has three by construction),
+     * which is what keeps this league refusing manager A's join AND reading "Mostly newcomers"
+     * durably — see that module's own docblock for the aging-class incident this replaced (Phase
+     * 3.5, Task 7.5). A brand-new league id, never seeded before Task 10: shifting an EXISTING
+     * league's seat mapping (tried first, reverted) breaks `teams_league_user_idx` on any
+     * database this seed already ran against under the old mapping — see `seedPublicLeagues`'s
+     * own docblock for that incident.
      */
     {
       leagueId: "dev_public_tier_demo",
@@ -70,7 +72,6 @@ export const DEV_SEED = {
       stakeTier: 0,
       teamCount: 12,
       filled: 3,
-      skipOwnerIndexZero: true,
     },
   ],
 } as const;

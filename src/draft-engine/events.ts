@@ -18,6 +18,22 @@ export interface DraftEventEnvelope {
 }
 
 /**
+ * The team a TIMER_EXPIRE just skipped, and the pick number it owes — null when this
+ * transition wasn't a skip at all (Task 5). A skip is the only thing that ever grows a team's
+ * `owedPicks` entry, and only ever one team's, by exactly one, so the first team whose list grew
+ * IS the skip. Shared by `draftEventsFor` (the wire event's `skipped` flag) and `store.ts` (who
+ * to notify), so the two can never disagree about which transition was a skip.
+ */
+export function newlySkippedPick(prev: DraftState, next: DraftState): { readonly teamId: string; readonly pickNumber: number } | null {
+  for (const teamId of next.draftOrder) {
+    const before = prev.owedPicks[teamId]?.length ?? 0;
+    const owed = next.owedPicks[teamId];
+    if (owed !== undefined && owed.length > before) return { teamId, pickNumber: owed[owed.length - 1]! };
+  }
+  return null;
+}
+
+/**
  * What to broadcast for a transition. Derived from the state diff rather than the action
  * alone, so a clock-driven autopick or auto-nomination produces the same events a human
  * action would. Ordering is deliberate: the cause (`draft.timer_expire`) precedes its
@@ -30,7 +46,10 @@ export function draftEventsFor(prev: DraftState, next: DraftState, action: Draft
   const events: DraftEventEnvelope[] = [];
 
   if (action.type === "TIMER_EXPIRE") {
-    events.push({ type: "draft.timer_expire", payload: { ...base, pickNumber: prev.pickNumber } });
+    // The flag is new (Task 5); the payload already existed. A skip records no pick at all, so
+    // this is the only signal a client gets that `pickNumber` just went pending rather than
+    // vanishing into a name it will never see.
+    events.push({ type: "draft.timer_expire", payload: { ...base, pickNumber: prev.pickNumber, skipped: newlySkippedPick(prev, next) !== null } });
   }
 
   if (action.type === "SET_QUEUE") {

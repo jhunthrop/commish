@@ -10,6 +10,7 @@ const props = {
   view: SNAKE_VIEW,
   pendingPlayerId: null,
   canAct: true,
+  myTeamId: "t1",
   actionLabel: "Draft",
   submitting: false,
   onAct: () => {},
@@ -125,6 +126,29 @@ describe("PlayerPool", () => {
     const view = { ...SNAKE_VIEW, availablePlayerIds: manyPlayers.map((player) => player.id) };
     render(<PlayerPool {...props} players={manyPlayers} view={view} />);
     expect(screen.getByText("Showing the top 60 of 75. Narrow your search to see more.")).toBeInTheDocument();
+  });
+
+  // Task 5, Phase 3.5: the Draft buttons live on your turn AND off it, for a team that owes a
+  // pick from an earlier skip — it may make it any time.
+  it("lights up the Draft button off your own turn when you owe a pick (Task 5)", () => {
+    const onAct = vi.fn();
+    const view = { ...SNAKE_VIEW, owedPicks: { t1: [1] } };
+    render(<PlayerPool {...props} view={view} canAct={false} onAct={onAct} />);
+    const button = screen.getAllByRole("button", { name: "Draft" })[0]!;
+    fireEvent.click(button);
+    expect(onAct).toHaveBeenCalledWith("qb1");
+  });
+
+  it("shows no act button for an owed pick that belongs to a different team", () => {
+    const view = { ...SNAKE_VIEW, owedPicks: { t2: [1] } };
+    render(<PlayerPool {...props} view={view} canAct={false} />);
+    expect(screen.queryByRole("button", { name: "Draft" })).toBeNull();
+  });
+
+  it("shows no act button for a commissioner with no team at all, even if somebody owes a pick", () => {
+    const view = { ...SNAKE_VIEW, owedPicks: { t1: [1] } };
+    render(<PlayerPool {...props} view={view} canAct={false} myTeamId={null} />);
+    expect(screen.queryByRole("button", { name: "Draft" })).toBeNull();
   });
 
   it("queues and un-queues a player from the pool", () => {

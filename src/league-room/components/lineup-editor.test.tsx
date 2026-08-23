@@ -15,6 +15,12 @@ const LINEUP_WITH_FLEX: LineupBody = {
   starters: [...LINEUP.starters, { slot: "FLEX", slotIndex: 0, playerId: "wr1", playerName: "Ja'Marr Chase", position: "WR" }],
 };
 
+/** Task 1 (superflex): the same "no branch without a fixture" reasoning as `LINEUP_WITH_FLEX`. */
+const LINEUP_WITH_SUPERFLEX: LineupBody = {
+  ...LINEUP,
+  starters: [...LINEUP.starters, { slot: "SUPERFLEX", slotIndex: 0, playerId: "qb2", playerName: "Backup Quarterback", position: "QB" }],
+};
+
 describe("LineupEditor", () => {
   it("shows starters and bench with a labelled control per starting slot, in both themes", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: LINEUP });
@@ -66,6 +72,34 @@ describe("LineupEditor", () => {
   it("also captions FLEX on the locked, read-only slot list", () => {
     renderInLeague(<LineupEditor leagueId="l1" lineup={{ ...LINEUP_WITH_FLEX, locked: true }} totalWeeks={14} />, fixtureLeagueDeps().deps);
     expect(screen.getByText(term("flex").short)).toBeInTheDocument();
+  });
+
+  // Task 1 (superflex): the same shared-caption treatment FLEX gets, plus an InfoTip — a newer
+  // word than FLEX and worth the click-to-learn-more.
+  it("captions SUPERFLEX near the slot list when the roster has one, with an InfoTip, and says nothing when it doesn't", () => {
+    const { rerender } = renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} />, fixtureLeagueDeps().deps);
+    expect(screen.queryByText(term("superflex").short)).not.toBeInTheDocument();
+    rerender(
+      <LeagueRoomDepsProvider deps={fixtureLeagueDeps().deps}>
+        <LineupEditor leagueId="l1" lineup={LINEUP_WITH_SUPERFLEX} totalWeeks={14} />
+      </LeagueRoomDepsProvider>,
+    );
+    expect(screen.getByText(term("superflex").short)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What is a superflex spot?" })).toBeInTheDocument();
+  });
+
+  it("also captions SUPERFLEX on the locked, read-only slot list", () => {
+    renderInLeague(<LineupEditor leagueId="l1" lineup={{ ...LINEUP_WITH_SUPERFLEX, locked: true }} totalWeeks={14} />, fixtureLeagueDeps().deps);
+    expect(screen.getByText(term("superflex").short)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What is a superflex spot?" })).toBeInTheDocument();
+  });
+
+  // The SUPERFLEX caption's short line is already unconditional, unlike bench/lineup-lock's
+  // InfoTip-only short line — so `helpLevel="guided"` must not print it a second time.
+  it("does not duplicate the SUPERFLEX short line when helpLevel is guided", () => {
+    const fixture = fixtureLeagueDeps();
+    renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP_WITH_SUPERFLEX} totalWeeks={14} helpLevel="guided" />, fixture.deps);
+    expect(screen.getAllByText(GLOSSARY.superflex.short)).toHaveLength(1);
   });
 
   // Persona review (veteran, FIX 5): the whole-week lock is coarse and nothing said so before

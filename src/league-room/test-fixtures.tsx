@@ -33,6 +33,7 @@ export const MATCHUP: MatchupDetail = {
   weekNumber: 5,
   final: true,
   weekStatus: "final",
+  median: null,
   home: {
     teamId: "t1",
     teamName: "Bay Bandits",
@@ -50,6 +51,15 @@ export const MATCHUP: MatchupDetail = {
     starters: [{ slot: "QB", slotIndex: 0, playerId: "qb3", playerName: "Marcus Reed", position: "QB", points: 19.25 }],
     bench: [],
   },
+};
+
+/** `MATCHUP`, but a median league whose week has settled: `t1` (home, 112.5) beat the 104.2
+ *  median, `t2` (away, 98.25) missed it — a win and a loss against the SAME median score, so a
+ *  test asserting both sentences at once proves the panel reads `homeResult`/`awayResult`
+ *  independently rather than copying one side's result onto the other. */
+export const MATCHUP_WITH_MEDIAN: MatchupDetail = {
+  ...MATCHUP,
+  median: { score: 104.2, homeResult: "win", awayResult: "loss" },
 };
 
 /** A final week `t1` wins. */
@@ -93,6 +103,7 @@ export const TERMS: LeagueTerms = {
   commissionerName: "Alex Rivera",
   commissionerAvatar: null,
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
+  formatNotes: [],
 };
 
 /** `DraftSchedulePanel`'s entire initial read, as `leagueHome` (`@/league-service/read.ts`)
@@ -104,6 +115,10 @@ export const DRAFT_SCHEDULE: DraftScheduleBody = {
   status: "complete",
   kickoffAt: "2026-08-24T12:00:00.000Z",
   isPublicMatchmade: false,
+  startTrigger: "scheduled",
+  filledTeams: TEAMS.length,
+  // Task 6, Phase 3.5: NFFC's Kentucky Derby System. `t1` ranked slot 3 first and got it.
+  slotPreference: { slotCount: 12, ranking: [3, 1], assignedSlot: 3, canEdit: false },
 };
 
 /** Everything `LeagueHome` needs: a commissioner, mid-season, drafted, `t1` up this week. */
@@ -114,10 +129,11 @@ export const HOME: LeagueHomeBody = {
   teamCount: 12,
   rosterSlots: STANDARD_ROSTER_SLOTS,
   isCommissioner: true,
-  commissionerUserId: "u1",
+  authority: { kind: "member", userId: "u1" },
   myTeamId: "t1",
   teams: TEAMS,
   standings: STANDINGS,
+  medianGame: false,
   terms: TERMS,
   currentWeek: 3,
   totalWeeks: 14,
@@ -210,6 +226,6 @@ export function renderInLeague(ui: ReactElement, deps: LeagueRoomDeps): RenderRe
  *  one all-newcomer composition, one veteran-leaning composition, so a consumer's rendering of
  *  BOTH `TIER_COMPOSITION_LABEL` buckets it is likely to show has real fixture data to render. */
 export const PUBLIC_LEAGUES: readonly PublicLeagueSummary[] = [
-  { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 3, scoringLabel: "Standard", compositionCategory: "all_newcomers", draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)" },
-  { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 10, filledTeams: 9, scoringLabel: "PPR", compositionCategory: "open", draftAt: "Sunday 13 September, 1:00 PM UTC (in 4 days)" },
+  { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 3, scoringLabel: "Standard", compositionCategory: "all_newcomers", draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)", medianGame: false, startTrigger: "scheduled", houseRung: null },
+  { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 10, filledTeams: 9, scoringLabel: "PPR", compositionCategory: "open", draftAt: "Sunday 13 September, 1:00 PM UTC (in 4 days)", medianGame: false, startTrigger: "scheduled", houseRung: null },
 ];

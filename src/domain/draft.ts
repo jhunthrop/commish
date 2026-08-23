@@ -32,6 +32,26 @@ export interface StartDraftAction {
    * never reads `AUCTION_CONFIG` while folding state. Present-but-unused for snake drafts.
    */
   readonly minBid: number;
+  /**
+   * The skip-and-owe allowance in force when this draft started (Task 5), snapshotted here for
+   * the identical reason `minBid` is: `reduceSnakeExpiry` reads it while folding state, so
+   * replaying this log must never depend on `DRAFT_SKIP_POLICY`'s CURRENT value. Present-but-
+   * unused for an auction draft, which never skips a nomination at all.
+   *
+   * OPTIONAL, and only for the rows that predate Task 5 (final whole-branch review, F3). Every
+   * `START_DRAFT` this codebase writes carries the value; a log row written before the field
+   * existed carries nothing, and ABSENT MUST MEAN "no skipping", not "today's allowance". The
+   * persisted-row schema used to `.default(DRAFT_SKIP_POLICY)` here, which quietly gave a
+   * pre-Task-5 draft the CURRENT tunable on every replay — so a queueless team at a slow tier
+   * replayed as a SKIP where the live draft had autopicked, and the reconstructed rosters
+   * disagreed with the ones actually committed. `reduceSnakeExpiry`'s own `?? null` path
+   * (`@/draft-engine/snake.ts`) has always handled the absent case correctly; the default was
+   * what made it unreachable.
+   */
+  readonly skipPolicy?: {
+    readonly maxOwedPerTeam: number;
+    readonly appliesAtOrAbovePickSeconds: number;
+  };
 }
 
 export interface MakePickAction {

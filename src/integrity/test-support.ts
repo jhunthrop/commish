@@ -206,4 +206,7 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   trade_held_for_review: { leagueName: "Sunday Money", counterpartyTeamName: "Iron Owls" },
   trade_blocked: { leagueName: "Sunday Money", note: "Both teams belong to one person." },
   draft_auto_started: { leagueName: "Sunday Money" },
+  draft_pick_skipped: { leagueName: "Sunday Money" },
+  draft_fill_triggered: { leagueName: "Sunday Money", graceLabel: "5 minutes" },
+  house_league_filled: { leagueName: "Open 12-team League 3" },
 };

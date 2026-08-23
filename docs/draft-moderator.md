@@ -17,6 +17,21 @@ manager truly never responds — at zero marginal staffing cost and unlimited co
 plan builds that role in two halves: the queue (what the moderator escalates to) and the
 nudge (what it says beforehand).
 
+## The queue's stakes rose (Phase 3.5, Task 5)
+
+Before this phase, a queue only changed WHO autopick chose; every stalled team was autopicked
+either way. Since Task 5's skip-and-return, a queue also decides WHETHER a team is autopicked at
+all: `skipEligible` (`src/draft-engine/snake.ts`) autopicks a team with a queue unconditionally,
+and only a team with **no** queue, in a slow tier, under the owed allowance, is skipped instead
+(the pick goes unowed-but-owed, not made). That makes the nudge more load-bearing than it used to
+be — a manager who never sees or acts on it is no longer just accepting whatever the queue (or the
+pool's own ranking) would have picked for them; they may now be accepting a skip, and the pick
+they owe has to be redeemed later on top of whatever else is happening in the draft. The nudge's
+own mechanics are unchanged (it still only reads state and publishes, never applies an action or
+decides skip-versus-autopick itself) — its CONSEQUENCE changed underneath it. See
+`docs/draft-engine.md`'s "Skip and return" section and `docs/decisions/formats-and-lobby.md` §4
+for the consent test in full.
+
 ## The queue is a `SET_QUEUE` action, not a side table
 
 A team's autopick queue is `SET_QUEUE { teamId, playerIds }` (`src/draft-engine/action-schema.ts`),

@@ -1,8 +1,9 @@
 import { and, eq, gte, lt } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
-import { leagues, matchups, players, playerStatLines, scoringSettings, teams } from "@/db/schema";
+import { leagues, matchups, players, playerStatLines, scoringSettings, teams, weeks } from "@/db/schema";
 import { ADVISOR_CONFIG } from "@/domain/advisor";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
+import { computeStandings, type StandingsRow } from "@/league";
 import { getLineup } from "@/league-service/lineups";
 import { computeFantasyPoints, roundPoints, type ScoringRules } from "@/scoring";
 import type { StartSitCandidate, ValuedPlayer } from "./valuation";
@@ -46,21 +47,16 @@ function scoringWithoutLeagueId(row: ScoringSettings): Omit<ScoringSettings, "le
   >;
 }
 
-function recordOf(rows: readonly (typeof matchups.$inferSelect)[], teamId: string): string {
-  let wins = 0;
-  let losses = 0;
-  let ties = 0;
-  for (const row of rows) {
-    if (row.homeScore === null || row.awayScore === null) continue;
-    const isHome = row.homeTeamId === teamId;
-    if (!isHome && row.awayTeamId !== teamId) continue;
-    const mine = isHome ? row.homeScore : row.awayScore;
-    const theirs = isHome ? row.awayScore : row.homeScore;
-    if (mine > theirs) wins += 1;
-    else if (mine < theirs) losses += 1;
-    else ties += 1;
-  }
-  return ties === 0 ? `${wins}-${losses}` : `${wins}-${losses}-${ties}`;
+/**
+ * "7-4-1", or "0-0" before a week has been scored. Delegates the actual win/loss/tie count to
+ * `computeStandings` (`@/league`) — the SAME function `leagueStandings` and `crossLeagueHome`
+ * read — rather than re-deriving it from `matchups` by hand: a hand-rolled head-to-head tally
+ * here used to disagree with the standings page the moment a league turned its median game on,
+ * because it only ever counted the ONE result a matchup row can hold and had no way to fold in
+ * the second, medianByWeek-derived result every other record consumer already does.
+ */
+function formatTeamRecord(row: StandingsRow): string {
+  return row.ties === 0 ? `${row.wins}-${row.losses}` : `${row.wins}-${row.losses}-${row.ties}`;
 }
 
 /**
@@ -93,13 +89,42 @@ export async function assembleAdvisorContext(db: ReadonlyDb, input: AssembleCont
   // straight from the request body. Both routes already answer `null` as a 404.
   if (!nameById.has(input.teamId)) return null;
 
-  const allMatchups = await db.select().from(matchups).where(eq(matchups.leagueId, input.leagueId));
+  // Fix round 1 (F2): the league's own stored medians ride along on this SAME query, a LEFT JOIN
+  // rather than a second round trip — `weeks`' own primary key is `(league_id, week_number)`,
+  // the exact pair `matchups` is already scoped and grouped by, so the join costs nothing this
+  // query wasn't already paying for. A row with no matching `weeks` entry (the toggle is off, or
+  // that week never finalized) simply carries `medianScore: null`, indistinguishable from the
+  // standalone read's own "absent from the map" case. This keeps `assembleAdvisorContext` at the
+  // SAME query count Task 2 found it at, rather than adding one — measured directly in
+  // `context.test.ts`'s own query-budget test, since this function is on the hot path for both
+  // the trade propose (`trades.ts`) and trade accept-time fairness (`trade-fairness.ts`) checks,
+  // each of which calls it TWICE per action.
+  const allMatchups = await db
+    .select({
+      leagueId: matchups.leagueId,
+      weekNumber: matchups.weekNumber,
+      homeTeamId: matchups.homeTeamId,
+      awayTeamId: matchups.awayTeamId,
+      homeScore: matchups.homeScore,
+      awayScore: matchups.awayScore,
+      medianScore: weeks.medianScore,
+    })
+    .from(matchups)
+    .leftJoin(weeks, and(eq(weeks.leagueId, matchups.leagueId), eq(weeks.weekNumber, matchups.weekNumber)))
+    .where(eq(matchups.leagueId, input.leagueId));
   const thisWeek = allMatchups.find(
     (row) =>
       row.weekNumber === input.weekNumber && (row.homeTeamId === input.teamId || row.awayTeamId === input.teamId),
   );
   const opponentTeamId =
     thisWeek === undefined ? null : thisWeek.homeTeamId === input.teamId ? thisWeek.awayTeamId : thisWeek.homeTeamId;
+
+  // The SAME record `leagueStandings` and `crossLeagueHome` show, median game included: a
+  // league's own stored medians (riding on `allMatchups` above), folded into one win/loss/tie
+  // count per team by the one function every other record consumer already goes through.
+  const medianByWeek = new Map(allMatchups.flatMap((row) => (row.medianScore === null ? [] : [[row.weekNumber, row.medianScore] as const])));
+  const standings = computeStandings({ teamIds: [...nameById.keys()], matchups: allMatchups, medianByWeek });
+  const standingsByTeam = new Map(standings.map((row) => [row.teamId, row]));
 
   // Recent form is BOUNDED: `trendWeeks` completed weeks before this one, never the season.
   const firstTrendWeek = Math.max(1, input.weekNumber - ADVISOR_CONFIG.trendWeeks);
@@ -145,7 +170,12 @@ export async function assembleAdvisorContext(db: ReadonlyDb, input: AssembleCont
         },
       ];
     });
-    return { teamId, teamName: nameById.get(teamId) ?? teamId, record: recordOf(allMatchups, teamId), players: roster };
+    // `standingsByTeam` has a row for every id `nameById` does (`computeStandings` tallies every
+    // team it's given, whether or not it has ever played a matchup), and `teamContext` is only
+    // ever called with `input.teamId` (checked against `nameById` above) or an `opponentTeamId`
+    // drawn from this same league's own matchup rows — so this is never missing.
+    const record = formatTeamRecord(standingsByTeam.get(teamId)!);
+    return { teamId, teamName: nameById.get(teamId) ?? teamId, record, players: roster };
   }
 
   const [me, opponent] = await Promise.all([

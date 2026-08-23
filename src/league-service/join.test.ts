@@ -57,6 +57,7 @@ async function seedLeague(over: {
   readonly isPublicMatchmade?: boolean;
   readonly draftStatus?: "scheduled" | "in_progress" | "complete";
   readonly experienceTier?: "beginner" | "experienced";
+  readonly startTrigger?: "scheduled" | "when_full";
 } = {}): Promise<string> {
   const id = over.id ?? "open";
   await db.insert(leagues).values({
@@ -76,6 +77,7 @@ async function seedLeague(over: {
     status: over.draftStatus ?? "scheduled",
     kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
     auctionBudget: null,
+    startTrigger: over.startTrigger ?? "scheduled",
   });
   for (let i = 0; i < (over.filled ?? 0); i++) {
     const userId = `${id}_seat_${i}`;
@@ -201,6 +203,19 @@ describe("joinPublicLeague", () => {
     expect(results.filter((r) => r.ok)).toHaveLength(1);
     expect(results.filter((r) => !r.ok)).toEqual([{ ok: false, status: 409, reason: LEAGUE_FULL }]);
     expect(await db.select().from(teams).where(eq(teams.leagueId, leagueId))).toHaveLength(4);
+  });
+
+  // Phase 3.5, Task 7: `joinLeagueInTx` is where `fireWhenFullInTx` lives — a full write-through
+  // proof lives in `fill-trigger.test.ts`; this is the seam-level proof that `joinPublicLeague`
+  // really does thread through to it rather than an implementation detail neither test file
+  // actually drives.
+  it("moves a sit-and-go draft's kickoff when the last public-browse join fills the league", async () => {
+    const leagueId = await seedLeague({ teamCount: 3, filled: 2, startTrigger: "when_full" });
+    const before = await joinPublicLeague(deps(), { leagueId, userId: "joiner" });
+    expect(before.ok).toBe(true);
+
+    const [draft] = await db.select().from(drafts).where(eq(drafts.leagueId, leagueId));
+    expect(draft!.kickoffAt.toISOString()).not.toBe("2026-09-10T17:00:00.000Z");
   });
 
   it("records member_joined when a public join seats someone", async () => {

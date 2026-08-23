@@ -89,4 +89,31 @@ describe("StandingsTable", () => {
       expect(await axe(container)).toHaveNoViolations();
     });
   });
+
+  // Task 3 (Phase 3.5): the standings surface that says the record itself is a two-games-a-week
+  // one. Inverted assertion — a non-median league (the default, `medianGame` omitted) never
+  // shows either the caption note or the swapped InfoTip. `formatRecord`/`computeStandings`
+  // themselves are unchanged (one column, because the median game IS a game — a second record
+  // column would say the opposite of what the format means); this only adds context around it.
+  it("adds neither the caption note nor a swapped InfoTip for a non-median league", () => {
+    render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
+    expect(screen.queryByText(/median game/)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "What is a record?" })).toBeInTheDocument();
+  });
+
+  it("names the median game in a caption note and swaps the Record header's InfoTip, in both themes, axe-clean", async () => {
+    await inBothThemes(<StandingsTable rows={STANDINGS} myTeamId="t1" medianGame />, async ({ container }) => {
+      expect(screen.getByText(/Records include each week's median game\./)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "What is a median game?" })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "What is a record?" })).not.toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("keeps the tiebreak sentence and appends the median note to the SAME line, not a second paragraph", () => {
+    render(<StandingsTable rows={STANDINGS} myTeamId="t1" medianGame />);
+    expect(
+      screen.getByText("Ties in the standings break on points for. Clinched means a guaranteed playoff spot. Records include each week's median game."),
+    ).toBeInTheDocument();
+  });
 });

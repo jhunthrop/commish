@@ -63,13 +63,14 @@ async function seedAcceptedTrade(opts: { readonly flagId: string; readonly weekN
     scoringPreset: "ppr",
     auctionBudget: null,
     rosterSlots: SLOTS,
-    commissionerUserId: userA,
-    teamName: "Team Alice",
+    owner: { kind: "member", userId: userA, teamName: "Team Alice" },
     experienceTier: "beginner",
     stakeTier: 0,
     isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);
+  const teamId = created.teamId;
+  if (teamId === null) throw new Error("expected a team id");
   const teamB = `team_bob_${suffix}`;
   await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
   await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
@@ -82,10 +83,10 @@ async function seedAcceptedTrade(opts: { readonly flagId: string; readonly weekN
     ])
     .onConflictDoNothing();
   await db.insert(rosterSlots).values([
-    { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: `p_rb1_${suffix}` },
+    { teamId, slot: "RB", slotIndex: 0, playerId: `p_rb1_${suffix}` },
     { teamId: teamB, slot: "WR", slotIndex: 0, playerId: `p_wr1_${suffix}` },
   ]);
-  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, teamB], weeks: 6 }));
+  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [teamId, teamB], weeks: 6 }));
 
   const proposed = await proposeTrade(db, {
     leagueId: created.leagueId,
@@ -114,7 +115,7 @@ async function seedAcceptedTrade(opts: { readonly flagId: string; readonly weekN
     }),
   );
 
-  return { leagueId: created.leagueId, teamA: created.teamId, teamB, userA, userB, tradeId: proposed.tradeId, flagId: opts.flagId, weekNumber: 1 };
+  return { leagueId: created.leagueId, teamA: teamId, teamB, userA, userB, tradeId: proposed.tradeId, flagId: opts.flagId, weekNumber: 1 };
 }
 
 async function tradeRow(tradeId: string) {
@@ -450,13 +451,13 @@ describe("reverseTradeInTx", () => {
       scoringPreset: "ppr",
       auctionBudget: null,
       rosterSlots: SLOTS,
-      commissionerUserId: userA,
-      teamName: "Team Alice",
+      owner: { kind: "member", userId: userA, teamName: "Team Alice" },
       experienceTier: "beginner",
       stakeTier: 0,
       isPublicMatchmade: false,
     });
     if (!created.ok) throw new Error(created.reason);
+    if (created.teamId === null) throw new Error("expected a team id");
     const teamB = `team_bob_${suffix}`;
     await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team Bob" });
 

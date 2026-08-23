@@ -4,6 +4,7 @@ import { drafts } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import { currentDeadline } from "@/draft-engine";
+import { ensureHouseCatalog, type HouseFactoryDeps, type HouseFactoryOutcome } from "@/league-service/house-factory";
 import { autoStartDueDrafts, type AutoStartDeps, type AutoStartOutcome } from "./auto-start";
 import { DRAFT_SERVICE_CONFIG } from "./config";
 import { NO_OP_NUDGE_SCHEDULER, type NudgeScheduler } from "./nudge";
@@ -60,6 +61,14 @@ interface TickerDeps {
    */
   readonly autoStart?: (db: Db, deps: AutoStartDeps) => Promise<readonly AutoStartOutcome[]>;
   /**
+   * Phase 3.5 addendum, Task 13's reconciler: keeps `HOUSE_CATALOG`'s shelf stocked. Defaults to
+   * the real `ensureHouseCatalog` (`@/league-service/house-factory`); injectable so a test can
+   * stub it without seeding a house-catalog fixture for every ticker test that has nothing to do
+   * with the shelf. Gated by `DRAFT_SERVICE_CONFIG.houseReconcileIntervalMs` (below) rather than
+   * run every tick — a shelf of house leagues does not change once a second.
+   */
+  readonly reconcileHouse?: (db: Db, deps: HouseFactoryDeps) => Promise<HouseFactoryOutcome>;
+  /**
    * Called for every `applied: false` outcome, rate-limited per draft id (see
    * `DRAFT_SERVICE_CONFIG.tickWarnIntervalMs`) so a stuck draft is visible in logs without
    * spamming them. Defaults to `console.warn`.
@@ -83,6 +92,7 @@ export function createDraftTicker({
   intervalMs = DRAFT_SERVICE_CONFIG.tickIntervalMs,
   nudger = NO_OP_NUDGE_SCHEDULER,
   autoStart = autoStartDueDrafts,
+  reconcileHouse = ensureHouseCatalog,
   onOutcome = defaultOnOutcome,
 }: TickerDeps): DraftTicker {
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -91,6 +101,10 @@ export function createDraftTicker({
   // the first failure always logs; a rejection or thrown error may recur every tick, and
   // without this a stuck draft would log once per tick forever.
   const lastWarnedAtMs = new Map<string, number>();
+  // `undefined` until the first reconcile ever runs, so a fresh ticker restocks the shelf on
+  // its very first tick rather than waiting a full `houseReconcileIntervalMs` for a shelf that
+  // may have sat empty since the last deploy.
+  let lastHouseReconcileAtMs: number | undefined;
 
   function reportIfDue(outcome: TickOutcome, nowMs: number): void {
     if (outcome.applied) return;
@@ -135,6 +149,24 @@ export function createDraftTicker({
       }
     } catch (error: unknown) {
       console.error("[draft] auto-start scan failed", error);
+    }
+
+    // House reconcile SECOND, still before the expiry scan below: a house league whose draft
+    // this very tick auto-started (just above) is already off the shelf by the time this count
+    // runs, so its replacement opens on the SAME tick that emptied it rather than waiting a
+    // full reconcile interval. Gated by `houseReconcileIntervalMs` — most ticks skip this
+    // entirely, and both sides of that gate are real: a tick before the interval elapses never
+    // calls `reconcileHouse` at all, a tick at or after it always does.
+    if (lastHouseReconcileAtMs === undefined || nowMs - lastHouseReconcileAtMs >= DRAFT_SERVICE_CONFIG.houseReconcileIntervalMs) {
+      lastHouseReconcileAtMs = nowMs;
+      try {
+        const outcome = await reconcileHouse(db, { clock, newId: () => crypto.randomUUID() });
+        for (const refusal of outcome.refused) {
+          reportIfDue({ draftId: `house:${refusal.rung}`, applied: false, reason: refusal.reason }, nowMs);
+        }
+      } catch (error: unknown) {
+        console.error("[draft] house reconcile failed", error);
+      }
     }
 
     const rows = await liveDraftsQuery(db);

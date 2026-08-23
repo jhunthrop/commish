@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { SCORING_PRESETS } from "@/domain/scoring";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import { SUPERFLEX_ROSTER_SLOTS } from "./roster-shape";
 import { formatDraftTime, leagueTerms, type LeagueTermsInput } from "./terms";
 
 /** A small custom roster shape — distinct from `STANDARD_ROSTER_SLOTS` so a test that swaps one
@@ -19,9 +20,11 @@ const BASE: LeagueTermsInput = {
   scoring: SCORING_PRESETS.ppr,
   rosterSlots: SMALL_ROSTER,
   stakeTier: 1,
+  medianGame: false,
   commissioner: { displayName: "Alex Rivera", avatarUrl: "preset:crown" },
   kickoffAt: "2026-09-12T23:00:00.000Z",
   now: "2026-09-09T23:00:00.000Z",
+  startTrigger: "scheduled",
 };
 
 describe("leagueTerms", () => {
@@ -62,6 +65,29 @@ describe("leagueTerms", () => {
     expect(leagueTerms(BASE).stakeDisclosure).toBe(MATCHMAKING_CONFIG.stakeDisclosure);
   });
 
+  it("carries no format notes for a plain standard-shape, non-median league", () => {
+    expect(leagueTerms(BASE).formatNotes).toEqual([]);
+  });
+
+  it("notes the median game, derived from the stored toggle, not a remembered preset", () => {
+    expect(leagueTerms({ ...BASE, medianGame: true }).formatNotes).toEqual([
+      "Every team also plays the league median each week.",
+    ]);
+  });
+
+  it("notes superflex, derived from the stored roster slots, not a remembered preset name", () => {
+    expect(leagueTerms({ ...BASE, rosterSlots: SUPERFLEX_ROSTER_SLOTS }).formatNotes).toEqual([
+      "Superflex: you can start a second quarterback.",
+    ]);
+  });
+
+  it("lists both notes, median first, when a league opts into both", () => {
+    expect(leagueTerms({ ...BASE, medianGame: true, rosterSlots: SUPERFLEX_ROSTER_SLOTS }).formatNotes).toEqual([
+      "Every team also plays the league median each week.",
+      "Superflex: you can start a second quarterback.",
+    ]);
+  });
+
   it("names the commissioner", () => {
     expect(leagueTerms({ ...BASE, commissioner: { displayName: "Ada Lovelace", avatarUrl: "preset:crown" } }).commissionerName).toBe(
       "Ada Lovelace",
@@ -75,6 +101,29 @@ describe("leagueTerms", () => {
 
   it("renders the draft's scheduled time absolute-first, then relative", () => {
     expect(leagueTerms(BASE).draftAt).toBe("Saturday 12 September, 11:00 PM UTC (in 3 days)");
+  });
+
+  // Phase 3.5, Task 8 fix round 1 (review HIGH). `BASE` has an open seat (8 of 12) — a `when_full`
+  // league in that state has no chosen kickoff yet, so `draftAt` must never format the stored
+  // `kickoffAt` (a placeholder) as though it were a real time.
+  describe("when_full", () => {
+    it("speaks the fills-truth instead of a fabricated date while a when_full league is still filling", () => {
+      expect(leagueTerms({ ...BASE, startTrigger: "when_full" }).draftAt).toBe("Starts as soon as it fills");
+    });
+
+    it("renders the real date once a when_full league has actually filled — the fill trigger's own kickoff", () => {
+      const full = { ...BASE, startTrigger: "when_full" as const, teamCount: 12, filledTeams: 12 };
+      expect(leagueTerms(full).draftAt).toBe("Saturday 12 September, 11:00 PM UTC (in 3 days)");
+    });
+
+    // Inverted: a `'scheduled'`-trigger league is byte-identical to how this panel has always
+    // rendered it, whether or not it happens to have an open seat.
+    it("never speaks the fills-truth for an ordinary scheduled league, full or not", () => {
+      expect(leagueTerms(BASE).draftAt).toBe("Saturday 12 September, 11:00 PM UTC (in 3 days)");
+      expect(leagueTerms({ ...BASE, teamCount: 12, filledTeams: 12 }).draftAt).toBe(
+        "Saturday 12 September, 11:00 PM UTC (in 3 days)",
+      );
+    });
   });
 });
 

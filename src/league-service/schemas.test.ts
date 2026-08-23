@@ -39,3 +39,31 @@ describe("league and team names are held to the same printable rule as a display
     expect(createLeagueSchema.safeParse({ name: "Sunday Money", teamName: "Renée's Raiders" }).success).toBe(true);
   });
 });
+
+// Phase 3.5, Task 7: the sit-and-go trigger is public-matchmade only.
+describe("startTrigger", () => {
+  it("defaults to 'scheduled', so an ordinary create request is unaffected", () => {
+    const result = createLeagueSchema.safeParse({ name: "Sunday Money" });
+    expect(result.success).toBe(true);
+    expect(result.data?.startTrigger).toBe("scheduled");
+  });
+
+  it("refuses 'when_full' on an invite-only league, naming the field that has to change", () => {
+    const result = createLeagueSchema.safeParse({ name: "Sunday Money", startTrigger: "when_full", visibility: "invite_only" });
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({
+      path: ["startTrigger"],
+      message: "Leagues that start when they fill are public leagues. Make this one public, or pick a draft time.",
+    });
+  });
+
+  it("accepts 'when_full' once the league is also made public", () => {
+    const result = createLeagueSchema.safeParse({ name: "Sunday Money", startTrigger: "when_full", visibility: "public" });
+    expect(result.success).toBe(true);
+  });
+
+  it("never refuses 'scheduled' regardless of visibility", () => {
+    expect(createLeagueSchema.safeParse({ name: "Sunday Money", startTrigger: "scheduled", visibility: "invite_only" }).success).toBe(true);
+    expect(createLeagueSchema.safeParse({ name: "Sunday Money", startTrigger: "scheduled", visibility: "public" }).success).toBe(true);
+  });
+});

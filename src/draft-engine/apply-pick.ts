@@ -1,4 +1,4 @@
-import { rosterFor, type CompletedPick, type DraftState } from "./state";
+import { rosterFor, type CompletedPick, type DraftReduceResult, type DraftState } from "./state";
 import { roundForPick } from "./order";
 import { assignSlot } from "./slotting";
 import { draftedPlayerIds } from "./selectors";
@@ -10,6 +10,13 @@ export interface ApplyPickInput {
   readonly price: number | null;
   readonly auto: boolean;
   readonly timestamp: string;
+  /**
+   * Overrides `state.pickNumber` (Task 5): a redeemed owed pick fills the SLOT the team was
+   * skipped at, never whatever pick is currently on the clock. Absent for every ordinary pick,
+   * where the current pick number IS the one being filled — `redeemOwedPick` below is the one
+   * caller that ever sets it.
+   */
+  readonly pickNumber?: number;
 }
 
 export type ApplyPickResult =
@@ -42,13 +49,14 @@ export function applyPick(state: DraftState, input: ApplyPickInput): ApplyPickRe
   const assignment = assignSlot({ position: entry.position, roster, slotConfig: state.config.slotConfig });
   if (!assignment.ok) return { ok: false, reason: assignment.reason };
 
+  const pickNumber = input.pickNumber ?? state.pickNumber;
   const round =
     state.config.format === "snake"
-      ? roundForPick(state.draftOrder.length, state.pickNumber)
+      ? roundForPick(state.draftOrder.length, pickNumber)
       : state.picks.filter((p) => p.teamId === input.teamId).length + 1;
 
   const pick: CompletedPick = {
-    pickNumber: state.pickNumber,
+    pickNumber,
     round,
     teamId: input.teamId,
     playerId: input.playerId,
@@ -70,4 +78,44 @@ export function applyPick(state: DraftState, input: ApplyPickInput): ApplyPickRe
       },
     },
   };
+}
+
+export interface RedeemOwedPickInput {
+  readonly teamId: string;
+  readonly playerId: string;
+  /** True only when the CATCH-UP clock made this pick, not the owing manager themselves. */
+  readonly auto: boolean;
+  readonly timestamp: string;
+}
+
+/**
+ * Fills the EARLIEST pick number `teamId` was skipped at (FIFO — Task 5's answer to "how do
+ * multiple owed picks order": whichever one they missed first). Delegates to `applyPick` with
+ * that pick number instead of `state.pickNumber`, and drops the redeemed number from
+ * `owedPicks` — removing the team's key entirely once its list is empty, never leaving one
+ * mapped to `[]`, the invariant `hasOwedPicks`/`catchUpTeamId` (`selectors.ts`) both lean on.
+ *
+ * Never touches `pickNumber` or `turnStartedAt`: whether this redemption also settles the
+ * current turn (a catch-up turn resolving) or leaves it alone entirely (redeeming on somebody
+ * else's turn, mid-draft) is `snake.ts`'s call to make, not this function's.
+ */
+export function redeemOwedPick(state: DraftState, input: RedeemOwedPickInput): DraftReduceResult {
+  const owed = state.owedPicks[input.teamId] ?? [];
+  const pickNumber = owed[0];
+  if (pickNumber === undefined) return { ok: false, reason: "This team doesn't owe a pick." };
+  // A friendlier, redemption-specific message: the ordinary "That player has already been
+  // drafted." reads as a race against the CURRENT turn, which this pick is never on.
+  if (draftedPlayerIds(state).has(input.playerId)) {
+    return { ok: false, reason: "Somebody already drafted that player. Pick another." };
+  }
+  const applied = applyPick(state, { teamId: input.teamId, playerId: input.playerId, price: null, auto: input.auto, timestamp: input.timestamp, pickNumber });
+  if (!applied.ok) return applied;
+
+  const remaining = owed.slice(1);
+  const owedPicks =
+    remaining.length === 0
+      ? Object.fromEntries(Object.entries(state.owedPicks).filter(([teamId]) => teamId !== input.teamId))
+      : { ...state.owedPicks, [input.teamId]: remaining };
+
+  return { ok: true, state: { ...applied.state, owedPicks } };
 }

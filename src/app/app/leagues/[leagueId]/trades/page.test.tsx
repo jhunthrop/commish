@@ -28,17 +28,18 @@ const HOME = {
   teamCount: 2,
   rosterSlots: [],
   isCommissioner: false,
-  commissionerUserId: "u2",
+  authority: { kind: "member" as const, userId: "u2" },
   myTeamId: "t1",
   teams: [
     { id: "t1", name: "Bay Bandits", ownerDisplayName: "Ada Lovelace", ownerAvatarUrl: null, ownerUserId: "u1" },
     { id: "t2", name: "Iron Owls", ownerDisplayName: "Grace Hopper", ownerAvatarUrl: null, ownerUserId: "u2" },
   ],
   standings: [],
+  medianGame: false,
   terms: {
     name: "Sunday Money", format: "snake" as const, teamCount: 2, filledTeams: 2, scoringLabel: "PPR",
     rosterLine: "", stakeLabel: "Friendly", stakeDisclosure: "", commissionerName: "Grace Hopper", commissionerAvatar: null,
-    draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
+    draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)", formatNotes: [],
   },
   currentWeek: 5,
   totalWeeks: 14,
@@ -60,6 +61,7 @@ const WEEK_BODY = {
       weekNumber: 5,
       final: false,
       weekStatus: "in_progress" as const,
+      median: null,
       home: {
         teamId: "t1",
         teamName: "Bay Bandits",

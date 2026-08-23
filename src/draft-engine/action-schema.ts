@@ -17,6 +17,29 @@ const poolEntry = z.object({
 });
 
 /**
+ * ABSENT MEANS "NO SKIPPING", not "today's allowance" (final whole-branch review, F3).
+ *
+ * This shipped as `.default(DRAFT_SKIP_POLICY)` — and unlike `minBid` below, where a default is
+ * harmless because a snake draft never reads it and an auction's opening price was the same
+ * number then as now, this one CHANGES WHAT REPLAY PRODUCES. `reduceSnakeExpiry`
+ * (`./snake.ts`) folds a `TIMER_EXPIRE` into either an autopick or a skip depending on this
+ * value, so handing a pre-Task-5 log today's tunable replays a queueless team at a slow tier as
+ * a SKIP where the live draft autopicked — a reconstructed roster that disagrees with the one
+ * actually committed, and a drift that grows every time the tunable is edited.
+ *
+ * `.optional()` sends those legacy rows down the branch `skipEligible` already has for them
+ * (`state.config.skipPolicy ?? null` -> no skip, autopick as before), which was correct and
+ * unreachable until this fix. A log written from here on always carries its own value, so this
+ * branch only ever describes history.
+ */
+const skipPolicy = z
+  .object({
+    maxOwedPerTeam: z.number().int().positive(),
+    appliesAtOrAbovePickSeconds: z.number().int().positive(),
+  })
+  .optional();
+
+/**
  * The persisted-row boundary. `draft_actions.action` is jsonb written by an earlier
  * process (possibly an earlier deploy), so replay validates it rather than trusting it.
  * Unknown `v` values fail loudly instead of being reinterpreted as v1.
@@ -24,7 +47,10 @@ const poolEntry = z.object({
 export const draftActionSchema: z.ZodType<DraftAction> = z.discriminatedUnion("type", [
   // `minBid` defaults for logs persisted before it existed — the one place today's tunable
   // may reach an old draft's replay, and only for those legacy rows (new logs carry it).
-  z.object({ v: version, type: z.literal("START_DRAFT"), timestamp, draftOrder: z.array(teamId).min(2), pool: z.array(poolEntry).min(1), minBid: dollars.default(AUCTION_CONFIG.minBid) }),
+  z.object({
+    v: version, type: z.literal("START_DRAFT"), timestamp, draftOrder: z.array(teamId).min(2), pool: z.array(poolEntry).min(1),
+    minBid: dollars.default(AUCTION_CONFIG.minBid), skipPolicy,
+  }),
   z.object({ v: version, type: z.literal("MAKE_PICK"), timestamp, teamId, playerId }),
   z.object({ v: version, type: z.literal("NOMINATE"), timestamp, teamId, playerId, openingBid: dollars }),
   z.object({ v: version, type: z.literal("BID"), timestamp, teamId, amount: dollars }),

@@ -1,11 +1,11 @@
 import { and, asc, eq } from "drizzle-orm";
 import type { Db, DbTx, ReadonlyDb } from "@/db/client";
-import { drafts, leagues, matchups, players, playerStatLines, scoringSettings } from "@/db/schema";
+import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, weeks } from "@/db/schema";
 import type { Position, StatLine } from "@/domain/player";
 import type { RosterSlotConfig } from "@/domain/roster";
 import { PPR_SCORING } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
-import { startersOf } from "@/league";
+import { leagueMedian, startersOf } from "@/league";
 import { getLineup } from "@/league-service/lineups";
 import { stampSeasonCompleteInTx } from "@/league-service/participation";
 import { scoreLineup, type ScoringRules } from "@/scoring";
@@ -212,6 +212,13 @@ export interface FinalizeWrite {
  * Placed last for the LOCK ORDER too, not only correctness: see that function's own docblock for
  * why a settlement transaction touching `leagues` after `matchups` never inverts against
  * `joinLeagueInTx`'s `leagues FOR UPDATE`.
+ *
+ * PHASE 3.5, TASK 2: one more write sits BETWEEN the matchup loop and the season stamp — the
+ * league median (`leagueMedian`, `@/league/median`), computed from the SAME `scores` map the
+ * matchup loop just wrote and persisted to `weeks.median_score` for leagues with the toggle on.
+ * Ordered there for the identical reason the season stamp is ordered last: a median must never
+ * describe a week whose own scores haven't committed, and the season must never complete from a
+ * state this median hasn't yet caught up to.
  */
 export async function finalizeWeekInTx(tx: DbTx, leagueId: string, weekNumber: number, occurredAt: string): Promise<FinalizeWrite> {
   const week = await tx
@@ -228,6 +235,26 @@ export async function finalizeWeekInTx(tx: DbTx, leagueId: string, weekNumber: n
       .update(matchups)
       .set({ homeScore: requireScore(scores, row.homeTeamId), awayScore: requireScore(scores, row.awayTeamId) })
       .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber), eq(matchups.homeTeamId, row.homeTeamId)));
+  }
+
+  // The median write, AFTER every matchup score for this week and BEFORE the season stamp: a
+  // median can never be written for a week whose scores rolled back, and the season can never be
+  // marked complete from a state this median hasn't yet caught up to. `leagues.id` is what
+  // `matchups.leagueId` (the source of `leagueId`, above) is a NOT NULL foreign key to, so this
+  // row always exists. An OVERWRITE, not a one-way stamp: `correctSettledWeek` re-runs this same
+  // function for an already-settled week, and a median left at its first value would describe a
+  // week that no longer exists — the opposite of `leagues.season_completed_at`'s deliberate
+  // one-way stamp below.
+  //
+  // LOCK ORDER: this UPDATE's own foreign key takes `FOR KEY SHARE` on `leagues[leagueId]` — a
+  // lock this same transaction already holds, via the identical FK the matchup UPDATEs above
+  // took on the same row. No new edge enters the lock order documented in
+  // `src/integrity-service/lock-order.test.ts`; see that file's own note beside
+  // `stampSeasonCompleteInTx`'s entry.
+  const [league] = await tx.select({ medianGame: leagues.medianGame }).from(leagues).where(eq(leagues.id, leagueId));
+  if (league!.medianGame) {
+    const median = leagueMedian([...scores.values()]);
+    await tx.update(weeks).set({ medianScore: median }).where(and(eq(weeks.leagueId, leagueId), eq(weeks.weekNumber, weekNumber)));
   }
 
   await stampSeasonCompleteInTx(tx, leagueId, occurredAt);

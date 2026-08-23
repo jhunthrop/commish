@@ -60,6 +60,47 @@ describe("RoomRail", () => {
     expect(screen.getByText("Picks shorten to 10 minutes in 2h 14m")).toBeInTheDocument();
   });
 
+  it("shows the paused state honestly in place of the countdown, and drops it once picks resume — both themes, axe-clean", async () => {
+    // 3 hours out: well within the freeze right now (real time, not a fake timer — see this
+    // file's own top-of-file note on why).
+    const resumeAt = new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString();
+    await inBothThemes(<RoomRail {...props} view={liveView({ pausedUntil: resumeAt })} myTeamId="t2" />, async ({ container }) => {
+      expect(screen.queryByTestId("countdown")).toBeNull();
+      const message = screen.getByTestId("paused-message");
+      expect(message).toHaveTextContent(/^Picks are paused until \d{1,2}:\d{2} (AM|PM) Eastern\. You can still make yours\.$/);
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("keeps ticking the countdown once pausedUntil is already in the past", () => {
+    // The stale-payload case: an event set `pausedUntil` for a freeze that has since lifted, and
+    // no later event has refreshed it (nothing happened overnight). `now` having already passed
+    // it is what the live room reads, never the field alone.
+    const resumeAt = new Date(Date.now() - 60_000).toISOString();
+    render(<RoomRail {...props} view={liveView({ pausedUntil: resumeAt })} myTeamId="t2" />);
+    expect(screen.queryByTestId("paused-message")).toBeNull();
+    expect(screen.getByTestId("countdown")).toBeInTheDocument();
+  });
+
+  it("never shows the paused message when the view carries no pausedUntil at all", () => {
+    render(<RoomRail {...props} view={liveView({ pausedUntil: null })} myTeamId="t2" />);
+    expect(screen.queryByTestId("paused-message")).toBeNull();
+    expect(screen.getByTestId("countdown")).toBeInTheDocument();
+  });
+
+  // Task 5, Phase 3.5: a plain count, no name — the board's own pending cells and each owing
+  // manager's own dock say WHO; this says only THAT the room is waiting on somebody.
+  it("shows a neutral pending-picks count when the draft owes one, and none when it owes nothing", () => {
+    const { rerender } = render(<RoomRail {...props} view={liveView({ owedPicks: { t1: [1] } })} myTeamId="t2" />);
+    expect(screen.getByTestId("pending-picks")).toHaveTextContent("1 pick pending");
+
+    rerender(<RoomRail {...props} view={liveView({ owedPicks: { t1: [1], t3: [2] } })} myTeamId="t2" />);
+    expect(screen.getByTestId("pending-picks")).toHaveTextContent("2 picks pending");
+
+    rerender(<RoomRail {...props} view={liveView({ owedPicks: {} })} myTeamId="t2" />);
+    expect(screen.queryByTestId("pending-picks")).toBeNull();
+  });
+
   it("carries an InfoTip on the format name and on the on-the-clock label", () => {
     render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
     expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();

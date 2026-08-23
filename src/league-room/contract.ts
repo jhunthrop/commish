@@ -4,7 +4,8 @@ import type { Position } from "@/domain/player";
 import type { RosterSlotConfig, RosterSlotType } from "@/domain/roster";
 import type { TradeFlag, TradeVerdict } from "@/trades/fairness";
 import type { FirstRunPlan } from "@/identity";
-import type { LeagueTerms, NextAction, StandingsRow, WeekStatus } from "@/league";
+import type { LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
+import type { LeagueAuthority } from "@/league-service/authority";
 
 /**
  * TYPES ONLY, no runtime code. Imported by the `/api/leagues/**` routes as their return shape
@@ -39,15 +40,52 @@ export interface LeagueListBody {
  * extra query cost. The PUT route still calls `draftScheduleView` to build its own response —
  * that write path has no server-rendered parent to hand it a prop.
  */
+/**
+ * Task 6 (Phase 3.5): NFFC's Kentucky Derby System. The caller's OWN slot ranking and its
+ * result, never anybody else's — Plan A's notice-privacy reasoning applies to a ranking whole,
+ * because it is a preference a person expressed privately (`slotPreference.ts`'s own docblock).
+ */
+export interface SlotPreferenceView {
+  /** How many draft slots this league has — the league's own `teamCount`, the ceiling every
+   *  ranked slot number must fall within. */
+  readonly slotCount: number;
+  /** 1-based slot numbers, most-wanted first. Empty means "I do not mind" — a real answer, not
+   *  an unset one. */
+  readonly ranking: readonly number[];
+  /** The slot this manager actually drafted from, once the draw has run. `null` before the
+   *  draft starts — there is nothing to report yet. */
+  readonly assignedSlot: number | null;
+  /** True only while the draft is still `scheduled` — the preference window closes at the
+   *  draw, on both start doors (a commissioner's press and the platform's own auto-start). */
+  readonly canEdit: boolean;
+}
+
 export interface DraftScheduleBody {
   readonly draftId: string;
   readonly leagueId: string;
   readonly status: DraftStatus;
-  /** ISO instant. */
+  /** ISO instant. For a `'when_full'` draft that hasn't filled yet, this is a PLACEHOLDER
+   *  (`createLeague`'s own default) rather than a chosen time — `startTrigger` is what a reader
+   *  checks before ever displaying it as a scheduled kickoff (`WaitingRoom`'s own reasoning). */
   readonly kickoffAt: string;
   /** Whether the platform will start this draft on its own if nobody presses the button
    *  (Task 7) — read by the panel to decide whether to say so. */
   readonly isPublicMatchmade: boolean;
+  /**
+   * Phase 3.5, Task 8: which of the two ways this draft's `kickoffAt` comes to be set — the
+   * SAME union `setDraftKickoff`'s own refusal already keys on (`KICKOFF_REFUSALS.whenFull`).
+   * `LeagueHome` reads this to decide which of `WaitingRoom`/`DraftSchedulePanel` renders: the
+   * two never render at once.
+   */
+  readonly startTrigger: "scheduled" | "when_full";
+  /** How many seats are taken right now — the same `count(teams.id)` `filledTeams` means
+   *  everywhere else in this codebase (`LeagueSummary`, `PublicLeagueSummary`). `WaitingRoom`'s
+   *  own fill line reads this; `DraftSchedulePanel` (the `'scheduled'`-trigger case) has no use
+   *  for it and does not render it. */
+  readonly filledTeams: number;
+  /** `null` only for a caller with no team in this league (a commissioner without one of
+   *  their own) — a ranking is scoped to a team, so there is nothing to show them. */
+  readonly slotPreference: SlotPreferenceView | null;
 }
 
 export interface CreateLeagueBody {
@@ -92,10 +130,11 @@ export interface TeamStandingsRow extends StandingsRow {
 /**
  * One league member as the members panel (`LeagueMembersPanel`) renders it: `TeamCard` plus
  * the one raw fact needed to find the commissioner among peers. `ownerUserId` is never shown —
- * it is only ever compared against `LeagueHomeBody.commissionerUserId` to mark the single row
- * that runs the league. That comparison, and the display name and face it sits beside, are
- * fair game inside a league by design: the public-browse contract (Task 6) is the one place
- * commissioner identity stays hidden, and this panel is members-only.
+ * it is only ever compared against `LeagueHomeBody.authority`'s member branch to mark the single
+ * row that runs the league (no row is marked at all in a house league's `authority.kind ===
+ * "house"` case). That comparison, and the display name and face it sits beside, are fair game
+ * inside a league by design: the public-browse contract (Task 6) is the one place commissioner
+ * identity stays hidden, and this panel is members-only.
  */
 export interface LeagueMemberCard extends TeamCard {
   readonly ownerUserId: string;
@@ -157,12 +196,22 @@ export interface LeagueHomeBody {
   readonly teamCount: number;
   readonly rosterSlots: readonly RosterSlotConfig[];
   readonly isCommissioner: boolean;
-  /** The commissioner's raw user id — never rendered on its own, only handed to
-   *  `LeagueMembersPanel` so it can mark the one member who runs the league. */
-  readonly commissionerUserId: string;
+  /** Who runs this league — a named member, or the platform for a house league (Phase 3.5
+   *  addendum, Task 12). Never rendered as raw text on its own: `LeagueMembersPanel` reads the
+   *  member branch's `userId` to mark the one row that runs the league, and reads the `house`
+   *  branch to show "Run by Commish" instead of marking any row at all. */
+  readonly authority: LeagueAuthority;
   readonly myTeamId: string | null;
   readonly teams: readonly LeagueMemberCard[];
   readonly standings: readonly TeamStandingsRow[];
+  /**
+   * Whether this league plays a median game (Task 2) — the same `leagues.median_game` flag
+   * `standings` above already folded into every row's record. `StandingsTable` reads this,
+   * never the rows themselves, to decide whether the record it renders is a two-games-a-week
+   * one: the fold is invisible from a `TeamStandingsRow` alone (it is one `wins`/`losses`/`ties`
+   * tally either way), so the page needs the flag stated, not inferred.
+   */
+  readonly medianGame: boolean;
   /**
    * The SAME `LeagueTerms` the invite preview renders (`InvitePreviewBody`, above), assembled by
    * the SAME pure `leagueTerms` — every member sees this, not just the commissioner: the terms
@@ -204,6 +253,19 @@ export interface MatchupSide {
   readonly bench: readonly MatchupLineupEntry[];
 }
 
+/**
+ * One week's league median, as `matchupWeek` (`@/league-service/read.ts`) computes it for a
+ * single matchup: the median score itself, plus each side's own result against it
+ * (`medianResultFor`, `@/league/median`) — the SAME three-way split (win/loss/tie) the
+ * head-to-head score already gets, just against the league's middle score instead of an
+ * opponent.
+ */
+export interface MatchupMedian {
+  readonly score: number;
+  readonly homeResult: MedianResult;
+  readonly awayResult: MedianResult;
+}
+
 export interface MatchupDetail {
   readonly weekNumber: number;
   readonly home: MatchupSide;
@@ -211,6 +273,13 @@ export interface MatchupDetail {
   /** True once the settlement write has happened — see `MatchupSummary.final`'s docblock. */
   readonly final: boolean;
   readonly weekStatus: WeekStatus;
+  /**
+   * `null` for a non-median league (the toggle is off), and `null` for a median league whose
+   * week hasn't settled yet — the same "no median yet" state a week with no scores reads as.
+   * Read from `weeks.median_score` (Task 2), never recomputed here: `finalizeWeekInTx` already
+   * derived it once, in the transaction that scored these same matchups.
+   */
+  readonly median: MatchupMedian | null;
 }
 
 export interface MatchupWeekBody {

@@ -174,6 +174,17 @@ describe("NOTICE_TEMPLATES", () => {
     expect(started.body).not.toContain("There is no reply to this message.");
   });
 
+  it("says what happened when a pick is skipped instead of penalized, verbatim (Task 5, Phase 3.5)", () => {
+    const skipped = renderNotice("draft_pick_skipped", NOTICE_SAMPLES.draft_pick_skipped);
+    expect(skipped.title).toBe("Your pick passed in Sunday Money");
+    expect(skipped.body).toBe("Your pick passed while you were away. You can still make it, and the draft will wait for it before it finishes.");
+    // A courtesy, not a sanction: nothing about this manager's own conduct to appeal.
+    expect(skipped.body).not.toContain("There is no reply to this message.");
+    // The whole point of a skip is that the pick is still theirs — never "missed", the same
+    // failure mode `lineup_auto_set`'s own copy avoids.
+    expect(skipped.body).not.toContain("missed");
+  });
+
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
@@ -182,6 +193,9 @@ describe("NOTICE_TEMPLATES", () => {
       "chat_message_removed",
       "draft_auto_picked",
       "draft_auto_started",
+      "draft_fill_triggered",
+      "draft_pick_skipped",
+      "house_league_filled",
       "lineup_auto_set",
       "operator_warning",
       "review_removed",
@@ -199,15 +213,25 @@ describe("NOTICE_TEMPLATES", () => {
   });
 
   /**
-   * Task 10's own requirement: `outcome` is a closed three-clause union, never a free string, so
-   * this notice's copy sweep covers every sentence it can actually produce rather than the one
-   * sample `NOTICE_SAMPLES` carries.
+   * Task 10's own requirement, extended by Phase 3.5 Task 2's fix round 1 (F1): `outcome` is a
+   * closed union, never a free string, so this notice's copy sweep covers every sentence it can
+   * actually produce rather than the one sample `NOTICE_SAMPLES` carries — the original three
+   * matchup-only clauses, and the nine median-aware ones that name both games' movement.
    */
-  it("says what happened for every one of the three fixed outcome clauses, all copy-clean", () => {
+  it("says what happened for every one of the twelve fixed outcome clauses, all copy-clean", () => {
     const outcomes: readonly StatWeekCorrectionOutcome[] = [
       "your matchup result stays the same",
       "that turns your matchup into a win",
       "that turns your matchup into a loss",
+      "your matchup result stays the same, and so does your median result",
+      "your matchup result stays the same, but that turns your median result into a win",
+      "your matchup result stays the same, but that turns your median result into a loss",
+      "that turns your matchup into a win, but your median result stays the same",
+      "that turns your matchup into a win, and that also turns your median result into a win",
+      "that turns your matchup into a win, but that turns your median result into a loss",
+      "that turns your matchup into a loss, but your median result stays the same",
+      "that turns your matchup into a loss, but that turns your median result into a win",
+      "that turns your matchup into a loss, and that also turns your median result into a loss",
     ];
     for (const outcome of outcomes) {
       const notice = renderNotice("stat_week_corrected", { leagueName: "Sunday Money", week: 3, points: 84.2, outcome });

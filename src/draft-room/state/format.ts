@@ -1,25 +1,11 @@
 import type { Tightening } from "@/draft-engine";
 import type { RosterSlotConfig } from "@/domain/roster";
-import { MS_PER_SECOND, MINUTES_PER_HOUR, SECONDS_PER_HOUR, SECONDS_PER_MINUTE, formatClockLength, plural } from "@/domain/duration";
-import { DRAFT_ROOM_CONFIG } from "./config";
+import { UI_CONFIG } from "@/components/ui/config";
+import { MINUTES_PER_HOUR, MS_PER_SECOND, formatClockLength, plural } from "@/domain/duration";
 
 export { formatClockLength };
 
-const MS_PER_MINUTE = MS_PER_SECOND * SECONDS_PER_MINUTE;
-const MS_PER_HOUR = MS_PER_MINUTE * MINUTES_PER_HOUR;
-
-function pad(value: number): string {
-  return value.toString().padStart(2, "0");
-}
-
-/** "0:09", "2:05", "1:04:09". Clamped at zero — a passed deadline reads 0:00, never negative. */
-export function formatCountdown(msRemaining: number): string {
-  const total = Math.max(0, Math.ceil(msRemaining / MS_PER_SECOND));
-  const hours = Math.floor(total / SECONDS_PER_HOUR);
-  const minutes = Math.floor((total % SECONDS_PER_HOUR) / SECONDS_PER_MINUTE);
-  const seconds = total % SECONDS_PER_MINUTE;
-  return hours > 0 ? `${hours}:${pad(minutes)}:${pad(seconds)}` : `${minutes}:${pad(seconds)}`;
-}
+const MS_PER_MINUTE = 60_000;
 
 /** A coarse distance: "2h 14m", "14m", "under a minute". */
 export function formatGap(ms: number): string {
@@ -31,27 +17,38 @@ export function formatGap(ms: number): string {
 }
 
 /**
- * A coarse, rarely-changing summary of time remaining — "About 8 hours left", "About 2 minutes
- * left", "Under a minute left" — for a screen-reader `aria-live` region paired with
- * `Countdown`'s (`aria-hidden`) ticking digits. Rounds to the nearest whole minute or hour, so
- * it updates on a boundary crossing rather than every second; the boundaries themselves are
- * `DRAFT_ROOM_CONFIG.coarseRemainingMinuteMs` / `coarseRemainingHourMs`, not inline literals.
- */
-export function formatCoarseRemaining(msRemaining: number): string {
-  const remaining = Math.max(0, msRemaining);
-  if (remaining < DRAFT_ROOM_CONFIG.coarseRemainingMinuteMs) return "Under a minute left";
-  if (remaining < DRAFT_ROOM_CONFIG.coarseRemainingHourMs) return `About ${plural(Math.round(remaining / MS_PER_MINUTE), "minute")} left`;
-  return `About ${plural(Math.round(remaining / MS_PER_HOUR), "hour")} left`;
-}
-
-/**
  * "Picks shorten to 10 minutes in 2h 14m" — the auto-tightening clock made visible, which is
  * the only thing that turns it from an engine feature into a product feature. `nowMs` is
  * supplied by the caller (from `useNow`), never read here.
+ *
+ * `pausedUntil` is `DraftClockView.pausedUntil` (Task 4's overnight freeze) — when the room is
+ * currently paused and the schedule's own tightening threshold would otherwise fall before the
+ * freeze lifts, the gap shown is to the RESUME instant instead. This engine cannot import
+ * `@/draft-engine`'s own `deadlineAfter` to compute that properly (client room code goes
+ * through the HTTP/SSE boundary only — `eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`), so
+ * this is deliberately the coarser fix available from data the room already has on `view`
+ * rather than an un-routable import: an ETA landing IN the freeze is corrected to the instant
+ * right after it, not silently left to undercount a six-hour freeze.
  */
-export function formatTightening(next: Tightening | null, nowMs: number): string | null {
+export function formatTightening(next: Tightening | null, nowMs: number, pausedUntil: string | null = null): string | null {
   if (next === null) return null;
-  return `Picks shorten to ${formatClockLength(next.pickSeconds)} in ${formatGap(Date.parse(next.at) - nowMs)}`;
+  const at = pausedUntil !== null && Date.parse(next.at) < Date.parse(pausedUntil) ? pausedUntil : next.at;
+  return `Picks shorten to ${formatClockLength(next.pickSeconds)} in ${formatGap(Date.parse(at) - nowMs)}`;
+}
+
+/**
+ * "Picks are paused until 5:00 AM Eastern. You can still make yours." — Task 4's overnight
+ * freeze, worded so nobody reads a frozen countdown as a stalled connection. `resumeAt` is
+ * `DraftClockView.pausedUntil`; this only FORMATS it, it never decides whether the room is
+ * paused (that live check is `RoomRail`'s own `now < Date.parse(pausedUntil)`, since a payload's
+ * `pausedUntil` is only ever fresh as of the event that carried it, and the room keeps ticking
+ * after that).
+ */
+export function formatPausedUntil(resumeAt: string): string {
+  const clock = new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "numeric", minute: "2-digit", hour12: true }).format(
+    new Date(resumeAt),
+  );
+  return `Picks are paused until ${clock} Eastern. You can still make yours.`;
 }
 
 /**
@@ -73,16 +70,32 @@ export function rosterSpots(slotConfig: readonly RosterSlotConfig[]): number {
  * Null when there is nothing to say: a spectator with no team, or a team the lookahead does
  * not reach (a long rotation, or a draft that isn't running). A sub-minute wait reads "any
  * moment" rather than a duration rounded away to nothing — against the same one-minute floor
- * `formatCoarseRemaining` uses, from the same config value rather than a second literal.
+ * `@/components/ui/countdown`'s own `formatCoarseRemaining` uses, from the SAME
+ * `UI_CONFIG.countdown.coarseRemainingMinuteMs` rather than a second literal, so the two
+ * "under a minute"/"any moment" cutoffs can never drift apart.
+ *
+ * `pausedUntil` is `DraftClockView.pausedUntil` (Task 4's overnight freeze). The flat
+ * `picksAway * clockSeconds` estimate below already assumes every intervening turn runs its
+ * full, un-paused length — an assumption a six-hour freeze breaks outright, and an ETA that
+ * ignores it is worse than no ETA at all. Rather than projecting through the freeze (this room
+ * cannot value-import `@/draft-engine`'s own `deadlineAfter` — see `formatTightening`'s
+ * docblock for the same boundary), a currently-paused room gets the honest, qualitative answer
+ * instead of a wrong number.
  */
-export function formatYourTurn(upcoming: readonly string[], myTeamId: string | null, clockSeconds: number | null): string | null {
+export function formatYourTurn(
+  upcoming: readonly string[],
+  myTeamId: string | null,
+  clockSeconds: number | null,
+  pausedUntil: string | null = null,
+): string | null {
   if (myTeamId === null) return null;
   const picksAway = upcoming.indexOf(myTeamId);
   if (picksAway < 0) return null;
   if (picksAway === 0) return "You're on the clock.";
   const picks = plural(picksAway, "pick");
   if (clockSeconds === null) return `You're up in ${picks}.`;
+  if (pausedUntil !== null) return `You're up in ${picks}, once picks resume.`;
   const waitMs = picksAway * clockSeconds * MS_PER_SECOND;
-  const wait = waitMs < DRAFT_ROOM_CONFIG.coarseRemainingMinuteMs ? "any moment" : `~${formatGap(waitMs)}`;
+  const wait = waitMs < UI_CONFIG.countdown.coarseRemainingMinuteMs ? "any moment" : `~${formatGap(waitMs)}`;
   return `You're up in ${picks} (${wait}).`;
 }

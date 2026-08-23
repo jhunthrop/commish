@@ -2,6 +2,7 @@ import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { fail } from "@/lib/api/respond";
 import { requireLeagueMember, resolveLeagueMembership } from "@/lib/leagues/membership";
+import { HOUSE_AUTHORITY_REFUSALS, type LeagueAuthority } from "@/league-service/authority";
 
 export interface LeagueRouteContext {
   readonly params: Promise<{ readonly leagueId: string }>;
@@ -13,6 +14,10 @@ export interface LeagueActor {
   /** The caller's team in this league, or null if they don't have one. */
   readonly teamId: string | null;
   readonly isCommissioner: boolean;
+  /** Who runs this league — a member or the platform. `withCommissioner` reads this to tell a
+   *  house league's "there is no commissioner seat" apart from an ordinary member's "you aren't
+   *  the commissioner". */
+  readonly authority: LeagueAuthority;
 }
 
 type LeagueHandler = (actor: LeagueActor, request: Request) => Promise<Response>;
@@ -65,14 +70,23 @@ export async function withLeagueMemberActor(
   });
 }
 
-/** Commissioner-only routes: minting an invite, and scoring a week. */
+/**
+ * Commissioner-only routes: minting an invite, and scoring a week. A house league answers with
+ * `HOUSE_AUTHORITY_REFUSALS.invite` instead of the ordinary 403 — ruling 32 refuses rather than
+ * routing to the operator console, and the refusal is true (a house league genuinely has no
+ * commissioner seat) rather than the ordinary sentence about a commissioner who simply isn't the
+ * caller.
+ */
 export async function withCommissioner(
   request: Request,
   context: LeagueRouteContext,
   handler: LeagueHandler,
 ): Promise<Response> {
   return withLeagueActor(request, context, async (actor, req) => {
-    if (!actor.isCommissioner) return fail("Only the commissioner can do that.", 403);
+    if (!actor.isCommissioner) {
+      const reason = actor.authority.kind === "house" ? HOUSE_AUTHORITY_REFUSALS.invite : "Only the commissioner can do that.";
+      return fail(reason, 403);
+    }
     return handler(actor, req);
   });
 }

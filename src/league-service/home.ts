@@ -1,10 +1,11 @@
 import { inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { matchups, statWeeks } from "@/db/schema";
+import { matchups, statWeeks, weeks } from "@/db/schema";
 import { computeStandings, LEAGUE_CONFIG, nextAction, seasonProgress, type WeekStatus } from "@/league";
 import type { HomeBody, HomeLeagueCard, MatchupSummary } from "@/league-room/contract";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import type { ScoreCache, ScoreCacheBatchRequest } from "@/stats-pipeline/score-cache";
+import { isCommissionerOf } from "./authority";
 import { myLeaguesOverview, toSummary } from "./read";
 
 /** No Redis connection needed: every existing caller of `crossLeagueHome` keeps working
@@ -32,12 +33,14 @@ function cachedPoints(scores: readonly { readonly teamId: string; readonly point
  *
  * Extends `myLeaguesOverview` (`./read.ts`) rather than re-querying membership its own way — the
  * league/team/draft rows are the SAME shared read `listLeaguesForUser` uses, so the two can never
- * quietly disagree about which leagues a user is in. Two more queries cover everything else: the
- * matchups across every one of those leagues, and the `stat_weeks` rows for the distinct current
- * weeks among them (usually just one, since Phase 1's calendar is shared across leagues). That is
- * five queries total — `myLeaguesOverview`'s three, plus these two — however many leagues the
- * caller is in, ten or fifty: the query-count discipline `listLeaguesForUser`'s own docblock
- * commits to, extended rather than re-earned.
+ * quietly disagree about which leagues a user is in. Three more queries cover everything else:
+ * the matchups across every one of those leagues, the `weeks` rows across every one of them too
+ * (their stored medians, for a league with the Task 2 toggle on — a per-league query inside the
+ * standings loop below would be exactly the N+1 the data-layer rules forbid), and the
+ * `stat_weeks` rows for the distinct current weeks among them (usually just one, since Phase 1's
+ * calendar is shared across leagues). That is six queries total — `myLeaguesOverview`'s three,
+ * plus these three — however many leagues the caller is in, ten or fifty: the query-count
+ * discipline `listLeaguesForUser`'s own docblock commits to, extended rather than re-earned.
  *
  * The one live read is a single `MGET` (`ScoreCache.readMany`) across every league whose current
  * week is `in_progress` — never one `GET` per league. A cache miss (including "never written",
@@ -70,6 +73,20 @@ export async function crossLeagueHome(
     else bucket.push(row);
   }
 
+  // Every league's stored medians, in ONE grouped query before the per-league loop below reads
+  // them — never a per-league query inside that loop, which is exactly the N+1 the data-layer
+  // rules forbid. A week absent here (unsettled, or a league with the toggle off) simply
+  // contributes no median entry, the same "absent means no second result" `computeStandings`
+  // already treats a half-scored matchup with.
+  const allWeeks = await db.select({ leagueId: weeks.leagueId, weekNumber: weeks.weekNumber, medianScore: weeks.medianScore }).from(weeks).where(inArray(weeks.leagueId, ids));
+  const medianByWeekByLeague = new Map<string, Map<number, number>>();
+  for (const row of allWeeks) {
+    if (row.medianScore === null) continue;
+    const bucket = medianByWeekByLeague.get(row.leagueId) ?? new Map<number, number>();
+    bucket.set(row.weekNumber, row.medianScore);
+    medianByWeekByLeague.set(row.leagueId, bucket);
+  }
+
   interface LeaguePhase {
     readonly currentWeek: number;
     readonly myTeamId: string | null;
@@ -88,7 +105,11 @@ export async function crossLeagueHome(
     const mine = leagueMatchups.find(
       (row) => row.weekNumber === currentWeek && (row.homeTeamId === myTeamId || row.awayTeamId === myTeamId),
     );
-    const standings = computeStandings({ teamIds: leagueTeams.map((row) => row.id), matchups: leagueMatchups });
+    const standings = computeStandings({
+      teamIds: leagueTeams.map((row) => row.id),
+      matchups: leagueMatchups,
+      medianByWeek: medianByWeekByLeague.get(league.id),
+    });
     const myStanding = myTeamId === null ? undefined : standings.find((row) => row.teamId === myTeamId);
     const record = myStanding === undefined ? null : { wins: myStanding.wins, losses: myStanding.losses, ties: myStanding.ties };
     phaseByLeague.set(league.id, { currentWeek, myTeamId, nameById, mine, record });
@@ -140,7 +161,7 @@ export async function crossLeagueHome(
       format: league.format,
       teamCount: league.teamCount,
       filledTeams,
-      isCommissioner: league.commissionerUserId === userId,
+      isCommissioner: isCommissionerOf(league, userId),
       myTeamId: phase.myTeamId,
       draftId: draft?.id ?? null,
       draftStatus: draft?.status ?? null,
@@ -149,7 +170,7 @@ export async function crossLeagueHome(
       weekStatus,
       matchup,
       nextAction: nextAction({
-        isCommissioner: league.commissionerUserId === userId,
+        isCommissioner: isCommissionerOf(league, userId),
         filledTeams,
         teamCount: league.teamCount,
         myTeamId: phase.myTeamId,

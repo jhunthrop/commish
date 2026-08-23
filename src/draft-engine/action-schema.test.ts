@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DRAFT_QUEUE_CONFIG, PERSISTED_QUEUE_MAX } from "./config";
+import { DRAFT_QUEUE_CONFIG, DRAFT_SKIP_POLICY, PERSISTED_QUEUE_MAX } from "./config";
 import { clientDraftActionSchema, clientQueueSchema, draftActionSchema, toDraftAction, toSetQueueAction } from "./action-schema";
 
 describe("draftActionSchema (persisted jsonb boundary)", () => {
@@ -11,12 +11,29 @@ describe("draftActionSchema (persisted jsonb boundary)", () => {
   it("accepts a v1 START_DRAFT row with its order and pool", () => {
     const row = {
       v: 1,
+      type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY,
+      timestamp: "2026-09-01T00:00:00.000Z",
+      draftOrder: ["t1", "t2"],
+      pool: [{ playerId: "p1", position: "QB" }],
+    };
+    expect(draftActionSchema.parse(row)).toEqual(row);
+  });
+
+  it("leaves a persisted START_DRAFT row with no skipPolicy WITHOUT one, rather than handing an old draft today's allowance", () => {
+    // Final whole-branch review, F3. This used to assert the opposite — that a pre-Task-5 row
+    // parsed to `DRAFT_SKIP_POLICY` — which is exactly the drift: `reduceSnakeExpiry` folds a
+    // `TIMER_EXPIRE` into an autopick or a skip depending on this value, so defaulting it
+    // replayed a draft that autopicked as one that skipped, and changed the reconstructed roster.
+    // The replay proof itself lives in `replay.test.ts` ("a pre-Task-5 log autopicks").
+    const row = {
+      v: 1,
       type: "START_DRAFT", minBid: 1,
       timestamp: "2026-09-01T00:00:00.000Z",
       draftOrder: ["t1", "t2"],
       pool: [{ playerId: "p1", position: "QB" }],
     };
     expect(draftActionSchema.parse(row)).toEqual(row);
+    expect(draftActionSchema.parse(row)).not.toHaveProperty("skipPolicy");
   });
 
   it("accepts a v1 SET_QUEUE row", () => {

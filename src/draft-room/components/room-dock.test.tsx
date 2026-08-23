@@ -31,6 +31,21 @@ describe("RoomDock", () => {
     });
   });
 
+  // Task 4 fix round 1 (review F1): `RoomDock`'s call into `formatYourTurn` dropped
+  // `view.pausedUntil` entirely, so a paused draft showed the flat, understated ETA instead of
+  // the honest "once picks resume" copy — this pair pins both sides of that wire-up.
+  it("gives the honest 'once picks resume' answer instead of a flat ETA while the room is paused", () => {
+    const view: DraftStateView = { ...SNAKE_VIEW, ...waiting, pausedUntil: "2026-09-15T09:00:00.000Z" };
+    render(<RoomDock {...props} view={view} />);
+    expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("You're up in 2 picks, once picks resume.");
+  });
+
+  it("keeps the flat ETA when the room isn't paused", () => {
+    const view: DraftStateView = { ...SNAKE_VIEW, ...waiting, pausedUntil: null };
+    render(<RoomDock {...props} view={view} />);
+    expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("You're up in 2 picks (~16h 0m).");
+  });
+
   it("morphs its left edge into one button that drafts the top of the queue", () => {
     const onAct = vi.fn();
     render(<RoomDock {...props} canAct onAct={onAct} />);
@@ -99,6 +114,31 @@ describe("RoomDock", () => {
     expect(screen.queryByTestId("dock-your-turn")).toBeNull();
     // The queue is still there: a bid war is exactly when you re-plan the next three picks.
     expect(screen.getByRole("list", { name: "Your queue" })).toBeInTheDocument();
+  });
+
+  // Task 5, Phase 3.5: the skip's own courtesy. `canAct` stays false (it's genuinely t2's
+  // turn), so this pins that the owed-pick message fires off a DIFFERENT signal (owedPicks)
+  // than the ordinary turn check.
+  it("tells the owing manager their pick passed and they can still make it, even on somebody else's turn", () => {
+    const view: DraftStateView = { ...SNAKE_VIEW, ...waiting, owedPicks: { t1: [1] } };
+    render(<RoomDock {...props} view={view} canAct={false} />);
+    expect(screen.getByTestId("dock-owed-pick")).toHaveTextContent("Your pick passed while you were away. Make it whenever you are ready.");
+    // No accusation, no blame voice — the integrity notices discipline applies to this copy too.
+    expect(screen.queryByText(/missed|failed/i)).toBeNull();
+  });
+
+  it("says nothing about an owed pick that belongs to somebody else", () => {
+    const view: DraftStateView = { ...SNAKE_VIEW, ...waiting, owedPicks: { t2: [1] } };
+    render(<RoomDock {...props} view={view} canAct={false} />);
+    expect(screen.queryByTestId("dock-owed-pick")).toBeNull();
+    expect(screen.getByTestId("dock-your-turn")).toBeInTheDocument();
+  });
+
+  it("puts the real, current turn ahead of an owed-pick courtesy when both are true at once", () => {
+    const view: DraftStateView = { ...SNAKE_VIEW, owedPicks: { t1: [1] } };
+    render(<RoomDock {...props} view={view} canAct queue={[]} />);
+    expect(screen.getByTestId("dock-primary-empty")).toHaveTextContent("Your pick. Take somebody from the pool.");
+    expect(screen.queryByTestId("dock-owed-pick")).toBeNull();
   });
 
   it("never strikes a queued player through before the draft has started", () => {

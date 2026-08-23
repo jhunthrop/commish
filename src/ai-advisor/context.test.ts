@@ -1,9 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
+import { drafts, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
 import { ADVISOR_CONFIG } from "@/domain/advisor";
+import { createLeague } from "@/league-service/creation";
+import { writeSchedule } from "@/league-service/schedule";
+import { finalizeWeek } from "@/stats-pipeline/finalize";
 import { assembleAdvisorContext, valuePlayers } from "./context";
 import { advisorFixture } from "@/league-service/test-support";
+
+const ADVISOR_SLOTS = [{ slot: "QB" as const, count: 1, eligiblePositions: ["QB" as const] }];
 
 const db: Db = createTestDb();
 
@@ -67,6 +74,91 @@ describe("assembleAdvisorContext", () => {
 
   it("returns null for a league that doesn't exist", async () => {
     expect(await assembleAdvisorContext(db, { leagueId: "nope", teamId: "nope", weekNumber: 1 })).toBeNull();
+  });
+
+  /**
+   * Fix round 1 (F2): the median-record fix (`formatTeamRecord`/`computeStandings`, above) folded
+   * its `weeks` read into the SAME query `matchups` already ran (a `leftJoin`, not a second round
+   * trip) rather than adding one — this pins that at ZERO added queries, not merely "some bounded
+   * number." Real stakes: `assembleAdvisorContext` is called TWICE per action on both the trade
+   * propose path (`league-service/trades.ts`) and the accept-time fairness re-check
+   * (`integrity-service/trade-fairness.ts`), so a silent extra read here is a silent extra FOUR
+   * round trips on those paths. Six: `leagues`, `scoring_settings`, `teams`, the joined `matchups`
+   * (median included), `player_stat_lines`, `players` — plus two more per team fielded
+   * (`getLineup`'s own `lineup_slots` and, absent a saved lineup, `roster_slots`) — `advisorFixture`
+   * saves no lineup for either team and has an opponent, so `me` and `opponent` each cost 2.
+   */
+  it("costs a bounded, MEASURED number of queries — the weeks read rides the matchups query, not a new one", async () => {
+    const fixture = await advisorFixture(db, "ppr");
+    const counting = countingDb(db);
+    const context = await assembleAdvisorContext(counting.db, { ...fixture, weekNumber: 4 });
+    expect(context).not.toBeNull();
+    expect(counting.selectCount()).toBe(10);
+    // And the fold is real, not a coincidence of this fixture's own shape: `weeks` is reached
+    // through a JOIN clause on the matchups query, never as its own standalone FROM — zero
+    // queries whose own FROM table is `weeks`, exactly one query whose JOIN names it.
+    expect(counting.queriesMatching(/from "weeks"/i)).toBe(0);
+    expect(counting.queriesMatching(/join "weeks"/i)).toBe(1);
+  });
+});
+
+describe("assembleAdvisorContext — the record", () => {
+  const clock = { now: () => "2026-08-17T12:00:00.000Z" };
+  let nextId = 0;
+  const newId = () => `id_rec_${++nextId}`;
+
+  /** Two teams, one QB slot each, a week-1 stat line per quarterback, and the median toggle the
+   *  caller asks for — enough for `finalizeWeek` to produce a real, scored record. */
+  async function twoTeamLeague(medianGame: boolean) {
+    await db.insert(users).values([
+      { id: "u_rec1", email: "u_rec1@test.local", displayName: "Manager 1" },
+      { id: "u_rec2", email: "u_rec2@test.local", displayName: "Manager 2" },
+    ]);
+    const created = await createLeague({ db, clock, newId }, {
+      name: "Record League", format: "snake", teamCount: 2, scoringPreset: "ppr", auctionBudget: null,
+      rosterSlots: ADVISOR_SLOTS, owner: { kind: "member", userId: "u_rec1", teamName: "Team One" },
+      experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false, medianGame,
+    });
+    if (!created.ok) throw new Error(created.reason);
+    const teamId = created.teamId;
+    if (teamId === null) throw new Error("expected a team id");
+    await db.insert(teams).values({ id: "team_rec2", leagueId: created.leagueId, userId: "u_rec2", name: "Team Two" });
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
+    await db.insert(players).values([
+      { id: "qb_rec1", name: "QB One", position: "QB", nflTeam: "KC" },
+      { id: "qb_rec2", name: "QB Two", position: "QB", nflTeam: "SF" },
+    ]);
+    await db.insert(playerStatLines).values([
+      { playerId: "qb_rec1", week: 1, passingYards: 300, passingTouchdowns: 3 },
+      { playerId: "qb_rec2", week: 1, passingYards: 100, passingTouchdowns: 0 },
+    ]);
+    await db.insert(rosterSlots).values([
+      { teamId, slot: "QB", slotIndex: 0, playerId: "qb_rec1" },
+      { teamId: "team_rec2", slot: "QB", slotIndex: 0, playerId: "qb_rec2" },
+    ]);
+    await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [teamId, "team_rec2"], weeks: 1 }));
+    return { leagueId: created.leagueId, teamId, opponentTeamId: "team_rec2" };
+  }
+
+  it("reports the SAME record the standings page would, off finished matchups", async () => {
+    const league = await twoTeamLeague(false);
+    await finalizeWeek(db, league.leagueId, 1);
+    const context = await assembleAdvisorContext(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 2 });
+    expect(context!.me.record).toBe("1-0");
+    const opponentContext = await assembleAdvisorContext(db, { leagueId: league.leagueId, teamId: league.opponentTeamId, weekNumber: 2 });
+    expect(opponentContext!.me.record).toBe("0-1");
+  });
+
+  it("folds the league median's own result into the record for a league with the toggle on", async () => {
+    // Two teams, so the median is the average of both scores: the head-to-head winner also
+    // clears it and the loser also misses it, doubling both records rather than leaving them
+    // exactly where the head-to-head-only computation used to freeze them.
+    const league = await twoTeamLeague(true);
+    await finalizeWeek(db, league.leagueId, 1);
+    const context = await assembleAdvisorContext(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 2 });
+    expect(context!.me.record).toBe("2-0");
+    const opponentContext = await assembleAdvisorContext(db, { leagueId: league.leagueId, teamId: league.opponentTeamId, weekNumber: 2 });
+    expect(opponentContext!.me.record).toBe("0-2");
   });
 });
 

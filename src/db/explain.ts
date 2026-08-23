@@ -15,6 +15,10 @@ export interface PlanNode {
    *  wall-clock time. `planCost` reads the root node's, which is the estimate for the plan
    *  as a whole. */
   readonly "Total Cost": number;
+  /** Present only on a `Sort`/`Incremental Sort` node — the expressions it actually sorts by, as
+   *  Postgres prints them. The one field that pins WHAT a sort node sorts on, not merely THAT one
+   *  exists (`nodeTypes` alone can't tell a seats-remaining sort from a `created_at` one). */
+  readonly "Sort Key"?: readonly string[];
   readonly Plans?: readonly PlanNode[];
 }
 

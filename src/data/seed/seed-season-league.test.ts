@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, beforeEach, afterAll, vi } from "vitest";
 import { eq } from "drizzle-orm";
 import { createTestDb, truncateAll, TEST_DATABASE_URL } from "@/db/test-db";
-import { leagues, matchups, rosterSlots, teams, users } from "@/db/schema";
+import { leagues, matchups, rosterSlots, teams, users, weeks } from "@/db/schema";
 import { createMockStatsProvider } from "@/stats/mock/mock-stats-provider";
 import { totalRosterSlots } from "@/draft-engine";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
@@ -12,7 +12,7 @@ import { participationTierFor } from "@/participation/tier";
 import { DEV_SEED } from "./config";
 import { ensureDevUsers } from "./dev-users";
 import { seedPlayers } from "./seed-players";
-import { seedSeasonLeague, VETERAN_SEASON_LEAGUES } from "./seed-season-league";
+import { MEDIAN_DEMO_LEAGUE, seedSeasonLeague, VETERAN_SEASON_LEAGUES } from "./seed-season-league";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-17T12:00:00.000Z" };
@@ -144,6 +144,50 @@ describe("VETERAN_SEASON_LEAGUES (Phase 3 Plan D, Task 10, Step 1)", () => {
     // primary league only.
     for (const index of [7, 8, 9, 10, 11]) {
       expect(await completedSeasonsFor(db, ownerIds[index]!)).toBe(1);
+    }
+  });
+});
+
+describe("MEDIAN_DEMO_LEAGUE (Phase 3.5, Task 10)", () => {
+  it("threads medianGame onto the league row and produces a real second (median) result every week", async () => {
+    const counts = await seedSeasonLeague(db, clock, undefined, MEDIAN_DEMO_LEAGUE);
+    expect(counts.scoredWeeks).toBe(LEAGUE_CONFIG.regularSeasonWeeks);
+
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, MEDIAN_DEMO_LEAGUE.leagueId));
+    expect(league?.medianGame).toBe(true);
+
+    const teamRows = await db.select().from(teams).where(eq(teams.leagueId, MEDIAN_DEMO_LEAGUE.leagueId));
+    expect(teamRows).toHaveLength(4);
+
+    const matchupRows = await db.select().from(matchups).where(eq(matchups.leagueId, MEDIAN_DEMO_LEAGUE.leagueId));
+    // The real stored medians (`weeks.median_score`, written by `finalizeWeekInTx`'s own median
+    // branch) — never recomputed here, the same read `leagueStandings` (`@/league-service/home.ts`)
+    // itself performs before folding them into `computeStandings`.
+    const weekRows = await db.select().from(weeks).where(eq(weeks.leagueId, MEDIAN_DEMO_LEAGUE.leagueId));
+    const medianByWeek = new Map(weekRows.filter((row) => row.medianScore !== null).map((row) => [row.weekNumber, row.medianScore!]));
+    expect(medianByWeek.size).toBe(LEAGUE_CONFIG.regularSeasonWeeks);
+
+    const standings = computeStandings({ teamIds: teamRows.map((row) => row.id), matchups: matchupRows, medianByWeek });
+    const games = standings.reduce((sum, row) => sum + row.wins + row.losses + row.ties, 0);
+    // Two games a week (head-to-head plus the median game) for every one of the 4 teams — a real
+    // second result folded into the SAME wins/losses/ties `computeStandings` already produces.
+    expect(games).toBe(LEAGUE_CONFIG.regularSeasonWeeks * 2 * teamRows.length);
+  });
+
+  it("stays disjoint from VETERAN_SEASON_LEAGUES' own indices, never pushing a rookie-snake identity over the cutoff", async () => {
+    for (const config of [DEV_SEED.season, ...VETERAN_SEASON_LEAGUES, MEDIAN_DEMO_LEAGUE]) {
+      await seedSeasonLeague(db, clock, undefined, config);
+    }
+
+    const ownerIds = await ensureDevUsers(db);
+    for (const index of [1, 2, 3, 4, 5, 6]) {
+      const seasons = await completedSeasonsFor(db, ownerIds[index]!);
+      expect(seasons).toBeLessThan(INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    }
+    // 7-9 sit in `DEV_SEED.season` AND `MEDIAN_DEMO_LEAGUE` — two completed seasons, still safely
+    // under the cutoff.
+    for (const index of [7, 8, 9]) {
+      expect(await completedSeasonsFor(db, ownerIds[index]!)).toBe(2);
     }
   });
 });

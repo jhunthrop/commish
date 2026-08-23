@@ -26,6 +26,7 @@ const TERMS: LeagueTerms = {
   commissionerName: "Alex Rivera",
   commissionerAvatar: null,
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
+  formatNotes: [],
 };
 
 async function renderPage(deps: Parameters<typeof LeagueRoomDepsProvider>[0]["deps"]) {

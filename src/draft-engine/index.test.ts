@@ -56,5 +56,7 @@ describe("the draft-engine public barrel", () => {
     expect(engine.nudgeDeadline).toBeTypeOf("function");
     expect(engine.clientQueueSchema).toBeDefined();
     expect(engine.toSetQueueAction).toBeTypeOf("function");
+    expect(engine.DRAFT_PAUSE_WINDOW).toBeDefined();
+    expect(engine.isPaused).toBeTypeOf("function");
   });
 });

@@ -32,6 +32,7 @@ const WEEK_BODY: MatchupWeekBody = {
       weekNumber: 5,
       final: false,
       weekStatus: "in_progress",
+      median: null,
       home: { teamId: "t1", teamName: "Bay Bandits", score: 12, starters: [], bench: [] },
       away: { teamId: "t2", teamName: "Iron Owls", score: 9, starters: [], bench: [] },
     },

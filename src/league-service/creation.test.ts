@@ -7,9 +7,10 @@ import { PPR_SCORING } from "@/domain/scoring";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { LEAGUE_CONFIG } from "@/league";
+import { SUPERFLEX_ROSTER_SLOTS } from "@/league/roster-shape";
 import { ENFORCEMENT_REFUSALS } from "./enforcement";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
-import { createLeague, type CreateLeagueInput } from "./creation";
+import { createLeague, type CreateLeagueInput, type LeagueOwner } from "./creation";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-17T12:00:00.000Z" };
@@ -20,6 +21,12 @@ const deps = (cache?: Pick<ReferenceCache, "invalidateScoringSettings">) => ({ d
 let counter = 0;
 const logger = createAuditLogger({ newId: () => `evt_${(counter += 1)}` });
 
+const MEMBER_OWNER: LeagueOwner = { kind: "member", userId: "u1", teamName: "Dana's Team" };
+
+function memberOwner(userId: string, teamName = "Dana's Team"): LeagueOwner {
+  return { kind: "member", userId, teamName };
+}
+
 function validInput(): CreateLeagueInput {
   return {
     name: "Sunday Money",
@@ -28,8 +35,7 @@ function validInput(): CreateLeagueInput {
     scoringPreset: "ppr",
     auctionBudget: null,
     rosterSlots: STANDARD_ROSTER_SLOTS,
-    commissionerUserId: "u1",
-    teamName: "Dana's Team",
+    owner: MEMBER_OWNER,
     experienceTier: "beginner",
     stakeTier: 0,
     isPublicMatchmade: false,
@@ -79,8 +85,7 @@ describe("createLeague", () => {
       scoringPreset: "ppr",
       auctionBudget: null,
       rosterSlots: STANDARD_ROSTER_SLOTS,
-      commissionerUserId: "u1",
-      teamName: "Dana's Team",
+      owner: memberOwner("u1"),
       experienceTier: "beginner",
       stakeTier: 0,
       isPublicMatchmade: false,
@@ -89,7 +94,7 @@ describe("createLeague", () => {
     if (!result.ok) return;
 
     const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
-    expect(league).toMatchObject({ name: "Sunday Money", format: "snake", teamCount: 12, commissionerUserId: "u1" });
+    expect(league).toMatchObject({ name: "Sunday Money", format: "snake", teamCount: 12, commissionerUserId: "u1", houseRung: null });
     expect(league!.rosterSlots).toEqual(STANDARD_ROSTER_SLOTS);
 
     const [settings] = await db.select().from(scoringSettings).where(eq(scoringSettings.leagueId, result.leagueId));
@@ -128,7 +133,7 @@ describe("createLeague", () => {
   it("carries the auction budget through for an auction league", async () => {
     const result = await createLeague(deps(), {
       name: "Auction Night", format: "auction", teamCount: 10, scoringPreset: "te_premium",
-      auctionBudget: 200, rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Dana's Team",
+      auctionBudget: 200, rosterSlots: STANDARD_ROSTER_SLOTS, owner: memberOwner("u1"),
       experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
     });
     if (!result.ok) throw new Error(result.reason);
@@ -142,7 +147,7 @@ describe("createLeague", () => {
     try {
       const result = await createLeague(deps(), {
         name: "Ghost League", format: "snake", teamCount: 12, scoringPreset: "ppr", auctionBudget: null,
-        rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "nobody", teamName: "Ghost",
+        rosterSlots: STANDARD_ROSTER_SLOTS, owner: memberOwner("nobody", "Ghost"),
         experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
       });
       expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't create that league. Please try again." });
@@ -157,7 +162,7 @@ describe("createLeague", () => {
     const cache = recordingReferenceCache();
     const result = await createLeague(deps(cache), {
       name: "Sunday Money", format: "snake", teamCount: LEAGUE_CONFIG.defaults.teamCount, scoringPreset: "ppr",
-      auctionBudget: null, rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Dana's Team",
+      auctionBudget: null, rosterSlots: STANDARD_ROSTER_SLOTS, owner: memberOwner("u1"),
       experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
     });
     expect(result.ok).toBe(true);
@@ -176,7 +181,7 @@ describe("createLeague", () => {
       };
       const result = await createLeague(deps(failingCache), {
         name: "Cache Outage League", format: "snake", teamCount: LEAGUE_CONFIG.defaults.teamCount, scoringPreset: "ppr",
-        auctionBudget: null, rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "u1", teamName: "Dana's Team",
+        auctionBudget: null, rosterSlots: STANDARD_ROSTER_SLOTS, owner: memberOwner("u1"),
         experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
       });
       expect(result.ok).toBe(true);
@@ -196,7 +201,7 @@ describe("createLeague", () => {
     try {
       const result = await createLeague(deps(cache), {
         name: "Ghost League", format: "snake", teamCount: 12, scoringPreset: "ppr", auctionBudget: null,
-        rosterSlots: STANDARD_ROSTER_SLOTS, commissionerUserId: "nobody", teamName: "Ghost",
+        rosterSlots: STANDARD_ROSTER_SLOTS, owner: memberOwner("nobody", "Ghost"),
         experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
       });
       expect(result.ok).toBe(false);
@@ -214,8 +219,7 @@ describe("createLeague", () => {
       scoringPreset: "ppr",
       auctionBudget: 200,
       rosterSlots: STANDARD_ROSTER_SLOTS,
-      commissionerUserId: "u1",
-      teamName: "Dana's Team",
+      owner: memberOwner("u1"),
       experienceTier: "experienced",
       stakeTier: 2,
       isPublicMatchmade: true,
@@ -227,6 +231,23 @@ describe("createLeague", () => {
     expect(league).toMatchObject({ experienceTier: "experienced", stakeTier: 2, isPublicMatchmade: true });
   });
 
+  // Phase 3.5, Task 7: the sit-and-go trigger's own column.
+  it("defaults the draft's start trigger to 'scheduled', unaffected for every existing caller", async () => {
+    const result = await createLeague(deps(), validInput());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const [draft] = await db.select().from(drafts).where(eq(drafts.id, result.draftId));
+    expect(draft!.startTrigger).toBe("scheduled");
+  });
+
+  it("writes 'when_full' straight through when the caller asks for it", async () => {
+    const result = await createLeague(deps(), { ...validInput(), isPublicMatchmade: true, startTrigger: "when_full" });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const [draft] = await db.select().from(drafts).where(eq(drafts.id, result.draftId));
+    expect(draft!.startTrigger).toBe("when_full");
+  });
+
   it("keeps a league private and unlisted unless it is created public on purpose", async () => {
     const result = await createLeague(deps(), {
       name: "Group Chat Only",
@@ -235,8 +256,7 @@ describe("createLeague", () => {
       scoringPreset: "ppr",
       auctionBudget: null,
       rosterSlots: STANDARD_ROSTER_SLOTS,
-      commissionerUserId: "u1",
-      teamName: "Dana's Team",
+      owner: memberOwner("u1"),
       experienceTier: "beginner",
       stakeTier: 0,
       isPublicMatchmade: false,
@@ -258,13 +278,13 @@ describe("createLeague", () => {
     expect(rows[0]).toMatchObject({
       eventType: "league_created",
       sequence: 1,
-      actorId: validInput().commissionerUserId,
+      actorId: MEMBER_OWNER.userId,
       actorType: "user",
       leagueId: result.leagueId,
     });
     expect(rows[0]!.payload).toEqual({
       name: "Sunday Money", format: "snake", teamCount: 12, stakeTier: 0,
-      isPublicMatchmade: false, experienceTier: "beginner", scoringPreset: "ppr",
+      isPublicMatchmade: false, experienceTier: "beginner", scoringPreset: "ppr", medianGame: false,
     });
     expect(rows[0]!.occurredAt.toISOString()).toBe(clock.now());
   });
@@ -292,7 +312,7 @@ describe("createLeague", () => {
       await giveCompletedSeasons("u_vet", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
       const result = await createLeague(deps(), {
         ...validInput(),
-        commissionerUserId: "u_vet",
+        owner: memberOwner("u_vet"),
         isPublicMatchmade: true,
         experienceTier: "beginner",
       });
@@ -303,7 +323,7 @@ describe("createLeague", () => {
       await giveCompletedSeasons("u_vet2", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
       const privateResult = await createLeague(deps(), {
         ...validInput(),
-        commissionerUserId: "u_vet2",
+        owner: memberOwner("u_vet2"),
         isPublicMatchmade: false,
         experienceTier: "beginner",
       });
@@ -311,7 +331,7 @@ describe("createLeague", () => {
 
       const publicExperienced = await createLeague(deps(), {
         ...validInput(),
-        commissionerUserId: "u_vet2",
+        owner: memberOwner("u_vet2"),
         isPublicMatchmade: true,
         experienceTier: "experienced",
       });
@@ -321,7 +341,7 @@ describe("createLeague", () => {
     it("does not gate a newcomer creating the identical public, beginner-declared league", async () => {
       const result = await createLeague(deps(), {
         ...validInput(),
-        commissionerUserId: "u1",
+        owner: memberOwner("u1"),
         isPublicMatchmade: true,
         experienceTier: "beginner",
       });
@@ -333,7 +353,7 @@ describe("createLeague", () => {
       const before = await db.select().from(leagues);
       const result = await createLeague({ db, clock, newId, audit: logger }, {
         ...validInput(),
-        commissionerUserId: "u_vet3",
+        owner: memberOwner("u_vet3"),
         isPublicMatchmade: true,
         experienceTier: "beginner",
       });
@@ -350,7 +370,7 @@ describe("createLeague", () => {
       try {
         const result = await createLeague(deps(), {
           ...validInput(),
-          commissionerUserId: "u_vet4",
+          owner: memberOwner("u_vet4"),
           isPublicMatchmade: true,
           experienceTier: "beginner",
         });
@@ -358,6 +378,88 @@ describe("createLeague", () => {
       } finally {
         config.enforceTierSegregation = original;
       }
+    });
+  });
+
+  describe("roster shape resolution (Task 1, superflex)", () => {
+    it("resolves a named shape to its rows when no explicit rosterSlots are given", async () => {
+      const result = await createLeague(deps(), {
+        ...validInput(),
+        rosterSlots: undefined,
+        rosterShape: "superflex",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
+      expect(league!.rosterSlots).toEqual(SUPERFLEX_ROSTER_SLOTS);
+    });
+
+    it("falls back to the configured default shape when neither rosterSlots nor rosterShape is given", async () => {
+      const result = await createLeague(deps(), {
+        ...validInput(),
+        rosterSlots: undefined,
+        rosterShape: undefined,
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
+      expect(league!.rosterSlots).toEqual(STANDARD_ROSTER_SLOTS);
+    });
+
+    it("still prefers explicit rosterSlots over a rosterShape given alongside it", async () => {
+      const result = await createLeague(deps(), {
+        ...validInput(),
+        rosterSlots: STANDARD_ROSTER_SLOTS,
+        rosterShape: "superflex",
+      });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
+      expect(league!.rosterSlots).toEqual(STANDARD_ROSTER_SLOTS);
+    });
+  });
+
+  // Phase 3.5 addendum, Task 13, Step 3: "createLeague learns that a league can have no owner."
+  // `writeLeagueInTx`'s house branch is what `spawnHouseLeagueInTx` (`./house-factory.ts`) calls
+  // from inside the reconciler's own transaction; these tests exercise the identical branch
+  // straight through the public `createLeague` entry point, which is the one place a caller who
+  // is not the reconciler could reach it — and the one place the coverage gate on this directory
+  // (`vitest.config.ts`, gate 17) can see it exercised without a house-catalog fixture.
+  describe("a house owner (Task 13)", () => {
+    function houseInput(): CreateLeagueInput {
+      return { ...validInput(), owner: { kind: "house", rung: "open_12" }, isPublicMatchmade: true };
+    }
+
+    it("writes commissioner_user_id null and house_rung set, and seats no team at all", async () => {
+      const result = await createLeague(deps(), houseInput());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.teamId).toBeNull();
+
+      const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
+      expect(league).toMatchObject({ commissionerUserId: null, houseRung: "open_12" });
+
+      const teamRows = await db.select().from(teams).where(eq(teams.leagueId, result.leagueId));
+      expect(teamRows).toHaveLength(0);
+    });
+
+    it("skips the creation-side tier gate entirely — there is no userId for it to check", async () => {
+      // A veteran-only precondition over a self-declared tier has nothing to ask when nobody
+      // declared it as themselves (ruling 39) — this proves the house branch never even reaches
+      // `tierJoinPrecondition`, by using the identical beginner-tier, public shape the member
+      // test above refuses, and getting `ok: true` instead.
+      await giveCompletedSeasons("u_vet_house", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+      const result = await createLeague(deps(), { ...houseInput(), experienceTier: "beginner" });
+      expect(result).toMatchObject({ ok: true });
+    });
+
+    it("records the league_created event as system-authored, with no actor", async () => {
+      const result = await createLeague({ db, clock, newId, audit: logger }, houseInput());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      const rows = await db.select().from(auditEvents).where(eq(auditEvents.chainScope, result.leagueId));
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ eventType: "league_created", actorId: null, actorType: "system" });
     });
   });
 });

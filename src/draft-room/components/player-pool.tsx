@@ -17,6 +17,12 @@ export interface PlayerPoolProps {
   readonly pendingPlayerId: string | null;
   /** True only when the server says it is this user's turn to act. */
   readonly canAct: boolean;
+  /**
+   * The caller's own team, or null when watching. Task 5's own use: a team that owes a pick may
+   * make it any time, whether or not `canAct` (this team's REAL current turn) is also true — the
+   * Draft button lives on their turn and off it.
+   */
+  readonly myTeamId: string | null;
   /** "Draft" for snake, "Nominate" for auction. */
   readonly actionLabel: string;
   readonly submitting: boolean;
@@ -74,9 +80,13 @@ function PositionFilters({ value, onChange }: { readonly value: string; readonly
  * The star is the queue toggle; the button beside it is the act. Both are real, named
  * controls, so the whole pool is walkable from the keyboard.
  */
-export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel, submitting, onAct, queuedPlayerIds, onQueue }: PlayerPoolProps) {
+export function PlayerPool({ players, view, pendingPlayerId, canAct, myTeamId, actionLabel, submitting, onAct, queuedPlayerIds, onQueue }: PlayerPoolProps) {
   const [query, setQuery] = useState("");
   const [position, setPosition] = useState(ALL);
+  // Task 5: a team that owes a pick may make it any time, so the row-level Draft button below
+  // is live for them even when `canAct` (this team's REAL current turn) is false.
+  const owesPick = myTeamId !== null && (view.owedPicks?.[myTeamId]?.length ?? 0) > 0;
+  const canDraft = canAct || owesPick;
   // A live pool's one job is "who can I take" — drafted names hide unless asked for.
   const [showDrafted, setShowDrafted] = useState(false);
 
@@ -151,9 +161,11 @@ export function PlayerPool({ players, view, pendingPlayerId, canAct, actionLabel
                   <span className="shrink-0 text-text-muted">—</span>
                 ) : row.drafted ? (
                   <Badge tone="neutral">Drafted</Badge>
-                ) : canAct ? (
-                  // Picking mode: the act button exists only while it is genuinely your turn.
-                  // While waiting, the star is the action — a disabled "Draft" would be a lie-in-waiting.
+                ) : canDraft ? (
+                  // Picking mode: the act button exists while it is genuinely your turn, OR
+                  // (Task 5) while you owe a pick from an earlier skip — live on your turn and
+                  // off it. While neither is true, the star is the action — a disabled "Draft"
+                  // would be a lie-in-waiting.
                   <Button
                     size="sm"
                     loading={submitting && pendingPlayerId === row.player.id}

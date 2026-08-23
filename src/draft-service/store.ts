@@ -7,8 +7,10 @@ import type { Clock } from "@/domain/timing";
 import {
   admitCommand,
   AUCTION_CONFIG,
+  DRAFT_SKIP_POLICY,
   draftActionSchema,
   draftEventsFor,
+  newlySkippedPick,
   reduceDraft,
   replayDraft,
   type DraftState,
@@ -25,6 +27,7 @@ import { createKeyedMutex } from "./mutex";
 import { draftOrderFor } from "./order";
 import { buildDraftPool } from "./pool";
 import { loadDraftConfig } from "./setup";
+import { slotPreferencesFor } from "./slot-preference";
 
 export type { PublishFn } from "@/lib/realtime/publish";
 
@@ -89,9 +92,32 @@ export interface StartDraftOptions {
   readonly auto?: boolean;
 }
 
+/**
+ * An action to apply, or HOW TO BUILD ONE once this store's transaction already holds the draft's
+ * row lock (final whole-branch review, F9).
+ *
+ * Every action in this product is a plain value: a pick, a bid, a queue edit — a decision already
+ * made by the time it reaches the store, with nothing left to read. `START_DRAFT` is the one
+ * exception, and it is the exception for a reason worth stating rather than working around.
+ * Its `draftOrder` is the OUTPUT of a draw (`draftOrderFor`, `./order`) over every team's saved
+ * slot ranking, and ruling 27 makes that output the snapshot the log carries forever. Read outside
+ * the transaction, that draw is decided against a `draft_slot_preferences` table a concurrent
+ * `setSlotPreference` can still write to before the lock is taken — the racing write then commits,
+ * answers `ok: true`, and changes nothing, because the draw that would have read it already ran.
+ * A function here lets the ONE action with a read in it take that read under the SAME
+ * `drafts FOR UPDATE` the append itself commits under, which is what makes `setSlotPreference`'s
+ * own status re-check honest: a preference that lands first is drawn from, and one that arrives
+ * second blocks on the lock and is then refused against a draft that has already started.
+ *
+ * Deliberately NOT a general "revise the action" hook. It runs exactly where a plain action would
+ * have been consumed — after the row locks, before `admitCommand` — so every guard, every
+ * reducer and the persisted row itself see one action, built once.
+ */
+export type DraftActionSource = DraftAction | ((tx: DbTx) => Promise<DraftAction>);
+
 export interface DraftStore {
   getDraftState(draftId: string): Promise<DraftState | null>;
-  applyAction(draftId: string, action: DraftAction, options?: ApplyOptions): Promise<ApplyResult>;
+  applyAction(draftId: string, action: DraftActionSource, options?: ApplyOptions): Promise<ApplyResult>;
   invalidate(draftId: string): void;
   startDraft(draftId: string, options?: StartDraftOptions): Promise<ApplyResult>;
   commitDraftResults(draftId: string): Promise<CommitResult>;
@@ -173,6 +199,29 @@ async function autopickNoticeContext(
 }
 
 /**
+ * Task 5's own version of the query above, for the ONE thing a skip's notice needs that an
+ * autopick's doesn't: no player, because a skip is precisely the transition where nobody was
+ * chosen. Guarded the identical way `autopickNoticeContext` is — a lookup failure here must
+ * never turn an already-decided skip into a rolled-back transaction over a notification nicety.
+ */
+async function skipNoticeContext(tx: DbTx, teamId: string): Promise<{ readonly userId: string; readonly leagueName: string } | undefined> {
+  const [row] = await tx
+    .select({ userId: teams.userId, leagueName: leagues.name })
+    .from(teams)
+    .innerJoin(leagues, eq(leagues.id, teams.leagueId))
+    .where(eq(teams.id, teamId));
+  return row;
+}
+
+/**
+ * `draft_pick_skipped`'s league-wide (never seen — `SYSTEM_ACTION_VISIBILITY` is `subject_only`)
+ * audit summary, the same "product copy lives where the copy sweeps can find it" discipline
+ * `DRAFT_AUTO_STARTED_SUMMARY` and `LINEUP_AUTO_SET_SUMMARY` (`@/league-service/auto-lineup`)
+ * both keep.
+ */
+export const DRAFT_PICK_SKIPPED_SUMMARY = "A manager's pick passed while they were away, and the draft moved on.";
+
+/**
  * The durable draft session store.
  *
  * The `draft_actions` log is the source of truth; `cache` is only a materialization of it,
@@ -239,7 +288,7 @@ export function createDraftStore({
       cache.delete(draftId);
     },
 
-    async applyAction(draftId, action, options?: ApplyOptions) {
+    async applyAction(draftId, source, options?: ApplyOptions) {
       return mutex.run(draftId, async (): Promise<ApplyResult> => {
         // `previous` is captured out of the transaction so `broadcast` (which must run AFTER
         // the commit, because publishing is best-effort and must never fail a committed write)
@@ -253,10 +302,54 @@ export function createDraftStore({
         // there rather than re-derived here for the same reason `previous` is: the before-state
         // this transition is judged against only exists inside the transaction.
         let completedLeagueId: string | null = null;
+        // The action this call actually applied — captured out of the transaction for the same
+        // reason `previous` is, because a `DraftActionSource` function only resolves to a value
+        // INSIDE it, and `broadcast` (which must run after the commit) diffs against it.
+        let applied: DraftAction | null = null;
         const createdNotices: MemberNotice[] = [];
 
         try {
           const outcome = await db.transaction(async (tx): Promise<ApplyResult> => {
+            /**
+             * THE LEAGUE ROW, FIRST, AS ITS OWN STATEMENT (final whole-branch review, F1 — a
+             * cycle reproduced with real `psql` sessions, SQLSTATE 40P01).
+             *
+             * This transaction was NEVER a leaf, and the docblock below used to claim it was.
+             * Its autopick/skip notices insert into `member_notices`, and `commitDraftState`
+             * inserts `draft_picks`/`roster_slots`/`matchups` — every one of those statements
+             * takes an implicit `FOR KEY SHARE` on the `leagues` row through its own foreign key,
+             * and `FOR KEY SHARE` conflicts with `FOR UPDATE`. So the true order was
+             * drafts-then-leagues, while `joinLeagueInTx` (`@/league-service/join`) holds
+             * `leagues FOR UPDATE` and then reaches `drafts` through `fireWhenFullInTx`'s
+             * `UPDATE drafts SET kickoff_at`. Two transactions, two orders, one cycle — and
+             * Postgres resolves a cycle by killing somebody's draft pick or somebody's join.
+             *
+             * THE GLOBAL RULE this branch now holds everywhere (stated in full in
+             * `setDraftKickoff`'s own docblock, `@/league-service/draft-schedule`): ANY
+             * TRANSACTION THAT TAKES BOTH A `leagues` ROW LOCK AND A `drafts` ROW LOCK ACQUIRES
+             * `leagues` FIRST, AS ITS OWN STATEMENT.
+             *
+             * `FOR KEY SHARE`, not `FOR UPDATE`, and the weaker mode is the point: it is EXACTLY
+             * the lock this transaction's own FK-carrying inserts take later anyway, so acquiring
+             * it up front reorders nothing and strengthens nothing. Escalating to `FOR UPDATE`
+             * here would be a genuine regression — `proposeTrade` (`@/league-service/trades`)
+             * holds `teams FOR UPDATE` and then takes `leagues FOR KEY SHARE` through its own
+             * notice insert, which coexists with this lock today and would start deadlocking
+             * against `commitDraftState`'s `teams FOR KEY SHARE` the moment this row went
+             * exclusive.
+             *
+             * `FOR KEY SHARE OF leagues` scopes the lock to the one row despite the join: the
+             * `drafts` row is only READ here (reading is not locking), and it is locked by the
+             * statement below, in the fixed order.
+             */
+            const [league] = await tx
+              .select({ id: leagues.id })
+              .from(leagues)
+              .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
+              .where(eq(drafts.id, draftId))
+              .for("key share", { of: leagues });
+            if (league === undefined) return { ok: false, reason: "That draft doesn't exist." };
+
             /**
              * THE CROSS-INSTANCE LOCK. Every accepted action for this draft passes through this
              * one row, so "replay the action log" becomes the single-writer path across any
@@ -269,9 +362,8 @@ export function createDraftStore({
              * exactly the property transaction pooling requires and exactly the trap the spec
              * warns about. See docs/decisions/data-layer-hardening.md.
              *
-             * Lock order: this is a leaf. `joinLeagueInTx` takes `league_invites` then `leagues`;
-             * nothing takes `drafts` before either of those, and this function takes nothing
-             * after `drafts`, so no cycle exists.
+             * Lock order: `leagues` (above) then `drafts` then the audit anchor, the same order
+             * `joinLeagueInTx` and `setDraftKickoff` take, so no cycle exists.
              */
             const [locked] = await tx.select({ id: drafts.id }).from(drafts).where(eq(drafts.id, draftId)).for("update");
             if (locked === undefined) return { ok: false, reason: "That draft doesn't exist." };
@@ -281,6 +373,14 @@ export function createDraftStore({
             const state = await load(draftId, tx);
             if (state === null) return { ok: false, reason: "That draft doesn't exist." };
             previous = state;
+
+            // THE ACTION, RESOLVED UNDER THE LOCK (final review F9 — see `DraftActionSource`).
+            // For every action but `START_DRAFT` this is the value the caller already handed in;
+            // for `START_DRAFT` it is the slot-preference draw, run here rather than out in
+            // `startDraft` so a `setSlotPreference` racing it either lands before the draw reads
+            // it or is refused against a draft that has already started.
+            const action = typeof source === "function" ? await source(tx) : source;
+            applied = action;
 
             // Command-time preconditions — the tunable-reading guards the reducer must not own,
             // because it also runs on replay.
@@ -353,6 +453,28 @@ export function createDraftStore({
               pending.push({ notice, pickIndex: i });
             }
 
+            // Task 5's own telling: a skip records no PICK at all (`picked` above is built from
+            // the picks diff, which a skip never grows), so it needs its own notice rather than
+            // riding the `pending` loop above. `newlySkippedPick` diffs the owed-picks before and
+            // after — the identical diff `draftEventsFor`'s `skipped` flag reads, so the two can
+            // never disagree about which transition this was.
+            const skip = newlySkippedPick(state, result.state);
+            let skipNotice: { readonly notice: MemberNotice; readonly userId: string } | null = null;
+            if (skip !== null) {
+              const context = await skipNoticeContext(tx, skip.teamId);
+              if (context !== undefined) {
+                const notice = await notifyAffectedMember(tx, {
+                  leagueId: result.state.config.leagueId,
+                  userId: context.userId,
+                  noticeType: "draft_pick_skipped",
+                  context: { leagueName: context.leagueName },
+                  occurredAt: action.timestamp,
+                  auditEventId: null,
+                });
+                skipNotice = { notice, userId: context.userId };
+              }
+            }
+
             if (options?.alsoInTransaction !== undefined) {
               const extraNotices = await options.alsoInTransaction(tx);
               if (extraNotices !== undefined) createdNotices.push(...extraNotices);
@@ -382,6 +504,21 @@ export function createDraftStore({
             for (const { notice, pickIndex } of pending) {
               createdNotices.push(await attachAuditEvent(tx, notice, pickedEvents[pickIndex]!.eventId));
             }
+            if (skipNotice !== null) {
+              // `subjectUserId` is what makes this event meaningful under `subject_only`
+              // visibility (`SYSTEM_ACTION_VISIBILITY.draft_pick_skipped`, `@/integrity/system-
+              // actions`) — the identical shape `lineup_auto_set`'s own write uses
+              // (`@/league-service/auto-lineup`).
+              const skipEvent = await audit.record(tx, {
+                eventType: "system_action",
+                actorId: null,
+                actorType: "system",
+                leagueId: result.state.config.leagueId,
+                payload: { action: "draft_pick_skipped", subjectUserId: skipNotice.userId, pickNumber: skip!.pickNumber, summary: DRAFT_PICK_SKIPPED_SUMMARY },
+                occurredAt: action.timestamp,
+              });
+              createdNotices.push(await attachAuditEvent(tx, skipNotice.notice, skipEvent.eventId));
+            }
             return { ok: true, state: result.state };
           });
 
@@ -394,7 +531,7 @@ export function createDraftStore({
           }
 
           cache.set(draftId, outcome.state);
-          if (previous !== null) await broadcast(previous, outcome.state, action);
+          if (previous !== null && applied !== null) await broadcast(previous, outcome.state, applied);
           // THE MULTI-ACCOUNT SWEEP'S SECOND TRIGGER (final review, HIGH 2), after the commit for
           // the same reason `broadcast` is: this transaction has just released `drafts` FOR
           // UPDATE, and the sweep appends to the PLATFORM chain — a third lock, on an anchor row,
@@ -465,16 +602,29 @@ export function createDraftStore({
       const now = clock.now();
       return store.applyAction(
         draftId,
-        {
+        // A `DraftActionSource` FUNCTION, not a value (final whole-branch review, F9). The only
+        // read left inside this action is Task 6's slot-preference draw, and it now happens under
+        // the `drafts FOR UPDATE` this same transaction takes — see `DraftActionSource`'s own
+        // docblock for the dead write that closed. Everything else here is already decided.
+        async (tx) => ({
           v: DRAFT_ACTION_VERSION,
           type: "START_DRAFT",
           timestamp: now,
-          draftOrder: draftOrderFor(draftId, teamRows.map((t) => t.id)),
+          // Task 6: NFFC's Kentucky Derby System. The draw's OUTPUT is what rides the persisted
+          // action from here on (`draftOrder` itself), so replay never re-reads this table and a
+          // preference saved after this instant can never change history (ruling 27 — see
+          // `draft_slot_preferences`'s own docblock in `@/db/schema`). What F9 changed is only
+          // WHEN the input is read, never that the output is a snapshot.
+          draftOrder: draftOrderFor(draftId, teamRows.map((t) => t.id), await slotPreferencesFor(tx, draftId)),
           pool,
           // Command time is the ONE place the tunable is read — it rides the persisted
           // action from here on, so replay never consults AUCTION_CONFIG.
           minBid: AUCTION_CONFIG.minBid,
-        },
+          // Task 5's identical discipline: the skip-and-owe allowance rides the action from
+          // here on, so a later deploy that changes `DRAFT_SKIP_POLICY` can never change what
+          // an already-persisted TIMER_EXPIRE did on replay.
+          skipPolicy: DRAFT_SKIP_POLICY,
+        }),
         {
           alsoInTransaction: async (tx) => {
             // `claimAutoStart` (`./auto-start.ts`), not a plain `UPDATE`: one start implementation

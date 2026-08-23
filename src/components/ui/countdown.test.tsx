@@ -1,11 +1,16 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, renderHook, screen, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
-import { inBothThemes } from "@/components/ui/test-utils";
-import { useCountdown, Countdown } from "./countdown";
+import { inBothThemes } from "./test-utils";
+import { UI_CONFIG } from "./config";
+import { useCountdown, Countdown, formatCountdown, formatCoarseRemaining, formatCoarseDuration } from "./countdown";
+
+vi.mock("@/design/use-reduced-motion", () => ({ usePrefersReducedMotion: vi.fn(() => false) }));
+import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.mocked(usePrefersReducedMotion).mockReturnValue(false);
 });
 
 describe("useCountdown", () => {
@@ -44,6 +49,24 @@ describe("useCountdown", () => {
     const { result } = renderHook(() => useCountdown("2026-09-01T00:00:12.000Z"));
     expect(result.current.now).toBe(Date.now());
   });
+
+  // Phase 3.5, Task 8: the reduced-motion branch — a real one, not a cosmetic no-op. The
+  // countdown stays correct at any tick rate; it simply refreshes less often.
+  it("ticks less often once the caller prefers reduced motion, and still agrees on the answer", () => {
+    vi.mocked(usePrefersReducedMotion).mockReturnValue(true);
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-09-01T00:00:00.000Z"));
+    const { result } = renderHook(() => useCountdown("2026-09-01T00:10:00.000Z"));
+    expect(result.current.remainingMs).toBe(10 * 60_000);
+
+    // A tick well under the reduced-motion interval leaves `now` — and so `remainingMs` — unmoved.
+    act(() => void vi.advanceTimersByTime(UI_CONFIG.countdown.tickMs * 2));
+    expect(result.current.remainingMs).toBe(10 * 60_000);
+
+    // The interval itself only fires once the FULL reduced-motion interval has elapsed since mount.
+    act(() => void vi.advanceTimersByTime(UI_CONFIG.countdown.reducedMotionTickMs - UI_CONFIG.countdown.tickMs * 2));
+    expect(result.current.remainingMs).toBe(10 * 60_000 - UI_CONFIG.countdown.reducedMotionTickMs);
+  });
 });
 
 describe("Countdown", () => {
@@ -75,5 +98,52 @@ describe("Countdown", () => {
 
     rerender(<Countdown remainingMs={5_000} />);
     expect(screen.getByText("Under a minute left")).toBeInTheDocument();
+  });
+});
+
+describe("formatCountdown", () => {
+  it.each([
+    [0, "0:00"],
+    [-5_000, "0:00"],
+    [9_400, "0:10"],
+    [125_000, "2:05"],
+    [3_849_000, "1:04:09"],
+  ])("renders %i ms as %s", (ms, expected) => {
+    expect(formatCountdown(ms)).toBe(expected);
+  });
+});
+
+describe("formatCoarseDuration", () => {
+  it.each([
+    [0, "under a minute"],
+    [-5_000, "under a minute"],
+    [59_000, "under a minute"],
+    [60_000, "1 minute"],
+    [125_000, "2 minutes"],
+    [3_599_999, "60 minutes"],
+    [3_600_000, "1 hour"],
+    [8 * 3_600_000, "8 hours"],
+  ])("renders %i ms as %s", (ms, expected) => {
+    expect(formatCoarseDuration(ms)).toBe(expected);
+  });
+});
+
+describe("formatCoarseRemaining", () => {
+  it.each([
+    [0, "Under a minute left"],
+    [-5_000, "Under a minute left"],
+    [59_000, "Under a minute left"],
+    [60_000, "About 1 minute left"],
+    [125_000, "About 2 minutes left"],
+    [3_599_999, "About 60 minutes left"],
+    [3_600_000, "About 1 hour left"],
+    [8 * 3_600_000, "About 8 hours left"],
+  ])("renders %i ms as %s", (ms, expected) => {
+    expect(formatCoarseRemaining(ms)).toBe(expected);
+  });
+
+  it("rounds rather than truncates, so it agrees with what a human would say", () => {
+    // 89 999 ms is 1.4999... minutes — rounds down to "1 minute", not up to "2".
+    expect(formatCoarseRemaining(89_999)).toBe("About 1 minute left");
   });
 });

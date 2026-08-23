@@ -3,9 +3,11 @@
 import { useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { CreateLeagueBody } from "../contract";
-import { Button, Input, Select } from "@/components/ui";
+import { Button, InfoTip, Input, Select } from "@/components/ui";
+import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
-import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import type { HelpLevel } from "@/identity/preferences";
+import { MATCHMAKING_CONFIG, SIT_AND_GO_GRACE_MINUTES } from "@/matchmaking/config";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
 const FORMATS = [
@@ -13,16 +15,41 @@ const FORMATS = [
   { value: "auction", label: "Auction" },
 ];
 const TEAM_COUNTS = [8, 10, 12, 14, 16].map((n) => ({ value: String(n), label: `${n} teams` }));
+/**
+ * Half-PPR leads (founder decision, §4.2's launch canon: "half-PPR default with PPR /
+ * TE-premium / superflex toggles") — full PPR stays one tap away, not removed or demoted past
+ * reach, only no longer preselected.
+ */
 const PRESETS = [
-  { value: "ppr", label: "PPR (a point per catch)" },
   { value: "half_ppr", label: "Half PPR" },
+  { value: "ppr", label: "PPR (a point per catch)" },
   { value: "standard", label: "Standard" },
   { value: "te_premium", label: "TE premium" },
 ];
-const VISIBILITIES = [
+/**
+ * Superflex is a TOGGLE on the canonical format here, not a separate browse queue (the
+ * liquidity ruling) — one more select beside scoring, words from `ROSTER_SHAPE_LABEL`
+ * (`@/domain/roster`) rather than typed at this call site, the same discipline `EXPERIENCE_TIERS`
+ * below already holds `LEAGUE_EXPERIENCE_TIER_LABEL` to. `@/domain/roster` (not
+ * `@/league/roster-shape`, where the actual slot ROWS live) is what a client component may
+ * value-import at all — the client boundary, `eslint.config.mjs`.
+ */
+const ROSTER_SHAPE_OPTIONS = Object.entries(ROSTER_SHAPE_LABEL).map(([value, label]) => ({ value, label }));
+/**
+ * WHO CAN JOIN, promoted out of the drawer alongside WHO IT'S FOR (Phase 3.5, Task 9) — see
+ * `CreateLeagueForm`'s own docblock below for why the two sit together, in this order, above the
+ * fold rather than one click away.
+ *
+ * A hint of its own, not a renamed label: "Who can join" and "Who it's for" read as near
+ * homonyms side by side, and the gauntlet finding was that the CONTROL was unfindable, not that
+ * either label was ambiguous once both are actually on screen. Renaming one would only move the
+ * defect; a distinct sentence under each is what actually tells them apart.
+ */
+export const VISIBILITIES = [
   { value: "invite_only", label: "Invite only" },
   { value: "public", label: "Anyone can find and join" },
 ];
+export const VISIBILITY_HINT = "Public leagues show up on the browse page and anyone can join without an invite. Invite-only leagues are joined by invite link only.";
 /**
  * WHO THE LEAGUE IS FOR, and the control the final review's own battery proved was missing.
  *
@@ -39,30 +66,226 @@ const VISIBILITIES = [
  */
 const EXPERIENCE_TIERS = Object.entries(LEAGUE_EXPERIENCE_TIER_LABEL).map(([value, label]) => ({ value, label }));
 const STAKE_TIERS = MATCHMAKING_CONFIG.stakeTiers.map((entry) => ({ value: String(entry.tier), label: entry.label }));
+/**
+ * WHEN IT DRAFTS (Phase 3.5, Task 9): the sit-and-go trigger's own creation-time control, wired
+ * for the first time — Task 7 taught `createLeagueSchema` to accept `startTrigger`, and Task 8
+ * gave a `when_full` league a room to wait in, but nothing before this form could actually
+ * choose it. Stays in the drawer, unlike the two controls above: it is a REFINEMENT of a public
+ * league, not a decision that gates who may enter it, and it renders only once `visibility` is
+ * `"public"` — the schema's own refusal ("Leagues that start when they fill are public leagues")
+ * names the exact rule this conditional enforces, so a commissioner can never submit the
+ * combination that trips it.
+ */
+export const START_TRIGGERS = [
+  { value: "scheduled", label: "On a schedule I set later" },
+  { value: "when_full", label: "Starts as soon as it fills" },
+];
+export const START_TRIGGER_HINT = `A sit-and-go league starts on its own about ${SIT_AND_GO_GRACE_MINUTES} minutes after its last seat fills, so everyone has time to open the room first.`;
+/**
+ * Named once, so the drawer's own summary and the fields it actually contains can never say two
+ * different things — the defect this task exists to close (the old summary named three of the
+ * seven fields the drawer actually held).
+ */
+export const DRAWER_SUMMARY = "Advanced settings: draft format, teams, scoring, roster shape, auction budget, draft start, and stake tier.";
 
 /**
- * One visible field. Everything else is behind a closed disclosure, because every advanced
- * setting already has a server-side default — a commissioner who types a name and presses
- * the button gets a complete, playable league. That is the spec's exit criterion, and the
- * interaction-count test in `create-league-interactions.test.tsx` makes it mechanical.
+ * The two promoted controls, extracted so `CreateLeagueForm`'s own render stays a plain list of
+ * sections rather than a wall of JSX. Pure presentation plus the two `onChange` callbacks —
+ * `handleVisibilityChange`'s own reset-on-leaving-public logic stays in the parent, since that
+ * rule is about `startTrigger`, a field this component never touches.
+ */
+function WhoCanJoinAndWhoItsFor({
+  visibility,
+  onVisibilityChange,
+  experienceTier,
+  onExperienceTierChange,
+}: {
+  readonly visibility: string;
+  readonly onVisibilityChange: (value: string) => void;
+  readonly experienceTier: string;
+  readonly onExperienceTierChange: (value: string) => void;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      <Select
+        label="Who can join"
+        options={VISIBILITIES}
+        value={visibility}
+        hint={VISIBILITY_HINT}
+        onChange={(event) => onVisibilityChange(event.target.value)}
+      />
+      <Select
+        label="Who it's for"
+        options={EXPERIENCE_TIERS}
+        value={experienceTier}
+        hint={LEAGUE_EXPERIENCE_TIER_HINT}
+        onChange={(event) => onExperienceTierChange(event.target.value)}
+      />
+    </div>
+  );
+}
+
+/**
+ * Everything still behind the closed disclosure: format, teams, scoring, roster shape, auction
+ * budget (auction only), draft start (public leagues only), and stake tier. Extracted for the
+ * same reason `WhoCanJoinAndWhoItsFor` above is — `CreateLeagueForm`'s render reads as a list of
+ * sections, and this is the one section with real internal conditionals of its own.
+ */
+function AdvancedSettingsDrawer({
+  format,
+  onFormatChange,
+  teamCount,
+  onTeamCountChange,
+  scoringPreset,
+  onScoringPresetChange,
+  rosterShape,
+  onRosterShapeChange,
+  auctionBudget,
+  onAuctionBudgetChange,
+  visibility,
+  startTrigger,
+  onStartTriggerChange,
+  stakeTier,
+  onStakeTierChange,
+  helpLevel,
+}: {
+  readonly format: string;
+  readonly onFormatChange: (value: string) => void;
+  readonly teamCount: string;
+  readonly onTeamCountChange: (value: string) => void;
+  readonly scoringPreset: string;
+  readonly onScoringPresetChange: (value: string) => void;
+  readonly rosterShape: string;
+  readonly onRosterShapeChange: (value: string) => void;
+  readonly auctionBudget: string;
+  readonly onAuctionBudgetChange: (value: string) => void;
+  readonly visibility: string;
+  readonly startTrigger: string;
+  readonly onStartTriggerChange: (value: string) => void;
+  readonly stakeTier: string;
+  readonly onStakeTierChange: (value: string) => void;
+  readonly helpLevel?: HelpLevel;
+}) {
+  return (
+    <details className="rounded-md border border-border p-3">
+      <summary className="cursor-pointer text-sm text-text-muted">{DRAWER_SUMMARY}</summary>
+      <div className="mt-3 grid gap-3 sm:grid-cols-2">
+        <Select label="Draft format" options={FORMATS} value={format} onChange={(event) => onFormatChange(event.target.value)} />
+        <Select label="Teams" options={TEAM_COUNTS} value={teamCount} onChange={(event) => onTeamCountChange(event.target.value)} />
+        <Select label="Scoring" options={PRESETS} value={scoringPreset} onChange={(event) => onScoringPresetChange(event.target.value)} />
+        <div className="flex flex-col gap-1">
+          <Select label="Roster shape" options={ROSTER_SHAPE_OPTIONS} value={rosterShape} onChange={(event) => onRosterShapeChange(event.target.value)} />
+          <span className="flex items-center gap-1">
+            <InfoTip term="superflex" helpLevel={helpLevel} />
+          </span>
+        </div>
+        {format === "auction" ? (
+          <Input
+            label="Auction budget"
+            type="number"
+            value={auctionBudget}
+            hint="Dollars each manager has to spend."
+            onChange={(event) => onAuctionBudgetChange(event.target.value)}
+          />
+        ) : null}
+        {visibility === "public" ? (
+          <div className="flex flex-col gap-1">
+            <Select
+              label="Draft start"
+              options={START_TRIGGERS}
+              value={startTrigger}
+              hint={START_TRIGGER_HINT}
+              onChange={(event) => onStartTriggerChange(event.target.value)}
+            />
+            <span className="flex items-center gap-1">
+              <InfoTip term="sit-and-go" helpLevel={helpLevel} />
+            </span>
+          </div>
+        ) : null}
+        <Select label="Stake tier" options={STAKE_TIERS} value={stakeTier} onChange={(event) => onStakeTierChange(event.target.value)} />
+        <p className="text-sm text-text-muted sm:col-span-2">{MATCHMAKING_CONFIG.stakeDisclosure}</p>
+      </div>
+    </details>
+  );
+}
+
+/**
+ * Three visible fields, not one — the league name plus the two questions the gauntlet finding
+ * named: who can join, and who it's for. Everything else stays behind a closed disclosure,
+ * because every OTHER setting already has a server-side default — a commissioner who types a
+ * name and presses the button still gets a complete, playable league. That is the spec's exit
+ * criterion, and the interaction-count test in `create-league-interactions.test.tsx` makes it
+ * mechanical: promoting a control that already carries a default adds a visible element, never
+ * a required interaction, so the count does not move.
+ *
+ * WHY THESE TWO, AND IN THIS ORDER (Phase 3.5, Task 9). Both used to sit inside "Advanced
+ * settings", nested two disclosures deep, sixth and seventh of seven, under a summary that named
+ * neither — a beginner filling in a name and pressing the button never saw either, and a veteran
+ * hunting for the control the creation gate's own refusal names ("Open it to everyone instead")
+ * had no reason to open a drawer whose own summary never mentioned it. `visibility` leads
+ * because it decides whether `experienceTier` means anything at all: `enforcementAppliesTo`
+ * (`@/league-service/enforcement`) never applies to an invite-only league, so a commissioner
+ * choosing "Who it's for" for a private league is choosing a label nobody's join is ever checked
+ * against. Neither label changed — the near-homonymy IS the actual defect the gauntlet named,
+ * and renaming one would only move it — so each carries its own distinct hint instead.
  *
  * The numeric fields are `<Select>`s of the values we actually support rather than free
  * number inputs: there is no such thing as a 13-team league here, and a select cannot
  * produce one.
+ *
+ * PERSONA PANEL, STEP 5 — commissioner first this time, then first-timer, casual, veteran.
+ * Commissioner: yes — "Who can join" is the first control under the name, answered without
+ * opening anything (`create-league-panel.test.tsx`'s own composed assertion). First-timer:
+ * `LEAGUE_EXPERIENCE_TIER_HINT`'s "Open leagues accept everyone" reads "reserved" as a
+ * protection a newer manager's OWN league can opt into, never a demotion — the same sentence a
+ * veteran reads as the rule keeping them out of somebody else's reserved room. Casual: three
+ * fields to glance at and one button, same as before this task — the drawer still opens to
+ * exactly nothing a casual commissioner needs to touch. Veteran: `DRAWER_SUMMARY` now names
+ * every field the drawer holds, roster shape and draft start (the sit-and-go trigger) included,
+ * so a veteran hunting for either finds the word in the summary before opening it.
+ *
+ * `WhoCanJoinAndWhoItsFor` and `AdvancedSettingsDrawer` above hold the actual field markup
+ * (fix round 1, LOW 2): this function's own body is state, the visibility-reset rule, and the
+ * submit handler — composition, not a 140-line wall of JSX.
  */
-export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: CreateLeagueBody) => void }) {
+export function CreateLeagueForm({
+  onCreated,
+  helpLevel,
+}: {
+  readonly onCreated: (created: CreateLeagueBody) => void;
+  /** Forwarded the same way `LineupEditor` takes it — `InfoTip` defaults to click-only when omitted. */
+  readonly helpLevel?: HelpLevel;
+}) {
   const { fetchJson } = useLeagueRoomDeps();
   const [name, setName] = useState("");
   const [format, setFormat] = useState("snake");
   const [teamCount, setTeamCount] = useState("12");
-  const [scoringPreset, setScoringPreset] = useState("ppr");
+  const [scoringPreset, setScoringPreset] = useState("half_ppr");
+  const [rosterShape, setRosterShape] = useState("standard");
   const [auctionBudget, setAuctionBudget] = useState("200");
   const [visibility, setVisibility] = useState("invite_only");
   // `experienced` — the choice that refuses nobody. See `EXPERIENCE_TIERS` above.
   const [experienceTier, setExperienceTier] = useState("experienced");
+  // `'scheduled'` — `createLeagueSchema`'s own default, and the only legal value for a private
+  // league (that refine's own refusal). See `handleVisibilityChange` below for what keeps this
+  // control from ever holding a value the schema would then refuse.
+  const [startTrigger, setStartTrigger] = useState("scheduled");
   const [stakeTier, setStakeTier] = useState("0");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  /**
+   * PUBLIC-MATCHMADE ONLY (the sit-and-go ruling): a private league's fill would otherwise write
+   * a time nobody pressed. Switching away from `"public"` resets `startTrigger` back to its
+   * default in the SAME gesture that hides its control, so a commissioner can never be left
+   * holding `"when_full"` on a field they can no longer see — the identical "the remedy points at
+   * something visible" discipline `EXPERIENCE_TIERS` above already holds the creation gate's own
+   * refusal to.
+   */
+  const handleVisibilityChange = (value: string): void => {
+    setVisibility(value);
+    if (value !== "public") setStartTrigger("scheduled");
+  };
 
   const submit = async (): Promise<void> => {
     setSubmitting(true);
@@ -76,9 +299,11 @@ export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: 
           format,
           teamCount: Number(teamCount),
           scoringPreset,
+          rosterShape,
           auctionBudget: Number(auctionBudget),
           visibility,
           experienceTier,
+          startTrigger,
           stakeTier: Number(stakeTier),
         }),
       });
@@ -105,33 +330,31 @@ export function CreateLeagueForm({ onCreated }: { readonly onCreated: (created: 
     >
       <Input label="League name" value={name} onChange={(event) => setName(event.target.value)} error={error ?? undefined} />
 
-      <details className="rounded-md border border-border p-3">
-        <summary className="cursor-pointer text-sm text-text-muted">Advanced settings: draft format, team count, scoring</summary>
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Select label="Draft format" options={FORMATS} value={format} onChange={(event) => setFormat(event.target.value)} />
-          <Select label="Teams" options={TEAM_COUNTS} value={teamCount} onChange={(event) => setTeamCount(event.target.value)} />
-          <Select label="Scoring" options={PRESETS} value={scoringPreset} onChange={(event) => setScoringPreset(event.target.value)} />
-          {format === "auction" ? (
-            <Input
-              label="Auction budget"
-              type="number"
-              value={auctionBudget}
-              hint="Dollars each manager has to spend."
-              onChange={(event) => setAuctionBudget(event.target.value)}
-            />
-          ) : null}
-          <Select label="Who can join" options={VISIBILITIES} value={visibility} onChange={(event) => setVisibility(event.target.value)} />
-          <Select
-            label="Who it's for"
-            options={EXPERIENCE_TIERS}
-            value={experienceTier}
-            hint={LEAGUE_EXPERIENCE_TIER_HINT}
-            onChange={(event) => setExperienceTier(event.target.value)}
-          />
-          <Select label="Stake tier" options={STAKE_TIERS} value={stakeTier} onChange={(event) => setStakeTier(event.target.value)} />
-          <p className="text-sm text-text-muted sm:col-span-2">{MATCHMAKING_CONFIG.stakeDisclosure}</p>
-        </div>
-      </details>
+      <WhoCanJoinAndWhoItsFor
+        visibility={visibility}
+        onVisibilityChange={handleVisibilityChange}
+        experienceTier={experienceTier}
+        onExperienceTierChange={setExperienceTier}
+      />
+
+      <AdvancedSettingsDrawer
+        format={format}
+        onFormatChange={setFormat}
+        teamCount={teamCount}
+        onTeamCountChange={setTeamCount}
+        scoringPreset={scoringPreset}
+        onScoringPresetChange={setScoringPreset}
+        rosterShape={rosterShape}
+        onRosterShapeChange={setRosterShape}
+        auctionBudget={auctionBudget}
+        onAuctionBudgetChange={setAuctionBudget}
+        visibility={visibility}
+        startTrigger={startTrigger}
+        onStartTriggerChange={setStartTrigger}
+        stakeTier={stakeTier}
+        onStakeTierChange={setStakeTier}
+        helpLevel={helpLevel}
+      />
 
       <Button type="submit" loading={submitting} disabled={submitting}>
         Create league

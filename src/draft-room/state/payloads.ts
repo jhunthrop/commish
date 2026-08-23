@@ -18,6 +18,18 @@ const clockSchema = z.object({
   // `readonly string[]`, and a mutable `string[]` is not assignable to it in BOTH directions,
   // so a plain `z.array` would fail the bidirectional shape assertion below.
   upcoming: z.array(z.string()).readonly(),
+  // Task 4's overnight freeze. `.optional()` matches `DraftClockView.pausedUntil` being an
+  // optional field (the engine's own test suite predates this task and hand-builds plenty of
+  // `DraftClockView` literals that never set it) — the server always sends it in a real payload,
+  // but the schema itself only needs to say what's ALLOWED, and stripping it silently (the
+  // default for a key `z.object` doesn't know about) would have been the actual bug here: the
+  // room would never see a paused turn at all.
+  pausedUntil: z.string().nullable().optional(),
+  // Task 5's owed picks: teamId -> the pick numbers they still owe. `.optional()` matches
+  // `DraftClockView.owedPicks` being optional for the identical reason `pausedUntil` is — the
+  // engine's own test suite predates this task and hand-builds `DraftClockView` literals that
+  // never set it. The server always sends it in a real payload.
+  owedPicks: z.record(z.string(), z.array(z.number()).readonly()).optional(),
 });
 
 /**
@@ -71,7 +83,8 @@ const bidPayloadSchema = z.object({
   minBid: z.number(),
 });
 const statusPayloadSchema = z.object({ ...common, phase: z.enum(["scheduled", "in_progress", "complete"]) });
-const expirePayloadSchema = z.object({ ...common, pickNumber: z.number().int().nonnegative() });
+/** `skipped` is Task 5's own addition: true when this expiry owed the pick instead of making it. */
+const expirePayloadSchema = z.object({ ...common, pickNumber: z.number().int().nonnegative(), skipped: z.boolean() });
 const queuePayloadSchema = z.object({ ...common, teamId: z.string().min(1) });
 
 /** The moderator's prompt. The queue itself is never on the wire — only this sentence. */

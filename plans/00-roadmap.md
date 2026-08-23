@@ -20,6 +20,26 @@ This is the full build, sequenced as 9 phases. Each phase is its own blueprint f
 | 8 | `phase-8-legal-launch-readiness.md` | — | Entity formation, counsel sign-off, partner contracts, per-state go-live sequencing | 4, 5, 7 | **This entire phase is the real-world-blocker checklist** — mostly not code |
 | 9 | `phase-9-dynasty-and-keeper-depth.md` | 6 | Dynasty startup + rookie drafts, keeper rules, tradeable draft-pick assets, trade calculator, orphan-team marketplace | 1 (min.); 3 (trade calc); 4 (marketplace proration) | No — pure software (marketplace proration mocked until Phase 4 is real) |
 
+## Phase 3.5 — a founder-ordered interstitial pass
+
+`docs/superpowers/plans/2026-08-22-phase3p5-competitiveness.md` is Phase 3.5: a founder-ordered
+pass (2026-08-22, "before payments, make the site experience correct against the field") inserted
+between Phase 3 and Phase 4 — superflex, the league median game, the overnight pause,
+skip-and-return draft timeouts, draft-slot preferences (KDS) and the sit-and-go fill trigger with
+its waiting room. It is competitive-analysis work, not a numbered phase: the nine-phase sequence
+above and Phase 4's position in it are **unchanged** — Phase 3.5 does not renumber anything, add a
+phase, or move a dependency edge. A reader who finds a "3.5" in a commit message and wants the
+full story reads that plan file directly; this line exists so they know where to look without
+reading it first.
+
+`docs/superpowers/plans/2026-08-22-phase3p5-addendum-house-leagues.md` is that pass's own addendum:
+a founder-ordered "view and join, like FFPC and Apex" house-league lobby — a catalog of
+platform-run leagues on a nullable-commissioner schema, kept stocked by a reconciler, always with a
+seat open. Same non-renumbering rule as its parent: no phase, no dependency edge, nothing else in
+this table moves. `docs/decisions/house-leagues.md` is the addendum's own decision doc, for a
+reader who finds "house league" in a commit message and wants the full story without reading the
+plan file first.
+
 ## Cross-phase dependency graph
 
 ```

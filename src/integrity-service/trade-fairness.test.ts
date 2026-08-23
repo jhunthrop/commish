@@ -59,13 +59,14 @@ async function fairnessLeague(db: Db, idSuffix = ""): Promise<{ readonly leagueI
     scoringPreset: "standard",
     auctionBudget: null,
     rosterSlots: SLOTS,
-    commissionerUserId: userA,
-    teamName: "Team A",
+    owner: { kind: "member", userId: userA, teamName: "Team A" },
     experienceTier: "beginner",
     stakeTier: 0,
     isPublicMatchmade: false,
   });
   if (!created.ok) throw new Error(created.reason);
+  const teamId = created.teamId;
+  if (teamId === null) throw new Error("expected a team id");
   const teamB = `fair_team_b${idSuffix}`;
   await db.insert(teams).values({ id: teamB, leagueId: created.leagueId, userId: userB, name: "Team B" });
   await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, created.leagueId));
@@ -81,8 +82,8 @@ async function fairnessLeague(db: Db, idSuffix = ""): Promise<{ readonly leagueI
     { id: pEvenB, name: "Even B", position: "RB", nflTeam: "MIA" },
   ]);
   await db.insert(rosterSlots).values([
-    { teamId: created.teamId, slot: "RB", slotIndex: 0, playerId: pStar },
-    { teamId: created.teamId, slot: "BENCH", slotIndex: 0, playerId: pEvenA },
+    { teamId, slot: "RB", slotIndex: 0, playerId: pStar },
+    { teamId, slot: "BENCH", slotIndex: 0, playerId: pEvenA },
     { teamId: teamB, slot: "RB", slotIndex: 0, playerId: pScrub },
     { teamId: teamB, slot: "BENCH", slotIndex: 0, playerId: pEvenB },
   ]);
@@ -91,9 +92,9 @@ async function fairnessLeague(db: Db, idSuffix = ""): Promise<{ readonly leagueI
     ...[1, 2, 3].map((week) => ({ playerId: pEvenA, week, rushingYards: 50 })),
     ...[1, 2, 3].map((week) => ({ playerId: pEvenB, week, rushingYards: 50 })),
   ]);
-  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [created.teamId, teamB], weeks: 4 }));
+  await db.transaction((tx) => writeSchedule(tx, { leagueId: created.leagueId, teamIds: [teamId, teamB], weeks: 4 }));
 
-  return { leagueId: created.leagueId, teamA: created.teamId, teamB };
+  return { leagueId: created.leagueId, teamA: teamId, teamB };
 }
 
 async function grotesquelyLopsided(db: Db): Promise<EvaluateTradeInput> {
