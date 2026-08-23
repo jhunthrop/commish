@@ -1,5 +1,6 @@
 import type { DraftFormat } from "@/domain/league";
 import type { ExperienceTier } from "@/domain/user";
+import type { HouseRungName } from "@/matchmaking/house-catalog";
 import type { CompositionCategory } from "@/participation/composition";
 import type { ParticipationTier } from "@/participation/tier";
 
@@ -57,6 +58,17 @@ import type { ParticipationTier } from "@/participation/tier";
  * fills" instead of `draftAt`, never both, and never that placeholder date as though somebody
  * chose it.
  *
+ * `houseRung` (Phase 3.5 addendum, Task 14) is the thirteenth field, and the same disclosure
+ * reasoning every field above already carries: WHO runs a league is a fact about the league, not
+ * about any person in it, so it costs nothing to disclose — unlike `commissionerUserId`, which
+ * names a PERSON and stays off this interface entirely. Typed `HouseRungName | null` rather than
+ * `string`, the narrowed union `@/matchmaking/house-catalog` (Task 13) declares, so a caller that
+ * switches on it exhaustively is a compile error away from ever falling silently out of step with
+ * the catalog. `null` for every ordinary member league; one of the catalog's own rung names for a
+ * league the platform runs. This field never appears on `BrowseFilter` (`filter.test.ts`'s own
+ * "refuses to let a filter hide the shelf" pins that) — it is a fact a CARD renders, never an axis
+ * a visitor can narrow the shelf by, because a shelf a filter could empty is not "always a seat".
+ *
  * A stranger gets what they need to CHOOSE a league and nothing about the people already in it.
  */
 export interface PublicLeagueSummary {
@@ -80,6 +92,9 @@ export interface PublicLeagueSummary {
   /** Which of the two ways this draft's kickoff comes to be set (Task 8) — see this interface's
    *  own docblock for why the card needs this to decide what `draftAt` means. */
   readonly startTrigger: "scheduled" | "when_full";
+  /** Which catalog rung a house league came from, or `null` for an ordinary member league — see
+   *  this interface's own docblock for the full disclosure reasoning. */
+  readonly houseRung: HouseRungName | null;
 }
 
 /** A normalized browse filter: every field is a concrete value or the "any" sentinel. */
@@ -97,6 +112,20 @@ export interface BrowseFilter {
   readonly participationTier: ParticipationTier | "any";
 }
 
+/**
+ * The whole browse read: the member list AND the house shelf, as two separate lists rather than
+ * one list a `houseRung` sort key would fold together (Phase 3.5 addendum, Task 14). A shelf and
+ * a list are different promises — the shelf says "these are ours, they draft on time, and there
+ * is always another one"; the list says "these are open leagues other people started" — and
+ * collapsing them into one ordered array makes the shelf's promise unreadable. Every entry in
+ * `house` carries a non-null `houseRung`; every entry in `leagues` carries `null` — `browse.
+ * test.ts`'s own first assertion is what keeps the two from ever crossing.
+ */
 export interface BrowseBody {
   readonly leagues: readonly PublicLeagueSummary[];
+  /** Ordered soonest-draft-first — a visitor's actual question is "which one can I attend
+   *  tonight", never "which one is newest" (that's the member list's own tiebreaker, and it
+   *  answers a different question). Never narrowed by `BrowseFilter` — see `houseRung`'s own
+   *  docblock on `PublicLeagueSummary`. */
+  readonly house: readonly PublicLeagueSummary[];
 }

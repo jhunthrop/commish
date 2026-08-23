@@ -22,6 +22,7 @@ const league = (over: Partial<PublicLeagueSummary> = {}): PublicLeagueSummary =>
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
   medianGame: false,
   startTrigger: "scheduled",
+  houseRung: null,
   ...over,
 });
 

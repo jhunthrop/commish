@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
-import { eq } from "drizzle-orm";
+import { eq, isNotNull } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
@@ -8,10 +8,66 @@ import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { EMPTY_BROWSE_FILTER, hasOpenSeat, matchesBrowseFilter } from "@/matchmaking/filter";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
+import type { HouseRungName } from "@/matchmaking/house-catalog";
 import { compositionCategoryFor } from "@/participation/composition";
 import { listPublicLeagues, PUBLIC_LEAGUE_FIELDS } from "./browse";
 
 const db = createTestDb();
+
+/**
+ * The convenience wrapper almost every pre-existing test in this file uses: `listPublicLeagues`
+ * now answers `BrowseBody` (`leagues` AND `house`, Phase 3.5 addendum, Task 14), and every test
+ * below that predates the shelf is asking about the MEMBER list specifically — `seed()`/
+ * `seedPublicLeague()` never set `houseRung`, so every league they create lands in `.leagues`
+ * anyway. The shelf's own behavior is tested directly, through `listPublicLeagues` itself, in
+ * `describe("listPublicLeagues house shelf")` below.
+ */
+async function browseLeagues(...args: Parameters<typeof listPublicLeagues>): Promise<readonly PublicLeagueSummary[]> {
+  return (await listPublicLeagues(...args)).leagues;
+}
+
+/** One open, public, joinable HOUSE league — the shelf's own seeder, parallel to `seed()` above
+ *  but for a row `leagues_house_commissioner_ck` requires a NULL `commissionerUserId` for. */
+async function seedHouseLeague(league: {
+  readonly id: string;
+  readonly rung: HouseRungName;
+  readonly kickoffAt: Date;
+  readonly teamCount?: number;
+  readonly filled?: number;
+}): Promise<void> {
+  const teamCount = league.teamCount ?? 12;
+  const filled = league.filled ?? 0;
+  await db.insert(leagues).values({
+    id: league.id,
+    name: `House ${league.id}`,
+    format: "snake",
+    teamCount,
+    stakeTier: 0,
+    experienceTier: "experienced",
+    isPublicMatchmade: true,
+    commissionerUserId: null,
+    houseRung: league.rung,
+  });
+  await db.insert(drafts).values({
+    id: `${league.id}_draft`,
+    leagueId: league.id,
+    format: "snake",
+    status: "scheduled",
+    kickoffAt: league.kickoffAt,
+  });
+  await db.insert(scoringSettings).values({ leagueId: league.id, ...STANDARD_SCORING });
+  for (let i = 0; i < filled; i++) {
+    const userId = `${league.id}_u${i}`;
+    await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: `Manager ${i}` }).onConflictDoNothing();
+    await db.insert(teams).values({ id: `${league.id}_t${i}`, leagueId: league.id, userId, name: `Team ${i}` });
+  }
+}
+
+/** Every house league this test database holds, gone — cascades to its draft, teams and scoring
+ *  settings (`leagues.id`'s own `onDelete: "cascade"` FKs), leaving every member league untouched. */
+async function removeHouseLeagues(db: Db): Promise<void> {
+  await db.delete(leagues).where(isNotNull(leagues.houseRung));
+}
 
 interface SeedLeague {
   readonly id: string;
@@ -158,6 +214,9 @@ async function seedPublicLeague(
     // `seed()` above never sets a start trigger — the schema default, `'scheduled'`, always
     // applies here.
     startTrigger: "scheduled",
+    // `seed()` above never sets `houseRung` — every league this fixture builds is a member
+    // league, so it always lands in `.leagues`, never `.house`.
+    houseRung: null,
   };
 }
 
@@ -178,12 +237,13 @@ describe("listPublicLeagues", () => {
     });
     // `seed()` schedules the draft for "2026-09-10T17:00:00.000Z" (below) — pin `now` so
     // `draftAt`'s relative half is deterministic rather than measured against the real clock.
-    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER, { now: () => "2026-08-17T12:00:00.000Z" });
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER, { now: () => "2026-08-17T12:00:00.000Z" });
     expect(rows).toEqual([
       {
         id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0,
         teamCount: 12, filledTeams: 8, scoringLabel: "Standard", compositionCategory: "all_newcomers",
         draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)", medianGame: false, startTrigger: "scheduled",
+        houseRung: null,
       },
     ]);
   });
@@ -199,7 +259,7 @@ describe("listPublicLeagues", () => {
       id: "median", name: "Median Room", format: "snake", experienceTier: "beginner",
       stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true, medianGame: true,
     });
-    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     const byId = new Map(rows.map((row) => [row.id, row.medianGame]));
     expect(byId.get("standard")).toBe(false);
     expect(byId.get("median")).toBe(true);
@@ -221,7 +281,7 @@ describe("listPublicLeagues", () => {
     });
     await db.insert(scoringSettings).values({ leagueId: "when_full_one", ...STANDARD_SCORING });
 
-    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     const byId = new Map(rows.map((row) => [row.id, row.startTrigger]));
     expect(byId.get("scheduled_one")).toBe("scheduled");
     expect(byId.get("when_full_one")).toBe("when_full");
@@ -232,7 +292,7 @@ describe("listPublicLeagues", () => {
       id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner",
       stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
     });
-    const [row] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const [row] = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     expect(Object.keys(row!).sort()).toEqual([...PUBLIC_LEAGUE_FIELDS].sort());
     // The facts a stranger must never learn from an unauthenticated read.
     expect(JSON.stringify(row)).not.toContain("owner");
@@ -253,7 +313,7 @@ describe("listPublicLeagues", () => {
       stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
       scoring: { ...STANDARD_SCORING, pointsPerPassingTouchdown: 6 },
     });
-    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     const byId = new Map(rows.map((row) => [row.id, row.scoringLabel]));
     expect(byId.get("ppr")).toBe("PPR");
     expect(byId.get("custom")).toBe("Custom");
@@ -270,7 +330,7 @@ describe("listPublicLeagues", () => {
       stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
     });
     await db.delete(scoringSettings).where(eq(scoringSettings.leagueId, "no_scoring"));
-    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     expect(rows[0]?.scoringLabel).toBe("Custom");
   });
 
@@ -279,8 +339,8 @@ describe("listPublicLeagues", () => {
       id: "private", name: "Group Chat Only", format: "snake", experienceTier: "beginner",
       stakeTier: 0, teamCount: 12, filled: 2, isPublicMatchmade: false,
     });
-    expect(await listPublicLeagues(db, EMPTY_BROWSE_FILTER)).toEqual([]);
-    expect(await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, format: "snake" })).toEqual([]);
+    expect(await browseLeagues(db, EMPTY_BROWSE_FILTER)).toEqual([]);
+    expect(await browseLeagues(db, { ...EMPTY_BROWSE_FILTER, format: "snake" })).toEqual([]);
   });
 
   it("never lists a full league", async () => {
@@ -288,7 +348,7 @@ describe("listPublicLeagues", () => {
       id: "full", name: "Packed House", format: "snake", experienceTier: "beginner",
       stakeTier: 0, teamCount: 4, filled: 4, isPublicMatchmade: true,
     });
-    expect(await listPublicLeagues(db, EMPTY_BROWSE_FILTER)).toEqual([]);
+    expect(await browseLeagues(db, EMPTY_BROWSE_FILTER)).toEqual([]);
   });
 
   it("never lists a league whose draft has already started or finished", async () => {
@@ -300,7 +360,7 @@ describe("listPublicLeagues", () => {
       id: "done", name: "Already Played", format: "snake", experienceTier: "beginner",
       stakeTier: 0, teamCount: 12, filled: 3, isPublicMatchmade: true, draftStatus: "complete",
     });
-    expect(await listPublicLeagues(db, EMPTY_BROWSE_FILTER)).toEqual([]);
+    expect(await browseLeagues(db, EMPTY_BROWSE_FILTER)).toEqual([]);
   });
 
   it("narrows by format, experience tier and stake tier", async () => {
@@ -313,11 +373,11 @@ describe("listPublicLeagues", () => {
       stakeTier: 3, teamCount: 12, filled: 1, isPublicMatchmade: true,
     });
 
-    expect((await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, format: "auction" })).map((l) => l.id)).toEqual(["b"]);
-    expect((await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, experienceTier: "beginner" })).map((l) => l.id)).toEqual(["a"]);
-    expect((await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, stakeTier: 3 })).map((l) => l.id)).toEqual(["b"]);
+    expect((await browseLeagues(db, { ...EMPTY_BROWSE_FILTER, format: "auction" })).map((l) => l.id)).toEqual(["b"]);
+    expect((await browseLeagues(db, { ...EMPTY_BROWSE_FILTER, experienceTier: "beginner" })).map((l) => l.id)).toEqual(["a"]);
+    expect((await browseLeagues(db, { ...EMPTY_BROWSE_FILTER, stakeTier: 3 })).map((l) => l.id)).toEqual(["b"]);
     expect(
-      await listPublicLeagues(db, { format: "snake", experienceTier: "experienced", stakeTier: 3, participationTier: "any" }),
+      await browseLeagues(db, { format: "snake", experienceTier: "experienced", stakeTier: 3, participationTier: "any" }),
     ).toEqual([]);
   });
 
@@ -344,7 +404,7 @@ describe("listPublicLeagues", () => {
       stakeTier: 0, teamCount: 12, filled: 6, isPublicMatchmade: true,
       createdAt: new Date("2026-09-02T00:00:00.000Z"),
     });
-    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     // "newest" has 1 seat left, "middle" has 6, "oldest" has 11 — seats-remaining ASC puts the
     // nearly-full league first, the opposite of creation order.
     expect(rows.map((league) => league.id)).toEqual(["newest", "middle", "oldest"]);
@@ -366,7 +426,7 @@ describe("listPublicLeagues", () => {
       stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
       createdAt: new Date("2026-09-02T00:00:00.000Z"),
     });
-    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     expect(rows.map((league) => league.id)).toEqual(["oldest", "middle", "newest"]);
   });
 
@@ -377,7 +437,7 @@ describe("listPublicLeagues", () => {
         stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
       });
     }
-    expect(await listPublicLeagues(db, EMPTY_BROWSE_FILTER)).toHaveLength(MATCHMAKING_CONFIG.maxResults);
+    expect(await browseLeagues(db, EMPTY_BROWSE_FILTER)).toHaveLength(MATCHMAKING_CONFIG.maxResults);
   });
 
 });
@@ -388,7 +448,7 @@ describe("listPublicLeagues tier composition", () => {
       id: "comp_all_newcomer", name: "Rookie Room", format: "snake", experienceTier: "beginner",
       stakeTier: 0, teamCount: 12, filled: 6, isPublicMatchmade: true,
     });
-    const [summary] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const [summary] = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     expect(summary!.compositionCategory).toBe("all_newcomers");
     expect(Object.keys(summary!).sort()).toEqual([...PUBLIC_LEAGUE_FIELDS].sort());
     expect(JSON.stringify(summary)).not.toContain("comp_all_newcomer_u0");
@@ -411,7 +471,7 @@ describe("listPublicLeagues tier composition", () => {
       stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true, seatUserIds: ["solo_veteran"],
     });
 
-    const [summary] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const [summary] = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     const body = JSON.stringify(summary);
 
     expect(summary!.filledTeams).toBe(1);
@@ -431,7 +491,7 @@ describe("listPublicLeagues tier composition", () => {
       stakeTier: 0, teamCount: 12, filled: 2, isPublicMatchmade: true,
       seatUserIds: ["mix_veteran", "mix_newcomer"],
     });
-    const [summary] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const [summary] = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     // One each: `compositionCategoryFor`'s own `>` rather than `>=` puts an even split in `open`.
     expect(summary!.compositionCategory).toBe("open");
   });
@@ -441,16 +501,17 @@ describe("listPublicLeagues tier composition", () => {
       id: "empty_seats", name: "Just Opened", format: "snake", experienceTier: "beginner",
       stakeTier: 0, teamCount: 12, filled: 0, isPublicMatchmade: true,
     });
-    const [summary] = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const [summary] = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     // An empty roster has signalled nothing, so it reads `open` rather than `all_newcomers`.
     expect(summary!.compositionCategory).toBe("open");
   });
 
-  it("costs exactly two queries, whether or not any seat-holder has a completed-season history", async () => {
-    // `listPublicLeagues` is `browseQuery` + `scoringWeightsByLeagueId` — the composition join is
-    // FOLDED into `browseQuery` itself (measured in `src/db/index-plans.test.ts`), never a third
-    // round trip, so this stays two queries regardless of how many leagues or seats it answers
-    // for.
+  it("costs exactly three queries, whether or not any seat-holder has a completed-season history", async () => {
+    // `listPublicLeagues` is `browseQuery` + `houseShelfQuery` + `scoringWeightsByLeagueId`
+    // (Phase 3.5 addendum, Task 14) — the composition join is FOLDED into each of the first two
+    // queries itself (measured in `src/db/index-plans.test.ts`), never a fourth round trip, so
+    // this stays three queries regardless of how many leagues, seats or house rungs it answers
+    // for. WAS two queries, before the shelf gained its own query alongside the member list's.
     await giveCompletedSeasons("counting_veteran", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
     await seed({
       id: "counting", name: "Counting League", format: "snake", experienceTier: "beginner",
@@ -459,7 +520,7 @@ describe("listPublicLeagues tier composition", () => {
     });
     const counting = countingDb(db);
     await listPublicLeagues(counting.db, EMPTY_BROWSE_FILTER);
-    expect(counting.selectCount()).toBe(2);
+    expect(counting.selectCount()).toBe(3);
   });
 });
 
@@ -475,7 +536,7 @@ describe("listPublicLeagues narrows on participation tier", () => {
       stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
       seatUserIds: ["pt_veteran"],
     });
-    const rows = await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, participationTier: "newcomer" });
+    const rows = await browseLeagues(db, { ...EMPTY_BROWSE_FILTER, participationTier: "newcomer" });
     expect(rows.map((l) => l.id)).toEqual(["pt_newcomer_league"]);
   });
 
@@ -490,7 +551,7 @@ describe("listPublicLeagues narrows on participation tier", () => {
       stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
       seatUserIds: ["pt2_veteran"],
     });
-    const rows = await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, participationTier: "veteran" });
+    const rows = await browseLeagues(db, { ...EMPTY_BROWSE_FILTER, participationTier: "veteran" });
     expect(rows.map((l) => l.id)).toEqual(["pt2_veteran_league"]);
   });
 
@@ -507,8 +568,8 @@ describe("listPublicLeagues narrows on participation tier", () => {
     });
     for (const participationTier of ["any", "newcomer", "veteran"] as const) {
       const filter = { ...EMPTY_BROWSE_FILTER, participationTier };
-      const fromSql = (await listPublicLeagues(db, filter)).map((l) => l.id).sort();
-      const fromRule = (await listPublicLeagues(db, EMPTY_BROWSE_FILTER))
+      const fromSql = (await browseLeagues(db, filter)).map((l) => l.id).sort();
+      const fromRule = (await browseLeagues(db, EMPTY_BROWSE_FILTER))
         .filter((league) => matchesBrowseFilter(league, filter))
         .map((l) => l.id)
         .sort();
@@ -531,7 +592,7 @@ describe("listPublicLeagues narrows on participation tier", () => {
         seatUserIds: ["pt_wide_veteran"],
       });
     }
-    const veteranOnly = await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, participationTier: "veteran" });
+    const veteranOnly = await browseLeagues(db, { ...EMPTY_BROWSE_FILTER, participationTier: "veteran" });
     expect(veteranOnly).toHaveLength(5);
   });
 });
@@ -591,7 +652,7 @@ describe("listPublicLeagues narrows in SQL", () => {
     expect(combinations).toHaveLength(3 * 3 * 5 * 3);
 
     for (const filter of combinations) {
-      const fromSql = await listPublicLeagues(db, filter);
+      const fromSql = await browseLeagues(db, filter);
       const fromRule = corpus.filter((league) => hasOpenSeat(league) && matchesBrowseFilter(league, filter));
       expect(fromSql.map((league) => league.id).sort()).toEqual(fromRule.map((league) => league.id).sort());
     }
@@ -608,7 +669,7 @@ describe("listPublicLeagues narrows in SQL", () => {
       await seedPublicLeague(db, { format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 12, filledTeams: 0 });
     }
 
-    const narrow = await listPublicLeagues(db, {
+    const narrow = await browseLeagues(db, {
       format: "auction",
       experienceTier: "experienced",
       stakeTier: 3,
@@ -621,15 +682,101 @@ describe("listPublicLeagues narrows in SQL", () => {
     for (let i = 0; i < MATCHMAKING_CONFIG.maxResults + 10; i += 1) {
       await seedPublicLeague(db, { format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 0 });
     }
-    const all = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const all = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     expect(all).toHaveLength(MATCHMAKING_CONFIG.maxResults);
   });
 
   it("counts fill with a grouped count, so a full league is excluded by the database", async () => {
     await seedPublicLeague(db, { format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 4, filledTeams: 4 });
     const open = await seedPublicLeague(db, { format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 4, filledTeams: 3 });
-    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
     expect(rows.map((league) => league.id)).toEqual([open.id]);
     expect(rows[0]?.filledTeams).toBe(3);
+  });
+});
+
+/**
+ * PHASE 3.5 ADDENDUM, TASK 14, STEP 1. The failing shelf tests, verbatim per the brief — the
+ * front door: browse leads with the house shelf, as a SECOND list (`BrowseBody.house`) rather
+ * than a `houseRung` sort key on the member list.
+ */
+describe("listPublicLeagues house shelf", () => {
+  it("puts the house shelf and the member leagues in separate lists", async () => {
+    await seed({
+      id: "member", name: "A Member League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    await seedHouseLeague({ id: "house_open_12_1", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
+    const body = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(body.house.every((l) => l.houseRung !== null)).toBe(true);
+    expect(body.leagues.every((l) => l.houseRung === null)).toBe(true);
+  });
+
+  it("orders the shelf by the draft a visitor can attend soonest", async () => {
+    // Seeded out of both creation order AND rung order, and 7 days apart so every kickoff falls
+    // on the SAME weekday (`formatDraftTime`'s absolute half leads with the weekday name) — the
+    // one shape that lets a lexical sort of the rendered `draftAt` strings agree with the actual
+    // chronological order, which is what this assertion (verbatim per the brief) compares.
+    await seedHouseLeague({ id: "house_c", rung: "beginner_12", kickoffAt: new Date("2026-09-24T19:00:00.000Z") });
+    await seedHouseLeague({ id: "house_a", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
+    await seedHouseLeague({ id: "house_b", rung: "open_12", kickoffAt: new Date("2026-09-17T19:00:00.000Z") });
+    const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER, { now: () => "2026-08-17T12:00:00.000Z" });
+    expect(house.map((l) => l.draftAt)).toEqual([...house.map((l) => l.draftAt)].sort());
+    // The stronger, non-lexical proof behind the brief's own assertion: the actual id order.
+    expect(house.map((l) => l.id)).toEqual(["house_a", "house_b", "house_c"]);
+  });
+
+  it("still shows the member leagues when the shelf is empty, rather than an apology", async () => {
+    // Never a dead end, in the form this addendum makes possible: the reconciler has not run yet.
+    await seed({
+      id: "member", name: "A Member League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    await removeHouseLeagues(db);
+    const body = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(body.house).toEqual([]);
+    expect(body.leagues.length).toBeGreaterThan(0);
+  });
+
+  it("refuses to let a filter hide the shelf", () => {
+    // Parent ruling 1: every filter axis is a way for an open seat to become invisible to
+    // somebody who would have taken it. `houseRung` is a field on a card and is NOT a
+    // `BrowseFilter` member, and this is the test that keeps it that way.
+    expect(Object.keys(EMPTY_BROWSE_FILTER)).not.toContain("houseRung");
+  });
+
+  it("declares the new field on the wire, or fails", () => {
+    // `PUBLIC_LEAGUE_FIELDS` plus this assertion are why adding a field to a public,
+    // unauthenticated read is a deliberate disclosure decision rather than a diff nobody
+    // reviewed.
+    expect(PUBLIC_LEAGUE_FIELDS).toContain("houseRung");
+  });
+
+  it("carries the real catalog rung name on a house card, honestly per rung", async () => {
+    await seedHouseLeague({ id: "house_open", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
+    await seedHouseLeague({ id: "house_beg", rung: "beginner_12", kickoffAt: new Date("2026-09-11T19:00:00.000Z") });
+    const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const byId = new Map(house.map((l) => [l.id, l.houseRung]));
+    expect(byId.get("house_open")).toBe("open_12");
+    expect(byId.get("house_beg")).toBe("beginner_12");
+  });
+
+  it("never lets a full house league sit on the shelf", async () => {
+    await seedHouseLeague({
+      id: "house_full", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z"),
+      teamCount: 2, filled: 2,
+    });
+    const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(house).toEqual([]);
+  });
+
+  it("ignores every filter axis on the shelf, even one no house league matches", async () => {
+    // The shelf is filter-immune by construction, not merely unfiltered by default — every
+    // catalog rung shares one canonical format (`HOUSE_CATALOG`'s own `CANON`), so narrowing to
+    // the format no house league plays is exactly the case that would empty the shelf if a
+    // filter ever reached it.
+    await seedHouseLeague({ id: "house_snake", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
+    const { house } = await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, format: "auction" });
+    expect(house.map((l) => l.id)).toEqual(["house_snake"]);
   });
 });

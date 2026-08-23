@@ -49,4 +49,13 @@ describe("GLOSSARY", () => {
     expect(term("sit-and-go").short).toMatch(/moment every seat fills/);
     expect(term("sit-and-go").detail).toContain(`${MATCHMAKING_CONFIG.sitAndGo.graceSeconds / 60} minutes`);
   });
+
+  // Phase 3.5 addendum, Task 14: the word the shelf and the members panel's "Run by Commish"
+  // line both need.
+  it("defines a house league by who runs it, not by who is missing", () => {
+    expect(term("house-league").term).toBe("a house league");
+    expect(term("house-league").detail).toBe(
+      "A league Commish runs. Everyone joins the same way, the rules are the same in every one, and a new one opens whenever one fills.",
+    );
+  });
 });

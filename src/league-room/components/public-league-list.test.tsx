@@ -5,8 +5,9 @@ import { GLOSSARY } from "@/help/glossary";
 import { inBothThemes } from "@/components/ui/test-utils";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import { HOUSE_RUNG_LABEL } from "@/matchmaking/house-catalog";
 import { fixtureLeagueDeps, PUBLIC_LEAGUES, renderInLeague } from "../test-fixtures";
-import { PublicLeagueList } from "./public-league-list";
+import { HOUSE_SHELF_PROMISE, HouseLeagueShelf, PublicLeagueList } from "./public-league-list";
 
 /** FIX 2: the missing Custom-league case — `describeScoring` can answer "Custom" and the card
  *  needs its own `InfoTip`, same as the three shipped presets. */
@@ -23,6 +24,7 @@ const CUSTOM_SCORING_LEAGUE: PublicLeagueSummary = {
   draftAt: "Monday 14 September, 6:00 PM UTC (in 5 days)",
   medianGame: false,
   startTrigger: "scheduled",
+  houseRung: null,
 };
 
 // A signed-in list renders `JoinPublicLeagueButton` per card, which navigates via
@@ -174,5 +176,83 @@ describe("PublicLeagueList", () => {
       expect(screen.getByRole("link", { name: "Start your own league" })).toHaveAttribute("href", "/app#create-league");
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+});
+
+// Phase 3.5 addendum, Task 14, Step 3: the house shelf, §4.1's hybrid lobby made visible.
+const HOUSE_LEAGUE: PublicLeagueSummary = {
+  id: "house_1",
+  name: "Open 12-team League 3",
+  format: "snake",
+  experienceTier: "experienced",
+  stakeTier: 0,
+  teamCount: 12,
+  filledTeams: 5,
+  scoringLabel: "Half PPR",
+  compositionCategory: "open",
+  draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
+  medianGame: false,
+  startTrigger: "scheduled",
+  houseRung: "open_12",
+};
+
+const SIT_AND_GO_HOUSE_LEAGUE: PublicLeagueSummary = {
+  ...HOUSE_LEAGUE,
+  id: "house_sitandgo",
+  name: "Sit and Go League 1",
+  houseRung: "sitandgo_12",
+  startTrigger: "when_full",
+};
+
+describe("HouseLeagueShelf", () => {
+  it("renders nothing at all when the shelf is empty, rather than an apology", () => {
+    const { container } = render(<HouseLeagueShelf leagues={[]} signedIn />);
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("shows each house league's rung label, 'Run by Commish', fill status and draft time, in both themes, axe-clean", async () => {
+    await inBothThemes(
+      <HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />,
+      async ({ container }) => {
+        expect(screen.getByText(HOUSE_RUNG_LABEL.open_12)).toBeInTheDocument();
+        expect(screen.getByText("Run by Commish")).toBeInTheDocument();
+        expect(screen.getByText(/5 of 12 joined/)).toBeInTheDocument();
+        expect(screen.getByText("7 spots left")).toBeInTheDocument();
+        expect(screen.getByText(/Drafts Saturday 12 September/)).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+  });
+
+  it("prints the shelf's promise once, beneath the whole shelf, never per card", () => {
+    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE, SIT_AND_GO_HOUSE_LEAGUE]} signedIn />);
+    expect(screen.getAllByText(HOUSE_SHELF_PROMISE)).toHaveLength(1);
+  });
+
+  it("shows 'Starts as soon as it fills' for the sit-and-go rung, never a fabricated date", () => {
+    render(<HouseLeagueShelf leagues={[SIT_AND_GO_HOUSE_LEAGUE]} signedIn />);
+    expect(screen.getByText("Starts as soon as it fills")).toBeInTheDocument();
+    expect(screen.queryByText(/Drafts /)).not.toBeInTheDocument();
+  });
+
+  it("renders no progress bar", () => {
+    const { container } = render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />);
+    expect(container.querySelector("[role='progressbar']")).not.toBeInTheDocument();
+  });
+
+  it("opens an InfoTip on the shelf heading, guided by default, defining a house league", () => {
+    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />);
+    expect(screen.getByRole("button", { name: "What is a house league?" })).toBeInTheDocument();
+    expect(screen.getByText(GLOSSARY["house-league"].short)).toBeInTheDocument();
+  });
+
+  it("gives a signed-in visitor a join button per house league", () => {
+    renderInLeague(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />, fixtureLeagueDeps().deps);
+    expect(screen.getByRole("button", { name: `Join ${HOUSE_LEAGUE.name}` })).toBeInTheDocument();
+  });
+
+  it("sends a signed-out visitor to sign in, named per house league", () => {
+    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn={false} />);
+    expect(screen.getByRole("link", { name: `Sign in to join ${HOUSE_LEAGUE.name}` })).toHaveAttribute("href", "/sign-in");
   });
 });

@@ -108,6 +108,7 @@ export async function fireWhenFullInTx(
       startTrigger: drafts.startTrigger,
       teamCount: leagues.teamCount,
       leagueName: leagues.name,
+      houseRung: leagues.houseRung,
     })
     .from(drafts)
     .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
@@ -124,10 +125,16 @@ export async function fireWhenFullInTx(
     return { fired: false, reason: FILL_TRIGGER_REFUSALS.notFull };
   }
 
+  // Phase 3.5 addendum, Task 14, Step 4: a HOUSE league's members get `house_league_filled`
+  // instead of `draft_fill_triggered` — the one sentence a house league can say that a
+  // member-run one cannot (the shelf refills itself). The two never both fire for the same
+  // league (below), so the dedup check reads whichever type THIS call would actually write.
+  const isHouse = row.houseRung !== null;
+  const noticeType = isHouse ? "house_league_filled" : "draft_fill_triggered";
   const [alreadyFired] = await tx
     .select({ id: memberNotices.id })
     .from(memberNotices)
-    .where(and(eq(memberNotices.leagueId, leagueId), eq(memberNotices.noticeType, "draft_fill_triggered")))
+    .where(and(eq(memberNotices.leagueId, leagueId), eq(memberNotices.noticeType, noticeType)))
     .limit(1);
   if (alreadyFired !== undefined) {
     return { fired: false, reason: FILL_TRIGGER_REFUSALS.alreadyFired };
@@ -139,20 +146,38 @@ export async function fireWhenFullInTx(
   // `SYSTEM_ACTION_VISIBILITY.draft_fill_triggered` is `"everyone"`, so this sends ONE notice per
   // TEAM in the league, all referencing the SAME `system_action` event — the identical
   // one-event-many-notices shape `startDraft`'s own auto-start announcement uses
-  // (`@/draft-service/store`).
+  // (`@/draft-service/store`). The audit event's own `action` stays `draft_fill_triggered`
+  // regardless of `isHouse` — it is still the identical fact about the league's shared calendar
+  // either way, and `SYSTEM_ACTION_CODES` gains no second code for a distinction that only ever
+  // shows up in the PERSONAL notice's own wording.
   const graceLabel = formatClockLength(MATCHMAKING_CONFIG.sitAndGo.graceSeconds);
   const created: MemberNotice[] = [];
-  for (const member of seated) {
-    created.push(
-      await notifyAffectedMember(tx, {
-        leagueId,
-        userId: member.userId,
-        noticeType: "draft_fill_triggered",
-        context: { leagueName: row.leagueName, graceLabel },
-        occurredAt: nowIso,
-        auditEventId: null,
-      }),
-    );
+  if (isHouse) {
+    for (const member of seated) {
+      created.push(
+        await notifyAffectedMember(tx, {
+          leagueId,
+          userId: member.userId,
+          noticeType: "house_league_filled",
+          context: { leagueName: row.leagueName },
+          occurredAt: nowIso,
+          auditEventId: null,
+        }),
+      );
+    }
+  } else {
+    for (const member of seated) {
+      created.push(
+        await notifyAffectedMember(tx, {
+          leagueId,
+          userId: member.userId,
+          noticeType: "draft_fill_triggered",
+          context: { leagueName: row.leagueName, graceLabel },
+          occurredAt: nowIso,
+          auditEventId: null,
+        }),
+      );
+    }
   }
   const event = await audit.record(tx, {
     eventType: "system_action",

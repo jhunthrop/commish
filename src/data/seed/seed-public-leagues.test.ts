@@ -58,7 +58,7 @@ describe("seedPublicLeagues", () => {
 
   it("covers both formats, both experience tiers and more than one stake tier, so every filter narrows something", async () => {
     await seedPublicLeagues(db, clock);
-    const rows = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    const { leagues: rows } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
     expect(new Set(rows.map((row) => row.format))).toEqual(new Set(["snake", "auction"]));
     expect(new Set(rows.map((row) => row.experienceTier))).toEqual(new Set(["beginner", "experienced"]));
     expect(new Set(rows.map((row) => row.stakeTier)).size).toBeGreaterThan(1);
@@ -68,7 +68,7 @@ describe("seedPublicLeagues", () => {
     await seedPublicLeagues(db, clock);
     const full = DEV_SEED.publicLeagues.filter((plan) => plan.filled >= plan.teamCount);
     expect(full.length).toBeGreaterThan(0);
-    const listed = new Set((await listPublicLeagues(db, EMPTY_BROWSE_FILTER)).map((row) => row.id));
+    const listed = new Set((await listPublicLeagues(db, EMPTY_BROWSE_FILTER)).leagues.map((row) => row.id));
     for (const plan of full) expect(listed.has(plan.leagueId)).toBe(false);
   });
 

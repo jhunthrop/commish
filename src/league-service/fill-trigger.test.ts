@@ -11,6 +11,7 @@ import { SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { createLeague } from "./creation";
 import { FILL_TRIGGER_REFUSALS, fireWhenFullInTx } from "./fill-trigger";
+import { ensureHouseCatalog } from "./house-factory";
 import { acceptInvite, createInvite } from "./invites";
 import { joinPublicLeague } from "./join";
 
@@ -256,5 +257,38 @@ describe("fireWhenFullInTx, driven through the real join door", () => {
       .from(auditEvents)
       .where(and(eq(auditEvents.leagueId, leagueId), eq(auditEvents.eventType, "system_action")));
     expect(events).toHaveLength(1);
+  });
+
+  // Phase 3.5 addendum, Task 14, Step 4: the house case — `sitandgo_12` is the one catalog rung
+  // whose `startTrigger` is `when_full` (`HOUSE_CATALOG`'s own docblock), so it is the ONLY house
+  // rung this trigger ever reaches. Real production spawn (`ensureHouseCatalog`), not a hand-built
+  // fixture, so this proves the wiring an actual restock produces, not a lookalike.
+  it("sends house_league_filled, not draft_fill_triggered, when a HOUSE sit-and-go league fills", async () => {
+    const opened = await ensureHouseCatalog(db, { clock, newId });
+    const leagueId = opened.opened.find((id) => id.includes("sitandgo"));
+    if (leagueId === undefined) throw new Error("ensureHouseCatalog did not open a sitandgo_12 league");
+
+    await fillTo(leagueId, 12);
+
+    const houseNotices = await db
+      .select()
+      .from(memberNotices)
+      .where(and(eq(memberNotices.leagueId, leagueId), eq(memberNotices.noticeType, "house_league_filled")));
+    expect(houseNotices).toHaveLength(12);
+    expect(houseNotices.every((notice) => notice.body === "Your league is full and the draft is next. A new house league is open if you want a second team.")).toBe(true);
+
+    // Never the member-league notice for a house league that just filled.
+    expect(await fillTriggeredNotices(leagueId)).toEqual([]);
+
+    // The audit event's own `action` stays `draft_fill_triggered` either way — see
+    // `fireWhenFullInTx`'s own docblock for why no second system-action code exists for this.
+    // Two `system_action` events exist on this chain by now (`house_league_opened` from the
+    // spawn above, `draft_fill_triggered` from this fill), so this looks for the fill one by name
+    // rather than destructuring the first row back off an unordered `select`.
+    const events = await db
+      .select()
+      .from(auditEvents)
+      .where(and(eq(auditEvents.leagueId, leagueId), eq(auditEvents.eventType, "system_action"), eq(auditEvents.actorType, "system")));
+    expect(events.some((event) => (event.payload as { readonly action?: string }).action === "draft_fill_triggered")).toBe(true);
   });
 });

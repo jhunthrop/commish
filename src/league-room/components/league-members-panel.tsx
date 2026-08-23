@@ -1,6 +1,7 @@
 import type { LeagueMemberCard } from "../contract";
-import { Avatar, Badge, Button, EmptyState } from "@/components/ui";
+import { Avatar, Badge, Button, EmptyState, InfoTip } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
+import type { HelpLevel } from "@/identity/preferences";
 import type { LeagueAuthority } from "@/league-service/authority";
 
 export interface LeagueMembersPanelProps {
@@ -13,6 +14,7 @@ export interface LeagueMembersPanelProps {
   /** The league's total seat count. Omit to hide the open-seats line entirely (e.g. a context
    *  that already states it elsewhere) rather than render "0 seats still open" as a fact. */
   readonly teamCount?: number;
+  readonly helpLevel?: HelpLevel;
 }
 
 /**
@@ -31,7 +33,7 @@ export interface LeagueMembersPanelProps {
  * silent. The line above the roster states the fact instead of leaving it to be inferred from
  * an absence.
  */
-export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount }: LeagueMembersPanelProps) {
+export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, helpLevel }: LeagueMembersPanelProps) {
   const openSeats = teamCount === undefined ? 0 : Math.max(0, teamCount - teams.length);
 
   return (
@@ -41,6 +43,7 @@ export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount }: Le
         <p className="flex items-center gap-2 text-sm text-text-muted">
           <Icon name="shield" size={16} />
           Run by Commish
+          <InfoTip term="house-league" helpLevel={helpLevel} />
         </p>
       ) : null}
       {teams.length === 0 ? (

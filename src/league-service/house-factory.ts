@@ -30,8 +30,18 @@ import { writeLeagueInTx, type CreateLeagueInput } from "./creation";
  * `dueDraftsQuery`/`liveDraftsQuery` already use, so `src/db/index-plans.test.ts` can `EXPLAIN`
  * the real thing rather than a hand copy.
  *
- * Ordered by `created_at` ascending — the order Task 14's shelf is read in, and the order
- * `leagues_house_rung_idx` (`@/db/schema`) carries `created_at` as its second column for.
+ * Ordered by `created_at` ascending — the order THIS reconciler needs (each new spawn gets the
+ * next stagger slot, `openIndex` below, off how many of the rung's own leagues already exist),
+ * and the order `leagues_house_rung_idx` (`@/db/schema`) carries `created_at` as its second
+ * column for.
+ *
+ * NOT the order the shelf itself is read in. An earlier draft of this docblock (and of the
+ * index's own) assumed creation order and Task 14's soonest-draft shelf order would coincide,
+ * because a `scheduled` rung's kickoff IS creation-ordered WITHIN that one rung
+ * (`houseKickoffFor`'s own stagger). They do not coincide ACROSS rungs — `open_12` and
+ * `beginner_12` stagger on independent clocks — so the shelf reads through its own query,
+ * ordered on `drafts.kickoff_at` (`houseShelfQuery`, `@/league-service/browse.ts`), never this
+ * one.
  */
 export function openHouseLeaguesQuery(db: Db, rung: HouseRungName) {
   return db

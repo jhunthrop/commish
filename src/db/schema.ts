@@ -202,8 +202,17 @@ export const leagues = pgTable(
     /**
      * PARTIAL for the identical reason `leagues_public_browse_idx` is: `house_rung` is null for
      * the overwhelming majority of leagues forever. Carries `created_at` as its second column
-     * because the reconciler's count (Task 13) and the shelf's ordering (Task 14) both read house
-     * rows in creation order.
+     * because the reconciler's count (Task 13, `openHouseLeaguesQuery`) reads house rows in
+     * creation order to assign each new spawn the next stagger slot.
+     *
+     * The shelf itself (Task 14, `houseShelfQuery`, `@/league-service/browse.ts`) does NOT read
+     * this second column for its own ordering — an earlier draft of this note assumed creation
+     * order and the shelf's soonest-draft order would coincide, true only WITHIN one rung
+     * (`houseKickoffFor`'s own stagger), never ACROSS rungs staggering on independent clocks. The
+     * shelf orders on `drafts.kickoff_at` instead, a `Sort` measured after this index's own scan
+     * in `src/db/index-plans.test.ts` rather than served by the index directly. This index still
+     * serves the shelf query's `WHERE house_rung IS NOT NULL` predicate — that half of the plan,
+     * never the order.
      */
     index("leagues_house_rung_idx").on(t.houseRung, t.createdAt).where(sql`${t.houseRung} is not null`),
     /**

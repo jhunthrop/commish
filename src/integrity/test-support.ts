@@ -208,4 +208,5 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   draft_auto_started: { leagueName: "Sunday Money" },
   draft_pick_skipped: { leagueName: "Sunday Money" },
   draft_fill_triggered: { leagueName: "Sunday Money", graceLabel: "5 minutes" },
+  house_league_filled: { leagueName: "Open 12-team League 3" },
 };

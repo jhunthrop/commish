@@ -283,6 +283,21 @@ export interface NoticeContexts {
     readonly leagueName: string;
     readonly graceLabel: string;
   };
+  /**
+   * `fireWhenFullInTx`'s own notice for a HOUSE league specifically (Phase 3.5 addendum, Task 14,
+   * Step 4) — the sit-and-go rung's last-seat moment, told with the one fact `draft_fill_
+   * triggered`'s generic sentence cannot: the shelf refills itself, so this is never the last
+   * seat this member can find. Sent to every seat in place of `draft_fill_triggered` when the
+   * filling league is a house league (`leagues.house_rung IS NOT NULL`) — never both, the
+   * identical "one event, one sentence" discipline every other system-triggered notice in this
+   * file holds to. `leagueName` rides along for the audit context even though the template below
+   * does not read it (`review_removed`'s own `reason` is the precedent for a context field a
+   * template leaves unused): the sentence is deliberately generic, because which SPECIFIC house
+   * league just filled is a fact the member already sees on the room they are standing in.
+   */
+  readonly house_league_filled: {
+    readonly leagueName: string;
+  };
 }
 
 /**
@@ -480,6 +495,16 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   draft_fill_triggered: ({ leagueName, graceLabel }) => ({
     title: `Your league in ${leagueName} just filled up`,
     body: `The last seat in ${leagueName} just filled, so the draft starts in about ${graceLabel}. Head to the draft room now, or let the clock queue your picks if you cannot make it.`,
+  }),
+  // No "no reply to this message" line: this is not a sanction, and there is nothing about any
+  // member's own conduct to appeal — it explains a fact about the league's shared calendar, the
+  // identical framing `draft_fill_triggered`'s own template already carries. The second sentence
+  // is the one thing a house league can say that a member-run one cannot (Task 14's own brief,
+  // verbatim): the shelf refills itself, so this was never the last house room this member could
+  // find.
+  house_league_filled: () => ({
+    title: "Your house league is full",
+    body: "Your league is full and the draft is next. A new house league is open if you want a second team.",
   }),
 };
 

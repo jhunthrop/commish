@@ -124,7 +124,7 @@ describe("features built on fixtures, run against a real drafted league", () => 
 
     // Browse must never surface a league whose draft already ran, even though it is now public.
     const listed = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
-    expect(listed.some((row) => row.id === league.leagueId)).toBe(false);
+    expect(listed.leagues.some((row) => row.id === league.leagueId)).toBe(false);
 
     // And the join door agrees: a stranger posting this league's real id is refused because its
     // draft already started, not silently seated into a league mid-season.

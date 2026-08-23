@@ -3,18 +3,24 @@
 import Link from "next/link";
 import { Countdown, formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
 import { StatePanel } from "@/components/ui/state-panel";
+import type { LeagueAuthority } from "@/league-service/authority";
 import { hasOpenSeat } from "@/matchmaking/filter";
 import type { DraftScheduleBody } from "../contract";
 import { draftTerminalStatePanel } from "./draft-schedule-panel";
 
 /**
- * `DraftScheduleBody` plus the one fact Task 8's own "Produces" list deliberately does not add
+ * `DraftScheduleBody` plus the two facts Task 8's own "Produces" list deliberately does not add
  * there (`DraftScheduleBody.startTrigger`/`filledTeams` are the only two new fields it names):
  * `teamCount` rides in from `LeagueHomeBody`, which `LeagueHome` already holds for its own
- * header line, rather than a third copy of a league's own seat count on the wire.
+ * header line, rather than a third copy of a league's own seat count on the wire. `authority`
+ * (Phase 3.5 addendum, Task 14) is the SAME `LeagueHomeBody.authority` Task 12's wire type
+ * carries — this component reads its `kind` directly, rather than trusting a page-local
+ * `isHouse` boolean a caller could compute wrong, to decide which of the two filling-state
+ * actions a house league can actually offer.
  */
 export interface WaitingRoomLeague extends DraftScheduleBody {
   readonly teamCount: number;
+  readonly authority: LeagueAuthority;
 }
 
 /**
@@ -52,8 +58,19 @@ export interface WaitingRoomLeague extends DraftScheduleBody {
  * draft (state 2) — a manager watching a half-full league (state 1) sees no ticking clock at all,
  * so there is nothing counting down to create false urgency around a moment that may be hours
  * away.
+ *
+ * PHASE 3.5 ADDENDUM, TASK 14, STEP 4. A house league adds no fifth state and changes one: in
+ * the filling state, "Invite someone" is a member-league-only lever (ruling 33 — nobody holds an
+ * invite code to a room the platform runs), gated on `league.authority.kind === "house"` rather
+ * than on `isCommissioner` alone. That reads the SAME wire union `LeagueMembersPanel`'s own
+ * "Run by Commish" branch keys on, never a page-local recomputation of who runs this league —
+ * `isCommissioner` is already always `false` for a house league (`isCommissionerOf`'s own
+ * docblock), so the two conditions never disagree, but only one of them SAYS why. In its place, a
+ * house league's second action reads "See the rest of the shelf" — the "never a dead end" rule
+ * doing exactly what it exists for on the one surface where the obvious action is unavailable.
  */
 export function WaitingRoom({ league, isCommissioner }: { readonly league: WaitingRoomLeague; readonly isCommissioner: boolean }) {
+  const isHouse = league.authority.kind === "house";
   const full = !hasOpenSeat(league);
   // Called unconditionally, before any early return — React's Rules of Hooks. `null` once
   // there's nothing left to count down to: still filling (no kickoff has been set yet), or a
@@ -100,13 +117,13 @@ export function WaitingRoom({ league, isCommissioner }: { readonly league: Waiti
       description="You don't have to wait here. We'll let you know the moment it fills."
       action={
         <div className="flex flex-wrap items-center justify-center gap-4">
-          {isCommissioner ? (
+          {isHouse || !isCommissioner ? null : (
             <Link href={`/app/leagues/${league.leagueId}#invite-managers`} className="text-sm font-medium text-accent underline">
               Invite someone
             </Link>
-          ) : null}
+          )}
           <Link href="/browse" className="text-sm font-medium text-accent underline">
-            See leagues closer to filling
+            {isHouse ? "See the rest of the shelf" : "See leagues closer to filling"}
           </Link>
         </div>
       }

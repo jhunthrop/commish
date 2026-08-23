@@ -30,7 +30,8 @@ export type TermKey =
   | "queue"
   | "draft-slot"
   | "sit-and-go"
-  | "verified-reviewer";
+  | "verified-reviewer"
+  | "house-league";
 
 export interface GlossaryTerm {
   readonly key: TermKey;
@@ -184,6 +185,20 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     term: "a verified reviewer",
     short: VERIFIED_BADGE_TOOLTIP,
     detail: VERIFIED_BADGE_TOOLTIP,
+  },
+  /**
+   * Phase 3.5 addendum, Task 14, Step 5: the word the shelf and the members panel both need.
+   * `detail` is the brief's own sentence, verbatim. `short` is a compliant derivative — the
+   * full sentence runs to 128 characters, past `HELP_CONFIG.maxShortLength` (90) — that keeps
+   * the same two facts (Commish runs it, everyone plays the same game) without the third
+   * (the shelf always has a seat), which `detail` still states in full once a reader opens it.
+   */
+  "house-league": {
+    key: "house-league",
+    term: "a house league",
+    short: "A league Commish runs. Everyone joins the same way and plays the same rules.",
+    detail:
+      "A league Commish runs. Everyone joins the same way, the rules are the same in every one, and a new one opens whenever one fills.",
   },
 };
 

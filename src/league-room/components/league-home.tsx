@@ -59,7 +59,10 @@ export function LeagueHome({
           at once, keyed on `home.draftSchedule.startTrigger`. `DraftSchedulePanel` keeps the
           `'scheduled'`-trigger case exactly as it was. */}
       {home.draftSchedule === null ? null : home.draftSchedule.startTrigger === "when_full" ? (
-        <WaitingRoom league={{ ...home.draftSchedule, teamCount: home.teamCount }} isCommissioner={home.isCommissioner} />
+        <WaitingRoom
+          league={{ ...home.draftSchedule, teamCount: home.teamCount, authority: home.authority }}
+          isCommissioner={home.isCommissioner}
+        />
       ) : (
         <DraftSchedulePanel leagueId={home.leagueId} isCommissioner={home.isCommissioner} initialSchedule={home.draftSchedule} />
       )}
@@ -140,7 +143,13 @@ export function LeagueHome({
       */}
       <LeagueTermsPanel terms={home.terms} helpLevel={helpLevel} titleAs="p" />
 
-      <LeagueMembersPanel teams={home.teams} teamCount={home.teamCount} authority={home.authority} myTeamId={home.myTeamId} />
+      <LeagueMembersPanel
+        teams={home.teams}
+        teamCount={home.teamCount}
+        authority={home.authority}
+        myTeamId={home.myTeamId}
+        helpLevel={helpLevel}
+      />
 
       {/* `id="invite-managers"`: `WaitingRoom`'s own "Invite someone" link (Task 8, a `when_full`
           league's filling state) points here — the one real invite surface a commissioner has. */}

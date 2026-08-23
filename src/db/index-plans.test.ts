@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import type { Db } from "./client";
 import { createTestDb, truncateAll } from "./test-db";
 import { draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
 import { explainPlan, findNode, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
@@ -11,7 +12,7 @@ import { liveDraftsQuery } from "@/draft-service/ticker";
 import { openQuestionsQuery, pendingFlagQuery } from "@/integrity-service/flags";
 import { signalsForUsersQuery } from "@/integrity-service/session-signals";
 import { completedSeasonsQuery } from "@/league-service/participation";
-import { browseQuery } from "@/league-service/browse";
+import { browseQuery, houseShelfQuery } from "@/league-service/browse";
 import { leaguesNeedingAutoSetQuery } from "@/league-service/auto-lineup";
 import { tradesQuery } from "@/league-service/trades";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
@@ -19,10 +20,42 @@ import { AUDIT_EVENT_TYPES } from "@/domain/audit";
 
 const db = createTestDb();
 
+/**
+ * A small house-shelf sample, layered on top of `seedRealisticCorpus`'s 5,000 member leagues
+ * (Phase 3.5 addendum, Task 14) — a handful of house rows against thousands of member ones, the
+ * realistic proportion `leagues_house_rung_idx`'s own partial predicate exists for.
+ *
+ * `kickoff_at` is seeded in the EXACT REVERSE of `created_at` — league 1 created first but
+ * kicking off last, league 8 created last but kicking off first — the one shape that would catch
+ * a regression back to sorting the shelf by the index's own `created_at` column instead of the
+ * kickoff a visitor actually cares about. No `teams` rows: every house league here is empty, so
+ * `HAVING count(teams.id) < team_count` holds trivially and every row is a shelf candidate.
+ */
+async function seedHouseShelfSample(db: Db): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO leagues (id, name, format, team_count, stake_tier, is_public_matchmade, experience_tier, commissioner_user_id, house_rung, created_at)
+    SELECT 'house_shelf_' || g,
+           'House Shelf ' || g,
+           'snake'::draft_format,
+           12, 0, true, 'experienced'::experience_tier, NULL,
+           (ARRAY['open_12', 'beginner_12'])[1 + (g % 2)],
+           now() - (g || ' hours')::interval
+    FROM generate_series(1, 8) g
+  `);
+  await db.execute(sql`
+    INSERT INTO drafts (id, league_id, format, status, kickoff_at)
+    SELECT 'house_shelf_' || g || '_draft', 'house_shelf_' || g, 'snake'::draft_format, 'scheduled'::draft_status,
+           now() + ((9 - g) || ' hours')::interval
+    FROM generate_series(1, 8) g
+  `);
+  await db.execute(sql`ANALYZE leagues, drafts`);
+}
+
 describe("hot read paths use indexes", () => {
   beforeAll(async () => {
     await truncateAll(db);
     await seedRealisticCorpus(db);
+    await seedHouseShelfSample(db);
   }, 120_000);
 
   // `teams` is deliberately not asserted here: at this corpus size, the planner's genuine
@@ -98,6 +131,44 @@ describe("hot read paths use indexes", () => {
     const types = nodeTypes(plan);
     expect(types.indexOf("Limit")).toBeLessThan(types.indexOf("Sort"));
     expect(types.some((type) => type === "HashAggregate" || type === "Aggregate")).toBe(true);
+  });
+
+  /**
+   * PHASE 3.5 ADDENDUM, TASK 14, STEP 2. The house shelf's own query, measured separately from
+   * the member list's: `leagues_house_rung_idx`'s partial predicate (`house_rung IS NOT NULL`)
+   * matches `houseShelfQuery`'s own `WHERE` exactly, the identical reasoning
+   * `leagues_season_completed_idx`'s own consumer note carries, so the planner answers with an
+   * index scan rather than a sequential scan of 5,008 rows to find the 8 that qualify.
+   */
+  it("the house shelf reads leagues_house_rung_idx, never a sequential scan of leagues", async () => {
+    const plan = await explainPlan(db, houseShelfQuery(db));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
+    expect(indexScanNode(plan, "leagues_house_rung_idx")).toBeDefined();
+  });
+
+  /**
+   * THE MEASUREMENT THIS TASK'S BINDING CONTEXT DEMANDED: an earlier draft of both
+   * `leagues_house_rung_idx`'s own docblock (`schema.ts`) and `houseShelfQuery`'s assumed the
+   * shelf could read its ordering straight off the index's second column (`created_at`), on the
+   * (false, across rungs) belief that creation order and soonest-draft order coincide. They do
+   * not: `seedHouseShelfSample`'s own corpus seeds `kickoff_at` in the EXACT REVERSE of
+   * `created_at`, so a plan that still sorted by `created_at` would rank these leagues backwards.
+   * The mutation proof is the `"Sort Key"` assertion itself — `nodeTypes` alone can only see THAT
+   * a `Sort` node exists, not WHAT it sorts by, so a regression back to trusting the index's own
+   * column order would leave every other assertion in this describe block green while silently
+   * shipping the wrong shelf.
+   */
+  it("sorts the shelf by drafts.kickoff_at, never by leagues_house_rung_idx's own created_at column", async () => {
+    const plan = await explainPlan(db, houseShelfQuery(db));
+    const sort = findNode(plan, (node) => node["Node Type"] === "Sort" && (node["Sort Key"]?.length ?? 0) >= 1);
+    expect(sort).toBeDefined();
+    expect(sort?.["Sort Key"]?.[0]).toBe("drafts.kickoff_at");
+
+    const shelf = await houseShelfQuery(db);
+    expect(shelf.map((row) => row.id)).toEqual([
+      "house_shelf_8", "house_shelf_7", "house_shelf_6", "house_shelf_5",
+      "house_shelf_4", "house_shelf_3", "house_shelf_2", "house_shelf_1",
+    ]);
   });
 
   /**

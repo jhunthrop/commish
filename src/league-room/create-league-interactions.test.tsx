@@ -109,6 +109,7 @@ describe("signed in to an invitable league", () => {
       filledTeams: 1,
       teamCount: body.teamCount,
       slotPreference: null,
+      authority: { kind: "member", userId: "commish_1" },
     };
     render(<WaitingRoom league={waitingRoomLeague} isCommissioner={true} />);
     expect(screen.getByText(`1 of ${body.teamCount} seats taken`)).toBeVisible();

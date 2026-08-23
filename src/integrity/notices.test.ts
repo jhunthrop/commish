@@ -195,6 +195,7 @@ describe("NOTICE_TEMPLATES", () => {
       "draft_auto_started",
       "draft_fill_triggered",
       "draft_pick_skipped",
+      "house_league_filled",
       "lineup_auto_set",
       "operator_warning",
       "review_removed",

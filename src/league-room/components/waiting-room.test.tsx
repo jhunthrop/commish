@@ -15,6 +15,14 @@ const BASE: WaitingRoomLeague = {
   filledTeams: 9,
   teamCount: 12,
   slotPreference: null,
+  authority: { kind: "member", userId: "commish_1" },
+};
+
+/** Phase 3.5 addendum, Task 14, Step 4: the house case — no member holds an invite code to a
+ *  room the platform runs, ruling 33. */
+const houseFilling: WaitingRoomLeague = {
+  ...BASE,
+  authority: { kind: "house", rung: "sitandgo_12" },
 };
 
 const fullSitAndGo: WaitingRoomLeague = {
@@ -111,5 +119,21 @@ describe("WaitingRoom", () => {
     expect(screen.getByRole("link", { name: "Invite someone" })).toHaveFocus();
     await user.tab();
     expect(screen.getByRole("link", { name: "See leagues closer to filling" })).toHaveFocus();
+  });
+
+  // Phase 3.5 addendum, Task 14, Step 4. The gate reads `league.authority.kind`, the wire union
+  // Task 12 shipped, never a page-local recomputation — `isCommissioner={true}` here is
+  // deliberately the impossible case (nobody is ever commissioner of a house league,
+  // `isCommissionerOf`'s own docblock) to prove the authority check is what actually hides the
+  // link, not a value this test could never seed wrong.
+  it("never offers Invite for a house league, even if isCommissioner were somehow true", () => {
+    render(<WaitingRoom league={houseFilling} isCommissioner={true} />);
+    expect(screen.queryByRole("link", { name: "Invite someone" })).not.toBeInTheDocument();
+  });
+
+  it("offers the rest of the shelf instead, for a house league's filling state", () => {
+    render(<WaitingRoom league={houseFilling} isCommissioner={false} />);
+    expect(screen.getByRole("link", { name: "See the rest of the shelf" })).toHaveAttribute("href", "/browse");
+    expect(screen.queryByText("See leagues closer to filling")).not.toBeInTheDocument();
   });
 });
