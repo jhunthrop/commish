@@ -1,18 +1,26 @@
 import { Button, Select } from "@/components/ui";
+import { LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter } from "@/matchmaking/contract";
 
 const ANY = MATCHMAKING_CONFIG.anyValue;
 const FORMAT_LABELS: Readonly<Record<string, string>> = { snake: "Snake", auction: "Auction" };
-const TIER_LABELS: Readonly<Record<string, string>> = { beginner: "New to fantasy", experienced: "Played before" };
 
 const FORMAT_OPTIONS = [
   { value: ANY, label: "Any format" },
   ...MATCHMAKING_CONFIG.formats.map((value) => ({ value, label: FORMAT_LABELS[value] ?? value })),
 ];
+/**
+ * `experienceTier` here narrows by the LEAGUE's own declared tier (`league.experienceTier` in
+ * `matchesBrowseFilter`, `@/matchmaking/filter`), the same axis `CreateLeagueForm`'s `Who it's
+ * for` control writes — so this control reads `LEAGUE_EXPERIENCE_TIER_LABEL` (`@/identity/config`)
+ * rather than the person-facing `EXPERIENCE_TIER_LABEL` a private copy here used to duplicate
+ * word-for-word: a visitor filtering leagues is choosing "open" vs. "reserved", not describing
+ * their own football history.
+ */
 const EXPERIENCE_OPTIONS = [
   { value: ANY, label: "Any experience" },
-  ...MATCHMAKING_CONFIG.experienceTiers.map((value) => ({ value, label: TIER_LABELS[value] ?? value })),
+  ...MATCHMAKING_CONFIG.experienceTiers.map((value) => ({ value, label: LEAGUE_EXPERIENCE_TIER_LABEL[value] ?? value })),
 ];
 const STAKE_OPTIONS = [
   { value: ANY, label: "Any stake tier" },
