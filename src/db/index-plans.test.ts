@@ -141,7 +141,7 @@ describe("hot read paths use indexes", () => {
    * index scan rather than a sequential scan of 5,008 rows to find the 8 that qualify.
    */
   it("the house shelf reads leagues_house_rung_idx, never a sequential scan of leagues", async () => {
-    const plan = await explainPlan(db, houseShelfQuery(db));
+    const plan = await explainPlan(db, houseShelfQuery(db, new Date().toISOString()));
     expect(sequentiallyScannedRelations(plan)).not.toContain("leagues");
     expect(indexScanNode(plan, "leagues_house_rung_idx")).toBeDefined();
   });
@@ -159,12 +159,12 @@ describe("hot read paths use indexes", () => {
    * shipping the wrong shelf.
    */
   it("sorts the shelf by drafts.kickoff_at, never by leagues_house_rung_idx's own created_at column", async () => {
-    const plan = await explainPlan(db, houseShelfQuery(db));
+    const plan = await explainPlan(db, houseShelfQuery(db, new Date().toISOString()));
     const sort = findNode(plan, (node) => node["Node Type"] === "Sort" && (node["Sort Key"]?.length ?? 0) >= 1);
     expect(sort).toBeDefined();
     expect(sort?.["Sort Key"]?.[0]).toBe("drafts.kickoff_at");
 
-    const shelf = await houseShelfQuery(db);
+    const shelf = await houseShelfQuery(db, new Date().toISOString());
     expect(shelf.map((row) => row.id)).toEqual([
       "house_shelf_8", "house_shelf_7", "house_shelf_6", "house_shelf_5",
       "house_shelf_4", "house_shelf_3", "house_shelf_2", "house_shelf_1",

@@ -1,4 +1,4 @@
-import { and, asc, eq, sql } from "drizzle-orm";
+import { and, asc, eq, gt, or, sql, type SQL } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { drafts, leagues, teams } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
@@ -23,6 +23,24 @@ import { writeLeagueInTx, type CreateLeagueInput } from "./creation";
  */
 
 /**
+ * "This house league's draft can still happen" — the ONE expression of the kickoff half of
+ * "standing open", shared by the reconciler's count (`openHouseLeaguesQuery`, below) and the
+ * public shelf (`houseShelfQuery`, `./browse.ts`) so the two can never disagree about which
+ * leagues are on the shelf. Two expressions of one rule is how a drift starts, and this
+ * particular drift would be invisible: the shelf would render a league the reconciler had already
+ * replaced, or the reconciler would restock a slot the shelf still shows as occupied.
+ *
+ * True for a `when_full` rung unconditionally — its `kickoff_at` is a far-future placeholder
+ * until `fireWhenFullInTx` (`./fill-trigger.ts`) writes a real one on the last seat, so the
+ * column does not yet mean what a clock comparison would read it as. True for a `scheduled` rung
+ * only while its chosen time is still ahead. See `openHouseLeaguesQuery`'s docblock for the
+ * permanent stall this closes.
+ */
+export function houseKickoffStillAhead(nowIso: string): SQL | undefined {
+  return or(eq(drafts.startTrigger, "when_full"), gt(drafts.kickoffAt, new Date(nowIso)));
+}
+
+/**
  * Every house league of `rung` currently occupying a shelf slot: its draft is still `scheduled`
  * AND it has a free seat — the identical pair `browseQuery` (`@/league-service/browse.ts`)
  * already reads, so the reconciler's count and the browse page's own idea of "still joinable"
@@ -42,14 +60,40 @@ import { writeLeagueInTx, type CreateLeagueInput } from "./creation";
  * `beginner_12` stagger on independent clocks — so the shelf reads through its own query,
  * ordered on `drafts.kickoff_at` (`houseShelfQuery`, `@/league-service/browse.ts`), never this
  * one.
+ *
+ * STILL IN THE FUTURE, for a `scheduled` rung (final whole-branch review, F2). Without the
+ * kickoff predicate an under-filled scheduled-trigger house league whose time has PASSED occupied
+ * a shelf slot forever: `reduceStart` (`@/draft-engine`) refuses a draft with fewer than two
+ * teams, so its status never leaves `'scheduled'`; this count therefore never saw a shortfall, so
+ * the reconciler never restocked the slot; and `houseShelfQuery` kept rendering it at the TOP of
+ * the shelf, reading "starting now", forever. Nothing could repair it by hand either, because a
+ * house league's kickoff refuses edits by design (`HOUSE_AUTHORITY_REFUSALS.schedule`). One
+ * predicate on both queries retires the stale league from both roles at once: it stops counting,
+ * so the next reconciler pass opens a fresh edition in its place, and it stops rendering.
+ *
+ * `when_full` rungs are EXEMPT from it, and that is not an edge case being waved through: a
+ * sit-and-go draft has no chosen time at all until `fireWhenFullInTx` writes one on the last seat,
+ * and the placeholder it carries until then (`kickoffFor`, below) is a far-future date precisely
+ * so nothing mistakes it for a real one. Judging it by the clock would be judging a value that
+ * does not mean what the column's name says.
+ *
+ * `nowIso` is INJECTED, never `now()` in SQL — the repo-wide clock discipline (`docs/conventions.md`),
+ * which is also what lets `house-factory.test.ts` seed a passed kickoff without waiting for one.
+ *
+ * NOT AN ABANDONMENT STATE MACHINE, deliberately. A stale draft is still scanned by
+ * `dueDraftsQuery`/`autoStartDueDrafts` (`@/draft-service/auto-start`) every tick and still
+ * refused by `reduceStart` every time, which is a bounded no-op over a bounded set, not a leak.
+ * Phase 3.6's Task 7 ("roll until full") replaces this whole door — a house league that cannot
+ * start rolls its own kickoff forward instead of being retired — so a retirement state written
+ * here would be built to be deleted.
  */
-export function openHouseLeaguesQuery(db: Db, rung: HouseRungName) {
+export function openHouseLeaguesQuery(db: Db, rung: HouseRungName, nowIso: string) {
   return db
     .select({ id: leagues.id, createdAt: leagues.createdAt })
     .from(leagues)
     .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
     .leftJoin(teams, eq(teams.leagueId, leagues.id))
-    .where(and(eq(leagues.houseRung, rung), eq(drafts.status, "scheduled")))
+    .where(and(eq(leagues.houseRung, rung), eq(drafts.status, "scheduled"), houseKickoffStillAhead(nowIso)))
     .groupBy(leagues.id, drafts.id)
     .having(sql`count(${teams.id}) < ${leagues.teamCount}`)
     .orderBy(asc(leagues.createdAt));
@@ -217,7 +261,10 @@ export async function ensureHouseCatalog(db: Db, deps: HouseFactoryDeps): Promis
     let attempts = 0;
 
     while (budget > 0 && attempts < attemptCeiling) {
-      const open = await openHouseLeaguesQuery(db, rungName);
+      // The clock is read per iteration, not hoisted: each pass re-reads the open count FRESH
+      // (see this function's docblock on the two-instance race), and a count is only as fresh as
+      // the instant its kickoff predicate is measured against.
+      const open = await openHouseLeaguesQuery(db, rungName, deps.clock.now());
       if (open.length >= rung.openAtOnce) break;
 
       attempts += 1;

@@ -134,7 +134,7 @@ const HOUSE_JOIN_FILLER_ID_PREFIX = "e2e_house_filler_";
  *  clause), so — unlike the seed's own `resolveSafeFillTarget` — there is no "already full, safe
  *  regardless of kickoff" shortcut here: each candidate is checked on its kickoff alone. */
 async function resolveOpenHouseLeague(db: Db, clock: { readonly now: () => string }): Promise<{ readonly id: string; readonly name: string; readonly teamCount: number; readonly filled: number }> {
-  const rows = await openHouseLeaguesQuery(db, "open_12");
+  const rows = await openHouseLeaguesQuery(db, "open_12", clock.now());
   if (rows.length === 0) {
     throw new Error("[e2e] formats-and-lobby: no open open_12 house league found — has the shelf's own reconciler run yet?");
   }

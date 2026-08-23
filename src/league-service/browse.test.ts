@@ -34,6 +34,14 @@ async function seedHouseLeague(league: {
   readonly kickoffAt: Date;
   readonly teamCount?: number;
   readonly filled?: number;
+  /** Defaults to `'scheduled'` — the two `scheduled` rungs are what every case before the final
+   *  review's F2 seeded. A `'when_full'` row is what proves the staleness predicate exempts a
+   *  sit-and-go placeholder kickoff. */
+  readonly startTrigger?: "scheduled" | "when_full";
+  /** Defaults to `true`, which is the only value the real factory ever writes. `false` exists
+   *  for exactly one test: the final review's F6, proving the shelf's privacy boundary is
+   *  structural rather than conventional. */
+  readonly isPublicMatchmade?: boolean;
 }): Promise<void> {
   const teamCount = league.teamCount ?? 12;
   const filled = league.filled ?? 0;
@@ -44,7 +52,7 @@ async function seedHouseLeague(league: {
     teamCount,
     stakeTier: 0,
     experienceTier: "experienced",
-    isPublicMatchmade: true,
+    isPublicMatchmade: league.isPublicMatchmade ?? true,
     commissionerUserId: null,
     houseRung: league.rung,
   });
@@ -54,6 +62,7 @@ async function seedHouseLeague(league: {
     format: "snake",
     status: "scheduled",
     kickoffAt: league.kickoffAt,
+    startTrigger: league.startTrigger ?? "scheduled",
   });
   await db.insert(scoringSettings).values({ leagueId: league.id, ...STANDARD_SCORING });
   for (let i = 0; i < filled; i++) {
@@ -767,6 +776,60 @@ describe("listPublicLeagues house shelf", () => {
       teamCount: 2, filled: 2,
     });
     const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(house).toEqual([]);
+  });
+
+  /**
+   * FINAL WHOLE-BRANCH REVIEW, F2. An under-filled `scheduled`-trigger house league whose kickoff
+   * has passed used to render FIRST on the public shelf, forever: the shelf orders by
+   * `kickoff_at` ASC, so the most-past time sorts to the top and reads "starting now". Nothing
+   * could ever start it (`reduceStart` refuses a draft with fewer than two teams, so its status
+   * never leaves `'scheduled'`) and nothing could repair it (a house league's kickoff refuses
+   * edits by design). The same predicate that stops it counting toward the reconciler's shelf
+   * width stops it rendering — one expression, `houseKickoffStillAhead`, shared by both queries.
+   */
+  const AFTER_A_STALE_KICKOFF = { now: () => "2026-09-11T19:00:00.000Z" };
+
+  it("leaves a stale scheduled house league off the shelf rather than showing it as starting now", async () => {
+    await seedHouseLeague({ id: "house_stale", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
+    await seedHouseLeague({ id: "house_fresh", rung: "open_12", kickoffAt: new Date("2026-09-12T19:00:00.000Z") });
+
+    const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER, AFTER_A_STALE_KICKOFF);
+
+    // Not merely ranked below the fresh one — gone. Sorted by kickoff it would have led the shelf.
+    expect(house.map((l) => l.id)).toEqual(["house_fresh"]);
+  });
+
+  it("keeps a sit-and-go league on the shelf however far its placeholder kickoff has drifted", async () => {
+    // A `when_full` rung has no chosen time at all until the last seat lands (`fireWhenFullInTx`
+    // writes one then). Until that moment `kickoff_at` is a placeholder, and judging it by the
+    // clock would be judging a value that does not mean what the column's name says — so the
+    // staleness predicate exempts the trigger outright rather than reaching for a wider margin.
+    await seedHouseLeague({
+      id: "house_sitandgo", rung: "sitandgo_12",
+      kickoffAt: new Date("2026-09-10T19:00:00.000Z"), startTrigger: "when_full",
+    });
+
+    const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER, AFTER_A_STALE_KICKOFF);
+
+    expect(house.map((l) => l.id)).toEqual(["house_sitandgo"]);
+  });
+
+  /**
+   * FINAL WHOLE-BRANCH REVIEW, F6. `browseQuery`'s first safety property is that
+   * `is_public_matchmade` is opt-in, and the shelf half shipped without checking it — resting
+   * instead on the convention that the house factory always writes `true`. The row below cannot
+   * exist through any code path this product has; seeding it directly is the point, because what
+   * is under test is whether the boundary is structural or merely remembered.
+   */
+  it("refuses a house league that is not public-matchmade, on the one unauthenticated read", async () => {
+    await seedHouseLeague({
+      id: "house_private", rung: "open_12",
+      kickoffAt: new Date("2026-09-10T19:00:00.000Z"), isPublicMatchmade: false,
+    });
+
+    const { house } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER);
+
     expect(house).toEqual([]);
   });
 

@@ -119,14 +119,45 @@ describe("seedHouseCatalogDemo", () => {
     expect(filledSeats).toHaveLength(FILLER_COUNT);
   });
 
-  it("throws a named, loud error when every open_12 league is stale and none is already full — never a flaky fill", async () => {
+  /**
+   * FINAL WHOLE-BRANCH REVIEW, F2. This case used to end in the loud "stale shelf" throw, and it
+   * no longer can: an under-filled house league whose kickoff has passed stops counting toward
+   * the rung's width (`openHouseLeaguesQuery`), so the reconciler this arc runs FIRST sees the
+   * shortfall and opens fresh editions — and the arc then fills one of those instead of failing.
+   * That is the whole point of F2, so the test says so rather than pinning the old error.
+   */
+  it("self-heals an entirely stale shelf: the reconciler opens fresh editions and the arc fills one of those", async () => {
     await ensureHouseCatalog(db, { clock, newId: () => crypto.randomUUID() });
-    const openLeagues = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.houseRung, "open_12"));
-    for (const league of openLeagues) {
+    const staleLeagues = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.houseRung, "open_12"));
+    for (const league of staleLeagues) {
       await setKickoffOffset(league.id, -60_000); // one minute PAST kickoff — as stale as it gets.
     }
 
-    await expect(seedHouseCatalogDemo(db, clock)).rejects.toThrow(/stale shelf, not a flake/);
+    const result = await seedHouseCatalogDemo(db, clock);
+
+    // Never one of the stalled ones, and every one of them is left exactly as it was found.
+    expect(staleLeagues.map((league) => league.id)).not.toContain(result.filledLeagueId);
+    expect(result.seatsJoined).toBe(FILLER_COUNT);
+    for (const league of staleLeagues) {
+      const seats = await db.select().from(teams).where(eq(teams.leagueId, league.id));
+      expect(seats).toHaveLength(0);
+    }
+  });
+
+  it("throws a named, loud error when every open_12 league is stale AND the reconciler cannot restock — never a flaky fill", async () => {
+    await ensureHouseCatalog(db, { clock, newId: () => crypto.randomUUID() });
+    const openLeagues = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.houseRung, "open_12"));
+    for (const league of openLeagues) {
+      await setKickoffOffset(league.id, -60_000);
+    }
+    // The restock's own failure mode, driven rather than imagined: `ensureHouseCatalog` catches a
+    // spawn error, reports it on `refused` and moves on WITHOUT opening anything (its own
+    // docblock). Handing it a draft id that ALREADY EXISTS makes every spawn attempt fail exactly
+    // that way, which leaves the shelf as stale as it was — the one state in which this arc still
+    // has no safe league to fill and must say so loudly rather than race `autoStartDueDrafts`.
+    const [taken] = await db.select({ id: drafts.id }).from(drafts).where(eq(drafts.leagueId, openLeagues[0]!.id));
+
+    await expect(seedHouseCatalogDemo(db, clock, { newId: () => taken!.id })).rejects.toThrow(/stale shelf, not a flake/);
 
     // The loud failure left every candidate exactly as it found it — no partial, racy fill.
     for (const league of openLeagues) {

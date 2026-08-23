@@ -7,6 +7,7 @@ import type { Clock } from "@/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { formatDraftTime } from "@/league";
+import { houseKickoffStillAhead } from "./house-factory";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseBody, BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
 import type { HouseRungName } from "@/matchmaking/house-catalog";
@@ -262,8 +263,26 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
  * same reasoning `leagues_season_completed_idx`'s own consumer note carries) — the plan is an
  * index scan for the FILTER, then a `Sort` on `kickoff_at` for the order, measured rather than
  * assumed in `src/db/index-plans.test.ts`.
+ *
+ * `is_public_matchmade` IS CHECKED HERE (final whole-branch review, F6). This is an
+ * UNAUTHENTICATED read, and `browseQuery` above states the opt-in rule as the first of the three
+ * things that make such a read safe — but the shelf half shipped without it, resting instead on
+ * the convention that `spawnHouseLeagueInTx` (`./house-factory.ts`) always writes `true`. A
+ * privacy boundary held by a convention is held by whoever remembers it; this one is now
+ * structural, so a house row that somehow carried `false` could not reach a stranger even if
+ * something wrote one. `browse.test.ts` seeds exactly that hypothetical row and requires the
+ * shelf to refuse it.
+ *
+ * `houseKickoffStillAhead` (final whole-branch review, F2) retires a stale scheduled-trigger
+ * league from the shelf at the same instant it stops counting toward the reconciler's shelf
+ * width — ONE shared predicate, in `./house-factory.ts`, for exactly that reason. Without it, an
+ * under-filled league whose kickoff had passed rendered FIRST, forever, reading "starting now":
+  * `kickoffAt` ascending puts the most-past time at the top, and nothing could ever start it
+ * (`reduceStart` refuses a draft with fewer than two teams) or repair it (a house kickoff refuses
+ * edits by design). See that predicate's own docblock, and `openHouseLeaguesQuery`'s, for the
+ * whole account and for why no retirement state machine ships with it.
  */
-export function houseShelfQuery(db: Db) {
+export function houseShelfQuery(db: Db, nowIso: string) {
   const cutoff = INTEGRITY_CONFIG.participation.veteranSeasonCutoff;
   const seatCompletion = seatCompletedSeasonsQuery(db).as("seat_completion");
   const { veteranSeats, newcomerSeats } = participationAggregates(seatCompletion, cutoff);
@@ -288,7 +307,7 @@ export function houseShelfQuery(db: Db) {
     .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
     .leftJoin(teams, eq(teams.leagueId, leagues.id))
     .leftJoinLateral(seatCompletion, sql`true`)
-    .where(and(isNotNull(leagues.houseRung), eq(drafts.status, "scheduled")))
+    .where(and(eq(leagues.isPublicMatchmade, true), isNotNull(leagues.houseRung), eq(drafts.status, "scheduled"), houseKickoffStillAhead(nowIso)))
     .groupBy(leagues.id, drafts.id)
     .having(sql`count(${teams.id}) < ${leagues.teamCount}`)
     .orderBy(asc(drafts.kickoffAt))
@@ -406,10 +425,13 @@ function summarizeRow(
  * `browseQuery` alone to.
  */
 export async function listPublicLeagues(db: Db, filter: BrowseFilter, clock: Clock = systemClock): Promise<BrowseBody> {
-  const memberRows = await browseQuery(db, filter);
-  const houseRows = await houseShelfQuery(db);
-  const weightsByLeagueId = await scoringWeightsByLeagueId(db, [...memberRows, ...houseRows].map((row) => row.id));
+  // ONE instant for the shelf's own staleness predicate and for every card's rendered
+  // `draftAt` — read once, so a league cannot be judged not-yet-started by one and
+  // already-past by the other.
   const now = clock.now();
+  const memberRows = await browseQuery(db, filter);
+  const houseRows = await houseShelfQuery(db, now);
+  const weightsByLeagueId = await scoringWeightsByLeagueId(db, [...memberRows, ...houseRows].map((row) => row.id));
   return {
     leagues: memberRows.map((row) => summarizeRow(row, null, weightsByLeagueId, now)),
     house: houseRows.map((row) => summarizeRow(row, row.houseRung as HouseRungName, weightsByLeagueId, now)),
