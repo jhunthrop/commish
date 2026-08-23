@@ -10,6 +10,12 @@ import { VERIFIED_BADGE_TOOLTIP } from "@/participation/verified";
  *
  * `waiver` is deliberately absent: this product has no waiver-wire surface yet, and defining a
  * feature it doesn't have would teach a word nobody can act on.
+ *
+ * A term defined here does not have to be wired to an `InfoTip` the same commit it is added — but
+ * it cannot go unwired silently. `glossary.source.test.ts`'s `UNSURFACED` allowlist is where an
+ * unwired term is named on purpose, with a reason and the task that owns wiring it; a term with
+ * neither an `InfoTip` caller nor an `UNSURFACED` entry fails that test (Phase 3.6 addendum,
+ * Task 15 — the backend-leverage inventory, `docs/backend-surface-map.md`).
  */
 export type TermKey =
   | "snake-draft"
