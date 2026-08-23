@@ -1,8 +1,9 @@
 import { and, eq } from "drizzle-orm";
 import type { Db, DbTx, ReadonlyDb } from "@/db/client";
-import { leagues, matchups, statWeeks, teams } from "@/db/schema";
+import { leagues, matchups, statWeeks, teams, weeks } from "@/db/schema";
 import type { StatLine } from "@/domain/player";
 import type { Clock } from "@/domain/timing";
+import { medianResultFor } from "@/league";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import type { StatWeekCorrectionOutcome } from "@/integrity/notices";
@@ -103,6 +104,61 @@ export function correctionOutcome(before: MatchupResult, after: MatchupResult): 
   return "your matchup result stays the same";
 }
 
+type AxisMovement = "same" | "win" | "loss";
+
+/** The SAME "only a transition INTO a clean win or loss is actionable" rule `correctionOutcome`
+ *  uses, extracted so it can be applied to either axis (matchup or median) without duplicating
+ *  the rule inline — see that function's own docblock for why every other transition is "same". */
+function axisMovement(before: MatchupResult, after: MatchupResult): AxisMovement {
+  if (after === "win" && before !== "win") return "win";
+  if (after === "loss" && before !== "loss") return "loss";
+  return "same";
+}
+
+/**
+ * Fix round 1 (F1), the honesty gap: `correctionOutcome` alone names only the head-to-head
+ * matchup's own movement, so a correction that flips a team's MEDIAN result while its matchup
+ * holds used to say "your matchup result stays the same" — true about the matchup, and silent
+ * about the median swing that just changed the same team's real record. Keyed on BOTH axes'
+ * `AxisMovement` (`same`/`win`/`loss`), the full 3x3 grid — every combination is a fixed sentence
+ * naming both games, never assembled from free-interpolated fragments at runtime.
+ */
+const MEDIAN_AWARE_OUTCOME: Readonly<Record<`${AxisMovement}:${AxisMovement}`, StatWeekCorrectionOutcome>> = {
+  "same:same": "your matchup result stays the same, and so does your median result",
+  "same:win": "your matchup result stays the same, but that turns your median result into a win",
+  "same:loss": "your matchup result stays the same, but that turns your median result into a loss",
+  "win:same": "that turns your matchup into a win, but your median result stays the same",
+  "win:win": "that turns your matchup into a win, and that also turns your median result into a win",
+  "win:loss": "that turns your matchup into a win, but that turns your median result into a loss",
+  "loss:same": "that turns your matchup into a loss, but your median result stays the same",
+  "loss:win": "that turns your matchup into a loss, but that turns your median result into a win",
+  "loss:loss": "that turns your matchup into a loss, and that also turns your median result into a loss",
+};
+
+/**
+ * The outcome a correction notice actually reports, resolved once here rather than at each call
+ * site. `medianBefore`/`medianAfter` are `null` whenever a median isn't genuinely in play for
+ * this comparison — the league's toggle is off, or one side of the before/after pair has no
+ * stored median yet (a league whose week is reaching `finalizeWeekInTx` for the very first time
+ * through a correction, rather than through the worker) — and in that case this is EXACTLY
+ * `correctionOutcome`'s own matchup-only clause, unchanged, so a plain league's notices read
+ * identically to before this fix round. Only when both sides genuinely have a median does the
+ * fuller `MEDIAN_AWARE_OUTCOME` grid apply.
+ */
+export function resolveCorrectionOutcome(input: {
+  readonly matchupBefore: MatchupResult;
+  readonly matchupAfter: MatchupResult;
+  readonly medianBefore: MatchupResult | null;
+  readonly medianAfter: MatchupResult | null;
+}): StatWeekCorrectionOutcome {
+  if (input.medianBefore === null || input.medianAfter === null) {
+    return correctionOutcome(input.matchupBefore, input.matchupAfter);
+  }
+  const matchupMovement = axisMovement(input.matchupBefore, input.matchupAfter);
+  const medianMovement = axisMovement(input.medianBefore, input.medianAfter);
+  return MEDIAN_AWARE_OUTCOME[`${matchupMovement}:${medianMovement}`];
+}
+
 /** Every league fielding this week, from `matchups` — the same "matchups is the source of truth
  *  for which leagues are in season" the worker's own `leaguesInWeek` uses, sorted for a
  *  deterministic per-league transaction order. */
@@ -133,6 +189,15 @@ async function teamStatesFor(db: ReadonlyDb, leagueId: string, week: number): Pr
   return states;
 }
 
+/** The league's own stored median for this week, or `null` when there isn't one yet (the toggle
+ *  is off, or this week has never been finalized before). Read directly from `weeks` rather than
+ *  recomputed — the SAME column `finalizeWeekInTx` writes, so a "before" read here is genuinely
+ *  the number the earlier settlement left behind, not a value this module derives itself. */
+async function medianScoreFor(db: ReadonlyDb, leagueId: string, week: number): Promise<number | null> {
+  const [row] = await db.select({ medianScore: weeks.medianScore }).from(weeks).where(and(eq(weeks.leagueId, leagueId), eq(weeks.weekNumber, week)));
+  return row?.medianScore ?? null;
+}
+
 const LEAGUE_WIDE_SUMMARY = (week: number): string =>
   `We corrected week ${week} scores after our stats provider revised its numbers. Standings now match the update.`;
 
@@ -160,6 +225,12 @@ const LEAGUE_WIDE_SUMMARY = (week: number): string =>
  * rejection.
  *
  * Returns whether this league's diff found real movement — the caller's `changed` accounting.
+ *
+ * Fix round 1 (F1): each notice's `outcome` is resolved by `resolveCorrectionOutcome`, which
+ * folds in the league's own median movement (read before and after `finalizeWeekInTx`, via
+ * `medianScoreFor`) alongside the matchup movement `correctionOutcome` alone used to report —
+ * see that function's own docblock for why a matchup-only clause used to be silent about a
+ * median-only flip.
  */
 async function correctLeagueInTx(
   tx: DbTx,
@@ -170,9 +241,22 @@ async function correctLeagueInTx(
   audit: AuditLogger,
   notify: typeof notifyAffectedMember,
 ): Promise<boolean> {
+  // `leagues.id` is what `matchups.leagueId` (the source of `leagueId`, via `leaguesInWeek`) is
+  // a NOT NULL foreign key to, so this row always exists. Read up front (rather than only once
+  // `moved` is known non-empty, as `name` alone used to be) because `medianGame` decides whether
+  // the "before" median read below is even worth attempting.
+  const [league] = await tx.select({ name: leagues.name, medianGame: leagues.medianGame }).from(leagues).where(eq(leagues.id, leagueId));
+  const leagueName = league!.name;
+
   const before = await teamStatesFor(tx, leagueId, week);
+  // The median THIS correction is about to overwrite, read before `finalizeWeekInTx` touches it —
+  // `null` for a league with the toggle off, or a week reaching settlement for the first time.
+  const medianBefore = league!.medianGame ? await medianScoreFor(tx, leagueId, week) : null;
+
   await finalizeWeekInTx(tx, leagueId, week, clock.now());
+
   const after = await teamStatesFor(tx, leagueId, week);
+  const medianAfter = league!.medianGame ? await medianScoreFor(tx, leagueId, week) : null;
 
   const moved: { readonly teamId: string; readonly before: TeamState; readonly after: TeamState }[] = [];
   for (const [teamId, afterState] of after) {
@@ -185,22 +269,26 @@ async function correctLeagueInTx(
 
   if (moved.length === 0) return false;
 
-  // `leagues.id` is what `matchups.leagueId` (the source of `leagueId`, via `leaguesInWeek`) is
-  // a NOT NULL foreign key to, so this row always exists.
-  const [league] = await tx.select({ name: leagues.name }).from(leagues).where(eq(leagues.id, leagueId));
-  const leagueName = league!.name;
-
   const notices: MemberNotice[] = [];
   for (const { teamId, before: beforeState, after: afterState } of moved) {
     // `teams.id` is what `matchups.homeTeamId`/`awayTeamId` are a NOT NULL foreign key to, and
     // `teamId` came from exactly those columns — so this row always exists.
     const [team] = await tx.select({ userId: teams.userId }).from(teams).where(eq(teams.id, teamId));
+    const outcome = resolveCorrectionOutcome({
+      matchupBefore: beforeState.result,
+      matchupAfter: afterState.result,
+      // Each team's OWN score against the (before/after) league median — a median swing another
+      // team's revision caused shows up here even when THIS team's own points never moved, which
+      // is exactly the case fix round 1 (F1) found the old matchup-only clause silent about.
+      medianBefore: medianBefore === null ? null : medianResultFor(beforeState.points, medianBefore),
+      medianAfter: medianAfter === null ? null : medianResultFor(afterState.points, medianAfter),
+    });
     notices.push(
       await notify(tx, {
         leagueId,
         userId: team!.userId,
         noticeType: "stat_week_corrected",
-        context: { leagueName, week, points: afterState.points, outcome: correctionOutcome(beforeState.result, afterState.result) },
+        context: { leagueName, week, points: afterState.points, outcome },
         occurredAt: clock.now(),
         auditEventId: null,
       }),

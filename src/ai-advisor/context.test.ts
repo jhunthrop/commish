@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, players, playerStatLines, rosterSlots, teams, users } from "@/db/schema";
 import { ADVISOR_CONFIG } from "@/domain/advisor";
 import { createLeague } from "@/league-service/creation";
@@ -74,6 +74,31 @@ describe("assembleAdvisorContext", () => {
 
   it("returns null for a league that doesn't exist", async () => {
     expect(await assembleAdvisorContext(db, { leagueId: "nope", teamId: "nope", weekNumber: 1 })).toBeNull();
+  });
+
+  /**
+   * Fix round 1 (F2): the median-record fix (`formatTeamRecord`/`computeStandings`, above) folded
+   * its `weeks` read into the SAME query `matchups` already ran (a `leftJoin`, not a second round
+   * trip) rather than adding one — this pins that at ZERO added queries, not merely "some bounded
+   * number." Real stakes: `assembleAdvisorContext` is called TWICE per action on both the trade
+   * propose path (`league-service/trades.ts`) and the accept-time fairness re-check
+   * (`integrity-service/trade-fairness.ts`), so a silent extra read here is a silent extra FOUR
+   * round trips on those paths. Six: `leagues`, `scoring_settings`, `teams`, the joined `matchups`
+   * (median included), `player_stat_lines`, `players` — plus two more per team fielded
+   * (`getLineup`'s own `lineup_slots` and, absent a saved lineup, `roster_slots`) — `advisorFixture`
+   * saves no lineup for either team and has an opponent, so `me` and `opponent` each cost 2.
+   */
+  it("costs a bounded, MEASURED number of queries — the weeks read rides the matchups query, not a new one", async () => {
+    const fixture = await advisorFixture(db, "ppr");
+    const counting = countingDb(db);
+    const context = await assembleAdvisorContext(counting.db, { ...fixture, weekNumber: 4 });
+    expect(context).not.toBeNull();
+    expect(counting.selectCount()).toBe(10);
+    // And the fold is real, not a coincidence of this fixture's own shape: `weeks` is reached
+    // through a JOIN clause on the matchups query, never as its own standalone FROM — zero
+    // queries whose own FROM table is `weeks`, exactly one query whose JOIN names it.
+    expect(counting.queriesMatching(/from "weeks"/i)).toBe(0);
+    expect(counting.queriesMatching(/join "weeks"/i)).toBe(1);
   });
 });
 

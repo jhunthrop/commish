@@ -260,16 +260,36 @@ export interface NoticeContexts {
 }
 
 /**
- * The three, and only three, sentences `stat_week_corrected`'s `outcome` clause may say — resolved
- * by the caller from a team's before/after matchup result, never free text. A closed union rather
- * than a string is what lets `notices.test.ts` sweep every sentence this notice can actually
- * produce (`NOTICE_SAMPLES` carries one; a dedicated test iterates all three) instead of trusting
- * one sample to represent all of them.
+ * The fixed sentences `stat_week_corrected`'s `outcome` clause may say — resolved by the caller
+ * (`resolveCorrectionOutcome`, `@/stats-pipeline/correction`) from a team's before/after result,
+ * never free text. A closed union rather than a string is what lets `notices.test.ts` sweep
+ * every sentence this notice can actually produce (`NOTICE_SAMPLES` carries one; a dedicated test
+ * iterates all of them) instead of trusting one sample to represent all of them.
+ *
+ * The first three cover a league with no median in play for this correction (the toggle is off,
+ * or the week's median wasn't computed on one side of the before/after comparison) — the
+ * ORIGINAL three-clause set, unchanged, naming only the head-to-head matchup's own movement.
+ *
+ * The remaining nine cover a league where a median genuinely exists both before and after: a
+ * matchup-only clause there would be true about the matchup and SILENT about a median swing that
+ * changed the same team's real record — fix round 1 (F1)'s honesty gap. Each names BOTH games'
+ * movement — matchup and median, each independently "stays the same" / "turns into a win" /
+ * "turns into a loss" — the full 3x3 grid, so a median-only flip while the matchup holds gets
+ * its own truthful sentence rather than falling back to "your matchup result stays the same."
  */
 export type StatWeekCorrectionOutcome =
   | "your matchup result stays the same"
   | "that turns your matchup into a win"
-  | "that turns your matchup into a loss";
+  | "that turns your matchup into a loss"
+  | "your matchup result stays the same, and so does your median result"
+  | "your matchup result stays the same, but that turns your median result into a win"
+  | "your matchup result stays the same, but that turns your median result into a loss"
+  | "that turns your matchup into a win, but your median result stays the same"
+  | "that turns your matchup into a win, and that also turns your median result into a win"
+  | "that turns your matchup into a win, but that turns your median result into a loss"
+  | "that turns your matchup into a loss, but your median result stays the same"
+  | "that turns your matchup into a loss, but that turns your median result into a win"
+  | "that turns your matchup into a loss, and that also turns your median result into a loss";
 
 export type NoticeType = keyof NoticeContexts;
 

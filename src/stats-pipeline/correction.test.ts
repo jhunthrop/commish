@@ -10,7 +10,7 @@ import { writeSchedule } from "@/league-service/schedule";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { copyViolations } from "@/integrity/copy-rules";
 import type { RequestBudget } from "./budget";
-import { correctSettledWeek, correctionOutcome, matchupResultFor, type CorrectionResult } from "./correction";
+import { correctSettledWeek, correctionOutcome, matchupResultFor, resolveCorrectionOutcome, type CorrectionResult } from "./correction";
 import { finalizeWeek } from "./finalize";
 import { fakeStatsProvider } from "./test-support";
 
@@ -335,6 +335,119 @@ describe("correctSettledWeek", () => {
     expect(await medianOf("lg_median", WEEK)).toBe(recomputed);
   });
 
+  it("reports a median-only flip's own outcome truthfully — fix round 1 (F1)'s honesty gap", async () => {
+    // Four teams, so the median is a real number distinct from any one team's own score. The
+    // pairing is pinned by hand (a-vs-b, c-vs-d) rather than trusted from the generated schedule,
+    // so team_b's own matchup opponent is GUARANTEED never to be team_c — the team whose own
+    // correction is what pulls the league median down across team_b's score.
+    await db.insert(players).values([
+      { id: "mf_a", name: "MF A", position: "QB", nflTeam: "KC" },
+      { id: "mf_b", name: "MF B", position: "QB", nflTeam: "SF" },
+      { id: "mf_c", name: "MF C", position: "QB", nflTeam: "DAL" },
+      { id: "mf_d", name: "MF D", position: "QB", nflTeam: "NYJ" },
+    ]);
+    await seedLeagueShell(
+      "lg_median_flip",
+      [
+        { teamId: "mf_team_a", userId: "u_mf_a" },
+        { teamId: "mf_team_b", userId: "u_mf_b" },
+        { teamId: "mf_team_c", userId: "u_mf_c" },
+        { teamId: "mf_team_d", userId: "u_mf_d" },
+      ],
+      "complete",
+      true,
+    );
+    await addRoster("mf_team_a", "mf_a");
+    await addRoster("mf_team_b", "mf_b");
+    await addRoster("mf_team_c", "mf_c");
+    await addRoster("mf_team_d", "mf_d");
+
+    await db.delete(matchups).where(and(eq(matchups.leagueId, "lg_median_flip"), eq(matchups.weekNumber, WEEK)));
+    await db.insert(matchups).values([
+      { leagueId: "lg_median_flip", weekNumber: WEEK, homeTeamId: "mf_team_a", awayTeamId: "mf_team_b", homeScore: null, awayScore: null },
+      { leagueId: "lg_median_flip", weekNumber: WEEK, homeTeamId: "mf_team_c", awayTeamId: "mf_team_d", homeScore: null, awayScore: null },
+    ]);
+
+    // passingYards * 0.04 (PPR_SCORING's rate — the fallback this shell-seeded league gets with
+    // no scoring_settings row): a=50, b=40, c=45, d=20. Median = avg(40,45) = 42.5. team_b (40)
+    // loses to team_a (50) head to head, AND loses to the median.
+    await db.insert(playerStatLines).values([
+      { playerId: "mf_a", week: WEEK, passingYards: 1250 },
+      { playerId: "mf_b", week: WEEK, passingYards: 1000 },
+      { playerId: "mf_c", week: WEEK, passingYards: 1125 },
+      { playerId: "mf_d", week: WEEK, passingYards: 500 },
+    ]);
+    await finalizeWeek(db, "lg_median_flip", WEEK);
+    await markWeekSettled(WEEK, NOW);
+
+    // The correction nudges team_b's OWN score up slightly (40->41 — a real movement, so it
+    // enters the "moved" notify gate at all) and drops team_c's score hard (45->30). team_a and
+    // team_d are untouched, so team_b's own matchup (vs team_a, 50) stays a loss both times. But
+    // the LEAGUE median drops from 42.5 to avg(30,41)=35.5 — team_b's median result flips from a
+    // loss to a win, even though team_b never played team_c and its own matchup never moved.
+    const provider = fakeStatsProvider({
+      games: {
+        [WEEK]: [
+          {
+            gameId: "g_mf_1", week: WEEK, status: "final", homeNflTeam: "KC", awayNflTeam: "SF",
+            lines: [statLine("mf_b", WEEK, { passingYards: 1025 })],
+          },
+          {
+            gameId: "g_mf_2", week: WEEK, status: "final", homeNflTeam: "DAL", awayNflTeam: "NYJ",
+            lines: [statLine("mf_c", WEEK, { passingYards: 750 })],
+          },
+        ],
+      },
+    });
+
+    const result = expectOk(await correctSettledWeek(db, { week: WEEK, by: "u_op", provider, budget: grantedBudget }));
+    expect(result.leaguesChanged).toBe(1);
+
+    const [row] = await db.select().from(matchups).where(and(eq(matchups.leagueId, "lg_median_flip"), eq(matchups.weekNumber, WEEK), eq(matchups.homeTeamId, "mf_team_a")));
+    expect(row!.homeScore).toBe(50);
+    expect(row!.awayScore).toBe(41); // team_b: still loses the matchup...
+    expect(await medianOf("lg_median_flip", WEEK)).toBe(35.5); // ...but the median it now beats moved under it.
+
+    // The old matchup-only clause would say "your matchup result stays the same" here — true
+    // about the matchup, and silent about the median swing that just changed team_b's real
+    // record. The fix names both games.
+    const notices = await noticesFor("u_mf_b");
+    expect(notices).toHaveLength(1);
+    expect(notices[0]!.body).toContain("your matchup result stays the same, but that turns your median result into a win");
+    expect(notices[0]!.body).not.toMatch(/points, and your matchup result stays the same\.$/);
+    expect(copyViolations(`${notices[0]!.title} ${notices[0]!.body}`)).toEqual([]);
+  });
+
+  it("finds no stored 'before' median for a median league reaching settlement for the first time through a correction", async () => {
+    // `weeks` rows exist from `writeSchedule` for every league regardless of scoring, but
+    // `median_score` stays null until something actually calls `finalizeWeekInTx` — a league
+    // whose week has NEVER been scored (never through the worker, never through a prior
+    // correction) has a `weeks` row with a null median, not a missing row. `medianScoreFor`
+    // must read that as "no median yet" rather than crash on it, exactly like `weeks.median_
+    // score`'s own nullable column claims for exactly this case.
+    await db.insert(players).values({ id: "nb_qb", name: "No Before QB", position: "QB", nflTeam: "KC" });
+    await seedLeagueShell("lg_no_before", [{ teamId: "nb_team_a", userId: "u_nb_a" }, { teamId: "nb_team_b", userId: "u_nb_b" }], "complete", true);
+    await addRoster("nb_team_a", "nb_qb");
+    await db.insert(playerStatLines).values({ playerId: "nb_qb", week: WEEK, passingYards: 1000 });
+    // Deliberately no `finalizeWeek` call here — this league's matchups still hold null scores,
+    // and its `weeks` row for WEEK still holds a null median, both for the very first time.
+    await markWeekSettled(WEEK, NOW);
+
+    // The provider's own line must genuinely differ from what's stored, or `persistTick` reports
+    // no change at all and `correctLeagueInTx` (and therefore `medianScoreFor`) is never reached.
+    const provider = fakeStatsProvider({
+      games: { [WEEK]: [{ gameId: "g_no_before", week: WEEK, status: "final", homeNflTeam: "KC", awayNflTeam: "SF", lines: [statLine("nb_qb", WEEK, { passingYards: 1200 })] }] },
+    });
+    const result = expectOk(await correctSettledWeek(db, { week: WEEK, by: "u_op", provider, budget: grantedBudget }));
+    // The league genuinely resettles (its matchups now have real scores for the first time), but
+    // nothing is reported as "moved": every team's own `before` state was `undefined` (never
+    // previously scored), which `correctLeagueInTx`'s own moved-loop already treats as nothing to
+    // compare against — this test's point is that reaching that state never throws, not that it
+    // notifies anyone.
+    expect(result.leaguesResettled).toBe(1);
+    expect(result.leaguesChanged).toBe(0);
+  });
+
   /**
    * Fix round 1, F1 (HIGH, adjudicated): a league that re-settles to BYTE-IDENTICAL numbers used
    * to get a `system_action` anyway, because the write happened unconditionally. Ruled: gate the
@@ -538,5 +651,54 @@ describe("correctionOutcome", () => {
     // same" instead, since it is the one clause that is never actively wrong.
     expect(correctionOutcome("win", "tie")).toBe("your matchup result stays the same");
     expect(correctionOutcome("loss", "tie")).toBe("your matchup result stays the same");
+  });
+});
+
+describe("resolveCorrectionOutcome", () => {
+  it("falls back to correctionOutcome's own matchup-only clause when no median is in play", () => {
+    // Either side missing (toggle off, or a week reaching finalizeWeekInTx for the first time
+    // through a correction) — the exact fallback that keeps a plain league's notices unchanged.
+    expect(resolveCorrectionOutcome({ matchupBefore: "loss", matchupAfter: "win", medianBefore: null, medianAfter: null })).toBe(
+      correctionOutcome("loss", "win"),
+    );
+    expect(resolveCorrectionOutcome({ matchupBefore: "tie", matchupAfter: "tie", medianBefore: "win", medianAfter: null })).toBe(
+      correctionOutcome("tie", "tie"),
+    );
+    expect(resolveCorrectionOutcome({ matchupBefore: "tie", matchupAfter: "tie", medianBefore: null, medianAfter: "win" })).toBe(
+      correctionOutcome("tie", "tie"),
+    );
+  });
+
+  // Fix round 1 (F1), the honesty gap this test set exists to close: a median-only flip while the
+  // matchup holds used to be reported as "your matchup result stays the same" — true and
+  // misleading, since the team's real record DID move. Every one of the full 3x3 grid's nine
+  // combinations is driven here, not just the one the review named.
+  type Result = "win" | "loss" | "tie";
+  const CASES: readonly [Result, Result, Result, Result, string][] = [
+    ["tie", "tie", "tie", "tie", "your matchup result stays the same, and so does your median result"],
+    ["tie", "tie", "loss", "win", "your matchup result stays the same, but that turns your median result into a win"],
+    ["tie", "tie", "win", "loss", "your matchup result stays the same, but that turns your median result into a loss"],
+    ["loss", "win", "tie", "tie", "that turns your matchup into a win, but your median result stays the same"],
+    ["loss", "win", "loss", "win", "that turns your matchup into a win, and that also turns your median result into a win"],
+    ["loss", "win", "win", "loss", "that turns your matchup into a win, but that turns your median result into a loss"],
+    ["win", "loss", "tie", "tie", "that turns your matchup into a loss, but your median result stays the same"],
+    ["win", "loss", "loss", "win", "that turns your matchup into a loss, but that turns your median result into a win"],
+    ["win", "loss", "win", "loss", "that turns your matchup into a loss, and that also turns your median result into a loss"],
+  ];
+
+  it.each(CASES)(
+    "matchup %s->%s, median %s->%s reports %j",
+    (matchupBefore, matchupAfter, medianBefore, medianAfter, expected) => {
+      expect(resolveCorrectionOutcome({ matchupBefore, matchupAfter, medianBefore, medianAfter })).toBe(expected);
+    },
+  );
+
+  it("reports the median-only flip specifically — the exact scenario that used to lie", () => {
+    // The matchup holds a tie both times (no head-to-head movement at all); the median moves from
+    // a loss to a win. The old matchup-only clause would have said "stays the same" here, silently
+    // dropping the median swing that just changed this team's real record.
+    const outcome = resolveCorrectionOutcome({ matchupBefore: "tie", matchupAfter: "tie", medianBefore: "loss", medianAfter: "win" });
+    expect(outcome).toBe("your matchup result stays the same, but that turns your median result into a win");
+    expect(outcome).not.toBe("your matchup result stays the same");
   });
 });

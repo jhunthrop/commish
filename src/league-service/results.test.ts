@@ -69,7 +69,7 @@ describe("leagueStandings", () => {
     const league = await twoTeamLeague("complete");
     await finalizeWeek(db, league.leagueId, 1);
     const teamCards = await listTeamCards(db, league.leagueId);
-    const rows = await leagueStandings(db, league.leagueId, teamCards);
+    const rows = await leagueStandings(db, league.leagueId, teamCards, false);
     expect(rows).toHaveLength(2);
     expect(rows[0]).toMatchObject({ wins: 1, losses: 0, pointsFor: 24 });
     expect(rows[0]!.teamName).toBeTruthy();
@@ -78,7 +78,7 @@ describe("leagueStandings", () => {
   });
 
   it("is an empty table for a league with no teams at all", async () => {
-    expect(await leagueStandings(db, "nope", [])).toEqual([]);
+    expect(await leagueStandings(db, "nope", [], false)).toEqual([]);
   });
 
   it("folds the median game's own result into wins and losses for a league with the toggle on", async () => {
@@ -89,7 +89,7 @@ describe("leagueStandings", () => {
     expect(weekRow?.medianScore).not.toBeNull();
 
     const teamCards = await listTeamCards(db, league.leagueId);
-    const rows = await leagueStandings(db, league.leagueId, teamCards);
+    const rows = await leagueStandings(db, league.leagueId, teamCards, true);
     // Two teams, one head-to-head result each PLUS one median result each: the winner of the
     // head-to-head also clears the median (it's the higher of the two scores averaged), so it
     // goes 2-0 rather than 1-0, and the loser goes 0-2 rather than 0-1.
@@ -103,7 +103,7 @@ describe("leagueStandings", () => {
     const league = await twoTeamLeague("complete", false);
     await finalizeWeek(db, league.leagueId, 1);
     const teamCards = await listTeamCards(db, league.leagueId);
-    const rows = await leagueStandings(db, league.leagueId, teamCards);
+    const rows = await leagueStandings(db, league.leagueId, teamCards, false);
     const winner = rows.find((row) => row.wins > 0)!;
     expect(winner).toMatchObject({ wins: 1, losses: 0 });
   });
