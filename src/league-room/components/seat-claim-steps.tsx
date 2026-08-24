@@ -1,3 +1,5 @@
+import { SEAT_HOLD } from "@/matchmaking/config";
+
 interface Step {
   readonly number: string;
   readonly timing: string;
@@ -15,7 +17,7 @@ interface Step {
  * behind it is the exact failure this plan exists to stop.
  */
 const STEPS: readonly Step[] = [
-  { number: "01", timing: "10 SEC", title: "Pick a seat", detail: "Your seat holds for 10 minutes" },
+  { number: "01", timing: "10 SEC", title: "Pick a seat", detail: `Your seat holds for ${SEAT_HOLD.minutes} minutes` },
   { number: "02", timing: "30 SEC", title: "Sign in with email", detail: "That is the whole signup" },
   { number: "03", timing: "DONE", title: "You are in the league", detail: "Meet the room, rank your draft slots" },
 ];
