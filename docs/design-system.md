@@ -319,7 +319,7 @@ Tunables for primitives live in `src/components/ui/config.ts` (`UI_CONFIG`, `EYE
 ## Motion
 `TOKENS.motion` — fast 120ms / base 200ms / slow 320ms, easings `standard` and `emphasized`. Use motion for state changes and moments that matter (a pick landing, a win). Never decorative loops.
 
-Four sanctioned animations, all declared in `globals.css` against token variables — never a literal duration:
+Seven sanctioned animations, all declared in `globals.css` against token variables — never a literal duration:
 
 | class | what it does | where |
 |---|---|---|
@@ -327,6 +327,9 @@ Four sanctioned animations, all declared in `globals.css` against token variable
 | `animate-celebrate-self` | scale 0.96 → 1.03 → 1 settle, `slow`/`emphasized` | `Celebration`'s panel when the moment is yours (`emphasis="self"`) — your own drafted pick, your matchup win, a clinched playoff spot |
 | `animate-sticker-slap` | scale 1.15 → 1 with a small rotate settle, `slow`/`emphasized` | the board cell for the pick that just landed |
 | `animate-spotlight` | a slow opacity breath on the accent ring | the board cell that is on the clock |
+| `animate-wire` | translateX marquee, `wire` (38s), linear, infinite | *stub — v3 Task 2; consumer is Task 8's activity ticker under the nav* |
+| `animate-pulse-live` | opacity 1 → .35 → 1 breath, `pulse` (1.6s) | *stub — v3 Task 2; consumer is Task 5/8's live chip dot* |
+| `animate-rise` | opacity + 14px rise, `base`; `rise-1..4` stagger by 1–4× `fast` | *stub — v3 Task 2; consumer is Task 7's front door hero entrance* |
 
 **One `Celebration` primitive, two callers.** `PickCelebration` (the draft room) and `MatchupCelebration` (the league room) are the same moment — "something worth announcing just happened" — said with different words. Both are built on `Celebration` + `useTransientVisibility` (`src/design/use-transient-visibility.ts`, keyed so a redelivered event never re-animates) rather than each rolling its own timer and markup. The board's sticker slap is a separate animation on the grid cell, independent of the panel's own self/peer treatment.
 

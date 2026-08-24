@@ -92,6 +92,17 @@ body {
   letter-spacing: -0.02em;
 }
 
+/* S3 — v3's hero and its display-size kin pull tighter still: -0.028em, but only at the four
+   `text-display-*` sizes (the hero, the clock, the big score). Smaller display-face text — badge
+   labels, eyebrows, section titles — keeps the -0.02em above; body tracking is untouched either
+   way. */
+.font-display.text-display-sm,
+.font-display.text-display-md,
+.font-display.text-display-lg,
+.font-display.text-display-xl {
+  letter-spacing: -0.028em;
+}
+
 /* So a score that changes never shifts the column beside it — every mono numeral is the same
    width, everywhere `font-mono` is used, not just where a caller remembered to ask for it. */
 .font-mono {
@@ -144,6 +155,97 @@ body {
 
 .animate-spotlight {
   animation: commish-spotlight calc(var(--commish-motion-duration-slow) * 5) var(--commish-motion-easing-standard) infinite;
+}
+
+/* The wire (Task 8) — real product events streaming under the nav like a broadcast ticker.
+   `--commish-motion-duration-wire` is the token built for exactly this loop; nothing else
+   references it. The track is expected to hold two copies of its content back to back so the
+   halfway translate loops seamlessly. */
+@keyframes commish-wire {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-wire {
+  animation: commish-wire var(--commish-motion-duration-wire) linear infinite;
+}
+
+/* The live chip's dot (Tasks 5 and 8) — a breathing pulse, never a hard blink. */
+@keyframes commish-pulse-live {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+.animate-pulse-live {
+  animation: commish-pulse-live var(--commish-motion-duration-pulse) var(--commish-motion-easing-standard) infinite;
+}
+
+/* The front door hero's entrance (Task 7) — the same opacity+translateY idiom as
+   `celebrate-peer` above, just a longer rise (14px) reserved for the one hero on the page.
+   `rise-1..4` stagger consecutive elements by whole multiples of the fast duration, so the
+   spacing between them is a token relationship, never a literal millisecond count. */
+@keyframes commish-rise {
+  from { opacity: 0; transform: translateY(14px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-rise {
+  animation: commish-rise var(--commish-motion-duration-base) var(--commish-motion-easing-standard) both;
+}
+
+.rise-1 { animation-delay: var(--commish-motion-duration-fast); }
+.rise-2 { animation-delay: calc(var(--commish-motion-duration-fast) * 2); }
+.rise-3 { animation-delay: calc(var(--commish-motion-duration-fast) * 3); }
+.rise-4 { animation-delay: calc(var(--commish-motion-duration-fast) * 4); }
+
+/* Ground vocabulary for Task 7's front door hero — a floodlight wash and yard lines at whisper
+   opacity, both from sunday-standard.html's `.m-heroband`/`.yards` blocks. `.floodlight` goes on
+   the hero's container (it establishes the `position: relative` its own wash and any nested
+   `.yard-lines` overlay anchor to); `.yard-lines` goes on a full-bleed child. */
+.floodlight {
+  position: relative;
+}
+
+.floodlight::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(90% 130% at 78% -20%, var(--commish-color-accent-glow), transparent 55%);
+}
+
+:root[data-theme="dark"] .floodlight::before {
+  background:
+    radial-gradient(90% 140% at 78% -20%, var(--commish-color-accent-glow), transparent 55%),
+    radial-gradient(60% 90% at 15% 110%, var(--commish-color-accent-glow), transparent 60%);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .floodlight::before {
+    background:
+      radial-gradient(90% 140% at 78% -20%, var(--commish-color-accent-glow), transparent 55%),
+      radial-gradient(60% 90% at 15% 110%, var(--commish-color-accent-glow), transparent 60%);
+  }
+}
+
+/* S5 — the 120px pitch is a plain CSS fact of this one class, exactly like sunday-standard.html's
+   `.yards`, not feature code; it does not route through the generated token variables. */
+.yard-lines {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.5;
+  background: repeating-linear-gradient(to right, transparent 0 119px, var(--commish-color-line) 119px 120px);
+}
+
+:root[data-theme="dark"] .yard-lines {
+  opacity: 0.35;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .yard-lines {
+    opacity: 0.35;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
