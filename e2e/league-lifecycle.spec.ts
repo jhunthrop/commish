@@ -50,11 +50,11 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   const leagueId = new URL(managerA.url()).pathname.split("/").pop()!;
   expect(leagueId).toBeTruthy();
   // Phase 3.6, Task 11 (Step 1 + F17): the page header no longer states the fill count at all —
-  // its own dense line is now record/seed/calendar/format facts, and the seat sentence
-  // converged onto `SeatMeter` everywhere it counts seats, which now includes BOTH the terms
-  // panel's Size row and the members panel's own open-seats line (deliberately duplicated, the
-  // same "one sentence, several honest callers" shape `SeatHoldPanel` already carries) — hence
-  // `.first()` rather than a single-match locator.
+  // its own dense line is now record/seed/calendar/format facts, and the seat sentence converged
+  // onto `SeatMeter` everywhere it counts seats. Pre-draft, the FIRST DOM occurrence is the
+  // WaitingRoom's nested `DraftSchedulePanel` hero (Task 9's re-homed gate renders it above the
+  // terms panel's Size row and the members panel's open-seats line — three honest callers of one
+  // shared sentence) — hence `.first()` rather than a single-match locator.
   await expect(managerA.getByText("1 of 8 seated").first()).toBeVisible();
 
   // --- Invite ------------------------------------------------------------------------------
