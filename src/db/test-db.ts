@@ -1,10 +1,11 @@
 import { sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
-import { afterAll } from "vitest";
+import { afterAll, expect } from "vitest";
 import { resetRankedPlayersCacheForTests } from "@/draft-service/pool";
 import { envOr } from "@/lib/env";
 import { createDb, type Db } from "./client";
 import { DB_POOL_CONFIG } from "./config";
+import { unwrapCauseChain } from "./errors";
 import * as schema from "./schema";
 
 export const TEST_DATABASE_URL = envOr("TEST_DATABASE_URL", "postgres://commish:commish@localhost:5433/commish_test");
@@ -38,6 +39,7 @@ export async function truncateAll(db: Db): Promise<void> {
       player_stat_lines, players, stat_weeks,
       matchups, weeks, draft_picks, draft_nudges, draft_slot_preferences, draft_actions, drafts,
       lineup_slots, roster_slots, league_invites,
+      money_entries, money_transactions, money_accounts,
       scoring_settings, trade_proposals, teams, leagues, user_preferences, member_notices, users
     RESTART IDENTITY CASCADE
   `);
@@ -46,6 +48,29 @@ export async function truncateAll(db: Db): Promise<void> {
   // across `it` blocks under a fresh seed each time. Without this, a cache entry built before
   // this truncate would outlive the data it was computed from.
   resetRankedPlayersCacheForTests();
+}
+
+/**
+ * `db.execute` throws drizzle-orm's `DrizzleQueryError`, whose own `.message` is just the SQL
+ * text it was trying to run — the driver's real error (a trigger's `RAISE EXCEPTION` text, or
+ * the violated constraint's name) sits one level down on `.cause`. `unwrapCauseChain`
+ * (`src/db/errors.ts`) is the one place that walk is written; this joins every `.message` found
+ * along it, so a test can assert against what postgres actually said, not drizzle's wrapper.
+ *
+ * Shared test support, extracted from `audit-append-only.test.ts` the day a second table gained
+ * database-enforced immutability (`schema-invariants.test.ts`, Phase 4 Task 2) — the walk is one
+ * thing to keep correct, not one per append-only table.
+ */
+export function causeChainMessage(error: unknown): string {
+  const messages = unwrapCauseChain(error)
+    .filter((link): link is Error => link instanceof Error)
+    .map((link) => link.message);
+  return messages.length > 0 ? messages.join(": ") : String(error);
+}
+
+/** `.rejects.toThrow(pattern)` only ever looks at the top `.message` — see `causeChainMessage`. */
+export async function expectRejectionMatching(promise: Promise<unknown>, pattern: RegExp): Promise<void> {
+  await expect(promise).rejects.toSatisfy((error: unknown) => pattern.test(causeChainMessage(error)));
 }
 
 export interface CountingDb {

@@ -1,29 +1,12 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, truncateAll } from "./test-db";
-import { unwrapCauseChain } from "./errors";
+// `expectRejectionMatching`/`causeChainMessage` lived here privately until Phase 4 Task 2 gave a
+// second table trigger-enforced immutability (`src/money-service/schema-invariants.test.ts`) —
+// the cause-chain walk is shared test support now, one copy in `test-db.ts`.
+import { createTestDb, expectRejectionMatching, truncateAll } from "./test-db";
 import { GENESIS_HASH } from "@/integrity/chain";
 
 const db = createTestDb();
-
-/**
- * `db.execute` throws drizzle-orm's `DrizzleQueryError`, whose own `.message` is just the SQL
- * text it was trying to run — the driver's real error (the trigger's `RAISE EXCEPTION` text, or
- * the violated constraint's name) sits one level down on `.cause`. `unwrapCauseChain`
- * (`src/db/errors.ts`) is the one place that walk is written; this joins every `.message` found
- * along it, so a test can assert against what postgres actually said, not drizzle's wrapper.
- */
-function causeChainMessage(error: unknown): string {
-  const messages = unwrapCauseChain(error)
-    .filter((link): link is Error => link instanceof Error)
-    .map((link) => link.message);
-  return messages.length > 0 ? messages.join(": ") : String(error);
-}
-
-/** `.rejects.toThrow(pattern)` only ever looks at the top `.message` — see `causeChainMessage`. */
-async function expectRejectionMatching(promise: Promise<unknown>, pattern: RegExp): Promise<void> {
-  await expect(promise).rejects.toSatisfy((error: unknown) => pattern.test(causeChainMessage(error)));
-}
 
 async function seedOneEvent(): Promise<void> {
   await db.execute(sql`
