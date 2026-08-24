@@ -180,12 +180,20 @@ test.describe("formats and lobby", () => {
     await managerA.goto(`/app/leagues/${E2E_SLOT_PREF_LEAGUE_ID}`);
     await expect(managerA.getByRole("heading", { name: "E2E Slot Preference League" })).toBeVisible();
 
-    // Rank slot 2 first, slot 1 second — real, named buttons (`SlotPreferencePanel`'s own
-    // click-and-verify shape), never a drag gesture.
-    await managerA.getByRole("button", { name: "Add slot 2 to your ranking" }).click();
-    await managerA.getByRole("button", { name: "Add slot 1 to your ranking" }).click();
-    await expect(managerA.getByRole("listitem").filter({ hasText: "Slot 2" })).toBeVisible();
-    await expect(managerA.getByRole("listitem").filter({ hasText: "Slot 1" })).toBeVisible();
+    // Rank slot 2 first, slot 1 second — real, named buttons, never a drag gesture. Click-and-
+    // verify, RETRIED (discipline (a)): the panel now hydrates inside the waiting room's
+    // checklist (Task 9's restructure), so an eager click can land pre-hydration as a silent
+    // no-op; each rank click re-fires until its own receipt (the ranked tile) appears.
+    await expect(async () => {
+      const ranked2 = managerA.locator('[aria-label="Your ranked slots"]').getByRole("listitem").filter({ hasText: "Slot 2" });
+      if (!(await ranked2.isVisible())) await managerA.getByRole("button", { name: "Add slot 2 to your ranking" }).click();
+      await expect(ranked2).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
+    await expect(async () => {
+      const ranked1 = managerA.locator('[aria-label="Your ranked slots"]').getByRole("listitem").filter({ hasText: "Slot 1" });
+      if (!(await ranked1.isVisible())) await managerA.getByRole("button", { name: "Add slot 1 to your ranking" }).click();
+      await expect(ranked1).toBeVisible({ timeout: 2_000 });
+    }).toPass({ timeout: 20_000 });
 
     await managerA.getByRole("button", { name: "Save ranking" }).click();
     await expect(managerA.getByText("Saved. You ranked: 2, then 1.")).toBeVisible();
