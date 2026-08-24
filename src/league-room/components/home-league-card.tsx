@@ -26,7 +26,7 @@ export function HomeLeagueCard({ league }: { readonly league: HomeLeagueCardData
           href={`/app/leagues/${league.id}`}
           // `min-w-0 break-words`: a flex item will not shrink below its min-content width
           // without it, so a long league name widened this whole card at 360px.
-          className="min-w-0 break-words font-display text-2xl font-bold uppercase leading-display text-text-primary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="min-w-0 break-words font-display text-2xl font-semibold leading-display text-text-primary hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           {league.name}
         </Link>

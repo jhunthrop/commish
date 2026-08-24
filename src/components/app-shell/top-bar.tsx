@@ -78,7 +78,7 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
       <div className="flex w-full items-center justify-between gap-2 border-b border-line px-2 py-3">
         <Link
           href="/app"
-          className="font-display text-xl font-bold uppercase text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="font-display text-xl font-semibold text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           Commish
         </Link>

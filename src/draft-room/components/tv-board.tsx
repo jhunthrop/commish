@@ -66,7 +66,7 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
         <section data-testid="spotlight" className="flex shrink-0 items-center gap-4 rounded-lg border border-line bg-surface-elevated p-6 shadow-card">
           {onClock === null ? null : <Avatar name={onClock.ownerDisplayName} avatar={onClock.ownerAvatarUrl} size="lg" />}
           <div>
-            <p className="font-display text-sm uppercase tracking-wide text-text-muted">Now picking</p>
+            <p className="font-display text-sm tracking-wide text-text-muted">Now picking</p>
             <p className="font-display text-display-lg font-bold leading-display text-text-primary">{onClock?.name ?? "Nobody"}</p>
             {onClock === null ? null : <Badge tone="neutral">{onClock.ownerDisplayName}</Badge>}
           </div>

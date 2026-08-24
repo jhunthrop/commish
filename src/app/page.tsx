@@ -104,7 +104,7 @@ export default async function Home({ searchParams }: PageProps) {
 
         <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 border-t border-line px-4 pb-10 pt-8">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="font-display text-lg font-bold uppercase leading-display text-text-primary">Open leagues</h2>
+            <h2 className="font-display text-lg font-semibold leading-display text-text-primary">Open leagues</h2>
             <p className="text-sm text-text-muted">{seatCountsAsOfSentence(formatAbsoluteTime(nowIso))}</p>
           </div>
           <HouseLeagueShelf leagues={house} signedIn={user !== null} />
@@ -115,7 +115,7 @@ export default async function Home({ searchParams }: PageProps) {
               an afterthought rather than a category of its own. Its own row, its own framing,
               below the shelf it is not competing with. */}
           <div className="flex flex-col items-start gap-2 rounded-lg border border-line bg-surface-elevated p-4">
-            <h3 className="font-display text-lg font-bold uppercase leading-display text-text-primary">Start your own league</h3>
+            <h3 className="font-display text-lg font-semibold leading-display text-text-primary">Start your own league</h3>
             <p className="max-w-prose text-sm text-text-muted">
               Your rules, your people. The platform still runs the chores: the draft room, the
               schedule, and the scoring. Snake or auction, any scoring preset, private or public.

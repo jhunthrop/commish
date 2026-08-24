@@ -1,8 +1,8 @@
 import { Badge, type BadgeTone } from "./badge";
 
 export interface StatPillProps {
-  /** The pill's own case is preserved in the DOM — capitals are CSS, not the text itself, so a
-   *  screen reader announces "Final", not "F I N A L". */
+  /** Rendered exactly as written — "Live", "Final", "Fix lineup" — sentence case per the caps
+   *  charter, so the chip reads the same to the eye and to a screen reader. */
   readonly label: string;
   readonly tone?: BadgeTone;
   /** The live pill's tinted ring — forwarded to `Badge`. */
@@ -11,13 +11,13 @@ export interface StatPillProps {
 }
 
 /**
- * The tone-carrying state chip: LIVE / FINAL / FIX LINEUP. `Badge` plus a forced uppercase
- * treatment — the pill's capitals are CSS, so the underlying string a caller passes (and a
- * screen reader announces) stays in whatever case reads naturally as a sentence.
+ * The tone-carrying state chip: Live / Final / Fix lineup. `Badge` plus a widened tracking —
+ * the caps charter (v3, the `src/design` caps sweep) retired the old forced-caps treatment,
+ * so the chip now shows the caller's string as-is.
  */
 export function StatPill({ label, tone = "neutral", glow = false, className = "" }: StatPillProps) {
   return (
-    <Badge tone={tone} glow={glow} className={`uppercase tracking-wide ${className}`}>
+    <Badge tone={tone} glow={glow} className={`tracking-wide ${className}`}>
       {label}
     </Badge>
   );

@@ -123,9 +123,11 @@ export const UI_CONFIG = {
 } as const;
 
 /**
- * The small-caps section-label treatment: a board header, a roster/queue heading, a sticky
- * column header. A class CONSTANT, not a component — the element varies (`span`/`h2`/`th`) and
- * the color is often conditional, so a caller composes this with its own color utility rather
- * than a component absorbing a `className` prop for the one thing it varies by.
+ * The section-label treatment: a board header, a roster/queue heading, a sticky column header.
+ * v3 "Sunday Standard" register — sentence case, mono, quiet (the caps charter removed the
+ * old all-caps display treatment; `no-uppercase.source.test.ts` keeps it removed). A class
+ * CONSTANT, not a component — the element varies (`span`/`h2`/`th`) and the color is often
+ * conditional, so a caller composes this with its own color utility rather than a component
+ * absorbing a `className` prop for the one thing it varies by.
  */
-export const EYEBROW = "font-display text-xs font-semibold uppercase tracking-wide";
+export const EYEBROW = "font-mono text-xs tracking-wide";

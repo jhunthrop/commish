@@ -31,7 +31,7 @@ export function OpenSeatsPanel({ leagues, quiet = false }: OpenSeatsPanelProps) 
         className={
           quiet
             ? "text-sm font-medium text-text-muted"
-            : "font-display text-lg font-bold uppercase leading-display text-text-primary"
+            : "font-display text-lg font-semibold leading-display text-text-primary"
         }
       >
         Open leagues

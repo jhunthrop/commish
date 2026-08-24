@@ -26,7 +26,7 @@ export function MatchupScoreboard({ matchup, myTeamId }: MatchupScoreboardProps)
           them — so `truncate`'s `overflow-hidden`/`ellipsis` never had a constrained box to clip
           against, and a long team name pushed the page wider at narrow viewports. `w-full` gives
           it the parent's actual (already-shrunk, `min-w-0 flex-1`) width to truncate against. */}
-      <p className={`w-full truncate font-display text-xl font-bold uppercase leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
+      <p className={`w-full truncate font-display text-xl font-semibold leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
         {name}
         {teamId === myTeamId ? <span className="ml-1.5 align-middle text-xs font-semibold text-accent">YOU</span> : null}
       </p>

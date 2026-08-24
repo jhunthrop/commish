@@ -44,7 +44,7 @@ function Side({
   // The score lives on the scoreboard above; down here the roster is the story.
   return (
     <Card>
-      <h3 className="font-display text-lg font-bold uppercase leading-display text-text-primary">{side.teamName}</h3>
+      <h3 className="font-display text-lg font-semibold leading-display text-text-primary">{side.teamName}</h3>
       {median === null ? null : (
         <MedianResultLine
           teamName={side.teamName}

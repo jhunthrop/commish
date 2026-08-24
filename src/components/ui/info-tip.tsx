@@ -58,13 +58,15 @@ export function InfoTip({ term, className, helpLevel }: InfoTipProps) {
       >
         <Icon name="info" size={14} />
       </button>
-      {/* A definition is a sentence, never a label: reset the casing, weight, tracking and face a
-          caller's label context (e.g. `EYEBROW`'s uppercase) would otherwise cascade onto it. */}
+      {/* A definition is a sentence, never a label: reset the weight, tracking and face a
+          caller's label context (e.g. `EYEBROW`'s mono and wide tracking) would otherwise
+          cascade onto it. The old `normal-case` reset died with the caps charter — no label
+          context transforms case anymore, so there is nothing left to reset. */}
       {helpLevel === "guided" ? (
-        <span className="max-w-[280px] font-sans text-xs font-normal normal-case tracking-normal text-text-muted">{entry.short}</span>
+        <span className="max-w-[280px] font-sans text-xs font-normal tracking-normal text-text-muted">{entry.short}</span>
       ) : null}
       {open ? (
-        <span id={noteId} role="note" className="max-w-[280px] font-sans text-xs font-normal normal-case tracking-normal text-text-muted">
+        <span id={noteId} role="note" className="max-w-[280px] font-sans text-xs font-normal tracking-normal text-text-muted">
           {entry.detail}
         </span>
       ) : null}

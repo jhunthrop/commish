@@ -106,7 +106,7 @@ export function OpenLeagueCard({ league, signedIn }: OpenLeagueCardProps) {
         {/* `min-w-0 break-words`: see `HomeLeagueCard`'s identical heading — a grid item's
             default `min-width: auto` otherwise lets a long league name widen the item past its
             column at 360px. */}
-        <h3 className="min-w-0 break-words font-display text-2xl font-bold uppercase leading-display text-text-primary">
+        <h3 className="min-w-0 break-words font-display text-2xl font-semibold leading-display text-text-primary">
           {league.name}
         </h3>
         {league.houseRung === null ? (
@@ -150,7 +150,7 @@ export function OpenLeagueCard({ league, signedIn }: OpenLeagueCardProps) {
       {/* The four facts a veteran actually shops on (Task 5, Step 3). */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Drafts</p>
+          <p className={`${EYEBROW} text-text-muted`}>Drafts</p>
           <p className={`font-medium ${league.startTrigger === "when_full" ? "text-warning" : "text-text-primary"}`}>
             {league.startTrigger === "when_full" ? describeStartTiming({ startTrigger: "when_full", authority }) : league.draftAt}
           </p>
@@ -163,15 +163,15 @@ export function OpenLeagueCard({ league, signedIn }: OpenLeagueCardProps) {
           ) : null}
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Who</p>
+          <p className={`${EYEBROW} text-text-muted`}>Who</p>
           <p className="font-medium text-text-primary">{isBeginnerOnly ? "Newer players only" : "Open to everyone"}</p>
         </div>
         <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Roster</p>
+          <p className={`${EYEBROW} text-text-muted`}>Roster</p>
           <p className="font-medium text-text-primary">{league.rosterSummary}</p>
         </div>
         <div className="min-w-0">
-          <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
+          <p className={`inline-flex items-center gap-1 ${EYEBROW} text-text-muted`}>
             Playoffs
             {/* NEW-3: `standard`, not `CARD_HELP_LEVEL`, only here. A guided caption stacks
                 between this label and its value, growing this one cell past its three siblings

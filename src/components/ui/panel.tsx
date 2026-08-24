@@ -12,7 +12,7 @@ export interface PanelProps {
 }
 
 /**
- * The "uppercase label, hairline, content" block the mocks repeat. Built on `Card` plus
+ * The "quiet label, hairline, content" block the mocks repeat. Built on `Card` plus
  * `EYEBROW`, so the depth token and the eyebrow class each still have one home rather than a
  * third copy of either.
  */

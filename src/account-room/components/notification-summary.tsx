@@ -15,7 +15,7 @@ const CHANNEL_LABEL: Readonly<Record<NotificationChannel, string>> = {
  * own docblock is why there is no switch beside it. A toggle for a channel with no sender is a
  * preference this product cannot honor, and this plan's rule is that one does not ship.
  *
- * Retoned onto `Panel` (Task 18, Step 4): the account room's own "uppercase label, hairline,
+ * Retoned onto `Panel` (Task 18, Step 4): the account room's own "quiet label, hairline,
  * content" block, matching `StandingPanel` beside it rather than a hand-rolled `<section>` with
  * its own heading and border. The heading text and the description list underneath it are
  * unchanged — only the wrapper is.

@@ -77,7 +77,7 @@ export function HouseLeagueShelf({
           sibling) is the same "give the guided element room instead of forcing it to share an
           ill-fitting line" fix `OpenLeagueCard` applied, adapted to a single heading rather than
           a list of terms. */}
-      <h2 className="flex flex-wrap items-start gap-x-1 gap-y-1 font-display text-lg font-bold uppercase leading-display text-text-primary">
+      <h2 className="flex flex-wrap items-start gap-x-1 gap-y-1 font-display text-lg font-semibold leading-display text-text-primary">
         Commish house leagues
         <InfoTip term="house-league" helpLevel={BROWSE_HELP_LEVEL} />
       </h2>

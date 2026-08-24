@@ -31,7 +31,7 @@ export function PublicBar({ intent, nav = [], action = null }: PublicBarProps) {
       <div className="flex w-full items-center justify-between gap-4 px-4 py-3">
         <Link
           href="/"
-          className="font-display text-xl font-bold uppercase tracking-wide text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          className="font-display text-xl font-semibold tracking-wide text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           Commish
         </Link>

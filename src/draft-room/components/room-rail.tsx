@@ -62,12 +62,12 @@ const LEAGUE_TEXT: Readonly<Record<RoomRailVariant, string>> = {
  */
 const RAIL_EYEBROW: Readonly<Record<RoomRailVariant, string>> = {
   room: EYEBROW,
-  tv: "font-display text-sm font-semibold uppercase tracking-wide",
+  tv: "font-display text-sm font-semibold tracking-wide",
 };
 
 /** The tightening line's own size: an ordinary sentence in the room, bumped one step for the TV
  *  variant's "no `xs` anywhere" rule (Step 3) — it is prose, not a chip, so it earns `text-sm`
- *  rather than joining `RAIL_EYEBROW`'s all-caps treatment. */
+ *  rather than joining `RAIL_EYEBROW`'s label treatment. */
 const TIGHTENING_TEXT: Readonly<Record<RoomRailVariant, string>> = {
   room: "text-xs",
   tv: "text-sm",
@@ -269,7 +269,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
         {variant === "room" ? <InfoTip term={FORMAT_TERM[view.format]} helpLevel={helpLevel} /> : null}
       </span>
       {turnWhere === null ? null : (
-        <span data-testid="turn-label" className="font-display text-sm font-semibold uppercase tracking-wide text-text-muted">
+        <span data-testid="turn-label" className="font-display text-sm font-semibold tracking-wide text-text-muted">
           {turnWhere}
         </span>
       )}

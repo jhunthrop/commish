@@ -1,3 +1,4 @@
+import { EYEBROW } from "@/components/ui";
 import { SEAT_HOLD } from "@/matchmaking/config";
 
 interface Step {
@@ -28,7 +29,7 @@ export function SeatClaimSteps() {
     <ol className="grid gap-px overflow-hidden rounded-lg border border-line bg-line sm:grid-cols-3">
       {STEPS.map((step) => (
         <li key={step.number} className="flex flex-col gap-1 bg-surface p-4">
-          <span className="font-mono text-xs font-bold uppercase tracking-wide text-accent">
+          <span className={`${EYEBROW} text-accent`}>
             {step.number} &middot; {step.timing}
           </span>
           <span className="font-display text-base font-bold text-text-primary">{step.title}</span>

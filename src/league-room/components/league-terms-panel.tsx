@@ -59,7 +59,7 @@ export function LeagueTermsPanel({
           renders it at display size inside a card — see `PageTitle`, which carries the same
           rule for the same reason (`break-words` wraps visually but is ignored when a browser
           computes min-content, so an unbroken name can still widen the card past its container). */}
-      <Title className="min-w-0 [overflow-wrap:anywhere] font-display text-2xl font-bold uppercase leading-display text-text-primary">
+      <Title className="min-w-0 [overflow-wrap:anywhere] font-display text-2xl font-semibold leading-display text-text-primary">
         {terms.name}
       </Title>
       <dl className="flex flex-col gap-3">
