@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
@@ -8,6 +8,12 @@ vi.mock("@/design/use-reduced-motion", () => ({ usePrefersReducedMotion: vi.fn((
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
 
 describe("LiveStatePill", () => {
+  // Reset regardless of test order (P13 review LOW): the reduced-motion mock must never leak
+  // into a test added after the one that flips it.
+  afterEach(() => {
+    vi.mocked(usePrefersReducedMotion).mockReturnValue(false);
+  });
+
   it("carries the real weekday and game count as an sr-only sentence, in both themes, axe-clean", async () => {
     await renderSurface(<LiveStatePill liveState={{ weekday: "Sunday", gamesLive: 7 }} />, async ({ container }) => {
       expect(screen.getByText("Sunday · 7 games live")).toBeInTheDocument();
@@ -54,6 +60,5 @@ describe("LiveStatePill", () => {
     const { container } = render(<LiveStatePill liveState={{ weekday: "Sunday", gamesLive: 7 }} />);
     expect(container.querySelector("svg")?.getAttribute("class") ?? "").not.toContain("animate-pulse");
     expect(screen.getByText("Sunday · 7 games live")).toBeInTheDocument();
-    vi.mocked(usePrefersReducedMotion).mockReturnValue(false);
   });
 });

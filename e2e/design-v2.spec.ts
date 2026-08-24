@@ -147,15 +147,25 @@ test("front door -> card -> hold -> sign-in -> waiting room -> rank a slot -> le
   await expect(managerD.getByRole("heading", { name: WALK_LEAGUE_NAME, exact: true })).toBeVisible();
 
   // --- Rank a slot, keyboard only ------------------------------------------------------------
-  const addSlotOne = managerD.getByRole("button", { name: "Add slot 1 to your ranking" });
-  await addSlotOne.focus();
-  await managerD.keyboard.press("Enter");
-  await expect(managerD.getByRole("button", { name: "Move slot 1 up" })).toBeVisible();
+  // Retried per the SSR-fake discipline (P13 review): a React button's Enter is a silent no-op
+  // pre-hydration (unlike a native link's), so each press re-fires until its own receipt shows.
+  await expect(async () => {
+    const receipt = managerD.getByRole("button", { name: "Move slot 1 up" });
+    if (!(await receipt.isVisible())) {
+      await managerD.getByRole("button", { name: "Add slot 1 to your ranking" }).focus();
+      await managerD.keyboard.press("Enter");
+    }
+    await expect(receipt).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
 
-  const saveRanking = managerD.getByRole("button", { name: "Save ranking" });
-  await saveRanking.focus();
-  await managerD.keyboard.press("Enter");
-  await expect(managerD.getByText(/^Saved\. You ranked: 1\./)).toBeVisible();
+  await expect(async () => {
+    const receipt = managerD.getByText(/^Saved\. You ranked: 1\./);
+    if (!(await receipt.isVisible())) {
+      await managerD.getByRole("button", { name: "Save ranking" }).focus();
+      await managerD.keyboard.press("Enter");
+    }
+    await expect(receipt).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 20_000 });
 
   // --- League home: the walk ends on the league's own page, ranking persisted --------------
   await expect(managerD).toHaveURL(new RegExp(`/app/leagues/${E2E_DESIGNV2_WALK_HOLD_LEAGUE_ID}$`));

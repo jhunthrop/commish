@@ -53,6 +53,16 @@ describe("PlayerPool", () => {
     expect(poolRows()).toHaveLength(4);
   });
 
+  it("never dims an unselected sticker, because opacity is what washed RB/TE below AA in light", () => {
+    // P13's axe battery caught opacity-80 on unselected filters dropping sticker contrast below
+    // 4.5:1 in the light theme; selection is signaled by the ring, never by dimming a readable
+    // label. This pins the fix at vitest speed rather than only at the next e2e axe run.
+    render(<PlayerPool {...props} />);
+    for (const button of screen.getAllByRole("button", { name: /^Show .* only$/ })) {
+      expect(button.className).not.toMatch(/opacity/);
+    }
+  });
+
   it("offers a way out when nothing matches", () => {
     render(<PlayerPool {...props} />);
     fireEvent.change(screen.getByLabelText("Search players"), { target: { value: "zzzz" } });
