@@ -177,7 +177,7 @@ async function tickUntilLiveWeekReached(): Promise<void> {
     for (let tick = 0; tick < MAX_TICKS_TO_REACH_LIVE_WEEK; tick++) {
       execFileSync(
         "npx",
-        ["dotenv", "-e", ".env.local", "-v", `MOCK_STATS_LIVE_WEEK=${SEEDED_SEASON_CURRENT_WEEK}`, "--", "tsx", "scripts/ingest-once.ts"],
+        ["dotenv", "-e", ".env.local", "-v", "STATS_PROVIDER=mock", "-v", `MOCK_STATS_LIVE_WEEK=${SEEDED_SEASON_CURRENT_WEEK}`, "--", "tsx", "scripts/ingest-once.ts"],
         { stdio: "inherit", cwd: resolve(AUTH_DIR, "../..") },
       );
       const [current] = await db.select({ status: statWeeks.status }).from(statWeeks).where(eq(statWeeks.week, SEEDED_SEASON_CURRENT_WEEK));
@@ -763,7 +763,7 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   // already uses for exactly this override (see the `db:migrate:test` script).
   execFileSync(
     "npx",
-    ["dotenv", "-e", ".env.local", "-v", `DEV_SEED_CLAIM_USER_ID=${a.userId}`, "--", "tsx", "src/data/seed/index.ts"],
+    ["dotenv", "-e", ".env.local", "-v", "STATS_PROVIDER=mock", "-v", `DEV_SEED_CLAIM_USER_ID=${a.userId}`, "--", "tsx", "src/data/seed/index.ts"],
     { stdio: "inherit", cwd: resolve(AUTH_DIR, "../..") },
   );
 

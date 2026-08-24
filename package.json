@@ -29,8 +29,8 @@
     "trades:sweep": "dotenv -e .env.local -- tsx scripts/sweep-trade-fairness.ts",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down",
-    "e2e": "dotenv -e .env.local -- playwright test",
-    "e2e:ui": "dotenv -e .env.local -- playwright test --ui",
+    "e2e": "dotenv -e .env.local -v STATS_PROVIDER=mock -- playwright test",
+    "e2e:ui": "dotenv -e .env.local -v STATS_PROVIDER=mock -- playwright test --ui",
     "e2e:install": "playwright install --with-deps chromium"
   },
   "dependencies": {
