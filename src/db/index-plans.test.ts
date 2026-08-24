@@ -653,6 +653,24 @@ describe("hot read paths use indexes", () => {
   });
 
   /**
+   * Phase 3.6, Task 10, Step 1b (F1): `crossLeagueHome`'s own `lineupSet` read
+   * (`@/league-service/home.ts`) — every caller's own team ids, no week filter, since one
+   * caller's leagues can each be on a different current week. `team_id` still leads `lineup_
+   * slots`' own primary key, so an `IN` over the caller's team ids rides it exactly the same way
+   * the single-team lookup above does, rather than a new index.
+   */
+  it("answers a manager's own lineupSet fact across every league by index, not by scanning every lineup row", async () => {
+    const plan = await explainPlan(
+      db,
+      db
+        .selectDistinct({ teamId: lineupSlots.teamId, weekNumber: lineupSlots.weekNumber })
+        .from(lineupSlots)
+        .where(inArray(lineupSlots.teamId, ["tm1_1", "tm1_2", "tm1_3"])),
+    );
+    expect(planUsesSeqScanOn(plan, "lineup_slots")).toBe(false);
+  });
+
+  /**
    * `applyTradeInTx`'s own read: both teams' current rosters, fresh, inside the transaction that
    * is about to move a player between them — never trusted from propose time. `team_id` leads
    * `roster_slots`' own primary key, so an `IN` over two team ids is still an index lookup, not a

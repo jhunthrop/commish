@@ -29,6 +29,13 @@ const SCHEDULED_CARD: HomeBody["leagues"][number] = {
   weekStatus: "scheduled",
   matchup: null,
   nextAction: { kind: "set-lineup", label: "Set your lineup" },
+  lineupSet: true,
+  medianGame: false,
+  medianScore: null,
+  kickoffAt: null,
+  startTrigger: null,
+  kickoffRolls: 0,
+  myTeamName: "Sunday Money Team",
 };
 
 const LIVE_CARD: HomeBody["leagues"][number] = {
@@ -41,10 +48,30 @@ const LIVE_CARD: HomeBody["leagues"][number] = {
 
 const FIRST_RUN = firstRunPlan({ experienceTier: "beginner", helpLevel: "guided", leagueCount: 0 })!;
 
-const EMPTY: HomeBody = { leagues: [], firstRun: FIRST_RUN };
-const EMPTY_NO_FIRST_RUN: HomeBody = { leagues: [], firstRun: null };
-const ONE_SCHEDULED: HomeBody = { leagues: [SCHEDULED_CARD], firstRun: null };
-const ONE_LIVE: HomeBody = { leagues: [LIVE_CARD], firstRun: null };
+const EMPTY: HomeBody = { leagues: [], firstRun: FIRST_RUN, liveState: null };
+const EMPTY_NO_FIRST_RUN: HomeBody = { leagues: [], firstRun: null, liveState: null };
+const ONE_SCHEDULED: HomeBody = { leagues: [SCHEDULED_CARD], firstRun: null, liveState: null };
+const ONE_LIVE: HomeBody = { leagues: [LIVE_CARD], firstRun: null, liveState: null };
+
+const BAY_BANDITS: HomeBody["leagues"][number] = { ...SCHEDULED_CARD, id: "l_bb", name: "Bay Bandits" };
+const ONE_LEAGUE: HomeBody = { leagues: [BAY_BANDITS], firstRun: null, liveState: null };
+
+const PRE_DRAFT_LEAGUE: HomeBody["leagues"][number] = {
+  ...SCHEDULED_CARD,
+  id: "l_predraft",
+  name: "Rookie Room",
+  draftId: "d_predraft",
+  draftStatus: "scheduled",
+  filledTeams: 10,
+  teamCount: 12,
+  weekNumber: 1,
+  weekStatus: "scheduled",
+  nextAction: null,
+  startTrigger: "scheduled",
+  kickoffAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
+  kickoffRolls: 0,
+};
+const ALL_PRE_DRAFT: HomeBody = { leagues: [PRE_DRAFT_LEAGUE], firstRun: null, liveState: null };
 
 afterEach(() => {
   if (vi.isFakeTimers()) vi.useRealTimers();
@@ -105,7 +132,7 @@ describe("HomeBoard", () => {
   it("polls on the interval once visible and some week is in progress, and folds the response in", async () => {
     vi.useFakeTimers();
     setVisibility("visible");
-    const refreshed: HomeBody = { leagues: [{ ...LIVE_CARD, name: "Auction Night Refreshed" }], firstRun: null };
+    const refreshed: HomeBody = { leagues: [{ ...LIVE_CARD, name: "Auction Night Refreshed" }], firstRun: null, liveState: null };
     const fixture = fixtureLeagueDeps({ ok: true, data: refreshed });
     renderInLeague(<HomeBoard initial={ONE_LIVE} />, fixture.deps);
 
@@ -122,6 +149,7 @@ describe("HomeBoard", () => {
     const final: HomeBody = {
       leagues: [{ ...LIVE_CARD, weekStatus: "final", nextAction: { kind: "review-week", label: "See how the week went" } }],
       firstRun: null,
+      liveState: null,
     };
     const fixture = fixtureLeagueDeps({ ok: true, data: final });
     renderInLeague(<HomeBoard initial={ONE_LIVE} />, fixture.deps);
@@ -154,5 +182,27 @@ describe("HomeBoard", () => {
       await vi.advanceTimersByTimeAsync(LEAGUE_ROOM_CONFIG.homeRefreshIntervalMs);
     });
     expect(screen.getByRole("link", { name: "Auction Night" })).toBeInTheDocument();
+  });
+
+  // Step 1's own n=1 test (locker-room-panel.md, HIGH — the casual in ONE league): every hero
+  // element on this screen is a cross-league aggregation, and n=1 turned the house shelf into
+  // the loudest thing on the page. At n=1 the board IS the league, and no sort is named.
+  it("degrades to one league without announcing a sort over a list of one", async () => {
+    await renderSurface(<HomeBoard initial={ONE_LEAGUE} />, async ({ queryByText, getByRole }) => {
+      expect(queryByText(/closest first/i)).toBeNull();
+      expect(getByRole("heading", { name: "Bay Bandits" })).toBeInTheDocument();
+    });
+  });
+
+  // Step 2b (F18c): a manager whose leagues have all not drafted yet has no games at all — the
+  // gauntlet's "somebody else's dashboard" finding in its purest form, fixed by promoting the
+  // nearest draft's own row to a hero rather than an empty board of games that do not exist.
+  it("gives a manager with nothing but a future draft a screen about that draft", async () => {
+    await renderSurface(<HomeBoard initial={ALL_PRE_DRAFT} />, async ({ getByTestId, getByText, queryByRole, container }) => {
+      expect(getByTestId("pre-draft-hero")).toBeInTheDocument();
+      expect(getByText("10 of 12 seated. 2 seats left.")).toBeInTheDocument();
+      expect(queryByRole("table")).toBeNull();
+      expect(await axe(container)).toHaveNoViolations();
+    });
   });
 });

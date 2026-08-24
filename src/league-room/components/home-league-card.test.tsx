@@ -21,6 +21,13 @@ const BASE: HomeLeagueCardData = {
   weekStatus: "final",
   matchup: WON,
   nextAction: { kind: "review-week", label: "See how the week went" },
+  lineupSet: true,
+  medianGame: false,
+  medianScore: null,
+  kickoffAt: null,
+  startTrigger: null,
+  kickoffRolls: 0,
+  myTeamName: "Bay Bandits Team",
 };
 
 describe("HomeLeagueCard", () => {
@@ -60,8 +67,21 @@ describe("HomeLeagueCard", () => {
   });
 
   it("sends every other action into the league's own home", () => {
+    render(<HomeLeagueCard league={{ ...BASE, nextAction: { kind: "review-week", label: "See how the week went" } }} />);
+    expect(screen.getByRole("link", { name: "See how the week went for Sunday Money" })).toHaveAttribute("href", "/app/leagues/l1");
+  });
+
+  // F16: `fix-lineup`/`set-lineup` land on the editor itself, not the league home the manager
+  // then has to scan — `LineupEditor` carries `id="lineup"` (Task 11 Step 1) that makes this
+  // fragment land.
+  it("sends a lineup action straight to the editor's own anchor", () => {
     render(<HomeLeagueCard league={{ ...BASE, nextAction: { kind: "set-lineup", label: "Set your lineup" } }} />);
-    expect(screen.getByRole("link", { name: "Set your lineup for Sunday Money" })).toHaveAttribute("href", "/app/leagues/l1");
+    expect(screen.getByRole("link", { name: "Set your lineup for Sunday Money" })).toHaveAttribute("href", "/app/leagues/l1#lineup");
+  });
+
+  it("sends a fix-lineup action straight to the editor's own anchor too", () => {
+    render(<HomeLeagueCard league={{ ...BASE, nextAction: { kind: "fix-lineup", label: "Fix your lineup" } }} />);
+    expect(screen.getByRole("link", { name: "Fix your lineup for Sunday Money" })).toHaveAttribute("href", "/app/leagues/l1#lineup");
   });
 
   it("gives a live draft the same loud ring treatment LeagueList (the card this replaced) gave it", () => {

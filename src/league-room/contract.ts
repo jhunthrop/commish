@@ -207,6 +207,55 @@ export interface HomeLeagueCard extends LeagueSummary {
   readonly matchup: MatchupSummary | null;
   /** `null` renders as no action at all — never a disabled button (`@/league/next-action.ts`). */
   readonly nextAction: NextAction | null;
+  /**
+   * Phase 3.6, Task 10, Step 1b (F1): whether THIS manager already has a `lineup_slots` row for
+   * `weekNumber` — the same `notExists(lineupSlots WHERE teamId AND weekNumber)` predicate
+   * `leaguesNeedingAutoSetQuery` (`@/league-service/auto-lineup.ts`) already asks, folded into
+   * `crossLeagueHome`'s own grouped reads rather than a second query per league. `true` for a
+   * caller with no team here (`myTeamId === null`) — there is nothing to fix, so the value never
+   * disagrees with `nextAction`, which already gates `fix-lineup` on `myTeamId !== null`.
+   */
+  readonly lineupSet: boolean;
+  /** Whether this league plays a median game (Task 2's toggle) — read straight off the `leagues`
+   *  row `crossLeagueHome` already selects, zero extra cost. `LeagueBoard`'s second-result cell
+   *  reads this to render a median line instead of reusing the head-to-head vs-block. */
+  readonly medianGame: boolean;
+  /** This week's own stored league median (`weeks.median_score`), or `null` before the week has
+   *  settled — read from the SAME `medianByWeekByLeague` fold `crossLeagueHome` already builds
+   *  for `record`, never a second query. Meaningless when `medianGame` is `false`. */
+  readonly medianScore: number | null;
+  /**
+   * Phase 3.6, Task 10, Step 2b: the three facts the pre-draft hero needs, off the SAME `drafts`
+   * row `crossLeagueHome` already selects (`DraftMembershipRow`, `@/league-service/read.ts`) —
+   * three more columns, never a second query. `null`/`0` for a league with no draft row at all
+   * (the same never-true defensive case `draftId`/`draftStatus` already carry).
+   */
+  readonly kickoffAt: string | null;
+  readonly startTrigger: "scheduled" | "when_full" | null;
+  readonly kickoffRolls: number;
+  /** This manager's own team name in this league, off the SAME `teamRows`/`nameById` fold
+   *  `crossLeagueHome` already builds — `null` only for a caller with no team here. The
+   *  pre-draft hero's inlined `checklistItems` (`./waiting-room.tsx`) reads this for its "Name
+   *  your team" row, the same fact `WaitingRoom` itself reads from its own `teams` prop. */
+  readonly myTeamName: string | null;
+}
+
+/**
+ * The one live fact the top bar (and, per Task 10 Step 3, the board itself) can carry — `null`
+ * outside a real game window (ruling 12: nothing live means no pill, never one that pulses on a
+ * Tuesday in July). `weekday`/`gamesLive` are both real, server-derived facts: see
+ * `liveStateFor` (`@/league-service/home.ts`) for how they are computed, and its own docblock for
+ * the coarseness this product accepts rather than modeling a per-game kickoff window it does not
+ * have (the same tradeoff `isLineupLocked`'s own docblock names: "coarse and correct beats fine
+ * and absent").
+ */
+export interface LiveState {
+  /** "Sunday" — the real weekday, from the server clock, never a stored or guessed value. */
+  readonly weekday: string;
+  /** `stat_weeks.games_total - stat_weeks.games_final` for the one week currently `in_progress`,
+   *  always positive when this type is constructed at all (`liveStateFor` returns `null` rather
+   *  than a zero count). */
+  readonly gamesLive: number;
 }
 
 export interface HomeBody {
@@ -218,6 +267,12 @@ export interface HomeBody {
    * `HomeBoard` reads this field, not `leagues.length`, to decide which empty treatment to show.
    */
   readonly firstRun: FirstRunPlan | null;
+  /**
+   * Phase 3.6, Task 10, Step 3: the SAME fact `shellData` (`@/components/app-shell/shell-data`)
+   * threads into `TopBar` — computed once, in `crossLeagueHome`, from the `stat_weeks` rows it
+   * already reads for `weekStatus`, and reused by `shellData` rather than recomputed a second way.
+   */
+  readonly liveState: LiveState | null;
 }
 
 export interface LeagueHomeBody {

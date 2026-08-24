@@ -14,13 +14,17 @@ import type { TradeProposalView } from "@/trades/contract";
 import type { ValuedPlayer } from "@/trades/fairness";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
 import { DRAFT_SCHEDULE, HOME, LINEUP, PUBLIC_LEAGUES, TERMS, fixtureLeagueDeps } from "@/league-room/test-fixtures";
+import { AttentionQueue, attentionQueueItemsFrom } from "@/league-room/components/attention-queue";
 import { DraftSchedulePanel } from "@/league-room/components/draft-schedule-panel";
 import { WaitingRoom, type WaitingRoomLeague } from "@/league-room/components/waiting-room";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
+import { LeagueBoard } from "@/league-room/components/league-board";
 import { LeagueHome } from "@/league-room/components/league-home";
 import { LeagueTermsPanel } from "@/league-room/components/league-terms-panel";
+import { LiveStatePill } from "@/league-room/components/live-state-pill";
 import { ModerationSummary } from "@/league-room/components/moderation-summary";
 import { OpenLeagueCard } from "@/league-room/components/open-league-card";
+import { OpenSeatsPanel } from "@/league-room/components/open-seats-panel";
 import { ProofStrip } from "@/league-room/components/proof-strip";
 import { PublicLeagueList } from "@/league-room/components/public-league-list";
 import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
@@ -28,7 +32,7 @@ import { SeatHoldPanel } from "@/league-room/components/seat-hold-panel";
 import { SeatTakenPanel } from "@/league-room/components/seat-taken-panel";
 import { TradeCard } from "@/league-room/components/trade-card";
 import { TradeComposer } from "@/league-room/components/trade-composer";
-import type { ModerationSummaryView, TradeRoomContext } from "@/league-room/contract";
+import type { HomeLeagueCard, ModerationSummaryView, TradeRoomContext } from "@/league-room/contract";
 import { ReviewFeed } from "@/account-room/components/review-feed";
 import type { ReviewsPage, ReviewView } from "@/reviews/contract";
 import { Crest } from "@/components/ui/crest";
@@ -1094,5 +1098,105 @@ describe("SessionNotice says nothing that breaks the house copy rules, quiet and
     unmountModal();
 
     fetchSpy.mockRestore();
+  });
+});
+
+/**
+ * Phase 3.6, Task 10: the locker room's four new components join the roster the same commit
+ * that creates them, per this file's own "one place to add" point.
+ */
+const SWEEP_LEAGUE: HomeLeagueCard = {
+  id: "l_sweep",
+  name: "Sunday Money",
+  format: "snake",
+  teamCount: 10,
+  filledTeams: 10,
+  isCommissioner: false,
+  myTeamId: "t1",
+  draftId: "d1",
+  draftStatus: "complete",
+  record: { wins: 5, losses: 2, ties: 0 },
+  weekNumber: 4,
+  weekStatus: "scheduled",
+  matchup: null,
+  nextAction: { kind: "fix-lineup", label: "Fix your lineup" },
+  lineupSet: false,
+  medianGame: true,
+  medianScore: 121.4,
+  kickoffAt: null,
+  startTrigger: null,
+  kickoffRolls: 0,
+  myTeamName: "Sunday Money Team",
+};
+
+describe("LeagueBoard says nothing that breaks the house copy rules", () => {
+  it("is clean with a mix of leagues, including a median league's second result", () => {
+    const { container } = render(
+      <LeagueBoard
+        leagues={[
+          SWEEP_LEAGUE,
+          {
+            ...SWEEP_LEAGUE,
+            id: "l_sweep_live",
+            name: "Auction Night",
+            weekStatus: "in_progress",
+            nextAction: { kind: "watch-scores", label: "Watch the scores" },
+            lineupSet: true,
+            matchup: {
+              weekNumber: 4,
+              homeTeamId: "t1",
+              awayTeamId: "t2",
+              homeTeamName: "Bay Bandits",
+              awayTeamName: "Iron Owls",
+              homeScore: 112.5,
+              awayScore: 98.25,
+              final: false,
+              weekStatus: "in_progress",
+            },
+          },
+        ]}
+      />,
+    );
+    expectClean(container, "Sunday Money", "Auction Night", "Bay Bandits", "Iron Owls");
+  });
+});
+
+describe("AttentionQueue says nothing that breaks the house copy rules", () => {
+  it("is clean populated and empty", () => {
+    for (const element of [
+      <AttentionQueue key="populated" items={attentionQueueItemsFrom([SWEEP_LEAGUE])} />,
+      <AttentionQueue key="empty" items={[]} />,
+    ]) {
+      const { container, unmount } = render(element);
+      expectClean(container, SWEEP_LEAGUE.name);
+      unmount();
+    }
+  });
+});
+
+describe("OpenSeatsPanel says nothing that breaks the house copy rules", () => {
+  it("is clean populated, empty, and quiet", () => {
+    for (const element of [
+      <OpenSeatsPanel key="populated" leagues={PUBLIC_LEAGUES} />,
+      <OpenSeatsPanel key="quiet" leagues={PUBLIC_LEAGUES} quiet />,
+      <OpenSeatsPanel key="empty" leagues={[]} />,
+    ]) {
+      const { container, unmount } = render(element);
+      expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));
+      unmount();
+    }
+  });
+});
+
+describe("LiveStatePill says nothing that breaks the house copy rules", () => {
+  it("is clean live and null", () => {
+    for (const element of [
+      <LiveStatePill key="live" liveState={{ weekday: "Sunday", gamesLive: 7 }} />,
+      <LiveStatePill key="null" liveState={null} />,
+    ]) {
+      const { container, unmount } = render(element);
+      expectClean(container);
+      unmount();
+    }
   });
 });

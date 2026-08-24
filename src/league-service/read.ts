@@ -49,10 +49,22 @@ type LeagueRow = typeof leagues.$inferSelect;
  *  (`@/league-service/home.ts`) both extend rather than each re-querying it their own way. One
  *  query per table, not one per league — a manager in ten leagues must not cost thirty round
  *  trips, whichever of the two callers is asking. */
+/** `kickoffAt`/`startTrigger`/`kickoffRolls` (Phase 3.6, Task 10, Step 2b) ride the SAME
+ *  `drafts` select `crossLeagueHome` already paid for — three more columns off one row, never a
+ *  second query — so the pre-draft home's hero can be built from data this read already holds. */
+export interface DraftMembershipRow {
+  readonly id: string;
+  readonly leagueId: string;
+  readonly status: DraftStatus;
+  readonly kickoffAt: Date;
+  readonly startTrigger: "scheduled" | "when_full";
+  readonly kickoffRolls: number;
+}
+
 export interface LeagueMembershipRows {
   readonly leagueRows: readonly LeagueRow[];
   readonly teamRows: readonly { readonly id: string; readonly leagueId: string; readonly name: string }[];
-  readonly draftRows: readonly { readonly id: string; readonly leagueId: string; readonly status: DraftStatus }[];
+  readonly draftRows: readonly DraftMembershipRow[];
   /** This user's own team in each league they're in. */
   readonly myTeamByLeague: ReadonlyMap<string, string>;
 }
@@ -72,7 +84,14 @@ export async function myLeaguesOverview(db: Db, userId: string): Promise<LeagueM
   const leagueRows = await db.select().from(leagues).where(inArray(leagues.id, ids)).orderBy(asc(leagues.createdAt));
   const teamRows = await db.select({ id: teams.id, leagueId: teams.leagueId, name: teams.name }).from(teams).where(inArray(teams.leagueId, ids));
   const draftRows = await db
-    .select({ id: drafts.id, leagueId: drafts.leagueId, status: drafts.status })
+    .select({
+      id: drafts.id,
+      leagueId: drafts.leagueId,
+      status: drafts.status,
+      kickoffAt: drafts.kickoffAt,
+      startTrigger: drafts.startTrigger,
+      kickoffRolls: drafts.kickoffRolls,
+    })
     .from(drafts)
     .where(inArray(drafts.leagueId, ids));
 

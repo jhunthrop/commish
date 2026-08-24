@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
 import type { Clock } from "@/domain/timing";
-import { drafts, matchups, statWeeks, teams, users } from "@/db/schema";
+import { drafts, lineupSlots, matchups, statWeeks, teams, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { createLeague } from "@/league-service/creation";
 import { shellData, shortNameFor } from "./shell-data";
@@ -21,15 +21,18 @@ afterAll(async () => {
 });
 
 /** One member-owned league, named `name`, commissioned by `userId` — the shape every test below
- *  needs and nothing more (`nextAction`/`weekStatus` fixtures are layered on top per test). */
-async function seedLeague(name: string, userId: string): Promise<string> {
+ *  needs and nothing more (`nextAction`/`weekStatus` fixtures are layered on top per test).
+ *  `teamCount` defaults to 8 (an ordinary open league); a test that needs `invite-managers`'
+ *  unfilled-seat check to never outrank the fact under test passes `1` — a solo, already-full
+ *  room — rather than seeding seven more teams it has no other use for. */
+async function seedLeague(name: string, userId: string, teamCount = 8): Promise<string> {
   await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: name }).onConflictDoNothing();
   const created = await createLeague(
     { db, clock, newId },
     {
       name,
       format: "snake",
-      teamCount: 8,
+      teamCount,
       scoringPreset: "ppr",
       auctionBudget: null,
       rosterSlots: [{ slot: "QB", count: 1, eligiblePositions: ["QB"] }],
@@ -62,10 +65,25 @@ describe("shellData", () => {
     expect(rail).toEqual([]);
   });
 
-  it("always answers a null liveState — Task 9's own read decides the real pill (ruling 12)", async () => {
+  it("answers a null liveState off-season — no stat_weeks row means nothing is live (ruling 12)", async () => {
     await seedLeague("Thunder Squad", "u_quiet");
     const { liveState } = await shellData(db, { id: "u_quiet" });
     expect(liveState).toBeNull();
+  });
+
+  it("answers the real liveState once a week is genuinely live, on a real game day (Task 10, Step 3)", async () => {
+    const leagueId = await seedLeague("Sunday Squad", "u_liveday");
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, leagueId));
+    const [team] = await db.select().from(teams).where(eq(teams.leagueId, leagueId));
+    await db.insert(users).values({ id: "u_liveday_rival", email: "u_liveday_rival@test.local", displayName: "Rival" });
+    await db.insert(teams).values({ id: "u_liveday_rival_team", leagueId, userId: "u_liveday_rival", name: "Rival" });
+    await db.insert(matchups).values({ leagueId, weekNumber: 1, homeTeamId: team!.id, awayTeamId: "u_liveday_rival_team" });
+    await db.insert(statWeeks).values({ week: 1, status: "in_progress", gamesTotal: 16, gamesFinal: 9 }).onConflictDoNothing();
+
+    // `clock` above (2026-08-23T12:00:00.000Z) is a real Sunday — the one day `shellData`'s own
+    // injected clock can prove `liveStateFor`'s weekday gate through, deterministically.
+    const { liveState } = await shellData(db, { id: "u_liveday" }, clock);
+    expect(liveState).toEqual({ weekday: "Sunday", gamesLive: 7 });
   });
 
   it("marks a league needs-you exactly when the caller's own draft is live (join-draft, F1)", async () => {
@@ -98,12 +116,27 @@ describe("shellData", () => {
   });
 
   it("marks a league quiet when nothing needs the caller and the week isn't live", async () => {
-    await seedLeague("Thunder Squad", "u_quiet2");
+    const leagueId = await seedLeague("Thunder Squad", "u_quiet2", 1);
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, leagueId));
+    // A lineup this manager already saved for the current week — without this row, `lineupSet`
+    // is false and the league correctly reads `needs-you` (`fix-lineup`), not `quiet`.
+    const [team] = await db.select().from(teams).where(eq(teams.leagueId, leagueId));
+    await db.insert(lineupSlots).values({ teamId: team!.id, weekNumber: 1, slot: "QB", slotIndex: 0, playerId: null });
 
     const { rail } = await shellData(db, { id: "u_quiet2" });
 
     expect(rail).toHaveLength(1);
     expect(rail[0]!.shortName).toBe("TS");
     expect(rail[0]!.state).toBe("quiet");
+  });
+
+  it("marks a league needs-you when this manager's own lineup is genuinely unset (fix-lineup, F1)", async () => {
+    const leagueId = await seedLeague("Bay Bandits", "u_fixlineup", 1);
+    await db.update(drafts).set({ status: "complete" }).where(eq(drafts.leagueId, leagueId));
+
+    const { rail } = await shellData(db, { id: "u_fixlineup" });
+
+    expect(rail).toHaveLength(1);
+    expect(rail[0]!.state).toBe("needs-you");
   });
 });

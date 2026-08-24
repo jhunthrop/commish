@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { nextAction, type NextActionInput } from "./next-action";
+import { COPY, nextAction, type NextActionInput } from "./next-action";
 
 /** A full team, mid-season, week scheduled, nothing pending — the "no action" baseline every
  *  test below overrides exactly one field of. */
@@ -10,6 +10,7 @@ const BASE: NextActionInput = {
   myTeamId: "t1",
   draftStatus: "complete",
   weekStatus: null,
+  lineupSet: true,
 };
 
 describe("nextAction", () => {
@@ -106,6 +107,7 @@ describe("nextAction", () => {
         myTeamId: "t1",
         draftStatus: "in_progress",
         weekStatus: null,
+        lineupSet: true,
       };
       expect(nextAction(input)?.kind).toBe("join-draft");
     });
@@ -118,6 +120,7 @@ describe("nextAction", () => {
         myTeamId: "t1",
         draftStatus: "in_progress",
         weekStatus: "in_progress",
+        lineupSet: true,
       };
       expect(nextAction(input)?.kind).toBe("join-draft");
     });
@@ -130,6 +133,7 @@ describe("nextAction", () => {
         myTeamId: "t1",
         draftStatus: "scheduled",
         weekStatus: null,
+        lineupSet: true,
       };
       expect(nextAction(input)?.kind).toBe("invite-managers");
     });
@@ -142,6 +146,7 @@ describe("nextAction", () => {
         myTeamId: "t1",
         draftStatus: "complete",
         weekStatus: "final",
+        lineupSet: true,
       };
       expect(nextAction(input)?.kind).toBe("invite-managers");
     });
@@ -154,6 +159,7 @@ describe("nextAction", () => {
         myTeamId: "t1",
         draftStatus: "scheduled",
         weekStatus: "in_progress",
+        lineupSet: true,
       };
       expect(nextAction(input)?.kind).toBe("open-draft-room");
     });
@@ -166,5 +172,34 @@ describe("nextAction", () => {
       const input: NextActionInput = { ...BASE, myTeamId: "t1", weekStatus: "scheduled" };
       expect(nextAction(input)?.kind).toBe("set-lineup");
     });
+
+    // Step 1b (F1): the fact under "Fix your lineup" — nothing computed this before `lineupSet`
+    // existed, so `set-lineup` fired for every scheduled week regardless of whether the manager
+    // had actually saved a lineup.
+    it("asks for a fix only when the lineup is genuinely unset and the week can still be changed", () => {
+      expect(nextAction({ ...BASE, myTeamId: "t1", weekStatus: "scheduled", lineupSet: false })?.kind).toBe("fix-lineup");
+      expect(nextAction({ ...BASE, myTeamId: "t1", weekStatus: "scheduled", lineupSet: true })?.kind).not.toBe("fix-lineup");
+      expect(nextAction({ ...BASE, myTeamId: "t1", weekStatus: "in_progress", lineupSet: false })?.kind).not.toBe("fix-lineup");
+    });
+
+    it("does not offer fix-lineup for a scheduled week when I have no team", () => {
+      expect(nextAction({ ...BASE, myTeamId: null, weekStatus: "scheduled", lineupSet: false })?.kind).not.toBe("fix-lineup");
+    });
+
+    it("fix-lineup sits directly above set-lineup: an unset lineup gets the fix, a set one falls through to set-lineup", () => {
+      expect(nextAction({ ...BASE, myTeamId: "t1", weekStatus: "scheduled", lineupSet: false })).toEqual({
+        kind: "fix-lineup",
+        label: "Fix your lineup",
+      });
+      expect(nextAction({ ...BASE, myTeamId: "t1", weekStatus: "scheduled", lineupSet: true })).toEqual({
+        kind: "set-lineup",
+        label: "Set your lineup",
+      });
+    });
+  });
+
+  it("keeps one string per kind, and they are not the same string (C2)", () => {
+    expect(COPY["fix-lineup"]).toBe("Fix your lineup");
+    expect(COPY["set-lineup"]).toBe("Set your lineup");
   });
 });

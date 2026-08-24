@@ -4,7 +4,9 @@ import { readPreferences } from "@/identity-service/preferences";
 import { firstRunPlan } from "@/identity";
 import { PageTitle } from "@/components/ui";
 import { crossLeagueHome } from "@/league-service";
+import { listPublicLeagues } from "@/league-service/browse";
 import { getScoreCache } from "@/league-service/score-cache-instance";
+import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import type { HomeBody } from "@/league-room/contract";
 import { HomeBoard } from "@/league-room/components/home-board";
 import { StartOrJoinDisclosure } from "@/league-room/components/start-or-join-disclosure";
@@ -38,9 +40,14 @@ export const dynamic = "force-dynamic";
 export default async function AppHome() {
   const user = await requireCurrentUser();
   const db = getDb();
-  const [leaguesHome, preferences] = await Promise.all([
+  const [leaguesHome, preferences, openLeagues] = await Promise.all([
     crossLeagueHome(db, user.id, { scoreCache: getScoreCache() }),
     readPreferences(db, user),
+    // Task 10, Step 4: the house shelf on the home screen — the SAME `listPublicLeagues` read
+    // `/browse` and the front door already make, filtered down to the house's own leagues
+    // (`.house`) rather than the whole member list, since "the house always has a game" is the
+    // promise this panel exists to keep visible.
+    listPublicLeagues(db, normalizeBrowseFilter({})),
   ]);
   const firstRun = firstRunPlan({
     experienceTier: user.experienceTier,
@@ -52,7 +59,7 @@ export default async function AppHome() {
   return (
     <>
       <PageTitle>Your leagues</PageTitle>
-      <HomeBoard initial={home} />
+      <HomeBoard initial={home} openLeagues={openLeagues.house} helpLevel={preferences.helpLevel} />
       {firstRun === null ? <StartOrJoinDisclosure experienceTier={user.experienceTier} /> : null}
     </>
   );

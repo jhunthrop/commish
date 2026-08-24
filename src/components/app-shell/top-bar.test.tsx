@@ -88,7 +88,7 @@ describe("TopBar", () => {
     expect(header.innerHTML).not.toMatch(/max-w-4xl/);
   });
 
-  it("accepts a null liveState without rendering anything for it — Task 9's own pill fills this slot later", () => {
+  it("accepts a null liveState without rendering anything for it (ruling 12)", () => {
     const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
     const { container } = render(
       <AccountRoomDepsProvider deps={fixture.deps}>
@@ -98,5 +98,18 @@ describe("TopBar", () => {
       </AccountRoomDepsProvider>,
     );
     expect(container.querySelector("header")).toBeInTheDocument();
+    expect(screen.queryByText(/games live/i)).not.toBeInTheDocument();
+  });
+
+  it("renders the live pill (Task 10, Step 3) once liveState carries a real game window", () => {
+    const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
+    render(
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <NoticesProvider>
+          <TopBar displayName="Ada Lovelace" avatar={null} isAdmin={false} liveState={{ weekday: "Sunday", gamesLive: 7 }} />
+        </NoticesProvider>
+      </AccountRoomDepsProvider>,
+    );
+    expect(screen.getByText("Sunday · 7 games live")).toBeInTheDocument();
   });
 });

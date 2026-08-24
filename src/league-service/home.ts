@@ -1,12 +1,53 @@
 import { inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { matchups, statWeeks, weeks } from "@/db/schema";
+import { lineupSlots, matchups, statWeeks, weeks } from "@/db/schema";
+import type { Clock } from "@/domain/timing";
 import { computeStandings, LEAGUE_CONFIG, nextAction, seasonProgress, type WeekStatus } from "@/league";
-import type { HomeBody, HomeLeagueCard, MatchupSummary } from "@/league-room/contract";
+import type { HomeBody, HomeLeagueCard, LiveState, MatchupSummary } from "@/league-room/contract";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import type { ScoreCache, ScoreCacheBatchRequest } from "@/stats-pipeline/score-cache";
 import { isCommissionerOf } from "./authority";
 import { myLeaguesOverview, toSummary } from "./read";
+
+/** The outermost edge is the only place a wall clock is allowed — see `read.ts`'s identical
+ *  constant. Only used for `liveStateFor`'s weekday, below. */
+const systemClock: Clock = { now: () => new Date().toISOString() };
+
+/** Real NFL game days — Thursday Night Football, the Sunday slate, Monday Night Football. Gates
+ *  `liveStateFor` (below) against the coarsest false-positive it would otherwise produce: a week
+ *  whose own `stat_weeks.status` is still `"in_progress"` days after Monday night settles (a
+ *  correction sweep can lag), or days before Thursday's kickoff even opens it. */
+const NFL_GAME_WEEKDAYS: ReadonlySet<string> = new Set(["Thursday", "Sunday", "Monday"]);
+
+const WEEKDAY_FORMAT = new Intl.DateTimeFormat("en-US", { weekday: "long", timeZone: "UTC" });
+
+/**
+ * The top bar's one live fact (Task 10, Step 3), from `stat_weeks.games_total`/`games_final` —
+ * columns `crossLeagueHome` already selects for `weekStatus`, so this costs no extra read.
+ *
+ * COARSE BY DESIGN, and the coarseness is named rather than hidden: `stat_weeks` carries an
+ * aggregate `gamesFinal`/`gamesTotal` for the whole week, not a per-game "is this one being
+ * played RIGHT NOW" flag, so a week that is genuinely mid-gap (Tuesday, with Monday night long
+ * over and Thursday's kickoff days away) can still read `status: "in_progress"` if the
+ * correction sweep has not yet stamped the week final. The weekday gate is what keeps that gap
+ * from lighting a pill that lies: only a real NFL game day can ever render one, exactly the same
+ * "coarse and correct beats fine and absent" tradeoff `isLineupLocked`'s own docblock states for
+ * the identical reason (a per-game kickoff window this product does not model). `off-season`
+ * (no `in_progress` week at all), `mid-week` (an `in_progress` week, but not a game day) and
+ * `pre-kickoff` (the week has not started at all — `status !== "in_progress"`) all return `null`
+ * — ruling 12, nothing live means no pill.
+ */
+export function liveStateFor(
+  statWeekRows: readonly { readonly status: WeekStatus; readonly gamesTotal: number; readonly gamesFinal: number }[],
+  now: Date,
+): LiveState | null {
+  const active = statWeekRows.find((row) => row.status === "in_progress");
+  if (active === undefined) return null;
+  const weekday = WEEKDAY_FORMAT.format(now);
+  if (!NFL_GAME_WEEKDAYS.has(weekday)) return null;
+  const gamesLive = active.gamesTotal - active.gamesFinal;
+  return gamesLive > 0 ? { weekday, gamesLive } : null;
+}
 
 /** No Redis connection needed: every existing caller of `crossLeagueHome` keeps working
  *  untouched, the same idiom `matchupWeek`'s `referenceCache` and `setLineup`'s `cache`
@@ -16,10 +57,13 @@ const NOOP_SCORE_CACHE: Pick<ScoreCache, "readMany"> = {
 };
 
 export interface CrossLeagueHomeDeps {
-  readonly scoreCache: Pick<ScoreCache, "readMany">;
+  readonly scoreCache?: Pick<ScoreCache, "readMany">;
+  /** Only `liveStateFor`'s weekday needs a clock — defaults to the real one, exactly like every
+   *  other service module's own outermost-edge constant, injectable so a test can pin the day. */
+  readonly clock?: Clock;
 }
 
-const DEFAULT_DEPS: CrossLeagueHomeDeps = { scoreCache: NOOP_SCORE_CACHE };
+const DEFAULT_DEPS: CrossLeagueHomeDeps = {};
 
 /** A live score for one team, out of the cache's batch response for one league/week pair, or
  *  `undefined` on a miss — the caller falls back to the matchup row's own (Postgres) score. */
@@ -33,14 +77,17 @@ function cachedPoints(scores: readonly { readonly teamId: string; readonly point
  *
  * Extends `myLeaguesOverview` (`./read.ts`) rather than re-querying membership its own way — the
  * league/team/draft rows are the SAME shared read `listLeaguesForUser` uses, so the two can never
- * quietly disagree about which leagues a user is in. Three more queries cover everything else:
+ * quietly disagree about which leagues a user is in. Four more queries cover everything else:
  * the matchups across every one of those leagues, the `weeks` rows across every one of them too
  * (their stored medians, for a league with the Task 2 toggle on — a per-league query inside the
- * standings loop below would be exactly the N+1 the data-layer rules forbid), and the
- * `stat_weeks` rows for the distinct current weeks among them (usually just one, since Phase 1's
- * calendar is shared across leagues). That is six queries total — `myLeaguesOverview`'s three,
- * plus these three — however many leagues the caller is in, ten or fifty: the query-count
- * discipline `listLeaguesForUser`'s own docblock commits to, extended rather than re-earned.
+ * standings loop below would be exactly the N+1 the data-layer rules forbid), the `stat_weeks`
+ * rows for the distinct current weeks among them (usually just one, since Phase 1's calendar is
+ * shared across leagues), and (Phase 3.6, Task 10, Step 1b) ONE grouped `lineup_slots` read over
+ * every caller's own team ids, answering `HomeLeagueCard.lineupSet` for every league in one round
+ * trip regardless of how many different "current weeks" they are each on. That is eight queries
+ * total — `myLeaguesOverview`'s four (membership, leagues, teams, drafts), plus these four —
+ * however many leagues the caller is in, ten or fifty: the query-count discipline
+ * `listLeaguesForUser`'s own docblock commits to, extended rather than re-earned.
  *
  * The one live read is a single `MGET` (`ScoreCache.readMany`) across every league whose current
  * week is `in_progress` — never one `GET` per league. A cache miss (including "never written",
@@ -58,7 +105,7 @@ export async function crossLeagueHome(
   deps: CrossLeagueHomeDeps = DEFAULT_DEPS,
 ): Promise<Omit<HomeBody, "firstRun">> {
   const { leagueRows, teamRows, draftRows, myTeamByLeague } = await myLeaguesOverview(db, userId);
-  if (leagueRows.length === 0) return { leagues: [] };
+  if (leagueRows.length === 0) return { leagues: [], liveState: null };
   const ids = leagueRows.map((league) => league.id);
 
   const filledByLeague = new Map<string, number>();
@@ -124,6 +171,24 @@ export async function crossLeagueHome(
 
   const weekStatusFor = (weekNumber: number): WeekStatus => statWeekByWeek.get(weekNumber)?.status ?? "scheduled";
 
+  // Step 1b (F1): the EIGHTH grouped query — `HomeLeagueCard.lineupSet`, the same
+  // `notExists(lineupSlots WHERE teamId AND weekNumber)` predicate `leaguesNeedingAutoSetQuery`
+  // (`@/league-service/auto-lineup.ts`) already asks, folded in here rather than a per-league
+  // read. Every team id is globally unique (`teams.id` is the primary key), so one `IN` over
+  // every caller's own team ids across every league answers every league's own current-week
+  // question in a single round trip, whatever week each league happens to be on.
+  const myTeamIds = [...new Set([...phaseByLeague.values()].map((phase) => phase.myTeamId).filter((id): id is string => id !== null))];
+  const lineupRows =
+    myTeamIds.length === 0
+      ? []
+      : await db.selectDistinct({ teamId: lineupSlots.teamId, weekNumber: lineupSlots.weekNumber }).from(lineupSlots).where(inArray(lineupSlots.teamId, myTeamIds));
+  const lineupSetKeys = new Set(lineupRows.map((row) => `${row.teamId}:${row.weekNumber}`));
+  const lineupSetFor = (teamId: string | null, weekNumber: number): boolean => teamId === null || lineupSetKeys.has(`${teamId}:${weekNumber}`);
+
+  // Step 3: the top bar's one live fact, from the SAME `statWeekRows` read above — zero extra
+  // queries. See `liveStateFor`'s own docblock for the coarseness this accepts.
+  const liveState = liveStateFor(statWeekRows, new Date((deps.clock ?? systemClock).now()));
+
   // Batch every league whose current week is actually live: a scheduled or final week never
   // wrote anything fresher than Postgres already has, so asking the cache for it would be a
   // wasted key in the MGET.
@@ -135,7 +200,7 @@ export async function crossLeagueHome(
       cacheRequests.push({ leagueId: league.id, week: phase.currentWeek, version: statWeek.version });
     }
   }
-  const cacheHits = await deps.scoreCache.readMany(cacheRequests);
+  const cacheHits = await (deps.scoreCache ?? NOOP_SCORE_CACHE).readMany(cacheRequests);
 
   const leagues: HomeLeagueCard[] = leagueRows.map((league) => {
     const phase = phaseByLeague.get(league.id)!;
@@ -169,6 +234,13 @@ export async function crossLeagueHome(
       weekNumber: phase.currentWeek,
       weekStatus,
       matchup,
+      lineupSet: lineupSetFor(phase.myTeamId, phase.currentWeek),
+      medianGame: league.medianGame,
+      medianScore: medianByWeekByLeague.get(league.id)?.get(phase.currentWeek) ?? null,
+      kickoffAt: draft?.kickoffAt.toISOString() ?? null,
+      startTrigger: draft?.startTrigger ?? null,
+      kickoffRolls: draft?.kickoffRolls ?? 0,
+      myTeamName: phase.myTeamId === null ? null : (phase.nameById.get(phase.myTeamId) ?? null),
       nextAction: nextAction({
         isCommissioner: isCommissionerOf(league, userId),
         filledTeams,
@@ -176,9 +248,10 @@ export async function crossLeagueHome(
         myTeamId: phase.myTeamId,
         draftStatus: draft?.status ?? null,
         weekStatus,
+        lineupSet: lineupSetFor(phase.myTeamId, phase.currentWeek),
       }),
     };
   });
 
-  return { leagues };
+  return { leagues, liveState };
 }

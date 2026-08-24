@@ -11,6 +11,7 @@ export type NextActionKind =
   | "join-draft" // the draft is live and you have a seat in it
   | "open-draft-room" // scheduled, not started
   | "invite-managers" // you are the commissioner and seats are empty
+  | "fix-lineup" // the week is still open and your lineup is genuinely unset (F1)
   | "set-lineup" // the week is still scheduled and you have a team
   | "watch-scores" // the week is in progress
   | "review-week" // the week is final
@@ -33,6 +34,15 @@ export interface NextActionInput {
   readonly myTeamId: string | null;
   readonly draftStatus: DraftStatus | null;
   readonly weekStatus: WeekStatus | null;
+  /**
+   * Whether THIS manager's `lineup_slots` row for the current week already exists (F1) — the
+   * same `notExists(lineupSlots WHERE teamId AND weekNumber)` predicate `leaguesNeedingAutoSetQuery`
+   * (`@/league-service/auto-lineup.ts`) already asks, folded into `crossLeagueHome`'s own grouped
+   * reads (`src/league-service/home.ts`). Before this field existed, `set-lineup` fired for every
+   * league with `weekStatus === "scheduled"` and a team, set or not, so the rail's needs-you dot
+   * lit every league forever. `fix-lineup` reads this fact; `set-lineup` does not.
+   */
+  readonly lineupSet: boolean;
 }
 
 /** The one sentence-fragment for each next action, owned here and nowhere else (C2) — a caller
@@ -43,6 +53,7 @@ export const COPY: Readonly<Record<Exclude<NextActionKind, "none">, string>> = {
   "join-draft": "Join the draft",
   "open-draft-room": "Open the draft room",
   "invite-managers": "Invite managers",
+  "fix-lineup": "Fix your lineup",
   "set-lineup": "Set your lineup",
   "watch-scores": "Watch the scores",
   "review-week": "See how the week went",
@@ -62,10 +73,14 @@ function action(kind: Exclude<NextActionKind, "none">): NextAction {
  *   1. A live draft beats everything — nothing else matters while your league is on the clock.
  *   2. Next, an unfilled league still needs its commissioner to go recruit, whatever the draft
  *      or week are doing — a league that can't field two full sides can't play.
- *   3. Everything after that is the league's own phase: a draft that hasn't started yet, and
- *      then the current week's own three states (scheduled/in progress/final). A league with
- *      none of the above — no team, no current week, nothing pending — gets `null`: the card
- *      renders no action rather than a disabled one.
+ *   3. A draft that hasn't started yet.
+ *   4. `fix-lineup` (F1), directly above `set-lineup`: the week is still open (`"scheduled"`)
+ *      and this manager's own lineup is genuinely unset. `set-lineup` keeps its place and its
+ *      own condition unchanged below it — it never fires for a manager `fix-lineup` already
+ *      caught, since the two conditions differ only by `lineupSet`.
+ *   5. The current week's remaining two states (in progress/final). A league with none of the
+ *      above — no team, no current week, nothing pending — gets `null`: the card renders no
+ *      action rather than a disabled one.
  */
 export function nextAction(input: NextActionInput): NextAction | null {
   if (input.draftStatus === "in_progress" && input.myTeamId !== null) {
@@ -76,6 +91,9 @@ export function nextAction(input: NextActionInput): NextAction | null {
   }
   if (input.draftStatus === "scheduled") {
     return action("open-draft-room");
+  }
+  if (input.myTeamId !== null && input.weekStatus === "scheduled" && !input.lineupSet) {
+    return action("fix-lineup");
   }
   if (input.myTeamId !== null && input.weekStatus === "scheduled") {
     return action("set-lineup");

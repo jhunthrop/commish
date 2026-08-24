@@ -1,23 +1,10 @@
 import Link from "next/link";
 import type { HomeLeagueCard as HomeLeagueCardData } from "../contract";
 import { Badge, Card, EYEBROW, SeatMeter } from "@/components/ui";
+import { actionHref } from "../lib/action-href";
 import { formatRecord, formatWeek } from "../lib/format";
 import { MatchupScoreboard } from "./matchup-scoreboard";
 import { WeekStatusBadge } from "./week-status-badge";
-
-/**
- * Where the card's one action button goes. Draft-phase actions go to the draft room; every
- * other action (invite, lineup, scores, review) goes to the league's own home, which is where
- * `InvitePanel`, `LineupEditor`, and the week's `MatchupScoreboard` already live
- * (`league-home.tsx`) — this never duplicates a second copy of any of them.
- */
-function actionHref(league: HomeLeagueCardData): string {
-  const kind = league.nextAction?.kind;
-  if ((kind === "join-draft" || kind === "open-draft-room") && league.draftId !== null) {
-    return `/app/drafts/${league.draftId}`;
-  }
-  return `/app/leagues/${league.id}`;
-}
 
 /**
  * One league, as the cross-league home renders it: the record, this week's matchup with its

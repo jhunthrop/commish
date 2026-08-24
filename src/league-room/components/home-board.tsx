@@ -2,12 +2,22 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import { EmptyState } from "@/components/ui";
-import type { HomeBody } from "../contract";
+import { Crest, EmptyState, Meter, SeatMeter } from "@/components/ui";
+import { Countdown, useCountdown } from "@/components/ui/countdown";
+import { RoomTour } from "@/draft-room/components/room-tour";
+import { actionLabelFor } from "@/draft-room/lib/lookups";
+import type { HelpLevel } from "@/identity/preferences";
+import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import type { HomeBody, HomeLeagueCard as HomeLeagueCardData } from "../contract";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { useLeagueRoomDeps } from "../hooks/deps";
+import { AttentionQueue, attentionQueueItemsFrom } from "./attention-queue";
 import { FirstRunPanel } from "./first-run-panel";
 import { HomeLeagueCard } from "./home-league-card";
+import { LeagueBoard } from "./league-board";
+import { OpenSeatsPanel } from "./open-seats-panel";
+import { WaitingChecklist } from "./waiting-checklist";
+import { checklistItems } from "./waiting-room";
 
 function someWeekInProgress(body: HomeBody): boolean {
   return body.leagues.some((league) => league.weekStatus === "in_progress");
@@ -15,6 +25,74 @@ function someWeekInProgress(body: HomeBody): boolean {
 
 function isHomeBody(value: unknown): value is HomeBody {
   return typeof value === "object" && value !== null && Array.isArray((value as { leagues?: unknown }).leagues);
+}
+
+/** Every league on the board is still pre-draft — the manager has no games at all, only a
+ *  future draft (F18c). */
+function allPreDraft(leagues: readonly HomeLeagueCardData[]): boolean {
+  return leagues.length > 0 && leagues.every((league) => league.draftStatus === "scheduled");
+}
+
+/** The nearest draft among a set of pre-draft leagues: a `when_full` league sorts first — it
+ *  could start the moment its last seat lands, which is a nearer fact than any dated kickoff —
+ *  and the rest sort by their own real `kickoffAt`. */
+function nearestPreDraft(leagues: readonly HomeLeagueCardData[]): HomeLeagueCardData {
+  return [...leagues].sort((a, b) => {
+    const aWhenFull = a.startTrigger === "when_full";
+    const bWhenFull = b.startTrigger === "when_full";
+    if (aWhenFull !== bWhenFull) return aWhenFull ? -1 : 1;
+    const at = a.kickoffAt === null ? Number.POSITIVE_INFINITY : Date.parse(a.kickoffAt);
+    const bt = b.kickoffAt === null ? Number.POSITIVE_INFINITY : Date.parse(b.kickoffAt);
+    return at - bt;
+  })[0]!;
+}
+
+/**
+ * The pre-draft home's own hero (Phase 3.6, Task 10, Step 2b): every element real data already
+ * on the page — `kickoffAt`/`filledTeams`/`teamCount`/`startTrigger` from the same home read the
+ * board uses, and the checklist's items the SAME `checklistItems` (`./waiting-room.tsx`) Task 9
+ * Step 4 defines, inlined rather than linked. `slotPreference` is not part of this cross-league
+ * read (it is a per-draft, per-team query `crossLeagueHome` does not run for every pre-draft
+ * league on the board), so the rank item renders its own stated fact with no control rather than
+ * a second, narrower ranking panel invented just for this hero.
+ */
+function PreDraftHero({
+  league,
+  remainingMs,
+  myTeamName,
+  helpLevel,
+}: {
+  readonly league: HomeLeagueCardData;
+  readonly remainingMs: number | null;
+  readonly myTeamName: string | null;
+  readonly helpLevel: HelpLevel | undefined;
+}) {
+  const [tourOpen, setTourOpen] = useState(false);
+  const items = checklistItems({
+    leagueId: league.id,
+    myTeamName,
+    slotPreference: null,
+    helpLevel,
+    format: league.format,
+    onOpenTour: () => setTourOpen(true),
+  });
+
+  return (
+    <div data-testid="pre-draft-hero" className="flex flex-col gap-4">
+      <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
+        <Crest id={league.id} label={league.name.slice(0, 2).toUpperCase()} size={64} />
+        <h2 className="font-display text-2xl font-bold uppercase leading-display text-text-primary">{league.name}</h2>
+        {league.startTrigger === "when_full" ? (
+          <Meter label="Seats filled" value={league.filledTeams} max={league.teamCount} className="w-full max-w-xs" />
+        ) : (
+          <Countdown remainingMs={remainingMs ?? 0} size="xl" />
+        )}
+        <SeatMeter filled={league.filledTeams} total={league.teamCount} />
+      </div>
+      <WaitingChecklist items={items} />
+      {tourOpen ? <RoomTour dismissedAt={null} onDismiss={() => setTourOpen(false)} actionLabel={actionLabelFor(league.format)} /> : null}
+    </div>
+  );
 }
 
 /**
@@ -37,12 +115,39 @@ function isHomeBody(value: unknown): value is HomeBody {
  * against the latest held state (via `bodyRef`), not just at mount: a week that goes final
  * between two ticks stops polling on the very next one, and a tab that comes back into view
  * resumes on its own without a dedicated `visibilitychange` listener.
+ *
+ * Three shapes, decided by what the leagues actually are (Task 10):
+ *   - Zero leagues: `FirstRunPanel` (or the defensive plain empty state).
+ *   - Exactly one league: the board IS the league (Step 1's own n=1 test) — a heading and the
+ *     ordinary `HomeLeagueCard`, never the multi-league table and never a sort announced over a
+ *     list of one.
+ *   - Every league pre-draft: the nearest draft's row promoted to a hero (Step 2b), no table of
+ *     games that do not exist.
+ *   - Otherwise: `AttentionQueue` above `LeagueBoard`, the dense multi-league table.
+ *
+ * `OpenSeatsPanel` renders below always, quieter for the single pre-draft manager (Step 4), and
+ * not at all when `firstRun !== null` (F18b) — `FirstRunPanel`'s own three paths already open
+ * with "find an open league".
  */
-export function HomeBoard({ initial }: { readonly initial: HomeBody }) {
+export function HomeBoard({
+  initial,
+  openLeagues = [],
+  helpLevel,
+}: {
+  readonly initial: HomeBody;
+  /** The house shelf's own leagues (`listPublicLeagues`), server-read once by `AppHome` — this
+   *  board never fetches them itself. Defaults to `[]` (renders no `OpenSeatsPanel`) so a caller
+   *  that predates Step 4 keeps working; `AppHome`/`/api/home`'s own page always supplies it. */
+  readonly openLeagues?: readonly PublicLeagueSummary[];
+  readonly helpLevel?: HelpLevel;
+}) {
   const [body, setBody] = useState<HomeBody>(initial);
   const deps = useLeagueRoomDeps();
   const bodyRef = useRef(body);
   bodyRef.current = body;
+
+  const preDraftHero = allPreDraft(body.leagues) ? nearestPreDraft(body.leagues) : null;
+  const { remainingMs } = useCountdown(preDraftHero?.startTrigger === "scheduled" ? preDraftHero.kickoffAt : null);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,17 +194,41 @@ export function HomeBoard({ initial }: { readonly initial: HomeBody }) {
     );
   }
 
-  // `min-w-0` on the grid ITEM below, not on the track: a grid item's default `min-width: auto`
-  // lets its min-content width push the item — and with it the whole single-column track — wider
-  // than the container, which is how one long league name made this page scroll sideways at
-  // 360px. `HomeLeagueCard`'s heading carries the matching `min-w-0 break-words`.
+  const openSeats = body.firstRun !== null ? null : <OpenSeatsPanel leagues={openLeagues} quiet={body.leagues.length === 1} />;
+
+  if (preDraftHero !== null) {
+    return (
+      <div className="flex flex-col gap-6">
+        <PreDraftHero league={preDraftHero} remainingMs={remainingMs} myTeamName={preDraftHero.myTeamName} helpLevel={helpLevel} />
+        {openSeats}
+      </div>
+    );
+  }
+
+  // n=1 (Step 1's own test): the board IS the league — a heading and the ordinary card, no
+  // sort language ("closest first") announced over a list of one, and no multi-league table.
+  if (body.leagues.length === 1) {
+    const only = body.leagues[0]!;
+    return (
+      <div className="flex flex-col gap-6">
+        <div className="flex flex-col gap-3">
+          {/* n=1 (Step 1's own test): the board IS the league — a real heading naming it, never
+              a sort ("closest first") announced over a list of one. `HomeLeagueCard` below still
+              carries its own link to the league; this heading names the page, it does not
+              duplicate that control. */}
+          <h2 className="font-display text-2xl font-bold uppercase leading-display text-text-primary">{only.name}</h2>
+          <HomeLeagueCard league={only} />
+        </div>
+        {openSeats}
+      </div>
+    );
+  }
+
   return (
-    <ul className="grid gap-3 sm:grid-cols-2">
-      {body.leagues.map((league) => (
-        <li key={league.id} className="min-w-0">
-          <HomeLeagueCard league={league} />
-        </li>
-      ))}
-    </ul>
+    <div className="flex flex-col gap-6">
+      <AttentionQueue items={attentionQueueItemsFrom(body.leagues)} />
+      <LeagueBoard leagues={body.leagues} />
+      {openSeats}
+    </div>
   );
 }

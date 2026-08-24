@@ -2,12 +2,12 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { inArray } from "drizzle-orm";
 import type { DraftFormat } from "@/domain/league";
 import type { DraftStatus } from "@/domain/draft";
-import { drafts, leagues, matchups, statWeeks, teams, users, weeks } from "@/db/schema";
+import { drafts, leagues, lineupSlots, matchups, statWeeks, teams, users, weeks } from "@/db/schema";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { STATS_INGESTION_CONFIG } from "@/stats-pipeline/config";
 import type { ScoreCache, ScoreCacheBatchRequest } from "@/stats-pipeline/score-cache";
 import type { TeamScore } from "@/stats-pipeline/contract";
-import { crossLeagueHome } from "./home";
+import { crossLeagueHome, liveStateFor } from "./home";
 
 const db = createTestDb();
 
@@ -192,7 +192,7 @@ describe("crossLeagueHome", () => {
 
   it("a user in zero leagues gets an empty list, not an error", async () => {
     await db.insert(users).values({ id: "lonely", email: "lonely@test.local", displayName: "Lonely" });
-    await expect(crossLeagueHome(db, "lonely")).resolves.toEqual({ leagues: [] });
+    await expect(crossLeagueHome(db, "lonely")).resolves.toEqual({ leagues: [], liveState: null });
   });
 
   it("the record and this week's matchup are correct against a partially-played season", async () => {
@@ -279,8 +279,8 @@ describe("crossLeagueHome", () => {
     const result = await crossLeagueHome(counting.db, "uMany");
     expect(result.leagues).toHaveLength(10);
     // `myLeaguesOverview`'s four queries (membership, leagues, teams, drafts) plus this
-    // function's own matchups, weeks (medians) and stat_weeks reads: seven total, bounded
-    // regardless of league count, never one query per league.
+    // function's own matchups, weeks (medians), stat_weeks and (Task 10, Step 1b) lineup_slots
+    // reads: eight total, bounded regardless of league count, never one query per league.
     expect(counting.selectCount()).toBeLessThanOrEqual(8);
   });
 
@@ -383,18 +383,155 @@ describe("crossLeagueHome", () => {
       [], // statWeekRows
     ];
     let call = 0;
+    const fromStub = () => {
+      const data = responses[call] ?? [];
+      call += 1;
+      return thenableChain(data);
+    };
     const stubDb = {
-      select: () => ({
-        from: () => {
-          const data = responses[call] ?? [];
-          call += 1;
-          return thenableChain(data);
-        },
-      }),
+      select: () => ({ from: fromStub }),
+      // Step 1b's `lineup_slots` read (F1) uses `selectDistinct`, not `select` — same stub
+      // shape, so it falls back to `responses[call] ?? []` exactly like every other read here.
+      selectDistinct: () => ({ from: fromStub }),
     } as unknown as import("@/db/client").Db;
 
     const result = await crossLeagueHome(stubDb, "u1");
     const phantom = result.leagues.find((league) => league.id === "lg_phantom");
     expect(phantom).toMatchObject({ myTeamId: null, filledTeams: 0, draftId: null, draftStatus: null, record: null });
+  });
+
+  // Phase 3.6, Task 10, Step 1b (F1).
+  it("lineupSet is false, and nextAction asks for a fix, when this manager has no lineup_slots row for the current week", async () => {
+    await seedLeague({
+      leagueId: "lgLineup",
+      commissionerUserId: "u1",
+      teamCount: 2,
+      teams: [{ teamId: "ll_t1", userId: "u1" }, { teamId: "ll_t2", userId: "u2" }],
+    });
+    await seedMatchup("lgLineup", 1, "ll_t1", "ll_t2", null, null);
+    await setWeekStatus(1, "scheduled");
+    // Neither row is THIS manager's own week-1 lineup: one belongs to the other team, the other
+    // is a different week entirely — proving the predicate is scoped to (teamId, weekNumber).
+    await db.insert(lineupSlots).values({ teamId: "ll_t2", weekNumber: 1, slot: "QB", slotIndex: 0, playerId: null });
+    await db.insert(lineupSlots).values({ teamId: "ll_t1", weekNumber: 2, slot: "QB", slotIndex: 0, playerId: null });
+
+    const result = await crossLeagueHome(db, "u1");
+    const card = result.leagues.find((league) => league.id === "lgLineup");
+    expect(card?.lineupSet).toBe(false);
+    expect(card?.nextAction).toEqual({ kind: "fix-lineup", label: "Fix your lineup" });
+  });
+
+  it("lineupSet is true once this manager's own row exists for the current week, and nextAction falls through to set-lineup", async () => {
+    await seedLeague({
+      leagueId: "lgLineupSet",
+      commissionerUserId: "u1",
+      teamCount: 2,
+      teams: [{ teamId: "ls_t1", userId: "u1" }, { teamId: "ls_t2", userId: "u2" }],
+    });
+    await seedMatchup("lgLineupSet", 1, "ls_t1", "ls_t2", null, null);
+    await setWeekStatus(1, "scheduled");
+    await db.insert(lineupSlots).values({ teamId: "ls_t1", weekNumber: 1, slot: "QB", slotIndex: 0, playerId: null });
+
+    const result = await crossLeagueHome(db, "u1");
+    const card = result.leagues.find((league) => league.id === "lgLineupSet");
+    expect(card?.lineupSet).toBe(true);
+    expect(card?.nextAction).toEqual({ kind: "set-lineup", label: "Set your lineup" });
+  });
+
+  // A caller with NO team in a league can never actually reach this function for that league at
+  // all: `myLeaguesOverview`'s own membership read (`teams.userId = userId`) is the sole entry
+  // point into `ids`, so a league with no team for this caller is a league that never appears in
+  // `leagueRows` in the first place. `lineupSetFor`'s own `teamId === null` branch is exercised
+  // instead by the "falls back on every '??' guard" test above, the one place a `myTeamId: null`
+  // card is ever constructed (through a stub `Db`, the only way to reach that state at all).
+
+  // Phase 3.6, Task 10, Step 2: the median row's own fact, read off the same `weeks`/`leagues`
+  // rows this function already selects.
+  it("carries the league's medianGame flag and this week's own stored median, at zero extra cost", async () => {
+    await seedLeague({
+      leagueId: "lgMedianFlag",
+      commissionerUserId: "u1",
+      teamCount: 2,
+      teams: [{ teamId: "mf_t1", userId: "u1" }, { teamId: "mf_t2", userId: "u2" }],
+    });
+    await db.update(leagues).set({ medianGame: true }).where(inArray(leagues.id, ["lgMedianFlag"]));
+    await seedMatchup("lgMedianFlag", 1, "mf_t1", "mf_t2", 30, 20);
+    await seedMedian("lgMedianFlag", 1, 121.4);
+    // Week 2 is the CURRENT week (week 1 is fully scored); it has no stored median yet.
+    await seedMatchup("lgMedianFlag", 2, "mf_t1", "mf_t2", null, null);
+
+    const result = await crossLeagueHome(db, "u1");
+    const card = result.leagues.find((league) => league.id === "lgMedianFlag");
+    expect(card?.medianGame).toBe(true);
+    expect(card?.weekNumber).toBe(2);
+    expect(card?.medianScore).toBeNull();
+  });
+
+  it("a non-median league carries medianGame: false", async () => {
+    await seedLeague({
+      leagueId: "lgNotMedian",
+      commissionerUserId: "u1",
+      teamCount: 2,
+      teams: [{ teamId: "nm_t1", userId: "u1" }, { teamId: "nm_t2", userId: "u2" }],
+    });
+
+    const result = await crossLeagueHome(db, "u1");
+    const card = result.leagues.find((league) => league.id === "lgNotMedian");
+    expect(card?.medianGame).toBe(false);
+  });
+
+  // Phase 3.6, Task 10, Step 3: the top bar's one live fact, read from the same `stat_weeks`
+  // rows already fetched for `weekStatus` — the pure gate itself (`liveStateFor`) is unit-tested
+  // below; this proves `crossLeagueHome` actually wires a real clock through to it.
+  it("wires liveState from stat_weeks through an injected clock", async () => {
+    await seedLeague({
+      leagueId: "lgLive",
+      commissionerUserId: "u1",
+      teamCount: 2,
+      teams: [{ teamId: "lv_t1", userId: "u1" }, { teamId: "lv_t2", userId: "u2" }],
+    });
+    await seedMatchup("lgLive", 1, "lv_t1", "lv_t2", null, null);
+    await setWeekStatus(1, "in_progress", 1, 16, 9);
+
+    const sunday = { now: () => "2026-08-23T18:00:00.000Z" };
+    const result = await crossLeagueHome(db, "u1", { clock: sunday });
+    expect(result.liveState).toEqual({ weekday: "Sunday", gamesLive: 7 });
+
+    const tuesday = { now: () => "2026-08-25T18:00:00.000Z" };
+    const resultMidWeek = await crossLeagueHome(db, "u1", { clock: tuesday });
+    expect(resultMidWeek.liveState).toBeNull();
+  });
+});
+
+describe("liveStateFor", () => {
+  const ROW = { status: "in_progress" as const, gamesTotal: 16, gamesFinal: 9 };
+
+  it("is null off-season: no in-progress week at all", () => {
+    expect(liveStateFor([{ ...ROW, status: "scheduled" }], new Date("2026-08-23T18:00:00.000Z"))).toBeNull();
+  });
+
+  it("is null mid-week: the week is in progress, but today is not a real NFL game day", () => {
+    expect(liveStateFor([ROW], new Date("2026-08-25T18:00:00.000Z"))).toBeNull(); // a Tuesday
+  });
+
+  it("is null pre-kickoff: the week has not started at all, even on a real game day", () => {
+    expect(liveStateFor([{ ...ROW, status: "scheduled", gamesFinal: 0 }], new Date("2026-08-23T18:00:00.000Z"))).toBeNull();
+  });
+
+  it("is null once every game in the week is already final, even on a game day", () => {
+    expect(liveStateFor([{ ...ROW, gamesFinal: 16 }], new Date("2026-08-23T18:00:00.000Z"))).toBeNull();
+  });
+
+  it("renders the real weekday and the real live count on an actual game day", () => {
+    expect(liveStateFor([ROW], new Date("2026-08-23T18:00:00.000Z"))).toEqual({ weekday: "Sunday", gamesLive: 7 });
+  });
+
+  it("picks the one in-progress week among several stat_weeks rows", () => {
+    expect(
+      liveStateFor(
+        [{ status: "final", gamesTotal: 16, gamesFinal: 16 }, ROW, { status: "scheduled", gamesTotal: 16, gamesFinal: 0 }],
+        new Date("2026-08-23T18:00:00.000Z"),
+      ),
+    ).toEqual({ weekday: "Sunday", gamesLive: 7 });
   });
 });

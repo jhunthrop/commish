@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import { NoticeInbox } from "@/account-room/components/notice-inbox";
+import { LiveStatePill } from "@/league-room/components/live-state-pill";
 import { SessionNotice } from "./session-notice";
 import type { LiveState } from "./shell-data";
 
@@ -82,10 +83,10 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
           Commish
         </Link>
         <div className="flex items-center gap-2">
-          {/* Task 9's `LiveStatePill` renders here once `liveState` carries real content — this
-              task only threads the prop through, so `liveState` is always `null` and this branch
-              never renders anything yet. */}
-          {liveState === null ? null : null}
+          {/* Task 10, Step 3: the top bar's one live fact — `LiveStatePill` itself renders
+              nothing when `liveState` is `null` (ruling 12), so this slot is silent outside a
+              real game window with no branch needed here. */}
+          <LiveStatePill liveState={liveState} />
           {!isAdmin ? null : (
             <Link
               href="/app/admin/queue"
