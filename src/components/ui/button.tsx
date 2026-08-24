@@ -33,8 +33,10 @@ const BASE =
 // - `primary` is the INK PILL — `bg-text-primary text-surface`, ink on ground: the mock's pill
 //   IS the text color inverted, which is why no new role exists for it (self-ruling S2, and the
 //   accent-budget sweep bans the spelling outside this file and `button-link.tsx`). Hover is
-//   `brightness-90`: on the night theme the near-white ink visibly dims, on daylight the
-//   near-black ink deepens — `110` would clip against white and read as no feedback at all.
+//   `opacity-90`, not a brightness shift: blending the fill toward the ground reads at the same
+//   perceptual strength in BOTH themes, where brightness math is asymmetric — dimming near-white
+//   ink is visible but deepening near-black ink moves ~3 RGB units and reads as no feedback
+//   (Task 4 review LOW, controller-ruled fix).
 // - `secondary` is the QUIET PILL — outlined, transparent. `border-edge`, not `border-line`:
 //   a control boundary must clear 3:1 (`edge`'s asserted floor), a decorative separator does not.
 // - `destructive` keeps its negative fill (red is live and clocks and danger — rule 1) and
@@ -44,7 +46,7 @@ const BASE =
 //
 // Accent survives here only as the focus ring, which was never a fill.
 const VARIANT: Readonly<Record<ButtonVariant, string>> = {
-  primary: "rounded-pill bg-text-primary text-surface hover:brightness-90",
+  primary: "rounded-pill bg-text-primary text-surface hover:opacity-90",
   secondary: "rounded-pill border border-edge bg-transparent text-text-primary hover:bg-surface-elevated",
   destructive: "rounded-pill bg-negative text-negative-text hover:brightness-110",
   ghost: "rounded-md text-text-primary hover:bg-surface-elevated",
