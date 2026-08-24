@@ -7,6 +7,7 @@ import type { AuditEventType } from "@/domain/audit";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { canonicalPairId, defaultSweepDeps, type SweepDeps } from "@/integrity-service/multi-account";
+import { SEAT_HOLD_REFUSALS } from "@/matchmaking/seat-hold";
 import { ENFORCEMENT_REFUSALS } from "./enforcement";
 import { acceptInvite, createInvite } from "./invites";
 import {
@@ -15,9 +16,11 @@ import {
   LEAGUE_FULL,
   NOT_PUBLIC,
   recordTierBlockedJoin,
+  returnFromSignIn,
   triggerMultiAccountSweep,
   type JoinLeagueOutcome,
 } from "./join";
+import { claimSeatHold, liveHoldsFor } from "./seat-hold";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-20T17:00:00.000Z" };
@@ -504,6 +507,62 @@ describe("joinPublicLeague — tier enforcement (Task 3, ruling 6)", () => {
       await recordTierBlockedJoin(db, { leagueId: "does_not_exist", userId: "u_ghost", occurredAt: clock.now() });
       expect(await noticesFor("u_ghost")).toEqual([]);
       expect(await auditEventsOn("platform", "system_action")).toEqual([]);
+    });
+  });
+});
+
+/**
+ * Phase 3.6, Task 6: `joinLeagueInTx`'s own two seat-hold behaviors — capacity now counts a live
+ * hold against anybody without that hold's own token, and a hold this join redeems is released
+ * (its `consumed_at` stamped) even on a refusal that follows it, never left to expire. The Step 1
+ * scenario list (claim, race, expiry, `returnFromSignIn`'s three outcomes) lives in
+ * `./seat-hold.test.ts`, beside `claimSeatHold` and `liveHoldsFor` themselves; these two are the
+ * join-side nuances that file has no reason to know about.
+ */
+describe("joinPublicLeague — seat holds (Task 6)", () => {
+  it("counts a live hold against capacity for anyone who does not hold that exact token", async () => {
+    const leagueId = await seedLeague({ teamCount: 12, filled: 11 });
+    expect(await claimSeatHold(db, { leagueId, token: "hold_racer", now: clock.now() })).toMatchObject({ ok: true });
+
+    expect(await joinPublicLeague(deps(), { leagueId, userId: "joiner" })).toEqual({
+      ok: false,
+      status: 409,
+      reason: SEAT_HOLD_REFUSALS.taken,
+    });
+    // The holder's own token still seats them — the same seat the hold reserved.
+    expect(await joinPublicLeague(deps(), { leagueId, userId: "joiner", holdToken: "hold_racer" })).toMatchObject({ ok: true });
+  });
+
+  it("releases a held seat immediately when the holder turns out to be tier-blocked, rather than leaving it to expire", async () => {
+    const leagueId = await seedLeague({ id: "lg_hold_tier_block", experienceTier: "beginner" });
+    await giveCompletedSeasons("u_vet_hold", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    expect(await claimSeatHold(db, { leagueId, token: "hold_vet", now: clock.now() })).toMatchObject({ ok: true });
+
+    const outcome = await joinPublicLeague(deps(), { leagueId, userId: "u_vet_hold", holdToken: "hold_vet" });
+    expect(outcome).toEqual({ ok: false, status: 409, reason: ENFORCEMENT_REFUSALS.join });
+
+    // Released, not merely abandoned: the hold no longer counts as live, freeing the seat for
+    // somebody who actually can take it, in the SAME request that refused the tier-blocked holder.
+    expect(await liveHoldsFor(db, leagueId, clock.now())).toBe(0);
+  });
+});
+
+/**
+ * Phase 3.6, Task 6, Step 4, F4: "the return" — a signed-in visitor arriving back at the hold
+ * interstitial. `returnFromSignIn`'s own module is `./join`, so its full test list (the three
+ * outcomes named in the brief's Step 1) lives beside `claimSeatHold`'s in `./seat-hold.test.ts`;
+ * this is the one join-side check that belongs here instead — the tier refusal it keeps distinct
+ * from `SEAT_HOLD_REFUSALS.taken` rather than collapsing every "no seat" shape into one word.
+ */
+describe("returnFromSignIn — the tier refusal stays honest (Task 6 Step 4)", () => {
+  it("names the real reason for a tier-blocked return, never the generic 'someone else got it'", async () => {
+    const leagueId = await seedLeague({ id: "lg_return_tier", experienceTier: "beginner" });
+    await giveCompletedSeasons("u_vet_return", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
+    expect(await claimSeatHold(db, { leagueId, token: "hold_return_vet", now: clock.now() })).toMatchObject({ ok: true });
+
+    expect(await returnFromSignIn(db, { leagueId, userId: "u_vet_return", holdToken: "hold_return_vet", now: clock.now() })).toEqual({
+      ok: false,
+      reason: ENFORCEMENT_REFUSALS.join,
     });
   });
 });

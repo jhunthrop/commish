@@ -16,6 +16,10 @@ import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
  */
 const browseRequests = createRateLimiter(MATCHMAKING_CONFIG.browseRateLimit);
 
+/** `POST /api/public/leagues/[leagueId]/hold`'s own ceiling (Phase 3.6, Task 6) — same
+ *  per-IP-key shape as `browseRequests` above, a tighter budget because it is a write. */
+const holdRequests = createRateLimiter(MATCHMAKING_CONFIG.holdRateLimit);
+
 /**
  * `X-Forwarded-For` may carry a comma-separated chain (client, then every proxy hop); the first
  * entry is the original client as the nearest trusted hop saw it. Falls back to one shared
@@ -37,4 +41,15 @@ export function browseRateLimited(request: Request): Response | null {
 /** Test seam: the limiter outlives a single test, same rationale as `resetAdvisorRateLimit`. */
 export function resetBrowseRateLimit(): void {
   browseRequests.reset();
+}
+
+/** The 429 the hold-claim route answers with, or `null` when the caller is inside the ceiling. */
+export function holdRateLimited(request: Request): Response | null {
+  if (holdRequests.allow(clientKey(request))) return null;
+  return fail("Too many requests. Please try again in a minute.", 429);
+}
+
+/** Test seam: the limiter outlives a single test, same rationale as `resetBrowseRateLimit`. */
+export function resetHoldRateLimit(): void {
+  holdRequests.reset();
 }

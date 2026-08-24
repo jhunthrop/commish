@@ -1,7 +1,7 @@
-import { and, asc, eq, inArray, isNotNull, isNull, sql, type SQL, type SQLWrapper } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNotNull, isNull, sql, type SQL, type SQLWrapper } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "@/db/client";
-import { drafts, leagues, scoringSettings, teams } from "@/db/schema";
+import { drafts, leagues, scoringSettings, seatHolds, teams } from "@/db/schema";
 import type { DraftFormat } from "@/domain/league";
 import type { Clock } from "@/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
@@ -36,6 +36,7 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "medianGame",
   "startTrigger",
   "houseRung",
+  "heldSeats",
 ];
 
 /** The league's own seats, aliased a second time so a `LATERAL` join can ask "how many of THIS
@@ -353,6 +354,28 @@ async function scoringWeightsByLeagueId(db: Db, leagueIds: readonly string[]): P
   return new Map(rows.map(({ leagueId, ...weights }) => [leagueId, weights]));
 }
 
+/**
+ * Every league's live hold count, keyed by id (Phase 3.6, Task 6) — a SEPARATE, batched query
+ * over the SAME page `browseQuery`/`houseShelfQuery` already narrowed, the identical shape
+ * `scoringWeightsByLeagueId` above already uses and for the same reason: `seat_holds` is a
+ * one-row-per-hold table with no natural place in either query's own `GROUP BY leagues.id`
+ * without widening it for a third, unrelated aggregate.
+ *
+ * `now` is `listPublicLeagues`'s OWN single instant, read once and threaded down — never a fresh
+ * `now()` read here — so a hold that expired between this query and the page's own `draftAt`
+ * rendering cannot show up as live in one and past in the other, the same "one instant, every
+ * card" discipline `listPublicLeagues` already holds for `draftAt`.
+ */
+async function heldSeatsByLeagueId(db: Db, leagueIds: readonly string[], now: string): Promise<ReadonlyMap<string, number>> {
+  if (leagueIds.length === 0) return new Map();
+  const rows = await db
+    .select({ leagueId: seatHolds.leagueId, heldSeats: sql<number>`count(*)::int` })
+    .from(seatHolds)
+    .where(and(inArray(seatHolds.leagueId, [...leagueIds]), isNull(seatHolds.consumedAt), gt(seatHolds.expiresAt, new Date(now))))
+    .groupBy(seatHolds.leagueId);
+  return new Map(rows.map((row) => [row.leagueId, row.heldSeats]));
+}
+
 /** The fields `browseQuery` and `houseShelfQuery` both project — everything `summarizeRow` needs
  *  to build a `PublicLeagueSummary` regardless of which of the two queries a row came from. */
 interface SummarizableRow {
@@ -395,6 +418,7 @@ function summarizeRow(
   row: SummarizableRow,
   houseRung: HouseRungName | null,
   weightsByLeagueId: ReadonlyMap<string, ScoringRules>,
+  heldSeatsByLeagueId: ReadonlyMap<string, number>,
   now: string,
 ): PublicLeagueSummary {
   const weights = weightsByLeagueId.get(row.id);
@@ -412,6 +436,7 @@ function summarizeRow(
     medianGame: row.medianGame,
     startTrigger: row.startTrigger,
     houseRung,
+    heldSeats: heldSeatsByLeagueId.get(row.id) ?? 0,
   };
 }
 
@@ -419,11 +444,65 @@ function summarizeRow(
  * The whole browse read (Phase 3.5 addendum, Task 14): the member list, off `browseQuery`, and
  * the house shelf, off `houseShelfQuery` — two queries answering two different promises
  * (`BrowseBody`'s own docblock), never one list a `houseRung` sort key folds together. Both run
- * before the ONE scoring lookup, batched over the combined id set, so a page with both a shelf
- * and a list still costs exactly three queries total — not two-per-half — the same "one extra,
- * trivially indexed query" discipline `scoringWeightsByLeagueId`'s own docblock already holds
- * `browseQuery` alone to.
+ * before the scoring lookup and the held-seats lookup (Phase 3.6, Task 6), each batched over the
+ * combined id set, so a page with both a shelf and a list still costs exactly FOUR queries total
+ * — not two-per-half, and not a fifth for holds — the same "one extra, trivially indexed query"
+ * discipline `scoringWeightsByLeagueId`'s own docblock already holds `browseQuery` alone to.
  */
+/** The one-league read the hold interstitial (`/join/[leagueId]/hold`) renders from (Phase 3.6,
+ *  Task 6) — the league's own facts a signed-out visitor sees while a seat is held for them. */
+export interface PublicLeaguePreview {
+  readonly id: string;
+  readonly name: string;
+  readonly teamCount: number;
+  readonly filledTeams: number;
+  readonly heldSeats: number;
+  readonly draftAt: string;
+  readonly startTrigger: "scheduled" | "when_full";
+  readonly houseRung: HouseRungName | null;
+}
+
+/**
+ * A single league, by id, for the hold interstitial — never a card `listPublicLeagues`'s own
+ * narrowing (open-seat `HAVING`, `maxResults`) could hide a visitor's OWN league behind: this
+ * page is reached holding that exact id, not discovered by scanning a list, so it answers
+ * regardless of whether the league would still appear on `/browse` right now.
+ *
+ * `null` for a private league OR a missing one — the identical collapse
+ * `publicJoinPrecondition`'s own `NOT_PUBLIC` docblock argues for, so a 404 built on this can
+ * never tell a caller "this id names a real, private league" apart from "no such league".
+ */
+export async function publicLeaguePreview(db: Db, leagueId: string, clock: Clock = systemClock): Promise<PublicLeaguePreview | null> {
+  const now = clock.now();
+  const [row] = await db
+    .select({
+      id: leagues.id,
+      name: leagues.name,
+      teamCount: leagues.teamCount,
+      isPublicMatchmade: leagues.isPublicMatchmade,
+      houseRung: leagues.houseRung,
+      kickoffAt: drafts.kickoffAt,
+      startTrigger: drafts.startTrigger,
+    })
+    .from(leagues)
+    .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
+    .where(eq(leagues.id, leagueId));
+  if (row === undefined || !row.isPublicMatchmade) return null;
+
+  const filled = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, leagueId));
+  const heldByLeagueId = await heldSeatsByLeagueId(db, [leagueId], now);
+  return {
+    id: row.id,
+    name: row.name,
+    teamCount: row.teamCount,
+    filledTeams: filled.length,
+    heldSeats: heldByLeagueId.get(row.id) ?? 0,
+    draftAt: formatDraftTime(row.kickoffAt.toISOString(), now),
+    startTrigger: row.startTrigger,
+    houseRung: row.houseRung as HouseRungName | null,
+  };
+}
+
 export async function listPublicLeagues(db: Db, filter: BrowseFilter, clock: Clock = systemClock): Promise<BrowseBody> {
   // ONE instant for the shelf's own staleness predicate and for every card's rendered
   // `draftAt` — read once, so a league cannot be judged not-yet-started by one and
@@ -431,9 +510,11 @@ export async function listPublicLeagues(db: Db, filter: BrowseFilter, clock: Clo
   const now = clock.now();
   const memberRows = await browseQuery(db, filter);
   const houseRows = await houseShelfQuery(db, now);
-  const weightsByLeagueId = await scoringWeightsByLeagueId(db, [...memberRows, ...houseRows].map((row) => row.id));
+  const ids = [...memberRows, ...houseRows].map((row) => row.id);
+  const weightsByLeagueId = await scoringWeightsByLeagueId(db, ids);
+  const heldByLeagueId = await heldSeatsByLeagueId(db, ids, now);
   return {
-    leagues: memberRows.map((row) => summarizeRow(row, null, weightsByLeagueId, now)),
-    house: houseRows.map((row) => summarizeRow(row, row.houseRung as HouseRungName, weightsByLeagueId, now)),
+    leagues: memberRows.map((row) => summarizeRow(row, null, weightsByLeagueId, heldByLeagueId, now)),
+    house: houseRows.map((row) => summarizeRow(row, row.houseRung as HouseRungName, weightsByLeagueId, heldByLeagueId, now)),
   };
 }

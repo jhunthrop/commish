@@ -95,6 +95,18 @@ export interface PublicLeagueSummary {
   /** Which catalog rung a house league came from, or `null` for an ordinary member league — see
    *  this interface's own docblock for the full disclosure reasoning. */
   readonly houseRung: HouseRungName | null;
+  /**
+   * Phase 3.6, Task 6, the fourteenth field: how many seats are mid-claim right now, a live
+   * `seat_holds` count and nothing else — never a person's identity, never a token. The SAME
+   * disclosure reasoning `filledTeams` itself already carries: a seat somebody is claiming is a
+   * fact about the LEAGUE's capacity, not about any person in it, and a card that hid it would
+   * read "9 of 12 seated" while a stranger's own click a moment later found the twelfth already
+   * spoken for with no warning at all.
+   *
+   * Rendered through `SeatMeter` (`@/components/ui/seat-meter`), never a second sentence written
+   * here or on any card — that primitive owns the ONE seat sentence for the whole product (F17).
+   */
+  readonly heldSeats: number;
 }
 
 /** A normalized browse filter: every field is a concrete value or the "any" sentinel. */

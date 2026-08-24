@@ -1063,3 +1063,43 @@ export const tradeProposals = pgTable(
     index("trade_proposals_league_idx").on(t.leagueId, t.proposedAt),
   ],
 );
+
+/**
+ * Phase 3.6, Task 6: a seat reserved for a visitor who is not signed in yet, keyed by an opaque
+ * `token` and NOTHING ELSE — no user id, because a hold exists to survive the trip to WorkOS and
+ * back, and there is no user to name until that trip completes (`claimSeatHold`,
+ * `@/league-service/seat-hold.ts`).
+ *
+ * NOT REDIS, and NOT A LOCK. A seat is capacity, capacity is a correctness question, and Postgres
+ * is authoritative here by the codebase's own rule; PgBouncer forbids `pg_advisory_lock`, so
+ * exclusion comes from the write itself, guarded by the SAME `leagues FOR UPDATE` every capacity
+ * writer in this file already takes first. See `claimSeatHold`'s own docblock for the full
+ * reasoning and the FK lock enumeration.
+ *
+ * `expiresAt` is read by a PREDICATE (`expires_at > now`), never swept by a deletion job — level-
+ * triggered, exactly like the house reconciler and `houseKickoffStillAhead`: a hold that only
+ * expired when a sweeper ran would be a seat held hostage by an unrelated outage.
+ */
+export const seatHolds = pgTable(
+  "seat_holds",
+  {
+    token: text("token").primaryKey(),
+    leagueId: text("league_id")
+      .notNull()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+    /** Set once, by `consumeSeatHoldInTx`, the moment the holder actually joins — a ONE-WAY
+     *  stamp matching `reviews.removed_at`/`leagues.season_completed_at`. Null forever for a hold
+     *  that simply expires unused; nothing ever deletes that row, the same "the record outlives
+     *  the event" discipline `trade_proposals.status = 'open'` follows. */
+    consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  },
+  (t) => [
+    /** The live-hold read (`liveHoldsFor`): partial on unconsumed rows, the same reasoning
+     *  `leagues_season_completed_idx`'s own docblock gives for a column that is rare on the
+     *  timescale that matters — a hold spends ten minutes unconsumed and then is either consumed
+     *  or simply stops mattering, never revisited by this index again. */
+    index("seat_holds_live_idx").on(t.leagueId, t.expiresAt).where(sql`${t.consumedAt} is null`),
+  ],
+);

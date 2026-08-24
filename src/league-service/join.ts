@@ -7,8 +7,10 @@ import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logg
 import { defaultSweepDeps, sweepQuietly, type SweepDeps } from "@/integrity-service/multi-account";
 import { attachAuditEvent, notifyAffectedMember } from "@/integrity-service/notify";
 import { hasOpenSeat } from "@/matchmaking/filter";
+import { SEAT_HOLD_REFUSALS } from "@/matchmaking/seat-hold";
 import { ENFORCEMENT_REFUSALS, tierJoinPrecondition } from "./enforcement";
 import { fireWhenFullInTx } from "./fill-trigger";
+import { consumeSeatHoldInTx, liveHoldsFor } from "./seat-hold";
 
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
 const TEAM_MEMBERSHIP_UNIQUE_INDEX = "teams_league_user_idx";
@@ -19,7 +21,22 @@ export const NOT_PUBLIC = "That league isn't open to join. Ask its commissioner 
 export const DRAFT_ALREADY_STARTED = "That league's draft has already started. Try another open league.";
 
 export type JoinLeagueOutcome =
-  | { readonly ok: true; readonly leagueId: string; readonly teamId: string; readonly alreadyMember: boolean }
+  | {
+      readonly ok: true;
+      readonly leagueId: string;
+      readonly teamId: string;
+      readonly alreadyMember: boolean;
+      /**
+       * Phase 3.6, Task 6: what became of `input.holdToken`, when one was supplied and the
+       * caller reached the seat. `"consumed"` — a live hold was redeemed by THIS join, the
+       * return flow's own "you're in" moment. `"expired"` — a token was real but had run out, so
+       * this join proceeded as an ordinary walk-in instead (the return flow's "we put you in it
+       * anyway"). `undefined` — no token was ever in play (an invite accept, an ordinary signed-
+       * in "Join" click, or a token that named nothing real). Absent rather than `"none"` so
+       * every caller that predates holds never has to spell a value it never asked about.
+       */
+      readonly holdOutcome?: "consumed" | "expired";
+    }
   | { readonly ok: false; readonly status: number; readonly reason: string };
 
 /**
@@ -45,6 +62,14 @@ export interface JoinLeagueInput {
   readonly occurredAt: string;
   /** Defaults to the process-wide logger (`getAuditLogger()`). */
   readonly audit?: AuditLogger;
+  /**
+   * Phase 3.6, Task 6: the opaque seat-hold token from `POST /api/public/leagues/[leagueId]/hold`'s
+   * cookie, when the caller (`returnFromSignIn`, below) is redeeming one. `undefined`/`null` for
+   * every other caller — an invite accept, or an ordinary signed-in "Join" click — which run the
+   * capacity check exactly as they always have, now simply also counting anyone ELSE's live hold
+   * against it (see the capacity check's own comment).
+   */
+  readonly holdToken?: string | null;
 }
 
 /**
@@ -72,6 +97,15 @@ export interface JoinLeagueInput {
  * `applyAction` (`@/draft-service/store`) takes `leagues FOR KEY SHARE` before `drafts FOR UPDATE`.
  * Both previously-cyclic pairs are driven on two real connections in
  * `src/integrity-service/lock-order.test.ts`'s "the leagues-before-drafts rule" block.
+ *
+ * **PHASE 3.6, TASK 6 — the seat hold's own place in this order.** `consumeSeatHoldInTx`
+ * (`./seat-hold`), when `input.holdToken` is present, runs immediately after the already-member
+ * check — an `UPDATE seat_holds SET consumed_at ...` by primary key, which takes no lock beyond
+ * the row it updates and adds no new edge to the order above (`seat_holds`' own docblock,
+ * `@/db/schema`). `liveHoldsFor`'s own read (the capacity check, below) is a plain `SELECT`,
+ * likewise no new lock. Both run while `leagues[X] FOR UPDATE` is already held, which is what
+ * serializes either of them against a concurrent `claimSeatHold` on the same league — see that
+ * function's own FK enumeration in `./seat-hold`.
  *
  * **Why the precondition runs where it does.** Every path-specific gate (an invite's expiry and
  * use cap, a public league's listing and draft status) is checked AFTER the "are you already a
@@ -103,14 +137,48 @@ export async function joinLeagueInTx(
   // Arriving twice is not an error, and costs nothing.
   if (existing !== undefined) return { ok: true, leagueId: league.id, teamId: existing.id, alreadyMember: true };
 
+  // PHASE 3.6, TASK 6. Redeemed BEFORE the precondition below, deliberately: Step 3's own rule is
+  // that "a held seat that a tier refusal rejects is released immediately rather than left to
+  // expire" — a hold this transaction marks consumed here COMMITS even when the precondition
+  // refuses the join a few lines down (this callback returns a value rather than throwing, and
+  // Drizzle commits a transaction on normal return), which is exactly how "released immediately"
+  // becomes true rather than merely intended. Nothing is queued for a token that is absent,
+  // already spent, or simply never real — see `consumeSeatHoldInTx`'s own docblock for why
+  // `"absent"` is silently treated as no hold at all rather than a refusal.
+  let holdOutcome: "consumed" | "expired" | undefined;
+  if (input.holdToken !== undefined && input.holdToken !== null) {
+    const consumed = await consumeSeatHoldInTx(tx, { token: input.holdToken, leagueId: league.id, now: input.occurredAt });
+    if (consumed.ok) {
+      holdOutcome = "consumed";
+    } else if (consumed.reason === SEAT_HOLD_REFUSALS.expired) {
+      holdOutcome = "expired";
+    } else if (consumed.reason === SEAT_HOLD_REFUSALS.spent) {
+      return { ok: false, status: 409, reason: SEAT_HOLD_REFUSALS.spent };
+    }
+    // `"absent"`: fall through exactly as though no token had been supplied at all.
+  }
+
   if (precondition !== undefined) {
     const denied = await precondition(tx, league.id, input.userId);
     if (denied !== null) return denied;
   }
 
   const filled = await tx.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, league.id));
-  if (!hasOpenSeat({ teamCount: league.teamCount, filledTeams: filled.length })) {
+  if (filled.length >= league.teamCount) {
     return { ok: false, status: 409, reason: LEAGUE_FULL };
+  }
+  // A caller who just redeemed a LIVE hold already had a seat reserved for them at claim time
+  // (`claimSeatHold`'s own capacity check) — the plain count above is this join's own safety net
+  // for that case, never re-widened by `liveHoldsFor`, which would otherwise count the caller's
+  // OWN hold (already marked consumed, so it would not, but re-reading it costs a query for
+  // nothing). Everyone else — no token, an absent one, or one that just expired — is checked
+  // against real seats PLUS anyone else's still-live hold, so a seat somebody is mid-claiming
+  // reads as taken, not open, for anybody without that exact claim's own token.
+  if (holdOutcome !== "consumed") {
+    const liveHolds = await liveHoldsFor(tx, league.id, input.occurredAt);
+    if (!hasOpenSeat({ teamCount: league.teamCount, filledTeams: filled.length }, liveHolds)) {
+      return { ok: false, status: 409, reason: SEAT_HOLD_REFUSALS.taken };
+    }
   }
 
   const [profile] = await tx.select({ displayName: users.displayName }).from(users).where(eq(users.id, input.userId));
@@ -153,7 +221,7 @@ export async function joinLeagueInTx(
     payload: { teamId, via: input.via },
     occurredAt: input.occurredAt,
   });
-  return { ok: true, leagueId: league.id, teamId, alreadyMember: false };
+  return { ok: true, leagueId: league.id, teamId, alreadyMember: false, holdOutcome };
 }
 
 /**
@@ -232,9 +300,14 @@ export const publicJoinPrecondition: JoinPrecondition = async (tx, leagueId, use
 
 /**
  * The tier block's own record, written by `joinPublicLeague` AFTER `joinLeagueInTx`'s transaction
- * has already rolled back — never inside it. A refused join writes NOTHING to the league it
- * refused (that transaction is gone, and `joinLeagueInTx` never queued a write for a precondition
- * denial in the first place); this is a wholly separate platform-scoped transaction, on the
+ * has already committed (or, with no writes queued, rolled back to the same observable effect) —
+ * never inside it. A refused join writes NOTHING to the league it refused for the ordinary case
+ * (`joinLeagueInTx` never queues a write for a precondition denial on its own); the ONE exception,
+ * added by Phase 3.6, Task 6, is a caller who arrived holding a LIVE seat-hold token that this
+ * same refused attempt just redeemed — that hold's `consumed_at` stamp DOES commit, on purpose
+ * (Step 3: "a held seat that a tier refusal rejects is released immediately rather than left to
+ * expire"), and it is the only durable trace a tier-blocked join with a hold ever leaves. This is
+ * a wholly separate platform-scoped transaction, on the
  * PLATFORM chain (`leagueId: null`), because a league nobody joined is not told about it
  * (`SYSTEM_ACTION_SUMMARY_ALLOWED.tier_blocked_join` is `false`, and this event carries no
  * `summary` field at all).
@@ -292,6 +365,9 @@ export interface JoinPublicLeagueInput {
   readonly leagueId: string;
   readonly userId: string;
   readonly teamName?: string;
+  /** Phase 3.6, Task 6 — see `JoinLeagueInput.holdToken`'s own docblock. Spread straight through
+   *  to `joinLeagueInTx` below; an ordinary "Join" click never sets it. */
+  readonly holdToken?: string | null;
 }
 
 /**
@@ -341,4 +417,63 @@ export async function joinPublicLeague(
     console.error("[league] public join failed", { leagueId: input.leagueId }, error);
     return { ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." };
   }
+}
+
+export interface ReturnFromSignInInput {
+  readonly leagueId: string;
+  readonly userId: string;
+  /** The hold cookie's value, or `null` when there is none — a visitor who never held a seat, or
+   *  whose cookie did not survive the round trip, is treated on the SAME predicate as one whose
+   *  hold expired: what decides is whether the room has room, never whether a receipt exists. */
+  readonly holdToken: string | null;
+  readonly now: string;
+}
+
+export type ReturnFromSignInOutcome =
+  | {
+      readonly ok: true;
+      readonly seated: true;
+      /** A LIVE hold was redeemed by this exact request — outcome (a), Task 6 Step 4. */
+      readonly justSeated: boolean;
+      /** A hold existed but had run out, and a seat was still open regardless — outcome (b). */
+      readonly expiredHold: boolean;
+      readonly leagueId: string;
+      readonly teamId: string;
+    }
+  | { readonly ok: false; readonly reason: string };
+
+/**
+ * "The return" (Task 6 Step 4, F4): a signed-in visitor arriving back at the hold interstitial,
+ * with or without the cookie `POST /api/public/leagues/[leagueId]/hold` set before they left for
+ * WorkOS. Built ENTIRELY on `joinPublicLeague` rather than a second copy of its transaction, its
+ * tier handling and its multi-account trigger (DRY, and the two doors' capacity rule staying one
+ * rule rather than two that could drift) — the only thing this function adds is translating
+ * `JoinLeagueOutcome.holdOutcome` into the two flags the interstitial's screens need, and
+ * collapsing every "no seat" shape (a league that was always full, one a hold made full, a token
+ * that named nothing real) into ONE vocabulary word, `SEAT_HOLD_REFUSALS.taken` — a visitor who
+ * signed in to find their seat gone does not need to know WHY, only that it is (Step 4's own
+ * "shows the race loser the taken panel rather than a refusal code").
+ *
+ * The ONE refusal kept distinct is the tier block (`ENFORCEMENT_REFUSALS.join`): a visitor turned
+ * away for who they are, not for bad luck, is owed the honest reason, not a shrug — and
+ * `joinPublicLeague` has already recorded it (`recordTierBlockedJoin`) by the time this returns.
+ */
+export async function returnFromSignIn(db: Db, input: ReturnFromSignInInput): Promise<ReturnFromSignInOutcome> {
+  const clock: Clock = { now: () => input.now };
+  const outcome = await joinPublicLeague(
+    { db, newId: () => crypto.randomUUID(), clock },
+    { leagueId: input.leagueId, userId: input.userId, holdToken: input.holdToken },
+  );
+  if (!outcome.ok) {
+    if (outcome.reason === ENFORCEMENT_REFUSALS.join) return { ok: false, reason: ENFORCEMENT_REFUSALS.join };
+    return { ok: false, reason: SEAT_HOLD_REFUSALS.taken };
+  }
+  return {
+    ok: true,
+    seated: true,
+    justSeated: outcome.holdOutcome === "consumed",
+    expiredHold: outcome.holdOutcome === "expired",
+    leagueId: outcome.leagueId,
+    teamId: outcome.teamId,
+  };
 }

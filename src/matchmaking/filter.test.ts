@@ -23,6 +23,7 @@ const league = (over: Partial<PublicLeagueSummary> = {}): PublicLeagueSummary =>
   medianGame: false,
   startTrigger: "scheduled",
   houseRung: null,
+  heldSeats: 0,
   ...over,
 });
 
@@ -125,6 +126,15 @@ describe("hasOpenSeat", () => {
     expect(hasOpenSeat({ teamCount: 12, filledTeams: 11 })).toBe(true);
     expect(hasOpenSeat({ teamCount: 12, filledTeams: 12 })).toBe(false);
     expect(hasOpenSeat({ teamCount: 12, filledTeams: 13 })).toBe(false);
+  });
+
+  // Phase 3.6, Task 6: a live seat hold counts against capacity exactly like a real member does,
+  // for anyone without that hold's own token — `heldSeats` defaults to `0`, so every caller that
+  // predates seat holds keeps its exact prior meaning unchanged.
+  it("counts a live seat hold against capacity when the caller passes one", () => {
+    expect(hasOpenSeat({ teamCount: 12, filledTeams: 11 }, 1)).toBe(false);
+    expect(hasOpenSeat({ teamCount: 12, filledTeams: 10 }, 1)).toBe(true);
+    expect(hasOpenSeat({ teamCount: 12, filledTeams: 11 })).toBe(true);
   });
 });
 

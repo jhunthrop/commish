@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, chatMessages, draftSlotPreferences, drafts, integrityFlags, leagues, lineupSlots, memberNotices, playerStatLines, reviews, rosterSlots, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
+import { auditChains, chatMessages, draftSlotPreferences, drafts, integrityFlags, leagues, lineupSlots, memberNotices, playerStatLines, reviews, rosterSlots, seatHolds, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { currentDeadline, DRAFT_SKIP_POLICY } from "@/draft-engine";
 import { setSlotPreference } from "@/draft-service/slot-preference";
@@ -9,12 +9,14 @@ import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-supp
 import { autoSetLineupInTx, autoSetLineupsForWeek } from "@/league-service/auto-lineup";
 import { setDraftKickoff } from "@/league-service/draft-schedule";
 import { joinLeagueInTx, recordTierBlockedJoin } from "@/league-service/join";
+import { claimSeatHold } from "@/league-service/seat-hold";
 import { setLineup } from "@/league-service/lineups";
 import { writeSchedule } from "@/league-service/schedule";
 import { seasonCurrentWeek } from "@/league-service/test-support";
 import { acceptTrade, blockHeldTradeInTx, proposeTrade, rejectTrade, releaseHeldTradeInTx } from "@/league-service/trades";
 import { reverseTradeInTx } from "@/league-service/trade-reversal";
 import type { StatLine } from "@/domain/player";
+import { SEAT_HOLD_REFUSALS } from "@/matchmaking/seat-hold";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { notifyAffectedMember } from "@/integrity-service/notify";
 import { correctSettledWeek } from "@/stats-pipeline/correction";
@@ -2938,6 +2940,86 @@ describe("the leagues-before-drafts rule", () => {
           ? setDraftKickoff(pickDb, { leagueId, userId: userIds[0]!, kickoffAt: "2026-09-20T17:00:00.000Z" }, clock)
           : pickStore().startDraft(draftId, { auto: true });
       await expect(Promise.all([joining, other])).resolves.toBeDefined();
+    }
+  });
+});
+
+/**
+ * PHASE 3.6, TASK 6. `claimSeatHold` (`@/league-service/seat-hold`) takes `leagues[X] FOR UPDATE`
+ * FIRST, its own statement, before counting either real seats or live holds — the identical order
+ * `joinLeagueInTx` already establishes (Step 2's own docblock: "the identical leagues-then-child
+ * order `joinLeagueInTx` already establishes"). This is that claim, driven on two real
+ * connections rather than trusted: a real join and a real hold claim, contending for the SAME
+ * league's last seat, must never deadlock, and the one that loses the race must lose it honestly
+ * — refused for a seat that is genuinely gone, never oversold a thirteenth reservation.
+ */
+describe("claimSeatHold and a last-seat join — the hold-vs-join race (Task 6)", () => {
+  it("lets a join and a concurrent hold claim for the same league's last seat run concurrently without deadlocking, and the hold claim honestly refuses once the seat is really gone", async () => {
+    const leagueId = "lg_hold_race";
+    await seedLeagueWith(leagueId, ["u_hr_commish", "u_hr_a", "u_hr_b", `${leagueId}_joiner`]);
+    await joinDb.update(leagues).set({ teamCount: 3 }).where(eq(leagues.id, leagueId));
+    await joinDb.insert(teams).values([
+      { id: "team_hr_a", leagueId, userId: "u_hr_a", name: "A" },
+      { id: "team_hr_b", leagueId, userId: "u_hr_b", name: "B" },
+    ]);
+    // teamCount 3, 2 real seats filled: exactly one seat left, for either side to take.
+
+    // T_join: the real function, parked exactly where every other proof in this file parks it —
+    // after `leagues[X] FOR UPDATE`, before the capacity check.
+    const join = parkedJoin(leagueId, `${leagueId}_joiner`, "team_hold_race_joiner");
+    await join.leagueLocked;
+
+    // T_hold: the real `claimSeatHold`, on its own connection, reaching for the SAME
+    // `leagues[X] FOR UPDATE` the join already holds. It has to block here, behind the join,
+    // before either side can proceed — asked of Postgres, never assumed.
+    const holding = claimSeatHold(pickDb, { leagueId, token: "hold_race_token", now: clock.now() });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    const joined = await join.joining;
+    const held = await holding;
+    expect(joined).toMatchObject({ ok: true, alreadyMember: false });
+    // The join reached the capacity check first and took the last real seat; the hold claim,
+    // once unblocked, counts that seat and correctly refuses rather than overselling one more.
+    expect(held).toEqual({ ok: false, reason: SEAT_HOLD_REFUSALS.noSeat });
+
+    expect(await joinDb.select().from(teams).where(eq(teams.leagueId, leagueId))).toHaveLength(3);
+    expect(await joinDb.select().from(seatHolds).where(eq(seatHolds.leagueId, leagueId))).toHaveLength(0);
+  });
+
+  it("survives the same race run repeatedly, in both arrival orders", async () => {
+    // The rendezvous above pins one interleaving; this one pins that nothing about the outcome
+    // depends on which of the two Postgres happens to let through first — over enough runs that
+    // a surviving oversell (or a deadlock) would have to be lucky many times over rather than once.
+    for (let run = 0; run < 6; run += 1) {
+      await truncateAll(joinDb);
+      const leagueId = `lg_hold_race_${run}`;
+      await seedLeagueWith(leagueId, [`u_hrr_commish_${run}`, `u_hrr_a_${run}`, `u_hrr_joiner_${run}`]);
+      await joinDb.update(leagues).set({ teamCount: 2 }).where(eq(leagues.id, leagueId));
+      await joinDb.insert(teams).values({ id: `team_hrr_a_${run}`, leagueId, userId: `u_hrr_a_${run}`, name: "A" });
+      // teamCount 2, 1 real seat filled: exactly one seat left, contended by both sides at once.
+
+      const joining = joinDb.transaction((tx) =>
+        joinLeagueInTx(tx, { leagueId, userId: `u_hrr_joiner_${run}`, newId: () => `team_hrr_joiner_${run}`, via: "public_browse", occurredAt: clock.now() }),
+      );
+      const holding = claimSeatHold(pickDb, { leagueId, token: `hold_hrr_${run}`, now: clock.now() });
+      // `run % 2` flips which promise is awaited first; both are already in flight either way, so
+      // what actually varies is which one the event loop resumes on first — the identical idiom
+      // "the audit anchor is the last lock" suite's own "both arrival orders" test uses above.
+      if (run % 2 === 0) {
+        await joining;
+        await holding;
+      } else {
+        await holding;
+        await joining;
+      }
+      const joinWon = (await joining).ok === true;
+      const holdWon = (await holding).ok === true;
+      // Exactly one side wins the last seat — never both, and never neither.
+      expect(joinWon !== holdWon).toBe(true);
+      expect(await joinDb.select().from(teams).where(eq(teams.leagueId, leagueId))).toHaveLength(joinWon ? 2 : 1);
+      expect(await joinDb.select().from(seatHolds).where(eq(seatHolds.leagueId, leagueId))).toHaveLength(holdWon ? 1 : 0);
     }
   });
 });

@@ -54,6 +54,15 @@ export const MATCHMAKING_CONFIG = {
    */
   browseRateLimit: { maxRequests: 60, windowMs: 60_000 },
   /**
+   * Phase 3.6, Task 6: `POST /api/public/leagues/[leagueId]/hold`'s own per-IP ceiling — a WRITE,
+   * unlike `browseRateLimit`'s read, so it stays tighter. Generous enough that nobody who lands
+   * on the interstitial once (or refreshes it, re-claiming the same live hold) ever notices it;
+   * tight enough to bound a script that tries to exhaust a league's seats with holds nobody signs
+   * in to redeem. See `browseRateLimit`'s own docblock for what a single-process fixed window is
+   * and is not.
+   */
+  holdRateLimit: { maxRequests: 20, windowMs: 60_000 },
+  /**
    * Phase 3.5, Task 7: the sit-and-go trigger's own tunable. `graceSeconds` is how long after a
    * public matchmade league's last seat fills its draft's `kickoff_at` is set to
    * (`fireWhenFullInTx`, `@/league-service/fill-trigger`) — never zero. Underdog fires instantly;
@@ -79,6 +88,17 @@ export const MATCHMAKING_CONFIG = {
     },
   },
 } as const;
+
+/**
+ * Phase 3.6, Task 6: the seat hold's own tunable, standalone rather than nested inside
+ * `MATCHMAKING_CONFIG` — the front door's own "ten minute" promise is the one number every
+ * caller (`claimSeatHold`, the interstitial's `Countdown`, `src/matchmaking/seat-hold.ts`'s
+ * refusal copy) has to agree on, and a bare `SEAT_HOLD.minutes` is what keeps a future reader
+ * from mistaking it for one more field on the matchmaking grab-bag. Ten minutes is long enough
+ * to complete WorkOS hosted sign-in without feeling rushed, short enough that a seat a visitor
+ * abandoned mid-flow is back in circulation before the next visitor gives up waiting for it.
+ */
+export const SEAT_HOLD = { minutes: 10 } as const;
 
 /**
  * `MATCHMAKING_CONFIG.sitAndGo.graceSeconds` in whole minutes — the ONE place that arithmetic

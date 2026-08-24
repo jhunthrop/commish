@@ -19,6 +19,8 @@ import { LeagueHome } from "@/league-room/components/league-home";
 import { LeagueTermsPanel } from "@/league-room/components/league-terms-panel";
 import { ModerationSummary } from "@/league-room/components/moderation-summary";
 import { PublicLeagueList } from "@/league-room/components/public-league-list";
+import { SeatHoldPanel } from "@/league-room/components/seat-hold-panel";
+import { SeatTakenPanel } from "@/league-room/components/seat-taken-panel";
 import { TradeCard } from "@/league-room/components/trade-card";
 import { TradeComposer } from "@/league-room/components/trade-composer";
 import type { ModerationSummaryView, TradeRoomContext } from "@/league-room/contract";
@@ -34,6 +36,8 @@ import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { SessionNotice } from "@/components/app-shell/session-notice";
 import { fetchWithSessionWatch } from "@/components/app-shell/session-watch";
+import Link from "next/link";
+import { SEAT_HOLD_REFUSALS } from "@/matchmaking/seat-hold";
 import { copyViolations } from "./copy-rules";
 import { renderNotice } from "./notices";
 
@@ -706,6 +710,55 @@ describe("PublicLeagueList says nothing that breaks the house copy rules, includ
       expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));
       unmount();
     }
+  });
+});
+
+/**
+ * Phase 3.6, Task 6: the seat hold's own three screens. `SeatHoldPanel` claims a hold on mount, so
+ * this sweep drives it through a real (fixtured) fetch rather than reading its loading skeleton.
+ */
+describe("SeatHoldPanel says nothing that breaks the house copy rules", () => {
+  it("is clean held, loading, and refused", async () => {
+    const held = fixtureLeagueDeps({ ok: true, data: { expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() } });
+    const heldRender = render(
+      <LeagueRoomDepsProvider deps={held.deps}>
+        <SeatHoldPanel leagueId="lg1" leagueName="Rookie Snake Room" />
+      </LeagueRoomDepsProvider>,
+    );
+    await screen.findByTestId("seat-hold-countdown");
+    expectClean(heldRender.container, "Rookie Snake Room");
+    heldRender.unmount();
+
+    const loadingRender = render(
+      <LeagueRoomDepsProvider deps={fixtureLeagueDeps(undefined, { deferred: true }).deps}>
+        <SeatHoldPanel leagueId="lg1" leagueName="Rookie Snake Room" />
+      </LeagueRoomDepsProvider>,
+    );
+    expectClean(loadingRender.container);
+    loadingRender.unmount();
+
+    const refused = fixtureLeagueDeps({ ok: false, error: SEAT_HOLD_REFUSALS.noSeat });
+    const refusedRender = render(
+      <LeagueRoomDepsProvider deps={refused.deps}>
+        <SeatHoldPanel leagueId="lg1" leagueName="Rookie Snake Room" />
+      </LeagueRoomDepsProvider>,
+    );
+    await screen.findByText(SEAT_HOLD_REFUSALS.noSeat);
+    expectClean(refusedRender.container, SEAT_HOLD_REFUSALS.noSeat);
+    refusedRender.unmount();
+  });
+});
+
+describe("SeatTakenPanel says nothing that breaks the house copy rules", () => {
+  it("is clean with its two actions", () => {
+    const { container } = render(
+      <SeatTakenPanel
+        leagueName="Rookie Snake Room"
+        primaryAction={<Link href="/browse">Join the next open league</Link>}
+        secondaryAction={<Link href="/browse">See leagues closest to filling</Link>}
+      />,
+    );
+    expectClean(container, "Rookie Snake Room", SEAT_HOLD_REFUSALS.taken);
   });
 });
 

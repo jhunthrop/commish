@@ -109,6 +109,16 @@ export interface JoinBody {
 }
 
 /**
+ * `POST /api/public/leagues/[leagueId]/hold`'s success payload (Phase 3.6, Task 6). Just the
+ * expiry — the token itself never rides the response body at all, only the httpOnly cookie the
+ * route sets alongside it, so a caller reading this JSON can render the countdown without ever
+ * being able to read (or forge) the hold it is counting down on.
+ */
+export interface SeatHoldBody {
+  readonly expiresAt: string;
+}
+
+/**
  * `GET /api/invites/[code]`'s success payload — one `LeagueTerms` (`@/league/terms`), the exact
  * shape `LeagueTermsPanel` renders here on the invite page AND, unchanged, inside the league
  * itself (Task 8). Re-exported under its own name rather than left as a bare `LeagueTerms`

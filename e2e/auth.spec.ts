@@ -1,3 +1,8 @@
+import { eq } from "drizzle-orm";
+import { createDb, type Db } from "../src/db/client";
+import { drafts, leagues, scoringSettings, users } from "../src/db/schema";
+import { STANDARD_ROSTER_SLOTS } from "../src/domain/roster";
+import { STANDARD_SCORING } from "../src/domain/scoring";
 import { expect, test } from "./support/fixtures";
 
 /**
@@ -80,4 +85,104 @@ test("sign-out through managerSignOut still walks the whole WorkOS chain and lan
   await managerSignOut.goto("/browse");
   await expect(managerSignOut.getByRole("link", { name: "Sign in" }).first()).toBeVisible();
   await expect(managerSignOut.getByRole("button", { name: "Sign out" })).toHaveCount(0);
+});
+
+// -------------------------------------------------------------------------------------------
+// The hold journey (Phase 3.6, Task 6) — the fourth test A16's own Step 6 ledger note promised
+// ("this step writes that sentence into the parent task's ledger note and asserts it in
+// e2e/auth.spec.ts's hold journey"): the seat-hold cookie has to survive the top-level GET a
+// signed-in visitor's browser makes landing BACK on `/join/[leagueId]/hold` from WorkOS, and
+// `SameSite=Lax` only allows that if the cookie's own `Path` covers this route in the first
+// place. `Path=/` is the load-bearing fact this journey exists to prove, not merely state.
+//
+// A dedicated, wiped-and-rebuilt public league (the identical `ensureSlotPreferenceLeague` idiom
+// `formats-and-lobby.spec.ts` already uses for the same class of hazard): this journey only ever
+// claims a hold, never joins, so nothing here could ever race another spec for a real seat — but
+// a league only this test touches is still cheaper to reason about than one shared with the rest
+// of the suite.
+// -------------------------------------------------------------------------------------------
+
+const E2E_HOLD_LEAGUE_ID = "e2e_auth_hold_league";
+const E2E_HOLD_COMMISH_ID = "e2e_auth_hold_commish";
+
+async function ensureHoldJourneyLeague(db: Db): Promise<void> {
+  await db.delete(leagues).where(eq(leagues.id, E2E_HOLD_LEAGUE_ID));
+  await db
+    .insert(users)
+    .values({ id: E2E_HOLD_COMMISH_ID, email: `${E2E_HOLD_COMMISH_ID}@commish-lab.test`, displayName: "Hold Commish" })
+    .onConflictDoNothing({ target: users.id });
+  await db.insert(leagues).values({
+    id: E2E_HOLD_LEAGUE_ID,
+    name: "E2E Hold Journey League",
+    format: "snake",
+    teamCount: 12,
+    isPublicMatchmade: true,
+    commissionerUserId: E2E_HOLD_COMMISH_ID,
+    rosterSlots: [...STANDARD_ROSTER_SLOTS],
+  });
+  await db.insert(scoringSettings).values({ leagueId: E2E_HOLD_LEAGUE_ID, ...STANDARD_SCORING });
+  await db.insert(drafts).values({
+    id: `${E2E_HOLD_LEAGUE_ID}_draft`,
+    leagueId: E2E_HOLD_LEAGUE_ID,
+    format: "snake",
+    status: "scheduled",
+    kickoffAt: new Date(Date.now() + 2 * 60 * 60 * 1000),
+    auctionBudget: null,
+  });
+}
+
+test.describe("the hold journey (Task 6)", () => {
+  test.beforeAll(async () => {
+    const db = createDb();
+    try {
+      await ensureHoldJourneyLeague(db);
+    } finally {
+      await db.$client.end();
+    }
+  });
+
+  test("claiming a seat sets a real Path=/ cookie, and Sign in to finish joining leaves for AuthKit carrying the hold's own return path", async ({ page }) => {
+    // The real click path: the browse card's own "Sign in to join" is a plain `SignInLink`
+    // (asserted by other specs) — this journey starts one step later, on the interstitial itself,
+    // which is where the hold is actually claimed (Task 6 Step 4).
+    await page.goto(`/join/${E2E_HOLD_LEAGUE_ID}/hold`);
+    const ownOrigin = new URL(page.url()).origin;
+
+    await expect(page.getByRole("heading", { name: "E2E Hold Journey League" })).toBeVisible();
+    // `SeatHoldPanel` claims the hold on mount — the countdown is the receipt that the real
+    // `POST /api/public/leagues/[leagueId]/hold` round trip actually happened, not merely that
+    // the page rendered.
+    await expect(page.getByTestId("seat-hold-countdown")).toBeVisible();
+
+    const cookies = await page.context().cookies();
+    const hold = cookies.find((cookie) => cookie.name === "seat_hold");
+    expect(hold, "the hold cookie was never set").toBeDefined();
+    expect(hold?.httpOnly).toBe(true);
+    expect(hold?.sameSite).toBe("Lax");
+    // The load-bearing assertion: a `Path` scoped to `/api/public/leagues` would never be sent on
+    // the top-level GET back from WorkOS to THIS route — `Path=/` is the simplest correct answer,
+    // and this is what keeps it that way rather than merely documented as one.
+    expect(hold?.path).toBe("/");
+
+    const signInLink = page.getByRole("link", { name: "Sign in to finish joining E2E Hold Journey League" });
+    await expect(signInLink).toHaveAttribute("href", `/sign-in?returnTo=%2Fjoin%2F${E2E_HOLD_LEAGUE_ID}%2Fhold`);
+
+    // Click-and-verify, retried (the SSR-fake discipline this file's own first test already uses).
+    await expect(async () => {
+      await signInLink.click();
+      await page.waitForURL((url) => url.origin !== ownOrigin, { timeout: 5_000 });
+    }).toPass({ timeout: 20_000 });
+
+    const destination = new URL(page.url());
+    expect(destination.origin).not.toBe(ownOrigin);
+    expect(destination.searchParams.get("state")).toBeTruthy();
+    const redirectUri = destination.searchParams.get("redirect_uri");
+    expect(redirectUri).toBeTruthy();
+    expect(new URL(redirectUri!).pathname).toBe("/callback");
+
+    // The hold cookie is STILL held after leaving — it is what the callback's own top-level GET
+    // back to `/join/[leagueId]/hold` will carry, never cleared by the mere act of leaving.
+    const afterLeaving = (await page.context().cookies()).find((cookie) => cookie.name === "seat_hold");
+    expect(afterLeaving?.value).toBe(hold?.value);
+  });
 });

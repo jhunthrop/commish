@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, Card, EmptyState, EYEBROW, InfoTip } from "@/components/ui";
+import { Badge, Card, EmptyState, EYEBROW, InfoTip, SeatMeter } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import type { DraftFormat } from "@/domain/league";
@@ -52,17 +52,6 @@ const COMPOSITION_ICON: Readonly<Record<CompositionCategory, IconName>> = {
   mostly_newcomers: "clover",
   open: "crown",
 };
-
-/**
- * "6 of 8 joined" answers "how full is it"; a visitor's actual decision is "is there room for
- * me", so the seat count gets its own clause. Singular "1 spot left" reads right for the one
- * case it applies to; a league with zero seats left never reaches this list at all (`browse`
- * only ever returns leagues `hasOpenSeat` accepts), so there is no "0 spots left" to word.
- */
-function spotsLeftLabel(league: Pick<PublicLeagueSummary, "teamCount" | "filledTeams">): string {
-  const spotsLeft = league.teamCount - league.filledTeams;
-  return `${spotsLeft} spot${spotsLeft === 1 ? "" : "s"} left`;
-}
 
 /**
  * The one new sentence Task 14 (Phase 3.5 addendum) prints, said once beneath the whole shelf
@@ -121,11 +110,10 @@ export function HouseLeagueShelf({
                 <Icon name="shield" size={16} />
                 Run by Commish
               </p>
-              <p className="text-sm text-text-muted">
-                {`${league.filledTeams} of ${league.teamCount} joined`}
-                {" · "}
-                <span className="font-medium">{spotsLeftLabel(league)}</span>
-              </p>
+              {/* F17: the seat sentence is `SeatMeter`'s, everywhere, held seats included — the
+                  shelf, the member list, the waiting room and the open-seats panel converge on
+                  ONE phrasing rather than four. */}
+              <SeatMeter filled={league.filledTeams} total={league.teamCount} heldSeats={league.heldSeats} />
               <p className="inline-flex items-center gap-1 text-sm text-text-muted">
                 <Icon name="clock" size={16} />
                 {/* The identical when-full/scheduled branch `PublicLeagueList`'s own draft-time
@@ -162,12 +150,10 @@ export function HouseLeagueShelf({
  * The matching open leagues. Not a client component: it renders server-shaped data, and the one
  * interactive part is a child that owns its own state.
  *
- * Fill status is stated plainly ("3 of 12 joined") rather than drawn as a bar, because the
- * number is the decision a visitor is actually making and a bar makes them estimate it — and
- * the seat count that follows it (`spotsLeftLabel`) answers that decision directly rather than
- * asking a visitor to do the subtraction themselves. Every fact on a card comes from
- * `PublicLeagueSummary` and nothing else — see that contract for what a stranger is and is not
- * told.
+ * Fill status is stated plainly (`SeatMeter`'s own "9 of 12 seated") rather than drawn as a bar,
+ * because the number is the decision a visitor is actually making and a bar makes them estimate
+ * it. Every fact on a card comes from `PublicLeagueSummary` and nothing else — see that contract
+ * for what a stranger is and is not told, `heldSeats` (Phase 3.6, Task 6) included.
  */
 export function PublicLeagueList({
   leagues,
@@ -252,11 +238,8 @@ export function PublicLeagueList({
                     </>
                   ) : null}
                 </p>
-                <p className="text-sm text-text-muted">
-                  {`${league.filledTeams} of ${league.teamCount} joined`}
-                  {" · "}
-                  <span className="font-medium">{spotsLeftLabel(league)}</span>
-                </p>
+                {/* F17: the seat sentence is `SeatMeter`'s, everywhere, held seats included. */}
+                <SeatMeter filled={league.filledTeams} total={league.teamCount} heldSeats={league.heldSeats} />
                 <p className="inline-flex items-center gap-1 text-sm text-text-muted">
                   <Icon name="clock" size={16} />
                   {/* Task 8 (Phase 3.5): a `when_full` league's stored kickoff is a placeholder

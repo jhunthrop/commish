@@ -25,6 +25,7 @@ const CUSTOM_SCORING_LEAGUE: PublicLeagueSummary = {
   medianGame: false,
   startTrigger: "scheduled",
   houseRung: null,
+  heldSeats: 0,
 };
 
 // A signed-in list renders `JoinPublicLeagueButton` per card, which navigates via
@@ -40,10 +41,9 @@ describe("PublicLeagueList", () => {
       <PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />,
       async ({ container }) => {
         expect(screen.getByText("Rookie Snake Room")).toBeInTheDocument();
-        expect(screen.getByText(/3 of 12 joined/)).toBeInTheDocument();
-        expect(screen.getByText(/9 of 10 joined/)).toBeInTheDocument();
-        expect(screen.getByText("9 spots left")).toBeInTheDocument();
-        expect(screen.getByText("1 spot left")).toBeInTheDocument();
+        expect(screen.getByText(/3 of 12 seated/)).toBeInTheDocument();
+        expect(screen.getByText(/9 of 10 seated/)).toBeInTheDocument();
+        expect(screen.getByText(/1 seat left/)).toBeInTheDocument();
         expect(screen.getByText("All newcomers")).toBeInTheDocument();
         expect(screen.getByText("Open to everyone")).toBeInTheDocument();
         expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
@@ -86,6 +86,18 @@ describe("PublicLeagueList", () => {
     render(<PublicLeagueList leagues={[CUSTOM_SCORING_LEAGUE]} signedIn />);
     expect(screen.getByText("Custom")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "What is custom scoring?" })).toBeInTheDocument();
+  });
+
+  // Phase 3.6, Task 6, F17: `heldSeats` is wired straight into `SeatMeter` — this card never
+  // writes a seat sentence of its own, so a hold reads exactly the same way here as it does on
+  // the waiting room and the open-seats panel.
+  it("shows a live hold through SeatMeter's own clause, and shows nothing extra when there is none", () => {
+    const held = render(<PublicLeagueList leagues={[{ ...PUBLIC_LEAGUES[0]!, heldSeats: 1 }]} signedIn />);
+    expect(screen.getByText(/1 seat is being claimed right now/)).toBeInTheDocument();
+    held.unmount();
+
+    render(<PublicLeagueList leagues={[PUBLIC_LEAGUES[0]!]} signedIn />);
+    expect(screen.queryByText(/being claimed right now/)).not.toBeInTheDocument();
   });
 
   // FIX 1 (HIGH): /browse is the app's one unauthenticated surface, with no signed-in caller's
@@ -200,6 +212,7 @@ const HOUSE_LEAGUE: PublicLeagueSummary = {
   medianGame: false,
   startTrigger: "scheduled",
   houseRung: "open_12",
+  heldSeats: 0,
 };
 
 const SIT_AND_GO_HOUSE_LEAGUE: PublicLeagueSummary = {
@@ -222,8 +235,7 @@ describe("HouseLeagueShelf", () => {
       async ({ container }) => {
         expect(screen.getByText(HOUSE_RUNG_LABEL.open_12)).toBeInTheDocument();
         expect(screen.getByText("Run by Commish")).toBeInTheDocument();
-        expect(screen.getByText(/5 of 12 joined/)).toBeInTheDocument();
-        expect(screen.getByText("7 spots left")).toBeInTheDocument();
+        expect(screen.getByText(/5 of 12 seated/)).toBeInTheDocument();
         expect(screen.getByText(/Drafts Saturday 12 September/)).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },

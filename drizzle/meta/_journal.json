@@ -232,6 +232,13 @@
       "when": 1787489574723,
       "tag": "0032_house_leagues",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1787532466372,
+      "tag": "0033_seat_holds",
+      "breakpoints": true
     }
   ]
 }

@@ -10,7 +10,9 @@ import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
 import type { HouseRungName } from "@/matchmaking/house-catalog";
 import { compositionCategoryFor } from "@/participation/composition";
-import { listPublicLeagues, PUBLIC_LEAGUE_FIELDS } from "./browse";
+import { listPublicLeagues, publicLeaguePreview, PUBLIC_LEAGUE_FIELDS } from "./browse";
+import { joinPublicLeague } from "./join";
+import { claimSeatHold } from "./seat-hold";
 
 const db = createTestDb();
 
@@ -226,6 +228,9 @@ async function seedPublicLeague(
     // `seed()` above never sets `houseRung` — every league this fixture builds is a member
     // league, so it always lands in `.leagues`, never `.house`.
     houseRung: null,
+    // `seed()` above never claims a seat hold — no caller of this fixture is testing Task 6's
+    // own mechanism, so every league it builds reads `0` held seats.
+    heldSeats: 0,
   };
 }
 
@@ -252,7 +257,7 @@ describe("listPublicLeagues", () => {
         id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0,
         teamCount: 12, filledTeams: 8, scoringLabel: "Standard", compositionCategory: "all_newcomers",
         draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)", medianGame: false, startTrigger: "scheduled",
-        houseRung: null,
+        houseRung: null, heldSeats: 0,
       },
     ]);
   });
@@ -451,6 +456,51 @@ describe("listPublicLeagues", () => {
 
 });
 
+/**
+ * Phase 3.6, Task 6, Step 5: `heldSeats` is a live count off `seat_holds`, read at the SAME
+ * instant `draftAt` is composed from — never a stale or a fresh-`now()` mismatch between the two.
+ */
+describe("listPublicLeagues held seats (Task 6)", () => {
+  it("reports a live hold and stops counting one the moment it expires, with no sweeper", async () => {
+    await seed({
+      id: "held_live", name: "Held Live", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 9, isPublicMatchmade: true,
+    });
+    await claimSeatHold(db, { leagueId: "held_live", token: "hold_browse_a", now: "2026-08-17T12:00:00.000Z" });
+
+    const live = await browseLeagues(db, EMPTY_BROWSE_FILTER, { now: () => "2026-08-17T12:00:00.000Z" });
+    expect(live[0]).toMatchObject({ heldSeats: 1 });
+
+    const afterExpiry = await browseLeagues(db, EMPTY_BROWSE_FILTER, { now: () => "2026-08-17T12:15:00.000Z" });
+    expect(afterExpiry[0]).toMatchObject({ heldSeats: 0 });
+  });
+
+  it("never counts a consumed hold, even while it is still inside its own ten minutes", async () => {
+    await seed({
+      id: "held_consumed", name: "Held Consumed", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 0, isPublicMatchmade: true,
+    });
+    await claimSeatHold(db, { leagueId: "held_consumed", token: "hold_browse_b", now: "2026-08-17T12:00:00.000Z" });
+    await joinPublicLeague(
+      { db, newId: () => "team_browse_b", clock: { now: () => "2026-08-17T12:00:00.000Z" } },
+      { leagueId: "held_consumed", userId: "owner", holdToken: "hold_browse_b" },
+    );
+
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER, { now: () => "2026-08-17T12:00:00.000Z" });
+    const summary = rows.find((league) => league.id === "held_consumed");
+    expect(summary).toMatchObject({ filledTeams: 1, heldSeats: 0 });
+  });
+
+  it("reports zero for a league nobody is claiming, never `undefined`", async () => {
+    await seed({
+      id: "held_none", name: "Held None", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    const [summary] = await browseLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(summary!.heldSeats).toBe(0);
+  });
+});
+
 describe("listPublicLeagues tier composition", () => {
   it("carries the composition as ONE coarse bucket and nothing that names a person", async () => {
     await seed({
@@ -515,12 +565,13 @@ describe("listPublicLeagues tier composition", () => {
     expect(summary!.compositionCategory).toBe("open");
   });
 
-  it("costs exactly three queries, whether or not any seat-holder has a completed-season history", async () => {
-    // `listPublicLeagues` is `browseQuery` + `houseShelfQuery` + `scoringWeightsByLeagueId`
-    // (Phase 3.5 addendum, Task 14) — the composition join is FOLDED into each of the first two
-    // queries itself (measured in `src/db/index-plans.test.ts`), never a fourth round trip, so
-    // this stays three queries regardless of how many leagues, seats or house rungs it answers
-    // for. WAS two queries, before the shelf gained its own query alongside the member list's.
+  it("costs exactly four queries, whether or not any seat-holder has a completed-season history", async () => {
+    // `listPublicLeagues` is `browseQuery` + `houseShelfQuery` + `scoringWeightsByLeagueId` +
+    // `heldSeatsByLeagueId` (Phase 3.5 addendum, Task 14; Phase 3.6, Task 6) — the composition
+    // join is FOLDED into each of the first two queries itself (measured in
+    // `src/db/index-plans.test.ts`), never a fifth round trip, so this stays four queries
+    // regardless of how many leagues, seats or house rungs it answers for. WAS three queries,
+    // before Task 6 gave the held-seats count its own batched lookup.
     await giveCompletedSeasons("counting_veteran", INTEGRITY_CONFIG.participation.veteranSeasonCutoff);
     await seed({
       id: "counting", name: "Counting League", format: "snake", experienceTier: "beginner",
@@ -529,7 +580,7 @@ describe("listPublicLeagues tier composition", () => {
     });
     const counting = countingDb(db);
     await listPublicLeagues(counting.db, EMPTY_BROWSE_FILTER);
-    expect(counting.selectCount()).toBe(3);
+    expect(counting.selectCount()).toBe(4);
   });
 });
 
@@ -841,5 +892,39 @@ describe("listPublicLeagues house shelf", () => {
     await seedHouseLeague({ id: "house_snake", rung: "open_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
     const { house } = await listPublicLeagues(db, { ...EMPTY_BROWSE_FILTER, format: "auction" });
     expect(house.map((l) => l.id)).toEqual(["house_snake"]);
+  });
+});
+
+/**
+ * Phase 3.6, Task 6: the hold interstitial's own one-league read — reached by an id a visitor
+ * already holds (the browse card they clicked, the hold cookie they are carrying), never
+ * discovered by scanning a list, so it must answer regardless of whether `listPublicLeagues`'s
+ * own narrowing would still surface this league right now.
+ */
+describe("publicLeaguePreview", () => {
+  it("answers a public league's own facts by id, held seats included", async () => {
+    await seed({
+      id: "preview_open", name: "Preview League", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 9, isPublicMatchmade: true,
+    });
+    await claimSeatHold(db, { leagueId: "preview_open", token: "hold_preview", now: "2026-08-17T12:00:00.000Z" });
+
+    const preview = await publicLeaguePreview(db, "preview_open", { now: () => "2026-08-17T12:00:00.000Z" });
+    expect(preview).toMatchObject({ id: "preview_open", name: "Preview League", teamCount: 12, filledTeams: 9, heldSeats: 1, houseRung: null });
+  });
+
+  it("answers null for a private league, byte-identically to a missing one", async () => {
+    await seed({
+      id: "preview_private", name: "Preview Private", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: false,
+    });
+    expect(await publicLeaguePreview(db, "preview_private")).toBeNull();
+    expect(await publicLeaguePreview(db, "does_not_exist")).toBeNull();
+  });
+
+  it("answers a house league too, carrying its own rung", async () => {
+    await seedHouseLeague({ id: "preview_house", rung: "beginner_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
+    const preview = await publicLeaguePreview(db, "preview_house");
+    expect(preview).toMatchObject({ id: "preview_house", houseRung: "beginner_12" });
   });
 });

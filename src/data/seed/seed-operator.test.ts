@@ -108,11 +108,14 @@ describe("ruling 15 — no in-product way to grant operator access (a drift trip
     // render `AppShell` themselves, Task 2 Step 5). None of these WRITE to the column. Left in
     // rather than tightened, because narrowing the pattern to dodge a known-safe match is
     // exactly the kind of adjustment that quietly widens what this tripwire would miss on a REAL
-    // second writer later.
+    // second writer later. Phase 3.6, Task 6 adds a sixth, the identical false positive: the seat-
+    // hold page (`/join/[leagueId]/hold`) sits outside `/app` too, and its signed-in "the return"
+    // branch renders `AppShell` the same passthrough way `browse/page.tsx` already does.
     const writers = grepSourceTree(/\bisAdmin\s*:/, { dirs: ["src", "scripts"], exclude: /\.test\.tsx?$/ });
     expect(writers).toEqual([
       "src/app/app/(shell)/layout.tsx",
       "src/app/browse/page.tsx",
+      "src/app/join/[leagueId]/hold/page.tsx",
       "src/app/reviews/page.tsx",
       "src/components/app-shell/app-shell.tsx",
       "src/components/app-shell/top-bar.tsx",

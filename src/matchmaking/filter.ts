@@ -65,9 +65,15 @@ export function matchesBrowseFilter(league: PublicLeagueSummary, filter: BrowseF
 /**
  * A league is browsable and joinable only while it has a seat left. Shared by the browse read
  * and the join, so a card that says "join" and a POST that accepts it agree by construction.
+ *
+ * `heldSeats` (Phase 3.6, Task 6) defaults to `0`, so every caller that predates seat holds —
+ * `browseQuery`'s own listing rule among them — keeps its exact prior meaning unchanged. A
+ * caller that DOES know the league's live hold count (`joinLeagueInTx`, `claimSeatHold`) passes
+ * it so a seat somebody else is mid-claiming reads as taken, not open, for anybody without that
+ * exact hold's own token.
  */
-export function hasOpenSeat(league: Pick<PublicLeagueSummary, "teamCount" | "filledTeams">): boolean {
-  return league.filledTeams < league.teamCount;
+export function hasOpenSeat(league: Pick<PublicLeagueSummary, "teamCount" | "filledTeams">, heldSeats = 0): boolean {
+  return league.filledTeams + heldSeats < league.teamCount;
 }
 
 /** The human label for a cosmetic stake tier. Never an amount of money. */
