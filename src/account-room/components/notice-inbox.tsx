@@ -97,7 +97,7 @@ export function NoticeInbox() {
         aria-controls={panelId}
         aria-label={unreadCount === 0 ? "Notices" : `Notices, ${unreadCount} unread`}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
-        className="relative flex items-center justify-center rounded-md p-2 text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+        className="relative flex items-center justify-center rounded-md p-1.5 text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
       >
         <Icon name="inbox" />
         {unreadCount === 0 ? null : (

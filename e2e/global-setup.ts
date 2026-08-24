@@ -24,6 +24,7 @@ export const MANAGER_B_STATE = resolve(AUTH_DIR, "manager-b.json");
 export const MANAGER_C_STATE = resolve(AUTH_DIR, "manager-c.json");
 export const MANAGER_ZERO_STATE = resolve(AUTH_DIR, "manager-zero.json");
 export const MANAGER_SIGNOUT_STATE = resolve(AUTH_DIR, "manager-signout.json");
+export const MANAGER_D_STATE = resolve(AUTH_DIR, "manager-d.json");
 
 // Stable, not secret: fixed WorkOS TEST-directory identities, minted once and reused on
 // every rerun (`mintLabSession`'s mint-if-absent path). A fresh random identity per run used to
@@ -60,6 +61,22 @@ const MANAGER_ZERO_EMAIL = "e2e-manager-zero@commish-lab.test";
 // `authenticateWithPassword` on every run, so this identity gets a brand new session each time
 // and the revocation costs the next run nothing.
 const MANAGER_SIGNOUT_EMAIL = "e2e-manager-signout@commish-lab.test";
+// A SIXTH stable identity (Phase 3.6, Task 13): `e2e/design-v2.spec.ts`'s own keyboard walk
+// front door -> card -> hold -> sign-in -> waiting room -> rank a slot -> league home needs a
+// caller who actually WALKS the real `SignInLink`/AuthKit boundary and comes back through
+// `/join/[leagueId]/hold` to claim a real seat, live. None of the four identities above are
+// safe for that: A/B/C already carry seeded leagues whose own specs assert an exact league
+// count or an exact roster; `managerZero` is contractually held at ZERO leagues forever
+// (`onboarding.spec.ts`'s own need, stated on its own fixture below) and joining it to
+// anything here would break that invariant out from under a spec this file has no view of.
+// `managerSignOut` is unusable for a different reason — `auth.spec.ts` signs it out for real,
+// and it runs alphabetically before this task's own spec. A dedicated, minted-once identity
+// that only this task's walk ever touches is the same "cheaper to reason about" argument this
+// file already makes for `managerSignOut`.
+// Exported (unlike its B/Zero/SignOut siblings above): `support/fixtures.ts`'s own
+// `seedPastMember` resolves this identity's real `users.id` by email, the same durable-lookup
+// need `MANAGER_A_EMAIL` already serves for manager A.
+export const MANAGER_D_EMAIL = "e2e-manager-d@commish-lab.test";
 const MANAGER_PASSWORD = "E2e-Manager-Lab-Password-1!";
 
 function storageState(baseURL: string, cookie: string): string {
@@ -727,12 +744,13 @@ async function ensureDraftScheduleLeague(db: Db, managerAUserId: string, manager
 export default async function globalSetup(config: FullConfig): Promise<void> {
   const baseURL = config.projects[0]?.use.baseURL ?? "http://localhost:3100";
 
-  const [a, b, c, zero, signOut] = await Promise.all([
+  const [a, b, c, zero, signOut, d] = await Promise.all([
     mintLabSession({ email: MANAGER_A_EMAIL, password: MANAGER_PASSWORD }),
     mintLabSession({ email: MANAGER_B_EMAIL, password: MANAGER_PASSWORD }),
     mintLabSession({ email: MANAGER_C_EMAIL, password: MANAGER_PASSWORD }),
     mintLabSession({ email: MANAGER_ZERO_EMAIL, password: MANAGER_PASSWORD }),
     mintLabSession({ email: MANAGER_SIGNOUT_EMAIL, password: MANAGER_PASSWORD }),
+    mintLabSession({ email: MANAGER_D_EMAIL, password: MANAGER_PASSWORD }),
   ]);
 
   mkdirSync(AUTH_DIR, { recursive: true });
@@ -742,10 +760,11 @@ export default async function globalSetup(config: FullConfig): Promise<void> {
   writeFileSync(MANAGER_C_STATE, storageState(baseURL, c.cookie), { mode: 0o600 });
   writeFileSync(MANAGER_ZERO_STATE, storageState(baseURL, zero.cookie), { mode: 0o600 });
   writeFileSync(MANAGER_SIGNOUT_STATE, storageState(baseURL, signOut.cookie), { mode: 0o600 });
+  writeFileSync(MANAGER_D_STATE, storageState(baseURL, d.cookie), { mode: 0o600 });
 
   const browser = await chromium.launch();
   try {
-    for (const state of [MANAGER_A_STATE, MANAGER_B_STATE, MANAGER_C_STATE, MANAGER_ZERO_STATE, MANAGER_SIGNOUT_STATE]) {
+    for (const state of [MANAGER_A_STATE, MANAGER_B_STATE, MANAGER_C_STATE, MANAGER_ZERO_STATE, MANAGER_SIGNOUT_STATE, MANAGER_D_STATE]) {
       const context = await browser.newContext({ storageState: state, baseURL });
       const page = await context.newPage();
       const response = await page.goto("/app", { waitUntil: "domcontentloaded" });

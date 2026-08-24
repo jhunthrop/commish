@@ -57,12 +57,20 @@ function PositionFilters({ value, onChange }: { readonly value: string; readonly
       {POSITIONS.map((position) => (
         // A bare toggle, not a padded Button: seven chips must sit on one rail row, and the
         // sticker badge already is the visual — button chrome around it was pure width.
+        // Task 13's own axe pass caught the previous `opacity-80` inactive treatment for real:
+        // `PositionBadge` is white text on a solid sticker fill, verified ≥4.5:1 at FULL opacity
+        // only (`tokens.test.ts`) — dimming the whole button toward the room's own (light-theme)
+        // near-white ground washes the fill toward that ground faster than it washes the text,
+        // closing the gap for RB and TE specifically. The ring alone (already the selected
+        // state's own signal) is what tells the six stickers apart from "no ring", the same
+        // accent/ghost distinction the "All" button beside them already uses — no dimming
+        // anywhere means no theme can ever wash a sticker's own contrast out again.
         <button
           key={position}
           type="button"
           aria-pressed={value === position}
           aria-label={`Show ${position} only`}
-          className={`rounded-sm p-0.5 focus-visible:outline-2 focus-visible:outline-accent ${value === position ? "ring-2 ring-accent" : "opacity-80 hover:opacity-100"}`}
+          className={`rounded-sm p-0.5 focus-visible:outline-2 focus-visible:outline-accent ${value === position ? "ring-2 ring-accent" : ""}`}
           onClick={() => onChange(value === position ? ALL : position)}
         >
           <PositionBadge position={position} size="sm" />

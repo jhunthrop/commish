@@ -75,46 +75,44 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
           `border-b` moved here from the outer `<header>` (Task 16, F13) so `SessionNotice` below
           can render its OWN band, under this row, still inside the one grid item `AppShell`
           spans across row 1 — "above the content column", never a second header. */}
-      <div className="flex w-full items-center justify-between gap-3 border-b border-line px-3 py-3">
+      <div className="flex w-full items-center justify-between gap-2 border-b border-line px-2 py-3">
         <Link
           href="/app"
           className="font-display text-xl font-bold uppercase text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
         >
           Commish
         </Link>
-        <div className="flex items-center gap-2">
+        {/* Task 13, Step 1c: `gap-1`, not `gap-2` — the row's own fix-round-1 history already
+            tightened this once for a font change; a SIXTH real control (the live pill, now
+            genuinely present at every width instead of hidden below `sm`) is the second squeeze,
+            and `mobile-360.spec.ts`'s own 360px battery is what caught it needing one. */}
+        <div className="flex items-center gap-1">
           {/* Task 10, Step 3: the top bar's one live fact — `LiveStatePill` itself renders
               nothing when `liveState` is `null` (ruling 12), so this slot is silent outside a
               real game window with no branch needed here.
 
-              e2e checkpoint fix round (reconciliation, P9-P11 checkpoint): `hidden sm:block` —
-              this docblock's own fix-round-1 history names the exact failure mode ("five
-              controls at full width... overflowed a 360px viewport by 30px") and says the
-              icon-only discipline exists so a later, sixth control "cannot regress the same way
-              if [it] ever joins this row." `LiveStatePill` is that sixth control, added by Task
-              10 as a full-text pill ("Monday · 16 games live") rather than an icon, so it missed
-              that discipline and reopened the exact regression on a 360px viewport with the
-              queue link, notices, avatar name and sign-out already filling the row (a real
-              account can be an operator AND inside a live window at once). A wrapper, not a
-              class on the pill itself: `Badge`'s own base class already hardcodes `inline-flex`
-              with no responsive prefix, and two same-specificity `display` utilities on one
-              element race on Tailwind's generated stylesheet order rather than JSX order. */}
-          <div className="hidden sm:block">
-            <LiveStatePill liveState={liveState} />
-          </div>
+              Task 13, Step 1c (reconciliation review follow-up): NO WRAPPER, no breakpoint.
+              The checkpoint fix round hid this behind `hidden sm:block` — the exact failure mode
+              this file's own fix-round-1 history warns about, restated: a control that only
+              disappears below a breakpoint is one narrow-viewport regression waiting to reopen,
+              and hiding the live pill also drops the live-game signal on the one device people
+              watch games beside. `LiveStatePill` now carries the discipline this header already
+              applies to its other controls itself (icon-only, at every width, sentence in the
+              accessible name), so it needs no wrapper and no width class here at all. */}
+          <LiveStatePill liveState={liveState} />
           {!isAdmin ? null : (
             <Link
               href="/app/admin/queue"
               aria-label="Queue"
-              className="flex items-center justify-center rounded-md p-2 text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="flex items-center justify-center rounded-md p-1.5 text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
-              <Icon name="shield" size={20} />
+              <Icon name="shield" size={18} />
             </Link>
           )}
           <NoticeInbox />
           <Link
             href="/app/profile"
-            className="flex items-center gap-2 rounded-md text-sm text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="flex items-center gap-1 rounded-md text-sm text-text-muted transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             <Avatar name={displayName} avatar={avatar} size="sm" />
             {displayName}
@@ -122,7 +120,7 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
           <form action="/sign-out" method="post">
             <button
               type="submit"
-              className="rounded-md px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className="rounded-md px-2 py-1.5 text-sm font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             >
               Sign out
             </button>

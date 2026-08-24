@@ -110,6 +110,8 @@ describe("TopBar", () => {
         </NoticesProvider>
       </AccountRoomDepsProvider>,
     );
+    // Task 13, Step 1c: icon-only at every width — the sentence lives in an `sr-only` sibling,
+    // never as visible text (`LiveStatePill`'s own test covers the glyph/count rendering).
     expect(screen.getByText("Sunday · 7 games live")).toBeInTheDocument();
   });
 });

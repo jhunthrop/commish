@@ -1,6 +1,35 @@
 import { DEV_SEED } from "../src/data/seed/config";
-import { expect, SEEDED_SEASON_LEAGUE_ID, test } from "./support/fixtures";
-import { E2E_HELD_TRADE_LEAGUE_ID, MANAGER_A_STATE } from "./global-setup";
+import { createDb } from "../src/db/client";
+import { ensureOpenHoldLeague, ensureRoomJourneyLeague, expect, SEEDED_SEASON_LEAGUE_ID, startDraftAndEnterRoom, test } from "./support/fixtures";
+import { E2E_HELD_TRADE_LEAGUE_ID, MANAGER_A_STATE, SEEDED_SEASON_CURRENT_WEEK } from "./global-setup";
+
+// Phase 3.6, Task 13, Step 1: the v2 surface set adds a hold interstitial (anonymous), a waiting
+// room and a draft room — none of which this spec's pre-existing fixtures reach. Both new
+// leagues are dedicated to THIS file (see `support/fixtures.ts`'s own docblock on why they are
+// not shared with `enforcement.spec.ts`'s `E2E_DRAFT_SCHEDULE_LEAGUE_ID`), wiped and rebuilt
+// every run, the same reason every other per-spec fixture league in this suite is.
+const E2E_MOBILE360_HOLD_LEAGUE_ID = "e2e_mobile360_hold_league";
+const E2E_MOBILE360_HOLD_COMMISH_ID = "e2e_mobile360_hold_commish";
+const E2E_MOBILE360_ROOM_LEAGUE_ID = "e2e_mobile360_room_league";
+const E2E_MOBILE360_ROOM_DRAFT_ID = "e2e_mobile360_room_draft";
+const E2E_MOBILE360_ROOM_TEAM_A_ID = "e2e_mobile360_room_team_a";
+const E2E_MOBILE360_ROOM_TEAM_B_ID = "e2e_mobile360_room_team_b";
+
+test.beforeAll(async () => {
+  const db = createDb();
+  try {
+    await ensureOpenHoldLeague(db, { leagueId: E2E_MOBILE360_HOLD_LEAGUE_ID, commishId: E2E_MOBILE360_HOLD_COMMISH_ID, name: "Mobile360 Hold League" });
+    await ensureRoomJourneyLeague(db, {
+      leagueId: E2E_MOBILE360_ROOM_LEAGUE_ID,
+      draftId: E2E_MOBILE360_ROOM_DRAFT_ID,
+      teamAId: E2E_MOBILE360_ROOM_TEAM_A_ID,
+      teamBId: E2E_MOBILE360_ROOM_TEAM_B_ID,
+      name: "Mobile360 Room League",
+    });
+  } finally {
+    await db.$client.end();
+  }
+});
 
 /**
  * The 360px baseline, which nothing in this suite had ever rendered at.
@@ -42,6 +71,14 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
   const page = await context.newPage();
 
   try {
+    // --- Phase 3.6, Task 13: the front door, the v2 set's first surface --------------------
+    // Renders identically signed in or signed out (`FrontDoorHero`/`ProofStrip`/the shelf never
+    // branch on session), so this reuses the one signed-in context the rest of the spec already
+    // holds rather than opening a second one just for this page.
+    await page.goto("/");
+    await expect(page.getByRole("heading", { name: "Real leagues. Real seats. Pick one and you are drafting this week." })).toBeVisible();
+    await expectNoHorizontalScroll(page, "the front door");
+
     // --- Create the league whose NAME is the test input -------------------------------------
     // The defect this spec caught was a grid item's min-content width pushing its track wider
     // than the container, and only a long unbroken name does that. So the league is created
@@ -165,6 +202,51 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await page.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/trades`);
     await expect(page.getByRole("heading", { name: "Trades" })).toBeVisible();
     await expectNoHorizontalScroll(page, "the trades page");
+
+    // --- Phase 3.6, Task 13: league home (post-draft, standings included) and standings -----
+    // The seeded season league is already fully drafted and played (`global-setup.ts`), so its
+    // own `/app/leagues/[leagueId]` renders the real `LeagueHome` — `StandingsTable` and all —
+    // rather than `WaitingRoom`. Standings has no route of its own (it renders inline on this
+    // same page, `league-home.tsx`'s own `<StandingsTable>`), so this reuses the one navigation
+    // for both surfaces rather than a second, identical page load.
+    await page.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expect(page.getByRole("table")).toBeVisible();
+    await expectNoHorizontalScroll(page, "league home (standings included)");
+
+    // --- Phase 3.6, Task 13: a matchup week ------------------------------------------------
+    await page.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/matchups/${SEEDED_SEASON_CURRENT_WEEK}`);
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await expectNoHorizontalScroll(page, "a matchup week");
+
+    // --- Phase 3.6, Task 13: the hold interstitial, signed OUT — a second, short-lived context,
+    // since the rest of this spec's own `page` carries a real session and this page renders
+    // completely differently for one (`src/app/join/[leagueId]/hold/page.tsx`'s own docblock).
+    const anonContext = await browser.newContext({ viewport: VIEWPORT });
+    try {
+      const anonPage = await anonContext.newPage();
+      await anonPage.goto(`/join/${E2E_MOBILE360_HOLD_LEAGUE_ID}/hold`);
+      await expect(anonPage.getByRole("heading", { name: "Mobile360 Hold League" })).toBeVisible();
+      // `SeatHoldPanel` claims the hold on mount — the countdown is the receipt.
+      await expect(anonPage.getByTestId("seat-hold-countdown")).toBeVisible();
+      await expect(anonPage.getByRole("link", { name: /^Sign in to finish joining/ })).toBeVisible();
+      await expectNoHorizontalScroll(anonPage, "the hold interstitial");
+    } finally {
+      await anonContext.close();
+    }
+
+    // --- Phase 3.6, Task 13: the waiting room, then the draft room -------------------------
+    // A dedicated two-team league (`support/fixtures.ts`), manager A already seated, draft
+    // scheduled and not yet started: `/app/leagues/[leagueId]` renders `WaitingRoom` for exactly
+    // that state.
+    await page.goto(`/app/leagues/${E2E_MOBILE360_ROOM_LEAGUE_ID}`);
+    await expect(page.getByRole("heading", { name: "Mobile360 Room League", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Start the draft" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "the waiting room");
+
+    await startDraftAndEnterRoom(page, E2E_MOBILE360_ROOM_LEAGUE_ID);
+    await expect(page.getByLabel("Player pool")).toBeVisible();
+    await expectNoHorizontalScroll(page, "the draft room");
 
     // --- Phase 3 Plan D, Task 10: the held-trade banner — a long sentence inside a bordered
     // panel, and one of the two new surfaces this task adds to this spec's own 360px walk.

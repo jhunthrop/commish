@@ -46,7 +46,19 @@ export default defineConfig({
     screenshot: "only-on-failure",
     video: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    // Every spec but `mobile-360.spec.ts` — that file's own tests already set a 360px viewport
+    // per `browser.newContext(...)` call (it needs a specific `storageState` alongside the
+    // width, which a project's own default `use.viewport` cannot supply per-test), so it is
+    // carved out here rather than run twice.
+    { name: "chromium", use: { ...devices["Desktop Chrome"] }, testIgnore: /mobile-360\.spec\.ts$/ },
+    // Task 13's second viewport project (plan Task 13 Files list): 360px is a first-class
+    // target for this suite, not an incidental override buried inside one spec file's own
+    // `newContext` calls — declaring it here is what makes `mobile-360.spec.ts` runnable on its
+    // own project (`playwright test --project=mobile-360`) with the width as its own default,
+    // exactly like `chromium` above declares Desktop Chrome as ITS default.
+    { name: "mobile-360", use: { ...devices["Desktop Chrome"], viewport: { width: 360, height: 740 } }, testMatch: /mobile-360\.spec\.ts$/ },
+  ],
   webServer: {
     // `next start`, not `next dev`: an e2e run should exercise what a deploy would serve, and
     // dev-mode compilation on first hit is the single largest source of e2e timeout flake.
