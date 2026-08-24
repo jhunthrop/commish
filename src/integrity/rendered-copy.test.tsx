@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
 import { NoticeInbox } from "@/account-room/components/notice-inbox";
-import { fixtureAccountDeps } from "@/account-room/test-fixtures";
+import { fixtureAccountDeps, PROFILE } from "@/account-room/test-fixtures";
 import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import type { NoticeView } from "@/account-room/contract";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
@@ -16,6 +16,8 @@ import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
 import { DRAFT_SCHEDULE, HOME, LINEUP, PUBLIC_LEAGUES, TERMS, fixtureLeagueDeps } from "@/league-room/test-fixtures";
 import { AttentionQueue, attentionQueueItemsFrom } from "@/league-room/components/attention-queue";
 import { DraftSchedulePanel } from "@/league-room/components/draft-schedule-panel";
+import { FirstRunPanel } from "@/league-room/components/first-run-panel";
+import { firstRunPlan } from "@/identity";
 import { WaitingRoom, type WaitingRoomLeague } from "@/league-room/components/waiting-room";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
 import { LeagueBoard } from "@/league-room/components/league-board";
@@ -840,6 +842,28 @@ describe("SeatTakenPanel says nothing that breaks the house copy rules", () => {
       />,
     );
     expectClean(container, "Rookie Snake Room", SEAT_HOLD_REFUSALS.taken);
+  });
+});
+
+/**
+ * Task 17: the identity card (`ProfileForm`, `variant="first-run"`) is new composed copy inside
+ * an existing component — `src/account-room/**` is not itself in `room-copy.source.test.ts`'s
+ * `ROOM_DIRS`, so this rendered sweep is the one thing that catches its two new sentences.
+ */
+describe("FirstRunPanel says nothing that breaks the house copy rules, guided and standard", () => {
+  it("is clean for a beginner (explainer + identity card) and an experienced manager (no explainer)", async () => {
+    const guidedBeginner = firstRunPlan({ experienceTier: "beginner", helpLevel: "guided", leagueCount: 0 })!;
+    const standardExperienced = firstRunPlan({ experienceTier: "experienced", helpLevel: "standard", leagueCount: 0 })!;
+    for (const plan of [guidedBeginner, standardExperienced]) {
+      const fixture = fixtureLeagueDeps({ ok: true, data: {} });
+      const { container, unmount } = render(
+        <LeagueRoomDepsProvider deps={fixture.deps}>
+          <FirstRunPanel plan={plan} profile={PROFILE} />
+        </LeagueRoomDepsProvider>,
+      );
+      expectClean(container, PROFILE.displayName);
+      unmount();
+    }
   });
 });
 

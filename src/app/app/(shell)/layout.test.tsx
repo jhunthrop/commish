@@ -44,4 +44,18 @@ describe("the (shell) route group's layout", () => {
     expect(getAllByRole("banner")).toHaveLength(1);
     expect(getAllByRole("main")).toHaveLength(1);
   });
+
+  // Task 17, Step 4: a brand-new manager's first arrival renders `AppHome`'s first-run branch
+  // INSIDE this layout (ruling 8, as amended) — the page no longer renders its own shell, so the
+  // rail's zero-league state has to be proven at THIS boundary, with `shellData` handing back the
+  // same `rail: []` a zero-league manager's real read produces. The rail is `LeagueRail`'s own
+  // component (Task 2 owns it); this asserts it never renders as a broken row of nothing — one
+  // real, working control, named for what it does, and no league tile at all.
+  it("renders the rail's join-or-create control alone, named for what it does, when the manager has zero leagues", async () => {
+    const { getByRole, getAllByRole } = await renderLayout();
+    const rail = getByRole("navigation", { name: "Your leagues" });
+    const railLinks = getAllByRole("link").filter((link) => rail.contains(link));
+    expect(railLinks).toHaveLength(1);
+    expect(railLinks[0]).toHaveAccessibleName("Join or create another league");
+  });
 });

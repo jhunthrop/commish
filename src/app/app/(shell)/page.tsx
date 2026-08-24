@@ -1,6 +1,7 @@
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
+import { readProfile } from "@/identity-service/profile";
 import { firstRunPlan } from "@/identity";
 import { PageTitle } from "@/components/ui";
 import { crossLeagueHome } from "@/league-service";
@@ -36,6 +37,20 @@ export const dynamic = "force-dynamic";
  * Renders no `TopBar` and no `<main>` of its own (Task 2 Step 5) — `(shell)/layout.tsx` is now
  * the thing that renders `AppShell`, which supplies both, once, for every page in this route
  * group. This page returns its content alone.
+ *
+ * Takes NO arguments — no `searchParams`, no cookie read, nothing that could carry a visitor's
+ * intent (Task 17, Step 3). That is the seat-hold arrival guard, made structural rather than a
+ * branch this page would have to remember to take: a visitor who followed a public shelf card
+ * into a hold never reaches here at all, because Task 16's `safeReturnTo` seals `/join/
+ * [leagueId]/hold` into the sign-in state and the callback's own fallback (`returnPathname:
+ * "/app"`, unchanged) never runs once that sealed value exists. If that machinery ever broke,
+ * THIS is the page a first-run manager holding a seat would wrongly land on instead of the hold
+ * page's race-winner or race-loser screen — so its own test (`page.test.tsx`) pins the zero-
+ * argument signature that makes that impossible to reach for by reading a query string here.
+ *
+ * `profile` (Task 17, Step 2) is read ONLY when `firstRun !== null` — the identity card
+ * (`FirstRunPanel`'s first section, `ProfileForm` itself, `variant="first-run"`) is the only
+ * consumer, and a manager who already has a league costs this page nothing extra to render.
  */
 export default async function AppHome() {
   const user = await requireCurrentUser();
@@ -55,11 +70,12 @@ export default async function AppHome() {
     leagueCount: leaguesHome.leagues.length,
   });
   const home: HomeBody = { ...leaguesHome, firstRun };
+  const profile = firstRun === null ? null : await readProfile(db, user.id);
 
   return (
     <>
       <PageTitle>Your leagues</PageTitle>
-      <HomeBoard initial={home} openLeagues={openLeagues.house} helpLevel={preferences.helpLevel} />
+      <HomeBoard initial={home} openLeagues={openLeagues.house} helpLevel={preferences.helpLevel} profile={profile} />
       {firstRun === null ? <StartOrJoinDisclosure experienceTier={user.experienceTier} /> : null}
     </>
   );

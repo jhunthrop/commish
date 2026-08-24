@@ -3,6 +3,7 @@ import { screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { firstRunPlan } from "@/identity";
+import { PROFILE } from "@/account-room/test-fixtures";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { FirstRunPanel } from "./first-run-panel";
 
@@ -18,14 +19,55 @@ const STANDARD_EXPERIENCED = firstRunPlan({ experienceTier: "experienced", helpL
 
 function renderPanel(plan = GUIDED_BEGINNER) {
   const fixture = fixtureLeagueDeps({ ok: true, data: {} });
-  return renderInLeague(<FirstRunPanel plan={plan} />, fixture.deps);
+  return renderInLeague(<FirstRunPanel plan={plan} profile={PROFILE} />, fixture.deps);
 }
 
 describe("FirstRunPanel", () => {
-  it("renders all three paths, in the plan's own order, with real titles and detail", async () => {
-    await renderSurface(<FirstRunPanel plan={GUIDED_BEGINNER} />, async ({ container }) => {
+  it("asks a brand new manager who they are, before it asks them to pick a league", () => {
+    renderSurface(<FirstRunPanel plan={GUIDED_BEGINNER} profile={PROFILE} />, ({ getAllByRole }) => {
+      expect(getAllByRole("heading", { level: 3 })[0]).toHaveTextContent("Set up your manager profile");
+    });
+  });
+
+  // Derived-only, exactly like the parent's attention queue (ruling 11). The identity step is
+  // shown while `firstRunPlan` is non-null, which is precisely "this manager has zero leagues".
+  // Joining is the dismissal; there is no seen-flag, no column and no snooze.
+  it("stops asking the moment they are in a league, with nothing to dismiss and nothing stored", () => {
+    renderSurface(<FirstRunPanel plan={null} profile={PROFILE} />, ({ container }) => {
+      expect(container.textContent).not.toContain("Set up your manager profile");
+    });
+  });
+
+  it("says what the experience answer actually does, because it decides which leagues they can see", () => {
+    renderSurface(<FirstRunPanel plan={GUIDED_BEGINNER} profile={PROFILE} />, ({ getByText }) => {
+      expect(
+        getByText("Some leagues are kept for newer players. Your answer here decides which ones you see."),
+      ).toBeInTheDocument();
+    });
+  });
+
+  // The founder's centralization rule, tested: a first-run copy of the name and tier fields is
+  // exactly the page-local mapping that rule exists to stop, and it would drift within a phase.
+  it("renders the same ProfileForm the profile page renders, not a second one", () => {
+    renderPanel(GUIDED_BEGINNER);
+    expect(screen.getByLabelText("Display name")).toHaveValue(PROFILE.displayName);
+    expect(screen.getByRole("option", { name: "New to fantasy" })).toBeInTheDocument();
+    expect(
+      screen.getByText("We use this to match you to leagues and to show you the right amount of help."),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("radiogroup", { name: "Avatar" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+  });
+
+  it("renders all four cards — the identity step, then all three paths, in the plan's own order, with real titles and detail", async () => {
+    await renderSurface(<FirstRunPanel plan={GUIDED_BEGINNER} profile={PROFILE} />, async ({ container }) => {
       const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-      expect(headings).toEqual(["Find an open league", "Join with an invite", "Start a league"]);
+      expect(headings).toEqual([
+        "Set up your manager profile",
+        "Find an open league",
+        "Join with an invite",
+        "Start a league",
+      ]);
       expect(screen.getByText("Browse leagues that still have seats and join one today.")).toBeInTheDocument();
       expect(screen.getByText("Paste the link or code your commissioner sent you.")).toBeInTheDocument();
       expect(screen.getByText("You pick the format, the scoring and who is in it.")).toBeInTheDocument();
@@ -43,10 +85,10 @@ describe("FirstRunPanel", () => {
     expect(screen.queryByText(/A league is a group of managers/)).not.toBeInTheDocument();
   });
 
-  it("reorders for an experienced manager, create leading", () => {
+  it("reorders for an experienced manager, create leading — the identity card always stays first", () => {
     renderPanel(STANDARD_EXPERIENCED);
     const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
-    expect(headings).toEqual(["Start a league", "Join with an invite", "Find an open league"]);
+    expect(headings).toEqual(["Set up your manager profile", "Start a league", "Join with an invite", "Find an open league"]);
   });
 
   it("gives every path a real, working control, not a description-only card", () => {

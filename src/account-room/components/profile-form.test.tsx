@@ -139,4 +139,55 @@ describe("ProfileForm", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
     await waitFor(() => expect(screen.getByRole("button", { name: "Save" })).toBeDisabled());
   });
+
+  // Task 17, Step 2: the `variant` prop is mechanical — heading and density ONLY, never the
+  // fields, the validation, the endpoint or the success copy.
+  describe("variant", () => {
+    it("renders no heading of its own by default (\"page\") — /app/profile already carries one", () => {
+      renderInAccount(<ProfileForm profile={PROFILE} />, fixtureAccountDeps().deps);
+      expect(screen.queryByRole("heading", { level: 3 })).not.toBeInTheDocument();
+      expect(screen.queryByText("Set up your manager profile")).not.toBeInTheDocument();
+    });
+
+    it("adds the identity heading and the experience explainer for \"first-run\", and nothing else changes", async () => {
+      const fixture = fixtureAccountDeps();
+      await renderSurface(
+        <AccountRoomDepsProvider deps={fixture.deps}>
+          <ProfileForm profile={PROFILE} variant="first-run" />
+        </AccountRoomDepsProvider>,
+        async ({ container }) => {
+          expect(screen.getByRole("heading", { level: 3 })).toHaveTextContent("Set up your manager profile");
+          expect(
+            screen.getByText("Some leagues are kept for newer players. Your answer here decides which ones you see."),
+          ).toBeInTheDocument();
+          // The fields, their labels and the existing experience hint are exactly the "page"
+          // variant's own — never a second, differently-worded copy of any of them.
+          expect(screen.getByLabelText("Display name")).toHaveValue(PROFILE.displayName);
+          expect(screen.getByRole("option", { name: "New to fantasy" })).toBeInTheDocument();
+          expect(
+            screen.getByText("We use this to match you to leagues and to show you the right amount of help."),
+          ).toBeInTheDocument();
+          expect(screen.getByRole("button", { name: "Save" })).toBeInTheDocument();
+          expect(await axe(container)).toHaveNoViolations();
+        },
+      );
+    });
+
+    it("saves through the same endpoint regardless of variant", async () => {
+      const bodies: unknown[] = [];
+      const fixture = fixtureAccountDeps({ ok: true, data: { ...PROFILE, displayName: "Ada B." } });
+      fixture.deps = {
+        ...fixture.deps,
+        fetchJson: async (url, init) => {
+          bodies.push({ url, body: JSON.parse(String(init?.body)) });
+          return { json: async () => fixture.response } as unknown as Response;
+        },
+      };
+      renderInAccount(<ProfileForm profile={PROFILE} variant="first-run" />, fixture.deps);
+      fireEvent.change(screen.getByLabelText("Display name"), { target: { value: "Ada B." } });
+      fireEvent.click(screen.getByRole("button", { name: "Save" }));
+      await waitFor(() => expect(bodies).toEqual([{ url: "/api/profile", body: { displayName: "Ada B." } }]));
+      expect(await screen.findByText("Saved.")).toBeInTheDocument();
+    });
+  });
 });

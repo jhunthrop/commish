@@ -18,10 +18,14 @@ test("a manager with zero leagues sees the fork, ordered and explained, and brow
   await expect(managerZero.getByRole("heading", { name: "Your leagues" })).toBeVisible();
 
   // The fork itself: a headline, the plain-language explainer (guided help only), and all three
-  // paths present, in the beginner order browse leads.
+  // paths present, in the beginner order browse leads. Task 17 puts the identity card
+  // (`ProfileForm`, `variant="first-run"`) first — "Set up your manager profile" now leads the
+  // level-3 heading list, ahead of the three paths it used to open with; this is a deliberate
+  // structure move, not a loosened assertion, so the array still asserts the exact order.
   await expect(managerZero.getByText(/A league is a group of managers/)).toBeVisible();
   const headings = managerZero.getByRole("heading", { level: 3 });
-  await expect(headings).toHaveText(["Find an open league", "Join with an invite", "Start a league"]);
+  await expect(headings).toHaveText(["Set up your manager profile", "Find an open league", "Join with an invite", "Start a league"]);
+  await expect(managerZero.getByLabel("Display name")).toBeVisible();
 
   // Guidance is ordering, never removal — the other two paths' real controls are on the page
   // too, not hidden behind the one this test follows.

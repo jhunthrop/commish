@@ -3,6 +3,7 @@ import { act, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { firstRunPlan } from "@/identity";
+import { PROFILE } from "@/account-room/test-fixtures";
 import type { HomeBody } from "../contract";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
@@ -91,7 +92,7 @@ describe("HomeBoard", () => {
   });
 
   it("shows the first-run fork, not the plain empty state, when the caller has no leagues", async () => {
-    await renderSurface(<HomeBoard initial={EMPTY} />, async ({ container }) => {
+    await renderSurface(<HomeBoard initial={EMPTY} profile={PROFILE} />, async ({ container }) => {
       expect(screen.getByRole("heading", { name: FIRST_RUN.headline })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Browse open leagues" })).toHaveAttribute("href", "/browse");
       expect(screen.queryByText("No leagues yet")).not.toBeInTheDocument();
@@ -103,6 +104,15 @@ describe("HomeBoard", () => {
     renderInLeague(<HomeBoard initial={EMPTY_NO_FIRST_RUN} />, fixtureLeagueDeps({ ok: true, data: EMPTY_NO_FIRST_RUN }).deps);
     expect(screen.getByText("No leagues yet")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Jump to the form/ })).toHaveAttribute("href", "#create-league");
+  });
+
+  // Task 17: `AppHome` only reads `profile` when `firstRun !== null`, so a `firstRun`-without-
+  // `profile` combination should be equally unreachable in production — but nothing in either
+  // prop's type ties them together, so this board still renders something real rather than
+  // crashing a manager whose profile read somehow failed.
+  it("falls back to the plain empty state on the defensive path, if a caller ever hands it a plan with no profile", () => {
+    renderInLeague(<HomeBoard initial={EMPTY} />, fixtureLeagueDeps({ ok: true, data: EMPTY }).deps);
+    expect(screen.getByText("No leagues yet")).toBeInTheDocument();
   });
 
   it("never polls when no league's week is in progress, even once visible and past the interval", async () => {

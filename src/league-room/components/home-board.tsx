@@ -6,6 +6,7 @@ import { Crest, EmptyState, Meter, SeatMeter } from "@/components/ui";
 import { Countdown, useCountdown } from "@/components/ui/countdown";
 import { RoomTour } from "@/draft-room/components/room-tour";
 import { actionLabelFor } from "@/draft-room/lib/lookups";
+import type { ProfileBody } from "@/account-room/contract";
 import type { HelpLevel } from "@/identity/preferences";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import type { HomeBody, HomeLeagueCard as HomeLeagueCardData } from "../contract";
@@ -133,6 +134,7 @@ export function HomeBoard({
   initial,
   openLeagues = [],
   helpLevel,
+  profile = null,
 }: {
   readonly initial: HomeBody;
   /** The house shelf's own leagues (`listPublicLeagues`), server-read once by `AppHome` — this
@@ -140,6 +142,11 @@ export function HomeBoard({
    *  that predates Step 4 keeps working; `AppHome`/`/api/home`'s own page always supplies it. */
   readonly openLeagues?: readonly PublicLeagueSummary[];
   readonly helpLevel?: HelpLevel;
+  /** `FirstRunPanel`'s identity card needs it (Task 17); every other branch this board renders
+   *  ignores it entirely. `AppHome` reads it only when `initial.firstRun !== null` (no new data
+   *  cost for the common case of a manager who already has leagues) and defaults to `null`
+   *  otherwise, same shape as `openLeagues`' own predates-Step-4 default. */
+  readonly profile?: ProfileBody | null;
 }) {
   const [body, setBody] = useState<HomeBody>(initial);
   const deps = useLeagueRoomDeps();
@@ -175,11 +182,14 @@ export function HomeBoard({
   }, [deps]);
 
   if (body.leagues.length === 0) {
-    if (body.firstRun !== null) return <FirstRunPanel plan={body.firstRun} />;
+    if (body.firstRun !== null && profile !== null) return <FirstRunPanel plan={body.firstRun} profile={profile} />;
     // Defensive only: `firstRunPlan` (@/identity/first-run.ts) returns `null` exactly when
     // `leagueCount > 0`, so a caller that computed `firstRun` from the same league count this
     // board renders can never reach this branch. It stays as a fail-safe rather than an assumed
-    // invariant, since nothing in `HomeBody`'s own type ties the two fields together.
+    // invariant, since nothing in `HomeBody`'s own type ties the two fields together. `profile
+    // === null` joins it for the same reason: `AppHome` only skips the read when `firstRun` is
+    // already `null`, so a `firstRun`-but-no-`profile` combination is equally unreachable in
+    // practice — this still renders something real rather than crashing if it ever happened.
     return (
       <EmptyState
         title="No leagues yet"

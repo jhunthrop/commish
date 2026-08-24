@@ -20,6 +20,29 @@ function isExperienceTier(value: string): value is ExperienceTier {
   return value === "beginner" || value === "experienced";
 }
 
+/** Which caller is rendering `ProfileForm` — Task 17: mechanical only, per its own rule (heading
+ *  and density are the ONLY things that differ). `"page"` (the default) is `/app/profile`'s own
+ *  rendering, byte-identical to before this variant existed: no heading of its own, since
+ *  `ProfilePage` already renders `<PageTitle>Your profile</PageTitle>` above it. `"first-run"` is
+ *  `FirstRunPanel`'s identity card (Task 17, Step 2): the fields, the validation, the endpoint
+ *  and the success copy are the exact same `ProfileForm`, never a second form A18 would have to
+ *  find and retone twice. */
+export type ProfileFormVariant = "page" | "first-run";
+
+/** The identity card's own heading, matching the `h3` weight and color every other first-run
+ *  path card already uses (`FirstRunPanel`'s `FirstRunPathAction` siblings) — this is the first
+ *  card in that list, not a differently-styled one. Exported so `FirstRunPanel` can give the
+ *  `Card` wrapping this form the SAME string as its own `aria-label`, one source rather than two
+ *  literals that could drift. */
+export const PROFILE_FORM_FIRST_RUN_HEADING = "Set up your manager profile";
+
+/** Why the experience question matters, first-run only — the page variant leaves this unsaid
+ *  because a returning manager already has an answer on file; a brand-new one has never been
+ *  told the fork exists at all (Task 17, Step 1's third test). Placed above the fields rather
+ *  than folded into the `Select`'s own `hint`, which stays exactly as it reads on `/app/profile`
+ *  per this component's own rule against touching field copy between variants. */
+const FIRST_RUN_EXPERIENCE_EXPLAINER = "Some leagues are kept for newer players. Your answer here decides which ones you see.";
+
 /** What a sparse `PATCH /api/profile` body may carry. Absent key means "don't touch it". */
 interface ProfilePatch {
   readonly displayName?: string;
@@ -51,7 +74,14 @@ function dirtyFields(baseline: ProfileBody, draft: Required<ProfilePatch>): Prof
  * `profile` and moves to whatever a successful PATCH returns, so a second Save re-sends nothing
  * the first one already wrote.
  */
-export function ProfileForm({ profile }: { readonly profile: ProfileBody }) {
+export function ProfileForm({
+  profile,
+  variant = "page",
+}: {
+  readonly profile: ProfileBody;
+  readonly variant?: ProfileFormVariant;
+}) {
+  const isFirstRun = variant === "first-run";
   const router = useRouter();
   const { fetchJson } = useAccountRoomDeps();
   const [baseline, setBaseline] = useState<ProfileBody>(profile);
@@ -95,12 +125,18 @@ export function ProfileForm({ profile }: { readonly profile: ProfileBody }) {
 
   return (
     <form
-      className="flex flex-col gap-4"
+      className={`flex flex-col ${isFirstRun ? "gap-3" : "gap-4"}`}
       onSubmit={(event) => {
         event.preventDefault();
         void submit();
       }}
     >
+      {isFirstRun ? (
+        <div>
+          <h3 className="font-medium text-text-primary">{PROFILE_FORM_FIRST_RUN_HEADING}</h3>
+          <p className="text-sm text-text-muted">{FIRST_RUN_EXPERIENCE_EXPLAINER}</p>
+        </div>
+      ) : null}
       <AvatarPicker displayName={displayName} value={avatarPreset} onChange={setAvatarPreset} />
 
       <Input
