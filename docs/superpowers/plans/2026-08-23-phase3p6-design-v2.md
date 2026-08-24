@@ -991,6 +991,8 @@ The post-join screen is where a first-timer decides whether this product is comp
 - Consumes: `Countdown` (`size="xl"`), `Meter`, `Panel`, `Crest`, `SeatMeter`, `describeStartTiming`, `SlotPreferencePanel`, `LeagueChat`, `RoomTour`.
 - Produces: `WaitingChecklist`, `RoomRoster`, `WaitingRoomLeague`'s rolled and missed states.
 
+**Carry from Task 6 (binding):** the `?holdExpired=1` query param the return flow hands this page is CALLER-FORGEABLE and must be treated as decorative copy only — it may soften a sentence ("your hold ran out, so we seated you the ordinary way"), it may never decide capacity, identity, state, or anything load-bearing, and forging it must render nothing untrue about the visitor's actual membership.
+
 - [ ] **Step 1: Write the failing waiting-room tests**
 
 ```tsx

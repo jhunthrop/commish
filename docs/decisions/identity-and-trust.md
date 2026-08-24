@@ -346,6 +346,16 @@ limiter protects cost and noise, not data — and because the correct key is a d
 decision: behind Fly's proxy (Plan D) the platform overwrites the header and it becomes
 trustworthy.
 
+A FIFTH consumer changed the stakes (Phase 3.6, Task 6, recorded by controller adjudication):
+`POST /api/public/leagues/[leagueId]/hold` keys the same forgeable header, and it is a WRITE
+that reserves real, shared capacity — a scripted caller rotating the header can hold every
+open seat in every public league and refresh the holds forever, denying real visitors any
+seat on the shelf. The read-route reasoning above ("protects cost and noise, not data") does
+NOT cover it. The residual risk is accepted for local development only; the platform-IP fix
+below applies to this route FIRST, and the seat-hold route may not be publicly exposed until
+it lands. Holds self-expire, so the damage window is bounded and self-healing, but it is
+repeatable; no in-app defense short of a verified client identity closes it.
+
 LAUNCH-BLOCKING, recorded here so Plan D cannot miss it: before the first deployed release,
 (1) confirm the platform's proxy semantics and key on the platform-verified client IP, and
 (2) move these counters into the Redis this app already runs (the in-memory limiter is
