@@ -27,7 +27,7 @@ export default function NotFound() {
       <main className="mx-auto flex min-h-[60vh] max-w-lg items-center px-4">
         <EmptyState
           icon="search"
-          title="We couldn't find that page."
+          title="We could not find that page."
           description="That link may be outdated. The page you were looking for is not here."
           action={
             <div className="flex flex-wrap items-center justify-center gap-3">
