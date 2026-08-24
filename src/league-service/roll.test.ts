@@ -210,13 +210,20 @@ describe("rollDueDrafts", () => {
 
     try {
       const [a, b] = await Promise.all([rollDueDrafts(dbOne, { clock }), rollDueDrafts(dbTwo, { clock })]);
+      // Fix round 1 LOW: the invariant that actually matters is the DRAFT's own state and that
+      // no more than one write ever won — not the scan's own cardinality, which can honestly
+      // vary run to run (a scan that started a moment later may not find the row at all once the
+      // winner has already moved its kickoff out of the due window).
       const draft = await draftRow(leagueId);
       expect(draft.kickoffRolls).toBe(1);
-      expect(a.length + b.length).toBe(2); // both scans find the draft; only one write wins
       const rolledCount = [...a, ...b].filter((outcome) => outcome.rolled).length;
       const racedCount = [...a, ...b].filter((outcome) => !outcome.rolled && outcome.reason === ROLL_REFUSALS.raced).length;
       expect(rolledCount).toBe(1);
-      expect(racedCount).toBe(1);
+      expect(racedCount).toBeLessThanOrEqual(1);
+      // And the win was genuinely written once, not twice under two different guises: exactly
+      // one notice per seated team, never doubled by a second, silently-successful roll.
+      const notices = await noticesOf(leagueId, "draft_kickoff_rolled");
+      expect(notices).toHaveLength(2); // seedDueLeague({ filled: 2 }) seats exactly two teams
     } finally {
       await dbOne.$client.end();
       await dbTwo.$client.end();
@@ -229,16 +236,18 @@ describe("rollDueDrafts", () => {
 
     const whenFull = await seedDueLeague({ teamCount: 3, filled: 2, startTrigger: "when_full" });
     const full = await seedDueLeague({ teamCount: 2, filled: 2 });
+    const notYetDue = await seedDueLeague({ teamCount: 3, filled: 2, kickoffAt: "2026-09-20T17:00:00.000Z" });
 
     const everyRefusalPath = [
       () => db.transaction((tx) => rollUnfilledDraftInTx(tx, { draftId: started.draftId, leagueId: started.leagueId }, FIXED_NOW)),
       () => db.transaction((tx) => rollUnfilledDraftInTx(tx, { draftId: whenFull.draftId, leagueId: whenFull.leagueId }, FIXED_NOW)),
       () => db.transaction((tx) => rollUnfilledDraftInTx(tx, { draftId: full.draftId, leagueId: full.leagueId }, FIXED_NOW)),
+      () => db.transaction((tx) => rollUnfilledDraftInTx(tx, { draftId: notYetDue.draftId, leagueId: notYetDue.leagueId }, FIXED_NOW)),
     ];
 
-    const before = await Promise.all([snapshotOf(started.leagueId), snapshotOf(whenFull.leagueId), snapshotOf(full.leagueId)]);
+    const before = await Promise.all([snapshotOf(started.leagueId), snapshotOf(whenFull.leagueId), snapshotOf(full.leagueId), snapshotOf(notYetDue.leagueId)]);
     for (const call of everyRefusalPath) await call();
-    const after = await Promise.all([snapshotOf(started.leagueId), snapshotOf(whenFull.leagueId), snapshotOf(full.leagueId)]);
+    const after = await Promise.all([snapshotOf(started.leagueId), snapshotOf(whenFull.leagueId), snapshotOf(full.leagueId), snapshotOf(notYetDue.leagueId)]);
     expect(after).toEqual(before);
   });
 });
@@ -262,6 +271,20 @@ describe("rollUnfilledDraftInTx", () => {
     const before = await snapshotOf(leagueId);
     const outcome = await db.transaction((tx) => rollUnfilledDraftInTx(tx, { draftId, leagueId }, FIXED_NOW));
     expect(outcome).toEqual({ draftId, rolled: false, reason: ROLL_REFUSALS.full });
+    await expectNoRollTookPlace(leagueId, before);
+  });
+
+  // Fix round 1, H2: a commissioner's own `setDraftKickoff` reschedule landing between the scan
+  // and this transaction must never be silently rolled — the row this call reads is real and
+  // `'scheduled'`, but its `kickoff_at` is not actually due yet.
+  it("refuses a draft whose kickoff has not actually arrived yet, naming why (H2)", async () => {
+    const future = "2026-09-20T17:00:00.000Z";
+    const { leagueId, draftId } = await seedDueLeague({ teamCount: 3, filled: 2, kickoffAt: future });
+    const before = await snapshotOf(leagueId);
+    // `FIXED_NOW` is well before `future` — the exact shape a reschedule landing after the scan
+    // read a stale, already-past `kickoff_at` would produce.
+    const outcome = await db.transaction((tx) => rollUnfilledDraftInTx(tx, { draftId, leagueId }, FIXED_NOW));
+    expect(outcome).toEqual({ draftId, rolled: false, reason: ROLL_REFUSALS.notDue });
     await expectNoRollTookPlace(leagueId, before);
   });
 });

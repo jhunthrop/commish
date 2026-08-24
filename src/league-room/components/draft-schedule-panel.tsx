@@ -8,7 +8,7 @@ import type { DraftScheduleBody } from "../contract";
 import { Button, Input } from "@/components/ui";
 import { StatePanel } from "@/components/ui/state-panel";
 import { formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
-import { rollNoticeSentence } from "@/matchmaking/roll";
+import { PUBLIC_ROOM_SHORT_REFUSAL, rollNoticeSentence } from "@/matchmaking/roll";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
 const MS_PER_MINUTE = 60_000;
@@ -48,10 +48,12 @@ function formatRelativeCountdown(msUntil: number): string {
 
 /**
  * "3 seats are still open. Starting now drafts a short league." / "1 seat is still open.
- * Starting now drafts a short league." (Task 7, Step 3) — the warning the commissioner's manual
- * press gains rather than a refusal: the platform door is where the founder's "roll until full"
- * ruling binds, but a private commissioner has no other way to ever draft if their twelfth
- * friend never signs up, so the button stays live and honest about what pressing it does instead.
+ * Starting now drafts a short league." (Task 7, Step 3) — the warning a PRIVATE commissioner's
+ * manual press gets rather than a refusal: a private commissioner has no other way to ever draft
+ * if their twelfth friend never signs up, so their button stays live and honest about what
+ * pressing it does instead. Fix round 1, M5 (controller ruling): a PUBLIC MATCHMADE MEMBER
+ * league's commissioner gets `PUBLIC_ROOM_SHORT_REFUSAL` here instead — see that constant's own
+ * docblock (`@/matchmaking/roll`) for why the founder's ruling DOES bind that press.
  */
 function shortRoomWarning(openSeats: number): string {
   const seat = openSeats === 1 ? "seat is" : "seats are";
@@ -239,12 +241,19 @@ export function DraftSchedulePanel({
       <p className="text-sm text-text-muted">{rollNoticeSentence(schedule.kickoffRolls)}</p>
     );
 
-  // Task 7, Step 3: the commissioner's manual press keeps its two-team floor (this task does not
-  // change what `POST /api/drafts/[draftId]/start` accepts) but gains this warning — the one
-  // place the founder's "roll until full" ruling does not bind, named rather than left implicit.
+  // Task 7, Step 3, narrowed by fix round 1's M5 (controller ruling): a PRIVATE commissioner's
+  // manual press keeps its two-team floor and this warning — the one place the founder's
+  // "roll until full" ruling does not bind, because there is no other way to ever draft a
+  // private league nobody else can start for them. A PUBLIC MATCHMADE MEMBER league's press is
+  // instead REFUSED server-side (`store.ts`'s `startDraft`), so this tells the commissioner the
+  // same honest sentence proactively rather than only after a failed press.
   const openSeats = teamCount - schedule.filledTeams;
   const shortRoomNotice =
-    schedule.status !== "scheduled" || !isCommissioner || openSeats <= 0 ? null : (
+    schedule.status !== "scheduled" || !isCommissioner || openSeats <= 0 ? null : schedule.isPublicMatchmade ? (
+      <p role="status" className="text-sm text-warning">
+        {PUBLIC_ROOM_SHORT_REFUSAL}
+      </p>
+    ) : (
       <p role="status" className="text-sm text-warning">
         {shortRoomWarning(openSeats)}
       </p>

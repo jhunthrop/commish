@@ -20,6 +20,8 @@ import { sweepQuietly } from "@/integrity-service/multi-account";
 import { attachAuditEvent, deliverNotice, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import type { RealtimeEventType } from "@/lib/realtime/events";
 import type { PublishFn } from "@/lib/realtime/publish";
+import { hasOpenSeat } from "@/matchmaking/filter";
+import { PUBLIC_ROOM_SHORT_REFUSAL } from "@/matchmaking/roll";
 import { auditEventsForPicks, ownerIdsForContestedPicks } from "./audit";
 import { claimAutoStart } from "./auto-start";
 import { commitDraftState } from "./commit";
@@ -581,6 +583,30 @@ export function createDraftStore({
       if (row?.status === "complete") {
         const existingActions = await db.select({ id: draftActions.draftId }).from(draftActions).where(eq(draftActions.draftId, draftId)).limit(1);
         if (existingActions.length === 0) return { ok: false, reason: "This draft has already finished." };
+      }
+
+      // Fix round 1, M5 (controller ruling). The founder's "roll until full" ruling binds the
+      // platform door absolutely; a PUBLIC MATCHMADE MEMBER league's commissioner pressing this
+      // SAME button by hand is the one human door that could otherwise undercut it, so it is
+      // refused rather than merely warned — `PUBLIC_ROOM_SHORT_REFUSAL`'s own docblock
+      // (`@/matchmaking/roll`) states the full reasoning and why a PRIVATE league (no way at all
+      // to ever draft otherwise) and a HOUSE league (no commissioner to press anything) are both
+      // untouched by it. Scoped to a MANUAL press only (`options?.auto !== true`): the platform's
+      // own auto-start already only ever reaches a full room (`dueDraftsQuery`'s own seat-count
+      // predicate, `@/draft-service/auto-start`), so this would be a redundant, never-true check
+      // on that path. NO-WRITE-BEFORE-REFUSAL: this reads `leagues`/`teams`, writes nothing, and
+      // returns before `applyAction` (the one place this function writes) is ever reached.
+      if (options?.auto !== true) {
+        const [leagueRow] = await db
+          .select({ isPublicMatchmade: leagues.isPublicMatchmade, houseRung: leagues.houseRung, teamCount: leagues.teamCount })
+          .from(leagues)
+          .where(eq(leagues.id, config.leagueId));
+        if (leagueRow !== undefined && leagueRow.isPublicMatchmade && leagueRow.houseRung === null) {
+          const seated = await db.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, config.leagueId));
+          if (hasOpenSeat({ teamCount: leagueRow.teamCount, filledTeams: seated.length })) {
+            return { ok: false, reason: PUBLIC_ROOM_SHORT_REFUSAL };
+          }
+        }
       }
 
       // `userId`/`leagueName` ride along with `id` on this ONE read (rather than a second query

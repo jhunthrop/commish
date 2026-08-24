@@ -2,12 +2,13 @@ import { describe, it, expect, beforeEach, afterAll } from "vitest";
 import { asc, eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, draftActions, memberNotices, players, teams } from "@/db/schema";
+import { auditEvents, draftActions, drafts, memberNotices, players, teams } from "@/db/schema";
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
 import { currentDeadline, DRAFT_SKIP_POLICY, initialDraftState, type DraftConfig } from "@/draft-engine";
 import type { MemberNotice } from "@/integrity-service/notify";
 import { draftOrderFor } from "./order";
 import { setSlotPreference, slotPreferencesFor } from "./slot-preference";
+import { PUBLIC_ROOM_SHORT_REFUSAL } from "@/matchmaking/roll";
 import { createDraftStore, isSequenceConflict, type ApplyResult, type DraftStore, type DraftStoreDeps, type PublishFn } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
 
@@ -867,5 +868,67 @@ describe("draft store — slot preferences (Task 6)", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) throw new Error("unreachable — asserted above");
     expect(result.state.draftOrder).toEqual(draftOrderFor(draftId, teamIds));
+  });
+});
+
+describe("draft store — the public-room-short refusal (Task 7 fix round 1, M5)", () => {
+  it("refuses a public matchmade member league's manual press while a seat is still open", async () => {
+    const { draftId } = await seedDraftFixture(db, {
+      draftId: "draft_public_short",
+      leagueId: "league_public_short",
+      format: "snake",
+      teamCount: 12,
+      filledTeams: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+      isPublicMatchmade: true,
+    });
+
+    const result = await newStore().startDraft(draftId);
+
+    expect(result).toEqual({ ok: false, reason: PUBLIC_ROOM_SHORT_REFUSAL });
+    const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
+    expect(row?.status).toBe("scheduled");
+    expect(await db.select().from(draftActions).where(eq(draftActions.draftId, draftId))).toEqual([]);
+  });
+
+  it("never applies the public-room-short refusal to the platform's own auto-start path", async () => {
+    // `options.auto === true` is the ONLY path `dueDraftsQuery` (`@/draft-service/auto-start`)
+    // reaches after Task 7's own fix — it never finds an unfilled room to begin with — but this
+    // proves the SCOPE of the check itself, not merely that the caller happens to be well-behaved.
+    const { draftId } = await seedDraftFixture(db, {
+      draftId: "draft_public_auto",
+      leagueId: "league_public_auto",
+      format: "snake",
+      teamCount: 12,
+      filledTeams: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+      isPublicMatchmade: true,
+    });
+
+    const result = await newStore().startDraft(draftId, { auto: true });
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("still lets a PRIVATE commissioner start a short room by hand, floor and warning unchanged", async () => {
+    const { draftId } = await seedDraftFixture(db, {
+      draftId: "draft_private_short",
+      leagueId: "league_private_short",
+      format: "snake",
+      teamCount: 12,
+      filledTeams: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+      isPublicMatchmade: false,
+    });
+
+    const result = await newStore().startDraft(draftId);
+
+    expect(result.ok).toBe(true);
   });
 });

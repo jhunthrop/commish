@@ -306,17 +306,21 @@ export interface NoticeContexts {
    * `"everyone"`, on `draft_fill_triggered`'s own reasoning: a fact about the league's shared
    * calendar, true for everyone in it, about nobody's conduct.
    *
-   * `rollSentence` and `startTimingSentence` arrive PRE-RENDERED (`rollNoticeSentence` and
-   * `describeStartTiming`, both `@/matchmaking/roll`) — the same "a template composes a
-   * sentence, it does not re-derive one from a payload shape" discipline `draft_fill_triggered`'s
-   * own `graceLabel` already holds this file to, and it is what makes this notice's last sentence
-   * and every other start-timing sentence in the product (F9) provably the same string rather
-   * than a second hand-typed copy of it. `showReleaseParagraph` is `kickoffRolls >= 2` (F12): the
-   * release door is named from the SECOND roll onward, never the first — offering the exit the
-   * first time something slips reads as the product giving up on its own room.
+   * `newKickoffAt`, `rollSentence` and `startTimingSentence` all arrive PRE-RENDERED
+   * (`formatAbsoluteTime`/`rollNoticeSentence`/`describeStartTiming`, `@/league/terms` and
+   * `@/matchmaking/roll`) — the same "a template composes a sentence, it does not re-derive one
+   * from a payload shape" discipline `draft_fill_triggered`'s own `graceLabel` already holds this
+   * file to, and it is what makes this notice's last sentence and every other start-timing
+   * sentence in the product (F9) provably the same string rather than a second hand-typed copy of
+   * it. `newKickoffAt` (fix round 1, M2) is what lets the FIRST sentence name the actual target
+   * rather than only saying "it moved" — the plan's own Step 6 example ("...so its draft moves to
+   * Friday 8:00 PM") is the sentence this answers. `showReleaseParagraph` is `kickoffRolls >= 2`
+   * (F12): the release door is named from the SECOND roll onward, never the first — offering the
+   * exit the first time something slips reads as the product giving up on its own room.
    */
   readonly draft_kickoff_rolled: {
     readonly leagueName: string;
+    readonly newKickoffAt: string;
     readonly rollSentence: string;
     readonly startTimingSentence: string;
     readonly showReleaseParagraph: boolean;
@@ -531,12 +535,15 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   }),
   // No "no reply to this message" line: this is not a sanction, and there is nothing about any
   // member's own conduct to appeal — it explains a fact about the league's shared calendar, the
-  // identical framing `draft_fill_triggered`'s own template already carries. `rollSentence` and
-  // `startTimingSentence` arrive pre-rendered (this file's own docblock explains why); the
-  // release paragraph only appears from the SECOND roll onward (F12).
-  draft_kickoff_rolled: ({ leagueName, rollSentence, startTimingSentence, showReleaseParagraph }) => ({
+  // identical framing `draft_fill_triggered`'s own template already carries. Fix round 1, M2: the
+  // FIRST sentence now names the actual target (`newKickoffAt`), the plan's own Step 6 example
+  // ("...so its draft moves to Friday 8:00 PM") rather than only saying "it moved". `rollSentence`
+  // still carries the honestly-pluralized count (F12) Task 9's waiting-room test asserts against
+  // this same body; `startTimingSentence` arrives pre-rendered (this file's own docblock explains
+  // why); the release paragraph only appears from the SECOND roll onward (F12).
+  draft_kickoff_rolled: ({ leagueName, newKickoffAt, rollSentence, startTimingSentence, showReleaseParagraph }) => ({
     title: `Your draft in ${leagueName} moved`,
-    body: `${rollSentence} Your seat is still yours. ${startTimingSentence}${showReleaseParagraph ? " If you would rather not wait, you can release your seat and someone else can take it." : ""}`,
+    body: `${leagueName} did not fill in time, so its draft moves to ${newKickoffAt}. ${rollSentence} Your seat is still yours. ${startTimingSentence}${showReleaseParagraph ? " If you would rather not wait, you can release your seat and someone else can take it." : ""}`,
   }),
 };
 

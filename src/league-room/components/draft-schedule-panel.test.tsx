@@ -233,9 +233,10 @@ describe("DraftSchedulePanel", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("There are no players to draft yet.");
   });
 
-  // Task 7, Step 3: the commissioner's manual press keeps its two-team floor and gains this
+  // Task 7, Step 3: a PRIVATE commissioner's manual press keeps its two-team floor and gains this
   // warning instead — the one place the founder's "roll until full" ruling does not bind.
-  it("warns the commissioner that starting now drafts a short league", () => {
+  // `SCHEDULED` is private (`isPublicMatchmade: false`) by default.
+  it("warns a private commissioner that starting now drafts a short league", () => {
     renderInLeague(
       <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={SCHEDULED} />,
       fixtureLeagueDeps().deps,
@@ -257,6 +258,18 @@ describe("DraftSchedulePanel", () => {
       fixtureLeagueDeps().deps,
     );
     expect(screen.queryByText(/still open/)).not.toBeInTheDocument();
+  });
+
+  // Fix round 1, M5 (controller ruling): a PUBLIC MATCHMADE MEMBER league's commissioner sees the
+  // refusal sentence proactively, not the private-league warning — `store.ts`'s `startDraft`
+  // refuses the actual press with the identical string.
+  it("tells a public league's commissioner the room fills from the shelf, not the private warning", () => {
+    renderInLeague(
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={{ ...SCHEDULED, isPublicMatchmade: true }} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText("This league fills from the open shelf. The draft starts when the room is full.")).toBeInTheDocument();
+    expect(screen.queryByText(/Starting now drafts a short league/)).not.toBeInTheDocument();
   });
 
   // Task 7 (F12/F21): only a SCHEDULED draft ever rolls.

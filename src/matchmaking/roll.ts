@@ -110,9 +110,9 @@ export function nextKickoffAfter(kickoffIso: string, nowIso: string): string {
 /**
  * Every reason `rollUnfilledDraftInTx` (`@/league-service/roll`) declines to roll a draft's
  * kickoff, named once so the function and its tests never hand-type a second copy of the same
- * sentence — the identical discipline `FILL_TRIGGER_REFUSALS` and `ROLL_REFUSALS`'s own sibling
- * guards already hold. None of these reach a member directly: the roll, like the fill trigger, has
- * no human caller.
+ * sentence — the identical discipline `FILL_TRIGGER_REFUSALS` (`@/league-service/fill-trigger`)
+ * already holds itself to. None of these reach a member directly: the roll, like the fill
+ * trigger, has no human caller.
  */
 export const ROLL_REFUSALS = {
   /** The draft has already left `'scheduled'` — nothing about a kickoff is left to roll. */
@@ -120,6 +120,15 @@ export const ROLL_REFUSALS = {
   /** A `when_full` draft's kickoff only exists after its room fills — there is no chosen time to
    *  roll forward, and no target it could ever be late for before that. */
   notScheduled: "This draft starts when the room fills, so nobody rolls its clock.",
+  /**
+   * Fix round 1, H2. The row this call read is real and `'scheduled'`, but its `kickoff_at` is
+   * NOT actually due — re-derived fresh, immediately before the write, in case a commissioner's
+   * `setDraftKickoff` reschedule landed between the scan that found this draft and the
+   * transaction that would have rolled it. Without this check the roll would silently move a
+   * time the commissioner just chose on purpose, and tell every seat the room "was not full" at
+   * a target that was never actually due — a false sentence about why the date moved.
+   */
+  notDue: "This draft's kickoff has not arrived yet, so there is nothing due to roll.",
   /** The room is genuinely full — re-derived fresh, immediately before the write, in case a join
    *  landed the last seat between the scan that found this draft and the roll that would have
    *  moved it. A full room's own next stop is the START door, not this one. */
@@ -141,3 +150,21 @@ export function rollNoticeSentence(kickoffRolls: number): string {
   const tail = kickoffRolls <= 2 ? "" : " since it was scheduled";
   return `This draft moved ${times} because the room was not full${tail}.`;
 }
+
+/**
+ * Fix round 1, M5 (controller ruling). The founder's "roll until full" ruling binds the platform
+ * door absolutely; this is the SAME ruling restated for the one human door that could otherwise
+ * undercut it — a PUBLIC MATCHMADE MEMBER league's commissioner pressing "start" by hand while a
+ * seat is still open. That league's kickoff is not a time the commissioner chose the way a
+ * private league's is; it is the open shelf's own promise, and a manual press should not be the
+ * one door that quietly breaks it. Refused, not merely warned — `src/draft-service/store.ts`'s `startDraft` reads this
+ * for a manual (`options?.auto !== true`) press on a public, non-house league only; the panel
+ * (`draft-schedule-panel.tsx`) quotes it verbatim rather than composing a second copy of it.
+ *
+ * A PRIVATE league's manual press is unaffected: `ROLL_REFUSALS`'s own model (Step 3) already
+ * states why the ruling does not bind there — no way at all to ever draft otherwise, in a league
+ * nobody else can start for them — and that press keeps its two-team floor and its short-room
+ * warning exactly as shipped. A HOUSE league has no commissioner to press anything at all
+ * (`isCommissionerOf`'s own docblock), so this sentence never reaches one.
+ */
+export const PUBLIC_ROOM_SHORT_REFUSAL = "This league fills from the open shelf. The draft starts when the room is full.";

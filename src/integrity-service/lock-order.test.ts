@@ -9,6 +9,7 @@ import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-supp
 import { autoSetLineupInTx, autoSetLineupsForWeek } from "@/league-service/auto-lineup";
 import { setDraftKickoff } from "@/league-service/draft-schedule";
 import { joinLeagueInTx, recordTierBlockedJoin } from "@/league-service/join";
+import { rollUnfilledDraftInTx } from "@/league-service/roll";
 import { claimSeatHold } from "@/league-service/seat-hold";
 import { setLineup } from "@/league-service/lineups";
 import { writeSchedule } from "@/league-service/schedule";
@@ -2945,27 +2946,86 @@ describe("the leagues-before-drafts rule", () => {
 });
 
 /**
- * PHASE 3.6, TASK 7 — `rollUnfilledDraftInTx` (`@/league-service/roll`) VERIFIED AGAINST THE
- * RULE ABOVE, DELIBERATELY NOT EXTENDING IT THE SAME WAY. Every OTHER writer that reaches both
- * `leagues` and `drafts` in this branch (`joinLeagueInTx`, `setDraftKickoff`, `applyAction`) takes
- * `leagues FOR UPDATE` first, as its own statement, on the rule this file's own "leagues-before-
- * drafts" block fixed a real reproduced cycle to establish. `rollUnfilledDraftInTx` does NOT: it
- * has no caller that already holds that lock for an unrelated reason (unlike `claimAutoStart`'s
- * `applyAction` or `fireWhenFullInTx`'s `joinLeagueInTx`), and taking the lock itself would break
- * a DIFFERENT property this function needs more — two concurrent rolls of the SAME draft must
- * RACE (one write wins, the other reports a clean no-op via its guarded `UPDATE`'s own zero-rows
- * return), not serialize into two sequential successes. A `leagues FOR UPDATE` preamble would
- * serialize them: the second caller, unblocked after the first commits, would re-read the row
- * fresh and see a genuinely-still-due, genuinely-still-unfilled league — and honestly roll it a
- * SECOND time, which is correct in isolation and wrong for the race guarantee
- * `src/league-service/roll.test.ts`'s own "survives two instances rolling the same draft on the
- * same tick" test pins. `rollUnfilledDraftInTx`'s own docblock states the resulting tradeoff in
- * full: a narrow, deadlock-detector-recoverable window against a `setDraftKickoff` racing the
- * IDENTICAL draft at the IDENTICAL instant, left open rather than resolved, because closing it
- * would cost the race guarantee this function's own tests already depend on. Flagged here as the
- * one place in this branch that read the leagues-before-drafts rule and chose not to apply it,
- * with the reason written down rather than the choice left for a future reader to rediscover.
+ * PHASE 3.6, TASK 7, FIX ROUND 1 (H1) — `rollUnfilledDraftInTx` (`@/league-service/roll`) DRIVEN
+ * AGAINST THE RULE ABOVE, ON TWO REAL CONNECTIONS, NOT ARGUED FROM ITS OWN DOCBLOCK.
+ *
+ * The FIRST version of this function shipped with no `leagues` lock at all, reasoning that it had
+ * no caller (unlike `claimAutoStart`'s `applyAction` or `fireWhenFullInTx`'s `joinLeagueInTx`)
+ * already holding one. An opus reviewer reproduced a genuine `SQLSTATE 40P01` between that shape
+ * and `setDraftKickoff` below, on two real connections — the deadlock's victim can be the
+ * commissioner's own reschedule, not merely a theoretical bystander. The fix is `leagues[X] FOR
+ * KEY SHARE` as this function's own first statement: `KEY SHARE` conflicts with `setDraftKickoff`'s
+ * `leagues FOR UPDATE` (so the two now order themselves on the SAME row, in the SAME direction,
+ * before either ever reaches `drafts`), but does NOT conflict with another `KEY SHARE` (so two
+ * concurrent rolls of the SAME draft still race through to the guarded `UPDATE` uncontended,
+ * exactly as `src/league-service/roll.test.ts`'s own self-race test requires).
  */
+describe("rollUnfilledDraftInTx vs. setDraftKickoff — the roll's own leagues-before-drafts proof (H1)", () => {
+  /** A due, unfilled, `'scheduled'`-trigger public league — the one shape both a roll and a
+   *  commissioner's own reschedule can reach at the same instant. */
+  async function dueUnfilledLeague(leagueId: string, draftId: string) {
+    return seedDraftFixture(joinDb, {
+      draftId,
+      leagueId,
+      format: "snake",
+      teamCount: 3,
+      filledTeams: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-08-25T00:00:00.000Z"), // before `clock.now()` (2026-09-01): due
+      auctionBudget: null,
+      isPublicMatchmade: true,
+    });
+  }
+
+  it("blocks setDraftKickoff behind the roll's own leagues[X] FOR KEY SHARE, then lets it through once released — no cycle", async () => {
+    const { leagueId, userIds } = await dueUnfilledLeague("lg_roll_kick", "draft_roll_kick");
+
+    // T_roll: the roll's own FIRST statement, held open on its own connection — the identical
+    // statement `rollUnfilledDraftInTx` issues as its own first line (this function's own
+    // docblock, H1).
+    let release: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (release = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, leagueId)).for("key share");
+      await parked;
+    });
+
+    // T_kickoff: the real reschedule, on its own connection. Its FIRST statement is `leagues[X]
+    // FOR UPDATE`, which conflicts with the KEY SHARE T_roll already holds — it blocks HERE,
+    // genuinely, before it can ever reach the draft row.
+    const rescheduling = setDraftKickoff(pickDb, { leagueId, userId: userIds[0]!, kickoffAt: "2026-09-20T17:00:00.000Z" }, clock);
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    release();
+    await holding;
+
+    expect(await rescheduling).toMatchObject({ ok: true });
+  });
+
+  it("drives the real roll and a real reschedule concurrently, repeatedly, in both arrival orders, without ever deadlocking", async () => {
+    // The parked proof above pins one interleaving deterministically. This one drives the REAL
+    // `rollUnfilledDraftInTx` (not a hand-issued statement standing in for it) against a REAL
+    // `setDraftKickoff` call, launched together, arrival order alternated by `run % 2` — the same
+    // "survives both races run repeatedly, in both arrival orders" shape the leagues-before-drafts
+    // block above already holds every other pair in this file to.
+    for (let run = 0; run < 6; run += 1) {
+      await truncateAll(joinDb);
+      const leagueId = `lg_roll_kick_race_${run}`;
+      const draftId = `draft_roll_kick_race_${run}`;
+      const { userIds } = await dueUnfilledLeague(leagueId, draftId);
+
+      const roll = () => joinDb.transaction((tx) => rollUnfilledDraftInTx(tx, { draftId, leagueId }, clock.now()));
+      const reschedule = () => setDraftKickoff(pickDb, { leagueId, userId: userIds[0]!, kickoffAt: "2026-09-20T17:00:00.000Z" }, clock);
+
+      const [a, b] = run % 2 === 0 ? await Promise.all([roll(), reschedule()]) : await Promise.all([reschedule(), roll()]);
+      // Neither call ever throws (no unresolved 40P01 reaching the caller) — that is the whole
+      // property under test. Which one "won" the kickoff is not: a roll and a reschedule racing
+      // for the same draft is a real product ambiguity Task 8 does not resolve either way, and
+      // asserting a specific winner here would pin an arrival order this test deliberately varies.
+      expect([a, b].every((outcome) => outcome !== undefined)).toBe(true);
+    }
+  });
+});
 
 /**
  * PHASE 3.6, TASK 6. `claimSeatHold` (`@/league-service/seat-hold`) takes `leagues[X] FOR UPDATE`

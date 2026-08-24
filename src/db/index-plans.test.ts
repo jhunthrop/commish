@@ -299,13 +299,18 @@ describe("hot read paths use indexes", () => {
    * (`@/matchmaking/roll`) — that Postgres cannot fold into the composite index the way it folds
    * `status`/`kickoff_at`: it depends on `teams` and `leagues.team_count`, neither of which
    * `drafts_status_idx` carries. `(status, kickoff_at)` still does every bit of the narrowing
-   * work it always did — asserted below exactly as it always was — and the seat-count predicate
-   * rides on top of that already-narrow candidate set rather than replacing it: measured here
-   * rather than assumed, on `seedFullDueLeagueSample`'s own two full rooms among this corpus's
-   * forty-five due-and-scheduled leagues (fifty candidates land on `g % 100 = 0`; five of those
-   * are ALSO `g % 1000 = 0`, `DRAFT_LIVE_INTERVAL`'s own overlap, and read `in_progress` instead
-   * of `scheduled` — the exact accounting the ORIGINAL "45 genuinely due rows" note already made).
-   * This scan now returns exactly the two full rooms; `dueUnfilledScheduledDraftsQuery`'s own
+   * work it always did — asserted below exactly as it always was, and the "drafts" node itself
+   * STILL carries no `Filter` (0 rows removed there, unchanged from before this predicate
+   * existed). MEASURED, fix round 1 LOW: the seat-count predicate itself lands as a real
+   * `Filter` on the LEAGUES node instead (Postgres evaluates it once the join has `leagues.
+   * team_count` and the correlated `teams` subplan available, not while still scanning
+   * `drafts`) — asserted here as a BOUND (`> 0` rows removed) rather than a brittle exact count,
+   * since the exact number moves with the corpus's own public-league population. On
+   * `seedFullDueLeagueSample`'s own two full rooms among this corpus's forty-five
+   * due-and-scheduled leagues (fifty candidates land on `g % 100 = 0`; five of those are ALSO
+   * `g % 1000 = 0`, `DRAFT_LIVE_INTERVAL`'s own overlap, and read `in_progress` instead of
+   * `scheduled` — the exact accounting the ORIGINAL "45 genuinely due rows" note already made),
+   * this scan returns exactly the two full rooms; `dueUnfilledScheduledDraftsQuery`'s own
    * assertion below is this test's mirror image — the SAME candidate set, the OPPOSITE seat-count
    * comparison, the other forty-three rows.
    */
@@ -318,6 +323,17 @@ describe("hot read paths use indexes", () => {
     // doing its job, not merely present in the plan by name.
     expect(usedIndex?.["Index Cond"]).toContain("status");
     expect(usedIndex?.["Index Cond"]).toContain("kickoff_at");
+    // The "drafts" heap fetch itself still discards nothing — unchanged from before this task.
+    const draftsNode = findNode(plan, (node) => node["Relation Name"] === "drafts");
+    expect(draftsNode).toBeDefined();
+    expect(draftsNode?.Filter).toBeUndefined();
+    expect(draftsNode?.["Rows Removed by Filter"] ?? 0).toBe(0);
+    // The seat-count predicate is a real `Filter`, and it is on "leagues" — measured as a BOUND
+    // (genuinely discards candidates), not an exact count pinned to this corpus's population.
+    const leaguesNode = findNode(plan, (node) => node["Relation Name"] === "leagues");
+    expect(leaguesNode).toBeDefined();
+    expect(leaguesNode?.Filter).toContain("team_count");
+    expect(leaguesNode?.["Rows Removed by Filter"] ?? 0).toBeGreaterThan(0);
     // The correctness claim itself, measured directly rather than inferred from plan shape: only
     // the two rooms `seedFullDueLeagueSample` actually filled come back.
     const rows = await dueDraftsQuery(db, new Date().toISOString());
@@ -329,7 +345,12 @@ describe("hot read paths use indexes", () => {
    * the roll's half of the same due population `dueDraftsQuery` above now excludes. Same corpus,
    * same `(status, kickoff_at)` index condition, the OPPOSITE seat-count comparison: the
    * forty-three due-and-scheduled leagues that are NOT full (forty-five candidates minus the two
-   * `seedFullDueLeagueSample` filled all the way).
+   * `seedFullDueLeagueSample` filled all the way). UNLIKE `dueDraftsQuery`, this query carries a
+   * FOURTH predicate — `start_trigger = 'scheduled'` (Step 2's own model ruling: a `when_full`
+   * draft has no chosen time to roll) — which `drafts_status_idx` cannot fold in either, so it is
+   * a genuine `Filter` on the "drafts" node itself here (removing zero rows in THIS corpus, since
+   * `seedRealisticCorpus` never sets a `when_full` trigger — the predicate is still exercised, it
+   * simply has nothing to discard against this particular seed).
    */
   it("the roll's own due-unfilled scan seeks on the same index, and finds the OTHER forty-three rows", async () => {
     const plan = await explainPlan(db, dueUnfilledScheduledDraftsQuery(db, new Date().toISOString()));
@@ -338,6 +359,13 @@ describe("hot read paths use indexes", () => {
     expect(usedIndex).toBeDefined();
     expect(usedIndex?.["Index Cond"]).toContain("status");
     expect(usedIndex?.["Index Cond"]).toContain("kickoff_at");
+    const draftsNode = findNode(plan, (node) => node["Relation Name"] === "drafts");
+    expect(draftsNode).toBeDefined();
+    expect(draftsNode?.Filter).toContain("start_trigger");
+    const leaguesNode = findNode(plan, (node) => node["Relation Name"] === "leagues");
+    expect(leaguesNode).toBeDefined();
+    expect(leaguesNode?.Filter).toContain("team_count");
+    expect(leaguesNode?.["Rows Removed by Filter"] ?? 0).toBeGreaterThan(0);
     const rows = await dueUnfilledScheduledDraftsQuery(db, new Date().toISOString());
     expect(rows).toHaveLength(43);
   });

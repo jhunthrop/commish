@@ -211,6 +211,7 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   house_league_filled: { leagueName: "Open 12-team League 3" },
   draft_kickoff_rolled: {
     leagueName: "Sunday Money",
+    newKickoffAt: "Friday 11 September, 8:00 PM UTC",
     rollSentence: "This draft moved once because the room was not full.",
     startTimingSentence: "The draft starts as soon as the last seat is taken, or when your commissioner starts it.",
     showReleaseParagraph: false,

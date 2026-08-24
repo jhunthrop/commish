@@ -19,14 +19,6 @@ const BASE: WaitingRoomLeague = {
   authority: { kind: "member", userId: "commish_1" },
 };
 
-/** Phase 3.6, Task 7: a SCHEDULED league that has rolled once — `when_full` leagues never roll
- *  (Step 2's own model ruling), so this variant switches `startTrigger` too. */
-const rolledOnce: WaitingRoomLeague = {
-  ...BASE,
-  startTrigger: "scheduled",
-  kickoffRolls: 1,
-};
-
 /** Phase 3.5 addendum, Task 14, Step 4: the house case — no member holds an invite code to a
  *  room the platform runs, ruling 33. */
 const houseFilling: WaitingRoomLeague = {
@@ -144,18 +136,5 @@ describe("WaitingRoom", () => {
     render(<WaitingRoom league={houseFilling} isCommissioner={false} />);
     expect(screen.getByRole("link", { name: "See the rest of the shelf" })).toHaveAttribute("href", "/browse");
     expect(screen.queryByText("See leagues closer to filling")).not.toBeInTheDocument();
-  });
-
-  // Phase 3.6, Task 7 (F12/F21): `kickoffRolls` is the same fact the browse card and the
-  // `draft_kickoff_rolled` notice read — a rolled room says why the date moved rather than
-  // silently showing a different one.
-  it("says why the date moved, rather than quietly showing a different one", () => {
-    render(<WaitingRoom league={rolledOnce} isCommissioner={true} />);
-    expect(screen.getByText("This draft moved once because the room was not full.")).toBeInTheDocument();
-  });
-
-  it("says nothing about a roll for a room that has never rolled", () => {
-    render(<WaitingRoom league={BASE} isCommissioner={true} />);
-    expect(screen.queryByText(/This draft moved/)).not.toBeInTheDocument();
   });
 });

@@ -5,6 +5,7 @@ import type { Clock } from "@/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
 import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";
+import { formatAbsoluteTime } from "@/league/terms";
 import { describeStartTiming, nextKickoffAfter, ROLL_REFUSALS, roomIsFull, rollNoticeSentence, type StartTimingAuthority } from "@/matchmaking/roll";
 import { ENFORCED_LEAGUE_SQL, enforcementIsSwitchedOn } from "./enforcement";
 
@@ -65,44 +66,46 @@ export function dueUnfilledScheduledDraftsQuery(db: Db, nowIso: string) {
 }
 
 /**
- * The roll, as a guarded write — one draft, one transaction, no preliminary lock. `claimAutoStart`
- * (`@/draft-service/auto-start`) and `fireWhenFullInTx` (`./fill-trigger`) both take `leagues FOR
- * UPDATE` before they ever reach `drafts`, but BOTH rely on a CALLER that already holds that lock
- * for its own reason (`applyAction`, `joinLeagueInTx`) — this function has no such caller (the
- * ticker calls straight in, on no lock at all), and taking the lock itself here would do the
- * WRONG thing: it would SERIALIZE two concurrent rolls of the same draft rather than letting them
- * RACE. A caller that blocks on `leagues FOR UPDATE`, then re-reads the row fresh once unblocked,
- * would see the WINNER's already-rolled kickoff and honestly roll it a SECOND time — a correct
- * roll in isolation, but not the "one write wins, the other reports a clean no-op" property this
- * function's own guarded `UPDATE` exists to guarantee. So this function reads `drafts`/`leagues`
- * PLAIN (no lock at all), exactly `fireWhenFullInTx`'s own initial read — the guarded `UPDATE`
- * below is the ONLY place a lock is taken, and it is the exclusion itself, not a guard in front
- * of one.
+ * The roll, as a guarded write — one draft, one transaction. `leagues[X] FOR KEY SHARE` is this
+ * function's OWN first statement, PROVEN rather than argued (fix round 1, H1): an opus reviewer
+ * reproduced a genuine `SQLSTATE 40P01` between this function's shipped no-lock shape and
+ * `setDraftKickoff` (`./draft-schedule.ts`) on two real connections — a commissioner's own
+ * reschedule can be the deadlock's VICTIM, not merely a theoretical bystander, exactly the same
+ * `leagues`/`drafts` cycle `lock-order.test.ts`'s own "leagues-before-drafts" block already fixed
+ * once for a DIFFERENT pair of writers. `KEY SHARE` is the fix that closes the cycle WITHOUT
+ * reintroducing the earlier mistake (a first attempt at this used `FOR UPDATE`, which serializes
+ * two concurrent rolls of the SAME draft into two sequential successes instead of one winner and
+ * one clean no-op — see H2 below for what that attempt actually surfaced): `KEY SHARE` does not
+ * conflict with another `KEY SHARE`, so two racing rolls both proceed past this statement
+ * together, uncontended, and the guarded `UPDATE` below remains the sole exclusion between them
+ * (`lock-order.test.ts`'s live two-connection proof, "roll vs. setDraftKickoff", and
+ * `src/league-service/roll.test.ts`'s own self-race test both pin this). `KEY SHARE` DOES
+ * conflict with `setDraftKickoff`'s `leagues FOR UPDATE`, so whichever of the two transactions
+ * arrives first now blocks the other at the SAME row, in the SAME order, before either one has
+ * touched `drafts` at all — the ordering-inversion the branch-wide rule exists to forbid never
+ * has a chance to form.
  *
  * NO-WRITE-BEFORE-REFUSAL holds throughout: every refusal branch below returns before the
  * guarded `UPDATE` is ever reached.
  *
  * THE GUARDED WRITE. `WHERE id = $1 AND status = 'scheduled' AND kickoff_at = $2` — the exact
- * kickoff this call read a moment earlier, BEFORE any lock. Zero rows means another instance's
- * own guarded `UPDATE` already rolled this exact kickoff first; `ROLL_REFUSALS.raced` reports
- * that cleanly, the identical "the write itself is the exclusion, no leader election required"
- * argument `claimAutoStart`'s own docblock makes for its status transition
- * (`docs/decisions/data-layer-hardening.md` forbids `pg_advisory_lock` under PgBouncer
- * transaction pooling). One row means this caller owns the roll, and only then does it write the
- * notices and the audit anchor — business writes, then notices, then the anchor (ruling 3).
+ * kickoff this call read a moment earlier. Zero rows means another instance's own guarded
+ * `UPDATE` already rolled this exact kickoff first; `ROLL_REFUSALS.raced` reports that cleanly,
+ * the identical "the write itself is the exclusion, no leader election required" argument
+ * `claimAutoStart`'s own docblock makes for its status transition (`docs/decisions/data-layer-
+ * hardening.md` forbids `pg_advisory_lock` under PgBouncer transaction pooling). One row means
+ * this caller owns the roll, and only then does it write the notices and the audit anchor —
+ * business writes, then notices, then the anchor (ruling 3).
  *
- * A KNOWN, NARROW GAP (flagged rather than silently closed): because this function takes no
- * `leagues` lock, a `setDraftKickoff` (`./draft-schedule.ts`) reschedule racing this exact draft
- * at this exact instant is a genuine — if rare — cross-transaction deadlock window (its own
- * `leagues FOR UPDATE` then `drafts FOR UPDATE`, against this function's `drafts` `UPDATE` then
- * implicit `leagues` `FOR KEY SHARE`, the two previously-cyclic orders `setDraftKickoff`'s own
- * docblock already reproduced once for a DIFFERENT pair). Postgres's own deadlock detector
- * resolves it (one side aborts with `SQLSTATE 40P01`), and this function's caller
- * (`rollDueDrafts`) already catches and retries any per-draft failure on the next tick — so the
- * failure mode is a rare aborted transaction, not a hang or a lost roll, but closing it fully
- * would require either serializing this function's own self-race (the wrong tradeoff, above) or a
- * version-token guard neither this task's brief nor its schema specifies. Left open, on purpose,
- * for the next reviewer to weigh rather than resolved silently in either direction.
+ * FIX ROUND 1, H2 — DUE-NESS IS RE-DERIVED TOO, NOT ONLY FULLNESS. The scan that found this draft
+ * read `kickoff_at <= now` a moment ago; between that read and this transaction, a commissioner's
+ * own `setDraftKickoff` reschedule can land — and without re-checking, this function would roll a
+ * kickoff the commissioner just chose on purpose, and tell every seat "the room was not full" at
+ * a target that was never actually due. `ROLL_REFUSALS.notDue` catches exactly that: this is also
+ * what the FIRST, `FOR UPDATE`-based attempt at H1 actually exposed — that attempt's "double
+ * roll" failure was not proof that racing is unsafe, it was this exact gap, surfaced by
+ * serialization (the second, unblocked caller re-read a kickoff already moved into the future by
+ * the first, and rolled it again because nothing here checked whether it was still due).
  */
 export async function rollUnfilledDraftInTx(
   tx: DbTx,
@@ -111,6 +114,11 @@ export async function rollUnfilledDraftInTx(
   audit: AuditLogger = getAuditLogger(),
 ): Promise<RollOutcome> {
   const { draftId, leagueId } = params;
+
+  // LEAGUES FIRST, ON ITS OWN, KEY SHARE — see this function's own docblock (fix round 1, H1)
+  // for why this is the mode that closes the `setDraftKickoff` cycle without serializing this
+  // function's own self-race.
+  await tx.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, leagueId)).for("key share");
 
   const [row] = await tx
     .select({
@@ -130,6 +138,11 @@ export async function rollUnfilledDraftInTx(
   }
   if (row.startTrigger !== "scheduled") {
     return { draftId, rolled: false, reason: ROLL_REFUSALS.notScheduled };
+  }
+  // Fix round 1, H2: re-derived fresh, immediately before the write — see `ROLL_REFUSALS.notDue`'s
+  // own docblock for the false-sentence bug this closes.
+  if (row.kickoffAt.getTime() > Date.parse(nowIso)) {
+    return { draftId, rolled: false, reason: ROLL_REFUSALS.notDue };
   }
 
   const seated = await tx.select({ userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
@@ -155,6 +168,11 @@ export async function rollUnfilledDraftInTx(
   const authority: StartTimingAuthority = row.houseRung !== null ? "house" : "member";
   const rollSentence = rollNoticeSentence(kickoffRolls);
   const startTimingSentence = describeStartTiming({ startTrigger: "scheduled", authority });
+  // Fix round 1, M2: the notice names the NEW kickoff, pre-rendered here (the "template composes
+  // a sentence, it never re-derives one from a payload shape" discipline `graceLabel`
+  // established for `draft_fill_triggered`) — the plan's own Step 6 example ("...so its draft
+  // moves to Friday 8:00 PM") is the sentence this answers, not merely "it moved" with no target.
+  const newKickoffAt = formatAbsoluteTime(next);
   // F12: the release door is named from the SECOND roll onward, never the first — offering the
   // exit the first time something slips reads as the product giving up on its own room.
   const showReleaseParagraph = kickoffRolls >= 2;
@@ -166,7 +184,7 @@ export async function rollUnfilledDraftInTx(
         leagueId,
         userId: member.userId,
         noticeType: "draft_kickoff_rolled",
-        context: { leagueName: row.leagueName, rollSentence, startTimingSentence, showReleaseParagraph },
+        context: { leagueName: row.leagueName, newKickoffAt, rollSentence, startTimingSentence, showReleaseParagraph },
         occurredAt: nowIso,
         auditEventId: null,
       }),
