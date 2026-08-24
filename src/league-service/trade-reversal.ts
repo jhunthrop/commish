@@ -17,7 +17,7 @@ const systemClock: Clock = { now: () => new Date().toISOString() };
  *  (`raiseTradeFairnessFlag`'s own `leagueId`/`tradeId` are both required fields), so this branch
  *  is never reached through `resolveFlag`'s own wiring, the same "impossible-state guard, proved
  *  by a stub" discipline this codebase's other unreachable branches hold to. */
-const TRADE_NOT_FOUND = "We couldn't find that trade.";
+const TRADE_NOT_FOUND = "We could not find that trade.";
 const ALREADY_REVERSED = "This trade has already been reversed.";
 const PLAYER_MOVED_AGAIN =
   "One of these players has been traded again since. Undoing this trade would take a player off a third team, so it needs a different decision.";

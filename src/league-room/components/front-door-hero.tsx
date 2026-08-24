@@ -17,7 +17,7 @@ export function FrontDoorHero() {
       </h1>
       <p className="max-w-2xl text-lg text-text-muted">
         Season-long fantasy football with a live draft room, real-time scoring, and a platform
-        that runs the league so nobody&apos;s brother-in-law has to. Browse the open leagues
+        that runs the league so no brother-in-law has to. Browse the open leagues
         below. No account is needed to look.
       </p>
       <p className="text-lg font-medium text-text-primary">Every league is free this season.</p>

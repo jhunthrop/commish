@@ -70,7 +70,7 @@ describe("PUT /api/leagues/[leagueId]/teams/me/lineup", () => {
     const params = Promise.resolve({ leagueId: league.leagueId });
     const response = await putLineup(put({ weekNumber: 1, slots: validSwap }), { params });
     expect(response.status).toBe(403);
-    expect((await response.json()).error).toBe("You don't have a team in this league.");
+    expect((await response.json()).error).toBe("You do not have a team in this league.");
   });
 
   it("answers 403 for a commissioner who never fielded a team of their own", async () => {
@@ -79,7 +79,7 @@ describe("PUT /api/leagues/[leagueId]/teams/me/lineup", () => {
     const params = Promise.resolve({ leagueId });
     const response = await putLineup(put({ weekNumber: 1, slots: validSwap }), { params });
     expect(response.status).toBe(403);
-    expect((await response.json()).error).toBe("You don't have a team in this league.");
+    expect((await response.json()).error).toBe("You do not have a team in this league.");
   });
 
   it("saves the caller's own lineup and answers with the new one", async () => {
@@ -109,7 +109,7 @@ describe("PUT /api/leagues/[leagueId]/teams/me/lineup", () => {
     const params = Promise.resolve({ leagueId: league.leagueId });
     const response = await putLineup(put({ weekNumber: 1, slots: validSwap }), { params });
     expect(response.status).toBe(409);
-    expect((await response.json()).error).toBe("Week 1 has started, so its lineup can't change.");
+    expect((await response.json()).error).toBe("Week 1 has started, so its lineup cannot change.");
   });
 
   it("answers 400 naming the field for a malformed body", async () => {
@@ -153,6 +153,6 @@ describe("GET /api/leagues/[leagueId]/teams/me/lineup", () => {
     const params = Promise.resolve({ leagueId });
     const response = await getLineupRoute(new Request(`http://test/api/leagues/${leagueId}/teams/me/lineup?week=1`), { params });
     expect(response.status).toBe(403);
-    expect((await response.json()).error).toBe("You don't have a team in this league.");
+    expect((await response.json()).error).toBe("You do not have a team in this league.");
   });
 });

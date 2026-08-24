@@ -109,7 +109,7 @@ describe("NoticeInbox", () => {
     const trigger = await screen.findByRole("button", { name: "Notices" });
     fireEvent.click(trigger);
 
-    expect(await screen.findByText("We couldn't load your notices.")).toBeInTheDocument();
+    expect(await screen.findByText("We could not load your notices.")).toBeInTheDocument();
     expect(screen.getByText("Not signed in.")).toBeInTheDocument();
 
     fixture.response = { ok: true, data: ONE_UNREAD };

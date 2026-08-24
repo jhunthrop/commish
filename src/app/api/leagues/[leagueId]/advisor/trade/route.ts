@@ -36,7 +36,7 @@ export async function POST(request: Request, context: LeagueRouteContext) {
       teamId: actor.teamId,
       weekNumber: parsed.value.weekNumber,
     });
-    if (mine === null) return fail("That league doesn't exist.", 404);
+    if (mine === null) return fail("That league does not exist.", 404);
 
     // The counterparty's roster is assembled the same way, through the same read-only path.
     const theirs = await assembleAdvisorContext(db, {
@@ -45,7 +45,7 @@ export async function POST(request: Request, context: LeagueRouteContext) {
       weekNumber: parsed.value.weekNumber,
     });
     if (theirs === null || theirs.me.players.length === 0 || parsed.value.counterpartyTeamId === actor.teamId) {
-      return fail("We couldn't find that team in this league.", 404);
+      return fail("We could not find that team in this league.", 404);
     }
 
     const analyze = createTradeAnalyzer({ enabled: isLLMEnabled(), llm: getLlmClient() });

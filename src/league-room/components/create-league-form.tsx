@@ -40,23 +40,24 @@ const ROSTER_SHAPE_OPTIONS = Object.entries(ROSTER_SHAPE_LABEL).map(([value, lab
  * `CreateLeagueForm`'s own docblock below for why the two sit together, in this order, above the
  * fold rather than one click away.
  *
- * A hint of its own, not a renamed label: "Who can join" and "Who it's for" read as near
+ * A hint of its own, not a renamed label: "Who can join" and "Who it is for" read as near
  * homonyms side by side, and the gauntlet finding was that the CONTROL was unfindable, not that
  * either label was ambiguous once both are actually on screen. Renaming one would only move the
- * defect; a distinct sentence under each is what actually tells them apart.
+ * defect; a distinct sentence under each is what actually tells them apart. That sentence is
+ * `VISIBILITY_DISCLOSURE` below — this control used to carry a second one of its own on the
+ * `Select`'s `hint` prop (`VISIBILITY_HINT`, since deleted), one promise phrased two ways stacked
+ * on top of each other the moment Step 3b landed the disclosure underneath it (the gauntlet's
+ * NEW-6). One sentence, at the control, said once.
  */
 export const VISIBILITIES = [
   { value: "invite_only", label: "Invite only" },
   { value: "public", label: "Anyone can find and join" },
 ];
-export const VISIBILITY_HINT = "Public leagues show up on the browse page and anyone can join without an invite. Invite-only leagues are joined by invite link only.";
 /**
  * Step 3b's disclosure, verbatim and tested. The join-flow panel filed the absence as the thing
  * a first-time commissioner learns AFTER their league appears somewhere they did not expect —
  * this describes behavior that already exists (`is_public_matchmade` and the browse shelf), said
  * at the visibility control, above the submit button, where the decision is actually made.
- * `VISIBILITY_HINT` above is the Select's own hint (what each option DOES); this is the
- * consequence a commissioner might not otherwise picture — where a public league SHOWS UP.
  */
 export const VISIBILITY_DISCLOSURE = "Public leagues appear on the open shelf, where anyone can take a seat. Private leagues are invite only.";
 /**
@@ -120,11 +121,10 @@ function WhoCanJoinAndWhoItsFor({
         label="Who can join"
         options={VISIBILITIES}
         value={visibility}
-        hint={VISIBILITY_HINT}
         onChange={(event) => onVisibilityChange(event.target.value)}
       />
       <Select
-        label="Who it's for"
+        label="Who it is for"
         options={EXPERIENCE_TIERS}
         value={experienceTier}
         hint={LEAGUE_EXPERIENCE_TIER_HINT}
@@ -236,7 +236,7 @@ function AdvancedSettingsDrawer({
  * had no reason to open a drawer whose own summary never mentioned it. `visibility` leads
  * because it decides whether `experienceTier` means anything at all: `enforcementAppliesTo`
  * (`@/league-service/enforcement`) never applies to an invite-only league, so a commissioner
- * choosing "Who it's for" for a private league is choosing a label nobody's join is ever checked
+ * choosing "Who it is for" for a private league is choosing a label nobody's join is ever checked
  * against. Neither label changed — the near-homonymy IS the actual defect the gauntlet named,
  * and renaming one would only move it — so each carries its own distinct hint instead.
  *
@@ -325,7 +325,7 @@ export function CreateLeagueForm({
       }
       onCreated(body.data);
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We could not reach the server. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }

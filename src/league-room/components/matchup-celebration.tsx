@@ -42,7 +42,7 @@ export function MatchupCelebration({ matchup, myTeamId, clinched }: MatchupCeleb
       key={key}
       testId="matchup-celebration"
       emphasis="self"
-      title={won ? `You won in ${formatWeek(matchup.weekNumber)}!` : "You've clinched a playoff spot!"}
+      title={won ? `You won in ${formatWeek(matchup.weekNumber)}!` : "You have clinched a playoff spot!"}
       detail={
         won && mineScore !== null && theirScore !== null ? `${formatPoints(mineScore)} to ${formatPoints(theirScore)}` : undefined
       }

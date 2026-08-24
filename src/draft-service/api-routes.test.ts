@@ -102,7 +102,7 @@ describe("GET /api/drafts/[draftId]", () => {
     signedInAs("stranger");
     const response = await getDraft(new Request(`http://test/api/drafts/${DRAFT_ID}`), { params });
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ ok: false, error: "You don't have a team in this league." });
+    expect(await response.json()).toEqual({ ok: false, error: "You do not have a team in this league." });
   });
 
   // The `teamId === null && isCommissioner` branch: a commissioner who runs the league but

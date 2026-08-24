@@ -57,7 +57,7 @@ export function JoinForm({
         setPreview(body.ok ? { status: "ready", terms: body.data } : { status: "error", reason: body.error });
       } catch {
         if (!cancelled) {
-          setPreview({ status: "error", reason: "We couldn't reach the server. Check your connection and try again." });
+          setPreview({ status: "error", reason: "We could not reach the server. Check your connection and try again." });
         }
       }
     })();
@@ -83,7 +83,7 @@ export function JoinForm({
       }
       router.push(`/app/leagues/${body.data.leagueId}`);
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We could not reach the server. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -96,7 +96,7 @@ export function JoinForm({
   if (preview.status === "error") {
     return (
       <ErrorState
-        title="We couldn't open that invite"
+        title="We could not open that invite"
         description={preview.reason}
         action={
           <Link href="/app" className="text-sm font-medium text-accent underline">
@@ -114,7 +114,7 @@ export function JoinForm({
           post-join inside the league itself (Task 8), where this sentence would be stale and
           confusing (you already ARE in the draft and season). */}
       <p className="text-sm text-text-muted">
-        {"Joining puts you in the draft and the season that follows. You'll set a lineup every week."}
+        {"Joining puts you in the draft and the season that follows. You will set a lineup every week."}
       </p>
       <LeagueTermsPanel terms={preview.terms} helpLevel={helpLevel} />
       {signedIn ? (

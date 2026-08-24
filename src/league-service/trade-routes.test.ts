@@ -139,7 +139,7 @@ describe("GET /api/leagues/[leagueId]/trades", () => {
     signedInAs("u_carol");
     const response = await get("lg_1");
     expect(response.status).toBe(403);
-    expect((await response.json()).error).toBe("You don't have a team in this league.");
+    expect((await response.json()).error).toBe("You do not have a team in this league.");
   });
 
   it("answers the caller's own inbox/outbox/history", async () => {
@@ -166,7 +166,7 @@ describe("POST /api/leagues/[leagueId]/trades", () => {
     signedInAs("u_carol");
     const response = await post("lg_1", validProposeBody);
     expect(response.status).toBe(403);
-    expect((await response.json()).error).toBe("You don't have a team in this league.");
+    expect((await response.json()).error).toBe("You do not have a team in this league.");
   });
 
   it("answers 400 naming the field for a malformed body", async () => {
@@ -278,7 +278,7 @@ describe("POST /api/leagues/[leagueId]/trades/[tradeId]", () => {
     signedInAs("u_alice"); // the PROPOSER, not the counterparty
     const response = await postDecision("lg_1", trade.id, { action: "accept" });
     expect(response.status).toBe(404);
-    expect((await response.json()).error).toBe("We couldn't find that offer.");
+    expect((await response.json()).error).toBe("We could not find that offer.");
   });
 
   it("lets the counterparty reject, and answers the settled status", async () => {
@@ -306,7 +306,7 @@ describe("POST /api/leagues/[leagueId]/trades/[tradeId]", () => {
     signedInAs("u_bob");
     const response = await postDecision("lg_1", "trade_ghost", { action: "reject" });
     expect(response.status).toBe(404);
-    expect((await response.json()).error).toBe("We couldn't find that offer.");
+    expect((await response.json()).error).toBe("We could not find that offer.");
   });
 
   it("404s a real tradeId acted on through the WRONG league's URL, indistinguishably from a bogus one (F1)", async () => {

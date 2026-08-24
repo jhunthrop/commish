@@ -33,9 +33,9 @@ describe("InvitePanel", () => {
   });
 
   it("shows the server's reason when minting fails", async () => {
-    const fixture = fixtureLeagueDeps({ ok: false, error: "We couldn't create an invite just now. Please try again." });
+    const fixture = fixtureLeagueDeps({ ok: false, error: "We could not create an invite just now. Please try again." });
     renderInLeague(<InvitePanel leagueId="l1" />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Create invite link" }));
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("We couldn't create an invite"));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("We could not create an invite"));
   });
 });

@@ -15,9 +15,9 @@ import { consumeSeatHoldInTx, liveHoldsFor } from "./seat-hold";
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
 const TEAM_MEMBERSHIP_UNIQUE_INDEX = "teams_league_user_idx";
 
-export const LEAGUE_MISSING = "That league doesn't exist.";
+export const LEAGUE_MISSING = "That league does not exist.";
 export const LEAGUE_FULL = "That league is already full.";
-export const NOT_PUBLIC = "That league isn't open to join. Ask its commissioner for an invite link.";
+export const NOT_PUBLIC = "That league is not open to join. Ask its commissioner for an invite link.";
 export const DRAFT_ALREADY_STARTED = "That league's draft has already started. Try another open league.";
 
 export type JoinLeagueOutcome =
@@ -415,7 +415,7 @@ export async function joinPublicLeague(
       }
     }
     console.error("[league] public join failed", { leagueId: input.leagueId }, error);
-    return { ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." };
+    return { ok: false, status: 500, reason: "We could not join that league just now. Please try again." };
   }
 }
 

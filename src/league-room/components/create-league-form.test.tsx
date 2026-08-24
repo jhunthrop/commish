@@ -6,7 +6,7 @@ import { GLOSSARY } from "@/help/glossary";
 import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
-import { CreateLeagueForm, DRAWER_SUMMARY, START_TRIGGER_HINT, START_TRIGGERS, VISIBILITIES, VISIBILITY_DISCLOSURE, VISIBILITY_HINT } from "./create-league-form";
+import { CreateLeagueForm, DRAWER_SUMMARY, START_TRIGGER_HINT, START_TRIGGERS, VISIBILITIES, VISIBILITY_DISCLOSURE } from "./create-league-form";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 
 describe("CreateLeagueForm", () => {
@@ -26,7 +26,7 @@ describe("CreateLeagueForm", () => {
       async ({ container }) => {
         expect(screen.getByLabelText("League name")).toBeVisible();
         expect(screen.getByLabelText("Who can join")).toBeVisible();
-        expect(screen.getByLabelText("Who it's for")).toBeVisible();
+        expect(screen.getByLabelText("Who it is for")).toBeVisible();
         expect(screen.getByRole("group")).toBeInTheDocument(); // the <details> disclosure
         expect(screen.getByText(DRAWER_SUMMARY)).toBeInTheDocument();
         expect(container.querySelector("details")).not.toHaveAttribute("open");
@@ -162,7 +162,7 @@ describe("CreateLeagueForm", () => {
     it("offers the open choice FIRST and defaults to it, so the default never reaches the creation gate's refusal", () => {
       const fixture = fixtureLeagueDeps();
       renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixture.deps);
-      const select = screen.getByLabelText("Who it's for") as HTMLSelectElement;
+      const select = screen.getByLabelText("Who it is for") as HTMLSelectElement;
       expect(select.value).toBe("experienced");
       // Order is the control's own promise (`EXPERIENCE_TIERS`' docblock), pinned rather than
       // assumed: `Object.entries` preserves insertion order, and the map is written open-first on
@@ -189,7 +189,7 @@ describe("CreateLeagueForm", () => {
       renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixture.deps);
       fireEvent.change(screen.getByLabelText("League name"), { target: { value: "Rookie Room" } });
       fireEvent.change(screen.getByLabelText("Who can join"), { target: { value: "public" } });
-      fireEvent.change(screen.getByLabelText("Who it's for"), { target: { value: "beginner" } });
+      fireEvent.change(screen.getByLabelText("Who it is for"), { target: { value: "beginner" } });
       fireEvent.click(screen.getByRole("button", { name: "Create league" }));
       await waitFor(() => expect(bodies).toHaveLength(1));
       expect(bodies[0]).toMatchObject({ visibility: "public", experienceTier: "beginner" });
@@ -206,12 +206,12 @@ describe("CreateLeagueForm", () => {
       const fixture = fixtureLeagueDeps({ ok: false, error: refusal });
       renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixture.deps);
       fireEvent.change(screen.getByLabelText("League name"), { target: { value: "Rookie Room" } });
-      fireEvent.change(screen.getByLabelText("Who it's for"), { target: { value: "beginner" } });
+      fireEvent.change(screen.getByLabelText("Who it is for"), { target: { value: "beginner" } });
       fireEvent.click(screen.getByRole("button", { name: "Create league" }));
       await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent(refusal));
       expect((screen.getByLabelText("League name") as HTMLInputElement).value).toBe("Rookie Room");
       // And the control that fixes it is still on screen, still holding the choice that caused it.
-      expect((screen.getByLabelText("Who it's for") as HTMLSelectElement).value).toBe("beginner");
+      expect((screen.getByLabelText("Who it is for") as HTMLSelectElement).value).toBe("beginner");
     });
 
     /**
@@ -226,7 +226,7 @@ describe("CreateLeagueForm", () => {
           <CreateLeagueForm onCreated={vi.fn()} />
         </LeagueRoomDepsProvider>,
         async ({ container }) => {
-          const select = screen.getByLabelText("Who it's for");
+          const select = screen.getByLabelText("Who it is for");
           // A native `<select>` through the shared `Select` primitive: focusable, labelled, and in
           // the tab order without a `tabIndex` of its own.
           expect(select.tagName).toBe("SELECT");
@@ -242,32 +242,33 @@ describe("CreateLeagueForm", () => {
   /**
    * "Who can join" — the control that decides FIRST, and the near homonym `EXPERIENCE_TIERS`'
    * own docblock names. Both promoted out of the drawer together (Task 9); this describes what
-   * makes "Who can join" its own thing rather than a rename of "Who it's for".
+   * makes "Who can join" its own thing rather than a rename of "Who it is for".
    */
   describe("who can join", () => {
-    it("offers invite-only FIRST and defaults to it, with its own distinct hint", () => {
+    it("offers invite-only FIRST and defaults to it", () => {
       renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
       const select = screen.getByLabelText("Who can join") as HTMLSelectElement;
       expect(select.value).toBe("invite_only");
       expect([...select.options].map((option) => option.value)).toEqual(VISIBILITIES.map((option) => option.value));
       expect([...select.options].map((option) => option.textContent)).toEqual(VISIBILITIES.map((option) => option.label));
-      expect(screen.getByText(VISIBILITY_HINT)).toBeInTheDocument();
-      // Distinct sentences, not distinct-sounding labels — the near homonymy is the defect the
-      // gauntlet named, and renaming either label would only move it.
-      expect(VISIBILITY_HINT).not.toBe(LEAGUE_EXPERIENCE_TIER_HINT);
     });
 
     // Step 3b: the join-flow panel's own disclosure, verbatim, at the visibility control and
     // above the submit button — so a commissioner learns where a public league shows up BEFORE
-    // they press create, not after.
-    it("discloses where a public league shows up, verbatim, before the submit button", () => {
+    // they press create, not after. Gauntlet fix wave, NEW-6: this used to be the SECOND sentence
+    // about visibility — the `Select`'s own `hint` prop (`VISIBILITY_HINT`) said the same thing
+    // in different words, stacked right above this one. That hint is gone; this is now the one
+    // and only sentence about who can join, distinct from `LEAGUE_EXPERIENCE_TIER_HINT` (the
+    // near-homonym "Who it is for" control's own, separate hint).
+    it("discloses where a public league shows up, verbatim, before the submit button, as the one sentence about visibility", () => {
       renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
-      expect(screen.getByText(VISIBILITY_DISCLOSURE)).toBeInTheDocument();
+      expect(screen.getAllByText(VISIBILITY_DISCLOSURE)).toHaveLength(1);
       const disclosure = screen.getByText(VISIBILITY_DISCLOSURE);
       const submit = screen.getByRole("button", { name: "Create league" });
       // DOCUMENT_POSITION_FOLLOWING on `submit` compared from `disclosure` means the disclosure
       // comes first in document order — literally "above the submit button".
       expect(disclosure.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(VISIBILITY_DISCLOSURE).not.toBe(LEAGUE_EXPERIENCE_TIER_HINT);
     });
 
     it("is visible and keyboard-reachable without opening anything, axe-clean in both themes, at 360px", async () => {

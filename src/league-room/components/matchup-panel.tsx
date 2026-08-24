@@ -1,21 +1,21 @@
 import type { MedianResult, WeekStatus } from "@/league";
 import type { MatchupDetail, MatchupSide } from "../contract";
-import { Card, EYEBROW, InfoTip, PositionBadge, SlotChip, Table, type TableColumn } from "@/components/ui";
+import { Card, EYEBROW, InfoTip, SlotChip, Table, type TableColumn } from "@/components/ui";
 import { formatPoints } from "../lib/format";
 import { MatchupScoreboard } from "./matchup-scoreboard";
 import { MedianResultLine } from "./median-result";
 
+/**
+ * NEW-10 (gauntlet fix wave): `Slot` and `Pos` used to be two columns for one fact — identical
+ * for every row but FLEX, at ~15% of the table's width each. `Slot` is the one that survives:
+ * `LineupEditor`'s own roster table (`lineup-editor.tsx`) already shows only the slot, the same
+ * precedent this table now matches, and `SlotChip` alone still tells FLEX and BENCH apart from a
+ * starting position — the one thing `Pos` (`PositionBadge`) added beyond `Slot` for six of nine
+ * rows was nothing.
+ */
 const COLUMNS: readonly TableColumn<MatchupSide["starters"][number]>[] = [
   { key: "slot", header: "Slot", cell: (row) => <SlotChip slot={row.slot} /> },
   { key: "player", header: "Player", cell: (row) => row.playerName ?? "Empty" },
-  {
-    key: "position",
-    header: "Pos",
-    // `null`, not a dash glyph: the Player column already says "Empty" for this same row, and a
-    // slot with no player has no position to show beside it.
-    cell: (row) => (row.position === null ? null : <PositionBadge position={row.position} size="sm" />),
-    hideOnNarrow: true,
-  },
   { key: "points", header: "Points", cell: (row) => formatPoints(row.points), numeric: true },
 ];
 

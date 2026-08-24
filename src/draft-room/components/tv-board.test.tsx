@@ -101,9 +101,9 @@ describe("TvBoard", () => {
   it("still offers a way forward if the board cannot load", async () => {
     stubMatchMedia();
     const fixture = fixtureDeps();
-    fixture.deps = { ...fixture.deps, fetchJson: async () => ({ json: async () => ({ ok: false, error: "That draft doesn't exist." }) }) as unknown as Response };
+    fixture.deps = { ...fixture.deps, fetchJson: async () => ({ json: async () => ({ ok: false, error: "That draft does not exist." }) }) as unknown as Response };
     renderInRoom(<TvBoard draftId="d1" />, fixture.deps);
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("That draft doesn't exist."));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("That draft does not exist."));
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 

@@ -175,7 +175,7 @@ describe("finalizeWeek", () => {
   it("refuses a week the league does not have", async () => {
     const league = await twoTeamLeague();
     expect(await finalizeWeek(db, league.leagueId, 9)).toEqual({
-      ok: false, status: 404, reason: "That week isn't part of this league's season.",
+      ok: false, status: 404, reason: "That week is not part of this league's season.",
     });
   });
 
@@ -209,13 +209,13 @@ describe("finalizeWeek", () => {
     expect(await finalizeWeek(db, leagueId, 99)).toEqual({
       ok: false,
       status: 404,
-      reason: "That week isn't part of this league's season.",
+      reason: "That week is not part of this league's season.",
     });
   });
 
   it("refuses a league that doesn't exist", async () => {
     expect(await finalizeWeek(db, "nope", 1)).toEqual({
-      ok: false, status: 404, reason: "That league doesn't exist.",
+      ok: false, status: 404, reason: "That league does not exist.",
     });
   });
 

@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request, context: RouteContext) {
   return withLeagueMember(request, context, async (actor) => {
     const state = await getDraftStore().getDraftState(actor.draftId);
-    if (state === null) return fail("That draft doesn't exist.", 404);
+    if (state === null) return fail("That draft does not exist.", 404);
 
     const [teams, leagueName] = await Promise.all([listTeamCards(getDb(), actor.leagueId), leagueNameFor(getDb(), actor.leagueId)]);
     const body: DraftSnapshotBody = {

@@ -235,7 +235,7 @@ describe("invites", () => {
       params: Promise.resolve({ code: "NOSUCH12" }),
     });
     expect(response.status).toBe(404);
-    expect((await response.json()).error).toBe("That invite link isn't valid. Ask your commissioner for a new one.");
+    expect((await response.json()).error).toBe("That invite link is not valid. Ask your commissioner for a new one.");
   });
 
   it("answers 404 for an invite on a league that doesn't exist", async () => {
@@ -244,7 +244,7 @@ describe("invites", () => {
       params: Promise.resolve({ leagueId: "nope" }),
     });
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ ok: false, error: "That league doesn't exist." });
+    expect(await response.json()).toEqual({ ok: false, error: "That league does not exist." });
   });
 });
 
@@ -283,7 +283,7 @@ describe("GET /api/invites/[code]", () => {
     });
     expect(response.status).toBe(404);
     const body = await response.json();
-    expect(body).toEqual({ ok: false, error: "That invite link isn't valid. Ask your commissioner for a new one." });
+    expect(body).toEqual({ ok: false, error: "That invite link is not valid. Ask your commissioner for a new one." });
     expect(JSON.stringify(body)).not.toContain(created.leagueId);
   });
 

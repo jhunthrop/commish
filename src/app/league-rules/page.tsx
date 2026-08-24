@@ -32,7 +32,7 @@ export default function LeagueRulesPage() {
         <p className="text-text-muted">
           Scoring is one of a small set of presets: Standard, PPR (a full point for every catch),
           Half PPR (half a point for every catch), or PPR with a TE premium (an extra bonus for a
-          tight end&apos;s catch on top of PPR). A commissioner may also hand-tune the point
+          catch by a tight end on top of PPR). A commissioner may also hand-tune the point
           values, which reads as Custom scoring rather than any of the four presets.
         </p>
         <p className="text-text-muted">

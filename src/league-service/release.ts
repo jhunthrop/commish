@@ -12,14 +12,14 @@ import { isCommissionerOf, type LeagueAuthorityRow } from "./authority";
  * `KICKOFF_REFUSALS` and `ROLL_REFUSALS` already hold this branch to.
  */
 export const RELEASE_REFUSALS = {
-  leagueMissing: "That league doesn't exist.",
+  leagueMissing: "That league does not exist.",
   /** A caller with no team in this league — nothing to release. Structurally reachable only for
    *  a member who already left, or one who never joined at all. */
-  notMember: "You don't have a seat in this league to release.",
+  notMember: "You do not have a seat in this league to release.",
   /** Folds "no draft row at all" (structurally unreachable — `drafts_league_id_idx` is UNIQUE
    *  and every league gets one at creation) into the same sentence a genuinely started draft
    *  gets: either way, there is no seat left this call can free. */
-  draftStarted: "This league's draft has already started, so there's no seat left to release.",
+  draftStarted: "This league's draft has already started, so there is no seat left to release.",
   /**
    * A member league whose commissioner walks away is a league with nobody to run it, and this
    * product has no transfer-of-commissioner path — the same dead end `HOUSE_AUTHORITY_REFUSALS`
@@ -27,7 +27,7 @@ export const RELEASE_REFUSALS = {
    * ever `isCommissionerOf` one (`leagueAuthority`'s own `house` branch), so the same member
    * leaves through the ordinary path, no special case required.
    */
-  commissioner: "You're this league's commissioner, and there's no way to hand that role to someone else yet, so you can't leave until the league does.",
+  commissioner: "You are this league's commissioner, and there is no way to hand that role to someone else yet, so you cannot leave until the league does.",
 } as const;
 
 export interface ReleaseSeatInput {

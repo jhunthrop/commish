@@ -11,7 +11,7 @@ import { leagueAuthority, type LeagueAuthority } from "@/league-service/authorit
  * `POST /api/drafts/[draftId]/actions` (a stricter, different rule: acting requires an actual
  * team, commissioner or not), so the two routes can never drift apart on the wording.
  */
-export const NO_TEAM_MESSAGE = "You don't have a team in this league.";
+export const NO_TEAM_MESSAGE = "You do not have a team in this league.";
 
 export interface LeagueMembership {
   readonly leagueId: string;
@@ -41,7 +41,7 @@ export async function resolveLeagueMembership(db: Db, leagueId: string, userId: 
     .select({ commissionerUserId: leagues.commissionerUserId, houseRung: leagues.houseRung })
     .from(leagues)
     .where(eq(leagues.id, leagueId));
-  if (league === undefined) return { ok: false, status: 404, error: "That league doesn't exist." };
+  if (league === undefined) return { ok: false, status: 404, error: "That league does not exist." };
 
   const [team] = await db.select({ id: teams.id }).from(teams).where(and(eq(teams.leagueId, leagueId), eq(teams.userId, userId)));
 

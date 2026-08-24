@@ -51,7 +51,8 @@ export default async function ReviewsPage() {
     return (
       <>
         <PublicBar intent={PAGE_INTENT} />
-        <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
+        {/* Full-bleed, no `max-w-*` (NEW-2) — matching `AppShell`'s own signed-in `<main>`. */}
+        <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-4">
           <ErrorState
             title="Too many requests"
             description="You've loaded this page a lot in the last minute. Wait a minute and reload."
@@ -83,7 +84,7 @@ export default async function ReviewsPage() {
     <>
       <div className="flex flex-col gap-1">
         <PageTitle>What managers are saying</PageTitle>
-        <p className="text-sm text-text-muted">
+        <p className="max-w-prose text-sm text-text-muted">
           Every review, ordered by when it was written. Nothing here is filtered by rating.
         </p>
       </div>
@@ -95,7 +96,10 @@ export default async function ReviewsPage() {
     return (
       <>
         <PublicBar intent={PAGE_INTENT} />
-        <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">{content}</main>
+        {/* Full-bleed, no `max-w-*` (NEW-2) — matching `AppShell`'s own signed-in `<main>`. The
+            feed itself is dense cards; the one long-form paragraph on this page keeps its own
+            `max-w-prose` below, so the reading column stays measured inside the wide frame. */}
+        <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-4">{content}</main>
         <PublicFooter />
       </>
     );

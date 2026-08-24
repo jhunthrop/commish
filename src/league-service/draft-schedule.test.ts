@@ -336,7 +336,7 @@ describe("setDraftKickoff", () => {
   it("refuses a string that isn't a real ISO instant", async () => {
     const { leagueId, commissioner } = await seedLeague();
     const result = await setDraftKickoff(db, { leagueId, userId: commissioner, kickoffAt: "not a date" }, clock);
-    expect(result).toEqual({ ok: false, status: 422, reason: "That doesn't look like a valid time." });
+    expect(result).toEqual({ ok: false, status: 422, reason: "That does not look like a valid time." });
   });
 
   it("refuses a time in the past", async () => {

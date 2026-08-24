@@ -23,7 +23,7 @@ export const setSlotPreferenceSchema = z.object({
  * gets the same non-oracle 404 a stranger to the league entirely would (ruling 14): whether the
  * caller merely lacks a team or the league doesn't exist at all is not this function's to say.
  */
-const NOT_FOUND = "That league doesn't exist.";
+const NOT_FOUND = "That league does not exist.";
 
 /**
  * The refusal sentences `setSlotPreference` gives for an otherwise-authorized request, named

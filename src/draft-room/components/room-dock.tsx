@@ -93,7 +93,7 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
   if (queue.length === 0) {
     return (
       <p className="min-w-0 flex-1 self-center text-sm text-text-muted">
-        Star players in the pool to build your queue. We&apos;ll auto-pick the top one if your clock runs out.
+        Star players in the pool to build your queue. The room picks for you from your queue if your clock runs out.
       </p>
     );
   }

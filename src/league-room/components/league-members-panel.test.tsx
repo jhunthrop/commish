@@ -84,7 +84,7 @@ describe("LeagueMembersPanel", () => {
     await renderSurface(
       <LeagueMembersPanel teams={[]} authority={MEMBER} myTeamId={null} />,
       async ({ container }) => {
-        expect(screen.getByText("Nobody's here yet")).toBeInTheDocument();
+        expect(screen.getByText("Nobody is here yet")).toBeInTheDocument();
         expect(await axe(container)).toHaveNoViolations();
       },
     );

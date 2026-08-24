@@ -70,14 +70,14 @@ describe("ReleaseSeatControl", () => {
   });
 
   it("shows the service's own refusal inline, and keeps the control available", async () => {
-    const fixture = fixtureLeagueDeps({ ok: false, error: "This league's draft has already started, so there's no seat left to release." });
+    const fixture = fixtureLeagueDeps({ ok: false, error: "This league's draft has already started, so there is no seat left to release." });
     renderInLeague(<ReleaseSeatControl leagueId="l1" leagueName="Half-PPR #241" kickoffRolls={0} />, fixture.deps);
 
     fireEvent.click(screen.getByRole("button", { name: "Release your seat" }));
     await screen.findByRole("dialog", { name: "Release your seat?" });
     fireEvent.click(screen.getByRole("button", { name: "Release seat" }));
 
-    expect(await screen.findByRole("alert")).toHaveTextContent("This league's draft has already started, so there's no seat left to release.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("This league's draft has already started, so there is no seat left to release.");
     expect(screen.getByRole("button", { name: "Release your seat" })).toBeInTheDocument();
   });
 

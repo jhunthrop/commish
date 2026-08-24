@@ -105,7 +105,7 @@ export function SlotPreferencePanel({ leagueId, initialPreference, helpLevel }: 
       setRanking(body.data.ranking);
       setSavedMessage(savedMessageFor(body.data.ranking));
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We could not reach the server. Check your connection and try again.");
     } finally {
       setSaving(false);
     }

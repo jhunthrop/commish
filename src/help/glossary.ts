@@ -129,7 +129,7 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
   "lineup-lock": {
     key: "lineup-lock",
     term: "a lineup lock",
-    short: "Once a week's first game kicks off, that week's lineup can't change.",
+    short: "Once a week's first game kicks off, that week's lineup cannot change.",
     detail:
       "A lineup locks for the whole week the moment its first game kicks off, not player by player. Set your lineup before that kickoff, because you can't swap anyone in or out again until the following week opens.",
   },
@@ -164,12 +164,12 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
   queue: {
     key: "queue",
     term: "your draft queue",
-    short: "The list of players you ranked to auto-draft if you're away when it's your pick.",
+    short: "The list of players you ranked, used to pick for you if you are away on your turn.",
     // C3: the safety net has one phrasing, "the room picks for you from your queue" — quoted
     // here so the waiting room's own missed-draft and filling-state sentences (Task 9) never
     // drift from what this term already promises.
     detail:
-      "Your draft queue is the ranked list of players you'd want if you can't pick in person. If the clock runs out on your turn, the room picks for you from your queue instead of skipping you.",
+      "Your draft queue is the ranked list of players you would want if you cannot pick in person. If the clock runs out on your turn, the room picks for you from your queue instead of skipping you.",
   },
   "draft-slot": {
     key: "draft-slot",

@@ -160,7 +160,7 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
   if (status === "error") {
     return (
       <ErrorState
-        title="We couldn't load your trades."
+        title="We could not load your trades."
         description={error ?? undefined}
         action={
           <Button variant="secondary" onClick={() => void refetch()}>
@@ -212,7 +212,7 @@ export function TradeInbox({ leagueId, context }: TradeInboxProps) {
       {nothingHere ? (
         <EmptyState
           title="No trades yet."
-          description="Build an offer to a leaguemate whenever you're ready."
+          description="Build an offer to a leaguemate whenever you are ready."
           action={<Button onClick={() => setComposing(true)}>Put an offer together</Button>}
         />
       ) : (

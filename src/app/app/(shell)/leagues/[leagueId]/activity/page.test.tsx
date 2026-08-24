@@ -65,7 +65,7 @@ describe("LeagueActivityPage — membership gate", () => {
   });
 
   it("404s a league id that names no real league, the same as a stranger — a non-oracle response", async () => {
-    vi.mocked(resolveLeagueMembership).mockResolvedValue({ ok: false, status: 404, error: "That league doesn't exist." });
+    vi.mocked(resolveLeagueMembership).mockResolvedValue({ ok: false, status: 404, error: "That league does not exist." });
 
     await expect(callPage()).rejects.toMatchObject({ digest: "NEXT_HTTP_ERROR_FALLBACK;404" });
     expect(vi.mocked(listLeagueActivity)).not.toHaveBeenCalled();

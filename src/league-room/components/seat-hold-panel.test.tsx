@@ -26,6 +26,14 @@ describe("SeatHoldPanel", () => {
     expect(fixture.calls).toEqual(["POST /api/public/leagues/lg1/hold", "POST /api/public/leagues/lg1/hold"]);
   });
 
+  // Gauntlet fix wave, item 11 (JF-H4): C3's safety-net sentence reaches the join flow's own
+  // first screen now — the hold page is where a first-timer first asks "what if I miss it".
+  it("answers the first-timer's own question, verbatim, once the hold lands", async () => {
+    const fixture = fixtureLeagueDeps({ ok: true, data: { expiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString() } });
+    renderInLeague(<SeatHoldPanel leagueId="lg1" leagueName="Rookie Snake Room" />, fixture.deps);
+    expect(await screen.findByText("The room picks for you from your queue if your clock runs out.")).toBeInTheDocument();
+  });
+
   it("shows a loading skeleton before the claim resolves", () => {
     const fixture = fixtureLeagueDeps(undefined, { deferred: true });
     renderInLeague(<SeatHoldPanel leagueId="lg1" leagueName="Rookie Snake Room" />, fixture.deps);

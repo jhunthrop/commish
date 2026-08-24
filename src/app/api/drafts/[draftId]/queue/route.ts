@@ -20,7 +20,7 @@ export async function GET(request: Request, context: RouteContext) {
   return withLeagueMember(request, context, async (actor) => {
     if (actor.teamId === null) return ok<DraftQueueBody>({ queue: [] });
     const queue = await getTeamQueue(getDraftStore(), actor.draftId, actor.teamId);
-    if (queue === null) return fail("That draft doesn't exist.", 404);
+    if (queue === null) return fail("That draft does not exist.", 404);
     return ok<DraftQueueBody>({ queue });
   });
 }

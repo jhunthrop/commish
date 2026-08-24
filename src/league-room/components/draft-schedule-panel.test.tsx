@@ -49,6 +49,18 @@ describe("DraftSchedulePanel", () => {
     );
   });
 
+  // Gauntlet fix wave, item 11 (JF-H4): C3's safety-net sentence now reaches a SCHEDULED
+  // league's own waiting room — the most common waiting state in the product, and previously the
+  // one place it never said this at all (only a full `when_full` room and the missed-draft panel
+  // did).
+  it("answers the first-timer's own question, verbatim, for every scheduled draft", () => {
+    renderInLeague(
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={SCHEDULED} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText("The room picks for you from your queue if your clock runs out.")).toBeInTheDocument();
+  });
+
   it("offers no controls to a member who is not the commissioner", () => {
     renderInLeague(
       <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={SCHEDULED} />,
@@ -141,7 +153,7 @@ describe("DraftSchedulePanel", () => {
       <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={{ ...SCHEDULED, isPublicMatchmade: false }} />,
       fixtureLeagueDeps().deps,
     );
-    expect(screen.getByText("Nothing starts this automatically. Press Start the draft when everyone's ready.")).toBeInTheDocument();
+    expect(screen.getByText("Nothing starts this automatically. Press Start the draft when everyone is ready.")).toBeInTheDocument();
   });
 
   it("shows a link into the room while the draft is live, in both themes, axe-clean", async () => {
@@ -162,7 +174,7 @@ describe("DraftSchedulePanel", () => {
     const fixture = fixtureLeagueDeps();
     await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
-        <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={{ ...SCHEDULED, status: "complete" }} />
+        <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={{ ...SCHEDULED, status: "complete" }} currentWeek={1} />
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByText("Draft complete")).toBeInTheDocument();
@@ -170,6 +182,27 @@ describe("DraftSchedulePanel", () => {
         expect(await axe(container)).toHaveNoViolations();
       },
     );
+  });
+
+  // Gauntlet fix wave, NEW-8: this card used to hold the hero slot forever — no expiry at all on
+  // a bare `status === "complete"` predicate, so a league well past its own regular season still
+  // showed "Draft complete / Every roster is set" as the largest block on the page. It renders
+  // nothing at all once `currentWeek` is past `totalWeeks` (the season's own regular-season
+  // length, server-derived from `LEAGUE_CONFIG.regularSeasonWeeks`).
+  it("yields the hero slot once the season is past its own regular-season window", () => {
+    renderInLeague(
+      <DraftSchedulePanel
+        leagueId="league_1"
+        teamCount={12}
+        isCommissioner={true}
+        initialSchedule={{ ...SCHEDULED, status: "complete" }}
+        currentWeek={15}
+        totalWeeks={14}
+      />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByText("Draft complete")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View the draft board" })).not.toBeInTheDocument();
   });
 
   it("saves a new time and reflects it without a page reload", async () => {

@@ -39,7 +39,7 @@ export interface NoticesContextValue extends UseNoticesResult {
 
 const NoticesContext = createContext<NoticesContextValue | null>(null);
 
-const CONNECTION_FAILED_MESSAGE = "We couldn't reach the server. Check your connection and try again.";
+const CONNECTION_FAILED_MESSAGE = "We could not reach the server. Check your connection and try again.";
 
 /**
  * The inbox's data layer, moved here from `useNotices` (Plan D Task 9) so its STATE outlives

@@ -24,7 +24,7 @@ describe("NotificationSummary", () => {
   it("states honestly that email isn't connected, with no toggle beside it", () => {
     const { container } = render(<NotificationSummary />);
     expect(
-      screen.getByText("Email updates aren't connected yet. When they are, you'll choose which of these arrive in your inbox."),
+      screen.getByText("Email updates are not connected yet. When they are, you will choose which of these arrive in your inbox."),
     ).toBeInTheDocument();
     expect(container.querySelectorAll('input[type="checkbox"], [role="switch"]')).toHaveLength(0);
   });

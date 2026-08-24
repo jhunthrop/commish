@@ -9,7 +9,7 @@ afterEach(() => {
 
 describe("liveScoringCopy", () => {
   it("names the mock stat set, not live games, when nothing is configured", () => {
-    expect(liveScoringCopy()).toBe("Scores come from this preview's 2026 stat set, not from live games.");
+    expect(liveScoringCopy()).toBe("Scores come from a preview 2026 stat set, not from live games.");
   });
 
   it("says scores update live when the configured provider is tank01", () => {

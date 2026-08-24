@@ -327,7 +327,7 @@ describe("plannedTransfer", () => {
     const plan = plannedTransfer({ ...ONE_QB_LEAGUE_FULL_BENCH, give: [rb("a")], get: [qb("x"), qb("y")] });
     expect(plan).toEqual({
       ok: false,
-      reason: "There's no room on your roster for two quarterbacks. Send a player at that position, or free up a bench spot first.",
+      reason: "There is no room on your roster for two quarterbacks. Send a player at that position, or free up a bench spot first.",
     });
   });
 
@@ -337,7 +337,7 @@ describe("plannedTransfer", () => {
     const plan = plannedTransfer({ ...ONE_QB_LEAGUE_FULL_BENCH, give: [], get: [qb("x")] });
     expect(plan).toEqual({
       ok: false,
-      reason: "There's no room on your roster for a quarterback. Send a player at that position, or free up a bench spot first.",
+      reason: "There is no room on your roster for a quarterback. Send a player at that position, or free up a bench spot first.",
     });
   });
 

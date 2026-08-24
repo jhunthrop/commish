@@ -52,7 +52,7 @@ export function SeatHoldPanel({ leagueId, leagueName }: SeatHoldPanelProps) {
         setClaim(body.ok ? { status: "held", expiresAt: body.data.expiresAt } : { status: "error", reason: body.error });
       } catch {
         if (!cancelled) {
-          setClaim({ status: "error", reason: "We couldn't reach the server. Check your connection and try again." });
+          setClaim({ status: "error", reason: "We could not reach the server. Check your connection and try again." });
         }
       }
     })();
@@ -90,6 +90,11 @@ export function SeatHoldPanel({ leagueId, leagueName }: SeatHoldPanelProps) {
       <div className="flex flex-col items-center gap-1 py-2">
         <Countdown remainingMs={remainingMs} size="xl" data-testid="seat-hold-countdown" />
         <p role="status" className="text-sm text-text-muted">{`Your hold expires in ${formatCoarseDuration(remainingMs)}.`}</p>
+        {/* Gauntlet fix wave, item 11 (JF-H4): C3's safety-net sentence, quoted verbatim, reaching
+            the join flow's own first screen — the hold page is where a first-timer first asks
+            "what if I miss it", and until now the sentence rendered nowhere earlier than a
+            full sit-and-go room or a missed draft, both well past this point. */}
+        <p className="text-sm text-text-muted">The room picks for you from your queue if your clock runs out.</p>
       </div>
       <SignInLink
         intent={`/join/${leagueId}/hold`}

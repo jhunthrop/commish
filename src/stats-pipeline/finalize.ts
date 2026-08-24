@@ -170,7 +170,7 @@ export type FinalizeGuardFailure = Extract<FinalizeResult, { readonly ok: false 
  */
 export async function checkFinalizeGuards(db: ReadonlyDb, leagueId: string, weekNumber: number): Promise<FinalizeGuardFailure | null> {
   const [league] = await db.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, leagueId));
-  if (league === undefined) return { ok: false, status: 404, reason: "That league doesn't exist." };
+  if (league === undefined) return { ok: false, status: 404, reason: "That league does not exist." };
 
   // Guard order is "does this thing exist" before "is it allowed", so a week the league does not
   // have answers 404 whatever the state of its draft.
@@ -179,7 +179,7 @@ export async function checkFinalizeGuards(db: ReadonlyDb, leagueId: string, week
     .from(matchups)
     .where(and(eq(matchups.leagueId, leagueId), eq(matchups.weekNumber, weekNumber)))
     .limit(1);
-  if (exists === undefined) return { ok: false, status: 404, reason: "That week isn't part of this league's season." };
+  if (exists === undefined) return { ok: false, status: 404, reason: "That week is not part of this league's season." };
 
   // A league that has not drafted has no rosters, so every team would score zero and the
   // standings would show a season of phantom losses. An undrafted league is not behind on

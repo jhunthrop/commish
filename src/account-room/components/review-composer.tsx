@@ -89,7 +89,7 @@ export function ReviewComposer({ myReview, onSubmitted }: ReviewComposerProps) {
       setSaved(true);
       onSubmitted?.(envelope.data);
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We could not reach the server. Check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -108,7 +108,7 @@ export function ReviewComposer({ myReview, onSubmitted }: ReviewComposerProps) {
       }}
     >
       {existingReview === null ? null : (
-        <p className="text-sm text-text-muted">You&apos;ve already left a review. Editing replaces it.</p>
+        <p className="text-sm text-text-muted">You have already left a review. Editing replaces it.</p>
       )}
 
       <fieldset className="flex flex-col gap-2">

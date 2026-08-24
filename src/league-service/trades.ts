@@ -274,7 +274,7 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
 
   const [proposerTeam] = await db.select({ id: teams.id }).from(teams).where(and(eq(teams.leagueId, input.leagueId), eq(teams.userId, input.userId)));
   if (proposerTeam === undefined) {
-    return { ok: false, status: 403, reason: "You don't have a team in this league." };
+    return { ok: false, status: 403, reason: "You do not have a team in this league." };
   }
   const proposerTeamId = proposerTeam.id;
 
@@ -308,7 +308,7 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
   // `resolverNameFor` (`@/integrity-service/flags`) uses for its own FK-guaranteed row.
   const myContext = mine!;
   if (theirs === null) {
-    return { ok: false, status: 404, reason: "We couldn't find that team in this league." };
+    return { ok: false, status: 404, reason: "We could not find that team in this league." };
   }
 
   const myPlayers = playersById(myContext.me.players);
@@ -317,10 +317,10 @@ export async function proposeTrade(db: Db, input: ProposeTradeInput): Promise<Pr
   const theirOwnedIds = new Set(Object.keys(theirPlayers));
 
   if (!proposerAssetIds.every((id) => myOwnedIds.has(id))) {
-    return { ok: false, status: 422, reason: "One of those players isn't on your team." };
+    return { ok: false, status: 422, reason: "One of those players is not on your team." };
   }
   if (!counterpartyAssetIds.every((id) => theirOwnedIds.has(id))) {
-    return { ok: false, status: 422, reason: "One of those players isn't on that team." };
+    return { ok: false, status: 422, reason: "One of those players is not on that team." };
   }
 
   const [leagueRow] = await db.select({ rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId));
@@ -558,12 +558,12 @@ export async function refusalFor(
   input: SettleProposalInput & { readonly actorTeamId: string },
 ): Promise<Extract<SettleTradeResult, { readonly ok: false }>> {
   const [row] = await tx.select().from(tradeProposals).where(eq(tradeProposals.id, input.tradeId));
-  if (row === undefined) return { ok: false, status: 404, reason: "We couldn't find that offer." };
+  if (row === undefined) return { ok: false, status: 404, reason: "We could not find that offer." };
 
   const authorizedTeamId = input.transition === "withdraw" ? row.proposerTeamId : row.counterpartyTeamId;
   if (authorizedTeamId !== input.actorTeamId) {
     // Same answer for "doesn't exist" and "isn't yours" — an id must tell a prober nothing.
-    return { ok: false, status: 404, reason: "We couldn't find that offer." };
+    return { ok: false, status: 404, reason: "We could not find that offer." };
   }
   // Plan D (Task 5): a held trade is no longer a question between these two managers — it is a
   // question for an operator — so the ordinary refusal ("someone already answered") would be a
@@ -621,7 +621,7 @@ async function settleProposal(db: Db, input: SettleProposalInput): Promise<Settl
       .select({ id: tradeProposals.id })
       .from(tradeProposals)
       .where(and(eq(tradeProposals.id, input.tradeId), eq(tradeProposals.leagueId, input.leagueId)));
-    if (existing === undefined) return { ok: false as const, status: 404, reason: "We couldn't find that offer." };
+    if (existing === undefined) return { ok: false as const, status: 404, reason: "We could not find that offer." };
 
     const [team] = await tx.select({ id: teams.id }).from(teams).where(and(eq(teams.leagueId, input.leagueId), eq(teams.userId, input.userId)));
     // No team in this league at all: never a real match for either role column, so this
@@ -1074,7 +1074,7 @@ export async function acceptTrade(db: Db, input: AcceptTradeInput): Promise<Acce
         .from(tradeProposals)
         .where(and(eq(tradeProposals.id, input.tradeId), eq(tradeProposals.leagueId, input.leagueId)));
       if (existing === undefined) {
-        return { ok: false as const, status: 404, reason: "We couldn't find that offer." };
+        return { ok: false as const, status: 404, reason: "We could not find that offer." };
       }
 
       // STEP 2 — THE WEEK, DERIVED AT THE MOMENT OF THE YES (final review, CRITICAL 1), then
@@ -1494,7 +1494,7 @@ export async function releaseHeldTradeInTx(tx: DbTx, input: ReleaseHeldTradeInpu
     .from(tradeProposals)
     .where(and(eq(tradeProposals.id, input.tradeId), eq(tradeProposals.leagueId, input.leagueId)));
   if (existing === undefined) {
-    return { ok: false, status: 404, reason: "We couldn't find that trade." };
+    return { ok: false, status: 404, reason: "We could not find that trade." };
   }
   if (existing.status === "accepted") {
     // THE HEALING BRANCH (mirroring `reverseTradeInTx`'s own) — see this function's own docblock.
@@ -1718,7 +1718,7 @@ export async function blockHeldTradeInTx(tx: DbTx, input: BlockHeldTradeInput): 
     .from(tradeProposals)
     .where(and(eq(tradeProposals.id, input.tradeId), eq(tradeProposals.leagueId, input.leagueId)));
   if (existing === undefined) {
-    return { ok: false, status: 404, reason: "We couldn't find that trade." };
+    return { ok: false, status: 404, reason: "We could not find that trade." };
   }
   if (existing.status === "blocked") {
     return { ok: true, tradeId: existing.id, notices: [] };

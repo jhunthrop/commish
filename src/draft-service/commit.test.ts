@@ -134,7 +134,7 @@ describe("startDraft", () => {
   });
 
   it("refuses to start a draft that doesn't exist", async () => {
-    expect(await store.startDraft("nope")).toEqual({ ok: false, reason: "That draft doesn't exist." });
+    expect(await store.startDraft("nope")).toEqual({ ok: false, reason: "That draft does not exist." });
   });
 
   it("refuses to start a draft with an empty pool", async () => {
@@ -348,7 +348,7 @@ describe("commitDraftState — the empty-rosters branch", () => {
 
 describe("commitDraftResults — the real commit branch", () => {
   it("refuses to commit a draft that doesn't exist", async () => {
-    expect(await store.commitDraftResults("nope")).toEqual({ ok: false, reason: "That draft doesn't exist." });
+    expect(await store.commitDraftResults("nope")).toEqual({ ok: false, reason: "That draft does not exist." });
   });
 
   it("commits for real (not the auto-commit shortcut) when a completed log exists but drafts.status was never flipped", async () => {

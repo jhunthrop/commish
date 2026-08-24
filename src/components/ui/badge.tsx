@@ -2,9 +2,19 @@ import type { HTMLAttributes } from "react";
 
 export type BadgeTone = "neutral" | "accent" | "positive" | "negative" | "warning";
 
+/**
+ * NEW-5 (Phase 3.6 gauntlet fix wave): `accent` used to be `bg-accent text-accent-text` — a
+ * solid green fill, pixel-identical to `Button`'s primary variant. Every caller of this tone is a
+ * LABEL (a house rung, a role, a live state, a count), never a control, and `positive`'s own row
+ * below already proves the house rule for a Badge: "good outcome, as text/glow/meter fill only —
+ * never a solid fill" (`docs/design-system.md`). Green as a solid block is reserved for the one
+ * thing on this product that is actually clickable; a badge that copies it reads as a second,
+ * unclickable "Take a seat" button sitting right next to the real one. `glow` (below) still gives
+ * a genuinely live/urgent badge its own tinted ring — the outcome-is-a-glow escape hatch stays.
+ */
 const TONE: Readonly<Record<BadgeTone, string>> = {
   neutral: "border border-line text-text-muted",
-  accent: "bg-accent text-accent-text",
+  accent: "text-accent border border-accent",
   positive: "text-positive border border-positive",
   negative: "text-negative border border-negative",
   warning: "text-warning border border-warning",

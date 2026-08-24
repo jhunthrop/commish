@@ -263,7 +263,7 @@ describe("joinPublicLeague", () => {
         { db: dbWhoseTransactionThrows(uniqueViolation("teams_league_user_idx")), newId, clock },
         { leagueId, userId: "joiner" },
       );
-      expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." });
+      expect(result).toEqual({ ok: false, status: 500, reason: "We could not join that league just now. Please try again." });
     } finally {
       consoleSpy.mockRestore();
     }
@@ -279,7 +279,7 @@ describe("joinPublicLeague", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       const result = await joinPublicLeague(deps(), { leagueId, userId: "ghost_no_profile" });
-      expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." });
+      expect(result).toEqual({ ok: false, status: 500, reason: "We could not join that league just now. Please try again." });
     } finally {
       consoleSpy.mockRestore();
     }

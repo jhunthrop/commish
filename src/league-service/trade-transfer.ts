@@ -84,7 +84,7 @@ const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seve
 function describeUnplaceable(position: Position, count: number): string {
   const label = POSITION_LABELS[position];
   const subject = count === 1 ? `a ${label}` : `${COUNT_WORDS[count]} ${label}s`;
-  return `There's no room on your roster for ${subject}. Send a player at that position, or free up a bench spot first.`;
+  return `There is no room on your roster for ${subject}. Send a player at that position, or free up a bench spot first.`;
 }
 
 type PlacementResult = { readonly ok: true; readonly roster: readonly FilledRosterSlot[] } | TransferRefusal;
@@ -329,7 +329,7 @@ export async function applyTradeInTx(tx: DbTx, input: ApplyTradeInput): Promise<
   const proposerOwned = new Set(proposerCurrent.map((slot) => slot.playerId));
   const counterpartyOwned = new Set(counterpartyCurrent.map((slot) => slot.playerId));
   if (!giveIds.every((id) => proposerOwned.has(id)) || !getIds.every((id) => counterpartyOwned.has(id))) {
-    throw new TransferRefusedError("One of those players isn't on that roster any more.");
+    throw new TransferRefusedError("One of those players is not on that roster any more.");
   }
 
   const movingIds = [...giveIds, ...getIds];

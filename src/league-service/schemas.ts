@@ -123,7 +123,7 @@ export const weekNumberSchema = z.number().int().positive().max(LEAGUE_CONFIG.ma
  *  future" and "within the clock schedule's ceiling" are enforced — this boundary only checks
  *  that the string is a real ISO instant at all. */
 export const setDraftKickoffSchema = z.object({
-  kickoffAt: z.iso.datetime({ message: "That doesn't look like a valid time." }),
+  kickoffAt: z.iso.datetime({ message: "That does not look like a valid time." }),
 });
 
 export const setLineupSchema = z.object({

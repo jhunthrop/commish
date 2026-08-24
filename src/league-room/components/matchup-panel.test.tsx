@@ -97,12 +97,14 @@ describe("MatchupPanel", () => {
     expect(headerCell).toHaveStyle({ paddingTop: "11px", paddingBottom: "11px" });
   });
 
-  it("renders a starter's position as a PositionBadge sticker, not a bare string", () => {
+  // Gauntlet fix wave, NEW-10: `Pos` (a `PositionBadge` sticker) used to be its own column here,
+  // identical to `Slot` for every row but FLEX — two columns for one fact. `Slot` is the one
+  // that survives (the same precedent `LineupEditor`'s own roster table already sets); this
+  // table no longer renders a `PositionBadge` at all.
+  it("renders every starter's roster slot as a SlotChip, with no separate position column", () => {
     render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
-    const position = MATCHUP.home.starters[0]!.position;
-    if (position === null) throw new Error("fixture starter has no position");
-    const candidates = screen.getAllByText(position, { selector: "span" });
-    const sticker = candidates.find((el) => el.className.includes("bg-pos-"));
-    expect(sticker?.className).toContain(`bg-pos-${position.toLowerCase()}`);
+    expect(screen.queryByRole("columnheader", { name: "Pos" })).not.toBeInTheDocument();
+    const slot = MATCHUP.home.starters[0]!.slot;
+    expect(screen.getAllByText(slot).length).toBeGreaterThan(0);
   });
 });

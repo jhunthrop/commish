@@ -29,7 +29,7 @@ export interface DecidedTrade {
  *  reason on failure — never a thrown exception, so a caller never needs a `try/catch` of its own. */
 export type TradeActionResult<T> = { readonly ok: true; readonly data: T } | { readonly ok: false; readonly error: string };
 
-const CONNECTION_FAILED_MESSAGE = "We couldn't reach the server. Check your connection and try again.";
+const CONNECTION_FAILED_MESSAGE = "We could not reach the server. Check your connection and try again.";
 
 async function postJson<T>(
   fetchJson: (url: string, init?: RequestInit) => Promise<Response>,

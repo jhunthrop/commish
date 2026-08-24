@@ -378,7 +378,7 @@ export function createDraftStore({
               .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
               .where(eq(drafts.id, draftId))
               .for("key share", { of: leagues });
-            if (league === undefined) return { ok: false, reason: "That draft doesn't exist." };
+            if (league === undefined) return { ok: false, reason: "That draft does not exist." };
 
             /**
              * THE CROSS-INSTANCE LOCK. Every accepted action for this draft passes through this
@@ -396,12 +396,12 @@ export function createDraftStore({
              * `joinLeagueInTx` and `setDraftKickoff` take, so no cycle exists.
              */
             const [locked] = await tx.select({ id: drafts.id }).from(drafts).where(eq(drafts.id, draftId)).for("update");
-            if (locked === undefined) return { ok: false, reason: "That draft doesn't exist." };
+            if (locked === undefined) return { ok: false, reason: "That draft does not exist." };
 
             // Loaded INSIDE the lock and validated against the log, so a state another instance
             // has already advanced can never be the state this action is admitted against.
             const state = await load(draftId, tx);
-            if (state === null) return { ok: false, reason: "That draft doesn't exist." };
+            if (state === null) return { ok: false, reason: "That draft does not exist." };
             previous = state;
 
             // THE ACTION, RESOLVED UNDER THE LOCK (final review F9 — see `DraftActionSource`).
@@ -602,7 +602,7 @@ export function createDraftStore({
       // Reads happen OUTSIDE the mutex — applyAction (below) takes it once. Acquiring it
       // here too would deadlock, since the mutex is not reentrant.
       const config = await loadDraftConfig(db, draftId);
-      if (config === null) return { ok: false, reason: "That draft doesn't exist." };
+      if (config === null) return { ok: false, reason: "That draft does not exist." };
 
       // Guards against a draft the reducer's own "already started"/"already finished" checks
       // cannot see: one whose `drafts.status` was written straight to "complete" (e.g. the
@@ -795,7 +795,7 @@ export function createDraftStore({
       return mutex.run(draftId, async (): Promise<CommitResult> => {
         // `load` (not `getDraftState`) — we already hold the mutex here.
         const state = await load(draftId);
-        if (state === null) return { ok: false, reason: "That draft doesn't exist." };
+        if (state === null) return { ok: false, reason: "That draft does not exist." };
         if (state.phase !== "complete") return { ok: false, reason: "This draft isn't finished yet." };
         const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
         if (row?.status === "complete") {

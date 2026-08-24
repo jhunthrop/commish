@@ -94,6 +94,6 @@ export function isCommissionerOf(row: LeagueAuthorityRow, userId: string): boole
  * nothing.
  */
 export const HOUSE_AUTHORITY_REFUSALS = {
-  invite: "House leagues are open to everyone, so they don't use invite links. Share the league's page instead.",
+  invite: "House leagues are open to everyone, so they do not use invite links. Share the league's page instead.",
   schedule: "Commish picks the draft time when a house league opens, because everyone here chose their seat around it.",
 } as const;

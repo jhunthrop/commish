@@ -161,7 +161,7 @@ describe("LineupEditor", () => {
       async ({ container }) => {
         expect(screen.queryByRole("button", { name: "Save lineup" })).not.toBeInTheDocument();
         expect(
-          screen.getByText("Week 5 has started, so its lineup can't change. You can set next week's lineup as soon as this week ends."),
+          screen.getByText("Week 5 has started, so its lineup cannot change. You can set next week's lineup as soon as this week ends."),
         ).toBeInTheDocument();
         // The unlocked-only kickoff warning has no place here — the week already started.
         expect(screen.queryByText(/Lineups lock for the whole week/)).not.toBeInTheDocument();
@@ -176,7 +176,7 @@ describe("LineupEditor", () => {
   it("drops the reopening sentence on the season's final week — there is no next week", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<LineupEditor leagueId="l1" lineup={{ ...LINEUP, locked: true, weekNumber: 14 }} totalWeeks={14} />, fixture.deps);
-    expect(screen.getByText("Week 14 has started, so its lineup can't change.")).toBeInTheDocument();
+    expect(screen.getByText("Week 14 has started, so its lineup cannot change.")).toBeInTheDocument();
     expect(screen.queryByText(/next week/)).not.toBeInTheDocument();
   });
 });

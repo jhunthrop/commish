@@ -166,7 +166,7 @@ export async function setLineup(
   const audit = deps.audit ?? getAuditLogger();
   const clock = deps.clock ?? systemClock;
   const [league] = await db.select({ rosterSlots: leagues.rosterSlots }).from(leagues).where(eq(leagues.id, input.leagueId));
-  if (league === undefined) return { ok: false, status: 404, reason: "That league doesn't exist." };
+  if (league === undefined) return { ok: false, status: 404, reason: "That league does not exist." };
 
   // `docs/decisions/audit-and-integrity.md`'s residual, closed: this used to trust `input.teamId`
   // and `input.leagueId` to agree without ever checking, safe only because the route derives both
@@ -176,22 +176,22 @@ export async function setLineup(
   // residual asked the next team-scoped writer to add rather than copy the omission.
   const [team] = await db.select({ leagueId: teams.leagueId }).from(teams).where(eq(teams.id, input.teamId));
   if (team === undefined || team.leagueId !== input.leagueId) {
-    return { ok: false, status: 404, reason: "That team isn't part of this league." };
+    return { ok: false, status: 404, reason: "That team is not part of this league." };
   }
 
   const week = await db
     .select({ weekNumber: matchups.weekNumber })
     .from(matchups)
     .where(and(eq(matchups.leagueId, input.leagueId), eq(matchups.weekNumber, input.weekNumber)));
-  if (week.length === 0) return { ok: false, status: 404, reason: "That week isn't part of this league's season." };
+  if (week.length === 0) return { ok: false, status: 404, reason: "That week is not part of this league's season." };
   if (await isWeekLocked(db, input.weekNumber)) {
-    return { ok: false, status: 409, reason: `Week ${input.weekNumber} has started, so its lineup can't change.` };
+    return { ok: false, status: 409, reason: `Week ${input.weekNumber} has started, so its lineup cannot change.` };
   }
 
   const roster = await db.select().from(rosterSlots).where(eq(rosterSlots.teamId, input.teamId));
   const owned = new Set(roster.map((row) => row.playerId).filter((id): id is string => id !== null));
   const named = input.slots.map((slot) => slot.playerId).filter((id): id is string => id !== null);
-  if (named.some((id) => !owned.has(id))) return { ok: false, status: 422, reason: "One of those players isn't on your team." };
+  if (named.some((id) => !owned.has(id))) return { ok: false, status: 422, reason: "One of those players is not on your team." };
   if (new Set(named).size !== named.length) return { ok: false, status: 422, reason: "You can only start a player in one spot." };
 
   // The BENCH is derived, never trusted from the client: it is exactly "everyone on this
@@ -241,7 +241,7 @@ export async function setLineup(
     });
     return false;
   });
-  if (locked) return { ok: false, status: 409, reason: `Week ${input.weekNumber} has started, so its lineup can't change.` };
+  if (locked) return { ok: false, status: 409, reason: `Week ${input.weekNumber} has started, so its lineup cannot change.` };
 
   // After the write commits, never inside it — see the doc comment above. Awaited and caught
   // rather than fire-and-forget: the cache degrades open on its own, so awaiting cannot fail this

@@ -76,7 +76,7 @@ describe("ModerationSummary", () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: HEALTHY });
     fixture.deps = { ...fixture.deps, fetchJson: async () => { throw new Error("network down"); } };
     renderInLeague(<ModerationSummary leagueId="l1" />, fixture.deps);
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("We couldn't reach the server."));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("We could not reach the server."));
   });
 
   it("renders no dead cell for a healthy count with no date — mostRecentAt is genuinely optional", async () => {

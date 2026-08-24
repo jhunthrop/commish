@@ -25,7 +25,7 @@ function stubDbAnswering(answers: { readonly draftLeagueId?: string; readonly le
 describe("resolveDraftActor", () => {
   it("404s when the draft itself doesn't exist", async () => {
     const result = await resolveDraftActor(stubDbAnswering({}), "draft_ghost", "u_1");
-    expect(result).toEqual({ ok: false, status: 404, error: "That draft doesn't exist." });
+    expect(result).toEqual({ ok: false, status: 404, error: "That draft does not exist." });
   });
 
   it("resolves a real caller's draft actor from the draft id and user id alone", async () => {
@@ -41,6 +41,6 @@ describe("resolveDraftActor", () => {
     // Postgres — but the type still allows it, and this proves the fallback stays scoped to
     // what the caller actually asked about (the draft) rather than leaking the league's error.
     const result = await resolveDraftActor(stubDbAnswering({ draftLeagueId: "league_ghost", leagueFound: false }), "draft_1", "u_1");
-    expect(result).toEqual({ ok: false, status: 404, error: "That draft doesn't exist." });
+    expect(result).toEqual({ ok: false, status: 404, error: "That draft does not exist." });
   });
 });

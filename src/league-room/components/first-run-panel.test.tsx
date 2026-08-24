@@ -28,7 +28,7 @@ describe("FirstRunPanel", () => {
       expect(headings).toEqual(["Find an open league", "Join with an invite", "Start a league"]);
       expect(screen.getByText("Browse leagues that still have seats and join one today.")).toBeInTheDocument();
       expect(screen.getByText("Paste the link or code your commissioner sent you.")).toBeInTheDocument();
-      expect(screen.getByText("You pick the format, the scoring and who's in it.")).toBeInTheDocument();
+      expect(screen.getByText("You pick the format, the scoring and who is in it.")).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
   });

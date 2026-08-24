@@ -115,7 +115,7 @@ export function NoticeInbox() {
         >
           {status === "error" ? (
             <ErrorState
-              title="We couldn't load your notices."
+              title="We could not load your notices."
               description={error ?? undefined}
               action={
                 <button type="button" className="text-accent underline" onClick={() => void refetch()}>

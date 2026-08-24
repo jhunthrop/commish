@@ -34,7 +34,7 @@ export function InvitePanel({ leagueId }: { readonly leagueId: string }) {
       }
       setInvite(body.data);
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We could not reach the server. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }

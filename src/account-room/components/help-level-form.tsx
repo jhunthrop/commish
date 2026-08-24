@@ -56,7 +56,7 @@ export function HelpLevelForm({ helpLevel }: { readonly helpLevel: HelpLevel }) 
       setSaved(true);
       router.refresh();
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We could not reach the server. Check your connection and try again.");
     } finally {
       setSaving(false);
     }

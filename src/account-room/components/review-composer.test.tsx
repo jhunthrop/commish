@@ -62,7 +62,7 @@ describe("ReviewComposer", () => {
 
   it("says an existing review will be replaced, pre-fills it, and shows Save changes", () => {
     renderInAccount(<ReviewComposer myReview={{ state: "live", review: EXISTING }} />, fixtureAccountDeps().deps);
-    expect(screen.getByText("You've already left a review. Editing replaces it.")).toBeInTheDocument();
+    expect(screen.getByText("You have already left a review. Editing replaces it.")).toBeInTheDocument();
     expect(screen.getByRole("radio", { name: "4, very good" })).toBeChecked();
     expect(screen.getByLabelText("Your review")).toHaveValue(EXISTING.body);
     expect(screen.getByRole("button", { name: "Save changes" })).toBeInTheDocument();

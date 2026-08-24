@@ -28,14 +28,14 @@ export type ActorResult =
  */
 export async function resolveDraftActor(db: Db, draftId: string, userId: string): Promise<ActorResult> {
   const [draft] = await db.select({ leagueId: drafts.leagueId }).from(drafts).where(eq(drafts.id, draftId));
-  if (draft === undefined) return { ok: false, status: 404, error: "That draft doesn't exist." };
+  if (draft === undefined) return { ok: false, status: 404, error: "That draft does not exist." };
 
   const membership = await resolveLeagueMembership(db, draft.leagueId, userId);
   // A draft's `leagueId` is a NOT NULL foreign key, so its league existing is guaranteed —
   // this branch is unreachable in practice, but resolveLeagueMembership's type still allows
   // it, and surfacing the draft's own 404 here (rather than the league's) keeps the error
   // scoped to what the caller actually asked about.
-  if (!membership.ok) return { ok: false, status: 404, error: "That draft doesn't exist." };
+  if (!membership.ok) return { ok: false, status: 404, error: "That draft does not exist." };
 
   return {
     ok: true,

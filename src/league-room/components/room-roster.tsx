@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Avatar, Badge, SeatMeter } from "@/components/ui";
+import { Avatar, Badge } from "@/components/ui";
 import { TIER_COMPOSITION_LABEL, type CompositionCategory } from "@/participation/composition";
 import type { LeagueMemberCard } from "../contract";
 
@@ -35,8 +35,11 @@ export function RoomRoster({ leagueId, teams, teamCount, myTeamId, compositionCa
   const openSeats = Math.max(0, teamCount - teams.length);
   return (
     <section className="flex flex-col gap-3 rounded-lg border border-line bg-surface-elevated p-4" aria-label="The room">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <SeatMeter filled={teams.length} total={teamCount} />
+      {/* Gauntlet fix wave, NEW-9: `SeatMeter` used to render here too — `WaitingRoom`'s own hero,
+          immediately above this panel, already owns the "N of 12 seated" sentence (F17); a second
+          meter within 200px said the same fact twice. `Badge` alone stays: composition is a fact
+          about the room this panel is the only place that names. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <Badge tone="neutral">{TIER_COMPOSITION_LABEL[compositionCategory]}</Badge>
       </div>
       <ul aria-label="Seated managers" className="flex flex-wrap gap-3">

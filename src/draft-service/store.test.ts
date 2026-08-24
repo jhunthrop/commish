@@ -199,7 +199,7 @@ describe("draft store — persistence", () => {
     // those locks is the league row, joined through `drafts.id`, so a missing draft is answered
     // there — one statement earlier than it used to be, and with the same sentence.
     const result = await newStore().applyAction("nope", start(["team_a", "team_b"]));
-    expect(result).toEqual({ ok: false, reason: "That draft doesn't exist." });
+    expect(result).toEqual({ ok: false, reason: "That draft does not exist." });
   });
 
   it("refuses an action when the league lock finds its row but the draft row is gone, inside the same transaction", async () => {
@@ -223,7 +223,7 @@ describe("draft store — persistence", () => {
     const store = createDraftStore({ db: stubDb, publish, clock });
 
     const result = await store.applyAction("draft_vanished", start(["team_a", "team_b"]));
-    expect(result).toEqual({ ok: false, reason: "That draft doesn't exist." });
+    expect(result).toEqual({ ok: false, reason: "That draft does not exist." });
   });
 
   it("refuses an action when the row locks but its config join comes back empty, inside the same transaction", async () => {
@@ -250,7 +250,7 @@ describe("draft store — persistence", () => {
     const store = createDraftStore({ db: stubDb, publish, clock });
 
     const result = await store.applyAction("draft_locked_ghost", start(["team_a", "team_b"]));
-    expect(result).toEqual({ ok: false, reason: "That draft doesn't exist." });
+    expect(result).toEqual({ ok: false, reason: "That draft does not exist." });
   });
 
   it("skips the broadcast when the transaction resolves ok without ever setting `previous`", async () => {
@@ -626,7 +626,7 @@ describe("draft store — notices", () => {
       readAt: null,
     });
     expect(notice!.body).toBe(
-      `The clock ran out on pick ${payload.pickNumber} in league_1, so we used your queue and drafted ${PLAYER_NAMES[payload.playerId]} (${payload.playerId.startsWith("qb") ? "QB" : payload.playerId.startsWith("rb") ? "RB" : "WR"}). Set your queue before your next draft so this doesn't happen again.`,
+      `The clock ran out on pick ${payload.pickNumber} in league_1, so we used your queue and drafted ${PLAYER_NAMES[payload.playerId]} (${payload.playerId.startsWith("qb") ? "QB" : payload.playerId.startsWith("rb") ? "RB" : "WR"}). Set your queue before your next draft so this does not happen again.`,
     );
 
     // Ruling 13's guard: a private notice may not ride the league broadcast (every subscriber in

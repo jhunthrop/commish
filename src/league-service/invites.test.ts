@@ -148,7 +148,7 @@ describe("createInvite", () => {
     if (!first.ok) throw new Error(first.reason);
     // Fixed randomness mints the one code that already exists, every attempt.
     expect(await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" })).toEqual({
-      ok: false, reason: "We couldn't create an invite just now. Please try again.",
+      ok: false, reason: "We could not create an invite just now. Please try again.",
     });
     expect(await db.select().from(leagueInvites)).toHaveLength(1);
   });
@@ -222,7 +222,7 @@ describe("acceptInvite", () => {
   it("refuses an unknown, expired or exhausted code with a reason a person can act on", async () => {
     const created = await league();
     expect(await acceptInvite(writeDeps(), { code: "NOSUCH12", userId: "u2" })).toEqual({
-      ok: false, status: 404, reason: "That invite link isn't valid. Ask your commissioner for a new one.",
+      ok: false, status: 404, reason: "That invite link is not valid. Ask your commissioner for a new one.",
     });
 
     const expiring = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
@@ -346,7 +346,7 @@ describe("acceptInvite", () => {
         { db: dbWhoseTransactionThrows(uniqueViolation("teams_league_user_idx")), clock, newId },
         { code: invite.code, userId: "u2" },
       );
-      expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." });
+      expect(result).toEqual({ ok: false, status: 500, reason: "We could not join that league just now. Please try again." });
     } finally {
       consoleSpy.mockRestore();
     }
@@ -358,7 +358,7 @@ describe("acceptInvite", () => {
     if (!invite.ok) throw new Error(invite.reason);
 
     const result = await acceptInvite({ db: dbWhoseInnerLeagueLookupMisses(), clock, newId }, { code: invite.code, userId: "u2" });
-    expect(result).toEqual({ ok: false, status: 404, reason: "That invite link isn't valid. Ask your commissioner for a new one." });
+    expect(result).toEqual({ ok: false, status: 404, reason: "That invite link is not valid. Ask your commissioner for a new one." });
   });
 
   it("answers a plain-language 500 for an unexpected failure, and logs the real detail", async () => {
@@ -372,7 +372,7 @@ describe("acceptInvite", () => {
         { db: dbWhoseTransactionThrows(new Error("connection reset by peer")), clock, newId },
         { code: invite.code, userId: "u2" },
       );
-      expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." });
+      expect(result).toEqual({ ok: false, status: 500, reason: "We could not join that league just now. Please try again." });
       expect(JSON.stringify(result)).not.toContain("connection reset");
       expect(consoleSpy).toHaveBeenCalled();
     } finally {
@@ -434,7 +434,7 @@ describe("acceptInvite", () => {
 describe("invitePreview", () => {
   it("tells you nothing about a league when the code is not valid", async () => {
     const result = await invitePreview(db, "NOPE99");
-    expect(result).toEqual({ ok: false, reason: "That invite link isn't valid. Ask your commissioner for a new one." });
+    expect(result).toEqual({ ok: false, reason: "That invite link is not valid. Ask your commissioner for a new one." });
     expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
   });
 
@@ -451,7 +451,7 @@ describe("invitePreview", () => {
     if (!invite.ok) throw new Error(invite.reason);
 
     const result = await invitePreview(db, invite.code);
-    expect(result).toEqual({ ok: false, reason: "That invite link isn't valid. Ask your commissioner for a new one." });
+    expect(result).toEqual({ ok: false, reason: "That invite link is not valid. Ask your commissioner for a new one." });
     expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
   });
 
@@ -630,7 +630,7 @@ describe("invitePreview", () => {
     if (!invite.ok) throw new Error(invite.reason);
 
     const result = await invitePreview(dbWithNthSelectEmpty(2), invite.code);
-    expect(result).toEqual({ ok: false, reason: "That invite link isn't valid. Ask your commissioner for a new one." });
+    expect(result).toEqual({ ok: false, reason: "That invite link is not valid. Ask your commissioner for a new one." });
     expect(JSON.stringify(result)).not.toContain(SEEDED_LEAGUE_NAME);
   });
 

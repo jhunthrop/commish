@@ -18,7 +18,7 @@ const systemClock: Clock = { now: () => new Date().toISOString() };
  *  `publicJoinPrecondition` and `withAdmin` already answer 404 rather than 403 (ruling 14): a
  *  caller who is not allowed to act on this draft learns nothing about whether a different
  *  draft exists that they also can't act on. */
-const DRAFT_NOT_FOUND = "That draft doesn't exist.";
+const DRAFT_NOT_FOUND = "That draft does not exist.";
 
 /**
  * The three refusals `setDraftKickoff` can give for an otherwise-authorized request, named once
@@ -301,7 +301,7 @@ export async function setDraftKickoff(
 
     const kickoffMs = Date.parse(input.kickoffAt);
     if (Number.isNaN(kickoffMs)) {
-      return { ok: false, status: 422, reason: "That doesn't look like a valid time." };
+      return { ok: false, status: 422, reason: "That does not look like a valid time." };
     }
     const nowMs = Date.parse(clock.now());
     if (kickoffMs <= nowMs) {

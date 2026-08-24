@@ -32,7 +32,7 @@ describe("MessageList", () => {
 
   it("offers a way to start talking when there is nothing here yet", () => {
     render(<MessageList leagueId="l1" messages={[]} meUserId="u1" hasMore={false} loadingEarlier={false} onLoadEarlier={() => {}} onReact={() => {}} />);
-    expect(screen.getByText("Nobody's said anything yet")).toBeInTheDocument();
+    expect(screen.getByText("Nobody has said anything yet")).toBeInTheDocument();
   });
 
   it("offers earlier messages only when there are some, and asks for them once", () => {

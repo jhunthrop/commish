@@ -76,10 +76,10 @@ describe("withLeagueActor", () => {
 
   it("surfaces the membership lookup's own status and message", async () => {
     signedInAs("u1");
-    vi.mocked(resolveLeagueMembership).mockResolvedValue({ ok: false, status: 404, error: "That league doesn't exist." });
+    vi.mocked(resolveLeagueMembership).mockResolvedValue({ ok: false, status: 404, error: "That league does not exist." });
     const response = await withLeagueActor(request(), context, async () => new Response(null, { status: 200 }));
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ ok: false, error: "That league doesn't exist." });
+    expect(await response.json()).toEqual({ ok: false, error: "That league does not exist." });
   });
 });
 
@@ -96,7 +96,7 @@ describe("withLeagueMemberActor", () => {
     membership(null, false);
     const response = await withLeagueMemberActor(request(), context, async () => new Response(null, { status: 200 }));
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ ok: false, error: "You don't have a team in this league." });
+    expect(await response.json()).toEqual({ ok: false, error: "You do not have a team in this league." });
   });
 });
 

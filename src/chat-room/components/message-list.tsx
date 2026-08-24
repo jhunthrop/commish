@@ -34,8 +34,8 @@ export function MessageList({ leagueId, messages, meUserId, hasMore, loadingEarl
   if (messages.length === 0) {
     return (
       <EmptyState
-        title="Nobody's said anything yet"
-        description="Say hello, talk trash, or ask who's actually starting that kicker."
+        title="Nobody has said anything yet"
+        description="Say hello, talk trash, or ask who is actually starting that kicker."
         action={
           <a href="#chat-message-input" className="text-sm font-medium text-accent underline">
             Say hello

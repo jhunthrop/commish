@@ -9,7 +9,7 @@ import { UnknownStatsProviderError } from "./registry";
  * would be a lie in the product's own voice for any deployment configured for `tank01`.
  */
 const LIVE_SCORING_COPY: Readonly<Record<StatsProviderName, string>> = {
-  mock: "Scores come from this preview's 2026 stat set, not from live games.",
+  mock: "Scores come from a preview 2026 stat set, not from live games.",
   tank01: "Scores update from live game data while games are being played.",
 };
 

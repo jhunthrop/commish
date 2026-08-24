@@ -21,7 +21,7 @@ export async function GET(request: Request, context: LeagueRouteContext) {
     if (!week.success) return fail("That isn't a week we can show.", 400);
 
     const view = await lineupView(getDb(), { leagueId: actor.leagueId, teamId: actor.teamId, weekNumber: week.data });
-    if (view === null) return fail("That league doesn't exist.", 404);
+    if (view === null) return fail("That league does not exist.", 404);
     return ok<LineupBody>(view);
   });
 }

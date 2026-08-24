@@ -550,12 +550,12 @@ describe("proposeTrade", () => {
 
   it("refuses an offer naming a player the proposer does not own", async () => {
     const result = await proposeTrade(db, await proposeInput(db, { give: ["p_not_mine"] }));
-    expect(result).toEqual({ ok: false, status: 422, reason: "One of those players isn't on your team." });
+    expect(result).toEqual({ ok: false, status: 422, reason: "One of those players is not on your team." });
   });
 
   it("refuses an offer naming a player the counterparty does not own", async () => {
     const result = await proposeTrade(db, await proposeInput(db, { receive: ["p_not_theirs"] }));
-    expect(result).toEqual({ ok: false, status: 422, reason: "One of those players isn't on that team." });
+    expect(result).toEqual({ ok: false, status: 422, reason: "One of those players is not on that team." });
   });
 
   it("refuses a team trading with itself, in the service and not only in the schema", async () => {
@@ -573,13 +573,13 @@ describe("proposeTrade", () => {
   it("refuses when the caller has no team of their own in this league", async () => {
     const input = await proposeInput(db, { as: "u_alice" });
     const result = await proposeTrade(db, { ...input, userId: "u_carol" });
-    expect(result).toEqual({ ok: false, status: 403, reason: "You don't have a team in this league." });
+    expect(result).toEqual({ ok: false, status: 403, reason: "You do not have a team in this league." });
   });
 
   it("refuses a counterparty team this league doesn't have", async () => {
     const input = await proposeInput(db, { as: "u_alice" });
     const result = await proposeTrade(db, { ...input, counterpartyTeamId: "team_ghost" });
-    expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that team in this league." });
+    expect(result).toEqual({ ok: false, status: 404, reason: "We could not find that team in this league." });
   });
 
   it("refuses an eleventh open offer and says what to do about it", async () => {
@@ -756,12 +756,12 @@ describe("rejectTrade and withdrawTrade", () => {
     expect(await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_alice", deliver: deliverNoticeFake })).toEqual({
       ok: false,
       status: 404,
-      reason: "We couldn't find that offer.",
+      reason: "We could not find that offer.",
     });
     expect(await withdrawTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake })).toEqual({
       ok: false,
       status: 404,
-      reason: "We couldn't find that offer.",
+      reason: "We could not find that offer.",
     });
   });
 
@@ -775,12 +775,12 @@ describe("rejectTrade and withdrawTrade", () => {
   it("refuses a caller with no team at all in this league, the same 404 as the wrong manager", async () => {
     const trade = await openTrade(db);
     const result = await withdrawTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_carol", deliver: deliverNoticeFake });
-    expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+    expect(result).toEqual({ ok: false, status: 404, reason: "We could not find that offer." });
   });
 
   it("refuses a trade id that names nothing at all", async () => {
     const result = await rejectTrade(db, { tradeId: "trade_ghost", leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake });
-    expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+    expect(result).toEqual({ ok: false, status: 404, reason: "We could not find that offer." });
   });
 
   it("refuses a real trade id borrowed from another league, no differently than a bogus one (F1)", async () => {
@@ -795,7 +795,7 @@ describe("rejectTrade and withdrawTrade", () => {
     const wrongLeague = await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_2", userId: "u_dave", deliver: deliverNoticeFake });
     const ghost = await rejectTrade(db, { tradeId: "trade_totally_ghost", leagueId: "lg_2", userId: "u_dave", deliver: deliverNoticeFake });
     expect(wrongLeague).toEqual(ghost);
-    expect(wrongLeague).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+    expect(wrongLeague).toEqual({ ok: false, status: 404, reason: "We could not find that offer." });
 
     // And the RIGHT league still acts on the very same offer.
     const rightLeague = await rejectTrade(db, { tradeId: trade.id, leagueId: "lg_1", userId: "u_bob", deliver: deliverNoticeFake });
@@ -864,7 +864,7 @@ describe("rejectTrade and withdrawTrade", () => {
       clock: fixedClock("2026-08-21T00:00:00.000Z"),
       deliver: deliverNoticeFake,
     });
-    expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+    expect(result).toEqual({ ok: false, status: 404, reason: "We could not find that offer." });
     await expectNoSettlementTookPlace(db, trade.id);
   });
 
@@ -962,7 +962,7 @@ describe("refusalFor's impossible-state guard", () => {
       transition: "reject",
       actorTeamId: "team_a",
     });
-    expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+    expect(result).toEqual({ ok: false, status: 404, reason: "We could not find that offer." });
   });
 });
 
@@ -1248,7 +1248,7 @@ describe("acceptTrade", () => {
   it("refuses a caller with no team at all in this league, the same 404 as the wrong manager", async () => {
     const trade = await openAcceptTrade(db);
     const result = await acceptAs("u_dave", trade.id);
-    expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+    expect(result).toEqual({ ok: false, status: 404, reason: "We could not find that offer." });
     await expectNoAcceptanceTookPlace(db, trade.id, [
       { playerId: "p_rb1", teamId: "team_a" },
       { playerId: "p_wr1", teamId: "team_b" },
@@ -1257,7 +1257,7 @@ describe("acceptTrade", () => {
 
   it("refuses a trade id that names nothing at all, leaving no trace", async () => {
     const result = await acceptAs("u_bob", "trade_totally_ghost");
-    expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that offer." });
+    expect(result).toEqual({ ok: false, status: 404, reason: "We could not find that offer." });
     await expectNoAcceptanceTookPlace(db, null, [
       { playerId: "p_rb1", teamId: "team_a" },
       { playerId: "p_wr1", teamId: "team_b" },
@@ -1922,7 +1922,7 @@ describe("acceptTrade", () => {
 
     it("refuses a trade id that names nothing at all", async () => {
       const result = await db.transaction((tx) => releaseHeldTradeInTx(tx, { tradeId: "ghost", leagueId: "lg_1", operatorUserId: "u_alice" }));
-      expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that trade." });
+      expect(result).toEqual({ ok: false, status: 404, reason: "We could not find that trade." });
     });
 
     it("refuses a trade that is no longer waiting on a decision — never was held at all", async () => {
@@ -1962,7 +1962,7 @@ describe("acceptTrade", () => {
 
     it("refuses a block for a trade id that names nothing at all", async () => {
       const result = await db.transaction((tx) => blockHeldTradeInTx(tx, { tradeId: "ghost", leagueId: "lg_1", operatorUserId: "u_alice", note: "" }));
-      expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that trade." });
+      expect(result).toEqual({ ok: false, status: 404, reason: "We could not find that trade." });
     });
 
     it("refuses to block a trade that is no longer waiting on a decision — never was held at all", async () => {

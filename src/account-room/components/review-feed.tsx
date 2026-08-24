@@ -72,7 +72,7 @@ function ReportControl({ reviewId }: { readonly reviewId: string }) {
       setStatus("sent");
     } catch {
       setStatus("error");
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We could not reach the server. Check your connection and try again.");
     }
   };
 
@@ -179,7 +179,7 @@ export function ReviewFeed({ initialPage, emptyAction }: ReviewFeedProps) {
       setHasMore(envelope.data.hasMore);
       setNextBefore(envelope.data.nextBefore);
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We could not reach the server. Check your connection and try again.");
     } finally {
       setLoadingMore(false);
     }

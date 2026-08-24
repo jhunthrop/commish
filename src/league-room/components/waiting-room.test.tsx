@@ -170,12 +170,22 @@ describe("WaitingRoom", () => {
   });
 
   it("shows a designed complete state with a link into the finished board when the caller did not miss it", async () => {
-    const complete: WaitingRoomLeague = { ...fullSitAndGo, status: "complete", missedDraft: false };
+    const complete: WaitingRoomLeague = { ...fullSitAndGo, status: "complete", missedDraft: false, currentWeek: 1 };
     await renderSurface(<WaitingRoom league={complete} />, async ({ container }) => {
       expect(screen.getByText("Draft complete")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "View the draft board" })).toHaveAttribute("href", "/app/drafts/draft_1");
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+
+  // Gauntlet fix wave, NEW-8: this panel used to hold the hero slot forever on a `when_full`
+  // league too — same fix as `DraftSchedulePanel`'s own (`draftTerminalStatePanel`'s shared
+  // expiry), reached here through `WaitingRoom`'s own direct call rather than through the panel.
+  it("yields its own terminal panel once the season is past its regular-season window", () => {
+    const complete: WaitingRoomLeague = { ...fullSitAndGo, status: "complete", missedDraft: false, currentWeek: 15, totalWeeks: 14 };
+    render(<WaitingRoom league={complete} />);
+    expect(screen.queryByText("Draft complete")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "View the draft board" })).not.toBeInTheDocument();
   });
 
   // Task 12 fix round 1 (F1): `LeagueHome`'s own `DraftCompleteArrival` already shows this exact
@@ -277,6 +287,14 @@ describe("WaitingRoom", () => {
     expect(screen.getByText("Alex Rivera")).toBeInTheDocument();
     rerender(<WaitingRoom league={whenFullAndFilling} />);
     expect(screen.queryByText("Alex Rivera")).not.toBeInTheDocument();
+  });
+
+  // Gauntlet fix wave, NEW-9: `SeatMeter` used to render twice on this exact page — once in the
+  // hero, once again in `RoomRoster`'s own header, both saying "N of 12 seated" within 200px of
+  // each other. The hero's is the one that stays; `RoomRoster` still shows the composition badge.
+  it("renders the seat meter's sentence exactly once, with the room roster on screen", () => {
+    render(<WaitingRoom league={whenFullAndFilling} teams={TEAMS} compositionCategory="open" />);
+    expect(screen.getAllByText(/of 12 seated/)).toHaveLength(1);
   });
 
   it("puts the room tour first for a first-timer (guided help), and last for everyone else", () => {

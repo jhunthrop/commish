@@ -14,7 +14,7 @@ import { useLeagueRoomDeps } from "../hooks/deps";
 const MODERATION_SUMMARY_SENTENCE =
   "Commish reviews reports in every league. We keep the details between the people involved and our operators.";
 
-const CONNECTION_FAILED_MESSAGE = "We couldn't reach the server. Check your connection and try again.";
+const CONNECTION_FAILED_MESSAGE = "We could not reach the server. Check your connection and try again.";
 
 const DEFAULT_SUMMARY: ModerationSummaryView = { removedMessages: 0, removedReviews: 0, mostRecentAt: null, openQuestions: 0 };
 

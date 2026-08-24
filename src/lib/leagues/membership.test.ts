@@ -16,7 +16,7 @@ describe("requireLeagueMember", () => {
     const response = requireLeagueMember({ teamId: null, isCommissioner: false });
     expect(response).not.toBeNull();
     expect(response!.status).toBe(403);
-    expect(await response!.json()).toEqual({ ok: false, error: "You don't have a team in this league." });
+    expect(await response!.json()).toEqual({ ok: false, error: "You do not have a team in this league." });
   });
 
   it("accepts DraftActor's shape structurally — the same predicate, no adapter needed", () => {
@@ -78,6 +78,6 @@ describe("resolveLeagueMembership", () => {
 
   it("answers 404 for a league that doesn't exist", async () => {
     const result = await resolveLeagueMembership(db, "lg_does_not_exist", "u_anyone");
-    expect(result).toEqual({ ok: false, status: 404, error: "That league doesn't exist." });
+    expect(result).toEqual({ ok: false, status: 404, error: "That league does not exist." });
   });
 });

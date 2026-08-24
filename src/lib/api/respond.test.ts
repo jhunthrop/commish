@@ -14,9 +14,9 @@ describe("the API envelope", () => {
   });
 
   it("wraps an error in { ok: false, error } at the given status, and refuses to be stored", async () => {
-    const response = fail("That league doesn't exist.", 404);
+    const response = fail("That league does not exist.", 404);
     expect(response.status).toBe(404);
-    await expect(response.json()).resolves.toEqual({ ok: false, error: "That league doesn't exist." });
+    await expect(response.json()).resolves.toEqual({ ok: false, error: "That league does not exist." });
     expect(response.headers.get("cache-control")).toBe("no-store");
   });
 

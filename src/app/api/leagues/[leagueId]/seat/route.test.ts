@@ -101,6 +101,6 @@ describe("DELETE /api/leagues/[leagueId]/seat", () => {
     signedInAs("u2");
     const response = await deleteSeat(del(), { params: Promise.resolve({ leagueId: league.leagueId }) });
     expect(response.status).toBe(409);
-    expect((await response.json()).error).toBe("This league's draft has already started, so there's no seat left to release.");
+    expect((await response.json()).error).toBe("This league's draft has already started, so there is no seat left to release.");
   });
 });

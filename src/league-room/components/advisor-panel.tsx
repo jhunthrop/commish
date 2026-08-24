@@ -42,7 +42,7 @@ export function AdvisorPanel({ leagueId, weekNumber }: { readonly leagueId: stri
       }
       setAdvice(body.data);
     } catch {
-      setError("We couldn't reach the advisor. Check your connection and try again.");
+      setError("We could not reach the advisor. Check your connection and try again.");
     } finally {
       setThinking(false);
     }

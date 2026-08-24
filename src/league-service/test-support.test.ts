@@ -21,7 +21,7 @@ describe("test-support fixtures' own failure path", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       await expect(twoTeamLeague(dbWhoseTransactionThrows())).rejects.toThrow(
-        "We couldn't create that league. Please try again.",
+        "We could not create that league. Please try again.",
       );
     } finally {
       consoleSpy.mockRestore();
@@ -32,7 +32,7 @@ describe("test-support fixtures' own failure path", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       await expect(advisorFixture(dbWhoseTransactionThrows(), "ppr")).rejects.toThrow(
-        "We couldn't create that league. Please try again.",
+        "We could not create that league. Please try again.",
       );
     } finally {
       consoleSpy.mockRestore();
@@ -43,7 +43,7 @@ describe("test-support fixtures' own failure path", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
       await expect(seasonThroughWeek(dbWhoseTransactionThrows(), { week: 3, settled: true, lineupsSaved: false })).rejects.toThrow(
-        "We couldn't create that league. Please try again.",
+        "We could not create that league. Please try again.",
       );
     } finally {
       consoleSpy.mockRestore();

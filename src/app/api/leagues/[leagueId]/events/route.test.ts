@@ -67,7 +67,7 @@ describe("GET /api/leagues/[leagueId]/events", () => {
     signedInAs("someone");
     const response = await GET(request(), { params });
     expect(response.status).toBe(404);
-    expect(await response.json()).toEqual({ ok: false, error: "That league doesn't exist." });
+    expect(await response.json()).toEqual({ ok: false, error: "That league does not exist." });
   });
 
   it("answers 403 for a signed-in user with no team in this league", async () => {
@@ -75,7 +75,7 @@ describe("GET /api/leagues/[leagueId]/events", () => {
     signedInAs("stranger");
     const response = await GET(request(), { params });
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ ok: false, error: "You don't have a team in this league." });
+    expect(await response.json()).toEqual({ ok: false, error: "You do not have a team in this league." });
   });
 
   it("opens the stream for a member with a team in the league", async () => {

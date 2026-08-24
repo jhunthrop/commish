@@ -5,7 +5,7 @@ import { renderSurface } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import type { LeagueHomeBody, LineupBody, MatchupSummary } from "../contract";
-import { DRAFT_SCHEDULE, HOME, LINEUP, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
+import { DRAFT_SCHEDULE, HOME, LINEUP, STANDINGS, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { LeagueHome } from "./league-home";
 
@@ -82,6 +82,22 @@ describe("LeagueHome", () => {
       </ChatRoomDepsProvider>,
       fixtureLeagueDeps().deps,
     );
+    expect(screen.getByText(/^Week 3 · Snake draft/)).toBeInTheDocument();
+  });
+
+  // Gauntlet fix wave, item 7: "0-0 · #1 seed" is true of every team before the league's first
+  // played week — noise for a full field, absurd on a one-team room. Omitted until a result has
+  // actually separated the standings, the same "no row would make this true" reasoning the
+  // no-team case above already carries.
+  it("omits the record and seed from the header before the league's first played week", () => {
+    const unplayedStandings = STANDINGS.map((row) => ({ ...row, wins: 0, losses: 0, ties: 0 }));
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, standings: unplayedStandings }} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByText(/seed/)).not.toBeInTheDocument();
     expect(screen.getByText(/^Week 3 · Snake draft/)).toBeInTheDocument();
   });
 
@@ -256,7 +272,7 @@ describe("LeagueHome", () => {
   it("tells the commissioner scores run themselves now, in both themes, axe-clean", async () => {
     await renderSurface(wrap(), async ({ container }) => {
       expect(
-        screen.getByText("Scores update automatically as games finish. There's nothing to run by hand."),
+        screen.getByText("Scores update automatically as games finish. There is nothing to run by hand."),
       ).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -289,6 +305,28 @@ describe("LeagueHome", () => {
     expect(screen.getByText("Draft scheduled")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Start the draft" })).toBeInTheDocument();
     expect(screen.queryByText(/hasn't drafted yet/)).not.toBeInTheDocument();
+  });
+
+  // Gauntlet fix wave, NEW-4: the header's own dense line used to ALSO print `terms.draftAt` (the
+  // fixed-UTC instant) here, 300px above `WaitingRoom`'s local-time hero for the SAME kickoff —
+  // one instant, printed twice, unlabelled, in two different zones. The header now omits it
+  // entirely while a draft is not yet complete; the schedule panel is the one surface that names
+  // the instant, in the reader's own local time. (`LeagueTermsPanel`, elsewhere on this same
+  // page, still names the kickoff in UTC on purpose — that panel is this product's one
+  // documented exception to "no per-visitor timezone" and is not the 300px duplicate NEW-4
+  // named, so this assertion is scoped to the header line itself, not the whole page.)
+  it("never prints the fixed-UTC draft time in the header line while WaitingRoom owns naming it locally", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome
+          home={{ ...HOME, draftStatus: "scheduled", draftSchedule: { ...DRAFT_SCHEDULE, status: "scheduled", kickoffAt: "2099-01-01T00:00:00.000Z" } }}
+          lineup={null}
+        />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    const header = screen.getByText(/Snake draft/);
+    expect(header.textContent).not.toMatch(/UTC/);
   });
 
   // Phase 3.6, Task 9 (F12/P8): `WaitingRoom` is now the ONLY renderer for `home.draftSchedule`,
@@ -461,7 +499,7 @@ describe("LeagueHome", () => {
       fixtureLeagueDeps().deps,
     );
     expect(
-      screen.queryByText("Joining puts you in the draft and the season that follows. You'll set a lineup every week."),
+      screen.queryByText("Joining puts you in the draft and the season that follows. You will set a lineup every week."),
     ).not.toBeInTheDocument();
   });
 

@@ -52,7 +52,7 @@ export function ReportDialog({ open, leagueId, messageId, onClose }: ReportDialo
       setStatus("sent");
     } catch {
       setStatus("error");
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We could not reach the server. Check your connection and try again.");
     }
   };
 

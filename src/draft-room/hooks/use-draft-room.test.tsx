@@ -52,10 +52,10 @@ describe("useDraftRoom", () => {
 
   it("surfaces the server's own message when the state request fails", async () => {
     const h = fixtureDeps();
-    h.deps = { ...h.deps, fetchJson: async () => jsonOf({ ok: false, error: "You don't have a team in this league." }) };
+    h.deps = { ...h.deps, fetchJson: async () => jsonOf({ ok: false, error: "You do not have a team in this league." }) };
     const { result } = renderHook(() => useDraftRoom("d1"), { wrapper: wrapper(h.deps) });
     await waitFor(() => expect(result.current.status).toBe("error"));
-    expect(result.current.error).toBe("You don't have a team in this league.");
+    expect(result.current.error).toBe("You do not have a team in this league.");
   });
 
   it("applies a pick event to the local view without refetching", async () => {

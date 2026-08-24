@@ -72,7 +72,7 @@ describe("POST /api/drafts/[draftId]/queue", () => {
     signedInAs("stranger");
     const response = await postQueue(post({ playerIds: ["rb1"] }), { params });
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ ok: false, error: "You don't have a team in this league." });
+    expect(await response.json()).toEqual({ ok: false, error: "You do not have a team in this league." });
   });
 
   it("stores the caller's own queue — a body teamId is impossible to send", async () => {

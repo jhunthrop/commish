@@ -274,7 +274,7 @@ export async function createLeague(
   } catch (error: unknown) {
     // Plain language out, real detail into the logs — never raw driver text to a user.
     console.error("[league] create failed", { owner: input.owner }, error);
-    return { ok: false, status: 500, reason: "We couldn't create that league. Please try again." };
+    return { ok: false, status: 500, reason: "We could not create that league. Please try again." };
   }
   if (!outcome!.claimed) {
     // Unreachable for a member owner (a fresh UUID never collides); real only for a house
@@ -282,7 +282,7 @@ export async function createLeague(
     // reconciler creates one (`spawnHouseLeagueInTx` calls `writeLeagueInTx` directly, inside
     // its own transaction, so it can report a clean no-op instead of a 500).
     console.error("[league] create lost a primary-key race it should never have entered", { leagueId });
-    return { ok: false, status: 500, reason: "We couldn't create that league. Please try again." };
+    return { ok: false, status: 500, reason: "We could not create that league. Please try again." };
   }
 
   // After the transaction commits, never inside it — the same reason `setLineup` invalidates

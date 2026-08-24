@@ -5,7 +5,7 @@ import { Input, Modal } from "@/components/ui";
 import type { GifResult } from "@/gifs/provider";
 import { CHAT_ROOM_CONFIG } from "../config";
 
-const SEARCH_ERROR = "We couldn't search GIFs. Check your connection and try again.";
+const SEARCH_ERROR = "We could not search GIFs. Check your connection and try again.";
 
 export interface GifPickerProps {
   readonly open: boolean;

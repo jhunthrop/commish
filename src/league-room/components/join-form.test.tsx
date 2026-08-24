@@ -79,7 +79,7 @@ describe("JoinForm", () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });
     renderInLeague(<JoinForm code="SUNDAY12" />, fixture.deps);
     expect(
-      await screen.findByText("Joining puts you in the draft and the season that follows. You'll set a lineup every week."),
+      await screen.findByText("Joining puts you in the draft and the season that follows. You will set a lineup every week."),
     ).toBeInTheDocument();
   });
 
@@ -125,7 +125,7 @@ describe("JoinForm", () => {
   it("offers a way back to Commish, never a dead end, when the code itself is invalid", async () => {
     const fixture = fixtureLeagueDeps({
       ok: false,
-      error: "That invite link isn't valid. Ask your commissioner for a new one.",
+      error: "That invite link is not valid. Ask your commissioner for a new one.",
     });
     renderInLeague(<JoinForm code="NOPE9999" />, fixture.deps);
     expect(await screen.findByText("Ask your commissioner for a new one.", { exact: false })).toBeInTheDocument();

@@ -39,6 +39,18 @@ import { WaitingChecklist, type WaitingChecklistItem } from "./waiting-checklist
 export interface WaitingRoomLeague extends DraftScheduleBody {
   readonly teamCount: number;
   readonly authority: LeagueAuthority;
+  /**
+   * Gauntlet fix wave, NEW-8: `draftTerminalStatePanel`'s expiry window needs the season's
+   * current week — `LeagueHome` already holds it for its own header line, the same "rides in as
+   * a prop rather than widening the wire body" precedent `teamCount`/`authority` above set.
+   * Optional, defaulting to `1` (inside the window) at every read site, so every fixture and
+   * caller that predates this task — none of which had a season to be deep into — keeps its old
+   * behavior unchanged.
+   */
+  readonly currentWeek?: number;
+  /** `draftTerminalStatePanel`'s expiry window's other half — `home.totalWeeks`. Same optional,
+   *  same `1` default, same "predates this task" reasoning `currentWeek` above carries. */
+  readonly totalWeeks?: number;
 }
 
 /** "Thursday" from a real, given instant — never the ambient clock. */
@@ -283,7 +295,7 @@ export function WaitingRoom({
       </div>
     ) : null;
 
-  const terminal = draftTerminalStatePanel(league);
+  const terminal = draftTerminalStatePanel(league, league.currentWeek ?? 1, league.totalWeeks ?? 1);
   if (terminal !== null && !league.missedDraft) {
     // Task 12 fix round 1 (F1): `LeagueHome`'s own `DraftCompleteArrival` (Step 3b, D4) already
     // shows this exact "draft complete" moment, more richly, during its own window — this
@@ -359,6 +371,8 @@ export function WaitingRoom({
         teamCount={league.teamCount}
         leagueName={leagueName}
         myTeamId={myTeamId}
+        currentWeek={league.currentWeek ?? 1}
+        totalWeeks={league.totalWeeks ?? 1}
       />
     ) : full ? (
       <div className="flex flex-col gap-2">

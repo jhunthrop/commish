@@ -165,7 +165,7 @@ export function HeldTradeDetail({ flagId, subject, trail, decisions, noteMaxLeng
       setConfirming(null);
       router.refresh();
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We could not reach the server. Check your connection and try again.");
       setConfirming(null);
     } finally {
       setSubmitting(false);

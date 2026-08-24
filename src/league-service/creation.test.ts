@@ -150,7 +150,7 @@ describe("createLeague", () => {
         rosterSlots: STANDARD_ROSTER_SLOTS, owner: memberOwner("nobody", "Ghost"),
         experienceTier: "beginner", stakeTier: 0, isPublicMatchmade: false,
       });
-      expect(result).toEqual({ ok: false, status: 500, reason: "We couldn't create that league. Please try again." });
+      expect(result).toEqual({ ok: false, status: 500, reason: "We could not create that league. Please try again." });
       expect(await db.select().from(leagues)).toEqual([]);
       expect(consoleSpy).toHaveBeenCalled();
     } finally {

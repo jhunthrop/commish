@@ -107,7 +107,11 @@ export default async function BrowsePage({ searchParams }: PageProps) {
     return (
       <>
         <PublicBar intent={PAGE_INTENT} />
-        <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">{content}</main>
+        {/* Full-bleed, no `max-w-*`, matching `AppShell`'s own signed-in `<main>` (NEW-2): the
+            open-league shelf is the busiest page in the product and is not under `/app`, so it
+            never inherited the shell's full-width fix. A long-form reading surface keeps its own
+            `max-w-prose` on its paragraph column instead, same as the shell's own carve-out. */}
+        <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-4">{content}</main>
         <PublicFooter />
       </>
     );

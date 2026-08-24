@@ -51,7 +51,7 @@ describe("GifPicker", () => {
   it("shows a plain-language error when the search fails, rather than a silent empty grid", async () => {
     render(<GifPicker open onClose={() => {}} search={async () => Promise.reject(new Error("offline"))} onPick={() => {}} />);
     await userEvent.type(screen.getByRole("searchbox", { name: "Search GIFs" }), "touchdown");
-    expect(await screen.findByRole("alert")).toHaveTextContent("We couldn't search GIFs. Check your connection and try again.");
+    expect(await screen.findByRole("alert")).toHaveTextContent("We could not search GIFs. Check your connection and try again.");
   });
 
   it("says so when a search comes back with nothing", async () => {

@@ -39,7 +39,7 @@ export function NotificationSummary() {
           </div>
         ))}
       </dl>
-      <p className="text-sm text-text-muted">Email updates aren&apos;t connected yet. When they are, you&apos;ll choose which of these arrive in your inbox.</p>
+      <p className="text-sm text-text-muted">Email updates are not connected yet. When they are, you will choose which of these arrive in your inbox.</p>
     </section>
   );
 }

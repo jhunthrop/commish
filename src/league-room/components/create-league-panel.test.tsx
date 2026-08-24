@@ -36,6 +36,6 @@ describe("CreateLeaguePanel", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<CreateLeaguePanel />, fixture.deps);
     expect(screen.getByLabelText("Who can join")).toBeVisible();
-    expect(screen.getByLabelText("Who it's for")).toBeVisible();
+    expect(screen.getByLabelText("Who it is for")).toBeVisible();
   });
 });

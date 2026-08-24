@@ -25,7 +25,7 @@ export function LeagueChat({ leagueId }: { readonly leagueId: string }) {
   if (chat.status === "error") {
     return (
       <ErrorState
-        title="We couldn't open the chat"
+        title="We could not open the chat"
         description={chat.error ?? "Something went wrong on our side."}
         action={<Button onClick={() => void chat.refresh()}>Try again</Button>}
       />

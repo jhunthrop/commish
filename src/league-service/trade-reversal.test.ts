@@ -246,7 +246,7 @@ describe("reverseTradeInTx", () => {
     const result = await db.transaction((tx) =>
       reverseTradeInTx(tx, { tradeId: "trade_ghost", leagueId: fx.leagueId, flagId: fx.flagId, operatorUserId: "u_op", note: "n", clock }),
     );
-    expect(result).toEqual({ ok: false, status: 404, reason: "We couldn't find that trade." });
+    expect(result).toEqual({ ok: false, status: 404, reason: "We could not find that trade." });
   });
 
   it("tells BOTH managers, which no other resolution in this product does", async () => {

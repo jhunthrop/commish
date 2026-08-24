@@ -28,8 +28,8 @@ export interface NotificationTopic {
  * (`@/lib/realtime/events`), so a topic can never promise a notification nobody sends.
  */
 export const NOTIFICATION_CATALOG: readonly NotificationTopic[] = [
-  { key: "draft-turn", title: "It's your turn to pick", detail: "While you're in the draft room.", events: ["draft.pick", "draft.nudge"] },
-  { key: "draft-start", title: "Your draft is starting", detail: "While you're in the league.", events: ["draft.status"] },
+  { key: "draft-turn", title: "It is your turn to pick", detail: "While you are in the draft room.", events: ["draft.pick", "draft.nudge"] },
+  { key: "draft-start", title: "Your draft is starting", detail: "While you are in the league.", events: ["draft.status"] },
   { key: "scores", title: "Your scores are moving", detail: "On your league page and your home page, while games are being played.", events: ["score.update"] },
   { key: "chat", title: "Your league is talking", detail: "In the league's chat.", events: ["chat.message", "chat.reaction"] },
   {

@@ -203,12 +203,12 @@ export function TradeComposer({ context, onAssess, onPropose, onDone, onCancel }
           value={note}
           onChange={(event) => setNote(event.target.value)}
           maxLength={TRADE_CONFIG.noteMaxLength}
-          hint="Say why you're offering this, if you want to."
+          hint="Say why you are offering this, if you want to."
         />
 
         {error === null ? null : (
           <ErrorState
-            title="We couldn't propose that trade."
+            title="We could not propose that trade."
             description={error}
             action={
               <Button variant="secondary" onClick={() => void send()}>

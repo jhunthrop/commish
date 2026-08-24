@@ -116,13 +116,21 @@ export function OpenLeagueCard({ league, signedIn }: OpenLeagueCardProps) {
         )}
       </div>
 
-      <p className={`${EYEBROW} flex flex-wrap items-center gap-x-1 gap-y-1`}>
+      {/* NEW-3: each term is its own full-width line (`basis-full`) rather than a shared
+          `flex-wrap` row of same-line chunks. A guided `InfoTip` stacks its caption directly
+          beneath its own trigger (`info-tip.tsx`'s own behavior, untouched), and a chunk that
+          can grow to two lines cannot safely share a text-flow row with a `·` separator and its
+          neighbor — the separator ends up orphaned on its own line the moment one chunk wraps.
+          Giving every chunk `basis-full` removes the ambiguity outright: one line (icon + label,
+          then its caption) per term, its own leading separator folded IN rather than a sibling
+          that can strand itself. */}
+      <div className={`${EYEBROW} flex flex-col gap-y-1`}>
         <span className="inline-flex items-center gap-1">
           {FORMAT_LABEL[league.format] ?? league.format}
           <InfoTip term={FORMAT_TERM[league.format]} helpLevel={CARD_HELP_LEVEL} />
         </span>
-        <span>·</span>
         <span className="inline-flex items-center gap-1">
+          <span aria-hidden="true">·</span>
           {league.scoringLabel}
           {SCORING_LABEL_TERM[league.scoringLabel] === undefined ? null : (
             <InfoTip term={SCORING_LABEL_TERM[league.scoringLabel]!} helpLevel={CARD_HELP_LEVEL} />
@@ -131,15 +139,13 @@ export function OpenLeagueCard({ league, signedIn }: OpenLeagueCardProps) {
         {/* Deciding a week is a fact about the league, not about anyone in it — the same
             reasoning `PublicLeagueSummary.medianGame`'s own docblock carries. */}
         {league.medianGame ? (
-          <>
-            <span>·</span>
-            <span className="inline-flex items-center gap-1">
-              Median
-              <InfoTip term="median-game" helpLevel={CARD_HELP_LEVEL} />
-            </span>
-          </>
+          <span className="inline-flex items-center gap-1">
+            <span aria-hidden="true">·</span>
+            Median
+            <InfoTip term="median-game" helpLevel={CARD_HELP_LEVEL} />
+          </span>
         ) : null}
-      </p>
+      </div>
 
       {/* The four facts a veteran actually shops on (Task 5, Step 3). */}
       <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -167,7 +173,13 @@ export function OpenLeagueCard({ league, signedIn }: OpenLeagueCardProps) {
         <div className="min-w-0">
           <p className="inline-flex items-center gap-1 text-xs font-semibold uppercase tracking-wide text-text-muted">
             Playoffs
-            <InfoTip term="playoffs" helpLevel={CARD_HELP_LEVEL} />
+            {/* NEW-3: `standard`, not `CARD_HELP_LEVEL`, only here. A guided caption stacks
+                between this label and its value, growing this one cell past its three siblings
+                in the same grid row and knocking "Weeks 15, 16 and 17" out of alignment with
+                them — a popover-only trigger keeps every cell in this 2x2 grid the same shape;
+                the definition is still one click away, same as it is everywhere `InfoTip` is not
+                the always-visible kind. */}
+            <InfoTip term="playoffs" helpLevel="standard" />
           </p>
           <p className="font-medium text-text-primary">{formatPlayoffWeeks(league.playoffWeeks)}</p>
         </div>

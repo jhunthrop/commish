@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request, context: LeagueRouteContext) {
   return withLeagueMemberActor(request, context, async (actor) => {
     const home = await leagueHome(getDb(), actor.leagueId, actor.userId);
-    if (home === null) return fail("That league doesn't exist.", 404);
+    if (home === null) return fail("That league does not exist.", 404);
     return ok<LeagueHomeBody>(home);
   });
 }

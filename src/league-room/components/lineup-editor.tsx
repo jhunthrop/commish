@@ -65,8 +65,8 @@ export function LineupEditor({
         <h2 className="text-lg font-medium text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
         <p className="text-sm text-text-muted">
           {hasNextWeek
-            ? `${formatWeek(lineup.weekNumber)} has started, so its lineup can't change. You can set next week's lineup as soon as this week ends.`
-            : `${formatWeek(lineup.weekNumber)} has started, so its lineup can't change.`}
+            ? `${formatWeek(lineup.weekNumber)} has started, so its lineup cannot change. You can set next week's lineup as soon as this week ends.`
+            : `${formatWeek(lineup.weekNumber)} has started, so its lineup cannot change.`}
         </p>
         <ul className="flex flex-col gap-1">
           {lineup.starters.map((slot) => (
@@ -110,7 +110,7 @@ export function LineupEditor({
       }
       setSaved(true);
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We could not reach the server. Check your connection and try again.");
     } finally {
       setSubmitting(false);
     }

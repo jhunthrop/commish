@@ -30,9 +30,9 @@ describe("LeagueChat", () => {
 
   it("offers a retry when the chat can't be loaded", async () => {
     const fixture = fixtureChatDeps();
-    fixture.response = { ok: false, error: "You don't have a team in this league." };
+    fixture.response = { ok: false, error: "You do not have a team in this league." };
     renderChat(fixture);
-    await waitFor(() => expect(screen.getByText("You don't have a team in this league.")).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByText("You do not have a team in this league.")).toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 

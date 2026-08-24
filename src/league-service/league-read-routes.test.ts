@@ -120,7 +120,7 @@ describe("GET /api/leagues/[leagueId]", () => {
       params: Promise.resolve({ leagueId: created.leagueId }),
     });
     expect(response.status).toBe(403);
-    expect(await response.json()).toEqual({ ok: false, error: "You don't have a team in this league." });
+    expect(await response.json()).toEqual({ ok: false, error: "You do not have a team in this league." });
   });
 
   it("returns standings, the roster shape and the draft's state for a member", async () => {

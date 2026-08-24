@@ -13,7 +13,7 @@ import { TRADE_CONFIG } from "@/trades/config";
  */
 const tradeAssetSchema: z.ZodType<TradeAsset> = z.object({
   kind: z.literal(TRADE_ASSET_KINDS[0]),
-  playerId: z.string().min(1, { message: "That isn't a player." }),
+  playerId: z.string().min(1, { message: "That is not a player." }),
 });
 
 /**

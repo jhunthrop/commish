@@ -72,7 +72,7 @@ describe("StartOrJoinDisclosure", () => {
   it("carries who-can-join and who-it's-for straight through into the create section, unopened", () => {
     render(<StartOrJoinDisclosure experienceTier="beginner" />);
     expect(screen.getByLabelText("Who can join")).toBeInTheDocument();
-    expect(screen.getByLabelText("Who it's for")).toBeInTheDocument();
+    expect(screen.getByLabelText("Who it is for")).toBeInTheDocument();
   });
 
   it("orders browse and join ahead of create for a beginner, the same rule firstRunPlan uses", () => {

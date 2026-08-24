@@ -83,7 +83,7 @@ describe("TradeInbox", () => {
   it("says so plainly when the fetch fails, and offers a retry", async () => {
     const fixture = fixtureLeagueDeps({ ok: false, error: "Not signed in." });
     renderInLeague(<TradeInbox leagueId="l1" context={CONTEXT} />, fixture.deps);
-    expect(await screen.findByText("We couldn't load your trades.")).toBeInTheDocument();
+    expect(await screen.findByText("We could not load your trades.")).toBeInTheDocument();
     expect(screen.getByText("Not signed in.")).toBeInTheDocument();
 
     fixture.response = { ok: true, data: EMPTY_PAGE };

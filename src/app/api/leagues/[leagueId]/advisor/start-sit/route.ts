@@ -32,7 +32,7 @@ export async function POST(request: Request, context: LeagueRouteContext) {
       teamId: actor.teamId,
       weekNumber: parsed.value.weekNumber,
     });
-    if (advisorContext === null) return fail("That league doesn't exist.", 404);
+    if (advisorContext === null) return fail("That league does not exist.", 404);
 
     const advise = createStartSitAdvisor({ enabled: isLLMEnabled(), llm: getLlmClient() });
     return ok<AdviceBody>(await advise({ context: advisorContext, question: parsed.value.question }));

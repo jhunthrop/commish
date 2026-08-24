@@ -94,7 +94,7 @@ describe("setLineup", () => {
         leagueId: league.leagueId, teamId: league.teamId, weekNumber: 1, userId: "u1",
         slots: [{ slot: "QB", slotIndex: 0, playerId: "qb1" }, { slot: "RB", slotIndex: 0, playerId: "rb_other" }],
       }),
-    ).toEqual({ ok: false, status: 422, reason: "One of those players isn't on your team." });
+    ).toEqual({ ok: false, status: 422, reason: "One of those players is not on your team." });
 
     expect(
       await setLineup(db, {
@@ -110,7 +110,7 @@ describe("setLineup", () => {
     expect(await isWeekLocked(db, 3)).toBe(true);
     const result = await setLineup(db, validLineupInput(league, 3));
     expect(result).toMatchObject({ ok: false, status: 409 });
-    expect(result.ok ? "" : result.reason).toBe("Week 3 has started, so its lineup can't change.");
+    expect(result.ok ? "" : result.reason).toBe("Week 3 has started, so its lineup cannot change.");
   });
 
   it("leaves a week open while it is still scheduled", async () => {
@@ -134,7 +134,7 @@ describe("setLineup", () => {
     expect(await setLineup(db, validLineupInput(league, 1))).toEqual({
       ok: false,
       status: 409,
-      reason: "Week 1 has started, so its lineup can't change.",
+      reason: "Week 1 has started, so its lineup cannot change.",
     });
   });
 
@@ -215,14 +215,14 @@ describe("setLineup", () => {
   it("refuses a league that doesn't exist", async () => {
     expect(
       await setLineup(db, { leagueId: "nope", teamId: "team_x", weekNumber: 1, slots: validSwap, userId: "u1" }),
-    ).toEqual({ ok: false, status: 404, reason: "That league doesn't exist." });
+    ).toEqual({ ok: false, status: 404, reason: "That league does not exist." });
   });
 
   it("refuses a week the league doesn't have", async () => {
     const league = await twoTeamLeague(db);
     expect(
       await setLineup(db, { leagueId: league.leagueId, teamId: league.teamId, weekNumber: 9, slots: validSwap, userId: "u1" }),
-    ).toEqual({ ok: false, status: 404, reason: "That week isn't part of this league's season." });
+    ).toEqual({ ok: false, status: 404, reason: "That week is not part of this league's season." });
   });
 
   /**
@@ -240,14 +240,14 @@ describe("setLineup", () => {
 
     expect(
       await setLineup(db, { leagueId: league.leagueId, teamId: "team_other", weekNumber: 1, slots: validSwap, userId: "u1" }),
-    ).toEqual({ ok: false, status: 404, reason: "That team isn't part of this league." });
+    ).toEqual({ ok: false, status: 404, reason: "That team is not part of this league." });
   });
 
   it("refuses a team id that doesn't exist at all", async () => {
     const league = await twoTeamLeague(db);
     expect(
       await setLineup(db, { leagueId: league.leagueId, teamId: "team_nope", weekNumber: 1, slots: validSwap, userId: "u1" }),
-    ).toEqual({ ok: false, status: 404, reason: "That team isn't part of this league." });
+    ).toEqual({ ok: false, status: 404, reason: "That team is not part of this league." });
   });
 
   it("invalidates the score cache for this league and week after a successful save", async () => {

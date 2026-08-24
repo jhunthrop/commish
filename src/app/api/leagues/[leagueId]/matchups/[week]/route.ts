@@ -20,7 +20,7 @@ export async function GET(request: Request, context: RouteContext) {
 
   return withLeagueMemberActor(request, { params: context.params }, async (actor) => {
     const body = await matchupWeek(getDb(), actor.leagueId, weekNumber, actor.userId, getReferenceCache());
-    if (body === null) return fail("That league doesn't exist.", 404);
+    if (body === null) return fail("That league does not exist.", 404);
     return ok<MatchupWeekBody>(body);
   });
 }

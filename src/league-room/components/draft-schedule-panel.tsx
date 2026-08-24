@@ -79,9 +79,30 @@ function toDatetimeLocalValue(iso: string): string {
  * states through this function rather than a second copy of the same two sentences that could
  * drift from this one — the identical "centralize at the second/third caller" reasoning
  * `@/components/ui/countdown` is built on.
+ *
+ * Gauntlet fix wave, NEW-8: `"complete"` used to render this card FOREVER — a bare
+ * `schedule.status === "complete"` predicate with no expiry, so a league well into its season
+ * (the report's example: week 14) still showed "Draft complete / Every roster is set" as the
+ * largest block above the matchup. `LeagueHome`'s own `DraftCompleteArrival` (D4) already
+ * self-expires (its own window is `currentWeek === 1`, the delight beat); this card's job is
+ * different — it is the ordinary, load-bearing way to reach the draft board before the season
+ * finds some other one, which is why its own window is the whole regular season rather than D4's
+ * single week: a member two months in still legitimately wants "View the draft board" reachable
+ * from here. What it may not do is outlive the season it was drafted for.
+ *
+ * `totalWeeks` (never `LEAGUE_CONFIG.regularSeasonWeeks` imported directly) for the same reason
+ * `teamCount` rides in as a prop rather than a shared import elsewhere in this file: client room
+ * code goes through the HTTP/SSE boundary only (`eslint.config.mjs`'s client-boundary rule), and
+ * `LeagueHomeBody.totalWeeks` is already this exact number, server-derived
+ * (`seasonProgress(matchups, LEAGUE_CONFIG.regularSeasonWeeks)`, `@/league-service/read.ts`).
  */
-export function draftTerminalStatePanel(schedule: Pick<DraftScheduleBody, "status" | "draftId">): ReactNode | null {
+export function draftTerminalStatePanel(
+  schedule: Pick<DraftScheduleBody, "status" | "draftId">,
+  currentWeek: number,
+  totalWeeks: number,
+): ReactNode | null {
   if (schedule.status === "complete") {
+    if (currentWeek > totalWeeks) return null;
     return (
       <StatePanel
         tone="neutral"
@@ -141,6 +162,8 @@ export function DraftSchedulePanel({
   teamCount,
   leagueName = "",
   myTeamId = null,
+  currentWeek = 1,
+  totalWeeks = 1,
 }: {
   readonly leagueId: string;
   readonly isCommissioner: boolean;
@@ -160,6 +183,19 @@ export function DraftSchedulePanel({
   /** `null` for a caller with no team here — the same shape `WaitingRoom`'s identical prop
    *  keeps, and the default for every caller that predates this task. */
   readonly myTeamId?: string | null;
+  /**
+   * Gauntlet fix wave, NEW-8: `draftTerminalStatePanel`'s own expiry window needs the season's
+   * CURRENT week, not just the schedule row — `LeagueHome` already holds `home.currentWeek` for
+   * its own header line, the same "rides in as a second prop rather than widening the wire body"
+   * precedent `teamCount` above sets. Defaults to `1` (inside the window, matching every caller
+   * that predates this task and never had a season to be deep into).
+   */
+  readonly currentWeek?: number;
+  /** `draftTerminalStatePanel`'s own expiry window's OTHER half — `home.totalWeeks`, the same
+   *  server-derived regular-season length `currentWeek` above is compared against. Defaults to
+   *  `1`, matching `currentWeek`'s own default: together they keep the window open for every
+   *  caller that predates this task. */
+  readonly totalWeeks?: number;
 }) {
   const { fetchJson } = useLeagueRoomDeps();
   const [schedule, setSchedule] = useState<DraftScheduleBody>(initialSchedule);
@@ -185,7 +221,7 @@ export function DraftSchedulePanel({
   const save = async (): Promise<void> => {
     const parsed = new Date(draftValue);
     if (Number.isNaN(parsed.getTime())) {
-      setSaveError("That doesn't look like a valid time.");
+      setSaveError("That does not look like a valid time.");
       return;
     }
     setSaving(true);
@@ -204,7 +240,7 @@ export function DraftSchedulePanel({
       setSchedule(body.data);
       setEditing(false);
     } catch {
-      setSaveError("We couldn't reach the server. Check your connection and try again.");
+      setSaveError("We could not reach the server. Check your connection and try again.");
     } finally {
       setSaving(false);
     }
@@ -226,7 +262,7 @@ export function DraftSchedulePanel({
       }
       setSchedule({ ...schedule, status: "in_progress" });
     } catch {
-      setStartError("We couldn't reach the server. Check your connection and try again.");
+      setStartError("We could not reach the server. Check your connection and try again.");
     } finally {
       setStarting(false);
     }
@@ -241,7 +277,7 @@ export function DraftSchedulePanel({
     schedule.status !== "scheduled" ? null : schedule.isPublicMatchmade ? (
       <p className="text-sm text-text-muted">If nobody starts it, we will start it at the scheduled time.</p>
     ) : isCommissioner ? (
-      <p className="text-sm text-text-muted">{"Nothing starts this automatically. Press Start the draft when everyone's ready."}</p>
+      <p className="text-sm text-text-muted">{"Nothing starts this automatically. Press Start the draft when everyone is ready."}</p>
     ) : null;
 
   // Task 7 (F12/F21): only a SCHEDULED draft ever rolls (Step 2's own model ruling), so this
@@ -281,7 +317,7 @@ export function DraftSchedulePanel({
       </p>
     );
 
-  const terminal = draftTerminalStatePanel(schedule);
+  const terminal = draftTerminalStatePanel(schedule, currentWeek, totalWeeks);
   if (terminal !== null) return terminal;
 
   const msUntil = remainingMs ?? 0;
@@ -296,6 +332,11 @@ export function DraftSchedulePanel({
       <Countdown remainingMs={msUntil} size="xl" data-testid="waiting-room-countdown" />
       <SeatMeter filled={schedule.filledTeams} total={teamCount} />
       <p className="text-sm text-text-muted">{`${formatLocal(schedule.kickoffAt)} (${formatRelativeCountdown(msUntil)})`}</p>
+      {/* Gauntlet fix wave, item 11 (JF-H4): C3's safety-net sentence, quoted verbatim, reaching
+          a SCHEDULED league's waiting room — this product's most common waiting state, and the
+          one the gauntlet's first-timer persona actually asked "what if I miss it" from. Only
+          `full && startTrigger === "when_full"` said this before; a scheduled room never did. */}
+      <p className="text-sm text-text-muted">The room picks for you from your queue if your clock runs out.</p>
     </div>
   );
 

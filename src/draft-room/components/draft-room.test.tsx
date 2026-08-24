@@ -66,7 +66,7 @@ describe("DraftRoom", () => {
 
   it("offers a retry when the draft cannot be loaded", async () => {
     const fixture = fixtureDeps();
-    fixture.deps = { ...fixture.deps, fetchJson: async () => ({ json: async () => ({ ok: false, error: "That draft doesn't exist." }) }) as unknown as Response };
+    fixture.deps = { ...fixture.deps, fetchJson: async () => ({ json: async () => ({ ok: false, error: "That draft does not exist." }) }) as unknown as Response };
     renderInRoom(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <ToastProvider>
@@ -75,7 +75,7 @@ describe("DraftRoom", () => {
       </ChatRoomDepsProvider>,
       fixture.deps,
     );
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("That draft doesn't exist."));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("That draft does not exist."));
     expect(screen.getByRole("button", { name: "Try again" })).toBeInTheDocument();
   });
 

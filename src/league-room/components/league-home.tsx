@@ -31,19 +31,28 @@ import { WaitingRoom } from "./waiting-room";
  *  thing on the calendar, and the league's format facts — every fact this component already
  *  holds, joined with the same " · " separator the old subtitle used. `record`/`seed` are
  *  omitted for a viewer with no team (a commissioner without one of their own): there is no row
- *  in `standings` naming them, so nothing here would be true. */
+ *  in `standings` naming them, so nothing here would be true.
+ *
+ *  Gauntlet fix wave, item 7: also omitted before the league's first played week. "0-0 · #1
+ *  seed" is true of every team in a league that has not played yet, which makes it noise for the
+ *  many and absurd on a one-team room (the first-timer's own reading of it, gauntlet report) — a
+ *  seed only means something once at least one result has separated the field. */
 function headerFacts(home: LeagueHomeBody): string {
   const parts: string[] = [];
   const myRank = home.standings.findIndex((row) => row.teamId === home.myTeamId);
-  if (myRank !== -1) {
-    parts.push(formatRecord(home.standings[myRank]!));
+  const myRow = myRank === -1 ? null : home.standings[myRank]!;
+  const hasPlayedWeek = myRow !== null && myRow.wins + myRow.losses + myRow.ties > 0;
+  if (myRow !== null && hasPlayedWeek) {
+    parts.push(formatRecord(myRow));
     parts.push(`#${myRank + 1} seed`);
   }
-  // The next thing on the calendar: the draft's own real-or-placeholder time before it's
-  // complete (`terms.draftAt`, already the one sentence every draft-time surface renders), the
-  // current week once there's a season to point at instead — never a new fact, both already on
-  // `home`.
-  parts.push(home.draftStatus === "complete" ? formatWeek(home.currentWeek) : home.terms.draftAt);
+  // The next thing on the calendar: the current week once there's a season to point at
+  // (`formatWeek`, never a new fact). Before the draft is complete, `WaitingRoom` (below,
+  // whenever `home.draftSchedule` is non-null) already owns naming this same instant, in the
+  // reader's OWN local time (`DraftSchedulePanel`'s `formatLocal`) — this line used to ALSO
+  // print `terms.draftAt`, the fixed-UTC rendering, 300px above it (gauntlet fix wave, NEW-4).
+  // One instant, one presentation: the schedule panel's local hero is the one that stays.
+  if (home.draftStatus === "complete") parts.push(formatWeek(home.currentWeek));
   parts.push(`${home.format === "auction" ? "Auction" : "Snake"} draft`);
   return parts.join(" · ");
 }
@@ -200,7 +209,13 @@ export function LeagueHome({
           third item rather than a fourth sibling panel here. */}
       {home.draftSchedule === null ? null : (
         <WaitingRoom
-          league={{ ...home.draftSchedule, teamCount: home.teamCount, authority: home.authority }}
+          league={{
+            ...home.draftSchedule,
+            teamCount: home.teamCount,
+            authority: home.authority,
+            currentWeek: home.currentWeek,
+            totalWeeks: home.totalWeeks,
+          }}
           isCommissioner={home.isCommissioner}
           leagueName={home.name}
           myTeamId={home.myTeamId}
@@ -241,7 +256,7 @@ export function LeagueHome({
             gone, and this is what replaced it — an explanation of why, not a silent absence. */}
         {home.isCommissioner ? (
           <p className="text-sm text-text-muted">
-            {"Scores update automatically as games finish. There's nothing to run by hand."}
+            {"Scores update automatically as games finish. There is nothing to run by hand."}
           </p>
         ) : null}
       </section>

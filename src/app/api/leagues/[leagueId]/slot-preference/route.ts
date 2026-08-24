@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
  *  builds their `SlotPreferenceView` (`@/league-service/draft-schedule`) — a ranking is scoped
  *  to a team, so a caller with none here gets the SAME non-oracle 404 a stranger to the league
  *  entirely would, never a 403 (ruling 14, and the brief's own rule for this route). */
-const NOT_FOUND = "That league doesn't exist.";
+const NOT_FOUND = "That league does not exist.";
 
 /**
  * NFFC's Kentucky Derby System. Own preferences only — this route never takes a team id, so a

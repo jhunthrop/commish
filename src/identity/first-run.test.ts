@@ -94,7 +94,7 @@ describe("firstRunPlan", () => {
     expect(byKey(beginner).get("create")).toEqual({
       key: "create",
       title: "Start a league",
-      detail: "You pick the format, the scoring and who's in it.",
+      detail: "You pick the format, the scoring and who is in it.",
       cta: "Start a league",
     });
     expect(byKey(beginner).get("join")).toEqual({

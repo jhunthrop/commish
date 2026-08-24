@@ -19,7 +19,7 @@ const TEAM_MEMBERSHIP_UNIQUE_INDEX = "teams_league_user_idx";
  * same sentence for the same failure, rather than two hand-typed copies that could quietly
  * diverge.
  */
-const INVALID = "That invite link isn't valid. Ask your commissioner for a new one.";
+const INVALID = "That invite link is not valid. Ask your commissioner for a new one.";
 const EXPIRED = "That invite link has expired. Ask your commissioner for a new one.";
 const EXHAUSTED = "That invite link has already been used up. Ask your commissioner for a new one.";
 
@@ -75,7 +75,7 @@ export async function createInvite(
       .returning({ code: leagueInvites.code });
     if (inserted.length > 0) return { ok: true, code, expiresAt: expiresAt.toISOString(), maxUses };
   }
-  return { ok: false, reason: "We couldn't create an invite just now. Please try again." };
+  return { ok: false, reason: "We could not create an invite just now. Please try again." };
 }
 
 /**
@@ -157,7 +157,7 @@ export async function acceptInvite(
     }
     // The code is a membership capability — never write it to a log.
     console.error("[league] accept invite failed", { league: "redacted-code" }, error);
-    return { ok: false, status: 500, reason: "We couldn't join that league just now. Please try again." };
+    return { ok: false, status: 500, reason: "We could not join that league just now. Please try again." };
   }
 }
 

@@ -53,12 +53,12 @@ describe("AdvisorPanel", () => {
   });
 
   it("shows the server's reason when the advisor can't answer, and keeps the question", async () => {
-    const fixture = fixtureLeagueDeps({ ok: false, error: "You don't have a team in this league." });
+    const fixture = fixtureLeagueDeps({ ok: false, error: "You do not have a team in this league." });
     renderInLeague(<AdvisorPanel leagueId="l1" weekNumber={4} />, fixture.deps);
     fireEvent.change(screen.getByLabelText("Ask about your lineup"), { target: { value: "Who do I start?" } });
     fireEvent.click(screen.getByRole("button", { name: "Get advice" }));
 
-    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("You don't have a team in this league."));
+    await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("You do not have a team in this league."));
     expect(screen.getByLabelText("Ask about your lineup")).toHaveValue("Who do I start?");
   });
 
