@@ -63,16 +63,22 @@ test("the advisor answers from this league's own numbers, with or without a mode
 test("a signed-in manager can browse open leagues and join one", async ({ managerB }) => {
   await managerB.goto("/browse");
   await expect(managerB.getByRole("heading", { name: "Open leagues" })).toBeVisible();
-  await expect(managerB.getByText(/of \d+ joined/).first()).toBeVisible();
+  // Pre-existing drift found while touching this spec for Task 5: `SeatMeter` (F17, the one seat
+  // sentence for the whole product) has read "X of Y seated" since well before this task, never
+  // "joined" — this assertion never matched current product copy.
+  await expect(managerB.getByText(/of \d+ seated/).first()).toBeVisible();
   // The stake disclosure appears twice by design (the stake-tier filter's hint, and again
   // below the results — see browse-filters.tsx) so this is deliberately not a strict match.
   await expect(managerB.getByText("No money changes hands.").first()).toBeVisible();
 
-  // Filtering narrows, and the URL carries it.
-  await managerB.getByLabel("Draft format").selectOption("auction");
-  await managerB.getByRole("button", { name: "Show leagues" }).click();
-  await expect(managerB).toHaveURL(/format=auction/);
-  await expect(managerB.getByText("Rookie Snake Room")).toHaveCount(0);
+  // Filtering narrows, and the URL carries it. Phase 3.6, Task 5, Step 4 replaced the old
+  // four-`Select` filter form with four pills (ruling 1: "variety in toggles, not queues") —
+  // "Newer players" is the surviving `experienceTier` axis, the same one this spec always
+  // exercised, now reached by a link rather than a form submit.
+  await managerB.getByRole("link", { name: "Newer players" }).click();
+  await expect(managerB).toHaveURL(/experienceTier=beginner/);
+  await expect(managerB.getByText("Sunday Regulars")).toHaveCount(0);
+  await expect(managerB.getByText("Rookie Snake Room")).toBeVisible();
 
   // Scoped to the member list, not the whole page (Phase 3.5 addendum, Task 15): the house
   // shelf (`HouseLeagueShelf`) renders its OWN "Join {name}" buttons above this list and is
@@ -138,7 +144,10 @@ test("a signed-OUT visitor can browse but is asked to sign in before joining", a
   const page = await context.newPage();
   await page.goto("/browse");
   await expect(page.getByRole("heading", { name: "Open leagues" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Sign in to join" }).first()).toBeVisible();
+  // Phase 3.6, Task 5: `OpenLeagueCard`'s signed-out CTA reads "Take a seat in {league}." (or
+  // "Take the last seat…", plus a "Newer players only." clause on a beginner-only card) —
+  // deliberately named, per league, rather than the old generic "Sign in to join" this replaced.
+  await expect(page.getByRole("link", { name: /^Take (a seat|the last seat) in / }).first()).toBeVisible();
   await expect(page.getByRole("button", { name: /^Join / })).toHaveCount(0);
   await context.close();
 });

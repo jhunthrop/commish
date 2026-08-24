@@ -6,10 +6,11 @@ import { AppShell } from "@/components/app-shell/app-shell";
 import { shellData } from "@/components/app-shell/shell-data";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
+import { formatAbsoluteTime } from "@/league";
 import { listPublicLeagues } from "@/league-service/browse";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
-import { BrowseFilters } from "@/league-room/components/browse-filters";
-import { HouseLeagueShelf, PublicLeagueList } from "@/league-room/components/public-league-list";
+import { BrowseFilters, type BrowseFilterOption } from "@/league-room/components/browse-filters";
+import { HouseLeagueShelf, PublicLeagueList, seatCountsAsOfSentence } from "@/league-room/components/public-league-list";
 
 export const dynamic = "force-dynamic";
 
@@ -58,12 +59,30 @@ export default async function BrowsePage({ searchParams }: PageProps) {
     stakeTier: first(params.stakeTier),
     participationTier: first(params.participationTier),
   });
-  const user = await getCurrentUser();
-  const { leagues, house } = await listPublicLeagues(getDb(), filter);
+  // Phase 3.6, Task 5, Step 4: the shelf's own sort pill and when-full toggle — separate query
+  // params, never a `BrowseFilter` axis (`BrowseQueryOptions`'s own docblock, `@/league-service/
+  // browse.ts`).
+  const sort = first(params.sort) === "soonest" ? "soonest" : "seats_remaining";
+  const whenFullOnly = first(params.whenFull) === "1";
+  const active: BrowseFilterOption =
+    whenFullOnly ? "when_full" : sort === "soonest" ? "soonest" : filter.experienceTier === "beginner" ? "newer" : "all";
+
+  const nowIso = new Date().toISOString();
+  const clock = { now: () => nowIso };
+  const [user, { leagues, house }] = await Promise.all([
+    getCurrentUser(),
+    listPublicLeagues(getDb(), filter, clock, { sort, whenFullOnly }),
+  ]);
 
   const content = (
     <>
-      <PageTitle>Open leagues</PageTitle>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <PageTitle>Open leagues</PageTitle>
+        {/* F20, and the honest half of deferral D4: the shelf says when its numbers were true,
+            verbatim, rather than the mock's refused "Live seat counts · updated just now" — see
+            `seatCountsAsOfSentence`'s own docblock for why. */}
+        <p className="text-sm text-text-muted">{seatCountsAsOfSentence(formatAbsoluteTime(nowIso))}</p>
+      </div>
       <p className="max-w-prose text-text-muted">
         Leagues looking for managers, with a draft still to come. Pick one that matches how you
         like to play. Recruiting your own group instead?{" "}
@@ -79,7 +98,7 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           an unreconciled database (or a rung mid-restock) never shows an apology above a
           member list that is doing just fine on its own. */}
       <HouseLeagueShelf leagues={house} signedIn={user !== null} />
-      <BrowseFilters filter={filter} />
+      <BrowseFilters active={active} />
       <PublicLeagueList leagues={leagues} signedIn={user !== null} />
     </>
   );

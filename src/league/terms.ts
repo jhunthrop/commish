@@ -178,6 +178,18 @@ function relativeDraftTime(kickoffMs: number, nowMs: number): string {
 }
 
 /**
+ * "Saturday 12 September, 7:00 PM UTC" — the absolute half of `formatDraftTime`, factored out
+ * (Phase 3.6, Task 5) so a caller that has a plain instant to name and no relative comparison to
+ * make (the browse shelf's own "Seat counts as of {time}" header, F20) can render the identical
+ * words rather than growing a second, parallel formatter. `formatDraftTime` below is now this
+ * function plus its own relative clause.
+ */
+export function formatAbsoluteTime(iso: string): string {
+  const instant = new Date(iso);
+  return `${WEEKDAY_FORMAT.format(instant)} ${DAY_FORMAT.format(instant)} ${MONTH_FORMAT.format(instant)}, ${CLOCK_FORMAT.format(instant)} UTC`;
+}
+
+/**
  * The one sentence every surface that names a draft's scheduled time renders — absolute first,
  * because a relative-only string ("in 3 days") is useless to somebody who doesn't yet know what
  * day that even is; relative second, because "Saturday 12 September, 7:00 PM UTC" alone makes a
@@ -186,11 +198,9 @@ function relativeDraftTime(kickoffMs: number, nowMs: number): string {
  * `leagueTerms` computes.
  */
 export function formatDraftTime(kickoffAtIso: string, nowIso: string): string {
-  const kickoff = new Date(kickoffAtIso);
-  const kickoffMs = kickoff.getTime();
+  const kickoffMs = new Date(kickoffAtIso).getTime();
   const nowMs = new Date(nowIso).getTime();
-  const absolute = `${WEEKDAY_FORMAT.format(kickoff)} ${DAY_FORMAT.format(kickoff)} ${MONTH_FORMAT.format(kickoff)}, ${CLOCK_FORMAT.format(kickoff)} UTC`;
-  return `${absolute} (${relativeDraftTime(kickoffMs, nowMs)})`;
+  return `${formatAbsoluteTime(kickoffAtIso)} (${relativeDraftTime(kickoffMs, nowMs)})`;
 }
 
 /**

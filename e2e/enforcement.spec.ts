@@ -94,8 +94,11 @@ test("a veteran browses, is refused a beginner league, and reads why", async ({ 
   await managerA.goto("/browse");
   await expect(managerA.getByRole("heading", { name: "Open leagues" })).toBeVisible();
 
-  // Sees the tier filter — Task 2's own "who's playing" axis.
-  await expect(managerA.getByLabel("Who's playing")).toBeVisible();
+  // Sees the shelf's own filter row (Phase 3.6, Task 5, Step 4 retired the "who's playing"
+  // participation-tier `Select` this used to check for — ruling 1's four-control reduction did
+  // not keep it, since a visitor sees the SAME fact per card via `OpenLeagueCard`'s own
+  // composition line instead of a fifth axis a seat could disappear behind).
+  await expect(managerA.getByRole("navigation", { name: "Filter open leagues" })).toBeVisible();
 
   // The target beginner league, already visible in the unfiltered default listing, carrying the
   // composition label a real query computed SERVER-side (final review F6 moved the reduction off

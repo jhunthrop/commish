@@ -1,195 +1,134 @@
 import Link from "next/link";
-import type { Position } from "@/domain/player";
-import { Sticker } from "@/components/ui";
 import { getDb } from "@/db/client";
-import { getDraftStore } from "@/draft-service";
-import { rankedPlayers } from "@/draft-service/pool";
-import { envOr } from "@/lib/env";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { PublicBar, type NavLink } from "@/components/app-shell/public-bar";
+import { PublicFooter } from "@/components/app-shell/public-footer";
+import { formatAbsoluteTime } from "@/league";
+import { listPublicLeagues } from "@/league-service/browse";
+import { proofStats } from "@/league-service/proof";
+import { getProofCache } from "@/league-service/proof-cache-instance";
+import { normalizeBrowseFilter } from "@/matchmaking/filter";
+import { BrowseFilters, type BrowseFilterOption } from "@/league-room/components/browse-filters";
+import { FrontDoorHero } from "@/league-room/components/front-door-hero";
+import { HouseLeagueShelf, PublicLeagueList, seatCountsAsOfSentence } from "@/league-room/components/public-league-list";
+import { ProofStrip } from "@/league-room/components/proof-strip";
+import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
 
-/**
- * The signed-out landing page. The hero panel is NOT a mock: it renders the first rounds of a
- * real draft — the platform-owned showcase league — through the identical service/selector
- * path the live room uses (`getDraftStore().getDraftState`, `rankedPlayers`). If that draft
- * doesn't exist or hasn't started (fresh database, no seed), the panel simply doesn't render;
- * the landing page never invents picks and never breaks over a data problem.
- *
- * A public page must never show a customer's league — the showcase id points at a
- * platform-owned league, dev-seeded locally, and is env-swappable for production.
- */
-
-// Reads DB per request (no build-time prerender against a database that may not exist).
 export const dynamic = "force-dynamic";
 
-const SHOWCASE_DRAFT_ID = envOr("SHOWCASE_DRAFT_ID", "dev_draft_snake");
-const SHOWCASE_ROUNDS = 4;
-const SHOWCASE_TEAMS = 4;
+/** This page's own path — its `PublicBar`'s sign-in link returns here (Task 16, F6). */
+const PAGE_INTENT = "/";
 
-interface ShowcaseCell {
-  readonly name: string;
-  readonly position: Position;
-}
-interface ShowcaseRow {
-  readonly round: number;
-  readonly serpentine: "→" | "←";
-  readonly picks: readonly ShowcaseCell[];
-}
-interface Showcase {
-  readonly caption: string;
-  readonly rows: readonly ShowcaseRow[];
-}
+/**
+ * The mock's three nav links (Task 16, F5) — `PublicBar` renders bare on every other public
+ * surface (`/browse`, `/reviews`, `/app/join/[code]`); the front door alone fills these in.
+ * "How it works" points at `/league-rules` (the addendum's Task 21 Step 4 page, stubbed real by
+ * this task — see `src/app/league-rules/page.tsx`): a nav item pointing at a route nobody
+ * created is the footer-to-a-404 failure with a bigger font.
+ */
+const NAV: readonly NavLink[] = [
+  { href: "/browse", label: "Open leagues" },
+  { href: "/league-rules", label: "How it works" },
+  { href: "/reviews", label: "Reviews" },
+];
 
-async function loadShowcase(): Promise<Showcase | null> {
-  try {
-    const state = await getDraftStore().getDraftState(SHOWCASE_DRAFT_ID);
-    if (state === null || state.picks.length === 0) return null;
-    const players = await rankedPlayers(getDb(), state.config.leagueId);
-    const byId = new Map(players.map((player) => [player.id, player]));
-    const teams = state.draftOrder.slice(0, SHOWCASE_TEAMS);
+const first = (value: string | readonly string[] | undefined): string | null =>
+  typeof value === "string" ? value : Array.isArray(value) ? (value[0] ?? null) : null;
 
-    const rows = Array.from({ length: SHOWCASE_ROUNDS }, (_, index) => {
-      const round = index + 1;
-      const roundPicks = state.picks.filter((pick) => pick.round === round);
-      return {
-        round,
-        serpentine: round % 2 === 1 ? ("→" as const) : ("←" as const),
-        picks: teams
-          .map((teamId) => roundPicks.find((pick) => pick.teamId === teamId))
-          .flatMap((pick) => {
-            const player = pick === undefined ? undefined : byId.get(pick.playerId);
-            return player === undefined ? [] : [{ name: player.name, position: player.position }];
-          }),
-      };
-    }).filter((row) => row.picks.length > 0);
-    if (rows.length === 0) return null;
-
-    const latest = state.picks[state.picks.length - 1]!;
-    const caption =
-      state.phase === "complete"
-        ? "A finished draft on Commish. Every pick, live on the board."
-        : `Round ${latest.round} · Pick ${latest.pickNumber} · drafted live on Commish`;
-    return { caption, rows };
-  } catch {
-    // The public front door renders without its showcase before it ever renders an error.
-    return null;
-  }
+interface PageProps {
+  readonly searchParams: Promise<Record<string, string | readonly string[] | undefined>>;
 }
 
-const STICKER_TILT = ["-rotate-1", "rotate-1", "rotate-0", "-rotate-1"] as const;
+/**
+ * The signed-out landing page (Phase 3.6, Task 5) — the first surface a stranger sees, and the
+ * one the founder's "best app I've ever seen" bar is judged on hardest. Everything on it is
+ * either a query or a sentence this product can keep: the hero and three-step strip are static
+ * copy this task can defend word for word, `ProofStrip` renders only numbers `proofStats`
+ * actually earned (Task 4), and the shelf below it is the SAME `listPublicLeagues` read and the
+ * SAME `OpenLeagueCard`/`HouseLeagueShelf`/`BrowseFilters` components `/browse` renders — the
+ * front door does not invent a second, decorative shelf, it shows the real one.
+ *
+ * `PublicBar`'s `action` (the green "Take a seat" CTA) points at `/browse`, never an anchor into
+ * this page's own shelf: the shelf IS where a seat is actually taken, on this page or on
+ * `/browse`, but a fixed, bookmarkable destination is simpler to reason about than a scroll
+ * position, and `/browse` renders the identical shelf this page does.
+ *
+ * `proofStats` is read through `getProofCache()` (`@/league-service/proof-cache-instance`) —
+ * this is the highest-traffic unauthenticated page in the product, and the three-query read
+ * behind the strip is cached for `MATCHMAKING_CONFIG.proof.cacheTtlSeconds` (60s) rather than
+ * paid on every render (P4 review, binding CARRY).
+ *
+ * ONE `now` instant, read once and threaded to every reader that needs it (`listPublicLeagues`'s
+ * own clock, the shelf header's "Seat counts as of" sentence) — the same "one instant, every
+ * card" discipline `listPublicLeagues` itself already holds internally.
+ */
+export default async function Home({ searchParams }: PageProps) {
+  const params = await searchParams;
+  const filter = normalizeBrowseFilter({
+    experienceTier: first(params.experienceTier),
+  });
+  const sort = first(params.sort) === "soonest" ? "soonest" : "seats_remaining";
+  const whenFullOnly = first(params.whenFull) === "1";
+  const active: BrowseFilterOption =
+    whenFullOnly ? "when_full" : sort === "soonest" ? "soonest" : filter.experienceTier === "beginner" ? "newer" : "all";
 
-function ShowcaseBoard({ showcase }: { readonly showcase: Showcase }) {
+  const nowIso = new Date().toISOString();
+  const clock = { now: () => nowIso };
+
+  const [user, { leagues, house }, stats] = await Promise.all([
+    getCurrentUser(),
+    listPublicLeagues(getDb(), filter, clock, { sort, whenFullOnly }),
+    getProofCache().stats(() => proofStats(getDb(), { clock })),
+  ]);
+
   return (
-    <div aria-hidden="true" className="rotate-1 rounded-lg border border-line bg-surface-elevated p-4 shadow-sticker">
-      <p className="mb-3 font-display text-sm font-semibold uppercase tracking-widest text-text-muted">
-        {showcase.caption}
-      </p>
-      <div className="flex flex-col gap-2">
-        {showcase.rows.map((row, rowIndex) => (
-          <div key={row.round} className="grid grid-cols-[2rem_repeat(4,1fr)] items-center gap-2">
-            <span className="font-mono text-xs tabular-nums text-text-muted">{`${row.round} ${row.serpentine}`}</span>
-            {row.picks.map((cell, cellIndex) => (
-              <Sticker
-                key={`${row.round}:${cell.name}`}
-                position={cell.position}
-                className={`px-2 py-1.5 ${STICKER_TILT[(rowIndex + cellIndex) % STICKER_TILT.length]}`}
-              >
-                <p className="truncate font-display text-sm font-bold leading-tight">{cell.name}</p>
-                <p className="text-xs uppercase opacity-80">{cell.position}</p>
-              </Sticker>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-const PROOF = [
-  {
-    title: "Drafts that feel live",
-    body: "A sticker board, a real clock, and autopick that never stalls the room.",
-  },
-  {
-    title: "The trash talk stays in",
-    body: "League chat lives beside the board and the standings, not in a separate app.",
-  },
-  {
-    title: "An advisor on your bench",
-    body: "Start/sit and trade calls computed from your league's own scoring. Advice only. You make the move.",
-  },
-] as const;
-
-export default async function Home() {
-  const showcase = await loadShowcase();
-  return (
-    <main className="min-h-screen bg-surface">
-      <header className="mx-auto flex w-full max-w-6xl items-center justify-between px-6 py-5">
-        <p className="font-display text-2xl font-bold uppercase tracking-wide text-text-primary">Commish</p>
-        <div className="flex items-center gap-2">
+    <>
+      <PublicBar
+        intent={PAGE_INTENT}
+        nav={NAV}
+        action={
           <Link
             href="/browse"
-            className="rounded-md px-4 py-2 font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
           >
-            Browse open leagues
+            Take a seat
           </Link>
-          <Link
-            href="/reviews"
-            className="rounded-md px-4 py-2 font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Reviews
-          </Link>
-          <Link
-            href="/sign-in"
-            className="rounded-md px-4 py-2 font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-          >
-            Sign in
-          </Link>
-        </div>
-      </header>
+        }
+      />
+      <main className="flex flex-col gap-10 bg-surface">
+        <section className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-10 sm:py-14">
+          <FrontDoorHero />
+          <SeatClaimSteps />
+          <ProofStrip stats={stats} />
+        </section>
 
-      <section
-        className={`mx-auto grid w-full max-w-6xl items-center gap-10 px-6 py-14 lg:py-20 ${showcase === null ? "" : "lg:grid-cols-2"}`}
-      >
-        <div className="flex flex-col items-start gap-6">
-          <p className="font-display text-sm font-semibold uppercase tracking-widest text-text-muted">
-            Season-long · Real stakes · No spreadsheets
-          </p>
-          <h1 className="font-display text-display-xl font-bold uppercase leading-display text-text-primary">
-            The money league your group chat deserves
-          </h1>
-          <p className="max-w-prose text-lg text-text-muted">
-            Live drafts, standings that settle arguments, and the trash talk built in. Season-long fantasy football
-            without the twenty-year-old software.
-          </p>
-          <div className="flex flex-col gap-2">
-            <Link
-              href="/sign-in"
-              className={
-                "inline-flex h-12 items-center justify-center rounded-md bg-accent px-8 text-lg font-medium text-accent-text transition-colors " +
-                "hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-              }
-            >
-              Get in the room
-            </Link>
-            <p className="text-sm text-text-muted">Free to sign up. Set up a league and invite your group in minutes.</p>
+        <section className="mx-auto flex w-full max-w-6xl flex-col gap-4 border-t border-line px-4 pb-10 pt-8">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="font-display text-lg font-bold uppercase leading-display text-text-primary">Open leagues</h2>
+            <p className="text-sm text-text-muted">{seatCountsAsOfSentence(formatAbsoluteTime(nowIso))}</p>
           </div>
-        </div>
-        {showcase === null ? null : <ShowcaseBoard showcase={showcase} />}
-      </section>
+          <HouseLeagueShelf leagues={house} signedIn={user !== null} />
+          <BrowseFilters active={active} />
+          <PublicLeagueList leagues={leagues} signedIn={user !== null} />
 
-      <section aria-label="What you get" className="border-t border-line bg-surface-elevated">
-        <div className="mx-auto grid w-full max-w-6xl gap-8 px-6 py-12 sm:grid-cols-3">
-          {PROOF.map((item) => (
-            <div key={item.title} className="flex flex-col gap-2">
-              <h2 className="font-display text-xl font-bold uppercase text-text-primary">{item.title}</h2>
-              <p className="text-sm text-text-muted">{item.body}</p>
-            </div>
-          ))}
-        </div>
-      </section>
-
-      <footer className="mx-auto w-full max-w-6xl px-6 py-8">
-        <p className="text-sm text-text-muted">Commish. Season-long fantasy football, run properly.</p>
-      </footer>
-    </main>
+          {/* The gauntlet's MEDIUM: "Start your own" used to be a tile among tiles, reading as
+              an afterthought rather than a category of its own. Its own row, its own framing,
+              below the shelf it is not competing with. */}
+          <div className="flex flex-col items-start gap-2 rounded-lg border border-line bg-surface-elevated p-4">
+            <h3 className="font-display text-lg font-bold uppercase leading-display text-text-primary">Start your own league</h3>
+            <p className="max-w-prose text-sm text-text-muted">
+              Your rules, your people. The platform still runs the chores: the draft room, the
+              schedule, and the scoring. Snake or auction, any scoring preset, private or public.
+            </p>
+            {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
+                first rather than an error, exactly like the shelf's own identical link. */}
+            <Link href="/app#create-league" className="text-sm font-medium text-accent underline">
+              Create a league
+            </Link>
+          </div>
+        </section>
+      </main>
+      <PublicFooter />
+    </>
   );
 }

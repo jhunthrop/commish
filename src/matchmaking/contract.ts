@@ -107,6 +107,27 @@ export interface PublicLeagueSummary {
    * here or on any card — that primitive owns the ONE seat sentence for the whole product (F17).
    */
   readonly heldSeats: number;
+  /**
+   * Phase 3.6, Task 5, the fourteenth field: "15 slots, 1 flex" or "16 slots, 2 flex, superflex"
+   * — a derived sentence from the league's stored `roster_slots` rows, through the existing
+   * `describeRosterShape` (`@/league/roster-shape`), on the SAME disclosure reasoning
+   * `scoringLabel` and `draftAt` already established for this interface: a fact about the
+   * league's own shape, never about a person in it. The gauntlet's veteran finding was that the
+   * card "looks premium, reads shallow" — this is one of the two cheapest fields that fix it,
+   * because the slot rows are already in the database.
+   */
+  readonly rosterSummary: string;
+  /**
+   * Phase 3.6, Task 5, the fifteenth field: the two or three week numbers the platform's
+   * standard playoff bracket runs across, e.g. `[15, 16, 17]`. The SAME fact for every league on
+   * this platform today — `LEAGUE_CONFIG.regularSeasonWeeks` and `LEAGUE_CONFIG.playoffTeams`
+   * are global tunables, not a per-league override anything in this codebase writes — so this is
+   * not read off a per-row column; `summarizeRow` (`@/league-service/browse.ts`) computes it
+   * once, from config, for every row. Raw week numbers rather than a pre-joined sentence (unlike
+   * `rosterSummary` above) because the card is the one place that decides how to say "and"
+   * between them.
+   */
+  readonly playoffWeeks: readonly number[];
 }
 
 /** A normalized browse filter: every field is a concrete value or the "any" sentinel. */

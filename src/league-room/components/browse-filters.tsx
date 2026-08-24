@@ -1,83 +1,67 @@
-import { Button, Select } from "@/components/ui";
-import { LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
-import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
-import type { BrowseFilter } from "@/matchmaking/contract";
-
-const ANY = MATCHMAKING_CONFIG.anyValue;
-const FORMAT_LABELS: Readonly<Record<string, string>> = { snake: "Snake", auction: "Auction" };
-
-const FORMAT_OPTIONS = [
-  { value: ANY, label: "Any format" },
-  ...MATCHMAKING_CONFIG.formats.map((value) => ({ value, label: FORMAT_LABELS[value] ?? value })),
-];
-/**
- * `experienceTier` here narrows by the LEAGUE's own declared tier (`league.experienceTier` in
- * `matchesBrowseFilter`, `@/matchmaking/filter`), the same axis `CreateLeagueForm`'s `Who it's
- * for` control writes — so this control reads `LEAGUE_EXPERIENCE_TIER_LABEL` (`@/identity/config`)
- * rather than the person-facing `EXPERIENCE_TIER_LABEL` a private copy here used to duplicate
- * word-for-word: a visitor filtering leagues is choosing "open" vs. "reserved", not describing
- * their own football history.
- */
-const EXPERIENCE_OPTIONS = [
-  { value: ANY, label: "Any experience" },
-  ...MATCHMAKING_CONFIG.experienceTiers.map((value) => ({ value, label: LEAGUE_EXPERIENCE_TIER_LABEL[value] ?? value })),
-];
-const STAKE_OPTIONS = [
-  { value: ANY, label: "Any stake tier" },
-  ...MATCHMAKING_CONFIG.stakeTiers.map((entry) => ({ value: String(entry.tier), label: entry.label })),
-];
-/**
- * A default, always-visible control (Step 6) — not an opt-in disclosure — narrowing on
- * `participationTier`, a DIFFERENT axis from `experienceTier` above: that one is a
- * commissioner's self-declared label for who a league is FOR, this is a computed fact about who
- * is already IN it (`BrowseFilter`'s own docblock, `@/matchmaking/contract`). Options read
- * "Newcomer-friendly"/"Veteran-heavy" rather than the bare tier words — a visitor is choosing a
- * KIND OF ROOM, not the tier vocabulary itself. That is also why no shared account-facing tier
- * label table exists: the one it would have served writes its own copy on purpose (final review
- * F13 deleted `PARTICIPATION_TIER_LABEL`/`_BLURB`, which had no production reader at all).
- */
-const PARTICIPATION_OPTIONS = [
-  { value: ANY, label: "Any experience level" },
-  { value: "newcomer" as const, label: "Newcomer-friendly" },
-  { value: "veteran" as const, label: "Veteran-heavy" },
-];
+import Link from "next/link";
 
 /**
- * Deliberately NOT a client component, and deliberately a plain GET form: the URL IS the
- * filter state, so a filtered browse can be linked, bookmarked, shared and reloaded, and the
- * whole surface works before (and without) any JavaScript. That matters more here than
- * anywhere else in the app — this is the one page a visitor with no account ever sees, on
- * whatever device and connection they happen to have.
+ * Phase 3.6, Task 5, Step 4: the shelf's filter row, replacing the four-`Select` form this
+ * component used to be. Phase 3.5's ruling 1 — *"variety in toggles, not queues"* — is why the
+ * shape changed rather than merely the copy: every `BrowseFilter` axis is a way an open seat
+ * could go invisible, and the mock's own six-control row (All, Drafting soonest, Drafts when
+ * full, Newer players, Superflex, Median game) is two different things wearing one shape.
+ * "Drafting soonest" is a SORT, never a filter — it reorders the same leagues rather than hiding
+ * any of them. "Superflex" and "Median game" would fragment the canonical pool for a fact a
+ * visitor can already see at a glance on every card (`OpenLeagueCard`'s own eyebrow line and
+ * badges) — they are card facts, never filter axes, and this row does not offer them. What
+ * remains is four controls, one of which is a sort: All, Drafting soonest, Drafts when full,
+ * Newer players.
  *
- * `defaultValue` rather than `value`: an uncontrolled native control needs no state and no
- * hydration, and the server has already rendered the applied filter into it.
- *
- * The stake tier control carries `MATCHMAKING_CONFIG.stakeDisclosure` as its own hint, right
- * where a visitor is about to narrow by "High stakes" and would otherwise wonder what that
- * costs. `PublicLeagueList` repeats the SAME constant once more, below the results it labels —
- * the two sites share one source of truth rather than two copies of the sentence drifting apart.
+ * A DIFFERENT shape from the removed `Select` form, but the SAME discipline: plain `<Link>`s,
+ * never a client component, so the URL is still the whole filter state — linkable, bookmarkable,
+ * shareable, and working before (and without) any JavaScript, on whatever device a stranger with
+ * no account happens to have. Mutually exclusive by construction (`ACTIVE_OPTION` below reads
+ * exactly one of them as selected), matching the mock's own single-highlighted-pill treatment,
+ * rather than four independently combinable toggles this task's own filter-count reduction did
+ * not ask for.
  */
-export function BrowseFilters({ filter }: { readonly filter: BrowseFilter }) {
+export type BrowseFilterOption = "all" | "soonest" | "when_full" | "newer";
+
+const OPTIONS: readonly { readonly key: BrowseFilterOption; readonly label: string; readonly href: string }[] = [
+  { key: "all", label: "All", href: "/browse" },
+  { key: "soonest", label: "Drafting soonest", href: "/browse?sort=soonest" },
+  { key: "when_full", label: "Drafts when full", href: "/browse?whenFull=1" },
+  // "Newer players" is the existing `experienceTier` axis (`BrowseFilter.experienceTier`), which
+  // exists to keep newer and veteran managers apart on purpose — this pill is a second, plainer
+  // entry point into the SAME query parameter `normalizeBrowseFilter` (`@/matchmaking/filter`)
+  // already parses, never a new axis.
+  { key: "newer", label: "Newer players", href: "/browse?experienceTier=beginner" },
+];
+
+export interface BrowseFiltersProps {
+  /** Which of the four controls the current URL selects — computed by the caller
+   *  (`src/app/browse/page.tsx`, `src/app/page.tsx`) from its own parsed search params, since
+   *  this component reads no URL of its own. */
+  readonly active: BrowseFilterOption;
+}
+
+export function BrowseFilters({ active }: BrowseFiltersProps) {
   return (
-    <form method="get" action="/browse" className="grid gap-3 sm:grid-cols-5 sm:items-start">
-      <Select label="Draft format" name="format" options={FORMAT_OPTIONS} defaultValue={String(filter.format)} />
-      <Select label="Experience" name="experienceTier" options={EXPERIENCE_OPTIONS} defaultValue={String(filter.experienceTier)} />
-      <Select
-        label="Stake tier"
-        name="stakeTier"
-        options={STAKE_OPTIONS}
-        defaultValue={String(filter.stakeTier)}
-        hint={MATCHMAKING_CONFIG.stakeDisclosure}
-      />
-      <Select
-        label="Who's playing"
-        name="participationTier"
-        options={PARTICIPATION_OPTIONS}
-        defaultValue={String(filter.participationTier)}
-      />
-      <Button type="submit" variant="secondary">
-        Show leagues
-      </Button>
-    </form>
+    <nav aria-label="Filter open leagues" className="flex flex-wrap gap-2">
+      {OPTIONS.map((option) => {
+        const isActive = option.key === active;
+        return (
+          <Link
+            key={option.key}
+            href={option.href}
+            aria-current={isActive ? "true" : undefined}
+            className={
+              "rounded-pill border px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
+              (isActive
+                ? "border-text-muted bg-surface-elevated text-text-primary"
+                : "border-line text-text-muted hover:bg-surface-elevated hover:text-text-primary")
+            }
+          >
+            {option.label}
+          </Link>
+        );
+      })}
+    </nav>
   );
 }

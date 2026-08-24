@@ -3,30 +3,11 @@ import { render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { GLOSSARY } from "@/help/glossary";
 import { renderSurface } from "@/components/ui/test-utils";
-import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { HOUSE_RUNG_LABEL } from "@/matchmaking/house-catalog";
 import { fixtureLeagueDeps, PUBLIC_LEAGUES, renderInLeague } from "../test-fixtures";
-import { HOUSE_SHELF_PROMISE, HouseLeagueShelf, PublicLeagueList } from "./public-league-list";
-
-/** FIX 2: the missing Custom-league case — `describeScoring` can answer "Custom" and the card
- *  needs its own `InfoTip`, same as the three shipped presets. */
-const CUSTOM_SCORING_LEAGUE: PublicLeagueSummary = {
-  id: "p3",
-  name: "House Rules League",
-  format: "snake",
-  experienceTier: "experienced",
-  stakeTier: 1,
-  teamCount: 12,
-  filledTeams: 5,
-  scoringLabel: "Custom",
-  compositionCategory: "all_newcomers",
-  draftAt: "Monday 14 September, 6:00 PM UTC (in 5 days)",
-  medianGame: false,
-  startTrigger: "scheduled",
-  houseRung: null,
-  heldSeats: 0,
-};
+import { HOUSE_SHELF_PROMISE, HouseLeagueShelf, PublicLeagueList, seatCountsAsOfSentence } from "./public-league-list";
 
 // A signed-in list renders `JoinPublicLeagueButton` per card, which navigates via
 // `next/navigation`'s `useRouter` and throws outside a mounted App Router. Stubbing the hook
@@ -35,79 +16,19 @@ vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
+/**
+ * `PublicLeagueList`'s own job, since Phase 3.6 Task 5 extracted `OpenLeagueCard`: rendering a
+ * list of cards, and the empty state when there are none — everything a SINGLE card says or does
+ * is `open-league-card.test.tsx`'s job now, not this file's.
+ */
 describe("PublicLeagueList", () => {
-  it("shows each league's format, tiers and fill status, in both themes, axe-clean", async () => {
-    await renderSurface(
-      <PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />,
-      async ({ container }) => {
-        expect(screen.getByText("Rookie Snake Room")).toBeInTheDocument();
-        expect(screen.getByText(/3 of 12 seated/)).toBeInTheDocument();
-        expect(screen.getByText(/9 of 10 seated/)).toBeInTheDocument();
-        expect(screen.getByText(/1 seat left/)).toBeInTheDocument();
-        expect(screen.getByText("All newcomers")).toBeInTheDocument();
-        expect(screen.getByText("Open to everyone")).toBeInTheDocument();
-        expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
-        expect(await axe(container)).toHaveNoViolations();
-      },
-    );
-    // The `expect(fixture.calls).toEqual([])` that used to sit here was trivially green: the
-    // fixture's deps were never provided to this render, so `calls` could not have been anything
-    // else. `PublicLeagueList` renders server-shaped data and fetches nothing of its own — the
-    // one interactive child (`JoinPublicLeagueButton`) owns its own request and its own test.
-  });
-
-  it("tells a visitor a beginner-tier card is reserved for newer players, with somewhere else to go", () => {
-    // `PUBLIC_LEAGUES` has exactly one beginner-tier card (`p1`) and one experienced-tier card
-    // (`p2`) — proactive, not reactive: this renders on the card itself, before anyone presses
-    // Join, so a veteran self-selects away rather than discovering the gate only after a refusal.
-    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />);
-    expect(screen.getByText(/Reserved for players newer to Commish/)).toBeInTheDocument();
-    const link = screen.getByRole("link", { name: "Browse leagues open to everyone" });
-    expect(link).toHaveAttribute("href", "/browse?experienceTier=experienced");
-  });
-
-  it("says nothing extra on an experienced-tier card", () => {
-    render(<PublicLeagueList leagues={[PUBLIC_LEAGUES[1]!]} signedIn />);
-    expect(screen.queryByText(/Reserved for players newer to Commish/)).not.toBeInTheDocument();
-  });
-
-  it("shows the scoring label beside the format, each with its own InfoTip", () => {
-    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />);
-    expect(screen.getByText("Standard")).toBeInTheDocument();
-    expect(screen.getByText("PPR")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is an auction draft?" })).toBeInTheDocument();
-    // "Standard" is plain English, not jargon — no InfoTip on it.
-    expect(screen.queryByRole("button", { name: "What is Standard?" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is PPR?" })).toBeInTheDocument();
-  });
-
-  it("carries an InfoTip on a Custom-scoring league too — bare and untipped reads as a lower-quality league", () => {
-    render(<PublicLeagueList leagues={[CUSTOM_SCORING_LEAGUE]} signedIn />);
-    expect(screen.getByText("Custom")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "What is custom scoring?" })).toBeInTheDocument();
-  });
-
-  // Phase 3.6, Task 6, F17: `heldSeats` is wired straight into `SeatMeter` — this card never
-  // writes a seat sentence of its own, so a hold reads exactly the same way here as it does on
-  // the waiting room and the open-seats panel.
-  it("shows a live hold through SeatMeter's own clause, and shows nothing extra when there is none", () => {
-    const held = render(<PublicLeagueList leagues={[{ ...PUBLIC_LEAGUES[0]!, heldSeats: 1 }]} signedIn />);
-    expect(screen.getByText(/1 seat is being claimed right now/)).toBeInTheDocument();
-    held.unmount();
-
-    render(<PublicLeagueList leagues={[PUBLIC_LEAGUES[0]!]} signedIn />);
-    expect(screen.queryByText(/being claimed right now/)).not.toBeInTheDocument();
-  });
-
-  // FIX 1 (HIGH): /browse is the app's one unauthenticated surface, with no signed-in caller's
-  // helpLevel to read on the common path — the rule is every InfoTip here opens guided,
-  // unconditionally, not the click-only default an authenticated room falls back to.
-  it("opens every InfoTip guided by default — the unauthenticated-surface rule, not a signed-in preference", () => {
-    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />);
-    expect(screen.getByText(GLOSSARY["snake-draft"].short)).toBeInTheDocument();
-    expect(screen.getByText(GLOSSARY["auction-draft"].short)).toBeInTheDocument();
-    expect(screen.getByText(GLOSSARY.ppr.short)).toBeInTheDocument();
+  it("renders one OpenLeagueCard per league, in both themes, axe-clean", async () => {
+    await renderSurface(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />, async ({ container }) => {
+      expect(screen.getByText("Rookie Snake Room")).toBeInTheDocument();
+      expect(screen.getByText("Sharks Only Auction")).toBeInTheDocument();
+      expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
   });
 
   it("gives a signed-in visitor a join button per league", () => {
@@ -116,75 +37,10 @@ describe("PublicLeagueList", () => {
     expect(screen.getByRole("button", { name: "Join Sharks Only Auction" })).toBeInTheDocument();
   });
 
-  it("sends a signed-out visitor to sign in, named per league so the offer reads as honest rather than a bait-and-switch", () => {
+  it("sends a signed-out visitor to the hold interstitial, one link per league", () => {
     render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn={false} />);
     expect(screen.queryByRole("button", { name: /^Join / })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sign in to join Rookie Snake Room" })).toHaveAttribute(
-      "href",
-      "/sign-in?returnTo=%2Fjoin%2Fp1%2Fhold",
-    );
-    expect(screen.getByRole("link", { name: "Sign in to join Sharks Only Auction" })).toHaveAttribute(
-      "href",
-      "/sign-in?returnTo=%2Fjoin%2Fp2%2Fhold",
-    );
-  });
-
-  it("labels the composition honestly, in the three phrases the brief names and no others", () => {
-    const allNewcomers: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_all", compositionCategory: "all_newcomers" };
-    const mostlyNewcomers: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_mostly", compositionCategory: "mostly_newcomers" };
-    const open: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_open", compositionCategory: "open" };
-    render(<PublicLeagueList leagues={[allNewcomers, mostlyNewcomers, open]} signedIn />);
-    expect(screen.getByText("All newcomers")).toBeInTheDocument();
-    expect(screen.getByText("Mostly newcomers")).toBeInTheDocument();
-    expect(screen.getByText("Open to everyone")).toBeInTheDocument();
-    // Never a raw ratio or a percentage — a browse card is a decision aid, not a statistic.
-    expect(screen.queryByText(/\d+ of \d+ (veteran|newcomer)/i)).not.toBeInTheDocument();
-    expect(screen.queryByText(/%/)).not.toBeInTheDocument();
-  });
-
-  it("marks the newcomer-leaning composition with a clover and everything else with a crown", () => {
-    const newcomerLeaning: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_clover", compositionCategory: "all_newcomers" };
-    const notNewcomerLeaning: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "comp_crown", compositionCategory: "open" };
-    const { container } = render(<PublicLeagueList leagues={[newcomerLeaning, notNewcomerLeaning]} signedIn />);
-    // `Icon` is decorative here (no `label`), so it renders `aria-hidden` — the adjacent text
-    // already carries the meaning for a screen reader, which is also what keeps this axe-clean.
-    const svgs = [...container.querySelectorAll("svg[aria-hidden='true']")];
-    expect(svgs.some((svg) => svg.classList.contains("lucide-clover"))).toBe(true);
-    expect(svgs.some((svg) => svg.classList.contains("lucide-crown"))).toBe(true);
-  });
-
-  // Task 3 (Phase 3.5): the disclosure decision `PublicLeagueSummary.medianGame`'s own docblock
-  // names — a visitor can't tell what game they'd be joining without it. Inverted first: none
-  // of `PUBLIC_LEAGUES` opts in, so the label never appears on the base render.
-  it("shows no Median label for a standard league", () => {
-    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />);
-    expect(screen.queryByText("Median")).not.toBeInTheDocument();
-  });
-
-  it("labels a median league right on the card, with its own InfoTip, in both themes, axe-clean", async () => {
-    const medianLeague = { ...CUSTOM_SCORING_LEAGUE, id: "median_1", medianGame: true };
-    await renderSurface(<PublicLeagueList leagues={[medianLeague]} signedIn />, async ({ container }) => {
-      expect(screen.getByText("Median")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "What is a median game?" })).toBeInTheDocument();
-      expect(await axe(container)).toHaveNoViolations();
-    });
-  });
-
-  // Phase 3.5, Task 8, Step 3: `startTrigger` gains a twelfth field, and the card renders either
-  // the draft time it already renders or "Starts as soon as it fills" — never both, and never a
-  // fabricated date.
-  it("shows the draft time for a scheduled league, and never the when-full sentence", () => {
-    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />);
-    expect(screen.getByText(/Drafts Saturday 12 September/)).toBeInTheDocument();
-    expect(screen.queryByText("Starts as soon as it fills")).not.toBeInTheDocument();
-  });
-
-  it("shows 'Starts as soon as it fills' for a when_full league, never a fabricated date", () => {
-    const whenFullLeague: PublicLeagueSummary = { ...CUSTOM_SCORING_LEAGUE, id: "wf1", startTrigger: "when_full" };
-    render(<PublicLeagueList leagues={[whenFullLeague]} signedIn />);
-    expect(screen.getByText("Starts as soon as it fills")).toBeInTheDocument();
-    expect(screen.queryByText(/Drafts /)).not.toBeInTheDocument();
-    expect(screen.queryByText(whenFullLeague.draftAt)).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /^Take (a seat|the last seat) in / })).toHaveLength(PUBLIC_LEAGUES.length);
   });
 
   it("offers a next action when no league matches, rather than a dead end", async () => {
@@ -197,7 +53,6 @@ describe("PublicLeagueList", () => {
   });
 });
 
-// Phase 3.5 addendum, Task 14, Step 3: the house shelf, §4.1's hybrid lobby made visible.
 const HOUSE_LEAGUE: PublicLeagueSummary = {
   id: "house_1",
   name: "Open 12-team League 3",
@@ -213,14 +68,8 @@ const HOUSE_LEAGUE: PublicLeagueSummary = {
   startTrigger: "scheduled",
   houseRung: "open_12",
   heldSeats: 0,
-};
-
-const SIT_AND_GO_HOUSE_LEAGUE: PublicLeagueSummary = {
-  ...HOUSE_LEAGUE,
-  id: "house_sitandgo",
-  name: "Sit and Go League 1",
-  houseRung: "sitandgo_12",
-  startTrigger: "when_full",
+  rosterSummary: "15 slots, 1 flex",
+  playoffWeeks: [15, 16, 17],
 };
 
 describe("HouseLeagueShelf", () => {
@@ -229,28 +78,18 @@ describe("HouseLeagueShelf", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows each house league's rung label, 'Run by Commish', fill status and draft time, in both themes, axe-clean", async () => {
-    await renderSurface(
-      <HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />,
-      async ({ container }) => {
-        expect(screen.getByText(HOUSE_RUNG_LABEL.open_12)).toBeInTheDocument();
-        expect(screen.getByText("Run by Commish")).toBeInTheDocument();
-        expect(screen.getByText(/5 of 12 seated/)).toBeInTheDocument();
-        expect(screen.getByText(/Drafts Saturday 12 September/)).toBeInTheDocument();
-        expect(await axe(container)).toHaveNoViolations();
-      },
-    );
+  it("shows each house league's rung label through its own OpenLeagueCard, in both themes, axe-clean", async () => {
+    await renderSurface(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />, async ({ container }) => {
+      expect(screen.getByText(HOUSE_RUNG_LABEL.open_12)).toBeInTheDocument();
+      expect(screen.getByText(/5 of 12 seated/)).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
   });
 
   it("prints the shelf's promise once, beneath the whole shelf, never per card", () => {
-    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE, SIT_AND_GO_HOUSE_LEAGUE]} signedIn />);
+    const sitAndGo: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "house_sitandgo", houseRung: "sitandgo_12", startTrigger: "when_full" };
+    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE, sitAndGo]} signedIn />);
     expect(screen.getAllByText(HOUSE_SHELF_PROMISE)).toHaveLength(1);
-  });
-
-  it("shows 'Starts as soon as it fills' for the sit-and-go rung, never a fabricated date", () => {
-    render(<HouseLeagueShelf leagues={[SIT_AND_GO_HOUSE_LEAGUE]} signedIn />);
-    expect(screen.getByText("Starts as soon as it fills")).toBeInTheDocument();
-    expect(screen.queryByText(/Drafts /)).not.toBeInTheDocument();
   });
 
   it("renders no progress bar", () => {
@@ -268,12 +107,18 @@ describe("HouseLeagueShelf", () => {
     renderInLeague(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />, fixtureLeagueDeps().deps);
     expect(screen.getByRole("button", { name: `Join ${HOUSE_LEAGUE.name}` })).toBeInTheDocument();
   });
+});
 
-  it("sends a signed-out visitor to sign in, named per house league", () => {
-    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn={false} />);
-    expect(screen.getByRole("link", { name: `Sign in to join ${HOUSE_LEAGUE.name}` })).toHaveAttribute(
-      "href",
-      `/sign-in?returnTo=%2Fjoin%2F${HOUSE_LEAGUE.id}%2Fhold`,
+describe("seatCountsAsOfSentence (F20)", () => {
+  it("is the verbatim sentence, with the pre-formatted time interpolated", () => {
+    expect(seatCountsAsOfSentence("Saturday 12 September, 7:42 PM UTC")).toBe(
+      "Seat counts as of Saturday 12 September, 7:42 PM UTC. A seat being claimed is counted.",
     );
+  });
+
+  it("never says 'live' or 'updated just now' — the mock's own refused phrasing", () => {
+    const sentence = seatCountsAsOfSentence("Saturday 12 September, 7:42 PM UTC");
+    expect(sentence).not.toMatch(/live/i);
+    expect(sentence).not.toMatch(/just now/i);
   });
 });

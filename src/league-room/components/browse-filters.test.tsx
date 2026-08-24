@@ -1,74 +1,55 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
+import { screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
-import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
-import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { BrowseFilters } from "./browse-filters";
 
 describe("BrowseFilters", () => {
-  it("offers every filter as a labelled control, in both themes, axe-clean", async () => {
-    await renderSurface(<BrowseFilters filter={EMPTY_BROWSE_FILTER} />, async ({ container }) => {
-      expect(screen.getByLabelText("Draft format")).toBeInTheDocument();
-      expect(screen.getByLabelText("Experience")).toBeInTheDocument();
-      expect(screen.getByLabelText("Stake tier")).toBeInTheDocument();
-      expect(screen.getByLabelText("Who's playing")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Show leagues" })).toBeInTheDocument();
+  it("ships exactly four controls: All, Drafting soonest, Drafts when full, Newer players", async () => {
+    await renderSurface(<BrowseFilters active="all" />, async ({ container }) => {
+      const nav = screen.getByRole("navigation", { name: "Filter open leagues" });
+      const links = nav.querySelectorAll("a");
+      expect(links).toHaveLength(4);
+      expect(screen.getByRole("link", { name: "All" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Drafting soonest" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Drafts when full" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "Newer players" })).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
   });
 
-  it("carries the no-money disclosure right under the stake tier control, not only in the footer", () => {
-    render(<BrowseFilters filter={EMPTY_BROWSE_FILTER} />);
-    expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
+  it("never offers Superflex or Median game as filters — they are card facts, not filter axes", async () => {
+    await renderSurface(<BrowseFilters active="all" />, ({ container }) => {
+      expect(container.textContent).not.toMatch(/Superflex/);
+      expect(container.textContent).not.toMatch(/Median game/);
+    });
   });
 
-  it("submits as a plain GET to /browse, so the URL is the filter and it works with no JavaScript", () => {
-    const { container } = render(<BrowseFilters filter={EMPTY_BROWSE_FILTER} />);
-    const form = container.querySelector("form");
-    expect(form).toHaveAttribute("method", "get");
-    expect(form).toHaveAttribute("action", "/browse");
+  it("points 'Drafting soonest' at the sort param, not a narrowing filter", async () => {
+    await renderSurface(<BrowseFilters active="all" />, () => {
+      expect(screen.getByRole("link", { name: "Drafting soonest" })).toHaveAttribute("href", "/browse?sort=soonest");
+    });
   });
 
-  it("reflects the filter already applied, so a shared link renders its own state", () => {
-    render(
-      <BrowseFilters filter={{ format: "auction", experienceTier: "experienced", stakeTier: 3, participationTier: "veteran" }} />,
-    );
-    expect(screen.getByLabelText<HTMLSelectElement>("Draft format").value).toBe("auction");
-    expect(screen.getByLabelText<HTMLSelectElement>("Experience").value).toBe("experienced");
-    expect(screen.getByLabelText<HTMLSelectElement>("Stake tier").value).toBe("3");
-    expect(screen.getByLabelText<HTMLSelectElement>("Who's playing").value).toBe("veteran");
+  it("points 'Drafts when full' and 'Newer players' at their own params", async () => {
+    await renderSurface(<BrowseFilters active="all" />, () => {
+      expect(screen.getByRole("link", { name: "Drafts when full" })).toHaveAttribute("href", "/browse?whenFull=1");
+      expect(screen.getByRole("link", { name: "Newer players" })).toHaveAttribute("href", "/browse?experienceTier=beginner");
+    });
   });
 
-  it("offers only the formats the draft engine can actually run", () => {
-    render(<BrowseFilters filter={EMPTY_BROWSE_FILTER} />);
-    const options = [...screen.getByLabelText<HTMLSelectElement>("Draft format").options].map((o) => o.value);
-    expect(options).toEqual(["any", "snake", "auction"]);
+  it("marks exactly one control current, matching the caller's own active option", async () => {
+    await renderSurface(<BrowseFilters active="soonest" />, () => {
+      expect(screen.getByRole("link", { name: "Drafting soonest" })).toHaveAttribute("aria-current", "true");
+      expect(screen.getByRole("link", { name: "All" })).not.toHaveAttribute("aria-current");
+      expect(screen.getByRole("link", { name: "Drafts when full" })).not.toHaveAttribute("aria-current");
+      expect(screen.getByRole("link", { name: "Newer players" })).not.toHaveAttribute("aria-current");
+    });
   });
 
-  it("offers exactly the two participation tiers the platform computes, plus 'any', defaulting to any", () => {
-    render(<BrowseFilters filter={EMPTY_BROWSE_FILTER} />);
-    const select = screen.getByLabelText<HTMLSelectElement>("Who's playing");
-    expect([...select.options].map((o) => o.value)).toEqual(["any", "newcomer", "veteran"]);
-    expect(select.value).toBe("any");
-  });
-
-  it("is reachable by keyboard, in the natural tab order, and choosable without a mouse", async () => {
-    const user = userEvent.setup();
-    render(<BrowseFilters filter={EMPTY_BROWSE_FILTER} />);
-    await user.tab();
-    expect(screen.getByLabelText("Draft format")).toHaveFocus();
-    await user.tab();
-    expect(screen.getByLabelText("Experience")).toHaveFocus();
-    await user.tab();
-    expect(screen.getByLabelText("Stake tier")).toHaveFocus();
-    await user.tab();
-    const participationSelect = screen.getByLabelText<HTMLSelectElement>("Who's playing");
-    expect(participationSelect).toHaveFocus();
-    await user.selectOptions(participationSelect, "newcomer");
-    expect(participationSelect.value).toBe("newcomer");
-    await user.tab();
-    expect(screen.getByRole("button", { name: "Show leagues" })).toHaveFocus();
+  it("'All' clears back to the unfiltered browse", async () => {
+    await renderSurface(<BrowseFilters active="when_full" />, () => {
+      expect(screen.getByRole("link", { name: "All" })).toHaveAttribute("href", "/browse");
+    });
   });
 });

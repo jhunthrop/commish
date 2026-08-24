@@ -3,10 +3,12 @@ import { alias } from "drizzle-orm/pg-core";
 import type { Db } from "@/db/client";
 import { drafts, leagues, scoringSettings, seatHolds, teams } from "@/db/schema";
 import type { DraftFormat } from "@/domain/league";
+import type { RosterSlotConfig } from "@/domain/roster";
 import type { Clock } from "@/domain/timing";
 import type { ExperienceTier } from "@/domain/user";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
-import { formatDraftTime } from "@/league";
+import { describeRosterShape, formatDraftTime, LEAGUE_CONFIG } from "@/league";
+import { ROSTER_SHAPE_LABEL } from "@/domain/roster";
 import { houseKickoffStillAhead } from "./house-factory";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { BrowseBody, BrowseFilter, PublicLeagueSummary } from "@/matchmaking/contract";
@@ -37,7 +39,39 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "startTrigger",
   "houseRung",
   "heldSeats",
+  "rosterSummary",
+  "playoffWeeks",
 ];
+
+/**
+ * The two or three week numbers the platform's standard playoff bracket runs across — computed
+ * ONCE, from config, at module load, never per row. `LEAGUE_CONFIG.playoffTeams` (Phase 3.6,
+ * Task 5) is a single-elimination bracket seeded up to the next power of two, so it needs
+ * `ceil(log2(playoffTeams))` rounds: today's `6` needs `3` (a bracket of 6 pads to 8), so the
+ * league's regular season (`regularSeasonWeeks`, 14) is followed by weeks 15, 16 and 17. Neither
+ * tunable varies per league in this codebase (`generateSchedule`'s own callers all pass
+ * `LEAGUE_CONFIG.regularSeasonWeeks` — see that constant's own docblock), so this is one constant
+ * shared by every `PublicLeagueSummary` row, not a per-league query.
+ */
+const PLAYOFF_WEEKS: readonly number[] = Array.from(
+  { length: Math.ceil(Math.log2(LEAGUE_CONFIG.playoffTeams)) },
+  (_, index) => LEAGUE_CONFIG.regularSeasonWeeks + index + 1,
+);
+
+/**
+ * "15 slots, 1 flex" / "16 slots, 2 flex, superflex" — `PublicLeagueSummary.rosterSummary`'s own
+ * derivation, through the existing `describeRosterShape` (`@/league/roster-shape`). The flex
+ * count folds `FLEX` and `SUPERFLEX` together (a superflex league's second flex-like slot is
+ * still a flex-like slot to a stranger deciding whether to join), and the shape clause is only
+ * ever appended for a genuinely superflex league — "Custom" (a commissioner-edited shape) adds
+ * nothing false rather than guessing at a label the slots no longer earn.
+ */
+function rosterSummaryFor(slots: readonly RosterSlotConfig[]): string {
+  const totalSlots = slots.reduce((sum, slot) => sum + slot.count, 0);
+  const flexSlots = slots.filter((slot) => slot.slot === "FLEX" || slot.slot === "SUPERFLEX").reduce((sum, slot) => sum + slot.count, 0);
+  const shapeClause = describeRosterShape(slots) === ROSTER_SHAPE_LABEL.superflex ? ", superflex" : "";
+  return `${totalSlots} slots, ${flexSlots} flex${shapeClause}`;
+}
 
 /** The league's own seats, aliased a second time so a `LATERAL` join can ask "how many of THIS
  *  seat-holder's OTHER leagues have completed a season" without colliding with the outer
@@ -110,6 +144,25 @@ function narrowingFor(filter: BrowseFilter): readonly (SQL | undefined)[] {
 }
 
 /**
+ * Phase 3.6, Task 5, Step 4: the shelf's own "Drafting soonest" sort pill and "Drafts when full"
+ * toggle — deliberately NOT `BrowseFilter` fields. Ruling 1's "variety in toggles, not queues"
+ * keeps every `BrowseFilter` axis a way an open seat could go invisible; these two are neither a
+ * privacy boundary nor a narrowing `matchesBrowseFilter`'s own pure mirror has to cross-check
+ * (`browse.test.ts`'s 3x3x5 corpus), so they are a second, separate parameter `browseQuery` reads
+ * directly rather than a fourth and fifth axis added to that contract. Both default to today's
+ * exact behavior — seats-remaining ordering, no `startTrigger` narrowing — so every existing
+ * caller (`index-plans.test.ts` included) is unaffected by leaving this argument off entirely.
+ */
+export interface BrowseQueryOptions {
+  /** `"seats_remaining"` (default, Task 8's liquidity-first order) or `"soonest"` (Task 5's own
+   *  addition — the draft a visitor could attend tonight, first). */
+  readonly sort?: "seats_remaining" | "soonest";
+  /** Narrows the member list to `when_full` leagues only. Never applied to the house shelf — see
+   *  `houseShelfQuery`'s own docblock on why that query takes no filter at all. */
+  readonly whenFullOnly?: boolean;
+}
+
+/**
  * The ONE unauthenticated league read in this application.
  *
  * Three things make it safe, and all three are here rather than spread over a route and a
@@ -171,11 +224,12 @@ function narrowingFor(filter: BrowseFilter): readonly (SQL | undefined)[] {
  * leagues_season_completed_idx" in `index-plans.test.ts`. The index has a real consumer after
  * all, and no drop migration ships.
  */
-export function browseQuery(db: Db, filter: BrowseFilter) {
+export function browseQuery(db: Db, filter: BrowseFilter, options: BrowseQueryOptions = {}) {
   const ANY = MATCHMAKING_CONFIG.anyValue;
   const cutoff = INTEGRITY_CONFIG.participation.veteranSeasonCutoff;
   const seatCompletion = seatCompletedSeasonsQuery(db).as("seat_completion");
   const { veteranSeats, newcomerSeats } = participationAggregates(seatCompletion, cutoff);
+  const sort = options.sort ?? "seats_remaining";
   // The SAME `newcomers > veterans` comparison `compositionCategoryFor` (`@/participation/
   // composition`) renders the label from, expressed once here in SQL rather than reimplemented —
   // `filter.test.ts` cross-checks the two never disagree over one corpus.
@@ -195,6 +249,11 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
       stakeTier: leagues.stakeTier,
       teamCount: leagues.teamCount,
       medianGame: leagues.medianGame,
+      // Ungrouped, on the identical functional-dependency proof `kickoffAt`/`startTrigger`
+      // below already rely on: `drafts.id` joins `leagues.id` in this query's own `groupBy`,
+      // and `leagues.id` is this table's own primary key, so Postgres accepts the column
+      // without folding it into the `GROUP BY` itself.
+      rosterSlots: leagues.rosterSlots,
       filledTeams: sql<number>`count(${teams.id})::int`,
       // A plain column, not an aggregate. Postgres accepts an ungrouped column only when the
       // `GROUP BY` covers ITS OWN table's primary key, so `drafts.id` joins `leagues.id` in the
@@ -214,20 +273,33 @@ export function browseQuery(db: Db, filter: BrowseFilter) {
     // the shelf/list split — a house league never reaches this query at all, so it can never be
     // sorted into the member list's seats-remaining ordering. `houseShelfQuery` below is the
     // house half, over the OPPOSITE predicate, with its own soonest-draft ordering.
-    .where(and(eq(leagues.isPublicMatchmade, true), eq(drafts.status, "scheduled"), isNull(leagues.houseRung), ...narrowingFor(filter)))
+    .where(
+      and(
+        eq(leagues.isPublicMatchmade, true),
+        eq(drafts.status, "scheduled"),
+        isNull(leagues.houseRung),
+        // Phase 3.6, Task 5, Step 4: "Drafts when full" — a plain column predicate, applied
+        // BEFORE the `LIMIT` on the identical "narrow before you cap" discipline this query's
+        // own docblock already holds every other narrowing to.
+        options.whenFullOnly === true ? eq(drafts.startTrigger, "when_full") : undefined,
+        ...narrowingFor(filter),
+      ),
+    )
     .groupBy(leagues.id, drafts.id)
     .having(and(sql`count(${teams.id}) < ${leagues.teamCount}`, participationHaving))
-    // PHASE 3.5, TASK 8, STEP 4. Seats remaining ASC, then `created_at` ASC as the tiebreaker
-    // (the ordering this replaced, kept second so ties still resolve oldest-first). §4.1's
-    // liquidity doctrine is concentration — the lobby's job is to FILL leagues, and a nearly-full
-    // one a single join would complete is worth surfacing ahead of a freshly created one nobody
-    // has joined yet. `count(${teams.id})` is the SAME aggregate `filledTeams` already computes
-    // two lines up; this is a second reference to it, not a second query. Cost is measured, not
-    // asserted: this docblock's own claim — the sort runs AFTER the `GROUP BY` either way, so
-    // changing the sort KEY costs nothing the unsorted plan wasn't already paying — is pinned by
-    // `src/db/index-plans.test.ts`'s "plans the seats-remaining ordering" assertion, built from
-    // the SAME 5,000-league realistic corpus every other browse plan assertion uses.
-    .orderBy(sql`(${leagues.teamCount} - count(${teams.id})) asc`, asc(leagues.createdAt))
+    // PHASE 3.5, TASK 8, STEP 4, extended by Phase 3.6, Task 5, Step 4. Seats remaining ASC,
+    // then `created_at` ASC as the tiebreaker, UNLESS the "Drafting soonest" sort pill asked for
+    // `kickoff_at` ASC instead — the identical ordering `houseShelfQuery`'s own shelf already
+    // uses, for the identical reason: a visitor asking "soonest" is asking which draft they
+    // could attend tonight, not which league is closest to full. `count(${teams.id})` is the
+    // SAME aggregate `filledTeams` already computes two lines up; this is a second reference to
+    // it, not a second query. Cost is measured, not asserted: this docblock's own claim — the
+    // sort runs AFTER the `GROUP BY` either way, so changing the sort KEY costs nothing the
+    // unsorted plan wasn't already paying — is pinned by `src/db/index-plans.test.ts`'s "plans
+    // the seats-remaining ordering" assertion, built from the SAME 5,000-league realistic corpus
+    // every other browse plan assertion uses; that assertion exercises the DEFAULT sort, still
+    // exactly as it did before this option existed.
+    .orderBy(sort === "soonest" ? asc(drafts.kickoffAt) : sql`(${leagues.teamCount} - count(${teams.id})) asc`, asc(leagues.createdAt))
     .limit(MATCHMAKING_CONFIG.maxResults);
 }
 
@@ -298,6 +370,7 @@ export function houseShelfQuery(db: Db, nowIso: string) {
       teamCount: leagues.teamCount,
       medianGame: leagues.medianGame,
       houseRung: leagues.houseRung,
+      rosterSlots: leagues.rosterSlots,
       filledTeams: sql<number>`count(${teams.id})::int`,
       kickoffAt: drafts.kickoffAt,
       startTrigger: drafts.startTrigger,
@@ -386,6 +459,7 @@ interface SummarizableRow {
   readonly stakeTier: number;
   readonly teamCount: number;
   readonly medianGame: boolean;
+  readonly rosterSlots: readonly RosterSlotConfig[];
   readonly filledTeams: number;
   readonly kickoffAt: Date;
   readonly startTrigger: "scheduled" | "when_full";
@@ -437,6 +511,8 @@ function summarizeRow(
     startTrigger: row.startTrigger,
     houseRung,
     heldSeats: heldSeatsByLeagueId.get(row.id) ?? 0,
+    rosterSummary: rosterSummaryFor(row.rosterSlots),
+    playoffWeeks: PLAYOFF_WEEKS,
   };
 }
 
@@ -503,12 +579,21 @@ export async function publicLeaguePreview(db: Db, leagueId: string, clock: Clock
   };
 }
 
-export async function listPublicLeagues(db: Db, filter: BrowseFilter, clock: Clock = systemClock): Promise<BrowseBody> {
+export async function listPublicLeagues(
+  db: Db,
+  filter: BrowseFilter,
+  clock: Clock = systemClock,
+  // Phase 3.6, Task 5, Step 4: appended AFTER `clock`, not before it — every existing 3-argument
+  // caller (`browse.test.ts`'s own clock-injecting tests among them) keeps its exact positional
+  // meaning, and only a caller that actually wants the sort pill or the when-full toggle adds a
+  // fourth argument.
+  options: BrowseQueryOptions = {},
+): Promise<BrowseBody> {
   // ONE instant for the shelf's own staleness predicate and for every card's rendered
   // `draftAt` — read once, so a league cannot be judged not-yet-started by one and
   // already-past by the other.
   const now = clock.now();
-  const memberRows = await browseQuery(db, filter);
+  const memberRows = await browseQuery(db, filter, options);
   const houseRows = await houseShelfQuery(db, now);
   const ids = [...memberRows, ...houseRows].map((row) => row.id);
   const weightsByLeagueId = await scoringWeightsByLeagueId(db, ids);

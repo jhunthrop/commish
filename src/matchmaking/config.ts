@@ -86,6 +86,27 @@ export const MATCHMAKING_CONFIG = {
       /** Below this, an average rating is one person's mood. */
       reviewCount: 20,
     },
+    /**
+     * Phase 3.6, Task 5 (P4 review, binding CARRY): the front door is the product's
+     * highest-traffic unauthenticated read, and `proofStats` runs three aggregate queries
+     * (`leaguesFilledQuery`, `draftsNext48hQuery`, `reviewAggregate`) — cheap individually, but
+     * paid on every render of the one page every stranger lands on first. `createProofCache`
+     * (`@/stats-pipeline/proof-cache.ts`) wraps it in a blind TTL, the same seam
+     * `ScoringSettings`'s belt-and-braces TTL uses (`STATS_INGESTION_CONFIG.ttlSeconds.
+     * scoringSettings`) rather than `ReferenceCache`'s write-through invalidation: nothing ever
+     * writes an explicit invalidation for this key (there is no "a league just filled, bust the
+     * cache" event this page's own correctness depends on — the three numbers are a strapline,
+     * not a fact anyone acts on with a stale value in hand), so a TTL alone is the honest,
+     * simplest cache for it.
+     *
+     * 60 seconds: short enough that a founder watching the number climb after a marketing push
+     * sees it move inside a minute, long enough that a stampede of concurrent front-door renders
+     * (this page has no session to key a per-visitor cache on) shares one set of three queries
+     * instead of running them per request. The strip's own credibility floors already gate away
+     * anything that would make staleness visible to begin with — a number that only appears once
+     * it has cleared 25/3/20 does not flicker across a floor inside one minute.
+     */
+    cacheTtlSeconds: 60,
   },
 } as const;
 

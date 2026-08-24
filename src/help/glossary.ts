@@ -37,7 +37,8 @@ export type TermKey =
   | "draft-slot"
   | "sit-and-go"
   | "verified-reviewer"
-  | "house-league";
+  | "house-league"
+  | "playoffs";
 
 export interface GlossaryTerm {
   readonly key: TermKey;
@@ -205,6 +206,18 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     short: "A league Commish runs. Everyone joins the same way and plays the same rules.",
     detail:
       "A league Commish runs. Everyone joins the same way, the rules are the same in every one, and a new one opens whenever one fills.",
+  },
+  /**
+   * Phase 3.6, Task 5: the open-league shelf's own fourth fact (`OpenLeagueCard`'s "Playoffs"
+   * line, `PublicLeagueSummary.playoffWeeks`) — a stranger sizing up a league before they join it
+   * can see the weeks named but has no way yet to know what happens in them without this.
+   */
+  playoffs: {
+    key: "playoffs",
+    term: "the playoff bracket",
+    short: "The top teams play a short bracket at the end of the season for the league title.",
+    detail:
+      "Once the regular season ends, the top teams in the standings play a short elimination bracket across the weeks shown here. Win your game each week to advance; lose and your season is over. Whoever wins the final week takes the league.",
   },
 };
 

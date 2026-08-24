@@ -4,6 +4,7 @@ import type { Db } from "@/db/client";
 import { countingDb, createTestDb, truncateAll } from "@/db/test-db";
 import { drafts, leagues, scoringSettings, teams, users } from "@/db/schema";
 import { STANDARD_SCORING, type ScoringSettings } from "@/domain/scoring";
+import { SUPERFLEX_ROSTER_SLOTS } from "@/league";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { EMPTY_BROWSE_FILTER, hasOpenSeat, matchesBrowseFilter } from "@/matchmaking/filter";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
@@ -231,6 +232,11 @@ async function seedPublicLeague(
     // `seed()` above never claims a seat hold — no caller of this fixture is testing Task 6's
     // own mechanism, so every league it builds reads `0` held seats.
     heldSeats: 0,
+    // `seed()` above never overrides `roster_slots` — the schema default (`STANDARD_ROSTER_SLOTS`)
+    // always applies here, and every league on this platform shares the same playoff weeks
+    // (Phase 3.6, Task 5: neither is a per-league override this codebase writes).
+    rosterSummary: "15 slots, 1 flex",
+    playoffWeeks: [15, 16, 17],
   };
 }
 
@@ -257,7 +263,7 @@ describe("listPublicLeagues", () => {
         id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0,
         teamCount: 12, filledTeams: 8, scoringLabel: "Standard", compositionCategory: "all_newcomers",
         draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)", medianGame: false, startTrigger: "scheduled",
-        houseRung: null, heldSeats: 0,
+        houseRung: null, heldSeats: 0, rosterSummary: "15 slots, 1 flex", playoffWeeks: [15, 16, 17],
       },
     ]);
   });
@@ -926,5 +932,105 @@ describe("publicLeaguePreview", () => {
     await seedHouseLeague({ id: "preview_house", rung: "beginner_12", kickoffAt: new Date("2026-09-10T19:00:00.000Z") });
     const preview = await publicLeaguePreview(db, "preview_house");
     expect(preview).toMatchObject({ id: "preview_house", houseRung: "beginner_12" });
+  });
+});
+
+/**
+ * Phase 3.6, Task 5, Step 3: the two disclosure decisions `PublicLeagueSummary`'s docblock names
+ * as the fourteenth and fifteenth fields.
+ */
+describe("listPublicLeagues roster and playoff facts (Task 5)", () => {
+  it("derives the roster summary from the league's own stored slots, never a hand-typed default", async () => {
+    await seed({
+      id: "roster_standard", name: "Roster Standard", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    await db.insert(leagues).values({
+      id: "roster_superflex", name: "Roster Superflex", format: "snake", teamCount: 12, stakeTier: 0,
+      experienceTier: "beginner", isPublicMatchmade: true, commissionerUserId: "owner",
+      rosterSlots: SUPERFLEX_ROSTER_SLOTS,
+    });
+    await db.insert(drafts).values({
+      id: "roster_superflex_draft", leagueId: "roster_superflex", format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+    });
+    await db.insert(scoringSettings).values({ leagueId: "roster_superflex", ...STANDARD_SCORING });
+
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
+    const byId = new Map(rows.map((row) => [row.id, row.rosterSummary]));
+    expect(byId.get("roster_standard")).toBe("15 slots, 1 flex");
+    expect(byId.get("roster_superflex")).toBe("16 slots, 2 flex, superflex");
+  });
+
+  it("gives every league the same platform-wide playoff weeks, computed from config", async () => {
+    await seed({
+      id: "playoffs_a", name: "Playoffs A", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    const [summary] = await browseLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(summary!.playoffWeeks).toEqual([15, 16, 17]);
+  });
+});
+
+/**
+ * Phase 3.6, Task 5, Step 4: the shelf's own sort pill and when-full toggle — separate
+ * parameters `browseQuery`/`listPublicLeagues` read directly, never a `BrowseFilter` axis (see
+ * `BrowseQueryOptions`'s own docblock). Every existing call above this describe block passes
+ * neither, and keeps passing today's exact default ordering.
+ */
+describe("listPublicLeagues sort and when-full options (Task 5)", () => {
+  it("defaults to seats-remaining ordering when no option is passed, unchanged from before this task", async () => {
+    await seed({
+      id: "sort_default_a", name: "Sort Default A", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 2, isPublicMatchmade: true,
+    });
+    await seed({
+      id: "sort_default_b", name: "Sort Default B", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 10, isPublicMatchmade: true,
+    });
+    const rows = await browseLeagues(db, EMPTY_BROWSE_FILTER);
+    expect(rows.map((row) => row.id)).toEqual(["sort_default_b", "sort_default_a"]);
+  });
+
+  it("'soonest' sorts the member list by kickoff time instead of seats remaining", async () => {
+    // Direct inserts, not `seed()`: that helper always schedules the same fixed kickoff, and
+    // this test's whole point is two DIFFERENT kickoffs the sort has to tell apart.
+    for (const [id, kickoffAt, filled] of [
+      ["sort_soon_later", "2026-09-20T00:00:00.000Z", 10],
+      ["sort_soon_sooner", "2026-09-11T00:00:00.000Z", 2],
+    ] as const) {
+      await db.insert(leagues).values({
+        id, name: id, format: "snake", teamCount: 12, stakeTier: 0, experienceTier: "beginner",
+        isPublicMatchmade: true, commissionerUserId: "owner",
+      });
+      await db.insert(drafts).values({ id: `${id}_draft`, leagueId: id, format: "snake", status: "scheduled", kickoffAt: new Date(kickoffAt) });
+      await db.insert(scoringSettings).values({ leagueId: id, ...STANDARD_SCORING });
+      for (let i = 0; i < filled; i++) {
+        const userId = `${id}_u${i}`;
+        await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: `Manager ${i}` }).onConflictDoNothing();
+        await db.insert(teams).values({ id: `${id}_t${i}`, leagueId: id, userId, name: `Team ${i}` });
+      }
+    }
+    const { leagues: rows } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER, undefined, { sort: "soonest" });
+    expect(rows.map((row) => row.id)).toEqual(["sort_soon_sooner", "sort_soon_later"]);
+  });
+
+  it("'whenFullOnly' narrows the member list to when-full leagues, before the cap", async () => {
+    await seed({
+      id: "wf_only_scheduled", name: "WF Only Scheduled", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 1, isPublicMatchmade: true,
+    });
+    await db.insert(leagues).values({
+      id: "wf_only_when_full", name: "WF Only When Full", format: "snake", teamCount: 12, stakeTier: 0,
+      experienceTier: "beginner", isPublicMatchmade: true, commissionerUserId: "owner",
+    });
+    await db.insert(drafts).values({
+      id: "wf_only_when_full_draft", leagueId: "wf_only_when_full", format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"), startTrigger: "when_full",
+    });
+    await db.insert(scoringSettings).values({ leagueId: "wf_only_when_full", ...STANDARD_SCORING });
+
+    const { leagues: rows } = await listPublicLeagues(db, EMPTY_BROWSE_FILTER, undefined, { whenFullOnly: true });
+    expect(rows.map((row) => row.id)).toEqual(["wf_only_when_full"]);
   });
 });

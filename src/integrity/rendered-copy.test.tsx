@@ -15,10 +15,14 @@ import type { ValuedPlayer } from "@/trades/fairness";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
 import { DRAFT_SCHEDULE, HOME, LINEUP, PUBLIC_LEAGUES, TERMS, fixtureLeagueDeps } from "@/league-room/test-fixtures";
 import { DraftSchedulePanel } from "@/league-room/components/draft-schedule-panel";
+import { FrontDoorHero } from "@/league-room/components/front-door-hero";
 import { LeagueHome } from "@/league-room/components/league-home";
 import { LeagueTermsPanel } from "@/league-room/components/league-terms-panel";
 import { ModerationSummary } from "@/league-room/components/moderation-summary";
+import { OpenLeagueCard } from "@/league-room/components/open-league-card";
+import { ProofStrip } from "@/league-room/components/proof-strip";
 import { PublicLeagueList } from "@/league-room/components/public-league-list";
+import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
 import { SeatHoldPanel } from "@/league-room/components/seat-hold-panel";
 import { SeatTakenPanel } from "@/league-room/components/seat-taken-panel";
 import { TradeCard } from "@/league-room/components/trade-card";
@@ -708,6 +712,78 @@ describe("PublicLeagueList says nothing that breaks the house copy rules, includ
     ]) {
       const { container, unmount } = render(element);
       expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));
+      unmount();
+    }
+  });
+});
+
+/**
+ * Phase 3.6, Task 5. `OpenLeagueCard` is where `describeStartTiming`'s (`@/matchmaking/roll`)
+ * when-full sentence and `PublicLeagueSummary.rosterSummary`/`playoffWeeks` first reach a
+ * screen — none of `PUBLIC_LEAGUES` above exercises the when-full or last-seat branches, so this
+ * sweeps those states explicitly rather than trusting the member-list fixture to happen to cover
+ * them.
+ */
+describe("OpenLeagueCard says nothing that breaks the house copy rules, in every branch", () => {
+  it("is clean scheduled, when-full, house-run, last-seat, and beginner-only", () => {
+    const base = PUBLIC_LEAGUES[0]!;
+    for (const element of [
+      <OpenLeagueCard key="scheduled" league={base} signedIn={false} />,
+      <OpenLeagueCard key="signed-in" league={base} signedIn={true} />,
+      <OpenLeagueCard key="when-full" league={{ ...base, id: "wf", startTrigger: "when_full" }} signedIn={false} />,
+      <OpenLeagueCard key="house" league={{ ...base, id: "house1", houseRung: "open_12" }} signedIn={false} />,
+      <OpenLeagueCard key="last-seat" league={{ ...base, id: "last", filledTeams: base.teamCount - 1 }} signedIn={false} />,
+      <OpenLeagueCard key="beginner" league={{ ...base, id: "beg", experienceTier: "beginner" }} signedIn={false} />,
+    ]) {
+      const { container, unmount } = render(element);
+      expectClean(container, base.name);
+      unmount();
+    }
+  });
+});
+
+describe("FrontDoorHero says nothing that breaks the house copy rules", () => {
+  it("is clean", () => {
+    const { container } = render(<FrontDoorHero />);
+    expectClean(container);
+  });
+});
+
+describe("SeatClaimSteps says nothing that breaks the house copy rules", () => {
+  it("is clean", () => {
+    const { container } = render(<SeatClaimSteps />);
+    expectClean(container);
+  });
+});
+
+/**
+ * Phase 3.6, Task 5, Step 5: the four trust stubs `PublicFooter` links to, real content rather
+ * than a placeholder or a 404 — swept here since none of them has a dedicated test of its own.
+ */
+describe("the four trust stubs say nothing that breaks the house copy rules", () => {
+  it("is clean for Terms, Privacy, Support and League rules", async () => {
+    const [{ default: TermsPage }, { default: PrivacyPage }, { default: SupportPage }, { default: LeagueRulesPage }] = await Promise.all([
+      import("@/app/legal/terms/page"),
+      import("@/app/legal/privacy/page"),
+      import("@/app/support/page"),
+      import("@/app/league-rules/page"),
+    ]);
+    for (const Page of [TermsPage, PrivacyPage, SupportPage, LeagueRulesPage]) {
+      const { container, unmount } = render(<Page />);
+      expectClean(container);
+      unmount();
+    }
+  });
+});
+
+describe("ProofStrip says nothing that breaks the house copy rules, full and empty", () => {
+  it("is clean with every stat present and with none of them", () => {
+    for (const element of [
+      <ProofStrip key="full" stats={{ leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, any: true }} />,
+      <ProofStrip key="empty" stats={{ leaguesFilled: null, draftsNext48h: null, rating: null, any: false }} />,
+    ]) {
+      const { container, unmount } = render(element);
+      expectClean(container);
       unmount();
     }
   });
