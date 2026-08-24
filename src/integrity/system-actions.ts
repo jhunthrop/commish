@@ -48,6 +48,16 @@ export const SYSTEM_ACTION_CODES = [
    * one-code-many-notices shape `draft_auto_started`/`draft_fill_triggered` both already use.
    */
   "draft_kickoff_rolled",
+  /**
+   * The other half of `draft_fill_triggered` (Phase 3.6, Task 8): `releaseSeat`
+   * (`@/league-service/release`) clears a filled sit-and-go's `drafts.fill_fired_at` when a
+   * released seat un-fills it during the grace window, and this is the fact everyone LEFT in the
+   * room is owed about it — a seat opened, so the room is no longer full and its draft is back to
+   * waiting for the last one. `NoticeContexts.draft_fill_reversed` (`@/integrity/notices`) is its
+   * own notice, sent to every REMAINING seated team (never the member who just left, who already
+   * has the Modal's own confirmation).
+   */
+  "draft_fill_reversed",
 ] as const;
 
 export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
@@ -106,6 +116,10 @@ export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
  *    nobody's conduct. A member whose draft just moved is owed the sentence that says so, and the
  *    ruling that founded this task ("no draft ever fires below a full room") makes that sentence a
  *    load-bearing part of the promise, not merely a courtesy.
+ *  - `draft_fill_reversed` is ALLOWED to everyone (Phase 3.6, Task 8), on `draft_fill_triggered`'s
+ *    reasoning exactly, run in reverse: a fact about the league's shared calendar, true for
+ *    everyone still in it, about nobody's conduct. A member who was told the room was about to
+ *    draft is owed the sentence that says it no longer is.
  */
 export type SystemActionVisibility = "everyone" | "subject_only" | "hidden";
 
@@ -120,6 +134,7 @@ export const SYSTEM_ACTION_VISIBILITY: Readonly<Record<SystemActionCode, SystemA
   draft_fill_triggered: "everyone",
   house_league_opened: "everyone",
   draft_kickoff_rolled: "everyone",
+  draft_fill_reversed: "everyone",
 };
 
 /**

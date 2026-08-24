@@ -9,6 +9,7 @@ import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-supp
 import { autoSetLineupInTx, autoSetLineupsForWeek } from "@/league-service/auto-lineup";
 import { setDraftKickoff } from "@/league-service/draft-schedule";
 import { joinLeagueInTx, recordTierBlockedJoin } from "@/league-service/join";
+import { RELEASE_REFUSALS, releaseSeat } from "@/league-service/release";
 import { rollUnfilledDraftInTx } from "@/league-service/roll";
 import { claimSeatHold } from "@/league-service/seat-hold";
 import { setLineup } from "@/league-service/lineups";
@@ -112,6 +113,13 @@ async function waitForBlockedBackend(timeoutMs = 5_000): Promise<boolean> {
 }
 
 const clock = { now: () => "2026-09-01T00:00:00.000Z" };
+// Nine entries — three teams' worth of `SPRINT_ROSTER_SLOTS` (3 spots each) — not six: Phase
+// 3.6, Task 8's binding precondition moved `startDraft`'s `teamRows`/`pool` reads INSIDE its own
+// transaction (`@/draft-service/store`), so a join that COMMITS while a concurrent `startDraft`
+// is parked behind it is now legitimately seen by the start's in-lock read, the same "whichever
+// commits first is what the other one's in-lock read sees" rule the release-vs-start proof below
+// exists for. The two auto-start-beside-a-join blocks further down draft a genuine THIRD team
+// once the parked join releases, and six players is no longer enough to fill it.
 const POOL: readonly DraftPoolEntry[] = [
   { playerId: "qb1", position: "QB" },
   { playerId: "rb1", position: "RB" },
@@ -119,6 +127,9 @@ const POOL: readonly DraftPoolEntry[] = [
   { playerId: "qb2", position: "QB" },
   { playerId: "rb2", position: "RB" },
   { playerId: "wr2", position: "WR" },
+  { playerId: "qb3", position: "QB" },
+  { playerId: "rb3", position: "RB" },
+  { playerId: "wr3", position: "WR" },
 ];
 
 /** The draft-pick half, driven through the real store so the order under test is the real one. */
@@ -2391,16 +2402,101 @@ describe("startDraft's fused auto-start announcement, { auto: true }", () => {
     expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
     const started = await starting;
     expect(started.ok).toBe(true);
-    expect(teamIds).toHaveLength(2); // the two teams the fused announcement notified
+    expect(teamIds).toHaveLength(2); // the fixture's own two teams, before the joiner
 
+    // THREE, not two (Phase 3.6, Task 8): the joiner's own `teams` INSERT committed before
+    // `starting`'s thunk ever read `teamRows` (this test `await`s `join.joining` first), and that
+    // read now happens INSIDE `startDraft`'s own transaction — so the fused announcement notifies
+    // the joiner too, not only the fixture's original pair.
     const notices = await joinDb.select().from(memberNotices).where(eq(memberNotices.noticeType, "draft_auto_started"));
-    expect(notices).toHaveLength(2);
+    expect(notices).toHaveLength(3);
     for (const notice of notices) expect(notice.auditEventId).not.toBeNull();
 
     // Both landed on the SAME league chain: the join's own `member_joined`, then the fused
     // announcement's own single `system_action` shared by both notices — one chain, no cycle.
     const [anchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, leagueId));
     expect(anchor!.headSequence).toBe(2);
+  });
+});
+
+/**
+ * PHASE 3.6, TASK 8 — `releaseSeat` (`@/league-service/release`) takes `leagues[X] FOR UPDATE` as
+ * its own first statement, the identical first lock `joinLeagueInTx` takes, so the two must
+ * serialize on the SAME row rather than race. This is not argued from either function's own
+ * docblock, it is driven: a real join and a real release, on two real connections, contesting the
+ * SAME league's last seat.
+ *
+ * THE SCENARIO THAT MAKES "ONE WINNER" A REAL CLAIM rather than a vacuous one: the league is
+ * FULL (`teamCount: 2`, two teams already seated) when both transactions start, so a join that
+ * runs BEFORE a release frees anything is genuinely, correctly refused (`LEAGUE_FULL`) — and a
+ * join that ran AFTER would have genuinely succeeded. Parking the join FIRST (holding
+ * `leagues[X] FOR UPDATE`, `parkedJoin`'s own shape) makes the arrival order deterministic: the
+ * release's own first statement blocks behind it, so the join's capacity check is provably
+ * decided against the PRE-release state, and the release only ever proceeds once the join's
+ * transaction has fully committed (or, here, cleanly refused with nothing written).
+ */
+describe("releaseSeat vs. joinLeagueInTx — the release-vs-join race on the same seat", () => {
+  it("blocks releaseSeat behind a parked join's leagues[X] FOR UPDATE, then lets it through once released — no cycle, exactly one winner", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_rvj_commish", email: "u_rvj_commish@test.local", displayName: "Commish" },
+      { id: "u_rvj_target", email: "u_rvj_target@test.local", displayName: "Target" },
+      { id: "u_rvj_joiner", email: "u_rvj_joiner@test.local", displayName: "Joiner" },
+    ]);
+    const leagueId = "lg_release_vs_join";
+    await joinDb.insert(leagues).values({ id: leagueId, name: leagueId, format: "snake", teamCount: 2, commissionerUserId: "u_rvj_commish" });
+    await joinDb.insert(drafts).values({ id: "draft_release_vs_join", leagueId, format: "snake", status: "scheduled", kickoffAt: new Date("2026-09-10T17:00:00.000Z") });
+    await joinDb.insert(teams).values([
+      { id: "team_rvj_commish", leagueId, userId: "u_rvj_commish", name: "Commish's Team" },
+      { id: "team_rvj_target", leagueId, userId: "u_rvj_target", name: "Target's Team" },
+    ]);
+
+    // T_join: parked holding `leagues[X] FOR UPDATE`, before its own capacity check — the
+    // league is genuinely FULL at this instant, so this join's own read is decided against that
+    // fact, whatever `releaseSeat` goes on to do afterward.
+    const join = parkedJoin(leagueId, "u_rvj_joiner", "team_rvj_joiner");
+    await join.leagueLocked;
+
+    // T_release: the real function, on its own connection. Its FIRST statement is the identical
+    // `leagues[X] FOR UPDATE` the parked join already holds — it blocks HERE, before it can ever
+    // read `drafts` or delete a `teams` row.
+    const releasing = releaseSeat(pickDb, { leagueId, userId: "u_rvj_target" }, { clock });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    // ONE WINNER: the join loses. It was parked FIRST and decided its own capacity check against
+    // the league's genuinely-full state — `releaseSeat` was still blocked on the SAME row and had
+    // written nothing yet, so there was no freed seat for this join to find.
+    expect(await join.joining).toMatchObject({ ok: false, status: 409 });
+
+    // The release proceeds only once the join's transaction has fully released the row —
+    // succeeding cleanly, on the state the join left behind.
+    expect(await releasing).toEqual({ ok: true });
+
+    // Net effect: the target's own seat is gone, the join that raced it never landed, and the
+    // league is back to one seated team — the one fact that proves this was a real serialization,
+    // not a lucky interleaving that merely avoided a deadlock.
+    const remaining = await joinDb.select({ userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
+    expect(remaining.map((row) => row.userId)).toEqual(["u_rvj_commish"]);
+  });
+
+  it("refuses a release for a stranger to the league without ever taking a second lock", async () => {
+    // The refusal-path half of the same claim: `RELEASE_REFUSALS.notMember` is decided AFTER
+    // `leagues[X] FOR UPDATE` is already held (NO-WRITE-BEFORE-REFUSAL), never before it — a
+    // caller with no seat here writes nothing and takes no lock this test cannot already account
+    // for.
+    await joinDb.insert(users).values([
+      { id: "u_rvj2_commish", email: "u_rvj2_commish@test.local", displayName: "Commish" },
+      { id: "u_rvj2_stranger", email: "u_rvj2_stranger@test.local", displayName: "Stranger" },
+    ]);
+    const leagueId = "lg_release_no_seat";
+    await joinDb.insert(leagues).values({ id: leagueId, name: leagueId, format: "snake", teamCount: 2, commissionerUserId: "u_rvj2_commish" });
+    await joinDb.insert(drafts).values({ id: "draft_release_no_seat", leagueId, format: "snake", status: "scheduled", kickoffAt: new Date("2026-09-10T17:00:00.000Z") });
+    await joinDb.insert(teams).values({ id: "team_rvj2_commish", leagueId, userId: "u_rvj2_commish", name: "Commish's Team" });
+
+    expect(await releaseSeat(pickDb, { leagueId, userId: "u_rvj2_stranger" }, { clock })).toEqual({ ok: false, reason: RELEASE_REFUSALS.notMember });
+    const stillSeated = await joinDb.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, leagueId));
+    expect(stillSeated).toHaveLength(1);
   });
 });
 
@@ -2892,8 +2988,12 @@ describe("the leagues-before-drafts rule", () => {
 
   it("lets an auto-start and a last-seat join in the same league run concurrently without deadlocking", async () => {
     const { leagueId, draftId } = await sitAndGoWithOneSeatOpen("lg_lbd_start", "draft_lbd_start");
-    // `startDraft` builds its pool outside the transaction; an empty `players` table refuses the
-    // start before any lock is taken, and the race under test would never happen at all.
+    // `startDraft` now builds its pool INSIDE the transaction (Phase 3.6, Task 8's binding
+    // precondition) — an empty `players` table would refuse the start there instead, but still
+    // after both row locks are already taken, so it would prove nothing new either way. Seeded
+    // regardless: the join below is the LAST seat, so the room genuinely reaches three teams by
+    // the time `starting`'s in-lock read runs, and `POOL` (nine players, three teams' worth) is
+    // sized for exactly that.
     await joinDb.insert(players).values(POOL.map((entry) => ({ id: entry.playerId, name: entry.playerId, position: entry.position, nflTeam: "FA" })));
 
     const join = parkedJoin(leagueId, `${leagueId}_joiner`, "team_lbd_start_joiner");

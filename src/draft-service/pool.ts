@@ -1,5 +1,5 @@
 import { eq, lte } from "drizzle-orm";
-import type { Db } from "@/db/client";
+import type { Db, DbTx } from "@/db/client";
 import { players, playerStatLines, scoringSettings } from "@/db/schema";
 import type { DraftPoolEntry } from "@/domain/draft";
 import type { Player } from "@/domain/player";
@@ -42,7 +42,7 @@ export function resetRankedPlayersCacheForTests(): void {
  * total. Projection uses the league's own scoring settings via the same scoring engine that
  * scores real weeks, so a PPR league's board looks like a PPR board.
  */
-export async function rankedPlayers(db: Db, leagueId: string): Promise<readonly Player[]> {
+export async function rankedPlayers(db: Db | DbTx, leagueId: string): Promise<readonly Player[]> {
   const cached = cache.get(leagueId);
   if (cached !== undefined) return cached;
 
@@ -74,7 +74,13 @@ export async function rankedPlayers(db: Db, leagueId: string): Promise<readonly 
 /**
  * The draftable pool as the engine wants it: id + position, in `rankedPlayers` order. This is
  * the ranking snapshotted into the START_DRAFT action; nothing re-ranks mid-draft.
+ *
+ * Takes `Db | DbTx` (Phase 3.6, Task 8's binding precondition): `startDraft`'s
+ * `DraftActionSource` thunk (`@/draft-service/store`) now calls this INSIDE the transaction that
+ * holds `drafts FOR UPDATE`, the same seam `slotPreferencesFor`/`loadDraftConfig` already read
+ * through under. `rankedPlayers`' own cross-call cache is unaffected either way — it is keyed on
+ * `leagueId` alone and reads no transaction state.
  */
-export async function buildDraftPool(db: Db, leagueId: string): Promise<readonly DraftPoolEntry[]> {
+export async function buildDraftPool(db: Db | DbTx, leagueId: string): Promise<readonly DraftPoolEntry[]> {
   return (await rankedPlayers(db, leagueId)).map((player) => ({ playerId: player.id, position: player.position }));
 }

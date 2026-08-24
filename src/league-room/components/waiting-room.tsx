@@ -7,6 +7,7 @@ import type { LeagueAuthority } from "@/league-service/authority";
 import { hasOpenSeat } from "@/matchmaking/filter";
 import type { DraftScheduleBody } from "../contract";
 import { draftTerminalStatePanel } from "./draft-schedule-panel";
+import { ReleaseSeatControl } from "./release-seat-control";
 
 /**
  * `DraftScheduleBody` plus the two facts Task 8's own "Produces" list deliberately does not add
@@ -69,9 +70,35 @@ export interface WaitingRoomLeague extends DraftScheduleBody {
  * house league's second action reads "See the rest of the shelf" — the "never a dead end" rule
  * doing exactly what it exists for on the one surface where the obvious action is unavailable.
  */
-export function WaitingRoom({ league, isCommissioner }: { readonly league: WaitingRoomLeague; readonly isCommissioner: boolean }) {
+export function WaitingRoom({
+  league,
+  isCommissioner,
+  leagueName = "",
+  myTeamId = null,
+}: {
+  readonly league: WaitingRoomLeague;
+  readonly isCommissioner: boolean;
+  /** Phase 3.6, Task 8: `ReleaseSeatControl`'s own Modal names the league by name, never by id —
+   *  rides in as a separate prop rather than a third copy of a league's own name on the wire, the
+   *  same reasoning `teamCount` already sets a precedent for on this component. Optional (default
+   *  `""`, never rendered on its own): every existing caller that predates this task never has to
+   *  supply a name it never asked about, the same "absent means never in play" shape
+   *  `holdOutcome` already keeps on `JoinLeagueOutcome`. */
+  readonly leagueName?: string;
+  /** `null` only for a caller with no team here (a commissioner without one of their own), and
+   *  the default for every caller that predates this task — the same shape
+   *  `LeagueHomeBody.myTeamId` already carries. Nothing to release without a seat, so `null`
+   *  simply never renders `ReleaseSeatControl` at all. */
+  readonly myTeamId?: string | null;
+}) {
   const isHouse = league.authority.kind === "house";
   const full = !hasOpenSeat(league);
+  // A member-league commissioner can never release (`RELEASE_REFUSALS.commissioner` — no
+  // transfer-of-commissioner path), so the control is not offered to them at all rather than
+  // shown and always refused. A house league never sets `isCommissioner` true in the first place
+  // (`isCommissionerOf`'s own docblock), so this reads correctly for both authorities without a
+  // second branch on `league.authority.kind`.
+  const canRelease = myTeamId !== null && !isCommissioner;
   // Called unconditionally, before any early return — React's Rules of Hooks. `null` once
   // there's nothing left to count down to: still filling (no kickoff has been set yet), or a
   // draft already in progress/complete (handled by `draftTerminalStatePanel` below).
@@ -90,43 +117,63 @@ export function WaitingRoom({ league, isCommissioner }: { readonly league: Waiti
     // idiom `RoomRail` (`@/draft-room/components/room-rail`) already uses for an identical
     // logically-guaranteed-non-null case.
     return (
-      <StatePanel
-        tone="neutral"
-        icon="bolt"
-        title={`All ${league.teamCount} seats are full.`}
-        action={
-          <div className="flex flex-col items-center gap-1">
-            <Countdown remainingMs={remainingMs!} size="lg" data-testid="waiting-room-countdown" />
-            <p role="status" className="text-sm text-text-muted">{`Starts in ${formatCoarseDuration(remainingMs!)}.`}</p>
-            {/* First-timer persona question, Step 5: "what happens if I'm not there?" — the
-                honest answer this room already gives during a live draft (`room-dock.tsx`'s
-                own copy), stated once here too rather than left for a member to discover only
-                once the clock is already running. */}
-            <p className="text-sm text-text-muted">Away when it starts? The room autopicks for you if your clock runs out.</p>
+      <div className="flex flex-col gap-2">
+        <StatePanel
+          tone="neutral"
+          icon="bolt"
+          title={`All ${league.teamCount} seats are full.`}
+          action={
+            <div className="flex flex-col items-center gap-1">
+              <Countdown remainingMs={remainingMs!} size="lg" data-testid="waiting-room-countdown" />
+              <p role="status" className="text-sm text-text-muted">{`Starts in ${formatCoarseDuration(remainingMs!)}.`}</p>
+              {/* First-timer persona question, Step 5: "what happens if I'm not there?" — the
+                  honest answer this room already gives during a live draft (`room-dock.tsx`'s
+                  own copy), stated once here too rather than left for a member to discover only
+                  once the clock is already running. */}
+              <p className="text-sm text-text-muted">Away when it starts? The room autopicks for you if your clock runs out.</p>
+            </div>
+          }
+        />
+        {/* Task 8: the escape hatch, at the bottom of the room. `league.kickoffRolls` is always
+            0 for a `when_full` league (`DraftScheduleBody.kickoffRolls`'s own docblock), so this
+            is always the quiet variant here — the escalation is `DraftSchedulePanel`'s own
+            `'scheduled'`-trigger surface. */}
+        {canRelease ? (
+          <div className="flex justify-center">
+            <ReleaseSeatControl leagueId={league.leagueId} leagueName={leagueName} kickoffRolls={league.kickoffRolls} />
           </div>
-        }
-      />
+        ) : null}
+      </div>
     );
   }
 
   return (
-    <StatePanel
-      tone="neutral"
-      icon="users"
-      title={`${league.filledTeams} of ${league.teamCount} seats taken`}
-      description="You don't have to wait here. We'll let you know the moment it fills."
-      action={
-        <div className="flex flex-wrap items-center justify-center gap-4">
-          {isHouse || !isCommissioner ? null : (
-            <Link href={`/app/leagues/${league.leagueId}#invite-managers`} className="text-sm font-medium text-accent underline">
-              Invite someone
+    <div className="flex flex-col gap-2">
+      <StatePanel
+        tone="neutral"
+        icon="users"
+        title={`${league.filledTeams} of ${league.teamCount} seats taken`}
+        description="You don't have to wait here. We'll let you know the moment it fills."
+        action={
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            {isHouse || !isCommissioner ? null : (
+              <Link href={`/app/leagues/${league.leagueId}#invite-managers`} className="text-sm font-medium text-accent underline">
+                Invite someone
+              </Link>
+            )}
+            <Link href="/browse" className="text-sm font-medium text-accent underline">
+              {isHouse ? "See the rest of the shelf" : "See leagues closer to filling"}
             </Link>
-          )}
-          <Link href="/browse" className="text-sm font-medium text-accent underline">
-            {isHouse ? "See the rest of the shelf" : "See leagues closer to filling"}
-          </Link>
+          </div>
+        }
+      />
+      {/* Task 8: the escape hatch, at the bottom of the room — always the quiet variant here,
+          for the same reason the full-and-counting-down branch above always is. */}
+      {canRelease ? (
+        <div className="flex justify-center">
+          <ReleaseSeatControl leagueId={league.leagueId} leagueName={leagueName} kickoffRolls={league.kickoffRolls} />
         </div>
-      }
-    />
+      ) : null}
+    </div>
   );
 }

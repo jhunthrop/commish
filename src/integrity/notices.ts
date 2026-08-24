@@ -325,6 +325,17 @@ export interface NoticeContexts {
     readonly startTimingSentence: string;
     readonly showReleaseParagraph: boolean;
   };
+  /**
+   * `releaseSeat`'s own notice (`@/league-service/release`, Phase 3.6 Task 8) — the other half of
+   * `draft_fill_triggered`. Sent to every seat REMAINING in a sit-and-go league whose seat release
+   * cleared an already-fired `drafts.fill_fired_at`: the room they were told was about to draft is
+   * no longer full, and this is the sentence that says so rather than leaving them to notice a
+   * countdown that quietly stopped meaning anything. Never sent to the member who just left —
+   * they already have the Modal's own confirmation, in the same breath they chose it.
+   */
+  readonly draft_fill_reversed: {
+    readonly leagueName: string;
+  };
 }
 
 /**
@@ -544,6 +555,12 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   draft_kickoff_rolled: ({ leagueName, newKickoffAt, rollSentence, startTimingSentence, showReleaseParagraph }) => ({
     title: `Your draft in ${leagueName} moved`,
     body: `${leagueName} did not fill in time, so its draft moves to ${newKickoffAt}. ${rollSentence} Your seat is still yours. ${startTimingSentence}${showReleaseParagraph ? " If you would rather not wait, you can release your seat and someone else can take it." : ""}`,
+  }),
+  // No "no reply to this message" line, the identical framing `draft_fill_triggered`'s own
+  // template carries: this explains a fact about the league's shared calendar, not a sanction.
+  draft_fill_reversed: ({ leagueName }) => ({
+    title: `${leagueName} is back to filling`,
+    body: `A seat opened up in ${leagueName}, so the room is no longer full and its draft goes back to waiting for the last seat.`,
   }),
 };
 

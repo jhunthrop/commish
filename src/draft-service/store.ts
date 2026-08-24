@@ -114,6 +114,15 @@ export interface StartDraftOptions {
  * Deliberately NOT a general "revise the action" hook. It runs exactly where a plain action would
  * have been consumed — after the row locks, before `admitCommand` — so every guard, every
  * reducer and the persisted row itself see one action, built once.
+ *
+ * PHASE 3.6, TASK 8's BINDING PRECONDITION extends this same reasoning to two MORE reads
+ * `startDraft` used to take out of transaction: `teamRows` (the roster `draftOrder` is drawn
+ * over) and `pool` (the draft board `START_DRAFT` snapshots). Read outside the lock, either one
+ * could disagree with the room `releaseSeat` (`@/league-service/release`) is concurrently
+ * editing — a team `releaseSeat` deletes between the outer read and the lock would otherwise
+ * persist into `draftOrder`, which the reducer's replay rule then makes PERMANENT, exactly the
+ * class of bug the slot-preference draw closed above. Both reads now happen inside `startDraft`'s
+ * own thunk, under the identical `drafts FOR UPDATE` lock — see that function's own body.
  */
 export type DraftActionSource = DraftAction | ((tx: DbTx) => Promise<DraftAction>);
 
@@ -151,6 +160,25 @@ export const DRAFT_AUTO_STARTED_SUMMARY = "This draft reached its scheduled time
  */
 export function isSequenceConflict(error: unknown): boolean {
   return isUniqueViolation(error, SEQUENCE_UNIQUE_INDEX);
+}
+
+/**
+ * Thrown from inside a `DraftActionSource` THUNK to refuse the action with a caller-facing
+ * reason, without writing anything — Phase 3.6, Task 8's binding precondition moved `startDraft`'s
+ * "there are no players to draft yet" check from an outer, pre-transaction read into the thunk
+ * itself (see `DraftActionSource`'s own docblock for why the read moved), and a thunk may only
+ * ever return a `DraftAction`, never an `ApplyResult`. This is the one escape hatch: the
+ * transaction the thunk runs in rolls back on any thrown error exactly as it always has, and
+ * `applyAction`'s own catch below turns THIS ONE error shape back into the ordinary
+ * `{ ok: false, reason }` a caller already expects — a route or a test can't tell the refusal
+ * moved. Nothing else in this module throws it, so catching it by `instanceof` here can never
+ * mask an unrelated bug the way a bare string match could.
+ */
+export class DraftActionRefused extends Error {
+  constructor(readonly reason: string) {
+    super(reason);
+    this.name = "DraftActionRefused";
+  }
 }
 
 /**
@@ -562,6 +590,9 @@ export function createDraftStore({
           // unreachable; if it fires, that is a real signal that something wrote outside the
           // lock, so it keeps its user-facing retry message rather than being swallowed.
           if (isSequenceConflict(error)) return { ok: false, reason: "Someone else acted first. Try again." };
+          // See `DraftActionRefused`'s own docblock — the one refusal a `DraftActionSource`
+          // thunk can raise from inside the transaction it runs in.
+          if (error instanceof DraftActionRefused) return { ok: false, reason: error.reason };
           throw error;
         }
       });
@@ -609,48 +640,69 @@ export function createDraftStore({
         }
       }
 
-      // `userId`/`leagueName` ride along with `id` on this ONE read (rather than a second query
-      // inside the transaction below): `draftOrder.length < 2` is `reduceStart`'s own precondition,
-      // checked against exactly this array's derived order, so if `applyAction` ever reaches
-      // `alsoInTransaction` these rows are already provably >= 2 — there is nothing an inner
-      // re-query could learn that this one has not already established.
-      const teamRows = await db
-        .select({ id: teams.id, userId: teams.userId, leagueName: leagues.name })
-        .from(teams)
-        .innerJoin(leagues, eq(leagues.id, teams.leagueId))
-        .where(eq(teams.leagueId, config.leagueId))
-        .orderBy(teams.id);
-      const pool = await buildDraftPool(db, config.leagueId);
-      if (pool.length === 0) return { ok: false, reason: "There are no players to draft yet." };
       // One instant for both the action's own timestamp and (when `auto`) the announcement's
       // `occurredAt` — read once here rather than twice, which could otherwise disagree by
       // however long the transaction below takes to reach the second read.
       const now = clock.now();
+      // Phase 3.6, Task 8's BINDING PRECONDITION (the 3.5 fix-wave re-review): `teamRows` and
+      // `pool` used to be read HERE, out of transaction, before `drafts FOR UPDATE` was ever
+      // taken — a window `releaseSeat` (`@/league-service/release`) could commit inside, persisting
+      // a departed team's id into `draftOrder`, which the reducer's replay rule then makes
+      // PERMANENT. Both reads now happen INSIDE the `DraftActionSource` thunk below, under the
+      // SAME `drafts FOR UPDATE` the slot-preference draw already runs under (`DraftActionSource`'s
+      // own docblock) — `releaseSeat` takes `leagues FOR UPDATE` as ITS first statement, which
+      // blocks this function's own `leagues FOR KEY SHARE` (`applyAction`'s first statement) for as
+      // long as a release is in flight, so whichever of the two commits first is what the other
+      // one's in-lock read sees. `teamRows` is captured into this outer, mutable binding so
+      // `alsoInTransaction` below — which runs AFTER the thunk resolves, in the SAME transaction —
+      // can reach the identical rows without a second, out-of-lock read; `applyAction` always calls
+      // `source(tx)` before it ever reaches `alsoInTransaction`, so this is set by the time it is
+      // read (see `applyAction`'s own body).
+      let lockedTeamRows: readonly { readonly id: string; readonly userId: string; readonly leagueName: string }[] | null = null;
       return store.applyAction(
         draftId,
-        // A `DraftActionSource` FUNCTION, not a value (final whole-branch review, F9). The only
-        // read left inside this action is Task 6's slot-preference draw, and it now happens under
-        // the `drafts FOR UPDATE` this same transaction takes — see `DraftActionSource`'s own
-        // docblock for the dead write that closed. Everything else here is already decided.
-        async (tx) => ({
-          v: DRAFT_ACTION_VERSION,
-          type: "START_DRAFT",
-          timestamp: now,
-          // Task 6: NFFC's Kentucky Derby System. The draw's OUTPUT is what rides the persisted
-          // action from here on (`draftOrder` itself), so replay never re-reads this table and a
-          // preference saved after this instant can never change history (ruling 27 — see
-          // `draft_slot_preferences`'s own docblock in `@/db/schema`). What F9 changed is only
-          // WHEN the input is read, never that the output is a snapshot.
-          draftOrder: draftOrderFor(draftId, teamRows.map((t) => t.id), await slotPreferencesFor(tx, draftId)),
-          pool,
-          // Command time is the ONE place the tunable is read — it rides the persisted
-          // action from here on, so replay never consults AUCTION_CONFIG.
-          minBid: AUCTION_CONFIG.minBid,
-          // Task 5's identical discipline: the skip-and-owe allowance rides the action from
-          // here on, so a later deploy that changes `DRAFT_SKIP_POLICY` can never change what
-          // an already-persisted TIMER_EXPIRE did on replay.
-          skipPolicy: DRAFT_SKIP_POLICY,
-        }),
+        // A `DraftActionSource` FUNCTION, not a value (final whole-branch review, F9). Every read
+        // this action needs — the team roster, the draft pool, and Task 6's slot-preference draw —
+        // now happens under the `drafts FOR UPDATE` this same transaction takes — see
+        // `DraftActionSource`'s own docblock. Everything else here is already decided.
+        async (tx) => {
+          // `userId`/`leagueName` ride along with `id` on this ONE read (rather than a second query
+          // later): `draftOrder.length < 2` is `reduceStart`'s own precondition, checked against
+          // exactly this array's derived order, so if `applyAction` ever reaches
+          // `alsoInTransaction` these rows are already provably >= 2 — there is nothing a second
+          // re-query could learn that this one has not already established.
+          const teamRows = await tx
+            .select({ id: teams.id, userId: teams.userId, leagueName: leagues.name })
+            .from(teams)
+            .innerJoin(leagues, eq(leagues.id, teams.leagueId))
+            .where(eq(teams.leagueId, config.leagueId))
+            .orderBy(teams.id);
+          lockedTeamRows = teamRows;
+          const pool = await buildDraftPool(tx, config.leagueId);
+          // A thunk may only ever return a `DraftAction` — never an `ApplyResult` — so this
+          // refusal rides `DraftActionRefused` (this module's own escape hatch, see its docblock)
+          // rather than an early `return { ok: false, ... }`, which is no longer reachable from here.
+          if (pool.length === 0) throw new DraftActionRefused("There are no players to draft yet.");
+          return {
+            v: DRAFT_ACTION_VERSION,
+            type: "START_DRAFT",
+            timestamp: now,
+            // Task 6: NFFC's Kentucky Derby System. The draw's OUTPUT is what rides the persisted
+            // action from here on (`draftOrder` itself), so replay never re-reads this table and a
+            // preference saved after this instant can never change history (ruling 27 — see
+            // `draft_slot_preferences`'s own docblock in `@/db/schema`). What F9 changed is only
+            // WHEN the input is read, never that the output is a snapshot.
+            draftOrder: draftOrderFor(draftId, teamRows.map((t) => t.id), await slotPreferencesFor(tx, draftId)),
+            pool,
+            // Command time is the ONE place the tunable is read — it rides the persisted
+            // action from here on, so replay never consults AUCTION_CONFIG.
+            minBid: AUCTION_CONFIG.minBid,
+            // Task 5's identical discipline: the skip-and-owe allowance rides the action from
+            // here on, so a later deploy that changes `DRAFT_SKIP_POLICY` can never change what
+            // an already-persisted TIMER_EXPIRE did on replay.
+            skipPolicy: DRAFT_SKIP_POLICY,
+          };
+        },
         {
           alsoInTransaction: async (tx) => {
             // `claimAutoStart` (`./auto-start.ts`), not a plain `UPDATE`: one start implementation
@@ -690,12 +742,14 @@ export function createDraftStore({
             // THIS event is the transaction's only anchor write, and nothing after it takes a
             // lock this callback's own `audit.record` has not already accounted for.
             //
-            // `teamRows` is the OUTER read above (`id`/`userId`/`leagueName` together, taken once
-            // before this transaction opened) — never re-queried here. `reduceDraft`/`reduceStart`
-            // already admitted `draftOrder` (built from this exact array) as >= 2 teams before
-            // `alsoInTransaction` ever runs, under the SAME `drafts FOR UPDATE` lock this
-            // transaction has held since before that check, so by the time this line runs
+            // `lockedTeamRows` is the THUNK's own read above (`id`/`userId`/`leagueName`
+            // together, taken under `drafts FOR UPDATE`) — never re-queried here, and never
+            // `null` at this point: `applyAction` always resolves `source(tx)` (which sets it)
+            // before it ever reaches `alsoInTransaction`. `reduceDraft`/`reduceStart` already
+            // admitted `draftOrder` (built from this exact array) as >= 2 teams before
+            // `alsoInTransaction` ever runs, under the SAME lock, so by the time this line runs
             // `teamRows.length >= 2` is not assumed, it is ALREADY PROVEN.
+            const teamRows = lockedTeamRows!;
             const created: MemberNotice[] = [];
             for (const teamRow of teamRows) {
               created.push(

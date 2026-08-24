@@ -66,6 +66,8 @@ export function LeagueHome({
         <WaitingRoom
           league={{ ...home.draftSchedule, teamCount: home.teamCount, authority: home.authority }}
           isCommissioner={home.isCommissioner}
+          leagueName={home.name}
+          myTeamId={home.myTeamId}
         />
       ) : (
         <DraftSchedulePanel
@@ -73,6 +75,8 @@ export function LeagueHome({
           isCommissioner={home.isCommissioner}
           initialSchedule={home.draftSchedule}
           teamCount={home.teamCount}
+          leagueName={home.name}
+          myTeamId={home.myTeamId}
         />
       )}
 

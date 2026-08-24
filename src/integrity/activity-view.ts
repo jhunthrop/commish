@@ -148,7 +148,24 @@ function renderLeagueCreated(event: AuditEvent, names: ActivityNames): Rendered 
   };
 }
 
+/**
+ * `AUDIT_EVENT_TYPES` is a frozen pg enum with no `member_left` (its own docblock forbids
+ * `ALTER TYPE ... ADD VALUE` forever) — Phase 3.6, Task 8's `releaseSeat`
+ * (`@/league-service/release`) therefore rides THIS event type, distinguished by
+ * `payload.outcome: "seat_released"`, on the in-code precedent `trade_rejected`'s own
+ * `payload.outcome` already set for a withdrawal (`@/league-service/trades`): "one event, one
+ * `payload.outcome` tells the two apart, because this list is frozen." A departed member's
+ * `actorId` is still a real `users.id` — the `teams` row `releaseSeat` deletes carries no
+ * identity of its own — so `names.member` resolves the same way it does for anyone else.
+ */
 function renderMemberJoined(event: AuditEvent, names: ActivityNames): Rendered {
+  if (event.payload.outcome === "seat_released") {
+    return {
+      icon: "users",
+      headline: `${names.member(event.actorId)} left the league before the draft.`,
+      detail: null,
+    };
+  }
   return {
     icon: "users",
     headline: `${names.member(event.actorId)} joined the league.`,

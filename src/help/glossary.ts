@@ -38,7 +38,8 @@ export type TermKey =
   | "sit-and-go"
   | "verified-reviewer"
   | "house-league"
-  | "playoffs";
+  | "playoffs"
+  | "release-seat";
 
 export interface GlossaryTerm {
   readonly key: TermKey;
@@ -218,6 +219,18 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     short: "The top teams play a short bracket at the end of the season for the league title.",
     detail:
       "Once the regular season ends, the top teams in the standings play a short elimination bracket across the weeks shown here. Win your game each week to advance; lose and your season is over. Whoever wins the final week takes the league.",
+  },
+  /**
+   * Phase 3.6, Task 8: the escape hatch a room that rolls forward forever requires.
+   * `ReleaseSeatControl` (`@/league-room/components/release-seat-control`) is this term's own
+   * `InfoTip` caller.
+   */
+  "release-seat": {
+    key: "release-seat",
+    term: "releasing your seat",
+    short: "Leaves the league and frees your seat for someone else, before the draft starts.",
+    detail:
+      "Releasing your seat leaves the league right away and frees it for another manager to claim, as long as the draft has not started yet. It cannot be undone. A member league's commissioner cannot release their own seat, because this product has no way yet to hand that role to someone else.",
   },
 };
 

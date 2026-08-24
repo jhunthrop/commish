@@ -10,6 +10,7 @@ import { StatePanel } from "@/components/ui/state-panel";
 import { formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
 import { PUBLIC_ROOM_SHORT_REFUSAL, rollNoticeSentence } from "@/matchmaking/roll";
 import { useLeagueRoomDeps } from "../hooks/deps";
+import { ReleaseSeatControl } from "./release-seat-control";
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 60 * MS_PER_MINUTE;
@@ -138,6 +139,8 @@ export function DraftSchedulePanel({
   isCommissioner,
   initialSchedule,
   teamCount,
+  leagueName = "",
+  myTeamId = null,
 }: {
   readonly leagueId: string;
   readonly isCommissioner: boolean;
@@ -150,6 +153,13 @@ export function DraftSchedulePanel({
    * this rides in as a second prop rather than widening the wire body.
    */
   readonly teamCount: number;
+  /** Phase 3.6, Task 8: `ReleaseSeatControl`'s own Modal names the league by name. Optional
+   *  (default `""`, never rendered on its own) — the same "absent means never in play" shape
+   *  `WaitingRoom`'s identical prop keeps. */
+  readonly leagueName?: string;
+  /** `null` for a caller with no team here — the same shape `WaitingRoom`'s identical prop
+   *  keeps, and the default for every caller that predates this task. */
+  readonly myTeamId?: string | null;
 }) {
   const { fetchJson } = useLeagueRoomDeps();
   const [schedule, setSchedule] = useState<DraftScheduleBody>(initialSchedule);
@@ -239,6 +249,18 @@ export function DraftSchedulePanel({
   const rolledNotice =
     schedule.status !== "scheduled" || schedule.kickoffRolls <= 0 ? null : (
       <p className="text-sm text-text-muted">{rollNoticeSentence(schedule.kickoffRolls)}</p>
+    );
+
+  // Task 8: the escape hatch. A member-league commissioner can never release
+  // (`RELEASE_REFUSALS.commissioner` — no transfer-of-commissioner path), and `isCommissioner`
+  // here is never true for a house league in the first place (`DraftSchedulePanel` only ever
+  // renders for a `'scheduled'`-trigger draft, and a house league's own trigger is always
+  // `'when_full'` — `HOUSE_CATALOG`'s own docblock), so `!isCommissioner` alone is the right gate,
+  // no second branch on authority needed. Placed right beside `rolledNotice` (F12): quiet at zero
+  // rolls, and visually beside the sentence that named the first slip once one has happened.
+  const releaseControl =
+    schedule.status !== "scheduled" || myTeamId === null || isCommissioner ? null : (
+      <ReleaseSeatControl leagueId={leagueId} leagueName={leagueName} kickoffRolls={schedule.kickoffRolls} />
     );
 
   // Task 7, Step 3, narrowed by fix round 1's M5 (controller ruling): a PRIVATE commissioner's
@@ -331,6 +353,7 @@ export function DraftSchedulePanel({
       />
       {autoStartNotice}
       {rolledNotice}
+      {releaseControl}
       {shortRoomNotice}
       {overnightPauseNotice}
       {startError === null ? null : (

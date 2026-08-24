@@ -382,14 +382,13 @@ export const drafts = pgTable(
      * refusal with (`FILL_TRIGGER_REFUSALS.alreadyFired`) — a notice is audit-anchored and
      * nothing ever deletes one, so once a released seat can genuinely UN-fill a league during its
      * grace window, a notice-shaped guard would refuse to fire a second time forever.
-     * `fireWhenFullInTx` (Task 7, this commit) is this column's own writer, stamping it the
-     * moment it fires. THE CLEARER HAS NOT LANDED YET: Task 8's `releaseSeat` is the column's
-     * intended writer of `null`, and it is a BINDING PRECONDITION — restated from the plan's own
-     * text — that `releaseSeat` lands before this branch merges, in the same commit as the
-     * `startDraft` pool-read move its own precondition names. Until Task 8 lands, this column has
-     * a writer and a reader (this file's own guard) but no clearer, and a league that fills,
-     * loses a seated member, and fills again will refuse its second fire exactly as it did before
-     * this column existed — a real, tracked gap, not a silent one.
+     * `fireWhenFullInTx` (Task 7) is this column's own writer, stamping it the moment it fires.
+     * THE CLEARER EXISTS: Phase 3.6, Task 8's `releaseSeat` (`@/league-service/release`) clears it
+     * back to `null` whenever a released seat un-fills a league that had already fired, landed in
+     * the same commit as the `startDraft` pool-read move its own binding precondition named
+     * (`DraftActionSource`'s own docblock, `@/draft-service/store`) — so a league that fills,
+     * loses a seated member, and fills again fires its `draft_fill_triggered`/`house_league_filled`
+     * notices a second time, exactly as this column was always meant to allow.
      */
     fillFiredAt: timestamp("fill_fired_at", { withTimezone: true }),
   },

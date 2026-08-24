@@ -102,17 +102,16 @@ export type FireWhenFullOutcome =
  * Phase 3.6, Task 7: this guard USED TO look for an existing `draft_fill_triggered` notice
  * instead — the same "read before you write" discipline `recordTierBlockedJoin` (`./join`)
  * still uses for an unrelated repeat, and it worked exactly as long as a league could only ever
- * fill once. Task 8's `releaseSeat` will break that: a league that fills, loses a seated member
- * during the grace window, and fills again is a league this function must fire for TWICE, and a
- * notice-shaped guard would refuse the second fire forever — notices are audit-anchored and
- * nothing ever deletes one, so "delete the notice" was never an available fix. `fill_fired_at` is
- * a COLUMN instead: stamped here, on the same `UPDATE` that writes `kickoff_at`. `releaseSeat` is
- * this column's own intended CLEARER, and it has not landed yet (see `drafts.fillFiredAt`'s own
- * docblock, `@/db/schema` — a binding precondition that it lands before this branch merges): until
- * it does, this guard has a writer and a reader but no clearer, and a league that fills, loses a
- * member, and refills will refuse its second fire exactly as it did before this column existed.
- * NO-WRITE-BEFORE-REFUSAL holds throughout: every refusal branch below returns before the
- * `UPDATE` is ever reached.
+ * fill once. Task 8's `releaseSeat` (`./release`) breaks that: a league that fills, loses a
+ * seated member during the grace window, and fills again is a league this function must fire for
+ * TWICE, and a notice-shaped guard would refuse the second fire forever — notices are
+ * audit-anchored and nothing ever deletes one, so "delete the notice" was never an available fix.
+ * `fill_fired_at` is a COLUMN instead: stamped here, on the same `UPDATE` that writes
+ * `kickoff_at`, and CLEARED by `releaseSeat` (see `drafts.fillFiredAt`'s own docblock,
+ * `@/db/schema`) whenever a released seat un-fills a league that had already fired. A league that
+ * fills, loses a member, and refills now fires its notices a second time, exactly as this column
+ * was always meant to allow. NO-WRITE-BEFORE-REFUSAL holds throughout: every refusal branch below
+ * returns before the `UPDATE` is ever reached.
  *
  * FK ACQUISITIONS, ENUMERATED (binding controller ruling, Plan C's H2 lesson: a lock-order review
  * must enumerate foreign keys). `UPDATE drafts SET kickoff_at` takes the draft row's own lock plus

@@ -216,4 +216,5 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
     startTimingSentence: "The draft starts as soon as the last seat is taken, or when your commissioner starts it.",
     showReleaseParagraph: false,
   },
+  draft_fill_reversed: { leagueName: "Sunday Money" },
 };
