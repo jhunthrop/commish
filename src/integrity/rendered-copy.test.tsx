@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { AccountRoomDepsProvider } from "@/account-room/hooks/deps";
-import { NoticeInbox } from "@/account-room/components/notice-inbox";
+import { NOTICE_INBOX_SIZE, NoticeInbox } from "@/account-room/components/notice-inbox";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { fixtureAccountDeps, PROFILE } from "@/account-room/test-fixtures";
 import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import type { NoticeView } from "@/account-room/contract";
@@ -144,6 +145,17 @@ describe("NoticeInbox says nothing that breaks the house copy rules", () => {
       await waitFor(() => expectClean(container, NOTICE.title, NOTICE.body));
       unmount();
     }
+  });
+
+  /**
+   * `NOTICE_INBOX_SIZE` (`@/account-room/components/notice-inbox`) is a duplicate of
+   * `INTEGRITY_CONFIG.notices.inboxSize`, not an import of it — `@/integrity` is blocked from
+   * `src/account-room/**` outright, tests included (the client boundary rule). This is the one
+   * file positioned to hold both values at once, so it is the one that proves a future change to
+   * either number cannot silently drift from the other.
+   */
+  it("states the same notice cap the account room's own duplicate constant claims", () => {
+    expect(NOTICE_INBOX_SIZE).toBe(INTEGRITY_CONFIG.notices.inboxSize);
   });
 });
 
