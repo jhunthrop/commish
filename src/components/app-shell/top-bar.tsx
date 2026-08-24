@@ -85,8 +85,23 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
         <div className="flex items-center gap-2">
           {/* Task 10, Step 3: the top bar's one live fact — `LiveStatePill` itself renders
               nothing when `liveState` is `null` (ruling 12), so this slot is silent outside a
-              real game window with no branch needed here. */}
-          <LiveStatePill liveState={liveState} />
+              real game window with no branch needed here.
+
+              e2e checkpoint fix round (reconciliation, P9-P11 checkpoint): `hidden sm:block` —
+              this docblock's own fix-round-1 history names the exact failure mode ("five
+              controls at full width... overflowed a 360px viewport by 30px") and says the
+              icon-only discipline exists so a later, sixth control "cannot regress the same way
+              if [it] ever joins this row." `LiveStatePill` is that sixth control, added by Task
+              10 as a full-text pill ("Monday · 16 games live") rather than an icon, so it missed
+              that discipline and reopened the exact regression on a 360px viewport with the
+              queue link, notices, avatar name and sign-out already filling the row (a real
+              account can be an operator AND inside a live window at once). A wrapper, not a
+              class on the pill itself: `Badge`'s own base class already hardcodes `inline-flex`
+              with no responsive prefix, and two same-specificity `display` utilities on one
+              element race on Tailwind's generated stylesheet order rather than JSX order. */}
+          <div className="hidden sm:block">
+            <LiveStatePill liveState={liveState} />
+          </div>
           {!isAdmin ? null : (
             <Link
               href="/app/admin/queue"
