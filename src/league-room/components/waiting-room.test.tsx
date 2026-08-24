@@ -178,6 +178,35 @@ describe("WaitingRoom", () => {
     });
   });
 
+  // Task 12 fix round 1 (F1): `LeagueHome`'s own `DraftCompleteArrival` already shows this exact
+  // moment, more richly, during the SAME window `draftJustCompleted` names — this panel would
+  // double the message. The "View the draft board" link this panel would have shown moves to
+  // that arrival instead (`league-home.test.tsx` proves it lands there).
+  it("suppresses its own terminal panel while draftJustCompleted is true, in both themes, axe-clean", async () => {
+    const complete: WaitingRoomLeague = { ...fullSitAndGo, status: "complete", missedDraft: false };
+    await renderSurface(<WaitingRoom league={complete} draftJustCompleted />, async ({ container }) => {
+      expect(screen.queryByText("Draft complete")).not.toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: "View the draft board" })).not.toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("brings its own terminal panel back once draftJustCompleted goes false again — the arrival's window closing, not a code change", () => {
+    const complete: WaitingRoomLeague = { ...fullSitAndGo, status: "complete", missedDraft: false };
+    render(<WaitingRoom league={complete} draftJustCompleted={false} />);
+    expect(screen.getByText("Draft complete")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View the draft board" })).toBeInTheDocument();
+  });
+
+  // `draftJustCompleted` is never true alongside a live draft in production (`LeagueHome`'s own
+  // predicate requires `draftStatus === "complete"`), but the guard is defensive, not assumed —
+  // pinned here so the terminal `in_progress` panel can never be suppressed by mistake.
+  it("never suppresses the in-progress terminal panel, even if draftJustCompleted were somehow true", () => {
+    const live: WaitingRoomLeague = { ...fullSitAndGo, status: "in_progress" };
+    render(<WaitingRoom league={live} draftJustCompleted />);
+    expect(screen.getByText("The draft is live")).toBeInTheDocument();
+  });
+
   it("offers the thing a half-full house league can actually give, and no invite link nobody can act on", () => {
     render(<WaitingRoom league={houseFilling} isCommissioner={true} />);
     expect(screen.queryByRole("link", { name: "Invite someone" })).not.toBeInTheDocument();

@@ -146,6 +146,16 @@ export interface WaitingRoomProps {
   /** Ruling 19: the room's coarse composition, never the raw counts. */
   readonly compositionCategory?: CompositionCategory;
   readonly helpLevel?: HelpLevel;
+  /**
+   * Task 12 fix round 1 (F1): the SAME derived flag `LeagueHome` computes for its own
+   * `DraftCompleteArrival` (Step 3b, D4) — threaded rather than re-derived, since this
+   * component has no `currentWeek`/`myMatchup` of its own to derive it from, and a second copy
+   * of that predicate is exactly the kind of drift risk the codebase's own "centralize the
+   * first time" discipline exists to avoid. `false` by default, so every caller that predates
+   * this flag keeps rendering the terminal panel exactly as before. See this component's own
+   * terminal branch below for what it suppresses and why.
+   */
+  readonly draftJustCompleted?: boolean;
 }
 
 /**
@@ -183,6 +193,7 @@ export function WaitingRoom({
   teams,
   compositionCategory = "open",
   helpLevel,
+  draftJustCompleted = false,
 }: WaitingRoomProps) {
   const isHouse = league.authority.kind === "house";
   const full = !hasOpenSeat(league);
@@ -274,6 +285,19 @@ export function WaitingRoom({
 
   const terminal = draftTerminalStatePanel(league);
   if (terminal !== null && !league.missedDraft) {
+    // Task 12 fix round 1 (F1): `LeagueHome`'s own `DraftCompleteArrival` (Step 3b, D4) already
+    // shows this exact "draft complete" moment, more richly, during its own window — this
+    // panel's plain "Draft complete / Every roster is set / View the draft board" card would
+    // double the message right at the delight beat. Suppressed for that window only (never for
+    // `in_progress`, which `draftJustCompleted` is never true alongside — see its own docblock);
+    // `DraftCompleteArrival` folds in the one thing this panel said that it didn't already say
+    // (the "View the draft board" link), so nothing is lost. `slotPreferenceResult` is unrelated
+    // to D4 and keeps rendering either way. The permanent panel returns on its own the moment
+    // `draftJustCompleted` goes false again — `LeagueHome` stops passing it true once the season
+    // has a result, the same self-expiry `DraftCompleteArrival` already has.
+    if (draftJustCompleted && league.status === "complete") {
+      return slotPreferenceResult === null ? null : <div className="flex flex-col gap-4">{slotPreferenceResult}</div>;
+    }
     return (
       <div className="flex flex-col gap-4">
         {terminal}

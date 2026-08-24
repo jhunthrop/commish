@@ -70,8 +70,25 @@ function matchupHeadline(matchup: MatchupSummary): string {
  * is a seen-flag a manager could dismiss. It stops rendering on its own the moment the season
  * has its first settled result, because `home.currentWeek` only stays at `1` while week 1 still
  * has an unscored matchup somewhere in the league (`currentWeekNumber`, `@/league/schedule.ts`).
+ *
+ * Task 12 fix round 1 (F1): `WaitingRoom`'s own terminal "Draft complete" `StatePanel` is
+ * suppressed for this same window (`draftJustCompleted`, threaded down as a prop — see its own
+ * docblock) so the two never stack, and its one distinct value — the "View the draft board"
+ * link — is folded in here rather than lost.
  */
-function DraftCompleteArrival({ leagueId, lineup, matchup }: { readonly leagueId: string; readonly lineup: LineupBody; readonly matchup: MatchupSummary }) {
+function DraftCompleteArrival({
+  leagueId,
+  draftId,
+  lineup,
+  matchup,
+}: {
+  readonly leagueId: string;
+  /** `home.draftId` — `null` only in the same never-true case every other reader of it already
+   *  guards defensively (a league somehow missing the draft `createLeague` always writes). */
+  readonly draftId: string | null;
+  readonly lineup: LineupBody;
+  readonly matchup: MatchupSummary;
+}) {
   const roster = [...lineup.starters, ...lineup.bench].filter((slot) => slot.playerId !== null);
   return (
     <Card as="section" data-testid="draft-complete-arrival" aria-label="Your draft is in the books" className="flex flex-col gap-3">
@@ -87,9 +104,16 @@ function DraftCompleteArrival({ leagueId, lineup, matchup }: { readonly leagueId
           </li>
         ))}
       </ul>
-      <Link href={`/app/leagues/${leagueId}/matchups/${matchup.weekNumber}`} className="text-sm font-medium text-accent underline">
-        See the matchup
-      </Link>
+      <div className="flex flex-wrap items-center gap-4">
+        <Link href={`/app/leagues/${leagueId}/matchups/${matchup.weekNumber}`} className="text-sm font-medium text-accent underline">
+          See the matchup
+        </Link>
+        {draftId === null ? null : (
+          <Link href={`/app/drafts/${draftId}`} className="text-sm font-medium text-accent underline">
+            View the draft board
+          </Link>
+        )}
+      </div>
     </Card>
   );
 }
@@ -134,7 +158,9 @@ export function LeagueHome({
   // Step 3b (D4): see `DraftCompleteArrival`'s own docblock for why `home.currentWeek === 1` is
   // the derived "the season has no settled result yet" signal, and why `lineup`/`myMatchup` both
   // being present is the same "nothing to show a team-less commissioner" guard `promoteLineup
-  // Editor` above already reads off `lineup !== null`.
+  // Editor` above already reads off `lineup !== null`. Also threaded into `WaitingRoom` below
+  // (fix round 1, F1) so its own terminal "Draft complete" panel suppresses itself for this same
+  // window rather than stacking a second "draft complete" message under the arrival.
   const draftJustCompleted = home.draftStatus === "complete" && home.currentWeek === 1 && lineup !== null && home.myMatchup !== null;
 
   return (
@@ -147,7 +173,9 @@ export function LeagueHome({
         </div>
       </header>
 
-      {draftJustCompleted ? <DraftCompleteArrival leagueId={home.leagueId} lineup={lineup!} matchup={home.myMatchup!} /> : null}
+      {draftJustCompleted ? (
+        <DraftCompleteArrival leagueId={home.leagueId} draftId={home.draftId} lineup={lineup!} matchup={home.myMatchup!} />
+      ) : null}
 
       {promoteLineupEditor ? (
         <LineupEditor leagueId={home.leagueId} lineup={lineup!} totalWeeks={home.totalWeeks} helpLevel={helpLevel} />
@@ -182,6 +210,7 @@ export function LeagueHome({
           teams={home.teams}
           compositionCategory={home.compositionCategory}
           helpLevel={helpLevel}
+          draftJustCompleted={draftJustCompleted}
         />
       )}
 

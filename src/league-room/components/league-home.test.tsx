@@ -500,7 +500,30 @@ describe("LeagueHome", () => {
       });
     });
 
-    it("stops rendering the arrival the moment the season has a result", () => {
+    // Fix round 1 (F1): the arrival and `WaitingRoom`'s own terminal "Draft complete" `StatePanel`
+    // both being full-weight bordered cards, stacked back-to-back, doubled the message at the
+    // exact delight beat. During the arrival's own window there is exactly ONE card, and it
+    // carries BOTH links — the arrival's own "See the matchup" and the terminal panel's
+    // "View the draft board", folded in rather than lost.
+    it("composes as ONE card with both links during the arrival window — no second 'Draft complete' panel, in both themes, axe-clean", async () => {
+      await renderSurface(wrap(JUST_DRAFTED_HOME, JUST_DRAFTED_LINEUP), async ({ container }) => {
+        const arrival = screen.getByTestId("draft-complete-arrival");
+        expect(within(arrival).getByRole("link", { name: "See the matchup" })).toHaveAttribute(
+          "href",
+          `/app/leagues/${JUST_DRAFTED_HOME.leagueId}/matchups/1`,
+        );
+        expect(within(arrival).getByRole("link", { name: "View the draft board" })).toHaveAttribute(
+          "href",
+          `/app/drafts/${JUST_DRAFTED_HOME.draftId}`,
+        );
+        // `WaitingRoom`'s own terminal panel never renders alongside the arrival — its heading
+        // ("Draft complete", an `h2` per `StatePanel`) appears nowhere on the page.
+        expect(screen.queryByRole("heading", { name: "Draft complete" })).not.toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      });
+    });
+
+    it("stops rendering the arrival the moment the season has a result, and brings WaitingRoom's own terminal panel back", () => {
       const afterWeekOne: LeagueHomeBody = { ...JUST_DRAFTED_HOME, currentWeek: 2, myMatchup: { ...JUST_DRAFTED_MATCHUP, weekNumber: 2 } };
       renderInLeague(
         <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
@@ -509,6 +532,13 @@ describe("LeagueHome", () => {
         fixtureLeagueDeps().deps,
       );
       expect(screen.queryByTestId("draft-complete-arrival")).toBeNull();
+      // The permanent panel returns on its own, with its own "View the draft board" link — no
+      // arrival card left to have folded it into.
+      expect(screen.getByRole("heading", { name: "Draft complete" })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: "View the draft board" })).toHaveAttribute(
+        "href",
+        `/app/drafts/${afterWeekOne.draftId}`,
+      );
     });
 
     it("never shows it for a draft that has not finished, even in week 1", () => {

@@ -213,6 +213,12 @@ the instant a league finishes drafting, never as a separate step a commissioner 
 remember — and the defensive re-commit `docs/draft-engine.md` describes for a wedged draft is
 safe to replay because this write already is.
 
+Phase 3.6, Task 12 Step 3b (D4): that same transaction is also what makes `LeagueHome`'s
+`DraftCompleteArrival` (`src/league-room/components/league-home.tsx`) possible — the drafted
+roster and the Week 1 matchup it shows are read straight off `roster_slots` and this schedule,
+with no second write and nothing new stored. See `docs/draft-room.md`, "The room's last moment
+now hands off," for the full derivation.
+
 ## Lineups
 
 Two tables, two different questions: `roster_slots` is **ownership** — what a team drafted, in
