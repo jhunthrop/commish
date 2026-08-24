@@ -72,7 +72,7 @@ export default async function ProfilePage() {
               invented here. */}
           <div className="flex flex-col gap-1 border-t border-line pt-4">
             <p className="text-sm font-medium text-text-primary">{user.email}</p>
-            <p className="text-sm text-text-muted">This is the email that identifies your account. Commish cannot change it here. WorkOS manages your sign-in, not Commish.</p>
+            <p className="text-sm text-text-muted">This is the email that identifies your account, visible only to you. Commish cannot change it here. WorkOS manages your sign-in, not Commish.</p>
           </div>
         </section>
         <section className="flex flex-col gap-4" aria-label="How the product treats you">
