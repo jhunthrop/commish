@@ -103,7 +103,7 @@ never falls back to `none`, it throws and names the valid choices.
 
 The whole suite also runs through PgBouncer in transaction pooling mode as an explicit release
 gate, rather than as the everyday default (a pooler in the path would slow down every one of the
-suite's 1,300-plus tests and can turn a real regression into something that looks like a pooling
+suite's 4,000-plus tests and can turn a real regression into something that looks like a pooling
 artifact):
 
 ```bash
@@ -160,7 +160,8 @@ suite refuses to start and names the variable that is missing. In CI the same su
 separate `e2e` job that stops with a visible warning when the repository has no WorkOS test
 secrets, rather than passing without having checked anything.
 
-The two managers the suite drives (`e2e/global-setup.ts`) are STABLE, fixed-email test-directory
+The manager identities the suite drives (`e2e/global-setup.ts` — six of them now: managers A
+through D, a zero-league manager and a sign-out fixture) are STABLE, fixed-email test-directory
 identities, minted once and reused on every rerun, rather than a fresh random identity per run.
 A fresh identity every run used to collide with the seed's own first-claim-sticks rule: run one
 claims the seeded season league's team for whichever identity ran first, and that claim sticks

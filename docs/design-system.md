@@ -227,7 +227,7 @@ chrome, and two chromes stacked would break the no-page-scroll contract (`RoomLa
 `/reviews` and `/app/join/[code]` are reachable without a session; a signed-in shell around a
 page a stranger can land on would be chrome nobody signed out can use, and the rail's leagues
 would be somebody's private list drawn beside a link anyone with the URL can open. Signed out,
-these three render their own plain header (`PublicBar`, once the addendum's Task 16 ships) —
+these three render their own plain header (`PublicBar`, shipped by the addendum's Task 16) —
 never `AppShell`. `/browse` and `/reviews` sit outside `/app` entirely, so when there IS a user
 they call `shellData` and render `AppShell` themselves, the same function `(shell)/layout.tsx`
 calls, never a second bespoke read.
@@ -236,7 +236,46 @@ calls, never a second bespoke read.
 has no `max-w-*`, but a 2000px line of body text is not density — it is a defect. A surface
 whose job is prose (the review feed, the glossary, a legal page) keeps a `max-w-prose` on its
 own paragraph column only, never on the frame around it. The frame is always full-bleed; only
-the words a person reads line-by-line ever get measured.
+the words a person reads line-by-line ever get measured. **The measured-paragraph pages**, the
+complete list: `/league-rules`, `/support`, `/legal/terms`, `/legal/privacy` (each a
+`max-w-3xl` prose column — reading pages, the carve-out from the full-width rule), a review's
+own body on `/reviews` (`max-w-prose` on the paragraph, never the feed frame), and the review
+section of `/app/profile`. Everything else is full-bleed.
+
+## Signed-out chrome and the sign-in entry (addendum Task 16)
+
+- **`PublicBar`** (`src/components/app-shell/public-bar.tsx`) — the one signed-out header:
+  wordmark → `/`, optional `nav?`/`action?` props (the front door passes its three links and
+  the Take a seat CTA; `/browse`, `/reviews` and `/app/join/[code]` render it bare), and a
+  `SignInLink` carrying the page's own `intent`. Rendered unconditionally by `error.tsx`,
+  `not-found.tsx` and `global-error.tsx` too (F14 — a client boundary cannot know the session).
+- **`PublicFooter`** (`public-footer.tsx`) — the four trust links (Terms · Privacy · Support ·
+  League rules) on every public surface; its own test owns the every-target-resolves assertion.
+- **`SignInLink`** (`sign-in-link.tsx`) — THE one way any surface renders "sign in"; takes
+  `intent: string | null` and spells `/sign-in?returnTo=…`. See `docs/conventions.md`'s intent
+  rule and `docs/decisions/auth-front-door.md`.
+- **`SessionNotice`** (`session-notice.tsx`) — placed by chrome, never by page: `TopBar` under
+  `AppShell`, `RoomRail` (`variant="room"`, a borderless pill beside `ConnectionBanner`),
+  `PublicBar` never. Quiet strip for a failed background read, `Modal` for a failed write.
+
+## Loading (addendum Task 21, ruling 31)
+
+The loading strategy is **four `loading.tsx` files, one per chrome, and no per-page skeleton**:
+
+- `src/app/loading.tsx` → `AppShellSkeleton shape="public"` (front door, `/browse`, `/reviews`,
+  the hold interstitial — everything above `/app`).
+- `src/app/app/(shell)/loading.tsx` → `shape="content"` — suspends **only the content column**;
+  the route-group layout keeps the real rail and top bar painted through every navigation.
+- `src/app/app/(room)/drafts/[draftId]/loading.tsx` → `shape="room"` — the room's own bands;
+  a room renders no shell.
+- `src/app/app/(public)/join/[code]/loading.tsx` → `shape="public"` (F7) — the invite landing
+  is signed-out reachable and must not be promised a rail.
+
+**`AppShellSkeleton`** (`src/components/app-shell/app-shell-skeleton.tsx`) is the one component
+behind all four: three `shape`s, announces exactly "Loading" (`aria-live="polite"`,
+`aria-busy`), every visual rectangle `aria-hidden`. Its geometry is deliberately approximate —
+per-page skeleton mimics are refused (D19): a second copy of every page's layout, maintained by
+nobody.
 
 Three rules any future room follows:
 

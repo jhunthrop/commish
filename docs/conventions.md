@@ -216,7 +216,11 @@ src/
   integrity-service/      Audit + moderation read/write service over Postgres: AuditLogger
                           (record/recordAll, the one way anything writes an audit event),
                           verifyChainIntegrity/verifyFullChainIntegrity,
-                          notifyAffectedMember/deliverNotice/listNotices/markNoticesRead,
+                          notifyAffectedMember/deliverNotice/listNotices/markNoticesRead
+                          (listNotices returns the newest INTEGRITY_CONFIG.notices.inboxSize
+                          (20) rows and takes no cursor — the cap is stated on the inbox
+                          surface, history past it is backlog HIGH, see
+                          docs/research/2026-08-23-backend-gaps-backlog.md row 1),
                           listLeagueActivity (the member-visible feed's read side), grantAdmin
                           (grant-admin.ts, the ONLY writer of users.is_admin), raiseFlag/
                           resolveFlag/listPendingFlags/flagDetail (flags.ts, the dispute queue's
@@ -310,6 +314,7 @@ Anything time-dependent takes a `Clock` (`src/domain/timing.ts`) and calls `cloc
 - `users.id` **is** the WorkOS user id. `/callback` upserts the local row on every sign-in (`user-sync.ts`); app-owned fields (`displayName`, `experienceTier`, `avatarUrl`) are never clobbered by a sync.
 - `src/middleware.ts` (composable `authkit()`/`handleAuthkitProxy`): pages under `/app` redirect to hosted sign-in; **API and SSE routes never redirect** — they return a JSON 401 themselves.
 - Routes: `/sign-in`, `/sign-up` (hosted, both accept `?returnTo=<path>` — validated fail-closed by `safeReturnTo`, `src/lib/auth/return-to.ts` — and forward it to `getSignInUrl`/`getSignUpUrl` as `returnTo`, which the SDK seals into the callback state and which beats the callback's own `returnPathname: "/app"` fallback), `/sign-out` (POST), `/callback` (unchanged `returnPathname`, plus an `onError` that redirects to `/sign-in/problem`), `/sign-in/problem` (the one screen a failed callback lands on), `GET /api/auth/me`. `SignInLink` (`src/components/app-shell/sign-in-link.tsx`) is the one way any surface renders "sign in".
+- **The intent rule:** every sign-in entry point carries the visitor's own intent (`SignInLink`'s `intent` prop → `?returnTo=`), so signing in never loses their place — the two shelf-card links carry `/join/<leagueId>/hold` so a stranger returns to the hold for *that* league. Intent is validated where it redirects (`/sign-in/route.ts`), not re-validated at every link. The one recorded exemption: `SessionNotice` passes `usePathname()` unvalidated (the router's own state has no foreign origin to smuggle) — do not copy that exemption to a caller whose intent comes from a query string or prop. Full decision record and the WorkOS dashboard runbook: `docs/decisions/auth-front-door.md`.
 - Env: `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD` (≥32 chars), `NEXT_PUBLIC_WORKOS_REDIRECT_URI`. Dashboard: Redirect URI `…/callback`, sign-in endpoint `…/sign-in`.
 
 ### Real-time — one mechanism

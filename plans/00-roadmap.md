@@ -48,7 +48,9 @@ founder-ordered visual and interaction redesign of the whole product — retoned
 themes), a real app shell, five extracted primitives, "roll until full" as server-side truth, the
 seat hold, and the proof-stats strip — run the same way Phase 3.5 was. Same non-renumbering rule:
 the nine-phase sequence above and Phase 4's position in it are **unchanged**. `docs/decisions/design-v2.md`
-is this pass's own decision doc.
+is this pass's own decision doc, and `docs/research/2026-08-23-backend-gaps-backlog.md` is its
+closeout deliverable: every backend gap the phase's persona panels flagged, with severities and
+suggested owner phases, none of it implemented in 3.6.
 
 ## Cross-phase dependency graph
 

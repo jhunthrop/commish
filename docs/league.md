@@ -137,7 +137,28 @@ could drift apart.
   existing `teams` row and returns it with `alreadyMember: true`; it costs the invite no use
   and mutates nothing.
 
-## League terms
+### The invite landing's states (Phase 3.6 addendum, Task 20)
+
+`/app/join/[code]` renders `InviteLanding` (`src/league-room/components/invite-landing.tsx`),
+one discriminated `state`, eight kinds, nine renders (A5):
+
+| State | How it is reached | What renders |
+|---|---|---|
+| `open`, signed out | `invitePreview`, server-side | The full terms panel and a plain `SignInLink` where the join button would be — never a join button that assumes an identity. |
+| `open`, signed in | same | The terms panel and `JoinForm`'s one accept action ("Join {league}"). |
+| `invalid` | `invitePreview` refusal | The refusal sentence and "Browse open leagues" — a closed door with a hand pointing at the open one. |
+| `expired` | `invitePreview` refusal (410 class) | Same shape, `invites.ts`'s own expiry sentence. |
+| `exhausted` | `invitePreview` refusal (use cap) | Same shape, the use-cap sentence. |
+| `already-member` | the accept reporting `alreadyMember: true` upward | Told plainly, handed "Go to {league}" — never a silent redirect. |
+| `league-full` | the accept's capacity check | `SeatTakenPanel` — literally the same component a shelf race-loser sees, with invite-path actions (browse; leagues closest to filling). |
+| `draft-started` | built and tested; not reachable through the live invite door today (`invitePrecondition` checks only expiry and use count — the docblocks in `join-form.tsx` say so plainly) | `SeatTakenPanel`, same rule. |
+| `tier-refused` | same reachability note | The tier refusal, same actions. |
+
+Only what `invitePreview` can honestly answer up front (`open`/`invalid`/`expired`/`exhausted`)
+is resolved server-side; the other outcomes are discovered by the accept itself and reported
+upward through callbacks. **No seat hold on the invite path**, on purpose: a code is not a
+public shelf card, and a member league's commissioner controls who is coming (F15). A code
+naming a house league is unreachable and collapses to `invalid` — the non-oracle answer.
 
 Trust is not a one-time disclosure. `leagueTerms` (`src/league/terms.ts`) is the ONE pure function
 that turns a league's raw facts — its format, size, scoring weights, roster shape, stake tier and
