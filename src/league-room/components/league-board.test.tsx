@@ -140,6 +140,46 @@ describe("LeagueBoard", () => {
     });
   });
 
+  // LED-11 (persona gauntlet): the gauntlet's own screenshots showed "NOT STARTED" (the State
+  // badge) and a Margin figure ("114.06 of 252.48") wrapping onto a second line in the light
+  // theme's render of this exact table while sitting on one line in dark's — same markup, same
+  // text, no `data-theme` branch anywhere in `Badge`/`Meter`/this board (verified: neither reads
+  // theme at all), so the two themes were never rendering anything different on purpose. The fix
+  // (`Badge`/`Meter`, both now `whitespace-nowrap`) removes the wrap outright rather than
+  // chasing a per-theme pixel budget; this asserts the structural property that let the two
+  // themes diverge — the nowrap class on the badge and on the meter's own value text — holds
+  // identically in BOTH themes, so a future change that reintroduces a theme-only text style
+  // cannot silently reopen the gap.
+  it("never lets the State badge or the Margin figure wrap, in either theme (LED-11)", async () => {
+    await renderSurface(<LeagueBoard leagues={[ORDINARY]} />, ({ getByText }) => {
+      expect(getByText("Watch the scores")).toBeInTheDocument();
+      expect(getByText("In progress").className).toMatch(/whitespace-nowrap/);
+    });
+    const wideMargin: readonly HomeLeagueCard[] = [
+      {
+        ...BASE,
+        id: "l_wide_margin",
+        name: "Wide Margin League",
+        myTeamId: "home_team",
+        matchup: {
+          weekNumber: 4,
+          homeTeamId: "home_team",
+          awayTeamId: "away_team",
+          homeTeamName: "Iron Owls",
+          awayTeamName: "Comet Crew",
+          homeScore: 100,
+          awayScore: 50,
+          final: false,
+          weekStatus: "in_progress",
+        },
+        nextAction: { kind: "watch-scores", label: "Watch the scores" },
+      },
+    ];
+    await renderSurface(<LeagueBoard leagues={wideMargin} />, ({ getByText }) => {
+      expect(getByText("100 of 150").className).toMatch(/whitespace-nowrap/);
+    });
+  });
+
   it("stays axe-clean with a mixed board, in both themes", async () => {
     await renderSurface(<LeagueBoard leagues={[...mixed, ...live, ...medianLeague]} />, async ({ container }) => {
       expect(await axe(container)).toHaveNoViolations();

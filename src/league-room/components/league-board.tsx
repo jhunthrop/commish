@@ -21,8 +21,11 @@ function marginOf(league: HomeLeagueCard): number {
 }
 
 /** Sorted by whether the manager is needed, then by how close the game is (Step 2) — a
- *  subtraction this product can actually do, never a model's probability. */
-function sortLeagues(leagues: readonly HomeLeagueCard[]): readonly HomeLeagueCard[] {
+ *  subtraction this product can actually do, never a model's probability. Exported for
+ *  `AttentionQueue` (LED-1): the queue's own "the rest by the board's own order" tier reuses
+ *  THIS function rather than re-deriving a second copy of the board's sort — the two can never
+ *  quietly disagree about what "the board's own order" means. */
+export function sortLeagues(leagues: readonly HomeLeagueCard[]): readonly HomeLeagueCard[] {
   return [...leagues].sort((a, b) => {
     const need = Number(needsYou(b)) - Number(needsYou(a));
     if (need !== 0) return need;

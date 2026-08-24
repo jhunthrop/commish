@@ -38,7 +38,14 @@ export interface BadgeProps extends HTMLAttributes<HTMLSpanElement> {
 export function Badge({ tone = "neutral", glow = false, className = "", children, ...rest }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center rounded-pill px-2 py-0.5 text-xs font-medium ${TONE[tone]} ${glow ? (GLOW[tone] ?? "") : ""} ${className}`}
+      // `whitespace-nowrap` (LED-11): a pill is a single glanceable shape, never a paragraph —
+      // `StatPill`'s two-word labels ("Not started") have no business breaking onto a second
+      // line just because the column beside it is narrow. Without it, a table's automatic
+      // column-width algorithm is free to leave a badge's own cell exactly one glyph too narrow,
+      // wrapping the label — a break the gauntlet caught only in one theme's screenshot because
+      // it sits on a pixel-width knife's edge, not because either theme is doing anything the
+      // other isn't (`week-status-badge.test.tsx`'s regression: the class is unconditional).
+      className={`inline-flex items-center whitespace-nowrap rounded-pill px-2 py-0.5 text-xs font-medium ${TONE[tone]} ${glow ? (GLOW[tone] ?? "") : ""} ${className}`}
       {...rest}
     >
       {children}

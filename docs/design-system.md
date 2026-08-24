@@ -45,27 +45,46 @@ The rule has been enforced by review since Phase 1; `src/design/no-raw-color.sou
 
 ### One pigment, two (or three) jobs
 
-The palette is **six pigments**, and four of them carry a semantic role as well as a position.
-Values live in exactly one place, `src/design/tokens.ts` (`lightPigments`/`darkPigments`) — this
-doc names the roles, not the hexes, so a palette tune never leaves it stale:
+The palette is **six pigments**. Values live in exactly one place, `src/design/tokens.ts`
+(`lightPigments`/`darkPigments`) — this doc names the roles, not the hexes, so a palette tune
+never leaves it stale.
 
-| pigment | position | semantic role |
-|---|---|---|
-| whistle | QB | `negative` |
-| leaf | RB | `positive` (== `accent`) |
-| marker | WR | `info` |
-| clay | TE | `warning` |
-| grape | K | — |
-| slate | DEF | — |
+`accent` and `positive` remain a true doubling: the exact same hex, deliberately (see "Color
+roles" below) — the product's identity is that a live game and a live action are the same
+energy.
 
-**v2 retone:** `accent` and `positive` became the same green, deliberately (see "Color roles"
-below) — the product's identity is that a live game and a live action are the same energy. That
-collapse is what moved `marker` (WR) off `accent`: sharing one hex between `leaf` (RB) and
-`marker` (WR) would make the two stickers indistinguishable, which the pairwise sticker test
-exists to catch. `marker` doubles as `info` instead — still one pigment with a semantic job,
-just a different one than before.
+**RETONED (LED-2, founder-delegated design ruling, 2026-08-24):** the other four pigments used to
+be a straight doubling of a semantic role's own hex too — `whistle` (QB) was literally
+`negative`, `leaf` (RB) was `positive`, `marker` (WR) was `info`, `clay` (TE) was `warning`. The
+gauntlet named that as the product's last old-software signal: a full-cell sticker fill at
+semantic-role saturation reads as a spreadsheet, not a board. Position color stays as scanning
+information — the veteran reads the position off the color before the letters — so the ruling
+did not remove the hue relationship, only the saturation:
 
-The doubling is deliberate: a real draft kit has one pack of markers, and reusing them is what makes the board and the chrome look like one object. It is safe only because **the two uses never share a context** — a position color appears exclusively inside a `PositionBadge` or a draft-board sticker, and a semantic color never appears inside either. Breaking that rule (a red "Drafted" chip next to a red QB sticker) is what would make the doubling a bug instead of a system.
+| pigment | position | derived from | relationship |
+|---|---|---|---|
+| whistle | QB | `negative` | same hue/lightness, 60% saturation |
+| leaf | RB | `positive` (== `accent`) | same hue/lightness, 60% saturation |
+| marker | WR | `info` | same hue/lightness, 60% saturation |
+| clay | TE | `warning` | same hue/lightness, 60% saturation |
+| grape | K | — | its own pigment, 60% saturation of its prior self |
+| slate | DEF | — | unchanged — already the quiet one, no hue of its own |
+
+Each of the four now has its **own hex**, no longer pinned to the semantic role's own value — a
+position sticker and its one-time semantic twin move independently. `negative`/`positive`/`info`/
+`warning` keep full saturation everywhere else in the product (an error state should not read as
+quiet); the draft board's own fills read calmer. `tokens.test.ts`'s pairwise sticker matrix is
+the gate this retone is proven against, in both themes: every pair still clears 1.5:1 contrast or
+30° of hue separation.
+
+The kinship is still deliberate: a real draft kit has one pack of markers dialed to a house tone,
+and that shared hue family is what still makes the board and the chrome read as one object even
+though the fills no longer match pixel-for-pixel. It stays safe for the same reason the doubling
+always was — **a position color and a semantic color never share a context** — a position color
+appears exclusively inside a `PositionBadge` or a draft-board sticker, and a semantic color never
+appears inside either. `marker` (WR) still cannot double `accent` outright: sharing a hex with
+`leaf` (RB) would make the two stickers indistinguishable, which the pairwise sticker test exists
+to catch, so it derives from `info` instead.
 
 **Green is a fill only when it is an action.** The `accent`/`positive` doubling has its own
 sharper rule, because unlike the position doubling, `accent` and `positive` CAN appear in the

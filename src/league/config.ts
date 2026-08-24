@@ -76,9 +76,12 @@ export const LEAGUE_CONFIG = {
    * given league; nothing else may re-derive "this season" from `now()`, a league's own age, or
    * an NFL calendar rule. When season rollover ships, this becomes the field that rolls.
    *
-   * FOUNDER-VERIFY: this constant is a Task 4 DEVIATION, not a plan value — the plan assumed a
-   * season boundary already existed here and none did, so this date was chosen by the implementer
-   * (the platform's launch month). Verify the intended boundary before real season rollover ships.
+   * SETTLED (founder delegated-decision directive, 2026-08-24): this constant was a Task 4
+   * DEVIATION, not a plan value — the plan assumed a season boundary already existed here and
+   * none did, so the implementer chose the platform's launch month. The founder has since
+   * verified 2026-08-01 as the intended boundary: it captures the draft season and predates
+   * every real league on the platform. No further verification is pending; this value rolls
+   * forward only when season rollover ships (see this docblock's opening paragraph).
    */
   season: {
     startedAt: "2026-08-01T00:00:00.000Z",

@@ -203,12 +203,14 @@ write-through invalidation, because this value has no event that should bust it 
 (`MATCHMAKING_CONFIG.proof.cacheTtlSeconds`, 60 seconds) is the correct, simpler choice for a
 single process-wide strapline nobody's own action ever changes out from under them.
 
-**`LEAGUE_CONFIG.season.startedAt` carries a FOUNDER-VERIFY marker (Task 4).** The plan assumed a
-season-boundary constant already existed in this codebase; none did. The implementer chose
-`"2026-08-01T00:00:00.000Z"` (the platform's own launch month) and marked the choice in
-`src/league/config.ts`'s own docblock for a human to confirm before a real season rollover ships —
-this is a deviation from the plan, not a value the plan specified, and it is stated as such rather
-than smoothed into an unmarked default.
+**`LEAGUE_CONFIG.season.startedAt` is SETTLED (Task 4; verified under the founder's 2026-08-24
+delegated-decision directive).** The plan assumed a season-boundary constant already existed in
+this codebase; none did. The implementer chose `"2026-08-01T00:00:00.000Z"` (the platform's own
+launch month) and marked the choice in `src/league/config.ts`'s own docblock as a deviation from
+the plan, not a value the plan specified. The founder has since verified this boundary: it
+captures the draft season and predates every real league on the platform. The marker now records
+that verification rather than requesting one; the value still rolls forward when real season
+rollover ships.
 
 **The just-seated moment derives from the `member_joined` audit event, not a `teams.created_at`
 column — because no such column exists (Task 9, D1).** The plan's own assumption that

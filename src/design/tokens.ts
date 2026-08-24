@@ -121,32 +121,44 @@ const light: Palette = {
 
 /**
  * The Poster Board's marker set, one pack per theme, each re-derived against its own ground
- * (`dark.surface` #0B0C0F, `light.surface` #F5F6F8). Six pigments do all the coloring in this
- * product. Two still double as a semantic role with a unique hex in both themes: `whistle` (QB)
- * is `negative`, `clay` (TE) is `warning`. `leaf` (RB) doubles as `positive`, which is the SAME
- * hex as `accent` in both themes; since `accent`/`positive` collapsed into one green, `marker`
- * (WR) can no longer also be `accent` without becoming indistinguishable from `leaf` (RB) — the
- * sticker test's pairwise check is what would catch that. `marker` is `info`'s blue instead:
- * still a shared hex with a semantic role, just a different one. `grape` (K) and `slate` (DEF)
- * carry no semantic role, as before. The doubling is safe because the two uses never share a
- * context — see docs/design-system.md, "One pigment, two jobs".
+ * (`dark.surface` #0B0C0F, `light.surface` #F5F6F8).
+ *
+ * RETONED (LED-2, founder-delegated design ruling, 2026-08-24, persona-adjudicated): these six
+ * used to be a straight doubling of a semantic role's own hex — `whistle` (QB) was literally
+ * `dark.negative`, `leaf` (RB) was `dark.positive`, `marker` (WR) was `dark.info`, `clay` (TE)
+ * was `dark.warning`. The gauntlet named that doubling as the product's last old-software
+ * signal: a full-cell sticker fill at semantic-role saturation reads as a spreadsheet, not a
+ * board. The ruling is narrow — position color STAYS as scanning information (the veteran reads
+ * the position off the color before the letters), and the six hues stay distinct — only the
+ * SATURATION was the complaint. Each pigment below is now its own value, one HSL desaturation
+ * pass off the semantic hue it used to share (60% of the original saturation, same hue, same
+ * lightness), no longer pinned to the semantic role's own hex — a position sticker and its
+ * one-time semantic twin can now move independently, which is the whole point: `negative`,
+ * `positive`, `info` and `warning` still carry full saturation everywhere else in the product
+ * (an error state should not read as quiet), while the board's own fills read calmer. `grape`
+ * (K) and `slate` (DEF) never doubled a semantic role; `grape` gets the same desaturation pass
+ * for consistency, `slate` is untouched — it was already the quiet one by design (its meaning is
+ * "no color of its own"), so there was nothing left to retone. `tokens.test.ts`'s sticker matrix
+ * is the gate this pass is proven against, in both themes: every pairwise sticker still clears
+ * 1.5:1 contrast or 30° of hue separation, and `marker`/`slate` (the one pair that was ALREADY
+ * hue-adjacent, ~1-9° apart, riding on contrast alone) still clear it with margin to spare.
  */
 const darkPigments: Pigments = {
-  whistle: dark.negative,
-  leaf: dark.positive,
-  marker: dark.info,
-  clay: dark.warning,
-  grape: "#C08BFF",
-  slate: "#3E4A5C",
+  whistle: "#DC7975", // was dark.negative #FF5A52, 60% saturation, same hue/lightness
+  leaf: "#62C48E", // was dark.positive #41E58A
+  marker: "#7CA2DE", // was dark.info #5B9BFF
+  clay: "#D3A550", // was dark.warning #FFB224
+  grape: "#C2A2E8", // was #C08BFF
+  slate: "#3E4A5C", // unchanged — already the quiet one
 };
 
 const lightPigments: Pigments = {
-  whistle: light.negative,
-  leaf: light.positive,
-  marker: light.info,
-  clay: light.warning,
-  grape: "#6B3FA0",
-  slate: "#B9C0CB",
+  whistle: "#933D46", // was light.negative #B0202F, 60% saturation, same hue/lightness
+  leaf: "#266448", // was light.positive #12784A
+  marker: "#42579B", // was light.info #2547B8
+  clay: "#715424", // was light.warning #8A5A0B
+  grape: "#6D528D", // was #6B3FA0
+  slate: "#B9C0CB", // unchanged — already the quiet one
 };
 
 /** One sticker: the fill, the label printed on it, and the hue's text-on-surface variant. */

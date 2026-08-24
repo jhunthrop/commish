@@ -16,4 +16,12 @@ export const LEAGUE_ROOM_CONFIG = {
    * every open card in an inbox to run its own tick without it mattering.
    */
   expiryTickMs: 300_000,
+  /**
+   * LED-1 (founder-delegated design ruling, 2026-08-24): how many chips `AttentionQueue`
+   * (`./components/attention-queue.tsx`) renders before it folds the rest into one sentence.
+   * The gauntlet found thirty-three chips, five rows deep, above a board that already sorts
+   * needs-you first — the queue is meant to be the glance, not a second board. Three is the
+   * veteran persona's own bar: a scan that finishes in under a second.
+   */
+  attentionQueueCap: 3,
 } as const;

@@ -15,9 +15,16 @@ export function Meter({ label, value, max, className = "" }: MeterProps) {
   const pct = max <= 0 ? 0 : Math.min(100, Math.max(0, (value / max) * 100));
   return (
     <div className={`flex flex-col gap-1 ${className}`}>
+      {/* `whitespace-nowrap` on both spans (LED-11): the number is the decision (this
+       *  component's own docblock) and a decision that breaks across two lines mid-number
+       *  ("114.06 of / 252.48") reads as a rendering bug, not a design. A table's automatic
+       *  column-width algorithm can leave either span exactly one glyph too narrow before its
+       *  min-width kicks in fully — the two themes render identical markup and identical text
+       *  (`meter.test.tsx`'s regression), so the fix is to stop the wrap from being reachable at
+       *  all rather than to chase a per-theme pixel budget. */}
       <div className="flex items-center justify-between gap-2 text-sm text-text-muted">
-        <span>{label}</span>
-        <span className="font-mono font-medium tabular-nums text-text-primary">{`${value} of ${max}`}</span>
+        <span className="whitespace-nowrap">{label}</span>
+        <span className="whitespace-nowrap font-mono font-medium tabular-nums text-text-primary">{`${value} of ${max}`}</span>
       </div>
       <div className="h-1.5 w-full overflow-hidden rounded-pill bg-surface-inset">
         <div className="h-full rounded-pill bg-accent" style={{ width: `${pct}%` }} />
