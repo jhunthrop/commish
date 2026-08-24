@@ -64,7 +64,20 @@ export function HouseLeagueShelf({
 
   return (
     <div className="flex flex-col gap-3">
-      <h2 className="inline-flex items-center gap-1 font-display text-lg font-bold uppercase leading-display text-text-primary">
+      {/* NEW-3 (gauntlet fix wave, "reported, not fixed"): the same guided-`InfoTip` layout break
+          `open-league-card.tsx`'s eyebrow row had — `BROWSE_HELP_LEVEL` is unconditionally
+          `"guided"` here, so the trigger's caption (`info-tip.tsx`'s own `inline-flex flex-col`,
+          up to 280px wide) always renders. `items-center` on a plain `inline-flex` row centers
+          the single-line heading text against that much taller column, and with no `flex-wrap`
+          the row cannot drop the caption to its own line at a narrow width — it just overflows
+          sideways instead. `flex` (not `inline-flex`, so the row claims the block's own width
+          rather than shrink-wrapping to content) plus `flex-wrap` (so the caption can fall to its
+          own line when it does not fit beside the heading) plus `items-start` (so the heading
+          text sits flush at the top of the row instead of floating mid-height against a tall
+          sibling) is the same "give the guided element room instead of forcing it to share an
+          ill-fitting line" fix `OpenLeagueCard` applied, adapted to a single heading rather than
+          a list of terms. */}
+      <h2 className="flex flex-wrap items-start gap-x-1 gap-y-1 font-display text-lg font-bold uppercase leading-display text-text-primary">
         Commish house leagues
         <InfoTip term="house-league" helpLevel={BROWSE_HELP_LEVEL} />
       </h2>

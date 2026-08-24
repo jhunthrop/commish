@@ -259,7 +259,7 @@ describe("submitReview", () => {
     const [before] = await db.select().from(reviews).where(eq(reviews.id, "r1"));
 
     const result = await submitReview(db, { userId: "u1", rating: 5, body: REVISED, clock: at("2026-08-05T00:00:00Z"), newId: () => "r-never" });
-    expect(result).toEqual({ ok: false, status: 409, reason: "Your review was removed and can't be edited." });
+    expect(result).toEqual({ ok: false, status: 409, reason: "We removed your review. It cannot be edited." });
 
     // The evidence ruling 18's removal row exists to preserve — every column of it.
     const [after] = await db.select().from(reviews).where(eq(reviews.id, "r1"));
@@ -424,7 +424,7 @@ describe("myReview", () => {
       reason: null,
       removedAt: "2026-08-04T00:00:00.000Z",
     });
-    expect(removalSentenceFor(null)).toBe("Your review was removed for breaking the review rules. It can't be edited.");
+    expect(removalSentenceFor(null)).toBe("We removed your review for breaking the review rules. It cannot be edited.");
   });
 });
 

@@ -77,7 +77,7 @@ describe("PATCH /api/profile", () => {
     expect(limited.status).toBe(429);
     expect(await limited.json()).toEqual({
       ok: false,
-      error: "You've changed that a lot in a short time. Give it a minute and try again.",
+      error: "You have changed that a lot in a short time. Give it a minute and try again.",
     });
   });
 

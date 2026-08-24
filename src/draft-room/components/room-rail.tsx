@@ -212,8 +212,21 @@ function StaticState({ headline, detail, eyebrowClass }: { readonly headline: st
  * absorbed `ClockBanner` before it and `AuctionLotPanel` alongside it — three surfaces
  * claiming one fact is what made the old room feel like a hunt.
  *
- * It is a fixed-height band by construction (`lg:h-20`): the stage below it gets every
- * remaining pixel, and nothing in the room reflows when the turn changes.
+ * It is a fixed-HEIGHT-FLOOR band by construction (`lg:min-h-20`): the stage below it gets
+ * every remaining pixel, and nothing in the room reflows when the turn changes — for the
+ * overwhelming common case, where every child renders at its ordinary single-line height, a
+ * `min-height` floor holds the band at exactly 80px indistinguishably from a hard `height`.
+ *
+ * NEW-3 (gauntlet fix wave, "reported, not fixed"): it was `lg:h-20`, a hard cap, until this fix
+ * — the same guided-`InfoTip` layout break `open-league-card.tsx`'s eyebrow row had. A guided
+ * caller's format-name and on-the-clock `InfoTip`s (below) print their glossary caption inline,
+ * growing their own row past a single line; a HARD `h-20` does not grow to fit that, so the
+ * caption either overflowed the band's own box (no `overflow-hidden` here — nothing does; see
+ * `info-tip.tsx`'s own "never a `position: absolute` overlay" rule) or, had one been added,
+ * would have been silently clipped — losing the very definition guided mode exists to show
+ * without a click. `min-h-20` keeps the band at exactly 80px whenever nothing demands more, and
+ * lets it grow the rare time a guided caption does, rather than fighting content that has every
+ * right to be there.
  */
 export function RoomRail({ leagueName, view, teams, myTeamId, playersById, connection, variant = "room", helpLevel }: RoomRailProps) {
   // The TV board is nobody's team: `personalId` is what every personal affordance reads, so
@@ -241,10 +254,16 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
     <header
       data-testid="room-rail"
       data-mode={mode}
-      className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2 lg:h-20 lg:flex-nowrap ${MODE_SKIN[mode]}`}
+      className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2 lg:min-h-20 lg:flex-nowrap ${MODE_SKIN[mode]}`}
     >
       <h1 className={`font-display font-bold leading-display text-text-primary ${LEAGUE_TEXT[variant]}`}>{leagueName}</h1>
-      <span className="inline-flex items-center gap-1">
+      {/* NEW-3: `basis-full` so that below `lg:` (where the header is still `flex-wrap`, not yet
+          `flex-nowrap`), a guided caption growing this span past one line claims a whole wrapped
+          line of its own rather than squeezing onto a shared one beside the league name — the
+          same "give the growing term its own line" containment `open-league-card.tsx`'s eyebrow
+          fix applied to a `flex flex-col` of terms, adapted here to one term inside a row of
+          otherwise-unrelated masthead chrome. */}
+      <span className="inline-flex basis-full items-center gap-1 lg:basis-auto">
         <Badge tone="neutral">{FORMAT_LABEL[view.format]}</Badge>
         {/* The TV variant is a shared, unattended display — no control on it is ever clickable. */}
         {variant === "room" ? <InfoTip term={FORMAT_TERM[view.format]} helpLevel={helpLevel} /> : null}

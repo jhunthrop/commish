@@ -174,7 +174,7 @@ describe("POST /api/reviews", () => {
 
     const response = await POST(post({ rating: 5, body: "Trying to write over the review that was taken down for spam." }));
     expect(response.status).toBe(409);
-    expect(await response.json()).toEqual({ ok: false, error: "Your review was removed and can't be edited." });
+    expect(await response.json()).toEqual({ ok: false, error: "We removed your review. It cannot be edited." });
   });
 
   it("answers 429 once the caller is past the rate-limit threshold", async () => {

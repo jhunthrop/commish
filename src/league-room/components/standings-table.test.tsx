@@ -55,6 +55,22 @@ describe("StandingsTable", () => {
     expect(screen.getByText(GLOSSARY["standings-record"].short)).toBeInTheDocument();
   });
 
+  // NEW-3 (gauntlet fix wave, "reported, not fixed"): the Record header's own instance of
+  // `open-league-card.tsx`'s guided-`InfoTip` layout break — a guided caller's caption grows
+  // that ONE header cell past the other headers' plain single-line height, and `Table`'s
+  // `<th>` picked up `align-top` (`@/components/ui/table.tsx`) so the row's other labels stay
+  // flush with `Record`'s own top edge rather than floating at the row's new, taller vertical
+  // center. None of the other tests in this file render `helpLevel="guided"` through axe, so
+  // this is the one that actually exercises the layout the fix targets.
+  it("keeps every header flush and stays axe-clean with the Record header's guided caption showing, in both themes", async () => {
+    await renderSurface(<StandingsTable rows={STANDINGS} myTeamId="t1" helpLevel="guided" />, async ({ container }) => {
+      expect(screen.getByText(GLOSSARY["standings-record"].short)).toBeInTheDocument();
+      expect(screen.getByRole("columnheader", { name: "Team" }).className).toContain("align-top");
+      expect(screen.getByRole("columnheader", { name: /^Record/ }).className).toContain("align-top");
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
   it("marks the clinched teams and the caller's own row", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
     expect(screen.getByText("Clinched")).toBeInTheDocument();

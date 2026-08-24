@@ -215,7 +215,7 @@ export interface SubmitReviewInput {
 }
 
 /** What the API says when a removed author tries to write over their removed review. */
-const REMOVED_REFUSAL = "Your review was removed and can't be edited.";
+const REMOVED_REFUSAL = "We removed your review. It cannot be edited.";
 
 export type SubmitReviewResult =
   | { readonly ok: true; readonly review: ReviewView }

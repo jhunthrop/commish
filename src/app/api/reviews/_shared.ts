@@ -43,7 +43,7 @@ export function browseRateLimited(request: Request): Response | null {
 /** The 429 `POST /api/reviews` answers with, or `null` when the caller is inside the ceiling. */
 export function submitRateLimited(userId: string): Response | null {
   if (submitRequests.allow(userId)) return null;
-  return fail("You've changed that a lot in a short time. Give it a minute and try again.", 429);
+  return fail("You have changed that a lot in a short time. Give it a minute and try again.", 429);
 }
 
 /** The 429 the report route answers with, or `null` when the caller is inside the ceiling. */

@@ -47,22 +47,67 @@ function stripDeveloperOnlyProse(source: string): string {
  * their own structured context object — the same "cheap, because the rules only fire on a dash, an
  * accusatory term or a passive construction, none of which belong in an identifier either" trade
  * `participation-copy.source.test.ts` already makes for its own directory.
+ *
+ * FOUR MORE ROSTER ENTRIES, added closing the gauntlet fix wave's own "reported, not fixed"
+ * residue (`.superpowers/sdd/2026-08-23-phase3p6-design-v2/gauntlet-fix-wave-report.md`, "NEW-1's
+ * non-19 fallout" and "`/reviews`' own rate-limit copy") — every file the report named as sitting
+ * outside every wired sweep:
+ *
+ *  - `src/moderation` (whole directory): `removal.ts`'s `removalSentenceFor` is the one place
+ *    "It cannot be edited." is composed. Swept whole rather than by single file, unlike the two
+ *    entries below, because its only other source file (`config.ts`) carries nothing but
+ *    docblock prose — safe for a directory-derived sweep to own outright.
+ *  - `src/review-service/reviews.ts` (single file, not the whole directory): `REMOVED_REFUSAL`
+ *    lives here. Its sibling `schemas.ts` is deliberately left OUT of this roster — it carries
+ *    "That isn't a place we can load from.", a string this task did not touch because it is
+ *    shared verbatim with `src/chat-service/schemas.ts` and `leagues/[leagueId]/chat/route.ts`,
+ *    outside this task's four-item scope; sweeping the whole directory would redden this file on
+ *    an unrelated, wider finding this fix wave was not chartered to open.
+ *  - `src/app/api/preferences`, `src/app/api/profile`, `src/app/api/reviews` (whole directories):
+ *    each one's `_shared.ts` carries the "You have changed that a lot..." rate-limit refusal;
+ *    each directory's other file is a thin `route.ts` handler with nothing but docblock prose, so
+ *    (unlike `review-service`) sweeping the whole directory adds no risk of an unrelated redden.
+ *
+ * `sourceFilesIn`'s single-file form (`@/integrity/test-support`) is what makes the
+ * `review-service` entry possible without also sweeping `schemas.ts` — a roster entry now names
+ * either a directory (swept whole, the common case) or one exact file, so a directory that is
+ * mostly out of scope does not have to be all-or-nothing.
  */
 const REPO_ROOT = process.cwd();
 
-const files = sourceFilesIn(["src/league-service"], ".ts");
+const files = sourceFilesIn(
+  [
+    "src/league-service",
+    "src/moderation",
+    "src/review-service/reviews.ts",
+    "src/app/api/preferences",
+    "src/app/api/profile",
+    "src/app/api/reviews",
+  ],
+  ".ts",
+);
 
 describe("src/league-service writes its user-facing refusals in the house voice", () => {
   it("finds the files to sweep, so an empty scan can never pass silently", () => {
-    expect(files.length).toBeGreaterThanOrEqual(3);
+    expect(files.length).toBeGreaterThanOrEqual(9);
     expect(files).toContain(join("src", "league-service", "enforcement.ts"));
     expect(files).toContain(join("src", "league-service", "join.ts"));
     expect(files).toContain(join("src", "league-service", "invites.ts"));
+    expect(files).toContain(join("src", "moderation", "removal.ts"));
+    expect(files).toContain(join("src", "review-service", "reviews.ts"));
+    expect(files).not.toContain(join("src", "review-service", "schemas.ts"));
+    expect(files).toContain(join("src", "app", "api", "preferences", "_shared.ts"));
+    expect(files).toContain(join("src", "app", "api", "profile", "_shared.ts"));
+    expect(files).toContain(join("src", "app", "api", "reviews", "_shared.ts"));
     expect(files.some((file) => file.includes(".test."))).toBe(false);
   });
 
   it("answers empty for a directory that is not there", () => {
     expect(sourceFilesIn(["src/no-such-league-service"], ".ts")).toEqual([]);
+  });
+
+  it("answers empty for a single named file that is not there", () => {
+    expect(sourceFilesIn(["src/league-service/no-such-file.ts"], ".ts")).toEqual([]);
   });
 
   it.each(files)("%s says nothing that breaks the copy rules", (file) => {

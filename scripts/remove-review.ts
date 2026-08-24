@@ -12,7 +12,7 @@
 // being silently accepted as free text.
 //
 // `--reason` IS SHOWN TO THE AUTHOR: `myReview` reports the removed state and `ReviewComposer`
-// renders "Your review was removed for <phrase>. It can't be edited." It is therefore NOT free
+// renders "We removed your review for <phrase>. It cannot be edited." It is therefore NOT free
 // text — it must be one of `REVIEW_CONFIG.reportReasons`' values, the same closed vocabulary a
 // reporter picks from, and the author reads that value's `removalPhrase`. An operator cannot
 // type an internal note into a sentence a user reads.

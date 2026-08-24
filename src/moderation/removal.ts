@@ -43,5 +43,5 @@ export function chatRemovalPhraseFor(storedReason: string | null): string {
  * this module does not generalize it to a subject-agnostic phrasing on this consumer's behalf.
  */
 export function removalSentenceFor(storedReason: string | null): string {
-  return `Your review was removed for ${removalPhraseFor(storedReason)}. It can't be edited.`;
+  return `We removed your review for ${removalPhraseFor(storedReason)}. It cannot be edited.`;
 }

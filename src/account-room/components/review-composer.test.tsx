@@ -77,7 +77,7 @@ describe("ReviewComposer", () => {
 
     // The STORED value is the closed vocabulary's `"spam"`; what the author reads is its
     // `removalPhrase`, so the sentence is a sentence.
-    expect(screen.getByText("Your review was removed for spam or fake content. It can't be edited.")).toBeInTheDocument();
+    expect(screen.getByText("We removed your review for spam or fake content. It cannot be edited.")).toBeInTheDocument();
     // No editable form anywhere: the server refuses this author's write (`submitReview`'s
     // `setWhere`), so offering a textarea and a Save button would be a promise it will break.
     expect(screen.queryByLabelText("Your review")).not.toBeInTheDocument();
@@ -109,7 +109,7 @@ describe("ReviewComposer", () => {
   });
 
   it("shows the server's reason without losing what was typed", async () => {
-    const fixture = fixtureAccountDeps({ ok: false, error: "You've changed that a lot in a short time. Give it a minute and try again." });
+    const fixture = fixtureAccountDeps({ ok: false, error: "You have changed that a lot in a short time. Give it a minute and try again." });
     renderInAccount(<ReviewComposer myReview={NONE} />, fixture.deps);
     fireEvent.click(screen.getByRole("radio", { name: "2, fair" }));
     fireEvent.change(screen.getByLabelText("Your review"), { target: { value: LONG_ENOUGH } });

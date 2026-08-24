@@ -71,7 +71,7 @@ describe("the removal vocabulary's one home", () => {
     expect(removalPhraseFor("other")).toBe("breaking the review rules");
     expect(removalPhraseFor("not-a-real-reason")).toBe("breaking the review rules");
     expect(removalPhraseFor(null)).toBe("breaking the review rules");
-    expect(removalSentenceFor("spam")).toBe("Your review was removed for spam or fake content. It can't be edited.");
+    expect(removalSentenceFor("spam")).toBe("We removed your review for spam or fake content. It cannot be edited.");
   });
 
   /**

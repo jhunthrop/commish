@@ -11,7 +11,7 @@ const limiter = createRateLimiter(IDENTITY_CONFIG.profileRateLimit);
 
 /** Keyed by user id: a profile write is authenticated, so the user is the right blast-radius unit. */
 export function profileRateLimited(userId: string): Response | null {
-  return limiter.allow(userId) ? null : fail("You've changed that a lot in a short time. Give it a minute and try again.", 429);
+  return limiter.allow(userId) ? null : fail("You have changed that a lot in a short time. Give it a minute and try again.", 429);
 }
 
 /** Test seam: the limiter outlives a single test, same rationale as `resetAdvisorRateLimit`. */

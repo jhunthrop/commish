@@ -20,13 +20,13 @@ describe("removal reason vocabulary", () => {
   });
 
   it("reads as a sentence when the author is told why", () => {
-    // The copy runs "Your review was removed for ___. It can't be edited." — a reporter's own
+    // The copy runs "We removed your review for ___. It cannot be edited." — a reporter's own
     // label ("Spam or fake") does not fit that slot, which is why there are two phrasings.
     // `removalSentenceFor` is the ONE place that sentence exists: `ReviewComposer` renders it and
     // `scripts/remove-review.ts` previews it, and they had drifted into two literals that only
     // happened to agree.
     for (const reason of REVIEW_CONFIG.reportReasons) {
-      expect(removalSentenceFor(reason.value)).toMatch(/^Your review was removed for [a-z].*\. It can't be edited\.$/);
+      expect(removalSentenceFor(reason.value)).toMatch(/^We removed your review for [a-z].*\. It cannot be edited\.$/);
       expect(removalSentenceFor(reason.value)).toContain(removalPhraseFor(reason.value));
     }
     expect(removalPhraseFor("spam")).toBe("spam or fake content");
@@ -41,6 +41,6 @@ describe("removal reason vocabulary", () => {
     // And an ABSENT one, which is what `myReview` now reports for a row whose `removal_reason`
     // column is empty — the mapper owns that fallback so the contract can keep carrying a token.
     expect(removalPhraseFor(null)).toBe("breaking the review rules");
-    expect(removalSentenceFor(null)).toBe("Your review was removed for breaking the review rules. It can't be edited.");
+    expect(removalSentenceFor(null)).toBe("We removed your review for breaking the review rules. It cannot be edited.");
   });
 });

@@ -120,6 +120,21 @@ describe("RoomRail", () => {
     expect(screen.getByText(GLOSSARY["snake-draft"].short)).toBeInTheDocument();
   });
 
+  // NEW-3 (gauntlet fix wave, "reported, not fixed"): the masthead's own instance of
+  // `open-league-card.tsx`'s guided-`InfoTip` layout break. Neither `axe`-checked test above
+  // renders `helpLevel="guided"`, so neither ever exercised the layout this fix targets — the
+  // format-name `InfoTip`'s caption growing its own row past one line, inside a header that used
+  // to be a hard `h-20` (now `min-h-20`, so it can grow instead of clipping or spilling out of
+  // its own box).
+  it("stays a fixed-height-floor band and axe-clean with both guided captions showing, in both themes", async () => {
+    await renderSurface(<RoomRail {...props} view={liveView()} myTeamId="t2" helpLevel="guided" />, async ({ container }) => {
+      expect(screen.getByText(GLOSSARY["snake-draft"].short)).toBeInTheDocument();
+      expect(screen.getByText(GLOSSARY["on-the-clock"].short)).toBeInTheDocument();
+      expect(screen.getByTestId("room-rail").className).toContain("lg:min-h-20");
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
   it("drops the on-the-clock InfoTip during a live auction lot — that state isn't the rule the term defines", () => {
     const lotView: DraftStateView = {
       ...AUCTION_VIEW,

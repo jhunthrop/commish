@@ -1,5 +1,5 @@
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, readdirSync, statSync } from "node:fs";
+import { basename, join } from "node:path";
 import type { NoticeContexts, NoticeType } from "./notices";
 
 /**
@@ -18,24 +18,33 @@ const REPO_ROOT = process.cwd();
 
 /**
  * Every non-test source file under the given repo-root-relative directories, recursively, with
- * the given extension. Paths come back repo-root-relative, so a failure names its own file.
+ * the given extension — PLUS any entry in `paths` that is itself a single file rather than a
+ * directory, swept as-is. A roster entry can name a whole directory (the common case: a new
+ * component or module in it is covered the moment it exists) or one exact file (for the rarer
+ * case where only one file in an otherwise out-of-scope directory carries user-facing copy, and
+ * sweeping its siblings would pull in strings a different sweep, or no sweep at all, actually
+ * owns). Paths come back repo-root-relative, so a failure names its own file.
  *
  * Directory-derived on purpose: this is the half of the copy discipline a hand-written list of
  * `describe` blocks cannot give, because a file that nobody added to the list looks exactly like
- * a file with nothing to say.
+ * a file with nothing to say. The single-file form does not weaken that — it is additive, named
+ * exactly like every other roster entry, and a directory entry still sweeps everything under it.
  */
-export function sourceFilesIn(dirs: readonly string[], extension: string): readonly string[] {
-  function walk(dir: string): readonly string[] {
-    const full = join(REPO_ROOT, dir);
+export function sourceFilesIn(paths: readonly string[], extension: string): readonly string[] {
+  function isSweepable(name: string): boolean {
+    return name.endsWith(extension) && !name.includes(".test.") && !name.startsWith("test-");
+  }
+  function walk(relativePath: string): readonly string[] {
+    const full = join(REPO_ROOT, relativePath);
     if (!existsSync(full)) return [];
+    if (statSync(full).isFile()) return isSweepable(basename(relativePath)) ? [relativePath] : [];
     return readdirSync(full, { withFileTypes: true }).flatMap((entry) => {
-      const path = join(dir, entry.name);
+      const path = join(relativePath, entry.name);
       if (entry.isDirectory()) return walk(path);
-      if (!entry.name.endsWith(extension) || entry.name.includes(".test.") || entry.name.startsWith("test-")) return [];
-      return [path];
+      return isSweepable(entry.name) ? [path] : [];
     });
   }
-  return dirs.flatMap(walk);
+  return paths.flatMap(walk);
 }
 
 /**

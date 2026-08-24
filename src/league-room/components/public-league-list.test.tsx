@@ -87,6 +87,19 @@ describe("HouseLeagueShelf", () => {
     });
   });
 
+  // NEW-3 (gauntlet fix wave, "reported, not fixed"): the shelf heading's own instance of
+  // `open-league-card.tsx`'s guided-`InfoTip` layout break — `BROWSE_HELP_LEVEL` is
+  // unconditionally `"guided"`, so the caption above is ALREADY present in every render of this
+  // heading (including the axe-clean assertion above); this locks in the structural fix itself
+  // rather than only its absence of axe violations, which a purely visual overflow would not
+  // trip.
+  it("wraps the shelf heading so its guided caption can drop to its own line instead of overflowing", () => {
+    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />);
+    const heading = screen.getByRole("heading", { level: 2, name: /Commish house leagues/ });
+    expect(heading.className).toContain("flex-wrap");
+    expect(heading.className).not.toContain("inline-flex");
+  });
+
   it("prints the shelf's promise once, beneath the whole shelf, never per card", () => {
     const sitAndGo: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "house_sitandgo", houseRung: "sitandgo_12", startTrigger: "when_full" };
     render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE, sitAndGo]} signedIn />);

@@ -12,7 +12,7 @@
  * own comment) rather than block the way `@/integrity`/`@/integrity-service` are blocked.
  *
  * `label` is what a REPORTER picks from; `removalPhrase` is what a removed review's AUTHOR reads
- * in "Your review was removed for ___." — kept side by side for the same reason
+ * in "We removed your review for ___." — kept side by side for the same reason
  * `EXPERIENCE_TIER_LABEL` (`@/identity/config`) sits beside its own enum: the alternative is two
  * lists that only happen to agree, until they don't.
  *

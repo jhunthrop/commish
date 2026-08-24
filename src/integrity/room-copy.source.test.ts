@@ -37,8 +37,17 @@ import { candidateCopyIn, sourceFilesIn } from "./test-support";
  *  plan is the one that adds thirty more of them (the trade surface). Directory-derived, so a
  *  component added next month is covered the moment it exists rather than when somebody
  *  remembers — the same reason the other two are here rather than in the rendered sweep's
- *  hand-maintained `describe` list. */
-const ROOM_DIRS = ["src/chat-room", "src/admin-room", "src/league-room"];
+ *  hand-maintained `describe` list.
+ *
+ *  `src/app/reviews`, added closing the gauntlet fix wave's own "reported, not fixed" residue
+ *  (`.superpowers/sdd/2026-08-23-phase3p6-design-v2/gauntlet-fix-wave-report.md`, "`/reviews`'
+ *  own rate-limit copy"): the page's rate-limit `ErrorState` carried a contraction no sweep
+ *  reached, because it is a `.tsx` file outside every `*-room` directory this list otherwise
+ *  names. Not a "room" by that name, but `sourceFilesIn` is directory-derived regardless of what
+ *  the directory is called, and this is the one page-level `.tsx` surface the report named — the
+ *  same reasoning that put `src/league-room` on this list despite the array's own name never
+ *  being renamed for it. */
+const ROOM_DIRS = ["src/chat-room", "src/admin-room", "src/league-room", "src/app/reviews"];
 
 const REPO_ROOT = process.cwd();
 
@@ -56,6 +65,7 @@ describe("the chat room and the admin room write in the house voice", () => {
     expect(files.some((file) => file.startsWith("src/chat-room"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/admin-room"))).toBe(true);
     expect(files.some((file) => file.startsWith("src/league-room"))).toBe(true);
+    expect(files).toContain(join("src", "app", "reviews", "page.tsx"));
     // Its own tests, and the module holding this scan's helpers, are the things DOING the
     // checking rather than things being checked — the same exclusion `flag-only.test.ts`'s own
     // walker makes, asserted here so widening the filter cannot silently pull them in.

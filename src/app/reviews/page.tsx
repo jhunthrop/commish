@@ -55,7 +55,7 @@ export default async function ReviewsPage() {
         <main className="flex w-full min-w-0 flex-col gap-6 px-4 py-4">
           <ErrorState
             title="Too many requests"
-            description="You've loaded this page a lot in the last minute. Wait a minute and reload."
+            description="You have loaded this page a lot in the last minute. Wait a minute and reload."
             action={
               <Link href="/" className="text-sm font-medium text-accent underline">
                 Go to the home page

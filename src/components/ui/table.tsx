@@ -105,7 +105,18 @@ export function Table<T>({
                 key={column.key}
                 scope="col"
                 style={cellPaddingStyle}
-                className={`${columnClass(column)}px-3 ${cellPaddingClass} font-medium text-text-muted`}
+                // `align-top`: NEW-3 (gauntlet fix wave, "reported, not fixed"), the standings
+                // `Record` column's own instance of `open-league-card.tsx`'s guided-`InfoTip`
+                // layout break. A `<th>`'s UA-default `vertical-align` is `middle`; every header
+                // here is an ordinary single-line label EXCEPT `Record`'s (`standings-table.tsx`),
+                // which also carries an `InfoTip` — a guided caller's caption grows that one
+                // cell's own content past a single line, and `middle` alignment then floats every
+                // OTHER header's plain one-line label at that row's new, taller vertical center,
+                // detaching them from the row's top edge they shared before. `align-top` on every
+                // header cell (not only `Record`'s) is a no-op for the common case — same-height
+                // cells look identical top- or middle-aligned — and is what keeps the row's other
+                // labels flush with `Record`'s own top edge the one time a cell actually grows.
+                className={`${columnClass(column)}px-3 ${cellPaddingClass} align-top font-medium text-text-muted`}
               >
                 {column.header}
               </th>
