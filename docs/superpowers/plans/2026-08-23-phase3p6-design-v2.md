@@ -1313,6 +1313,8 @@ The draft room is the one surface in this product that already obeys the founder
 
 The six position stickers keep their meaning and their contrast proofs against the new ground (Task 1 re-derived them). The board's spotlight and slap animations are unchanged; both already honor reduced motion twice over.
 
+- [ ] **Step 1b: A room-appropriate SessionNotice variant (A16 panel finding, parked here).** A16's persona panel found `RoomRail`'s `SessionNotice` reuses `TopBar`'s bordered quiet-strip markup verbatim beside `ConnectionBanner`'s borderless `Badge` pill — two status idioms in one tight `lg:h-20` row. Give `SessionNotice` a compact `variant` for the room slot that reads as `ConnectionBanner`'s sibling, changing no copy and no escalation behavior.
+
 - [ ] **Step 2: The rail, the dock and the pool take the dense scale**
 
 Fixed band heights are re-measured against the dense type scale, because a band whose height depends on its contents moves the thing the user is watching, and the type scale just changed under them.
