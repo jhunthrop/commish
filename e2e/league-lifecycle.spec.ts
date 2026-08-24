@@ -77,7 +77,11 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   // The league id is already in scope from the create step above, so this names the league
   // manager B was supposed to land in rather than accepting any league-shaped url.
   await expect(managerB).toHaveURL(new RegExp(`/app/leagues/${leagueId}$`));
-  await expect(managerB.getByRole("heading", { name: leagueName })).toBeVisible();
+  // e2e checkpoint (P9-P11): `exact: true` — Task 9's just-seated moment (D1) renders its own
+  // `<h2>"{name} · You're in"</h2>` alongside the page's real `<h1>{name}</h1>`, so the bare
+  // substring match now resolves to both; `exact` keeps this the page's own heading, the one
+  // this assertion has always meant to check.
+  await expect(managerB.getByRole("heading", { name: leagueName, exact: true })).toBeVisible();
 
   await managerA.reload();
   await expect(managerA.getByText("2 of 8 seated").first()).toBeVisible();

@@ -85,7 +85,10 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
 
     // --- A league home: terms panel and members panel, the two Task 3/8 surfaces ----------
     await expect(page.getByRole("heading", { name: leagueName })).toBeVisible();
-    await expect(page.getByRole("list", { name: "Managers" })).toBeVisible();
+    // e2e checkpoint (P9-P11): `exact: true` — Task 9 gave `RoomRoster` its own seated-managers
+    // list, `aria-label="Seated managers"`, which is a substring superset of the members panel's
+    // `aria-label="Managers"` this assertion means to check; `exact` disambiguates the two.
+    await expect(page.getByRole("list", { name: "Managers", exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page, "a league home");
 
     // --- Task 10: the league activity page, whose one seeded row (the league's own creation)

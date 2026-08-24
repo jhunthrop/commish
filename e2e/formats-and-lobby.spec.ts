@@ -244,7 +244,11 @@ test.describe("formats and lobby", () => {
     // `waiting-room-hero`: `RoomRoster`, below the hero, renders the identical sentence off the
     // SAME `SeatMeter` primitive (F17), so the bare text alone matches twice on this page.
     await expect(managerA.getByTestId("waiting-room-hero").getByText("1 of 8 seated")).toBeVisible();
-    await expect(managerA.getByText("Starts as soon as it fills")).toBeVisible();
+    // e2e checkpoint (P9-P11): `exact: true` — Task 11's dense header line also composes this
+    // exact phrase into a longer sentence ("0-0 · #1 seed · Starts as soon as it fills · ..."),
+    // so the substring match now resolves to both the terms panel's own `<dd>` (the fact this
+    // assertion means to check) and that unrelated composed line.
+    await expect(managerA.getByText("Starts as soon as it fills", { exact: true })).toBeVisible();
 
     // --- Backstage: fill every seat but the last, through the real join transaction ---------
     const db = createDb();
@@ -324,7 +328,11 @@ test.describe("formats and lobby", () => {
     await managerB.goto("/browse");
     await managerB.getByRole("button", { name: `Join ${target.name}` }).click();
     await expect(managerB).toHaveURL(new RegExp(`/app/leagues/${target.id}$`));
-    await expect(managerB.getByRole("heading", { name: target.name })).toBeVisible();
+    // e2e checkpoint (P9-P11): `exact: true` — Task 9's just-seated moment (D1) renders its own
+    // `<h2>"{name} · You're in"</h2>` alongside the page's real `<h1>{name}</h1>`, so the bare
+    // substring match now resolves to both; `exact` keeps this the page's own heading, the one
+    // this assertion has always meant to check.
+    await expect(managerB.getByRole("heading", { name: target.name, exact: true })).toBeVisible();
 
     // --- IMMEDIATE DELTA: the filled league drops off the shelf — a real-time read, no ticker
     //     wait needed, because `houseShelfQuery` (`@/league-service/browse`) only ever lists a

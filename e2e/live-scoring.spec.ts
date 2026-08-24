@@ -16,12 +16,17 @@ const SEASON_LEAGUE_NAME = DEV_SEED.season.name;
 test("a week in progress shows on the home card, locks the league page's lineup, and the home board refreshes on its own", async ({ managerA }) => {
   await managerA.goto("/app");
 
-  // The seeded season league's own card, not the whole page: every league card renders a week
-  // status badge (`HomeLeagueCard`), so scoping to this ONE card is what keeps the assertion
-  // honest against a page that happens to hold other leagues too.
-  const seasonCard = managerA.getByRole("article").filter({ has: managerA.getByRole("link", { name: SEASON_LEAGUE_NAME, exact: true }) });
-  await expect(seasonCard.getByText("In progress")).toBeVisible();
-  await expect(seasonCard.getByRole("link", { name: /Watch the scores/i })).toBeVisible();
+  // The seeded season league's own row, not the whole page: every league row renders a week
+  // status badge (`WeekStatusBadge`, via `LeagueBoard`), so scoping to this ONE row is what
+  // keeps the assertion honest against a page that happens to hold other leagues too.
+  // Phase 3.6, Task 10 (structural): `HomeBoard` now renders three shapes by league count — a
+  // single `Card as="article"` only at n=1, an all-pre-draft hero, or (this account's own case,
+  // seeded with dozens of leagues) `AttentionQueue` + `LeagueBoard`, a dense `Table` whose rows
+  // carry `role="row"`, not `role="article"` — the bare `article` role this assertion used to
+  // scope to no longer exists on this page at all for an account this size.
+  const seasonRow = managerA.getByRole("row").filter({ has: managerA.getByRole("link", { name: SEASON_LEAGUE_NAME, exact: true }) });
+  await expect(seasonRow.getByText("In progress")).toBeVisible();
+  await expect(seasonRow.getByRole("link", { name: /Watch the scores/i })).toBeVisible();
 
   await managerA.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}`);
   await expect(managerA.getByText("In progress")).toBeVisible();
