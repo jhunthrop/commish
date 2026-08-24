@@ -114,7 +114,11 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
       // creator's own self-reported `beginner`, so this step was refused on any correctly seeded
       // database and this whole spec could not run. The choice is made explicitly here rather than
       // left to the control's default, so the spec states its own requirement.
-      await page.getByLabel("Who it's for").selectOption("experienced");
+      // "Who it is for": the gauntlet fix wave's contraction sweep renamed this label from
+      // "Who it's for"; this line only runs on a fresh database (the league-exists branch above
+      // skips it on the shared dev DB), which is why the stale label survived that wave's own
+      // green run. Assertion updated to the shipped copy, not loosened.
+      await page.getByLabel("Who it is for").selectOption("experienced");
       await page.getByRole("button", { name: "Create league" }).click();
     } else {
       await existing.click();
@@ -183,6 +187,37 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     await page.goto("/reviews");
     await expect(page.getByRole("heading", { name: "What managers are saying" })).toBeVisible();
     await expectNoHorizontalScroll(page, "/reviews");
+
+    // --- Phase 3.6 addendum (Task 22): the whole-site surfaces join the existing loop, with
+    // this spec's own standing assertion unchanged — no horizontal overflow, the control the
+    // page exists for on screen. The four trust pages are measured-paragraph reading pages;
+    // the two edges (`/sign-in/problem`, the 404) are the addendum's own error chrome. All are
+    // public geometry and render fine under this spec's signed-in context. ------------------
+    await page.goto("/support");
+    await expect(page.getByRole("heading", { name: "Support", exact: true })).toBeVisible();
+    await expectNoHorizontalScroll(page, "/support");
+
+    await page.goto("/league-rules");
+    await expect(page.getByRole("heading", { name: "How it works", exact: true })).toBeVisible();
+    await expectNoHorizontalScroll(page, "/league-rules");
+
+    await page.goto("/legal/terms");
+    await expect(page.getByRole("heading", { name: "Terms", exact: true })).toBeVisible();
+    await expectNoHorizontalScroll(page, "/legal/terms");
+
+    await page.goto("/legal/privacy");
+    await expect(page.getByRole("heading", { name: "Privacy", exact: true })).toBeVisible();
+    await expectNoHorizontalScroll(page, "/legal/privacy");
+
+    await page.goto("/sign-in/problem");
+    await expect(page.getByRole("heading", { name: "Sign-in did not go through" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Try again" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "/sign-in/problem");
+
+    await page.goto("/definitely-not-a-page");
+    await expect(page.getByRole("heading", { name: "We could not find that page." })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Browse open leagues" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "the 404 page");
 
     // --- The profile: name, avatar tiles, help level, review composer ----------------------
     await page.goto("/app/profile");
@@ -294,7 +329,13 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // flag within its own test (alphabetically after this spec), so it never adds a sixth.
     await page.goto("/app/admin/queue");
     await expect(page.getByRole("heading", { name: "Dispute queue" })).toBeVisible();
-    const queueRows = page.getByRole("list", { name: "Open flags" }).getByRole("listitem");
+    // STRUCTURAL MOVE, followed deliberately (Task 22; the e2e-under-redesign rule): Task 19
+    // rebuilt the queue from a `<ul aria-label="Open flags">` of cards into the dense
+    // `QueueTable` (`Table caption="Open flags"`), so the row locator is now table rows. The
+    // COUNT and every flag-text assertion survive unchanged — same four flags, same sentences.
+    // (A20's report saw this section fail 0-rows and attributed it to shared-DB drift; the real
+    // cause was this list-to-table move, which no e2e run had crossed until now.)
+    const queueRows = page.getByRole("table", { name: "Open flags" }).locator("tbody").getByRole("row");
     await expect(queueRows).toHaveCount(4);
     await expect(queueRows.getByText("The platform flagged two accounts that may be the same person")).toBeVisible();
     const tradeFlagRow = queueRows.filter({ hasText: "The platform flagged a trade for a fairness review" });
