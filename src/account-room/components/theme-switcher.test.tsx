@@ -77,6 +77,67 @@ describe("ThemeSwitcher", () => {
     expect(window.localStorage.getItem("commish.theme")).toBeNull();
   });
 
+  // Fix round 1, F1: `AvatarPicker`'s exact roving-tabindex shape (`avatar-picker.test.tsx`) —
+  // "only the checked tile is tabbable" is a claim about EVERY option, so this checks all three
+  // rather than the one that happens to be selected.
+  it("leaves exactly one option tabbable — the one matching the current theme", () => {
+    stubMatchMedia(true);
+    renderSwitcher();
+    const options = screen.getAllByRole("radio");
+    expect(options.map((option) => option.getAttribute("tabindex"))).toEqual(["0", "-1", "-1"]);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+    expect(screen.getAllByRole("radio").map((option) => option.getAttribute("tabindex"))).toEqual(["-1", "-1", "0"]);
+  });
+
+  it("ArrowRight moves focus and selection to the next option, wrapping past the last", () => {
+    stubMatchMedia(true);
+    renderSwitcher();
+    screen.getByRole("radio", { name: "System" }).focus();
+
+    fireEvent.keyDown(screen.getByRole("radio", { name: "System" }), { key: "ArrowRight" });
+    expect(screen.getByRole("radio", { name: "Light" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "Light" })).toHaveFocus();
+
+    fireEvent.keyDown(screen.getByRole("radio", { name: "Light" }), { key: "ArrowDown" });
+    expect(screen.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "Dark" })).toHaveFocus();
+
+    // Wraps past the last option back to the first.
+    fireEvent.keyDown(screen.getByRole("radio", { name: "Dark" }), { key: "ArrowRight" });
+    expect(screen.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "System" })).toHaveFocus();
+  });
+
+  it("ArrowLeft moves focus and selection to the previous option, wrapping before the first", () => {
+    stubMatchMedia(true);
+    renderSwitcher();
+    screen.getByRole("radio", { name: "System" }).focus();
+
+    // Wraps before the first option to the last.
+    fireEvent.keyDown(screen.getByRole("radio", { name: "System" }), { key: "ArrowLeft" });
+    expect(screen.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "Dark" })).toHaveFocus();
+
+    fireEvent.keyDown(screen.getByRole("radio", { name: "Dark" }), { key: "ArrowUp" });
+    expect(screen.getByRole("radio", { name: "Light" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "Light" })).toHaveFocus();
+  });
+
+  it("Home and End jump to the first and last option", () => {
+    stubMatchMedia(true);
+    renderSwitcher();
+    fireEvent.click(screen.getByRole("radio", { name: "Light" }));
+
+    fireEvent.keyDown(screen.getByRole("radio", { name: "Light" }), { key: "End" });
+    expect(screen.getByRole("radio", { name: "Dark" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "Dark" })).toHaveFocus();
+
+    fireEvent.keyDown(screen.getByRole("radio", { name: "Dark" }), { key: "Home" });
+    expect(screen.getByRole("radio", { name: "System" })).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByRole("radio", { name: "System" })).toHaveFocus();
+  });
+
   /**
    * NOT `renderSurface` (`@/components/ui/test-utils`): that harness forces `data-theme`
    * externally, which is exactly what every OTHER component test wants (a passive reader of the

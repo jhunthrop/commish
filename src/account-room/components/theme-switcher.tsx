@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent } from "react";
 import { Panel } from "@/components/ui";
 import { useTheme, type ThemePreference } from "@/design/theme-provider";
 
@@ -9,6 +9,10 @@ const THEME_OPTIONS: readonly { readonly value: ThemePreference; readonly label:
   { value: "light", label: "Light" },
   { value: "dark", label: "Dark" },
 ];
+
+function wrap(index: number): number {
+  return (index + THEME_OPTIONS.length) % THEME_OPTIONS.length;
+}
 
 /** The same media query `tokens.css`'s own dark block answers to — kept as a literal here rather
  *  than imported, since `src/design/tokens.ts` is the CSS generator's own input, not a runtime
@@ -53,14 +57,53 @@ function resolutionSentence(theme: ThemePreference, systemPrefersDark: boolean):
  * control only ever calls `setTheme`, the exact seam `ThemeProvider`'s own test drives through
  * `useTheme` directly — no new persistence, no new source of truth.
  *
- * A radio group, like `AvatarPicker`'s tone tiles: three mutually exclusive choices, one of which
- * is always selected, so a screen reader announces "System, 1 of 3" rather than three unrelated
- * buttons.
+ * A radio group, exactly like `AvatarPicker`'s tone tiles (fix round 1, F1): three mutually
+ * exclusive choices, one of which is always selected, so a screen reader announces "System, 1 of
+ * 3" rather than three unrelated buttons. ROVING TABINDEX (WAI-ARIA APG "Radio Group"), the same
+ * pattern `AvatarPicker` already uses — only the checked option is in the Tab order, and arrow
+ * keys move focus AND selection together, matching how a native `<input type="radio">` group
+ * behaves. `theme` is never `null` (unlike `AvatarPicker`'s `value`), so `selectedIndex` needs no
+ * "nothing chosen yet" fallback — one of the three is always current.
  */
 export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
   const systemPrefersDark = useSystemPrefersDark();
   const labelId = useId();
+  const options = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const selectedIndex = THEME_OPTIONS.findIndex((option) => option.value === theme);
+
+  const moveTo = (index: number): void => {
+    const option = THEME_OPTIONS[index];
+    if (option === undefined) return;
+    setTheme(option.value);
+    options.current[index]?.focus();
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number): void => {
+    switch (event.key) {
+      case "ArrowRight":
+      case "ArrowDown":
+        event.preventDefault();
+        moveTo(wrap(index + 1));
+        break;
+      case "ArrowLeft":
+      case "ArrowUp":
+        event.preventDefault();
+        moveTo(wrap(index - 1));
+        break;
+      case "Home":
+        event.preventDefault();
+        moveTo(0);
+        break;
+      case "End":
+        event.preventDefault();
+        moveTo(THEME_OPTIONS.length - 1);
+        break;
+      default:
+        break;
+    }
+  };
 
   return (
     <Panel title="Theme">
@@ -69,15 +112,22 @@ export function ThemeSwitcher() {
           <span id={labelId} className="sr-only">
             Theme
           </span>
-          {THEME_OPTIONS.map((option) => {
+          {THEME_OPTIONS.map((option, index) => {
             const checked = theme === option.value;
             return (
               <button
                 key={option.value}
+                ref={(el) => {
+                  options.current[index] = el;
+                }}
                 type="button"
                 role="radio"
                 aria-checked={checked}
+                aria-posinset={index + 1}
+                aria-setsize={THEME_OPTIONS.length}
+                tabIndex={index === selectedIndex ? 0 : -1}
                 onClick={() => setTheme(option.value)}
+                onKeyDown={(event) => handleKeyDown(event, index)}
                 className={
                   "rounded px-3 py-1 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
                   (checked ? "bg-surface-elevated text-text-primary" : "text-text-muted hover:text-text-primary")

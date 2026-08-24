@@ -34,9 +34,20 @@ describe("StandingPanel", () => {
   it("shows the verified badge only when verified, in both directions", async () => {
     await renderSurface(<StandingPanel {...ANY_PROPS} verified={false} />, ({ queryByText }) => {
       expect(queryByText("Verified")).not.toBeInTheDocument();
+      expect(queryByText("Shown beside your reviews.")).not.toBeInTheDocument();
     });
     await renderSurface(<StandingPanel {...ANY_PROPS} verified />, ({ getByText }) => {
       expect(getByText("Verified")).toBeInTheDocument();
+    });
+  });
+
+  // Fix round 1, F2: the privacy skeptic's disclosure standard. This panel tells the reader what
+  // each fact OPENS — "Verified" is the one fact here that is not private, since it is the exact
+  // claim `ReviewFeed` already shows publicly beside this account's own reviews, so the badge
+  // says exactly that rather than leaving the skeptic to guess who else can see it.
+  it("says the verified badge is shown beside the reader's own reviews", async () => {
+    await renderSurface(<StandingPanel {...ANY_PROPS} verified />, ({ getByText }) => {
+      expect(getByText("Shown beside your reviews.")).toBeInTheDocument();
     });
   });
 

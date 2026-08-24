@@ -43,12 +43,20 @@ export function StandingPanel({ seasons, tier, verified }: StandingPanelProps) {
         <StatPill label={tier === "veteran" ? "Veteran" : "Newcomer"} tone={tier === "veteran" ? "positive" : "neutral"} />
         {/* Founder decision #8's badge, about the reader this time rather than another reviewer
             (`ReviewFeed`'s own use of the same pair, `InfoTip term="verified-reviewer"`) — the
-            unverified case renders nothing, matching that precedent exactly. */}
+            unverified case renders nothing, matching that precedent exactly. Fix round 1, F2 (the
+            privacy skeptic's disclosure standard): this panel tells the reader what a fact OPENS,
+            and "Verified" is the one fact on this panel that is not private — it is the exact
+            claim `ReviewFeed` already renders publicly beside every review this account posts, so
+            the line beneath the badge says exactly that, in words, rather than leaving the reader
+            to guess who else sees it. */}
         {verified ? (
-          <span className="inline-flex items-center gap-0.5">
-            <Badge tone="positive">{VERIFIED_BADGE_LABEL}</Badge>
-            <InfoTip term="verified-reviewer" />
-          </span>
+          <div className="flex flex-col gap-1">
+            <span className="inline-flex items-center gap-0.5">
+              <Badge tone="positive">{VERIFIED_BADGE_LABEL}</Badge>
+              <InfoTip term="verified-reviewer" />
+            </span>
+            <p className="text-xs text-text-muted">Shown beside your reviews.</p>
+          </div>
         ) : null}
       </div>
       <p className="text-sm text-text-muted">{standingSentence(tier)}</p>

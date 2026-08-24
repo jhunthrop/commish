@@ -124,11 +124,6 @@ export function NoticeInbox() {
           aria-label="Notices"
           className="fixed inset-x-4 top-16 z-20 flex max-h-96 flex-col gap-3 overflow-y-auto rounded-lg border border-line bg-surface-elevated p-4 shadow-card sm:inset-x-auto sm:right-4 sm:w-96"
         >
-          {/* The inventory's own HIGH: `listNotices` (`@/integrity-service/notify`) has no cursor
-              and caps at `NOTICE_INBOX_SIZE`, so a notice older than the cap is unreachable from
-              anywhere. One honest sentence about the cap, always shown while the panel is open —
-              not a scroll that quietly stops rather than saying why. */}
-          <p className="text-xs text-text-muted">Your last {NOTICE_INBOX_SIZE} notices.</p>
           {status === "error" ? (
             <ErrorState
               title="We could not load your notices."
@@ -139,14 +134,25 @@ export function NoticeInbox() {
                 </button>
               }
             />
-          ) : notices.length === 0 ? (
-            <p className="text-sm text-text-muted">Nothing here yet.</p>
           ) : (
-            <ul className="flex flex-col">
-              {notices.map((notice) => (
-                <NoticeRow key={notice.id} notice={notice} />
-              ))}
-            </ul>
+            <>
+              {/* Fix round 1, F4: the inventory's own HIGH — `listNotices`
+                  (`@/integrity-service/notify`) has no cursor and caps at `NOTICE_INBOX_SIZE`, so a
+                  notice older than the cap is unreachable from anywhere. One honest sentence about
+                  the cap, shown only once the panel has actually LOADED a page (`status === "ready"`)
+                  — never above a failed fetch, where there is no loaded page for the claim to be
+                  about. */}
+              {status === "ready" ? <p className="text-xs text-text-muted">Your last {NOTICE_INBOX_SIZE} notices.</p> : null}
+              {notices.length === 0 ? (
+                <p className="text-sm text-text-muted">Nothing here yet.</p>
+              ) : (
+                <ul className="flex flex-col">
+                  {notices.map((notice) => (
+                    <NoticeRow key={notice.id} notice={notice} />
+                  ))}
+                </ul>
+              )}
+            </>
           )}
         </div>
       ) : null}
