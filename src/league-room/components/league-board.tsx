@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { HomeLeagueCard } from "../contract";
-import { Crest, EYEBROW, Meter, Table, type TableColumn } from "@/components/ui";
+import { ButtonLink, Crest, EYEBROW, Meter, Table, type TableColumn } from "@/components/ui";
 import { actionHref } from "../lib/action-href";
 import { formatPoints, formatRecord, formatWeek } from "../lib/format";
 import { WeekStatusBadge } from "./week-status-badge";
@@ -114,13 +114,11 @@ function LeagueCell({ league }: { readonly league: HomeLeagueCard }) {
 function ActionCell({ league }: { readonly league: HomeLeagueCard }) {
   if (league.nextAction === null) return null;
   return (
-    <Link
-      href={actionHref(league)}
-      aria-label={`${league.nextAction.label} for ${league.name}`}
-      className="inline-flex rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-    >
+    // Quiet pill (rule 5): ten rows must never mean ten ink pills — the board's actions are
+    // peers, and none of them is the view's one ink action.
+    <ButtonLink href={actionHref(league)} aria-label={`${league.nextAction.label} for ${league.name}`} variant="secondary" size="sm">
       {league.nextAction.label}
-    </Link>
+    </ButtonLink>
   );
 }
 

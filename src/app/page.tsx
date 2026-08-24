@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { ButtonLink } from "@/components/ui";
 import { PublicBar, type NavLink } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { formatAbsoluteTime } from "@/league";
@@ -48,7 +49,8 @@ interface PageProps {
  * SAME `OpenLeagueCard`/`HouseLeagueShelf`/`BrowseFilters` components `/browse` renders — the
  * front door does not invent a second, decorative shelf, it shows the real one.
  *
- * `PublicBar`'s `action` (the green "Take a seat" CTA) points at `/browse`, never an anchor into
+ * `PublicBar`'s `action` (the ink-pill "Take a seat" CTA — the front door's ONE ink action,
+ * rule 5) points at `/browse`, never an anchor into
  * this page's own shelf: the shelf IS where a seat is actually taken, on this page or on
  * `/browse`, but a fixed, bookmarkable destination is simpler to reason about than a scroll
  * position, and `/browse` renders the identical shelf this page does.
@@ -87,12 +89,7 @@ export default async function Home({ searchParams }: PageProps) {
         intent={PAGE_INTENT}
         nav={NAV}
         action={
-          <Link
-            href="/browse"
-            className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 text-sm font-semibold text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-          >
-            Take a seat
-          </Link>
+          <ButtonLink href="/browse">Take a seat</ButtonLink>
         }
       />
       <main className="flex flex-col gap-10 bg-surface">

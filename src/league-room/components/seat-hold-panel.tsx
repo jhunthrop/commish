@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import { ErrorState, Panel, Skeleton } from "@/components/ui";
+import { ErrorState, Panel, Skeleton, buttonClassName } from "@/components/ui";
 import { Countdown, formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import type { SeatHoldBody } from "../contract";
@@ -96,10 +96,11 @@ export function SeatHoldPanel({ leagueId, leagueName }: SeatHoldPanelProps) {
             full sit-and-go room or a missed draft, both well past this point. */}
         <p className="text-sm text-text-muted">The room picks for you from your queue if your clock runs out.</p>
       </div>
+      {/* The hold page's ONE action (rule 5), so it is the view's ink pill. */}
       <SignInLink
         intent={`/join/${leagueId}/hold`}
         aria-label={`Sign in to finish joining ${leagueName}`}
-        className="inline-flex h-10 w-full items-center justify-center rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+        className={buttonClassName("primary", "md", "w-full")}
       >
         Sign in to finish joining
       </SignInLink>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Badge, Card, EYEBROW, InfoTip, SeatMeter } from "@/components/ui";
+import { Badge, Card, EYEBROW, InfoTip, SeatMeter, buttonClassName } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icon";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import type { DraftFormat } from "@/domain/league";
@@ -212,7 +212,9 @@ export function OpenLeagueCard({ league, signedIn }: OpenLeagueCardProps) {
           <SignInLink
             intent={`/join/${league.id}/hold`}
             aria-label={ctaAccessibleName(league)}
-            className="inline-flex h-10 min-w-0 items-center justify-center [overflow-wrap:anywhere] rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+            // Quiet pill (rule 5): a card in a shelf of twenty is never the view's one ink
+            // action — Task 6 owns which card, if any, gets ink emphasis.
+            className={buttonClassName("secondary", "md")}
           >
             {ctaVisibleText(league)}
           </SignInLink>

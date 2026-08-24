@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import type { LeagueTerms } from "@/league";
 import type { HelpLevel } from "@/identity/preferences";
-import { Panel, Crest } from "@/components/ui";
+import { ButtonLink, Panel, Crest, buttonClassName } from "@/components/ui";
 import { StatePanel } from "@/components/ui/state-panel";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { LeagueTermsPanel } from "./league-terms-panel";
@@ -154,12 +154,10 @@ export function InviteLanding({ state: initialState, signedIn = true, code, help
           <Crest id={state.leagueId} label={state.name.slice(0, 2).toUpperCase()} size={40} />
           <p className="text-sm text-text-primary">{`You are already a member of ${state.name}.`}</p>
         </div>
-        <Link
-          href={`/app/leagues/${state.leagueId}`}
-          className="inline-flex h-10 w-fit min-w-0 items-center justify-center [overflow-wrap:anywhere] rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-        >
+        {/* This state's ONE action (rule 5), so it is the view's ink pill. */}
+        <ButtonLink href={`/app/leagues/${state.leagueId}`} className="w-fit">
           {`Go to ${state.name}`}
-        </Link>
+        </ButtonLink>
       </Panel>
     );
   }
@@ -189,10 +187,7 @@ export function InviteLanding({ state: initialState, signedIn = true, code, help
       ) : (
         // This page's own path (Task 16, F6) — signing in returns here, to the same invite,
         // rather than dropping the visitor at a generic `/app`.
-        <SignInLink
-          intent={`/app/join/${code ?? ""}`}
-          className="inline-flex h-10 w-fit min-w-0 items-center justify-center [overflow-wrap:anywhere] rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-        />
+        <SignInLink intent={`/app/join/${code ?? ""}`} className={buttonClassName("primary", "md", "w-fit")} />
       )}
     </div>
   );

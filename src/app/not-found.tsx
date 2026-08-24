@@ -1,10 +1,5 @@
-import Link from "next/link";
-import { EmptyState } from "@/components/ui";
+import { ButtonLink, EmptyState } from "@/components/ui";
 import { PublicBar } from "@/components/app-shell/public-bar";
-
-const LINK_CLASS =
-  "inline-flex h-10 items-center justify-center rounded-md px-4 text-md font-medium transition-colors " +
-  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface";
 
 /**
  * A wrong URL is not a failure, so this is an `EmptyState` and not an `ErrorState`: no
@@ -31,12 +26,12 @@ export default function NotFound() {
           description="That link may be outdated. The page you were looking for is not here."
           action={
             <div className="flex flex-wrap items-center justify-center gap-3">
-              <Link href="/" className={`${LINK_CLASS} bg-accent text-accent-text hover:brightness-110`}>
-                Go to the home page
-              </Link>
-              <Link href="/browse" className={`${LINK_CLASS} border border-line text-text-primary hover:bg-surface-elevated`}>
+              {/* One ink action per view (rule 5): the escape hatch is the ink pill, the
+                  browse alternative the quiet one. */}
+              <ButtonLink href="/">Go to the home page</ButtonLink>
+              <ButtonLink href="/browse" variant="secondary">
                 Browse open leagues
-              </Link>
+              </ButtonLink>
             </div>
           }
         />

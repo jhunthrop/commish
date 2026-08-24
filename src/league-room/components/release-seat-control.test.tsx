@@ -23,8 +23,9 @@ describe("ReleaseSeatControl", () => {
       <ReleaseSeatControl leagueId="l1" leagueName="Half-PPR #241" kickoffRolls={1} />,
       async ({ container }) => {
         const trigger = screen.getByRole("button", { name: "Release your seat" });
-        // `Button`'s own `secondary` variant class, `button.tsx`'s `VARIANT.secondary`.
-        expect(trigger.className).toMatch(/border-line/);
+        // `Button`'s own `secondary` variant class, `button.tsx`'s `VARIANT.secondary` —
+        // the v3 quiet pill's edge border since Task 4.
+        expect(trigger.className).toMatch(/border-edge/);
         expect(await axe(container)).toHaveNoViolations();
       },
     );

@@ -50,7 +50,13 @@ export function PublicBar({ intent, nav = [], action = null }: PublicBarProps) {
         )}
         <div className="flex items-center gap-3">
           {action}
-          <SignInLink intent={intent} className="text-sm font-medium text-accent underline" />
+          {/* Quiet on purpose (E11): with the front door's ink "Take a seat" in `action`, a
+              second loud CTA beside it read as two competing doors. Sign in is the returning
+              member's link, not the stranger's pitch — muted ink, visible on hover. */}
+          <SignInLink
+            intent={intent}
+            className="text-sm font-medium text-text-muted underline transition-colors hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          />
         </div>
       </div>
     </header>

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { HomeLeagueCard as HomeLeagueCardData } from "../contract";
-import { Badge, Card, EYEBROW, SeatMeter } from "@/components/ui";
+import { Badge, ButtonLink, Card, EYEBROW, SeatMeter } from "@/components/ui";
 import { actionHref } from "../lib/action-href";
 import { formatRecord, formatWeek } from "../lib/format";
 import { MatchupScoreboard } from "./matchup-scoreboard";
@@ -68,13 +68,16 @@ export function HomeLeagueCard({ league }: { readonly league: HomeLeagueCardData
         // The visible label is the same short verb phrase on every card ("Watch the scores" can
         // repeat across many leagues); the accessible name is not, so two cards' action links
         // are never indistinguishable to a screen reader reading the page's link list.
-        <Link
+        // Quiet pill (rule 5): a card in a grid of leagues is never the view's one ink action.
+        <ButtonLink
           href={actionHref(league)}
           aria-label={`${league.nextAction.label} for ${league.name}`}
-          className="mt-auto self-start rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+          variant="secondary"
+          size="sm"
+          className="mt-auto self-start"
         >
           {league.nextAction.label}
-        </Link>
+        </ButtonLink>
       )}
     </Card>
   );

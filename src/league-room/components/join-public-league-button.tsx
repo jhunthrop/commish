@@ -51,7 +51,9 @@ export function JoinPublicLeagueButton({
 
   return (
     <div className="flex flex-col gap-1">
-      <Button onClick={() => void join()} loading={submitting} disabled={submitting} aria-label={`Join ${leagueName}`}>
+      {/* Quiet pill (rule 5), matching the card's signed-out `SignInLink` CTA: a card in a
+          shelf of twenty is never the view's one ink action — Task 6 owns ink emphasis. */}
+      <Button variant="secondary" onClick={() => void join()} loading={submitting} disabled={submitting} aria-label={`Join ${leagueName}`}>
         Join
       </Button>
       {error === null ? null : (
