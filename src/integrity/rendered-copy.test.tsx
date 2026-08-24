@@ -37,6 +37,7 @@ import { TradeCard } from "@/league-room/components/trade-card";
 import { TradeComposer } from "@/league-room/components/trade-composer";
 import type { HomeLeagueCard, ModerationSummaryView, TradeRoomContext } from "@/league-room/contract";
 import { ReviewFeed } from "@/account-room/components/review-feed";
+import { InviteLanding, type InviteLandingState } from "@/league-room/components/invite-landing";
 import { StandingPanel } from "@/account-room/components/standing-panel";
 import { ThemeSwitcher } from "@/account-room/components/theme-switcher";
 import { ThemeProvider } from "@/design/theme-provider";
@@ -50,6 +51,7 @@ import { QueueTable } from "@/admin-room/components/queue-table";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
+import { AppShellSkeleton } from "@/components/app-shell/app-shell-skeleton";
 import { SessionNotice } from "@/components/app-shell/session-notice";
 import { fetchWithSessionWatch } from "@/components/app-shell/session-watch";
 import Link from "next/link";
@@ -897,6 +899,36 @@ describe("SeatTakenPanel says nothing that breaks the house copy rules", () => {
 });
 
 /**
+ * Task 20. `InviteLanding`'s "already a member" branch composes `You are already a member of
+ * ${name}.` and `Go to ${name}` at runtime — invisible to `room-copy.source.test.ts`'s own
+ * blind spot the moment a caller stitches more than a template literal's static segments
+ * together, so this is the sweep that reads what actually renders. Every one of the addendum's
+ * nine states is driven here, "open" both signed in and out, the same discipline
+ * `LeagueTermsPanel`'s own block above already sets for a composed draft time.
+ */
+describe("InviteLanding says nothing that breaks the house copy rules, across every one of its nine states", () => {
+  it("is clean open (signed in and out), invalid, expired, exhausted, already a member, league full, draft started, and tier-refused", () => {
+    const states: readonly InviteLandingState[] = [
+      { kind: "open", terms: TERMS },
+      { kind: "invalid" },
+      { kind: "expired" },
+      { kind: "exhausted" },
+      { kind: "already-member", leagueId: "league_1", name: "Bay Bandits" },
+      { kind: "league-full", name: "Bay Bandits" },
+      { kind: "draft-started", name: "Bay Bandits" },
+      { kind: "tier-refused" },
+    ];
+    for (const state of states) {
+      for (const signedIn of [true, false]) {
+        const { container, unmount } = render(<InviteLanding state={state} signedIn={signedIn} code="SUNDAY12" />);
+        expectClean(container, TERMS.name, TERMS.commissionerName, "Bay Bandits");
+        unmount();
+      }
+    }
+  });
+});
+
+/**
  * Task 17: the identity card (`ProfileForm`, `variant="first-run"`) is new composed copy inside
  * an existing component — `src/account-room/**` is not itself in `room-copy.source.test.ts`'s
  * `ROOM_DIRS`, so this rendered sweep is the one thing that catches its two new sentences.
@@ -1235,6 +1267,22 @@ describe("SignInLink, PublicBar and PublicFooter say nothing that breaks the hou
       <PublicFooter key="footer" />,
     ]) {
       const { container, unmount } = render(element);
+      expectClean(container);
+      unmount();
+    }
+  });
+});
+
+/**
+ * Phase 3.6 addendum, Task 21. `AppShellSkeleton` joins the roster in the same commit that
+ * creates it, per this file's own "one place to add" point — even though its only text is the
+ * fixed word "Loading" in every shape, sweeping it here is what keeps that true if a future edit
+ * ever adds real copy to one of its geometries.
+ */
+describe("AppShellSkeleton says nothing that breaks the house copy rules, in every shape", () => {
+  it("is clean content, public, and room", () => {
+    for (const shape of ["content", "public", "room"] as const) {
+      const { container, unmount } = render(<AppShellSkeleton shape={shape} />);
       expectClean(container);
       unmount();
     }

@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { render } from "@testing-library/react";
 import { axe } from "vitest-axe";
+import type { ReactElement } from "react";
 import { renderSurface } from "@/components/ui/test-utils";
 import { PUBLIC_FOOTER_LINKS, PublicFooter } from "./public-footer";
 
@@ -17,14 +19,11 @@ describe("PublicFooter", () => {
   /**
    * THE EVERY-FOOTER-TARGET-RESOLVES ASSERTION (F19), moved up from the addendum's Task 21
    * Step 4 to here — the component that names the targets, not the task that happens to write
-   * the pages behind them. The four pages themselves (`src/app/legal/terms/page.tsx` and
-   * siblings) do not exist yet at the point this task lands — they are Task 21's own job, which
-   * runs after this one (controller ruling 1's combined order) — so "resolves" here is checked
-   * at the level this component actually controls: every link it renders is a real, well-formed,
-   * same-origin path (never a placeholder anchor, an external url, or an empty href), the
-   * structural half of "worth arriving at" that does not require the destination to exist yet.
-   * Task 21's own job, stated in its own Step 4, is the other half: making each target a page
-   * worth arriving at, now that this guard is already standing.
+   * the pages behind them. At the point this test first landed the four pages themselves
+   * (`src/app/legal/terms/page.tsx` and siblings) did not exist yet — Task 21 runs after Task 16
+   * (controller ruling 1's combined order) — so "resolves" here checked only the structural half
+   * of "worth arriving at": every link is a real, well-formed, same-origin path, never a
+   * placeholder anchor, an external url, or an empty href. That half still holds below.
    */
   it("names four real internal destinations — no placeholder, no dead anchor, no external link", () => {
     renderSurface(<PublicFooter />, ({ getAllByRole }) => {
@@ -37,6 +36,33 @@ describe("PublicFooter", () => {
         expect(href).toMatch(/^\/[a-z][a-z-]*(?:\/[a-z][a-z-]*)*$/);
       }
     });
+  });
+
+  /**
+   * THE OTHER HALF, now that Task 21 has landed: every page these four links name is a real
+   * route module that renders. Resolved the same way `src/integrity/rendered-copy.test.tsx`'s
+   * own "the four trust stubs" block already proves each page clean of copy — a dynamic import
+   * plus a real render — checked here too so a page moved or deleted breaks THIS component's
+   * own test, not only a copy sweep three directories away. Every `PUBLIC_FOOTER_LINKS` href is
+   * driven through `PAGE_MODULE_BY_HREF` explicitly, rather than a generic file-system guess, so
+   * a fifth link added here with no matching entry fails loudly instead of silently skipping the
+   * check.
+   */
+  it("resolves every link to a real page module that renders", async () => {
+    const PAGE_MODULE_BY_HREF: Readonly<Record<string, () => Promise<{ readonly default: () => ReactElement }>>> = {
+      "/legal/terms": () => import("@/app/legal/terms/page"),
+      "/legal/privacy": () => import("@/app/legal/privacy/page"),
+      "/support": () => import("@/app/support/page"),
+      "/league-rules": () => import("@/app/league-rules/page"),
+    };
+    expect(Object.keys(PAGE_MODULE_BY_HREF).sort()).toEqual(PUBLIC_FOOTER_LINKS.map((link) => link.href).sort());
+
+    for (const link of PUBLIC_FOOTER_LINKS) {
+      const { default: Page } = await PAGE_MODULE_BY_HREF[link.href]!();
+      const { container, unmount } = render(<Page />);
+      expect(container.textContent).not.toBe("");
+      unmount();
+    }
   });
 
   it("carries no target twice and no target with an empty label", () => {

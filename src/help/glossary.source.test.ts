@@ -6,31 +6,30 @@ import { GLOSSARY, type TermKey } from "./glossary";
 
 /**
  * Task 15 (the backend-leverage inventory) found ten of twenty glossary terms with no `InfoTip`
- * caller anywhere in the product. The fix is not to delete them — they are correct definitions of
- * things this product genuinely has — and not to leave them unenforced: it is to make "unsurfaced"
- * a decision somebody makes on purpose, with a reason, in a list a reviewer can read. A term with
- * neither a caller nor an entry here fails this file's first test, which is the point.
+ * caller anywhere in the product. The fix was not to delete them — they are correct definitions
+ * of things this product genuinely has — and not to leave them unenforced: it is to make
+ * "unsurfaced" a decision somebody makes on purpose, with a reason, in a list a reviewer can
+ * read. A term with neither a caller nor an entry here fails this file's first test, which is
+ * the point.
  *
- * Three landed on the parent plan's league space (Task 11) and are wired now: `stake-tier` on
+ * Three landed on the parent plan's league space (Task 11): `stake-tier` on
  * `league-terms-panel.tsx`'s Stake row, `matchup` on `matchup-panel.tsx`'s own eyebrow label
  * (not `matchup-scoreboard.tsx`, which is ALSO `HomeLeagueCard`'s dense hero and pins "no button
  * at all" for a league with nothing pending), and `standings-record` on `standings-table.tsx`'s
- * Record column header — no longer listed below.
+ * Record column header.
  *
- * The remaining seven are format vocabulary — `ppr`, `half-ppr`, `te-premium`, `custom-scoring`,
- * `flex`, `snake-draft` and `auction-draft` — and land on the league-rules page this addendum's
- * Task 21 Step 4 creates, which names them explicitly as "where the format vocabulary lands... and
- * Task 15 Step 4's orphan glossary terms... get their first real caller."
+ * The remaining seven were format vocabulary — `ppr`, `half-ppr`, `te-premium`, `custom-scoring`,
+ * `flex`, `snake-draft` and `auction-draft` — with no page to land on until one existed. The
+ * addendum's Task 21 Step 4 built that page (`src/app/league-rules/page.tsx`) and wired all
+ * seven there, their first real callers, in the same commit this allowlist emptied: the second
+ * test below fails a term left listed here once something actually renders it, so leaving these
+ * seven in place after wiring them was never an option.
+ *
+ * The allowlist itself stays — empty is not the same as deleted — because the mechanism it
+ * enforces (an unwired term is a decision someone made on purpose, not a silent gap) outlives
+ * any one term's own unsurfaced window.
  */
-const UNSURFACED: Readonly<Partial<Record<TermKey, string>>> = {
-  ppr: "Format vocabulary. Lands on the league-rules page, addendum Task 21 Step 4 — its first real caller.",
-  "half-ppr": "Format vocabulary. Lands on the league-rules page, addendum Task 21 Step 4.",
-  "te-premium": "Format vocabulary. Lands on the league-rules page, addendum Task 21 Step 4.",
-  "custom-scoring": "Format vocabulary. Lands on the league-rules page, addendum Task 21 Step 4.",
-  flex: "Format vocabulary. Lands on the league-rules page, addendum Task 21 Step 4.",
-  "snake-draft": "Format vocabulary. Lands on the league-rules page, addendum Task 21 Step 4.",
-  "auction-draft": "Format vocabulary. Lands on the league-rules page, addendum Task 21 Step 4.",
-};
+const UNSURFACED: Readonly<Partial<Record<TermKey, string>>> = {};
 
 /** Every surface a manager can actually be looking at when they might want a term explained.
  *  Directory-derived, the same discipline `room-copy.source.test.ts` already established for the

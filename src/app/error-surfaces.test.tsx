@@ -32,6 +32,15 @@ describe("app/error.tsx", () => {
     });
   });
 
+  // F14: a Client Component error boundary cannot know whether there is a session, so it always
+  // renders the honest chrome for an unknown one rather than guessing.
+  it("renders PublicBar unconditionally, since it cannot know whether there is a session", () => {
+    renderSurface(<AppError error={BOOM} reset={() => {}} />, ({ getByRole }) => {
+      expect(getByRole("link", { name: "Commish" })).toHaveAttribute("href", "/");
+      expect(getByRole("link", { name: "Sign in" })).toBeInTheDocument();
+    });
+  });
+
   it("never leaks the raw exception text into the page", async () => {
     await renderSurface(<AppError error={BOOM} reset={() => {}} />, ({ container }) => {
       expect(container.textContent).not.toContain("relation");
@@ -102,9 +111,28 @@ describe("app/not-found.tsx", () => {
   it("is an empty state, not an error, and offers both ways on, axe-clean", async () => {
     await renderSurface(<NotFound />, async ({ container }) => {
       expect(screen.queryByRole("alert")).toBeNull();
-      expect(screen.getByRole("link", { name: "Go to your leagues" })).toHaveAttribute("href", "/app");
+      expect(screen.getByRole("link", { name: "Go to the home page" })).toHaveAttribute("href", "/");
       expect(screen.getByRole("link", { name: "Browse open leagues" })).toHaveAttribute("href", "/browse");
       expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("offers a signed-out visitor somewhere they can actually go", () => {
+    // Today every action on both surfaces points at /app, which for a stranger who followed a bad
+    // public link is a bounce straight into hosted sign-in. The way out of a 404 must not require
+    // an account.
+    renderSurface(<NotFound />, ({ getByRole }) => {
+      expect(getByRole("link", { name: "Browse open leagues" })).toHaveAttribute("href", "/browse");
+      expect(getByRole("link", { name: "Go to the home page" })).toHaveAttribute("href", "/");
+    });
+  });
+
+  // F14: same reasoning as `AppError` — renders the honest chrome for an unknown session rather
+  // than the "Go to your leagues" bounce a total stranger has no account to follow.
+  it("renders PublicBar unconditionally, for the same reason AppError does", () => {
+    renderSurface(<NotFound />, ({ getByRole }) => {
+      expect(getByRole("link", { name: "Commish" })).toHaveAttribute("href", "/");
+      expect(getByRole("link", { name: "Sign in" })).toBeInTheDocument();
     });
   });
 });

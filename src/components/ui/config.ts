@@ -97,6 +97,29 @@ export const UI_CONFIG = {
      */
     minTargetPx: 24,
   },
+  skeleton: {
+    /**
+     * `AppShellSkeleton`'s `shape="content"` geometry: how many placeholder blocks fill the
+     * content column below its title bar while a `(shell)` page's own data loads (Phase 3.6
+     * addendum, Task 21, F8's content-column-only ruling). A count, not a guess at any one real
+     * page's card layout — the per-page-skeleton alternative is refused for the same reason
+     * `docs/superpowers/plans/2026-08-23-phase3p6-addendum-whole-site.md` refuses it.
+     */
+    contentBlockCount: 3,
+    /**
+     * `shape="public"`'s top band height, px — mirrors `PublicBar`'s own rendered header height
+     * (`py-3` around a `text-xl` wordmark line) so the swap from skeleton to the real bar causes
+     * no jump. The same "a dynamic value has to reach the DOM as a style, not a class" idiom
+     * `infoTip.minTargetPx` already uses, since a Tailwind arbitrary value cannot read a JS
+     * constant.
+     */
+    publicBarHeightPx: 57,
+    /**
+     * `shape="room"`'s top band height, px — mirrors `RoomRail`'s own `lg:min-h-20` (80px) so
+     * the room skeleton's rail-shaped band matches the real one it is standing in for.
+     */
+    roomRailHeightPx: 80,
+  },
 } as const;
 
 /**

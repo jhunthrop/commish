@@ -34,11 +34,13 @@ src/
                           once (`(shell)/layout.tsx`, `shellData(db, user)`, one round trip) around
                           every page that gets the rail + top bar — the locker room, `leagues/`
                           (list + create form, a league's home + lineup editor, its matchups page),
-                          `admin/` and `profile/`. No `loading.tsx` exists in this group yet; once
-                          the whole-site addendum's Task 21 adds one, it will suspend only the
-                          content column, never the shell. See docs/design-system.md's "Layout"
-                          section and docs/decisions/design-v2.md §5 (which carries the same
-                          correction).
+                          `admin/` and `profile/`. `loading.tsx` (whole-site addendum, Task 21)
+                          suspends only the content column here, never the shell the layout is
+                          already holding — matched by a `loading.tsx` in `(room)` (the room's own
+                          bands) and `(public)/join/[code]` (the public geometry, F7), plus one
+                          root `src/app/loading.tsx` for every public page above `/app`. See
+                          docs/design-system.md's "Layout" section and docs/decisions/design-v2.md
+                          §5 (which carries the same correction).
   app/app/(room)/drafts/[draftId]/       The live draft room (snake + auction) — v2: its own route
                           group, declining `(shell)` entirely, because `RoomRail`'s own full-height
                           header is the room's chrome (docs/draft-room.md).

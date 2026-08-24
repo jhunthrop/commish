@@ -145,12 +145,16 @@ around a page a stranger can land on would be chrome nobody signed out can use f
 `docs/draft-room.md`), but only the first two share the MECHANISM.
 
 `loading.tsx` inside `(shell)` suspends only the content column, not the rail or top bar — the
-concrete fix the route-group move exists to deliver. **Correction: no `loading.tsx` file exists
-anywhere under `src/app` in this worktree as of this closeout** — a directory search confirms
-zero. The four files the plan describes are a forward reference to the addendum's Task 21, which
-runs after this task in the ruled execution order (A15 → … → P14 → A17 → A18 → A19 → A20 → A21 →
-A22) and has not yet executed. State this in future tense only: the route-group structure that
-would let those files suspend correctly is in place today; the files themselves are not.
+concrete fix the route-group move exists to deliver. The addendum's Task 21 has since landed the
+four files the plan describes: `src/app/app/(shell)/loading.tsx` (the content column only, per
+the reasoning above), `src/app/app/(room)/drafts/[draftId]/loading.tsx` (the room's own bands,
+since the room renders no shell to hold anything steady), `src/app/app/(public)/join/[code]/
+loading.tsx` (the public geometry, F7 — that route is signed-out reachable through
+`middleware.ts`'s exemption, so the signed-in skeleton would promise a session it cannot confirm),
+and one root `src/app/loading.tsx` for every public page above `/app` (the front door, `/browse`,
+`/reviews`, the seat-hold interstitial). All four render `AppShellSkeleton`
+(`src/components/app-shell/app-shell-skeleton.tsx`), one component with three geometries rather
+than four bespoke mocks.
 
 ## 6. The roll's start predicate, and why `drafts.start_trigger` stayed at two members
 

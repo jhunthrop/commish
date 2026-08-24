@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { Button, ErrorState } from "@/components/ui";
+import { PublicBar } from "@/components/app-shell/public-bar";
 
 /**
  * The route-segment error boundary for every page under `src/app`. Next.js renders this in
@@ -13,6 +14,14 @@ import { Button, ErrorState } from "@/components/ui";
  * a Postgres relation name, a driver stack, or an upstream provider's response body. The
  * `digest` is different — it is a hash Next generates precisely so a user can quote it and an
  * operator can find the matching server log line, so it is shown as a quiet reference.
+ *
+ * Renders `PublicBar` unconditionally (F14). This is a Client Component, and it cannot know
+ * whether there is a session: `getCurrentUser()` is server-side, and an error boundary that
+ * guesses gets it wrong exactly when the thing it guessed with is what broke. `PublicBar` is the
+ * honest chrome for an unknown session — a wordmark home link and one sign-in link, both of
+ * which work whether the visitor reading this is a member or a stranger — where a rail with no
+ * leagues in it would be a lie and a rail with somebody's leagues in it is data this boundary
+ * does not have.
  */
 export default function AppError({
   error,
@@ -22,29 +31,32 @@ export default function AppError({
   readonly reset: () => void;
 }) {
   return (
-    <main className="mx-auto flex min-h-[60vh] max-w-lg items-center px-4">
-      <div className="w-full">
-        <ErrorState
-          title="Something went wrong on our side."
-          description="This one is on us, not on you. Nothing about your leagues has changed. Try again, or head back to your leagues."
-          action={
-            <div className="flex flex-wrap items-center justify-center gap-3">
-              <Button variant="primary" onClick={reset}>
-                Try again
-              </Button>
-              <Link
-                href="/app"
-                className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-md font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-              >
-                Go to your leagues
-              </Link>
-            </div>
-          }
-        />
-        {error.digest === undefined ? null : (
-          <p className="mt-4 text-center text-sm text-text-muted">Reference {error.digest}</p>
-        )}
-      </div>
-    </main>
+    <>
+      <PublicBar intent={null} />
+      <main className="mx-auto flex min-h-[60vh] max-w-lg items-center px-4">
+        <div className="w-full">
+          <ErrorState
+            title="Something went wrong on our side."
+            description="This one is on us, not on you. Nothing about your leagues has changed. Try again, or head back to your leagues."
+            action={
+              <div className="flex flex-wrap items-center justify-center gap-3">
+                <Button variant="primary" onClick={reset}>
+                  Try again
+                </Button>
+                <Link
+                  href="/app"
+                  className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-md font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
+                >
+                  Go to your leagues
+                </Link>
+              </div>
+            }
+          />
+          {error.digest === undefined ? null : (
+            <p className="mt-4 text-center text-sm text-text-muted">Reference {error.digest}</p>
+          )}
+        </div>
+      </main>
+    </>
   );
 }
