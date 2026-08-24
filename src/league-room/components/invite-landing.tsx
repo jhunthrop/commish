@@ -113,9 +113,22 @@ export function InviteLanding({ state: initialState, signedIn = true, code, help
   // Step 4) — never a second hand-written "sorry, it filled" screen for the invited friend who
   // is owed the identical care. `primaryAction`/`secondaryAction` are props precisely so this
   // landing can pass the actions that make sense from an invite rather than the shelf's own.
+  //
+  // Fix round 1 (review MEDIUM): `reason` selects which TRUE thing the panel says — `league-full`
+  // is a real capacity outcome, so it keeps the panel's own default (`SEAT_HOLD_REFUSALS.taken`,
+  // the shelf's exact race-loss wording); `draft-started` is never a capacity race on the invite
+  // path (no hold is ever taken here), so it gets its own reason rather than a claim about a race
+  // that never happened.
   if (state.kind === "league-full" || state.kind === "draft-started") {
     const { primaryAction, secondaryAction } = shelfActions();
-    return <SeatTakenPanel leagueName={state.name} primaryAction={primaryAction} secondaryAction={secondaryAction} />;
+    return (
+      <SeatTakenPanel
+        leagueName={state.name}
+        reason={state.kind === "draft-started" ? "draft-started" : "seat-taken"}
+        primaryAction={primaryAction}
+        secondaryAction={secondaryAction}
+      />
+    );
   }
 
   if (state.kind === "tier-refused") {

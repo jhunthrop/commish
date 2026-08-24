@@ -74,10 +74,21 @@ describe("InviteLanding", () => {
 
   // The seat's own two losing states — the friend who arrived a minute late, and the friend
   // whose invite named a league whose draft had already started. Both reuse `SeatTakenPanel`
-  // (F15) rather than a second hand-written "sorry" screen.
-  it("renders SeatTakenPanel for a league whose draft already started, the same as when it filled", () => {
+  // (F15) rather than a second hand-written "sorry" screen — but a started draft is never a
+  // seat-hold race (the invite path takes no hold), so it gets its own reason and its own true
+  // title rather than borrowing the capacity panel's wording (fix round 1, review MEDIUM).
+  it("renders SeatTakenPanel for a league that filled, with the real capacity title", () => {
+    renderInLeague(<InviteLanding state={{ kind: "league-full", name: "Bay Bandits" }} />, fixtureLeagueDeps().deps);
+    expect(screen.getByTestId("seat-taken-panel")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bay Bandits filled up" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Browse open leagues" })).toBeInTheDocument();
+  });
+
+  it("renders SeatTakenPanel for a league whose draft already started, with its own accurate title — never the capacity claim", () => {
     renderInLeague(<InviteLanding state={{ kind: "draft-started", name: "Bay Bandits" }} />, fixtureLeagueDeps().deps);
     expect(screen.getByTestId("seat-taken-panel")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Bay Bandits already started its draft" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Bay Bandits filled up" })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Browse open leagues" })).toBeInTheDocument();
   });
 

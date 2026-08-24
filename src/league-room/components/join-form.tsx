@@ -19,12 +19,14 @@ import type { JoinBody } from "../contract";
  * instead of the generic inline alert every other failure still gets — see `onLeagueFull`,
  * `onDraftStarted` and `onTierRefused` below.
  *
- * NEITHER refusal is reachable through `acceptInvite` today (`invitePrecondition`, in that
- * module, checks only an invite's own expiry and use count; the draft-status and tier gates
- * belong to `publicJoinPrecondition`, the PUBLIC BROWSE door's own precondition, and an invite
- * accept never runs it). This still wires the real state and the real action A5 (Phase 3.6
- * addendum) requires, honestly rather than silently, should the invite door ever grow the same
- * checks the public one already has.
+ * `LEAGUE_FULL` IS reachable through `acceptInvite` today: `joinLeagueInTx`'s capacity check
+ * (`@/league-service/join`) is unconditional, so an invite that fills between this page's own
+ * SSR render and the click lands here for real. `DRAFT_ALREADY_STARTED` and `TIER_REFUSED` are
+ * NOT — `invitePrecondition` (`@/league-service/invites`) checks only an invite's own expiry and
+ * use count; the draft-status and tier gates belong to `publicJoinPrecondition`, the PUBLIC
+ * BROWSE door's own precondition, and an invite accept never runs it. Both are still wired to
+ * the real state and the real action A5 (Phase 3.6 addendum) requires, honestly rather than
+ * silently, should the invite door ever grow the same checks the public one already has.
  */
 const LEAGUE_FULL = "That league is already full.";
 const DRAFT_ALREADY_STARTED = "That league's draft has already started. Try another open league.";
