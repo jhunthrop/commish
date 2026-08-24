@@ -40,6 +40,16 @@ this table moves. `docs/decisions/house-leagues.md` is the addendum's own decisi
 reader who finds "house league" in a commit message and wants the full story without reading the
 plan file first.
 
+## Phase 3.6 — a founder-ordered design pass
+
+`docs/superpowers/plans/2026-08-23-phase3p6-design-v2.md` (paired with its own addendum,
+`docs/superpowers/plans/2026-08-23-phase3p6-addendum-whole-site.md`) is Phase 3.6: a
+founder-ordered visual and interaction redesign of the whole product — retoned palette (both
+themes), a real app shell, five extracted primitives, "roll until full" as server-side truth, the
+seat hold, and the proof-stats strip — run the same way Phase 3.5 was. Same non-renumbering rule:
+the nine-phase sequence above and Phase 4's position in it are **unchanged**. `docs/decisions/design-v2.md`
+is this pass's own decision doc.
+
 ## Cross-phase dependency graph
 
 ```

@@ -189,6 +189,62 @@ peer to ask for an invite code (the door refuses instead — see `docs/decisions
 §6) and no peer who can move the draft's scheduled time — Commish sets it once, at the league's
 creation, on the same stagger every other league on that rung's shelf uses.
 
+## The waiting room: proof stats, the just-seated moment, and one voice for start timing
+
+**Proof stats are real or absent, never estimated (Phase 3.6, Task 4).** `ProofStats` — leagues
+filled, drafts starting in the next 48 hours, and a rating with its own review count — are each
+computed as a real query and each hide independently the moment their own floor
+(`MATCHMAKING_CONFIG.proof.*` — see `docs/decisions/design-v2.md`) is not cleared; there is no
+placeholder number and no synthesized rating. The strip is cached, not recomputed per request:
+`createProofCache` (`src/stats-pipeline/proof-cache.ts`) sits on the same
+`createReferenceCache`/`createScoreCache` seam this pipeline already uses — real field checks on
+read, degrade-open to a live query on any Redis failure — but deliberately WITHOUT their
+write-through invalidation, because this value has no event that should bust it early. A blind TTL
+(`MATCHMAKING_CONFIG.proof.cacheTtlSeconds`, 60 seconds) is the correct, simpler choice for a
+single process-wide strapline nobody's own action ever changes out from under them.
+
+**`LEAGUE_CONFIG.season.startedAt` carries a FOUNDER-VERIFY marker (Task 4).** The plan assumed a
+season-boundary constant already existed in this codebase; none did. The implementer chose
+`"2026-08-01T00:00:00.000Z"` (the platform's own launch month) and marked the choice in
+`src/league/config.ts`'s own docblock for a human to confirm before a real season rollover ships —
+this is a deviation from the plan, not a value the plan specified, and it is stated as such rather
+than smoothed into an unmarked default.
+
+**The just-seated moment derives from the `member_joined` audit event, not a `teams.created_at`
+column — because no such column exists (Task 9, D1).** The plan's own assumption that
+`teams.created_at` was available to read was false; `teams` carries exactly four columns (`id`,
+`leagueId`, `userId`, `name`), no timestamp. `joinedAtFor` (`src/league-service/draft-schedule.ts`)
+instead reads the member's own most recent `member_joined` audit event for that league. `justSeated`
+(`src/league-service/read.ts`) compares that timestamp against an INJECTED `Clock` — never
+`Date.now()` directly, the repo-wide clock discipline — and stays true for
+`UI_CONFIG.waitingRoom.justSeatedMinutes` (5) minutes, aging out on its own with no expiry write
+anywhere. The heading this produces, `` `${leagueName} · You're in` ``, is `docs/design-system.md`'s
+one named exception to the expanded-register rule (C1).
+
+**One function composes every start-timing sentence, across four surfaces, with no duplicate
+prose (F9, "the four-surfaces rule," finally holding as of Task 9).** `describeStartTiming`
+(`src/matchmaking/roll.ts`) is the single authority every surface that tells a member when a draft
+starts imports rather than re-derives: the waiting room's own hero, the commissioner's nested
+draft-schedule panel, the public browse/open-league card, and the `draft_kickoff_rolled` notice
+(composed server-side and delivered pre-rendered, never re-derived from the payload on the client).
+`describeStartTiming` takes its `authority` as `StartTimingAuthority` — `LeagueAuthority["kind"]`,
+the narrow `"member" | "house"` string, never the full `LeagueAuthority` object — so a sentence
+composed for a public browse card can never carry a real commissioner's `userId` by accident.
+`rollNoticeSentence` sits beside it for the roll-count clause ("moved once" / "moved twice" /
+"moved N times"), read by the same four surfaces.
+
+**`LiveStatePill` renders icon-only at every width, not just below `sm` (Task 13's fix round).**
+The control used to hide entirely below the `sm` breakpoint (`hidden sm:block`) — the exact live
+game signal a mobile visitor on a Sunday most wants — until the 360px battery named it the sixth
+control reopening the overflow bug the shell's own discipline forbids. It now renders unconditionally,
+icon-only, at every width. That same battery caught two real contrast bugs, both fixed rather than
+waived: the pill's own `animate-pulse` was dipping the READABLE digit's opacity mid-cycle below its
+contrast floor, fixed by moving the pulse to the decorative glyph alone and holding the digit at
+constant opacity (`aria-hidden`, folded into an `sr-only` sentence); and `PlayerPool`'s inactive
+position-filter buttons dimmed their whole `PositionBadge` at `opacity-80`, which in light theme
+dropped RB and TE below 4.5:1 — fixed by removing the dimming and using the selection ring
+(`ring-2 ring-accent`) as the sole differentiator instead.
+
 ## The schedule
 
 `generateSchedule` (`src/league/schedule.ts`) is the circle method: team 0 stays fixed while
@@ -404,17 +460,57 @@ place. See `docs/decisions/formats-and-lobby.md` §6 for the full reasoning.
 
 **The privacy boundary.** `GET /api/public/leagues` is the one unauthenticated read in this
 application. What a stranger may learn is `PublicLeagueSummary` (`src/matchmaking/contract.ts`)
-and nothing else — thirteen fields as of the Phase 3.5 addendum: id, name, format, experience
+and nothing else — **seventeen fields as of Phase 3.6 (v2)**: id, name, format, experience
 tier, stake tier, team count, filled count, `scoringLabel` (derived, never the raw weights),
 `compositionCategory` (the coarse participation-mix bucket), `draftAt` (an absolute-plus-relative
 sentence), `medianGame` (whether this league plays the median game), `startTrigger`
-(`"scheduled" | "when_full"` — see below) and `houseRung` (`HouseRungName | null` — non-null only
-on the house shelf's own rows, see below). No commissioner identity, no team or owner names, no
-invite code, no draft id, no standings, no rosters, no chat, no scoring settings. Three things
-enforce it: `is_public_matchmade` is opt-in and false by default, `listPublicLeagues` selects
-exactly the contract's columns, and a key-set test fails if the wire body ever grows a field the
-contract does not name. A league that is full, or whose draft has already started, is not listed
-at all: a card a visitor cannot act on is a dead end wearing a badge.
+(`"scheduled" | "when_full"` — see below), `houseRung` (`HouseRungName | null` — non-null only
+on the house shelf's own rows, see below), `heldSeats` (Task 6 — how many seats are mid-claim
+right now, rendered through `SeatMeter` and nothing else; a fact about the league's capacity, the
+same disclosure reasoning `filledTeams` already carries), `rosterSummary` (Task 5 — a derived
+sentence like "15 slots, 1 flex" from the league's stored roster-slot rows), `playoffWeeks` (Task
+5 — the raw week numbers the platform's standard bracket runs across, computed from config for
+every row rather than read off a per-league column), and `kickoffRolls` (Task 7 — how many times
+`rollUnfilledDraftInTx` has pushed this scheduled league's kickoff forward; `0` for every
+`when_full` league by construction, read through `rollNoticeSentence` and never rendered as a bare
+number). No commissioner identity, no team or owner names, no invite code, no draft id, no
+standings, no rosters, no chat, no scoring settings. Three things enforce it: `is_public_matchmade`
+is opt-in and false by default, `listPublicLeagues` selects exactly the contract's columns, and a
+key-set test fails if the wire body ever grows a field the contract does not name. A league that
+is full, or whose draft has already started, is not listed at all: a card a visitor cannot act on
+is a dead end wearing a badge.
+
+**The roll (Phase 3.6, Task 7 — "no draft ever fires below a full room").** Every scheduled,
+public matchmade draft whose kickoff has passed and whose room is not full gets its kickoff
+rolled forward instead of firing short. `rollUnfilledDraftInTx` (`src/league-service/roll.ts`)
+takes `leagues[leagueId] FOR KEY SHARE` before touching `drafts` — closing a real deadlock cycle
+against a commissioner's own `setDraftKickoff` reschedule without serializing the roll's own
+self-race — then re-derives both due-ness and fullness fresh, immediately before its guarded
+write, because either fact can go stale between the scan that found the row and the transaction
+that would act on it. A `when_full` draft is exempt from the roll by construction (`Step 2`'s own
+model ruling: it has no chosen time to be late for until it fills). Every seated member gets a
+`draft_kickoff_rolled` notice naming the new kickoff and quoting `rollNoticeSentence`
+("moved once" / "moved twice" / "moved N times since it was scheduled") and
+`describeStartTiming`; from the second roll onward, the notice also carries the release
+paragraph (below). A public matchmade league's commissioner cannot undercut the ruling by hand
+either: a manual (non-auto) `startDraft` press on a public, non-house league below a full room is
+refused (`PUBLIC_ROOM_SHORT_REFUSAL`) — a private league's manual press is unaffected, since there
+is no other way for its commissioner to ever draft in a league nobody else can start for them, and
+a house league has no commissioner to press anything.
+
+**The seat release (Phase 3.6, Task 8 — the escape hatch the roll requires).** `releaseSeat`
+(`src/league-service/release.ts`) lets a member leave a league whose draft has not started,
+freeing their seat immediately. An uncapped roll needs a door out to stay humane rather than
+becoming a trap (ruling 16): drafting a permanently short room is forbidden, and this product has
+no way to cancel a league, so the roll alone would otherwise mean waiting forever with no exit. If
+the departed team's seat had un-filled a sit-and-go league that had already fired its fill trigger,
+`releaseSeat` clears `drafts.fill_fired_at` and sends every remaining seated member a
+`draft_fill_reversed` notice — the other half of `draft_fill_triggered` — quoting
+`DRAFT_FILL_REVERSED_SUMMARY`: "A seat opened up, so we put this league's draft back to waiting
+for a full room." A league's commissioner cannot release their own seat (`RELEASE_REFUSALS.
+commissioner`) — there is no commissioner-transfer path yet, the same dead end
+`HOUSE_AUTHORITY_REFUSALS` names for a house league's own two closed doors — and a house league
+never reaches that refusal at all, since nobody is ever `isCommissionerOf` one.
 
 **The house shelf (Phase 3.5 addendum, Task 14) is a second query, not a sort key on the first.**
 `listPublicLeagues` returns `{ leagues, house }`: `browseQuery`'s own `WHERE` excludes house

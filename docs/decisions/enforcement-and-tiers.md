@@ -411,11 +411,10 @@ awkward to fix later.
 
 **A second writer of `kickoff_at` (Phase 3.5, Task 7).** `fireWhenFullInTx`
 (`src/league-service/fill-trigger.ts`) joins `setDraftKickoff` (`src/league-service/draft-schedule.ts`,
-a commissioner's own choice) as the second and only other place `drafts.kickoff_at` is written —
-there are exactly two `.set({ kickoffAt })` call sites in this codebase, and no third. Starting a
+a commissioner's own choice) as the second place `drafts.kickoff_at` is written. Starting a
 draft, whether by a commissioner's press or by `autoStartDueDrafts`, changes `drafts.status`
 through `startDraft`'s guarded transition; neither that path nor `claimAutoStart` ever touches
-`kickoff_at` itself, so a draft's kickoff is exactly what one of these two writers last set it to,
+`kickoff_at` itself, so a draft's kickoff is exactly what its most recent writer last set it to,
 never something a start implicitly stamps. `fireWhenFullInTx` writes ONLY when a public matchmade
 league's `start_trigger` is `'when_full'` and its last seat has just filled, moving the column to
 `now + MATCHMAKING_CONFIG.sitAndGo.graceSeconds` — never earlier than that grace period, and never
@@ -425,9 +424,23 @@ drives, so a sit-and-go draft starts through the identical guarded status transi
 commissioner-scheduled one does — see `docs/decisions/formats-and-lobby.md` §6 for the full
 argument against a third start path.
 
-**The house catalog's reconciler does not add a third writer (Phase 3.5 addendum, Task 13,
-verified rather than assumed).** `spawnHouseLeagueInTx` never calls `.set({ kickoffAt })` — a fresh
-grep across `src/**` for this addendum confirms the count above is still exactly two. It calls the
+**A third writer, and the platform door's new fullness precondition (Phase 3.6, Task 7 — "no
+draft ever fires below a full room").** `rollUnfilledDraftInTx` (`src/league-service/roll.ts`) is
+the third and, as of v2, last `.set({ kickoffAt })` call site: for a `'scheduled'` draft whose
+kickoff has passed with the room still short, it moves the column forward to the next instant that
+preserves the original clock-face time, rather than letting the platform door start a room that
+isn't full. This is the fourth thing `kickoff_at` now means: not merely "the time a human or a
+fill trigger chose," but "the time the platform door is allowed to check fullness at" — the due-scan
+that used to mean only "has this time passed" now means "has this time passed, AND is the room
+full," with the roll owning the negative branch (not full: push the clock forward) and
+`dueDraftsQuery`/`startDraft` owning the positive one (full: start). See "The roll" in
+`docs/league.md` for the guard (`FOR KEY SHARE`, fresh due-ness and fullness re-derivation) that
+keeps this third writer from racing the first two.
+
+**The house catalog's reconciler does not add a writer of its own (Phase 3.5 addendum, Task 13,
+verified rather than assumed; the count below is Phase 3.5's own, before Task 7 above added the
+roll).** `spawnHouseLeagueInTx` never calls `.set({ kickoffAt })` — a fresh grep across `src/**`
+for this addendum confirmed the count was exactly two at the time this paragraph was written. It calls the
 same `writeLeagueInTx` every member league's creation has always called, supplying
 `houseKickoffFor`'s staggered computation as the value the `drafts` row's own `INSERT` writes at
 creation — the identical insert-time mechanism `createLeague` has used since Phase 1, whether the

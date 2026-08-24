@@ -30,13 +30,19 @@ redundant postgres/redis stack on the same host ports. Run `docker compose up -d
 ```
 src/
   app/                    Next.js routes. API routes under app/api/**.
-  app/app/drafts/[draftId]/       The live draft room (snake + auction).
-  app/app/leagues/                The league room's pages: the league list + create form
-                          (leagues/page.tsx), league home + lineup editor
-                          (leagues/[leagueId]/page.tsx), and the matchup page
-                          (leagues/[leagueId]/matchups/[week]/page.tsx).
-  app/app/join/[code]/            The invite-link landing page.
-  app/draft/[draftId]/board/      The read-only large-format TV draftboard.
+  app/app/(shell)/                v2 (Phase 3.6): the route-group layout that renders `AppShell`
+                          once (`(shell)/layout.tsx`, `shellData(db, user)`, one round trip) around
+                          every page that gets the rail + top bar — the locker room, `leagues/`
+                          (list + create form, a league's home + lineup editor, its matchups page),
+                          `admin/` and `profile/`. `loading.tsx` inside this group suspends only the
+                          content column, never the shell. See docs/design-system.md's "Layout"
+                          section and docs/decisions/design-v2.md §5.
+  app/app/(room)/drafts/[draftId]/       The live draft room (snake + auction) — v2: its own route
+                          group, declining `(shell)` entirely, because `RoomRail`'s own full-height
+                          header is the room's chrome (docs/draft-room.md).
+  app/app/(public)/join/[code]/   The invite-link landing page — v2: its own route group, reachable
+                          signed out, so it never receives the signed-in shell.
+  app/draft/[draftId]/board/      The read-only large-format TV draftboard — also declines `(shell)`.
   middleware.ts           WorkOS AuthKit session middleware — runs on every non-static request.
   instrumentation.ts      Starts the dev draft ticker singleton once, server-side only.
   domain/                 Pure domain types + pure functions. NO I/O, NO Date.now(). readonly everywhere.
@@ -66,11 +72,18 @@ src/
                           LeagueAuthority discriminated union — member | house — and
                           isCommissionerOf, Phase 3.5 addendum Task 12), house-factory.ts (the
                           catalog reconciler — ensureHouseCatalog, spawnHouseLeagueInTx — Phase 3.5
-                          addendum Task 13), and trades (trades.ts — propose/withdraw/reject/accept,
-                          trade-transfer.ts — the roster move + locked-week materialization,
-                          trade-reversal.ts — the operator's compensating transfer). Consumed
-                          directly by app/api/leagues/** route handlers and by app/**/*.tsx Server
-                          Components.
+                          addendum Task 13), roll.ts (rollUnfilledDraftInTx — the founder's "roll
+                          until full" ruling, Phase 3.6 Task 7 — the third writer of
+                          drafts.kickoff_at, guarded by a leagues FOR KEY SHARE preamble; see
+                          docs/decisions/design-v2.md §6), release.ts (releaseSeat, Phase 3.6 Task 8
+                          — the roll's own escape hatch, and the second writer of
+                          drafts.fill_fired_at), seat-hold.ts (claimSeatHold/liveHoldsFor, Phase 3.6
+                          Task 6 — the front door's ten-minute reservation, expiring by predicate
+                          against seat_holds.expires_at, never by a sweeper), and trades
+                          (trades.ts — propose/withdraw/reject/accept, trade-transfer.ts — the
+                          roster move + locked-week materialization, trade-reversal.ts — the
+                          operator's compensating transfer). Consumed directly by app/api/leagues/**
+                          route handlers and by app/**/*.tsx Server Components.
   league-room/            The browser half of the league: the create/join/invite client
                           components and the trade surface (components/ — trade-composer.tsx,
                           trade-inbox.tsx, trade-card.tsx, reusing AdvisorPanel's shape), the
@@ -82,10 +95,16 @@ src/
                           tiers, MATCHMAKING_CONFIG.sitAndGo (the fill-trigger grace period,
                           Phase 3.5 Task 7), house-catalog.ts (HOUSE_CATALOG, HouseRungName,
                           HOUSE_RUNG_LABEL, houseKickoffFor — the house-league shelf's own
-                          declared vocabulary, Phase 3.5 addendum Task 13), and
+                          declared vocabulary, Phase 3.5 addendum Task 13), roll.ts
+                          (describeStartTiming, rollNoticeSentence, ROLL_REFUSALS,
+                          PUBLIC_ROOM_SHORT_REFUSAL — the roll's own pure sentence layer, Phase 3.6
+                          Task 7, the single authority every surface quotes rather than composing
+                          its own start-timing sentence) and seat-hold.ts (SEAT_HOLD,
+                          SEAT_HOLD_COOKIE, SEAT_HOLD_REFUSALS, Phase 3.6 Task 6), and
                           PublicLeagueSummary, the field-by-field privacy boundary of the app's ONE
-                          unauthenticated league read — thirteen fields as of the Phase 3.5
-                          addendum (medianGame, startTrigger, houseRung joined draftAt). NO I/O.
+                          unauthenticated league read — seventeen fields as of Phase 3.6 (v2)
+                          (heldSeats, rosterSummary, playoffWeeks, kickoffRolls joined the Phase
+                          3.5 addendum's medianGame, startTrigger, houseRung and draftAt). NO I/O.
                           100% coverage. Browser-safe, so src/league-room/** value-imports it
                           directly, the same way src/chat-room/** value-imports @/chat.
   identity/               Pure identity rules: AvatarRef parsing over the three ref cases
@@ -243,7 +262,9 @@ src/
   components/ui/          shared primitives (Button, Input, Card, Badge, PositionBadge, SlotChip,
                           PageTitle, Table, Celebration, Avatar, Modal, ToastProvider, Select,
                           Skeleton, EmptyState, ErrorState, Icon, Countdown — the ticking-clock
-                          primitive, extracted at its third caller, Phase 3.5 Task 8, …) — see
+                          primitive, extracted at its third caller, Phase 3.5 Task 8, …, and v2's
+                          five (Phase 3.6 Task 3, each extracted at its own second caller) — Panel,
+                          Crest, SeatMeter, Meter, StatPill) — see
                           design-system.md.
 drizzle/                  generated SQL migrations (committed)
 docs/                     conventions.md (this), design-system.md, draft-engine.md, draft-room.md,
@@ -253,7 +274,9 @@ docs/                     conventions.md (this), design-system.md, draft-engine.
                           the median's storage split, the pause/skip asymmetry, the KDS snapshot
                           argument and the fill trigger, house-leagues.md — the Phase 3.5 addendum:
                           the nullable-commissioner schema, the authority union, the catalog
-                          reconciler, …)
+                          reconciler, design-v2.md — Phase 3.6's own closing record: the theme
+                          reversal, the retone's contrast corrections, the roll's start predicate,
+                          the seat hold's Postgres argument, …)
 scripts/                  Operator-run CLIs, never imported by src/**: seed (npm run seed),
                           audit:verify (verify-audit-chain.ts), reviews:remove
                           (remove-review.ts), admin:grant (grant-admin.ts, the only door
@@ -456,6 +479,18 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 **The gate count stays twenty-one through the Phase 3.5 addendum (house leagues) too.** Every module the addendum adds — `src/league-service/authority.ts`, `src/league-service/house-factory.ts`, `src/matchmaking/house-catalog.ts` — lands inside a directory already on the list above; `src/matchmaking` and `src/league-service` were both gated before this addendum existed, for reasons unrelated to it. No ninth pure-exempt directory and no twenty-second gate were needed because nothing new here is a directory-level concern — see `docs/decisions/house-leagues.md`.
 
 **Phase 3.5 added no gate — the count stays twenty-one.** Every pure module this phase wrote lands inside a directory already gated: `src/league/roster-shape.ts`, `src/league/median.ts` (gate 4); `src/draft-engine/pause.ts` (gate 2); `src/draft-service/slot-preference.ts` and `order.ts`'s KDS extension (gate 18); `src/league-service/fill-trigger.ts` (gate 17). `src/domain` gained one union member (`SUPERFLEX` on `RosterSlotType`) but stays ungated on the same standing reasoning it always has (`docs/decisions/formats-and-lobby.md`'s cross-cutting section): it holds types the whole product shares, a 100% claim over it is separate work, and this phase's one addition there is pinned by tests in the gated directories that actually consume it.
+
+**Phase 3.6 (v2, the design pass) added no new directory and no new gate — the count stays
+twenty-one.** Every pure module this phase wrote lands inside a directory already on the list:
+`src/matchmaking/roll.ts` and `src/matchmaking/seat-hold.ts`'s browser-safe half (`src/matchmaking`,
+already gated), `src/league-service/roll.ts`, `release.ts` and `seat-hold.ts`'s
+server-only half (`src/league-service`, gate 17), `src/league/config.ts`'s season boundary
+(`src/league`, gate 4). `src/design/**` and `src/components/**` — where every new v2 token, every
+new primitive (`Panel`, `Crest`, `SeatMeter`, `Meter`, `StatPill`) and the shell's data seam all
+live — stay ungated, unchanged, the same hole ruling 24 of the v2 plan names rather than fixes:
+bringing roughly 40 primitives to 100% branch coverage is real, separate work that does not belong
+inside the phase rewriting all of them. Naming the hole here is better than a doc that implies it
+is closed.
 - **Browser end-to-end** lives in `e2e/` and runs under Playwright against a production build and the real docker-compose stack (`npm run e2e`). It authenticates with a sealed WorkOS test-directory session (`scripts/lib/lab-session.ts`), the same seam the screenshot lab uses. There is no dev auth bypass and none may be added. Vitest excludes `e2e/**`, because its default include glob would otherwise collect `*.spec.ts` there. `playwright.config.ts` pins `workers: 1` and `fullyParallel: false`, so every run is one worker walking the suite in one deterministic, alphabetical file order — a real cross-spec ordering dependency, not a latent flake: `mobile-360.spec.ts`'s dispute-queue check depends on `league-lifecycle.spec.ts` having already run and resolved its own flag, sorting first only because its filename does. A spec relying on suite order names the file it depends on in its own comment, the way both of these do; running either spec in isolation (`npx playwright test mobile-360.spec.ts` alone) will not reproduce the count that spec asserts.
 - Any step shipping a user-visible surface additionally requires: a design review against `docs/design-system.md`; loading/empty/error/success states all designed; an automated a11y check plus a keyboard-only walkthrough of the primary flow; a plain-language copy review; renders and operates at 360px width.
 

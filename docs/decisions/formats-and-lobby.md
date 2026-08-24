@@ -260,6 +260,40 @@ shape (`docs/decisions/house-leagues.md` §5), so the only fact worth stating pe
 and when it drafts — never a second copy of the format/scoring line the member card already
 carries, which would be identical on every house card and not worth printing twelve times.
 
+## 8. The roll (Phase 3.6, Task 7), and why it never touches a sit-and-go league
+
+The founder's "roll until full" ruling — no draft ever fires below a full room — is a THIRD
+mechanism in the lobby, alongside the fill trigger (§6) and the house shelf (§7), and it is
+scoped to exactly the population those two are not: `dueUnfilledScheduledDraftsQuery`
+(`src/league-service/roll.ts`) selects `drafts.start_trigger = 'scheduled'` only. A `when_full`
+league is exempt from the roll by construction, not by a runtime guard that could disagree with
+the schema-level refusal §6 already documents — it has no chosen target time to be late for until
+its own fill trigger writes one, and once that trigger fires, `autoStartDueDrafts` picks the write
+up through the same guarded path a commissioner-scheduled draft uses. The roll and the fill
+trigger therefore never compete for the same row: one exists because a promised time was kept
+short, the other because a promised time was missed. `rollUnfilledDraftInTx`'s own docblock states
+this exemption as a SQL predicate rather than an assumption, the same discipline `fireWhenFullInTx`
+holds itself to when it reads `drafts.start_trigger` instead of `leagues.is_public_matchmade`
+(§6's own "asking the same question from two different data sources is how the two answers
+eventually disagree" argument, applied here in the opposite direction).
+
+**The house shelf's scheduled rungs roll exactly like a member league's would.** The roll's own
+scan narrows to public-matchmade leagues (the same `ENFORCED_LEAGUE_SQL` gate `dueDraftsQuery`
+already holds itself to), which every house rung already satisfies by construction — a house
+league carries no special case in `rollUnfilledDraftInTx`, because it needs none. Verified
+directly against `house-catalog.ts`'s own `CANON`: **two of the shipped catalog's three rungs are
+`'scheduled'`** (`open_12`, `beginner_12`) and genuinely reachable by the roll; only `sitandgo_12`
+is `'when_full'` and exempt by the SQL predicate above. A scheduled house rung that misses its
+target time rolls forward exactly as a member league would, and its members get the identical
+`draft_kickoff_rolled` notice a member league's seats would. There is no separate "retire the room
+and mint a fresh edition" path for a scheduled rung that misses its window — the roll is what
+keeps it alive instead of the reconciler replacing it, and the reconciler's own replacement logic
+(`docs/decisions/house-leagues.md`) fires only on a league actually completing or being abandoned,
+never on a late kickoff.
+
+See `docs/decisions/design-v2.md` §6 for the full mechanism (the KEY SHARE lock-order fix and the
+due-ness re-derivation) and `docs/league.md`'s own "The roll" section for the notice contract.
+
 ## Cross-cutting: no new realtime event, no new coverage gate, no new config file
 
 **No new realtime event type.** The pause and the owed picks ride `DraftClockView`, which is

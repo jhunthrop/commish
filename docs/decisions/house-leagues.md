@@ -112,6 +112,17 @@ The tick order is deliberate and tested both ways: `ticker.ts` runs `autoStart`,
 — so a house league whose draft this tick just auto-started is already off the shelf before the
 reconcile count runs, and the two never observe each other's half-finished state.
 
+**A stale `scheduled` rung no longer needs retiring (Phase 3.6, Task 7).** `openHouseLeaguesQuery`
+still carries its `houseKickoffStillAhead(nowIso)` predicate, which stops counting and rendering a
+house league whose scheduled kickoff has passed unfilled — but the roll (`rollUnfilledDraftInTx`,
+`src/league-service/roll.ts`) now reaches every scheduled house league exactly as it reaches a
+member league, pushing its kickoff forward on the same cadence rather than letting it go stale in
+the first place. The predicate stays as defense-in-depth against a tick the roll somehow missed,
+but the "retire and let the next reconciler pass open a fresh edition" path it was written to
+protect is no longer the mechanism that actually keeps the shelf honest for a `scheduled` rung —
+the roll is. See `docs/decisions/formats-and-lobby.md` §8 for the full mechanism, including why
+the roll and this reconciler never observe each other's half-finished state.
+
 **Proven end to end, not just argued.** Task 13's fix round added an integration test
 (`house-factory.test.ts`) that stocks the shelf through the real `ensureHouseCatalog`, fills a
 spawned `open_12` league to capacity through the real `joinPublicLeague` door, advances a local
@@ -353,6 +364,34 @@ directly (`house-catalog.ts:72`) rather than spreading it from `LEAGUE_CONFIG.de
 `false`s instead of two, by necessity rather than oversight — worth centralizing the next time any
 of the three is touched for an unrelated reason, not fixed here for the same reason Task 11 did not
 fix it: this task documents what shipped.
+
+## 13. The roll (Phase 3.6, Task 7) needs no house-specific case, and the reconciler stays the only replacer
+
+The founder's "roll until full" ruling shipped after this addendum, as a platform-wide mechanism
+(`rollUnfilledDraftInTx`, `src/league-service/roll.ts`) scanning every `'scheduled'`, public
+matchmade draft whose kickoff has passed with its room still short. A house league is
+public-matchmade by construction (`ENFORCED_LEAGUE_SQL`, the same gate `dueUnfilledScheduledDraftsQuery`
+holds itself to), so it is swept into the roll's scan with no special case written for it —
+verified directly rather than assumed: `rollUnfilledDraftInTx` names no `houseRung` branch except
+to pick the notice's grammatical authority (`row.houseRung !== null ? "house" : "member"`, so a
+house room's notice never invents a commissioner to name).
+
+**The roll and the reconciler answer two different questions about a house league's lifecycle,
+and never compete for the same write.** The reconciler (§3) replaces a rung's league when that
+league fills or is abandoned — a capacity event. The roll moves a `'scheduled'` rung's kickoff
+forward when its target time passes with seats still open — a calendar event. Verified directly
+against `house-catalog.ts`'s own `CANON` rather than assumed: **two of the three shipped rungs are
+`'scheduled'`** (`open_12` and `beginner_12`, both staggered kickoffs) and genuinely reachable by
+the roll if a house room's target time passes short; only `sitandgo_12` is `'when_full'` and
+exempt by the roll's own SQL predicate (§8 of `docs/decisions/formats-and-lobby.md`). A scheduled
+house rung that misses its target rolls exactly like a member league's scheduled draft would —
+same guarded write, same notice — and the reconciler still only replaces the league once it either
+fills or is abandoned, never because it rolled; the two mechanisms have never yet collided in
+practice only because the shelf's own restocking keeps every rung's fill rate high, not because
+either mechanism special-cases the other.
+
+See `docs/decisions/design-v2.md` §6 and `docs/decisions/formats-and-lobby.md` §8 for the roll's
+own mechanism and its relationship to the sit-and-go fill trigger.
 
 A second, unrelated fast-follow candidate, recorded rather than fixed for the identical reason:
 `src/data/seed/seed-enforcement.ts` writes the same `drafts` shell shape (`format: "snake", status:

@@ -293,8 +293,15 @@ league home, not back in this room. `LeagueHome`'s own `DraftCompleteArrival`
 (`src/league-room/components/league-home.tsx`) is what puts those two facts — the fifteen players
 just drafted, and the Week 1 opponent — in front of the manager at the moment they mean the most,
 derived from fields `leagueHome` already returns (`draftStatus`, `currentWeek`, `myMatchup`, the
-same `lineup` `LineupEditor` reads), no new query and nothing stored. See that component's own
-docblock for the exact derivation and why it stops rendering itself once the season has a result.
+same `lineup` `LineupEditor` reads), no new query and nothing stored: `draftJustCompleted =
+draftStatus === "complete" && currentWeek === 1 && lineup !== null && myMatchup !== null`, a
+window that self-expires the moment the season moves past Week 1 or gains a result. **Fix round
+1 (F1):** the arrival used to render stacked on top of `WaitingRoom`'s own terminal `StatePanel`
+("Draft complete") — two messages for one fact. `WaitingRoom` now suppresses its terminal panel
+for the duration of `draftJustCompleted`'s own window, folding the panel's one useful link (to the
+draft board) into the arrival itself, so the manager reads one message, not two, and the suppressed
+panel returns on its own once the window naturally closes. See that component's own docblock for
+the exact derivation and why it stops rendering itself once the season has a result.
 
 ## Components inventory (`src/draft-room/components/`)
 
