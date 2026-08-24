@@ -1369,6 +1369,8 @@ The founder's brief has three words in it that are testable: responsive, efficie
 
 `mobile-360.spec.ts` grows from the Plan C surfaces to the v2 set: front door, browse, hold interstitial, waiting room, locker room, league home, standings, matchup, draft room. The assertion is the existing one and it is the right one: no horizontal overflow, every control reachable, nothing clipped.
 
+- [ ] **Step 1c: An icon-only LiveStatePill for narrow widths (reconciliation review follow-up).** The checkpoint fix hid the pill below `sm` to close the sixth-control 360px overflow, which drops the live-game signal on exactly the device people watch games beside. Design the icon-only compaction `TopBar`'s own discipline prescribes (a glyph plus count, full sentence in the accessible name), replacing the `hidden` wrapper; assert it at 360px in this task's battery.
+
 - [ ] **Step 2: The rail at every width**
 
 At `lg` and up it is a 64px column; below, a horizontal strip that scrolls with momentum and keeps `aria-current`. The gauntlet raised the bottom-tab-bar alternative and this plan **rules against it**: a bottom bar is a second information architecture that exists only on phones, and two IAs is how a product's navigation starts disagreeing with itself. One rail, two orientations.
