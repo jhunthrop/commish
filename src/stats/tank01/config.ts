@@ -9,6 +9,12 @@
  */
 export const TANK01_CONFIG = {
   host: "tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com",
+  /**
+   * How long the client waits before its single retry of a 429. RapidAPI's per-second burst
+   * limit resets within a second; 1100ms clears it with margin without meaningfully delaying
+   * a backfill. One retry only — a 429 that survives it is the monthly quota speaking.
+   */
+  burstRetryDelayMs: 1_100,
   baseUrl: "https://tank01-nfl-live-in-game-real-time-statistics-nfl.p.rapidapi.com",
   paths: {
     playerList: "/getNFLPlayerList",

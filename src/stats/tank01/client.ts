@@ -49,10 +49,23 @@ export function createTank01Client(options: Tank01ClientOptions): Tank01Client {
       const url = new URL(path, baseUrl);
       for (const [key, value] of Object.entries(query)) url.searchParams.set(key, value);
 
-      const response = await doFetch(url.toString(), {
+      let response = await doFetch(url.toString(), {
         method: "GET",
         headers: { "x-rapidapi-key": options.apiKey, "x-rapidapi-host": host },
       });
+
+      // RapidAPI enforces a per-second burst limit SEPARATELY from the monthly quota, and both
+      // answer 429. A burst 429 on concurrent calls (listPlayers fires two at once) is transient;
+      // one short, bounded retry absorbs it. A 429 that survives the retry is treated as the
+      // real thing — quota — and classified below. Verified against a live probe on 2026-08-23:
+      // the monthly ledger showed 14,998/15,000 remaining while Promise.all'd calls drew 429s.
+      if (response.status === 429) {
+        await new Promise((resolve) => setTimeout(resolve, TANK01_CONFIG.burstRetryDelayMs));
+        response = await doFetch(url.toString(), {
+          method: "GET",
+          headers: { "x-rapidapi-key": options.apiKey, "x-rapidapi-host": host },
+        });
+      }
 
       // The RapidAPI gateway's own failures. These do NOT carry the `{statusCode, body}`
       // envelope — they are `{"message": "..."}` — so they are classified before parsing.

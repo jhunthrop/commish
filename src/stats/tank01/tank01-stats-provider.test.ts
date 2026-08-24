@@ -114,6 +114,21 @@ describe("Tank01StatsProvider", () => {
     await expect(subject.listPlayers()).rejects.toMatchObject({ kind: "rate_limited" });
   });
 
+  it("absorbs a burst 429 with one retry, because the per-second limit is not the quota", async () => {
+    // RapidAPI throttles bursts separately from the monthly quota and answers 429 for both.
+    // The first call 429s, the bounded retry lands 200, and the caller never sees a failure.
+    const fixtureFetch = createFixtureFetch();
+    let calls = 0;
+    const bursty: typeof globalThis.fetch = async (input, init) => {
+      calls += 1;
+      if (calls === 1) return new Response(JSON.stringify({ message: "Too many requests" }), { status: 429 });
+      return fixtureFetch(input, init);
+    };
+    const subject = createTank01StatsProvider({ apiKey: "test-key", fetch: bursty, season: 2026 });
+    await expect(subject.listPlayers()).resolves.toBeDefined();
+    expect(calls).toBeGreaterThanOrEqual(2);
+  });
+
   it("turns a 403 into a typed forbidden failure naming the missing subscription", async () => {
     const notSubscribed: typeof globalThis.fetch = async () =>
       new Response(JSON.stringify({ message: "You are not subscribed to this API." }), { status: 403 });
