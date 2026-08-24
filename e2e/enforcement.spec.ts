@@ -193,7 +193,12 @@ test("a commissioner schedules and starts a draft; a signed-out visitor reads th
     // The one page under `/app` a signed-out visitor reaches — proven structurally, not just
     // by the page rendering: the sign-in prompt is what a stranger sees instead of a join
     // button that would silently assume an identity nobody supplied.
-    await expect(anonPage.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
+    //
+    // Phase 3.6, Task 20: `InviteLanding` now renders its OWN "Sign in" link, right where the
+    // "Join" button would be for a signed-in visitor — a SECOND exact "Sign in" alongside
+    // `PublicBar`'s own header one. Scoped to `main`, the same reason `mobile-360.spec.ts` scopes
+    // its own crest-name check: `main` is this page's own content, never the header around it.
+    await expect(anonPage.locator("main").getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
 
     // --- The commissioner presses Start the draft — the first time any browser in this
     // product's history has called `POST /api/drafts/[draftId]/start` ------------------------

@@ -1,71 +1,66 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import type { ApiEnvelope } from "@/lib/api/respond";
-import type { HelpLevel } from "@/identity/preferences";
-import type { InvitePreviewBody, JoinBody } from "../contract";
-import { Button, ErrorState, Skeleton } from "@/components/ui";
-import { SignInLink } from "@/components/app-shell/sign-in-link";
+import type { LeagueTerms } from "@/league";
+import { Button } from "@/components/ui";
 import { useLeagueRoomDeps } from "../hooks/deps";
-import { LeagueTermsPanel } from "./league-terms-panel";
-
-type PreviewState =
-  | { readonly status: "loading" }
-  | { readonly status: "error"; readonly reason: string }
-  | { readonly status: "ready"; readonly terms: InvitePreviewBody };
+import type { JoinBody } from "../contract";
 
 /**
- * The landing page for a shared invite link. It names what it is asking somebody to agree to
- * (`LeagueTermsPanel`, fed by `GET /api/invites/[code]`) before it asks them to agree to it —
- * the invite used to say only "You've been invited to a league. Invite code ABC123."
+ * Duplicated from `@/league-service/join`'s own refusal constants (`LEAGUE_FULL`,
+ * `DRAFT_ALREADY_STARTED`) and `@/league-service/enforcement`'s `ENFORCEMENT_REFUSALS.join` —
+ * never imported, because `@/league-service` is blocked as a value import from
+ * `src/league-room/**` (the client boundary, `eslint.config.mjs`'s `SERVER_ONLY_MODULE_GROUPS`),
+ * the same reasoning `SCORING_LABEL_TERM`/`WHEN_FULL_FILLING_NOTE` (`@/league/terms.ts`) already
+ * duplicate across for. Compared against `POST /api/invites/[code]/accept`'s own error string so
+ * this form can route the three DIFFERENT terminal outcomes to `InviteLanding`'s matching state
+ * instead of the generic inline alert every other failure still gets — see `onLeagueFull`,
+ * `onDraftStarted` and `onTierRefused` below.
  *
- * The preview fetch and the accept POST are two separate requests: a dead or expired code fails
- * the FIRST one, and there is nothing left to render but the same refusal `acceptInvite` would
- * have given anyway — no button, no code, no dead end, just a way back to `/app`.
- *
- * `signedIn` is the `PublicLeagueList` idiom: the terms are the same for everybody, and the only
- * thing an account changes is whether the action is "Join <league>" or "Sign in to join". The
- * preview fetch itself needs no session — that is the whole point of the route being
- * unauthenticated (see its own docblock and `middleware.ts`'s exemption).
+ * NEITHER refusal is reachable through `acceptInvite` today (`invitePrecondition`, in that
+ * module, checks only an invite's own expiry and use count; the draft-status and tier gates
+ * belong to `publicJoinPrecondition`, the PUBLIC BROWSE door's own precondition, and an invite
+ * accept never runs it). This still wires the real state and the real action A5 (Phase 3.6
+ * addendum) requires, honestly rather than silently, should the invite door ever grow the same
+ * checks the public one already has.
  */
-export function JoinForm({
-  code,
-  helpLevel,
-  signedIn = true,
-}: {
+const LEAGUE_FULL = "That league is already full.";
+const DRAFT_ALREADY_STARTED = "That league's draft has already started. Try another open league.";
+const TIER_REFUSED =
+  "This league is reserved for newer players so everyone starts on a level footing. Browse the open leagues to find one you can join.";
+
+export interface JoinFormProps {
   readonly code: string;
-  readonly helpLevel?: HelpLevel;
-  readonly signedIn?: boolean;
-}) {
+  /** Already known — `InviteLanding` fetched it once, server-side, before this ever mounts. This
+   *  form reads only `terms.name` for its own button label; the rest of the terms are
+   *  `LeagueTermsPanel`'s job, rendered once by `InviteLanding` regardless of session. */
+  readonly terms: LeagueTerms;
+  /** The accept succeeded, but this account already had a team here — no use spent, nothing
+   *  written. `InviteLanding` shows "you are already in, here is the door" instead of a silent
+   *  redirect. */
+  readonly onAlreadyMember: (leagueId: string) => void;
+  readonly onLeagueFull: () => void;
+  readonly onDraftStarted: () => void;
+  readonly onTierRefused: () => void;
+}
+
+/**
+ * The invite landing's own action: one button, one request. `InviteLanding` (this component's
+ * only caller) already fetched and rendered the terms before this ever mounts — this component's
+ * whole job is the accept itself and what happens after.
+ *
+ * A brand new join goes straight to the league it just joined; the four terminal outcomes above
+ * are reported upward instead, because each one replaces THIS SCREEN with a different one
+ * (`SeatTakenPanel`, the "you are already in" panel, the tier refusal) rather than an inline
+ * alert under a button that no longer makes sense to press again.
+ */
+export function JoinForm({ code, terms, onAlreadyMember, onLeagueFull, onDraftStarted, onTierRefused }: JoinFormProps) {
   const { fetchJson } = useLeagueRoomDeps();
   const router = useRouter();
-  const [preview, setPreview] = useState<PreviewState>({ status: "loading" });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    setPreview({ status: "loading" });
-
-    (async (): Promise<void> => {
-      try {
-        const response = await fetchJson(`/api/invites/${code}`);
-        const body = (await response.json()) as ApiEnvelope<InvitePreviewBody>;
-        if (cancelled) return;
-        setPreview(body.ok ? { status: "ready", terms: body.data } : { status: "error", reason: body.error });
-      } catch {
-        if (!cancelled) {
-          setPreview({ status: "error", reason: "We could not reach the server. Check your connection and try again." });
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [code, fetchJson]);
 
   const join = async (): Promise<void> => {
     setSubmitting(true);
@@ -78,7 +73,26 @@ export function JoinForm({
       });
       const body = (await response.json()) as ApiEnvelope<JoinBody>;
       if (!body.ok) {
+        if (body.error === LEAGUE_FULL) {
+          onLeagueFull();
+          return;
+        }
+        if (body.error === DRAFT_ALREADY_STARTED) {
+          onDraftStarted();
+          return;
+        }
+        if (body.error === TIER_REFUSED) {
+          onTierRefused();
+          return;
+        }
+        // Every other refusal (a dead code that expired or ran out between this page's own SSR
+        // render and this click, or an unexpected 500) keeps the plain inline alert — the visitor
+        // already read the terms and pressed Join, and there is nothing to swap the screen for.
         setError(body.error);
+        return;
+      }
+      if (body.data.alreadyMember) {
+        onAlreadyMember(body.data.leagueId);
         return;
       }
       router.push(`/app/leagues/${body.data.leagueId}`);
@@ -89,49 +103,11 @@ export function JoinForm({
     }
   };
 
-  if (preview.status === "loading") {
-    return <Skeleton lines={5} />;
-  }
-
-  if (preview.status === "error") {
-    return (
-      <ErrorState
-        title="We could not open that invite"
-        description={preview.reason}
-        action={
-          <Link href="/app" className="text-sm font-medium text-accent underline">
-            Back to Commish
-          </Link>
-        }
-      />
-    );
-  }
-
   return (
     <div className="flex flex-col gap-3">
-      {/* First-timer persona review, fix round 1: nothing anywhere in the invite flow said what
-          JOINING MEANS. Lives here, not in `LeagueTermsPanel` — that component also renders
-          post-join inside the league itself (Task 8), where this sentence would be stale and
-          confusing (you already ARE in the draft and season). */}
-      <p className="text-sm text-text-muted">
-        {"Joining puts you in the draft and the season that follows. You will set a lineup every week."}
-      </p>
-      <LeagueTermsPanel terms={preview.terms} helpLevel={helpLevel} />
-      {signedIn ? (
-        <Button onClick={() => void join()} loading={submitting} disabled={submitting}>
-          {`Join ${preview.terms.name}`}
-        </Button>
-      ) : (
-        // This page's own path (Task 16, F6) — signing in returns here, to the same invite,
-        // rather than dropping the visitor at a generic `/app`.
-        <SignInLink
-          intent={`/app/join/${code}`}
-          aria-label={`Sign in to join ${preview.terms.name}`}
-          className="inline-flex h-10 min-w-0 items-center justify-center [overflow-wrap:anywhere] rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-        >
-          Sign in to join
-        </SignInLink>
-      )}
+      <Button onClick={() => void join()} loading={submitting} disabled={submitting}>
+        {`Join ${terms.name}`}
+      </Button>
       {error === null ? null : (
         <p role="alert" className="text-sm text-negative">
           {error}

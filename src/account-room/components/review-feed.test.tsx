@@ -6,6 +6,9 @@ import type { ReviewsPage, ReviewView } from "@/reviews/contract";
 import { fixtureAccountDeps, renderInAccount } from "../test-fixtures";
 import { AccountRoomDepsProvider } from "../hooks/deps";
 import { ReviewFeed } from "./review-feed";
+// F15: this feed's neighbor public room (Task 20's other half) — see the "renders the same taken
+// panel" test below for why it is asserted here rather than only in `invite-landing.test.tsx`.
+import { InviteLanding } from "@/league-room/components/invite-landing";
 
 const REVIEW_A: ReviewView = {
   id: "r-new",
@@ -127,15 +130,41 @@ describe("ReviewFeed", () => {
     expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
   });
 
-  it("explains report scope alongside the reason select once the control opens", () => {
+  // A4. The founder's claim is that these are unedited, good and bad. A "highest rated" control
+  // would make that claim false while leaving every review technically present.
+  it("offers no way to reorder or filter what people said", () => {
+    renderSurface(<ReviewFeed initialPage={PAGE} emptyAction={null} />, ({ queryByRole }) => {
+      expect(queryByRole("button", { name: /sort|filter|highest|helpful/i })).toBeNull();
+    });
+  });
+
+  // C1 (ruled): the expanded register is the house standard, stated in docs/design-system.md by
+  // the parent's Task 14 Step 2. "isn't" becomes "is not" here, in the task that owns the string.
+  // Stated once for the whole feed (Task 20 Step 1) rather than gated behind opening any one
+  // row's report control, so a reader can see the boundary without starting the report flow.
+  it("says what reporting a review does and does not do", () => {
+    renderSurface(<ReviewFeed initialPage={PAGE} emptyAction={null} />, ({ getByText }) => {
+      expect(getByText("Report reviews that break the rules. Disagreeing with a rating is not a reason to report it.")).toBeInTheDocument();
+    });
+  });
+
+  it("shows the reason select once the control opens", () => {
     renderInAccount(<ReviewFeed initialPage={PAGE} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
-    expect(screen.queryByText(/break the rules/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
 
     fireEvent.click(screen.getAllByRole("button", { name: "Report" })[0]!);
-    expect(
-      screen.getByText("Report reviews that break the rules. Disagreeing with a rating isn't a reason to report it."),
-    ).toBeInTheDocument();
     expect(screen.getAllByRole("combobox")[0]).toBeInTheDocument();
+  });
+
+  // F15: an invited friend who arrives one minute late was getting a second, worse copy of the
+  // race loser. `SeatTakenPanel` takes its two actions as props precisely so the invite landing
+  // can give a private league's invitee the actions that make sense there, not the shelf's own —
+  // proven here by rendering the SAME component this feed's neighbor public room renders.
+  it("renders the same taken panel the shelf does when the league filled first", () => {
+    renderSurface(<InviteLanding state={{ kind: "league-full", name: "Bay Bandits" }} />, ({ getByTestId, getByRole }) => {
+      expect(getByTestId("seat-taken-panel")).toBeInTheDocument();
+      expect(getByRole("link", { name: "Browse open leagues" })).toBeInTheDocument();
+    });
   });
 
   it("has a Report control per row that sends a reason and confirms once sent", async () => {

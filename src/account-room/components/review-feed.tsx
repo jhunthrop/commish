@@ -78,7 +78,6 @@ function ReportControl({ reviewId }: { readonly reviewId: string }) {
 
   return (
     <div className="flex flex-col gap-2 text-sm">
-      <p className="text-text-muted">Report reviews that break the rules. Disagreeing with a rating isn&apos;t a reason to report it.</p>
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-2">
           <span className="text-text-muted">Reason</span>
@@ -128,7 +127,10 @@ function ReviewRow({ review }: { readonly review: ReviewView }) {
               </span>
             ) : null}
           </span>
-          <span className="text-sm text-text-muted">
+          {/* Task 20 Step 2: the rating and the date are the one dense, scannable fact on an
+              otherwise prose row — `font-mono tabular-nums`, the same idiom `LiveStatePill` and
+              `SlotPreferencePanel` already use for a number meant to be scanned, not read. */}
+          <span className="font-mono text-sm tabular-nums text-text-muted">
             {rating === null ? null : (
               <>
                 {rating}
@@ -139,7 +141,10 @@ function ReviewRow({ review }: { readonly review: ReviewView }) {
           </span>
         </div>
       </div>
-      <p className="text-md text-text-primary">{review.body}</p>
+      {/* A review is prose, not a data row — `max-w-prose` keeps its line length readable inside
+          the feed's own full-bleed frame (Task 20 Step 2's measured paragraph column), the same
+          width this page's own lede paragraph already carries (`src/app/reviews/page.tsx`). */}
+      <p className="max-w-prose text-md text-text-primary">{review.body}</p>
       <ReportControl reviewId={review.id} />
     </li>
   );
@@ -191,6 +196,13 @@ export function ReviewFeed({ initialPage, emptyAction }: ReviewFeedProps) {
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Task 20 Step 1: stated ONCE for the whole feed rather than repeated inside every row's
+          `ReportControl` (the report button itself carries no context of its own) — a reader
+          deciding whether a review even belongs here should not have to open the report flow
+          first to learn what reporting does and does not do. */}
+      <p className="max-w-prose text-sm text-text-muted">
+        Report reviews that break the rules. Disagreeing with a rating is not a reason to report it.
+      </p>
       <ul className="flex flex-col">
         {reviews.map((review) => (
           <ReviewRow key={review.id} review={review} />

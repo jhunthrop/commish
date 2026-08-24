@@ -9,9 +9,11 @@ vi.mock("next/navigation", () => ({ useRouter: () => ({ push: vi.fn(), refresh: 
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/identity-service/preferences", () => ({ readPreferences: vi.fn() }));
+vi.mock("@/league-service/invites", () => ({ invitePreview: vi.fn() }));
 
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
+import { invitePreview } from "@/league-service/invites";
 import JoinPage from "./page";
 
 const TERMS: LeagueTerms = {
@@ -37,6 +39,7 @@ async function renderPage(deps: Parameters<typeof LeagueRoomDepsProvider>[0]["de
 beforeEach(() => {
   vi.mocked(getCurrentUser).mockReset();
   vi.mocked(readPreferences).mockReset();
+  vi.mocked(invitePreview).mockReset();
 });
 
 /**
@@ -44,27 +47,46 @@ beforeEach(() => {
  * a prospect sees the terms "before holding an account". That premise was false in the shipped
  * product — the route's only consumer rendered exclusively from a `requireCurrentUser()` page
  * behind `middleware.ts`'s /app redirect. These are the assertions that make it true.
+ *
+ * Phase 3.6, Task 20: `invitePreview` is now called server-side, by this page, once — so these
+ * assertions read straight off the rendered `InviteLanding`, with no client fetch to await first.
  */
 describe("/app/join/[code] — signed out", () => {
   it("renders the league terms and a sign-in call to action, with no join button", async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(null);
+    vi.mocked(invitePreview).mockResolvedValue({ ok: true, terms: TERMS });
     const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });
     await renderPage(fixture.deps);
 
-    expect(await screen.findByRole("heading", { name: "Sunday Money" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Sunday Money" })).toBeInTheDocument();
     expect(screen.getByText(TERMS.rosterLine)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sign in to join Sunday Money" })).toHaveAttribute(
-      "href",
-      "/sign-in?returnTo=%2Fapp%2Fjoin%2FSUNDAY12",
-    );
+    // Two "Sign in" links render on this page signed out — `PublicBar`'s own header one (Task
+    // 16) and `InviteLanding`'s contextual one, right where the "Join" button would be — both
+    // must carry this exact invite's own intent.
+    const signInLinks = screen.getAllByRole("link", { name: "Sign in" });
+    expect(signInLinks.length).toBeGreaterThanOrEqual(2);
+    for (const link of signInLinks) expect(link).toHaveAttribute("href", "/sign-in?returnTo=%2Fapp%2Fjoin%2FSUNDAY12");
     expect(screen.queryByRole("button", { name: /^Join/ })).not.toBeInTheDocument();
   });
 
   it("seeds no preferences row for a visitor who has no account", async () => {
     vi.mocked(getCurrentUser).mockResolvedValue(null);
+    vi.mocked(invitePreview).mockResolvedValue({ ok: true, terms: TERMS });
     const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });
     await renderPage(fixture.deps);
     expect(vi.mocked(readPreferences)).not.toHaveBeenCalled();
+  });
+
+  it("offers a real action for a dead code, never a dead end, before anybody signs in", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(null);
+    vi.mocked(invitePreview).mockResolvedValue({
+      ok: false,
+      reason: "That invite link has expired. Ask your commissioner for a new one.",
+    });
+    const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });
+    await renderPage(fixture.deps);
+    expect(screen.getByRole("link", { name: "Browse open leagues" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Sunday Money" })).not.toBeInTheDocument();
   });
 });
 
@@ -80,11 +102,12 @@ describe("/app/join/[code] — signed in", () => {
       isAdmin: false,
     });
     vi.mocked(readPreferences).mockResolvedValue({ helpLevel: "standard", draftTourDismissedAt: null });
+    vi.mocked(invitePreview).mockResolvedValue({ ok: true, terms: TERMS });
     const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });
     await renderPage(fixture.deps);
 
-    expect(await screen.findByRole("button", { name: "Join Sunday Money" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Sign in to join/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join Sunday Money" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
     expect(vi.mocked(readPreferences)).toHaveBeenCalledWith({}, expect.objectContaining({ id: "u1" }));
   });
 });

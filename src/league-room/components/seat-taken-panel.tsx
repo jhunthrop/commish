@@ -25,17 +25,22 @@ export interface SeatTakenPanelProps {
  */
 export function SeatTakenPanel({ leagueName, primaryAction, secondaryAction }: SeatTakenPanelProps) {
   return (
-    <StatePanel
-      tone="neutral"
-      icon="clock"
-      title={`${leagueName} filled up`}
-      description={SEAT_HOLD_REFUSALS.taken}
-      action={
-        <div className="flex flex-wrap items-center justify-center gap-4">
-          {primaryAction}
-          {secondaryAction}
-        </div>
-      }
-    />
+    // `data-testid`, not a role or a class: Task 20's invite landing renders this SAME component
+    // for a private league's invitee and needs to prove it is THIS panel, not a hand-written
+    // lookalike (F15) — a test id is the one hook that asserts identity without asserting layout.
+    <div data-testid="seat-taken-panel">
+      <StatePanel
+        tone="neutral"
+        icon="clock"
+        title={`${leagueName} filled up`}
+        description={SEAT_HOLD_REFUSALS.taken}
+        action={
+          <div className="flex flex-wrap items-center justify-center gap-4">
+            {primaryAction}
+            {secondaryAction}
+          </div>
+        }
+      />
+    </div>
   );
 }
