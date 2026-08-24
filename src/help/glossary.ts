@@ -165,8 +165,11 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     key: "queue",
     term: "your draft queue",
     short: "The list of players you ranked to auto-draft if you're away when it's your pick.",
+    // C3: the safety net has one phrasing, "the room picks for you from your queue" — quoted
+    // here so the waiting room's own missed-draft and filling-state sentences (Task 9) never
+    // drift from what this term already promises.
     detail:
-      "Your draft queue is the ranked list of players you'd want if you can't pick in person. If the clock runs out on your turn, the room drafts the highest-ranked player still available from your queue instead of skipping you.",
+      "Your draft queue is the ranked list of players you'd want if you can't pick in person. If the clock runs out on your turn, the room picks for you from your queue instead of skipping you.",
   },
   "draft-slot": {
     key: "draft-slot",

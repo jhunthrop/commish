@@ -15,6 +15,13 @@ import { useLeagueRoomDeps } from "../hooks/deps";
 export const SLOT_PREFERENCE_EXPLAINER =
   "Rank the slots you want. At draft start we draw a random order and give each manager their highest choice that is still free.";
 
+/**
+ * Phase 3.6, Task 9, Step 5: the worked example the mock asked for and never got. One concrete
+ * walk-through beats a second abstract restatement of the rule above it.
+ */
+export const SLOT_PREFERENCE_WORKED_EXAMPLE =
+  "For example: rank 4, then 1, then 7. If the draw puts another manager into slot 4 first, you get slot 1 instead, as long as it is still free.";
+
 /** Moves `slot` one position within `ranking` — the same "swap with a neighbor, clamp at the
  *  ends" shape `moveInQueue` (`@/draft-room/state/queue`) uses for player ids, kept as its own
  *  small pure function here rather than imported: this domain is slot NUMBERS, not player ids,
@@ -44,7 +51,11 @@ function resultSentence(ranking: readonly number[], assignedSlot: number): strin
   return `Slot ${ranking[0]} went to another manager, so you got slot ${assignedSlot}.`;
 }
 
-const CHIP = "flex shrink-0 items-center gap-1 rounded-pill border border-line bg-surface py-1 pl-2 pr-1";
+// The mock's slot TILES (Step 5) — a rounded-md card per slot, not the pill chip this panel
+// shipped with. Still a `<li>` holding real, named `<button>`s: the restyle changes the shape,
+// never the affordance — dragging was never the only way to move a slot here, but it was the
+// mock's own HIGH accessibility finding, so this stays explicit rather than implied.
+const TILE = "flex shrink-0 items-center gap-1 rounded-md border border-line bg-surface px-2 py-1.5";
 
 export interface SlotPreferencePanelProps {
   readonly leagueId: string;
@@ -123,6 +134,7 @@ export function SlotPreferencePanel({ leagueId, initialPreference, helpLevel }: 
         <InfoTip term="draft-slot" helpLevel={helpLevel} />
       </div>
       <p className="text-sm text-text-muted">{SLOT_PREFERENCE_EXPLAINER}</p>
+      <p className="text-sm text-text-muted">{SLOT_PREFERENCE_WORKED_EXAMPLE}</p>
 
       {ranking.length === 0 ? (
         <p className="text-sm text-text-muted">
@@ -131,7 +143,7 @@ export function SlotPreferencePanel({ leagueId, initialPreference, helpLevel }: 
       ) : (
         <ol aria-label="Your ranked slots" className="flex flex-wrap items-center gap-2">
           {ranking.map((slot, index) => (
-            <li key={slot} className={CHIP}>
+            <li key={slot} className={TILE}>
               <span className="font-mono text-xs tabular-nums text-text-muted">{index + 1}</span>
               <span className="font-display font-semibold text-text-primary">Slot {slot}</span>
               <Button size="sm" variant="ghost" disabled={saving} aria-label={`Move slot ${slot} up`} onClick={() => setRanking((r) => moveRank(r, slot, -1))}>

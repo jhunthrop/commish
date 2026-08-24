@@ -24,6 +24,7 @@ const SCHEDULED: DraftScheduleBody = {
   kickoffRolls: 0,
   filledTeams: 6,
   slotPreference: { slotCount: 12, ranking: [], assignedSlot: null, canEdit: true },
+  missedDraft: false,
 };
 
 /** `<input type="datetime-local">` carries no timezone, so `new Date(EDITED_LOCAL_VALUE)`

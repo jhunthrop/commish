@@ -195,9 +195,11 @@ describe("LeagueHome", () => {
     expect(screen.queryByText(/hasn't drafted yet/)).not.toBeInTheDocument();
   });
 
-  // Phase 3.5, Task 8: the waiting room replaces the schedule panel outright for a `when_full`
-  // draft — the two never render at once.
-  it("renders the waiting room instead of the draft schedule panel for a when_full draft", () => {
+  // Phase 3.6, Task 9 (F12/P8): `WaitingRoom` is now the ONLY renderer for `home.draftSchedule`,
+  // for both `startTrigger`s — it decides internally whether to show its own hero (`when_full`)
+  // or delegate to `DraftSchedulePanel` (`scheduled`), rather than `LeagueHome` choosing between
+  // the two components itself.
+  it("renders the waiting room's own hero for a when_full draft, with no commissioner console", () => {
     renderInLeague(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome
@@ -207,12 +209,14 @@ describe("LeagueHome", () => {
       </ChatRoomDepsProvider>,
       fixtureLeagueDeps().deps,
     );
-    expect(screen.getByText(`${DRAFT_SCHEDULE.filledTeams} of ${HOME.teamCount} seats taken`)).toBeInTheDocument();
+    // F17: the seat sentence is `SeatMeter`'s, everywhere — "X seats taken" is retired. It
+    // appears twice here on purpose: once in the hero, once in `RoomRoster`'s own line below it.
+    expect(screen.getAllByText(`${DRAFT_SCHEDULE.filledTeams} of ${HOME.teamCount} seated`).length).toBeGreaterThan(0);
     expect(screen.queryByText("Draft scheduled")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Edit time" })).not.toBeInTheDocument();
   });
 
-  it("still renders the ordinary draft schedule panel for the scheduled trigger", () => {
+  it("still renders the ordinary draft schedule panel (nested inside the waiting room) for the scheduled trigger", () => {
     renderInLeague(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome
@@ -223,7 +227,6 @@ describe("LeagueHome", () => {
       fixtureLeagueDeps().deps,
     );
     expect(screen.getByText("Draft scheduled")).toBeInTheDocument();
-    expect(screen.queryByText(/seats taken/)).not.toBeInTheDocument();
   });
 
   // Task 6, Phase 3.5: NFFC's Kentucky Derby System.

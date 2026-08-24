@@ -6,7 +6,7 @@ import { renderSurface } from "@/components/ui/test-utils";
 import type { SlotPreferenceView } from "../contract";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
-import { SLOT_PREFERENCE_EXPLAINER, SlotPreferencePanel } from "./slot-preference-panel";
+import { SLOT_PREFERENCE_EXPLAINER, SLOT_PREFERENCE_WORKED_EXAMPLE, SlotPreferencePanel } from "./slot-preference-panel";
 
 const EMPTY: SlotPreferenceView = { slotCount: 12, ranking: [], assignedSlot: null, canEdit: true };
 const PARTIAL: SlotPreferenceView = { slotCount: 3, ranking: [2, 1], assignedSlot: null, canEdit: true };
@@ -24,6 +24,12 @@ describe("SlotPreferencePanel", () => {
         expect(await axe(container)).toHaveNoViolations();
       },
     );
+  });
+
+  // Phase 3.6, Task 9, Step 5: the worked example the mock asked for and never got.
+  it("gains the worked example beside the explainer", () => {
+    renderInLeague(<SlotPreferencePanel leagueId="league_1" initialPreference={EMPTY} />, fixtureLeagueDeps().deps);
+    expect(screen.getByText(SLOT_PREFERENCE_WORKED_EXAMPLE)).toBeInTheDocument();
   });
 
   it("offers every one of the league's slots to add, when nothing is ranked yet", () => {

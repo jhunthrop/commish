@@ -70,6 +70,23 @@ export const UI_CONFIG = {
      *  shell's density. */
     denseRowPaddingPx: 11,
   },
+  waitingRoom: {
+    /**
+     * D1, the seating moment (Phase 3.6, Task 9, Step 2b): how long after a manager's own
+     * `member_joined` moment the waiting room keeps showing "You're in" before it quietly goes
+     * back to being the ordinary room. Derived-only — there is no stored flag this ages out, the
+     * window itself is the whole mechanism.
+     */
+    justSeatedMinutes: 5,
+    /**
+     * D3, the room going full: how long the completed fill `Meter` stays the hero, once the last
+     * seat lands, before the `xl` `Countdown` to the grace-window kickoff replaces it — the pause
+     * that makes the state change a moment rather than a flicker. `usePrefersReducedMotion`
+     * (Task 13 Step 5's branch) skips this entirely: the meter completes and the countdown
+     * appears with no transition at all.
+     */
+    fillCelebrationMs: 1_500,
+  },
   infoTip: {
     /**
      * WCAG 2.2 SC 2.5.8 (Target Size, Minimum — Level AA): a pointer target must be at least

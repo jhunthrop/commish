@@ -46,6 +46,18 @@ describe("LeagueMembersPanel", () => {
     expect(screen.queryByText(/seated/)).not.toBeInTheDocument();
   });
 
+  // Phase 3.6, Task 9 (ruling 19): the SAME coarse composition line `RoomRoster` shows, never a
+  // per-manager history tag on any one row.
+  it("carries the room's coarse composition line beside the seat count, when the caller supplies one", () => {
+    render(<LeagueMembersPanel teams={THREE_TEAMS} teamCount={6} authority={MEMBER} myTeamId="t2" compositionCategory="all_newcomers" />);
+    expect(screen.getByText("All newcomers")).toBeInTheDocument();
+  });
+
+  it("says nothing about composition when the caller doesn't supply one", () => {
+    render(<LeagueMembersPanel teams={THREE_TEAMS} teamCount={6} authority={MEMBER} myTeamId="t2" />);
+    expect(screen.queryByText(/newcomers|Open to everyone/)).not.toBeInTheDocument();
+  });
+
   it("marks only the commissioner's own row, not every row", () => {
     render(<LeagueMembersPanel teams={THREE_TEAMS} authority={MEMBER} myTeamId="t2" />);
     expect(screen.getAllByText("Commissioner")).toHaveLength(1);

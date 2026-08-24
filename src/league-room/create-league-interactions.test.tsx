@@ -110,10 +110,12 @@ describe("signed in to an invitable league", () => {
       filledTeams: 1,
       teamCount: body.teamCount,
       slotPreference: null,
+      missedDraft: false,
       authority: { kind: "member", userId: "commish_1" },
     };
     render(<WaitingRoom league={waitingRoomLeague} isCommissioner={true} />);
-    expect(screen.getByText(`1 of ${body.teamCount} seats taken`)).toBeVisible();
+    // F17: the seat sentence is `SeatMeter`'s, everywhere — "1 of N seats taken" is retired.
+    expect(screen.getByText(`1 of ${body.teamCount} seated`)).toBeVisible();
     // The filling state's own promise: no countdown yet, because nothing has fired.
     expect(screen.queryByText(/Starts in/)).not.toBeInTheDocument();
   });

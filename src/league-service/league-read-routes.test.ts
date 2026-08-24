@@ -410,12 +410,18 @@ describe("the read models' own guards", () => {
     then(resolve: (value: readonly unknown[]) => void): void;
     where(): Thenable;
     orderBy(): Thenable;
+    limit(): Thenable;
   }
   function thenableChain(data: readonly unknown[]): Thenable {
     const chain: Thenable = {
       then: (resolve) => resolve(data),
       where: () => chain,
       orderBy: () => chain,
+      // Phase 3.6, Task 9: `leagueHome`'s new `joinedAtFor` read chains `.orderBy(...).limit(1)`
+      // — a no-op passthrough here, the same shape `where`/`orderBy` already are, since this stub
+      // exists to prove the `??` FALLBACKS below `leagueHome`'s reads are real code, not to
+      // re-implement Drizzle's own limiting.
+      limit: () => chain,
     };
     return chain;
   }
@@ -440,8 +446,14 @@ describe("the read models' own guards", () => {
             return {
               // The plain `teamRows` read: only the commissioner's own team.
               where: () => thenableChain([{ id: "t_commish", leagueId: "lg_stub", name: "Commish Team", userId: "u1" }]),
-              // `listTeamCards`'s joined read: a DIFFERENT team, absent from `teamRows` above.
-              innerJoin: () => ({ where: () => ({ orderBy: () => thenableChain([{ id: "t_phantom", name: "Phantom Team", ownerDisplayName: "Ghost", ownerAvatarUrl: null }]) }) }),
+              // Two DIFFERENT joins off `teams`, told apart by WHICH table they join:
+              // `listTeamCards`'s own `innerJoin(users, ...)` (a different team than `teamRows`
+              // above, absent from it on purpose) and Task 9's `completedSeasonsForMany`'s own
+              // `innerJoin(leagues, ...)` (empty — nobody in this stub has a completed season).
+              innerJoin: (joined: unknown) =>
+                joined === users
+                  ? { where: () => ({ orderBy: () => thenableChain([{ id: "t_phantom", name: "Phantom Team", ownerDisplayName: "Ghost", ownerAvatarUrl: null }]) }) }
+                  : { where: () => ({ groupBy: () => thenableChain([]) }) },
             };
           }
           if (table === drafts) return thenableChain([]); // no draft row at all

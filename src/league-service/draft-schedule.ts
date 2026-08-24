@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { draftActions, draftSlotPreferences, drafts, leagues, teams } from "@/db/schema";
+import { auditEvents, draftActions, draftSlotPreferences, drafts, leagues, teams } from "@/db/schema";
 import type { DraftStatus } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import { draftActionSchema } from "@/draft-engine";
@@ -113,6 +113,32 @@ async function resolvedSlotFor(db: Db, draftId: string, teamId: string): Promise
 }
 
 /**
+ * The caller's own MOST RECENT `member_joined` audit event for this league, or `null` for a
+ * caller with no team here (or, never true in production, one whose seat predates the audit
+ * chain). `joinLeagueInTx` (`./join.ts`) writes this event unconditionally through both doors
+ * into a league, so it is the durable fact `DraftScheduleBody.missedDraft` and
+ * `LeagueHomeBody.justSeated` (`./read.ts`, D1) both derive from in place of a `teams.created_at`
+ * column this schema does not carry. Shared here so the two readers can never disagree about the
+ * same moment.
+ */
+export async function joinedAtFor(db: Db, params: { readonly leagueId: string; readonly userId: string | null }): Promise<Date | null> {
+  if (params.userId === null) return null;
+  const [row] = await db
+    .select({ occurredAt: auditEvents.occurredAt })
+    .from(auditEvents)
+    .where(and(eq(auditEvents.leagueId, params.leagueId), eq(auditEvents.actorId, params.userId), eq(auditEvents.eventType, "member_joined")))
+    .orderBy(desc(auditEvents.occurredAt))
+    .limit(1);
+  return row?.occurredAt ?? null;
+}
+
+/** `DraftScheduleBody.missedDraft`'s own docblock, shared so `draftScheduleView` and `leagueHome`
+ *  (`./read.ts`) never compute it two different ways. */
+export function missedDraftFrom(status: DraftStatus, joinedAt: Date | null, kickoffAt: Date): boolean {
+  return status === "complete" && joinedAt !== null && joinedAt.getTime() >= kickoffAt.getTime();
+}
+
+/**
  * `DraftScheduleBody.slotPreference` for one team — `null` only for a caller with no team in
  * this league (`teamId === null`), since a ranking is scoped to a team. Shared by
  * `draftScheduleView` below (the route's own read) and `leagueHome` (`./read`, the page's
@@ -153,6 +179,7 @@ export async function draftScheduleView(db: Db, leagueId: string, userId: string
   if (row === undefined) return null;
   const teamRows = await db.select({ id: teams.id, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
   const myTeam = teamRows.find((team) => team.userId === userId);
+  const joinedAt = await joinedAtFor(db, { leagueId, userId });
   return {
     draftId: row.draftId,
     leagueId,
@@ -168,6 +195,7 @@ export async function draftScheduleView(db: Db, leagueId: string, userId: string
       teamId: myTeam?.id ?? null,
       slotCount: row.teamCount,
     }),
+    missedDraft: missedDraftFrom(row.status, joinedAt, row.kickoffAt),
   };
 }
 

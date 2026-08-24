@@ -15,6 +15,7 @@ import type { ValuedPlayer } from "@/trades/fairness";
 import { LeagueRoomDepsProvider } from "@/league-room/hooks/deps";
 import { DRAFT_SCHEDULE, HOME, LINEUP, PUBLIC_LEAGUES, TERMS, fixtureLeagueDeps } from "@/league-room/test-fixtures";
 import { DraftSchedulePanel } from "@/league-room/components/draft-schedule-panel";
+import { WaitingRoom, type WaitingRoomLeague } from "@/league-room/components/waiting-room";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
 import { LeagueHome } from "@/league-room/components/league-home";
 import { LeagueTermsPanel } from "@/league-room/components/league-terms-panel";
@@ -865,6 +866,45 @@ describe("DraftSchedulePanel says nothing that breaks the house copy rules, incl
     );
     fireEvent.click(screen.getByRole("button", { name: "Edit time" }));
     expectClean(container);
+  });
+});
+
+/**
+ * Phase 3.6, Task 9. `WaitingRoom` composes its own missed-draft sentence (a runtime weekday) and
+ * carries `describeStartTiming`'s own composed string — neither is caught by a source sweep.
+ */
+describe("WaitingRoom says nothing that breaks the house copy rules, across its states", () => {
+  it("is clean filling, full and counting down, rolled, missed-draft and just-seated", () => {
+    const base: WaitingRoomLeague = {
+      draftId: "draft_1",
+      leagueId: "league_1",
+      status: "scheduled",
+      kickoffAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+      isPublicMatchmade: true,
+      startTrigger: "when_full",
+      kickoffRolls: 0,
+      filledTeams: 4,
+      teamCount: 12,
+      slotPreference: null,
+      missedDraft: false,
+      authority: { kind: "member", userId: "commish_1" },
+    };
+    for (const element of [
+      <WaitingRoom key="filling" league={base} isCommissioner={true} leagueName="Sunday Money" />,
+      <WaitingRoom key="full" league={{ ...base, filledTeams: 12 }} isCommissioner={true} leagueName="Sunday Money" />,
+      <WaitingRoom key="rolled" league={{ ...base, startTrigger: "scheduled", kickoffRolls: 2 }} isCommissioner={true} leagueName="Sunday Money" />,
+      <WaitingRoom
+        key="missed"
+        league={{ ...base, status: "complete", missedDraft: true, kickoffAt: "2026-08-20T12:00:00.000Z" }}
+        leagueName="Sunday Money"
+      />,
+      <WaitingRoom key="seated" league={base} leagueName="Sunday Money" justSeated />,
+      <WaitingRoom key="seated-expired-hold" league={base} leagueName="Sunday Money" justSeated holdExpired />,
+    ]) {
+      const { container, unmount } = render(element);
+      expectClean(container, "Sunday Money");
+      unmount();
+    }
   });
 });
 

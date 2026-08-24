@@ -6,6 +6,7 @@ import type { TradeFlag, TradeVerdict } from "@/trades/fairness";
 import type { FirstRunPlan } from "@/identity";
 import type { LeagueTerms, MedianResult, NextAction, StandingsRow, WeekStatus } from "@/league";
 import type { LeagueAuthority } from "@/league-service/authority";
+import type { CompositionCategory } from "@/participation/composition";
 
 /**
  * TYPES ONLY, no runtime code. Imported by the `/api/leagues/**` routes as their return shape
@@ -94,6 +95,18 @@ export interface DraftScheduleBody {
    * through `rollNoticeSentence` (`@/matchmaking/roll`), never rendered as a bare number.
    */
   readonly kickoffRolls: number;
+  /**
+   * Phase 3.6, Task 9 (D1's sibling fact). `true` only for the CALLER's own team, only once the
+   * draft is `'complete'`, and only when this team's `member_joined` audit event (the durable
+   * record `joinLeagueInTx` already writes for every seat this codebase ever takes) landed AT OR
+   * AFTER the draft's own `kickoffAt` — this team was never seated while the room actually
+   * drafted, so every pick on it came from the queue, not a shrug at a live clock nobody was
+   * behind. `false` for a caller with no team here (`slotPreference`'s own null case) and for
+   * every draft that has not finished yet. `WaitingRoom` reads this to show "The draft ran on
+   * {day} and the room picked for you from your queue" (C3) instead of the ordinary complete
+   * state's "View the draft board".
+   */
+  readonly missedDraft: boolean;
 }
 
 export interface CreateLeagueBody {
@@ -252,6 +265,22 @@ export interface LeagueHomeBody {
    * `useEffect` GET on mount.
    */
   readonly draftSchedule: DraftScheduleBody | null;
+  /**
+   * D1, the seating moment (Task 9, Step 2b). `clock.now() - joinedAt < UI_CONFIG.waitingRoom.
+   * justSeatedMinutes`, where `joinedAt` is the SAME `member_joined` audit timestamp
+   * `DraftScheduleBody.missedDraft` reads, computed server-side against an injected `Clock`
+   * (never `Date.now()` in a component). Derived-only: no seen-flag, no snooze, no column of its
+   * own — it simply stops being true once the window passes. `false` for a caller with no team
+   * here.
+   */
+  readonly justSeated: boolean;
+  /**
+   * The room's coarse composition, the SAME three-bucket reduction `PublicLeagueSummary`
+   * discloses to a stranger (`compositionCategoryFor`, `@/participation/composition`) — never the
+   * raw newcomer/veteran counts, which would re-open the privacy ruling that reduction exists to
+   * keep closed (ruling 19). `RoomRoster` renders this rather than a per-manager history tag.
+   */
+  readonly compositionCategory: CompositionCategory;
 }
 
 export interface MatchupLineupEntry {

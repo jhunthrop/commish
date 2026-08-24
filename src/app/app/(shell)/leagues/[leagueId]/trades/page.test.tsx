@@ -48,6 +48,8 @@ const HOME = {
   draftId: null,
   draftStatus: "complete" as const,
   draftSchedule: null,
+  justSeated: false,
+  compositionCategory: "open" as const,
 };
 
 const WEEK_BODY = {

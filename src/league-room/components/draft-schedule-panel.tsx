@@ -5,9 +5,9 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { DraftScheduleBody } from "../contract";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, SeatMeter } from "@/components/ui";
 import { StatePanel } from "@/components/ui/state-panel";
-import { formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
+import { Countdown, formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
 import { PUBLIC_ROOM_SHORT_REFUSAL, rollNoticeSentence } from "@/matchmaking/roll";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { ReleaseSeatControl } from "./release-seat-control";
@@ -286,7 +286,18 @@ export function DraftSchedulePanel({
 
   const msUntil = remainingMs ?? 0;
   const startingSoon = msUntil <= MS_PER_HOUR;
-  const countdown = `${formatLocal(schedule.kickoffAt)} (${formatRelativeCountdown(msUntil)})`;
+  // Phase 3.6, Task 9, Step 2: the `xl` `Countdown` beside the fill `SeatMeter` (F17), with the
+  // local-time line under it — the hero every `describeStartTiming`-adjacent surface now shares.
+  // `data-testid="waiting-room-countdown"` is hardcoded rather than threaded as a prop: this
+  // panel's sole caller is `WaitingRoom`, so the id it asserts on is not a value another caller
+  // could ever need to change.
+  const hero = (
+    <div className="flex flex-col items-center gap-1">
+      <Countdown remainingMs={msUntil} size="xl" data-testid="waiting-room-countdown" />
+      <SeatMeter filled={schedule.filledTeams} total={teamCount} />
+      <p className="text-sm text-text-muted">{`${formatLocal(schedule.kickoffAt)} (${formatRelativeCountdown(msUntil)})`}</p>
+    </div>
+  );
 
   // Task 4's overnight freeze. `startingSoon` already draws the line this panel needs: a draft
   // more than an hour out picks at a tier of an hour or longer once it opens (the same
@@ -348,8 +359,12 @@ export function DraftSchedulePanel({
         tone="neutral"
         icon={startingSoon ? "bolt" : "clock"}
         title={startingSoon ? "Draft starting soon" : "Draft scheduled"}
-        description={countdown}
-        action={commissionerControls}
+        action={
+          <div className="flex flex-col items-center gap-3">
+            {hero}
+            {commissionerControls}
+          </div>
+        }
       />
       {autoStartNotice}
       {rolledNotice}

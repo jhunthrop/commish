@@ -9,6 +9,15 @@ export const dynamic = "force-dynamic";
 
 interface PageProps {
   readonly params: Promise<{ readonly leagueId: string }>;
+  /**
+   * Task 6's binding carry, read here and forwarded as a plain boolean: `?holdExpired=1` is
+   * CALLER-FORGEABLE (a visitor can type it into any league url they can already open) and
+   * decorative only — `WaitingRoom` (Task 9 Step 2b) may soften the just-seated moment's copy
+   * with it, and decides nothing about capacity, identity or state from it. `home.justSeated`
+   * itself is computed server-side, from this render's own `leagueHome` read, never from this
+   * param.
+   */
+  readonly searchParams: Promise<{ readonly holdExpired?: string }>;
 }
 
 /**
@@ -40,9 +49,10 @@ interface PageProps {
  * Renders no `TopBar` of its own (Task 2 Step 5) — `(shell)/layout.tsx` renders `AppShell`,
  * which supplies it once for every page in this route group.
  */
-export default async function LeaguePage({ params }: PageProps) {
+export default async function LeaguePage({ params, searchParams }: PageProps) {
   const user = await requireCurrentUser();
   const { leagueId } = await params;
+  const { holdExpired } = await searchParams;
 
   const [home, preferences] = await Promise.all([leagueHome(getDb(), leagueId, user.id), readPreferences(getDb(), user)]);
   if (home === null || (home.myTeamId === null && !home.isCommissioner)) notFound();
@@ -52,5 +62,5 @@ export default async function LeaguePage({ params }: PageProps) {
       ? null
       : await lineupView(getDb(), { leagueId, teamId: home.myTeamId, weekNumber: home.currentWeek });
 
-  return <LeagueHome home={home} lineup={lineup} helpLevel={preferences.helpLevel} />;
+  return <LeagueHome home={home} lineup={lineup} helpLevel={preferences.helpLevel} holdExpired={holdExpired === "1"} />;
 }

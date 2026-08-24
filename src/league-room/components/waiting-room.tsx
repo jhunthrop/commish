@@ -1,13 +1,30 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { Countdown, formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
+import { UI_CONFIG } from "@/components/ui/config";
+import { Crest } from "@/components/ui/crest";
+import { initialsFor } from "@/components/ui/avatar";
+import { Icon } from "@/components/ui/icon";
+import { SeatMeter } from "@/components/ui/seat-meter";
 import { StatePanel } from "@/components/ui/state-panel";
+import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
+import { actionLabelFor } from "@/draft-room/lib/lookups";
+import { RoomTour } from "@/draft-room/components/room-tour";
+import type { DraftFormat } from "@/domain/league";
+import type { HelpLevel } from "@/identity/preferences";
 import type { LeagueAuthority } from "@/league-service/authority";
 import { hasOpenSeat } from "@/matchmaking/filter";
-import type { DraftScheduleBody } from "../contract";
-import { draftTerminalStatePanel } from "./draft-schedule-panel";
+import { describeStartTiming } from "@/matchmaking/roll";
+import type { CompositionCategory } from "@/participation/composition";
+import type { DraftScheduleBody, LeagueMemberCard } from "../contract";
+import { DraftSchedulePanel, draftTerminalStatePanel } from "./draft-schedule-panel";
 import { ReleaseSeatControl } from "./release-seat-control";
+import { RoomRoster } from "./room-roster";
+import { SlotPreferencePanel } from "./slot-preference-panel";
+import { WaitingChecklist, type WaitingChecklistItem } from "./waiting-checklist";
 
 /**
  * `DraftScheduleBody` plus the two facts Task 8's own "Produces" list deliberately does not add
@@ -24,60 +41,75 @@ export interface WaitingRoomLeague extends DraftScheduleBody {
   readonly authority: LeagueAuthority;
 }
 
+/** "Thursday" from a real, given instant — never the ambient clock. */
+function weekdayOf(iso: string): string {
+  return new Date(iso).toLocaleDateString(undefined, { weekday: "long" });
+}
+
 /**
- * The room a `when_full` league's members watch before there is a draft to watch — the missing
- * state Task 7's sit-and-go trigger landed with no surface of its own (Phase 3.5, Task 8).
+ * The four checklist items, in the order that helps most (Phase 3.6, Task 9, Step 4): a
+ * first-timer (`helpLevel === "guided"`) gets the room tour first; a manager with a season behind
+ * them gets it last, because the highest-value item for someone who has never drafted is the
+ * lowest-value item for someone who has. Every item's `content` is a real, working control —
+ * never a link that only describes what the click would do (`first-run-panel.tsx`'s own rule).
  *
- * Four states, the same shape `DraftSchedulePanel` renders the `'scheduled'`-trigger case from:
- *
- * 1. FILLING — no countdown, because there is nothing to count down to yet (a `when_full`
- *    league's stored `kickoffAt` is a placeholder — `DraftScheduleBody.kickoffAt`'s own
- *    docblock). The fill count IS the hero, in words, per `public-league-list.tsx`'s own
- *    no-bar ruling (ruling 16) — this plan agrees with it rather than quietly overruling it a
- *    second time.
- * 2. FULL AND COUNTING DOWN — the shared `Countdown` primitive (`@/components/ui/countdown`,
- *    Task 8's Step 1) is the hero here; `WaitingRoom` is its third caller.
- * 3 & 4. IN PROGRESS / COMPLETE — identical to the two states a commissioner-scheduled draft
- *    reaches, rendered through the SAME `draftTerminalStatePanel` `DraftSchedulePanel` uses, so
- *    the two sentences can never drift apart.
- *
- * `LeagueHome` renders this OR `DraftSchedulePanel`, never both, keyed on
- * `league.startTrigger`.
- *
- * PERSONA PANEL, STEP 5. Veteran: reads as informed, not stranded — the fill count IS the state
- * of the world, stated once, not a spinner implying something is loading. Casual: "You don't have
- * to wait here" is a promise this product can keep, because it already sends a `draft_fill_
- * triggered` notice to every seat the moment the league fills (`fireWhenFullInTx`,
- * `@/league-service/fill-trigger`) — the sentence is not aspirational copy, it names a real
- * notification path. Commissioner: "Invite someone" is the one lever that's actually theirs;
- * gated on `isCommissioner` rather than offered to everyone and quietly failing for whoever isn't.
- * First-timer, the panel's own question — "what happens if I'm not there when it starts?" —
- * answered by NAMING the room's autopick fallback (Task 5) once the countdown is running, rather
- * than leaving a first-timer to discover it only once the clock is already live: the filling
- * state says nothing about it (there's no clock running yet to be away from), the full state
- * does. Urgency vs. anxiety: the countdown only ever appears once the room is genuinely about to
- * draft (state 2) — a manager watching a half-full league (state 1) sees no ticking clock at all,
- * so there is nothing counting down to create false urgency around a moment that may be hours
- * away.
- *
- * PHASE 3.5 ADDENDUM, TASK 14, STEP 4. A house league adds no fifth state and changes one: in
- * the filling state, "Invite someone" is a member-league-only lever (ruling 33 — nobody holds an
- * invite code to a room the platform runs), gated on `league.authority.kind === "house"` rather
- * than on `isCommissioner` alone. That reads the SAME wire union `LeagueMembersPanel`'s own
- * "Run by Commish" branch keys on, never a page-local recomputation of who runs this league —
- * `isCommissioner` is already always `false` for a house league (`isCommissionerOf`'s own
- * docblock), so the two conditions never disagree, but only one of them SAYS why. In its place, a
- * house league's second action reads "See the rest of the shelf" — the "never a dead end" rule
- * doing exactly what it exists for on the one surface where the obvious action is unavailable.
+ * "Name your team" and "Turn on notices" have no dedicated write path in this product today (no
+ * team-rename endpoint, no per-user notification toggle — every in-app notice is already live for
+ * everyone, `@/identity/notifications`'s own docblock), so both state the real, current fact
+ * rather than offering a control this codebase cannot yet honor.
  */
-export function WaitingRoom({
-  league,
-  isCommissioner,
-  leagueName = "",
-  myTeamId = null,
-}: {
+function checklistItems(params: {
+  readonly leagueId: string;
+  readonly myTeamName: string | null;
+  readonly slotPreference: DraftScheduleBody["slotPreference"];
+  readonly helpLevel: HelpLevel | undefined;
+  readonly format: DraftFormat;
+  readonly onOpenTour: () => void;
+}): readonly WaitingChecklistItem[] {
+  const tour: WaitingChecklistItem = {
+    key: "tour",
+    heading: "See how the draft room works",
+    body: "A quick look at the clock, the queue and how a pick actually happens, before it is your turn for real.",
+    content: (
+      <button type="button" className="text-sm font-medium text-accent underline" onClick={params.onOpenTour}>
+        Preview the room
+      </button>
+    ),
+  };
+  const name: WaitingChecklistItem = {
+    key: "name",
+    heading: "Name your team",
+    body:
+      params.myTeamName === null
+        ? "Every team in this room already has a name."
+        : `Your team is named ${params.myTeamName}. That is what the rest of the room will call you all season.`,
+  };
+  const rank: WaitingChecklistItem = {
+    key: "rank",
+    heading: "Rank your draft slots",
+    body: "A higher choice wins more often than luck alone.",
+    content:
+      params.slotPreference === null ? undefined : (
+        <SlotPreferencePanel leagueId={params.leagueId} initialPreference={params.slotPreference} helpLevel={params.helpLevel} />
+      ),
+  };
+  const notices: WaitingChecklistItem = {
+    key: "notices",
+    heading: "Turn on notices",
+    body: "In-app notices are already on for every league you are in.",
+    content: (
+      <Link href="/app/profile#notifications-heading" className="text-sm font-medium text-accent underline">
+        See what you will hear about
+      </Link>
+    ),
+  };
+  const firstTimer = params.helpLevel === "guided";
+  return firstTimer ? [tour, name, rank, notices] : [name, rank, notices, tour];
+}
+
+export interface WaitingRoomProps {
   readonly league: WaitingRoomLeague;
-  readonly isCommissioner: boolean;
+  readonly isCommissioner?: boolean;
   /** Phase 3.6, Task 8: `ReleaseSeatControl`'s own Modal names the league by name, never by id —
    *  rides in as a separate prop rather than a third copy of a league's own name on the wire, the
    *  same reasoning `teamCount` already sets a precedent for on this component. Optional (default
@@ -90,7 +122,65 @@ export function WaitingRoom({
    *  `LeagueHomeBody.myTeamId` already carries. Nothing to release without a seat, so `null`
    *  simply never renders `ReleaseSeatControl` at all. */
   readonly myTeamId?: string | null;
-}) {
+  /**
+   * D1, the seating moment (Task 9, Step 2b): derived server-side (`LeagueHomeBody.justSeated`)
+   * from the caller's own `member_joined` moment against an injected `Clock`, never `Date.now()`
+   * here. `false` by default — every caller that predates this task never has to reason about it.
+   */
+  readonly justSeated?: boolean;
+  /**
+   * The `?holdExpired=1` carry (Task 6, binding). CALLER-FORGEABLE and decorative only: it may
+   * soften the seating moment's copy, and it decides nothing about capacity, identity or state.
+   */
+  readonly holdExpired?: boolean;
+  /** For the room tour's own button label — "Draft" for snake, "Nominate" for auction
+   *  (`actionLabelFor`, `@/draft-room/lib/lookups`). Defaults to the more common format so a
+   *  caller that predates this task's checklist never has to supply it. */
+  readonly format?: DraftFormat;
+  /** `RoomRoster`'s own list. `undefined` renders no roster at all — a caller that has not yet
+   *  paid for the members read (none predate this task) is never shown half a room. */
+  readonly teams?: readonly LeagueMemberCard[];
+  /** Ruling 19: the room's coarse composition, never the raw counts. */
+  readonly compositionCategory?: CompositionCategory;
+  readonly helpLevel?: HelpLevel;
+}
+
+/**
+ * The room, before there is a draft to watch (Phase 3.6, Task 9 — v2's rewrite of Phase 3.5
+ * Task 8's four `StatePanel`s). Renders for EVERY pre-draft league now, not only a `when_full`
+ * one: `LeagueHome` hands this component `home.draftSchedule` whole and lets it decide the hero,
+ * the structural change this task owns (F12/P8) — a `'scheduled'`-trigger league delegates its
+ * own hero and commissioner console to `DraftSchedulePanel`, nested here rather than rendered as
+ * a sibling `LeagueHome` chooses between.
+ *
+ * Two hero variants for a `'scheduled'` trigger and a `'when_full'` one (Step 2): a scheduled
+ * league always has a real `kickoffAt`, so its hero is always the `xl` `Countdown` beside the
+ * fill `SeatMeter` (`DraftSchedulePanel`'s own hero, Task 9's addition to it); a `when_full`
+ * league's `kickoffAt` is a placeholder until the room fills, so its hero is the fill `SeatMeter`
+ * PROMOTED — no countdown at all — until the last seat lands, at which point (D3) the meter
+ * completes, the seat sentence settles to "N of N seated", and the `xl` `Countdown` to the
+ * grace-window kickoff replaces it as the hero, in that order. Under `prefers-reduced-motion`
+ * that sequencing collapses to nothing: the meter completes and the countdown appears with no
+ * transition at all.
+ *
+ * Five more states beyond the two heroes: the two terminal ones (`draftTerminalStatePanel`,
+ * shared with `DraftSchedulePanel` so the two can never phrase them differently), the missed-draft
+ * variant of "complete" (`league.missedDraft`), the just-seated moment (`justSeated`, D1), and,
+ * once none of those apply, the room itself — the hero, `RoomRoster` (Step 3) and
+ * `WaitingChecklist` (Step 4) together.
+ */
+export function WaitingRoom({
+  league,
+  isCommissioner = false,
+  leagueName = "",
+  myTeamId = null,
+  justSeated = false,
+  holdExpired = false,
+  format = "snake",
+  teams,
+  compositionCategory = "open",
+  helpLevel,
+}: WaitingRoomProps) {
   const isHouse = league.authority.kind === "house";
   const full = !hasOpenSeat(league);
   // A member-league commissioner can never release (`RELEASE_REFUSALS.commissioner` — no
@@ -99,62 +189,125 @@ export function WaitingRoom({
   // (`isCommissionerOf`'s own docblock), so this reads correctly for both authorities without a
   // second branch on `league.authority.kind`.
   const canRelease = myTeamId !== null && !isCommissioner;
+  const reducedMotion = usePrefersReducedMotion();
+  const [tourOpen, setTourOpen] = useState(false);
+
+  // D3: the meter-then-countdown sequencing, tracked across renders — `full` flips from false to
+  // true exactly once, the instant the last seat lands, and this is what makes the hero VISIBLY
+  // change state rather than quietly rerendering a different number. Initialized to `full` itself
+  // so a caller that mounts this component already full (the ordinary case — a page render, not
+  // a live transition) skips the pause entirely and shows the countdown immediately.
+  const [showCountdownHero, setShowCountdownHero] = useState(full);
+  const wasFullRef = useRef(full);
+  useEffect(() => {
+    if (!wasFullRef.current && full) {
+      if (reducedMotion) {
+        setShowCountdownHero(true);
+      } else {
+        setShowCountdownHero(false);
+        const timer = setTimeout(() => setShowCountdownHero(true), UI_CONFIG.waitingRoom.fillCelebrationMs);
+        wasFullRef.current = full;
+        return () => clearTimeout(timer);
+      }
+    }
+    wasFullRef.current = full;
+  }, [full, reducedMotion]);
+
   // Called unconditionally, before any early return — React's Rules of Hooks. `null` once
-  // there's nothing left to count down to: still filling (no kickoff has been set yet), or a
-  // draft already in progress/complete (handled by `draftTerminalStatePanel` below).
-  const { remainingMs } = useCountdown(league.status === "scheduled" && full ? league.kickoffAt : null);
+  // there's nothing left to count down to: a `when_full` league still filling has no real
+  // `kickoffAt` yet (`DraftScheduleBody.kickoffAt`'s own docblock).
+  const { remainingMs } = useCountdown(league.startTrigger === "when_full" && full ? league.kickoffAt : null);
+
+  const myTeamName = teams?.find((team) => team.id === myTeamId)?.name ?? null;
+  const items = checklistItems({
+    leagueId: league.leagueId,
+    myTeamName,
+    slotPreference: league.slotPreference,
+    helpLevel,
+    format,
+    onOpenTour: () => setTourOpen(true),
+  });
 
   const terminal = draftTerminalStatePanel(league);
-  if (terminal !== null) return terminal;
+  if (terminal !== null && !league.missedDraft) return terminal;
 
-  if (full) {
-    // `terminal` above is `null` only while `league.status === "scheduled"` (`draftTerminalStatePanel`'s
-    // own contract), and `full` is true here, so the ternary feeding `useCountdown` above took its
-    // `league.kickoffAt` branch — `remainingMs` is therefore never `null` at this point. Asserted,
-    // not re-guarded: a dead `remainingMs === null` branch here would be unreachable and, per this
-    // task's own review, exactly the kind of defensive code the gates' 100% coverage would then
-    // demand a test for despite there being no state that reaches it — the same `pausedUntil!`
-    // idiom `RoomRail` (`@/draft-room/components/room-rail`) already uses for an identical
-    // logically-guaranteed-non-null case.
+  // C3: the safety net has one phrasing, "the room picks for you from your queue", quoted here
+  // verbatim (`docs/design-system.md`, Task 14 Step 2) rather than composed a second way.
+  if (league.missedDraft) {
     return (
+      <StatePanel
+        tone="neutral"
+        icon="check"
+        title="Draft complete"
+        description={`The draft ran on ${weekdayOf(league.kickoffAt)} and the room picked for you from your queue.`}
+        action={
+          <Link href={`/app/drafts/${league.draftId}`} className="text-sm font-medium text-accent underline">
+            See your roster
+          </Link>
+        }
+      />
+    );
+  }
+
+  // D1: the seating moment. Crest at `lg`, the league line as the heading, the seat sentence
+  // under it, and one line of what happens next — the checklist's own first item, promoted, so
+  // the moment ends in an action rather than in applause.
+  if (justSeated) {
+    const next = items[0]!;
+    return (
+      <div className="flex flex-col items-center gap-2 rounded-lg border border-line bg-surface-elevated p-6 text-center">
+        <Crest id={league.leagueId} label={initialsFor(leagueName)} size={64} />
+        {/* The one place a contraction is deliberate, per C1's own named exception
+            (`docs/design-system.md`): the mock's own approved wordmark-adjacent line. */}
+        <h2 className="text-lg font-semibold text-text-primary">{`${leagueName} · You're in`}</h2>
+        <p className="text-sm text-text-primary">{`You claimed seat ${league.filledTeams} of ${league.teamCount} just now.`}</p>
+        {holdExpired ? (
+          <p className="text-sm text-text-muted">Your hold ran out, so we seated you the ordinary way.</p>
+        ) : null}
+        <p className="text-sm text-text-muted">{`${next.heading}. ${next.body}`}</p>
+      </div>
+    );
+  }
+
+  const hero: ReactNode =
+    league.startTrigger === "scheduled" ? (
+      <DraftSchedulePanel
+        leagueId={league.leagueId}
+        isCommissioner={isCommissioner}
+        initialSchedule={league}
+        teamCount={league.teamCount}
+        leagueName={leagueName}
+        myTeamId={myTeamId}
+      />
+    ) : full ? (
       <div className="flex flex-col gap-2">
-        <StatePanel
-          tone="neutral"
-          icon="bolt"
-          title={`All ${league.teamCount} seats are full.`}
-          action={
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
+          <Icon name={showCountdownHero ? "bolt" : "users"} size={28} className="text-text-muted" />
+          <SeatMeter filled={league.filledTeams} total={league.teamCount} />
+          {showCountdownHero ? (
             <div className="flex flex-col items-center gap-1">
-              <Countdown remainingMs={remainingMs!} size="lg" data-testid="waiting-room-countdown" />
-              <p role="status" className="text-sm text-text-muted">{`Starts in ${formatCoarseDuration(remainingMs!)}.`}</p>
-              {/* First-timer persona question, Step 5: "what happens if I'm not there?" — the
-                  honest answer this room already gives during a live draft (`room-dock.tsx`'s
-                  own copy), stated once here too rather than left for a member to discover only
-                  once the clock is already running. */}
-              <p className="text-sm text-text-muted">Away when it starts? The room autopicks for you if your clock runs out.</p>
+              <Countdown remainingMs={remainingMs ?? 0} size="xl" data-testid="waiting-room-countdown" />
+              <p role="status" className="text-sm text-text-muted">{`Starts in ${formatCoarseDuration(remainingMs ?? 0)}.`}</p>
+              {/* First-timer persona question, Step 5/6: "what happens if I'm not there?" —
+                  answered honestly, in C3's own phrasing, once the clock is actually running. */}
+              <p className="text-sm text-text-muted">Away when it starts? The room picks for you from your queue.</p>
             </div>
-          }
-        />
-        {/* Task 8: the escape hatch, at the bottom of the room. `league.kickoffRolls` is always
-            0 for a `when_full` league (`DraftScheduleBody.kickoffRolls`'s own docblock), so this
-            is always the quiet variant here — the escalation is `DraftSchedulePanel`'s own
-            `'scheduled'`-trigger surface. */}
+          ) : null}
+        </div>
         {canRelease ? (
           <div className="flex justify-center">
             <ReleaseSeatControl leagueId={league.leagueId} leagueName={leagueName} kickoffRolls={league.kickoffRolls} />
           </div>
         ) : null}
       </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col gap-2">
-      <StatePanel
-        tone="neutral"
-        icon="users"
-        title={`${league.filledTeams} of ${league.teamCount} seats taken`}
-        description="You don't have to wait here. We'll let you know the moment it fills."
-        action={
+    ) : (
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
+          <Icon name="users" size={28} className="text-text-muted" />
+          <SeatMeter filled={league.filledTeams} total={league.teamCount} />
+          {/* F9/C5: quoted from `describeStartTiming`, never typed here — the browse card, this
+              room, the schedule panel and the notice all say this one sentence. */}
+          <p className="text-sm text-text-muted">{describeStartTiming({ startTrigger: "when_full", authority: league.authority.kind })}</p>
           <div className="flex flex-wrap items-center justify-center gap-4">
             {isHouse || !isCommissioner ? null : (
               <Link href={`/app/leagues/${league.leagueId}#invite-managers`} className="text-sm font-medium text-accent underline">
@@ -165,15 +318,30 @@ export function WaitingRoom({
               {isHouse ? "See the rest of the shelf" : "See leagues closer to filling"}
             </Link>
           </div>
-        }
-      />
-      {/* Task 8: the escape hatch, at the bottom of the room — always the quiet variant here,
-          for the same reason the full-and-counting-down branch above always is. */}
-      {canRelease ? (
-        <div className="flex justify-center">
-          <ReleaseSeatControl leagueId={league.leagueId} leagueName={leagueName} kickoffRolls={league.kickoffRolls} />
         </div>
-      ) : null}
+        {canRelease ? (
+          <div className="flex justify-center">
+            <ReleaseSeatControl leagueId={league.leagueId} leagueName={leagueName} kickoffRolls={league.kickoffRolls} />
+          </div>
+        ) : null}
+      </div>
+    );
+
+  return (
+    <div className="flex flex-col gap-4">
+      {hero}
+      {teams === undefined ? null : (
+        <RoomRoster
+          leagueId={league.leagueId}
+          teams={teams}
+          teamCount={league.teamCount}
+          myTeamId={myTeamId}
+          compositionCategory={compositionCategory}
+          canInvite={!isHouse && isCommissioner}
+        />
+      )}
+      <WaitingChecklist items={items} />
+      {tourOpen ? <RoomTour dismissedAt={null} onDismiss={() => setTourOpen(false)} actionLabel={actionLabelFor(format)} /> : null}
     </div>
   );
 }

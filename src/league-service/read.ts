@@ -1,12 +1,17 @@
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { drafts, leagues, matchups, players, playerStatLines, scoringSettings, teams, weeks } from "@/db/schema";
+import { UI_CONFIG } from "@/components/ui/config";
 import type { DraftStatus } from "@/domain/draft";
 import { PPR_SCORING, type ScoringSettings } from "@/domain/scoring";
 import type { Clock } from "@/domain/timing";
+import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { listTeamCards } from "@/draft-service/teams";
 import { benchOf, LEAGUE_CONFIG, leagueTerms, medianResultFor, seasonProgress, startersOf, type WeekStatus } from "@/league";
+import { compositionCategoryFor, tierCompositionFor } from "@/participation/composition";
 import { isCommissionerOf, leagueAuthority } from "./authority";
+import { joinedAtFor, missedDraftFrom, slotPreferenceViewFor } from "./draft-schedule";
+import { completedSeasonsForMany } from "./participation";
 import type {
   DraftScheduleBody,
   LeagueHomeBody,
@@ -21,7 +26,6 @@ import type {
 } from "@/league-room/contract";
 import { computeFantasyPoints, type ScoringRules } from "@/scoring";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
-import { slotPreferenceViewFor } from "./draft-schedule";
 import { getLineup, weekStatusFor } from "./lineups";
 import { leagueStandings } from "./results";
 
@@ -131,7 +135,16 @@ export function toSummary(row: typeof matchups.$inferSelect, nameById: ReadonlyM
  * caller who adds an eleventh read trips the same assertion `invitePreview`'s neighboring test
  * would if it grew one.
  */
-export const BASELINE_LEAGUE_HOME_QUERIES = 10;
+/**
+ * Phase 3.6, Task 9: two more than the ten Fix round 1 pinned. `joinedAtQuery` below answers D1's
+ * seating moment and `DraftScheduleBody.missedDraft` from the SAME row (the caller's own
+ * `member_joined` audit event) — `teams.created_at` does not exist in this schema, so this is the
+ * durable fact this codebase already writes that stands in for it. `completedSeasonsForMany`
+ * answers `compositionCategory` for `RoomRoster`'s coarse composition line (ruling 19). Both are
+ * cheap, indexed, single reads over a league's own bounded team list — never a per-team round
+ * trip.
+ */
+export const BASELINE_LEAGUE_HOME_QUERIES = 12;
 
 /**
  * Everything the league home page renders, assembled once on the server. `listTeamCards` is
@@ -176,6 +189,22 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     ...card,
     ownerUserId: ownerUserIdByTeamId.get(card.id) ?? card.id,
   }));
+
+  // Task 9, D1 and `DraftScheduleBody.missedDraft`: the caller's own MOST RECENT `member_joined`
+  // audit event for this league — the durable, already-written fact that stands in for a
+  // `teams.created_at` column this schema does not carry. Shared with `draftScheduleView`
+  // (`./draft-schedule`) so the two readers can never disagree about the same moment.
+  const joinedAt = await joinedAtFor(db, { leagueId, userId: myTeamId === null ? null : userId });
+  const justSeated =
+    joinedAt !== null && Date.parse(clock.now()) - joinedAt.getTime() < UI_CONFIG.waitingRoom.justSeatedMinutes * 60_000;
+
+  // Task 9, Step 3 (ruling 19): the SAME coarse reduction `PublicLeagueSummary` discloses to a
+  // stranger, computed here for the league's own members rather than re-derived by a component —
+  // `RoomRoster` is never handed the raw newcomer/veteran counts this reduces, only the bucket.
+  const cutoff = INTEGRITY_CONFIG.participation.veteranSeasonCutoff;
+  const completedSeasonsByUserId = await completedSeasonsForMany(db, teamRows.map((row) => row.userId));
+  const veterans = teamRows.filter((row) => (completedSeasonsByUserId.get(row.userId) ?? 0) >= cutoff).length;
+  const compositionCategory = compositionCategoryFor(tierCompositionFor({ newcomers: teamRows.length - veterans, veterans }));
 
   // A MEMBER league's commissioner has a team in every league (`createLeague` gives them one in
   // the same transaction it writes the league itself), so their card is already sitting in
@@ -239,6 +268,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
             teamId: myTeamId,
             slotCount: league.teamCount,
           }),
+          missedDraft: missedDraftFrom(draft.status, joinedAt, draft.kickoffAt),
         };
 
   return {
@@ -261,6 +291,8 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     draftId: draft?.id ?? null,
     draftStatus: draft?.status ?? null,
     draftSchedule,
+    justSeated,
+    compositionCategory,
   };
 }
 

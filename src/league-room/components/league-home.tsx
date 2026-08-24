@@ -5,7 +5,6 @@ import { LeagueChat } from "@/chat-room/components/league-chat";
 import type { HelpLevel } from "@/identity/preferences";
 import { formatWeek } from "../lib/format";
 import { AdvisorPanel } from "./advisor-panel";
-import { DraftSchedulePanel } from "./draft-schedule-panel";
 import { InvitePanel } from "./invite-panel";
 import { LeagueMembersPanel } from "./league-members-panel";
 import { LeagueTermsPanel } from "./league-terms-panel";
@@ -13,7 +12,6 @@ import { LineupEditor } from "./lineup-editor";
 import { MatchupCelebration } from "./matchup-celebration";
 import { MatchupScoreboard } from "./matchup-scoreboard";
 import { ModerationSummary } from "./moderation-summary";
-import { SlotPreferencePanel } from "./slot-preference-panel";
 import { StandingsTable } from "./standings-table";
 import { TradeInboxLink } from "./trade-inbox-link";
 import { WaitingRoom } from "./waiting-room";
@@ -32,12 +30,17 @@ export function LeagueHome({
   home,
   lineup,
   helpLevel,
+  holdExpired = false,
 }: {
   readonly home: LeagueHomeBody;
   readonly lineup: LineupBody | null;
   /** Forwarded from `LeaguePage`. Omitted only by tests that don't care about this branch —
    *  `InfoTip` itself defaults to the click-only, non-inline behavior when it's absent. */
   readonly helpLevel?: HelpLevel;
+  /** The `?holdExpired=1` carry (Task 6, binding, forwarded from `LeaguePage`'s own
+   *  `searchParams`) — CALLER-FORGEABLE and decorative only. `WaitingRoom` is the one place it
+   *  reaches; every other panel on this page ignores it entirely. */
+  readonly holdExpired?: boolean;
 }) {
   const clinched = home.standings.some((row) => row.teamId === home.myTeamId && row.clinched);
 
@@ -59,32 +62,27 @@ export function LeagueHome({
           state, including `complete` — unlike the static card this replaced, which rendered
           nothing once a league had drafted.
 
-          Task 8: `WaitingRoom` renders instead for a `'when_full'` draft — the two never render
-          at once, keyed on `home.draftSchedule.startTrigger`. `DraftSchedulePanel` keeps the
-          `'scheduled'`-trigger case exactly as it was. */}
-      {home.draftSchedule === null ? null : home.draftSchedule.startTrigger === "when_full" ? (
+          Phase 3.6, Task 9 (F12/P8): `WaitingRoom` is now the ONLY renderer here, for BOTH
+          `startTrigger`s — the structural change this task owns. A `'when_full'` draft gets its
+          own hero (the fill meter, then the countdown once it fills, D3); a `'scheduled'` draft
+          delegates its hero and its commissioner console to `DraftSchedulePanel`, nested INSIDE
+          `WaitingRoom` rather than rendered as a sibling this page chooses between — `WaitingRoom`
+          is where the two are told apart now, not this page, and it is also where the ranking
+          panel (Task 6, NFFC's Kentucky Derby System) lives, inlined into the checklist's own
+          third item rather than a fourth sibling panel here. */}
+      {home.draftSchedule === null ? null : (
         <WaitingRoom
           league={{ ...home.draftSchedule, teamCount: home.teamCount, authority: home.authority }}
           isCommissioner={home.isCommissioner}
           leagueName={home.name}
           myTeamId={home.myTeamId}
+          justSeated={home.justSeated}
+          holdExpired={holdExpired}
+          format={home.format}
+          teams={home.teams}
+          compositionCategory={home.compositionCategory}
+          helpLevel={helpLevel}
         />
-      ) : (
-        <DraftSchedulePanel
-          leagueId={home.leagueId}
-          isCommissioner={home.isCommissioner}
-          initialSchedule={home.draftSchedule}
-          teamCount={home.teamCount}
-          leagueName={home.name}
-          myTeamId={home.myTeamId}
-        />
-      )}
-
-      {/* Task 6: NFFC's Kentucky Derby System. `null` only for a caller with no team here (a
-          commissioner without one of their own) — a ranking is scoped to a team, so there is
-          nothing for the panel to show them. */}
-      {home.draftSchedule === null || home.draftSchedule.slotPreference === null ? null : (
-        <SlotPreferencePanel leagueId={home.leagueId} initialPreference={home.draftSchedule.slotPreference} helpLevel={helpLevel} />
       )}
 
       <section className="flex flex-col gap-2" aria-label={`${formatWeek(home.currentWeek)} matchup`}>
@@ -161,6 +159,7 @@ export function LeagueHome({
         teamCount={home.teamCount}
         authority={home.authority}
         myTeamId={home.myTeamId}
+        compositionCategory={home.compositionCategory}
         helpLevel={helpLevel}
       />
 

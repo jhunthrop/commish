@@ -3,6 +3,7 @@ import { Avatar, Badge, Button, EmptyState, InfoTip, SeatMeter } from "@/compone
 import { Icon } from "@/components/ui/icon";
 import type { HelpLevel } from "@/identity/preferences";
 import type { LeagueAuthority } from "@/league-service/authority";
+import { TIER_COMPOSITION_LABEL, type CompositionCategory } from "@/participation/composition";
 
 export interface LeagueMembersPanelProps {
   readonly teams: readonly LeagueMemberCard[];
@@ -14,6 +15,12 @@ export interface LeagueMembersPanelProps {
   /** The league's total seat count. Omit to hide the `SeatMeter` line entirely (e.g. a context
    *  that already states it elsewhere) rather than render a claim about seats that count omits. */
   readonly teamCount?: number;
+  /**
+   * Phase 3.6, Task 9: the SAME coarse composition line `RoomRoster` shows (ruling 19) — beside
+   * `SeatMeter`, never a per-manager history tag. Omit to say nothing about it, the same
+   * "count omits" reasoning `teamCount` already follows.
+   */
+  readonly compositionCategory?: CompositionCategory;
   readonly helpLevel?: HelpLevel;
 }
 
@@ -34,7 +41,7 @@ export interface LeagueMembersPanelProps {
  * silent. The line above the roster states the fact instead of leaving it to be inferred from
  * an absence.
  */
-export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, helpLevel }: LeagueMembersPanelProps) {
+export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, compositionCategory, helpLevel }: LeagueMembersPanelProps) {
   return (
     <section className="flex flex-col gap-2" aria-label="League members">
       <h2 className="text-sm font-medium text-text-muted">Managers</h2>
@@ -72,7 +79,12 @@ export function LeagueMembersPanel({ teams, authority, myTeamId, teamCount, help
           ))}
         </ul>
       )}
-      {teamCount === undefined ? null : <SeatMeter filled={teams.length} total={teamCount} />}
+      {teamCount === undefined ? null : (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <SeatMeter filled={teams.length} total={teamCount} />
+          {compositionCategory === undefined ? null : <Badge tone="neutral">{TIER_COMPOSITION_LABEL[compositionCategory]}</Badge>}
+        </div>
+      )}
     </section>
   );
 }

@@ -109,17 +109,29 @@ export const TERMS: LeagueTerms = {
 /** `DraftSchedulePanel`'s entire initial read, as `leagueHome` (`@/league-service/read.ts`)
  *  assembles it — matches `HOME.draftId`/`draftStatus` below exactly, since the two are built
  *  from the same draft row in production. */
+/**
+ * A week out from whenever the suite actually runs, not a pinned fake clock — the same "read the
+ * real clock on both sides" reasoning `draft-schedule-panel.test.tsx`'s own `SCHEDULED` fixture
+ * states. A fixed near-term literal here (previously a single hardcoded date) drifted into the
+ * past against the real advancing clock the moment "now" caught up to it, which is exactly the
+ * calendar-drift class of bug this plan's own `Clock` discipline exists to prevent.
+ */
+const DRAFT_SCHEDULE_KICKOFF = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
+
 export const DRAFT_SCHEDULE: DraftScheduleBody = {
   draftId: "d1",
   leagueId: "l1",
   status: "complete",
-  kickoffAt: "2026-08-24T12:00:00.000Z",
+  kickoffAt: DRAFT_SCHEDULE_KICKOFF,
   isPublicMatchmade: false,
   startTrigger: "scheduled",
   kickoffRolls: 0,
   filledTeams: TEAMS.length,
   // Task 6, Phase 3.5: NFFC's Kentucky Derby System. `t1` ranked slot 3 first and got it.
   slotPreference: { slotCount: 12, ranking: [3, 1], assignedSlot: 3, canEdit: false },
+  // Task 9: `HOME.myTeamId` ("t1") did not miss anything in this base fixture — a test that wants
+  // the missed-draft state builds its own league from `WaitingRoomLeague`, not this one.
+  missedDraft: false,
 };
 
 /** Everything `LeagueHome` needs: a commissioner, mid-season, drafted, `t1` up this week. */
@@ -143,6 +155,8 @@ export const HOME: LeagueHomeBody = {
   draftId: "d1",
   draftStatus: "complete",
   draftSchedule: DRAFT_SCHEDULE,
+  justSeated: false,
+  compositionCategory: "open",
 };
 
 /** Three managers, an open seat implied by `teamCount`, and `t1`'s owner running the league —
