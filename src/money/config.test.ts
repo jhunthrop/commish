@@ -23,6 +23,16 @@ describe("MONEY_REFUSALS", () => {
       expect(reason.length).toBeGreaterThan(0);
     }
   });
+
+  it("uses no contractions anywhere in the closed set", () => {
+    for (const reason of Object.values(MONEY_REFUSALS)) {
+      expect(reason).not.toMatch(/[A-Za-z]'[A-Za-z]/);
+    }
+  });
+
+  it("says what happened to the money first, on the overflow refusal — FINDING 1", () => {
+    expect(MONEY_REFUSALS.amountOverflow).toMatch(/^No money moved\./);
+  });
 });
 
 describe("formatUsd", () => {

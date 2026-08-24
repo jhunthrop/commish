@@ -41,4 +41,24 @@ describe("balancedOrRefuse", () => {
     const out = balancedOrRefuse([{ accountId: "user_available:u1", direction: "debit", amountCents: 0 }]);
     expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.invalidAmount });
   });
+
+  it("refuses a single posting whose own amount is past the safe integer range", () => {
+    const out = balancedOrRefuse([
+      { accountId: "user_available:u1", direction: "debit", amountCents: Number.MAX_SAFE_INTEGER + 2 },
+    ]);
+    expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.amountOverflow });
+  });
+
+  it("refuses a posting set whose individually-safe amounts sum past the safe integer range", () => {
+    // Each amount alone is Number.MAX_SAFE_INTEGER, which is itself safe — this is the "an
+    // individually-valid pair whose sum crosses 2^53" case: only the SUM overflows.
+    const half = Number.MAX_SAFE_INTEGER;
+    const out = balancedOrRefuse([
+      { accountId: "user_available:u1", direction: "debit", amountCents: half },
+      { accountId: "user_available:u1", direction: "debit", amountCents: half },
+      { accountId: "league_escrow:lg1", direction: "credit", amountCents: half },
+      { accountId: "league_escrow:lg1", direction: "credit", amountCents: half },
+    ]);
+    expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.amountOverflow });
+  });
 });

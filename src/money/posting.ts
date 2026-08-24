@@ -24,6 +24,11 @@ export type BalancedOrRefuseResult = { readonly ok: true } | { readonly ok: fals
  * Per-posting validity is checked before the balance sum for a reason: a single zero-amount
  * posting with nothing to offset it sums to itself on both sides trivially (0 debits = 0 credits)
  * and would otherwise slip past a balance-only check.
+ *
+ * Every `posting.amountCents` is checked against `Number.isSafeInteger`, and so are the
+ * `totalDebits`/`totalCredits` sums this function computes from them: two individually safe
+ * amounts can still sum past `Number.MAX_SAFE_INTEGER` and lose exact-cent precision, which a
+ * double-entry ledger can never tolerate.
  */
 export function balancedOrRefuse(postings: readonly MoneyPosting[]): BalancedOrRefuseResult {
   if (postings.length === 0) {
@@ -33,9 +38,15 @@ export function balancedOrRefuse(postings: readonly MoneyPosting[]): BalancedOrR
     if (!Number.isInteger(posting.amountCents) || posting.amountCents <= 0) {
       return { ok: false, reason: MONEY_REFUSALS.invalidAmount };
     }
+    if (!Number.isSafeInteger(posting.amountCents)) {
+      return { ok: false, reason: MONEY_REFUSALS.amountOverflow };
+    }
   }
   const totalDebits = sumWhere(postings, "debit");
   const totalCredits = sumWhere(postings, "credit");
+  if (!Number.isSafeInteger(totalDebits) || !Number.isSafeInteger(totalCredits)) {
+    return { ok: false, reason: MONEY_REFUSALS.amountOverflow };
+  }
   if (totalDebits !== totalCredits) {
     return { ok: false, reason: MONEY_REFUSALS.unbalanced };
   }

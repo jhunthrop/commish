@@ -43,11 +43,21 @@ export const MONEY_REFUSALS = {
   /** `prizeTableInvariant`: the entry fee, rake or seat count is not a sane non-negative count. */
   invalidPrizeTableInputs:
     "Entry fee and rake must be non-negative whole cents, and seats must be a positive whole number.",
-  /** `prizeTableInvariant`: a place is non-positive, repeated, or its amount is not a positive whole cent value. */
+  /** `prizeTableInvariant`: a place is non-positive, repeated, skips a rank in the paid
+   *  sequence, or its amount is not a positive whole cent value. */
   invalidPrizeTableEntry:
-    "Every prize table place must be a positive whole number, listed once, with a positive whole-cent amount.",
+    "Every prize table place must be a positive whole number, listed once, unbroken from 1st place, with a positive whole-cent amount.",
   /** `prizeTableInvariant`: prizes plus rake do not equal the pot exactly. */
   prizeTableMismatch: "Prize table amounts plus rake must equal the pot exactly, to the cent.",
+  /**
+   * `balancedOrRefuse` and `prizeTableInvariant`: an individual amount, or a sum either function
+   * computes from several amounts, has grown past `Number.MAX_SAFE_INTEGER` — JavaScript can no
+   * longer represent it as an exact whole number of cents. Two individually safe amounts can
+   * still sum past that boundary, so both functions check every input AND every computed sum.
+   * Money-first copy, matching the deposit-failure example in the copy rulebook: state what
+   * happened to the money before the reason.
+   */
+  amountOverflow: "No money moved. This amount is too large for the ledger to represent safely.",
 } as const;
 
 /** The union of every refusal sentence in `MONEY_REFUSALS`, for a writer's own refusal type. */

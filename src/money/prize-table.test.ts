@@ -55,4 +55,53 @@ describe("prizeTableInvariant", () => {
   it("accepts an empty table only when the whole pot is rake — nothing left for prizes", () => {
     expect(prizeTableInvariant(200, 200, 12, [])).toEqual({ ok: true });
   });
+
+  it("refuses a table with a gap in the paid sequence, even when totals otherwise balance", () => {
+    // fee 2000c x 12 seats = 24000c pot; rake 200c x 12 = 2400c; 18600 + 3000 = 21600, the exact
+    // remainder — this table would balance if place 2 were allowed to be missing. It is not.
+    const out = prizeTableInvariant(2000, 200, 12, [
+      { place: 1, amountCents: 18_600 },
+      { place: 3, amountCents: 3_000 },
+    ]);
+    expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.invalidPrizeTableEntry });
+  });
+
+  it("refuses a non-safe-integer entry fee", () => {
+    const out = prizeTableInvariant(2 ** 60, 0, 1, []);
+    expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.amountOverflow });
+  });
+
+  it("refuses a non-safe-integer rake", () => {
+    const out = prizeTableInvariant(100, 2 ** 60, 1, []);
+    expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.amountOverflow });
+  });
+
+  it("refuses a non-safe-integer seat count", () => {
+    const out = prizeTableInvariant(100, 0, 2 ** 60, []);
+    expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.amountOverflow });
+  });
+
+  it("refuses a prize table entry whose own amount is past the safe integer range", () => {
+    const out = prizeTableInvariant(100, 0, 1, [{ place: 1, amountCents: Number.MAX_SAFE_INTEGER + 2 }]);
+    expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.amountOverflow });
+  });
+
+  it("refuses a pot that overflows even though the entry fee and seat count are each individually safe", () => {
+    // entryFeeCents * seats overflows — the exact case FINDING 1 names.
+    const out = prizeTableInvariant(Number.MAX_SAFE_INTEGER, 0, 2, []);
+    expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.amountOverflow });
+  });
+
+  it("refuses a rake total that overflows even though the pot does not", () => {
+    const out = prizeTableInvariant(0, Number.MAX_SAFE_INTEGER, 2, []);
+    expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.amountOverflow });
+  });
+
+  it("refuses individually-safe prize amounts whose sum overflows", () => {
+    const out = prizeTableInvariant(0, 0, 1, [
+      { place: 1, amountCents: Number.MAX_SAFE_INTEGER },
+      { place: 2, amountCents: Number.MAX_SAFE_INTEGER },
+    ]);
+    expect(out).toEqual({ ok: false, reason: MONEY_REFUSALS.amountOverflow });
+  });
 });
