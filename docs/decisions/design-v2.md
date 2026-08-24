@@ -33,12 +33,15 @@ surfaces, not formula-inverted from dark; and the controller's own arithmetic in
 amendments undercounted the roles at twenty when the shipped set is **nineteen** (`COLOR_ROLES`,
 `src/design/tokens.ts`) — caught and corrected during Task 1's review, not before.
 
-**What did not ship, and is still future work:** the real theme switcher control. `ThemeProvider`
-exists and both palettes are complete and tested, but nothing in the product today renders a
-control that lets a signed-in user pick `light` over `system`. That control is scoped to the
-addendum's Task 18 (the account room), which has not yet run as of this closeout — say so in the
-future tense, not as shipped. Until it lands, every user is on `system`, which is the provider's
-existing default.
+**What shipped later, closing this gap:** the real theme switcher control, addendum Task 18. A
+three-way segmented control (`system | light | dark`) in the account room's "how the product
+treats you" column (`src/account-room/components/theme-switcher.tsx`), over the existing
+`useTheme` — no new persistence, no new source of truth. It states the current RESOLUTION in
+words rather than just the choice ("Matching your device, which is dark right now"), so `system`
+reads as a fact about the screen it renders on rather than a mystery third option beside two real
+ones. Before this task, nothing in the product rendered a control that let a signed-in user pick
+`light` over `system`; every user was on `system`, the provider's existing default. That is no
+longer true.
 
 ## 2. The retone's contrast corrections — the two the mocks failed
 
@@ -74,9 +77,19 @@ than a runtime contrast failure discovered later on whichever call site happened
 The `accent`/`positive` collapse (the same green for "an action" and "a good outcome," deliberate
 — see `docs/design-system.md`'s "One pigment, two jobs") is what moved `marker` (the WR position
 pigment) off `accent`: sharing one hex between `leaf` (RB, `positive`/`accent`) and `marker` (WR)
-would make the two position stickers indistinguishable. `marker` now doubles as `info` instead,
+would make the two position stickers indistinguishable. `marker` doubled as `info` instead,
 verified by the pairwise-sticker contrast test that exists precisely to catch this class of
 collision.
+
+**Superseded in part (LED-2, founder-delegated design ruling, 2026-08-24):** the doubling
+described above — `whistle`/`leaf`/`marker`/`clay` sharing their semantic role's exact hex — held
+through P1 but was retoned as the last old-software signal the gauntlet found: a full-cell
+sticker fill at semantic-role saturation reads as a spreadsheet. Each of the four now derives
+from the same hue/lightness as its one-time semantic twin at 60% saturation, its own distinct hex
+rather than a literal share; `accent`/`positive` themselves are untouched by this and remain the
+one true doubling. See `docs/design-system.md`'s "One pigment, two jobs" for the current values'
+own rationale — this section stays as the record of the collapse that made the WR/RB move
+necessary in the first place, which the retone did not undo.
 
 ## 4. The dense-scale mechanism, and the density default that took three tasks to settle
 
@@ -253,7 +266,7 @@ fix lands first.
 | Cross-league conflict detection ("swap in both") | Deferred | Needs roster diffing across independent league instances plus a multi-league write path. Named as the single highest-value follow-on this phase identified. |
 | Dynasty/keeper filters, waivers, trade-deadline card fields | Refused for this phase | None of these features exists in the product; a card field for an absent feature is a lie with a label on it. |
 | Push notifications for sit-and-go fills | Deferred (founder gate) | No email sender and no push infrastructure exist. In-app notices only; the when-full copy promises exactly what in-app delivery can keep. |
-| The real theme switcher control | **Shipping next**, addendum Task 18 | `ThemeProvider` and both palettes are complete; only the account-room control that lets a user choose has not landed as of this closeout — see §1 above. |
+| The real theme switcher control | **Shipped**, addendum Task 18 | A three-way segmented control in the account room, over the existing `useTheme` — see §1 above. |
 
 ## 9. What this doc deliberately does not restate
 

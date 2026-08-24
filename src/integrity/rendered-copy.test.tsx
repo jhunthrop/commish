@@ -36,6 +36,9 @@ import { TradeCard } from "@/league-room/components/trade-card";
 import { TradeComposer } from "@/league-room/components/trade-composer";
 import type { HomeLeagueCard, ModerationSummaryView, TradeRoomContext } from "@/league-room/contract";
 import { ReviewFeed } from "@/account-room/components/review-feed";
+import { StandingPanel } from "@/account-room/components/standing-panel";
+import { ThemeSwitcher } from "@/account-room/components/theme-switcher";
+import { ThemeProvider } from "@/design/theme-provider";
 import type { ReviewsPage, ReviewView } from "@/reviews/contract";
 import { Crest } from "@/components/ui/crest";
 import { Meter } from "@/components/ui/meter";
@@ -157,6 +160,13 @@ vi.mock("@/draft-service/teams", () => ({ leagueNameFor: vi.fn() }));
 vi.mock("@/integrity-service/activity", () => ({ listLeagueActivity: vi.fn() }));
 vi.mock("@/integrity-service/notify", () => ({ listNotices: vi.fn(), quoteFor: vi.fn(() => null) }));
 vi.mock("@/integrity-service/flags", () => ({ listPendingFlags: vi.fn(), flagDetail: vi.fn() }));
+// Task 18's account room: `/app/profile` reads through all four of these directly, the same
+// "call the Server Component, mock its data seams" shape this file already uses for the league
+// activity and admin pages.
+vi.mock("@/identity-service/profile", () => ({ readProfile: vi.fn() }));
+vi.mock("@/identity-service/preferences", () => ({ readPreferences: vi.fn() }));
+vi.mock("@/review-service/reviews", () => ({ myReview: vi.fn() }));
+vi.mock("@/league-service/participation", () => ({ completedSeasonsFor: vi.fn() }));
 // `ResolutionForm` (Task 5, `src/admin-room/components/resolution-form.tsx`) calls `useRouter()`
 // for its post-submit `router.refresh()` — `notFound()` needs no request context (a plain
 // synchronous throw), so it stays real; `useRouter()` is the one export this file mocks.
@@ -984,11 +994,12 @@ describe("ModerationSummary says nothing that breaks the house copy rules", () =
 });
 
 /**
- * Task 8's other half. `account-room` carries no directory-derived source sweep at all
- * (`room-copy.source.test.ts`'s own `ROOM_DIRS` names only the four client-room directories that
- * predate it), so `ReviewFeed` — the one component in this task that gained new rendered text,
- * the verified badge — gets its coverage here instead, the same "one place to add" shape this
- * file's own docblock describes.
+ * Task 8's other half. At the time this block was written, `account-room` carried no
+ * directory-derived source sweep at all (`room-copy.source.test.ts`'s own `ROOM_DIRS` named only
+ * the four client-room directories that predated it) — Task 18 closed that gap by adding
+ * `src/account-room` to `ROOM_DIRS`, but this rendered sweep still owns `ReviewFeed`'s verified
+ * badge, since it is composed at runtime (`review.verified`) rather than a literal the source
+ * scan could ever see, the same "one place to add" shape this file's own docblock describes.
  */
 const VERIFIED_REVIEW: ReviewView = {
   id: "r_sweep",
@@ -1024,6 +1035,99 @@ describe("ReviewFeed says nothing that breaks the house copy rules, verified bad
     );
     fireEvent.click(screen.getByRole("button", { name: "What is a verified reviewer?" }));
     expectClean(container, VERIFIED_REVIEW.body, VERIFIED_REVIEW.authorName);
+  });
+});
+
+/**
+ * Task 18. `StandingPanel`'s two sentences (the seasons caption, the tier sentence) are both
+ * composed from props at runtime — `room-copy.source.test.ts`'s own blind spot, restated in its
+ * docblock: "a string has to be both composed at runtime AND unreachable at first paint to
+ * escape." This sweep drives every branch that changes either one: newcomer and veteran, verified
+ * and not, and 0/1/2 seasons for the seasons caption's own pluralization.
+ */
+describe("StandingPanel says nothing that breaks the house copy rules, in every branch", () => {
+  it("is clean across tier, verified and every seasons count", () => {
+    for (const props of [
+      { seasons: 0, tier: "newcomer" as const, verified: false },
+      { seasons: 1, tier: "newcomer" as const, verified: true },
+      { seasons: 2, tier: "veteran" as const, verified: true },
+      { seasons: 3, tier: "veteran" as const, verified: false },
+    ]) {
+      const { container, unmount } = render(<StandingPanel {...props} />);
+      expectClean(container);
+      unmount();
+    }
+  });
+});
+
+/**
+ * Task 18. The resolution sentence is composed from `ThemePreference` AND the device's own
+ * `matchMedia` read — two runtime inputs `room-copy.source.test.ts` cannot see. `happy-dom`'s own
+ * `matchMedia` answers `matches: false` for every query with no explicit stub, which is what the
+ * "system, resolves light" branch below relies on; the other two branches are reached by clicking
+ * through the actual control, the same "driven through the real radios" discipline the resolution
+ * form's own sweep above uses.
+ */
+describe("ThemeSwitcher says nothing that breaks the house copy rules, system, light and dark", () => {
+  it("is clean on every resolution sentence", () => {
+    const { container } = render(
+      <ThemeProvider>
+        <ThemeSwitcher />
+      </ThemeProvider>,
+    );
+    expectClean(container);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Light" }));
+    expectClean(container);
+
+    fireEvent.click(screen.getByRole("radio", { name: "Dark" }));
+    expectClean(container);
+  });
+});
+
+/**
+ * Task 18. The whole room, called as a Server Component with its five data seams mocked —
+ * `readProfile`/`readPreferences`/`myReview`/`completedSeasonsFor` join `requireCurrentUser` —
+ * the same "call the page, mock its seams" shape the league activity and admin pages above use.
+ * Worth the setup: the account facts paragraph (Step 3) is exactly the kind of carefully worded,
+ * once-composed string this file exists to catch, and it is assembled from `CurrentUser.email`
+ * at runtime, invisible to `room-copy.source.test.ts`. Two passes — a newcomer with no review on
+ * file, a verified veteran with one — cover both `StandingPanel` branches and both `ReviewComposer`
+ * states in the one page they actually share a screen with.
+ */
+describe("the profile page says nothing that breaks the house copy rules", () => {
+  it("is clean for a newcomer with no review, and a verified veteran with one", async () => {
+    const { requireCurrentUser } = await import("@/lib/auth/current-user");
+    const { readProfile } = await import("@/identity-service/profile");
+    const { readPreferences } = await import("@/identity-service/preferences");
+    const { myReview } = await import("@/review-service/reviews");
+    const { completedSeasonsFor } = await import("@/league-service/participation");
+    const { default: ProfilePage } = await import("@/app/app/(shell)/profile/page");
+
+    vi.mocked(requireCurrentUser).mockResolvedValue({
+      id: "u1", email: "ada@test.local", displayName: PROFILE.displayName, experienceTier: "beginner", avatarUrl: null,
+      createdAt: "2026-08-01T00:00:00.000Z", isAdmin: false,
+    });
+    vi.mocked(readProfile).mockResolvedValue(PROFILE);
+    vi.mocked(readPreferences).mockResolvedValue({ helpLevel: "guided", draftTourDismissedAt: null });
+
+    for (const [review, seasons] of [
+      [{ state: "none" as const }, 0],
+      [{ state: "live" as const, review: VERIFIED_REVIEW }, 2],
+    ] as const) {
+      vi.mocked(myReview).mockResolvedValue(review);
+      vi.mocked(completedSeasonsFor).mockResolvedValue(seasons);
+      const fixture = fixtureAccountDeps();
+      const page = await ProfilePage();
+      const { container, unmount } = render(
+        <ThemeProvider>
+          <AccountRoomDepsProvider deps={fixture.deps}>{page}</AccountRoomDepsProvider>
+        </ThemeProvider>,
+      );
+      await screen.findByText("Your profile");
+      expectClean(container, PROFILE.displayName, "ada@test.local", review.state === "live" ? VERIFIED_REVIEW.body : "", review.state === "live" ? VERIFIED_REVIEW.authorName : "");
+      unmount();
+    }
   });
 });
 

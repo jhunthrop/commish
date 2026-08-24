@@ -6,6 +6,17 @@ import { Icon } from "@/components/ui/icon";
 import type { NoticeView } from "../contract";
 import { useNotices } from "../hooks/use-notices";
 
+/**
+ * Mirrors `INTEGRITY_CONFIG.notices.inboxSize` (`@/integrity/config`) — duplicated rather than
+ * imported because `@/integrity` is blocked from client room code outright (the client boundary
+ * rule, `eslint.config.mjs`, `src/account-room/**` included): a notice's cap is a fact this
+ * component STATES in words, never data it reads over the wire. `rendered-copy.test.tsx`'s own
+ * `NoticeInbox` describe block sits outside that boundary and asserts these two numbers are the
+ * same value, so a future change to one that forgets the other fails there rather than silently
+ * drifting.
+ */
+export const NOTICE_INBOX_SIZE = 20;
+
 function formatNoticeDate(iso: string): string {
   return new Date(iso).toLocaleString();
 }
@@ -113,6 +124,11 @@ export function NoticeInbox() {
           aria-label="Notices"
           className="fixed inset-x-4 top-16 z-20 flex max-h-96 flex-col gap-3 overflow-y-auto rounded-lg border border-line bg-surface-elevated p-4 shadow-card sm:inset-x-auto sm:right-4 sm:w-96"
         >
+          {/* The inventory's own HIGH: `listNotices` (`@/integrity-service/notify`) has no cursor
+              and caps at `NOTICE_INBOX_SIZE`, so a notice older than the cap is unreachable from
+              anywhere. One honest sentence about the cap, always shown while the panel is open —
+              not a scroll that quietly stops rather than saying why. */}
+          <p className="text-xs text-text-muted">Your last {NOTICE_INBOX_SIZE} notices.</p>
           {status === "error" ? (
             <ErrorState
               title="We could not load your notices."

@@ -6,7 +6,7 @@ import { NoticesProvider } from "@/components/app-shell/notices-provider";
 import type { NoticesBody, NoticeView } from "../contract";
 import { fixtureAccountDeps, renderInAccount } from "../test-fixtures";
 import { AccountRoomDepsProvider } from "../hooks/deps";
-import { NoticeInbox } from "./notice-inbox";
+import { NOTICE_INBOX_SIZE, NoticeInbox } from "./notice-inbox";
 
 const UNREAD: NoticeView = {
   id: "n1",
@@ -38,6 +38,25 @@ describe("NoticeInbox", () => {
         // No unread badge — the "no dot" this case is named for.
         expect(container.querySelector("[class*='rounded-pill']")).toBeNull();
         expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+  });
+
+  // The inventory's own HIGH: `listNotices` has no cursor and caps at `NOTICE_INBOX_SIZE`, so
+  // notices older than the cap are unreachable. The design answer while that is true is one
+  // honest sentence, not a scroll that quietly ends.
+  it("says how much history it keeps, rather than implying it keeps all of it", async () => {
+    const fixture = fixtureAccountDeps({ ok: true, data: EMPTY_PAGE });
+    await renderSurface(
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <NoticesProvider>
+          <NoticeInbox />
+        </NoticesProvider>
+      </AccountRoomDepsProvider>,
+      async ({ getByRole, getByText }) => {
+        fireEvent.click(await screen.findByRole("button", { name: "Notices" }));
+        expect(getByRole("region", { name: "Notices" })).toBeInTheDocument();
+        expect(getByText(`Your last ${NOTICE_INBOX_SIZE} notices.`)).toBeInTheDocument();
       },
     );
   });

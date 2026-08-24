@@ -1,4 +1,4 @@
-import { Badge } from "@/components/ui";
+import { Badge, Panel } from "@/components/ui";
 import { NOTIFICATION_CATALOG, deliverableChannels, type NotificationChannel } from "@/identity";
 
 const CHANNEL_LABEL: Readonly<Record<NotificationChannel, string>> = {
@@ -14,6 +14,11 @@ const CHANNEL_LABEL: Readonly<Record<NotificationChannel, string>> = {
  * The one line about email below is a statement, not a control: `@/identity/notifications`'s
  * own docblock is why there is no switch beside it. A toggle for a channel with no sender is a
  * preference this product cannot honor, and this plan's rule is that one does not ship.
+ *
+ * Retoned onto `Panel` (Task 18, Step 4): the account room's own "uppercase label, hairline,
+ * content" block, matching `StandingPanel` beside it rather than a hand-rolled `<section>` with
+ * its own heading and border. The heading text and the description list underneath it are
+ * unchanged — only the wrapper is.
  */
 export function NotificationSummary() {
   const liveChannelLabel = deliverableChannels()
@@ -21,10 +26,7 @@ export function NotificationSummary() {
     .join(", ");
 
   return (
-    <section className="flex flex-col gap-4" aria-labelledby="notifications-heading">
-      <h2 id="notifications-heading" className="text-lg font-semibold text-text-primary">
-        Notifications
-      </h2>
+    <Panel title="Notifications">
       <dl className="flex flex-col gap-3">
         {NOTIFICATION_CATALOG.map((topic) => (
           // `<dl>`'s allowed direct children are `<dt>`/`<dd>` pairs, optionally grouped in a
@@ -40,6 +42,6 @@ export function NotificationSummary() {
         ))}
       </dl>
       <p className="text-sm text-text-muted">Email updates are not connected yet. When they are, you will choose which of these arrive in your inbox.</p>
-    </section>
+    </Panel>
   );
 }
