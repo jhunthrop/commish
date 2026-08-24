@@ -10,6 +10,8 @@ import { LEAGUE_CONFIG } from "@/league";
 import { HOUSE_AUTHORITY_REFUSALS } from "./authority";
 import { createLeague } from "./creation";
 import { draftScheduleView, setDraftKickoff, KICKOFF_REFUSALS } from "./draft-schedule";
+import { joinPublicLeague } from "./join";
+import { releaseSeat } from "./release";
 
 const db = createTestDb();
 const FIXED_NOW = "2026-08-17T12:00:00.000Z";
@@ -251,6 +253,64 @@ describe("draftScheduleView", () => {
       const after = await draftScheduleView(db, leagueId, commissioner);
 
       expect(after?.slotPreference?.assignedSlot).toBeNull();
+    });
+  });
+
+  // Phase 3.6, Task 9: `missedDraft`'s own derivation, and (P9 fix round, M3) the null-guard
+  // `joinedAtFor` mirrors from `leagueHome`.
+  describe("missedDraft", () => {
+    it("is true once the draft is complete and the caller's own join landed at or after its kickoff", async () => {
+      const { leagueId } = await seedLeague({ isPublicMatchmade: true });
+      const lateJoiner = "late_joiner";
+      await db.insert(users).values({ id: lateJoiner, email: `${lateJoiner}@test.local`, displayName: "Late Joiner" }).onConflictDoNothing();
+      const joined = await joinPublicLeague({ db, newId, clock: { now: () => LATER } }, { leagueId, userId: lateJoiner });
+      expect(joined.ok).toBe(true);
+
+      const [draft] = await db.select({ id: drafts.id }).from(drafts).where(eq(drafts.leagueId, leagueId));
+      await db.update(drafts).set({ status: "complete", kickoffAt: new Date(FIXED_NOW) }).where(eq(drafts.id, draft!.id));
+
+      const view = await draftScheduleView(db, leagueId, lateJoiner);
+      expect(view?.missedDraft).toBe(true);
+    });
+
+    it("is false for a team seated before the draft ran", async () => {
+      const { leagueId, commissioner } = await seedLeague();
+      const [draft] = await db.select({ id: drafts.id }).from(drafts).where(eq(drafts.leagueId, leagueId));
+      await db.update(drafts).set({ status: "complete" }).where(eq(drafts.id, draft!.id));
+
+      const view = await draftScheduleView(db, leagueId, commissioner);
+      expect(view?.missedDraft).toBe(false);
+    });
+
+    it("is false for a caller with no team in this league at all", async () => {
+      const { leagueId } = await seedLeague();
+      const [draft] = await db.select({ id: drafts.id }).from(drafts).where(eq(drafts.leagueId, leagueId));
+      await db.update(drafts).set({ status: "complete" }).where(eq(drafts.id, draft!.id));
+
+      const view = await draftScheduleView(db, leagueId, "a_total_stranger");
+      expect(view?.missedDraft).toBe(false);
+    });
+
+    // M3 (P9 fix round): a caller with no CURRENT team must never resolve to a stale
+    // `member_joined` event from a seat they have since released — `releaseSeat` writes its OWN
+    // `member_joined`-typed event (`payload.outcome: "seat_released"`, `release.ts`'s own audit
+    // compromise) that an unguarded read would otherwise pick up as "when I joined."
+    it("stays false for a caller who released their seat, even though a member_joined-typed event still exists for them", async () => {
+      const { leagueId } = await seedLeague({ isPublicMatchmade: true });
+      const leaver = "leaver";
+      await db.insert(users).values({ id: leaver, email: `${leaver}@test.local`, displayName: "Leaver" }).onConflictDoNothing();
+      const joinClock = { now: () => LATER };
+      const joined = await joinPublicLeague({ db, newId, clock: joinClock }, { leagueId, userId: leaver });
+      expect(joined.ok).toBe(true);
+
+      const released = await releaseSeat(db, { leagueId, userId: leaver }, { clock: joinClock });
+      expect(released.ok).toBe(true);
+
+      const [draft] = await db.select({ id: drafts.id }).from(drafts).where(eq(drafts.leagueId, leagueId));
+      await db.update(drafts).set({ status: "complete", kickoffAt: new Date(FIXED_NOW) }).where(eq(drafts.id, draft!.id));
+
+      const view = await draftScheduleView(db, leagueId, leaver);
+      expect(view?.missedDraft).toBe(false);
     });
   });
 });

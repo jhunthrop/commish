@@ -179,7 +179,12 @@ export async function draftScheduleView(db: Db, leagueId: string, userId: string
   if (row === undefined) return null;
   const teamRows = await db.select({ id: teams.id, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
   const myTeam = teamRows.find((team) => team.userId === userId);
-  const joinedAt = await joinedAtFor(db, { leagueId, userId });
+  // `joinedAtFor`'s own null-guard, mirrored here exactly as `leagueHome` (`./read.ts`) applies
+  // it: a caller with no team in THIS league right now (never true through `withLeagueMemberActor`
+  // today, but this function is called directly in tests and may gain other callers) must never
+  // resolve to a STALE `member_joined` event from a seat they have since released — `missedDraft`
+  // is a fact about the caller's CURRENT team, not their history with the league.
+  const joinedAt = await joinedAtFor(db, { leagueId, userId: myTeam === undefined ? null : userId });
   return {
     draftId: row.draftId,
     leagueId,

@@ -122,6 +122,31 @@ describe("WaitingRoom", () => {
     expect(screen.getByText("You're in", { exact: false })).toBeInTheDocument();
   });
 
+  // P9 fix round, H2: the two hero states this task itself composes (never delegated to
+  // `DraftSchedulePanel`) plus the just-seated moment, each in both themes, axe-clean.
+  it("is axe-clean while the when_full room is still filling (the promoted meter, no countdown)", async () => {
+    await renderSurface(<WaitingRoom league={whenFullAndFilling} isCommissioner={true} />, async ({ container }) => {
+      expect(screen.getByText("4 of 12 seated")).toBeInTheDocument();
+      expect(screen.queryByTestId("waiting-room-countdown")).toBeNull();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("is axe-clean once the when_full room is full and counting down", async () => {
+    await renderSurface(<WaitingRoom league={fullSitAndGo} isCommissioner={true} />, async ({ container }) => {
+      expect(screen.getByTestId("waiting-room-countdown")).toBeInTheDocument();
+      expect(screen.getByText("12 of 12 seated")).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
+  it("is axe-clean on the just-seated moment", async () => {
+    await renderSurface(<WaitingRoom league={scheduledAndFilling} leagueName="Half-PPR #241" justSeated />, async ({ container }) => {
+      expect(screen.getByText("Half-PPR #241 · You're in")).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
   it("shows a link into the room while the draft is live, in both themes, axe-clean", async () => {
     const live: WaitingRoomLeague = { ...fullSitAndGo, status: "in_progress" };
     await renderSurface(<WaitingRoom league={live} />, async ({ container }) => {
@@ -155,6 +180,14 @@ describe("WaitingRoom", () => {
     render(<WaitingRoom league={fullSitAndGo} isCommissioner={true} />);
     expect(screen.queryByRole("link", { name: "Invite someone" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "See leagues closer to filling" })).not.toBeInTheDocument();
+  });
+
+  // M5 (P9 fix round): restored from the pre-rewrite file — dropped in the Task 9 rewrite with
+  // no successor.
+  it("wraps its actions for 360px", () => {
+    render(<WaitingRoom league={whenFullAndFilling} isCommissioner={true} />);
+    const link = screen.getByRole("link", { name: "See leagues closer to filling" });
+    expect(link.parentElement?.className).toMatch(/flex-wrap/);
   });
 
   it("walks the filling state's two actions keyboard-only", async () => {
@@ -209,6 +242,23 @@ describe("WaitingRoom", () => {
     expect(screen.getAllByRole("listitem")[0]).toHaveTextContent("See how the draft room works");
     rerender(<WaitingRoom league={whenFullAndFilling} helpLevel="standard" />);
     expect(screen.getAllByRole("listitem")[3]).toHaveTextContent("See how the draft room works");
+  });
+
+  // P9 fix round, P8-M3: `myTeamId`/`leagueName` wiring, driven end to end rather than assumed —
+  // no test anywhere in this file previously passed a non-null `myTeamId` to a non-commissioner
+  // caller, so `ReleaseSeatControl` never actually mounted and a prop-name typo on either wire
+  // would have failed nothing. Checks the control's OWN text, and opens its confirm dialog to
+  // prove `leagueName` itself reached the control (not just that SOME control rendered).
+  it("wires myTeamId and leagueName through to a real ReleaseSeatControl, while the room is still filling", () => {
+    render(<WaitingRoom league={whenFullAndFilling} isCommissioner={false} myTeamId="team_9" leagueName="Rookie Room" />);
+    fireEvent.click(screen.getByRole("button", { name: "Release your seat" }));
+    expect(screen.getByText(/Rookie Room/)).toBeInTheDocument();
+  });
+
+  it("wires myTeamId and leagueName through DraftSchedulePanel's own ReleaseSeatControl, for a scheduled draft", () => {
+    render(<WaitingRoom league={scheduledAndFilling} isCommissioner={false} myTeamId="team_9" leagueName="Rookie Room" />);
+    fireEvent.click(screen.getByRole("button", { name: "Release your seat" }));
+    expect(screen.getByText(/Rookie Room/)).toBeInTheDocument();
   });
 
   it("opens the real room tour from the checklist's own control", () => {

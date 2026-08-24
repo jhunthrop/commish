@@ -58,7 +58,10 @@ function weekdayOf(iso: string): string {
  * everyone, `@/identity/notifications`'s own docblock), so both state the real, current fact
  * rather than offering a control this codebase cannot yet honor.
  */
-function checklistItems(params: {
+/** Exported at its second caller (Phase 3.6, Task 10, Step 2b): the pre-draft home's own hero
+ *  inlines this exact function rather than a second, narrower item list — "no new component that
+ *  exists only here." */
+export function checklistItems(params: {
   readonly leagueId: string;
   readonly myTeamName: string | null;
   readonly slotPreference: DraftScheduleBody["slotPreference"];
@@ -281,7 +284,7 @@ export function WaitingRoom({
       />
     ) : full ? (
       <div className="flex flex-col gap-2">
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
+        <div data-testid="waiting-room-hero" className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
           <Icon name={showCountdownHero ? "bolt" : "users"} size={28} className="text-text-muted" />
           <SeatMeter filled={league.filledTeams} total={league.teamCount} />
           {showCountdownHero ? (
@@ -302,7 +305,7 @@ export function WaitingRoom({
       </div>
     ) : (
       <div className="flex flex-col gap-2">
-        <div className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
+        <div data-testid="waiting-room-hero" className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
           <Icon name="users" size={28} className="text-text-muted" />
           <SeatMeter filled={league.filledTeams} total={league.teamCount} />
           {/* F9/C5: quoted from `describeStartTiming`, never typed here — the browse card, this

@@ -41,15 +41,23 @@ function tourStops(actionLabel: string): readonly TourStop[] {
 }
 
 /**
- * Shown once, the first time a manager opens a draft room, and never again. `dismissedAt` is
- * server-read state (`readPreferences`, passed down through `DraftRoomPage` -> `DraftRoom`), so
- * a manager who dismisses it on one device does not see it again on another.
+ * Two callers, two modes, same component — `open` is always exactly `dismissedAt === null &&
+ * !dismissedLocally`, and each caller shapes the props that flow into it differently.
  *
- * Dismissal is fire-and-forget by design: `onDismiss` PATCHes `/api/preferences` from the
- * caller, but this component closes on click regardless of whether that call ever resolves, and
- * swallows a SYNCHRONOUS throw from `onDismiss` too. A failed preference write is never allowed
- * to be the thing standing between a manager and a live draft — the worst case is seeing this
- * tour again next time.
+ * **The draft room's own auto-onboarding (its original caller).** Shown once, the first time a
+ * manager opens a draft room, and never again. `dismissedAt` is server-read state
+ * (`readPreferences`, passed down through `DraftRoomPage` -> `DraftRoom`), so a manager who
+ * dismisses it on one device does not see it again on another. Dismissal is fire-and-forget by
+ * design: `onDismiss` PATCHes `/api/preferences` from the caller, but this component closes on
+ * click regardless of whether that call ever resolves, and swallows a SYNCHRONOUS throw from
+ * `onDismiss` too. A failed preference write is never allowed to be the thing standing between a
+ * manager and a live draft — the worst case is seeing this tour again next time.
+ *
+ * **The waiting room's own repeatable preview (Phase 3.6, Task 9)** — `WaitingChecklist`'s "See
+ * how the draft room works" item mounts this with `dismissedAt` HARDCODED `null` and no
+ * `/api/preferences` write at all: `onDismiss` just unmounts it (a local `showTour` flip in the
+ * caller). It opens every time the caller mounts it, by construction, and is never itself the
+ * "have you seen this" gate — that gate belongs entirely to the draft room's own caller above.
  */
 export function RoomTour({ dismissedAt, onDismiss, actionLabel }: RoomTourProps) {
   // Local, not derived solely from `dismissedAt`: the write that would update that prop is

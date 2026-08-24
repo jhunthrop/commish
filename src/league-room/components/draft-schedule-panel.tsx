@@ -292,7 +292,7 @@ export function DraftSchedulePanel({
   // panel's sole caller is `WaitingRoom`, so the id it asserts on is not a value another caller
   // could ever need to change.
   const hero = (
-    <div className="flex flex-col items-center gap-1">
+    <div data-testid="waiting-room-hero" className="flex flex-col items-center gap-1">
       <Countdown remainingMs={msUntil} size="xl" data-testid="waiting-room-countdown" />
       <SeatMeter filled={schedule.filledTeams} total={teamCount} />
       <p className="text-sm text-text-muted">{`${formatLocal(schedule.kickoffAt)} (${formatRelativeCountdown(msUntil)})`}</p>

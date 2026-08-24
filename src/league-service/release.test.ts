@@ -281,6 +281,11 @@ describe("releaseSeat", () => {
     });
   });
 
+  // P9 fix round, P8-M2: every refusal path means all FOUR (`RELEASE_REFUSALS` has four members) —
+  // `draftStarted` was the one this sweep left out. `db.update(drafts)` here is a test-only
+  // shortcut for "a draft that has started," deliberately lighter than the dedicated test above
+  // (which drives a real `store.startDraft()`): that test already proves the refusal fires from a
+  // GENUINE started draft; this one only needs the status this refusal actually reads.
   it("writes nothing on every refusal path", async () => {
     const { leagueId: memberLeagueId, commissionerId } = await seedLeague({ teamCount: 2, startTrigger: "scheduled", commissionerId: "u_commish_refusal" });
     await db.insert(users).values({ id: "u_bob_refusal", email: "u_bob_refusal@test.local", displayName: "Bob" });
@@ -289,17 +294,30 @@ describe("releaseSeat", () => {
 
     await db.insert(users).values({ id: "u_stranger_refusal", email: "u_stranger_refusal@test.local", displayName: "Stranger" });
 
+    const { leagueId: startedLeagueId, draftId: startedDraftId } = await seedLeague({
+      teamCount: 2,
+      startTrigger: "scheduled",
+      commissionerId: "u_commish_started_refusal",
+    });
+    await db.insert(users).values({ id: "u_bob_started_refusal", email: "u_bob_started_refusal@test.local", displayName: "Bob" });
+    const startedJoin = await joinPublicLeague({ db, newId, clock }, { leagueId: startedLeagueId, userId: "u_bob_started_refusal" });
+    if (!startedJoin.ok) throw new Error(startedJoin.reason);
+    await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, startedDraftId));
+
     const everyRefusalPath = [
       () => releaseSeat(db, { leagueId: "nope", userId: "u_anyone" }, { clock }),
       () => releaseSeat(db, { leagueId: memberLeagueId, userId: commissionerId }, { clock }),
       () => releaseSeat(db, { leagueId: memberLeagueId, userId: "u_stranger_refusal" }, { clock }),
+      () => releaseSeat(db, { leagueId: startedLeagueId, userId: "u_bob_started_refusal" }, { clock }),
     ];
 
     const before = await snapshotOf();
+    const outcomes: { readonly ok: boolean }[] = [];
     for (const call of everyRefusalPath) {
-      const outcome = await call();
-      expect(outcome.ok).toBe(false);
+      outcomes.push(await call());
     }
+    expect(outcomes.every((outcome) => outcome.ok === false)).toBe(true);
+    expect(outcomes[3]).toEqual({ ok: false, reason: RELEASE_REFUSALS.draftStarted });
     await expectNoSeatReleaseTookPlace(before);
   });
 });

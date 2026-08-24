@@ -231,7 +231,11 @@ test.describe("formats and lobby", () => {
 
     // The filling state, and the create form's own "Starts as soon as it fills" choice showing
     // up as a real fact about this league, not only as a selected option.
-    await expect(managerA.getByRole("heading", { name: "1 of 8 seats taken" })).toBeVisible();
+    // Phase 3.6, Task 9 (F17): the seat sentence is `SeatMeter`'s own composed span now, not a
+    // heading this page wrote itself — "1 of 8 seats taken" is retired everywhere. Scoped to
+    // `waiting-room-hero`: `RoomRoster`, below the hero, renders the identical sentence off the
+    // SAME `SeatMeter` primitive (F17), so the bare text alone matches twice on this page.
+    await expect(managerA.getByTestId("waiting-room-hero").getByText("1 of 8 seated")).toBeVisible();
     await expect(managerA.getByText("Starts as soon as it fills")).toBeVisible();
 
     // --- Backstage: fill every seat but the last, through the real join transaction ---------
@@ -246,13 +250,17 @@ test.describe("formats and lobby", () => {
     await managerB.goto("/browse");
     await managerB.getByRole("button", { name: `Join ${leagueName}` }).click();
     await expect(managerB).toHaveURL(new RegExp(`/app/leagues/${leagueId}$`));
-    await expect(managerB.getByRole("heading", { name: "All 8 seats are full." })).toBeVisible();
+    // Phase 3.6, Task 9 (D3): "All N seats are full." was a `StatePanel` heading this task
+    // retired outright — the full room's own hero now settles the SAME `SeatMeter` sentence to
+    // "N of N seated" (no heading at all) before the `xl` `Countdown` beside it. Scoped to
+    // `waiting-room-hero` for the same reason as the filling-state assertion above.
+    await expect(managerB.getByTestId("waiting-room-hero").getByText("8 of 8 seated")).toBeVisible();
     await expect(managerB.getByTestId("waiting-room-countdown")).toBeVisible();
 
     // --- The OTHER session's own waiting room, retried against the real receipt ------------
     await expect(async () => {
       await managerA.reload();
-      await expect(managerA.getByRole("heading", { name: "All 8 seats are full." })).toBeVisible({ timeout: 5_000 });
+      await expect(managerA.getByTestId("waiting-room-hero").getByText("8 of 8 seated")).toBeVisible({ timeout: 5_000 });
       await expect(managerA.getByTestId("waiting-room-countdown")).toBeVisible({ timeout: 5_000 });
     }).toPass({ timeout: 30_000 });
   });

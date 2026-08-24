@@ -243,11 +243,21 @@ describe("LeagueHome", () => {
     expect(screen.getByText(/Rank the slots you want/)).toBeInTheDocument();
   });
 
+  // M4 (P9 fix round): `status: "scheduled"` here (not inherited from `DRAFT_SCHEDULE`'s own
+  // `"complete"`) is load-bearing — a `"complete"` draft makes `WaitingRoom` short-circuit to its
+  // terminal panel before the checklist (and the ranking panel it inlines) ever renders, which
+  // made this test pass for the wrong reason: the terminal short-circuit, not the
+  // `slotPreference === null` branch its own name describes.
   it("says nothing about a slot preference for a caller with no team in this league", () => {
     renderInLeague(
       <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
         <LeagueHome
-          home={{ ...HOME, myTeamId: null, draftSchedule: { ...DRAFT_SCHEDULE, slotPreference: null } }}
+          home={{
+            ...HOME,
+            myTeamId: null,
+            draftStatus: "scheduled",
+            draftSchedule: { ...DRAFT_SCHEDULE, status: "scheduled", slotPreference: null },
+          }}
           lineup={null}
         />
       </ChatRoomDepsProvider>,

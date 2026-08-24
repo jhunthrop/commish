@@ -18,28 +18,36 @@ describe("ReleaseSeatControl", () => {
     );
   });
 
-  it("takes a visible secondary Button from the first roll onward (F12)", () => {
-    renderInLeague(<ReleaseSeatControl leagueId="l1" leagueName="Half-PPR #241" kickoffRolls={1} />, fixtureLeagueDeps().deps);
-    const trigger = screen.getByRole("button", { name: "Release your seat" });
-    // `Button`'s own `secondary` variant class, `button.tsx`'s `VARIANT.secondary`.
-    expect(trigger.className).toMatch(/border-line/);
+  it("takes a visible secondary Button from the first roll onward (F12), in both themes, axe-clean", async () => {
+    await renderSurface(
+      <ReleaseSeatControl leagueId="l1" leagueName="Half-PPR #241" kickoffRolls={1} />,
+      async ({ container }) => {
+        const trigger = screen.getByRole("button", { name: "Release your seat" });
+        // `Button`'s own `secondary` variant class, `button.tsx`'s `VARIANT.secondary`.
+        expect(trigger.className).toMatch(/border-line/);
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
   });
 
-  it("opens a destructive confirm Modal with the league's own consequence copy, and cancel closes it without releasing", async () => {
-    const fixture = fixtureLeagueDeps();
-    renderInLeague(<ReleaseSeatControl leagueId="l1" leagueName="Half-PPR #241" kickoffRolls={0} />, fixture.deps);
+  it("opens a destructive confirm Modal with the league's own consequence copy, and cancel closes it without releasing, in both themes, axe-clean", async () => {
+    await renderSurface(
+      <ReleaseSeatControl leagueId="l1" leagueName="Half-PPR #241" kickoffRolls={0} />,
+      async ({ container }) => {
+        fireEvent.click(screen.getByRole("button", { name: "Release your seat" }));
+        const dialog = await screen.findByRole("dialog", { name: "Release your seat?" });
+        expect(dialog).toHaveTextContent(
+          "You will lose your seat in Half-PPR #241. Someone else can take it right away, and the league may fill without you.",
+        );
+        const confirmButton = screen.getByRole("button", { name: "Release seat" });
+        expect(confirmButton.className).toMatch(/bg-negative/); // the destructive variant
+        // P9 fix round, P8-L3: the escalated confirm dialog itself, not just the trigger.
+        expect(await axe(container)).toHaveNoViolations();
 
-    fireEvent.click(screen.getByRole("button", { name: "Release your seat" }));
-    const dialog = await screen.findByRole("dialog", { name: "Release your seat?" });
-    expect(dialog).toHaveTextContent(
-      "You will lose your seat in Half-PPR #241. Someone else can take it right away, and the league may fill without you.",
+        fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+      },
     );
-    const confirmButton = screen.getByRole("button", { name: "Release seat" });
-    expect(confirmButton.className).toMatch(/bg-negative/); // the destructive variant
-
-    fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(fixture.calls).toEqual([]);
   });
 
   it("releases the seat on confirm, calls DELETE and shows the release's own confirmation", async () => {

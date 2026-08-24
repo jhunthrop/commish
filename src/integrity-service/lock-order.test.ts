@@ -2500,6 +2500,89 @@ describe("releaseSeat vs. joinLeagueInTx — the release-vs-join race on the sam
   });
 });
 
+/**
+ * PHASE 3.6, TASK 8's BINDING PRECONDITION, DRIVEN RATHER THAN ARGUED (P9 fix round, P8-M1). The
+ * precondition's own docblock (`store.ts`, `startDraft`) names the exact failure the move closed:
+ * a seat released between `startDraft`'s OLD out-of-transaction read and its `drafts FOR UPDATE`
+ * lock could persist a departed team's id into `draftOrder`, PERMANENT once the reducer replays
+ * it. This drives the literal scenario — `releaseSeat` COMMITTING while `startDraft` WAITS — on
+ * two real connections, and inspects the drawn `draftOrder` itself: the departed team's id must
+ * never appear in it.
+ *
+ * `releaseSeat` has no precondition-hook parameter of its own the way `joinLeagueInTx` does
+ * (`parkedJoin`'s own shape), so the park below uses its `deps.audit` injection point instead:
+ * `audit.record` is `releaseSeat`'s OWN last lock (ruling 3, "anchor last"), called only after
+ * `leagues[X] FOR UPDATE`, the `teams` DELETE and the `fill_fired_at` clear have all already
+ * happened inside the same, still-open transaction — pausing there holds the identical lock
+ * `parkedJoin`'s precondition hook holds, for the identical reason, and delegates to the real
+ * `AuditLogger` once released rather than faking the write.
+ */
+describe("releaseSeat vs. startDraft — the binding precondition's own named scenario", () => {
+  it("commits the release while startDraft waits, and the departed team's id never reaches draftOrder", async () => {
+    const { draftId, leagueId, teamIds, userIds } = await seedDraftFixture(joinDb, {
+      draftId: "draft_release_vs_start",
+      leagueId: "lg_release_vs_start",
+      format: "snake",
+      teamCount: 3,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+    });
+    await joinDb.insert(players).values(POOL.map((entry) => ({ id: entry.playerId, name: entry.playerId, position: entry.position, nflTeam: "FA" })));
+    // `userIds[0]` is the commissioner (`seedDraftFixture`'s own convention) — `releaseSeat`
+    // refuses a commissioner outright, so the departing member is `userIds[1]`, leaving
+    // `userIds[0]`/`userIds[2]` (`teamIds[0]`/`teamIds[2]`) behind to draft.
+    const leavingUserId = userIds[1]!;
+    const leavingTeamId = teamIds[1]!;
+
+    // T_release: parked AFTER its own last lock (the audit anchor) — everything before it,
+    // including `leagues[X] FOR UPDATE` and the `teams` DELETE, has already happened, uncommitted.
+    let holdsLeagueLock: () => void = () => {};
+    const leagueLocked = new Promise<void>((resolve) => (holdsLeagueLock = resolve));
+    let releasePark: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releasePark = resolve));
+    const real = getAuditLogger();
+    let paused = false;
+    const pausingAudit: AuditLogger = {
+      record: async (tx, event) => {
+        if (!paused) {
+          paused = true;
+          holdsLeagueLock();
+          await parked;
+        }
+        return real.record(tx, event);
+      },
+      recordAll: (tx, events) => real.recordAll(tx, events),
+    };
+    const releasing = releaseSeat(releaseDb, { leagueId, userId: leavingUserId }, { clock, audit: pausingAudit });
+    await leagueLocked;
+
+    // T_start: the real `startDraft`, on a SEPARATE connection — `applyAction`'s own first
+    // statement is `leagues[X] FOR KEY SHARE`, which conflicts with the parked release's
+    // `FOR UPDATE` on the same row and blocks here.
+    const store = createDraftStore({ db: pickDb, publish: async () => "1-0", clock, deliverNotice: async () => {} });
+    const starting = store.startDraft(draftId);
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releasePark();
+
+    expect(await releasing).toEqual({ ok: true });
+    const started = await starting;
+    expect(started.ok).toBe(true);
+
+    // THE CLAIM ITSELF: the departed team's id never reached `draftOrder` — `startDraft`'s
+    // in-thunk `teamRows` read happened AFTER the release had already committed (the lock order
+    // above guarantees it), so the draw only ever saw the two teams still actually seated.
+    const draftOrder = started.ok ? started.state.draftOrder : [];
+    expect(draftOrder).not.toContain(leavingTeamId);
+    expect(draftOrder).toHaveLength(2);
+    expect([...draftOrder].sort()).toEqual([teamIds[0], teamIds[2]].sort());
+
+    const remaining = await joinDb.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, leagueId));
+    expect(remaining.map((row) => row.id).sort()).toEqual([teamIds[0], teamIds[2]].sort());
+  });
+});
+
 // ---------------------------------------------------------------------------------------------
 // FINAL REVIEW F10 — LOCK-ORDER COVERAGE FROM 7 OF 9 TO 9 OF 9. The two writers no describe block
 // above drives: `closeSupersededHoldFlag` (an `integrity_flags` guarded UPDATE plus a
