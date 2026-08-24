@@ -120,13 +120,16 @@ one round trip, reused from what `crossLeagueHome` already reads — and renders
 `aria-current`, which is what let the data-seam move from "every page" to "the one layout"
 without losing the navigation-state signal the original per-page ruling existed to preserve.
 
-Three route groups decline the shell entirely, by living outside `(shell)`'s tree rather than by
-a runtime branch: the draft room and the TV board (both under `src/app/app/(room)/drafts/...`,
-because `RoomRail`'s own full-height header is the room's chrome and stacking two chromes would
-break the no-page-scroll contract `docs/draft-room.md` documents), and `/app/join/[code]` (a
-route a signed-out stranger can land on, where a signed-in shell around it would be chrome nobody
-signed out can use). None of the three carve-outs changes a URL — a route group is invisible to
-the path.
+Three surfaces decline the shell entirely, and not all three do it the same way. The draft room
+(`src/app/app/(room)/drafts/[draftId]/`) and `/app/join/[code]`
+(`src/app/app/(public)/join/[code]/`) decline it by living in a SIBLING route group under `/app`
+— invisible to the URL, and the mechanism ruling 8's reversal actually introduced. The TV board
+(`src/app/draft/[draftId]/board/`) declines it more simply: it was never under `/app` at all, so
+it was never in `(shell)`'s tree to begin with and needs no route group of its own to opt out —
+its own docblock states this directly. All three share the same REASON for having no shell
+(`RoomRail`'s own full-height header is the room's chrome for the first two, and a signed-in shell
+around a page a stranger can land on would be chrome nobody signed out can use for the third — see
+`docs/draft-room.md`), but only the first two share the MECHANISM.
 
 `loading.tsx` inside `(shell)` suspends only the content column, not the rail or top bar — the
 concrete fix the route-group move exists to deliver. **Correction: no `loading.tsx` file exists
