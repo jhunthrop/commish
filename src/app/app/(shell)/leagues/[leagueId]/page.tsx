@@ -90,6 +90,12 @@ export default async function LeaguePage({ params, searchParams }: PageProps) {
  * in-progress/final state) is unaffected by this approximation — only the fix-lineup/set-lineup
  * boundary can move, and both already render the identical `LineupEditor`, just in a different
  * position on the page.
+ *
+ * The one cross-surface consequence (P11 review): `HomeLeagueCard` computes the SAME fact from
+ * `crossLeagueHome`'s DB-exact read, so in the divergence window (a materialized auto-set row
+ * with a genuinely empty starter slot) the home board and this page can briefly disagree about
+ * the same lineup. Bounded and self-correcting — it resolves the moment the manager next saves —
+ * but it is two surfaces, not one, and closing it means giving this page the DB-exact read.
  */
 function leagueNextActionKind(home: Awaited<ReturnType<typeof leagueHome>>, lineup: Awaited<ReturnType<typeof lineupView>>) {
   if (home === null) return null;
