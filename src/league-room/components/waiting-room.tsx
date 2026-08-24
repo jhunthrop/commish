@@ -231,24 +231,75 @@ export function WaitingRoom({
     onOpenTour: () => setTourOpen(true),
   });
 
+  // e2e checkpoint fix round (reconciliation, P9-P11 checkpoint): `SlotPreferencePanel` renders
+  // nothing until `preference.canEdit` is false (`slot-preference-panel.tsx`'s own gate), which
+  // only happens once `draft.status` moves past `"scheduled"` (`slotPreferenceViewFor`,
+  // `@/league-service/draft-schedule.ts`) — exactly the states `draftTerminalStatePanel` and the
+  // `missedDraft` branch below short-circuit BEFORE the checklist (and this panel inside it) is
+  // ever reached. Pre-Task-9, `SlotPreferencePanel` was `LeagueHome`'s own unconditional sibling
+  // (never gated on draft status at all), so the post-draw result sentence ("You ranked slot N
+  // first and you got slot N.") was always visible once the draw ran. Task 9's inlining made that
+  // sentence structurally unreachable — a real regression, not a copy move — so it is carried
+  // here, independent of which early return below fires, restoring the pre-Task-9 guarantee.
+  const slotPreferenceResult = items.find((item) => item.key === "rank")?.content ?? null;
+
+  // e2e checkpoint fix round (reconciliation, P9-P11 checkpoint), second real gap: D1 (the
+  // just-seated congratulatory panel, below) and D3 (this meter-then-countdown hero) were built
+  // independently and never reasoned about the one case where they collide — a `when_full`
+  // league's LAST seat, filled live. That join is simultaneously the fill event (D3: the room is
+  // now full, `kickoffAt` becomes real, the grace window starts) and the join event (D1: the
+  // filler is `justSeated`), and `justSeatedMinutes` (5) happens to equal
+  // `MATCHMAKING_CONFIG.sitAndGo.graceSeconds` in minutes (5) — so, unfixed, the ONE manager whose
+  // own click started the countdown was the one manager who could not see it for the entire grace
+  // window, stuck on a generic "you're in" card while everyone else who loads the page gets the
+  // real hero. Extracted so D1 can show the SAME hero, not a second copy that could drift from
+  // it — `showCountdownHero` is already `true` on this render (its `useState(full)` initializer),
+  // so no animation is skipped or duplicated by reusing it here.
+  const fullSeatHero: ReactNode =
+    full && league.startTrigger === "when_full" ? (
+      <div data-testid="waiting-room-hero" className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
+        <Icon name={showCountdownHero ? "bolt" : "users"} size={28} className="text-text-muted" />
+        <SeatMeter filled={league.filledTeams} total={league.teamCount} />
+        {showCountdownHero ? (
+          <div className="flex flex-col items-center gap-1">
+            <Countdown remainingMs={remainingMs ?? 0} size="xl" data-testid="waiting-room-countdown" />
+            <p role="status" className="text-sm text-text-muted">{`Starts in ${formatCoarseDuration(remainingMs ?? 0)}.`}</p>
+            {/* First-timer persona question, Step 5/6: "what happens if I'm not there?" —
+                answered honestly, in C3's own phrasing, once the clock is actually running. */}
+            <p className="text-sm text-text-muted">Away when it starts? The room picks for you from your queue.</p>
+          </div>
+        ) : null}
+      </div>
+    ) : null;
+
   const terminal = draftTerminalStatePanel(league);
-  if (terminal !== null && !league.missedDraft) return terminal;
+  if (terminal !== null && !league.missedDraft) {
+    return (
+      <div className="flex flex-col gap-4">
+        {terminal}
+        {slotPreferenceResult}
+      </div>
+    );
+  }
 
   // C3: the safety net has one phrasing, "the room picks for you from your queue", quoted here
   // verbatim (`docs/design-system.md`, Task 14 Step 2) rather than composed a second way.
   if (league.missedDraft) {
     return (
-      <StatePanel
-        tone="neutral"
-        icon="check"
-        title="Draft complete"
-        description={`The draft ran on ${weekdayOf(league.kickoffAt)} and the room picked for you from your queue.`}
-        action={
-          <Link href={`/app/drafts/${league.draftId}`} className="text-sm font-medium text-accent underline">
-            See your roster
-          </Link>
-        }
-      />
+      <div className="flex flex-col gap-4">
+        <StatePanel
+          tone="neutral"
+          icon="check"
+          title="Draft complete"
+          description={`The draft ran on ${weekdayOf(league.kickoffAt)} and the room picked for you from your queue.`}
+          action={
+            <Link href={`/app/drafts/${league.draftId}`} className="text-sm font-medium text-accent underline">
+              See your roster
+            </Link>
+          }
+        />
+        {slotPreferenceResult}
+      </div>
     );
   }
 
@@ -267,6 +318,9 @@ export function WaitingRoom({
         {holdExpired ? (
           <p className="text-sm text-text-muted">Your hold ran out, so we seated you the ordinary way.</p>
         ) : null}
+        {/* The fill-and-join collision (above): this manager's own join is what started the
+            clock, so they see it too, not just the generic next-step hint below. */}
+        {fullSeatHero}
         <p className="text-sm text-text-muted">{`${next.heading}. ${next.body}`}</p>
       </div>
     );
@@ -284,19 +338,7 @@ export function WaitingRoom({
       />
     ) : full ? (
       <div className="flex flex-col gap-2">
-        <div data-testid="waiting-room-hero" className="flex flex-col items-center gap-3 rounded-lg border border-dashed border-line p-8 text-center">
-          <Icon name={showCountdownHero ? "bolt" : "users"} size={28} className="text-text-muted" />
-          <SeatMeter filled={league.filledTeams} total={league.teamCount} />
-          {showCountdownHero ? (
-            <div className="flex flex-col items-center gap-1">
-              <Countdown remainingMs={remainingMs ?? 0} size="xl" data-testid="waiting-room-countdown" />
-              <p role="status" className="text-sm text-text-muted">{`Starts in ${formatCoarseDuration(remainingMs ?? 0)}.`}</p>
-              {/* First-timer persona question, Step 5/6: "what happens if I'm not there?" —
-                  answered honestly, in C3's own phrasing, once the clock is actually running. */}
-              <p className="text-sm text-text-muted">Away when it starts? The room picks for you from your queue.</p>
-            </div>
-          ) : null}
-        </div>
+        {fullSeatHero}
         {canRelease ? (
           <div className="flex justify-center">
             <ReleaseSeatControl leagueId={league.leagueId} leagueName={leagueName} kickoffRolls={league.kickoffRolls} />
