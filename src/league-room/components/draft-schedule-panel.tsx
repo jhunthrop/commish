@@ -8,6 +8,7 @@ import type { DraftScheduleBody } from "../contract";
 import { Button, Input } from "@/components/ui";
 import { StatePanel } from "@/components/ui/state-panel";
 import { formatCoarseDuration, useCountdown } from "@/components/ui/countdown";
+import { rollNoticeSentence } from "@/matchmaking/roll";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
 const MS_PER_MINUTE = 60_000;
@@ -43,6 +44,18 @@ function formatLocal(iso: string): string {
 function formatRelativeCountdown(msUntil: number): string {
   if (msUntil <= 0) return "starting any moment";
   return `in ${formatCoarseDuration(msUntil)}`;
+}
+
+/**
+ * "3 seats are still open. Starting now drafts a short league." / "1 seat is still open.
+ * Starting now drafts a short league." (Task 7, Step 3) — the warning the commissioner's manual
+ * press gains rather than a refusal: the platform door is where the founder's "roll until full"
+ * ruling binds, but a private commissioner has no other way to ever draft if their twelfth
+ * friend never signs up, so the button stays live and honest about what pressing it does instead.
+ */
+function shortRoomWarning(openSeats: number): string {
+  const seat = openSeats === 1 ? "seat is" : "seats are";
+  return `${openSeats} ${seat} still open. Starting now drafts a short league.`;
 }
 
 /** `<input type="datetime-local">`'s own value format — no timezone, read and written in
@@ -122,10 +135,19 @@ export function DraftSchedulePanel({
   leagueId,
   isCommissioner,
   initialSchedule,
+  teamCount,
 }: {
   readonly leagueId: string;
   readonly isCommissioner: boolean;
   readonly initialSchedule: DraftScheduleBody;
+  /**
+   * Task 7's own short-room warning needs the league's own seat ceiling, and — the same reasoning
+   * `WaitingRoomLeague`'s own docblock already states for the identical field — `DraftScheduleBody`
+   * itself deliberately does not carry it (a third copy of a league's own seat count on the wire).
+   * `LeagueHome` (`./league-home.tsx`) already holds `home.teamCount` for its own header line, so
+   * this rides in as a second prop rather than widening the wire body.
+   */
+  readonly teamCount: number;
 }) {
   const { fetchJson } = useLeagueRoomDeps();
   const [schedule, setSchedule] = useState<DraftScheduleBody>(initialSchedule);
@@ -210,6 +232,24 @@ export function DraftSchedulePanel({
       <p className="text-sm text-text-muted">{"Nothing starts this automatically. Press Start the draft when everyone's ready."}</p>
     ) : null;
 
+  // Task 7 (F12/F21): only a SCHEDULED draft ever rolls (Step 2's own model ruling), so this
+  // never appears beside a `when_full` panel — `WaitingRoom` is that trigger's own surface.
+  const rolledNotice =
+    schedule.status !== "scheduled" || schedule.kickoffRolls <= 0 ? null : (
+      <p className="text-sm text-text-muted">{rollNoticeSentence(schedule.kickoffRolls)}</p>
+    );
+
+  // Task 7, Step 3: the commissioner's manual press keeps its two-team floor (this task does not
+  // change what `POST /api/drafts/[draftId]/start` accepts) but gains this warning — the one
+  // place the founder's "roll until full" ruling does not bind, named rather than left implicit.
+  const openSeats = teamCount - schedule.filledTeams;
+  const shortRoomNotice =
+    schedule.status !== "scheduled" || !isCommissioner || openSeats <= 0 ? null : (
+      <p role="status" className="text-sm text-warning">
+        {shortRoomWarning(openSeats)}
+      </p>
+    );
+
   const terminal = draftTerminalStatePanel(schedule);
   if (terminal !== null) return terminal;
 
@@ -281,6 +321,8 @@ export function DraftSchedulePanel({
         action={commissionerControls}
       />
       {autoStartNotice}
+      {rolledNotice}
+      {shortRoomNotice}
       {overnightPauseNotice}
       {startError === null ? null : (
         <p role="alert" className="text-sm text-negative">

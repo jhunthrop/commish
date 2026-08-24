@@ -298,6 +298,29 @@ export interface NoticeContexts {
   readonly house_league_filled: {
     readonly leagueName: string;
   };
+  /**
+   * `rollUnfilledDraftInTx`'s own notice (`@/league-service/roll`, Phase 3.6 Task 7, the
+   * founder's "roll until full" ruling) — sent to EVERY seated team the moment a `'scheduled'`
+   * draft's kickoff rolls forward because its room was not full at its target time.
+   * `SYSTEM_ACTION_VISIBILITY.draft_kickoff_rolled` (`@/integrity/system-actions`) is
+   * `"everyone"`, on `draft_fill_triggered`'s own reasoning: a fact about the league's shared
+   * calendar, true for everyone in it, about nobody's conduct.
+   *
+   * `rollSentence` and `startTimingSentence` arrive PRE-RENDERED (`rollNoticeSentence` and
+   * `describeStartTiming`, both `@/matchmaking/roll`) — the same "a template composes a
+   * sentence, it does not re-derive one from a payload shape" discipline `draft_fill_triggered`'s
+   * own `graceLabel` already holds this file to, and it is what makes this notice's last sentence
+   * and every other start-timing sentence in the product (F9) provably the same string rather
+   * than a second hand-typed copy of it. `showReleaseParagraph` is `kickoffRolls >= 2` (F12): the
+   * release door is named from the SECOND roll onward, never the first — offering the exit the
+   * first time something slips reads as the product giving up on its own room.
+   */
+  readonly draft_kickoff_rolled: {
+    readonly leagueName: string;
+    readonly rollSentence: string;
+    readonly startTimingSentence: string;
+    readonly showReleaseParagraph: boolean;
+  };
 }
 
 /**
@@ -505,6 +528,15 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   house_league_filled: () => ({
     title: "Your house league is full",
     body: "Your league is full and the draft is next. A new house league is open if you want a second team.",
+  }),
+  // No "no reply to this message" line: this is not a sanction, and there is nothing about any
+  // member's own conduct to appeal — it explains a fact about the league's shared calendar, the
+  // identical framing `draft_fill_triggered`'s own template already carries. `rollSentence` and
+  // `startTimingSentence` arrive pre-rendered (this file's own docblock explains why); the
+  // release paragraph only appears from the SECOND roll onward (F12).
+  draft_kickoff_rolled: ({ leagueName, rollSentence, startTimingSentence, showReleaseParagraph }) => ({
+    title: `Your draft in ${leagueName} moved`,
+    body: `${rollSentence} Your seat is still yours. ${startTimingSentence}${showReleaseParagraph ? " If you would rather not wait, you can release your seat and someone else can take it." : ""}`,
   }),
 };
 

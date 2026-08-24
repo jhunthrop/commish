@@ -14,6 +14,7 @@ import { signalsForUsersQuery } from "@/integrity-service/session-signals";
 import { completedSeasonsQuery } from "@/league-service/participation";
 import { browseQuery, houseShelfQuery } from "@/league-service/browse";
 import { leaguesNeedingAutoSetQuery } from "@/league-service/auto-lineup";
+import { dueUnfilledScheduledDraftsQuery } from "@/league-service/roll";
 import { draftsNext48hQuery, leaguesFilledQuery } from "@/league-service/proof";
 import { tradesQuery } from "@/league-service/trades";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
@@ -51,6 +52,26 @@ async function seedHouseShelfSample(db: Db): Promise<void> {
     FROM generate_series(1, 8) g
   `);
   await db.execute(sql`ANALYZE leagues, drafts`);
+}
+
+/**
+ * Phase 3.6, Task 7 (the founder's "roll until full" ruling). `seedRealisticCorpus` gives every
+ * league exactly `TEAMS_PER_LEAGUE` (3) real teams against a `team_count` of 12, so EVERY one of
+ * its ~50 due leagues (`DRAFT_DUE_INTERVAL`) is short a seat — a corpus that never has a full due
+ * room would measure only that the seat-count predicate always empties the result, nothing about
+ * its OWN selectivity. This layers a full room onto TWO of those due leagues (`lg100`, `lg200`)
+ * by filling their remaining nine seats, the same "small sample beside the big corpus" shape
+ * `seedHouseShelfSample` above already uses. The user ids are shifted by a constant the original
+ * `t=1..3` teams never reach (`teams_league_user_idx`'s own uniqueness — one team per user per
+ * league), so no insert collides with the seats `seedRealisticCorpus` already wrote.
+ */
+async function seedFullDueLeagueSample(db: Db): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO teams (id, league_id, user_id, name)
+    SELECT 'tmfull' || lg || '_' || t, 'lg' || lg, 'u' || (1 + ((lg * 7 + t + 100) % 200)), 'Team ' || t
+    FROM unnest(ARRAY[100, 200]) AS lg, generate_series(4, 12) AS t
+  `);
+  await db.execute(sql`ANALYZE teams`);
 }
 
 /** Only a `reviews`-owning proof-stats read needs this table, so it stays a small, dedicated
@@ -94,6 +115,7 @@ describe("hot read paths use indexes", () => {
     await truncateAll(db);
     await seedRealisticCorpus(db);
     await seedHouseShelfSample(db);
+    await seedFullDueLeagueSample(db);
     await seedReviewCorpus(db);
   }, 120_000);
 
@@ -268,11 +290,26 @@ describe("hot read paths use indexes", () => {
    * a Bitmap Index Scan finding every `scheduled` row, then a Bitmap Heap Scan applying
    * `kickoff_at <= now()` as a `Filter` AFTER the fetch — discarding 450 of 495 rows (91%) in this
    * corpus, uncapped by `maxDraftsPerTick` because the `ORDER BY id` sorts the full result before
-   * the `LIMIT` ever applies. `kickoff_at` shipped as the index's second column, so this
-   * assertion pins the FIXED shape: the composite `Index Cond` covers both predicates and nothing
-   * is fetched only to be thrown away.
+   * the `LIMIT` ever applies. `kickoff_at` shipped as the index's second column, so the
+   * `(status, kickoff_at)` half of this query's own `Index Cond` still covers both predicates —
+   * asserted below exactly as it always was.
+   *
+   * PHASE 3.6, TASK 7 (the founder's "roll until full" ruling). This query gained a THIRD
+   * predicate — a correlated seat count, `roomIsFull`'s own rule expressed in SQL
+   * (`@/matchmaking/roll`) — that Postgres cannot fold into the composite index the way it folds
+   * `status`/`kickoff_at`: it depends on `teams` and `leagues.team_count`, neither of which
+   * `drafts_status_idx` carries. `(status, kickoff_at)` still does every bit of the narrowing
+   * work it always did — asserted below exactly as it always was — and the seat-count predicate
+   * rides on top of that already-narrow candidate set rather than replacing it: measured here
+   * rather than assumed, on `seedFullDueLeagueSample`'s own two full rooms among this corpus's
+   * forty-five due-and-scheduled leagues (fifty candidates land on `g % 100 = 0`; five of those
+   * are ALSO `g % 1000 = 0`, `DRAFT_LIVE_INTERVAL`'s own overlap, and read `in_progress` instead
+   * of `scheduled` — the exact accounting the ORIGINAL "45 genuinely due rows" note already made).
+   * This scan now returns exactly the two full rooms; `dueUnfilledScheduledDraftsQuery`'s own
+   * assertion below is this test's mirror image — the SAME candidate set, the OPPOSITE seat-count
+   * comparison, the other forty-three rows.
    */
-  it("the auto-start due-kickoff scan seeks on (status, kickoff_at) together, discarding nothing", async () => {
+  it("the auto-start due-kickoff scan still seeks on (status, kickoff_at), then filters to full rooms only", async () => {
     const plan = await explainPlan(db, dueDraftsQuery(db, new Date().toISOString()));
     expect(sequentiallyScannedRelations(plan)).not.toContain("drafts");
     const usedIndex = indexScanNode(plan, "drafts_status_idx");
@@ -281,13 +318,28 @@ describe("hot read paths use indexes", () => {
     // doing its job, not merely present in the plan by name.
     expect(usedIndex?.["Index Cond"]).toContain("status");
     expect(usedIndex?.["Index Cond"]).toContain("kickoff_at");
-    // And the node that actually touches `drafts` heap pages (the Bitmap Heap Scan one level up
-    // from the Bitmap Index Scan `indexScanNode` found) carries no `Filter` at all: every row the
-    // index returned was one of the 45 genuinely due rows, none fetched only to be discarded.
-    const draftsNode = findNode(plan, (node) => node["Relation Name"] === "drafts");
-    expect(draftsNode).toBeDefined();
-    expect(draftsNode?.Filter).toBeUndefined();
-    expect(draftsNode?.["Rows Removed by Filter"] ?? 0).toBe(0);
+    // The correctness claim itself, measured directly rather than inferred from plan shape: only
+    // the two rooms `seedFullDueLeagueSample` actually filled come back.
+    const rows = await dueDraftsQuery(db, new Date().toISOString());
+    expect(rows).toHaveLength(2);
+  });
+
+  /**
+   * Phase 3.6, Task 7: `dueUnfilledScheduledDraftsQuery`'s (`@/league-service/roll`) own scan —
+   * the roll's half of the same due population `dueDraftsQuery` above now excludes. Same corpus,
+   * same `(status, kickoff_at)` index condition, the OPPOSITE seat-count comparison: the
+   * forty-three due-and-scheduled leagues that are NOT full (forty-five candidates minus the two
+   * `seedFullDueLeagueSample` filled all the way).
+   */
+  it("the roll's own due-unfilled scan seeks on the same index, and finds the OTHER forty-three rows", async () => {
+    const plan = await explainPlan(db, dueUnfilledScheduledDraftsQuery(db, new Date().toISOString()));
+    expect(sequentiallyScannedRelations(plan)).not.toContain("drafts");
+    const usedIndex = indexScanNode(plan, "drafts_status_idx");
+    expect(usedIndex).toBeDefined();
+    expect(usedIndex?.["Index Cond"]).toContain("status");
+    expect(usedIndex?.["Index Cond"]).toContain("kickoff_at");
+    const rows = await dueUnfilledScheduledDraftsQuery(db, new Date().toISOString());
+    expect(rows).toHaveLength(43);
   });
 
   /**

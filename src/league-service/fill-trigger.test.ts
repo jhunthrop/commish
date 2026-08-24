@@ -175,6 +175,29 @@ describe("fireWhenFullInTx, driven through the real join door", () => {
     expect(clockTierFor(FIXED_NOW, plusSeconds(FIXED_NOW, GRACE)).pickSeconds).toBe(90);
   });
 
+  // Phase 3.6, Task 7: the guard is now `drafts.fill_fired_at`, not a notice-existence check —
+  // this proves the column itself is what the guard reads, and that clearing it (the exact write
+  // Task 8's `releaseSeat` makes once it can un-fill a league mid-grace) lets a genuinely second
+  // fire go through, which a notice-shaped guard could never have allowed (notices are
+  // audit-anchored and nothing deletes one).
+  it("fires a second time once fill_fired_at is cleared — the exact write releaseSeat makes", async () => {
+    const { leagueId } = await seedLeague({ teamCount: 2, startTrigger: "when_full" });
+    await db.insert(users).values({ id: "u_first_fill", email: "u_first_fill@test.local", displayName: "First Fill" });
+    await joinPublicLeague({ db, newId, clock }, { leagueId, userId: "u_first_fill" });
+    expect(await kickoffOf(leagueId)).toBe(plusSeconds(FIXED_NOW, GRACE));
+
+    const [before] = await db.select({ fillFiredAt: drafts.fillFiredAt }).from(drafts).where(eq(drafts.leagueId, leagueId));
+    expect(before?.fillFiredAt).not.toBeNull();
+
+    // Simulate `releaseSeat` clearing the guard (Task 8's own write, not exercised here).
+    await db.update(drafts).set({ fillFiredAt: null }).where(eq(drafts.leagueId, leagueId));
+
+    const laterNow = plusSeconds(FIXED_NOW, 999);
+    const second = await db.transaction((tx) => fireWhenFullInTx(tx, leagueId, laterNow));
+    expect(second).toEqual({ fired: true, kickoffAt: plusSeconds(laterNow, GRACE) });
+    expect(await fillTriggeredNotices(leagueId)).toHaveLength(4); // 2 members x 2 real fires
+  });
+
   it("refuses a repeat call once it has already fired, and writes nothing more", async () => {
     const { leagueId } = await seedLeague({ teamCount: 2, startTrigger: "when_full" });
     await db.insert(users).values({ id: "u_last_twice", email: "u_last_twice@test.local", displayName: "Last In" });

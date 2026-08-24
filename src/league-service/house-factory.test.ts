@@ -9,6 +9,7 @@ import type { AuditLogger } from "@/integrity-service/audit-logger";
 import { HOUSE_CATALOG, houseKickoffFor, type HouseRungName } from "@/matchmaking/house-catalog";
 import { ensureHouseCatalog, openHouseLeaguesQuery, type HouseFactoryDeps } from "./house-factory";
 import { joinPublicLeague } from "./join";
+import { rollDueDrafts } from "./roll";
 
 const db = createTestDb();
 const dbOne = createTestDb();
@@ -308,6 +309,62 @@ describe("a stale scheduled-trigger house league", () => {
 
     const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, "house_open_12_1"));
     expect(row?.status).toBe("in_progress");
+  });
+});
+
+/**
+ * PHASE 3.6, TASK 7 — THE COMPOSITION THIS DESCRIBE BLOCK'S OWN DOCBLOCK PROMISED. "No abandonment
+ * state machine ships with this fix (Phase 3.6's Task 7, 'roll until full', replaces this whole
+ * door)" — this is that replacement, proven rather than asserted. A stale scheduled-trigger house
+ * league does not sit retired forever waiting for a fresh edition to paper over it: the SAME
+ * `dueDraftsQuery`/`autoStartDueDrafts` scan that starts a full public league (`ENFORCED_LEAGUE_
+ * SQL` is `is_public_matchmade = true`, and a house league's own `spawnHouseLeagueInTx` always
+ * writes that) finds this one too, sees its room is not full, and ROLLS its kickoff forward
+ * instead. The instant that write lands, `houseKickoffStillAhead` reads TRUE again for this exact
+ * row — the identical predicate `houseShelfQuery` (public) and `openHouseLeaguesQuery`
+ * (reconciler) both already gate on — so the league re-enters BOTH roles on the very same write
+ * that retired it, with no separate "unstall" step and no state this task had to invent.
+ */
+describe("a stale scheduled-trigger house league composes with the roll (Task 7)", () => {
+  it("rolls instead of stalling, and re-enters the shelf the instant its kickoff moves forward", async () => {
+    await ensureHouseCatalog(db, deps());
+    const rung = HOUSE_CATALOG.rungs.open_12;
+    const leagueId = "house_open_12_1";
+
+    // A short room, the exact shape the founder's ruling exists for — some seats taken, not all.
+    const [league] = await db.select({ teamCount: leagues.teamCount }).from(leagues).where(eq(leagues.id, leagueId));
+    const shortOf = 3;
+    for (let i = 0; i < (league?.teamCount ?? 0) - shortOf; i++) {
+      const userId = `stall_filler_${++filler}`;
+      await db.insert(users).values({ id: userId, email: `${userId}@test.local`, displayName: userId }).onConflictDoNothing();
+      const outcome = await joinPublicLeague({ db, newId, clock }, { leagueId, userId });
+      if (!outcome.ok) throw new Error(outcome.reason);
+    }
+
+    // `open_12`'s first slot kicks off `firstKickoffMinutes` out; this is a minute past that —
+    // the identical instant `justPastTheFirstKickoff` (the stall describe block above) computes.
+    const dueAt = new Date(Date.parse(houseKickoffFor(NOW, rung, 0)) + 60_000).toISOString();
+    const laterClock = { now: () => dueAt };
+    // Off the shelf, exactly as the existing stall test already proves.
+    expect((await openHouseLeaguesQuery(db, "open_12", laterClock.now())).map((row) => row.id)).not.toContain(leagueId);
+
+    // THE COMPOSITION: the roll finds it (still short a seat, still due) and moves its kickoff
+    // forward — never starts it, because `roomIsFull` still says no.
+    const outcomes = await rollDueDrafts(db, { clock: laterClock });
+    const draftId = await draftIdOf(db, leagueId);
+    const rolledThisLeague = outcomes.find((outcome) => outcome.draftId === draftId);
+    expect(rolledThisLeague).toMatchObject({ rolled: true });
+
+    const [draft] = await db.select({ kickoffAt: drafts.kickoffAt, kickoffRolls: drafts.kickoffRolls }).from(drafts).where(eq(drafts.id, draftId));
+    expect(draft?.kickoffRolls).toBe(1);
+    expect(Date.parse(draft!.kickoffAt.toISOString())).toBeGreaterThan(Date.parse(laterClock.now()));
+
+    // BACK ON THE SHELF — the SAME `houseKickoffStillAhead` predicate that retired it a moment
+    // ago now reads TRUE again for the SAME row, with no second write and no unstall step.
+    expect((await openHouseLeaguesQuery(db, "open_12", laterClock.now())).map((row) => row.id)).toContain(leagueId);
+    // And the reconciler, asked again right now, sees the shelf as it actually is — full width,
+    // not short one slot the way the old retire-and-replace shape would have reported it.
+    expect(await openCountOf(db, "open_12")).toBe(rung.openAtOnce);
   });
 });
 

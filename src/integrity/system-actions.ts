@@ -40,6 +40,14 @@ export const SYSTEM_ACTION_CODES = [
    * notify, and Task 14's shelf-replacement notice is the one this addendum sends a member.
    */
   "house_league_opened",
+  /**
+   * The roll (Phase 3.6, Task 7, the founder's "roll until full" ruling):
+   * `rollUnfilledDraftInTx` (`@/league-service/roll`) pushing a `'scheduled'` draft's kickoff
+   * forward because its room was not full at its target time. `NoticeContexts.
+   * draft_kickoff_rolled` (`@/integrity/notices`) is its own notice, the identical
+   * one-code-many-notices shape `draft_auto_started`/`draft_fill_triggered` both already use.
+   */
+  "draft_kickoff_rolled",
 ] as const;
 
 export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
@@ -93,6 +101,11 @@ export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
  *    is a fact about a league nobody is in yet, true for whoever reads the chain, about nobody's
  *    conduct — the first person to walk in should be able to read that the platform opened it and
  *    when.
+ *  - `draft_kickoff_rolled` is ALLOWED to everyone (Phase 3.6, Task 7), on `draft_fill_triggered`'s
+ *    reasoning exactly: a fact about the league's shared calendar, true for everyone in it, about
+ *    nobody's conduct. A member whose draft just moved is owed the sentence that says so, and the
+ *    ruling that founded this task ("no draft ever fires below a full room") makes that sentence a
+ *    load-bearing part of the promise, not merely a courtesy.
  */
 export type SystemActionVisibility = "everyone" | "subject_only" | "hidden";
 
@@ -106,6 +119,7 @@ export const SYSTEM_ACTION_VISIBILITY: Readonly<Record<SystemActionCode, SystemA
   draft_pick_skipped: "subject_only",
   draft_fill_triggered: "everyone",
   house_league_opened: "everyone",
+  draft_kickoff_rolled: "everyone",
 };
 
 /**

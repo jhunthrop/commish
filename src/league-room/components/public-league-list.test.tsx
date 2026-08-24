@@ -70,6 +70,7 @@ const HOUSE_LEAGUE: PublicLeagueSummary = {
   heldSeats: 0,
   rosterSummary: "15 slots, 1 flex",
   playoffWeeks: [15, 16, 17],
+  kickoffRolls: 0,
 };
 
 describe("HouseLeagueShelf", () => {

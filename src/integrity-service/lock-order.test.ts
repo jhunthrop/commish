@@ -2945,6 +2945,29 @@ describe("the leagues-before-drafts rule", () => {
 });
 
 /**
+ * PHASE 3.6, TASK 7 — `rollUnfilledDraftInTx` (`@/league-service/roll`) VERIFIED AGAINST THE
+ * RULE ABOVE, DELIBERATELY NOT EXTENDING IT THE SAME WAY. Every OTHER writer that reaches both
+ * `leagues` and `drafts` in this branch (`joinLeagueInTx`, `setDraftKickoff`, `applyAction`) takes
+ * `leagues FOR UPDATE` first, as its own statement, on the rule this file's own "leagues-before-
+ * drafts" block fixed a real reproduced cycle to establish. `rollUnfilledDraftInTx` does NOT: it
+ * has no caller that already holds that lock for an unrelated reason (unlike `claimAutoStart`'s
+ * `applyAction` or `fireWhenFullInTx`'s `joinLeagueInTx`), and taking the lock itself would break
+ * a DIFFERENT property this function needs more — two concurrent rolls of the SAME draft must
+ * RACE (one write wins, the other reports a clean no-op via its guarded `UPDATE`'s own zero-rows
+ * return), not serialize into two sequential successes. A `leagues FOR UPDATE` preamble would
+ * serialize them: the second caller, unblocked after the first commits, would re-read the row
+ * fresh and see a genuinely-still-due, genuinely-still-unfilled league — and honestly roll it a
+ * SECOND time, which is correct in isolation and wrong for the race guarantee
+ * `src/league-service/roll.test.ts`'s own "survives two instances rolling the same draft on the
+ * same tick" test pins. `rollUnfilledDraftInTx`'s own docblock states the resulting tradeoff in
+ * full: a narrow, deadlock-detector-recoverable window against a `setDraftKickoff` racing the
+ * IDENTICAL draft at the IDENTICAL instant, left open rather than resolved, because closing it
+ * would cost the race guarantee this function's own tests already depend on. Flagged here as the
+ * one place in this branch that read the leagues-before-drafts rule and chose not to apply it,
+ * with the reason written down rather than the choice left for a future reader to rediscover.
+ */
+
+/**
  * PHASE 3.6, TASK 6. `claimSeatHold` (`@/league-service/seat-hold`) takes `leagues[X] FOR UPDATE`
  * FIRST, its own statement, before counting either real seats or live holds — the identical order
  * `joinLeagueInTx` already establishes (Step 2's own docblock: "the identical leagues-then-child

@@ -41,6 +41,7 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "heldSeats",
   "rosterSummary",
   "playoffWeeks",
+  "kickoffRolls",
 ];
 
 /**
@@ -262,6 +263,7 @@ export function browseQuery(db: Db, filter: BrowseFilter, options: BrowseQueryOp
       // proof for the planner.
       kickoffAt: drafts.kickoffAt,
       startTrigger: drafts.startTrigger,
+      kickoffRolls: drafts.kickoffRolls,
       newcomers: newcomerSeats,
       veterans: veteranSeats,
     })
@@ -374,6 +376,7 @@ export function houseShelfQuery(db: Db, nowIso: string) {
       filledTeams: sql<number>`count(${teams.id})::int`,
       kickoffAt: drafts.kickoffAt,
       startTrigger: drafts.startTrigger,
+      kickoffRolls: drafts.kickoffRolls,
       newcomers: newcomerSeats,
       veterans: veteranSeats,
     })
@@ -463,6 +466,7 @@ interface SummarizableRow {
   readonly filledTeams: number;
   readonly kickoffAt: Date;
   readonly startTrigger: "scheduled" | "when_full";
+  readonly kickoffRolls: number;
   readonly newcomers: number;
   readonly veterans: number;
 }
@@ -513,6 +517,7 @@ function summarizeRow(
     heldSeats: heldSeatsByLeagueId.get(row.id) ?? 0,
     rosterSummary: rosterSummaryFor(row.rosterSlots),
     playoffWeeks: PLAYOFF_WEEKS,
+    kickoffRolls: row.kickoffRolls,
   };
 }
 

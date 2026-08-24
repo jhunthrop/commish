@@ -209,4 +209,10 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
   draft_pick_skipped: { leagueName: "Sunday Money" },
   draft_fill_triggered: { leagueName: "Sunday Money", graceLabel: "5 minutes" },
   house_league_filled: { leagueName: "Open 12-team League 3" },
+  draft_kickoff_rolled: {
+    leagueName: "Sunday Money",
+    rollSentence: "This draft moved once because the room was not full.",
+    startTimingSentence: "The draft starts as soon as the last seat is taken, or when your commissioner starts it.",
+    showReleaseParagraph: false,
+  },
 };

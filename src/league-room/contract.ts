@@ -86,6 +86,14 @@ export interface DraftScheduleBody {
   /** `null` only for a caller with no team in this league (a commissioner without one of
    *  their own) — a ranking is scoped to a team, so there is nothing to show them. */
   readonly slotPreference: SlotPreferenceView | null;
+  /**
+   * Phase 3.6, Task 7: how many times this SCHEDULED draft's kickoff has rolled forward because
+   * its room was not full at its target time — the same fact `PublicLeagueSummary.kickoffRolls`
+   * discloses to a stranger, read here by a member on their own league's home/waiting room.
+   * `0` for a draft that has never rolled, which is every `when_full` draft by construction. Read
+   * through `rollNoticeSentence` (`@/matchmaking/roll`), never rendered as a bare number.
+   */
+  readonly kickoffRolls: number;
 }
 
 export interface CreateLeagueBody {

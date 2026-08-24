@@ -68,7 +68,12 @@ export function LeagueHome({
           isCommissioner={home.isCommissioner}
         />
       ) : (
-        <DraftSchedulePanel leagueId={home.leagueId} isCommissioner={home.isCommissioner} initialSchedule={home.draftSchedule} />
+        <DraftSchedulePanel
+          leagueId={home.leagueId}
+          isCommissioner={home.isCommissioner}
+          initialSchedule={home.draftSchedule}
+          teamCount={home.teamCount}
+        />
       )}
 
       {/* Task 6: NFFC's Kentucky Derby System. `null` only for a caller with no team here (a

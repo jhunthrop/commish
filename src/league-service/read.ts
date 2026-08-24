@@ -145,7 +145,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
   const matchupRows = await db.select().from(matchups).where(eq(matchups.leagueId, leagueId));
   const teamRows = await db.select({ id: teams.id, name: teams.name, userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
   const [draft] = await db
-    .select({ id: drafts.id, status: drafts.status, kickoffAt: drafts.kickoffAt, startTrigger: drafts.startTrigger })
+    .select({ id: drafts.id, status: drafts.status, kickoffAt: drafts.kickoffAt, startTrigger: drafts.startTrigger, kickoffRolls: drafts.kickoffRolls })
     .from(drafts)
     .where(eq(drafts.leagueId, leagueId));
   // `leagueTerms`'s one input this function did not already hold — every other field it needs
@@ -228,6 +228,7 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
           // decide between `WaitingRoom` and `DraftSchedulePanel`, and `WaitingRoom`'s own fill
           // line.
           startTrigger: draft.startTrigger,
+          kickoffRolls: draft.kickoffRolls,
           filledTeams: teamCards.length,
           // Task 6: NFFC's Kentucky Derby System. Shared with `draftScheduleView`
           // (`./draft-schedule`, the route's own read) so this page's initial render and a

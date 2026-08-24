@@ -1,8 +1,9 @@
-import { and, asc, eq, lte } from "drizzle-orm";
+import { and, asc, eq, lte, sql } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
-import { drafts, leagues } from "@/db/schema";
+import { drafts, leagues, teams } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { ENFORCED_LEAGUE_SQL, enforcementIsSwitchedOn } from "@/league-service/enforcement";
+import { rollDueDrafts } from "@/league-service/roll";
 import { DRAFT_SERVICE_CONFIG } from "./config";
 import type { DraftStore } from "./store";
 
@@ -68,7 +69,18 @@ export async function claimAutoStart(tx: DbTx, draftId: string): Promise<boolean
 export interface AutoStartOutcome {
   readonly draftId: string;
   readonly started: boolean;
-  /** Present only when `started` is `false` — a plain-language reason, never a driver message. */
+  /**
+   * Phase 3.6, Task 7 (the founder's "roll until full" ruling): `true` when this draft's kickoff
+   * was ROLLED forward instead of started, because its due room was not full — the other half of
+   * the same door `dueDraftsQuery`'s own seat-count predicate now separates. Present only on a
+   * roll outcome; absent (never `false`) on an ordinary start or an ordinary start-refusal, the
+   * same "absent, not a redundant boolean" shape `reason` already keeps.
+   */
+  readonly rolled?: boolean;
+  /** Present only when `rolled` is `true` — the ISO instant the kickoff moved to. */
+  readonly kickoffAt?: string;
+  /** Present only when `started` and `rolled` are both `false` — a plain-language reason, never a
+   *  driver message. */
   readonly reason?: string;
 }
 
@@ -86,6 +98,19 @@ export interface AutoStartDeps {
  * `DRAFT_SERVICE_CONFIG.maxDraftsPerTick` so one tick can't starve the event loop scanning a
  * backlog.
  *
+ * Phase 3.6, Task 7 (the founder's "roll until full" ruling — THE BUG THIS TASK EXISTS FOR): a
+ * due draft with an open seat is never a draft this scan starts. The seat count is `roomIsFull`'s
+ * own rule (`@/matchmaking/roll`), applied here as a SQL predicate — a correlated `count(*)` over
+ * `teams`, bounded by construction at a dozen rows per league — so the scan itself can no longer
+ * return a 3-of-12 public league whose kickoff has passed, the exact defect a 3-of-12 league
+ * drafted on `main` before this task. `dueUnfilledScheduledDraftsQuery`
+ * (`@/league-service/roll`) is this predicate's mirror image: the SAME due population, the
+ * OPPOSITE seat-count comparison, for the roll that replaces the start this query now refuses.
+ * The query filters here; `rollUnfilledDraftInTx` re-derives `roomIsFull` once more, in
+ * TypeScript, immediately before its own guarded write — the identical "the query filters, the
+ * code decides" discipline `browseQuery`/`matchesBrowseFilter` already hold each other to over
+ * one seeded corpus.
+ *
  * Exported as the query BUILDER (not yet awaited) rather than folded into `dueDraftIds` below, the
  * same shape `browseQuery`/`chatPageQuery`/`pendingFlagQuery` already use — the one seam an
  * `EXPLAIN` assertion can wrap without running the query twice or duplicating its shape.
@@ -95,7 +120,14 @@ export function dueDraftsQuery(db: Db, nowIso: string) {
     .select({ draftId: drafts.id })
     .from(drafts)
     .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
-    .where(and(eq(drafts.status, "scheduled"), lte(drafts.kickoffAt, new Date(nowIso)), ENFORCED_LEAGUE_SQL))
+    .where(
+      and(
+        eq(drafts.status, "scheduled"),
+        lte(drafts.kickoffAt, new Date(nowIso)),
+        ENFORCED_LEAGUE_SQL,
+        sql`(select count(*)::int from ${teams} where ${teams.leagueId} = ${leagues.id}) >= ${leagues.teamCount}`,
+      ),
+    )
     .orderBy(asc(drafts.id))
     .limit(DRAFT_SERVICE_CONFIG.maxDraftsPerTick);
 }
@@ -161,6 +193,23 @@ export async function autoStartDueDrafts(db: Db, deps: AutoStartDeps): Promise<r
       console.error("[draft] auto-start failed for draft", draftId, error);
       outcomes.push({ draftId, started: false, reason: "Something went wrong starting this draft." });
     }
+  }
+
+  // Task 7: the roll is the other half of this same door. `dueDraftsQuery` above now finds only
+  // the FULL half of the due population (its own docblock); `rollDueDrafts`
+  // (`@/league-service/roll`) finds the other half — due, `'scheduled'`-trigger, still short a
+  // seat — and moves each one's kickoff forward instead of starting it. Merged into ONE returned
+  // array, on the SAME `enforcementIsSwitchedOn`/`ENFORCED_LEAGUE_SQL` gate this function itself
+  // already applies (`rollDueDrafts` asks the identical question again, for the same reason
+  // `startOneDraft`'s own defense-in-depth re-derivations exist), so a caller scanning "what
+  // happened to every due draft this tick" reads both halves of the answer from one call.
+  const rolled = await rollDueDrafts(db, { clock: deps.clock });
+  for (const outcome of rolled) {
+    outcomes.push(
+      outcome.rolled
+        ? { draftId: outcome.draftId, started: false, rolled: true, kickoffAt: outcome.kickoffAt }
+        : { draftId: outcome.draftId, started: false, rolled: false, reason: outcome.reason },
+    );
   }
   return outcomes;
 }

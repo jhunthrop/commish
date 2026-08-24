@@ -5,6 +5,7 @@ import { Countdown, formatCoarseDuration, useCountdown } from "@/components/ui/c
 import { StatePanel } from "@/components/ui/state-panel";
 import type { LeagueAuthority } from "@/league-service/authority";
 import { hasOpenSeat } from "@/matchmaking/filter";
+import { rollNoticeSentence } from "@/matchmaking/roll";
 import type { DraftScheduleBody } from "../contract";
 import { draftTerminalStatePanel } from "./draft-schedule-panel";
 
@@ -114,7 +115,16 @@ export function WaitingRoom({ league, isCommissioner }: { readonly league: Waiti
       tone="neutral"
       icon="users"
       title={`${league.filledTeams} of ${league.teamCount} seats taken`}
-      description="You don't have to wait here. We'll let you know the moment it fills."
+      description={
+        // Task 7 (F12/F21): only a SCHEDULED draft ever rolls (Step 2's own model ruling — a
+        // `when_full` league has no target time to be late for until it fills), so this line
+        // replaces the ordinary reassurance rather than appending to it: a rolled member is
+        // being told something more specific than "we'll let you know", the fact they are
+        // actually tracking.
+        league.startTrigger === "scheduled" && league.kickoffRolls > 0
+          ? rollNoticeSentence(league.kickoffRolls)
+          : "You don't have to wait here. We'll let you know the moment it fills."
+      }
       action={
         <div className="flex flex-wrap items-center justify-center gap-4">
           {isHouse || !isCommissioner ? null : (

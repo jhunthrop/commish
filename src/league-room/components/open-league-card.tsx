@@ -5,7 +5,7 @@ import { SignInLink } from "@/components/app-shell/sign-in-link";
 import type { DraftFormat } from "@/domain/league";
 import type { TermKey } from "@/help/glossary";
 import type { HelpLevel } from "@/identity/preferences";
-import { describeStartTiming } from "@/matchmaking/roll";
+import { describeStartTiming, rollNoticeSentence } from "@/matchmaking/roll";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
 import { HOUSE_RUNG_LABEL } from "@/matchmaking/house-catalog";
@@ -97,7 +97,7 @@ export interface OpenLeagueCardProps {
  * every other reader away from rendering as though somebody chose it.
  */
 export function OpenLeagueCard({ league, signedIn }: OpenLeagueCardProps) {
-  const authorityKind: "house" | "member" = league.houseRung === null ? "member" : "house";
+  const authority: "house" | "member" = league.houseRung === null ? "member" : "house";
   const isBeginnerOnly = league.experienceTier === "beginner";
 
   return (
@@ -146,8 +146,15 @@ export function OpenLeagueCard({ league, signedIn }: OpenLeagueCardProps) {
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Drafts</p>
           <p className={`font-medium ${league.startTrigger === "when_full" ? "text-warning" : "text-text-primary"}`}>
-            {league.startTrigger === "when_full" ? describeStartTiming({ startTrigger: "when_full", authorityKind }) : league.draftAt}
+            {league.startTrigger === "when_full" ? describeStartTiming({ startTrigger: "when_full", authority }) : league.draftAt}
           </p>
+          {/* Task 7 (F12/F21): `kickoffRolls` is `PublicLeagueSummary`'s own field, read here
+              rather than silently showing a different date than the one a visitor is comparing
+              against their own calendar — only a SCHEDULED league can ever roll (Step 2's own
+              model ruling), so a `when_full` card never renders this line. */}
+          {league.startTrigger === "scheduled" && league.kickoffRolls > 0 ? (
+            <p className="mt-1 text-xs text-text-muted">{rollNoticeSentence(league.kickoffRolls)}</p>
+          ) : null}
         </div>
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Who</p>

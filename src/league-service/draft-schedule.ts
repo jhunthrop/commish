@@ -68,6 +68,8 @@ interface DraftRow {
   readonly teamCount: number;
   /** Phase 3.5, Task 8: which of the two ways this draft's `kickoffAt` comes to be set. */
   readonly startTrigger: "scheduled" | "when_full";
+  /** Phase 3.6, Task 7: how many times the roll has pushed this draft's kickoff forward. */
+  readonly kickoffRolls: number;
 }
 
 /** One league's draft row, joined to the one fact about its league every caller here needs:
@@ -83,6 +85,7 @@ async function draftRowForLeague(db: Db, leagueId: string): Promise<DraftRow | u
       isPublicMatchmade: leagues.isPublicMatchmade,
       teamCount: leagues.teamCount,
       startTrigger: drafts.startTrigger,
+      kickoffRolls: drafts.kickoffRolls,
     })
     .from(drafts)
     .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
@@ -157,6 +160,7 @@ export async function draftScheduleView(db: Db, leagueId: string, userId: string
     kickoffAt: row.kickoffAt.toISOString(),
     isPublicMatchmade: row.isPublicMatchmade,
     startTrigger: row.startTrigger,
+    kickoffRolls: row.kickoffRolls,
     filledTeams: teamRows.length,
     slotPreference: await slotPreferenceViewFor(db, {
       draftId: row.draftId,

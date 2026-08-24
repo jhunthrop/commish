@@ -24,6 +24,16 @@ interface SeedDraftInput {
    *  default, so every existing caller keeps seeding a private league without change. Task 7's
    *  own tests are the first to pass `true`. */
   readonly isPublicMatchmade?: boolean;
+  /**
+   * Phase 3.6, Task 7: how many of `teamCount` seats are actually FILLED with a real `teams`
+   * row — defaults to `teamCount` itself, so every existing caller keeps seeding a fully-seated
+   * league unchanged. Task 7's own bug-report test is the first to seed a league whose room is
+   * short, because that is the exact shape the founder's "roll until full" ruling exists for.
+   */
+  readonly filledTeams?: number;
+  /** Defaults to `"scheduled"` — `leagues.start_trigger`'s own default, so every existing caller
+   *  keeps seeding a commissioner-timed draft unchanged. */
+  readonly startTrigger?: "scheduled" | "when_full";
 }
 
 /** Module-private — see `SeedDraftInput` above. */
@@ -36,8 +46,9 @@ interface DraftFixture {
 
 /** Inserts users, a league, its teams and a scheduled draft. Test-only. */
 export async function seedDraftFixture(db: Db, input: SeedDraftInput): Promise<DraftFixture> {
+  const filledTeams = input.filledTeams ?? input.teamCount;
   const userIds = Array.from({ length: input.teamCount }, (_, i) => `${input.leagueId}_user_${i + 1}`);
-  const teamIds = Array.from({ length: input.teamCount }, (_, i) => `${input.leagueId}_team_${i + 1}`);
+  const teamIds = Array.from({ length: filledTeams }, (_, i) => `${input.leagueId}_team_${i + 1}`);
 
   await db.insert(users).values(userIds.map((id) => ({ id, email: `${id}@test.local`, displayName: id })));
   await db.insert(leagues).values({
@@ -59,6 +70,7 @@ export async function seedDraftFixture(db: Db, input: SeedDraftInput): Promise<D
     status: "scheduled",
     kickoffAt: input.kickoffAt,
     auctionBudget: input.auctionBudget,
+    startTrigger: input.startTrigger ?? "scheduled",
   });
 
   return { draftId: input.draftId, leagueId: input.leagueId, teamIds, userIds };

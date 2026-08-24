@@ -1,6 +1,6 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import type { DbTx } from "@/db/client";
-import { drafts, leagues, memberNotices, teams } from "@/db/schema";
+import { drafts, leagues, teams } from "@/db/schema";
 import { formatClockLength, MS_PER_SECOND } from "@/domain/duration";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
@@ -48,9 +48,11 @@ export const FILL_TRIGGER_REFUSALS = {
   notFull: "This league still has an open seat.",
   /** The draft has already left `'scheduled'` — nothing about a kickoff is left to set. */
   alreadyStarted: "This draft has already started.",
-  /** A `draft_fill_triggered` notice already exists for this league — this call is a repeat,
+  /** `drafts.fill_fired_at` is already stamped for this draft — this call is a repeat,
    *  structurally impossible through `joinLeagueInTx` alone (a full league refuses every further
-   *  join before it ever reaches this function again) but real for any other caller. */
+   *  join before it ever reaches this function again) but real for any other caller. Phase 3.6,
+   *  Task 7: a COLUMN guard, not a notice-existence check — see this function's own docblock for
+   *  why the notice-shaped guard had to go the moment a released seat could un-fill a league. */
   alreadyFired: "This league already fired its fill trigger.",
 } as const;
 
@@ -93,12 +95,21 @@ export type FireWhenFullOutcome =
  * `joinLeagueInTx`'s own capacity check refuses every further join before it ever reaches an
  * insert, so in ordinary use this function is invoked with a truly-just-filled league at most
  * once, ever. The dedicated check exists anyway, for a caller outside that guarantee: before
- * writing anything, it looks for an existing `draft_fill_triggered` notice on this league — the
- * same "read before you write, so a repeat asks for nothing twice" discipline
- * `recordTierBlockedJoin` (`./join`) already uses for an unrelated repeat. Found, it refuses
- * without writing kickoff, notice or audit event; not found, this call owns the fire.
- * NO-WRITE-BEFORE-REFUSAL holds throughout: every refusal branch below returns before the
- * `UPDATE` is ever reached.
+ * writing anything, it reads `drafts.fill_fired_at` off the SAME row this function already
+ * selected — `null` means this call owns the fire; a real instant means a repeat, refused
+ * without writing kickoff, notice or audit event.
+ *
+ * Phase 3.6, Task 7: this guard USED TO look for an existing `draft_fill_triggered` notice
+ * instead — the same "read before you write" discipline `recordTierBlockedJoin` (`./join`)
+ * still uses for an unrelated repeat, and it worked exactly as long as a league could only ever
+ * fill once. Task 8's `releaseSeat` breaks that: a league that fills, loses a seated member
+ * during the grace window, and fills again is a league this function must fire for TWICE, and a
+ * notice-shaped guard would refuse the second fire forever — notices are audit-anchored and
+ * nothing ever deletes one, so "delete the notice" was never an available fix. `fill_fired_at` is
+ * a COLUMN instead: stamped here, on the same `UPDATE` that writes `kickoff_at`, and cleared back
+ * to `null` by `releaseSeat` the moment a released seat genuinely un-fills the room — one guard,
+ * one column, one writer of the clear. NO-WRITE-BEFORE-REFUSAL holds throughout: every refusal
+ * branch below returns before the `UPDATE` is ever reached.
  *
  * FK ACQUISITIONS, ENUMERATED (binding controller ruling, Plan C's H2 lesson: a lock-order review
  * must enumerate foreign keys). `UPDATE drafts SET kickoff_at` takes the draft row's own lock plus
@@ -127,6 +138,7 @@ export async function fireWhenFullInTx(
       draftId: drafts.id,
       status: drafts.status,
       startTrigger: drafts.startTrigger,
+      fillFiredAt: drafts.fillFiredAt,
       teamCount: leagues.teamCount,
       leagueName: leagues.name,
       houseRung: leagues.houseRung,
@@ -140,6 +152,11 @@ export async function fireWhenFullInTx(
   if (row.status !== "scheduled") {
     return { fired: false, reason: FILL_TRIGGER_REFUSALS.alreadyStarted };
   }
+  // Phase 3.6, Task 7: the column guard — see this function's own docblock for why a notice-
+  // existence check could not survive Task 8's `releaseSeat` un-filling a league mid-grace.
+  if (row.fillFiredAt !== null) {
+    return { fired: false, reason: FILL_TRIGGER_REFUSALS.alreadyFired };
+  }
 
   const seated = await tx.select({ userId: teams.userId }).from(teams).where(eq(teams.leagueId, leagueId));
   if (hasOpenSeat({ teamCount: row.teamCount, filledTeams: seated.length })) {
@@ -148,21 +165,11 @@ export async function fireWhenFullInTx(
 
   // Phase 3.5 addendum, Task 14, Step 4: a HOUSE league's members get `house_league_filled`
   // instead of `draft_fill_triggered` — the one sentence a house league can say that a
-  // member-run one cannot (the shelf refills itself). The two never both fire for the same
-  // league (below), so the dedup check reads whichever type THIS call would actually write.
+  // member-run one cannot (the shelf refills itself).
   const isHouse = row.houseRung !== null;
-  const noticeType = isHouse ? "house_league_filled" : "draft_fill_triggered";
-  const [alreadyFired] = await tx
-    .select({ id: memberNotices.id })
-    .from(memberNotices)
-    .where(and(eq(memberNotices.leagueId, leagueId), eq(memberNotices.noticeType, noticeType)))
-    .limit(1);
-  if (alreadyFired !== undefined) {
-    return { fired: false, reason: FILL_TRIGGER_REFUSALS.alreadyFired };
-  }
 
   const kickoffAt = new Date(Date.parse(nowIso) + MATCHMAKING_CONFIG.sitAndGo.graceSeconds * MS_PER_SECOND);
-  await tx.update(drafts).set({ kickoffAt }).where(eq(drafts.id, row.draftId));
+  await tx.update(drafts).set({ kickoffAt, fillFiredAt: new Date(nowIso) }).where(eq(drafts.id, row.draftId));
 
   // `SYSTEM_ACTION_VISIBILITY.draft_fill_triggered` is `"everyone"`, so this sends ONE notice per
   // TEAM in the league, all referencing the SAME `system_action` event — the identical

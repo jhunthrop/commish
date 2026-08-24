@@ -21,6 +21,7 @@ const SCHEDULED: DraftScheduleBody = {
   kickoffAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
   isPublicMatchmade: false,
   startTrigger: "scheduled",
+  kickoffRolls: 0,
   filledTeams: 6,
   slotPreference: { slotCount: 12, ranking: [], assignedSlot: null, canEdit: true },
 };
@@ -37,7 +38,7 @@ describe("DraftSchedulePanel", () => {
     const fixture = fixtureLeagueDeps();
     await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
-        <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={SCHEDULED} />
+        <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={SCHEDULED} />
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByText("Draft scheduled")).toBeInTheDocument();
@@ -49,7 +50,7 @@ describe("DraftSchedulePanel", () => {
 
   it("offers no controls to a member who is not the commissioner", () => {
     renderInLeague(
-      <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={SCHEDULED} />,
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={SCHEDULED} />,
       fixtureLeagueDeps().deps,
     );
     expect(screen.getByText("Draft scheduled")).toBeInTheDocument();
@@ -59,7 +60,7 @@ describe("DraftSchedulePanel", () => {
 
   it("offers edit and start controls to the commissioner, wrapped for 360px", () => {
     renderInLeague(
-      <DraftSchedulePanel leagueId="league_1" isCommissioner={true} initialSchedule={SCHEDULED} />,
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={SCHEDULED} />,
       fixtureLeagueDeps().deps,
     );
     const startButton = screen.getByRole("button", { name: "Start the draft" });
@@ -72,7 +73,7 @@ describe("DraftSchedulePanel", () => {
   it("reads 'starting soon' once kickoff is within the hour", () => {
     const startingSoon = { ...SCHEDULED, kickoffAt: new Date(Date.now() + 30 * 60 * 1000).toISOString() };
     renderInLeague(
-      <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={startingSoon} />,
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={startingSoon} />,
       fixtureLeagueDeps().deps,
     );
     expect(screen.getByText("Draft starting soon")).toBeInTheDocument();
@@ -83,7 +84,7 @@ describe("DraftSchedulePanel", () => {
   // hour or longer, which is exactly what the overnight freeze applies to.
   it("mentions the overnight freeze for a draft scheduled to run more than an hour out", () => {
     renderInLeague(
-      <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={SCHEDULED} />,
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={SCHEDULED} />,
       fixtureLeagueDeps().deps,
     );
     expect(screen.getByText(/pause automatically between 2:00 AM and 5:00 AM Eastern/)).toBeInTheDocument();
@@ -92,7 +93,7 @@ describe("DraftSchedulePanel", () => {
   it("drops the overnight-freeze notice once kickoff is within the hour — that draft never reaches a slow enough tier", () => {
     const startingSoon = { ...SCHEDULED, kickoffAt: new Date(Date.now() + 30 * 60 * 1000).toISOString() };
     renderInLeague(
-      <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={startingSoon} />,
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={startingSoon} />,
       fixtureLeagueDeps().deps,
     );
     expect(screen.queryByText(/pause automatically/)).not.toBeInTheDocument();
@@ -101,13 +102,13 @@ describe("DraftSchedulePanel", () => {
   it("says nothing about the overnight freeze once the draft is live or complete", async () => {
     const fixture = fixtureLeagueDeps();
     const { rerender } = renderInLeague(
-      <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={{ ...SCHEDULED, status: "in_progress" }} />,
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={{ ...SCHEDULED, status: "in_progress" }} />,
       fixture.deps,
     );
     expect(screen.queryByText(/pause automatically/)).not.toBeInTheDocument();
     rerender(
       <LeagueRoomDepsProvider deps={fixture.deps}>
-        <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={{ ...SCHEDULED, status: "complete" }} />
+        <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={{ ...SCHEDULED, status: "complete" }} />
       </LeagueRoomDepsProvider>,
     );
     expect(screen.queryByText(/pause automatically/)).not.toBeInTheDocument();
@@ -115,7 +116,7 @@ describe("DraftSchedulePanel", () => {
 
   it("tells everyone the platform has a fallback, only for a scheduled public league", () => {
     renderInLeague(
-      <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={{ ...SCHEDULED, isPublicMatchmade: true }} />,
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={{ ...SCHEDULED, isPublicMatchmade: true }} />,
       fixtureLeagueDeps().deps,
     );
     expect(screen.getByText("If nobody starts it, we will start it at the scheduled time.")).toBeInTheDocument();
@@ -123,7 +124,7 @@ describe("DraftSchedulePanel", () => {
 
   it("says nothing about a platform fallback for a private league, to a member", () => {
     renderInLeague(
-      <DraftSchedulePanel leagueId="league_1" isCommissioner={false} initialSchedule={{ ...SCHEDULED, isPublicMatchmade: false }} />,
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={{ ...SCHEDULED, isPublicMatchmade: false }} />,
       fixtureLeagueDeps().deps,
     );
     expect(screen.getByText("Draft scheduled")).toBeInTheDocument();
@@ -136,7 +137,7 @@ describe("DraftSchedulePanel", () => {
   // presses this for them.
   it("tells the commissioner of a private league that nothing starts it automatically", () => {
     renderInLeague(
-      <DraftSchedulePanel leagueId="league_1" isCommissioner={true} initialSchedule={{ ...SCHEDULED, isPublicMatchmade: false }} />,
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={{ ...SCHEDULED, isPublicMatchmade: false }} />,
       fixtureLeagueDeps().deps,
     );
     expect(screen.getByText("Nothing starts this automatically. Press Start the draft when everyone's ready.")).toBeInTheDocument();
@@ -146,7 +147,7 @@ describe("DraftSchedulePanel", () => {
     const fixture = fixtureLeagueDeps();
     await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
-        <DraftSchedulePanel leagueId="league_1" isCommissioner={true} initialSchedule={{ ...SCHEDULED, status: "in_progress" }} />
+        <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={{ ...SCHEDULED, status: "in_progress" }} />
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByText("The draft is live")).toBeInTheDocument();
@@ -160,7 +161,7 @@ describe("DraftSchedulePanel", () => {
     const fixture = fixtureLeagueDeps();
     await renderSurface(
       <LeagueRoomDepsProvider deps={fixture.deps}>
-        <DraftSchedulePanel leagueId="league_1" isCommissioner={true} initialSchedule={{ ...SCHEDULED, status: "complete" }} />
+        <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={{ ...SCHEDULED, status: "complete" }} />
       </LeagueRoomDepsProvider>,
       async ({ container }) => {
         expect(screen.getByText("Draft complete")).toBeInTheDocument();
@@ -180,7 +181,7 @@ describe("DraftSchedulePanel", () => {
         return { json: async () => ({ ok: true, data: { ...SCHEDULED, kickoffAt: EDITED_ISO } }) } as unknown as Response;
       },
     };
-    renderInLeague(<DraftSchedulePanel leagueId="league_1" isCommissioner={true} initialSchedule={SCHEDULED} />, fixture.deps);
+    renderInLeague(<DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={SCHEDULED} />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Edit time" }));
     fireEvent.change(screen.getByLabelText("Draft time"), { target: { value: EDITED_LOCAL_VALUE } });
     fireEvent.click(screen.getByRole("button", { name: "Save time" }));
@@ -198,7 +199,7 @@ describe("DraftSchedulePanel", () => {
       fetchJson: async () =>
         ({ json: async () => ({ ok: false, error: "This draft has already started, so its time can't change." }) }) as unknown as Response,
     };
-    renderInLeague(<DraftSchedulePanel leagueId="league_1" isCommissioner={true} initialSchedule={SCHEDULED} />, fixture.deps);
+    renderInLeague(<DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={SCHEDULED} />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Edit time" }));
     fireEvent.change(screen.getByLabelText("Draft time"), { target: { value: EDITED_LOCAL_VALUE } });
     fireEvent.click(screen.getByRole("button", { name: "Save time" }));
@@ -215,7 +216,7 @@ describe("DraftSchedulePanel", () => {
         return { json: async () => ({ ok: true, data: { draft: {} } }) } as unknown as Response;
       },
     };
-    renderInLeague(<DraftSchedulePanel leagueId="league_1" isCommissioner={true} initialSchedule={SCHEDULED} />, fixture.deps);
+    renderInLeague(<DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={SCHEDULED} />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Start the draft" }));
     expect(await screen.findByText("The draft is live")).toBeInTheDocument();
     expect(calls).toContain("POST /api/drafts/draft_1/start");
@@ -227,9 +228,52 @@ describe("DraftSchedulePanel", () => {
       ...fixture.deps,
       fetchJson: async () => ({ json: async () => ({ ok: false, error: "There are no players to draft yet." }) }) as unknown as Response,
     };
-    renderInLeague(<DraftSchedulePanel leagueId="league_1" isCommissioner={true} initialSchedule={SCHEDULED} />, fixture.deps);
+    renderInLeague(<DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={SCHEDULED} />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Start the draft" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("There are no players to draft yet.");
+  });
+
+  // Task 7, Step 3: the commissioner's manual press keeps its two-team floor and gains this
+  // warning instead — the one place the founder's "roll until full" ruling does not bind.
+  it("warns the commissioner that starting now drafts a short league", () => {
+    renderInLeague(
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={SCHEDULED} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText("6 seats are still open. Starting now drafts a short league.")).toBeInTheDocument();
+  });
+
+  it("says nothing about a short room once every seat is filled", () => {
+    renderInLeague(
+      <DraftSchedulePanel leagueId="league_1" teamCount={6} isCommissioner={true} initialSchedule={SCHEDULED} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByText(/still open/)).not.toBeInTheDocument();
+  });
+
+  it("never warns a member who is not the commissioner about a short room", () => {
+    renderInLeague(
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={SCHEDULED} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByText(/still open/)).not.toBeInTheDocument();
+  });
+
+  // Task 7 (F12/F21): only a SCHEDULED draft ever rolls.
+  it("says why the date moved, rather than quietly showing a different one", () => {
+    renderInLeague(
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={{ ...SCHEDULED, kickoffRolls: 1 }} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText("This draft moved once because the room was not full.")).toBeInTheDocument();
+  });
+
+  it("says nothing about a roll for a draft that has never rolled", () => {
+    renderInLeague(
+      <DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={false} initialSchedule={SCHEDULED} />,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.queryByText(/This draft moved/)).not.toBeInTheDocument();
   });
 
   it("walks the choose-time-then-start flow keyboard-only", async () => {
@@ -244,7 +288,7 @@ describe("DraftSchedulePanel", () => {
         return { json: async () => ({ ok: true, data: { draft: {} } }) } as unknown as Response;
       },
     };
-    renderInLeague(<DraftSchedulePanel leagueId="league_1" isCommissioner={true} initialSchedule={SCHEDULED} />, fixture.deps);
+    renderInLeague(<DraftSchedulePanel leagueId="league_1" teamCount={12} isCommissioner={true} initialSchedule={SCHEDULED} />, fixture.deps);
     screen.getByRole("button", { name: "Edit time" });
 
     await user.tab();

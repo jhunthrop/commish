@@ -237,6 +237,9 @@ async function seedPublicLeague(
     // (Phase 3.6, Task 5: neither is a per-league override this codebase writes).
     rosterSummary: "15 slots, 1 flex",
     playoffWeeks: [15, 16, 17],
+    // `seed()` above never rolls a kickoff — no caller of this fixture is testing Task 7's roll,
+    // so every league it builds reads `0` rolls, the schema default.
+    kickoffRolls: 0,
   };
 }
 
@@ -264,6 +267,7 @@ describe("listPublicLeagues", () => {
         teamCount: 12, filledTeams: 8, scoringLabel: "Standard", compositionCategory: "all_newcomers",
         draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)", medianGame: false, startTrigger: "scheduled",
         houseRung: null, heldSeats: 0, rosterSummary: "15 slots, 1 flex", playoffWeeks: [15, 16, 17],
+        kickoffRolls: 0,
       },
     ]);
   });

@@ -128,6 +128,18 @@ export interface PublicLeagueSummary {
    * between them.
    */
   readonly playoffWeeks: readonly number[];
+  /**
+   * Phase 3.6, Task 7, the SEVENTEENTH and last field this plan adds (F21): how many times
+   * `rollUnfilledDraftInTx` (`@/league-service/roll`) has pushed this SCHEDULED league's kickoff
+   * forward because its room was not full at its target time — the founder's "roll until full"
+   * ruling, made a wire fact. `0` for a league that has never rolled (every `when_full` league,
+   * by construction: Step 2's own model ruling is that only a `'scheduled'` draft's unfilled
+   * target is "not due, it is rolled" — a sit-and-go league has no target to roll away from until
+   * it fills). Read through `rollNoticeSentence` (`@/matchmaking/roll`), never rendered as a bare
+   * number: "This draft moved once..." / "...moved twice..." / "...moved 5 times...", pluralized
+   * honestly rather than silently showing a different date than the one a visitor wrote down.
+   */
+  readonly kickoffRolls: number;
 }
 
 /** A normalized browse filter: every field is a concrete value or the "any" sentinel. */

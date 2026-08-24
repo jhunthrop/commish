@@ -124,6 +124,22 @@ describe("draftScheduleView", () => {
     expect(view).toMatchObject({ startTrigger: "when_full", filledTeams: 2 });
   });
 
+  // Phase 3.6, Task 7: the same `kickoff_rolls` fact `PublicLeagueSummary` discloses to a
+  // stranger, read here by a real member off their own league's row.
+  it("carries kickoff_rolls, zero for a draft that has never rolled", async () => {
+    const { leagueId, commissioner } = await seedLeague();
+    const view = await draftScheduleView(db, leagueId, commissioner);
+    expect(view).toMatchObject({ kickoffRolls: 0 });
+  });
+
+  it("reflects a real roll once one has actually happened", async () => {
+    const { leagueId, commissioner } = await seedLeague({ isPublicMatchmade: true });
+    const [draft] = await db.select({ id: drafts.id }).from(drafts).where(eq(drafts.leagueId, leagueId));
+    await db.update(drafts).set({ kickoffRolls: 2 }).where(eq(drafts.id, draft!.id));
+    const view = await draftScheduleView(db, leagueId, commissioner);
+    expect(view).toMatchObject({ kickoffRolls: 2 });
+  });
+
   // Task 6, Phase 3.5: NFFC's Kentucky Derby System.
   describe("slotPreference", () => {
     it("is null for a caller with no team in this league", async () => {

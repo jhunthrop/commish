@@ -72,6 +72,15 @@ export const MATCHMAKING_CONFIG = {
    */
   sitAndGo: { graceSeconds: 300 },
   /**
+   * Phase 3.6, Task 7 (the founder's "roll until full" ruling): how far forward
+   * `nextKickoffAfter` (`@/matchmaking/roll`) pushes a `'scheduled'` draft's kickoff once its
+   * target time arrives with an open seat still in the room. A whole day, not the sit-and-go
+   * grace's five minutes: a scheduled league's time is a time somebody planned their evening
+   * around, so the roll gives the room another full day to fill before it re-asks the same
+   * question, rather than nagging the room every few minutes with a clock nobody chose.
+   */
+  roll: { cadenceHours: 24 },
+  /**
    * Phase 3.6, Task 4: the front door's proof strip — three numbers a stranger can check, each
    * hidden below its own credibility floor rather than printed small (`proofStats`,
    * `@/league-service/proof`). Founder ruling: no fabricated number, no placeholder, no
@@ -130,3 +139,10 @@ export const SEAT_HOLD = { minutes: 10 } as const;
  * same import, not a new cross-module dependency.
  */
 export const SIT_AND_GO_GRACE_MINUTES = MATCHMAKING_CONFIG.sitAndGo.graceSeconds / 60;
+
+/**
+ * `MATCHMAKING_CONFIG.roll.cadenceHours`, re-exported standalone — the one place
+ * `nextKickoffAfter` (`@/matchmaking/roll`) and its tests read the roll's own cadence, on the
+ * identical "one place the arithmetic happens" precedent `SIT_AND_GO_GRACE_MINUTES` sets.
+ */
+export const ROLL_CADENCE_HOURS = MATCHMAKING_CONFIG.roll.cadenceHours;

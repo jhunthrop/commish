@@ -106,6 +106,7 @@ describe("signed in to an invitable league", () => {
       kickoffAt: "2026-09-01T00:00:00.000Z",
       isPublicMatchmade: true,
       startTrigger: body.startTrigger as "scheduled" | "when_full",
+      kickoffRolls: 0,
       filledTeams: 1,
       teamCount: body.teamCount,
       slotPreference: null,

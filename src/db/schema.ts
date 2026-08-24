@@ -363,6 +363,30 @@ export const drafts = pgTable(
     /** Task 7. Defaults `'scheduled'` — every draft before this column existed, and every
      *  draft a commissioner schedules by hand today, keeps that default. */
     startTrigger: draftStartTriggerEnum("start_trigger").notNull().default("scheduled"),
+    /**
+     * Phase 3.6, Task 7 (migration 0034): how many times `rollUnfilledDraftInTx`
+     * (`@/league-service/roll`) has pushed a `'scheduled'` draft's `kickoff_at` forward because
+     * its room was not full at its target time — the founder's "roll until full" ruling made a
+     * column. Written only by the roll's own guarded `UPDATE`; read by `PublicLeagueSummary`'s
+     * `kickoffRolls` (`@/matchmaking/contract`), `DraftScheduleBody.kickoffRolls`
+     * (`@/league-room/contract`), the waiting room and the browse card
+     * (`rollNoticeSentence`, `@/matchmaking/roll`), and the `draft_kickoff_rolled` notice. Never
+     * decremented and never capped — the ruling is that the time slips until the last seat
+     * fills, and Task 8's seat release is the pressure valve, not a ceiling here.
+     */
+    kickoffRolls: integer("kickoff_rolls").notNull().default(0),
+    /**
+     * Phase 3.6, Task 7 (migration 0034): the instant `fireWhenFullInTx` last stamped this
+     * draft's kickoff for a genuinely full room, or `null` before that has ever happened.
+     * Replaces the notice-existence check `fireWhenFullInTx` used to guard its own repeat-fire
+     * refusal with (`FILL_TRIGGER_REFUSALS.alreadyFired`) — a notice is audit-anchored and
+     * nothing ever deletes one, so once Task 8's `releaseSeat` can genuinely UN-fill a league
+     * during its grace window, a notice-shaped guard would refuse to fire a second time forever.
+     * `fireWhenFullInTx` stamps it; `releaseSeat` (Task 8) clears it back to `null` the moment a
+     * released seat un-fills the room, which is what lets a league that fills, loses a member,
+     * and fills again fire its trigger twice, honestly.
+     */
+    fillFiredAt: timestamp("fill_fired_at", { withTimezone: true }),
   },
   (t) => [
     // UNIQUE, not a plain index: nothing else in the schema enforces "one draft per league",

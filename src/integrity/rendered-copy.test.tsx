@@ -851,7 +851,7 @@ describe("DraftSchedulePanel says nothing that breaks the house copy rules, incl
     for (const schedule of [scheduledLater, scheduledSoon, { ...DRAFT_SCHEDULE, status: "in_progress" as const }, { ...DRAFT_SCHEDULE, status: "complete" as const }]) {
       const { container, unmount } = render(
         <LeagueRoomDepsProvider deps={fixture.deps}>
-          <DraftSchedulePanel leagueId="l1" isCommissioner={true} initialSchedule={schedule} />
+          <DraftSchedulePanel leagueId="l1" teamCount={12} isCommissioner={true} initialSchedule={schedule} />
         </LeagueRoomDepsProvider>,
       );
       expectClean(container);
@@ -860,7 +860,7 @@ describe("DraftSchedulePanel says nothing that breaks the house copy rules, incl
 
     const { container } = render(
       <LeagueRoomDepsProvider deps={fixture.deps}>
-        <DraftSchedulePanel leagueId="l1" isCommissioner={true} initialSchedule={scheduledLater} />
+        <DraftSchedulePanel leagueId="l1" teamCount={12} isCommissioner={true} initialSchedule={scheduledLater} />
       </LeagueRoomDepsProvider>,
     );
     fireEvent.click(screen.getByRole("button", { name: "Edit time" }));

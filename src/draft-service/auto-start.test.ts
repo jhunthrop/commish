@@ -10,6 +10,7 @@ import { copyViolations } from "@/integrity/copy-rules";
 import type { AuditEvent, AuditEventInput } from "@/domain/audit";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import type { MemberNotice } from "@/integrity-service/notify";
+import { ROLL_CADENCE_HOURS } from "@/matchmaking/config";
 import { autoStartDueDrafts, claimAutoStart } from "./auto-start";
 import { createDraftStore, DRAFT_AUTO_STARTED_SUMMARY, type DraftStore } from "./store";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "./test-support";
@@ -20,6 +21,10 @@ const clock = { now: () => now };
 const MINUTE_AGO = "2026-09-10T16:59:00.000Z";
 const WEEK_AGO = "2026-09-03T17:00:00.000Z";
 const IN_AN_HOUR = "2026-09-10T18:00:00.000Z";
+
+function plusHours(iso: string, hours: number): string {
+  return new Date(Date.parse(iso) + hours * 60 * 60 * 1000).toISOString();
+}
 
 const POOL = [
   { id: "qb1", name: "QB One", position: "QB", nflTeam: "KC" },
@@ -48,17 +53,30 @@ async function draftStatus(draftId: string): Promise<string | undefined> {
   return row?.status;
 }
 
+async function kickoffOfAuto(draftId: string): Promise<string | undefined> {
+  const [row] = await db.select({ kickoffAt: drafts.kickoffAt }).from(drafts).where(eq(drafts.id, draftId));
+  return row?.kickoffAt.toISOString();
+}
+
 async function startDraftActionCount(draftId: string): Promise<number> {
   const rows = await db.select().from(draftActions).where(eq(draftActions.draftId, draftId)).orderBy(asc(draftActions.sequence));
   return rows.filter((row) => (row.action as { type: string }).type === "START_DRAFT").length;
 }
 
-async function seededDraft(input: { readonly kickoffAt: string; readonly isPublicMatchmade: boolean; readonly teamCount: number }) {
+async function seededDraft(input: {
+  readonly kickoffAt: string;
+  readonly isPublicMatchmade: boolean;
+  readonly teamCount: number;
+  readonly filledTeams?: number;
+  readonly startTrigger?: "scheduled" | "when_full";
+}) {
   const fixture = await seedDraftFixture(db, {
     draftId: "draft_auto",
     leagueId: "league_auto",
     format: "snake",
     teamCount: input.teamCount,
+    filledTeams: input.filledTeams,
+    startTrigger: input.startTrigger,
     slotConfig: SPRINT_ROSTER_SLOTS,
     kickoffAt: new Date(input.kickoffAt),
     auctionBudget: null,
@@ -82,6 +100,41 @@ async function withEnforcementOff<T>(fn: () => Promise<T>): Promise<T> {
 }
 
 describe("autoStartDueDrafts", () => {
+  // THE BUG THIS TASK EXISTS FOR (Phase 3.6, Task 7 — the founder's "roll until full" ruling).
+  // `dueDraftsQuery` had no seat predicate and `store.startDraft` only requires two teams, so a
+  // 3-of-12 public league whose kickoff passed drafted with three teams on `main`. The ruling is
+  // absolute for the door the platform owns: this league is rolled, not started.
+  it("does not start a public draft whose room is not full, however late it is", async () => {
+    const { draftId } = await seededDraft({ kickoffAt: MINUTE_AGO, isPublicMatchmade: true, teamCount: 12, filledTeams: 3 });
+    expect(await autoStartDueDrafts(db, { store: newStore(), clock })).toEqual([
+      { draftId, started: false, rolled: true, kickoffAt: plusHours(MINUTE_AGO, ROLL_CADENCE_HOURS) },
+    ]);
+    expect(await draftStatus(draftId)).toBe("scheduled");
+  });
+
+  it("starts a full room at its scheduled time, exactly as it does today", async () => {
+    // `teamCount: 2` (fully filled) rather than a literal 12: `POOL` below is sized for a 2-team
+    // draft, and the point of this test is the room-is-full branch, not roster fixturing.
+    const { draftId } = await seededDraft({ kickoffAt: MINUTE_AGO, isPublicMatchmade: true, teamCount: 2, filledTeams: 2 });
+    expect(await autoStartDueDrafts(db, { store: newStore(), clock })).toEqual([{ draftId, started: true }]);
+  });
+
+  // Step 3's own exemption: a `when_full` draft has no chosen time to be late for until it
+  // fills, so a due-but-unfilled one is never rolled — its far-future placeholder kickoff
+  // (`kickoffFor`, `@/league-service/house-factory`) is not a time anybody planned around.
+  it("never rolls a when_full draft's placeholder kickoff, even if it somehow became due unfilled", async () => {
+    const { draftId } = await seededDraft({
+      kickoffAt: MINUTE_AGO,
+      isPublicMatchmade: true,
+      teamCount: 12,
+      filledTeams: 3,
+      startTrigger: "when_full",
+    });
+    expect(await autoStartDueDrafts(db, { store: newStore(), clock })).toEqual([]);
+    expect(await draftStatus(draftId)).toBe("scheduled");
+    expect(await kickoffOfAuto(draftId)).toBe(MINUTE_AGO);
+  });
+
   it("starts a public matchmade draft whose kickoff has passed", async () => {
     const { draftId } = await seededDraft({ kickoffAt: MINUTE_AGO, isPublicMatchmade: true, teamCount: 2 });
     const outcomes = await autoStartDueDrafts(db, { store: newStore(), clock });
