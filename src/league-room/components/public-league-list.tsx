@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge, Card, EmptyState, EYEBROW, InfoTip } from "@/components/ui";
 import { Icon, type IconName } from "@/components/ui/icon";
+import { SignInLink } from "@/components/app-shell/sign-in-link";
 import type { DraftFormat } from "@/domain/league";
 import type { TermKey } from "@/help/glossary";
 import { EXPERIENCE_TIER_LABEL } from "@/identity/config";
@@ -136,13 +137,16 @@ export function HouseLeagueShelf({
                 {signedIn ? (
                   <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} />
                 ) : (
-                  <Link
-                    href="/sign-in"
+                  // The highest-traffic entry into the funnel gets the intent that matters most
+                  // (Task 16, F6): the HOLD interstitial for THIS league, not a generic `/app` —
+                  // the parent's Task 6 seats a visitor who comes back still holding a live token.
+                  <SignInLink
+                    intent={`/join/${league.id}/hold`}
                     aria-label={`Sign in to join ${league.name}`}
                     className="inline-flex h-10 min-w-0 items-center justify-center [overflow-wrap:anywhere] rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                   >
                     Sign in to join
-                  </Link>
+                  </SignInLink>
                 )}
               </div>
             </Card>
@@ -279,13 +283,16 @@ export function PublicLeagueList({
                   {signedIn ? (
                     <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} />
                   ) : (
-                    <Link
-                      href="/sign-in"
+                    // See `HouseLeagueShelf`'s identical card above for why this carries the
+                    // HOLD interstitial as its intent, not the generic `/app` a bare
+                    // `<Link href="/sign-in">` used to drop a visitor at (Task 16, F6).
+                    <SignInLink
+                      intent={`/join/${league.id}/hold`}
                       aria-label={`Sign in to join ${league.name}`}
                       className="inline-flex h-10 min-w-0 items-center justify-center [overflow-wrap:anywhere] rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
                     >
                       Sign in to join
-                    </Link>
+                    </SignInLink>
                   )}
                 </div>
               </Card>

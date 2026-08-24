@@ -2,6 +2,7 @@
 
 import { createContext, useContext, type ReactNode } from "react";
 import { subscribeLeagueStream } from "@/event-stream/league-stream";
+import { fetchWithSessionWatch } from "@/components/app-shell/session-watch";
 
 /** The slice of `EventSource` the room uses. Narrow on purpose, so a test double is trivial. */
 export interface EventSourceLike {
@@ -20,9 +21,13 @@ export interface DraftRoomDeps {
  * stream, and one `EventSource` per url serves both (see that module's docblock). The
  * connection is still constructed lazily inside the factory, so importing this module is safe
  * in happy-dom, which has no `EventSource`.
+ *
+ * `fetchJson` is a one-line delegate to `fetchWithSessionWatch` (Task 16, Step 5) — same
+ * signature, same return value, so every existing caller keeps working unchanged, and a `401`
+ * in our own envelope shape now also reaches the shared session-lost recovery.
  */
 const BROWSER_DEPS: DraftRoomDeps = {
-  fetchJson: (url, init) => fetch(url, init),
+  fetchJson: (url, init) => fetchWithSessionWatch(url, init),
   openEventSource: (url) => subscribeLeagueStream(url),
 };
 

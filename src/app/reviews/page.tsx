@@ -5,6 +5,9 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { ErrorState, PageTitle } from "@/components/ui";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { shellData } from "@/components/app-shell/shell-data";
+import { PublicBar } from "@/components/app-shell/public-bar";
+import { PublicFooter } from "@/components/app-shell/public-footer";
+import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { listReviews, myReview } from "@/review-service/reviews";
 import { ReviewComposer } from "@/account-room/components/review-composer";
 import { ReviewFeed } from "@/account-room/components/review-feed";
@@ -12,24 +15,8 @@ import { browseAllowed } from "@/app/api/reviews/_shared";
 
 export const dynamic = "force-dynamic";
 
-/** The signed-out chrome, shared by the feed and the over-the-ceiling refusal below it. */
-function PublicHeader() {
-  return (
-    <header className="border-b border-line bg-surface">
-      <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-3">
-        <Link
-          href="/"
-          className="font-display text-xl font-bold uppercase tracking-wide text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-        >
-          Commish
-        </Link>
-        <Link href="/sign-in" className="text-sm font-medium text-accent underline">
-          Sign in
-        </Link>
-      </div>
-    </header>
-  );
-}
+/** This page's own path — every signed-out `SignInLink` on it returns here (Task 16, F6). */
+const PAGE_INTENT = "/reviews";
 
 /**
  * The unfiltered public review feed — this product's second unauthenticated read, after
@@ -51,14 +38,19 @@ function PublicHeader() {
  * Task 2: this page sits outside `/app`, so it is never wrapped by `(shell)/layout.tsx` — it
  * calls `shellData` and renders `AppShell` ITSELF, and only when there is a user (`/reviews` is
  * reachable signed out by design). The rate-limit refusal below runs before `getCurrentUser()`
- * ever resolves, so it always renders `PublicHeader` — content-neutral either way, and not worth
- * a `shellData` round trip for a request this page is about to refuse.
+ * ever resolves, so it always renders `PublicBar` — content-neutral either way, and not worth a
+ * `shellData` round trip for a request this page is about to refuse.
+ *
+ * Task 16: the signed-out chrome used to be a page-local `PublicHeader`, copy-pasted verbatim in
+ * two other places (`/browse`, `/app/join/[code]`) — it is `PublicBar` now, everywhere, and this
+ * page's own `SignInLink`s (the header's and the empty state's "write the first review" prompt,
+ * F6) carry `PAGE_INTENT` so signing in returns here.
  */
 export default async function ReviewsPage() {
   if (!browseAllowed((await headers()).get("x-forwarded-for"))) {
     return (
       <>
-        <PublicHeader />
+        <PublicBar intent={PAGE_INTENT} />
         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">
           <ErrorState
             title="Too many requests"
@@ -70,6 +62,7 @@ export default async function ReviewsPage() {
             }
           />
         </main>
+        <PublicFooter />
       </>
     );
   }
@@ -79,9 +72,9 @@ export default async function ReviewsPage() {
 
   const emptyAction =
     user === null || mine === null ? (
-      <Link href="/sign-in" className="text-sm font-medium text-accent underline">
+      <SignInLink intent={PAGE_INTENT} className="text-sm font-medium text-accent underline">
         Sign in to write the first review
-      </Link>
+      </SignInLink>
     ) : (
       <ReviewComposer myReview={mine} />
     );
@@ -101,8 +94,9 @@ export default async function ReviewsPage() {
   if (user === null) {
     return (
       <>
-        <PublicHeader />
+        <PublicBar intent={PAGE_INTENT} />
         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">{content}</main>
+        <PublicFooter />
       </>
     );
   }

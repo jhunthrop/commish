@@ -5,6 +5,7 @@ import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { Avatar, Badge, EYEBROW, InfoTip } from "@/components/ui";
 import { Countdown, useCountdown } from "@/components/ui/countdown";
+import { SessionNotice } from "@/components/app-shell/session-notice";
 import type { TermKey } from "@/help/glossary";
 import type { HelpLevel } from "@/identity/preferences";
 import { formatClockLength, formatPausedUntil, formatTightening } from "../state/format";
@@ -271,6 +272,12 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
         {/* A finished draft has nothing left to deliver: a connection chip beside
             "Every roster is final" reads as broken, not informative. */}
         {view.phase === "complete" ? null : <ConnectionBanner connection={connection} />}
+        {/* Task 16, F13: the room's EXISTING banner slot, beside `ConnectionBanner` — the slot
+            this room already uses to say "the connection is not what you think it is". A dead
+            session matters here whether or not the draft has finished (a manager reviewing a
+            just-finished board can still lose their session), so this renders regardless of
+            `view.phase`, unlike `ConnectionBanner` above it. */}
+        <SessionNotice />
       </div>
     </header>
   );

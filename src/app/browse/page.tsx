@@ -4,12 +4,17 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { PageTitle } from "@/components/ui";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { shellData } from "@/components/app-shell/shell-data";
+import { PublicBar } from "@/components/app-shell/public-bar";
+import { PublicFooter } from "@/components/app-shell/public-footer";
 import { listPublicLeagues } from "@/league-service/browse";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { BrowseFilters } from "@/league-room/components/browse-filters";
 import { HouseLeagueShelf, PublicLeagueList } from "@/league-room/components/public-league-list";
 
 export const dynamic = "force-dynamic";
+
+/** This page's own path — its `PublicBar`'s sign-in link returns here (Task 16, F6). */
+const PAGE_INTENT = "/browse";
 
 interface PageProps {
   readonly searchParams: Promise<Record<string, string | readonly string[] | undefined>>;
@@ -42,8 +47,8 @@ const first = (value: string | readonly string[] | undefined): string | null =>
  * Task 2: this page sits outside `/app`, so it is never wrapped by `(shell)/layout.tsx` — it
  * calls `shellData` and renders `AppShell` ITSELF, and only when there is a user (`/browse` is
  * reachable signed out by design, and a signed-in shell around a stranger would be chrome they
- * cannot use). Signed out, the inline header below is unchanged; it becomes `PublicBar` once the
- * addendum's Task 16 ships.
+ * cannot use). Signed out, the header is `PublicBar` (Task 16, F6) — this page's own copy-pasted
+ * inline header is gone.
  */
 export default async function BrowsePage({ searchParams }: PageProps) {
   const params = await searchParams;
@@ -82,20 +87,9 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   if (user === null) {
     return (
       <>
-        <header className="border-b border-line bg-surface">
-          <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-3">
-            <Link
-              href="/"
-              className="font-display text-xl font-bold uppercase tracking-wide text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Commish
-            </Link>
-            <Link href="/sign-in" className="text-sm font-medium text-accent underline">
-              Sign in
-            </Link>
-          </div>
-        </header>
+        <PublicBar intent={PAGE_INTENT} />
         <main className="mx-auto flex w-full max-w-4xl flex-col gap-6 p-4">{content}</main>
+        <PublicFooter />
       </>
     );
   }

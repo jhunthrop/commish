@@ -90,7 +90,10 @@ describe("JoinForm", () => {
     // The terms themselves are identical — an account changes the ACTION, never the facts.
     expect(await screen.findByRole("heading", { name: "Sunday Money" })).toBeInTheDocument();
     expect(screen.getByText(TERMS.rosterLine)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sign in to join Sunday Money" })).toHaveAttribute("href", "/sign-in");
+    expect(screen.getByRole("link", { name: "Sign in to join Sunday Money" })).toHaveAttribute(
+      "href",
+      "/sign-in?returnTo=%2Fapp%2Fjoin%2FSUNDAY12",
+    );
     expect(screen.queryByRole("button", { name: /^Join/ })).not.toBeInTheDocument();
   });
 

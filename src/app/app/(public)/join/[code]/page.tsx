@@ -1,8 +1,9 @@
-import Link from "next/link";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
 import { PageTitle } from "@/components/ui";
+import { PublicBar } from "@/components/app-shell/public-bar";
+import { PublicFooter } from "@/components/app-shell/public-footer";
 import { JoinForm } from "@/league-room/components/join-form";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +28,10 @@ interface PageProps {
  * holding an account", and until this page rendered signed out, no signed-out visitor could
  * reach the preview at all. Signed out, the terms render and the action is "Sign in to join" —
  * the same idiom `PublicLeagueList` uses on `/browse`. Signed in, still no shell renders here —
- * the addendum's Task 16 (`PublicBar`) is this page's eventual signed-out chrome; until it lands
- * this page keeps its own inline header, unchanged.
+ * `PublicBar` (Task 16) is the SIGNED-OUT chrome, so it renders only when `user === null`, the
+ * same conditional the header always used; `PublicFooter` renders regardless of session, because
+ * this route never gets `AppShell`'s own chrome either way and a footer's trust links cost a
+ * signed-in visitor nothing.
  *
  * `readPreferences` (the same seed-on-first-read call the league home page makes) only runs when
  * there IS a caller: a signed-out visitor has no preferences row and must not seed one. Their
@@ -38,28 +41,18 @@ interface PageProps {
 export default async function JoinPage({ params }: PageProps) {
   const [user, { code }] = await Promise.all([getCurrentUser(), params]);
   const preferences = user === null ? null : await readPreferences(getDb(), user);
+  // This page's own current path — its `PublicBar`'s sign-in link and its own `JoinForm`'s
+  // "Sign in to join" both return here (Task 16, F6).
+  const pageIntent = `/app/join/${code}`;
 
   return (
     <>
-      {user === null ? (
-        <header className="border-b border-line bg-surface">
-          <div className="mx-auto flex w-full max-w-4xl items-center justify-between gap-4 px-4 py-3">
-            <Link
-              href="/"
-              className="font-display text-xl font-bold uppercase tracking-wide text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              Commish
-            </Link>
-            <Link href="/sign-in" className="text-sm font-medium text-accent underline">
-              Sign in
-            </Link>
-          </div>
-        </header>
-      ) : null}
+      {user === null ? <PublicBar intent={pageIntent} /> : null}
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 p-4">
         <PageTitle>Join a league</PageTitle>
         <JoinForm code={code} helpLevel={preferences?.helpLevel ?? "guided"} signedIn={user !== null} />
       </main>
+      <PublicFooter />
     </>
   );
 }

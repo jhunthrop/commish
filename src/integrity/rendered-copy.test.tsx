@@ -29,6 +29,11 @@ import { Meter } from "@/components/ui/meter";
 import { Panel } from "@/components/ui/panel";
 import { SeatMeter } from "@/components/ui/seat-meter";
 import { StatPill } from "@/components/ui/stat-pill";
+import { SignInLink } from "@/components/app-shell/sign-in-link";
+import { PublicBar } from "@/components/app-shell/public-bar";
+import { PublicFooter } from "@/components/app-shell/public-footer";
+import { SessionNotice } from "@/components/app-shell/session-notice";
+import { fetchWithSessionWatch } from "@/components/app-shell/session-watch";
 import { copyViolations } from "./copy-rules";
 import { renderNotice } from "./notices";
 
@@ -140,9 +145,11 @@ vi.mock("@/integrity-service/flags", () => ({ listPendingFlags: vi.fn(), flagDet
 // `ResolutionForm` (Task 5, `src/admin-room/components/resolution-form.tsx`) calls `useRouter()`
 // for its post-submit `router.refresh()` — `notFound()` needs no request context (a plain
 // synchronous throw), so it stays real; `useRouter()` is the one export this file mocks.
+// `usePathname()` joins it for Task 16's `SessionNotice`, which reads the current path with no
+// Next router context to fall back to in a plain component render.
 vi.mock("next/navigation", async (importOriginal) => {
   const actual = await importOriginal<typeof import("next/navigation")>();
-  return { ...actual, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }) };
+  return { ...actual, useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }), usePathname: () => "/app/leagues/league_1" };
 });
 
 describe("the league activity page says nothing that breaks the house copy rules", () => {
@@ -857,5 +864,66 @@ describe("Panel, Crest, Meter and StatPill say nothing that breaks the house cop
       expectClean(container);
       unmount();
     }
+  });
+});
+
+/**
+ * Task 16. `SignInLink`, `PublicBar` and `PublicFooter` join the roster in the same commit that
+ * creates them, per this file's own "one place to add" point. `SessionNotice` joins them too,
+ * across BOTH states an actual dead session puts it in — the quiet strip and the escalated
+ * `Modal` — since its own copy is exactly the kind of "said once, behind an interaction" text
+ * this file's own docblock says a per-module sweep is likely to miss.
+ */
+describe("SignInLink, PublicBar and PublicFooter say nothing that breaks the house copy rules", () => {
+  it("is clean with and without an intent, and with the front door's own nav and action filled in", () => {
+    for (const element of [
+      <SignInLink key="plain" intent={null} />,
+      <SignInLink key="intent" intent="/join/league_1/hold" />,
+      <PublicBar key="bare" intent="/reviews" />,
+      <PublicBar
+        key="filled"
+        intent="/"
+        nav={[
+          { href: "/browse", label: "Open leagues" },
+          { href: "/league-rules", label: "How it works" },
+          { href: "/reviews", label: "Reviews" },
+        ]}
+        action={<span>Take a seat</span>}
+      />,
+      <PublicFooter key="footer" />,
+    ]) {
+      const { container, unmount } = render(element);
+      expectClean(container);
+      unmount();
+    }
+  });
+});
+
+function jsonResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
+}
+
+describe("SessionNotice says nothing that breaks the house copy rules, quiet and escalated", () => {
+  it("is clean idle, on the quiet strip, and on the escalated Modal", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+
+    const { container: idle, unmount: unmountIdle } = render(<SessionNotice />);
+    expectClean(idle);
+    unmountIdle();
+
+    fetchSpy.mockResolvedValue(jsonResponse(401, { ok: false, error: "Not authenticated." }));
+    const { container: strip, unmount: unmountStrip } = render(<SessionNotice />);
+    await fetchWithSessionWatch("/api/notices");
+    await within(strip).findByRole("status");
+    expectClean(strip);
+    unmountStrip();
+
+    const { container: modal, unmount: unmountModal } = render(<SessionNotice />);
+    await fetchWithSessionWatch("/api/invites/ABC/accept", { method: "POST", body: "{}" });
+    await within(modal).findByRole("dialog");
+    expectClean(modal);
+    unmountModal();
+
+    fetchSpy.mockRestore();
   });
 });

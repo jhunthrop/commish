@@ -107,8 +107,14 @@ describe("PublicLeagueList", () => {
   it("sends a signed-out visitor to sign in, named per league so the offer reads as honest rather than a bait-and-switch", () => {
     render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn={false} />);
     expect(screen.queryByRole("button", { name: /^Join / })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Sign in to join Rookie Snake Room" })).toHaveAttribute("href", "/sign-in");
-    expect(screen.getByRole("link", { name: "Sign in to join Sharks Only Auction" })).toHaveAttribute("href", "/sign-in");
+    expect(screen.getByRole("link", { name: "Sign in to join Rookie Snake Room" })).toHaveAttribute(
+      "href",
+      "/sign-in?returnTo=%2Fjoin%2Fp1%2Fhold",
+    );
+    expect(screen.getByRole("link", { name: "Sign in to join Sharks Only Auction" })).toHaveAttribute(
+      "href",
+      "/sign-in?returnTo=%2Fjoin%2Fp2%2Fhold",
+    );
   });
 
   it("labels the composition honestly, in the three phrases the brief names and no others", () => {
@@ -253,6 +259,9 @@ describe("HouseLeagueShelf", () => {
 
   it("sends a signed-out visitor to sign in, named per house league", () => {
     render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn={false} />);
-    expect(screen.getByRole("link", { name: `Sign in to join ${HOUSE_LEAGUE.name}` })).toHaveAttribute("href", "/sign-in");
+    expect(screen.getByRole("link", { name: `Sign in to join ${HOUSE_LEAGUE.name}` })).toHaveAttribute(
+      "href",
+      `/sign-in?returnTo=%2Fjoin%2F${HOUSE_LEAGUE.id}%2Fhold`,
+    );
   });
 });

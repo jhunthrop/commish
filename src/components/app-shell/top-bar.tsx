@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Avatar } from "@/components/ui/avatar";
 import { Icon } from "@/components/ui/icon";
 import { NoticeInbox } from "@/account-room/components/notice-inbox";
+import { SessionNotice } from "./session-notice";
 import type { LiveState } from "./shell-data";
 
 export interface TopBarProps {
@@ -57,15 +58,23 @@ export interface TopBarProps {
  * off the right edge. Icon-only at every width removes that width unconditionally rather than
  * only below a breakpoint, so it cannot regress the same way if a sixth control ever joins this
  * row.
+ *
+ * `SessionNotice` (Task 16, F13) renders below the bar row, still inside this one grid item —
+ * the shell's own chrome is where a dead session under `AppShell` gets said, above the content
+ * column. It renders nothing until a session is actually lost, so a page with a live session
+ * looks byte-for-byte the same as before this task.
  */
 export function TopBar({ displayName, avatar, isAdmin, liveState = null, className = "" }: TopBarProps) {
   return (
-    <header className={`border-b border-line bg-surface ${className}`}>
+    <header className={`bg-surface ${className}`}>
       {/* v2's Geist retone widened the wordmark (font-display's own -0.02em tracking cannot claw
           back a condensed-to-regular font-family swap), which is why the row and the right-hand
           group's gaps tightened one step each here — the same fix-round-1 problem this header's
-          own docblock names, reopened by the font change rather than by a sixth control. */}
-      <div className="flex w-full items-center justify-between gap-3 px-3 py-3">
+          own docblock names, reopened by the font change rather than by a sixth control.
+          `border-b` moved here from the outer `<header>` (Task 16, F13) so `SessionNotice` below
+          can render its OWN band, under this row, still inside the one grid item `AppShell`
+          spans across row 1 — "above the content column", never a second header. */}
+      <div className="flex w-full items-center justify-between gap-3 border-b border-line px-3 py-3">
         <Link
           href="/app"
           className="font-display text-xl font-bold uppercase text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
@@ -104,6 +113,7 @@ export function TopBar({ displayName, avatar, isAdmin, liveState = null, classNa
           </form>
         </div>
       </div>
+      <SessionNotice />
     </header>
   );
 }

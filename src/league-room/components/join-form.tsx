@@ -7,6 +7,7 @@ import type { ApiEnvelope } from "@/lib/api/respond";
 import type { HelpLevel } from "@/identity/preferences";
 import type { InvitePreviewBody, JoinBody } from "../contract";
 import { Button, ErrorState, Skeleton } from "@/components/ui";
+import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import { LeagueTermsPanel } from "./league-terms-panel";
 
@@ -121,13 +122,15 @@ export function JoinForm({
           {`Join ${preview.terms.name}`}
         </Button>
       ) : (
-        <Link
-          href="/sign-in"
+        // This page's own path (Task 16, F6) — signing in returns here, to the same invite,
+        // rather than dropping the visitor at a generic `/app`.
+        <SignInLink
+          intent={`/app/join/${code}`}
           aria-label={`Sign in to join ${preview.terms.name}`}
           className="inline-flex h-10 min-w-0 items-center justify-center [overflow-wrap:anywhere] rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
         >
           Sign in to join
-        </Link>
+        </SignInLink>
       )}
       {error === null ? null : (
         <p role="alert" className="text-sm text-negative">

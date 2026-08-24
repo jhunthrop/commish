@@ -281,7 +281,7 @@ Anything time-dependent takes a `Clock` (`src/domain/timing.ts`) and calls `cloc
 - Server code reads "who is this" **only** via `getCurrentUser()` / `requireCurrentUser()` from `src/lib/auth/current-user.ts`. Nothing else imports `@workos-inc/authkit-nextjs` for identity — the seam is what lets us swap or extend the provider later.
 - `users.id` **is** the WorkOS user id. `/callback` upserts the local row on every sign-in (`user-sync.ts`); app-owned fields (`displayName`, `experienceTier`, `avatarUrl`) are never clobbered by a sync.
 - `src/middleware.ts` (composable `authkit()`/`handleAuthkitProxy`): pages under `/app` redirect to hosted sign-in; **API and SSE routes never redirect** — they return a JSON 401 themselves.
-- Routes: `/sign-in`, `/sign-up` (hosted), `/sign-out` (POST), `/callback`, `GET /api/auth/me`.
+- Routes: `/sign-in`, `/sign-up` (hosted, both accept `?returnTo=<path>` — validated fail-closed by `safeReturnTo`, `src/lib/auth/return-to.ts` — and forward it to `getSignInUrl`/`getSignUpUrl` as `returnTo`, which the SDK seals into the callback state and which beats the callback's own `returnPathname: "/app"` fallback), `/sign-out` (POST), `/callback` (unchanged `returnPathname`, plus an `onError` that redirects to `/sign-in/problem`), `/sign-in/problem` (the one screen a failed callback lands on), `GET /api/auth/me`. `SignInLink` (`src/components/app-shell/sign-in-link.tsx`) is the one way any surface renders "sign in".
 - Env: `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD` (≥32 chars), `NEXT_PUBLIC_WORKOS_REDIRECT_URI`. Dashboard: Redirect URI `…/callback`, sign-in endpoint `…/sign-in`.
 
 ### Real-time — one mechanism
