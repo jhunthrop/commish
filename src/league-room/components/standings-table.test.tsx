@@ -29,6 +29,14 @@ describe("StandingsTable", () => {
     expect(screen.getByRole("button", { name: "What is a record?" })).toBeInTheDocument();
   });
 
+  // Step 2: dense numerals — `font-mono` on every number this table renders, the record cell
+  // included, so a re-sort never shifts a column's digits sideways.
+  it("renders its numbers in font-mono, record included", () => {
+    render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
+    expect(screen.getByText("9-4").className).toContain("font-mono");
+    expect(screen.getByText("1412.50").className).toContain("font-mono");
+  });
+
   it("renders dense, the mocks' own 11px vertical cell padding", () => {
     render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
     const headerCell = screen.getByRole("columnheader", { name: "Team" });
@@ -94,6 +102,24 @@ describe("StandingsTable", () => {
       expect(screen.queryByText("Clinched")).not.toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
+  });
+
+  // Step 2: the playoff cut, drawn as a hairline between two rows — never a colored row, which
+  // would be a WCAG 1.4.1 color-only-boundary failure. `STANDINGS` has three teams; a
+  // `playoffTeams` of 2 draws the cut above the third (`t3`, "Comet Crew").
+  it("draws the playoff cut as a border-top hairline above the first team out, when playoffTeams is given", () => {
+    render(<StandingsTable rows={STANDINGS} myTeamId="t1" playoffTeams={2} />);
+    const cutRow = screen.getByText("Comet Crew").closest("tr")!;
+    expect(cutRow.className).toContain("border-t-edge");
+    const inRow = screen.getByText("Iron Owls").closest("tr")!;
+    expect(inRow.className).not.toContain("border-t-edge");
+  });
+
+  it("draws no cut at all without a playoffTeams prop, or when the field covers the whole league", () => {
+    const { rerender } = render(<StandingsTable rows={STANDINGS} myTeamId="t1" />);
+    expect(document.querySelector("tr.border-t-edge")).toBeNull();
+    rerender(<StandingsTable rows={STANDINGS} myTeamId="t1" playoffTeams={STANDINGS.length} />);
+    expect(document.querySelector("tr.border-t-edge")).toBeNull();
   });
 
   // Task 3 (Phase 3.5): the standings surface that says the record itself is a two-games-a-week

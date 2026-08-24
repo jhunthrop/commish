@@ -1,9 +1,10 @@
 import Link from "next/link";
 import type { LeagueHomeBody, LineupBody } from "../contract";
-import { PageTitle } from "@/components/ui";
+import { Crest, PageTitle } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import type { HelpLevel } from "@/identity/preferences";
-import { formatWeek } from "../lib/format";
+import type { NextActionKind } from "@/league";
+import { formatRecord, formatWeek } from "../lib/format";
 import { AdvisorPanel } from "./advisor-panel";
 import { InvitePanel } from "./invite-panel";
 import { LeagueMembersPanel } from "./league-members-panel";
@@ -26,11 +27,42 @@ import { WaitingRoom } from "./waiting-room";
  * supplies the one `<main>` (full-bleed, `flex flex-col gap-6`) every page in this route group
  * renders into; this component's own top-level wrapper would be a second, redundant one.
  */
+/** The header's own dense line (Step 1): this manager's record, their standings seed, the next
+ *  thing on the calendar, and the league's format facts — every fact this component already
+ *  holds, joined with the same " · " separator the old subtitle used. `record`/`seed` are
+ *  omitted for a viewer with no team (a commissioner without one of their own): there is no row
+ *  in `standings` naming them, so nothing here would be true. */
+function headerFacts(home: LeagueHomeBody): string {
+  const parts: string[] = [];
+  const myRank = home.standings.findIndex((row) => row.teamId === home.myTeamId);
+  if (myRank !== -1) {
+    parts.push(formatRecord(home.standings[myRank]!));
+    parts.push(`#${myRank + 1} seed`);
+  }
+  // The next thing on the calendar: the draft's own real-or-placeholder time before it's
+  // complete (`terms.draftAt`, already the one sentence every draft-time surface renders), the
+  // current week once there's a season to point at instead — never a new fact, both already on
+  // `home`.
+  parts.push(home.draftStatus === "complete" ? formatWeek(home.currentWeek) : home.terms.draftAt);
+  parts.push(`${home.format === "auction" ? "Auction" : "Snake"} draft`);
+  return parts.join(" · ");
+}
+
 export function LeagueHome({
   home,
   lineup,
   helpLevel,
   holdExpired = false,
+  /**
+   * The league's own `nextAction.kind` (F16), computed by `LeaguePage` (`src/app/app/(shell)/
+   * leagues/[leagueId]/page.tsx`, exempt from the client boundary and the one place this room may
+   * call `nextAction` from `@/league` as a value) from fields `home`/`lineup` already carry — no
+   * new query, no new wire field. `null` for a league with nothing to point at (the `"none"` case,
+   * or a test that doesn't care) — the same "omit it, get the old behavior" contract every other
+   * optional prop on this component already holds.
+   */
+  nextActionKind = null,
+  playoffTeams = null,
 }: {
   readonly home: LeagueHomeBody;
   readonly lineup: LineupBody | null;
@@ -41,17 +73,32 @@ export function LeagueHome({
    *  `searchParams`) — CALLER-FORGEABLE and decorative only. `WaitingRoom` is the one place it
    *  reaches; every other panel on this page ignores it entirely. */
   readonly holdExpired?: boolean;
+  readonly nextActionKind?: NextActionKind | null;
+  /** `LEAGUE_CONFIG.playoffTeams` (Step 3c) — see `StandingsTable`'s own docblock for why this
+   *  arrives as a plain prop rather than a value-import. `null` (the default) draws no cut line. */
+  readonly playoffTeams?: number | null;
 }) {
   const clinched = home.standings.some((row) => row.teamId === home.myTeamId && row.clinched);
+  // Step 4 (F16): the ONE rule that promotes a panel — never a per-page list of exceptions, the
+  // same derived-only discipline the attention queue and the rail's own state already hold. The
+  // condition is the SAME fact `nextAction`'s own `fix-lineup` branch reads (`myTeamId !== null`
+  // is implied by `lineup !== null`, since `LeaguePage` only fetches a lineup for a caller with a
+  // team); this page has nothing else to add.
+  const promoteLineupEditor = nextActionKind === "fix-lineup" && lineup !== null;
 
   return (
     <>
-      <header className="flex flex-col gap-1">
-        <PageTitle>{home.name}</PageTitle>
-        <p className="text-sm text-text-muted">
-          {`${home.teams.length} of ${home.teamCount} managers · ${home.format === "auction" ? "Auction" : "Snake"} draft`}
-        </p>
+      <header className="flex flex-wrap items-center gap-3 rounded-lg border border-line bg-surface-elevated p-3 shadow-card">
+        <Crest id={home.leagueId} label={home.name.slice(0, 2).toUpperCase()} size={40} />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <PageTitle>{home.name}</PageTitle>
+          <p className="text-sm text-text-muted">{headerFacts(home)}</p>
+        </div>
       </header>
+
+      {promoteLineupEditor ? (
+        <LineupEditor leagueId={home.leagueId} lineup={lineup!} totalWeeks={home.totalWeeks} helpLevel={helpLevel} />
+      ) : null}
 
       <MatchupCelebration matchup={home.myMatchup} myTeamId={home.myTeamId} clinched={clinched} />
 
@@ -117,7 +164,13 @@ export function LeagueHome({
         ) : null}
       </section>
 
-      <StandingsTable rows={home.standings} myTeamId={home.myTeamId} helpLevel={helpLevel} medianGame={home.medianGame} />
+      <StandingsTable
+        rows={home.standings}
+        myTeamId={home.myTeamId}
+        helpLevel={helpLevel}
+        medianGame={home.medianGame}
+        playoffTeams={playoffTeams ?? undefined}
+      />
 
       {/*
         Unlike the draft room's `aside` band, this section sits in ordinary document flow, so
@@ -129,7 +182,10 @@ export function LeagueHome({
         <LeagueChat leagueId={home.leagueId} />
       </div>
 
-      {lineup === null ? null : (
+      {/* The default position (Step 4) — rendered here UNLESS `promoteLineupEditor` already put
+          it first, right below the header. One rule, read once, at the top of this component;
+          there is no second, per-page copy of it down here. */}
+      {lineup === null || promoteLineupEditor ? null : (
         <LineupEditor leagueId={home.leagueId} lineup={lineup} totalWeeks={home.totalWeeks} helpLevel={helpLevel} />
       )}
 

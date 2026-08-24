@@ -1,6 +1,6 @@
 import type { MedianResult, WeekStatus } from "@/league";
 import type { MatchupDetail, MatchupSide } from "../contract";
-import { Card, PositionBadge, SlotChip, Table, type TableColumn } from "@/components/ui";
+import { Card, EYEBROW, InfoTip, PositionBadge, SlotChip, Table, type TableColumn } from "@/components/ui";
 import { formatPoints } from "../lib/format";
 import { MatchupScoreboard } from "./matchup-scoreboard";
 import { MedianResultLine } from "./median-result";
@@ -56,6 +56,7 @@ function Side({
       )}
       <Table
         caption={`${side.teamName} starters`}
+        density="dense"
         columns={COLUMNS}
         rows={side.starters}
         rowKey={(row) => `${row.slot}:${row.slotIndex}`}
@@ -74,6 +75,13 @@ function Side({
  * to reconstruct the whole `MatchupDetail`. Live scoring exists now, so a week says which of
  * the three states it's in — scheduled, in progress, or final — and never shows a moving number
  * with no state beside it.
+ *
+ * A15: the "matchup" glossary term's own `InfoTip` caller — read off this file per the
+ * backend-leverage inventory's Task 15 Step 4 ledger. Placed on this panel's own eyebrow rather
+ * than on `MatchupScoreboard` itself: the scoreboard is ALSO `HomeLeagueCard`'s hero (Task 10),
+ * a dense card-list context whose own test pins "no button at all" for a league with nothing
+ * pending, and an unconditional InfoTip trigger there would be a real regression on a component
+ * this task does not own.
  */
 export function MatchupPanel({
   matchup,
@@ -86,6 +94,10 @@ export function MatchupPanel({
 }) {
   return (
     <section aria-label={`${matchup.home.teamName} against ${matchup.away.teamName}`} className="flex flex-col gap-3">
+      <span className="flex items-center gap-1">
+        <span className={`${EYEBROW} text-text-muted`}>Matchup</span>
+        <InfoTip term="matchup" />
+      </span>
       <MatchupScoreboard
         matchup={{
           weekNumber: matchup.weekNumber,

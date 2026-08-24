@@ -46,9 +46,28 @@ export interface TableProps<T> {
   readonly rowAttributes?: (row: T) => Record<string, string>;
   /** Required: a table with no rows must still offer the reader a next step. */
   readonly empty: ReactNode;
-  /** `dense` is the mocks' 11px vertical cell padding; `comfortable` keeps the table's original,
-   *  more generous padding. Defaults to `comfortable` — a caller under the shell opts into
-   *  `dense` explicitly. */
+  /**
+   * `dense` is the mocks' 11px vertical cell padding; `comfortable` keeps the table's original,
+   * more generous padding. Defaults to `comfortable`.
+   *
+   * DENSITY-DEFAULT DECISION (Phase 3.6, Task 11 Step 3c, the P3 review follow-up): Task 3
+   * shipped this default as `"comfortable"` with explicit opt-in specifically so flipping it
+   * later would never silently densify `matchup-panel.tsx` and `budget-table.tsx` before their
+   * own retone. Task 11 converges `matchup-panel.tsx` (now `density="dense"`, alongside
+   * `standings-table.tsx` and `league-board.tsx`); Task 12 owns `budget-table.tsx`, the last
+   * consumer.
+   *
+   * As of Task 11, only ONE of the two remaining consumers is converged — `budget-table.tsx`
+   * still carries no `density` prop at all, meaning it is still rendering `"comfortable"`
+   * un-retoned. Flipping the default here now would silently densify that table before Task 12
+   * has designed it for the change — exactly the outcome Task 3's explicit-opt-in default was
+   * built to prevent. The call, stated: **comfortable stays the default through Task 11.**
+   * Task 12, once it converges `budget-table.tsx`, is where every `Table` consumer in the
+   * product is finally dense-or-decided, and is where this default should actually flip (with
+   * every now-redundant explicit `density="dense"` prop dropped in the same commit) — or, if
+   * Task 12 finds a reason `budget-table.tsx` should stay comfortable, where that reason belongs
+   * in `docs/decisions/design-v2.md` (Task 14) instead. This paragraph is what Task 14 transcribes.
+   */
   readonly density?: TableDensity;
 }
 

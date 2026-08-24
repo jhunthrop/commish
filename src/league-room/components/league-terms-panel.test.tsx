@@ -26,7 +26,8 @@ describe("LeagueTermsPanel", () => {
     await renderSurface(<LeagueTermsPanel terms={TERMS} />, async ({ container }) => {
       expect(screen.getByRole("heading", { name: "Sunday Money" })).toBeInTheDocument();
       expect(screen.getByText("Snake")).toBeInTheDocument();
-      expect(screen.getByText("8 of 12 managers")).toBeInTheDocument();
+      // F17: converged onto SeatMeter's own sentence, not this panel's own "N of N managers".
+      expect(screen.getByText("8 of 12 seated")).toBeInTheDocument();
       expect(screen.getByText("PPR")).toBeInTheDocument();
       expect(screen.getByText(TERMS.rosterLine)).toBeInTheDocument();
       expect(screen.getByText("Friendly")).toBeInTheDocument();
@@ -41,6 +42,12 @@ describe("LeagueTermsPanel", () => {
     render(<LeagueTermsPanel terms={TERMS} />);
     expect(screen.getByRole("button", { name: "What is a snake draft?" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "What is PPR?" })).toBeInTheDocument();
+  });
+
+  // A15: the "stake-tier" glossary term's InfoTip caller.
+  it("gives Stake its own InfoTip", () => {
+    render(<LeagueTermsPanel terms={TERMS} />);
+    expect(screen.getByRole("button", { name: "What is a stake tier?" })).toBeInTheDocument();
   });
 
   it("leaves Standard scoring untipped — it is already plain English", () => {

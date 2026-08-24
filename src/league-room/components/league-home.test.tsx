@@ -17,6 +17,57 @@ const wrap = (home = HOME, lineup = LINEUP) => (
 );
 
 describe("LeagueHome", () => {
+  // Step 1: the header's own dense line — record, seed and the format facts, all derived from
+  // fields this component already holds, never a new one.
+  it("shows a dense header line with the manager's record, seed and the format facts", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    // HOME.myTeamId ("t1") is STANDINGS[0]: 9-4, rank 1.
+    expect(screen.getByText(/9-4 · #1 seed · Week 3 · Snake draft/)).toBeInTheDocument();
+  });
+
+  it("omits the record and seed from the header for a viewer with no team of their own", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={{ ...HOME, myTeamId: null }} lineup={null} />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    expect(screen.getByText(/^Week 3 · Snake draft/)).toBeInTheDocument();
+  });
+
+  // Step 4 (F16): the derived panel order — for `fix-lineup`, `LineupEditor` is the FIRST panel
+  // below the header, ahead of the standings it otherwise trails.
+  it("promotes the lineup editor above the standings when nextActionKind is fix-lineup", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} nextActionKind="fix-lineup" />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    const editor = screen.getByRole("heading", { name: "Week 5 lineup" });
+    const standings = screen.getByText("League standings");
+    // `DOCUMENT_POSITION_FOLLOWING` on `standings`, read from `editor`, means the editor comes
+    // first in document order.
+    expect(editor.compareDocumentPosition(standings) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("leaves the lineup editor in its default position (after standings) for every other nextActionKind, including none", () => {
+    renderInLeague(
+      <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+        <LeagueHome home={HOME} lineup={LINEUP} nextActionKind="set-lineup" />
+      </ChatRoomDepsProvider>,
+      fixtureLeagueDeps().deps,
+    );
+    const editor = screen.getByRole("heading", { name: "Week 5 lineup" });
+    const standings = screen.getByText("League standings");
+    expect(standings.compareDocumentPosition(editor) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
   it("shows the name, standings, this week's matchup and the lineup editor, in both themes, axe-clean", async () => {
     await renderSurface(wrap(), async ({ container }) => {
       expect(screen.getByRole("heading", { level: 1, name: "Sunday Money" })).toBeInTheDocument();
@@ -383,7 +434,10 @@ describe("LeagueHome", () => {
     // "Commissioner" is now ambiguous at the page level: the terms panel's own label reads the
     // same word. Scoped to the members list, this is still the commissioner BADGE.
     expect(within(list).getByText("Commissioner")).toBeInTheDocument();
-    // F17: the open-seats line is SeatMeter's own sentence now, not a paragraph this panel wrote.
-    expect(screen.getByText("3 of 12 seated")).toBeInTheDocument();
+    // F17: the open-seats line is SeatMeter's own sentence now, not a paragraph this panel wrote
+    // — it appears TWICE on this page on purpose, once here and once on the terms panel's own
+    // Size row (Task 11 Step 3b), the same "one sentence, several honest callers" shape
+    // `SeatHoldPanel`'s own docblock already describes for a held seat.
+    expect(screen.getAllByText("3 of 12 seated").length).toBeGreaterThanOrEqual(1);
   });
 });

@@ -32,4 +32,13 @@ describe("MedianResultLine", () => {
     ).toBeInTheDocument();
     expect(screen.queryByText(/^You /)).not.toBeInTheDocument();
   });
+
+  // Step 3: the gauntlet's finding that reusing the head-to-head block for the median result
+  // reads as a team named LEAGUE MEDIAN — this is the eyebrow that keeps the two apart at a
+  // glance, in a block sunk one depth step from the scoreboard above it.
+  it("carries its own Median eyebrow, sunk into a distinct inset block", () => {
+    render(<MedianResultLine teamName="Bay Bandits" isMine score={118.4} medianScore={104.2} result="win" />);
+    const eyebrow = screen.getByText("Median");
+    expect(eyebrow.closest("div")?.className).toContain("bg-surface-inset");
+  });
 });

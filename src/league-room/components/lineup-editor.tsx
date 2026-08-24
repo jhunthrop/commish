@@ -59,7 +59,9 @@ export function LineupEditor({
     // dropped rather than promising a lineup that will never open.
     const hasNextWeek = lineup.weekNumber < totalWeeks;
     return (
-      <section className="flex flex-col gap-2">
+      // `id="lineup"` (F16): a real anchor on a real panel, in BOTH branches — the locked state
+      // is still where `/app/leagues/${id}#lineup` has to land, not just the editable one.
+      <section id="lineup" className="flex flex-col gap-2">
         <h2 className="text-lg font-medium text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
         <p className="text-sm text-text-muted">
           {hasNextWeek
@@ -115,7 +117,9 @@ export function LineupEditor({
   };
 
   return (
-    <section className="flex flex-col gap-3">
+    // `id="lineup"` (F16): the fragment `actionHref` builds (`/app/leagues/${id}#lineup`) is a
+    // real anchor on a real panel, not a scroll script — Step 1.
+    <section id="lineup" className="flex flex-col gap-3">
       <h2 className="text-lg font-medium text-text-primary">{`${formatWeek(lineup.weekNumber)} lineup`}</h2>
       {/* Persona review (veteran, FIX 5): the lock is coarse — the WHOLE week locks at the
           first kickoff, not each player at their own — and nothing said so before this. A

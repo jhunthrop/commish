@@ -11,20 +11,18 @@ import { GLOSSARY, type TermKey } from "./glossary";
  * a decision somebody makes on purpose, with a reason, in a list a reviewer can read. A term with
  * neither a caller nor an entry here fails this file's first test, which is the point.
  *
- * Three land on the parent plan's league space (Task 11): `stake-tier`, `matchup` and
- * `standings-record` are read off `standings-table.tsx`, `matchup-panel.tsx` and
- * `league-terms-panel.tsx`, all three already in that task's Files block, and the assignment is
- * recorded there rather than duplicated as a step here (Task 15 Step 4's ledger note).
+ * Three landed on the parent plan's league space (Task 11) and are wired now: `stake-tier` on
+ * `league-terms-panel.tsx`'s Stake row, `matchup` on `matchup-panel.tsx`'s own eyebrow label
+ * (not `matchup-scoreboard.tsx`, which is ALSO `HomeLeagueCard`'s dense hero and pins "no button
+ * at all" for a league with nothing pending), and `standings-record` on `standings-table.tsx`'s
+ * Record column header — no longer listed below.
  *
- * Seven are format vocabulary — `ppr`, `half-ppr`, `te-premium`, `custom-scoring`, `flex`,
- * `snake-draft` and `auction-draft` — and land on the league-rules page this addendum's Task 21
- * Step 4 creates, which names them explicitly as "where the format vocabulary lands... and
+ * The remaining seven are format vocabulary — `ppr`, `half-ppr`, `te-premium`, `custom-scoring`,
+ * `flex`, `snake-draft` and `auction-draft` — and land on the league-rules page this addendum's
+ * Task 21 Step 4 creates, which names them explicitly as "where the format vocabulary lands... and
  * Task 15 Step 4's orphan glossary terms... get their first real caller."
  */
 const UNSURFACED: Readonly<Partial<Record<TermKey, string>>> = {
-  "stake-tier": "Parent Task 11: the league-terms panel it retones is the honest home, not built yet.",
-  matchup: "Parent Task 11: the matchup panel it retones is the honest home, not built yet.",
-  "standings-record": "Parent Task 11: the standings table it retones is the honest home, not built yet.",
   ppr: "Format vocabulary. Lands on the league-rules page, addendum Task 21 Step 4 — its first real caller.",
   "half-ppr": "Format vocabulary. Lands on the league-rules page, addendum Task 21 Step 4.",
   "te-premium": "Format vocabulary. Lands on the league-rules page, addendum Task 21 Step 4.",

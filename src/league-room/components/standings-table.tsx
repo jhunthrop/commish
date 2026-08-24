@@ -36,9 +36,30 @@ export interface StandingsTableProps {
    * so this table needs the fact stated, not inferred from the numbers it renders.
    */
   readonly medianGame?: boolean;
+  /**
+   * `LEAGUE_CONFIG.playoffTeams`, threaded down from `LeaguePage` (`src/app/app/(shell)/leagues/
+   * [leagueId]/page.tsx`, exempt from the client boundary) rather than value-imported here —
+   * `src/league-room/**` may not import `@/league` as a value (`eslint.config.mjs`), and this
+   * table has no other way to learn the real cut line. A plain constant threaded as a prop is not
+   * new data: no query, no wire field, nothing `read.ts`'s pinned `BASELINE_LEAGUE_HOME_QUERIES`
+   * has to grow for. `undefined` (a test that doesn't care) renders no hairline at all — the same
+   * "omit the prop, get the old behavior" contract `medianGame` already holds.
+   */
+  readonly playoffTeams?: number;
 }
 
-export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false }: StandingsTableProps) {
+/** The team just OUTSIDE the playoff field, by real standings rank — never by whatever column
+ *  the reader currently has the table sorted on. `rows` is the ORIGINAL, server-ranked array
+ *  (never `ordered`, which a Points For/Against sort can reshuffle), so the hairline marks the
+ *  same boundary regardless of which column is currently driving the visible order. `undefined`
+ *  `playoffTeams`, or a field as large as the league itself (the same degenerate case
+ *  `showClinchBadges` already guards), draws nothing. */
+function firstTeamOutId(rows: readonly TeamStandingsRow[], playoffTeams: number | undefined): string | null {
+  if (playoffTeams === undefined || playoffTeams >= rows.length) return null;
+  return rows[playoffTeams]?.teamId ?? null;
+}
+
+export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false, playoffTeams }: StandingsTableProps) {
   const [sort, setSort] = useState<SortKey>("rank");
   const ordered = useMemo(() => [...rows].sort((a, b) => ORDER_BY[sort](b) - ORDER_BY[sort](a)), [rows, sort]);
 
@@ -47,6 +68,7 @@ export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false }
   // no information in it. Twelve meaningless badges are worse than none, so a whole-league
   // clinch is treated as "nothing to show" rather than rendered literally.
   const showClinchBadges = rows.length > 0 && rows.some((row) => !row.clinched);
+  const firstOutId = firstTeamOutId(rows, playoffTeams);
 
   const sortable = (key: SortKey, label: string) => (
     <button type="button" className="underline" onClick={() => setSort(key)}>
@@ -72,14 +94,26 @@ export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false }
         <span className="inline-flex items-center gap-1">
           Record
           {/* A median league's record is a two-games-a-week one — the definition changes to
-              say so, rather than sitting a second icon beside the first for the same header. */}
-          <InfoTip term={medianGame ? "median-game" : "standings-record"} helpLevel={helpLevel} />
+              say so, rather than sitting a second icon beside the first for the same header.
+              Two literal branches, never a dynamic `term={medianGame ? … : …}` expression:
+              `glossary.source.test.ts`'s wiring scan is a static regex over `term="…"` string
+              literals, so a computed prop value renders correctly but reads as unwired (A15). */}
+          {medianGame ? <InfoTip term="median-game" helpLevel={helpLevel} /> : <InfoTip term="standings-record" helpLevel={helpLevel} />}
         </span>
       ),
-      cell: (row) => formatRecord(row),
+      cell: (row) => <span className="font-mono">{formatRecord(row)}</span>,
     },
-    { key: "pointsFor", header: "Points for", cell: (row) => formatPoints(row.pointsFor), numeric: true },
-    { key: "pointsAgainst", header: "Points against", cell: (row) => formatPoints(row.pointsAgainst), numeric: true, hideOnNarrow: true },
+    // Step 2: the mocks' own dense numerals — `font-mono` (tabular by construction, see
+    // `docs/design-system.md`'s "Type" section) on every number this table renders, standings'
+    // own record included, so a re-sort never shifts a column's digits sideways.
+    { key: "pointsFor", header: "Points for", cell: (row) => <span className="font-mono">{formatPoints(row.pointsFor)}</span>, numeric: true },
+    {
+      key: "pointsAgainst",
+      header: "Points against",
+      cell: (row) => <span className="font-mono">{formatPoints(row.pointsAgainst)}</span>,
+      numeric: true,
+      hideOnNarrow: true,
+    },
   ];
 
   return (
@@ -96,9 +130,15 @@ export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false }
         columns={columns}
         rows={ordered}
         rowKey={(row) => row.teamId}
-        rowClassName={(row) =>
-          row.teamId === myTeamId ? "border-l-2 border-l-accent bg-surface-elevated font-medium" : ""
-        }
+        rowClassName={(row) => {
+          const own = row.teamId === myTeamId ? "border-l-2 border-l-accent bg-surface-elevated font-medium " : "";
+          // The playoff cut: a hairline ABOVE the first team out, never a colored row — a
+          // color-only boundary is a WCAG 1.4.1 failure, and `border-t-edge` is a real shape
+          // change every reader sees, in either theme, whether or not they perceive color at
+          // all (Step 2).
+          const cut = row.teamId === firstOutId ? "border-t-2 border-t-edge" : "";
+          return `${own}${cut}`;
+        }}
         rowAttributes={(row) => ({ "data-own": row.teamId === myTeamId ? "true" : "false" })}
         empty={
           <EmptyState

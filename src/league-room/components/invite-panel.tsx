@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { InviteBody } from "../contract";
-import { Button, Input } from "@/components/ui";
+import { Button, Input, Panel } from "@/components/ui";
 import { useLeagueRoomDeps } from "../hooks/deps";
 
 /**
@@ -41,8 +41,7 @@ export function InvitePanel({ leagueId }: { readonly leagueId: string }) {
   };
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="text-sm font-medium text-text-muted">Invite managers</h2>
+    <Panel title="Invite managers">
       {invite === null ? (
         <Button onClick={() => void create()} loading={submitting} disabled={submitting}>
           Create invite link
@@ -61,6 +60,6 @@ export function InvitePanel({ leagueId }: { readonly leagueId: string }) {
           {error}
         </p>
       )}
-    </section>
+    </Panel>
   );
 }

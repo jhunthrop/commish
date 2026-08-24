@@ -51,6 +51,15 @@ export const VISIBILITIES = [
 ];
 export const VISIBILITY_HINT = "Public leagues show up on the browse page and anyone can join without an invite. Invite-only leagues are joined by invite link only.";
 /**
+ * Step 3b's disclosure, verbatim and tested. The join-flow panel filed the absence as the thing
+ * a first-time commissioner learns AFTER their league appears somewhere they did not expect —
+ * this describes behavior that already exists (`is_public_matchmade` and the browse shelf), said
+ * at the visibility control, above the submit button, where the decision is actually made.
+ * `VISIBILITY_HINT` above is the Select's own hint (what each option DOES); this is the
+ * consequence a commissioner might not otherwise picture — where a public league SHOWS UP.
+ */
+export const VISIBILITY_DISCLOSURE = "Public leagues appear on the open shelf, where anyone can take a seat. Private leagues are invite only.";
+/**
  * WHO THE LEAGUE IS FOR, and the control the final review's own battery proved was missing.
  *
  * `createLeague` refuses a veteran opening a PUBLIC league declared `beginner`
@@ -167,7 +176,9 @@ function AdvancedSettingsDrawer({
   readonly helpLevel?: HelpLevel;
 }) {
   return (
-    <details className="rounded-md border border-line p-3">
+    // `border-edge`, never `border-line`: a disclosure is a control a user must find, not a
+    // decorative hairline (Step 3b, "edge on every field boundary and never line").
+    <details className="rounded-md border border-edge p-3">
       <summary className="cursor-pointer text-sm text-text-muted">{DRAWER_SUMMARY}</summary>
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         <Select label="Draft format" options={FORMATS} value={format} onChange={(event) => onFormatChange(event.target.value)} />
@@ -336,6 +347,8 @@ export function CreateLeagueForm({
         experienceTier={experienceTier}
         onExperienceTierChange={setExperienceTier}
       />
+
+      <p className="text-sm text-text-muted">{VISIBILITY_DISCLOSURE}</p>
 
       <AdvancedSettingsDrawer
         format={format}

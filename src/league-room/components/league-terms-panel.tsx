@@ -1,4 +1,4 @@
-import { Avatar, Card, EYEBROW, InfoTip } from "@/components/ui";
+import { Avatar, Card, EYEBROW, InfoTip, SeatMeter } from "@/components/ui";
 import type { DraftFormat } from "@/domain/league";
 import type { TermKey } from "@/help/glossary";
 import type { HelpLevel } from "@/identity/preferences";
@@ -76,13 +76,20 @@ export function LeagueTermsPanel({
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Stake</dt>
           <dd className="flex flex-col gap-1 text-text-primary">
-            <span>{terms.stakeLabel}</span>
+            <span className="inline-flex items-center gap-1">
+              {terms.stakeLabel}
+              <InfoTip term="stake-tier" helpLevel={helpLevel} />
+            </span>
             <span className="text-sm text-text-muted">{terms.stakeDisclosure}</span>
           </dd>
         </div>
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Size</dt>
-          <dd className="text-text-primary">{`${terms.filledTeams} of ${terms.teamCount} managers`}</dd>
+          {/* F17: SeatMeter owns the seat sentence everywhere it counts seats — this row used to
+              write its own "N of N managers" phrasing, a fourth wording of the same count. */}
+          <dd className="text-text-primary">
+            <SeatMeter filled={terms.filledTeams} total={terms.teamCount} />
+          </dd>
         </div>
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
           <dt className={`${EYEBROW} text-text-muted`}>Scoring</dt>

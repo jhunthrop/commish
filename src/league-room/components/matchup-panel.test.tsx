@@ -83,6 +83,20 @@ describe("MatchupPanel", () => {
     expect(screen.getByText(/Iron Owls scored 98.25/)).toBeInTheDocument();
   });
 
+  // A15: the "matchup" glossary term's InfoTip caller.
+  it("carries an InfoTip on its own Matchup eyebrow", () => {
+    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+    expect(screen.getByRole("button", { name: "What is a matchup?" })).toBeInTheDocument();
+  });
+
+  // Step 3c: the last two `Table` consumers to converge dense (the other is `budget-table.tsx`,
+  // Task 12) — see `table.tsx`'s own docblock for the density-default decision this leaves.
+  it("renders its starters table dense, the mocks' own 11px vertical cell padding", () => {
+    render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
+    const headerCell = screen.getAllByRole("columnheader", { name: "Player" })[0]!;
+    expect(headerCell).toHaveStyle({ paddingTop: "11px", paddingBottom: "11px" });
+  });
+
   it("renders a starter's position as a PositionBadge sticker, not a bare string", () => {
     render(<MatchupPanel matchup={MATCHUP} myTeamId="t1" weekStatus="final" />);
     const position = MATCHUP.home.starters[0]!.position;

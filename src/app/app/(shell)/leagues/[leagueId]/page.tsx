@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getDb } from "@/db/client";
 import { requireCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
+import { LEAGUE_CONFIG, nextAction } from "@/league";
 import { leagueHome, lineupView } from "@/league-service";
 import { LeagueHome } from "@/league-room/components/league-home";
 
@@ -62,5 +63,44 @@ export default async function LeaguePage({ params, searchParams }: PageProps) {
       ? null
       : await lineupView(getDb(), { leagueId, teamId: home.myTeamId, weekNumber: home.currentWeek });
 
-  return <LeagueHome home={home} lineup={lineup} helpLevel={preferences.helpLevel} holdExpired={holdExpired === "1"} />;
+  return (
+    <LeagueHome
+      home={home}
+      lineup={lineup}
+      helpLevel={preferences.helpLevel}
+      holdExpired={holdExpired === "1"}
+      nextActionKind={leagueNextActionKind(home, lineup)?.kind ?? null}
+      playoffTeams={LEAGUE_CONFIG.playoffTeams}
+    />
+  );
+}
+
+/**
+ * F16 (Task 11 Step 4): the same `nextAction` a cross-league card already computes, called here
+ * because it is a pure, value-import-only function (`@/league`, exempt for `src/app/**` but not
+ * for `src/league-room/**`) and `LeagueHome` may not call it itself. `lineupSet`'s input is an
+ * approximation, stated plainly: `crossLeagueHome`'s own `lineupSet` reads a real
+ * `notExists(lineup_slots WHERE teamId AND weekNumber)` query this single-league read does not
+ * run (Task 11 adds no data, no new query — `read.ts`'s pinned `BASELINE_LEAGUE_HOME_QUERIES`
+ * stays 12), so this reads the SAME signal `LineupBody` already carries instead: every starter
+ * slot filled. The two can disagree only when a lineup_slots row exists but happens to leave a
+ * slot empty on purpose — a real state, and one `fix-lineup`'s own copy ("your lineup is
+ * genuinely unset") describes just as honestly as the DB-precise version would. Every other
+ * `nextAction` branch (a live draft, an unfilled league, a scheduled draft, the week's own
+ * in-progress/final state) is unaffected by this approximation — only the fix-lineup/set-lineup
+ * boundary can move, and both already render the identical `LineupEditor`, just in a different
+ * position on the page.
+ */
+function leagueNextActionKind(home: Awaited<ReturnType<typeof leagueHome>>, lineup: Awaited<ReturnType<typeof lineupView>>) {
+  if (home === null) return null;
+  const lineupSet = lineup === null || lineup.starters.every((slot) => slot.playerId !== null);
+  return nextAction({
+    isCommissioner: home.isCommissioner,
+    filledTeams: home.teams.length,
+    teamCount: home.teamCount,
+    myTeamId: home.myTeamId,
+    draftStatus: home.draftStatus,
+    weekStatus: home.weekStatus,
+    lineupSet,
+  });
 }

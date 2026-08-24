@@ -49,10 +49,13 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   await expect(managerA.getByRole("heading", { name: leagueName })).toBeVisible();
   const leagueId = new URL(managerA.url()).pathname.split("/").pop()!;
   expect(leagueId).toBeTruthy();
-  // Scoped to the page header: Task 8's terms panel now ALSO states the fill count (its own
-  // "Size" row), so the bare substring is ambiguous — this locator names the header's own
-  // "N of 8 managers · Snake draft" line specifically, not the terms panel's restatement of it.
-  await expect(managerA.locator("header").getByText("1 of 8 managers")).toBeVisible();
+  // Phase 3.6, Task 11 (Step 1 + F17): the page header no longer states the fill count at all —
+  // its own dense line is now record/seed/calendar/format facts, and the seat sentence
+  // converged onto `SeatMeter` everywhere it counts seats, which now includes BOTH the terms
+  // panel's Size row and the members panel's own open-seats line (deliberately duplicated, the
+  // same "one sentence, several honest callers" shape `SeatHoldPanel` already carries) — hence
+  // `.first()` rather than a single-match locator.
+  await expect(managerA.getByText("1 of 8 seated").first()).toBeVisible();
 
   // --- Invite ------------------------------------------------------------------------------
   await managerA.getByRole("button", { name: "Create invite link" }).click();
@@ -77,7 +80,7 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   await expect(managerB.getByRole("heading", { name: leagueName })).toBeVisible();
 
   await managerA.reload();
-  await expect(managerA.locator("header").getByText("2 of 8 managers")).toBeVisible();
+  await expect(managerA.getByText("2 of 8 seated").first()).toBeVisible();
 
   // --- Open the draft ----------------------------------------------------------------------
   // Task 6: the button that used to be reachable only by curl (`POST /api/drafts/[draftId]

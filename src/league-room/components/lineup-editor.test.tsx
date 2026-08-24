@@ -37,6 +37,18 @@ describe("LineupEditor", () => {
     );
   });
 
+  // F16: the real anchor `actionHref` (`/app/leagues/${id}#lineup`) lands on — both branches,
+  // since a locked week is still where the fragment has to land.
+  it("carries id=\"lineup\" while editable", () => {
+    renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} />, fixtureLeagueDeps().deps);
+    expect(document.getElementById("lineup")).toBeInTheDocument();
+  });
+
+  it("carries id=\"lineup\" while locked", () => {
+    renderInLeague(<LineupEditor leagueId="l1" lineup={{ ...LINEUP, locked: true }} totalWeeks={14} />, fixtureLeagueDeps().deps);
+    expect(document.getElementById("lineup")).toBeInTheDocument();
+  });
+
   it("carries an InfoTip on the Bench heading", () => {
     renderInLeague(<LineupEditor leagueId="l1" lineup={LINEUP} totalWeeks={14} />, fixtureLeagueDeps().deps);
     expect(screen.getByRole("button", { name: "What is the bench?" })).toBeInTheDocument();

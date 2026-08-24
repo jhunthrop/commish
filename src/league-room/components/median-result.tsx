@@ -1,4 +1,5 @@
 import type { MedianResult } from "@/league";
+import { EYEBROW } from "@/components/ui";
 import { formatPoints } from "../lib/format";
 
 const VERB: Readonly<Record<MedianResult, string>> = { win: "won", loss: "lost", tie: "tied" };
@@ -27,13 +28,23 @@ export interface MedianResultLineProps {
  * Numbers go through `formatPoints` (two decimal places, `toFixed(2)`) — the SAME formatting
  * every other score on this page already uses (`MatchupScoreboard`, the starters table), so a
  * reader never sees two different precisions for what is otherwise the same kind of number.
+ *
+ * Step 3: given its own shape, an inset block with a "Median" eyebrow, distinct from the
+ * head-to-head scoreboard above it — the gauntlet's finding is that reusing one block for both
+ * results reads as a team named LEAGUE MEDIAN. `bg-surface-inset` is the design system's own
+ * "a track, a slot well" depth step (`docs/design-system.md`, "Color roles"), one step recessed
+ * from the `Card` this renders inside, so the median result reads as a second, quieter fact
+ * rather than a continuation of the same block.
  */
 export function MedianResultLine({ teamName, isMine, score, medianScore, result }: MedianResultLineProps) {
   const subject = isMine ? "You" : teamName;
   const subjectLower = isMine ? "you" : "they";
   return (
-    <p className="text-sm text-text-muted">
-      {`${subject} scored ${formatPoints(score)}. The league median was ${formatPoints(medianScore)}, so ${subjectLower} ${VERB[result]} that one too.`}
-    </p>
+    <div className="rounded-md bg-surface-inset px-2 py-1.5">
+      <p className={`${EYEBROW} text-text-faint`}>Median</p>
+      <p className="text-sm text-text-muted">
+        {`${subject} scored ${formatPoints(score)}. The league median was ${formatPoints(medianScore)}, so ${subjectLower} ${VERB[result]} that one too.`}
+      </p>
+    </div>
   );
 }

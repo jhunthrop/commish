@@ -6,7 +6,7 @@ import { GLOSSARY } from "@/help/glossary";
 import { LEAGUE_EXPERIENCE_TIER_HINT, LEAGUE_EXPERIENCE_TIER_LABEL } from "@/identity/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
-import { CreateLeagueForm, DRAWER_SUMMARY, START_TRIGGER_HINT, START_TRIGGERS, VISIBILITIES, VISIBILITY_HINT } from "./create-league-form";
+import { CreateLeagueForm, DRAWER_SUMMARY, START_TRIGGER_HINT, START_TRIGGERS, VISIBILITIES, VISIBILITY_DISCLOSURE, VISIBILITY_HINT } from "./create-league-form";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 
 describe("CreateLeagueForm", () => {
@@ -255,6 +255,19 @@ describe("CreateLeagueForm", () => {
       // Distinct sentences, not distinct-sounding labels — the near homonymy is the defect the
       // gauntlet named, and renaming either label would only move it.
       expect(VISIBILITY_HINT).not.toBe(LEAGUE_EXPERIENCE_TIER_HINT);
+    });
+
+    // Step 3b: the join-flow panel's own disclosure, verbatim, at the visibility control and
+    // above the submit button — so a commissioner learns where a public league shows up BEFORE
+    // they press create, not after.
+    it("discloses where a public league shows up, verbatim, before the submit button", () => {
+      renderInLeague(<CreateLeagueForm onCreated={vi.fn()} />, fixtureLeagueDeps().deps);
+      expect(screen.getByText(VISIBILITY_DISCLOSURE)).toBeInTheDocument();
+      const disclosure = screen.getByText(VISIBILITY_DISCLOSURE);
+      const submit = screen.getByRole("button", { name: "Create league" });
+      // DOCUMENT_POSITION_FOLLOWING on `submit` compared from `disclosure` means the disclosure
+      // comes first in document order — literally "above the submit button".
+      expect(disclosure.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
 
     it("is visible and keyboard-reachable without opening anything, axe-clean in both themes, at 360px", async () => {
