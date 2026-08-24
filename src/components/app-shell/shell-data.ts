@@ -22,12 +22,20 @@ export type RailLeagueState = "needs-you" | "live" | "quiet";
  * initial, and there is no column to migrate (ruling 10). The tile's tone is not carried here at
  * all: `Crest` (`@/components/ui/crest`) derives it deterministically from `id` itself
  * (`crestTone`, Phase 3.6, Task 3), so there is no second value that could ever disagree with it.
+ *
+ * `needsYouKind` is `state`'s own kind-aware sibling: `state === "needs-you"` collapses TWO
+ * distinct facts (`"fix-lineup"` and `"join-draft"`) into one bucket for the dot's color, and a
+ * dot alone cannot say which — `league-rail.tsx`'s accessible name reads this field to pick the
+ * right sentence (`NEXT_ACTION_COPY["fix-lineup"]` vs `["join-draft"]`), never a hardcoded map
+ * that can only ever mean one of the two (fix round 1, H1). `null` whenever `state !== "needs-
+ * you"` — there is nothing to disambiguate outside that one state.
  */
 export interface RailLeague {
   readonly id: string;
   readonly name: string;
   readonly shortName: string;
   readonly state: RailLeagueState;
+  readonly needsYouKind: "fix-lineup" | "join-draft" | null;
 }
 
 /**
@@ -61,6 +69,13 @@ function stateFor(kind: NextActionKind | undefined, weekStatus: WeekStatus): Rai
   return "quiet";
 }
 
+/** Which of the two needs-you kinds `kind` is, or `null` — `RailLeague.needsYouKind`'s own
+ *  derivation, kept as a named function so `stateFor` and this can never independently disagree
+ *  about which kinds count as needs-you (fix round 1, H1). */
+function needsYouKindFor(kind: NextActionKind | undefined): "fix-lineup" | "join-draft" | null {
+  return kind === "fix-lineup" || kind === "join-draft" ? kind : null;
+}
+
 /**
  * The rail's data, once: `{ rail, liveState }` in one round trip, built on the reads
  * `crossLeagueHome` already performs (Step 3) — this function issues no query of its own.
@@ -78,6 +93,7 @@ export async function shellData(db: Db, user: { readonly id: string }, clock?: C
     name: league.name,
     shortName: shortNameFor(league.name),
     state: stateFor(league.nextAction?.kind, league.weekStatus),
+    needsYouKind: needsYouKindFor(league.nextAction?.kind),
   }));
   return { rail, liveState: home.liveState };
 }

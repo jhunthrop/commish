@@ -97,6 +97,9 @@ describe("shellData", () => {
     expect(rail[0]!.name).toBe("Bay Bandits");
     expect(rail[0]!.shortName).toBe("BB");
     expect(rail[0]!.state).toBe("needs-you");
+    // Fix round 1, H1: the rail's own kind, not just its bucket — `LeagueRail` reads this to
+    // pick between "Fix your lineup" and "Join the draft".
+    expect(rail[0]!.needsYouKind).toBe("join-draft");
   });
 
   it("marks a league live when its current week is in progress, regardless of nextAction", async () => {
@@ -113,6 +116,7 @@ describe("shellData", () => {
     expect(rail).toHaveLength(1);
     expect(rail[0]!.shortName).toBe("GH");
     expect(rail[0]!.state).toBe("live");
+    expect(rail[0]!.needsYouKind).toBeNull();
   });
 
   it("marks a league quiet when nothing needs the caller and the week isn't live", async () => {
@@ -128,6 +132,7 @@ describe("shellData", () => {
     expect(rail).toHaveLength(1);
     expect(rail[0]!.shortName).toBe("TS");
     expect(rail[0]!.state).toBe("quiet");
+    expect(rail[0]!.needsYouKind).toBeNull();
   });
 
   it("marks a league needs-you when this manager's own lineup is genuinely unset (fix-lineup, F1)", async () => {
@@ -138,5 +143,6 @@ describe("shellData", () => {
 
     expect(rail).toHaveLength(1);
     expect(rail[0]!.state).toBe("needs-you");
+    expect(rail[0]!.needsYouKind).toBe("fix-lineup");
   });
 });

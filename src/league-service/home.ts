@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { desc, inArray } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { lineupSlots, matchups, statWeeks, weeks } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
@@ -166,7 +166,11 @@ export async function crossLeagueHome(
   // sets exactly one `phaseByLeague` entry per league row, so there is always at least one
   // current week here — no `currentWeeks.length === 0` guard needed for `inArray`.
   const currentWeeks = [...new Set([...phaseByLeague.values()].map((phase) => phase.currentWeek))];
-  const statWeekRows = await db.select().from(statWeeks).where(inArray(statWeeks.week, currentWeeks));
+  // `.orderBy(desc(week))` (fix round 1, L3): `liveStateFor`'s `.find(status === "in_progress")`
+  // needs a stated, deterministic order across rows rather than trusting the database's own
+  // return order — the latest week wins on the rare tick two weeks are briefly `in_progress` at
+  // once (a settlement lag), which is the more useful one to report live.
+  const statWeekRows = await db.select().from(statWeeks).where(inArray(statWeeks.week, currentWeeks)).orderBy(desc(statWeeks.week));
   const statWeekByWeek = new Map(statWeekRows.map((row) => [row.week, row]));
 
   const weekStatusFor = (weekNumber: number): WeekStatus => statWeekByWeek.get(weekNumber)?.status ?? "scheduled";

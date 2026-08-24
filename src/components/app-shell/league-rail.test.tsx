@@ -19,9 +19,9 @@ function mockPathname(next: string): void {
 }
 
 const LEAGUES: readonly RailLeague[] = [
-  { id: "lg_bandits", name: "Bay Bandits", shortName: "BB", state: "quiet" },
-  { id: "lg_thunder", name: "Thunder Squad", shortName: "TS", state: "needs-you" },
-  { id: "lg_hawks", name: "Golden Hawks", shortName: "GH", state: "live" },
+  { id: "lg_bandits", name: "Bay Bandits", shortName: "BB", state: "quiet", needsYouKind: null },
+  { id: "lg_thunder", name: "Thunder Squad", shortName: "TS", state: "needs-you", needsYouKind: "join-draft" },
+  { id: "lg_hawks", name: "Golden Hawks", shortName: "GH", state: "live", needsYouKind: null },
 ];
 
 describe("LeagueRail", () => {
@@ -31,6 +31,19 @@ describe("LeagueRail", () => {
       expect(screen.getByRole("link", { name: "Bay Bandits" })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Thunder Squad. Join the draft." })).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Golden Hawks. Watch the scores." })).toBeInTheDocument();
+    });
+  });
+
+  // Fix round 1, H1: the missing combination — a needs-you league whose kind is `fix-lineup`
+  // must say so, not fall back to the (unrelated) `join-draft` sentence.
+  it("says 'Fix your lineup', not 'Join the draft', when needsYouKind is fix-lineup", async () => {
+    mockPathname("/app");
+    const leagues: readonly RailLeague[] = [
+      { id: "lg_volt", name: "Volt Kings", shortName: "VK", state: "needs-you", needsYouKind: "fix-lineup" },
+    ];
+    await renderSurface(<LeagueRail leagues={leagues} />, () => {
+      expect(screen.getByRole("link", { name: "Volt Kings. Fix your lineup." })).toBeInTheDocument();
+      expect(screen.queryByRole("link", { name: /Join the draft/ })).not.toBeInTheDocument();
     });
   });
 

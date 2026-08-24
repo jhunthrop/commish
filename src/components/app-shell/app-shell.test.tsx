@@ -19,10 +19,10 @@ function mockPathname(next: string): void {
 }
 
 const RAIL: readonly RailLeague[] = [
-  { id: "lg_bandits", name: "Bay Bandits", shortName: "BB", state: "quiet" },
-  // "needs-you" is exactly "join-draft" today — "fix-lineup" does not exist until Task 10 Step
-  // 1b (F1). This fixture's accessible name reflects the vocabulary this task actually ships.
-  { id: "lg_volt", name: "Volt Kings", shortName: "VK", state: "needs-you" },
+  { id: "lg_bandits", name: "Bay Bandits", shortName: "BB", state: "quiet", needsYouKind: null },
+  // "needs-you" can be either "join-draft" or "fix-lineup" (Task 10 Step 1b, F1) —
+  // `needsYouKind` is what tells `LeagueRail` which sentence to say.
+  { id: "lg_volt", name: "Volt Kings", shortName: "VK", state: "needs-you", needsYouKind: "join-draft" },
 ];
 
 function baseProps(): AppShellProps {
@@ -78,6 +78,19 @@ describe("AppShell", () => {
     mockPathname("/app");
     const { getByRole } = renderShell(baseProps());
     expect(getByRole("link", { name: "Volt Kings. Join the draft." })).toBeInTheDocument();
+  });
+
+  // Fix round 1, H1: the missing combination that let a hardcoded "needs-you" -> "join-draft"
+  // map ship — a manager whose LINEUP is unset must never hear "Join the draft."
+  it("says 'Fix your lineup', not 'Join the draft', for a needs-you league whose kind is fix-lineup", () => {
+    mockPathname("/app");
+    const props: AppShellProps = {
+      ...baseProps(),
+      rail: [{ id: "lg_volt", name: "Volt Kings", shortName: "VK", state: "needs-you", needsYouKind: "fix-lineup" }],
+    };
+    const { getByRole, queryByRole } = renderShell(props);
+    expect(getByRole("link", { name: "Volt Kings. Fix your lineup." })).toBeInTheDocument();
+    expect(queryByRole("link", { name: /Join the draft/ })).not.toBeInTheDocument();
   });
 
   it("keeps the rail reachable at 360px by becoming a horizontal strip, not by disappearing", () => {

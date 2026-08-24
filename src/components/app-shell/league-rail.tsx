@@ -9,18 +9,15 @@ import { NEXT_ACTION_COPY } from "@/league";
 import type { RailLeague, RailLeagueState } from "./shell-data";
 
 /**
- * Each non-`"quiet"` state's accessible-name fragment, reusing `NEXT_ACTION_COPY` (`@/league/
- * next-action.ts`) rather than typing a second copy of the same words — C2's "one string COPY
- * owns" rule applies here exactly as it does to the board cell.
- *
- * `"needs-you"` can only mean `"join-draft"` today, because `"fix-lineup"` does not exist until
- * Task 10 Step 1b (F1). Once it does, TWO kinds will share this one state, and this fixed
- * one-sentence map will need to become kind-aware — flagged here for whoever lands that task,
- * since a `"needs-you"` league will then need `nextAction.kind` carried alongside `state`,
- * which `RailLeague` deliberately does not do yet.
+ * `"live"`'s accessible-name fragment, reusing `NEXT_ACTION_COPY` (`@/league/next-action.ts`)
+ * rather than typing a second copy of the same words — C2's "one string COPY owns" rule applies
+ * here exactly as it does to the board cell. `"needs-you"` is NOT in this map: it can mean either
+ * of two kinds (`"fix-lineup"` or `"join-draft"`, Task 10 Step 1b, F1) and a fixed one-sentence
+ * map cannot tell them apart — `labelFor`, below, reads `league.needsYouKind` for that state
+ * instead (fix round 1, H1: this map used to hardcode `"needs-you"` to `NEXT_ACTION_COPY["join-
+ * draft"]`, so a manager whose lineup was unset heard "Join the draft" — false).
  */
 const STATE_LABEL: Readonly<Partial<Record<RailLeagueState, string>>> = {
-  "needs-you": NEXT_ACTION_COPY["join-draft"],
   live: NEXT_ACTION_COPY["watch-scores"],
 };
 
@@ -31,11 +28,22 @@ const DOT_CLASS: Readonly<Partial<Record<RailLeagueState, string>>> = {
   live: "bg-positive",
 };
 
-/** "Bay Bandits" (quiet) → "Bay Bandits". "Volt Kings" (needs-you) → "Volt Kings. Join the
- *  draft." — the accessible name is the league's real name, never its initials (Step 1's own
- *  test): the crest tile's two-letter text is `aria-hidden`, so only this string is announced. */
+/** `"needs-you"`'s own accessible-name fragment: `league.needsYouKind` names WHICH of the two
+ *  facts is true for this league, and `NEXT_ACTION_COPY` owns both sentences (C2) — never a
+ *  second, narrower copy of either typed here. */
+function labelFor(league: RailLeague): string | undefined {
+  if (league.state === "needs-you") {
+    return league.needsYouKind === null ? undefined : NEXT_ACTION_COPY[league.needsYouKind];
+  }
+  return STATE_LABEL[league.state];
+}
+
+/** "Bay Bandits" (quiet) → "Bay Bandits". "Volt Kings" (needs-you, fix-lineup) → "Volt Kings.
+ *  Fix your lineup." — the accessible name is the league's real name, never its initials (Step
+ *  1's own test): the crest tile's two-letter text is `aria-hidden`, so only this string is
+ *  announced. */
 function accessibleNameFor(league: RailLeague): string {
-  const label = STATE_LABEL[league.state];
+  const label = labelFor(league);
   return label === undefined ? league.name : `${league.name}. ${label}.`;
 }
 
