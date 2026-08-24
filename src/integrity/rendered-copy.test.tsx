@@ -46,6 +46,7 @@ import { Meter } from "@/components/ui/meter";
 import { Panel } from "@/components/ui/panel";
 import { SeatMeter } from "@/components/ui/seat-meter";
 import { StatPill } from "@/components/ui/stat-pill";
+import { QueueTable } from "@/admin-room/components/queue-table";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
@@ -255,23 +256,51 @@ const OPERATOR = { id: "u_op", email: "u_op@test.local", displayName: "Op Erator
  * so this also proves the gate itself renders clean copy, not just the read below it.
  */
 describe("the admin queue page says nothing that breaks the house copy rules", () => {
-  it("is clean empty and clean populated", async () => {
+  it("is clean empty, clean populated, and clean with a Load more page", async () => {
     const { requireAdmin } = await import("@/lib/auth/current-user");
     const { listPendingFlags } = await import("@/integrity-service/flags");
     const { default: AdminQueuePage } = await import("@/app/app/(shell)/admin/queue/page");
 
     vi.mocked(requireAdmin).mockResolvedValue(OPERATOR);
 
-    for (const rows of [[], [QUEUE_ROW]]) {
-      vi.mocked(listPendingFlags).mockResolvedValue({ rows, nextBefore: null });
+    for (const page of [
+      { rows: [], nextBefore: null },
+      { rows: [QUEUE_ROW], nextBefore: null },
+      // Task 19: the `Load more` link is server-composed copy (the page's own `nextHref`,
+      // handed down to `QueueTable` as a plain string) — no rendered-sweep case reached it
+      // before this, since every other case in this loop pages to `nextBefore: null`.
+      { rows: [QUEUE_ROW], nextBefore: { raisedAt: "2026-08-02T00:00:00.000Z", id: "flag_2" } },
+    ]) {
+      vi.mocked(listPendingFlags).mockResolvedValue(page);
       const fixture = fixtureAccountDeps({ ok: true, data: { notices: [], unreadCount: 0 } });
-      const page = await AdminQueuePage({ searchParams: Promise.resolve({}) });
+      const rendered = await AdminQueuePage({ searchParams: Promise.resolve({}) });
       const { container, unmount } = render(
         <AccountRoomDepsProvider deps={fixture.deps}>
-          <NoticesProvider>{page}</NoticesProvider>
+          <NoticesProvider>{rendered}</NoticesProvider>
         </AccountRoomDepsProvider>,
       );
       await screen.findByText("Dispute queue");
+      expectClean(container, QUEUE_ROW.question, QUEUE_ROW.about);
+      unmount();
+    }
+  });
+});
+
+/**
+ * `QueueTable` (Task 19, `src/admin-room/components/queue-table.tsx`) rendered directly, the
+ * same "own component, own `describe` block" precedent `ResolutionForm`'s and `HeldTradeDetail`'s
+ * blocks below already set — the admin queue page block above already renders it indirectly, but
+ * a direct render proves the component clean on its own, independent of whatever the page around
+ * it happens to pass.
+ */
+describe("QueueTable says nothing that breaks the house copy rules", () => {
+  it("is clean empty, populated, and with a Load more page", () => {
+    for (const element of [
+      <QueueTable key="empty" rows={[]} />,
+      <QueueTable key="populated" rows={[QUEUE_ROW]} />,
+      <QueueTable key="paged" rows={[QUEUE_ROW]} nextHref="/app/admin/queue?before=x" />,
+    ]) {
+      const { container, unmount } = render(element);
       expectClean(container, QUEUE_ROW.question, QUEUE_ROW.about);
       unmount();
     }

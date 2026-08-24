@@ -245,6 +245,16 @@ function nonDuplicatedEvidenceEntries(evidence: JsonObject, subject: FlagSubject
  *
  * Renders no `TopBar` and no `<main>` of its own (Task 2 Step 5) — `(shell)/layout.tsx` supplies
  * both, once, for every page in this route group.
+ *
+ * Task 19: the ORDINARY-subject branch below renders two columns at `lg` — evidence left,
+ * decision right — because that is the read/decide split every one of those subjects shares. The
+ * `held_trade` branch above it keeps its own whole-surface dispatch to `HeldTradeDetail` exactly
+ * as it was (Task 5's own brief: "shows what the operator needs and nothing else"); a held trade
+ * is not this same evidence-then-decision shape, and splitting it into two columns here would be
+ * inventing a layout for a surface that already has its own. Not one authorization check moves:
+ * `withAdmin` still gates the whole callback, `decisionsFor`'s two filters (removal not wired,
+ * content already removed) are untouched, and `admin-routes.test.ts` — the tripwire this task
+ * does not edit — stays the proof of it.
  */
 export default async function AdminFlagDetailPage({ params }: PageProps) {
   const { flagId } = await params;
@@ -302,77 +312,95 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
           </time>
         </header>
 
-        <SubjectCard subject={subject} />
+        {/*
+         * Task 19: two columns at `lg` and above, one below it. Left, the evidence a decision is
+         * made from — the subject card, the raw evidence list, the reporters, the trail. Right,
+         * the decision itself, `lg:sticky` so it stays reachable while an operator scrolls a long
+         * trail without losing the form they are about to submit. `lg:items-start` is required
+         * for the sticky column to work at all: a grid track's default `stretch` alignment would
+         * make the decision column as tall as its own content wants, but a sticky element needs
+         * its OWN box shorter than the viewport to have room to move within, and `items-start`
+         * is what keeps the track from stretching to match the (usually taller) evidence column.
+         * Nothing here changes what is rendered, only where — every card, every prop, every
+         * decision this page offers is exactly what it was.
+         */}
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-start">
+          <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">
+            <SubjectCard subject={subject} />
 
-        <Card>
-          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Evidence</p>
-          {evidenceEntries.length === 0 ? (
-            <p className="mt-2 text-sm text-text-muted">No evidence recorded for this flag.</p>
-          ) : (
-            <dl className="mt-2 flex flex-col gap-1">
-              {evidenceEntries.map(([key, value]) => (
-                <div key={key} className="flex justify-between gap-3 text-sm">
-                  <dt className="text-text-muted">{key}</dt>
-                  <dd className="break-all text-text-primary">{JSON.stringify(value)}</dd>
-                </div>
-              ))}
-            </dl>
-          )}
-        </Card>
+            <Card>
+              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Evidence</p>
+              {evidenceEntries.length === 0 ? (
+                <p className="mt-2 text-sm text-text-muted">No evidence recorded for this flag.</p>
+              ) : (
+                <dl className="mt-2 flex flex-col gap-1">
+                  {evidenceEntries.map(([key, value]) => (
+                    <div key={key} className="flex justify-between gap-3 text-sm">
+                      <dt className="text-text-muted">{key}</dt>
+                      <dd className="break-all text-text-primary">{JSON.stringify(value)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </Card>
 
-        <Card>
-          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Reporters</p>
-          {detail.reporters.length === 0 ? (
-            <p className="mt-2 text-sm text-text-muted">Nobody reported this. The platform raised it on its own.</p>
-          ) : (
-            <ul className="mt-2 flex flex-col gap-2">
-              {detail.reporters.map((reporter) => (
-                <li key={reporter.userId} className="text-sm">
-                  <span className="font-medium text-text-primary">{reporter.name}</span>{" "}
-                  <span className="text-text-muted">
-                    reported &ldquo;{reporter.reason}&rdquo; on {formatWhen(reporter.reportedAt)}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+            <Card>
+              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Reporters</p>
+              {detail.reporters.length === 0 ? (
+                <p className="mt-2 text-sm text-text-muted">Nobody reported this. The platform raised it on its own.</p>
+              ) : (
+                <ul className="mt-2 flex flex-col gap-2">
+                  {detail.reporters.map((reporter) => (
+                    <li key={reporter.userId} className="text-sm">
+                      <span className="font-medium text-text-primary">{reporter.name}</span>{" "}
+                      <span className="text-text-muted">
+                        reported &ldquo;{reporter.reason}&rdquo; on {formatWhen(reporter.reportedAt)}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
 
-        <Card>
-          <p className="text-xs font-medium uppercase tracking-wide text-text-muted">What happened</p>
-          {detail.trail.length === 0 ? (
-            <p className="mt-2 text-sm text-text-muted">No recorded history for this flag yet.</p>
-          ) : (
-            <ul className="mt-2 flex flex-col" aria-label="Flag history">
-              {detail.trail.map((row) => (
-                <li key={row.eventId} className="flex items-start gap-3 border-b border-line py-3 last:border-b-0">
-                  <Icon name={row.icon} size={18} className="mt-0.5 shrink-0 text-text-muted" />
-                  <div className="flex min-w-0 flex-col gap-0.5">
-                    <p className="break-words text-sm text-text-primary">{row.headline}</p>
-                    <time dateTime={row.occurredAt} className="text-xs text-text-muted">
-                      {formatWhen(row.occurredAt)}
-                    </time>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Card>
+            <Card>
+              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">What happened</p>
+              {detail.trail.length === 0 ? (
+                <p className="mt-2 text-sm text-text-muted">No recorded history for this flag yet.</p>
+              ) : (
+                <ul className="mt-2 flex flex-col" aria-label="Flag history">
+                  {detail.trail.map((row) => (
+                    <li key={row.eventId} className="flex items-start gap-3 border-b border-line py-3 last:border-b-0">
+                      <Icon name={row.icon} size={18} className="mt-0.5 shrink-0 text-text-muted" />
+                      <div className="flex min-w-0 flex-col gap-0.5">
+                        <p className="break-words text-sm text-text-primary">{row.headline}</p>
+                        <time dateTime={row.occurredAt} className="text-xs text-text-muted">
+                          {formatWhen(row.occurredAt)}
+                        </time>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          </div>
 
-        <Card>
-          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
-          {detail.resolution !== null ? (
-            <ResolutionSummary resolution={detail.resolution} />
-          ) : (
-            <ResolutionForm
-              flagId={detail.flagId}
-              decisions={decisions}
-              noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength}
-              previews={previews}
-              isChatSubject={subject.kind === "chat_message"}
-            />
-          )}
-        </Card>
+          <div className="lg:sticky lg:top-6">
+            <Card>
+              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
+              {detail.resolution !== null ? (
+                <ResolutionSummary resolution={detail.resolution} />
+              ) : (
+                <ResolutionForm
+                  flagId={detail.flagId}
+                  decisions={decisions}
+                  noteMaxLength={INTEGRITY_CONFIG.moderation.noteMaxLength}
+                  previews={previews}
+                  isChatSubject={subject.kind === "chat_message"}
+                />
+              )}
+            </Card>
+          </div>
+        </div>
       </>
     );
   });
