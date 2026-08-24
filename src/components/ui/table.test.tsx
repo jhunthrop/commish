@@ -82,20 +82,23 @@ describe("Table", () => {
     expect(screen.getByRole("columnheader", { name: "Team" }).className).toMatch(/hidden/);
   });
 
-  it("defaults to comfortable padding, unchanged from before density existed", () => {
+  // Task 12 Step 3c (the closeout): every real consumer now wants the mocks' 11px padding, so
+  // that is what a caller gets by saying nothing at all — the same "no consumer left opted out"
+  // reasoning `table.tsx`'s own DENSITY-DEFAULT DECISION docblock records.
+  it("defaults to dense padding now that every Table consumer in the product wants it", () => {
     render(<Table caption="Auction results" columns={columns} rows={rows} rowKey={(r) => r.id} empty={<p>None.</p>} />);
-    expect(screen.getByRole("columnheader", { name: "Player" }).className).toMatch(/py-2/);
-  });
-
-  it("applies the mocks' 11px padding as a style, not a class, under density dense", () => {
-    render(
-      <Table caption="Auction results" columns={columns} rows={rows} rowKey={(r) => r.id} empty={<p>None.</p>} density="dense" />,
-    );
     const header = screen.getByRole("columnheader", { name: "Player" });
     expect(header.className).not.toMatch(/py-2/);
     expect(header).toHaveStyle({ paddingTop: "11px", paddingBottom: "11px" });
     const cell = screen.getByText("Jalen Croft").closest("td")!;
     expect(cell).toHaveStyle({ paddingTop: "11px", paddingBottom: "11px" });
+  });
+
+  it("keeps the original, roomier padding available as an explicit opt-out", () => {
+    render(
+      <Table caption="Auction results" columns={columns} rows={rows} rowKey={(r) => r.id} empty={<p>None.</p>} density="comfortable" />,
+    );
+    expect(screen.getByRole("columnheader", { name: "Player" }).className).toMatch(/py-2/);
   });
 
   it("spreads rowAttributes directly onto the row, not a second wrapper element", () => {

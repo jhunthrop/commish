@@ -4,7 +4,7 @@ import type { TeamCard } from "@/domain/league";
 import type { Player } from "@/domain/player";
 import type { DraftStateView } from "@/draft-engine";
 import { Avatar, Badge, EYEBROW, InfoTip } from "@/components/ui";
-import { Countdown, useCountdown } from "@/components/ui/countdown";
+import { Countdown, useCountdown, type CountdownSize } from "@/components/ui/countdown";
 import { SessionNotice } from "@/components/app-shell/session-notice";
 import type { TermKey } from "@/help/glossary";
 import type { HelpLevel } from "@/identity/preferences";
@@ -45,6 +45,39 @@ const FORMAT_TERM: Readonly<Record<DraftStateView["format"], TermKey>> = {
 const LEAGUE_TEXT: Readonly<Record<RoomRailVariant, string>> = {
   room: "text-display-md",
   tv: "text-display-xl",
+};
+
+/**
+ * Task 12 Step 3: the TV board is read from across a room, and it is the one surface where `xs`
+ * never appears. The room variant keeps `EYEBROW`'s ordinary `text-xs`; the TV variant steps
+ * every eyebrow-shaped label THIS COMPONENT AUTHORS (the turn label, the waiting/complete
+ * headline, the tightening line) up to `text-sm` instead of reusing `EYEBROW` outright.
+ *
+ * SCOPE, STATED: this does not reach into `Badge` (the format chip, the pending-picks pill) or
+ * `Avatar`'s `sm` initials — both are fixed-size chrome shared by every surface in the product,
+ * not typographic choices this rail makes, and giving every shared primitive a caller-specific
+ * size variant for one room's reading distance would be a primitives refactor this task does not
+ * own. The rule binds the rail's OWN prose and labels; it does not cascade into the two shared
+ * chips riding beside them.
+ */
+const RAIL_EYEBROW: Readonly<Record<RoomRailVariant, string>> = {
+  room: EYEBROW,
+  tv: "font-display text-sm font-semibold uppercase tracking-wide",
+};
+
+/** The tightening line's own size: an ordinary sentence in the room, bumped one step for the TV
+ *  variant's "no `xs` anywhere" rule (Step 3) — it is prose, not a chip, so it earns `text-sm`
+ *  rather than joining `RAIL_EYEBROW`'s all-caps treatment. */
+const TIGHTENING_TEXT: Readonly<Record<RoomRailVariant, string>> = {
+  room: "text-xs",
+  tv: "text-sm",
+};
+
+/** Task 12 Step 3: the TV variant takes the largest countdown — the room's own headline size
+ *  everywhere else in the product stays `lg`. */
+const RAIL_COUNTDOWN_SIZE: Readonly<Record<RoomRailVariant, CountdownSize>> = {
+  room: "lg",
+  tv: "xl",
 };
 
 /**
@@ -161,11 +194,13 @@ function modeOf(view: DraftStateView, turn: TurnSummary): RoomMode {
   return turn.mine ? "hot" : "watching";
 }
 
-/** The waiting and finished states: no clock, one plain sentence, nothing to hunt for. */
-function StaticState({ headline, detail }: { readonly headline: string; readonly detail: string }) {
+/** The waiting and finished states: no clock, one plain sentence, nothing to hunt for.
+ *  `eyebrowClass` is `RAIL_EYEBROW[variant]` — the TV variant's own "no `xs` anywhere" rule
+ *  (Step 3) applied to this headline the same way it applies to the turn label below. */
+function StaticState({ headline, detail, eyebrowClass }: { readonly headline: string; readonly detail: string; readonly eyebrowClass: string }) {
   return (
     <div className="flex flex-col">
-      <span className={`${EYEBROW} text-text-muted`}>{headline}</span>
+      <span className={`${eyebrowClass} text-text-muted`}>{headline}</span>
       <span className="text-sm text-text-muted">{detail}</span>
     </div>
   );
@@ -229,9 +264,13 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
 
       <div className="ml-auto flex flex-wrap items-center gap-x-4 gap-y-1 lg:flex-nowrap">
         {mode === "scheduled" ? (
-          <StaticState headline="Not started" detail="Your commissioner starts it when everyone is here." />
+          <StaticState
+            headline="Not started"
+            detail="Your commissioner starts it when everyone is here."
+            eyebrowClass={RAIL_EYEBROW[variant]}
+          />
         ) : mode === "complete" ? (
-          <StaticState headline="Draft complete" detail="Every roster is final." />
+          <StaticState headline="Draft complete" detail="Every roster is final." eyebrowClass={RAIL_EYEBROW[variant]} />
         ) : (
           <>
             <div className="flex min-w-0 items-center gap-2">
@@ -239,7 +278,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                 <Avatar name={turn.team.ownerDisplayName} avatar={turn.team.ownerAvatarUrl} size="sm" />
               )}
               <div className="flex min-w-0 flex-col">
-                <span className={`inline-flex items-center gap-1 ${EYEBROW} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
+                <span className={`inline-flex items-center gap-1 ${RAIL_EYEBROW[variant]} ${turn.mine ? "text-negative" : "text-text-muted"}`}>
                   {turn.label}
                   {/* An auction's "Live bid"/"Nominating" states aren't the on-the-clock rule
                       this term defines, so the tip only joins the snake-format turn label. The
@@ -256,9 +295,9 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                   {formatPausedUntil(pausedUntil!)}
                 </span>
               ) : remainingMs === null ? null : (
-                <Countdown remainingMs={remainingMs} size="lg" tone={turn.mine ? "hot" : "default"} data-testid="countdown" />
+                <Countdown remainingMs={remainingMs} size={RAIL_COUNTDOWN_SIZE[variant]} tone={turn.mine ? "hot" : "default"} data-testid="countdown" />
               )}
-              {tightening === null ? null : <span className="text-xs text-warning">{tightening}</span>}
+              {tightening === null ? null : <span className={`${TIGHTENING_TEXT[variant]} text-warning`}>{tightening}</span>}
             </div>
             {/* The digits above are `aria-hidden`; this is the same turn stated once, in words. */}
             <p className="sr-only">{turn.sentence}</p>
@@ -276,8 +315,10 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
             this room already uses to say "the connection is not what you think it is". A dead
             session matters here whether or not the draft has finished (a manager reviewing a
             just-finished board can still lose their session), so this renders regardless of
-            `view.phase`, unlike `ConnectionBanner` above it. */}
-        <SessionNotice />
+            `view.phase`, unlike `ConnectionBanner` above it. `variant="room"` (Task 12 Step 1b)
+            is what makes it read as `ConnectionBanner`'s sibling instead of `TopBar`'s bordered
+            strip transplanted into a tight `lg:h-20` row. */}
+        <SessionNotice variant="room" />
       </div>
     </header>
   );

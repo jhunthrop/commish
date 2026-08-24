@@ -64,6 +64,35 @@ describe("SessionNotice", () => {
     fetchSpy.mockRestore();
   });
 
+  // Phase 3.6, Task 12 Step 1b (A16 finding): the room slot reads as `ConnectionBanner`'s
+  // sibling — same copy, same role, a borderless `Badge` pill instead of `TopBar`'s bordered
+  // strip. Only the shape changes; the modal escalation below never even reads this prop.
+  it("renders the room slot's compact variant as a borderless status pill, same copy, in both themes, axe-clean", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(401, { ok: false, error: "Not authenticated." }));
+    await renderSurface(<SessionNotice variant="room" />, async ({ container }) => {
+      await fetchWithSessionWatch("/api/notices");
+
+      const strip = await screen.findByRole("status");
+      expect(strip).toHaveTextContent("You are signed out.");
+      expect(strip.className).not.toMatch(/border-b/);
+      expect(screen.getByRole("link", { name: "Sign in to pick up where you left off" })).toHaveAttribute(
+        "href",
+        "/sign-in?returnTo=%2Fapp%2Fleagues%2Fl1",
+      );
+      expect(await axe(container)).toHaveNoViolations();
+    });
+    fetchSpy.mockRestore();
+  });
+
+  it("escalates the room variant to the SAME modal, unconditioned on the prop", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(401, { ok: false, error: "Not authenticated." }));
+    await renderSurface(<SessionNotice variant="room" />, async () => {
+      await fetchWithSessionWatch("/api/invites/ABC/accept", { method: "POST", body: "{}" });
+      expect(await screen.findByRole("dialog", { name: "That did not go through" })).toBeInTheDocument();
+    });
+    fetchSpy.mockRestore();
+  });
+
   it("says only the one true sentence about state — never that the work was saved, in both themes", async () => {
     const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(401, { ok: false, error: "Not authenticated." }));
     await renderSurface(<SessionNotice />, async () => {

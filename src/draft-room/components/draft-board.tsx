@@ -66,6 +66,24 @@ const CELL_MIN_WIDTH: Readonly<Record<DraftBoardVariant, string>> = {
   tv: "min-w-48",
 };
 
+/**
+ * Task 12 Step 3: the TV board never drops to `xs` — every place this board would otherwise use
+ * `text-xs` (a sticker's position/team sub-line, the draft-slot number, the "You" mark, the
+ * `Rd` column header, the on-clock/pending cell labels) steps up one notch on the TV variant.
+ * `META_TEXT` covers the plain size bump; `HEADER_EYEBROW` covers the two places that were
+ * `EYEBROW` outright — the same "TV steps its own eyebrows up, never reaches into shared chrome"
+ * scope `RoomRail`'s own `RAIL_EYEBROW` docblock states.
+ */
+const META_TEXT: Readonly<Record<DraftBoardVariant, string>> = {
+  room: "text-xs",
+  tv: "text-sm",
+};
+
+const HEADER_EYEBROW: Readonly<Record<DraftBoardVariant, string>> = {
+  room: EYEBROW,
+  tv: "font-display text-sm font-semibold uppercase tracking-wide",
+};
+
 /** The column order: the draft order once it exists, the league's teams before it does. */
 function columnIdsOf(view: DraftStateView, teams: readonly TeamCard[]): readonly string[] {
   return view.draftOrder.length > 0 ? view.draftOrder : teams.map((team) => team.id);
@@ -166,7 +184,7 @@ function StickerCell({
           <span className={`truncate font-display font-semibold leading-display ${CELL_TEXT[variant]}`}>
             {player?.name ?? cell.pick.playerId}
           </span>
-          <span className="truncate text-xs font-medium">
+          <span className={`truncate font-medium ${META_TEXT[variant]}`}>
             {player?.position ?? cell.pick.slot} · {player?.nflTeam ?? cell.pick.slot}
             {cell.pick.price === null ? "" : ` · $${cell.pick.price}`}
           </span>
@@ -187,7 +205,7 @@ function StickerCell({
     return (
       <div data-onclock-cell="true" className="relative flex h-full items-center justify-center rounded-sm border border-dashed border-line px-2 py-2">
         <span aria-hidden="true" className={`pointer-events-none absolute inset-0 rounded-sm ring-2 ring-accent ${spotlight ? "animate-spotlight" : ""}`} />
-        <span className={`${EYEBROW} text-accent`}>On the clock</span>
+        <span className={`${HEADER_EYEBROW[variant]} text-accent`}>On the clock</span>
       </div>
     );
   }
@@ -199,7 +217,7 @@ function StickerCell({
     // the same "what happened, not who" restraint every skip notice keeps.
     return (
       <div data-pending-cell="true" className="flex h-full items-center justify-center rounded-sm border border-dashed border-line px-2 py-2">
-        <span className={`${EYEBROW} text-text-muted`}>Pending</span>
+        <span className={`${HEADER_EYEBROW[variant]} text-text-muted`}>Pending</span>
       </div>
     );
   }
@@ -268,7 +286,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
           <caption className="sr-only">The draft board: one row per round, one column per team.</caption>
           <thead>
             <tr>
-              <th scope="col" className={`sticky left-0 z-10 bg-surface px-2 py-1 text-text-muted ${EYEBROW}`}>
+              <th scope="col" className={`sticky left-0 z-10 bg-surface px-2 py-1 text-text-muted ${HEADER_EYEBROW[variant]}`}>
                 Rd
               </th>
               {columnIds.map((teamId, index) => (
@@ -281,10 +299,12 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
                   }
                 >
                   {/* The columns ARE the draft order; the slot number says so out loud. */}
-                  <span aria-hidden="true" className="mr-1.5 font-mono text-xs tabular-nums text-text-muted">{index + 1}</span>
+                  <span aria-hidden="true" className={`mr-1.5 font-mono tabular-nums text-text-muted ${META_TEXT[variant]}`}>{index + 1}</span>
                   <span className="sr-only">{`Draft slot ${index + 1}: `}</span>
                   {teamName(byId, teamId)}
-                  {teamId === myTeamId ? <span className="ml-2 font-display text-xs uppercase tracking-wide text-accent">You</span> : null}
+                  {teamId === myTeamId ? (
+                    <span className={`ml-2 font-display uppercase tracking-wide text-accent ${META_TEXT[variant]}`}>You</span>
+                  ) : null}
                 </th>
               ))}
             </tr>

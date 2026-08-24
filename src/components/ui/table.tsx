@@ -48,25 +48,22 @@ export interface TableProps<T> {
   readonly empty: ReactNode;
   /**
    * `dense` is the mocks' 11px vertical cell padding; `comfortable` keeps the table's original,
-   * more generous padding. Defaults to `comfortable`.
+   * more generous padding. Defaults to `dense`.
    *
-   * DENSITY-DEFAULT DECISION (Phase 3.6, Task 11 Step 3c, the P3 review follow-up): Task 3
-   * shipped this default as `"comfortable"` with explicit opt-in specifically so flipping it
-   * later would never silently densify `matchup-panel.tsx` and `budget-table.tsx` before their
-   * own retone. Task 11 converges `matchup-panel.tsx` (now `density="dense"`, alongside
-   * `standings-table.tsx` and `league-board.tsx`); Task 12 owns `budget-table.tsx`, the last
-   * consumer.
-   *
-   * As of Task 11, only ONE of the two remaining consumers is converged — `budget-table.tsx`
-   * still carries no `density` prop at all, meaning it is still rendering `"comfortable"`
-   * un-retoned. Flipping the default here now would silently densify that table before Task 12
-   * has designed it for the change — exactly the outcome Task 3's explicit-opt-in default was
-   * built to prevent. The call, stated: **comfortable stays the default through Task 11.**
-   * Task 12, once it converges `budget-table.tsx`, is where every `Table` consumer in the
-   * product is finally dense-or-decided, and is where this default should actually flip (with
-   * every now-redundant explicit `density="dense"` prop dropped in the same commit) — or, if
-   * Task 12 finds a reason `budget-table.tsx` should stay comfortable, where that reason belongs
-   * in `docs/decisions/design-v2.md` (Task 14) instead. This paragraph is what Task 14 transcribes.
+   * DENSITY-DEFAULT DECISION, CLOSED (Phase 3.6, Task 12 Step 3c, completing the P3/Task 11
+   * follow-up): Task 3 shipped this default as `"comfortable"` with explicit opt-in specifically
+   * so flipping it could never silently densify `matchup-panel.tsx` and `budget-table.tsx` before
+   * their own retone. Task 11 converged `matchup-panel.tsx`, alongside `standings-table.tsx` and
+   * `league-board.tsx`, all three passing `density="dense"` explicitly. Task 12 converges the
+   * fourth and last consumer, `budget-table.tsx` — at which point every `Table` in the product
+   * wants `dense` and not one wants `comfortable`, which is the moment this default was always
+   * meant to flip: keeping `"comfortable"` as the default past that point would just be dead
+   * configuration nobody opts into. The call, made: **`dense` is now the default**, and the
+   * three now-redundant explicit `density="dense"` props (`standings-table.tsx`,
+   * `league-board.tsx`, `matchup-panel.tsx`) were dropped in this same commit — `budget-table.tsx`
+   * never carried one to begin with, so it needed no prop change at all, only this default. A
+   * future table that genuinely wants the old, roomier padding still can, via `density=
+   * "comfortable"` — the option stays, just no longer the default nobody chooses.
    */
   readonly density?: TableDensity;
 }
@@ -90,7 +87,7 @@ export function Table<T>({
   rowClassName,
   rowAttributes,
   empty,
-  density = "comfortable",
+  density = "dense",
 }: TableProps<T>) {
   if (rows.length === 0) return <>{empty}</>;
 

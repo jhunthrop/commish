@@ -1,6 +1,6 @@
 import Link from "next/link";
-import type { LeagueHomeBody, LineupBody } from "../contract";
-import { Crest, PageTitle } from "@/components/ui";
+import type { LeagueHomeBody, LineupBody, MatchupSummary } from "../contract";
+import { Card, Crest, EYEBROW, PageTitle, SlotChip } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
 import type { HelpLevel } from "@/identity/preferences";
 import type { NextActionKind } from "@/league";
@@ -48,6 +48,52 @@ function headerFacts(home: LeagueHomeBody): string {
   return parts.join(" · ");
 }
 
+/** "Week 1 · Bay Bandits vs Volt Kings" — the one sentence `DraftCompleteArrival` (Step 3b)
+ *  needs and no other caller on this page does yet, so it stays local rather than joining
+ *  `../lib/format.ts` for a single consumer. */
+function matchupHeadline(matchup: MatchupSummary): string {
+  return `${formatWeek(matchup.weekNumber)} · ${matchup.homeTeamName} vs ${matchup.awayTeamName}`;
+}
+
+/**
+ * Step 3b (D4). The draft room's last moment used to be a room emptying out; this is what a
+ * manager sees on the FIRST league-home visit after it instead — the fifteen players
+ * `commitDraftResults` wrote to their roster, and the Week 1 opponent the SAME transaction
+ * scheduled. `lineup` is the exact prop `LineupEditor` below already reads: before anyone has
+ * ever saved a lineup, `getLineup`'s own fallback (`@/league-service/lineups.ts`) makes the
+ * drafted roster (`rosterSlots`) the lineup, so `lineup.starters`/`lineup.bench` together ARE
+ * the fifteen players the draft produced — no second query, no new field.
+ *
+ * Derived-only, same discipline as D1 (the seating moment) and ruling 11 (the attention queue):
+ * `LeagueHome` decides whether to render this from fields it already holds
+ * (`home.draftStatus`/`home.currentWeek`/`home.myMatchup`) — nothing is stored, and nothing here
+ * is a seen-flag a manager could dismiss. It stops rendering on its own the moment the season
+ * has its first settled result, because `home.currentWeek` only stays at `1` while week 1 still
+ * has an unscored matchup somewhere in the league (`currentWeekNumber`, `@/league/schedule.ts`).
+ */
+function DraftCompleteArrival({ leagueId, lineup, matchup }: { readonly leagueId: string; readonly lineup: LineupBody; readonly matchup: MatchupSummary }) {
+  const roster = [...lineup.starters, ...lineup.bench].filter((slot) => slot.playerId !== null);
+  return (
+    <Card as="section" data-testid="draft-complete-arrival" aria-label="Your draft is in the books" className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line pb-2">
+        <h2 className={EYEBROW}>Your draft is in the books</h2>
+        <span className="text-sm text-text-muted">{matchupHeadline(matchup)}</span>
+      </div>
+      <ul className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+        {roster.map((slot) => (
+          <li key={`${slot.slot}:${slot.slotIndex}`} className="flex items-center gap-2 text-sm text-text-primary">
+            <SlotChip slot={slot.slot} />
+            <span className="truncate">{slot.playerName}</span>
+          </li>
+        ))}
+      </ul>
+      <Link href={`/app/leagues/${leagueId}/matchups/${matchup.weekNumber}`} className="text-sm font-medium text-accent underline">
+        See the matchup
+      </Link>
+    </Card>
+  );
+}
+
 export function LeagueHome({
   home,
   lineup,
@@ -85,6 +131,11 @@ export function LeagueHome({
   // is implied by `lineup !== null`, since `LeaguePage` only fetches a lineup for a caller with a
   // team); this page has nothing else to add.
   const promoteLineupEditor = nextActionKind === "fix-lineup" && lineup !== null;
+  // Step 3b (D4): see `DraftCompleteArrival`'s own docblock for why `home.currentWeek === 1` is
+  // the derived "the season has no settled result yet" signal, and why `lineup`/`myMatchup` both
+  // being present is the same "nothing to show a team-less commissioner" guard `promoteLineup
+  // Editor` above already reads off `lineup !== null`.
+  const draftJustCompleted = home.draftStatus === "complete" && home.currentWeek === 1 && lineup !== null && home.myMatchup !== null;
 
   return (
     <>
@@ -95,6 +146,8 @@ export function LeagueHome({
           <p className="text-sm text-text-muted">{headerFacts(home)}</p>
         </div>
       </header>
+
+      {draftJustCompleted ? <DraftCompleteArrival leagueId={home.leagueId} lineup={lineup!} matchup={home.myMatchup!} /> : null}
 
       {promoteLineupEditor ? (
         <LineupEditor leagueId={home.leagueId} lineup={lineup!} totalWeeks={home.totalWeeks} helpLevel={helpLevel} />

@@ -143,9 +143,10 @@ export interface LeagueBoardProps {
  * season projection are NOT rendered (deferrals D1, D2, D3 name the data each would require);
  * the action column replaces them, and it is real, already computed by `nextActionFor`.
  *
- * Sorted by whether the manager is needed, then by margin — never a probability. `Table`'s own
- * `density="dense"` is the shell's own density, adopted here rather than the default
- * `"comfortable"` (Task 3's P3 adjudication: a page under the shell opts in explicitly).
+ * Sorted by whether the manager is needed, then by margin — never a probability. `Table` now
+ * defaults to `density="dense"` itself (Task 12 Step 3c's closeout, once every consumer in the
+ * product wanted it), so this page no longer opts in explicitly — see `table.tsx`'s own
+ * DENSITY-DEFAULT DECISION docblock.
  */
 export function LeagueBoard({ leagues }: LeagueBoardProps) {
   const sorted = sortLeagues(leagues);
@@ -155,7 +156,6 @@ export function LeagueBoard({ leagues }: LeagueBoardProps) {
       columns={COLUMNS}
       rows={sorted}
       rowKey={(league) => league.id}
-      density="dense"
       empty={<p className={`${EYEBROW} text-text-muted`}>No leagues yet.</p>}
     />
   );

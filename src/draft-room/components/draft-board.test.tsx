@@ -179,6 +179,21 @@ describe("DraftBoard", () => {
     expect(sticker.className).toContain("text-display-md");
   });
 
+  // Task 12 Step 3: "the one surface where `xs` never appears" — the board's own authored
+  // labels (a sticker's position/team sub-line, the "Rd" header, the slot number, the "You"
+  // mark, and the on-clock/pending cell labels), walked across a live board and an on-clock one.
+  it("never drops its own labels to text-xs on the TV", () => {
+    stubMatchMedia(false);
+    const onClockView: DraftStateView = { ...SNAKE_VIEW, picks: SERPENTINE, onClockTeamId: "t1", pickNumber: 5 };
+    render(<DraftBoard {...props} view={onClockView} variant="tv" />);
+    expect(within(grid()).getByText("QB · KC").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+    expect(within(grid()).getByText("Rd").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+    const myColumnHeader = within(grid()).getByRole("columnheader", { name: /Bay Bandits/ });
+    expect(within(myColumnHeader).getByText("1").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+    expect(within(myColumnHeader).getByText("You").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+    expect(within(grid()).getByText("On the clock").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+  });
+
   // Fix round 1 (F3): a skipped pick used to fall through to the same bare dashed `<div>` as a
   // round nobody has reached yet — indistinguishable in an otherwise-filled round, which is
   // exactly where it is most confusing. `SKIPPED_SERPENTINE` mirrors `SERPENTINE` with t2's own

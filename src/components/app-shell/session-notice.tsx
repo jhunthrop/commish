@@ -2,17 +2,26 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { Badge } from "@/components/ui/badge";
 import { Modal } from "@/components/ui/modal";
 import { onSessionLost } from "./session-watch";
 import { SignInLink } from "./sign-in-link";
 
 type NoticeState = "quiet" | "strip" | "modal";
 
+/** `"default"` is `TopBar`'s own bordered quiet-strip. `"room"` (Phase 3.6, Task 12 Step 1b, an
+ *  A16 persona-panel finding parked here) is for the draft room's own tight `RoomRail` band,
+ *  where this component was reusing `TopBar`'s bordered markup verbatim beside
+ *  `ConnectionBanner`'s borderless `Badge` pill — two status idioms in one row. `"room"` reads as
+ *  `ConnectionBanner`'s sibling instead: the same borderless pill, inline. Neither the copy nor
+ *  the escalation behavior below changes with this prop — only the quiet strip's own shape. */
+export type SessionNoticeVariant = "default" | "room";
+
 /**
  * The session strip and the escalation, PLACED BY CHROME rather than owned by any one page
  * (F13): `TopBar` renders this under `AppShell`, above the content column; `RoomRail` renders it
- * in the draft room's own banner slot beside `ConnectionBanner`; `PublicBar` never — a signed-out
- * visitor cannot lose a session they do not have.
+ * (`variant="room"`) in the draft room's own banner slot beside `ConnectionBanner`; `PublicBar`
+ * never — a signed-out visitor cannot lose a session they do not have.
  *
  * Listens once, through `onSessionLost` (`./session-watch.ts`), and escalates deliberately:
  *
@@ -25,9 +34,11 @@ type NoticeState = "quiet" | "strip" | "modal";
  * It never says the work was saved, and it never claims it was lost when that is not known. The
  * one sentence it is allowed about state is the true one: "Nothing you typed was sent." Closing
  * the modal returns to the quiet strip rather than hiding the fact entirely — the session is
- * still gone, and this component does not un-know that because somebody dismissed a dialog.
+ * still gone, and this component does not un-know that because somebody dismissed a dialog. The
+ * modal itself is IDENTICAL regardless of `variant` — a write failing is the same emergency in
+ * every slot this component renders into.
  */
-export function SessionNotice() {
+export function SessionNotice({ variant = "default" }: { readonly variant?: SessionNoticeVariant }) {
   const pathname = usePathname();
   const [state, setState] = useState<NoticeState>("quiet");
 
@@ -50,6 +61,20 @@ export function SessionNotice() {
           <SignInLink intent={intent}>Sign in to pick up where you left off</SignInLink>
         </p>
       </Modal>
+    );
+  }
+
+  if (variant === "room") {
+    // `ConnectionBanner`'s own sibling shape: borderless, a `Badge` pill for the state, inline
+    // rather than a full-width bordered band — the room's rail has no room to spare for a
+    // second bordered strip beside its own. Same copy, same `role="status"`, same link.
+    return (
+      <span role="status" className="inline-flex items-center gap-2 text-sm text-text-muted">
+        <Badge tone="warning">You are signed out.</Badge>
+        <SignInLink intent={intent} className="font-medium text-accent underline">
+          Sign in to pick up where you left off
+        </SignInLink>
+      </span>
     );
   }
 

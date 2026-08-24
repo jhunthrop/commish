@@ -48,6 +48,9 @@ export function BudgetTable({ view, teams, myTeamId }: BudgetTableProps) {
   ];
 
   return (
+    // Task 12 Step 3c: the last `Table` consumer in the product to converge — no explicit
+    // `density` needed, since `Table` now defaults to `"dense"` itself (`table.tsx`'s own
+    // DENSITY-DEFAULT DECISION docblock, closed by this task).
     <Table
       caption="Team budgets"
       captionVisible

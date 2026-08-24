@@ -4,9 +4,54 @@ import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
+import type { LeagueHomeBody, LineupBody, MatchupSummary } from "../contract";
 import { DRAFT_SCHEDULE, HOME, LINEUP, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
 import { LeagueRoomDepsProvider } from "../hooks/deps";
 import { LeagueHome } from "./league-home";
+
+// Step 3b (D4): the fifteen players `commitDraftResults` writes, before anyone has ever saved a
+// lineup — `getLineup`'s own fallback makes the drafted roster the lineup, so this fixture is
+// shaped the way that real fallback reads (every configured slot, `BENCH` filling the rest).
+const JUST_DRAFTED_LINEUP: LineupBody = {
+  weekNumber: 1,
+  locked: false,
+  starters: [
+    { slot: "QB", slotIndex: 0, playerId: "p1", playerName: "Josh Allen", position: "QB" },
+    { slot: "RB", slotIndex: 0, playerId: "p2", playerName: "Derrick Henry", position: "RB" },
+    { slot: "RB", slotIndex: 1, playerId: "p3", playerName: "Bijan Robinson", position: "RB" },
+    { slot: "WR", slotIndex: 0, playerId: "p4", playerName: "Justin Jefferson", position: "WR" },
+    { slot: "WR", slotIndex: 1, playerId: "p5", playerName: "CeeDee Lamb", position: "WR" },
+    { slot: "TE", slotIndex: 0, playerId: "p6", playerName: "Travis Kelce", position: "TE" },
+    { slot: "FLEX", slotIndex: 0, playerId: "p7", playerName: "Amon-Ra St. Brown", position: "WR" },
+    { slot: "K", slotIndex: 0, playerId: "p8", playerName: "Justin Tucker", position: "K" },
+    { slot: "DEF", slotIndex: 0, playerId: "p9", playerName: "Steelers D/ST", position: "DEF" },
+  ],
+  bench: [
+    { slot: "BENCH", slotIndex: 0, playerId: "p10", playerName: "Backup One", position: "RB" },
+    { slot: "BENCH", slotIndex: 1, playerId: "p11", playerName: "Backup Two", position: "WR" },
+    { slot: "BENCH", slotIndex: 2, playerId: "p12", playerName: "Backup Three", position: "QB" },
+    { slot: "BENCH", slotIndex: 3, playerId: "p13", playerName: "Backup Four", position: "TE" },
+    { slot: "BENCH", slotIndex: 4, playerId: "p14", playerName: "Backup Five", position: "WR" },
+    { slot: "BENCH", slotIndex: 5, playerId: "p15", playerName: "Backup Six", position: "RB" },
+  ],
+};
+
+const JUST_DRAFTED_MATCHUP: MatchupSummary = {
+  weekNumber: 1,
+  homeTeamId: "t1",
+  // A team not in `TEAMS`/`STANDINGS` on purpose — this fixture stands alone (see
+  // `JUST_DRAFTED_HOME`'s own note) and never needs to agree with the mid-season roster below.
+  awayTeamId: "t4",
+  homeTeamName: "Bay Bandits",
+  awayTeamName: "Volt Kings",
+  homeScore: null,
+  awayScore: null,
+  final: false,
+  weekStatus: "scheduled",
+};
+
+/** `HOME`, moved back to the moment its own draft just finished: week 1, nothing scored yet. */
+const JUST_DRAFTED_HOME: LeagueHomeBody = { ...HOME, currentWeek: 1, weekStatus: "scheduled", myMatchup: JUST_DRAFTED_MATCHUP };
 
 const wrap = (home = HOME, lineup = LINEUP) => (
   <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
@@ -439,5 +484,51 @@ describe("LeagueHome", () => {
     // Size row (Task 11 Step 3b), the same "one sentence, several honest callers" shape
     // `SeatHoldPanel`'s own docblock already describes for a held seat.
     expect(screen.getAllByText("3 of 12 seated").length).toBeGreaterThanOrEqual(1);
+  });
+
+  // Step 3b (D4): the draft room's last moment, moved to where the manager goes next.
+  describe("the draft-complete arrival (D4)", () => {
+    it("shows a manager who just drafted their roster and who they play first, in both themes, axe-clean", async () => {
+      await renderSurface(wrap(JUST_DRAFTED_HOME, JUST_DRAFTED_LINEUP), async ({ container }) => {
+        const arrival = screen.getByTestId("draft-complete-arrival");
+        expect(arrival).toBeInTheDocument();
+        expect(within(arrival).getByText("Week 1 · Bay Bandits vs Volt Kings")).toBeInTheDocument();
+        // All fifteen — starters and bench alike, exactly what `commitDraftResults` wrote.
+        expect(within(arrival).getByText("Josh Allen")).toBeInTheDocument();
+        expect(within(arrival).getByText("Backup Six")).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      });
+    });
+
+    it("stops rendering the arrival the moment the season has a result", () => {
+      const afterWeekOne: LeagueHomeBody = { ...JUST_DRAFTED_HOME, currentWeek: 2, myMatchup: { ...JUST_DRAFTED_MATCHUP, weekNumber: 2 } };
+      renderInLeague(
+        <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+          <LeagueHome home={afterWeekOne} lineup={JUST_DRAFTED_LINEUP} />
+        </ChatRoomDepsProvider>,
+        fixtureLeagueDeps().deps,
+      );
+      expect(screen.queryByTestId("draft-complete-arrival")).toBeNull();
+    });
+
+    it("never shows it for a draft that has not finished, even in week 1", () => {
+      renderInLeague(
+        <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+          <LeagueHome home={{ ...JUST_DRAFTED_HOME, draftStatus: "in_progress" }} lineup={JUST_DRAFTED_LINEUP} />
+        </ChatRoomDepsProvider>,
+        fixtureLeagueDeps().deps,
+      );
+      expect(screen.queryByTestId("draft-complete-arrival")).toBeNull();
+    });
+
+    it("never shows it to a commissioner with no team of their own — there is no personal roster to show", () => {
+      renderInLeague(
+        <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+          <LeagueHome home={{ ...JUST_DRAFTED_HOME, myTeamId: null, myMatchup: null }} lineup={null} />
+        </ChatRoomDepsProvider>,
+        fixtureLeagueDeps().deps,
+      );
+      expect(screen.queryByTestId("draft-complete-arrival")).toBeNull();
+    });
   });
 });

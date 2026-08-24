@@ -54,9 +54,10 @@ function Side({
           result={median.result}
         />
       )}
+      {/* No explicit `density`: `Table` defaults to `"dense"` itself since Task 12 Step 3c's
+          closeout (`table.tsx`'s own DENSITY-DEFAULT DECISION docblock). */}
       <Table
         caption={`${side.teamName} starters`}
-        density="dense"
         columns={COLUMNS}
         rows={side.starters}
         rowKey={(row) => `${row.slot}:${row.slotIndex}`}

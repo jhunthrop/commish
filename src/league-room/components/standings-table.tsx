@@ -123,10 +123,11 @@ export function StandingsTable({ rows, myTeamId, helpLevel, medianGame = false, 
         {sortable("pointsFor", "points for")}
         {sortable("pointsAgainst", "points against")}
       </div>
+      {/* No explicit `density`: `Table` defaults to `"dense"` itself since Task 12 Step 3c's
+          closeout (`table.tsx`'s own DENSITY-DEFAULT DECISION docblock). */}
       <Table
         caption="League standings"
         captionVisible
-        density="dense"
         columns={columns}
         rows={ordered}
         rowKey={(row) => row.teamId}

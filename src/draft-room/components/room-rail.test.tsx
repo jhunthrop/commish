@@ -245,4 +245,38 @@ describe("RoomRail", () => {
     expect(screen.queryAllByRole("button")).toHaveLength(0);
     expect(screen.getByTestId("room-rail")).toHaveAttribute("data-mode", "watching");
   });
+
+  // Task 12 Step 3: the TV board takes the largest countdown — the room's own headline `lg`
+  // stays put everywhere else.
+  it("takes the xl countdown on the TV, and lg in the room", () => {
+    const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId="t2" />);
+    expect(screen.getByTestId("countdown").className).toContain("text-3xl");
+    rerender(<RoomRail {...props} view={liveView()} myTeamId="t2" variant="tv" />);
+    expect(screen.getByTestId("countdown").className).toContain("text-display-xl");
+  });
+
+  // Task 12 Step 3: "the one surface where `xs` never appears", scoped to this rail's OWN
+  // authored labels (the turn label, the waiting/complete headline, the tightening line) — not
+  // the shared `Badge`/`Avatar` chrome beside them, which stays fixed-size everywhere in the
+  // product (see `RAIL_EYEBROW`'s own docblock for the stated carve-out).
+  it("never drops its own labels to text-xs on the TV, across every mode", () => {
+    const { rerender } = render(<RoomRail {...props} view={liveView()} myTeamId={null} variant="tv" />);
+    expect(screen.getByText("On the clock").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+
+    rerender(
+      <RoomRail
+        {...props}
+        view={liveView({ nextTightening: { at: new Date(Date.now() + 134 * 60_000 + 30_000).toISOString(), pickSeconds: 600 } })}
+        myTeamId={null}
+        variant="tv"
+      />,
+    );
+    expect(screen.getByText("Picks shorten to 10 minutes in 2h 14m").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+
+    rerender(<RoomRail {...props} view={{ ...SNAKE_VIEW, phase: "scheduled", ...finished }} myTeamId={null} variant="tv" />);
+    expect(screen.getByText("Not started").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+
+    rerender(<RoomRail {...props} view={{ ...SNAKE_VIEW, phase: "complete", ...finished }} myTeamId={null} variant="tv" />);
+    expect(screen.getByText("Draft complete").className).not.toMatch(/(^|\s)text-xs(\s|$)/);
+  });
 });
