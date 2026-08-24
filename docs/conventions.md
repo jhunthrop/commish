@@ -99,8 +99,9 @@ src/
                           (describeStartTiming, rollNoticeSentence, ROLL_REFUSALS,
                           PUBLIC_ROOM_SHORT_REFUSAL — the roll's own pure sentence layer, Phase 3.6
                           Task 7, the single authority every surface quotes rather than composing
-                          its own start-timing sentence) and seat-hold.ts (SEAT_HOLD,
-                          SEAT_HOLD_COOKIE, SEAT_HOLD_REFUSALS, Phase 3.6 Task 6), and
+                          its own start-timing sentence) and seat-hold.ts (SEAT_HOLD_COOKIE,
+                          SEAT_HOLD_REFUSALS — SEAT_HOLD itself, the ten-minute duration, lives in
+                          this directory's own config.ts, Phase 3.6 Task 6), and
                           PublicLeagueSummary, the field-by-field privacy boundary of the app's ONE
                           unauthenticated league read — seventeen fields as of Phase 3.6 (v2)
                           (heldSeats, rosterSummary, playoffWeeks, kickoffRolls joined the Phase
