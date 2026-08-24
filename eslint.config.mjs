@@ -96,9 +96,9 @@ const SERVER_ONLY_MODULE_GROUPS = [
  * NOT on the list above, deliberately: `@/identity` (`src/identity/**`) joins `@/chat`
  * (`src/chat/**`), `@/matchmaking` (`src/matchmaking/**`), `@/help` (`src/help/**`),
  * `@/reviews` (`src/reviews/**`), `@/moderation` (`src/moderation/**`), `@/trades`
- * (`src/trades/**`) and `@/participation` (`src/participation/**`) in the browser-safe exempt
- * set — pure, I/O-free code with no server module behind it, so client code may value-import it
- * directly. `@/trades` is new in Phase 3 Plan C. The
+ * (`src/trades/**`), `@/participation` (`src/participation/**`) and `@/money`
+ * (`src/money/**`) in the browser-safe exempt set — pure, I/O-free code with no server module
+ * behind it, so client code may value-import it directly. `@/trades` is new in Phase 3 Plan C. The
  * real browser VALUE-imports are `TRADE_CONFIG.maxAssetsPerSide` (`trade-composer.tsx`) and
  * `describeAsset`/`isExpired` (`trade-card.tsx`); `TradeProposalView` is an `interface`
  * (`src/trades/contract.ts`) and every consumer reaches it through `import type`, which needs no
@@ -120,6 +120,15 @@ const SERVER_ONLY_MODULE_GROUPS = [
  * `completedSeasonsFor`, `participationFor`, `leagueTierComposition`, `stampSeasonCompleteInTx` —
  * lives in `@/league-service/participation`, which stays exactly as blocked as the rest of
  * `@/league-service` always has been.
+ *
+ * `@/money` is new in Phase 4, Task 1 — the ninth pure directory on this list, and for the same
+ * reason as `@/trades`/`@/participation`: no database, no clock, no I/O, only the vocabulary
+ * (`MONEY_CONFIG`, `MONEY_STATES`/`moneyIsLive`, the account/posting/prize-table shapes and
+ * refusal reasons) a later task's wallet and entry-fee form value-import directly, so the fee
+ * ceiling a member sees and the one the server enforces read the identical number. The Postgres
+ * half (`src/money-service/**`, a later task) and the external-money seam
+ * (`src/payments-provider/**`) are NOT exempt and join `SERVER_ONLY_MODULE_GROUPS` when they
+ * land, the same split every other exempt pure directory keeps from its own service layer.
  *
  * `src/chat-room/**` reaches `parseAvatarRef` indirectly through
  * `Avatar` (`src/components/ui/avatar.tsx`) rather than importing `@/identity` itself, but the
@@ -181,6 +190,12 @@ const BROWSER_SAFE_MODULE_DIRS = [
   "src/moderation/**/*.{ts,tsx}",
   "src/trades/**/*.{ts,tsx}",
   "src/participation/**/*.{ts,tsx}",
+  // Phase 4, Task 1. `src/money` (MONEY_CONFIG, MONEY_STATES, the account/posting/prize-table
+  // vocabulary) is pure, I/O-free, no clock — the ninth directory on this list, for the same
+  // reason `src/matchmaking` is: the wallet and the creation form value-import it directly so
+  // the number a member sees and the number the server enforces can never be two different
+  // numbers.
+  "src/money/**/*.{ts,tsx}",
 ];
 
 /**
@@ -338,6 +353,7 @@ const eslintConfig = [
       "src/moderation/**",
       "src/trades/**",
       "src/participation/**",
+      "src/money/**",
     ],
     plugins: { "@typescript-eslint": tseslint },
     rules: {

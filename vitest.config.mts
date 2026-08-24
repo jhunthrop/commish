@@ -67,6 +67,12 @@ const COVERAGE_GATED_DIRS = [
   // writes into was already gated two plans early, so this is the plan's own last piece to
   // join.
   "src/participation",
+  // Gate 22 (Phase 4, Task 1). `src/money` is pure, browser-safe and holds the money vocabulary
+  // everything downstream imports from — the wallet's sentence, the creation form's fee ceiling
+  // and the server's enforcement all read the SAME `MONEY_CONFIG`/`MONEY_STATES`/refusal
+  // reasons, the identical argument that put the roll's vocabulary in `src/matchmaking`. NO I/O,
+  // no clock, no database.
+  "src/money",
 ] as const;
 /**
  * The three service directories' `schemas.ts` files are named explicitly alongside the `**` glob
@@ -251,6 +257,15 @@ export default defineConfig({
         // entry with no `thresholds` block measures nothing, the defect a Phase 2 fix wave
         // caught in `src/stats` — both halves ship in the same commit.
         "src/participation/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        // Gate 22 (Phase 4, Task 1). Pure and gates for the same reason every pure directory
+        // does; an `include` entry with no `thresholds` block measures nothing, so both halves
+        // ship in the same commit as every gate before it.
+        "src/money/**": {
           branches: 100,
           functions: 100,
           lines: 100,

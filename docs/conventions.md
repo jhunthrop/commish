@@ -176,6 +176,27 @@ src/
                           src/moderation and src/trades — public-league-list.tsx value-imports
                           TIER_COMPOSITION_LABEL directly. See docs/enforcement.md and
                           docs/decisions/enforcement-and-tiers.md.
+  money/                  Phase 4, Task 1: the money vocabulary, pure and browser-safe.
+                          MONEY_CONFIG (config.ts — the entry-fee ceiling, deposit/withdrawal
+                          floors and ceilings, the tax-year-versioned reporting threshold, the
+                          zero reconcile tolerance) and MONEY_REFUSALS, the one closed set of
+                          refusal reasons balancedOrRefuse and prizeTableInvariant hand back.
+                          MONEY_STATES + moneyIsLive (states.ts — the state-enablement config,
+                          EMPTY BY DEFAULT per founder decision 7; neverEligible pins HI/ID/MT/
+                          NV/WA, which have never permitted paid fantasy sports; CA sits on
+                          neither list pending counsel reconciling the 2025 AG opinion with DFPI
+                          guidance). The account vocabulary (accounts.ts — MoneyAccountKind's
+                          eight kinds, accountSide, signedBalance, accountIdFor/parseAccountId).
+                          The posting vocabulary (posting.ts — MoneyPosting, balancedOrRefuse,
+                          the double-entry balance gate every money writer calls before it opens
+                          a Postgres transaction). The prize-table invariant (prize-table.ts —
+                          PrizeTable, prizeTableInvariant: prizes plus the platform's fixed rake
+                          must equal the pot exactly, founder decision 10, never percent-of-pool).
+                          NO I/O, no clock, no database. 100% coverage. Browser-safe: the ninth
+                          pure exempt directory, beside src/chat, src/matchmaking, src/identity,
+                          src/help, src/reviews, src/moderation, src/trades and
+                          src/participation. See docs/superpowers/plans/
+                          2026-08-24-phase4-money-foundations.md.
   scoring/                Pure fantasy-scoring engine: computeFantasyPoints/scoreLineup, every
                           preset (PPR/standard/K-DEF/TE-premium). NO I/O. 100% coverage.
   stats/                  The stats seam. provider.ts (the interface: listPlayers, listGames,
@@ -447,9 +468,20 @@ on this list. It joins `flag-only.test.ts`'s `INTEGRITY_DIRS` in the same commit
 list, because the directory that decides who is a veteran is exactly the directory somebody would
 one day reach for an account action from.
 
+`src/money/**` joins the exempt set for the same reason (Phase 4, Task 1): it is the ninth pure
+directory on the list, holding `MONEY_CONFIG`, `MONEY_STATES`/`moneyIsLive`, the account vocabulary
+(`MoneyAccountKind`, `accountIdFor`, `parseAccountId`), the posting vocabulary (`MoneyPosting`,
+`balancedOrRefuse`) and the prize-table invariant (`PrizeTable`, `prizeTableInvariant`) — no
+database, no clock, no I/O. A later task's wallet component and entry-fee creation form
+value-import `MONEY_CONFIG.entryFeeCeilingCents` and `moneyIsLive()` directly, the same
+"a client-side number and a server-enforced one must read the identical value" reason every other
+exempt directory is on this list. Its Postgres half, `src/money-service/**`, and the external-money
+seam, `src/payments-provider/**`, are NOT exempt and join the BLOCKED list when a later task creates
+them.
+
 `src/integrity/**` and `src/integrity-service/**` join the BLOCKED list instead — unlike
-`@/chat`, `@/matchmaking`, `@/identity`, `@/help`, `@/reviews`, `@/moderation`, `@/trades` and
-`@/participation`, neither half of the audit spine
+`@/chat`, `@/matchmaking`, `@/identity`, `@/help`, `@/reviews`, `@/moderation`, `@/trades`,
+`@/participation` and `@/money`, neither half of the audit spine
 is exempt, because neither half is actually browser-safe: `src/integrity/**` is pure but reads
 `node:crypto` (`chain.ts`'s `createHash`), which has no browser polyfill in this stack, and
 `src/integrity-service/**` is Postgres-backed outright. Client code needs neither as a value —
