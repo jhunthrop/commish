@@ -147,6 +147,19 @@ describe("WaitingRoom", () => {
     });
   });
 
+  it("gives the seat-filler who completed the room BOTH the welcome and the countdown, axe-clean", async () => {
+    // The composed D1+D3 state the checkpoint reconciliation created: the manager whose own join
+    // filled the last when_full seat is just-seated AND the room is full, so the welcome card and
+    // the full-seat countdown hero must render together — for the whole grace window this pairing
+    // is what that person sees. Pinned at the unit level per this file's axe-per-state convention.
+    await renderSurface(<WaitingRoom league={fullSitAndGo} leagueName="Sit and Go #7" justSeated />, async ({ container }) => {
+      expect(screen.getByText("Sit and Go #7 · You're in")).toBeInTheDocument();
+      expect(screen.getByTestId("waiting-room-hero")).toBeInTheDocument();
+      expect(screen.getByTestId("waiting-room-countdown")).toBeInTheDocument();
+      expect(await axe(container)).toHaveNoViolations();
+    });
+  });
+
   it("shows a link into the room while the draft is live, in both themes, axe-clean", async () => {
     const live: WaitingRoomLeague = { ...fullSitAndGo, status: "in_progress" };
     await renderSurface(<WaitingRoom league={live} />, async ({ container }) => {
