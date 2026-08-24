@@ -48,6 +48,49 @@ export const AUDIT_EVENT_TYPES = [
   "profile_updated",
   /** Published by Plan A, from the review removal stamp. */
   "review_removed",
+  /*
+   * Phase 4 (money foundations), ruling 2: the ten money events. Phase 3 froze this list and
+   * Phase 3.6 honored the freeze via payload outcomes; money is the one addition that clears the
+   * bar for growing it — a new event CLASS, not an outcome of an existing type, and the class an
+   * auditor of a real-money book reads FIRST. Shipped in their own migration
+   * (`drizzle/0036_money_audit_events.sql`, `ALTER TYPE … ADD VALUE`), separate from the tables'
+   * `0035` because an added enum value must not be used by the migration that adds it.
+   *
+   * The dossier named eight; the shipped list is ten. `deposit_returned` and
+   * `withdrawal_returned` are added because the ACH return is this plan's mandatory failure
+   * model, and a reversal riding a `*_completed` payload would hide the one event an auditor
+   * most wants to find behind the event that says the opposite.
+   *
+   * PLATFORM-SCOPED (the deposit/withdrawal five): a member's own money motion is nobody else's
+   * feed. LEAGUE-SCOPED (the entry-fee/prize/payout five): they ride the league chain, beside
+   * the joins and trades they pay for.
+   */
+  /** Published by Task 6 (`@/money-service/deposits`), when the provider settles a deposit. */
+  "deposit_completed",
+  /** Published by Task 6 (`@/money-service/deposits`), from the ACH-return posting — including
+   *  ruling 5's shortfall path to `platform_receivable`. Platform-scoped. */
+  "deposit_returned",
+  /** Published by Task 6 (`@/money-service/withdrawals`), at the member's own request. */
+  "withdrawal_requested",
+  /** Published by Task 6 (`@/money-service/withdrawals`), when the provider settles it. */
+  "withdrawal_completed",
+  /** Published by Task 6 (`@/money-service/withdrawals`), when a sent withdrawal comes back. */
+  "withdrawal_returned",
+  /** Published by Task 8 (`@/money-service/entry-fee`), inside `joinLeagueInTx`'s own
+   *  transaction. League-scoped: the fee is the league's own record of who paid in. */
+  "entry_fee_collected",
+  /** Published by Task 8 (`@/money-service/entry-fee`, seat release) and Task 9
+   *  (`@/money-service/dissolution`, every seat at once). League-scoped. */
+  "entry_fee_refunded",
+  /** Published by Task 10 (`@/money-service/settlement`), one per prize-table row paid. */
+  "prize_paid",
+  /** Published by Task 10 (`@/money-service/settlement`), when an open integrity flag moves a
+   *  winner's payout to `held_for_review` instead of `user_available`. League-scoped. */
+  "payout_held",
+  /** Published by Task 10 (`@/money-service/settlement`'s `releaseHold`), when the flag resolves
+   *  in the member's favor. Confiscation is the same writer's other arm, recorded on the flag's
+   *  own resolution — the hold's release is the event the LEAGUE is owed sight of. */
+  "payout_released",
 ] as const;
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];

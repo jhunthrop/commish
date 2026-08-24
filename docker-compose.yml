@@ -95,7 +95,13 @@ services:
       DB_PORT: "5432"
       DB_USER: commish
       DB_PASSWORD: commish
-      DB_NAME: commish_test
+      # DB_NAME is deliberately UNSET (Phase 4, Task 2): the image's entrypoint then writes a
+      # wildcard `[databases]` entry (`* = host=postgres-test ...`), so this one pooler routes
+      # EVERY database on postgres-test by its connect-time name — `commish_test` exactly as
+      # before, plus the per-lane databases the worktree doctrine hands out (`commish_test_p4`,
+      # `commish_test_v3`, ...), each lane pointing `TEST_PGBOUNCER_URL` at its own. Pinned, a
+      # lane's pgbouncer suite could only ever test the shared database's schema, which stops
+      # matching the lane's code the moment a lane ships a migration.
       POOL_MODE: transaction
       AUTH_TYPE: scram-sha-256
       MAX_CLIENT_CONN: "500"

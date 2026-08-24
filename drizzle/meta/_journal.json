@@ -246,6 +246,20 @@
       "when": 1787540115112,
       "tag": "0034_roll_until_full",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1787614163507,
+      "tag": "0035_money_foundations",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1787614203826,
+      "tag": "0036_money_audit_events",
+      "breakpoints": true
     }
   ]
 }

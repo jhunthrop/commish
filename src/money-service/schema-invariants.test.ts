@@ -1,6 +1,6 @@
 import { sql } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { createTestDb, expectRejectionMatching, truncateAll } from "@/db/test-db";
+import { createTestDb, expectRejectionMatching, truncateAll, truncateMoneyTables } from "@/db/test-db";
 
 const db = createTestDb();
 
@@ -39,6 +39,7 @@ async function seedOnePosting(): Promise<void> {
 
 beforeEach(async () => {
   await truncateAll(db);
+  await truncateMoneyTables(db);
   await seedOnePosting();
 });
 

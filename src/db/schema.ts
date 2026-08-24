@@ -2,6 +2,7 @@ import {
   pgTable,
   pgEnum,
   text,
+  char,
   integer,
   real,
   boolean,
@@ -17,6 +18,9 @@ import {
 import { sql } from "drizzle-orm";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { AUDIT_EVENT_TYPES, type JsonObject } from "@/domain/audit";
+import { MONEY_ACCOUNT_KINDS } from "@/money/accounts";
+import type { MoneyPostingDirection } from "@/money/posting";
+import type { PrizeTable } from "@/money/prize-table";
 import type { TradeAsset } from "@/trades/assets";
 
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
@@ -37,9 +41,12 @@ export const playerPositionEnum = pgEnum("player_position", ["QB", "RB", "WR", "
 export const weekStatusEnum = pgEnum("week_status", ["scheduled", "in_progress", "final"]);
 export const helpLevelEnum = pgEnum("help_level", ["guided", "standard"]);
 /**
- * The vocabulary is fixed by the spec and declared in full today (`@/domain/audit`): no later
- * plan adds a value, so no later migration ever runs `ALTER TYPE … ADD VALUE`. Contrast
- * `member_notices.notice_type` (Task 7), which every later plan extends and is therefore `text`.
+ * Phase 3 declared the vocabulary fixed ("no later migration ever runs `ALTER TYPE … ADD VALUE`")
+ * and Phase 3.6 honored that via payload outcomes (its ruling 25). Phase 4's ruling 2 is the ONE
+ * phase-level decision that grows it — money's ten events are a new event CLASS, not an outcome
+ * of an existing one — shipped as `drizzle/0036_money_audit_events.sql`, a migration of its own
+ * because an added enum value must not be used by the migration that adds it. Contrast
+ * `member_notices.notice_type`, which every later plan extends casually and is therefore `text`.
  */
 export const auditEventTypeEnum = pgEnum("audit_event_type", AUDIT_EVENT_TYPES);
 export const auditActorTypeEnum = pgEnum("audit_actor_type", ["user", "system"]);
@@ -49,6 +56,45 @@ export const auditActorTypeEnum = pgEnum("audit_actor_type", ["user", "system"])
  * row can never be ambiguous mid-migration or under a future third kind.
  */
 export const chatMessageKindEnum = pgEnum("chat_message_kind", ["text", "gif"]);
+
+/** Phase 4, Task 2 (migration 0035). Derived from the money vocabulary (`@/money/accounts`), the
+ *  `AUDIT_EVENT_TYPES` shape: the pg enum and the union are one list, never two to keep in step. */
+export const moneyAccountKindEnum = pgEnum("money_account_kind", MONEY_ACCOUNT_KINDS);
+/**
+ * Every way a money transaction can come to exist — one per door money walks through, external
+ * (Seam A: deposits, withdrawals and their async reversals/failures) and internal (entry fees,
+ * refunds, settlement, collusion-hold outcomes, receivable recovery). Declared here rather than
+ * in `@/money`: `MoneyPosting` is the browser-safe vocabulary; which KINDS of transaction exist
+ * is a fact about the ledger's own writers (`src/money-service/**`), all server-side.
+ *
+ * `satisfies` pins each member to the plan's list; the `money_txn_kind` enum below is the same
+ * runtime tuple, so the database can never accept a kind this union does not name.
+ */
+export const MONEY_TXN_KINDS = [
+  "deposit",
+  "deposit_return",
+  "withdrawal_request",
+  "withdrawal_complete",
+  "withdrawal_return",
+  "withdrawal_fail",
+  "entry_fee",
+  "entry_fee_refund",
+  "settlement",
+  "hold_release",
+  "hold_confiscation",
+  "receivable_settlement",
+] as const;
+export type MoneyTxnKind = (typeof MONEY_TXN_KINDS)[number];
+export const moneyTxnKindEnum = pgEnum("money_txn_kind", MONEY_TXN_KINDS);
+/** The runtime tuple for `@/money/posting`'s `MoneyPostingDirection` — `satisfies` holds the two
+ *  to the same pair of words, so the pure vocabulary and the pg enum cannot drift. */
+export const MONEY_DIRECTIONS = ["debit", "credit"] as const satisfies readonly MoneyPostingDirection[];
+export const moneyDirectionEnum = pgEnum("money_direction", MONEY_DIRECTIONS);
+/** `none → pending → verified | failed`, written only by the KYC callback path (Task 7) — one-way
+ *  except an operator reset. `none` is the default every existing and future row starts at. */
+export const KYC_STATUSES = ["none", "pending", "verified", "failed"] as const;
+export type KycStatus = (typeof KYC_STATUSES)[number];
+export const kycStatusEnum = pgEnum("kyc_status", KYC_STATUSES);
 
 // Identity (credentials, sessions, MFA, OAuth) is owned by WorkOS AuthKit. This table is
 // the app's own profile row for a WorkOS user — `id` IS the WorkOS user id — holding the
@@ -77,6 +123,22 @@ export const users = pgTable(
      * bug here.
      */
     isAdmin: boolean("is_admin").notNull().default(false),
+    /**
+     * Phase 4, Task 2 (migration 0035). `none` until the member ever starts verification; written
+     * only by the KYC callback path (Task 7's `KycProvider` seam) — `none → pending → verified |
+     * failed`, one-way except an operator reset. Read by `moneyGates` (Task 5): no deposit and no
+     * paid join while this is anything but `verified`, which is the dossier's §4.2 federal-rules
+     * gate as a column rather than a promise.
+     */
+    kycStatus: kycStatusEnum("kyc_status").notNull().default("none"),
+    /**
+     * Phase 4, Task 2 (migration 0035). Self-exclusion is a ONE-WAY STAMP in the
+     * `reviews.removed_at` family: set once by the member's own exclusion action (Task 7's door),
+     * never cleared by anything in the product — a member who excluded themselves and changed
+     * their mind is a support conversation, not an endpoint. `moneyGates` refuses every money
+     * door while this is non-null; free play is untouched.
+     */
+    selfExcludedAt: timestamp("self_excluded_at", { withTimezone: true }),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
@@ -164,6 +226,27 @@ export const leagues = pgTable(
      * leaves the original date alone.
      */
     seasonCompletedAt: timestamp("season_completed_at", { withTimezone: true }),
+    /**
+     * Phase 4, Task 2 (migration 0035). What one seat costs, in cents, fixed at creation —
+     * `0` IS the free league, and the ONLY kind that can exist until the founder names a launch
+     * state with counsel (`MONEY_STATES.enabled` ships empty, founder decision 7). A paid join
+     * collects exactly this into `league_escrow` (Task 8); bounded at creation by
+     * `MONEY_CONFIG.entryFee` ($500 ceiling, founder decision 8 — config, never a constant here).
+     */
+    entryFeeCents: integer("entry_fee_cents").notNull().default(0),
+    /**
+     * Phase 4, Task 2 (migration 0035). The platform's fixed per-entry fee in cents, published
+     * beside the prize table and NEVER percent-of-pool (founder decision 10, the UIGEA posture).
+     * Collected into `platform_rake` at settlement's sweep (Task 10), not skimmed en route.
+     */
+    platformFeeCents: integer("platform_fee_cents").notNull().default(0),
+    /**
+     * Phase 4, Task 2 (migration 0035). The published prize table (`@/money/prize-table`), fixed
+     * in advance — no proration ever (founder decision 9). `NULL` for a free league; for a paid
+     * one, `prizeTableInvariant` holds sum(prizes) + rake to the pot exactly, at creation AND
+     * again at settlement, browser and server enforcing the one rule from the one module.
+     */
+    payoutTable: jsonb("payout_table").$type<PrizeTable>(),
   },
   (t) => [
     /**
@@ -1129,5 +1212,124 @@ export const seatHolds = pgTable(
      *  timescale that matters — a hold spends ten minutes unconsumed and then is either consumed
      *  or simply stops mattering, never revisited by this index again. */
     index("seat_holds_live_idx").on(t.leagueId, t.expiresAt).where(sql`${t.consumedAt} is null`),
+  ],
+);
+
+/**
+ * Phase 4, Task 2 (migration 0035): the money ledger's rollup rows — one per account the
+ * double-entry book posts against, keyed by the vocabulary's own id string (`accountIdFor`,
+ * `@/money/accounts`: `"user_available:usr_x"`, or the bare kind for a singleton), so the id IS
+ * the fact and a join to look it up never exists.
+ *
+ * The row exists SOLELY to be `SELECT … FOR UPDATE`d: `balance_cents` is the rollup
+ * `docs/decisions/data-layer-hardening.md` requires over the unbounded `money_entries` history,
+ * advanced in the SAME transaction as the entries it summarizes (Task 3's `postMoneyTransaction`,
+ * the one writer), and its row lock is what serializes concurrent postings against one account —
+ * PgBouncer forbids advisory locks, so exclusion is this row lock and nothing else. `audit_chains`
+ * is the shape being copied, deliberately: mutable rollup over an append-only record, reconciled
+ * by re-derivation (`reconcileMoney`, Task 4), never trusted as the record itself.
+ *
+ * The CHECK is ruling 5's floor: no player-facing liability ever goes negative — the
+ * sufficient-balance refusal happens in code under the row lock, and this is the database's own
+ * backstop when that code is ever wrong. The three kinds exempted are exactly the accounts the
+ * ACH-return failure model swings below zero legitimately: the pool an already-spent deposit
+ * reverses out of, the clearing account mid-flight, and the receivable that CARRIES the shortfall
+ * (which is why the shortfall goes there instead of to any member's balance).
+ */
+export const moneyAccounts = pgTable(
+  "money_accounts",
+  {
+    id: text("id").primaryKey(),
+    kind: moneyAccountKindEnum("kind").notNull(),
+    /** The user or league this account belongs to; NULL for the platform-wide singletons —
+     *  redundant with the id's own suffix by construction, queryable without parsing it. */
+    ownerId: text("owner_id"),
+    balanceCents: bigint("balance_cents", { mode: "number" }).notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check(
+      "money_accounts_balance_floor_ck",
+      sql`${t.balanceCents} >= 0 OR ${t.kind} IN ('fbo_pool', 'provider_clearing', 'platform_receivable')`,
+    ),
+  ],
+);
+
+/**
+ * Phase 4, Task 2 (migration 0035): one row per money EVENT — the thing a set of balanced
+ * `money_entries` legs belongs to. Append-only by trigger, exactly as `money_entries` is: the
+ * transaction row names what happened and the entries are its arithmetic, and history that can
+ * be edited at either level is not history.
+ *
+ * `league_id` carries NO foreign key — the audit chain's own ruling-7 precedent, restated for
+ * money: `leagues` cascades to nine tables, a cascade is a DELETE, and the money trail of a
+ * deleted league is exactly the trail an auditor (or a member owed a refund) most needs to still
+ * have. Money history must survive anything, including the league it happened in.
+ *
+ * `idempotency_key` is nullable and UNIQUE: a provider webhook retrying a settled transfer, or a
+ * double-submitted deposit, collides here and becomes a no-op instead of a double posting.
+ * Internal postings (entry fee inside a join transaction) are serialized by their own row locks
+ * and carry NULL, which Postgres's UNIQUE treats as always-distinct — exactly right.
+ */
+export const moneyTransactions = pgTable(
+  "money_transactions",
+  {
+    id: text("id").primaryKey(),
+    kind: moneyTxnKindEnum("kind").notNull(),
+    leagueId: text("league_id"),
+    /** The provider's own reference for an external transfer (Seam A), NULL for an internal
+     *  posting — provenance, the `member_notices.audit_event_id` class: never a join key. */
+    providerTransferRef: text("provider_transfer_ref"),
+    idempotencyKey: text("idempotency_key"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("money_transactions_idempotency_key_idx").on(t.idempotencyKey),
+    /** The league money history read: every fee, refund and payout a league's money door ever
+     *  produced — dissolution (Task 9) and settlement (Task 10) both walk it. */
+    index("money_transactions_league_idx").on(t.leagueId),
+  ],
+);
+
+/**
+ * Phase 4, Task 2 (migration 0035): THE BOOK OF RECORD (founder decision 1) — one row per
+ * double-entry leg, append-only by trigger (`0019`/`0021`'s precedent, applied to money), written
+ * ONLY by `postMoneyTransaction` (Task 3) in balanced sets `balancedOrRefuse` has already passed.
+ *
+ * `state_of_entry` and `tax_year` are NOT NULL on EVERY row — founder decision 6, and the whole
+ * of what Phase 5's tax stack assumes: the 1099 threshold query is answerable by index over these
+ * two columns alone, with no backfill and no row ever grandfathered out. `tax_year` is derived
+ * from the writer's own `Clock` at the write and stored, never recomputed from `created_at` later
+ * (a posting written at 23:59 on Dec 31 belongs to the year the writer's clock said, forever).
+ *
+ * `amount_cents` is strictly positive by CHECK: direction lives in `direction` alone, so an
+ * amount can never encode it a second, disagreeing time. Whole cents only — the vocabulary's
+ * `balancedOrRefuse` refuses fractions in code, and `bigint` refuses them at the database.
+ */
+export const moneyEntries = pgTable(
+  "money_entries",
+  {
+    id: text("id").primaryKey(),
+    transactionId: text("transaction_id")
+      .notNull()
+      .references(() => moneyTransactions.id),
+    accountId: text("account_id")
+      .notNull()
+      .references(() => moneyAccounts.id),
+    direction: moneyDirectionEnum("direction").notNull(),
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    stateOfEntry: char("state_of_entry", { length: 2 }).notNull(),
+    taxYear: integer("tax_year").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("money_entries_amount_positive_ck", sql`${t.amountCents} > 0`),
+    /** The account statement read (`walletSummary`/`accountBalance` reconciliation, Task 3's
+     *  `read.ts`): one account's history in time order, an index range scan however large the
+     *  book grows. */
+    index("money_entries_account_created_idx").on(t.accountId, t.createdAt),
+    /** THE Phase 5 guarantee (founder decision 6): the 1099 threshold query — every entry for a
+     *  tax year, grouped by state — seeks here instead of scanning the whole book each January. */
+    index("money_entries_tax_year_state_idx").on(t.taxYear, t.stateOfEntry),
   ],
 );

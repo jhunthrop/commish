@@ -11,7 +11,7 @@ import { AUDIT_EVENT_TYPES, type AuditEventType } from "@/domain/audit";
  * `Record<AuditEventType, …>` and not a partial map: adding a type to the vocabulary without
  * deciding this is a TYPE ERROR, which is a better reminder than a review comment.
  */
-const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "plan-d">> = {
+const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "plan-d" | "phase-4">> = {
   league_created: "plan-a",
   member_joined: "plan-a",
   draft_pick: "plan-a",
@@ -56,6 +56,22 @@ const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "p
   // specifically, so the two checks below now hold this type to the same bar as every other
   // published type: a real writer must exist, and no OTHER reserved type may gain one by accident.
   admin_action: "plan-a",
+  // Phase 4 (money foundations), ruling 2: the ten money events, RESERVED with named consumers —
+  // Task 2 grows the vocabulary (migration 0036) and the publishers land later in the same plan.
+  // Each moves to "plan-a" territory in the task that lands its writer, exactly the way
+  // `flag_raised`/`roster_move` did above — the value marks PUBLISHED, not which phase wrote it.
+  // The "no publisher anywhere" check below is what keeps these honest in the meantime: a money
+  // writer landing without flipping its row here reddens this file, not just a review comment.
+  deposit_completed: "phase-4", // Task 6, `@/money-service/deposits`
+  deposit_returned: "phase-4", // Task 6, `@/money-service/deposits` (the ACH-return posting)
+  withdrawal_requested: "phase-4", // Task 6, `@/money-service/withdrawals`
+  withdrawal_completed: "phase-4", // Task 6, `@/money-service/withdrawals`
+  withdrawal_returned: "phase-4", // Task 6, `@/money-service/withdrawals`
+  entry_fee_collected: "phase-4", // Task 8, `@/money-service/entry-fee`, inside joinLeagueInTx
+  entry_fee_refunded: "phase-4", // Task 8 (seat release) and Task 9 (`@/money-service/dissolution`)
+  prize_paid: "phase-4", // Task 10, `@/money-service/settlement`
+  payout_held: "phase-4", // Task 10, `@/money-service/settlement`
+  payout_released: "phase-4", // Task 10, `@/money-service/settlement`'s releaseHold
 };
 
 interface SourceFile {
@@ -157,11 +173,12 @@ describe("the audit vocabulary", () => {
 
   // Phase 3 Plan D, Task 11, Step 5. Phase 3 ends here. A reserved audit event type with a named
   // owner is honest while the owner is coming; after the last plan it is a name with no writer
-  // and no plan that will ever write one. Every one of the sixteen `AUDIT_EVENT_TYPES` is
-  // published (`OWNER`'s own values above are all "plan-a" — Plan D adds no new event TYPE,
+  // and no plan that will ever write one. Every one of Phase 3's sixteen `AUDIT_EVENT_TYPES` is
+  // published (their `OWNER` values above are all "plan-a" — Plan D adds no new event TYPE,
   // ruling 7: `SYSTEM_ACTION_CODES` is the vocabulary this plan grows instead, a plain array with
   // no database representation), and this assertion is what keeps a future reader from adding a
-  // seventeenth "for Plan D".
+  // seventeenth "for Plan D". Phase 4's ten money events reserve to "phase-4" (its ruling 2, a
+  // phase-level decision with its own migration), which leaves this assertion exactly as true.
   it("leaves the plan-d arm of OWNER unused, because there is no plan after this one", () => {
     expect(Object.values(OWNER)).not.toContain("plan-d");
   });

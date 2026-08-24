@@ -39,7 +39,6 @@ export async function truncateAll(db: Db): Promise<void> {
       player_stat_lines, players, stat_weeks,
       matchups, weeks, draft_picks, draft_nudges, draft_slot_preferences, draft_actions, drafts,
       lineup_slots, roster_slots, league_invites,
-      money_entries, money_transactions, money_accounts,
       scoring_settings, trade_proposals, teams, leagues, user_preferences, member_notices, users
     RESTART IDENTITY CASCADE
   `);
@@ -48,6 +47,25 @@ export async function truncateAll(db: Db): Promise<void> {
   // across `it` blocks under a fresh seed each time. Without this, a cache entry built before
   // this truncate would outlive the data it was computed from.
   resetRankedPlayersCacheForTests();
+}
+
+/**
+ * The money tables' own truncation (Phase 4, Task 2 — migration 0035), SEPARATE from
+ * `truncateAll` for exactly one reason, and deliberately temporary: `src/db/pgbouncer.test.ts`
+ * reaches Postgres through docker-compose's `pgbouncer-test`, whose config pins the ONE database
+ * it routes (`commish_test`) — a database that stays at main's schema until this lane merges, so
+ * a `truncateAll` that named the money tables would fail every pgbouncer test against a table
+ * that does not exist there yet. Every money suite runs on the lane database (`TEST_DATABASE_URL`)
+ * where 0035 IS applied, and calls this beside `truncateAll`. THE MERGE CLEANUP: once this lane
+ * lands on main and `db:migrate:test` carries `commish_test` past 0035, fold these three names
+ * into `truncateAll`'s own list and delete this helper.
+ *
+ * The append-only triggers do not block TRUNCATE, by 0035's own note (ruling 26's reasoning,
+ * inherited from 0019/0021): table ownership can already DROP or DISABLE TRIGGER, and this
+ * function is how every money integration test starts.
+ */
+export async function truncateMoneyTables(db: Db): Promise<void> {
+  await db.execute(sql`TRUNCATE TABLE money_entries, money_transactions, money_accounts RESTART IDENTITY CASCADE`);
 }
 
 /**

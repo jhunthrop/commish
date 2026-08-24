@@ -59,6 +59,24 @@ export const ACTIVITY_VISIBILITY: Readonly<Record<AuditEventType, ActivityVisibi
   session_started: "hidden", // platform chain: never in a league feed at all
   profile_updated: "hidden", // platform chain
   review_removed: "hidden", // platform chain
+  /*
+   * Phase 4, Task 2: the money vocabulary lands hidden, ALL TEN — this module's own rule ("the
+   * plan that adds the publisher is the plan that decides what its payload may show") applied to
+   * money. The deposit/withdrawal five are platform-chain and could never reach a league feed
+   * anyway; the league-scoped five stay hidden until the task that publishes each decides what a
+   * league may see of its neighbors' money (Tasks 8-10), which is a copy-rulebook and persona
+   * question, not a schema one.
+   */
+  deposit_completed: "hidden", // platform chain
+  deposit_returned: "hidden", // platform chain
+  withdrawal_requested: "hidden", // platform chain
+  withdrawal_completed: "hidden", // platform chain
+  withdrawal_returned: "hidden", // platform chain
+  entry_fee_collected: "hidden", // Task 8 decides
+  entry_fee_refunded: "hidden", // Tasks 8-9 decide
+  prize_paid: "hidden", // Task 10 decides
+  payout_held: "hidden", // Task 10 decides
+  payout_released: "hidden", // Task 10 decides
 };
 
 /**

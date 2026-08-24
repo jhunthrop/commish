@@ -130,6 +130,20 @@ const SAMPLE_PAYLOADS: Readonly<Record<AuditEventType, readonly { readonly paylo
   session_started: [{ payload: {}, actorId: "user_bob" }],
   profile_updated: [{ payload: {}, actorId: "user_bob" }],
   review_removed: [{ payload: {}, actorId: "user_bob" }],
+  // Phase 4, Task 2: all ten money events land hidden (see ACTIVITY_VISIBILITY), so these
+  // placeholder samples render nothing today — the task that flips one to "everyone" replaces
+  // its sample with the real payload shape, and this Record's exhaustiveness is what makes
+  // forgetting that a type error rather than an unswept sentence.
+  deposit_completed: [{ payload: {}, actorId: "user_bob" }],
+  deposit_returned: [{ payload: {}, actorId: null }],
+  withdrawal_requested: [{ payload: {}, actorId: "user_bob" }],
+  withdrawal_completed: [{ payload: {}, actorId: null }],
+  withdrawal_returned: [{ payload: {}, actorId: null }],
+  entry_fee_collected: [{ payload: {}, actorId: "user_bob" }],
+  entry_fee_refunded: [{ payload: {}, actorId: null }],
+  prize_paid: [{ payload: {}, actorId: null }],
+  payout_held: [{ payload: {}, actorId: null }],
+  payout_released: [{ payload: {}, actorId: null }],
 };
 
 /** Every sentence this module can actually produce, derived from the visibility table itself. */
@@ -155,6 +169,23 @@ describe("ACTIVITY_VISIBILITY", () => {
 
   it("hides the platform chain's types, which can never appear in a league feed anyway", () => {
     for (const type of ["session_started", "profile_updated", "review_removed"] as const) {
+      expect(ACTIVITY_VISIBILITY[type]).toBe("hidden");
+    }
+  });
+
+  it("hides all ten money events until the task that publishes each decides otherwise (Phase 4, Task 2)", () => {
+    for (const type of [
+      "deposit_completed",
+      "deposit_returned",
+      "withdrawal_requested",
+      "withdrawal_completed",
+      "withdrawal_returned",
+      "entry_fee_collected",
+      "entry_fee_refunded",
+      "prize_paid",
+      "payout_held",
+      "payout_released",
+    ] as const) {
       expect(ACTIVITY_VISIBILITY[type]).toBe("hidden");
     }
   });

@@ -2,8 +2,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import type { Db } from "./client";
-import { createTestDb, truncateAll } from "./test-db";
-import { draftActions, lineupSlots, matchups, rosterSlots, teams } from "./schema";
+import { createTestDb, truncateAll, truncateMoneyTables } from "./test-db";
+import { draftActions, lineupSlots, matchups, moneyEntries, moneyTransactions, rosterSlots, teams, MONEY_DIRECTIONS, MONEY_TXN_KINDS } from "./schema";
 import { explainPlan, findNode, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
 import { seedRealisticCorpus, seedTradeCorpus } from "./test-corpus";
 import { chatPageQuery } from "@/chat-service/chat";
@@ -20,6 +20,7 @@ import { tradesQuery } from "@/league-service/trades";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { reviewAggregateQuery } from "@/review-service/reviews";
 import { AUDIT_EVENT_TYPES } from "@/domain/audit";
+import { MONEY_ACCOUNT_KINDS } from "@/money/accounts";
 
 const db = createTestDb();
 
@@ -110,6 +111,56 @@ async function seedReviewCorpus(db: Db): Promise<void> {
   await db.execute(sql`ANALYZE reviews`);
 }
 
+/** Phase 4, Task 2's money book: enough history that the planner has a real choice to make. */
+const MONEY_ACCOUNT_COUNT = 2_000;
+const MONEY_TXN_COUNT = 6_000;
+/** One transaction in this many belongs to a league (an entry fee); the rest are deposits with
+ *  `league_id` NULL — the realistic proportion once money is live, external motion dwarfing fees. */
+const MONEY_LEAGUE_TXN_INTERVAL = 3;
+const MONEY_LEAGUE_COUNT = 100;
+
+/**
+ * Phase 4, Task 2 (migration 0035): the money book's own corpus, layered beside the others in the
+ * same "small sample beside the big corpus" shape — except money's tables are NEW, so this is
+ * their whole population: 2,000 member accounts plus the pool singleton, 6,000 transactions, two
+ * balanced legs each (12,000 entries) spread over four tax years and eight states. The spreads
+ * are what give every predicate below real selectivity to measure: one account owns ~12 of
+ * 12,000 entries, one `(tax_year, state)` pair ~375, one league ~20 of 6,000 transactions.
+ */
+async function seedMoneyCorpus(db: Db): Promise<void> {
+  // `truncateAll` deliberately does not name the money tables yet (`truncateMoneyTables`' own
+  // docblock carries the pgbouncer reason and the merge cleanup) — cleared here so a rerun
+  // against the same lane database never collides with its own previous corpus.
+  await truncateMoneyTables(db);
+  await db.execute(sql`
+    INSERT INTO money_accounts (id, kind, owner_id, balance_cents)
+    SELECT 'user_available:mu' || g, 'user_available'::money_account_kind, 'mu' || g, 1000
+    FROM generate_series(1, ${MONEY_ACCOUNT_COUNT}) g
+  `);
+  await db.execute(sql`INSERT INTO money_accounts (id, kind, owner_id, balance_cents) VALUES ('fbo_pool', 'fbo_pool', NULL, ${MONEY_ACCOUNT_COUNT * 1000})`);
+  await db.execute(sql`
+    INSERT INTO money_transactions (id, kind, league_id, created_at)
+    SELECT 'mtx' || g,
+           CASE WHEN g % ${MONEY_LEAGUE_TXN_INTERVAL} = 0 THEN 'entry_fee'::money_txn_kind ELSE 'deposit'::money_txn_kind END,
+           CASE WHEN g % ${MONEY_LEAGUE_TXN_INTERVAL} = 0 THEN 'mlg' || (g % ${MONEY_LEAGUE_COUNT}) ELSE NULL END,
+           now() - (g || ' minutes')::interval
+    FROM generate_series(1, ${MONEY_TXN_COUNT}) g
+  `);
+  await db.execute(sql`
+    INSERT INTO money_entries (id, transaction_id, account_id, direction, amount_cents, state_of_entry, tax_year, created_at)
+    SELECT 'men' || g || '_' || leg,
+           'mtx' || g,
+           CASE WHEN leg = 1 THEN 'fbo_pool' ELSE 'user_available:mu' || (1 + g % ${MONEY_ACCOUNT_COUNT}) END,
+           CASE WHEN leg = 1 THEN 'debit'::money_direction ELSE 'credit'::money_direction END,
+           500,
+           (ARRAY['NJ', 'NY', 'PA', 'IL', 'OH', 'MI', 'GA', 'VA'])[1 + g % 8],
+           2023 + g % 4,
+           now() - (g || ' minutes')::interval
+    FROM generate_series(1, ${MONEY_TXN_COUNT}) g, generate_series(1, 2) leg
+  `);
+  await db.execute(sql`ANALYZE money_accounts, money_transactions, money_entries`);
+}
+
 describe("hot read paths use indexes", () => {
   beforeAll(async () => {
     await truncateAll(db);
@@ -117,6 +168,7 @@ describe("hot read paths use indexes", () => {
     await seedHouseShelfSample(db);
     await seedFullDueLeagueSample(db);
     await seedReviewCorpus(db);
+    await seedMoneyCorpus(db);
   }, 120_000);
 
   // `teams` is deliberately not asserted here: at this corpus size, the planner's genuine
@@ -761,6 +813,46 @@ describe("hot read paths use indexes", () => {
     const scan = findNode(plan, (node) => node["Relation Name"] === "reviews");
     expect(scan?.Filter).toContain("removed_at");
   });
+
+  /*
+   * PHASE 4, TASK 2 — the money book's three indexes (migration 0035), each measured against the
+   * query it exists to serve, over `seedMoneyCorpus`'s 12,000-entry book. The queries are built
+   * inline for now, shaped exactly as their named consumers will issue them: Task 3's `read.ts`
+   * (`walletSummary`'s statement read) and the Phase 5 guarantee (`getUserAnnualNetProfit`'s
+   * tax-year read, founder decision 6), and Task 9/10's league money history. When those exported
+   * builders land, these assertions should EXPLAIN the real export instead — the same evolution
+   * every other query in this describe block already went through.
+   */
+  it("one account's statement is an index range scan of money_entries_account_created_idx, already in time order", async () => {
+    const statement = db
+      .select()
+      .from(moneyEntries)
+      .where(eq(moneyEntries.accountId, "user_available:mu7"))
+      .orderBy(asc(moneyEntries.createdAt));
+    const plan = await explainPlan(db, statement);
+    expect(sequentiallyScannedRelations(plan)).not.toContain("money_entries");
+    expect(indexScanNode(plan, "money_entries_account_created_idx")).toBeDefined();
+    // `(account_id, created_at)` IS the ORDER BY under an equality on the leading column, so the
+    // index hands back time order for free — the assertion that pins the second column's job.
+    expect(nodeTypes(plan)).not.toContain("Sort");
+  });
+
+  it("the 1099 tax-year read seeks on money_entries_tax_year_state_idx instead of scanning the whole book each January", async () => {
+    const taxYearTotal = db
+      .select({ totalCents: sql<string>`sum(${moneyEntries.amountCents})` })
+      .from(moneyEntries)
+      .where(and(eq(moneyEntries.taxYear, 2026), eq(moneyEntries.stateOfEntry, "NJ")));
+    const plan = await explainPlan(db, taxYearTotal);
+    expect(sequentiallyScannedRelations(plan)).not.toContain("money_entries");
+    expect(indexScanNode(plan, "money_entries_tax_year_state_idx")).toBeDefined();
+  });
+
+  it("a league's money history reads money_transactions_league_idx, never a sequential scan", async () => {
+    const leagueHistory = db.select().from(moneyTransactions).where(eq(moneyTransactions.leagueId, "mlg7"));
+    const plan = await explainPlan(db, leagueHistory);
+    expect(sequentiallyScannedRelations(plan)).not.toContain("money_transactions");
+    expect(indexScanNode(plan, "money_transactions_league_idx")).toBeDefined();
+  });
 });
 
 /**
@@ -991,6 +1083,70 @@ describe("audit_event_type stays in sync with AUDIT_EVENT_TYPES", () => {
       SELECT enumlabel FROM pg_enum WHERE enumtypid = 'audit_event_type'::regtype ORDER BY enumsortorder
     `);
     expect(rows.map((row) => row.enumlabel)).toEqual([...AUDIT_EVENT_TYPES]);
+  });
+});
+
+/**
+ * Phase 4, Task 2 (migration 0035): the money book's guards, read back out of the catalog rather
+ * than trusted from the SQL — the identical discipline `audit_events` gets above, and for the
+ * book of record the sharpest version of the reason: the triggers and CHECKs are hand-written or
+ * hand-named DDL that `drizzle-kit generate`'s diffing can silently drop on a table recreation,
+ * and a money history that quietly reopened to UPDATE and DELETE would still pass every
+ * service-layer test. `src/money-service/schema-invariants.test.ts` proves the guards FIRE; this
+ * proves they are PRESENT, which is the half a migration regression actually breaks.
+ */
+describe("the money tables carry their append-only triggers, checks, indexes and enums", () => {
+  it("carries the append-only trigger pair on money_entries AND money_transactions", async () => {
+    const entryTriggers = await db.execute<{ tgname: string }>(sql`
+      SELECT tgname FROM pg_trigger WHERE tgrelid = 'money_entries'::regclass AND NOT tgisinternal
+    `);
+    expect(entryTriggers.map((row) => row.tgname).sort()).toEqual(["money_entries_no_delete", "money_entries_no_update"]);
+    const txnTriggers = await db.execute<{ tgname: string }>(sql`
+      SELECT tgname FROM pg_trigger WHERE tgrelid = 'money_transactions'::regclass AND NOT tgisinternal
+    `);
+    expect(txnTriggers.map((row) => row.tgname).sort()).toEqual(["money_transactions_no_delete", "money_transactions_no_update"]);
+  });
+
+  it("carries ruling 5's balance floor and the positive-amount CHECK on disk", async () => {
+    const accountChecks = await db.execute<{ conname: string; condef: string }>(sql`
+      SELECT conname, pg_get_constraintdef(oid) AS condef
+      FROM pg_constraint WHERE conrelid = 'money_accounts'::regclass AND contype = 'c'
+    `);
+    const floor = accountChecks.find((row) => row.conname === "money_accounts_balance_floor_ck");
+    expect(floor?.condef).toContain("balance_cents >= 0");
+    // The three kinds that may legitimately swing negative — the pool an ACH return reverses out
+    // of, the clearing account mid-flight, and the receivable carrying the shortfall.
+    expect(floor?.condef).toContain("fbo_pool");
+    expect(floor?.condef).toContain("provider_clearing");
+    expect(floor?.condef).toContain("platform_receivable");
+    const entryChecks = await db.execute<{ conname: string; condef: string }>(sql`
+      SELECT conname, pg_get_constraintdef(oid) AS condef
+      FROM pg_constraint WHERE conrelid = 'money_entries'::regclass AND contype = 'c'
+    `);
+    expect(entryChecks.find((row) => row.conname === "money_entries_amount_positive_ck")?.condef).toContain("amount_cents > 0");
+  });
+
+  it("carries the three query indexes and the idempotency backstop", async () => {
+    const rows = await db.execute<{ indexname: string; indexdef: string }>(
+      sql`SELECT indexname, indexdef FROM pg_indexes WHERE tablename IN ('money_entries', 'money_transactions')`,
+    );
+    const byName = new Map(rows.map((row) => [row.indexname, row.indexdef]));
+    expect(byName.get("money_entries_account_created_idx")).toMatch(/\(account_id, created_at\)/);
+    expect(byName.get("money_entries_tax_year_state_idx")).toMatch(/\(tax_year, state_of_entry\)/);
+    expect(byName.get("money_transactions_league_idx")).toMatch(/\(league_id\)/);
+    expect(byName.get("money_transactions_idempotency_key_idx")).toMatch(/UNIQUE.*\(idempotency_key\)/);
+  });
+
+  it("keeps every money enum in step with its one vocabulary array, in the same order", async () => {
+    const labelsOf = async (typeName: string): Promise<readonly string[]> => {
+      const rows = await db.execute<{ enumlabel: string }>(sql`
+        SELECT enumlabel FROM pg_enum WHERE enumtypid = ${typeName}::regtype ORDER BY enumsortorder
+      `);
+      return rows.map((row) => row.enumlabel);
+    };
+    expect(await labelsOf("money_account_kind")).toEqual([...MONEY_ACCOUNT_KINDS]);
+    expect(await labelsOf("money_txn_kind")).toEqual([...MONEY_TXN_KINDS]);
+    expect(await labelsOf("money_direction")).toEqual([...MONEY_DIRECTIONS]);
   });
 });
 
