@@ -35,6 +35,11 @@ export function SessionNotice() {
 
   if (state === "quiet") return null;
 
+  // Not run through `safeReturnTo` (unlike every OTHER `SignInLink` caller, which handles
+  // untrusted input): `usePathname()` is the router's own state for the page THIS component is
+  // already mounted on, never a foreign string a visitor or a query param could shape — there is
+  // no origin to smuggle through it. Do not copy this exemption to a caller whose intent comes
+  // from anywhere else (a query string, a prop threaded from outside, stored state).
   const intent = pathname === "" ? null : pathname;
 
   if (state === "modal") {
