@@ -9,6 +9,14 @@ export interface SeatMeterProps {
    * once this is positive, and it says exactly what it knows, nothing more.
    */
   readonly heldSeats?: number;
+  /**
+   * Phase 3.7, Task 13: the desktop `LeagueRow` prints "{n} of {t} open" as its Seats column's
+   * visible value, so the sentence here goes `sr-only` — the one product seat sentence (F17)
+   * still speaks to assistive tech, held seats included, without a second visible phrasing
+   * stacked beside the caller's own count. Default false: everywhere else the sentence IS the
+   * visible value.
+   */
+  readonly srOnlySentence?: boolean;
   readonly className?: string;
 }
 
@@ -42,11 +50,11 @@ export function seatSentence(filled: number, total: number, heldSeats: number): 
  * a sentence that is already on screen, not a second control, so it stays `aria-hidden` and
  * encodes nothing a screen reader needs that the sentence does not already say.
  */
-export function SeatMeter({ filled, total, heldSeats = 0, className = "" }: SeatMeterProps) {
+export function SeatMeter({ filled, total, heldSeats = 0, srOnlySentence = false, className = "" }: SeatMeterProps) {
   const sentence = seatSentence(filled, total, heldSeats);
   return (
     <div className={`flex flex-wrap items-center gap-2 ${className}`}>
-      <span className="text-sm text-text-muted">{sentence}</span>
+      <span className={srOnlySentence ? "sr-only" : "text-sm text-text-muted"}>{sentence}</span>
       {/* `min-w-24 flex-1`: the bar takes the row's remaining width so its segments stay equal
           and legible, and drops to its own full-width line (the wrapper wraps) when the sentence
           leaves it less than a readable minimum. */}

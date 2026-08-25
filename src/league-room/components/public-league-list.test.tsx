@@ -141,8 +141,11 @@ describe("OpenLeagueShelf", () => {
       expect(item.className).toContain("border-t");
       expect(item.className).toContain("border-line");
     }
+    // The header is the rows rendering's first element; "Entry" also exists per row as each
+    // cell's own sr-only key, so the column names are asserted inside the header alone.
+    const header = rows().firstElementChild as HTMLElement;
     for (const label of ["League", "Format", "Drafts", "Entry", "Seats"]) {
-      expect(within(rows()).getByText(label)).toBeInTheDocument();
+      expect(within(header).getByText(label)).toBeInTheDocument();
     }
   });
 

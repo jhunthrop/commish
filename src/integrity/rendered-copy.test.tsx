@@ -766,10 +766,11 @@ describe("LeagueTermsPanel says nothing that breaks the house copy rules, includ
 });
 
 describe("OpenLeagueShelf says nothing that breaks the house copy rules, including each card's composed draft time", () => {
-  // Task 6: the merged shelf's OWN voice grew — the shelf head, the house explainer row
-  // (`HOUSE_SHELF_EXPLAINER` + `HOUSE_SHELF_PROMISE`), the legend line (`OPEN_LEAGUE_LEGEND`)
-  // and the composed `seatCountsAsOfSentence` all render here and are all swept here, left IN
-  // the scanned text rather than subtracted.
+  // Task 6: the merged shelf's OWN voice grew — the shelf head, the collapsed house sentence
+  // (`HOUSE_SHELF_SENTENCE`, Task 13), the legend line (`OPEN_LEAGUE_LEGEND`) and the composed
+  // `seatCountsAsOfSentence` all render here and are all swept here, left IN the scanned text
+  // rather than subtracted. Task 13's `LeagueRow` rendering (the lg+ form, column header
+  // included) is part of this same render, so its copy is swept here too.
   const AS_OF = "Saturday 12 September, 7:42 PM UTC";
   const HOUSE = { ...PUBLIC_LEAGUES[0]!, id: "house_sweep", name: "Open 12-team League 3", houseRung: "open_12" as const };
   it("is clean signed in, signed out, house-shelved, and empty", () => {

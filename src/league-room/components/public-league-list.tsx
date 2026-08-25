@@ -4,25 +4,24 @@ import { EmptyState, InfoTip } from "@/components/ui";
 import type { HelpLevel } from "@/identity/preferences";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { LeagueRow, LeagueRowsHeader } from "./league-row";
 import { OpenLeagueCard } from "./open-league-card";
 
 /**
- * The factory's user-visible contract (Phase 3.5 addendum, Task 14), said once in the shelf
- * head's explainer row rather than repeated on every card — allowed to be printed only because
- * Task 13's reconciler makes it true by construction (`ensureHouseCatalog`,
- * `@/league-service/house-factory.ts`).
+ * THE house sentence — Task 6's two-constant explainer row (`HOUSE_SHELF_EXPLAINER` +
+ * `HOUSE_SHELF_PROMISE`) collapsed to ONE muted sentence, FOUNDER-ORDERED (2026-08-24, the same
+ * live-page feedback that ordered the rows): the shelf head stacked three explainer lines and
+ * the eye had nowhere to land. The factory's user-visible contract (Phase 3.5 addendum,
+ * Task 14 — "a new league opens as soon as one fills, so there is always a seat") survives
+ * inside it verbatim as the sentence's second half, still allowed to be printed only because
+ * the reconciler makes it true by construction (`ensureHouseCatalog`,
+ * `@/league-service/house-factory.ts`). The dropped "everyone joins the same way and plays the
+ * same rules" clause lives one press away in the house-league glossary entry beside it. Still
+ * written WITHOUT pointing at a badge: a factory-named house league carries its rung in its
+ * TITLE by construction (`houseLeagueName`), so neither form renders a rung badge (E3).
  */
-export const HOUSE_SHELF_PROMISE = "A new league opens as soon as one fills, so there is always a seat.";
-
-/**
- * E3/F2 (Phase 3.7, Task 6): the house explainer, a plain FULL-ROW muted sentence under the one
- * merged shelf head — the old "Commish house leagues" floating caption (a second `h2` fighting
- * the band's own) is dead. Written WITHOUT pointing at a badge on purpose: a factory-named house
- * league carries its rung in its TITLE by construction (`houseLeagueName`), so the card renders
- * no rung badge at all (`OpenLeagueCard`'s own E3 ruling) and a sentence like "leagues marked
- * with a rung" would describe a marker that is not there.
- */
-export const HOUSE_SHELF_EXPLAINER = "Commish runs some of these leagues itself. Everyone joins the same way and plays the same rules.";
+export const HOUSE_SHELF_SENTENCE =
+  "Commish runs some of these leagues itself, and a new league opens as soon as one fills, so there is always a seat.";
 
 /**
  * D1's other half (Phase 3.7, Task 6): the one legend line above the grid, spelled with the real
@@ -98,17 +97,21 @@ export interface OpenLeagueShelfProps {
 }
 
 /**
- * THE open-league shelf (Phase 3.7, Task 6, from the founder-approved "Sunday Standard" mock):
- * one band, one head, one grid. The mock's `m-shelf-head` — title beside the quiet freshness
- * sub — with the house explainer as a full-row muted sentence beneath it (F2), the one legend
- * line above the grid (D1), and house cards and member cards flowing into ONE grid (E3: the
- * audit's "merge the two section headers into one"). House cards differentiate by TITLE — the
- * factory names them "Open 12-team League 3" — and member cards by their stake badge, so the
- * merged grid needs no section boundary to keep the two kinds apart.
+ * THE open-league shelf (Phase 3.7, Task 6; re-formed by Task 13): one band, one head, one
+ * merged house-then-member list — rendered TWICE for the lg boundary. On lg+ viewports it is a
+ * hairline-separated stack of horizontal `LeagueRow`s under one eyebrow column header
+ * (FOUNDER-ORDERED, 2026-08-24: "horizontal row elements instead of these cards - my eyes don't
+ * know where to focus"); below lg it stays the `OpenLeagueCard` grid, the form that fits 360px.
+ * The mock's `m-shelf-head` — title beside the quiet freshness sub — keeps the collapsed house
+ * sentence beneath it (`HOUSE_SHELF_SENTENCE`) and the one legend line (D1). House leagues
+ * differentiate by TITLE — the factory names them "Open 12-team League 3" — and member leagues
+ * by their stake badge, so the merged list needs no section boundary to keep the two kinds
+ * apart (E3).
  *
- * Exactly one card gets `emphasis="ink"` (D2, rule 5): `featuredLeagueId` above picks it across
- * the WHOLE merged grid, house and member alike, and every other card's action stays a quiet
- * pill.
+ * Exactly one league gets `emphasis="ink"` PER RENDERING (D2, rule 5): `featuredLeagueId` above
+ * picks it once across the WHOLE merged list, house and member alike, and both its row and its
+ * card carry the ink — only one of the two is ever on screen, so the view still shows exactly
+ * one ink action.
  *
  * The title register is the mock's 22/650: `text-2xl` is 22px on the dense (desktop) scale, and
  * `font-semibold` is the repo's weight stop for the mock's 600-650 band — the same mapping the
@@ -137,13 +140,15 @@ export function OpenLeagueShelf({
         <p className="text-sm text-text-muted">{seatCountsAsOfSentence(asOfTime)}</p>
       </div>
 
-      {/* F2: a full-row muted paragraph, never a flex-wrapped caption fragment beside a heading.
-          Rendered only while the factory actually has leagues on the shelf — an unreconciled
-          database never prints a promise about cards that are not there. The `InfoTip` keeps the
-          glossary definition one press away, exactly as the legend line below advertises. */}
+      {/* F2 kept, collapsed (Task 13): ONE full-row muted sentence, never a stack. Rendered only
+          while the factory actually has leagues on the shelf — an unreconciled database never
+          prints a promise about leagues that are not there. The `InfoTip` keeps the glossary
+          definition one press away exactly as the legend line advertises, and deliberately does
+          NOT take this surface's `helpLevel`: its guided caption was the stacked duplicate the
+          founder cut, so here the trigger stays click-only for everyone. */}
       {house.length > 0 ? (
         <p className="max-w-prose text-sm text-text-muted">
-          {HOUSE_SHELF_EXPLAINER} {HOUSE_SHELF_PROMISE} <InfoTip term="house-league" helpLevel={helpLevel} />
+          {HOUSE_SHELF_SENTENCE} <InfoTip term="house-league" />
         </p>
       ) : null}
 
@@ -153,19 +158,39 @@ export function OpenLeagueShelf({
       {merged.length > 0 ? (
         <>
           <p className="text-sm text-text-muted">{OPEN_LEAGUE_LEGEND}</p>
-          {/* `min-w-0`: see `HomeBoard`'s identical grid — a grid item's default
-              `min-width: auto` otherwise lets a long league name widen the item past its column
-              at 360px. E2: the wide tiers, so the full-width band actually uses its width. */}
-          <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {/* Task 13 (FOUNDER-ORDERED): on lg+ the shelf is a hairline-separated ROW stack —
+              horizontal rows, one league each, under one eyebrow column header — because a grid
+              of cards gave the eye nowhere to land. The `data-testid="member-league"` scoping
+              (`season.spec.ts`'s "click the first Join button") rides on BOTH renderings' member
+              `<li>`s: house leagues share each list, render the identical "Join {name}"
+              accessible-name shape, and a house league's tier can refuse the very manager the
+              spec is driving. This block renders FIRST so a `.first()` text read at a desktop
+              viewport lands on the visible form. */}
+          <div data-testid="league-rows" className="hidden lg:block">
+            <LeagueRowsHeader />
+            <ul className="flex flex-col">
+              {house.map((league) => (
+                <li key={league.id} className="border-t border-line">
+                  <LeagueRow league={league} signedIn={signedIn} emphasis={league.id === featuredId ? "ink" : "quiet"} />
+                </li>
+              ))}
+              {leagues.map((league) => (
+                <li key={league.id} className="border-t border-line" data-testid="member-league">
+                  <LeagueRow league={league} signedIn={signedIn} emphasis={league.id === featuredId ? "ink" : "quiet"} />
+                </li>
+              ))}
+            </ul>
+          </div>
+          {/* Below lg the ledger card IS the form — a six-column row cannot fit 360px. `min-w-0`:
+              see `HomeBoard`'s identical grid — a grid item's default `min-width: auto` otherwise
+              lets a long league name widen the item past its column at 360px. The old lg:3/xl:4
+              tiers (E2) moved out with the founder's rows ruling: this grid never renders at lg+. */}
+          <ul data-testid="league-cards" className="grid gap-3 sm:grid-cols-2 lg:hidden">
             {house.map((league) => (
               <li key={league.id} className="min-w-0">
                 <OpenLeagueCard league={league} signedIn={signedIn} helpLevel={helpLevel} emphasis={league.id === featuredId ? "ink" : "quiet"} />
               </li>
             ))}
-            {/* `data-testid="member-league"`, per member card: what an e2e spec scopes its own
-                "click the first Join button" to (`season.spec.ts`) — the house cards above share
-                this ONE grid and render the identical "Join {name}" accessible-name shape, and a
-                house league's tier can refuse the very manager the spec is driving. */}
             {leagues.map((league) => (
               <li key={league.id} className="min-w-0" data-testid="member-league">
                 <OpenLeagueCard league={league} signedIn={signedIn} helpLevel={helpLevel} emphasis={league.id === featuredId ? "ink" : "quiet"} />

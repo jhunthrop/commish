@@ -78,7 +78,11 @@ test("a signed-in manager can browse open leagues and join one", async ({ manage
   await managerB.getByRole("link", { name: "Newer players" }).click();
   await expect(managerB).toHaveURL(/experienceTier=beginner/);
   await expect(managerB.getByText("Sunday Regulars")).toHaveCount(0);
-  await expect(managerB.getByText("Rookie Snake Room")).toBeVisible();
+  // Task 13 (rows on lg+): the shelf renders every league TWICE in the DOM — a `LeagueRow` for
+  // lg+ and an `OpenLeagueCard` below lg, one hidden by the breakpoint — so a bare text read
+  // resolves to two nodes and trips strict mode. The role query sees only the visible form's
+  // heading (rows kept the league-name heading element), at either viewport.
+  await expect(managerB.getByRole("heading", { name: "Rookie Snake Room" })).toBeVisible();
 
   // Scoped to MEMBER cards, not the whole page (Phase 3.5 addendum, Task 15; re-anchored by
   // Phase 3.7, Task 6): house cards share the ONE merged shelf grid (`OpenLeagueShelf`), render

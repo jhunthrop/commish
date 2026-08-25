@@ -1,88 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { Badge, Card, InfoTip, LedgerRow, SeatMeter, buttonClassName } from "@/components/ui";
-import { UI_CONFIG } from "@/components/ui/config";
-import { Countdown, useCountdown } from "@/components/ui/countdown";
-import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
-import { SignInLink } from "@/components/app-shell/sign-in-link";
-import type { DraftFormat } from "@/domain/league";
-import type { TermKey } from "@/help/glossary";
+import { Card, InfoTip, LedgerRow, SeatMeter } from "@/components/ui";
 import type { HelpLevel } from "@/identity/preferences";
-import { describeStartTiming, rollNoticeSentence } from "@/matchmaking/roll";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
-import { JoinPublicLeagueButton } from "./join-public-league-button";
-
-const FORMAT_LABEL: Readonly<Record<string, string>> = { snake: "Snake", auction: "Auction" };
-const FORMAT_TERM: Readonly<Record<DraftFormat, TermKey>> = { snake: "snake-draft", auction: "auction-draft" };
-
-/** `scoringLabel` is a derived string (`describeScoring`), not a `TermKey` — every label but
- *  "Standard" gets an `InfoTip`. */
-const SCORING_LABEL_TERM: Readonly<Record<string, TermKey>> = {
-  PPR: "ppr",
-  "Half PPR": "half-ppr",
-  "PPR, TE premium": "te-premium",
-  Custom: "custom-scoring",
-};
+import {
+  DraftTimingNotes,
+  FormatLine,
+  LiveChip,
+  OpenLeagueCta,
+  ScheduledDraftValue,
+  stakeBadge,
+  useOpenLeagueLive,
+} from "./open-league-shared";
 
 /** "Weeks 15, 16 and 17" / "Weeks 15 and 16" / "Week 15" — the one place a raw week-number list
  *  becomes a sentence, so `PublicLeagueSummary.playoffWeeks` stays raw data on the wire (its own
- *  docblock) and every reader of it says "and" the same way. */
+ *  docblock) and every reader of it says "and" the same way. Card-only: the founder's six row
+ *  columns (Task 13) do not carry Playoffs, so the row never formats one. */
 function formatPlayoffWeeks(weeks: readonly number[]): string {
   if (weeks.length === 0) return "Not scheduled yet";
   if (weeks.length === 1) return `Week ${weeks[0]}`;
   const last = weeks[weeks.length - 1];
   const rest = weeks.slice(0, -1);
   return `Weeks ${rest.join(", ")} and ${last}`;
-}
-
-/**
- * Whether `league` names the LAST open seat — the exact remaining count, never accounting for a
- * live hold: a hold is a fact about who is CLAIMING the seat, not about how many are left to be
- * claimed, and the two never agree on the wire in a way this label needs to second-guess.
- */
-function isLastSeat(league: PublicLeagueSummary): boolean {
-  return league.teamCount - league.filledTeams === 1;
-}
-
-/**
- * The one CTA accessible name every card on the shelf uses (Phase 3.6, Task 5): "Take the last
- * seat in Median #13. Newer players only." or "Take a seat in Half-PPR #241." — a stranger who
- * lands on this control by voice or screen reader hears what they are about to do and who it is
- * for, in the one sentence rather than a bare "Join" that says neither. Fed into BOTH the signed-
- * out `SignInLink`'s `aria-label` and (via the visible half alone) a signed-in `Button`'s own
- * label — see `ctaVisibleText` below for the shorter half a sighted visitor actually reads.
- */
-function ctaAccessibleName(league: PublicLeagueSummary): string {
-  const who = league.experienceTier === "beginner" ? " Newer players only." : "";
-  return `Take ${isLastSeat(league) ? "the last seat" : "a seat"} in ${league.name}.${who}`;
-}
-
-function ctaVisibleText(league: PublicLeagueSummary): string {
-  return isLastSeat(league) ? "Take the last seat" : "Take a seat";
-}
-
-/** The format line's `·`, decoration for eyes only — the words on either side already read as a
- *  list without it. */
-function Dot() {
-  return <span aria-hidden="true">·</span>;
-}
-
-/**
- * The mock's live chip (rule 6): a pulsing dot beside one word, in the live family, rendered
- * only while something on this card is genuinely live — the label is DERIVED on every render
- * from facts already on the wire, never a stored flag. Static under reduced motion: the state
- * still shows, only the pulse stops.
- */
-function LiveChip({ label }: { readonly label: string }) {
-  const reducedMotion = usePrefersReducedMotion();
-  return (
-    <span className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-semibold text-negative">
-      <span aria-hidden="true" className={`size-1.5 rounded-pill bg-negative${reducedMotion ? "" : " animate-pulse-live"}`} />
-      {label}
-    </span>
-  );
 }
 
 export interface OpenLeagueCardProps {
@@ -105,49 +47,24 @@ export interface OpenLeagueCardProps {
 
 /**
  * THE open-league card — v3's ledger card (Phase 3.7, Task 5, from the founder-approved
- * "Sunday Standard" mock): sentence-case name at card size, one quiet dot-separated format line
- * (F1 — the stacked `basis-full` term list and its orphanable separators are gone), five
- * hairline-topped ledger rows (S7: Drafts, Entry, Seats, Roster, Playoffs — the mock's three
- * plus the audit's veteran shopping facts, with Who folded into the format line), the segment
- * seat bar, a live chip only when something is genuinely live, and one action. Every fact on it
- * comes from `PublicLeagueSummary` and nothing else — see that contract for what a stranger is
- * and is not told.
+ * "Sunday Standard" mock), since Task 13 the shelf's SUB-LG form only: on lg+ viewports the
+ * shelf renders `LeagueRow` instead (founder-ordered), and every derived fact the two share —
+ * clock, chip, badge authority, the CTA contract — moved to `open-league-shared.tsx`, the one
+ * source both consume. What stays card-only is the card's own shape: sentence-case name at card
+ * size, one quiet dot-separated format line (F1), five hairline-topped ledger rows (S7: Drafts,
+ * Entry, Seats, Roster, Playoffs), the segment seat bar with its visible sentence, the beginner
+ * escape hatch, and one action. Every fact on it comes from `PublicLeagueSummary` and nothing
+ * else — see that contract for what a stranger is and is not told.
  *
  * The when-full commitment is `describeStartTiming`'s own sentence (F9), quoted rather than
  * restated, in `text-text-muted` (E5: `warning` is reserved for a tightening clock, and this
- * sentence is reassurance). It REPLACES the Drafts row's value for a `when_full` league — never
- * both a date and the sentence, and never the placeholder kickoff `startTrigger`'s own docblock
- * warns every other reader away from rendering as though somebody chose it.
+ * sentence is reassurance) — `DraftTimingNotes` renders it in place of the Drafts value, never
+ * both a date and the sentence.
  */
 export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet" }: OpenLeagueCardProps) {
-  const authority: "house" | "member" = league.houseRung === null ? "member" : "house";
+  const { authority, remainingSeats, remainingMs, onDeck, liveChipLabel } = useOpenLeagueLive(league);
   const isBeginnerOnly = league.experienceTier === "beginner";
-
-  // The ledger clock (rule 6): tick only against a real, chosen instant — a `when_full`
-  // league's `draftAtIso` is the same placeholder its `draftAt` is, so it never reaches the
-  // hook at all (the identical gate every reader of `draftAt` holds).
-  const { remainingMs } = useCountdown(league.startTrigger === "scheduled" ? (league.draftAtIso ?? null) : null);
-  const onDeck = remainingMs !== null && remainingMs < UI_CONFIG.openLeagueCard.clockWithinMs;
-
-  // The live chip's two derived-only states, one source of truth each: "Filling" reads the seat
-  // meter's own low-seats threshold, "On deck" reads the clock's own window. On deck outranks
-  // Filling — one chip, and a draft about to start is the more imminent fact than seats running
-  // low on the way to it.
-  const remainingSeats = league.teamCount - league.filledTeams;
-  const filling = remainingSeats > 0 && remainingSeats < UI_CONFIG.seatMeter.lowSeatsThreshold;
-  const liveChipLabel = onDeck ? "On deck" : filling ? "Filling" : null;
-
-  // E3, review-ruled (fix round 1): the badge carries only what the title does not — decided by
-  // AUTHORITY, never by inspecting user text. A house league's title carries its rung BY
-  // CONSTRUCTION (`houseLeagueName`, `@/matchmaking/house-catalog`, is the one namer of house
-  // leagues and prefixes `HOUSE_RUNG_LABEL` verbatim), so a rung badge is always redundant and
-  // never renders. A member league's name is the member's own arbitrary text, so its stake badge
-  // ALWAYS renders — the earlier `name.includes(label)` spelling was rejected because a member
-  // league named "Free For All League" (or any future paid-tier label coinciding with a name
-  // fragment) would silently lose its stake badge to a substring coincidence.
-  const badge = league.houseRung === null ? <Badge tone="neutral">{stakeTierLabel(league.stakeTier)}</Badge> : null;
-
-  const ctaVariant = emphasis === "ink" ? ("primary" as const) : ("secondary" as const);
+  const badge = stakeBadge(league);
 
   return (
     <Card as="article" className="flex h-full flex-col gap-3">
@@ -167,65 +84,16 @@ export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet"
         )}
       </div>
 
-      {/* F1: ONE muted format line, dot-separated — a separator between items on one line
-          separates something again. Who folds in here (S7): the beginner tier is a fact about
-          the league's format, said once, quietly. */}
-      <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-sm text-text-muted">
-        <span>{league.teamCount} teams</span>
-        <Dot />
-        <span className="inline-flex items-center gap-1">
-          {FORMAT_LABEL[league.format] ?? league.format}
-          <InfoTip term={FORMAT_TERM[league.format]} helpLevel={helpLevel} />
-        </span>
-        <Dot />
-        <span className="inline-flex items-center gap-1">
-          {league.scoringLabel}
-          {SCORING_LABEL_TERM[league.scoringLabel] === undefined ? null : (
-            <InfoTip term={SCORING_LABEL_TERM[league.scoringLabel]!} helpLevel={helpLevel} />
-          )}
-        </span>
-        {/* Deciding a week is a fact about the league, not about anyone in it — the same
-            reasoning `PublicLeagueSummary.medianGame`'s own docblock carries. */}
-        {league.medianGame ? (
-          <>
-            <Dot />
-            <span className="inline-flex items-center gap-1">
-              Median
-              <InfoTip term="median-game" helpLevel={helpLevel} />
-            </span>
-          </>
-        ) : null}
-        {isBeginnerOnly ? (
-          <>
-            <Dot />
-            <span>newer players only</span>
-          </>
-        ) : null}
-      </p>
+      <FormatLine league={league} helpLevel={helpLevel} />
 
       {/* The five ledger rows (S7): dense, comparable, hairline-topped. */}
       <div className="flex flex-col">
         <div className="border-t border-line py-1.5 text-sm">
           <div className="flex items-baseline justify-between gap-2">
             <span className="shrink-0 text-text-muted">Drafts</span>
-            {league.startTrigger === "scheduled" ? (
-              onDeck && remainingMs !== null ? (
-                <Countdown remainingMs={remainingMs} size="sm" tone="hot" data-testid="draft-clock" />
-              ) : (
-                <span className="min-w-0 text-right font-medium tabular-nums text-text-primary">{league.draftAt}</span>
-              )
-            ) : null}
+            <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} className="text-right" />
           </div>
-          {league.startTrigger === "when_full" ? (
-            <p className="mt-1 text-text-muted">{describeStartTiming({ startTrigger: "when_full", authority })}</p>
-          ) : null}
-          {/* F12/F21: `kickoffRolls` is `PublicLeagueSummary`'s own field, read here rather than
-              silently showing a different date than the one a visitor is comparing against their
-              own calendar — only a SCHEDULED league can ever roll, so a `when_full` card never
-              renders this line. */}
-          {league.startTrigger === "scheduled" && league.kickoffRolls > 0 ? (
-            <p className="mt-1 text-xs text-text-muted">{rollNoticeSentence(league.kickoffRolls)}</p>
-          ) : null}
+          <DraftTimingNotes league={league} authority={authority} />
         </div>
         <LedgerRow label="Entry">
           {/* Real, not promotional: every league is free this season — `stakeTierLabel` is the
@@ -272,15 +140,7 @@ export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet"
       ) : null}
 
       <div className="mt-auto">
-        {signedIn ? (
-          <JoinPublicLeagueButton leagueId={league.id} leagueName={league.name} variant={ctaVariant} />
-        ) : (
-          // The HOLD interstitial for THIS league (Task 6, F6), not a generic `/app` — the
-          // parent's Task 6 seats a visitor who comes back still holding a live token.
-          <SignInLink intent={`/join/${league.id}/hold`} aria-label={ctaAccessibleName(league)} className={buttonClassName(ctaVariant, "md")}>
-            {ctaVisibleText(league)}
-          </SignInLink>
-        )}
+        <OpenLeagueCta league={league} signedIn={signedIn} emphasis={emphasis} />
       </div>
     </Card>
   );
