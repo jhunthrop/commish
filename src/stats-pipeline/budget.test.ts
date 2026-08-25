@@ -1,7 +1,7 @@
 import { describe, expect, it, beforeEach, afterAll } from "vitest";
 import Redis from "ioredis";
 import type { Clock } from "@/domain/timing";
-import { createRequestBudget } from "./budget";
+import { createRequestBudget, reserveBackfillOrThrow } from "./budget";
 import { STATS_INGESTION_CONFIG } from "./config";
 
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
@@ -194,5 +194,21 @@ describe("createRequestBudget", () => {
     // And it reports the whole ceiling, because nothing has been spent. A falling number here
     // would be reporting fiction.
     expect(await budget.remaining()).toBe(INGESTION_CEILING);
+  });
+});
+
+describe("reserveBackfillOrThrow", () => {
+  it("resolves silently when the ledger grants the reservation", async () => {
+    const granting = { reserveBackfill: async () => ({ granted: true as const }) };
+    await expect(reserveBackfillOrThrow(granting, 3, "the ADP feed")).resolves.toBeUndefined();
+  });
+
+  it("throws naming what was refused, the count, the denial and the operator remedy", async () => {
+    const denying = {
+      reserveBackfill: async () => ({ granted: false as const, denial: "ledger-unavailable" as const }),
+    };
+    await expect(reserveBackfillOrThrow(denying, 3, "the ADP feed")).rejects.toThrow(
+      /the ADP feed \(3 requests, denied: ledger-unavailable\).*STATS_MONTHLY_REQUEST_BUDGET/,
+    );
   });
 });

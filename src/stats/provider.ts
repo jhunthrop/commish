@@ -23,6 +23,14 @@ export interface GameSummary {
 }
 
 /**
+ * The request-cost table below, as importable numbers, for the two callers that reserve against
+ * the monthly ledger BEFORE calling (`seedPlayers`, `ingestAdp`). One source: a reservation made
+ * from a hand-written 2 goes quietly wrong the day the roster read gains or loses a call.
+ */
+export const LIST_PLAYERS_REQUEST_COST = 2;
+export const LIST_ADP_REQUEST_COST = 1;
+
+/**
  * One player's Average Draft Position: the market's consensus of where that player gets taken,
  * averaged over many real drafts — LOWER means drafted EARLIER, and fractional values ("1.6")
  * are the norm because it is an average, never a rank.

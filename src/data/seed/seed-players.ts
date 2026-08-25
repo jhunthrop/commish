@@ -3,16 +3,12 @@ import { players, playerStatLines } from "@/db/schema";
 import { excludedSetFor } from "@/db/upsert";
 import type { StatLine } from "@/domain/player";
 import { dedupedByPlayerId } from "@/stats-pipeline/persist";
-import type { StatsProvider } from "@/stats/provider";
-import type { RequestBudget } from "@/stats-pipeline/budget";
+import { LIST_PLAYERS_REQUEST_COST, type StatsProvider } from "@/stats/provider";
+import { reserveBackfillOrThrow, type RequestBudget } from "@/stats-pipeline/budget";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { assertLocalSeedTarget } from "./guard";
 
 const BATCH = 500;
-
-/** The documented cost of `listPlayers()`: the player list, plus the teams call that mints one
- *  synthetic player per team defense. See `StatsProvider`'s request-cost table. */
-const LIST_PLAYERS_REQUESTS = 2;
 
 /** No Redis connection needed: every existing caller of `seedPlayers` keeps working untouched. */
 const NOOP_REFERENCE_CACHE: Pick<ReferenceCache, "invalidatePlayers"> = {
@@ -27,17 +23,6 @@ const NOOP_REFERENCE_CACHE: Pick<ReferenceCache, "invalidatePlayers"> = {
 const UNMETERED_BUDGET: Pick<RequestBudget, "reserveBackfill"> = {
   reserveBackfill: async () => ({ granted: true }),
 };
-
-/** Fails the seed LOUDLY rather than silently backfilling half a season: a partially seeded
- *  `player_stat_lines` table looks exactly like a complete one to every reader. */
-async function reserveOrThrow(budget: Pick<RequestBudget, "reserveBackfill">, count: number, what: string): Promise<void> {
-  const reservation = await budget.reserveBackfill(count);
-  if (reservation.granted) return;
-  throw new Error(
-    `The monthly upstream request budget could not cover ${what} (${count} requests, denied: ${reservation.denial}). ` +
-      `Raise STATS_MONTHLY_REQUEST_BUDGET to the purchased quota, or wait for the calendar month to roll over.`,
-  );
-}
 
 function chunks<T>(arr: readonly T[], size: number): readonly (readonly T[])[] {
   const out: T[][] = [];
@@ -90,7 +75,7 @@ export async function seedPlayers(
   budget: Pick<RequestBudget, "reserveBackfill"> = UNMETERED_BUDGET,
 ): Promise<{ players: number; statLines: number }> {
   assertLocalSeedTarget();
-  await reserveOrThrow(budget, LIST_PLAYERS_REQUESTS, "the player list");
+  await reserveBackfillOrThrow(budget, LIST_PLAYERS_REQUEST_COST, "the player list");
   const allPlayers = await provider.listPlayers();
   for (const batch of chunks(allPlayers, BATCH)) {
     await db
@@ -109,13 +94,13 @@ export async function seedPlayers(
   // Ask the provider week by week — the interface is week-scoped so a live feed can be polled the same way.
   for (let week = 1; week <= provider.lastWeekOfSeason; week++) {
     try {
-      await reserveOrThrow(budget, 1, `week ${week}'s schedule`);
+      await reserveBackfillOrThrow(budget, 1, `week ${week}'s schedule`);
       const games = await provider.listGames(week);
       // A week inside the season with no games is a gap in the schedule, not the end of it — the
       // end is `lastWeekOfSeason`, which the provider names and the contract suite pins.
       if (games.length === 0) continue;
 
-      await reserveOrThrow(budget, games.length, `week ${week}'s ${games.length} box scores`);
+      await reserveBackfillOrThrow(budget, games.length, `week ${week}'s ${games.length} box scores`);
       const lines: StatLine[] = [];
       for (const game of games) lines.push(...(await provider.getGameStatLines(game)));
       if (lines.length === 0) continue;
