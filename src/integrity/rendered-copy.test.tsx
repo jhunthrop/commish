@@ -855,9 +855,24 @@ describe("the four trust stubs say nothing that breaks the house copy rules", ()
 
 describe("ProofStrip says nothing that breaks the house copy rules, full and empty", () => {
   it("is clean with every stat present and with none of them", () => {
+    // Both units of the next-draft chip's coarse wording get swept: hours (five ahead) and
+    // minutes (thirty ahead), against the same fixed `nowIso`.
     for (const element of [
-      <ProofStrip key="full" stats={{ leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, any: true }} />,
-      <ProofStrip key="empty" stats={{ leaguesFilled: null, draftsNext48h: null, rating: null, any: false }} />,
+      <ProofStrip
+        key="full"
+        stats={{ leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, nextDraftAt: "2026-09-10T17:00:00.000Z", any: true }}
+        nowIso="2026-09-10T12:00:00.000Z"
+      />,
+      <ProofStrip
+        key="soon"
+        stats={{ leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, nextDraftAt: "2026-09-10T12:30:00.000Z", any: true }}
+        nowIso="2026-09-10T12:00:00.000Z"
+      />,
+      <ProofStrip
+        key="empty"
+        stats={{ leaguesFilled: null, draftsNext48h: null, rating: null, nextDraftAt: null, any: false }}
+        nowIso="2026-09-10T12:00:00.000Z"
+      />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container);

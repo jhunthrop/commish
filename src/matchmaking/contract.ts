@@ -215,6 +215,13 @@ export interface ProofStats {
    *  a stat. `null` below `MATCHMAKING_CONFIG.proof.floors.reviewCount`, average and count
    *  together or not at all. */
   readonly rating: { readonly average: number; readonly count: number } | null;
-  /** `false` exactly when every field above is `null` — the strip's own render switch. */
+  /** The earliest public `'scheduled'` kickoff, as an ISO instant, over the same privacy join
+   *  as `draftsNext48h` — `null` when nothing is scheduled inside
+   *  `MATCHMAKING_CONFIG.proof.nextDraftWithinMs` (Phase 3.7, Task 7). Real or absent, never
+   *  dressed up. NOT part of `any` below: a lone scheduled draft is a calendar entry, not
+   *  earned proof, so its chip only ever rides a strip the three stats above already earned. */
+  readonly nextDraftAt: string | null;
+  /** `false` exactly when `leaguesFilled`, `draftsNext48h` and `rating` are all `null` — the
+   *  strip's own render switch. Deliberately blind to `nextDraftAt` (see its docblock). */
   readonly any: boolean;
 }

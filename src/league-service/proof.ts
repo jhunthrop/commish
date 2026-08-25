@@ -73,6 +73,35 @@ export function draftsNext48hQuery(db: Db, now: Date) {
 }
 
 /**
+ * "Next draft" (Phase 3.7, Task 7 — the phase's one sanctioned `proof.ts` addition):
+ * `min(kickoff_at)` over `'scheduled'` drafts joined on `ENFORCED_LEAGUE_SQL`
+ * (`@/league-service/enforcement`) — read-only, and the SAME privacy join `draftsNext48hQuery`
+ * above applies for the same reason: a private league's calendar is never disclosed in
+ * aggregate, and a MIN is an aggregate that would otherwise leak one private instant exactly.
+ *
+ * Bounded to `[now, now + MATCHMAKING_CONFIG.proof.nextDraftWithinMs]` in SQL, mirroring
+ * `draftsNext48hQuery`'s own window idiom: outside the window the scoreboard chip is omitted by
+ * construction (see the config field's docblock — real or absent, never dressed up), so there is
+ * no post-hoc filter for a caller to forget.
+ */
+export function nextDraftAtQuery(db: Db, now: Date) {
+  const horizon = new Date(now.getTime() + MATCHMAKING_CONFIG.proof.nextDraftWithinMs);
+  return db
+    .select({ min: sql<Date | string | null>`min(${drafts.kickoffAt})` })
+    .from(drafts)
+    .innerJoin(leagues, eq(leagues.id, drafts.leagueId))
+    .where(and(eq(drafts.status, "scheduled"), gte(drafts.kickoffAt, now), lte(drafts.kickoffAt, horizon), ENFORCED_LEAGUE_SQL));
+}
+
+/** `min()` comes back from the driver as a `Date` (pg parses the timestamp OID itself, drizzle
+ *  never sees a raw `sql` fragment's type) — normalized to the ISO string the contract states,
+ *  defensively accepting a string in case a driver upgrade changes the parse. */
+function toIsoOrNull(value: Date | string | null): string | null {
+  if (value === null) return null;
+  return new Date(value).toISOString();
+}
+
+/**
  * The front door's proof strip (Phase 3.6, Task 4), real only. Three independent reads —
  * `leaguesFilledQuery`, `draftsNext48hQuery` and `reviewAggregate` (`@/review-service/reviews`)
  * — run concurrently through `Promise.all` on the same pooled `db`, the identical idiom
@@ -97,9 +126,10 @@ export async function proofStats(db: Db, deps: ProofStatsDeps = {}): Promise<Pro
   const now = new Date(clock.now());
   const floors = MATCHMAKING_CONFIG.proof.floors;
 
-  const [[filledRow], [next48hRow], aggregate] = await Promise.all([
+  const [[filledRow], [next48hRow], [nextDraftRow], aggregate] = await Promise.all([
     leaguesFilledQuery(db),
     draftsNext48hQuery(db, now),
+    nextDraftAtQuery(db, now),
     reviewAggregate(db),
   ]);
 
@@ -109,6 +139,9 @@ export async function proofStats(db: Db, deps: ProofStatsDeps = {}): Promise<Pro
   const leaguesFilled = leaguesFilledCount >= floors.leaguesFilled ? leaguesFilledCount : null;
   const draftsNext48h = draftsNext48hCount >= floors.draftsNext48h ? draftsNext48hCount : null;
   const rating = aggregate.count >= floors.reviewCount ? { average: Math.round(aggregate.average * 10) / 10, count: aggregate.count } : null;
+  const nextDraftAt = toIsoOrNull(nextDraftRow?.min ?? null);
 
-  return { leaguesFilled, draftsNext48h, rating, any: leaguesFilled !== null || draftsNext48h !== null || rating !== null };
+  // `any` stays blind to `nextDraftAt` on purpose — the chip rides a strip the three floored
+  // stats earned, it never carries the strip itself (`ProofStats.nextDraftAt`'s own docblock).
+  return { leaguesFilled, draftsNext48h, rating, nextDraftAt, any: leaguesFilled !== null || draftsNext48h !== null || rating !== null };
 }

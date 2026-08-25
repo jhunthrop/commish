@@ -19,8 +19,8 @@ import { PUBLIC_LEAGUES } from "@/league-room/test-fixtures";
 import Home from "./page";
 
 const EMPTY_BROWSE: BrowseBody = { leagues: [], house: [] };
-const EMPTY_STATS: ProofStats = { leaguesFilled: null, draftsNext48h: null, rating: null, any: false };
-const FULL_STATS: ProofStats = { leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, any: true };
+const EMPTY_STATS: ProofStats = { leaguesFilled: null, draftsNext48h: null, rating: null, nextDraftAt: null, any: false };
+const FULL_STATS: ProofStats = { leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, nextDraftAt: null, any: true };
 
 async function renderHome() {
   const page = await Home();
@@ -122,6 +122,20 @@ describe("the front door (Task 5)", () => {
       expect.any(Object),
       { sort: "seats_remaining", whenFullOnly: false },
     );
+  });
+
+  // Task 7: the hero band is the page's one floodlit, yard-lined ground — the wrapper owns
+  // overflow-hidden (Task 2's carry) so the full-bleed overlays clip at the band's own edge.
+  it("grounds the hero band under the floodlight and yard lines, clipped at the band edge (Task 7)", async () => {
+    const { container } = await renderHome();
+    const band = container.querySelector(".floodlight");
+    expect(band).not.toBeNull();
+    expect(band?.className).toContain("overflow-hidden");
+    expect(band?.querySelector(".yard-lines")).not.toBeNull();
+    expect(band?.querySelector(".yard-lines")).toHaveAttribute("aria-hidden", "true");
+    // The band holds the hero, the steps and (when earned) the proof chips.
+    expect(within(band as HTMLElement).getByRole("heading", { level: 1 })).toBeInTheDocument();
+    expect(within(band as HTMLElement).getByText("Pick a seat")).toBeInTheDocument();
   });
 
   it("frames 'Start your own league' as a hairline-topped row, never a box (rule 4)", async () => {

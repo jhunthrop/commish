@@ -95,10 +95,19 @@ export default async function Home() {
         }
       />
       <main className="flex flex-col gap-10 bg-surface">
-        <section className="flex w-full flex-col gap-6 px-4 py-10 sm:px-10 sm:py-14">
-          <FrontDoorHero />
-          <SeatClaimSteps />
-          <ProofStrip stats={stats} />
+        {/* Task 7: the hero band is the page's one floodlit ground — `.floodlight` (the wash,
+            and the `position: relative` its overlays anchor to) and `.yard-lines` (a full-bleed
+            child) are Task 2's ground vocabulary, and this wrapper owns the `overflow-hidden`
+            that clips both at the band's own edge (Task 2's carry). The inner div is `relative`
+            so the content paints above the positioned overlays; each child carries its own
+            `Rise` stagger slot (headline 1, sub 2, steps 3, scoreboard 4 — the mock's d1..d4). */}
+        <section className="floodlight w-full overflow-hidden">
+          <div aria-hidden="true" className="yard-lines" />
+          <div className="relative flex flex-col gap-6 px-4 py-10 sm:px-10 sm:py-14">
+            <FrontDoorHero />
+            <SeatClaimSteps />
+            <ProofStrip stats={stats} nowIso={nowIso} />
+          </div>
         </section>
 
         <section className="flex w-full flex-col gap-4 border-t border-line px-4 pb-10 pt-8 sm:px-10">

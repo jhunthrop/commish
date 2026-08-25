@@ -76,7 +76,7 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // branch on session), so this reuses the one signed-in context the rest of the spec already
     // holds rather than opening a second one just for this page.
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Real leagues. Real seats. Pick one and you are drafting this week." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Real leagues. Real seats. Drafting this week." })).toBeVisible();
     await expectNoHorizontalScroll(page, "the front door");
 
     // --- Create the league whose NAME is the test input -------------------------------------

@@ -33,6 +33,9 @@ function isProofStats(value: unknown): value is ProofStats {
     (typeof record.leaguesFilled === "number" || record.leaguesFilled === null) &&
     (typeof record.draftsNext48h === "number" || record.draftsNext48h === null) &&
     isRating(record.rating) &&
+    // Task 7: a value cached before `nextDraftAt` joined the contract fails here and is
+    // treated as a miss — the cache self-heals across the shape change on its first read.
+    (typeof record.nextDraftAt === "string" || record.nextDraftAt === null) &&
     typeof record.any === "boolean"
   );
 }

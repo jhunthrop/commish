@@ -96,6 +96,14 @@ export const MATCHMAKING_CONFIG = {
       reviewCount: 20,
     },
     /**
+     * Phase 3.7, Task 7 (self-ruled: 24 hours): how far ahead the scoreboard's "next draft"
+     * chip is allowed to look (`nextDraftAtQuery`, `@/league-service/proof`). Inside the
+     * window, a coarse "hours until the next draft" is a fact a visitor can act on tonight;
+     * beyond it, "next draft on Thursday" is a schedule wearing a scoreboard chip, so the chip
+     * is omitted instead — the same real-or-absent ruling as the floors above.
+     */
+    nextDraftWithinMs: 24 * 60 * 60 * 1000,
+    /**
      * Phase 3.6, Task 5 (P4 review, binding CARRY): the front door is the product's
      * highest-traffic unauthenticated read, and `proofStats` runs three aggregate queries
      * (`leaguesFilledQuery`, `draftsNext48hQuery`, `reviewAggregate`) — cheap individually, but
