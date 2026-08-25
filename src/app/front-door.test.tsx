@@ -17,7 +17,9 @@ import { listPublicLeagues } from "@/league-service/browse";
 import { getProofCache } from "@/league-service/proof-cache-instance";
 import { listWireItems } from "@/league-service/wire";
 import { UI_CONFIG } from "@/components/ui/config";
+import { featuredLeagueId, featuredScheduledLeague } from "@/league-room/components/public-league-list";
 import { PUBLIC_LEAGUES } from "@/league-room/test-fixtures";
+import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import Home from "./page";
 
 const EMPTY_BROWSE: BrowseBody = { leagues: [], house: [] };
@@ -28,6 +30,30 @@ async function renderHome() {
   const page = await Home();
   return render(page);
 }
+
+/** How many ink pills (rule 5's `bg-text-primary` fill) the WHOLE rendered page holds — the nav's
+ *  "Take a seat" CTA is always one of them, so this is the count `next-draft-module` tests below
+ *  check against, the same convention `public-league-list.test.tsx`'s own `inkPillCount` uses. */
+function inkPillCount(container: HTMLElement): number {
+  return container.querySelectorAll('[class*="bg-text-primary"]').length;
+}
+
+/**
+ * Review HIGH (2951353's pair): `PUBLIC_LEAGUES` carries no `draftAtIso` at all, so every test
+ * above renders with `featuredScheduledLeague` always null — the hero's `NextDraftModule` never
+ * mounts in any of them, and `page.tsx`'s derive-once-thread-twice wiring (`featuredLeague` to
+ * both `NextDraftModule` and `OpenLeagueShelf`'s `featuredInHero`) had zero integration coverage
+ * outside the component's own unit isolation. `SCHEDULED_SOON` extends `PUBLIC_LEAGUES[0]` with
+ * one field (`draftAtIso`) at the call site — the same minimal-spread idiom
+ * `public-league-list.test.tsx`'s own scheduled fixtures already use — rather than forking a
+ * parallel fixture set.
+ */
+const SCHEDULED_SOON: PublicLeagueSummary = {
+  ...PUBLIC_LEAGUES[0]!,
+  id: "front_door_scheduled_soon",
+  name: "Front Door Scheduled Soon League",
+  draftAtIso: "2026-09-10T19:00:00.000Z",
+};
 
 beforeEach(() => {
   vi.mocked(getCurrentUser).mockReset().mockResolvedValue(null);
@@ -171,5 +197,44 @@ describe("the front door (Task 5)", () => {
     const row = heading.closest("div");
     expect(row?.className).toContain("border-t");
     expect(row?.className).not.toContain("rounded");
+  });
+});
+
+describe("the front door's Next Draft module — page-level wiring (2026-08-25 hero finding)", () => {
+  it("mounts the module naming the shelf's own featured league, and leaves the shelf all-quiet (rule 5)", async () => {
+    vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [SCHEDULED_SOON, PUBLIC_LEAGUES[1]!], house: [] });
+    const { container } = await renderHome();
+
+    // (1) the module renders and names the featured league.
+    const nextDraftModule = screen.getByTestId("next-draft-module");
+    expect(within(nextDraftModule).getByText(SCHEDULED_SOON.name)).toBeInTheDocument();
+
+    // (2) the page's total ink stays at exactly the nav's one CTA — the shelf goes all-quiet
+    // (`featuredInHero`) because the module IS this league's featured rendering (rule 5): two
+    // inked renderings of the same league would double the one-ink-per-view budget.
+    expect(inkPillCount(container)).toBe(1);
+
+    // (3) the module names the SAME league id the shelf's own featured-selection logic
+    // (`featuredLeagueId`) would independently pick for this identical merged list — proving
+    // `page.tsx` derives ONE feature and threads it to both children, rather than the module and
+    // the shelf each computing (and risking disagreeing on) their own.
+    const merged = [SCHEDULED_SOON, PUBLIC_LEAGUES[1]!];
+    expect(featuredScheduledLeague(merged)?.id).toBe(SCHEDULED_SOON.id);
+    expect(featuredLeagueId(merged)).toBe(SCHEDULED_SOON.id);
+    expect(within(nextDraftModule).getByText(SCHEDULED_SOON.name).textContent).toBe(featuredScheduledLeague(merged)!.name);
+  });
+
+  // (4) the paired case: nothing scheduled and ticking means no module at all, and the shelf's
+  // OWN featured pick keeps rule 5's one ink action — just owned by the shelf instead of the
+  // hero, exactly as every test above this describe block already renders (none of them carries
+  // a `draftAtIso`, so this is that same shape asserted explicitly rather than incidentally).
+  it("stays absent, and lets the shelf carry its own featured ink, when nothing is scheduled and ticking", async () => {
+    vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [...PUBLIC_LEAGUES], house: [] });
+    const { container } = await renderHome();
+    expect(screen.queryByTestId("next-draft-module")).not.toBeInTheDocument();
+    // 1 nav CTA + 1 ink row + 1 ink card — both responsive shelf renderings coexist in jsdom
+    // (Task 13's own pair, no stylesheet to hide either), each carrying the shelf's own single
+    // featured ink since `featuredInHero` is never passed `true` in this branch.
+    expect(inkPillCount(container)).toBe(3);
   });
 });

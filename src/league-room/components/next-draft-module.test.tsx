@@ -43,6 +43,15 @@ describe("NextDraftModule (2026-08-25 hero finding)", () => {
     expect(screen.queryByRole("heading", { name: LEAGUE.name })).not.toBeInTheDocument();
   });
 
+  // A stable, structural hook for a page-level integration test to find this module by (rather
+  // than by its league's name, which the shelf's own row/card renders too — same page, same
+  // text) — `src/app/front-door.test.tsx` scopes to this testid to prove `page.tsx` threads its
+  // one derived featured league to this module coherently.
+  it("carries a stable testid a page-level integration test can scope to", () => {
+    render(<NextDraftModule league={LEAGUE} signedIn={false} />);
+    expect(screen.getByTestId("next-draft-module")).toBeInTheDocument();
+  });
+
   it("ticks the SAME gated clock the card and row render, at a larger register (extracted, not forked)", () => {
     render(<NextDraftModule league={{ ...LEAGUE, draftAtIso: soonIso() }} signedIn={false} />);
     const clock = screen.getByTestId("draft-clock");
@@ -78,14 +87,14 @@ describe("NextDraftModule (2026-08-25 hero finding)", () => {
 
   it("stays hidden below xl and only appears at xl+ (the shelf is one scroll away below that)", () => {
     render(<NextDraftModule league={LEAGUE} signedIn={false} />);
-    const root = screen.getByText(LEAGUE.name).parentElement!;
+    const root = screen.getByTestId("next-draft-module");
     expect(root.className).toContain("hidden");
     expect(root.className).toContain("xl:flex");
   });
 
   it("sits on surfaceElevated with a hairline border, rounded — the scoreboard-chip register, not a heavy card", () => {
     render(<NextDraftModule league={LEAGUE} signedIn={false} />);
-    const root = screen.getByText(LEAGUE.name).parentElement!;
+    const root = screen.getByTestId("next-draft-module");
     expect(root.className).toContain("bg-surface-elevated");
     expect(root.className).toContain("border-line");
     expect(root.className).toContain("rounded-lg");

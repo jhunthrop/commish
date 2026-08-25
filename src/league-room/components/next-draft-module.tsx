@@ -49,7 +49,10 @@ export function NextDraftModule({ league, signedIn }: NextDraftModuleProps) {
   const { remainingSeats, remainingMs, onDeck } = useOpenLeagueLive(league);
 
   return (
-    <div className="hidden min-w-0 flex-col gap-4 rounded-lg border border-line bg-surface-elevated px-5 py-5 xl:flex">
+    <div
+      data-testid="next-draft-module"
+      className="hidden min-w-0 flex-col gap-4 rounded-lg border border-line bg-surface-elevated px-5 py-5 xl:flex"
+    >
       <p className="min-w-0 break-words font-display text-lg font-semibold leading-display text-text-primary">{league.name}</p>
       <ScheduledDraftValue league={league} onDeck={onDeck} remainingMs={remainingMs} size="lg" />
       <div className="flex flex-col gap-1 text-sm">
