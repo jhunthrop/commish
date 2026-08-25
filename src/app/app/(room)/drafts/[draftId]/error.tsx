@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Button, ErrorState } from "@/components/ui";
+import { Button, ButtonLink, ErrorState } from "@/components/ui";
 
 /**
  * The draft room's own error boundary (F14). The `(room)` route group declines
@@ -39,12 +38,11 @@ export default function DraftRoomError({
               <Button variant="primary" onClick={reset}>
                 Try the room again
               </Button>
-              <Link
-                href="/app"
-                className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-md font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-              >
+              {/* Task 10 pill sweep: same fix as `src/app/error.tsx` — a hand-rolled `Link`
+                  copying the quiet-pill classes, replaced with the real primitive. */}
+              <ButtonLink href="/app" variant="secondary">
                 Go to your leagues
-              </Link>
+              </ButtonLink>
             </div>
           }
         />

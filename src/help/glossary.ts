@@ -5,8 +5,11 @@ import { VERIFIED_BADGE_TOOLTIP } from "@/participation/verified";
  * The registry: every piece of jargon this product shows a manager, defined exactly once.
  *
  * Nothing else in the codebase may write an inline definition string — a component that wants
- * to explain a term imports it from HERE, through `InfoTip` (`@/components/ui/info-tip`), so
- * two surfaces can never quietly say two different things about what "on the clock" means.
+ * to explain a term imports it from HERE, either through `InfoTip`'s (`@/components/ui/info-tip`)
+ * click-to-reveal trigger, or, for a page that already reads start to finish rather than one a
+ * manager glances at mid-task, by rendering an entry directly (`/league-rules`'s `GlossarySection`,
+ * Task 10 / E10) — so two surfaces can never quietly say two different things about what "on the
+ * clock" means.
  *
  * `waiver` is deliberately absent: this product has no waiver-wire surface yet, and defining a
  * feature it doesn't have would teach a word nobody can act on.
@@ -96,7 +99,7 @@ export const GLOSSARY: Readonly<Record<TermKey, GlossaryTerm>> = {
     term: "custom scoring",
     short: "The commissioner changed at least one scoring rule from the standard presets.",
     detail:
-      "This league's point values don't match Standard, PPR, Half PPR, or PPR with a TE premium exactly, because its commissioner adjusted at least one of them. It is not a lower-quality league, just a hand-tuned one.",
+      "This league's point values do not match Standard, PPR, Half PPR, or PPR with a TE premium exactly, because its commissioner adjusted at least one of them. It is not a lower-quality league, just a hand-tuned one.",
   },
   flex: {
     key: "flex",

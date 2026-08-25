@@ -145,7 +145,13 @@ function ReviewRow({ review }: { readonly review: ReviewView }) {
           the feed's own full-bleed frame (Task 20 Step 2's measured paragraph column), the same
           width this page's own lede paragraph already carries (`src/app/reviews/page.tsx`). */}
       <p className="max-w-prose text-md text-text-primary">{review.body}</p>
-      <ReportControl reviewId={review.id} />
+      {/* E9 (Task 10): "Report" used to sit flush left, full width, its own line below the body —
+          reading as a fourth thing on the page rather than a control attached to the review
+          above it. `justify-end` keeps it inside THIS row (the hairline-bounded `<li>`), pinned
+          to the trailing edge, so it reads as this review's own report action, not the feed's. */}
+      <div className="flex justify-end">
+        <ReportControl reviewId={review.id} />
+      </div>
     </li>
   );
 }

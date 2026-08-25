@@ -21,9 +21,15 @@ import { GLOSSARY, type TermKey } from "./glossary";
  * The remaining seven were format vocabulary — `ppr`, `half-ppr`, `te-premium`, `custom-scoring`,
  * `flex`, `snake-draft` and `auction-draft` — with no page to land on until one existed. The
  * addendum's Task 21 Step 4 built that page (`src/app/league-rules/page.tsx`) and wired all
- * seven there, their first real callers, in the same commit this allowlist emptied: the second
- * test below fails a term left listed here once something actually renders it, so leaving these
- * seven in place after wiring them was never an option.
+ * seven there, in the same commit this allowlist emptied: the second test below fails a term
+ * left listed here once something actually renders it, so leaving these seven in place after
+ * wiring them was never an option.
+ *
+ * Task 10 (E10) moved those same seven off `InfoTip` and onto `TermLink` — a plain in-page
+ * anchor down to that page's own `GlossarySection`, since a reading page reads and does not need
+ * a second control to click open mid-sentence. The scan below never cared which component held
+ * the `term` prop, only that a real JSX caller carries it, so this stayed a rename in the prose
+ * below rather than a change to what the test enforces.
  *
  * The allowlist itself stays — empty is not the same as deleted — because the mechanism it
  * enforces (an unwired term is a decision someone made on purpose, not a silent gap) outlives
@@ -39,7 +45,13 @@ const SURFACE_DIRS = ["src/app", "src/components", "src/league-room", "src/draft
 
 const REPO_ROOT = process.cwd();
 
-function infoTipTermsUsed(): ReadonlySet<string> {
+/**
+ * Any JSX caller passing a real `TermKey` through a `term` prop counts as wired — `InfoTip`'s
+ * click-to-reveal trigger and `TermLink`'s (`@/app/league-rules/term-link`) plain in-page anchor
+ * both qualify, and neither is named here by design: a third way to wire a term some future page
+ * invents needs no change to this scan, only a `term="key"` prop of its own.
+ */
+function glossaryTermsWired(): ReadonlySet<string> {
   const used = new Set<string>();
   for (const file of sourceFilesIn(SURFACE_DIRS, ".tsx")) {
     const text = readFileSync(join(REPO_ROOT, file), "utf8");
@@ -48,11 +60,11 @@ function infoTipTermsUsed(): ReadonlySet<string> {
   return used;
 }
 
-describe("every glossary term is wired to an InfoTip or accounted for", () => {
-  it("keeps every glossary term either wired to an InfoTip or listed with a reason", () => {
-    const used = infoTipTermsUsed();
+describe("every glossary term is wired to a caller or accounted for", () => {
+  it("keeps every glossary term either wired to a real caller or listed with a reason", () => {
+    const used = glossaryTermsWired();
     for (const key of Object.keys(GLOSSARY) as TermKey[]) {
-      expect(used.has(key) || key in UNSURFACED, `Glossary term "${key}" has no InfoTip caller and no stated reason.`).toBe(true);
+      expect(used.has(key) || key in UNSURFACED, `Glossary term "${key}" has no wired caller and no stated reason.`).toBe(true);
     }
   });
 
@@ -60,9 +72,9 @@ describe("every glossary term is wired to an InfoTip or accounted for", () => {
     // The reverse direction, which is what stops the allowlist becoming a graveyard: a term that
     // gets wired up in a later task must be deleted from UNSURFACED in that same commit, and this
     // is the assertion that makes forgetting to do so a failing test rather than a stale comment.
-    const used = infoTipTermsUsed();
+    const used = glossaryTermsWired();
     for (const key of Object.keys(UNSURFACED) as TermKey[]) {
-      expect(used.has(key), `"${key}" is listed in UNSURFACED but an InfoTip already renders it — remove the entry.`).toBe(false);
+      expect(used.has(key), `"${key}" is listed in UNSURFACED but something already renders it — remove the entry.`).toBe(false);
     }
   });
 
