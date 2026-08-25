@@ -45,6 +45,15 @@ describe("SeatMeter", () => {
     });
   });
 
+  it("moves the sentence to screen readers only when the caller shows its own visible count (Task 13's LeagueRow)", () => {
+    // The desktop league row's Seats column prints "{n} of {t} open" as its visible value —
+    // `srOnlySentence` keeps the one product seat sentence (F17) for assistive tech without
+    // stacking a second visible phrasing beside it.
+    renderSurface(<SeatMeter filled={9} total={12} heldSeats={1} srOnlySentence />, ({ getByText }) => {
+      expect(getByText("9 of 12 seated. 1 seat is being claimed right now.")).toHaveClass("sr-only");
+    });
+  });
+
   it("renders one equal segment per total seat, the filled ones in money green", () => {
     renderSurface(<SeatMeter filled={2} total={5} />, ({ getByTestId }) => {
       const bar = getByTestId("seat-segments");

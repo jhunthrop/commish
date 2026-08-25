@@ -91,9 +91,11 @@ describe("the front door (Task 5)", () => {
     }));
     vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: many, house: [] });
     await renderHome();
-    expect(screen.getByRole("heading", { name: `Capped League ${cap}` })).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: `Capped League ${cap + 1}` })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: `Capped League ${cap + 2}` })).not.toBeInTheDocument();
+    // Two headings per league within the cap: the shelf renders rows for lg+ AND cards below lg
+    // (Task 13's responsive pair — jsdom applies no stylesheet, so both are queryable here).
+    expect(screen.getAllByRole("heading", { name: `Capped League ${cap}` })).toHaveLength(2);
+    expect(screen.queryAllByRole("heading", { name: `Capped League ${cap + 1}` })).toHaveLength(0);
+    expect(screen.queryAllByRole("heading", { name: `Capped League ${cap + 2}` })).toHaveLength(0);
     expect(screen.getByRole("link", { name: "See every open league" })).toHaveAttribute("href", "/browse");
   });
 
