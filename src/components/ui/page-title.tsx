@@ -31,5 +31,9 @@ const SIZE: Readonly<Record<PageTitleSize, string>> = {
  * the primitive rather than at one call site, so every page title is safe by construction.
  */
 export function PageTitle({ children, size = "md" }: PageTitleProps) {
-  return <h1 className={`min-w-0 [overflow-wrap:anywhere] font-display font-bold leading-display text-text-primary ${SIZE[size]}`}>{children}</h1>;
+  // `font-semibold`, not `font-bold` (Task 9, the last display-weight residue named by Task 3's
+  // and Task 7's reports): every other display heading in the product converged on the mock's
+  // 600 weight once its caps transform came off — this primitive is the one spot that still
+  // carried the old 700, since nothing here ever wore a caps class for the caps sweep to catch.
+  return <h1 className={`min-w-0 [overflow-wrap:anywhere] font-display font-semibold leading-display text-text-primary ${SIZE[size]}`}>{children}</h1>;
 }

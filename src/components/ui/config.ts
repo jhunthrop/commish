@@ -55,6 +55,29 @@ export const UI_CONFIG = {
     /** Oldest toasts beyond this are dropped so the stack can never cover the page. */
     maxVisible: 3,
   },
+  frontDoor: {
+    /**
+     * D3 (Phase 3.7, Task 6, self-ruled at 6): how many MEMBER leagues the front door's shelf
+     * shows before the one quiet "See every open league" pill hands off to `/browse` — the
+     * capped teaser that kills the audit's 5,800px front door (E2/D3). Member leagues only: the
+     * house shelf renders whole, since the factory's own `openAtOnce` already bounds it. Two
+     * full rows at the shelf's `lg` three-column tier; `/browse` remains the uncapped, filterable
+     * lobby.
+     */
+    shelfCap: 6,
+  },
+  openLeagueCard: {
+    /**
+     * Rule 6, "only true things move" (Phase 3.7, Task 5, self-ruled at 6 hours): a browse
+     * card's Drafts value becomes the ticking `Countdown` (tone `hot`) — and its live chip may
+     * read "On deck" — only while a SCHEDULED draft's kickoff is within this many ms. Inside a
+     * game-day window the minutes are what a shopper acts on; further out, the absolute
+     * `draftAt` sentence is the honest register and nothing on the card moves. Measured against
+     * `PublicLeagueSummary.draftAtIso` — a card whose summary does not carry the instant simply
+     * never enters the window.
+     */
+    clockWithinMs: 21_600_000,
+  },
   seatMeter: {
     /**
      * Below this many remaining seats (and above zero), `SeatMeter` appends its own "{n} seat(s)
@@ -86,6 +109,17 @@ export const UI_CONFIG = {
      * appears with no transition at all.
      */
     fillCelebrationMs: 1_500,
+  },
+  wire: {
+    /**
+     * Phase 3.7, Task 8 (self-ruled: 3): fewer real items than this and `Wire`
+     * (`@/league-room/components/wire`) renders `null` — a quiet product shows a clean
+     * hairline under the nav, never filler (the plan's own "no mock data on a real surface"
+     * rule, applied to a marquee that would otherwise loop two lonely sentences). The
+     * reduced-motion branch also shows exactly this many as its static row: the count that
+     * makes the wire worth showing is the count a non-scrolling row can honestly show.
+     */
+    minItems: 3,
   },
   infoTip: {
     /**
@@ -123,9 +157,11 @@ export const UI_CONFIG = {
 } as const;
 
 /**
- * The small-caps section-label treatment: a board header, a roster/queue heading, a sticky
- * column header. A class CONSTANT, not a component — the element varies (`span`/`h2`/`th`) and
- * the color is often conditional, so a caller composes this with its own color utility rather
- * than a component absorbing a `className` prop for the one thing it varies by.
+ * The section-label treatment: a board header, a roster/queue heading, a sticky column header.
+ * v3 "Sunday Standard" register — sentence case, mono, quiet (the caps charter removed the
+ * old all-caps display treatment; `no-uppercase.source.test.ts` keeps it removed). A class
+ * CONSTANT, not a component — the element varies (`span`/`h2`/`th`) and the color is often
+ * conditional, so a caller composes this with its own color utility rather than a component
+ * absorbing a `className` prop for the one thing it varies by.
  */
-export const EYEBROW = "font-display text-xs font-semibold uppercase tracking-wide";
+export const EYEBROW = "font-mono text-xs tracking-wide";

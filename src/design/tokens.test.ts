@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { TOKENS, COLOR_ROLES, type ColorRole, type PositionColorRole, type ThemeName } from "./tokens";
-import { contrastRatio, hueDegrees, hueDistance } from "./test-support";
+import { contrastRatio, hueDegrees, hueDistance, blendOver } from "./test-support";
 
 const THEMES: readonly ThemeName[] = ["light", "dark"];
 const AA_TEXT = 4.5;
@@ -93,6 +93,60 @@ describe("TOKENS.color", () => {
       it("accent and positive are the same green, deliberately — not a drift bug", () => {
         expect(c.accent).toBe(c.positive);
       });
+    });
+  }
+});
+
+// A `ColorRole` text sitting directly on a plain `SURFACES` entry is not the only ground it can
+// be painted on: this product tints a plain surface with a translucent 10%-opacity wash of a
+// semantic role in two places — `bg-negative/10` (the draft room's "hot" rail, `room-rail.tsx`'s
+// `MODE_SKIN.hot`, live while a team is on the clock) and `bg-accent/10` (`celebration.tsx`'s
+// "self" emphasis and `budget-table.tsx`'s own-row highlight). The pair matrix above cannot see
+// this: a role can clear 4.5:1 against `surface` itself and still miss the floor once 10% of a
+// saturated hue is mixed into that same ground — exactly what happened to `light.textMuted`,
+// `light.negative` and `light.warning` against `light.negative`'s own 10% tint. Axe-core caught
+// it on the draft room's real, built CSS (`e2e/design-v2.spec.ts`'s color-contrast scan); this
+// block makes the same class of gap a `tokens.test.ts` numbers failure from now on. `blendOver`
+// reproduces the flat sRGB composite a Tailwind `bg-<role>/10` utility paints and the one axe's
+// own color-contrast check measures against.
+const BAND_ALPHA = 0.1;
+
+interface ColorBand {
+  /** The semantic role whose hue tints the ground (`bg-<role>/10`). */
+  readonly tint: ColorRole;
+  /** The plain surface the tint is painted on top of. */
+  readonly ground: ColorRole;
+  /** Every role this product renders as text directly on this composite today. */
+  readonly textRoles: readonly ColorRole[];
+}
+
+const COLOR_BANDS: readonly ColorBand[] = [
+  // room-rail.tsx's MODE_SKIN.hot: the whole rail is `border-negative bg-negative/10` while a
+  // team is on the clock, and its own text sits directly on that composite — the format badge
+  // and InfoTip captions (`textMuted`), the turn label (`textMuted`), the "you're on the clock"
+  // eyebrow (`negative`, swapped in when `turn.mine`), and the "Connecting…" chip (`warning`;
+  // `Badge` carries no fill of its own, so it paints straight onto whatever is behind it).
+  { tint: "negative", ground: "surface", textRoles: ["textMuted", "negative", "warning"] },
+  // celebration.tsx's "self" emphasis (`border-accent bg-accent/10`) and budget-table.tsx's
+  // own-row highlight (`bg-accent/10`) both put `textMuted`/`textPrimary` prose directly on the
+  // tint, and both can land on either the page ground or a card.
+  { tint: "accent", ground: "surface", textRoles: ["textMuted", "textPrimary"] },
+  { tint: "accent", ground: "surfaceElevated", textRoles: ["textMuted", "textPrimary"] },
+];
+
+describe("TOKENS.color bands", () => {
+  for (const theme of THEMES) {
+    describe(theme, () => {
+      const c = TOKENS.color[theme];
+
+      for (const { tint, ground, textRoles } of COLOR_BANDS) {
+        const composite = blendOver(c[tint], BAND_ALPHA, c[ground]);
+        for (const role of textRoles) {
+          it(`${role} on ${tint}/10 over ${ground} ≥ ${AA_TEXT}:1`, () => {
+            expect(contrastRatio(c[role], composite)).toBeGreaterThanOrEqual(AA_TEXT);
+          });
+        }
+      }
     });
   }
 });

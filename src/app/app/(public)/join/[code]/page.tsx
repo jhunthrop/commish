@@ -51,7 +51,7 @@ function stateFor(preview: Awaited<ReturnType<typeof invitePreview>>): InviteLan
  * than aspirational: the record says a prospect sees what they are joining "before holding an
  * account", and a server-rendered preview is what makes that true on the very first byte, signed
  * out, with no client round trip in between. Signed out, the terms render and the action is a
- * plain "Sign in" — the same idiom `PublicLeagueList` uses on `/browse`. Signed in, still no
+ * plain "Sign in" — the same idiom `OpenLeagueShelf` uses on `/browse`. Signed in, still no
  * shell renders here — `PublicBar` (Task 16) is the SIGNED-OUT chrome, so it renders only when
  * `user === null`, the same conditional the header always used; `PublicFooter` renders
  * regardless of session, because this route never gets `AppShell`'s own chrome either way and a

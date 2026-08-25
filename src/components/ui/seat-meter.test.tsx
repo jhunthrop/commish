@@ -4,10 +4,9 @@ import { renderSurface } from "./test-utils";
 import { SeatMeter } from "./seat-meter";
 
 describe("SeatMeter", () => {
-  it("names the seats in words, and hides the dots from the accessibility tree", () => {
-    renderSurface(<SeatMeter filled={9} total={12} />, ({ getByText, getByTestId }) => {
+  it("names the seats in words beside the bar", () => {
+    renderSurface(<SeatMeter filled={9} total={12} />, ({ getByText }) => {
       expect(getByText("9 of 12 seated")).toBeInTheDocument();
-      expect(getByTestId("seat-dots")).toHaveAttribute("aria-hidden", "true");
     });
   });
 
@@ -46,9 +45,30 @@ describe("SeatMeter", () => {
     });
   });
 
-  it("renders one dot per total seat, with the filled ones distinguished", () => {
+  it("moves the sentence to screen readers only when the caller shows its own visible count (Task 13's LeagueRow)", () => {
+    // The desktop league row's Seats column prints "{n} of {t} open" as its visible value —
+    // `srOnlySentence` keeps the one product seat sentence (F17) for assistive tech without
+    // stacking a second visible phrasing beside it.
+    renderSurface(<SeatMeter filled={9} total={12} heldSeats={1} srOnlySentence />, ({ getByText }) => {
+      expect(getByText("9 of 12 seated. 1 seat is being claimed right now.")).toHaveClass("sr-only");
+    });
+  });
+
+  it("renders one equal segment per total seat, the filled ones in money green", () => {
     renderSurface(<SeatMeter filled={2} total={5} />, ({ getByTestId }) => {
-      expect(getByTestId("seat-dots").children).toHaveLength(5);
+      const bar = getByTestId("seat-segments");
+      expect(bar.children).toHaveLength(5);
+      const segments = Array.from(bar.children);
+      // Equal flex segments, never sized dots — the v3 mock's seat bar (Task 5, rule 1).
+      expect(segments.every((segment) => segment.className.includes("flex-1"))).toBe(true);
+      expect(segments.filter((segment) => segment.className.includes("bg-accent"))).toHaveLength(2);
+      expect(segments.filter((segment) => segment.className.includes("bg-surface-inset"))).toHaveLength(3);
+    });
+  });
+
+  it("hides the segment bar from the accessibility tree — the sentence beside it says everything", () => {
+    renderSurface(<SeatMeter filled={2} total={5} />, ({ getByTestId }) => {
+      expect(getByTestId("seat-segments")).toHaveAttribute("aria-hidden", "true");
     });
   });
 

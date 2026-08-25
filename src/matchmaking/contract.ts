@@ -87,6 +87,22 @@ export interface PublicLeagueSummary {
   /** Absolute-plus-relative, e.g. "Saturday 12 September, 7:00 PM UTC (in 3 days)" — see this
    *  interface's own docblock. */
   readonly draftAt: string;
+  /**
+   * Phase 3.7, Task 5: the SAME instant `draftAt` is formatted from, as a raw ISO string — the
+   * machine-readable spelling of a fact this interface already discloses in words, so it is not
+   * a new disclosure decision, only a new spelling of one already made (`draftAt`'s own). The
+   * card's ledger clock (rule 6) needs the instant itself: a ticking `Countdown` cannot be
+   * computed from a pre-formatted sentence, and re-parsing `formatDraftTime`'s prose would couple
+   * the clock to display copy.
+   *
+   * OPTIONAL in type (a fixture may omit it), but produced by `summarizeRow` and named in
+   * `PUBLIC_LEAGUE_FIELDS` since the controller sanctioned the one-line producer as the phase's
+   * third read-only league-service diff (beside Task 7's proof query and Task 8's wire read).
+   * The instant was already public as `draftAt`'s prose; this is the same fact in machine form.
+   * Carries `when_full` leagues' PLACEHOLDER kickoff exactly as `draftAt` does; every reader
+   * gates on `startTrigger === "scheduled"` first, same as `draftAt`.
+   */
+  readonly draftAtIso?: string;
   /** Whether this league plays a median game (Task 2) — see this interface's own docblock. */
   readonly medianGame: boolean;
   /** Which of the two ways this draft's kickoff comes to be set (Task 8) — see this interface's
@@ -199,6 +215,65 @@ export interface ProofStats {
    *  a stat. `null` below `MATCHMAKING_CONFIG.proof.floors.reviewCount`, average and count
    *  together or not at all. */
   readonly rating: { readonly average: number; readonly count: number } | null;
-  /** `false` exactly when every field above is `null` — the strip's own render switch. */
+  /** The earliest public `'scheduled'` kickoff, as an ISO instant, over the same privacy join
+   *  as `draftsNext48h` — `null` when nothing is scheduled inside
+   *  `MATCHMAKING_CONFIG.proof.nextDraftWithinMs` (Phase 3.7, Task 7). Real or absent, never
+   *  dressed up. NOT part of `any` below: a lone scheduled draft is a calendar entry, not
+   *  earned proof, so its chip only ever rides a strip the three stats above already earned. */
+  readonly nextDraftAt: string | null;
+  /** `false` exactly when `leaguesFilled`, `draftsNext48h` and `rating` are all `null` — the
+   *  strip's own render switch. Deliberately blind to `nextDraftAt` (see its docblock). */
   readonly any: boolean;
 }
+
+/**
+ * One item on the wire (Phase 3.7, Task 8) — the ticker of REAL product events under the public
+ * nav, produced by `listWireItems` (`@/league-service/wire`) and rendered by `Wire`
+ * (`@/league-room/components/wire`).
+ *
+ * ACTOR-FREE BY CONSTRUCTION (self-ruling S9): the approved mock's ticker says "Marcus claimed a
+ * seat"; this product does not put a member's display name — or id — on an anonymous marketing
+ * surface, so no variant here CAN carry one. A deliberate deviation from the mock's literal
+ * copy, never from its idea.
+ *
+ * Every field is a disclosure this interface's siblings already made: `leagueName` names a
+ * PUBLIC league (`ENFORCED_LEAGUE_SQL` is in every source read's own WHERE, the same join
+ * `draftsNext48h` documents), the seat and season counts are the same capacity facts
+ * `PublicLeagueSummary.filledTeams`/`teamCount` and `ProofStats.leaguesFilled` already carry,
+ * and the two millisecond deltas are COARSE by consumption — the component renders them only
+ * through the `formatCoarseDuration` family, never as instants, so no timestamp precision a
+ * stranger could correlate against ever reaches the page.
+ *
+ * Deltas rather than instants on purpose: the wire is request-time truth (deferral D4 — no
+ * anonymous SSE), computed against the page's ONE `now`, and a delta cannot quietly drift from
+ * a second clock read the way a re-parsed instant could.
+ */
+export type WireItem =
+  | {
+      readonly kind: "seat_claimed";
+      readonly leagueName: string;
+      /** How long before the page's own `now` the seat was claimed. */
+      readonly agoMs: number;
+      /** The league's open seats at read time (`teamCount - filledTeams`) — the fact the
+       *  component's live tint keys on, against the SAME `UI_CONFIG.seatMeter.lowSeatsThreshold`
+       *  every seat sentence already uses. Never rendered as its own sentence: `SeatMeter` owns
+       *  the product's one seat sentence (F17). */
+      readonly seatsOpen: number;
+    }
+  | {
+      readonly kind: "league_filled";
+      readonly leagueName: string;
+      /** `"in_progress"` reads "drafting now"; `"scheduled"` reads "drafting soon". */
+      readonly draftStatus: "scheduled" | "in_progress";
+    }
+  | {
+      readonly kind: "draft_tonight";
+      readonly leagueName: string;
+      /** How long after the page's own `now` the kickoff lands. */
+      readonly untilMs: number;
+    }
+  | {
+      readonly kind: "season_count";
+      /** `ProofStats.leaguesFilled`'s own number, gated by the same floor. */
+      readonly count: number;
+    };

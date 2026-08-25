@@ -22,15 +22,25 @@ test("a manager with zero leagues sees the fork, ordered and explained, and brow
   // (`ProfileForm`, `variant="first-run"`) first — "Set up your manager profile" now leads the
   // level-3 heading list, ahead of the three paths it used to open with; this is a deliberate
   // structure move, not a loosened assertion, so the array still asserts the exact order.
-  await expect(managerZero.getByText(/A league is a group of managers/)).toBeVisible();
+  //
+  // Text/label assertions here are scoped to `main` because this content streams: the App
+  // Router flushes the panel into a hidden buffer (`div#S:1[hidden]`, a direct child of
+  // `<body>`) an instant before the inline swap script moves it into the Suspense boundary,
+  // and `getByText`/`getByLabel` strict resolution counts hidden elements — an unscoped
+  // locator polling inside that window sees two copies and throws a strict-mode violation
+  // (diagnosed with a MutationObserver, Task 12; the ledger's earlier "Display name" flake
+  // was the same race). Role queries (`getByRole`) are immune — a hidden subtree is not in
+  // the accessibility tree — which is why the heading assertions stay unscoped.
+  const fork = managerZero.getByRole("main");
+  await expect(fork.getByText(/A league is a group of managers/)).toBeVisible();
   const headings = managerZero.getByRole("heading", { level: 3 });
   await expect(headings).toHaveText(["Set up your manager profile", "Find an open league", "Join with an invite", "Start a league"]);
-  await expect(managerZero.getByLabel("Display name")).toBeVisible();
+  await expect(fork.getByLabel("Display name")).toBeVisible();
 
   // Guidance is ordering, never removal — the other two paths' real controls are on the page
   // too, not hidden behind the one this test follows.
-  await expect(managerZero.getByLabel("Invite link or code")).toBeVisible();
-  await expect(managerZero.getByLabel("League name")).toBeVisible();
+  await expect(fork.getByLabel("Invite link or code")).toBeVisible();
+  await expect(fork.getByLabel("League name")).toBeVisible();
 
   // The old always-on wall (its own "Invited by a friend?" / "No group to play with yet?"
   // section headings) is gone for a zero-leagues manager — the fork already is those sections.

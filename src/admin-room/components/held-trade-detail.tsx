@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button, Card, Modal, PositionBadge, Sticker, Textarea } from "@/components/ui";
+import { Button, Card, EYEBROW, Modal, PositionBadge, Sticker, Textarea } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { ActivityRow } from "@/integrity/activity-view";
@@ -184,7 +184,7 @@ export function HeldTradeDetail({ flagId, subject, trail, decisions, noteMaxLeng
   return (
     <div className="flex flex-col gap-4">
       <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-text-muted">The trade</p>
+        <p className={`${EYEBROW} text-text-muted`}>The trade</p>
         <p className="mt-1 text-sm text-text-muted">{subject.valuationBasis}</p>
         <p className="mt-1 text-sm text-text-primary">{subject.fairnessGapSummary}</p>
 
@@ -200,7 +200,7 @@ export function HeldTradeDetail({ flagId, subject, trail, decisions, noteMaxLeng
       </Card>
 
       <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-text-muted">What happened</p>
+        <p className={`${EYEBROW} text-text-muted`}>What happened</p>
         {trail.length === 0 ? (
           <p className="mt-2 text-sm text-text-muted">No recorded history for this flag yet.</p>
         ) : (
@@ -222,7 +222,7 @@ export function HeldTradeDetail({ flagId, subject, trail, decisions, noteMaxLeng
 
       {decisions.length === 0 ? (
         <Card>
-          <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
+          <p className={`mb-3 ${EYEBROW} text-text-muted`}>Decision</p>
           {/* F4: no decision can land on this trade any more, so none is offered and the state
               explains itself. The flag stays OPEN on purpose — closing it is the sweep's job
               (`sweepSupersededHoldFlags`), not a button this page could invent. */}
@@ -232,7 +232,7 @@ export function HeldTradeDetail({ flagId, subject, trail, decisions, noteMaxLeng
         </Card>
       ) : (
       <Card>
-        <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
+        <p className={`mb-3 ${EYEBROW} text-text-muted`}>Decision</p>
         <Textarea
           label="Your note"
           value={note}

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { HomeLeagueCard } from "../contract";
-import { EYEBROW } from "@/components/ui";
+import { EYEBROW, buttonClassName } from "@/components/ui";
 import { actionHref } from "../lib/action-href";
 import { LEAGUE_ROOM_CONFIG } from "../config";
 import { sortLeagues } from "./league-board";
@@ -68,6 +68,13 @@ export interface AttentionQueueProps {
  * to be the veteran's under-a-second glance, not a second board. `items` arrives already in
  * urgency order, so slicing to `LEAGUE_ROOM_CONFIG.attentionQueueCap` keeps exactly the most
  * urgent chips; the plain sentence below names the real remainder rather than a vague "more."
+ *
+ * S10 (Task 9, founder-delegated design ruling): the locker room's ONE ink action is this queue's
+ * TOP item — the surface's genuinely most urgent act, already sorted to the front by
+ * `attentionQueueItemsFrom`'s own urgency order. Every other chip, in this queue or the board
+ * below, stays quiet (rule 5). Both pills route through `buttonClassName` (never a hand-rolled
+ * class string) so the ink fill can never drift from the one spelling the accent-budget sweep
+ * allows (`button.tsx`'s own docblock).
  */
 export function AttentionQueue({ items }: AttentionQueueProps) {
   if (items.length === 0) return null;
@@ -76,12 +83,12 @@ export function AttentionQueue({ items }: AttentionQueueProps) {
   return (
     <div className="flex flex-col gap-2">
       <ul aria-label="Needs you" className="flex flex-wrap gap-2">
-        {shown.map((item) => (
+        {shown.map((item, index) => (
           <li key={item.leagueId}>
             <Link
               href={item.href}
               aria-label={`${item.label} for ${item.leagueName}`}
-              className="inline-flex items-center gap-1.5 rounded-pill border border-line bg-surface-elevated px-3 py-1.5 text-sm font-medium text-text-primary transition-colors hover:border-accent hover:text-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              className={buttonClassName(index === 0 ? "primary" : "secondary", "sm")}
             >
               <span aria-hidden="true" className={EYEBROW}>
                 {item.leagueName}

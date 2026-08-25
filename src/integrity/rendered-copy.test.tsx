@@ -28,8 +28,10 @@ import { LiveStatePill } from "@/league-room/components/live-state-pill";
 import { ModerationSummary } from "@/league-room/components/moderation-summary";
 import { OpenLeagueCard } from "@/league-room/components/open-league-card";
 import { OpenSeatsPanel } from "@/league-room/components/open-seats-panel";
+import { Wire } from "@/league-room/components/wire";
+import type { WireItem } from "@/matchmaking/contract";
 import { ProofStrip } from "@/league-room/components/proof-strip";
-import { PublicLeagueList } from "@/league-room/components/public-league-list";
+import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
 import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
 import { SeatHoldPanel } from "@/league-room/components/seat-hold-panel";
 import { SeatTakenPanel } from "@/league-room/components/seat-taken-panel";
@@ -788,7 +790,7 @@ describe("TradeComposer says nothing that breaks the house copy rules, with and 
 });
 
 /**
- * Task 6, fix round 1 (review LOW). `LeagueTermsPanel`, `PublicLeagueList`, `DraftSchedulePanel`
+ * Task 6, fix round 1 (review LOW). `LeagueTermsPanel`, `OpenLeagueShelf`, `DraftSchedulePanel`
  * and `LeagueHome` all render `formatDraftTime`'s (`@/league/terms`) COMPOSED output — a string
  * assembled at runtime from a weekday, a day, a month, a time and a relative clause, never a
  * literal in the source. `room-copy.source.test.ts`'s own docblock states its blind spot exactly:
@@ -806,15 +808,22 @@ describe("LeagueTermsPanel says nothing that breaks the house copy rules, includ
   });
 });
 
-describe("PublicLeagueList says nothing that breaks the house copy rules, including each card's composed draft time", () => {
-  it("is clean signed in, signed out, and empty", () => {
+describe("OpenLeagueShelf says nothing that breaks the house copy rules, including each card's composed draft time", () => {
+  // Task 6: the merged shelf's OWN voice grew — the shelf head, the collapsed house sentence
+  // (`HOUSE_SHELF_SENTENCE`, Task 13), the legend line (`OPEN_LEAGUE_LEGEND`) and the composed
+  // `seatCountsAsOfSentence` all render here and are all swept here, left IN the scanned text
+  // rather than subtracted. Task 13's `LeagueRow` rendering (the lg+ form, column header
+  // included) is part of this same render, so its copy is swept here too.
+  const AS_OF = "Saturday 12 September, 7:42 PM UTC";
+  const HOUSE = { ...PUBLIC_LEAGUES[0]!, id: "house_sweep", name: "Open 12-team League 3", houseRung: "open_12" as const };
+  it("is clean signed in, signed out, house-shelved, and empty", () => {
     for (const element of [
-      <PublicLeagueList key="signed-in" leagues={PUBLIC_LEAGUES} signedIn={true} />,
-      <PublicLeagueList key="signed-out" leagues={PUBLIC_LEAGUES} signedIn={false} />,
-      <PublicLeagueList key="empty" leagues={[]} signedIn={true} />,
+      <OpenLeagueShelf key="signed-in" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={true} helpLevel="guided" asOfTime={AS_OF} />,
+      <OpenLeagueShelf key="signed-out" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={false} helpLevel="standard" asOfTime={AS_OF} />,
+      <OpenLeagueShelf key="empty" house={[]} leagues={[]} signedIn={true} helpLevel="standard" asOfTime={AS_OF} />,
     ]) {
       const { container, unmount } = render(element);
-      expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));
+      expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name), HOUSE.name);
       unmount();
     }
   });
@@ -828,15 +837,26 @@ describe("PublicLeagueList says nothing that breaks the house copy rules, includ
  * them.
  */
 describe("OpenLeagueCard says nothing that breaks the house copy rules, in every branch", () => {
-  it("is clean scheduled, when-full, house-run, last-seat, and beginner-only", () => {
+  it("is clean scheduled, when-full, house-run, last-seat, beginner-only, guided, and live-chipped", () => {
     const base = PUBLIC_LEAGUES[0]!;
+    // Phase 3.7, Task 5: `draftAtIso` inside the clock window puts the ticking Countdown and the
+    // "On deck" chip on screen; a nearly-full card puts "Filling" on screen — both live states'
+    // rendered copy is swept here, not trusted.
+    const soonIso = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     for (const element of [
-      <OpenLeagueCard key="scheduled" league={base} signedIn={false} />,
-      <OpenLeagueCard key="signed-in" league={base} signedIn={true} />,
-      <OpenLeagueCard key="when-full" league={{ ...base, id: "wf", startTrigger: "when_full" }} signedIn={false} />,
-      <OpenLeagueCard key="house" league={{ ...base, id: "house1", houseRung: "open_12" }} signedIn={false} />,
-      <OpenLeagueCard key="last-seat" league={{ ...base, id: "last", filledTeams: base.teamCount - 1 }} signedIn={false} />,
-      <OpenLeagueCard key="beginner" league={{ ...base, id: "beg", experienceTier: "beginner" }} signedIn={false} />,
+      <OpenLeagueCard key="scheduled" league={base} signedIn={false} helpLevel="standard" />,
+      <OpenLeagueCard key="signed-in" league={base} signedIn={true} helpLevel="standard" />,
+      <OpenLeagueCard key="guided" league={base} signedIn={false} helpLevel="guided" />,
+      <OpenLeagueCard key="when-full" league={{ ...base, id: "wf", startTrigger: "when_full" }} signedIn={false} helpLevel="standard" />,
+      <OpenLeagueCard key="house" league={{ ...base, id: "house1", houseRung: "open_12" }} signedIn={false} helpLevel="standard" />,
+      <OpenLeagueCard
+        key="last-seat"
+        league={{ ...base, id: "last", filledTeams: base.teamCount - 1 }}
+        signedIn={false}
+        helpLevel="standard"
+      />,
+      <OpenLeagueCard key="on-deck" league={{ ...base, id: "deck", draftAtIso: soonIso }} signedIn={false} helpLevel="standard" />,
+      <OpenLeagueCard key="beginner" league={{ ...base, id: "beg", experienceTier: "beginner" }} signedIn={false} helpLevel="standard" />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container, base.name);
@@ -881,14 +901,52 @@ describe("the four trust stubs say nothing that breaks the house copy rules", ()
 
 describe("ProofStrip says nothing that breaks the house copy rules, full and empty", () => {
   it("is clean with every stat present and with none of them", () => {
+    // Both units of the next-draft chip's coarse wording get swept: hours (five ahead) and
+    // minutes (thirty ahead), against the same fixed `nowIso`.
     for (const element of [
-      <ProofStrip key="full" stats={{ leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, any: true }} />,
-      <ProofStrip key="empty" stats={{ leaguesFilled: null, draftsNext48h: null, rating: null, any: false }} />,
+      <ProofStrip
+        key="full"
+        stats={{ leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, nextDraftAt: "2026-09-10T17:00:00.000Z", any: true }}
+        nowIso="2026-09-10T12:00:00.000Z"
+      />,
+      <ProofStrip
+        key="soon"
+        stats={{ leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, nextDraftAt: "2026-09-10T12:30:00.000Z", any: true }}
+        nowIso="2026-09-10T12:00:00.000Z"
+      />,
+      <ProofStrip
+        key="empty"
+        stats={{ leaguesFilled: null, draftsNext48h: null, rating: null, nextDraftAt: null, any: false }}
+        nowIso="2026-09-10T12:00:00.000Z"
+      />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container);
       unmount();
     }
+  });
+});
+
+/**
+ * Phase 3.7, Task 8: the wire's composed ticker sentences — every kind, both `league_filled`
+ * branches, the urgent live-tinted claim, and both coarse-time units — are runtime-composed
+ * (`formatCoarseDuration` deltas stitched into each sentence), exactly the composition the
+ * source sweeps are blind to, so the rendered sweep is the one that reads them. League names
+ * are the content subtracted; every remaining word is the wire's own voice.
+ */
+describe("Wire says nothing that breaks the house copy rules, across every kind and tone", () => {
+  const WIRE_ITEMS: readonly WireItem[] = [
+    { kind: "seat_claimed", leagueName: "Sunday Money", agoMs: 5 * 60_000, seatsOpen: 6 },
+    { kind: "seat_claimed", leagueName: "Almost Full", agoMs: 30_000, seatsOpen: 1 },
+    { kind: "league_filled", leagueName: "Iron Bowl", draftStatus: "in_progress" },
+    { kind: "league_filled", leagueName: "Quiet Room", draftStatus: "scheduled" },
+    { kind: "draft_tonight", leagueName: "Night Draft", untilMs: 3 * 60 * 60_000 },
+    { kind: "season_count", count: 76 },
+  ];
+
+  it("is clean with the full ticker rendered", () => {
+    const { container } = render(<Wire items={WIRE_ITEMS} />);
+    expectClean(container, "Sunday Money", "Almost Full", "Iron Bowl", "Quiet Room", "Night Draft");
   });
 });
 
@@ -1437,9 +1495,9 @@ describe("AttentionQueue says nothing that breaks the house copy rules", () => {
 describe("OpenSeatsPanel says nothing that breaks the house copy rules", () => {
   it("is clean populated, empty, and quiet", () => {
     for (const element of [
-      <OpenSeatsPanel key="populated" leagues={PUBLIC_LEAGUES} />,
-      <OpenSeatsPanel key="quiet" leagues={PUBLIC_LEAGUES} quiet />,
-      <OpenSeatsPanel key="empty" leagues={[]} />,
+      <OpenSeatsPanel key="populated" leagues={PUBLIC_LEAGUES} helpLevel="standard" />,
+      <OpenSeatsPanel key="quiet" leagues={PUBLIC_LEAGUES} quiet helpLevel="guided" />,
+      <OpenSeatsPanel key="empty" leagues={[]} helpLevel="standard" />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));

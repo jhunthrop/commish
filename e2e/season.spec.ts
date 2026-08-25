@@ -20,7 +20,11 @@ test("a manager sets a lineup, and sees the week's real state and the standings 
   // regression that made BOTH "Save lineup" and the locked message disappear would silently
   // skip the `if` below and still pass.
   const save = managerA.getByRole("button", { name: /Save lineup/i });
-  const locked = managerA.getByText(/lineup can.t change/i);
+  // COPY MOVE, followed deliberately: the design-v2 gauntlet wave (8f7b8f9) retoned the lock
+  // sentence from "can't change" to "cannot change" (matching the server's own copy in
+  // `lineups.ts`), and the old `/can.t/` pattern cannot match "cannot". Same lock, same
+  // disjunction below — tighter pattern.
+  const locked = managerA.getByText(/lineup cannot change/i);
   await expect(save.or(locked).first()).toBeVisible();
   if ((await save.count()) > 0) {
     await save.first().click();
@@ -78,15 +82,21 @@ test("a signed-in manager can browse open leagues and join one", async ({ manage
   await managerB.getByRole("link", { name: "Newer players" }).click();
   await expect(managerB).toHaveURL(/experienceTier=beginner/);
   await expect(managerB.getByText("Sunday Regulars")).toHaveCount(0);
-  await expect(managerB.getByText("Rookie Snake Room")).toBeVisible();
+  // Task 13 (rows on lg+): the shelf renders every league TWICE in the DOM — a `LeagueRow` for
+  // lg+ and an `OpenLeagueCard` below lg, one hidden by the breakpoint — so a bare text read
+  // resolves to two nodes and trips strict mode. The role query sees only the visible form's
+  // heading (rows kept the league-name heading element), at either viewport.
+  await expect(managerB.getByRole("heading", { name: "Rookie Snake Room" })).toBeVisible();
 
-  // Scoped to the member list, not the whole page (Phase 3.5 addendum, Task 15): the house
-  // shelf (`HouseLeagueShelf`) renders its OWN "Join {name}" buttons above this list and is
-  // never narrowed by the format filter above (`data-testid="public-league-list"`,
-  // `PublicLeagueList`'s own docblock) — a bare `.first()` over the page can land on a house
-  // card instead, and a house league declared `beginner`-tier would refuse a veteran manager B
-  // has become across this suite's own other specs.
-  await managerB.getByTestId("public-league-list").getByRole("button", { name: /^Join / }).first().click();
+  // Scoped to MEMBER cards, not the whole page (Phase 3.5 addendum, Task 15; re-anchored by
+  // Phase 3.7, Task 6): house cards share the ONE merged shelf grid (`OpenLeagueShelf`), render
+  // the identical "Join {name}" accessible-name shape, and are never narrowed by the filter
+  // above — a bare `.first()` over the page can land on a house card instead, and a house league
+  // declared `beginner`-tier would refuse a veteran manager B has become across this suite's own
+  // other specs. Each member card's `<li>` carries `data-testid="member-league"` for exactly
+  // this scoping (the old wrapper-level `public-league-list` testid died with the two-section
+  // shelf).
+  await managerB.getByTestId("member-league").getByRole("button", { name: /^Join / }).first().click();
   await expect(managerB).toHaveURL(/\/app\/leagues\//);
   await expect(managerB.getByRole("heading", { level: 1 })).toBeVisible();
 });

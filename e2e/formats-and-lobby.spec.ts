@@ -337,8 +337,17 @@ test.describe("formats and lobby", () => {
     // --- IMMEDIATE DELTA: the filled league drops off the shelf — a real-time read, no ticker
     //     wait needed, because `houseShelfQuery` (`@/league-service/browse`) only ever lists a
     //     league `hasOpenSeat` still accepts. -------------------------------------------------
+    // e2e checkpoint (Phase 3.7 fix round): `reload()` resolves on the document's load event,
+    // which fires while the root `loading.tsx` skeleton (`AppShellSkeleton shape="public"`) is
+    // still on screen — the dynamic page streams in after it — and `allInnerTexts` reads WITHOUT
+    // waiting. The checkpoint trace showed every post-reload read returning [] (this step passing
+    // trivially on an empty list, the delayed delta below never passing) while the BEFORE read,
+    // anchored by its own `toBeVisible`, saw all three open house headings. Each post-reload read
+    // now anchors on the page's own hydrated `h1` first, so the name-diff compares the same fully
+    // rendered shelf the BEFORE snapshot read. The assertions themselves are unchanged.
     await expect(async () => {
       await managerA.reload();
+      await expect(managerA.getByRole("heading", { name: "Open leagues" })).toBeVisible();
       const afterNames = await managerA.getByRole("heading", { name: openRungHeading }).allInnerTexts();
       expect(afterNames).not.toContain(target.name);
     }).toPass({ timeout: 15_000 });
@@ -348,6 +357,8 @@ test.describe("formats and lobby", () => {
     //     interval, never a synthesized "tick now" call. -----------------------------------------
     await expect(async () => {
       await managerA.reload();
+      // The same hydration anchor as the immediate delta above — see that step's comment.
+      await expect(managerA.getByRole("heading", { name: "Open leagues" })).toBeVisible();
       const afterNames = await managerA.getByRole("heading", { name: openRungHeading }).allInnerTexts();
       const replacement = afterNames.filter((name) => !beforeNames.includes(name));
       expect(replacement.length).toBeGreaterThan(0);

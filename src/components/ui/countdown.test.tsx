@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, renderHook, screen, act } from "@testing-library/react";
+import { renderToString } from "react-dom/server";
 import { axe } from "vitest-axe";
 import { renderSurface } from "./test-utils";
 import { UI_CONFIG } from "./config";
@@ -17,6 +18,18 @@ describe("useCountdown", () => {
   it("is null when there is no deadline", () => {
     const { result } = renderHook(() => useCountdown(null));
     expect(result.current.remainingMs).toBeNull();
+  });
+
+  // The hydration contract (founder-reported live defect, 2026-08-24): the server render and
+  // the client's FIRST render must agree byte-for-byte, so neither may read the wall clock —
+  // `renderToString` IS the server render, and a hook that returns a `Date.now()` reading there
+  // is the whole bug. The clock snaps in an effect, which never runs during either render.
+  it("is null on the server render — never a wall-clock reading the hydrating client would disagree with", () => {
+    function Probe() {
+      const { remainingMs, now } = useCountdown("2026-09-01T00:00:12.000Z");
+      return <span>{`${String(remainingMs)}|${String(now)}`}</span>;
+    }
+    expect(renderToString(<Probe />)).toContain("null|null");
   });
 
   it("returns the ms remaining until the deadline", () => {
@@ -86,9 +99,25 @@ describe("Countdown", () => {
     expect(live.closest('[aria-hidden="true"]')).toBeNull();
   });
 
+  it("sizes sm for a ledger-row clock at body size", () => {
+    render(<Countdown remainingMs={125_000} size="sm" data-testid="countdown" />);
+    expect(screen.getByTestId("countdown").className).toMatch(/text-sm/);
+  });
+
   it("sizes xl for the waiting room's hero clock", () => {
     render(<Countdown remainingMs={125_000} size="xl" data-testid="countdown" />);
     expect(screen.getByTestId("countdown").className).toMatch(/text-display-xl/);
+  });
+
+  // Pre-hydration fallback: `remainingMs` is null until the client clock snaps, and the digits
+  // render a stable em-height placeholder — never "0:00" (a false time) and never a layout jump.
+  it("renders a stable em-height placeholder, no digits and an empty live region, while remainingMs is null", () => {
+    render(<Countdown remainingMs={null} data-testid="countdown" />);
+    const el = screen.getByTestId("countdown");
+    expect(el.textContent).toBe("\u00A0");
+    // The same classes as the ticking digits — the line box (and so the row's height) is stable.
+    expect(el.className).toMatch(/font-mono/);
+    expect(screen.queryByText(/left$/)).not.toBeInTheDocument();
   });
 
   it("announces rarely — the coarse text is unchanged by a sub-boundary tick, and updates on a boundary crossing", () => {

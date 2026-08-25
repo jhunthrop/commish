@@ -99,7 +99,7 @@ test("front door -> card -> hold -> sign-in -> waiting room -> rank a slot -> le
 
     // --- Front door, signed out --------------------------------------------------------------
     await page.goto("/");
-    await expect(page.getByRole("heading", { name: "Real leagues. Real seats. Pick one and you are drafting this week." })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Real leagues. Real seats. Drafting this week." })).toBeVisible();
 
     // --- Keyboard-only nav to the shelf (`PublicBar`'s own "Open leagues" link) --------------
     const openLeagues = page.getByRole("link", { name: "Open leagues" });
@@ -273,7 +273,7 @@ test("every v2 surface clears axe's color-contrast rule, in both themes", async 
     const anonPage = await anonContext.newPage();
 
     await anonPage.goto("/");
-    await expect(anonPage.getByRole("heading", { name: "Real leagues. Real seats. Pick one and you are drafting this week." })).toBeVisible();
+    await expect(anonPage.getByRole("heading", { name: "Real leagues. Real seats. Drafting this week." })).toBeVisible();
     await assertContrastClean(anonPage, "the front door");
 
     await anonPage.goto("/browse");

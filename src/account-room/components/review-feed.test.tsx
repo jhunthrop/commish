@@ -148,6 +148,27 @@ describe("ReviewFeed", () => {
     });
   });
 
+  // E9 (Task 10): "Report" used to render as its own left-aligned line below the body — a fourth
+  // thing on the page rather than a control attached to the review above it. Proves both halves:
+  // it sits inside the SAME hairline-bounded row as the review it reports (the shared `<li>`),
+  // and that row pins it to the trailing edge rather than the leading one.
+  it("keeps Report right-aligned inside its own review's row, attached to what it reports", () => {
+    renderInAccount(<ReviewFeed initialPage={PAGE} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
+    const reportButtons = screen.getAllByRole("button", { name: "Report" });
+    expect(reportButtons).toHaveLength(2);
+
+    const firstRow = reportButtons[0]!.closest("li");
+    expect(firstRow).not.toBeNull();
+    expect(firstRow).toHaveTextContent(REVIEW_A.authorName);
+    expect(firstRow).toHaveTextContent(REVIEW_A.body);
+    expect(reportButtons[0]!.parentElement).toHaveClass("justify-end");
+
+    const secondRow = reportButtons[1]!.closest("li");
+    expect(secondRow).not.toBe(firstRow);
+    expect(secondRow).toHaveTextContent(REVIEW_B.authorName);
+    expect(secondRow).toHaveTextContent(REVIEW_B.body);
+  });
+
   it("shows the reason select once the control opens", () => {
     renderInAccount(<ReviewFeed initialPage={PAGE} emptyAction={<span>Write the first review</span>} />, fixtureAccountDeps().deps);
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();

@@ -1,0 +1,82 @@
+import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { sourceFilesIn } from "./test-support";
+
+/**
+ * THE CAPS CHARTER, APPLIED TO SOURCE: no capitals anywhere, enforced forever.
+ *
+ * v3 "Sunday Standard" rule 3 removes every `text-transform: uppercase` from the product —
+ * league names, eyebrows, section labels, wordmarks, chips, all of it (the 2026-08-24 UX
+ * remediation audit inventoried 43 sites; the founder-approved mock has zero). Like the hex
+ * ban next door (`no-raw-color.source.test.ts`), the rule only survives contact with the next
+ * hundred class strings if a test enforces it, so this sweep walks the same directories and
+ * fails any `.tsx` file that spells the one word Tailwind uses to shout: `uppercase`.
+ *
+ * MATCHING IS DELIBERATELY BLUNT — the raw, case-sensitive string, comments included:
+ *
+ * - Case-SENSITIVE, so `.toUpperCase()` never matches. That is the charter's own data
+ *   carve-out (S6): initials ("Bay Bandits" → "BB") and crest letters are semantically
+ *   capitals — data, not styled shouting — and the sweep has no opinion about them.
+ * - No comment stripping, unlike the hex sweep. A banned color literal in a docblock is
+ *   harmless prose, but this ban is on one WORD, and a comment keeping that word alive is one
+ *   paste away from a `className`. Engineering prose says "caps" or "all-caps" instead.
+ *
+ * TWO FILES ARE ALLOWLISTED (self-ruling S6): `position-badge.tsx` and `crest.tsx`. "QB" and
+ * "BB" are acronym data, not prose — the class there guards against a lowercase data bug, not
+ * a typographic choice. The guard test below asserts both still contain the string, so an
+ * allowlist entry that stops earning its exemption fails loudly instead of rotting.
+ */
+
+const SWEPT_DIRS = ["src/components", "src/league-room", "src/draft-room", "src/chat-room", "src/account-room", "src/admin-room", "src/app"];
+
+const ALLOWLIST: readonly string[] = ["src/components/ui/position-badge.tsx", "src/components/ui/crest.tsx"];
+
+const REPO_ROOT = process.cwd();
+
+const BANNED = "uppercase";
+
+const files = sourceFilesIn(SWEPT_DIRS, ".tsx");
+const sweptFiles = files.filter((file) => !ALLOWLIST.includes(file));
+
+describe("nothing outside the acronym allowlist forces text to uppercase", () => {
+  it("finds the component files to sweep, so an empty scan can never pass silently", () => {
+    expect(sweptFiles.length).toBeGreaterThanOrEqual(50);
+    // Every swept directory is pinned by name, LITERALLY — never by iterating `SWEPT_DIRS`,
+    // which would delete the assertion along with the entry it was meant to defend (the same
+    // discipline `no-raw-color.source.test.ts` and `room-copy.source.test.ts` name).
+    expect(sweptFiles.some((file) => file.startsWith("src/components"))).toBe(true);
+    expect(sweptFiles.some((file) => file.startsWith("src/league-room"))).toBe(true);
+    expect(sweptFiles.some((file) => file.startsWith("src/draft-room"))).toBe(true);
+    expect(sweptFiles.some((file) => file.startsWith("src/chat-room"))).toBe(true);
+    expect(sweptFiles.some((file) => file.startsWith("src/account-room"))).toBe(true);
+    expect(sweptFiles.some((file) => file.startsWith("src/admin-room"))).toBe(true);
+    expect(sweptFiles.some((file) => file.startsWith("src/app"))).toBe(true);
+    expect(sweptFiles.some((file) => file.includes(".test."))).toBe(false);
+  });
+
+  it("keeps the allowlist honest: both exempted files exist and still carry the class", () => {
+    // If either file drops its acronym guard (or is renamed), its entry here is dead armor —
+    // this fails to say "remove the allowlist entry", the same way a stale swept dir would.
+    for (const file of ALLOWLIST) {
+      expect(files).toContain(file);
+      expect(readFileSync(join(REPO_ROOT, file), "utf8")).toContain(BANNED);
+    }
+  });
+
+  it.each(sweptFiles)("%s never spells uppercase", (file) => {
+    const source = readFileSync(join(REPO_ROOT, file), "utf8");
+    const offendingLines = source
+      .split("\n")
+      .map((line, index) => (line.includes(BANNED) ? `${file}:${index + 1}: ${line.trim()}` : null))
+      .filter((line): line is string => line !== null);
+    expect(offendingLines).toEqual([]);
+  });
+
+  /** The scan's own proof of bite: the exact string a Tailwind class ships as is what fails,
+   *  while the data transform the charter exempts (capital U) does not. */
+  it("catches the class string and exempts the data transform", () => {
+    expect('className="uppercase tracking-wide"'.includes(BANNED)).toBe(true);
+    expect("name.slice(0, 2).toUpperCase()".includes(BANNED)).toBe(false);
+  });
+});

@@ -60,7 +60,7 @@ function FirstRunPathAction({ path }: { readonly path: FirstRunPath }) {
  * removal, `first-run.ts`'s own existing rule).
  *
  * The `create` path carries `id="create-league"` because three other surfaces
- * (`/browse`'s intro line, `PublicLeagueList`'s empty state, and the returning-manager
+ * (`/browse`'s intro line, `OpenLeagueShelf`'s empty state, and the returning-manager
  * disclosure this same task adds) link straight at that fragment. Nothing here is collapsed, so
  * unlike the returning-manager case there is no hash-driven open-on-load logic to write: the
  * anchor only needs somewhere real to land, and it already is one.

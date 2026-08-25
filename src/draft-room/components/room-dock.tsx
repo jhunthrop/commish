@@ -170,7 +170,7 @@ function PrimarySlot({
   }
   if (canAct) {
     return (
-      <p data-testid="dock-primary-empty" className="shrink-0 self-center font-display text-display-sm font-bold leading-display text-negative">
+      <p data-testid="dock-primary-empty" className="shrink-0 self-center font-display text-display-sm font-semibold leading-display text-negative">
         Your pick. Take somebody from the pool.
       </p>
     );

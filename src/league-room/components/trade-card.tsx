@@ -132,6 +132,10 @@ export function TradeCard({
   // same idiom `useCountdown` uses in `src/draft-room`), never inline as `new Date()` here —
   // `docs/conventions.md`'s "no ambient clock" rule, and what keeps this value mockable in a
   // test without patching the global clock.
+  // Null on the server render and the hydrating render (`useNow`'s hydration contract): until
+  // the clock snaps, the card treats an open offer as not-yet-expired and holds the expiry line
+  // back for that one frame — display-only optimism the server ticker corrects nothing by,
+  // since no write path reads this (`isExpired` is re-asked on the server for every action).
   const now = useNow(LEAGUE_ROOM_CONFIG.expiryTickMs);
   const sides = myAndTheirSides(trade, meTeamId);
   const iAmProposer = trade.from.teamId === meTeamId;
@@ -142,7 +146,7 @@ export function TradeCard({
   // share is asked here, against `useNow`'s tick, so an offer that ages out while the page is
   // open loses its controls without a refetch — and nothing writes `status = 'expired'`, because
   // there is no event moment to write one at (expiry stays DERIVED).
-  const expired = isExpired(trade, new Date(now).toISOString());
+  const expired = now !== null && isExpired(trade, new Date(now).toISOString());
   const isAnswerable = trade.status === "open" && !expired && iAmCounterparty;
   // Withdraw survives expiry: clearing your own dead offer is housekeeping, not answering it, and
   // `withdrawTrade` (`@/league-service/trades`) accepts it — the server and this card agree.
@@ -173,7 +177,7 @@ export function TradeCard({
             Final review, HIGH 3: a past-due offer says "Expired August 18." — the state and the
             day — rather than "Expires today." forever, which is what the old `Math.max(0, …)`
             clamp produced for an offer that died three days ago. */}
-        {trade.status === "open" ? (
+        {trade.status === "open" && now !== null ? (
           <p className="text-sm text-text-muted">{expired ? formatExpired(trade.expiresAt) : formatExpiry(daysUntil(trade.expiresAt, new Date(now)))}</p>
         ) : null}
 

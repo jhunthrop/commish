@@ -3,7 +3,7 @@
 import { useId, useState } from "react";
 import { useRouter } from "next/navigation";
 import { chatRemovalPhraseFor, removalPhraseFor } from "@/moderation/removal";
-import { Button, Textarea } from "@/components/ui";
+import { Button, EYEBROW, Textarea } from "@/components/ui";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { ResolutionDecision } from "@/integrity/flags";
 import { REVIEW_CONFIG } from "@/reviews/config";
@@ -227,7 +227,7 @@ export function ResolutionForm({ flagId, decisions, noteMaxLength, previews, isC
       />
 
       <div className="flex flex-col gap-2 rounded-lg border border-line bg-surface-elevated p-3" aria-label="What the member will see">
-        <p className="text-xs font-medium uppercase tracking-wide text-text-muted">What the member sees</p>
+        <p className={`${EYEBROW} text-text-muted`}>What the member sees</p>
         {decision === "no_action" ? (
           <NoActionPreview />
         ) : decision === "content_removed" && preview != null ? (

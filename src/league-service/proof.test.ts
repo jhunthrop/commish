@@ -188,10 +188,47 @@ describe("proofStats — rating", () => {
   });
 });
 
+describe("proofStats — nextDraftAt", () => {
+  it("reports the earliest public scheduled kickoff inside the window, as the instant itself", async () => {
+    const now = new Date(NOW);
+    const in5h = new Date(now.getTime() + 5 * 60 * 60 * 1000);
+    const in10h = new Date(now.getTime() + 10 * 60 * 60 * 1000);
+    await seedLeague({ draftStatus: "scheduled", kickoffAt: in10h, isPublicMatchmade: true });
+    await seedLeague({ draftStatus: "scheduled", kickoffAt: in5h, isPublicMatchmade: true });
+    // A private league's earlier draft never wins: ENFORCED_LEAGUE_SQL keeps a private
+    // calendar out of the aggregate, the identical reasoning draftsNext48hQuery documents.
+    await seedLeague({ draftStatus: "scheduled", kickoffAt: new Date(now.getTime() + 60 * 60 * 1000), isPublicMatchmade: false });
+    // A draft already running is not a "next draft" anybody can still sit down for.
+    await seedLeague({ draftStatus: "in_progress", kickoffAt: new Date(now.getTime() + 30 * 60 * 1000), isPublicMatchmade: true });
+    expect((await proofStats(db, deps)).nextDraftAt).toBe(in5h.toISOString());
+  });
+
+  it("omits a next draft beyond MATCHMAKING_CONFIG.proof.nextDraftWithinMs, and keeps the boundary itself", async () => {
+    const now = new Date(NOW);
+    const beyond = new Date(now.getTime() + MATCHMAKING_CONFIG.proof.nextDraftWithinMs + 60 * 60 * 1000);
+    await seedLeague({ draftStatus: "scheduled", kickoffAt: beyond, isPublicMatchmade: true });
+    expect((await proofStats(db, deps)).nextDraftAt).toBeNull();
+
+    const atBoundary = new Date(now.getTime() + MATCHMAKING_CONFIG.proof.nextDraftWithinMs);
+    await seedLeague({ draftStatus: "scheduled", kickoffAt: atBoundary, isPublicMatchmade: true });
+    expect((await proofStats(db, deps)).nextDraftAt).toBe(atBoundary.toISOString());
+  });
+
+  it("never lets nextDraftAt alone show the strip: `any` is untouched and ignores it", async () => {
+    const now = new Date(NOW);
+    await seedLeague({ draftStatus: "scheduled", kickoffAt: new Date(now.getTime() + 2 * 60 * 60 * 1000), isPublicMatchmade: true });
+    const stats = await proofStats(db, deps);
+    expect(stats.nextDraftAt).not.toBeNull();
+    // One scheduled draft is below every floor — the chip rides a strip other numbers earned,
+    // it never carries the strip itself.
+    expect(stats.any).toBe(false);
+  });
+});
+
 describe("proofStats — the whole strip", () => {
   it("hides the whole strip when every stat is below its floor, and says nothing at all", async () => {
     await truncateAll(db);
-    expect(await proofStats(db, deps)).toEqual({ leaguesFilled: null, draftsNext48h: null, rating: null, any: false });
+    expect(await proofStats(db, deps)).toEqual({ leaguesFilled: null, draftsNext48h: null, rating: null, nextDraftAt: null, any: false });
   });
 
   it("shows the strip once even one stat clears its floor", async () => {

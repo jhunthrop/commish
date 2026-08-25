@@ -239,7 +239,12 @@ test("a commissioner creates a league, a second manager joins it, and a pick rea
   //     2 (old) + 2 (held trades) + 1 (this spec's own report) = 5 -------------------------------
   await managerA.goto("/app/admin/queue");
   await expect(managerA.getByRole("heading", { name: "Dispute queue" })).toBeVisible();
-  const queueRows = managerA.getByRole("list", { name: "Open flags" }).getByRole("listitem");
+  // STRUCTURAL MOVE, followed deliberately (the e2e-under-redesign rule): Phase 3.6 Task 19
+  // rebuilt the queue from a `<ul aria-label="Open flags">` of cards into the dense `QueueTable`
+  // (`Table caption="Open flags"`, `src/admin-room/components/queue-table.tsx`), so the row
+  // locator is now table rows — the same move `mobile-360.spec.ts` (A22) already made. The
+  // COUNT (5) and the question-text filter below survive unchanged.
+  const queueRows = managerA.getByRole("table", { name: "Open flags" }).locator("tbody").getByRole("row");
   await expect(queueRows).toHaveCount(5);
   // Found by its own question text, not `.first()`: the seed's flag is OLDER than this spec's
   // own (the queue is oldest-first, ruling 30), so ordinal position would click the wrong row.

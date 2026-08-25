@@ -92,6 +92,27 @@ describe("AttentionQueue", () => {
     expect(items.map((item) => item.leagueId)).toEqual(["l_join", "l_fix"]);
   });
 
+  // S10 (Task 9, founder-delegated design ruling, 2026-08-24): the locker room's one ink action
+  // is this queue's own top item — the surface's genuinely most urgent act. Every other chip,
+  // here or on the board below, stays quiet.
+  it("gives the top chip the ink pill and every other chip the quiet one", () => {
+    const fixLineup: HomeLeagueCard = { ...BASE_LEAGUE, id: "l_fix", name: "Fix Me" };
+    const joinDraft: HomeLeagueCard = {
+      ...BASE_LEAGUE,
+      id: "l_join",
+      name: "Join Me",
+      draftStatus: "in_progress",
+      nextAction: { kind: "join-draft", label: "Join the draft" },
+    };
+    render(<AttentionQueue items={attentionQueueItemsFrom([fixLineup, joinDraft])} />);
+    const top = screen.getByRole("link", { name: "Join the draft for Join Me" });
+    const rest = screen.getByRole("link", { name: "Fix your lineup for Fix Me" });
+    // The ink pill's own fill (`button.tsx`'s sanctioned spelling), never hand-rolled here.
+    expect(top.className).toContain("bg-text-primary");
+    expect(rest.className).not.toContain("bg-text-primary");
+    expect(rest.className).toContain("border-edge");
+  });
+
   it("orders lineup fixes by the earliest kickoff, once kind no longer distinguishes them", () => {
     const later: HomeLeagueCard = { ...BASE_LEAGUE, id: "l_later", name: "Later", kickoffAt: "2026-09-10T00:00:00.000Z" };
     const earlier: HomeLeagueCard = { ...BASE_LEAGUE, id: "l_earlier", name: "Earlier", kickoffAt: "2026-09-01T00:00:00.000Z" };

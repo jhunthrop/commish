@@ -6,9 +6,9 @@ const VERB: Readonly<Record<MedianResult, string>> = { win: "won", loss: "lost",
 
 export interface MedianResultLineProps {
   /** The team this sentence is about — used only when `isMine` is false, the same way
-   *  `MatchupScoreboard`'s own "YOU" mark is the one place identity is compared at all. */
+   *  `MatchupScoreboard`'s own "You" mark is the one place identity is compared at all. */
   readonly teamName: string;
-  /** Whether this is the viewer's own team, exactly like `MatchupScoreboard`'s "YOU" mark
+  /** Whether this is the viewer's own team, exactly like `MatchupScoreboard`'s "You" mark
    *  (`teamId === myTeamId`). Second-person copy ("You scored...") only ever applies to the
    *  viewer's own side; every other team's sentence is written about them, in the third person. */
   readonly isMine: boolean;

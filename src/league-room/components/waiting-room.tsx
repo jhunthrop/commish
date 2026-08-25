@@ -285,8 +285,14 @@ export function WaitingRoom({
         <SeatMeter filled={league.filledTeams} total={league.teamCount} />
         {showCountdownHero ? (
           <div className="flex flex-col items-center gap-1">
-            <Countdown remainingMs={remainingMs ?? 0} size="xl" data-testid="waiting-room-countdown" />
-            <p role="status" className="text-sm text-text-muted">{`Starts in ${formatCoarseDuration(remainingMs ?? 0)}.`}</p>
+            {/* `remainingMs` is null on the server and hydrating renders (`useNow`'s hydration
+                contract): the digits hold their placeholder and the status line stays empty for
+                that one frame — never a false "Starts in under a minute." computed from a 0
+                nobody's clock produced. */}
+            <Countdown remainingMs={remainingMs} size="xl" data-testid="waiting-room-countdown" />
+            <p role="status" className="text-sm text-text-muted">
+              {remainingMs === null ? null : `Starts in ${formatCoarseDuration(remainingMs)}.`}
+            </p>
             {/* First-timer persona question, Step 5/6: "what happens if I'm not there?" —
                 answered honestly, in C3's own phrasing, once the clock is actually running. */}
             <p className="text-sm text-text-muted">Away when it starts? The room picks for you from your queue.</p>

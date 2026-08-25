@@ -1,0 +1,300 @@
+<title>Sunday Standard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;650;700&family=Geist+Mono:wght@500;600&display=swap">
+<style>
+  *{box-sizing:border-box;margin:0}
+  body{background:#FFFFFF;color:#1A1A1E;font-family:Geist,-apple-system,'SF Pro Text',Inter,system-ui,sans-serif;line-height:1.5;font-size:15px}
+  .gallery{max-width:1160px;margin:0 auto;padding:64px 28px 120px}
+  .manifesto{max-width:66ch;margin-bottom:20px}
+  .manifesto h1{font-size:40px;font-weight:650;letter-spacing:-0.025em;line-height:1.1;margin-bottom:14px;text-wrap:balance}
+  .manifesto p{color:#6B6B70;font-size:16px;margin-bottom:10px}
+  .rules{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1px;background:#E8E8EA;border:1px solid #E8E8EA;border-radius:14px;overflow:hidden;margin:36px 0 72px}
+  .rule{background:#FFF;padding:18px 20px}
+  .rule .n{font-family:'Geist Mono',monospace;font-size:11px;color:#AEAEB4;margin-bottom:6px}
+  .rule .t{font-weight:600;font-size:14px;margin-bottom:4px;letter-spacing:-0.01em}
+  .rule .d{color:#6B6B70;font-size:12.5px}
+  .sec-label{font-family:'Geist Mono',monospace;font-size:11px;letter-spacing:.06em;color:#AEAEB4;margin:0 0 14px}
+  .frame{border:1px solid #E8E8EA;border-radius:18px;overflow:hidden;margin-bottom:16px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+  .caption{color:#6B6B70;font-size:13px;max-width:72ch;margin-bottom:64px}
+
+  /* ============ THE MOCK ============ */
+  .m{--bg:#FBFBFA;--card:#FFFFFF;--ink:#1A1A1E;--mut:#6B6B70;--faint:#AEAEB4;--hair:#E8E8EA;--money:#0B6B43;--live:#D6453A;--tickbg:#F3F3F1;
+     background:var(--bg);color:var(--ink)}
+  .m.dark{--bg:#0D0D0F;--card:#161619;--ink:#F4F4F6;--mut:#98989F;--faint:#5D5D66;--hair:#242428;--money:#3ECF8E;--live:#FF6B5E;--tickbg:#111114}
+  .m-nav{display:flex;align-items:center;gap:26px;padding:16px 40px;border-bottom:1px solid var(--hair);position:relative;z-index:2}
+  .m-logo{font-weight:650;font-size:16px;letter-spacing:-0.01em}
+  .m-links{display:flex;gap:22px;margin-left:auto;font-size:13.5px;color:var(--mut)}
+  .m-links .on{color:var(--ink)}
+  .pill{display:inline-block;background:var(--ink);color:var(--bg);font-weight:600;font-size:13.5px;padding:8px 18px;border-radius:980px;letter-spacing:-0.01em;transition:transform .15s ease}
+  .pill.quiet{background:transparent;color:var(--ink);border:1px solid var(--hair)}
+
+  /* the wire: live activity ticker */
+  .wire{overflow:hidden;background:var(--tickbg);border-bottom:1px solid var(--hair);white-space:nowrap;padding:7px 0;position:relative;z-index:2}
+  .wire-track{display:inline-block;animation:wire 38s linear infinite}
+  .wire span{font-family:'Geist Mono',monospace;font-size:11.5px;color:var(--mut);margin:0 26px}
+  .wire b{color:var(--ink);font-weight:600}
+  .wire .up{color:var(--money);font-weight:600}
+  .wire .hot{color:var(--live);font-weight:600}
+  @keyframes wire{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+  /* floodlit hero */
+  .m-heroband{position:relative;overflow:hidden}
+  .m-heroband::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(90% 130% at 78% -20%, rgba(11,107,67,.10), transparent 55%)}
+  .m.dark .m-heroband::before{background:radial-gradient(90% 140% at 78% -20%, rgba(62,207,142,.13), transparent 55%),
+    radial-gradient(60% 90% at 15% 110%, rgba(62,207,142,.05), transparent 60%)}
+  .yards{position:absolute;inset:0;pointer-events:none;opacity:.5;
+    background:repeating-linear-gradient(to right, transparent 0 119px, var(--hair) 119px 120px)}
+  .m.dark .yards{opacity:.35}
+  .m-hero{position:relative;padding:80px 40px 30px}
+  .m-hero h2{font-size:58px;font-weight:650;letter-spacing:-0.028em;line-height:1.04;max-width:17ch;text-wrap:balance;margin-bottom:20px}
+  .m-hero h2 .go{color:var(--money)}
+  .m-hero .sub{color:var(--mut);font-size:17px;max-width:52ch;margin-bottom:8px}
+  .m-hero .free{font-size:15px;font-weight:500;color:var(--money);margin-bottom:38px}
+  .rise{opacity:0;transform:translateY(14px);animation:rise .7s cubic-bezier(.2,.7,.2,1) forwards}
+  .rise.d1{animation-delay:.08s}.rise.d2{animation-delay:.18s}.rise.d3{animation-delay:.28s}.rise.d4{animation-delay:.4s}
+  @keyframes rise{to{opacity:1;transform:none}}
+
+  .m-steps{position:relative;display:grid;grid-template-columns:1fr 1fr 1fr;gap:40px;padding:0 40px;margin-bottom:34px;max-width:880px}
+  .m-step{border-top:1px solid var(--hair);padding-top:14px}
+  .m-step .n{font-family:'Geist Mono',monospace;font-size:11px;color:var(--faint);margin-bottom:6px}
+  .m-step .t{font-weight:600;font-size:15px;margin-bottom:2px;letter-spacing:-0.01em}
+  .m-step .d{color:var(--mut);font-size:13px}
+
+  /* scoreboard proof */
+  .m-proof{position:relative;display:flex;gap:14px;padding:0 40px 56px;flex-wrap:wrap}
+  .score{display:flex;align-items:baseline;gap:9px;border:1px solid var(--hair);border-radius:12px;padding:10px 16px;background:var(--card)}
+  .score .num{font-family:'Geist Mono',monospace;font-size:22px;font-weight:600;letter-spacing:-0.02em;font-variant-numeric:tabular-nums}
+  .score .lab{color:var(--mut);font-size:12.5px}
+  .score.liveN .num{color:var(--live)}
+
+  .m-shelf{padding:0 40px 56px}
+  .m-shelf-head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+  .m-shelf-head h3{font-size:22px;font-weight:650;letter-spacing:-0.02em}
+  .m-shelf-head .sub{color:var(--mut);font-size:13px}
+  .m-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+  @media (max-width:900px){.m-grid{grid-template-columns:1fr}.m-steps{grid-template-columns:1fr;gap:16px}.m-hero h2{font-size:38px}}
+  .m-card{background:var(--card);border:1px solid var(--hair);border-radius:16px;padding:22px 22px 20px;transition:transform .18s ease, box-shadow .18s ease}
+  .m-card:hover{transform:translateY(-3px);box-shadow:0 10px 30px rgba(0,0,0,.10)}
+  .m.dark .m-card:hover{box-shadow:0 12px 34px rgba(0,0,0,.5)}
+  .m-card .top{display:flex;align-items:baseline;gap:10px;margin-bottom:4px}
+  .m-card h4{font-size:16.5px;font-weight:600;letter-spacing:-0.015em}
+  .m-card .fmt{color:var(--mut);font-size:13px;margin-bottom:16px}
+  .m-card .row{display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;border-top:1px solid var(--hair)}
+  .m-card .row .k{color:var(--mut)}
+  .m-card .row .v{font-weight:500;font-variant-numeric:tabular-nums}
+  .m-card .row .v.money{color:var(--money);font-weight:600}
+  .m-card .row .v.clock{font-family:'Geist Mono',monospace;font-weight:600;color:var(--live)}
+  .m-card .act{margin-top:16px;display:flex;align-items:center;gap:12px}
+  .m-card .seats{color:var(--mut);font-size:12.5px;margin-left:auto;font-variant-numeric:tabular-nums}
+  .livechip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--live)}
+  .livechip::before{content:"";width:6px;height:6px;border-radius:99px;background:var(--live);animation:pulse 1.6s ease infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .seatbar{display:flex;gap:3px;margin-top:12px}
+  .seatbar i{height:5px;flex:1;border-radius:3px;background:var(--hair)}
+  .seatbar i.f{background:var(--money)}
+
+  @media (prefers-reduced-motion: reduce){
+    .wire-track{animation:none}
+    .rise{opacity:1;transform:none;animation:none}
+    .livechip::before{animation:none}
+    .m-card:hover{transform:none}
+  }
+
+  /* system section */
+  .spec{display:grid;grid-template-columns:1.4fr 1fr;gap:48px;margin-bottom:24px}
+  @media (max-width:900px){.spec{grid-template-columns:1fr}}
+  .ramp .r{display:flex;align-items:baseline;gap:18px;border-top:1px solid #E8E8EA;padding:14px 0}
+  .ramp .lab{font-family:'Geist Mono',monospace;font-size:11px;color:#AEAEB4;width:120px;flex-shrink:0}
+  .tok .trow{display:flex;align-items:center;gap:12px;border-top:1px solid #E8E8EA;padding:10px 0}
+  .sw{width:30px;height:30px;border-radius:9px;border:1px solid rgba(0,0,0,.08);flex-shrink:0}
+  .tok .name{font-size:13.5px;font-weight:500;width:130px}
+  .tok .hex{font-family:'Geist Mono',monospace;font-size:11.5px;color:#6B6B70}
+  .tok .use{font-size:12px;color:#AEAEB4;margin-left:auto;text-align:right}
+</style>
+
+<div class="gallery">
+  <header class="manifesto">
+    <h1>The quiet stays. The game brings the fireworks.</h1>
+    <p>Same discipline as before: two neutrals, one typeface, color only as meaning. What changed is where the energy comes from. A wire of real activity runs under the nav. The hero sits under a faint floodlight with yard lines you feel more than see. Proof becomes a scoreboard. Draft clocks tick in red, seats fill in green, and cards lift to meet your hand. Every moving thing on this page is something actually happening, which is the only kind of pizzazz that ages well.</p>
+  </header>
+
+  <div class="rules">
+    <div class="rule"><div class="n">01</div><div class="t">Color is meaning</div><div class="d">Green is money. Red is live. Everything else is ink and paper.</div></div>
+    <div class="rule"><div class="n">02</div><div class="t">One face, earned weights</div><div class="d">Geist only. Hierarchy from size and weight, never a second font.</div></div>
+    <div class="rule"><div class="n">03</div><div class="t">No capitals</div><div class="d">Nothing shouts, so the important things read louder.</div></div>
+    <div class="rule"><div class="n">04</div><div class="t">Hairlines, not boxes</div><div class="d">Structure from thin rules and space. The yard lines are hairlines too.</div></div>
+    <div class="rule"><div class="n">05</div><div class="t">One ink action</div><div class="d">Per view, one solid pill. Every other action is quiet.</div></div>
+    <div class="rule"><div class="n">06</div><div class="t">Only true things move</div><div class="d">Tickers, clocks, filling seats. Real events animate; chrome never does.</div></div>
+  </div>
+
+  <p class="sec-label">THE FRONT DOOR - GAME NIGHT</p>
+  <div class="frame">
+    <div class="m dark">
+      <nav class="m-nav"><span class="m-logo">Commish</span>
+        <div class="m-links"><span class="on">Open leagues</span><span>How it works</span><span>Reviews</span></div>
+        <span class="pill">Take a seat</span><span style="font-size:13.5px;color:var(--mut)">Sign in</span></nav>
+      <div class="wire"><div class="wire-track">
+        <span><b>Marcus</b> claimed a seat in <b>Open league 29</b> &middot; 12s ago</span>
+        <span class="hot">Sit and go 1 &middot; 2 seats left</span>
+        <span><b>Beginner league 3</b> drafts tonight &middot; 11:56 PM</span>
+        <span class="up">League 27 filled &middot; drafting now</span>
+        <span><b>Dana</b> ranked her draft slots &middot; League 30</span>
+        <span><b>76</b> leagues filled this season</span>
+        <span><b>Marcus</b> claimed a seat in <b>Open league 29</b> &middot; 12s ago</span>
+        <span class="hot">Sit and go 1 &middot; 2 seats left</span>
+        <span><b>Beginner league 3</b> drafts tonight &middot; 11:56 PM</span>
+        <span class="up">League 27 filled &middot; drafting now</span>
+        <span><b>Dana</b> ranked her draft slots &middot; League 30</span>
+        <span><b>76</b> leagues filled this season</span>
+      </div></div>
+      <div class="m-heroband">
+        <div class="yards"></div>
+        <div class="m-hero">
+          <h2 class="rise d1">Real leagues. Real seats. <span class="go">Drafting this week.</span></h2>
+          <p class="sub rise d2">Season-long fantasy football with a live draft room, real-time scoring, and a platform that runs the league so no brother-in-law has to.</p>
+          <p class="free rise d2">Every league is free this season.</p>
+        </div>
+        <div class="m-steps rise d3">
+          <div class="m-step"><div class="n">1 &middot; 10 seconds</div><div class="t">Pick a seat</div><div class="d">Your seat holds for 10 minutes</div></div>
+          <div class="m-step"><div class="n">2 &middot; 30 seconds</div><div class="t">Sign in with email</div><div class="d">That is the whole signup</div></div>
+          <div class="m-step"><div class="n">3 &middot; done</div><div class="t">You are in the league</div><div class="d">Meet the room, rank your draft slots</div></div>
+        </div>
+        <div class="m-proof rise d4">
+          <div class="score"><span class="num">76</span><span class="lab">leagues filled this season</span></div>
+          <div class="score liveN"><span class="num">25</span><span class="lab">drafts in the next 48 hours</span></div>
+          <div class="score"><span class="num">9:04</span><span class="lab">next draft tonight</span></div>
+        </div>
+      </div>
+      <div class="m-shelf">
+        <div class="m-shelf-head"><h3>Open leagues</h3><span class="sub">A league Commish runs. Everyone joins the same way and plays the same rules.</span></div>
+        <div class="m-grid">
+          <div class="m-card">
+            <div class="top"><h4>Open league 29</h4><span class="livechip" style="margin-left:auto">On deck</span></div>
+            <p class="fmt">12 teams &middot; Snake &middot; Half PPR</p>
+            <div class="row"><span class="k">Drafts in</span><span class="v clock">2:14:09</span></div>
+            <div class="row"><span class="k">Entry</span><span class="v money">Free</span></div>
+            <div class="row"><span class="k">Seats</span><span class="v">8 of 12 open</span></div>
+            <div class="seatbar"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="act"><span class="pill">Join</span><span class="seats">4 seated</span></div>
+          </div>
+          <div class="m-card">
+            <div class="top"><h4>Beginner league 3</h4></div>
+            <p class="fmt">12 teams &middot; Snake &middot; Half PPR &middot; guided</p>
+            <div class="row"><span class="k">Drafts</span><span class="v">Tonight, 11:56 PM</span></div>
+            <div class="row"><span class="k">Entry</span><span class="v money">Free</span></div>
+            <div class="row"><span class="k">Seats</span><span class="v">9 of 12 open</span></div>
+            <div class="seatbar"><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="act"><span class="pill quiet">Join</span><span class="seats">3 seated</span></div>
+          </div>
+          <div class="m-card">
+            <div class="top"><h4>Sit and go 1</h4><span class="livechip" style="margin-left:auto">Filling</span></div>
+            <p class="fmt">12 teams &middot; Snake &middot; Half PPR</p>
+            <div class="row"><span class="k">Drafts</span><span class="v">When it fills</span></div>
+            <div class="row"><span class="k">Entry</span><span class="v money">Free</span></div>
+            <div class="row"><span class="k">Seats</span><span class="v">2 of 12 open</span></div>
+            <div class="seatbar"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i></div>
+            <div class="act"><span class="pill quiet">Join</span><span class="seats">10 seated</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="caption">What earned its way in: the wire (real product events streaming under the nav, the way a ticker runs under a broadcast), a floodlight and yard lines behind the hero at whisper opacity, the closing phrase of the headline in money green, proof restyled as a scoreboard with the live number in red, a ticking draft clock, seat meters that fill green seat by seat, a pulse on anything live, and cards that lift to meet the cursor. Every one of them is information. None of them is decoration.</p>
+
+  <p class="sec-label">THE FRONT DOOR - DAYLIGHT</p>
+  <div class="frame">
+    <div class="m">
+      <nav class="m-nav"><span class="m-logo">Commish</span>
+        <div class="m-links"><span class="on">Open leagues</span><span>How it works</span><span>Reviews</span></div>
+        <span class="pill">Take a seat</span><span style="font-size:13.5px;color:var(--mut)">Sign in</span></nav>
+      <div class="wire"><div class="wire-track">
+        <span><b>Marcus</b> claimed a seat in <b>Open league 29</b> &middot; 12s ago</span>
+        <span class="hot">Sit and go 1 &middot; 2 seats left</span>
+        <span><b>Beginner league 3</b> drafts tonight &middot; 11:56 PM</span>
+        <span class="up">League 27 filled &middot; drafting now</span>
+        <span><b>Dana</b> ranked her draft slots &middot; League 30</span>
+        <span><b>76</b> leagues filled this season</span>
+        <span><b>Marcus</b> claimed a seat in <b>Open league 29</b> &middot; 12s ago</span>
+        <span class="hot">Sit and go 1 &middot; 2 seats left</span>
+        <span><b>Beginner league 3</b> drafts tonight &middot; 11:56 PM</span>
+        <span class="up">League 27 filled &middot; drafting now</span>
+        <span><b>Dana</b> ranked her draft slots &middot; League 30</span>
+        <span><b>76</b> leagues filled this season</span>
+      </div></div>
+      <div class="m-heroband">
+        <div class="yards"></div>
+        <div class="m-hero">
+          <h2>Real leagues. Real seats. <span class="go">Drafting this week.</span></h2>
+          <p class="sub">Season-long fantasy football with a live draft room, real-time scoring, and a platform that runs the league so no brother-in-law has to.</p>
+          <p class="free">Every league is free this season.</p>
+        </div>
+        <div class="m-steps">
+          <div class="m-step"><div class="n">1 &middot; 10 seconds</div><div class="t">Pick a seat</div><div class="d">Your seat holds for 10 minutes</div></div>
+          <div class="m-step"><div class="n">2 &middot; 30 seconds</div><div class="t">Sign in with email</div><div class="d">That is the whole signup</div></div>
+          <div class="m-step"><div class="n">3 &middot; done</div><div class="t">You are in the league</div><div class="d">Meet the room, rank your draft slots</div></div>
+        </div>
+        <div class="m-proof">
+          <div class="score"><span class="num">76</span><span class="lab">leagues filled this season</span></div>
+          <div class="score liveN"><span class="num">25</span><span class="lab">drafts in the next 48 hours</span></div>
+          <div class="score"><span class="num">9:04</span><span class="lab">next draft tonight</span></div>
+        </div>
+      </div>
+      <div class="m-shelf">
+        <div class="m-shelf-head"><h3>Open leagues</h3><span class="sub">A league Commish runs. Everyone joins the same way and plays the same rules.</span></div>
+        <div class="m-grid">
+          <div class="m-card">
+            <div class="top"><h4>Open league 29</h4><span class="livechip" style="margin-left:auto">On deck</span></div>
+            <p class="fmt">12 teams &middot; Snake &middot; Half PPR</p>
+            <div class="row"><span class="k">Drafts in</span><span class="v clock">2:14:09</span></div>
+            <div class="row"><span class="k">Entry</span><span class="v money">Free</span></div>
+            <div class="row"><span class="k">Seats</span><span class="v">8 of 12 open</span></div>
+            <div class="seatbar"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="act"><span class="pill">Join</span><span class="seats">4 seated</span></div>
+          </div>
+          <div class="m-card">
+            <div class="top"><h4>Beginner league 3</h4></div>
+            <p class="fmt">12 teams &middot; Snake &middot; Half PPR &middot; guided</p>
+            <div class="row"><span class="k">Drafts</span><span class="v">Tonight, 11:56 PM</span></div>
+            <div class="row"><span class="k">Entry</span><span class="v money">Free</span></div>
+            <div class="row"><span class="k">Seats</span><span class="v">9 of 12 open</span></div>
+            <div class="seatbar"><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+            <div class="act"><span class="pill quiet">Join</span><span class="seats">3 seated</span></div>
+          </div>
+          <div class="m-card">
+            <div class="top"><h4>Sit and go 1</h4><span class="livechip" style="margin-left:auto">Filling</span></div>
+            <p class="fmt">12 teams &middot; Snake &middot; Half PPR</p>
+            <div class="row"><span class="k">Drafts</span><span class="v">When it fills</span></div>
+            <div class="row"><span class="k">Entry</span><span class="v money">Free</span></div>
+            <div class="row"><span class="k">Seats</span><span class="v">2 of 12 open</span></div>
+            <div class="seatbar"><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i class="f"></i><i></i><i></i></div>
+            <div class="act"><span class="pill quiet">Join</span><span class="seats">10 seated</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <p class="caption">Daylight holds the same energy honestly: the wire keeps running, the clock keeps ticking, the floodlight softens to a breath of green. During the season the wire is where live scoring earns its place on every page: KC 24, BUF 21, your player just scored. The infrastructure for that already exists in the product's real-time layer.</p>
+
+  <p class="sec-label">THE SYSTEM</p>
+  <div class="spec">
+    <div class="ramp">
+      <div class="r"><span class="lab">display &middot; 58/650</span><span style="font-size:42px;font-weight:650;letter-spacing:-0.028em;line-height:1.05">Drafting <span style="color:#0B6B43">this week</span></span></div>
+      <div class="r"><span class="lab">title &middot; 22/650</span><span style="font-size:22px;font-weight:650;letter-spacing:-0.02em">Open leagues</span></div>
+      <div class="r"><span class="lab">card &middot; 16.5/600</span><span style="font-size:16.5px;font-weight:600;letter-spacing:-0.015em">Open league 29</span></div>
+      <div class="r"><span class="lab">body &middot; 15/400</span><span style="font-size:15px">A platform that runs the league so no brother-in-law has to.</span></div>
+      <div class="r"><span class="lab">detail &middot; 13/400</span><span style="font-size:13px;color:#6B6B70">Your seat holds for 10 minutes</span></div>
+      <div class="r"><span class="lab">the wire &middot; mono</span><span style="font-family:'Geist Mono',monospace;font-size:12px">2:14:09&ensp;&middot;&ensp;KC 24 BUF 21&ensp;&middot;&ensp;8 of 12</span></div>
+    </div>
+    <div class="tok">
+      <div class="trow"><span class="sw" style="background:#FBFBFA"></span><span class="name">paper / graphite</span><span class="hex">#FBFBFA &middot; #0D0D0F</span><span class="use">the ground</span></div>
+      <div class="trow"><span class="sw" style="background:#1A1A1E"></span><span class="name">ink</span><span class="hex">#1A1A1E &middot; #F4F4F6</span><span class="use">text, the one solid action</span></div>
+      <div class="trow"><span class="sw" style="background:#6B6B70"></span><span class="name">quiet</span><span class="hex">#6B6B70 &middot; #98989F</span><span class="use">supporting text</span></div>
+      <div class="trow"><span class="sw" style="background:#E8E8EA"></span><span class="name">hairline</span><span class="hex">#E8E8EA &middot; #242428</span><span class="use">structure and yard lines</span></div>
+      <div class="trow"><span class="sw" style="background:#0B6B43"></span><span class="name">money</span><span class="hex">#0B6B43 &middot; #3ECF8E</span><span class="use">entries, prizes, seats filling</span></div>
+      <div class="trow"><span class="sw" style="background:#D6453A"></span><span class="name">live</span><span class="hex">#D6453A &middot; #FF6B5E</span><span class="use">clocks, on the board, in play</span></div>
+    </div>
+  </div>
+
+  <p class="caption" style="margin-bottom:0">Still six colors, still one typeface. The pizzazz costs nothing from the system because it is all behavior: a wire fed by events the platform already records, clocks the draft engine already runs, seat counts the lobby already streams. The moment real money arrives, this page gets its best material yet: a green number with a dollar sign, sitting quietly in a ledger row, on the calmest surface in fantasy sports.</p>
+</div>

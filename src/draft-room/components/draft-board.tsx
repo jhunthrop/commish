@@ -81,7 +81,7 @@ const META_TEXT: Readonly<Record<DraftBoardVariant, string>> = {
 
 const HEADER_EYEBROW: Readonly<Record<DraftBoardVariant, string>> = {
   room: EYEBROW,
-  tv: "font-display text-sm font-semibold uppercase tracking-wide",
+  tv: "font-display text-sm font-semibold tracking-wide",
 };
 
 /** The column order: the draft order once it exists, the league's teams before it does. */
@@ -303,7 +303,7 @@ export function DraftBoard({ view, teams, playersById, myTeamId, landedPickNumbe
                   <span className="sr-only">{`Draft slot ${index + 1}: `}</span>
                   {teamName(byId, teamId)}
                   {teamId === myTeamId ? (
-                    <span className={`ml-2 font-display uppercase tracking-wide text-accent ${META_TEXT[variant]}`}>You</span>
+                    <span className={`ml-2 font-display tracking-wide text-accent ${META_TEXT[variant]}`}>You</span>
                   ) : null}
                 </th>
               ))}

@@ -136,6 +136,20 @@ describe("HomeLeagueCard", () => {
     expect(screen.queryByText("Draft live")).not.toBeInTheDocument();
   });
 
+  // Rule 5 / S10 (Task 9): quiet by default — a card is never assumed to be the view's one ink
+  // action on its own authority. `emphasis="ink"` is the caller's own call, mirroring
+  // `OpenLeagueCard`'s identical prop.
+  it("wears the quiet pill by default and the ink pill only when the caller says so", () => {
+    const { rerender } = render(<HomeLeagueCard league={BASE} />);
+    const quiet = screen.getByRole("link", { name: "See how the week went for Sunday Money" });
+    expect(quiet.className).not.toContain("bg-text-primary");
+    expect(quiet.className).toContain("border-edge");
+
+    rerender(<HomeLeagueCard league={BASE} emphasis="ink" />);
+    const ink = screen.getByRole("link", { name: "See how the week went for Sunday Money" });
+    expect(ink.className).toContain("bg-text-primary");
+  });
+
   it("stays axe-clean with a live draft badge, the record group, and a named action, in both themes", async () => {
     await renderSurface(
       <HomeLeagueCard league={{ ...BASE, draftStatus: "in_progress", nextAction: { kind: "join-draft", label: "Join the draft" } }} />,

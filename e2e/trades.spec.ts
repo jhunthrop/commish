@@ -159,7 +159,12 @@ test("propose, accept, notice, a real fairness flag, and an operator's reversal 
     // --- The seeded operator (manager A) finds the real flag in the real queue --------------
     await pageA.goto("/app/admin/queue");
     await expect(pageA.getByRole("heading", { name: "Dispute queue" })).toBeVisible();
-    const queueRows = pageA.getByRole("list", { name: "Open flags" }).getByRole("listitem");
+    // STRUCTURAL MOVE, followed deliberately (the e2e-under-redesign rule): Phase 3.6 Task 19
+    // rebuilt the queue from a `<ul aria-label="Open flags">` of cards into the dense
+    // `QueueTable` (`Table caption="Open flags"`), so the row locator is now table rows — the
+    // same move `mobile-360.spec.ts` (A22) already made. The team-name filter and the
+    // fairness-question assertion below survive unchanged.
+    const queueRows = pageA.getByRole("table", { name: "Open flags" }).locator("tbody").getByRole("row");
     const ourFlagRow = queueRows.filter({ hasText: `${TEAM_A_NAME} and ${TEAM_B_NAME}` });
     await expect(ourFlagRow).toBeVisible();
     await expect(ourFlagRow.getByText("The platform flagged a trade for a fairness review")).toBeVisible();

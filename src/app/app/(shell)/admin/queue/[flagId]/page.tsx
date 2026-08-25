@@ -7,7 +7,7 @@ import { INTEGRITY_CONFIG } from "@/integrity/config";
 import { renderNotice } from "@/integrity/notices";
 import { DECISION_PHRASE, subjectIsRemoved, type FlagResolutionView, type FlagSubjectView, type TradedPlayerView } from "@/integrity/queue-view";
 import { contentRemovalIsWiredFor, type ResolutionDecision } from "@/integrity/flags";
-import { Card, PageTitle } from "@/components/ui";
+import { Card, EYEBROW, PageTitle } from "@/components/ui";
 import { Icon } from "@/components/ui/icon";
 import { withAdmin } from "@/app/api/admin/_shared";
 import { ResolutionForm, type DecisionPreview } from "@/admin-room/components/resolution-form";
@@ -48,7 +48,7 @@ function SubjectCard({ subject }: { readonly subject: OrdinarySubject }) {
   if (subject.kind === "review") {
     return (
       <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Reported review</p>
+        <p className={`${EYEBROW} text-text-muted`}>Reported review</p>
         <p className="mt-1 text-sm text-text-muted">By {subject.authorName}</p>
         <p className="mt-2 break-words text-sm text-text-primary">{subject.body}</p>
         {subjectIsRemoved(subject) ? <AlreadyRemovedNote /> : null}
@@ -58,7 +58,7 @@ function SubjectCard({ subject }: { readonly subject: OrdinarySubject }) {
   if (subject.kind === "chat_message") {
     return (
       <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Reported message</p>
+        <p className={`${EYEBROW} text-text-muted`}>Reported message</p>
         <p className="mt-1 text-sm text-text-muted">From {subject.authorName}</p>
         <p className="mt-2 break-words text-sm text-text-primary">{subject.body ?? "This message is no longer here."}</p>
         {subjectIsRemoved(subject) ? <AlreadyRemovedNote /> : null}
@@ -68,7 +68,7 @@ function SubjectCard({ subject }: { readonly subject: OrdinarySubject }) {
   if (subject.kind === "account_pair") {
     return (
       <Card>
-        <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Accounts</p>
+        <p className={`${EYEBROW} text-text-muted`}>Accounts</p>
         <p className="mt-2 break-words text-sm text-text-primary">
           {subject.names[0]} and {subject.names[1]}
         </p>
@@ -110,7 +110,7 @@ function TradedPlayerList({ label, players }: { readonly label: string; readonly
 function TradeSubjectCard({ subject }: { readonly subject: Extract<FlagSubjectView, { readonly kind: "trade" }> }) {
   return (
     <Card>
-      <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Trade</p>
+      <p className={`${EYEBROW} text-text-muted`}>Trade</p>
       <p className="mt-1 text-sm text-text-primary">
         {subject.proposerTeamName} and {subject.counterpartyTeamName}
       </p>
@@ -279,7 +279,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
           </header>
           {detail.resolution !== null ? (
             <Card>
-              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
+              <p className={`mb-3 ${EYEBROW} text-text-muted`}>Decision</p>
               <ResolutionSummary resolution={detail.resolution} />
             </Card>
           ) : (
@@ -329,7 +329,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
             <SubjectCard subject={subject} />
 
             <Card>
-              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Evidence</p>
+              <p className={`${EYEBROW} text-text-muted`}>Evidence</p>
               {evidenceEntries.length === 0 ? (
                 <p className="mt-2 text-sm text-text-muted">No evidence recorded for this flag.</p>
               ) : (
@@ -345,7 +345,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
             </Card>
 
             <Card>
-              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">Reporters</p>
+              <p className={`${EYEBROW} text-text-muted`}>Reporters</p>
               {detail.reporters.length === 0 ? (
                 <p className="mt-2 text-sm text-text-muted">Nobody reported this. The platform raised it on its own.</p>
               ) : (
@@ -363,7 +363,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
             </Card>
 
             <Card>
-              <p className="text-xs font-medium uppercase tracking-wide text-text-muted">What happened</p>
+              <p className={`${EYEBROW} text-text-muted`}>What happened</p>
               {detail.trail.length === 0 ? (
                 <p className="mt-2 text-sm text-text-muted">No recorded history for this flag yet.</p>
               ) : (
@@ -386,7 +386,7 @@ export default async function AdminFlagDetailPage({ params }: PageProps) {
 
           <div className="lg:sticky lg:top-6">
             <Card>
-              <p className="mb-3 text-xs font-medium uppercase tracking-wide text-text-muted">Decision</p>
+              <p className={`mb-3 ${EYEBROW} text-text-muted`}>Decision</p>
               {detail.resolution !== null ? (
                 <ResolutionSummary resolution={detail.resolution} />
               ) : (

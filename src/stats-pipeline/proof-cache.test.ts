@@ -7,8 +7,14 @@ import type { ProofStats } from "@/matchmaking/contract";
 const REDIS_URL = process.env.REDIS_URL ?? "redis://localhost:6379";
 const PROOF_CACHE_KEY = "matchmaking:proof";
 
-const STATS: ProofStats = { leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, any: true };
-const EMPTY_STATS: ProofStats = { leaguesFilled: null, draftsNext48h: null, rating: null, any: false };
+const STATS: ProofStats = {
+  leaguesFilled: 247,
+  draftsNext48h: 12,
+  rating: { average: 4.8, count: 63 },
+  nextDraftAt: "2026-09-10T17:00:00.000Z",
+  any: true,
+};
+const EMPTY_STATS: ProofStats = { leaguesFilled: null, draftsNext48h: null, rating: null, nextDraftAt: null, any: false };
 
 /** A connection that throws on every command — models a Redis outage without touching docker. */
 function throwingRedis(): Redis {
@@ -69,6 +75,15 @@ describe("createProofCache", () => {
 
   it("a wrong-shape cached value is treated as a miss, never a throw", async () => {
     await control.set(PROOF_CACHE_KEY, JSON.stringify({ leaguesFilled: "not a number" }));
+    const cache = createProofCache({ redis });
+    await expect(cache.stats(async () => STATS)).resolves.toEqual(STATS);
+  });
+
+  // Task 7: `nextDraftAt` joined the contract, so a value cached by the previous deploy (no
+  // such field) fails the shape check and reloads — self-healing across the shape change.
+  it("a cached value from before nextDraftAt existed is treated as a miss and reloaded", async () => {
+    const previousShape = Object.fromEntries(Object.entries(STATS).filter(([key]) => key !== "nextDraftAt"));
+    await control.set(PROOF_CACHE_KEY, JSON.stringify(previousShape));
     const cache = createProofCache({ redis });
     await expect(cache.stats(async () => STATS)).resolves.toEqual(STATS);
   });

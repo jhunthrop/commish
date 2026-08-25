@@ -62,12 +62,12 @@ const LEAGUE_TEXT: Readonly<Record<RoomRailVariant, string>> = {
  */
 const RAIL_EYEBROW: Readonly<Record<RoomRailVariant, string>> = {
   room: EYEBROW,
-  tv: "font-display text-sm font-semibold uppercase tracking-wide",
+  tv: "font-display text-sm font-semibold tracking-wide",
 };
 
 /** The tightening line's own size: an ordinary sentence in the room, bumped one step for the TV
  *  variant's "no `xs` anywhere" rule (Step 3) — it is prose, not a chip, so it earns `text-sm`
- *  rather than joining `RAIL_EYEBROW`'s all-caps treatment. */
+ *  rather than joining `RAIL_EYEBROW`'s label treatment. */
 const TIGHTENING_TEXT: Readonly<Record<RoomRailVariant, string>> = {
   room: "text-xs",
   tv: "text-sm",
@@ -243,9 +243,12 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
   // reading `remainingMs` came from), so a turn that started BEFORE the freeze but runs into it
   // — the common case — still shows this once the clock actually crosses in, and "the countdown
   // resumes on the next frame" (Task 4) falls out of this same comparison flipping back once
-  // `now` passes `pausedUntil`, with no new event required.
-  const paused = pausedUntil !== null && now < Date.parse(pausedUntil);
-  const tightening = formatTightening(view.nextTightening, now, pausedUntil);
+  // `now` passes `pausedUntil`, with no new event required. `now` is null on the server render
+  // and the hydrating render (`useNow`'s hydration contract): both clock-derived lines hold
+  // their non-ticking fallback (nothing) for that one frame rather than reading a clock the
+  // server and client would disagree on.
+  const paused = pausedUntil !== null && now !== null && now < Date.parse(pausedUntil);
+  const tightening = now === null ? null : formatTightening(view.nextTightening, now, pausedUntil);
   const myTeamName = personalId === null ? null : teamName(teamsById(teams), personalId, "Your team");
   const turnWhere = turnLabel(view);
   const pending = pendingPickCount(view);
@@ -256,7 +259,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
       data-mode={mode}
       className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2 lg:min-h-20 lg:flex-nowrap ${MODE_SKIN[mode]}`}
     >
-      <h1 className={`font-display font-bold leading-display text-text-primary ${LEAGUE_TEXT[variant]}`}>{leagueName}</h1>
+      <h1 className={`font-display font-semibold leading-display text-text-primary ${LEAGUE_TEXT[variant]}`}>{leagueName}</h1>
       {/* NEW-3: `basis-full` so that below `lg:` (where the header is still `flex-wrap`, not yet
           `flex-nowrap`), a guided caption growing this span past one line claims a whole wrapped
           line of its own rather than squeezing onto a shared one beside the league name — the
@@ -269,7 +272,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
         {variant === "room" ? <InfoTip term={FORMAT_TERM[view.format]} helpLevel={helpLevel} /> : null}
       </span>
       {turnWhere === null ? null : (
-        <span data-testid="turn-label" className="font-display text-sm font-semibold uppercase tracking-wide text-text-muted">
+        <span data-testid="turn-label" className="font-display text-sm font-semibold tracking-wide text-text-muted">
           {turnWhere}
         </span>
       )}
@@ -305,7 +308,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                       controls at all. */}
                   {view.format === "auction" || variant !== "room" ? null : <InfoTip term="on-the-clock" helpLevel={helpLevel} />}
                 </span>
-                <span className="truncate font-display text-display-sm font-bold leading-display text-text-primary">{turn.subject}</span>
+                <span className="truncate font-display text-display-sm font-semibold leading-display text-text-primary">{turn.subject}</span>
               </div>
             </div>
             <div className="flex flex-col items-end">

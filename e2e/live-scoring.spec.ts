@@ -31,8 +31,11 @@ test("a week in progress shows on the home card, locks the league page's lineup,
   await managerA.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}`);
   await expect(managerA.getByText("In progress")).toBeVisible();
   // The plain-language lock, in the manager's own words — not "the button is gone", which a
-  // regression that broke lineup-fetching entirely would also produce.
-  await expect(managerA.getByText(/lineup can.t change/i)).toBeVisible();
+  // regression that broke lineup-fetching entirely would also produce. COPY MOVE, followed
+  // deliberately: the design-v2 gauntlet wave (8f7b8f9) retoned the lock sentence from "can't
+  // change" to "cannot change" (matching the server's own copy in `lineups.ts`), and the old
+  // `/can.t/` pattern cannot match "cannot". Same sentence, same lock — tighter pattern.
+  await expect(managerA.getByText(/lineup cannot change/i)).toBeVisible();
 
   // The home board's own refresh, proven by its CONSEQUENCE rather than a timer: wait for the
   // interval-driven request itself (`HomeBoard`'s `setInterval`,

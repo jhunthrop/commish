@@ -5,10 +5,12 @@ import { renderSurface } from "./test-utils";
 import { StatPill } from "./stat-pill";
 
 describe("StatPill", () => {
-  it("keeps the label's own case in the DOM — capitals are CSS, in both themes, axe-clean", async () => {
+  it("renders the label exactly as written — sentence case, no caps transform, in both themes, axe-clean", async () => {
     await renderSurface(<StatPill label="Final" tone="positive" />, async ({ container }) => {
       expect(screen.getByText("Final")).toBeInTheDocument();
-      expect(screen.getByText("Final").className).toMatch(/uppercase/);
+      // The caps charter (v3): the chip reads "Final", never a shouted transform of it.
+      expect(screen.getByText("Final").className).toMatch(/tracking-wide/);
+      expect(screen.getByText("Final").className).not.toMatch(/uppercase/);
       expect(await axe(container)).toHaveNoViolations();
     });
   });

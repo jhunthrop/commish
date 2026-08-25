@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Button, ErrorState } from "@/components/ui";
+import { Button, ButtonLink, ErrorState } from "@/components/ui";
 import { PublicBar } from "@/components/app-shell/public-bar";
 
 /**
@@ -43,12 +42,13 @@ export default function AppError({
                 <Button variant="primary" onClick={reset}>
                   Try again
                 </Button>
-                <Link
-                  href="/app"
-                  className="inline-flex h-10 items-center justify-center rounded-md border border-line px-4 text-md font-medium text-text-primary transition-colors hover:bg-surface-elevated focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-                >
+                {/* Task 10 pill sweep: this used to be a `Link` wearing a hand-rolled copy of the
+                    quiet-pill classes (`rounded-md`, `border-line`) — exactly the drift
+                    `buttonClassName`'s docblock (E8) exists to end. `ButtonLink`'s `secondary`
+                    variant is the real quiet pill: `rounded-pill`, `border-edge`. */}
+                <ButtonLink href="/app" variant="secondary">
                   Go to your leagues
-                </Link>
+                </ButtonLink>
               </div>
             }
           />

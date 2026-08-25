@@ -35,7 +35,13 @@ describe("JoinPublicLeagueButton", () => {
     const fixture = fixtureLeagueDeps({ ok: false, error: "That league is already full." });
     renderInLeague(<JoinPublicLeagueButton leagueId="p2" leagueName="Sharks Only Auction" />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Join Sharks Only Auction" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("That league is already full.");
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("That league is already full.");
+    // Task 12 (persona checkpoint, adjudicated): the refusal carries its own measure. In
+    // `LeagueRow`'s `max-content` action column an unmeasured paragraph sizes the track to the
+    // whole sentence unwrapped, exploding the row's other five columns — the cap makes the
+    // sentence wrap inside its own column in the row while changing nothing a card reader sees.
+    expect(alert).toHaveClass("max-w-56");
   });
 
   it("says something useful when the server cannot be reached at all", async () => {

@@ -18,9 +18,13 @@ import { useLeagueRoomDeps } from "../hooks/deps";
 export function JoinPublicLeagueButton({
   leagueId,
   leagueName,
+  variant = "secondary",
 }: {
   readonly leagueId: string;
   readonly leagueName: string;
+  /** Rule 5: quiet pill unless the PARENT grants this card the view's one ink action —
+   *  `OpenLeagueCard` maps its own `emphasis` prop here, and Task 6 decides which card gets it. */
+  readonly variant?: "primary" | "secondary";
 }) {
   const { fetchJson } = useLeagueRoomDeps();
   const router = useRouter();
@@ -51,11 +55,15 @@ export function JoinPublicLeagueButton({
 
   return (
     <div className="flex flex-col gap-1">
-      <Button onClick={() => void join()} loading={submitting} disabled={submitting} aria-label={`Join ${leagueName}`}>
+      <Button variant={variant} onClick={() => void join()} loading={submitting} disabled={submitting} aria-label={`Join ${leagueName}`}>
         Join
       </Button>
       {error === null ? null : (
-        <p role="alert" className="text-sm text-negative">
+        /* `max-w-56` (Task 12, persona checkpoint): inside `LeagueRow`'s `max-content` action
+           column an unmeasured paragraph sizes the track to the whole sentence unwrapped and
+           crushes the row's other five columns — the cap wraps the refusal inside its own
+           column. In a card the surrounding width already governs, so nothing changes there. */
+        <p role="alert" className="max-w-56 text-sm text-negative">
           {error}
         </p>
       )}

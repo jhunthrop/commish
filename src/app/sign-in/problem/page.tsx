@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { PageTitle } from "@/components/ui";
+import { PageTitle, buttonClassName } from "@/components/ui";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
@@ -39,10 +39,9 @@ export default async function SignInProblemPage({ searchParams }: PageProps) {
         <PageTitle>Sign-in did not go through</PageTitle>
         <p className="text-text-muted">Something interrupted the attempt. Nothing about your account changed.</p>
         <div className="flex flex-wrap gap-3">
-          <SignInLink
-            intent={intent}
-            className="inline-flex h-10 items-center justify-center rounded-md bg-accent px-4 font-medium text-accent-text transition-colors hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-surface"
-          >
+          {/* This page's ONE action (rule 5), so it is the view's ink pill; the front-door
+              escape below stays a plain text link. */}
+          <SignInLink intent={intent} className={buttonClassName("primary", "md")}>
             Try again
           </SignInLink>
           <Link
