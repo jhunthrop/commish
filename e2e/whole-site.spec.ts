@@ -103,7 +103,10 @@ test("every addendum surface renders its own chrome and its own first heading", 
   await expect(managerZero.getByRole("heading", { name: "Your leagues" })).toBeVisible();
   await shellChrome(managerZero, "/app first run");
   await expect(managerZero.getByRole("heading", { name: "Set up your manager profile" })).toBeVisible();
-  await expect(managerZero.getByLabel("Display name")).toBeVisible();
+  // Scoped to `main`: the fork streams, and an unscoped `getByLabel` can catch the App
+  // Router's hidden streaming buffer (`div#S:*[hidden]`) mid-swap and strict-fail on two
+  // copies — see onboarding.spec.ts's fork walk for the full diagnosis (Task 12).
+  await expect(managerZero.getByRole("main").getByLabel("Display name")).toBeVisible();
 });
 
 test("a 404 walk reaches /browse without an account", async ({ page }) => {
