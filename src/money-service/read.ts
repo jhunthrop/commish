@@ -1,6 +1,6 @@
 import { and, eq, inArray, sql } from "drizzle-orm";
 import type { ReadonlyDb } from "@/db/client";
-import { moneyEntries, moneyTransactions } from "@/db/schema";
+import { moneyEntries, moneyTransactions, users, type KycStatus } from "@/db/schema";
 import { accountIdFor, parseAccountId, signedBalance, type MoneyAccountId } from "@/money/accounts";
 
 /**
@@ -91,6 +91,28 @@ export async function walletSummary(db: ReadonlyDb, userId: string): Promise<Wal
     escrowCentsFor(db, userId),
   ]);
   return { availableCents, escrowCents, heldCents, owedCents };
+}
+
+/** The KYC status and self-exclusion stamp the wallet's own two non-figure panels render
+ *  (Task 12): `KycPanel` and `ExclusionPanel`. Neither is a SUM — both are read straight off
+ *  `users`, the same columns `moneyGates` (`./gates.ts`) reads to decide whether a door opens. */
+export interface WalletAccountFlags {
+  readonly kycStatus: KycStatus;
+  /** ISO 8601, or `null` while never excluded — `users.self_excluded_at`, verbatim. */
+  readonly selfExcludedAt: string | null;
+}
+
+/**
+ * `users.kyc_status` and `users.self_excluded_at` for one member, read together because both
+ * panels sit on the wallet page in the same request. Throws for a missing row rather than
+ * inventing a resting default: unlike `walletSummary` (a SUM legitimately answers zero for a
+ * stranger the book has never seen), a signed-in caller with no `users` row is not a reachable
+ * state, and a silent `"none"`/`null` guess would hide that bug rather than surface it.
+ */
+export async function walletAccountFlags(db: ReadonlyDb, userId: string): Promise<WalletAccountFlags> {
+  const [row] = await db.select({ kycStatus: users.kycStatus, selfExcludedAt: users.selfExcludedAt }).from(users).where(eq(users.id, userId));
+  if (row === undefined) throw new Error(`walletAccountFlags: no user row for "${userId}".`);
+  return { kycStatus: row.kycStatus, selfExcludedAt: row.selfExcludedAt === null ? null : row.selfExcludedAt.toISOString() };
 }
 
 /**

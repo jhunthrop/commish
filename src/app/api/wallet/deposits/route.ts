@@ -4,7 +4,7 @@ import { fail, ok, parseJson } from "@/lib/api/respond";
 import { initiateDeposit } from "@/money-service/deposits";
 import { depositRequestSchema } from "@/money-service/schemas";
 import { MONEY_STATES } from "@/money/states";
-import { createPaymentsProvider } from "@/payments-provider/registry";
+import { getSharedPaymentsProvider } from "@/payments-provider/registry";
 import type { TransferIntent } from "@/payments-provider/contract";
 import { withCurrentUser } from "@/app/api/leagues/_shared";
 import { depositRateLimited } from "../_shared";
@@ -14,16 +14,6 @@ export const dynamic = "force-dynamic";
 
 /** The outermost edge is the only place a wall clock or a random id is allowed. */
 const systemClock = { now: () => new Date().toISOString() };
-
-/**
- * One provider handle per PROCESS, not per request, built lazily so importing this module (a
- * build-time event) constructs nothing. Lazy-but-shared matters for the mock arm specifically:
- * its transfer book is in-memory, and Seam A's replay law — a double-submitted form resolves to
- * the SAME transfer — only holds across two HTTP requests if both reach the same instance. A
- * real rail is stateless per request and does not care.
- */
-let provider: ReturnType<typeof createPaymentsProvider> | undefined;
-const getProvider = () => (provider ??= createPaymentsProvider());
 
 export interface InitiateDepositBody {
   readonly transfer: TransferIntent;
@@ -36,6 +26,11 @@ export interface InitiateDepositBody {
  * `MONEY_CONFIG.deposit` bounds by `depositRequestSchema` before the writer runs; a DECLINE
  * comes back 200 as a `failed` transfer with its typed reason, because a bank saying no is a
  * business outcome the form renders, not an error.
+ *
+ * `getSharedPaymentsProvider()` (`@/payments-provider/registry`, Task 12 fix): ONE process-wide
+ * instance, shared with `withdrawals/route.ts` and `admin/money/reconcile/route.ts` — not a
+ * handle local to this file. See that function's own docblock for the collision this used to
+ * leave reachable.
  */
 export async function POST(request: Request) {
   return withCurrentUser(request, async (userId, req) => {
@@ -49,7 +44,7 @@ export async function POST(request: Request) {
       getDb(),
       { userId, ...parsed.value },
       {
-        provider: getProvider(),
+        provider: getSharedPaymentsProvider(),
         audit: getAuditLogger(),
         clock: systemClock,
         newId: () => crypto.randomUUID(),

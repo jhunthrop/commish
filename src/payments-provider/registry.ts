@@ -53,3 +53,31 @@ function build(name: PaymentsProviderName): PaymentsProvider {
       return createMockPaymentsProvider(systemClock);
   }
 }
+
+/**
+ * The ONE process-wide instance every `/api/wallet/**` route (and the admin reconcile route)
+ * shares — Task 12's fix for the gap `admin/money/reconcile/route.ts` used to disclose in its own
+ * docblock: deposits, withdrawals and reconcile each built their OWN `createPaymentsProvider()`
+ * handle, so with the shipped `mock` provider — whose transfer book lives in the instance's own
+ * memory — a deposit initiated through the deposits route was invisible to a reconcile check run
+ * against a different instance, AND two instances could independently mint the same
+ * `mock-transfer-N` ref (`nextRefSequence` restarts at 1 per instance), which `providerTransferRef`
+ * assumes is unique enough to key a webhook callback by. Once the wallet puts a deposit form and a
+ * withdrawal form on the same page (Task 12), that collision is reachable in a single session, not
+ * only a hypothetical. A REAL rail has no such gap (every call reaches the bank's own state, not
+ * this process's — the reconcile route's prior docblock made that argument already); this seam
+ * exists only because the mock keeps its book in memory, and one instance is the honest fix.
+ *
+ * Lazy, so importing this module builds nothing; `resetSharedPaymentsProvider` is a test-only
+ * escape hatch mirroring `resetDepositRateLimit`'s own shape (`@/app/api/wallet/_shared.ts`) — no
+ * production caller ever calls it.
+ */
+let sharedProvider: PaymentsProvider | undefined;
+export function getSharedPaymentsProvider(): PaymentsProvider {
+  return (sharedProvider ??= createPaymentsProvider());
+}
+
+/** Test seam: forces the next `getSharedPaymentsProvider()` call to build a fresh instance. */
+export function resetSharedPaymentsProvider(): void {
+  sharedProvider = undefined;
+}

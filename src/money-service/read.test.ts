@@ -10,7 +10,7 @@ import { accountIdFor } from "@/money/accounts";
 import { MONEY_CONFIG } from "@/money/config";
 import { postMoneyTransaction, type MoneyTransactionInput, type PostDeps } from "./post";
 import { confiscateHold, releaseHold, settleSeasonPayouts } from "./settlement";
-import { accountBalance, getUserAnnualNetProfit, walletSummary } from "./read";
+import { accountBalance, getUserAnnualNetProfit, walletAccountFlags, walletSummary } from "./read";
 import { runSeededPostingSequence } from "./test-support";
 
 const db = createTestDb();
@@ -302,5 +302,22 @@ describe("getUserAnnualNetProfit — held prizes across a year boundary (the con
     expect(await accountBalance(db, accountIdFor("user_available", "u_tax"))).toBe(30_00); // 50_00 deposit − 20_00 fee
     expect(await accountBalance(db, accountIdFor("platform_forfeiture"))).toBe(40_00);
     expect(await accountBalance(db, accountIdFor("held_for_review", "u_tax"))).toBe(0);
+  });
+});
+
+describe("walletAccountFlags — the KYC status and self-exclusion stamp the wallet panels render (Task 12)", () => {
+  it("reads a fresh user's resting state: none, never excluded", async () => {
+    await db.insert(users).values({ id: "u_fresh", email: "u_fresh@test.local", displayName: "Fresh" });
+    expect(await walletAccountFlags(db, "u_fresh")).toEqual({ kycStatus: "none", selfExcludedAt: null });
+  });
+
+  it("reads a verified, self-excluded user's actual stamped columns, never a derived guess", async () => {
+    const excludedAt = new Date("2026-06-01T12:00:00.000Z");
+    await db.insert(users).values({ id: "u_flagged", email: "u_flagged@test.local", displayName: "Flagged", kycStatus: "verified", selfExcludedAt: excludedAt });
+    expect(await walletAccountFlags(db, "u_flagged")).toEqual({ kycStatus: "verified", selfExcludedAt: excludedAt.toISOString() });
+  });
+
+  it("throws for a user id with no row — not a reachable state for a signed-in session, but never a silent wrong answer", async () => {
+    await expect(walletAccountFlags(db, "u_ghost")).rejects.toThrow(/no user row/);
   });
 });

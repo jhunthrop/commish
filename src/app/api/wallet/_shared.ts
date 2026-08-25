@@ -42,3 +42,14 @@ export function exclusionRateLimited(userId: string): Response | null {
 export function resetExclusionRateLimit(): void {
   exclusionLimiter.reset();
 }
+
+/** `GET /api/wallet`'s own limiter (Task 12) — same shape, `MONEY_CONFIG.wallet.rateLimit`. */
+const walletLimiter = createRateLimiter(MONEY_CONFIG.wallet.rateLimit);
+
+export function walletRateLimited(userId: string): Response | null {
+  return walletLimiter.allow(userId) ? null : fail("You have tried that a lot in a short time. Give it a minute and try again.", 429);
+}
+
+export function resetWalletRateLimit(): void {
+  walletLimiter.reset();
+}

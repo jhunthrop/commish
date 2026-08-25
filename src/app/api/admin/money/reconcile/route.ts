@@ -1,6 +1,6 @@
 import { getDb } from "@/db/client";
 import { moneyDriftFindings, reconcileMoney, type MoneyDriftFinding, type MoneyDriftReport } from "@/money-service/reconcile";
-import { createPaymentsProvider } from "@/payments-provider/registry";
+import { getSharedPaymentsProvider } from "@/payments-provider/registry";
 import { ok } from "@/lib/api/respond";
 import { withAdmin } from "../../_shared";
 
@@ -8,22 +8,19 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
- * One provider handle per PROCESS, not per request — `src/app/api/wallet/deposits/route.ts`'s own
- * idiom, copied rather than shared: each of the three callers (deposits, withdrawals, this route)
- * keeps its own process-wide instance rather than a cross-file singleton, which this route's own
- * job is honest about needing to disclose. With the shipped `mock` provider, whose transfer book
- * lives in this instance's own memory, that means a deposit initiated through the wallet route in
- * a running dev server is invisible to a reconcile check run against THIS instance — three
- * separate in-memory books, not one pooled account. A REAL rail (Column, founder decision 2) has
- * no such gap: every call reaches the bank's own state, not this process's, so the seam itself
- * behaves like one pooled account regardless of how many adapter instances exist locally. Proving
- * reconciliation against the mock (Task 4's own promise, `PaymentsProvider.getPooledBalanceCents`'s
- * docblock) is what `reconcile.test.ts` and `scripts/money-reconcile.ts` do, both by constructing
- * (or driving) one shared mock instance directly — this route's own dev-server gap is disclosed
- * here rather than silently left for someone to rediscover.
+ * `getSharedPaymentsProvider()` (`@/payments-provider/registry`, Task 12 fix): the SAME
+ * process-wide instance `wallet/deposits/route.ts` and `wallet/withdrawals/route.ts` share, not a
+ * handle local to this file. This route used to keep its own — with the shipped `mock` provider,
+ * whose transfer book lives in memory, that meant a deposit initiated through the wallet route was
+ * INVISIBLE to a reconcile check run against this route's own separate instance: three separate
+ * in-memory books, not one pooled account, the exact gap this route's docblock used to disclose
+ * rather than silently leave for someone to rediscover. Sharing the instance closes it. A REAL
+ * rail (Column, founder decision 2) never had this gap: every call reaches the bank's own state,
+ * not this process's. Proving reconciliation against the mock (Task 4's own promise,
+ * `PaymentsProvider.getPooledBalanceCents`'s docblock) is still `reconcile.test.ts`'s and
+ * `scripts/money-reconcile.ts`'s job, both by constructing (or driving) their own mock instance
+ * directly — unaffected by this route's own handle.
  */
-let provider: ReturnType<typeof createPaymentsProvider> | undefined;
-const getProvider = () => (provider ??= createPaymentsProvider());
 
 /** `MoneyDriftReport` plus the named findings the panel and the script both render from — the
  *  ONE place `moneyDriftFindings` runs server-side, so a browser never re-derives what counts as
@@ -42,7 +39,7 @@ export interface ReconcileDriftBody extends MoneyDriftReport {
  */
 export async function GET(request: Request) {
   return withAdmin(request, async () => {
-    const report = await reconcileMoney(getDb(), getProvider());
+    const report = await reconcileMoney(getDb(), getSharedPaymentsProvider());
     return ok<ReconcileDriftBody>({ ...report, findings: moneyDriftFindings(report) });
   });
 }

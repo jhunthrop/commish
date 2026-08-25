@@ -1,5 +1,6 @@
 import type { AvatarPresetKey } from "@/identity";
 import type { ExperienceTier } from "@/domain/user";
+import type { WalletSummary } from "@/money-service/read";
 
 /**
  * TYPES ONLY, no runtime code — mirrors `@/league-room/contract`'s own note. Imported by
@@ -50,4 +51,11 @@ export interface NoticeView {
 export interface NoticesBody {
   readonly notices: readonly NoticeView[];
   readonly unreadCount: number;
+}
+
+/** `GET /api/wallet`'s body (Task 12): `walletSummary` through the envelope, verbatim — the
+ *  wallet page's own one data source, so a future wallet-adjacent surface (a nav balance widget,
+ *  a script) reads the identical four figures rather than re-deriving them. */
+export interface WalletBody {
+  readonly summary: WalletSummary;
 }

@@ -47,6 +47,12 @@ import { Meter } from "@/components/ui/meter";
 import { Panel } from "@/components/ui/panel";
 import { SeatMeter } from "@/components/ui/seat-meter";
 import { StatPill } from "@/components/ui/stat-pill";
+import { WalletPanel } from "@/account-room/components/wallet-panel";
+import { DepositForm } from "@/account-room/components/deposit-form";
+import { WithdrawalForm } from "@/account-room/components/withdrawal-form";
+import { KycPanel } from "@/account-room/components/kyc-panel";
+import { ExclusionPanel } from "@/account-room/components/exclusion-panel";
+import type { MethodDescriptor } from "@/payments-provider/contract";
 import { QueueTable } from "@/admin-room/components/queue-table";
 import { ExclusionControl } from "@/admin-room/components/exclusion-control";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
@@ -1452,5 +1458,138 @@ describe("LiveStatePill says nothing that breaks the house copy rules", () => {
       expectClean(container);
       unmount();
     }
+  });
+});
+
+/**
+ * Task 12 (Phase 4, money foundations): the wallet, the account room's first user-facing money
+ * surface. All five components join the roster in this one commit, per this file's own "one
+ * describe block, one place to add" point.
+ */
+const WALLET_METHODS: readonly MethodDescriptor[] = [
+  { method: "bank", feeCents: 0, feePercentBasisPoints: 0, etaDescription: "1-3 business days" },
+  { method: "card", feeCents: 30, feePercentBasisPoints: 325, etaDescription: "Within minutes" },
+];
+
+describe("WalletPanel says nothing that breaks the house copy rules", () => {
+  it("is clean across a fresh account and one with every figure non-zero", () => {
+    for (const summary of [
+      { availableCents: 0, escrowCents: 0, heldCents: 0, owedCents: 0 },
+      { availableCents: 123_45, escrowCents: 20_00, heldCents: 5_00, owedCents: 10_00 },
+    ]) {
+      const { container, unmount } = render(<WalletPanel summary={summary} />);
+      expectClean(container);
+      unmount();
+    }
+  });
+});
+
+describe("DepositForm says nothing that breaks the house copy rules, including every refusal it can show", () => {
+  it("is clean at rest, below the minimum, above the maximum, missing a state, declined, and server-refused", async () => {
+    const { container, unmount } = render(
+      <AccountRoomDepsProvider deps={fixtureAccountDeps().deps}>
+        <DepositForm methods={WALLET_METHODS} />
+      </AccountRoomDepsProvider>,
+    );
+    expectClean(container);
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add money" }));
+    expectClean(container);
+
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("State"), { target: { value: "TN" } });
+    fireEvent.change(screen.getByLabelText("Method"), { target: { value: "card" } });
+    expectClean(container);
+    unmount();
+
+    const declinedFixture = fixtureAccountDeps({
+      ok: true,
+      data: {
+        transfer: {
+          ref: "mock-transfer-1",
+          direction: "deposit",
+          amountCents: 50_00,
+          status: "failed",
+          failureReason: "The bank declined this transfer.",
+          initiatedAt: "2026-09-01T00:00:00.000Z",
+        },
+      },
+    });
+    const { container: declinedContainer } = render(
+      <AccountRoomDepsProvider deps={declinedFixture.deps}>
+        <DepositForm methods={WALLET_METHODS} />
+      </AccountRoomDepsProvider>,
+    );
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "50" } });
+    fireEvent.change(screen.getByLabelText("State"), { target: { value: "TN" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add money" }));
+    await screen.findByText(/No money moved/);
+    expectClean(declinedContainer);
+  });
+});
+
+describe("WithdrawalForm says nothing that breaks the house copy rules, including a declined transfer", () => {
+  it("is clean at rest and after a decline", async () => {
+    const fixture = fixtureAccountDeps({
+      ok: true,
+      data: {
+        transfer: {
+          ref: "mock-transfer-1",
+          direction: "withdrawal",
+          amountCents: 5_00,
+          status: "failed",
+          failureReason: "The bank declined this transfer.",
+          initiatedAt: "2026-09-01T00:00:00.000Z",
+        },
+        feeCents: 0,
+        feePercentBasisPoints: 0,
+        etaDescription: "1-3 business days",
+      },
+    });
+    const { container } = render(
+      <AccountRoomDepsProvider deps={fixture.deps}>
+        <WithdrawalForm bankMethod={WALLET_METHODS[0]!} />
+      </AccountRoomDepsProvider>,
+    );
+    expectClean(container);
+    fireEvent.change(screen.getByLabelText("Amount"), { target: { value: "5" } });
+    fireEvent.change(screen.getByLabelText("State"), { target: { value: "TN" } });
+    fireEvent.change(screen.getByLabelText("Bank account reference"), { target: { value: "acct_1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Withdraw" }));
+    await screen.findByText(/No money moved/);
+    expectClean(container);
+  });
+});
+
+describe("KycPanel says nothing that breaks the house copy rules, in every one of its four statuses", () => {
+  it("is clean none, pending, verified and failed", () => {
+    for (const status of ["none", "pending", "verified", "failed"] as const) {
+      const { container, unmount } = render(
+        <AccountRoomDepsProvider deps={fixtureAccountDeps().deps}>
+          <KycPanel status={status} />
+        </AccountRoomDepsProvider>,
+      );
+      expectClean(container);
+      unmount();
+    }
+  });
+});
+
+describe("ExclusionPanel says nothing that breaks the house copy rules, excluded and not, confirm dialog included", () => {
+  it("is clean not excluded, with the confirm dialog open, and already excluded", async () => {
+    const { container, unmount } = render(
+      <AccountRoomDepsProvider deps={fixtureAccountDeps().deps}>
+        <ExclusionPanel selfExcludedAt={null} />
+      </AccountRoomDepsProvider>,
+    );
+    expectClean(container);
+    fireEvent.click(screen.getByRole("button", { name: "Close paid play on this account" }));
+    await screen.findByRole("dialog");
+    expectClean(container);
+    unmount();
+
+    const { container: excludedContainer, unmount: unmountExcluded } = render(<ExclusionPanel selfExcludedAt="2026-06-01T12:00:00.000Z" />);
+    expectClean(excludedContainer);
+    unmountExcluded();
   });
 });

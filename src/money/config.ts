@@ -28,6 +28,10 @@ export const MONEY_CONFIG = {
   /** The self-exclusion door's own ceiling — same shape, same reasoning as `kyc.rateLimit`: a
    *  one-way stamp a member sets at most once in the ordinary course of using this product. */
   exclusion: { rateLimit: { maxRequests: 5, windowMs: 60_000 } },
+  /** `GET /api/wallet`'s own ceiling (Task 12) — a read, not a write, so it gets `GET
+   *  /api/notices`'s own headroom (`noticesRateLimited`'s shape) rather than a write door's
+   *  tighter one: the wallet page loads this once per navigation, not once per keystroke. */
+  wallet: { rateLimit: { maxRequests: 30, windowMs: 60_000 } },
   /**
    * Founder decision 6 / Phase 5's "Assumed Phase 4 interface": the threshold the ledger must
    * be able to answer, versioned by tax year because it is already legislation-sensitive

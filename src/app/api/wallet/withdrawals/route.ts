@@ -4,7 +4,7 @@ import { fail, ok, parseJson } from "@/lib/api/respond";
 import { initiateWithdrawal } from "@/money-service/withdrawals";
 import { withdrawalRequestSchema } from "@/money-service/schemas";
 import { MONEY_STATES } from "@/money/states";
-import { createPaymentsProvider } from "@/payments-provider/registry";
+import { getSharedPaymentsProvider } from "@/payments-provider/registry";
 import type { TransferIntent } from "@/payments-provider/contract";
 import { withCurrentUser } from "@/app/api/leagues/_shared";
 
@@ -13,12 +13,6 @@ export const dynamic = "force-dynamic";
 
 /** The outermost edge is the only place a wall clock or a random id is allowed. */
 const systemClock = { now: () => new Date().toISOString() };
-
-/** One provider handle per PROCESS — `src/app/api/wallet/deposits/route.ts`'s exact reasoning:
- *  the mock's in-memory transfer book must be the SAME instance across requests for Seam A's
- *  replay law to hold. */
-let provider: ReturnType<typeof createPaymentsProvider> | undefined;
-const getProvider = () => (provider ??= createPaymentsProvider());
 
 export interface InitiateWithdrawalBody {
   readonly transfer: TransferIntent;
@@ -36,6 +30,10 @@ export interface InitiateWithdrawalBody {
  * balance, enforced by `initiateWithdrawal`'s own reservation posting, never a read this route
  * performs itself. A DECLINE comes back 200 as a `failed` transfer with its typed reason, the
  * same business-outcome discipline `initiateDeposit` uses.
+ *
+ * `getSharedPaymentsProvider()` (`@/payments-provider/registry`, Task 12 fix): the SAME
+ * process-wide instance `deposits/route.ts` and `admin/money/reconcile/route.ts` share, not a
+ * handle local to this file — see that function's own docblock.
  */
 export async function POST(request: Request) {
   return withCurrentUser(request, async (userId, req) => {
@@ -46,7 +44,7 @@ export async function POST(request: Request) {
       getDb(),
       { userId, ...parsed.value },
       {
-        provider: getProvider(),
+        provider: getSharedPaymentsProvider(),
         audit: getAuditLogger(),
         clock: systemClock,
         newId: () => crypto.randomUUID(),
