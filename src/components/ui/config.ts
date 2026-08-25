@@ -110,6 +110,17 @@ export const UI_CONFIG = {
      */
     fillCelebrationMs: 1_500,
   },
+  wire: {
+    /**
+     * Phase 3.7, Task 8 (self-ruled: 3): fewer real items than this and `Wire`
+     * (`@/league-room/components/wire`) renders `null` — a quiet product shows a clean
+     * hairline under the nav, never filler (the plan's own "no mock data on a real surface"
+     * rule, applied to a marquee that would otherwise loop two lonely sentences). The
+     * reduced-motion branch also shows exactly this many as its static row: the count that
+     * makes the wire worth showing is the count a non-scrolling row can honestly show.
+     */
+    minItems: 3,
+  },
   infoTip: {
     /**
      * WCAG 2.2 SC 2.5.8 (Target Size, Minimum — Level AA): a pointer target must be at least

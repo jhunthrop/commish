@@ -225,3 +225,55 @@ export interface ProofStats {
    *  strip's own render switch. Deliberately blind to `nextDraftAt` (see its docblock). */
   readonly any: boolean;
 }
+
+/**
+ * One item on the wire (Phase 3.7, Task 8) — the ticker of REAL product events under the public
+ * nav, produced by `listWireItems` (`@/league-service/wire`) and rendered by `Wire`
+ * (`@/league-room/components/wire`).
+ *
+ * ACTOR-FREE BY CONSTRUCTION (self-ruling S9): the approved mock's ticker says "Marcus claimed a
+ * seat"; this product does not put a member's display name — or id — on an anonymous marketing
+ * surface, so no variant here CAN carry one. A deliberate deviation from the mock's literal
+ * copy, never from its idea.
+ *
+ * Every field is a disclosure this interface's siblings already made: `leagueName` names a
+ * PUBLIC league (`ENFORCED_LEAGUE_SQL` is in every source read's own WHERE, the same join
+ * `draftsNext48h` documents), the seat and season counts are the same capacity facts
+ * `PublicLeagueSummary.filledTeams`/`teamCount` and `ProofStats.leaguesFilled` already carry,
+ * and the two millisecond deltas are COARSE by consumption — the component renders them only
+ * through the `formatCoarseDuration` family, never as instants, so no timestamp precision a
+ * stranger could correlate against ever reaches the page.
+ *
+ * Deltas rather than instants on purpose: the wire is request-time truth (deferral D4 — no
+ * anonymous SSE), computed against the page's ONE `now`, and a delta cannot quietly drift from
+ * a second clock read the way a re-parsed instant could.
+ */
+export type WireItem =
+  | {
+      readonly kind: "seat_claimed";
+      readonly leagueName: string;
+      /** How long before the page's own `now` the seat was claimed. */
+      readonly agoMs: number;
+      /** The league's open seats at read time (`teamCount - filledTeams`) — the fact the
+       *  component's live tint keys on, against the SAME `UI_CONFIG.seatMeter.lowSeatsThreshold`
+       *  every seat sentence already uses. Never rendered as its own sentence: `SeatMeter` owns
+       *  the product's one seat sentence (F17). */
+      readonly seatsOpen: number;
+    }
+  | {
+      readonly kind: "league_filled";
+      readonly leagueName: string;
+      /** `"in_progress"` reads "drafting now"; `"scheduled"` reads "drafting soon". */
+      readonly draftStatus: "scheduled" | "in_progress";
+    }
+  | {
+      readonly kind: "draft_tonight";
+      readonly leagueName: string;
+      /** How long after the page's own `now` the kickoff lands. */
+      readonly untilMs: number;
+    }
+  | {
+      readonly kind: "season_count";
+      /** `ProofStats.leaguesFilled`'s own number, gated by the same floor. */
+      readonly count: number;
+    };

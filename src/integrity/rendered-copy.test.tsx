@@ -28,6 +28,8 @@ import { LiveStatePill } from "@/league-room/components/live-state-pill";
 import { ModerationSummary } from "@/league-room/components/moderation-summary";
 import { OpenLeagueCard } from "@/league-room/components/open-league-card";
 import { OpenSeatsPanel } from "@/league-room/components/open-seats-panel";
+import { Wire } from "@/league-room/components/wire";
+import type { WireItem } from "@/matchmaking/contract";
 import { ProofStrip } from "@/league-room/components/proof-strip";
 import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
 import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
@@ -878,6 +880,29 @@ describe("ProofStrip says nothing that breaks the house copy rules, full and emp
       expectClean(container);
       unmount();
     }
+  });
+});
+
+/**
+ * Phase 3.7, Task 8: the wire's composed ticker sentences — every kind, both `league_filled`
+ * branches, the urgent live-tinted claim, and both coarse-time units — are runtime-composed
+ * (`formatCoarseDuration` deltas stitched into each sentence), exactly the composition the
+ * source sweeps are blind to, so the rendered sweep is the one that reads them. League names
+ * are the content subtracted; every remaining word is the wire's own voice.
+ */
+describe("Wire says nothing that breaks the house copy rules, across every kind and tone", () => {
+  const WIRE_ITEMS: readonly WireItem[] = [
+    { kind: "seat_claimed", leagueName: "Sunday Money", agoMs: 5 * 60_000, seatsOpen: 6 },
+    { kind: "seat_claimed", leagueName: "Almost Full", agoMs: 30_000, seatsOpen: 1 },
+    { kind: "league_filled", leagueName: "Iron Bowl", draftStatus: "in_progress" },
+    { kind: "league_filled", leagueName: "Quiet Room", draftStatus: "scheduled" },
+    { kind: "draft_tonight", leagueName: "Night Draft", untilMs: 3 * 60 * 60_000 },
+    { kind: "season_count", count: 76 },
+  ];
+
+  it("is clean with the full ticker rendered", () => {
+    const { container } = render(<Wire items={WIRE_ITEMS} />);
+    expectClean(container, "Sunday Money", "Almost Full", "Iron Bowl", "Quiet Room", "Night Draft");
   });
 });
 

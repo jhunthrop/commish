@@ -9,9 +9,11 @@ import type { HelpLevel } from "@/identity/preferences";
 import { readPreferences } from "@/identity-service/preferences";
 import { formatAbsoluteTime } from "@/league";
 import { listPublicLeagues } from "@/league-service/browse";
+import { listWireItems } from "@/league-service/wire";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { BrowseFilters, type BrowseFilterOption } from "@/league-room/components/browse-filters";
 import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
+import { Wire } from "@/league-room/components/wire";
 
 export const dynamic = "force-dynamic";
 
@@ -102,9 +104,18 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   );
 
   if (user === null) {
+    // Task 8: the wire mounts on the SIGNED-OUT branch only (per the Spec — the signed-in view
+    // is `AppShell` chrome, not the public nav), so its read runs only when there is a wire to
+    // feed. Awaited here rather than in the `Promise.all` above: the branch is not known until
+    // `getCurrentUser()` resolves, and a member's browse should not pay for a read it never
+    // renders. Same `clock` instant as every card on the page.
+    const wireItems = await listWireItems(getDb(), clock);
     return (
       <>
         <PublicBar intent={PAGE_INTENT} />
+        {/* Real events under the nav, per the mock — nothing at all when the product is too
+            quiet to earn it (`UI_CONFIG.wire.minItems`). */}
+        <Wire items={wireItems} />
         {/* Full-bleed, no `max-w-*`, matching `AppShell`'s own signed-in `<main>` (NEW-2): the
             open-league shelf is the busiest page in the product and is not under `/app`, so it
             never inherited the shell's full-width fix. A long-form reading surface keeps its own

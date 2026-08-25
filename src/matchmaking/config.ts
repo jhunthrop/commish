@@ -125,6 +125,29 @@ export const MATCHMAKING_CONFIG = {
      */
     cacheTtlSeconds: 60,
   },
+  /**
+   * Phase 3.7, Task 8: the wire — the ticker of real product events under the public nav
+   * (`listWireItems`, `@/league-service/wire`; rendered by `Wire`, `@/league-room/components/
+   * wire`). Request-time truth with coarse timestamps (deferral D4: no anonymous SSE), so both
+   * numbers here describe what ONE page render reads, never a stream.
+   */
+  wire: {
+    /**
+     * How far the wire looks — BACK for claimed seats, FORWARD for scheduled kickoffs. One
+     * day, the same horizon `proof.nextDraftWithinMs` above already rules for the same
+     * register: inside it, "a seat was claimed · 3 hours ago" still reads as activity and a
+     * kickoff is a fact a visitor can act on tonight; beyond it, one is history and the other
+     * is a schedule, and the real-or-absent ruling omits both rather than dressing them up.
+     */
+    windowMs: 24 * 60 * 60 * 1000,
+    /**
+     * The most items one wire render carries, and each source read's own LIMIT. Twelve fills
+     * the marquee's loop at desktop width without the track becoming a minutes-long read; the
+     * component separately renders nothing at all below `UI_CONFIG.wire.minItems`, so this cap
+     * only ever trims a busy product, never pads a quiet one.
+     */
+    maxItems: 12,
+  },
 } as const;
 
 /**

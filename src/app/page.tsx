@@ -11,11 +11,13 @@ import { formatAbsoluteTime } from "@/league";
 import { listPublicLeagues } from "@/league-service/browse";
 import { proofStats } from "@/league-service/proof";
 import { getProofCache } from "@/league-service/proof-cache-instance";
+import { listWireItems } from "@/league-service/wire";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { FrontDoorHero } from "@/league-room/components/front-door-hero";
 import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
 import { ProofStrip } from "@/league-room/components/proof-strip";
 import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
+import { Wire } from "@/league-room/components/wire";
 
 export const dynamic = "force-dynamic";
 
@@ -75,10 +77,13 @@ export default async function Home() {
   const nowIso = new Date().toISOString();
   const clock = { now: () => nowIso };
 
-  const [user, { leagues, house }, stats] = await Promise.all([
+  const [user, { leagues, house }, stats, wireItems] = await Promise.all([
     getCurrentUser(),
     listPublicLeagues(getDb(), normalizeBrowseFilter({}), clock, { sort: "seats_remaining", whenFullOnly: false }),
     getProofCache().stats(() => proofStats(getDb(), { clock })),
+    // Task 8: the wire's request-time read, on the page's one clock — see `Wire`'s own docblock
+    // for the whole request-time-truth account (deferral D4, no anonymous SSE).
+    listWireItems(getDb(), clock),
   ]);
 
   // D1/E7 (Phase 3.7, Task 5): guided is a signed-in PREFERENCE behavior, never a surface
@@ -94,6 +99,9 @@ export default async function Home() {
           <ButtonLink href="/browse">Take a seat</ButtonLink>
         }
       />
+      {/* Task 8: the wire — real events under the nav, per the mock. Renders nothing at all
+          when the product is too quiet to earn it (`UI_CONFIG.wire.minItems`). */}
+      <Wire items={wireItems} />
       <main className="flex flex-col gap-10 bg-surface">
         {/* Task 7: the hero band is the page's one floodlit ground — `.floodlight` (the wash,
             and the `position: relative` its overlays anchor to) and `.yard-lines` (a full-bleed

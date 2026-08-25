@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import type { BrowseBody, ProofStats } from "@/matchmaking/contract";
+import type { BrowseBody, ProofStats, WireItem } from "@/matchmaking/contract";
 
 vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/league-service/browse", () => ({ listPublicLeagues: vi.fn() }));
 vi.mock("@/league-service/proof", () => ({ proofStats: vi.fn() }));
 vi.mock("@/league-service/proof-cache-instance", () => ({ getProofCache: vi.fn() }));
+vi.mock("@/league-service/wire", () => ({ listWireItems: vi.fn() }));
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
@@ -14,6 +15,7 @@ vi.mock("next/navigation", () => ({
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { listPublicLeagues } from "@/league-service/browse";
 import { getProofCache } from "@/league-service/proof-cache-instance";
+import { listWireItems } from "@/league-service/wire";
 import { UI_CONFIG } from "@/components/ui/config";
 import { PUBLIC_LEAGUES } from "@/league-room/test-fixtures";
 import Home from "./page";
@@ -33,6 +35,9 @@ beforeEach(() => {
   vi.mocked(getProofCache)
     .mockReset()
     .mockReturnValue({ stats: vi.fn(async () => EMPTY_STATS) } as never);
+  // Quiet by default — the wire's own component tests own its rendering; the page tests below
+  // only assert where it mounts and that a quiet product mounts nothing.
+  vi.mocked(listWireItems).mockReset().mockResolvedValue([]);
 });
 
 describe("the front door (Task 5)", () => {
@@ -136,6 +141,26 @@ describe("the front door (Task 5)", () => {
     // The band holds the hero, the steps and (when earned) the proof chips.
     expect(within(band as HTMLElement).getByRole("heading", { level: 1 })).toBeInTheDocument();
     expect(within(band as HTMLElement).getByText("Pick a seat")).toBeInTheDocument();
+  });
+
+  // Task 8: the wire mounts under the nav — real events or nothing at all.
+  it("runs the wire under the nav when the product has earned it, on the page's own clock (Task 8)", async () => {
+    const items: readonly WireItem[] = [
+      { kind: "seat_claimed", leagueName: "Sunday Money", agoMs: 5 * 60_000, seatsOpen: 6 },
+      { kind: "league_filled", leagueName: "Iron Bowl", draftStatus: "in_progress" },
+      { kind: "season_count", count: 76 },
+    ];
+    vi.mocked(listWireItems).mockResolvedValue(items);
+    await renderHome();
+    const list = screen.getByRole("list", { name: "Recent activity" });
+    // Under the nav: the band sits immediately between the banner and the page's main content.
+    expect(screen.getByRole("banner").nextElementSibling).toBe(list.closest(".bg-surface-inset"));
+    expect(vi.mocked(listWireItems)).toHaveBeenCalledWith({}, expect.objectContaining({ now: expect.any(Function) }));
+  });
+
+  it("mounts no wire at all on a quiet product — a clean hairline, never filler (Task 8)", async () => {
+    await renderHome();
+    expect(screen.queryByRole("list", { name: "Recent activity" })).not.toBeInTheDocument();
   });
 
   it("frames 'Start your own league' as a hairline-topped row, never a box (rule 4)", async () => {
