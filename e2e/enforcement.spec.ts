@@ -128,7 +128,12 @@ test("a veteran browses, is refused a beginner league, and reads why", async ({ 
   // full incident.
   const card = managerA.locator("li").filter({ has: managerA.getByRole("heading", { name: target.name }) });
   await expect(card).toBeVisible();
-  await expect(card.getByText("Mostly newcomers")).toBeVisible();
+  // The card discloses who this league is for before the refusal proves it: the composition
+  // sentence ("Mostly newcomers") left the card with Phase 3.7 Task 5's ledger redesign, and the
+  // beginner tier's surviving user-visible signal is the format line's "newer players only" —
+  // the same fact, the phrase a visitor actually reads now (rows and cards both render it via
+  // `open-league-shared.tsx`).
+  await expect(card.getByText("newer players only")).toBeVisible();
 
   // Manager A is the platform's own real veteran: three REAL completed seasons, stamped by
   // `finalizeWeekInTx` itself (`npm run seed`'s own `VETERAN_SEASON_LEAGUES` loop). Pressing
