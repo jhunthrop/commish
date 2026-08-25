@@ -9,6 +9,15 @@ import {
   type DepositReturnedOutcome,
 } from "@/money-service/deposits";
 import type { PostDeps } from "@/money-service/post";
+import {
+  WITHDRAWAL_ALARMS,
+  recordWithdrawalCompleted,
+  recordWithdrawalFailed,
+  recordWithdrawalReturned,
+  type WithdrawalCompletedOutcome,
+  type WithdrawalFailedOutcome,
+  type WithdrawalReturnedOutcome,
+} from "@/money-service/withdrawals";
 import { PAYMENTS_PROVIDER_CONFIG } from "@/payments-provider/config";
 import { INGEST_REFUSALS, ingestProviderCallback, type PaymentsEvent } from "@/payments-provider/ingest";
 
@@ -33,11 +42,13 @@ const postingDeps = (): PostDeps => ({ audit: getAuditLogger(), clock: systemClo
  *    (ledger-vs-bank drift is the surface built to catch exactly this class).
  *  - return-before-completion → 503: the ONE alarm redelivery genuinely heals, because the
  *    completion callback is being retried too and posts first.
+ *  - failure-after-completion → 200: invalid on the seam's own transition graph (Task 6's
+ *    `WITHDRAWAL_ALARMS.failureAfterCompletion`); redelivery reproduces it verbatim, the same
+ *    class as unknown-ref/disagreement.
  *  - a thrown error → 500: the provider redelivers into a bug we want the retries for.
  *
- * `withdrawal_*` events are acknowledged 200 and logged untouched: Task 6 wires their writers,
- * and until it does, no withdrawal can be INITIATED anywhere in the product, so no real
- * withdrawal callback can exist — an arriving one is logged as the anomaly it is.
+ * `withdrawal_completed`, `withdrawal_failed` and `withdrawal_returned` (Task 6) ride the same
+ * dispatch as the deposit fates, through `@/money-service/withdrawals`'s three writers.
  */
 export async function POST(request: Request) {
   const body = await request.text();
@@ -55,14 +66,11 @@ export async function POST(request: Request) {
       case "deposit_returned":
         return answer(await recordDepositReturned(getDb(), event, postingDeps()), event);
       case "withdrawal_completed":
-      case "withdrawal_returned":
+        return answer(await recordWithdrawalCompleted(getDb(), event, postingDeps()), event);
       case "withdrawal_failed":
-        console.warn("[payments] webhook: withdrawal event before Task 6 wired its writers", {
-          type: event.type,
-          ref: event.ref,
-          amountCents: event.amountCents,
-        });
-        return ok({ received: true });
+        return answer(await recordWithdrawalFailed(getDb(), event, postingDeps()), event);
+      case "withdrawal_returned":
+        return answer(await recordWithdrawalReturned(getDb(), event, postingDeps()), event);
     }
   } catch (error: unknown) {
     console.error("[payments] webhook handler failed", { type: event.type, ref: event.ref }, error);
@@ -71,7 +79,10 @@ export async function POST(request: Request) {
 }
 
 /** See the module docblock's status discipline. The alarm sentence is logged, never echoed. */
-function answer(outcome: DepositCompletedOutcome | DepositReturnedOutcome, event: PaymentsEvent): Response {
+function answer(
+  outcome: DepositCompletedOutcome | DepositReturnedOutcome | WithdrawalCompletedOutcome | WithdrawalFailedOutcome | WithdrawalReturnedOutcome,
+  event: PaymentsEvent,
+): Response {
   if (outcome.ok) return ok({ received: true });
   console.error("[payments] webhook alarm", {
     alarm: outcome.alarm,
@@ -79,7 +90,7 @@ function answer(outcome: DepositCompletedOutcome | DepositReturnedOutcome, event
     ref: event.ref,
     amountCents: event.amountCents,
   });
-  if (outcome.alarm === DEPOSIT_ALARMS.returnBeforeCompletion) {
+  if (outcome.alarm === DEPOSIT_ALARMS.returnBeforeCompletion || outcome.alarm === WITHDRAWAL_ALARMS.returnBeforeCompletion) {
     return fail("Not ready for this callback yet. Deliver it again.", 503);
   }
   return ok({ received: true });

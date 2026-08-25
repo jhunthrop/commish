@@ -30,6 +30,7 @@ import { reportMessage } from "@/chat-service/moderation";
 import { reportReview } from "@/review-service/reviews";
 import { accountIdFor } from "@/money/accounts";
 import { initiateDeposit, recordDepositCompleted, recordDepositReturned, type DepositDeps } from "@/money-service/deposits";
+import { initiateWithdrawal, recordWithdrawalCompleted, type WithdrawalDeps } from "@/money-service/withdrawals";
 import { postMoneyTransaction, type PostDeps } from "@/money-service/post";
 import { ingestProviderCallback, type PaymentsEvent } from "@/payments-provider/ingest";
 import { createMockPaymentsProvider } from "@/payments-provider/mock/mock-payments-provider";
@@ -3575,5 +3576,113 @@ describe("recordDepositReturned's lock order", () => {
     expect(available!.balanceCents).toBe(0);
     const [receivable] = await joinDb.select().from(moneyAccounts).where(eq(moneyAccounts.id, "platform_receivable:u_ret_lock"));
     expect(receivable!.balanceCents).toBe(30_00);
+  });
+});
+
+/**
+ * PHASE 4, TASK 6 — the suite's 36th entry (35 counted off this file before it), for the
+ * withdrawal fate writers (`@/money-service/withdrawals`).
+ *
+ * `recordWithdrawalCompleted` (and its siblings `recordWithdrawalFailed`/
+ * `recordWithdrawalReturned`) share `recordDepositCompleted`'s own shape — `ensureAndLockMoneyAccounts`
+ * pre-locks the fate's three accounts, `postMoneyTransaction` re-locks the subset it actually
+ * posts against — but withdrawals introduce a lock-order risk deposits never had: TWO
+ * platform-wide singletons in the SAME fate set, `fbo_pool` AND `provider_clearing`, both shared
+ * across every user in the product, not just the one this posting is about. Sorted order makes
+ * `fbo_pool` ("f…") lock before `provider_clearing` ("p…") before any per-user
+ * `user_available:<id>` ("u…") row, for every caller — so two DIFFERENT users' withdrawal
+ * activity must queue on the SAME two shared rows without cycling.
+ *
+ * The proof: a bystander parks `fbo_pool`, the first-sorted row every withdrawal fate needs.
+ * `recordWithdrawalCompleted` for u1 blocks there, holding nothing. While it waits,
+ * `initiateWithdrawal`'s own REQUEST-TIME reservation for a SECOND, unrelated user (u2) — which
+ * touches `provider_clearing` and `user_available:u2`, but never `fbo_pool` — runs and commits
+ * freely on a third connection, exactly the "no fbo_pool leg, so nothing blocks it" shape the
+ * return proof above established. Released, u1's completion proceeds onto `provider_clearing`
+ * SECOND, exactly as sorted order requires, and finds u2's reservation already committed there —
+ * proof that the shared clearing row correctly serializes cross-user activity rather than each
+ * caller cycling on its own inputs' order.
+ */
+describe("recordWithdrawalCompleted's lock order", () => {
+  it("blocks at the pool row holding nothing while a second user's withdrawal request commits against the shared clearing row", async () => {
+    await truncateMoneyTables(joinDb);
+    for (const id of ["u_wd_lock_1", "u_wd_lock_2"]) {
+      await joinDb.insert(users).values({ id, email: `${id}@test.local`, displayName: id, kycStatus: "verified" }).onConflictDoNothing();
+    }
+    const provider = createMockPaymentsProvider(clock);
+    const withdrawalDeps: WithdrawalDeps = {
+      provider,
+      audit: getAuditLogger(),
+      clock,
+      newId: () => crypto.randomUUID(),
+      states: { enabled: [{ state: "TN", minAge: 18 }], neverEligible: [] },
+    };
+    const depositDeps: DepositDeps = withdrawalDeps;
+    const ingest = (queue: readonly { body: string; signature: string | undefined }[]) => {
+      const outcome = ingestProviderCallback(queue[0]!);
+      if (!outcome.ok) throw new Error(`mock callback failed ingestion: ${outcome.reason}`);
+      return outcome.event;
+    };
+
+    // Both members' real history: each funds through a completed deposit BEFORE anything parks.
+    for (const [id, amountCents] of [["u_wd_lock_1", 50_00], ["u_wd_lock_2", 30_00]] as const) {
+      const initiated = await initiateDeposit(joinDb, { userId: id, amountCents, stateOfEntry: "TN", method: "bank", idempotencyKey: `fund_${id}` }, depositDeps);
+      if (!initiated.ok) throw new Error(`unreachable: ${initiated.reason}`);
+      provider.advance();
+      const completed = await recordDepositCompleted(joinDb, ingest(provider.drainCallbacks()), depositDeps);
+      expect(completed).toMatchObject({ ok: true, replayed: false });
+    }
+
+    // u1's withdrawal reaches "pending" (a real reservation posted, a real intent stored) before
+    // anything parks — its completion event is what T_complete drives below.
+    const requested1 = await initiateWithdrawal(
+      joinDb,
+      { userId: "u_wd_lock_1", amountCents: 20_00, stateOfEntry: "TN", destination: { externalAccountRef: "ext_1" }, idempotencyKey: "wd_lock_1" },
+      withdrawalDeps,
+    );
+    if (!requested1.ok) throw new Error(`unreachable: ${requested1.reason}`);
+    provider.advance();
+    const completedEvent = ingest(provider.drainCallbacks());
+
+    // The bystander: holds the FIRST-sorted fate row, `"fbo_pool"`.
+    let holdsPoolLock: () => void = () => {};
+    const poolLocked = new Promise<void>((resolve) => (holdsPoolLock = resolve));
+    let releasePoolLock: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releasePoolLock = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM money_accounts WHERE id = ${"fbo_pool"} FOR UPDATE`);
+      holdsPoolLock();
+      await released;
+    });
+    await poolLocked;
+
+    // T_complete: the real writer, on its own connection. Its first LOCK is the parked pool row,
+    // so it must genuinely block here before it has touched `provider_clearing` at all.
+    const completing = recordWithdrawalCompleted(flagDb, completedEvent, withdrawalDeps);
+    expect(await waitForBlockedBackend()).toBe(true);
+
+    // T_request2: while u1's completion waits (holding nothing), a SECOND user's withdrawal
+    // request touches `provider_clearing` and `user_available:u_wd_lock_2` — no `fbo_pool` leg,
+    // so nothing blocks it — and commits on a third connection.
+    const requesting2 = await initiateWithdrawal(
+      pickDb,
+      { userId: "u_wd_lock_2", amountCents: 15_00, stateOfEntry: "TN", destination: { externalAccountRef: "ext_2" }, idempotencyKey: "wd_lock_2" },
+      withdrawalDeps,
+    );
+    expect(requesting2).toMatchObject({ ok: true, transfer: { status: "pending" } });
+
+    releasePoolLock();
+    await holding;
+
+    // Released, u1's completion proceeds onto the shared `provider_clearing` row SECOND and
+    // finds u2's reservation already committed there — the two users' activity serialized
+    // through the shared singletons without either cycling on the other's input order.
+    expect(await completing).toEqual({ ok: true, replayed: false });
+    const [pool] = await joinDb.select().from(moneyAccounts).where(eq(moneyAccounts.id, "fbo_pool"));
+    expect(pool!.balanceCents).toBe(60_00); // 50 + 30 funded, minus u1's 20 completed out
+    const [clearing] = await joinDb.select().from(moneyAccounts).where(eq(moneyAccounts.id, "provider_clearing"));
+    expect(clearing!.balanceCents).toBe(15_00); // u1's 20 resolved out, u2's 15 still reserved
+    const [available2] = await joinDb.select().from(moneyAccounts).where(eq(moneyAccounts.id, "user_available:u_wd_lock_2"));
+    expect(available2!.balanceCents).toBe(15_00); // 30 funded minus the 15 reserved
   });
 });
