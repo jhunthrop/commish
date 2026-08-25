@@ -26,7 +26,13 @@ import type { TradeAsset } from "@/trades/assets";
 
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
 export const draftFormatEnum = pgEnum("draft_format", ["snake", "auction"]);
-export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress", "complete"]);
+/**
+ * `"dissolved"` (Phase 4, Task 9, migration 0040) added to the END, on `0039`'s own precedent: a
+ * value `ALTER TYPE ... ADD VALUE`s onto an existing Postgres enum can only ever append, never
+ * insert — `@/domain/draft`'s own `DraftStatus` docblock carries the full reasoning for what this
+ * value means and where it is (and is not) read.
+ */
+export const draftStatusEnum = pgEnum("draft_status", ["scheduled", "in_progress", "complete", "dissolved"]);
 /**
  * Phase 3.5, Task 7 (the sit-and-go trigger): which of the two ways this draft's `kickoff_at`
  * came to be set. `'scheduled'` is a time a commissioner chose; `'when_full'` is a time

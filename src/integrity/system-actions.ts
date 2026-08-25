@@ -58,6 +58,14 @@ export const SYSTEM_ACTION_CODES = [
    * has the Modal's own confirmation).
    */
   "draft_fill_reversed",
+  /**
+   * The operator-triggered dissolution (Phase 4, Task 9, founder's own "a paid league that can
+   * wait forever holding twelve entry fees is not shippable" ruling): `dissolveLeague`
+   * (`@/money-service/dissolution`) closing a pre-draft league nobody is coming back to fill.
+   * `NoticeContexts.league_dissolved` (`@/integrity/notices`) is its own per-member notice; this
+   * is the league-wide fact beside it, on the SAME chain, written last.
+   */
+  "league_dissolved",
 ] as const;
 
 export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
@@ -120,6 +128,11 @@ export type SystemActionCode = (typeof SYSTEM_ACTION_CODES)[number];
  *    reasoning exactly, run in reverse: a fact about the league's shared calendar, true for
  *    everyone still in it, about nobody's conduct. A member who was told the room was about to
  *    draft is owed the sentence that says it no longer is.
+ *  - `league_dissolved` is ALLOWED to everyone (Phase 4, Task 9), on the identical reasoning: a
+ *    fact about the league's own shared calendar ending rather than moving, true for every
+ *    seated member, about nobody's conduct. Every member is also owed the personal half of this
+ *    same fact (`NoticeContexts.league_dissolved`), which carries the amount, if any, that came
+ *    back to THEM — this league-wide event states only that the room closed.
  */
 export type SystemActionVisibility = "everyone" | "subject_only" | "hidden";
 
@@ -135,6 +148,7 @@ export const SYSTEM_ACTION_VISIBILITY: Readonly<Record<SystemActionCode, SystemA
   house_league_opened: "everyone",
   draft_kickoff_rolled: "everyone",
   draft_fill_reversed: "everyone",
+  league_dissolved: "everyone",
 };
 
 /**

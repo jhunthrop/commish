@@ -198,6 +198,7 @@ describe("NOTICE_TEMPLATES", () => {
       "draft_kickoff_rolled",
       "draft_pick_skipped",
       "house_league_filled",
+      "league_dissolved",
       "lineup_auto_set",
       "operator_warning",
       "review_removed",

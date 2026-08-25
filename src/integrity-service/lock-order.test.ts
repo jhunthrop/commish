@@ -30,6 +30,7 @@ import { reportMessage } from "@/chat-service/moderation";
 import { reportReview } from "@/review-service/reviews";
 import { accountIdFor } from "@/money/accounts";
 import { initiateDeposit, recordDepositCompleted, recordDepositReturned, type DepositDeps } from "@/money-service/deposits";
+import { dissolveLeague } from "@/money-service/dissolution";
 import { initiateWithdrawal, recordWithdrawalCompleted, type WithdrawalDeps } from "@/money-service/withdrawals";
 import { postMoneyTransaction, type PostDeps } from "@/money-service/post";
 import { ingestProviderCallback, type PaymentsEvent } from "@/payments-provider/ingest";
@@ -3800,5 +3801,57 @@ describe("a paid join's fee posting beside a standalone posting on the same memb
     // member_joined — the composed transaction's two events, exactly.
     const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_fee_lock"));
     expect(leagueAnchor!.headSequence).toBe(2);
+  });
+});
+
+/**
+ * PHASE 4, TASK 9. `dissolveLeague` (`@/money-service/dissolution`) takes `leagues[X] FOR
+ * UPDATE` as its own first statement — the identical first lock `joinLeagueInTx` takes, so the
+ * two must serialize on the same row exactly the way `releaseSeat` and a join already do
+ * ("releaseSeat vs. joinLeagueInTx" above, this file's own template for this proof). Driven on a
+ * FREE league (`parkedJoin`'s own default) so the race is about the lock order alone, never about
+ * money gates a paid join would also have to pass — Task 9's own free-season law is proven
+ * separately, by the statement-log spy in `dissolution.test.ts`.
+ */
+describe("dissolveLeague vs. joinLeagueInTx — the dissolve-vs-join race on the same league (Task 9)", () => {
+  it("blocks dissolveLeague behind a parked join's leagues[X] FOR UPDATE, then lets it through once released — one winner joins, dissolution then refunds/notifies everyone seated", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_dvj_commish", email: "u_dvj_commish@test.local", displayName: "Commish" },
+      { id: "u_dvj_joiner", email: "u_dvj_joiner@test.local", displayName: "Joiner" },
+    ]);
+    const leagueId = "lg_dissolve_vs_join";
+    await joinDb.insert(leagues).values({ id: leagueId, name: leagueId, format: "snake", teamCount: 3, commissionerUserId: "u_dvj_commish" });
+    await joinDb
+      .insert(drafts)
+      .values({ id: "draft_dissolve_vs_join", leagueId, format: "snake", status: "scheduled", kickoffAt: new Date("2026-09-10T17:00:00.000Z") });
+    await joinDb.insert(teams).values({ id: "team_dvj_commish", leagueId, userId: "u_dvj_commish", name: "Commish's Team" });
+
+    // T_join: parked holding `leagues[X] FOR UPDATE`, before its own capacity check — the room
+    // genuinely has an open seat at this instant, whatever `dissolveLeague` goes on to do after.
+    const join = parkedJoin(leagueId, "u_dvj_joiner", "team_dvj_joiner");
+    await join.leagueLocked;
+
+    // T_dissolve: the real function, on its own connection. Its FIRST statement is the identical
+    // `leagues[X] FOR UPDATE` the parked join already holds — it blocks HERE, before it can ever
+    // read `drafts` or mark anything dissolved.
+    const dissolving = dissolveLeague(pickDb, { leagueId, operatorUserId: "u_dvj_operator" }, { clock });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    // The join proceeds on the state it found (still pre-draft, a real open seat) and commits.
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+
+    // The dissolution proceeds only once the join's transaction has fully released the row — and
+    // its own read of `teams`, taken UNDER its own `leagues[X] FOR UPDATE`, sees the seat the
+    // join just committed: two members refunded/notified, not one, proving this was a real
+    // serialization rather than a snapshot taken before the join landed.
+    const dissolved = await dissolving;
+    expect(dissolved).toMatchObject({ ok: true, refundedMembers: 2, totalRefundedCents: 0 });
+
+    const [draft] = await joinDb.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, "draft_dissolve_vs_join"));
+    expect(draft!.status).toBe("dissolved");
+    const notices = await joinDb.select({ userId: memberNotices.userId }).from(memberNotices).where(eq(memberNotices.leagueId, leagueId));
+    expect(notices.map((notice) => notice.userId).sort()).toEqual(["u_dvj_commish", "u_dvj_joiner"]);
   });
 });

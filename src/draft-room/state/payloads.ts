@@ -7,7 +7,11 @@ import type { DraftClockView } from "@/draft-engine";
  * applied in the other direction.
  */
 const clockSchema = z.object({
-  phase: z.enum(["scheduled", "in_progress", "complete"]),
+  // `"dissolved"` (Phase 4, Task 9, `@/domain/draft`'s own `DraftStatus`) joins this enum for the
+  // bidirectional check below alone, never because the wire actually sends it: a dissolved
+  // league's draft never reaches `"scheduled"`'s live session at all (dissolution is pre-draft
+  // only), so this stream never opens for one and `phase` never carries the value in practice.
+  phase: z.enum(["scheduled", "in_progress", "complete", "dissolved"]),
   sequence: z.number().int().nonnegative(),
   pickNumber: z.number().int().nonnegative(),
   onClockTeamId: z.string().nullable(),

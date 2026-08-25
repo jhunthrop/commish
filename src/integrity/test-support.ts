@@ -226,4 +226,5 @@ export const NOTICE_SAMPLES: { readonly [T in NoticeType]: NoticeContexts[T] } =
     showReleaseParagraph: false,
   },
   draft_fill_reversed: { leagueName: "Sunday Money" },
+  league_dissolved: { leagueName: "Sunday Money", refundedCents: 20_00 },
 };

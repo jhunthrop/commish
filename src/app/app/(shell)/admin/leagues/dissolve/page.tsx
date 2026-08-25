@@ -1,0 +1,30 @@
+import { PageTitle } from "@/components/ui";
+import { withAdmin } from "@/app/api/admin/_shared";
+import { DissolveLeagueControl } from "@/admin-room/components/dissolve-league-control";
+
+export const dynamic = "force-dynamic";
+
+/**
+ * The admin room's league-dissolution surface (Phase 4, Task 9). Renders no `TopBar` and no
+ * `<main>` of its own — `(shell)/layout.tsx` supplies both, `AdminExclusionsPage`'s own
+ * discipline (`../../exclusions/page.tsx`). Not linked from `TopBar` either, on the identical
+ * scoping note that page's own docblock states: an operator reaches this page directly, from the
+ * support conversation that names the league's id, the same way that page is reached rather than
+ * from a nav link enumerating every open league.
+ */
+export default async function AdminDissolveLeaguePage() {
+  return withAdmin(async () => {
+    return (
+      <>
+        <header className="flex flex-col gap-1">
+          <PageTitle>Dissolve league</PageTitle>
+          <p className="text-sm text-text-muted">
+            Close a league that did not fill before its draft. Every seated member is refunded their entry fee and told why.
+          </p>
+        </header>
+
+        <DissolveLeagueControl />
+      </>
+    );
+  });
+}

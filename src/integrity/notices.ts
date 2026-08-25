@@ -1,3 +1,5 @@
+import { formatUsd } from "@/money/config";
+
 /**
  * The copy a system-triggered action says to the member it affected. THE one place this text
  * lives: call sites pass structured context, never a string.
@@ -336,6 +338,21 @@ export interface NoticeContexts {
   readonly draft_fill_reversed: {
     readonly leagueName: string;
   };
+  /**
+   * `dissolveLeague`'s own notice (`@/money-service/dissolution`, Phase 4 Task 9) — the personal
+   * half of the `league_dissolved` `system_action` the same write appends
+   * (`SYSTEM_ACTION_VISIBILITY.league_dissolved` is `"everyone"`, `@/integrity/system-actions`),
+   * sent to EVERY seated team the moment an operator closes a pre-draft league nobody filled.
+   * Money-first, on `MONEY_REFUSALS`' own copy rulebook (`@/money/config`): the sentence that
+   * carries a dollar figure states what happened to the money before anything else.
+   * `refundedCents` is the member's own net entry-fee contribution this dissolution returned —
+   * `0` for a free league, or for a comped/seeded seat that was never charged, and the template
+   * below reads that as its own branch rather than ever printing "$0.00 is back in your wallet".
+   */
+  readonly league_dissolved: {
+    readonly leagueName: string;
+    readonly refundedCents: number;
+  };
 }
 
 /**
@@ -561,6 +578,20 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
   draft_fill_reversed: ({ leagueName }) => ({
     title: `${leagueName} is back to filling`,
     body: `A seat opened up in ${leagueName}, so the room is no longer full and its draft goes back to waiting for the last seat.`,
+  }),
+  // No "no reply to this message" line: this is not a sanction, and there is nothing about any
+  // member's own conduct to appeal — an operator closing a room nobody filled is a fact about
+  // the league, not a decision about the person reading it. Money-first on the paid branch, the
+  // same discipline `MONEY_REFUSALS`' own rulebook holds every dollar sentence to
+  // (`@/money/config`): the sentence naming a dollar figure says what happened to the money
+  // before anything else. The free/comped branch never claims a fee came back that was never
+  // charged.
+  league_dissolved: ({ leagueName, refundedCents }) => ({
+    title: `${leagueName} did not fill`,
+    body:
+      refundedCents > 0
+        ? `${leagueName} did not fill and an operator closed it. Your entry fee of ${formatUsd(refundedCents)} is back in your wallet.`
+        : `${leagueName} did not fill and an operator closed it.`,
   }),
 };
 

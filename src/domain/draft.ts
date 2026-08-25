@@ -1,6 +1,18 @@
 import type { Position } from "./player";
 
-export type DraftStatus = "scheduled" | "in_progress" | "complete";
+/**
+ * `"dissolved"` (Phase 4, Task 9) is reached from `"scheduled"` alone, one way, the moment an
+ * operator dissolves a league before its draft ever starts (`dissolveLeague`,
+ * `@/money-service/dissolution`) — never from `"in_progress"` or `"complete"`: a season already
+ * under way is a season in motion, and dissolution refuses it outright. Nothing in the live
+ * draft engine (`@/draft-engine`, `@/draft-room`) ever assigns or reads this value: a dissolved
+ * league's draft never started, so no draft SESSION — the reducer's own `phase`, the realtime
+ * `phase` payload — ever needs to represent it. It exists purely as the SEASON-STATE fact
+ * `@/league-service/browse.ts`'s `browseQuery` already filters on (`eq(drafts.status,
+ * "scheduled")`), which is what lets a dissolved league leave the public browse shelf with no
+ * new predicate: it simply stops matching the one browse already has.
+ */
+export type DraftStatus = "scheduled" | "in_progress" | "complete" | "dissolved";
 
 /**
  * Persisted JSON shape version. `draft_actions.action` stores these rows forever, so the
