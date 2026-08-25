@@ -4,13 +4,13 @@ import Link from "next/link";
 import { Card, InfoTip, LedgerRow, SeatMeter } from "@/components/ui";
 import type { HelpLevel } from "@/identity/preferences";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import { stakeTierLabel } from "@/matchmaking/filter";
 import {
   DraftTimingNotes,
   FormatLine,
   LiveChip,
   OpenLeagueCta,
   ScheduledDraftValue,
+  entryFeeLabel,
   stakeBadge,
   useOpenLeagueLive,
 } from "./open-league-shared";
@@ -96,10 +96,10 @@ export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet"
           <DraftTimingNotes league={league} authority={authority} />
         </div>
         <LedgerRow label="Entry">
-          {/* Real, not promotional: every league is free this season — `stakeTierLabel` is the
-              one place that says what a stake tier costs, and money green is what green means
-              (rule 1). */}
-          <span className="font-semibold text-positive">{stakeTierLabel(league.stakeTier)}</span>
+          {/* Real, not promotional: `entryFeeLabel` reads the league's REAL entry fee — "Free"
+              for every league today, because every league is free this season — and money
+              green is what green means (rule 1). */}
+          <span className="font-semibold text-positive">{entryFeeLabel(league)}</span>
         </LedgerRow>
         <LedgerRow label="Seats">
           <span className="font-medium tabular-nums text-text-primary">

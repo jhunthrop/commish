@@ -32,6 +32,7 @@ const BASE: PublicLeagueSummary = {
   format: "snake",
   experienceTier: "experienced",
   stakeTier: 0,
+  entryFeeCents: 0,
   teamCount: 12,
   filledTeams: 9,
   scoringLabel: "Half PPR",
@@ -135,6 +136,18 @@ describe("OpenLeagueCard", () => {
     const entry = screen.getAllByText("Free").find((element) => element.className.includes("text-positive"));
     expect(entry).toBeDefined();
     expect(entry!.className).toContain("font-semibold");
+  });
+
+  // Phase 4, Task 13: the live branch, proven through injection — no league that exists today
+  // carries `entryFeeCents > 0` (`moneyIsLive()` gates paid creation dark), so this fixture is
+  // the only way to exercise the row's real-money reading ahead of that day.
+  it("prices the Entry row from the real entry fee, once a league carries one", () => {
+    // `stakeTier` stays cosmetic (`stakeBadge` still reads "Free" from it, unchanged) — only the
+    // Entry ROW switches from the tier label to the real fee.
+    render(card({ ...BASE, entryFeeCents: 5000 }));
+    const entry = screen.getByText("$50.00");
+    expect(entry.className).toContain("text-positive");
+    expect(entry.className).toContain("font-semibold");
   });
 
   describe("the ledger clock (rule 6)", () => {

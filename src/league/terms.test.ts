@@ -20,6 +20,9 @@ const BASE: LeagueTermsInput = {
   scoring: SCORING_PRESETS.ppr,
   rosterSlots: SMALL_ROSTER,
   stakeTier: 1,
+  entryFeeCents: 0,
+  platformFeeCents: 0,
+  payoutTable: null,
   medianGame: false,
   commissioner: { displayName: "Alex Rivera", avatarUrl: "preset:crown" },
   kickoffAt: "2026-09-12T23:00:00.000Z",
@@ -63,6 +66,50 @@ describe("leagueTerms", () => {
     // somebody decides to enter a league, and two hand-written versions of "no money changes
     // hands" is exactly how one of them ends up out of date the week money starts changing hands.
     expect(leagueTerms(BASE).stakeDisclosure).toBe(MATCHMAKING_CONFIG.stakeDisclosure);
+  });
+
+  it("carries no money fields at all for a free league — real-or-absent, never zero-valued", () => {
+    const terms = leagueTerms(BASE);
+    expect(terms.entryFeeUsd).toBeUndefined();
+    expect(terms.platformFeeUsd).toBeUndefined();
+    expect(terms.prizeTable).toBeUndefined();
+  });
+
+  // Phase 4, Task 13: the live branch, proven through injection — no league that exists today
+  // carries `entryFeeCents > 0` (`moneyIsLive()` gates paid creation dark), so this fixture is
+  // the only way to exercise these fields ahead of that day.
+  describe("a paid league", () => {
+    const PAID = {
+      ...BASE,
+      entryFeeCents: 5_000,
+      platformFeeCents: 500,
+      payoutTable: [
+        { place: 1, amountCents: 3_000 },
+        { place: 2, amountCents: 1_500 },
+      ],
+    };
+
+    it("states the entry fee and platform fee in dollars", () => {
+      const terms = leagueTerms(PAID);
+      expect(terms.entryFeeUsd).toBe("$50.00");
+      expect(terms.platformFeeUsd).toBe("$5.00");
+    });
+
+    it("carries the published prize table, place-ordered, in dollars", () => {
+      expect(leagueTerms(PAID).prizeTable).toEqual([
+        { place: 1, amountUsd: "$30.00" },
+        { place: 2, amountUsd: "$15.00" },
+      ]);
+    });
+
+    it("switches the stake disclosure to the live sentence, never the free-season one", () => {
+      expect(leagueTerms(PAID).stakeDisclosure).toBe(MATCHMAKING_CONFIG.liveStakeDisclosure);
+      expect(leagueTerms(PAID).stakeDisclosure).not.toBe(MATCHMAKING_CONFIG.stakeDisclosure);
+    });
+
+    it("carries an empty prize table honestly, when a paid league published none", () => {
+      expect(leagueTerms({ ...PAID, payoutTable: null }).prizeTable).toEqual([]);
+    });
   });
 
   it("carries no format notes for a plain standard-shape, non-median league", () => {

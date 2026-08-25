@@ -15,6 +15,7 @@ const BASE: PublicLeagueSummary = {
   format: "snake",
   experienceTier: "experienced",
   stakeTier: 0,
+  entryFeeCents: 0,
   teamCount: 12,
   filledTeams: 9,
   scoringLabel: "Half PPR",

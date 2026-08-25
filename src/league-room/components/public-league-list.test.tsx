@@ -29,6 +29,7 @@ const HOUSE_LEAGUE: PublicLeagueSummary = {
   format: "snake",
   experienceTier: "experienced",
   stakeTier: 0,
+  entryFeeCents: 0,
   teamCount: 12,
   filledTeams: 5,
   scoringLabel: "Half PPR",

@@ -36,6 +36,19 @@ describe("FrontDoorHero", () => {
     });
   });
 
+  // Phase 4, Task 13: the live branch, proven through injection — `moneyIsLive()` ships false
+  // (`MONEY_STATES.enabled` is empty), so no real render reaches this sentence today. The
+  // free-season sentence and the config can never disagree: this is the ONE other value `live`
+  // can take, and the free sentence must never appear once it does.
+  it("gives way to the live money sentence once a state is enabled, and never says both", async () => {
+    await renderSurface(<FrontDoorHero live={true} />, ({ getByText, queryByText }) => {
+      const live = getByText("Play free everywhere, or play for real money where your state allows.");
+      expect(live).toBeInTheDocument();
+      expect(live.className).toContain("text-positive");
+      expect(queryByText("Every league is free this season.")).not.toBeInTheDocument();
+    });
+  });
+
   // S8: the sub adopts the mock's one sentence; "No account is needed to look." survives as a
   // detail line — it answered a persona concern and costs one quiet line.
   it("keeps the mock's sub sentence and the quiet no-account detail line", async () => {

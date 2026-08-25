@@ -100,6 +100,7 @@ export const TERMS: LeagueTerms = {
   rosterLine: "1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 K, 1 DEF, 6 bench",
   stakeLabel: "Friendly",
   stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
+  entryFeeCents: 0,
   commissionerName: "Alex Rivera",
   commissionerAvatar: null,
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
@@ -241,6 +242,6 @@ export function renderInLeague(ui: ReactElement, deps: LeagueRoomDeps): RenderRe
  *  one all-newcomer composition, one veteran-leaning composition, so a consumer's rendering of
  *  BOTH `TIER_COMPOSITION_LABEL` buckets it is likely to show has real fixture data to render. */
 export const PUBLIC_LEAGUES: readonly PublicLeagueSummary[] = [
-  { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, teamCount: 12, filledTeams: 3, scoringLabel: "Standard", compositionCategory: "all_newcomers", draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)", medianGame: false, startTrigger: "scheduled", houseRung: null, heldSeats: 0, rosterSummary: "15 slots, 1 flex", playoffWeeks: [15, 16, 17], kickoffRolls: 0 },
-  { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, teamCount: 10, filledTeams: 9, scoringLabel: "PPR", compositionCategory: "open", draftAt: "Sunday 13 September, 1:00 PM UTC (in 4 days)", medianGame: false, startTrigger: "scheduled", houseRung: null, heldSeats: 0, rosterSummary: "15 slots, 1 flex", playoffWeeks: [15, 16, 17], kickoffRolls: 0 },
+  { id: "p1", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0, entryFeeCents: 0, teamCount: 12, filledTeams: 3, scoringLabel: "Standard", compositionCategory: "all_newcomers", draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)", medianGame: false, startTrigger: "scheduled", houseRung: null, heldSeats: 0, rosterSummary: "15 slots, 1 flex", playoffWeeks: [15, 16, 17], kickoffRolls: 0 },
+  { id: "p2", name: "Sharks Only Auction", format: "auction", experienceTier: "experienced", stakeTier: 3, entryFeeCents: 0, teamCount: 10, filledTeams: 9, scoringLabel: "PPR", compositionCategory: "open", draftAt: "Sunday 13 September, 1:00 PM UTC (in 4 days)", medianGame: false, startTrigger: "scheduled", houseRung: null, heldSeats: 0, rosterSummary: "15 slots, 1 flex", playoffWeeks: [15, 16, 17], kickoffRolls: 0 },
 ];

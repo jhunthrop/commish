@@ -226,6 +226,11 @@ export async function invitePreview(db: Db, code: string, clock: Clock = systemC
       scoring: weights ?? PPR_SCORING,
       rosterSlots: league.rosterSlots,
       stakeTier: league.stakeTier,
+      // Phase 4, Task 13: the SAME reasoning `read.ts`'s own `leagueHome` carries — straight off
+      // the `league` row this function already read above, no new query.
+      entryFeeCents: league.entryFeeCents,
+      platformFeeCents: league.platformFeeCents,
+      payoutTable: league.payoutTable,
       medianGame: league.medianGame,
       commissioner: {
         displayName: commissioner?.displayName ?? "Commissioner",

@@ -26,10 +26,23 @@ const TERMS: LeagueTerms = {
   rosterLine: "1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 K, 1 DEF, 6 bench",
   stakeLabel: "Friendly",
   stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
+  entryFeeCents: 0,
   commissionerName: "Alex Rivera",
   commissionerAvatar: null,
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
   formatNotes: [],
+};
+
+// Phase 4, Task 13: the live branch, proven through injection — no invite can carry a paid
+// league's terms while `moneyIsLive()` stays false, so this fixture is the only way to exercise
+// `JoinForm`'s state-attestation step ahead of that day.
+const PAID_TERMS: LeagueTerms = {
+  ...TERMS,
+  stakeDisclosure: MATCHMAKING_CONFIG.liveStakeDisclosure,
+  entryFeeCents: 5_000,
+  entryFeeUsd: "$50.00",
+  platformFeeUsd: "$5.00",
+  prizeTable: [{ place: 1, amountUsd: "$45.00" }],
 };
 
 /** Every test passes all four terminal callbacks — most only care that theirs fires, or that
@@ -142,5 +155,51 @@ describe("JoinForm", () => {
     renderInLeague(<JoinForm code="SUNDAY12" terms={TERMS} {...NOOP} />, deps);
     fireEvent.click(screen.getByRole("button", { name: "Join Sunday Money" }));
     await waitFor(() => expect(screen.getByRole("alert")).toHaveTextContent("We could not reach the server."));
+  });
+
+  // Phase 4, Task 13: the paid join's own confirmation and state-attestation gate — proven
+  // through injection (`PAID_TERMS`), since no invite this platform mints can carry a paid
+  // league's terms while `moneyIsLive()` stays false.
+  describe("a paid league's join", () => {
+    it("renders no confirmation, and never gates the button, for a free join", () => {
+      renderInLeague(<JoinForm code="SUNDAY12" terms={TERMS} {...NOOP} />, fixtureLeagueDeps().deps);
+      expect(screen.queryByLabelText("State of entry")).not.toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Join Sunday Money" })).not.toBeDisabled();
+    });
+
+    it("states the fee, the balance after and the refund rule, and gates Join on a chosen state", () => {
+      renderInLeague(
+        <JoinForm code="SUNDAY12" terms={PAID_TERMS} balanceAfterUsd="$70.00" {...NOOP} />,
+        fixtureLeagueDeps().deps,
+      );
+      expect(screen.getByText("This league charges $50.00 to join.")).toBeInTheDocument();
+      expect(screen.getByText("$70.00")).toBeInTheDocument();
+      expect(
+        screen.getByText("Refunded in full if you leave before the draft or the league dissolves before it starts."),
+      ).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Join Sunday Money" })).toBeDisabled();
+    });
+
+    it("un-gates Join once a state is chosen, and sends it on the accept request", async () => {
+      const calls: { readonly url: string; readonly body: unknown }[] = [];
+      const deps = {
+        fetchJson: async (url: string, init?: RequestInit) => {
+          calls.push({ url, body: init?.body === undefined ? undefined : JSON.parse(init.body as string) });
+          return { json: async () => ({ ok: true, data: { leagueId: "l1", teamId: "t2", alreadyMember: false } }) } as unknown as Response;
+        },
+        openEventSource: fixtureLeagueDeps().deps.openEventSource,
+      };
+      renderInLeague(<JoinForm code="SUNDAY12" terms={PAID_TERMS} balanceAfterUsd="$70.00" {...NOOP} />, deps);
+
+      const button = screen.getByRole("button", { name: "Join Sunday Money" });
+      expect(button).toBeDisabled();
+
+      fireEvent.change(screen.getByLabelText("State of entry"), { target: { value: "TX" } });
+      expect(button).not.toBeDisabled();
+
+      fireEvent.click(button);
+      await waitFor(() => expect(calls).toEqual([{ url: "/api/invites/SUNDAY12/accept", body: { stateOfEntry: "TX" } }]));
+      await waitFor(() => expect(push).toHaveBeenCalledWith("/app/leagues/l1"));
+    });
   });
 });

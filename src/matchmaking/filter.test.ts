@@ -15,6 +15,7 @@ const league = (over: Partial<PublicLeagueSummary> = {}): PublicLeagueSummary =>
   format: "snake",
   experienceTier: "beginner",
   stakeTier: 0,
+  entryFeeCents: 0,
   teamCount: 12,
   filledTeams: 8,
   scoringLabel: "Standard",

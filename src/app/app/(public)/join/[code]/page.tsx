@@ -5,6 +5,8 @@ import { PageTitle } from "@/components/ui";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
 import { invitePreview } from "@/league-service/invites";
+import { formatUsd } from "@/money/config";
+import { walletSummary } from "@/money-service/read";
 import { InviteLanding, type InviteLandingState } from "@/league-room/components/invite-landing";
 
 export const dynamic = "force-dynamic";
@@ -72,12 +74,29 @@ export default async function JoinPage({ params }: PageProps) {
   // `SignInLink` both return here (Task 16, F6).
   const pageIntent = `/app/join/${code}`;
 
+  // Phase 4, Task 13: `JoinForm`'s own "balance after" sentence (`PaidJoinConfirmation`) —
+  // computed HERE, server-side, exactly once, and ONLY when there is a real balance to read: a
+  // signed-in caller AND a league that actually carries a fee (`preview.terms.entryFeeUsd`
+  // defined). Every free join — which is every join this season, `moneyIsLive()` gates paid
+  // league creation dark — reads the wallet zero times, the free-season reality check this task
+  // must hold: `undefined` here reads as `undefined` all the way down to `JoinForm`.
+  const balanceAfterUsd =
+    user !== null && preview.ok && preview.terms.entryFeeUsd !== undefined
+      ? formatUsd((await walletSummary(getDb(), user.id)).availableCents - preview.terms.entryFeeCents)
+      : undefined;
+
   return (
     <>
       {user === null ? <PublicBar intent={pageIntent} /> : null}
       <main className="mx-auto flex w-full max-w-md flex-col gap-4 p-4">
         <PageTitle>Join a league</PageTitle>
-        <InviteLanding state={stateFor(preview)} signedIn={user !== null} code={code} helpLevel={preferences?.helpLevel ?? "guided"} />
+        <InviteLanding
+          state={stateFor(preview)}
+          signedIn={user !== null}
+          code={code}
+          helpLevel={preferences?.helpLevel ?? "guided"}
+          balanceAfterUsd={balanceAfterUsd}
+        />
       </main>
       <PublicFooter />
     </>

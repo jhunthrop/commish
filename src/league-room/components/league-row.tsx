@@ -3,13 +3,13 @@
 import { SeatMeter } from "@/components/ui";
 import { EYEBROW } from "@/components/ui/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import { stakeTierLabel } from "@/matchmaking/filter";
 import {
   DraftTimingNotes,
   FormatLine,
   LiveChip,
   OpenLeagueCta,
   ScheduledDraftValue,
+  entryFeeLabel,
   stakeBadge,
   useOpenLeagueLive,
 } from "./open-league-shared";
@@ -93,7 +93,7 @@ export function LeagueRow({ league, signedIn, emphasis = "quiet" }: LeagueRowPro
         {/* The row's only spoken key: "Free" alone, mid-row, would answer a question a screen
             reader was never asked. Money green is what green means (rule 1). */}
         <span className="sr-only">Entry</span>{" "}
-        <span className="font-semibold text-positive">{stakeTierLabel(league.stakeTier)}</span>
+        <span className="font-semibold text-positive">{entryFeeLabel(league)}</span>
       </div>
 
       <div className="flex min-w-0 flex-col gap-1 text-sm">

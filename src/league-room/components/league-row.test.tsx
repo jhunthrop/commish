@@ -32,6 +32,7 @@ const BASE: PublicLeagueSummary = {
   format: "snake",
   experienceTier: "experienced",
   stakeTier: 0,
+  entryFeeCents: 0,
   teamCount: 12,
   filledTeams: 9,
   scoringLabel: "Half PPR",
@@ -96,6 +97,16 @@ describe("LeagueRow", () => {
     expect(entry).toBeDefined();
     expect(entry!.className).toContain("font-semibold");
     expect(screen.getByText("Entry")).toHaveClass("sr-only");
+  });
+
+  // Phase 4, Task 13: the live branch, proven through injection — no league that exists today
+  // carries `entryFeeCents > 0` (`moneyIsLive()` gates paid creation dark), so this fixture is
+  // the only way to exercise the column's real-money reading ahead of that day.
+  it("prices the Entry column from the real entry fee, once a league carries one", () => {
+    render(row({ ...BASE, entryFeeCents: 5000 }));
+    const entry = screen.getByText("$50.00");
+    expect(entry.className).toContain("text-positive");
+    expect(entry.className).toContain("font-semibold");
   });
 
   it("counts the Seats column as '{n} of {t} open', tabular, with the segment meter beside it", () => {

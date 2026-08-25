@@ -78,6 +78,13 @@ export interface PublicLeagueSummary {
   readonly experienceTier: ExperienceTier;
   /** A cosmetic tier index — see `MATCHMAKING_CONFIG.stakeTiers`. Never an amount of money. */
   readonly stakeTier: number;
+  /**
+   * Phase 4, Task 13: `leagues.entry_fee_cents`, straight through — `0` for every league that
+   * exists today, because `moneyIsLive()` (`@/money/states`) gates paid creation dark
+   * (`leagueMoneyOrRefuse`, `@/league-service/creation`) until the founder names a launch state
+   * with counsel. An amount of money at last — dark until a state is enabled.
+   */
+  readonly entryFeeCents: number;
   readonly teamCount: number;
   readonly filledTeams: number;
   /** Derived from the league's scoring weights (`describeScoring`) — never the raw weights. */

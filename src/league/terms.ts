@@ -2,6 +2,8 @@ import type { DraftFormat } from "@/domain/league";
 import { BENCH_SLOT, ROSTER_SHAPE_LABEL, type RosterSlotConfig } from "@/domain/roster";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { hasOpenSeat, stakeTierLabel } from "@/matchmaking/filter";
+import { formatUsd } from "@/money/config";
+import type { PrizeTable } from "@/money/prize-table";
 import { describeScoring, type ScoringRules } from "@/scoring";
 import { describeRosterShape } from "./roster-shape";
 
@@ -29,6 +31,29 @@ export interface LeagueTerms {
    * money starts changing hands.
    */
   readonly stakeDisclosure: string;
+  /**
+   * Phase 4, Task 13: `input.entryFeeCents`, straight through — `0` for every league that exists
+   * today. Carried alongside `entryFeeUsd` (the formatted twin) because a caller computing a
+   * balance AFTER this fee (`PaidJoinConfirmation`'s own "balance after" sentence,
+   * `@/league-room/components/paid-join-confirmation`) needs the raw cents, not a string it would
+   * otherwise have to re-parse.
+   */
+  readonly entryFeeCents: number;
+  /**
+   * Phase 4, Task 13: the real fee, `formatUsd`'d — present only when `input.entryFeeCents > 0`,
+   * which no league on this platform can be while `moneyIsLive()` (`@/money/states`) gates paid
+   * creation dark (`leagueMoneyOrRefuse`, `@/league-service/creation`). Absent, never `"$0.00"`,
+   * for every free league — the same real-or-absent discipline `ProofStats`' own fields hold.
+   */
+  readonly entryFeeUsd?: string;
+  /** The platform's fixed per-entry fee, `formatUsd`'d — present under the identical condition
+   *  `entryFeeUsd` is, and absent for the identical reason. */
+  readonly platformFeeUsd?: string;
+  /** The published prize table, each place's amount `formatUsd`'d — present under the identical
+   *  condition `entryFeeUsd` is, and absent for the identical reason. Ordered by place, 1st
+   *  first, the same order `payoutTable` itself is written in (`prizeTableInvariant`'s own
+   *  contiguous-from-1 rule). */
+  readonly prizeTable?: readonly { readonly place: number; readonly amountUsd: string }[];
   readonly commissionerName: string;
   /** The commissioner's STORED avatar ref, not a URL — same contract as `Avatar`'s `avatar` prop. */
   readonly commissionerAvatar: string | null;
@@ -69,6 +94,17 @@ export interface LeagueTermsInput {
   readonly rosterSlots: readonly RosterSlotConfig[];
   /** Cosmetic tier index only — see `MATCHMAKING_CONFIG.stakeTiers`. Never an amount of money. */
   readonly stakeTier: number;
+  /**
+   * Phase 4, Task 13: `leagues.entry_fee_cents`, straight through — `0` for every league that
+   * exists today (`moneyIsLive()` gates paid creation dark). `> 0` is what switches
+   * `stakeDisclosure` to `MATCHMAKING_CONFIG.liveStakeDisclosure` and populates `entryFeeUsd`,
+   * `platformFeeUsd` and `prizeTable`.
+   */
+  readonly entryFeeCents: number;
+  /** `leagues.platform_fee_cents`, straight through — `0` for every free league. */
+  readonly platformFeeCents: number;
+  /** `leagues.payout_table`, straight through — `null` for every free league. */
+  readonly payoutTable: PrizeTable | null;
   /** `leagues.median_game` (Task 2), straight through — every caller already has the league's
    *  own row in hand by the time it builds this input. */
   readonly medianGame: boolean;
@@ -204,6 +240,30 @@ export function formatDraftTime(kickoffAtIso: string, nowIso: string): string {
 }
 
 /**
+ * Phase 4, Task 13. The three money fields (`entryFeeUsd`, `platformFeeUsd`, `prizeTable`) as
+ * one object, spread into `leagueTerms`'s return rather than three separate ternaries — so the
+ * three either all appear together (a paid league) or none do (a free one), never a partial mix
+ * a caller would have to guard against. `{}` for a free league (`entryFeeCents === 0`), never
+ * `undefined`-valued keys — `Object.keys` on the free branch's return carries no money keys at
+ * all, matching `ProofStats`' own real-or-absent discipline.
+ */
+function moneyTermsFor(
+  input: Pick<LeagueTermsInput, "entryFeeCents" | "platformFeeCents" | "payoutTable">,
+): Pick<LeagueTerms, "entryFeeUsd" | "platformFeeUsd" | "prizeTable"> {
+  // `!(> 0)` rather than `<= 0`: a stub `leagues` row that omits the column entirely reads
+  // `undefined` here (`league-read-routes.test.ts`'s own defensive-fallback stub, never a real
+  // Postgres row — that NOT NULL column always answers `0` at worst), and `undefined <= 0` is
+  // `false`, which would otherwise fall through to `formatUsd(undefined)` and throw. `!(> 0)`
+  // catches `undefined`, `NaN` and every non-positive number the same honest way.
+  if (!(input.entryFeeCents > 0)) return {};
+  return {
+    entryFeeUsd: formatUsd(input.entryFeeCents),
+    platformFeeUsd: formatUsd(input.platformFeeCents),
+    prizeTable: (input.payoutTable ?? []).map((entry) => ({ place: entry.place, amountUsd: formatUsd(entry.amountCents) })),
+  };
+}
+
+/**
  * Pure. Turns raw league facts into the terms a human reads before joining — the one place
  * that assembly happens, so the invite preview and the in-league panel can only ever agree.
  *
@@ -214,6 +274,13 @@ export function formatDraftTime(kickoffAtIso: string, nowIso: string): string {
  * (`LeagueTermsInput.kickoffAt`'s own docblock): once the fill trigger writes the real kickoff
  * (the league is full), `kickoffAt` is a real chosen instant again and this renders the honest
  * date like every other league's terms do.
+ *
+ * Phase 4, Task 13. `stakeDisclosure` reads `MATCHMAKING_CONFIG.liveStakeDisclosure` instead of
+ * the free-season sentence exactly when `entryFeeCents > 0` — never on `moneyIsLive()` directly,
+ * because a LEAGUE's own fee, not the platform's global switch, is what this one league's terms
+ * are honest about. No league can carry a fee while `moneyIsLive()` is false
+ * (`leagueMoneyOrRefuse`, `@/league-service/creation`), so the two can never actually disagree in
+ * production; the free branch stays untouched, verbatim, for every league that exists today.
  */
 export function leagueTerms(input: LeagueTermsInput): LeagueTerms {
   const stillFillingWhenFull = input.startTrigger === "when_full" && hasOpenSeat(input);
@@ -225,7 +292,9 @@ export function leagueTerms(input: LeagueTermsInput): LeagueTerms {
     scoringLabel: describeScoring(input.scoring),
     rosterLine: rosterLine(input.rosterSlots),
     stakeLabel: stakeTierLabel(input.stakeTier),
-    stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
+    stakeDisclosure: input.entryFeeCents > 0 ? MATCHMAKING_CONFIG.liveStakeDisclosure : MATCHMAKING_CONFIG.stakeDisclosure,
+    entryFeeCents: input.entryFeeCents,
+    ...moneyTermsFor(input),
     commissionerName: input.commissioner.displayName,
     commissionerAvatar: input.commissioner.avatarUrl,
     draftAt: stillFillingWhenFull ? WHEN_FULL_FILLING_NOTE : formatDraftTime(input.kickoffAt, input.now),

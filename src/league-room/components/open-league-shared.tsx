@@ -12,6 +12,7 @@ import type { HelpLevel } from "@/identity/preferences";
 import { describeStartTiming, rollNoticeSentence } from "@/matchmaking/roll";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
+import { formatUsd } from "@/money/config";
 import { JoinPublicLeagueButton } from "./join-public-league-button";
 
 /**
@@ -134,6 +135,19 @@ export function useOpenLeagueLive(league: PublicLeagueSummary): OpenLeagueLive {
  */
 export function stakeBadge(league: PublicLeagueSummary): ReactElement | null {
   return league.houseRung === null ? <Badge tone="neutral">{stakeTierLabel(league.stakeTier)}</Badge> : null;
+}
+
+/**
+ * Phase 4, Task 13: the Entry ledger row's value — the league's REAL entry fee, `formatUsd`'d,
+ * when it carries one; `"Free"` otherwise, which is every league today (`league.entryFeeCents`
+ * is `0` for every league that exists while `moneyIsLive()` gates paid creation dark,
+ * `leagueMoneyOrRefuse`, `@/league-service/creation`). Replaces the old `stakeTierLabel` reading
+ * on this one row — `stakeBadge` above still reads the cosmetic tier for the badge beside the
+ * name; this row now states the one fact a member actually pays, THE ONE SOURCE both the card
+ * and the row consume so they can never disagree.
+ */
+export function entryFeeLabel(league: PublicLeagueSummary): string {
+  return league.entryFeeCents > 0 ? formatUsd(league.entryFeeCents) : "Free";
 }
 
 /**

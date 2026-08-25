@@ -15,6 +15,7 @@ const TERMS: LeagueTerms = {
   rosterLine: "1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 K, 1 DEF, 6 bench",
   stakeLabel: "Friendly",
   stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
+  entryFeeCents: 0,
   commissionerName: "Alex Rivera",
   commissionerAvatar: "preset:crown",
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",

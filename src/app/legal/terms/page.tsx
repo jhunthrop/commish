@@ -1,7 +1,7 @@
 import { PageTitle } from "@/components/ui";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
-import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import { termsMoneyDisclosure } from "./disclosure";
 
 /** This page's own path — its `PublicBar`'s sign-in link returns here (Task 16, F6). */
 const PAGE_INTENT = "/legal/terms";
@@ -20,7 +20,7 @@ export default function TermsPage() {
         <PageTitle>Terms</PageTitle>
         <p className="text-text-muted">
           Commish is a season-long fantasy football platform: a live draft room, automatic
-          scoring, league chat, and a commissioner-free way to run a league. {MATCHMAKING_CONFIG.stakeDisclosure}
+          scoring, league chat, and a commissioner-free way to run a league. {termsMoneyDisclosure()}
         </p>
         <p className="text-text-muted">
           A league you join or create on this platform is governed by the rules that league

@@ -30,6 +30,7 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "format",
   "experienceTier",
   "stakeTier",
+  "entryFeeCents",
   "teamCount",
   "filledTeams",
   "scoringLabel",
@@ -249,6 +250,7 @@ export function browseQuery(db: Db, filter: BrowseFilter, options: BrowseQueryOp
       format: leagues.format,
       experienceTier: leagues.experienceTier,
       stakeTier: leagues.stakeTier,
+      entryFeeCents: leagues.entryFeeCents,
       teamCount: leagues.teamCount,
       medianGame: leagues.medianGame,
       // Ungrouped, on the identical functional-dependency proof `kickoffAt`/`startTrigger`
@@ -370,6 +372,7 @@ export function houseShelfQuery(db: Db, nowIso: string) {
       format: leagues.format,
       experienceTier: leagues.experienceTier,
       stakeTier: leagues.stakeTier,
+      entryFeeCents: leagues.entryFeeCents,
       teamCount: leagues.teamCount,
       medianGame: leagues.medianGame,
       houseRung: leagues.houseRung,
@@ -461,6 +464,7 @@ interface SummarizableRow {
   readonly format: DraftFormat;
   readonly experienceTier: ExperienceTier;
   readonly stakeTier: number;
+  readonly entryFeeCents: number;
   readonly teamCount: number;
   readonly medianGame: boolean;
   readonly rosterSlots: readonly RosterSlotConfig[];
@@ -507,6 +511,7 @@ function summarizeRow(
     format: row.format,
     experienceTier: row.experienceTier,
     stakeTier: row.stakeTier,
+    entryFeeCents: row.entryFeeCents,
     teamCount: row.teamCount,
     filledTeams: row.filledTeams,
     scoringLabel: weights === undefined ? "Custom" : describeScoring(weights),

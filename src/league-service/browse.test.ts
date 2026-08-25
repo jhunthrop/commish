@@ -209,6 +209,7 @@ async function seedPublicLeague(
     format: overrides.format,
     experienceTier: overrides.experienceTier,
     stakeTier: overrides.stakeTier,
+    entryFeeCents: 0,
     teamCount: overrides.teamCount,
     filledTeams: overrides.filledTeams,
     scoringLabel: "Standard",
@@ -264,6 +265,7 @@ describe("listPublicLeagues", () => {
     expect(rows).toEqual([
       {
         id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0,
+        entryFeeCents: 0,
         teamCount: 12, filledTeams: 8, scoringLabel: "Standard", compositionCategory: "all_newcomers",
         draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)", draftAtIso: "2026-09-10T17:00:00.000Z",
         medianGame: false, startTrigger: "scheduled",

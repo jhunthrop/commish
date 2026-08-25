@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import type { ApiEnvelope } from "@/lib/api/respond";
 import type { LeagueTerms } from "@/league";
 import { Button } from "@/components/ui";
+import type { StateCode } from "@/money/states";
 import { useLeagueRoomDeps } from "../hooks/deps";
 import type { JoinBody } from "../contract";
+import { PaidJoinConfirmation } from "./paid-join-confirmation";
 
 /**
  * Duplicated from `@/league-service/join`'s own refusal constants (`LEAGUE_FULL`,
@@ -39,6 +41,14 @@ export interface JoinFormProps {
    *  form reads only `terms.name` for its own button label; the rest of the terms are
    *  `LeagueTermsPanel`'s job, rendered once by `InviteLanding` regardless of session. */
   readonly terms: LeagueTerms;
+  /**
+   * Phase 4, Task 13: `PaidJoinConfirmation`'s own "balance after" sentence — computed and
+   * `formatUsd`'d server-side (`walletSummary`, `@/money-service/read`, minus the league's own
+   * `entryFeeCents`) by the page above `InviteLanding`, ONLY when `terms.entryFeeUsd` is defined
+   * (never for a free join, which is every join this season). `undefined` for every free join and
+   * for a signed-out render.
+   */
+  readonly balanceAfterUsd?: string;
   /** The accept succeeded, but this account already had a team here — no use spent, nothing
    *  written. `InviteLanding` shows "you are already in, here is the door" instead of a silent
    *  redirect. */
@@ -58,11 +68,25 @@ export interface JoinFormProps {
  * (`SeatTakenPanel`, the "you are already in" panel, the tier refusal) rather than an inline
  * alert under a button that no longer makes sense to press again.
  */
-export function JoinForm({ code, terms, onAlreadyMember, onLeagueFull, onDraftStarted, onTierRefused }: JoinFormProps) {
+export function JoinForm({
+  code,
+  terms,
+  balanceAfterUsd,
+  onAlreadyMember,
+  onLeagueFull,
+  onDraftStarted,
+  onTierRefused,
+}: JoinFormProps) {
   const { fetchJson } = useLeagueRoomDeps();
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  // Phase 4, Task 13: the paid join's own state-of-entry attestation — the fee gate's own first
+  // question (`moneyGates`, `@/money-service/gates`), asked here before "Join" ever attempts to
+  // spend. `null` until chosen; `terms.entryFeeUsd === undefined` (every league today) never
+  // reads this state at all.
+  const [stateOfEntry, setStateOfEntry] = useState<StateCode | null>(null);
+  const paid = terms.entryFeeUsd !== undefined;
 
   const join = async (): Promise<void> => {
     setSubmitting(true);
@@ -71,7 +95,12 @@ export function JoinForm({ code, terms, onAlreadyMember, onLeagueFull, onDraftSt
       const response = await fetchJson(`/api/invites/${code}/accept`, {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({}),
+        // `stateOfEntry` rides only a paid join's own request — a free join's body stays `{}`,
+        // byte-identical to every join this season. The server-side wiring that reads this field
+        // (`money-live task wires commissioner fee collection before the creation gate opens`)
+        // is deliberately not this task's — see `JoinMoneyContext`'s own docblock
+        // (`@/league-service/join`).
+        body: JSON.stringify(paid && stateOfEntry !== null ? { stateOfEntry } : {}),
       });
       const body = (await response.json()) as ApiEnvelope<JoinBody>;
       if (!body.ok) {
@@ -105,9 +134,21 @@ export function JoinForm({ code, terms, onAlreadyMember, onLeagueFull, onDraftSt
     }
   };
 
+  // Phase 4, Task 13: the paid join's own confirmation gates the button on a chosen state —
+  // never a state the fee gate was never asked about. `balanceAfterUsd`'s own docblock says why
+  // it is always defined alongside a `paid` terms object; the `?? ""` fallback below is a
+  // type-level nicety that no real render exercises.
   return (
     <div className="flex flex-col gap-3">
-      <Button onClick={() => void join()} loading={submitting} disabled={submitting}>
+      {paid ? (
+        <PaidJoinConfirmation
+          entryFeeUsd={terms.entryFeeUsd ?? ""}
+          balanceAfterUsd={balanceAfterUsd ?? ""}
+          stateOfEntry={stateOfEntry}
+          onStateOfEntryChange={setStateOfEntry}
+        />
+      ) : null}
+      <Button onClick={() => void join()} loading={submitting} disabled={submitting || (paid && stateOfEntry === null)}>
         {`Join ${terms.name}`}
       </Button>
       {error === null ? null : (

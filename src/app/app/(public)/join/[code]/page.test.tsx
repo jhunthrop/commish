@@ -10,10 +10,12 @@ vi.mock("@/lib/auth/current-user", () => ({ getCurrentUser: vi.fn() }));
 vi.mock("@/db/client", () => ({ getDb: () => ({}) }));
 vi.mock("@/identity-service/preferences", () => ({ readPreferences: vi.fn() }));
 vi.mock("@/league-service/invites", () => ({ invitePreview: vi.fn() }));
+vi.mock("@/money-service/read", () => ({ walletSummary: vi.fn() }));
 
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { readPreferences } from "@/identity-service/preferences";
 import { invitePreview } from "@/league-service/invites";
+import { walletSummary } from "@/money-service/read";
 import JoinPage from "./page";
 
 const TERMS: LeagueTerms = {
@@ -25,10 +27,32 @@ const TERMS: LeagueTerms = {
   rosterLine: "1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 K, 1 DEF, 6 bench",
   stakeLabel: "Friendly",
   stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
+  entryFeeCents: 0,
   commissionerName: "Alex Rivera",
   commissionerAvatar: null,
   draftAt: "Saturday 12 September, 7:00 PM UTC (in 3 days)",
   formatNotes: [],
+};
+
+// Phase 4, Task 13: the live branch, proven through injection — no invite this platform mints
+// can carry a paid league's terms while `moneyIsLive()` stays false.
+const PAID_TERMS: LeagueTerms = {
+  ...TERMS,
+  stakeDisclosure: MATCHMAKING_CONFIG.liveStakeDisclosure,
+  entryFeeCents: 5_000,
+  entryFeeUsd: "$50.00",
+  platformFeeUsd: "$5.00",
+  prizeTable: [{ place: 1, amountUsd: "$45.00" }],
+};
+
+const CURRENT_USER = {
+  id: "u1",
+  email: "u1@test.local",
+  displayName: "Ada",
+  experienceTier: "beginner" as const,
+  avatarUrl: null,
+  createdAt: "2026-08-01T00:00:00.000Z",
+  isAdmin: false,
 };
 
 async function renderPage(deps: Parameters<typeof LeagueRoomDepsProvider>[0]["deps"]) {
@@ -40,6 +64,7 @@ beforeEach(() => {
   vi.mocked(getCurrentUser).mockReset();
   vi.mocked(readPreferences).mockReset();
   vi.mocked(invitePreview).mockReset();
+  vi.mocked(walletSummary).mockReset();
 });
 
 /**
@@ -109,5 +134,34 @@ describe("/app/join/[code] — signed in", () => {
     expect(screen.getByRole("button", { name: "Join Sunday Money" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Sign in" })).not.toBeInTheDocument();
     expect(vi.mocked(readPreferences)).toHaveBeenCalledWith({}, expect.objectContaining({ id: "u1" }));
+  });
+
+  // Phase 4, Task 13: the free-season reality check — this is every signed-in join that exists
+  // today, and it must never read the wallet at all.
+  it("never reads the wallet for a free join — every join this season", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(CURRENT_USER);
+    vi.mocked(readPreferences).mockResolvedValue({ helpLevel: "standard", draftTourDismissedAt: null });
+    vi.mocked(invitePreview).mockResolvedValue({ ok: true, terms: TERMS });
+    const fixture = fixtureLeagueDeps({ ok: true, data: TERMS });
+    await renderPage(fixture.deps);
+
+    expect(vi.mocked(walletSummary)).not.toHaveBeenCalled();
+    expect(screen.queryByLabelText("State of entry")).not.toBeInTheDocument();
+  });
+
+  // Phase 4, Task 13: the live branch, proven through injection — no invite this platform mints
+  // can carry `PAID_TERMS` while `moneyIsLive()` stays false.
+  it("reads the wallet server-side for a paid join, and states the balance after the fee", async () => {
+    vi.mocked(getCurrentUser).mockResolvedValue(CURRENT_USER);
+    vi.mocked(readPreferences).mockResolvedValue({ helpLevel: "standard", draftTourDismissedAt: null });
+    vi.mocked(invitePreview).mockResolvedValue({ ok: true, terms: PAID_TERMS });
+    vi.mocked(walletSummary).mockResolvedValue({ availableCents: 12_000, escrowCents: 0, heldCents: 0, owedCents: 0 });
+    const fixture = fixtureLeagueDeps({ ok: true, data: PAID_TERMS });
+    await renderPage(fixture.deps);
+
+    expect(vi.mocked(walletSummary)).toHaveBeenCalledWith({}, "u1");
+    expect(screen.getByText("This league charges $50.00 to join.")).toBeInTheDocument();
+    expect(screen.getByText("$70.00")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join Sunday Money" })).toBeDisabled();
   });
 });

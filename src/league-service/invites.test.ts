@@ -499,6 +499,7 @@ describe("invitePreview", () => {
         rosterLine: "1 QB, 2 RB, 2 WR, 1 TE, 1 FLEX, 1 K, 1 DEF, 6 bench",
         stakeLabel: "Free",
         stakeDisclosure: MATCHMAKING_CONFIG.stakeDisclosure,
+        entryFeeCents: 0,
         commissionerName: "Manager 1",
         commissionerAvatar: null,
         // `league()` creates with `clock` (`nowIso`, "2026-08-17T12:00:00.000Z"), so the draft

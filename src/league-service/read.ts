@@ -242,6 +242,12 @@ export async function leagueHome(db: Db, leagueId: string, userId: string, clock
     scoring: weights ?? PPR_SCORING,
     rosterSlots: league.rosterSlots,
     stakeTier: league.stakeTier,
+    // Phase 4, Task 13: straight off the SAME locked-free `league` row this function already
+    // read above — `0`/`null` for every league that exists today (`moneyIsLive()` gates paid
+    // creation dark), no new query.
+    entryFeeCents: league.entryFeeCents,
+    platformFeeCents: league.platformFeeCents,
+    payoutTable: league.payoutTable,
     medianGame: league.medianGame,
     commissioner: {
       displayName: commissionerCard?.ownerDisplayName ?? "Commissioner",

@@ -51,6 +51,9 @@ export interface InviteLandingProps {
    *  `JoinForm`'s accept call. */
   readonly code?: string;
   readonly helpLevel?: HelpLevel;
+  /** `JoinForm`'s own `balanceAfterUsd` — see that prop's docblock. Threaded straight through;
+   *  this component reads it for nothing of its own. */
+  readonly balanceAfterUsd?: string;
 }
 
 const BROWSE_LINK_CLASS = "text-sm font-medium text-accent underline";
@@ -90,7 +93,7 @@ function shelfActions() {
  * meant. This landing says what is true right now (open, or not) and never promises a hold this
  * product deliberately does not place here.
  */
-export function InviteLanding({ state: initialState, signedIn = true, code, helpLevel }: InviteLandingProps) {
+export function InviteLanding({ state: initialState, signedIn = true, code, helpLevel, balanceAfterUsd }: InviteLandingProps) {
   const [state, setState] = useState<InviteLandingState>(initialState);
 
   if (state.kind === "invalid" || state.kind === "expired" || state.kind === "exhausted") {
@@ -179,6 +182,7 @@ export function InviteLanding({ state: initialState, signedIn = true, code, help
         <JoinForm
           code={code ?? ""}
           terms={state.terms}
+          balanceAfterUsd={balanceAfterUsd}
           onAlreadyMember={(leagueId) => setState({ kind: "already-member", leagueId, name: state.terms.name })}
           onLeagueFull={() => setState({ kind: "league-full", name: state.terms.name })}
           onDraftStarted={() => setState({ kind: "draft-started", name: state.terms.name })}

@@ -41,8 +41,18 @@ export const MATCHMAKING_CONFIG = {
     { tier: 2, label: "Competitive" },
     { tier: 3, label: "High stakes" },
   ],
-  /** The one place the "no money" promise is worded, so a card and a page cannot disagree. */
+  /** The one place the "no money" promise is worded, so a card and a page cannot disagree.
+   *  Read verbatim while `moneyIsLive()` (`@/money/states`) is false — every league that exists
+   *  today. */
   stakeDisclosure: "Stake tiers are labels only in this preview. No money changes hands.",
+  /**
+   * Phase 4, Task 13: the disclosure's live half, read ONLY once `moneyIsLive()` is true and
+   * a league is actually paid (`leagueTerms`, `@/league/terms`) — `stakeDisclosure` above stays
+   * the word for every free league, live season or dark. The one place THIS sentence is worded,
+   * for the same "a card and a page cannot disagree" reason `stakeDisclosure` already is.
+   */
+  liveStakeDisclosure:
+    "This league charges a real entry fee. The prize table is fixed in advance and paid out when the season settles.",
   /** Most open leagues one browse answers with. A list nobody can scan is not a shortlist. */
   maxResults: 48,
   /**
