@@ -14,8 +14,8 @@ Phase 8 item 2 owns entity formation. **If the entity is not yet formed, say so 
 
 | Field | Value |
 |---|---|
-| Legal entity name | `[FOUNDER: legal name]` |
-| Entity type / formation state | `[FOUNDER: e.g. Delaware C-corp / LLC]` |
+| Legal entity name | Commish LLC `[filing pending with the Arkansas Secretary of State, 2026-08-25]` |
+| Entity type / formation state | Arkansas limited liability company (single-member) |
 | EIN | `[FOUNDER: EIN]` |
 | Formation documents | `[FOUNDER: attach certificate of formation / incorporation]` |
 | Registered address | `[FOUNDER: address]` |
