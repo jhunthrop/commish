@@ -88,6 +88,16 @@ describe("moneyGates", () => {
     }
   });
 
+  it("does NOT refuse a self-excluded member at the withdrawal door — exclusion closes the doors money enters, never the door it leaves", async () => {
+    const excluded = subject({ selfExcludedAt: new Date("2026-08-30T00:00:00.000Z") });
+    expect(await moneyGates(db, excluded, "TN", "withdraw", enabledTN)).toEqual({ ok: true });
+  });
+
+  it("does NOT check the receivable at the withdrawal door — 'spend doors only', and a withdrawal never spends INTO the platform", async () => {
+    await bookReceivable("u1", 30_00);
+    expect(await moneyGates(db, subject(), "TN", "withdraw", enabledTN)).toEqual({ ok: true });
+  });
+
   it("checks in the brief's fail-fast order: state before KYC before exclusion", async () => {
     const failsEverything = subject({ kycStatus: "none", selfExcludedAt: new Date("2026-08-30T00:00:00.000Z") });
     const stateFirst = await moneyGates(db, failsEverything, "NJ", "spend", enabledTN);
@@ -104,8 +114,8 @@ describe("moneyGates", () => {
     expect(deposit).toEqual({ ok: true });
   });
 
-  it("passes a verified, included member in an enabled state through both doors when nothing is owed", async () => {
-    for (const door of ["deposit", "spend"] as const) {
+  it("passes a verified, included member in an enabled state through every door when nothing is owed", async () => {
+    for (const door of ["deposit", "spend", "withdraw"] as const) {
       expect(await moneyGates(db, subject(), "TN", door, enabledTN)).toEqual({ ok: true });
     }
   });

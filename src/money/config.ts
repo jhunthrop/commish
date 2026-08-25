@@ -95,6 +95,10 @@ export const MONEY_REFUSALS = {
   depositBelowMinimum: `No money moved. The minimum deposit is ${formatUsd(MONEY_CONFIG.deposit.minCents)}.`,
   /** `depositRequestSchema`: above `MONEY_CONFIG.deposit.maxPerTransferCents`. Same construction. */
   depositAboveMaximum: `No money moved. The maximum deposit is ${formatUsd(MONEY_CONFIG.deposit.maxPerTransferCents)} per transfer.`,
+  /** `withdrawalRequestSchema` (`src/money-service/schemas.ts`): below `MONEY_CONFIG.withdrawal.minCents`.
+   *  Same construction as `depositBelowMinimum`; there is no per-transfer maximum to state — the
+   *  member's own LOCKED available balance is the ceiling, enforced by the writer's balance floor. */
+  withdrawalBelowMinimum: `No money moved. The minimum withdrawal is ${formatUsd(MONEY_CONFIG.withdrawal.minCents)}.`,
 } as const;
 
 /** The union of every refusal sentence in `MONEY_REFUSALS`, for a writer's own refusal type. */

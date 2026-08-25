@@ -25,17 +25,24 @@ import type { MoneyStatesConfig, StateCode } from "@/money/states";
  *  2. KYC — `kyc_status === "verified"` (the users column, Task 2; written only by Task 7's
  *     callback path). Says why in plain words: federal rules, before a balance.
  *  3. SELF-EXCLUSION — `self_excluded_at IS NULL`. One-way stamp; exclusion closes every door
- *     money ENTERS (deposit, paid join). Task 6's withdrawal door reuses gates 1-2 and
- *     documents why this one does not apply to money leaving.
+ *     money ENTERS (deposit, paid join) but never the door it LEAVES. Task 6's withdrawal door
+ *     (`door: "withdraw"`) is the one caller this gate skips for: a self-excluded member is
+ *     walking away from paid play, not into it, and the money sitting in `user_available` is
+ *     already theirs — withholding it has no exclusion rationale behind it and only reads as
+ *     the platform holding funds hostage.
  *  4. RECEIVABLE CLEAR — spend doors only (plan invariant 5): while a returned deposit's
  *     shortfall sits on `platform_receivable:<id>`, every paid door is closed. The DEPOSIT door
  *     deliberately skips this gate — the next completed deposit is HOW the receivable settles
  *     (`recordDepositCompleted`, `./deposits.ts`), so refusing deposits while owed would
- *     deadlock the member out of ever clearing it.
+ *     deadlock the member out of ever clearing it. The WITHDRAWAL door skips it too, for the
+ *     same "spend doors only" reason stated in its own name — a withdrawal moves the member's
+ *     OWN available balance to their own bank, it never spends INTO the platform.
  */
 
-/** Which class of door is asking. Spend doors add the receivable gate; the deposit door must not. */
-export type MoneyDoor = "deposit" | "spend";
+/** Which class of door is asking. Spend doors add the receivable gate; the deposit and
+ *  withdrawal doors must not. The withdrawal door additionally skips gate 3 (self-exclusion) —
+ *  see the module docblock. */
+export type MoneyDoor = "deposit" | "spend" | "withdraw";
 
 /** The two `users` columns the gates read, as a shape any caller's row satisfies. */
 export interface MoneyGateSubject {
@@ -68,7 +75,7 @@ export async function moneyGates(
   const entry = states.enabled.find((candidate) => candidate.state === stateOfEntry);
   if (entry === undefined) return refused(MONEY_REFUSALS.stateNotEnabled);
   if (user.kycStatus !== "verified") return refused(MONEY_REFUSALS.kycRequired);
-  if (user.selfExcludedAt !== null) return refused(MONEY_REFUSALS.selfExcluded);
+  if (door !== "withdraw" && user.selfExcludedAt !== null) return refused(MONEY_REFUSALS.selfExcluded);
   if (door === "spend" && !(await receivableIsClear(db, user.id))) {
     return refused(MONEY_REFUSALS.balanceOwed);
   }

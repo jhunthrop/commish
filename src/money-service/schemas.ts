@@ -32,3 +32,31 @@ export const depositRequestSchema = z.strictObject({
 });
 
 export type DepositRequest = z.infer<typeof depositRequestSchema>;
+
+/**
+ * The withdrawal door's request boundary (Task 6), the same discipline as `depositRequestSchema`
+ * above. No `method` field — `WithdrawalDestination` (`@/payments-provider/contract`) is bank
+ * ONLY, permanently (the closed-loop wallet has no card withdrawals), so there is no choice for a
+ * request to carry. No maximum bound either: the member's own LOCKED available balance is the
+ * ceiling, and `MONEY_REFUSALS.insufficientBalance` — the writer's balance floor, never a
+ * pre-trusted read — is what enforces it.
+ */
+export const withdrawalRequestSchema = z.strictObject({
+  /** Integer cents, at least `MONEY_CONFIG.withdrawal.minCents`. */
+  amountCents: z
+    .number()
+    .int(MONEY_REFUSALS.invalidAmount)
+    .min(MONEY_CONFIG.withdrawal.minCents, MONEY_REFUSALS.withdrawalBelowMinimum),
+  /** Self-attested at the door this phase (Task 5 Step 2); Phase 5 replaces the producer. */
+  stateOfEntry: z.enum(US_STATE_CODES),
+  /** The provider's reference for the member's linked external bank account. Opaque. */
+  destination: z.strictObject({ externalAccountRef: z.string().min(1) }),
+  /**
+   * Minted by the withdrawal form once per submission attempt — the deposit idiom. Namespaced
+   * per user at the writer (`withdrawal:<userId>:<idempotencyKey>`), so a double-click and a
+   * retried request become the SAME transfer and no two users can collide on a shared key.
+   */
+  idempotencyKey: z.string().min(1).max(128),
+});
+
+export type WithdrawalRequest = z.infer<typeof withdrawalRequestSchema>;
