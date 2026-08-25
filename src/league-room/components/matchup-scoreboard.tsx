@@ -32,7 +32,7 @@ export function MatchupScoreboard({ matchup, myTeamId }: MatchupScoreboardProps)
         {name}
         {teamId === myTeamId ? <span className="ml-1.5 align-middle text-xs font-semibold text-accent">You</span> : null}
       </p>
-      <p className={`font-display text-display-lg font-bold tabular-nums leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
+      <p className={`font-display text-display-lg font-semibold tabular-nums leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
         {score === null ? "—" : formatPoints(score)}
       </p>
     </div>
