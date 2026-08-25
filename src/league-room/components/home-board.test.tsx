@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { act, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { firstRunPlan } from "@/identity";
@@ -202,6 +202,13 @@ describe("HomeBoard", () => {
       expect(queryByText(/closest first/i)).toBeNull();
       expect(getByRole("heading", { name: "Bay Bandits" })).toBeInTheDocument();
     });
+  });
+
+  // Rule 5 / S10 (Task 9): the single-league home has no board and no attention queue to share
+  // ink with, so the one card's own action IS the view's one ink action.
+  it("gives the single league's own action the ink pill, since it is the view's only one", () => {
+    render(<HomeBoard initial={ONE_LEAGUE} />);
+    expect(screen.getByRole("link", { name: "Set your lineup for Bay Bandits" }).className).toContain("bg-text-primary");
   });
 
   // Step 2b (F18c): a manager whose leagues have all not drafted yet has no games at all — the

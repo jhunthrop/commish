@@ -228,7 +228,9 @@ export function HomeBoard({
               carries its own link to the league; this heading names the page, it does not
               duplicate that control. */}
           <h2 className="font-display text-2xl font-semibold leading-display text-text-primary">{only.name}</h2>
-          <HomeLeagueCard league={only} />
+          {/* Rule 5 / S10: the single-league home has no board and no attention queue to share
+              ink with — this card's own action IS the view's one ink action. */}
+          <HomeLeagueCard league={only} emphasis="ink" />
         </div>
         {openSeats}
       </div>

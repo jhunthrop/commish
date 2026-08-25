@@ -30,9 +30,9 @@ describe("MatchupScoreboard", () => {
     });
   });
 
-  it("marks the caller's own side with YOU and never guesses at unscored matchups", () => {
+  it("marks the caller's own side with You and never guesses at unscored matchups", () => {
     render(<MatchupScoreboard matchup={{ ...FINAL, final: false, weekStatus: "scheduled", homeScore: null, awayScore: null }} myTeamId="t2" />);
-    expect(screen.getByText("YOU")).toBeInTheDocument();
+    expect(screen.getByText("You")).toBeInTheDocument();
     expect(screen.getByText("Not started")).toBeInTheDocument();
     expect(screen.getAllByText("—")).toHaveLength(2);
     // Nobody recedes before a result exists.

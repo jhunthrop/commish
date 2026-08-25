@@ -24,6 +24,7 @@ export { Celebration } from "./celebration";
 export { Rise } from "./rise";
 export { InfoTip } from "./info-tip";
 export { EYEBROW } from "./config";
+export { LedgerRow } from "./ledger-row";
 export { Panel } from "./panel";
 export { Crest, crestTone } from "./crest";
 export { SeatMeter } from "./seat-meter";

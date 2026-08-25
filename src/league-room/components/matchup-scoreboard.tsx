@@ -12,7 +12,9 @@ export interface MatchupScoreboardProps {
  * The scoreboard poster — the league room's hero shape, shared by the league home and the
  * weekly matchup page so a score always looks like a score. Names in the display face,
  * numerals big and tabular; once a matchup is final the winner keeps full ink and the loser
- * recedes. Your own side carries the same "YOU" mark the draft board's column header wears.
+ * recedes. Your own side carries the same "You" mark the draft board's column header wears
+ * (Task 9: the caps charter treats DOM text as data, not CSS, so this was the one literal
+ * left shouting after Task 3's class-level sweep — respelled sentence-case here to match).
  */
 export function MatchupScoreboard({ matchup, myTeamId }: MatchupScoreboardProps) {
   const decided = matchup.final && matchup.homeScore !== null && matchup.awayScore !== null;
@@ -28,7 +30,7 @@ export function MatchupScoreboard({ matchup, myTeamId }: MatchupScoreboardProps)
           it the parent's actual (already-shrunk, `min-w-0 flex-1`) width to truncate against. */}
       <p className={`w-full truncate font-display text-xl font-semibold leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
         {name}
-        {teamId === myTeamId ? <span className="ml-1.5 align-middle text-xs font-semibold text-accent">YOU</span> : null}
+        {teamId === myTeamId ? <span className="ml-1.5 align-middle text-xs font-semibold text-accent">You</span> : null}
       </p>
       <p className={`font-display text-display-lg font-bold tabular-nums leading-display ${decided && !won ? "text-text-muted" : "text-text-primary"}`}>
         {score === null ? "—" : formatPoints(score)}

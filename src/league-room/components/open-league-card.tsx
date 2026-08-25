@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
-import { Badge, Card, InfoTip, SeatMeter, buttonClassName } from "@/components/ui";
+import { Badge, Card, InfoTip, LedgerRow, SeatMeter, buttonClassName } from "@/components/ui";
 import { UI_CONFIG } from "@/components/ui/config";
 import { Countdown, useCountdown } from "@/components/ui/countdown";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
@@ -83,17 +82,6 @@ function LiveChip({ label }: { readonly label: string }) {
       <span aria-hidden="true" className={`size-1.5 rounded-pill bg-negative${reducedMotion ? "" : " animate-pulse-live"}`} />
       {label}
     </span>
-  );
-}
-
-/** One hairline-topped ledger row: quiet key left, value right (S7, rule 4 — structure from
- *  thin rules and space, never boxes). */
-function LedgerRow({ label, children }: { readonly label: ReactNode; readonly children: ReactNode }) {
-  return (
-    <div className="flex items-baseline justify-between gap-2 border-t border-line py-1.5 text-sm">
-      <span className="inline-flex shrink-0 items-center gap-1 text-text-muted">{label}</span>
-      <span className="min-w-0 text-right">{children}</span>
-    </div>
   );
 }
 
