@@ -432,6 +432,15 @@ interface HoldOutcomeShape {
  * PERSON, not a league, and its audit event rides the platform chain exactly as `flag_resolved`
  * does (a record about a person under review is not any league's business).
  *
+ * DELIBERATELY NO "flags resolved?" CHECK (Task 10 review, MEDIUM): neither outcome verifies the
+ * member's integrity flags before acting. The brief shapes both as one-way operator actions the
+ * operator reaches FROM the flag decision that justified them — the pairing is the console's
+ * workflow, not a database constraint. A wired "no open flags remain on this member" guard would
+ * wrongly BLOCK a legitimate release whenever an UNRELATED open flag exists on the same member
+ * (a chat report has no claim on a prize a trade-fairness flag held), and settlement would
+ * simply re-hold any future prize while anything stays open — so the guard protects nothing the
+ * hold mechanism does not already protect, while taking a member's cleared money hostage.
+ *
  * FK ACQUISITIONS, in statement order: `money_accounts FOR UPDATE` for the held account and the
  * destination, in sorted order (`ensureAndLockMoneyAccounts` — no `leagues` lock: the posting
  * names no league). Then the book read (plain SELECT), the posting's own statements, the

@@ -1,13 +1,15 @@
-import { sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import type { DbTx } from "@/db/client";
-import { moneyAccounts } from "@/db/schema";
+import { leagues, moneyAccounts, moneyEntries, moneyTransactions, teams, users } from "@/db/schema";
 import { createTestDb, truncateAll, truncateMoneyTables } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
+import { raiseFlag } from "@/integrity-service/flags";
 import { accountIdFor } from "@/money/accounts";
 import { MONEY_CONFIG } from "@/money/config";
 import { postMoneyTransaction, type MoneyTransactionInput, type PostDeps } from "./post";
+import { confiscateHold, releaseHold, settleSeasonPayouts } from "./settlement";
 import { accountBalance, getUserAnnualNetProfit, walletSummary } from "./read";
 import { runSeededPostingSequence } from "./test-support";
 
@@ -202,5 +204,103 @@ describe("getUserAnnualNetProfit — the Phase 5 guarantee", () => {
       if ((await getUserAnnualNetProfit(db, userId, 2026)) >= threshold) crossed.push(userId);
     }
     expect(crossed).toEqual(["u_big"]);
+  });
+});
+
+/**
+ * The constructive-receipt ruling (Task 10 review, controller tax ruling), proven against the
+ * REAL writers rather than hand-shaped rows: a December-of-year-N prize held by an open flag is
+ * income in NO year while held; released in January of N+1 it is income in N+1, in the release's
+ * own stamped tax year (read back, never restamped); confiscated, it is income NEVER — the money
+ * lands on `platform_forfeiture` and dominion never arrives.
+ */
+describe("getUserAnnualNetProfit — held prizes across a year boundary (the constructive-receipt ruling)", () => {
+  const decemberClock: Clock = { now: () => "2025-12-20T00:00:00.000Z" };
+  const januaryClock: Clock = { now: () => "2026-01-10T00:00:00.000Z" };
+  const depsDecember: PostDeps = { audit: getAuditLogger(), clock: decemberClock, newId };
+
+  /** A real held settlement: paid 2-seat league, season complete in December 2025, the winner
+   *  under an OPEN flag — through `settleSeasonPayouts` itself, never a hand-shaped posting. */
+  async function seedHeldDecemberPrize(): Promise<void> {
+    await db.insert(users).values([
+      { id: "u_tax", email: "u_tax@test.local", displayName: "Tax" },
+      { id: "u_mate", email: "u_mate@test.local", displayName: "Mate" },
+    ]);
+    await db.insert(leagues).values({
+      id: "lg_tax",
+      name: "lg_tax",
+      format: "snake",
+      teamCount: 2,
+      commissionerUserId: "u_mate",
+      entryFeeCents: 20_00,
+      platformFeeCents: 0,
+      payoutTable: [{ place: 1, amountCents: 40_00 }],
+      seasonCompletedAt: new Date("2025-12-19T00:00:00.000Z"),
+    });
+    await db.insert(teams).values([
+      { id: "team_tax", leagueId: "lg_tax", userId: "u_tax", name: "Tax's Team" },
+      { id: "team_mate", leagueId: "lg_tax", userId: "u_mate", name: "Mate's Team" },
+    ]);
+    for (const userId of ["u_tax", "u_mate"]) {
+      await post(deposit(userId, 50_00, "TN"), depsDecember);
+      await post(fee(userId, "lg_tax", 20_00, "TN"), depsDecember);
+    }
+    await db.transaction((tx) =>
+      raiseFlag(tx, {
+        flagType: "multi_account",
+        subjectId: "u_mate:u_tax",
+        leagueId: null,
+        evidence: {},
+        raisedByUserId: null,
+        occurredAt: decemberClock.now(),
+        newId,
+        audit: getAuditLogger(),
+      }),
+    );
+    const settled = await settleSeasonPayouts(
+      db,
+      { leagueId: "lg_tax", operatorUserId: "u_mate", standings: [{ place: 1, userId: "u_tax" }] },
+      { clock: decemberClock, audit: getAuditLogger(), newId },
+    );
+    expect(settled).toMatchObject({ ok: true, heldCents: 40_00 });
+  }
+
+  it("excludes a held prize from year N, and counts the FULL amount in year N+1 once released — in the release's own stamped tax year", async () => {
+    await seedHeldDecemberPrize();
+
+    // Held: the fee is 2025's only movement, and NO year holds the prize.
+    expect(await getUserAnnualNetProfit(db, "u_tax", 2025)).toBe(-20_00);
+    expect(await getUserAnnualNetProfit(db, "u_tax", 2026)).toBe(0);
+
+    const released = await releaseHold(db, { userId: "u_tax", operatorUserId: "u_mate" }, { clock: januaryClock, audit: getAuditLogger(), newId });
+    expect(released).toEqual({ ok: true, amountCents: 40_00 });
+
+    // Income lands in the RELEASE's year; the held year stays untouched.
+    expect(await getUserAnnualNetProfit(db, "u_tax", 2025)).toBe(-20_00);
+    expect(await getUserAnnualNetProfit(db, "u_tax", 2026)).toBe(40_00);
+
+    // The stamp is the release row's own, from the writer's clock — read back, never restamped.
+    const releaseRows = await db
+      .select({ taxYear: moneyEntries.taxYear })
+      .from(moneyEntries)
+      .innerJoin(moneyTransactions, eq(moneyEntries.transactionId, moneyTransactions.id))
+      .where(and(eq(moneyTransactions.kind, "hold_release"), eq(moneyEntries.accountId, accountIdFor("user_available", "u_tax"))));
+    expect(releaseRows.length).toBeGreaterThan(0);
+    for (const row of releaseRows) expect(row.taxYear).toBe(2026);
+  });
+
+  it("never counts a confiscated prize in ANY year — it lands on platform_forfeiture, not the member's account", async () => {
+    await seedHeldDecemberPrize();
+
+    const confiscated = await confiscateHold(db, { userId: "u_tax", operatorUserId: "u_mate" }, { clock: januaryClock, audit: getAuditLogger(), newId });
+    expect(confiscated).toEqual({ ok: true, amountCents: 40_00 });
+
+    expect(await getUserAnnualNetProfit(db, "u_tax", 2025)).toBe(-20_00);
+    expect(await getUserAnnualNetProfit(db, "u_tax", 2026)).toBe(0);
+
+    // The destination proof: the member's available account never saw the money.
+    expect(await accountBalance(db, accountIdFor("user_available", "u_tax"))).toBe(30_00); // 50_00 deposit − 20_00 fee
+    expect(await accountBalance(db, accountIdFor("platform_forfeiture"))).toBe(40_00);
+    expect(await accountBalance(db, accountIdFor("held_for_review", "u_tax"))).toBe(0);
   });
 });

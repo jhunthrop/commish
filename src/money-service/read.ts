@@ -101,6 +101,14 @@ export async function walletSummary(db: ReadonlyDb, userId: string): Promise<Wal
  * was written. Phase 5 compares this against
  * `MONEY_CONFIG.reportingThresholdCentsByTaxYear[taxYear]` to answer "who crossed the line";
  * the companion test in `read.test.ts` runs that exact comparison.
+ *
+ * HELD PRIZES — the constructive-receipt ruling (Task 10 review, controller tax ruling): a prize
+ * settlement credits to `held_for_review` never touches this member's available account, so it
+ * is NOT income when held — the member has no dominion over it. It becomes income at RELEASE:
+ * `releaseHold`'s `hold_release` credit onto `user_available` counts here, in the tax year the
+ * release's own entry rows carry (`tax_year` is stamped by the writer's clock at release time —
+ * read back, never restamped). A confiscated hold lands on `platform_forfeiture`, never on this
+ * account, and therefore never counts in ANY year — dominion never arrived.
  */
 export async function getUserAnnualNetProfit(db: ReadonlyDb, userId: string, taxYear: number): Promise<number> {
   const accountId = accountIdFor("user_available", userId);
@@ -116,7 +124,7 @@ export async function getUserAnnualNetProfit(db: ReadonlyDb, userId: string, tax
       and(
         eq(moneyEntries.accountId, accountId),
         eq(moneyEntries.taxYear, taxYear),
-        inArray(moneyTransactions.kind, ["settlement", "entry_fee", "entry_fee_refund"]),
+        inArray(moneyTransactions.kind, ["settlement", "entry_fee", "entry_fee_refund", "hold_release"]),
       ),
     )
     .groupBy(moneyTransactions.kind, moneyEntries.direction);
@@ -124,10 +132,13 @@ export async function getUserAnnualNetProfit(db: ReadonlyDb, userId: string, tax
   let net = 0;
   for (const row of rows) {
     if (row.kind === "settlement" && row.direction === "credit") net += row.totalCents;
+    // A released hold is the prize arriving — income in the release's own stamped year (the
+    // constructive-receipt ruling above).
+    else if (row.kind === "hold_release" && row.direction === "credit") net += row.totalCents;
     else if (row.kind === "entry_fee" && row.direction === "debit") net -= row.totalCents;
     else if (row.kind === "entry_fee_refund" && row.direction === "credit") net += row.totalCents;
     // Any other leg on this account (a settlement-kind debit moving a payout to review) is
-    // neither a prize, a fee nor a refund, and the methodology ignores it.
+    // neither a prize, a release, a fee nor a refund, and the methodology ignores it.
   }
   return net;
 }
