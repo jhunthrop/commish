@@ -13,7 +13,7 @@
 
 Seam A mirrors `STATS_PROVIDER` deliberately: a fail-fast registry (`createPaymentsProvider`, `UnknownPaymentsProviderError`), env selection via `envOr` (`PAYMENTS_PROVIDER`, default `mock`), and one adversarial contract suite (`runPaymentsProviderContractSuite`) run against every implementation, mock included — with **return-after-completion** (the NACHA R01/R10 class) as a mandatory case, because a deposit that succeeds and reverses days later is the failure season-long operators actually eat. Webhooks land at one ingestion point (`ingest.ts`: raw-byte HMAC verification, strict Zod parse, typed `PaymentsEvent` out) so no posting code ever reads provider-shaped JSON.
 
-**The founder gate on real rails** (from `registry.ts`'s own docblock, restated here from the product side): the registry's `build` switch has only a `mock` arm this phase, on purpose. The real rails — Column, Aeropay, Paysafe (founder decisions 2-4) — are founder-gated future implementations: **an arm may be named in the registry only for an adapter that passes `runPaymentsProviderContractSuite` unchanged, ACH-return case included, and whose name the founder has signed off.** No signature, no spend, no SDK installed until then.
+**The founder gate on real rails** (from `registry.ts`'s own docblock, restated here from the product side): the registry's `build` switch has only a `mock` arm this phase, on purpose. The real rails — Column, Aeropay, Paysafe (founder decisions 2-4) — are founder-gated future implementations: **an arm may be added here only for an adapter that passes `runPaymentsProviderContractSuite` unchanged, ACH-return case included, and whose name the founder has signed off.** No signature, no spend, no SDK installed until then.
 
 ## The four laws
 
