@@ -204,7 +204,8 @@ export function HomeBoard({
     );
   }
 
-  const openSeats = body.firstRun !== null ? null : <OpenSeatsPanel leagues={openLeagues} quiet={body.leagues.length === 1} />;
+  const openSeats =
+    body.firstRun !== null ? null : <OpenSeatsPanel leagues={openLeagues} quiet={body.leagues.length === 1} helpLevel={helpLevel ?? "standard"} />;
 
   if (preDraftHero !== null) {
     return (

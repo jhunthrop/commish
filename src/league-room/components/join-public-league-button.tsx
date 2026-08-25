@@ -18,9 +18,13 @@ import { useLeagueRoomDeps } from "../hooks/deps";
 export function JoinPublicLeagueButton({
   leagueId,
   leagueName,
+  variant = "secondary",
 }: {
   readonly leagueId: string;
   readonly leagueName: string;
+  /** Rule 5: quiet pill unless the PARENT grants this card the view's one ink action —
+   *  `OpenLeagueCard` maps its own `emphasis` prop here, and Task 6 decides which card gets it. */
+  readonly variant?: "primary" | "secondary";
 }) {
   const { fetchJson } = useLeagueRoomDeps();
   const router = useRouter();
@@ -51,9 +55,7 @@ export function JoinPublicLeagueButton({
 
   return (
     <div className="flex flex-col gap-1">
-      {/* Quiet pill (rule 5), matching the card's signed-out `SignInLink` CTA: a card in a
-          shelf of twenty is never the view's one ink action — Task 6 owns ink emphasis. */}
-      <Button variant="secondary" onClick={() => void join()} loading={submitting} disabled={submitting} aria-label={`Join ${leagueName}`}>
+      <Button variant={variant} onClick={() => void join()} loading={submitting} disabled={submitting} aria-label={`Join ${leagueName}`}>
         Join
       </Button>
       {error === null ? null : (

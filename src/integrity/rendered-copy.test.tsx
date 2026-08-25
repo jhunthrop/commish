@@ -766,9 +766,9 @@ describe("LeagueTermsPanel says nothing that breaks the house copy rules, includ
 describe("PublicLeagueList says nothing that breaks the house copy rules, including each card's composed draft time", () => {
   it("is clean signed in, signed out, and empty", () => {
     for (const element of [
-      <PublicLeagueList key="signed-in" leagues={PUBLIC_LEAGUES} signedIn={true} />,
-      <PublicLeagueList key="signed-out" leagues={PUBLIC_LEAGUES} signedIn={false} />,
-      <PublicLeagueList key="empty" leagues={[]} signedIn={true} />,
+      <PublicLeagueList key="signed-in" leagues={PUBLIC_LEAGUES} signedIn={true} helpLevel="guided" />,
+      <PublicLeagueList key="signed-out" leagues={PUBLIC_LEAGUES} signedIn={false} helpLevel="standard" />,
+      <PublicLeagueList key="empty" leagues={[]} signedIn={true} helpLevel="standard" />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));
@@ -785,15 +785,26 @@ describe("PublicLeagueList says nothing that breaks the house copy rules, includ
  * them.
  */
 describe("OpenLeagueCard says nothing that breaks the house copy rules, in every branch", () => {
-  it("is clean scheduled, when-full, house-run, last-seat, and beginner-only", () => {
+  it("is clean scheduled, when-full, house-run, last-seat, beginner-only, guided, and live-chipped", () => {
     const base = PUBLIC_LEAGUES[0]!;
+    // Phase 3.7, Task 5: `draftAtIso` inside the clock window puts the ticking Countdown and the
+    // "On deck" chip on screen; a nearly-full card puts "Filling" on screen — both live states'
+    // rendered copy is swept here, not trusted.
+    const soonIso = new Date(Date.now() + 60 * 60 * 1000).toISOString();
     for (const element of [
-      <OpenLeagueCard key="scheduled" league={base} signedIn={false} />,
-      <OpenLeagueCard key="signed-in" league={base} signedIn={true} />,
-      <OpenLeagueCard key="when-full" league={{ ...base, id: "wf", startTrigger: "when_full" }} signedIn={false} />,
-      <OpenLeagueCard key="house" league={{ ...base, id: "house1", houseRung: "open_12" }} signedIn={false} />,
-      <OpenLeagueCard key="last-seat" league={{ ...base, id: "last", filledTeams: base.teamCount - 1 }} signedIn={false} />,
-      <OpenLeagueCard key="beginner" league={{ ...base, id: "beg", experienceTier: "beginner" }} signedIn={false} />,
+      <OpenLeagueCard key="scheduled" league={base} signedIn={false} helpLevel="standard" />,
+      <OpenLeagueCard key="signed-in" league={base} signedIn={true} helpLevel="standard" />,
+      <OpenLeagueCard key="guided" league={base} signedIn={false} helpLevel="guided" />,
+      <OpenLeagueCard key="when-full" league={{ ...base, id: "wf", startTrigger: "when_full" }} signedIn={false} helpLevel="standard" />,
+      <OpenLeagueCard key="house" league={{ ...base, id: "house1", houseRung: "open_12" }} signedIn={false} helpLevel="standard" />,
+      <OpenLeagueCard
+        key="last-seat"
+        league={{ ...base, id: "last", filledTeams: base.teamCount - 1 }}
+        signedIn={false}
+        helpLevel="standard"
+      />,
+      <OpenLeagueCard key="on-deck" league={{ ...base, id: "deck", draftAtIso: soonIso }} signedIn={false} helpLevel="standard" />,
+      <OpenLeagueCard key="beginner" league={{ ...base, id: "beg", experienceTier: "beginner" }} signedIn={false} helpLevel="standard" />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container, base.name);
@@ -1394,9 +1405,9 @@ describe("AttentionQueue says nothing that breaks the house copy rules", () => {
 describe("OpenSeatsPanel says nothing that breaks the house copy rules", () => {
   it("is clean populated, empty, and quiet", () => {
     for (const element of [
-      <OpenSeatsPanel key="populated" leagues={PUBLIC_LEAGUES} />,
-      <OpenSeatsPanel key="quiet" leagues={PUBLIC_LEAGUES} quiet />,
-      <OpenSeatsPanel key="empty" leagues={[]} />,
+      <OpenSeatsPanel key="populated" leagues={PUBLIC_LEAGUES} helpLevel="standard" />,
+      <OpenSeatsPanel key="quiet" leagues={PUBLIC_LEAGUES} quiet helpLevel="guided" />,
+      <OpenSeatsPanel key="empty" leagues={[]} helpLevel="standard" />,
     ]) {
       const { container, unmount } = render(element);
       expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));

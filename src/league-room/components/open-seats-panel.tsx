@@ -1,3 +1,4 @@
+import type { HelpLevel } from "@/identity/preferences";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { OpenLeagueCard } from "./open-league-card";
 
@@ -7,6 +8,9 @@ export interface OpenSeatsPanelProps {
    *  panel still renders below the fold, it simply does not compete for the eye with the
    *  pre-draft hero above it. */
   readonly quiet?: boolean;
+  /** D1/E7: the signed-in member's own stored preference, threaded from the home page's
+   *  `readPreferences` read — a guided-preference member keeps inline captions here too. */
+  readonly helpLevel: HelpLevel;
 }
 
 /**
@@ -22,7 +26,7 @@ export interface OpenSeatsPanelProps {
  * so its seat count is `SeatMeter`, never a fourth phrasing (F17); this panel writes no seat
  * sentence of its own.
  */
-export function OpenSeatsPanel({ leagues, quiet = false }: OpenSeatsPanelProps) {
+export function OpenSeatsPanel({ leagues, quiet = false, helpLevel }: OpenSeatsPanelProps) {
   if (leagues.length === 0) return null;
   const Heading = quiet ? "h3" : "h2";
   return (
@@ -39,7 +43,7 @@ export function OpenSeatsPanel({ leagues, quiet = false }: OpenSeatsPanelProps) 
       <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {leagues.map((league) => (
           <li key={league.id} className="min-w-0">
-            <OpenLeagueCard league={league} signedIn />
+            <OpenLeagueCard league={league} signedIn helpLevel={helpLevel} />
           </li>
         ))}
       </ul>

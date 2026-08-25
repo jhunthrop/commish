@@ -6,16 +6,6 @@ import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { OpenLeagueCard } from "./open-league-card";
 
 /**
- * `/browse` (and, as of Phase 3.6 Task 5, the front door) is the app's unauthenticated surface —
- * there is no signed-in caller's `helpLevel` to read on the common path, and a stranger deciding
- * whether to join is exactly who benefits most from more explanation, not less — so the shelf
- * heading's own `InfoTip` opens `guided`, unconditionally, rather than defaulting quiet the way
- * an authenticated room does. `OpenLeagueCard` (`./open-league-card.tsx`) carries the identical
- * rule for every `InfoTip` on a card itself.
- */
-const BROWSE_HELP_LEVEL: HelpLevel = "guided";
-
-/**
  * The one new sentence Task 14 (Phase 3.5 addendum) prints, said once beneath the whole shelf
  * rather than repeated on every card — the factory's user-visible contract, allowed to be printed
  * only because Task 13's reconciler makes it true by construction (`ensureHouseCatalog`,
@@ -56,18 +46,24 @@ export function seatCountsAsOfSentence(asOfTime: string): string {
 export function HouseLeagueShelf({
   leagues,
   signedIn,
+  helpLevel,
 }: {
   readonly leagues: readonly PublicLeagueSummary[];
   readonly signedIn: boolean;
+  /** D1/E7: the caller's decision, never a constant here — public pages pass `"standard"` (the
+   *  definitions stay one click away, beneath Task 6's one legend line) and a signed-in page
+   *  passes the member's own stored preference (`readPreferences`), so a guided-preference
+   *  member keeps inline captions. */
+  readonly helpLevel: HelpLevel;
 }) {
   if (leagues.length === 0) return null;
 
   return (
     <div className="flex flex-col gap-3">
       {/* NEW-3 (gauntlet fix wave, "reported, not fixed"): the same guided-`InfoTip` layout break
-          `open-league-card.tsx`'s eyebrow row had — `BROWSE_HELP_LEVEL` is unconditionally
-          `"guided"` here, so the trigger's caption (`info-tip.tsx`'s own `inline-flex flex-col`,
-          up to 280px wide) always renders. `items-center` on a plain `inline-flex` row centers
+          `open-league-card.tsx`'s eyebrow row had — a `guided` caller's caption (`info-tip.tsx`'s
+          own `inline-flex flex-col`, up to 280px wide) renders inline whenever `helpLevel` says
+          so. `items-center` on a plain `inline-flex` row centers
           the single-line heading text against that much taller column, and with no `flex-wrap`
           the row cannot drop the caption to its own line at a narrow width — it just overflows
           sideways instead. `flex` (not `inline-flex`, so the row claims the block's own width
@@ -79,12 +75,12 @@ export function HouseLeagueShelf({
           a list of terms. */}
       <h2 className="flex flex-wrap items-start gap-x-1 gap-y-1 font-display text-lg font-semibold leading-display text-text-primary">
         Commish house leagues
-        <InfoTip term="house-league" helpLevel={BROWSE_HELP_LEVEL} />
+        <InfoTip term="house-league" helpLevel={helpLevel} />
       </h2>
       <ul className="grid gap-3 sm:grid-cols-2">
         {leagues.map((league) => (
           <li key={league.id} className="min-w-0">
-            <OpenLeagueCard league={league} signedIn={signedIn} />
+            <OpenLeagueCard league={league} signedIn={signedIn} helpLevel={helpLevel} />
           </li>
         ))}
       </ul>
@@ -106,9 +102,12 @@ export function HouseLeagueShelf({
 export function PublicLeagueList({
   leagues,
   signedIn,
+  helpLevel,
 }: {
   readonly leagues: readonly PublicLeagueSummary[];
   readonly signedIn: boolean;
+  /** See `HouseLeagueShelf`'s identical prop — the caller's decision, never a constant (D1/E7). */
+  readonly helpLevel: HelpLevel;
 }) {
   if (leagues.length === 0) {
     return (
@@ -143,7 +142,7 @@ export function PublicLeagueList({
       <ul className="grid gap-3 sm:grid-cols-2">
         {leagues.map((league) => (
           <li key={league.id} className="min-w-0">
-            <OpenLeagueCard league={league} signedIn={signedIn} />
+            <OpenLeagueCard league={league} signedIn={signedIn} helpLevel={helpLevel} />
           </li>
         ))}
       </ul>

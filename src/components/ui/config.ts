@@ -55,6 +55,18 @@ export const UI_CONFIG = {
     /** Oldest toasts beyond this are dropped so the stack can never cover the page. */
     maxVisible: 3,
   },
+  openLeagueCard: {
+    /**
+     * Rule 6, "only true things move" (Phase 3.7, Task 5, self-ruled at 6 hours): a browse
+     * card's Drafts value becomes the ticking `Countdown` (tone `hot`) — and its live chip may
+     * read "On deck" — only while a SCHEDULED draft's kickoff is within this many ms. Inside a
+     * game-day window the minutes are what a shopper acts on; further out, the absolute
+     * `draftAt` sentence is the honest register and nothing on the card moves. Measured against
+     * `PublicLeagueSummary.draftAtIso` — a card whose summary does not carry the instant simply
+     * never enters the window.
+     */
+    clockWithinMs: 21_600_000,
+  },
   seatMeter: {
     /**
      * Below this many remaining seats (and above zero), `SeatMeter` appends its own "{n} seat(s)

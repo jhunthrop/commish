@@ -87,6 +87,23 @@ export interface PublicLeagueSummary {
   /** Absolute-plus-relative, e.g. "Saturday 12 September, 7:00 PM UTC (in 3 days)" — see this
    *  interface's own docblock. */
   readonly draftAt: string;
+  /**
+   * Phase 3.7, Task 5: the SAME instant `draftAt` is formatted from, as a raw ISO string — the
+   * machine-readable spelling of a fact this interface already discloses in words, so it is not
+   * a new disclosure decision, only a new spelling of one already made (`draftAt`'s own). The
+   * card's ledger clock (rule 6) needs the instant itself: a ticking `Countdown` cannot be
+   * computed from a pre-formatted sentence, and re-parsing `formatDraftTime`'s prose would couple
+   * the clock to display copy.
+   *
+   * OPTIONAL, deliberately, and absent from `PUBLIC_LEAGUE_FIELDS` for now: populating it is a
+   * one-line `summarizeRow` diff in `@/league-service/browse`, a path this phase's global
+   * constraint locks (its two sanctioned service additions are Task 7's proof query and Task 8's
+   * wire read). Until the controller sanctions that line, no producer sets this field and the
+   * card's clock/on-deck states simply never activate — the mechanics are built and tested
+   * against fixtures that pass it. Carries `when_full` leagues' PLACEHOLDER kickoff exactly as
+   * `draftAt` does; every reader gates on `startTrigger === "scheduled"` first, same as `draftAt`.
+   */
+  readonly draftAtIso?: string;
   /** Whether this league plays a median game (Task 2) — see this interface's own docblock. */
   readonly medianGame: boolean;
   /** Which of the two ways this draft's kickoff comes to be set (Task 8) — see this interface's

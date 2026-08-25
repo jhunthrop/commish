@@ -4,6 +4,8 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { ButtonLink } from "@/components/ui";
 import { PublicBar, type NavLink } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
+import type { HelpLevel } from "@/identity/preferences";
+import { readPreferences } from "@/identity-service/preferences";
 import { formatAbsoluteTime } from "@/league";
 import { listPublicLeagues } from "@/league-service/browse";
 import { proofStats } from "@/league-service/proof";
@@ -83,6 +85,10 @@ export default async function Home({ searchParams }: PageProps) {
     getProofCache().stats(() => proofStats(getDb(), { clock })),
   ]);
 
+  // D1/E7 (Phase 3.7, Task 5): guided is a signed-in PREFERENCE behavior, never a surface
+  // default — see `/browse`'s identical read.
+  const helpLevel: HelpLevel = user === null ? "standard" : (await readPreferences(getDb(), user)).helpLevel;
+
   return (
     <>
       <PublicBar
@@ -104,9 +110,9 @@ export default async function Home({ searchParams }: PageProps) {
             <h2 className="font-display text-lg font-semibold leading-display text-text-primary">Open leagues</h2>
             <p className="text-sm text-text-muted">{seatCountsAsOfSentence(formatAbsoluteTime(nowIso))}</p>
           </div>
-          <HouseLeagueShelf leagues={house} signedIn={user !== null} />
+          <HouseLeagueShelf leagues={house} signedIn={user !== null} helpLevel={helpLevel} />
           <BrowseFilters active={active} />
-          <PublicLeagueList leagues={leagues} signedIn={user !== null} />
+          <PublicLeagueList leagues={leagues} signedIn={user !== null} helpLevel={helpLevel} />
 
           {/* The gauntlet's MEDIUM: "Start your own" used to be a tile among tiles, reading as
               an afterthought rather than a category of its own. Its own row, its own framing,

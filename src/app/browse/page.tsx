@@ -6,6 +6,8 @@ import { AppShell } from "@/components/app-shell/app-shell";
 import { shellData } from "@/components/app-shell/shell-data";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
+import type { HelpLevel } from "@/identity/preferences";
+import { readPreferences } from "@/identity-service/preferences";
 import { formatAbsoluteTime } from "@/league";
 import { listPublicLeagues } from "@/league-service/browse";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
@@ -74,6 +76,11 @@ export default async function BrowsePage({ searchParams }: PageProps) {
     listPublicLeagues(getDb(), filter, clock, { sort, whenFullOnly }),
   ]);
 
+  // D1/E7 (Phase 3.7, Task 5): guided is a signed-in PREFERENCE behavior, never a surface
+  // default — a stranger gets `standard` (every definition one click away), a member gets
+  // their own stored choice, so a guided-preference member keeps inline captions here.
+  const helpLevel: HelpLevel = user === null ? "standard" : (await readPreferences(getDb(), user)).helpLevel;
+
   const content = (
     <>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -97,9 +104,9 @@ export default async function BrowsePage({ searchParams }: PageProps) {
           list follows. `HouseLeagueShelf` renders nothing at all when the shelf is empty, so
           an unreconciled database (or a rung mid-restock) never shows an apology above a
           member list that is doing just fine on its own. */}
-      <HouseLeagueShelf leagues={house} signedIn={user !== null} />
+      <HouseLeagueShelf leagues={house} signedIn={user !== null} helpLevel={helpLevel} />
       <BrowseFilters active={active} />
-      <PublicLeagueList leagues={leagues} signedIn={user !== null} />
+      <PublicLeagueList leagues={leagues} signedIn={user !== null} helpLevel={helpLevel} />
     </>
   );
 

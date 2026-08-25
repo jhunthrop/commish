@@ -81,20 +81,23 @@ export function formatCoarseRemaining(msRemaining: number): string {
   return `About ${formatCoarseDuration(msRemaining)} left`;
 }
 
-export type CountdownSize = "md" | "lg" | "xl";
+export type CountdownSize = "sm" | "md" | "lg" | "xl";
 /** `hot` is the rail's my-turn morph: the same digits, in the negative family. */
 export type CountdownTone = "default" | "hot";
 
 export interface CountdownProps {
   readonly remainingMs: number;
-  /** `lg` is the rail's headline clock; `md` is an inline one; `xl` is the waiting room's hero
-   *  clock. */
+  /** `lg` is the rail's headline clock; `md` is an inline one; `sm` is a ledger-row clock at
+   *  body size; `xl` is the waiting room's hero clock. */
   readonly size?: CountdownSize;
   readonly tone?: CountdownTone;
   readonly "data-testid"?: string;
 }
 
 const SIZE: Readonly<Record<CountdownSize, string>> = {
+  /** The open-league card's ledger-row clock (Phase 3.7, Task 5): digits at the row's own text
+   *  size, distinguished by mono, weight and tone rather than scale. */
+  sm: "text-sm",
   md: "text-2xl",
   lg: "text-3xl",
   xl: "text-display-xl",

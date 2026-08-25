@@ -23,7 +23,7 @@ vi.mock("next/navigation", () => ({
  */
 describe("PublicLeagueList", () => {
   it("renders one OpenLeagueCard per league, in both themes, axe-clean", async () => {
-    await renderSurface(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />, async ({ container }) => {
+    await renderSurface(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" />, async ({ container }) => {
       expect(screen.getByText("Rookie Snake Room")).toBeInTheDocument();
       expect(screen.getByText("Sharks Only Auction")).toBeInTheDocument();
       expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
@@ -32,19 +32,19 @@ describe("PublicLeagueList", () => {
   });
 
   it("gives a signed-in visitor a join button per league", () => {
-    renderInLeague(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn />, fixtureLeagueDeps().deps);
+    renderInLeague(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" />, fixtureLeagueDeps().deps);
     expect(screen.getByRole("button", { name: "Join Rookie Snake Room" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Join Sharks Only Auction" })).toBeInTheDocument();
   });
 
   it("sends a signed-out visitor to the hold interstitial, one link per league", () => {
-    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn={false} />);
+    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn={false} helpLevel="standard" />);
     expect(screen.queryByRole("button", { name: /^Join / })).not.toBeInTheDocument();
     expect(screen.getAllByRole("link", { name: /^Take (a seat|the last seat) in / })).toHaveLength(PUBLIC_LEAGUES.length);
   });
 
   it("offers a next action when no league matches, rather than a dead end", async () => {
-    await renderSurface(<PublicLeagueList leagues={[]} signedIn />, async ({ container }) => {
+    await renderSurface(<PublicLeagueList leagues={[]} signedIn helpLevel="standard" />, async ({ container }) => {
       expect(screen.getByText("No open leagues match")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: "Clear the filters" })).toHaveAttribute("href", "/browse");
       expect(screen.getByRole("link", { name: "Start your own league" })).toHaveAttribute("href", "/app#create-league");
@@ -75,13 +75,17 @@ const HOUSE_LEAGUE: PublicLeagueSummary = {
 
 describe("HouseLeagueShelf", () => {
   it("renders nothing at all when the shelf is empty, rather than an apology", () => {
-    const { container } = render(<HouseLeagueShelf leagues={[]} signedIn />);
+    const { container } = render(<HouseLeagueShelf leagues={[]} signedIn helpLevel="standard" />);
     expect(container).toBeEmptyDOMElement();
   });
 
-  it("shows each house league's rung label through its own OpenLeagueCard, in both themes, axe-clean", async () => {
-    await renderSurface(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />, async ({ container }) => {
-      expect(screen.getByText(HOUSE_RUNG_LABEL.open_12)).toBeInTheDocument();
+  it("shows each house league's rung through its own OpenLeagueCard, in both themes, axe-clean", async () => {
+    await renderSurface(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn helpLevel="guided" />, async ({ container }) => {
+      // E3 (Phase 3.7, Task 5): a factory-named house league carries its rung IN the title —
+      // "Open 12-team League 3" — so the card renders no duplicate badge beside it; the rung
+      // still reaches the reader exactly once.
+      expect(screen.getByRole("heading", { name: HOUSE_LEAGUE.name })).toBeInTheDocument();
+      expect(screen.getAllByText(new RegExp(HOUSE_RUNG_LABEL.open_12))).toHaveLength(1);
       expect(screen.getByText(/5 of 12 seated/)).toBeInTheDocument();
       expect(await axe(container)).toHaveNoViolations();
     });
@@ -94,7 +98,7 @@ describe("HouseLeagueShelf", () => {
   // rather than only its absence of axe violations, which a purely visual overflow would not
   // trip.
   it("wraps the shelf heading so its guided caption can drop to its own line instead of overflowing", () => {
-    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />);
+    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn helpLevel="guided" />);
     const heading = screen.getByRole("heading", { level: 2, name: /Commish house leagues/ });
     expect(heading.className).toContain("flex-wrap");
     expect(heading.className).not.toContain("inline-flex");
@@ -102,23 +106,23 @@ describe("HouseLeagueShelf", () => {
 
   it("prints the shelf's promise once, beneath the whole shelf, never per card", () => {
     const sitAndGo: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "house_sitandgo", houseRung: "sitandgo_12", startTrigger: "when_full" };
-    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE, sitAndGo]} signedIn />);
+    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE, sitAndGo]} signedIn helpLevel="standard" />);
     expect(screen.getAllByText(HOUSE_SHELF_PROMISE)).toHaveLength(1);
   });
 
   it("renders no progress bar", () => {
-    const { container } = render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />);
+    const { container } = render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn helpLevel="guided" />);
     expect(container.querySelector("[role='progressbar']")).not.toBeInTheDocument();
   });
 
   it("opens an InfoTip on the shelf heading, guided by default, defining a house league", () => {
-    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />);
+    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn helpLevel="guided" />);
     expect(screen.getByRole("button", { name: "What is a house league?" })).toBeInTheDocument();
     expect(screen.getByText(GLOSSARY["house-league"].short)).toBeInTheDocument();
   });
 
   it("gives a signed-in visitor a join button per house league", () => {
-    renderInLeague(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn />, fixtureLeagueDeps().deps);
+    renderInLeague(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn helpLevel="guided" />, fixtureLeagueDeps().deps);
     expect(screen.getByRole("button", { name: `Join ${HOUSE_LEAGUE.name}` })).toBeInTheDocument();
   });
 });

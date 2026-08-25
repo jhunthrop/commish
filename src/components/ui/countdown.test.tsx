@@ -86,6 +86,11 @@ describe("Countdown", () => {
     expect(live.closest('[aria-hidden="true"]')).toBeNull();
   });
 
+  it("sizes sm for a ledger-row clock at body size", () => {
+    render(<Countdown remainingMs={125_000} size="sm" data-testid="countdown" />);
+    expect(screen.getByTestId("countdown").className).toMatch(/text-sm/);
+  });
+
   it("sizes xl for the waiting room's hero clock", () => {
     render(<Countdown remainingMs={125_000} size="xl" data-testid="countdown" />);
     expect(screen.getByTestId("countdown").className).toMatch(/text-display-xl/);
