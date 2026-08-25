@@ -47,6 +47,17 @@ describe("BrowseFilters", () => {
     });
   });
 
+  it("dresses the active control as an ink-bordered quiet pill — never a filled one (Task 6 restyle)", async () => {
+    await renderSurface(<BrowseFilters active="soonest" />, () => {
+      const active = screen.getByRole("link", { name: "Drafting soonest" });
+      expect(active.className).toContain("border-text-primary");
+      expect(active.className).not.toContain("bg-surface-elevated");
+      const quiet = screen.getByRole("link", { name: "All" });
+      expect(quiet.className).toContain("border-line");
+      expect(quiet.className).not.toContain("bg-surface-elevated");
+    });
+  });
+
   it("'All' clears back to the unfiltered browse", async () => {
     await renderSurface(<BrowseFilters active="when_full" />, () => {
       expect(screen.getByRole("link", { name: "All" })).toHaveAttribute("href", "/browse");

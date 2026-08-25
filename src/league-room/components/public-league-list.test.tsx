@@ -5,53 +5,24 @@ import { GLOSSARY } from "@/help/glossary";
 import { renderSurface } from "@/components/ui/test-utils";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
-import { HOUSE_RUNG_LABEL } from "@/matchmaking/house-catalog";
-import { fixtureLeagueDeps, PUBLIC_LEAGUES, renderInLeague } from "../test-fixtures";
-import { HOUSE_SHELF_PROMISE, HouseLeagueShelf, PublicLeagueList, seatCountsAsOfSentence } from "./public-league-list";
+import { PUBLIC_LEAGUES, fixtureLeagueDeps, renderInLeague } from "../test-fixtures";
+import {
+  HOUSE_SHELF_EXPLAINER,
+  HOUSE_SHELF_PROMISE,
+  OPEN_LEAGUE_LEGEND,
+  OpenLeagueShelf,
+  featuredLeagueId,
+  seatCountsAsOfSentence,
+} from "./public-league-list";
 
-// A signed-in list renders `JoinPublicLeagueButton` per card, which navigates via
+// A signed-in shelf renders `JoinPublicLeagueButton` per card, which navigates via
 // `next/navigation`'s `useRouter` and throws outside a mounted App Router. Stubbing the hook
 // — not the component — is the idiom `join-form.test.tsx` and `league-home.test.tsx` established.
 vi.mock("next/navigation", () => ({
   useRouter: () => ({ push: vi.fn(), refresh: vi.fn() }),
 }));
 
-/**
- * `PublicLeagueList`'s own job, since Phase 3.6 Task 5 extracted `OpenLeagueCard`: rendering a
- * list of cards, and the empty state when there are none — everything a SINGLE card says or does
- * is `open-league-card.test.tsx`'s job now, not this file's.
- */
-describe("PublicLeagueList", () => {
-  it("renders one OpenLeagueCard per league, in both themes, axe-clean", async () => {
-    await renderSurface(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" />, async ({ container }) => {
-      expect(screen.getByText("Rookie Snake Room")).toBeInTheDocument();
-      expect(screen.getByText("Sharks Only Auction")).toBeInTheDocument();
-      expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
-      expect(await axe(container)).toHaveNoViolations();
-    });
-  });
-
-  it("gives a signed-in visitor a join button per league", () => {
-    renderInLeague(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" />, fixtureLeagueDeps().deps);
-    expect(screen.getByRole("button", { name: "Join Rookie Snake Room" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Join Sharks Only Auction" })).toBeInTheDocument();
-  });
-
-  it("sends a signed-out visitor to the hold interstitial, one link per league", () => {
-    render(<PublicLeagueList leagues={PUBLIC_LEAGUES} signedIn={false} helpLevel="standard" />);
-    expect(screen.queryByRole("button", { name: /^Join / })).not.toBeInTheDocument();
-    expect(screen.getAllByRole("link", { name: /^Take (a seat|the last seat) in / })).toHaveLength(PUBLIC_LEAGUES.length);
-  });
-
-  it("offers a next action when no league matches, rather than a dead end", async () => {
-    await renderSurface(<PublicLeagueList leagues={[]} signedIn helpLevel="standard" />, async ({ container }) => {
-      expect(screen.getByText("No open leagues match")).toBeInTheDocument();
-      expect(screen.getByRole("link", { name: "Clear the filters" })).toHaveAttribute("href", "/browse");
-      expect(screen.getByRole("link", { name: "Start your own league" })).toHaveAttribute("href", "/app#create-league");
-      expect(await axe(container)).toHaveNoViolations();
-    });
-  });
-});
+const AS_OF = "Saturday 12 September, 7:42 PM UTC";
 
 const HOUSE_LEAGUE: PublicLeagueSummary = {
   id: "house_1",
@@ -73,57 +44,219 @@ const HOUSE_LEAGUE: PublicLeagueSummary = {
   kickoffRolls: 0,
 };
 
-describe("HouseLeagueShelf", () => {
-  it("renders nothing at all when the shelf is empty, rather than an apology", () => {
-    const { container } = render(<HouseLeagueShelf leagues={[]} signedIn helpLevel="standard" />);
-    expect(container).toBeEmptyDOMElement();
+/** How many ink pills (rule 5's `bg-text-primary` fill) a rendered container holds. */
+function inkPillCount(container: HTMLElement): number {
+  return container.querySelectorAll('[class*="bg-text-primary"]').length;
+}
+
+function occurrences(container: HTMLElement, sentence: string): number {
+  return (container.textContent ?? "").split(sentence).length - 1;
+}
+
+/**
+ * D2's selector, tested as the pure function it is: the shelf's single featured card is the
+ * nearest scheduled draft, else the fewest seats remaining — the exact rule Task 6's brief
+ * states, with `when_full` placeholders never mistaken for a scheduled instant.
+ */
+describe("featuredLeagueId (D2)", () => {
+  const scheduledSoon: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "soon", draftAtIso: "2026-09-10T19:00:00.000Z" };
+  const scheduledLater: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "later", draftAtIso: "2026-09-12T19:00:00.000Z" };
+  const whenFull: PublicLeagueSummary = {
+    ...HOUSE_LEAGUE,
+    id: "wf",
+    startTrigger: "when_full",
+    // A `when_full` league's `draftAtIso` is the same PLACEHOLDER its `draftAt` is
+    // (`PublicLeagueSummary.draftAtIso`'s own docblock) — earlier than every scheduled
+    // instant here, to prove the gate is `startTrigger`, never the raw timestamp.
+    draftAtIso: "2026-09-01T00:00:00.000Z",
+    filledTeams: 11,
+  };
+
+  it("answers null for an empty shelf", () => {
+    expect(featuredLeagueId([])).toBeNull();
   });
 
-  it("shows each house league's rung through its own OpenLeagueCard, in both themes, axe-clean", async () => {
-    await renderSurface(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn helpLevel="guided" />, async ({ container }) => {
-      // E3 (Phase 3.7, Task 5): a factory-named house league carries its rung IN the title —
-      // "Open 12-team League 3" — so the card renders no duplicate badge beside it; the rung
-      // still reaches the reader exactly once.
-      expect(screen.getByRole("heading", { name: HOUSE_LEAGUE.name })).toBeInTheDocument();
-      expect(screen.getAllByText(new RegExp(HOUSE_RUNG_LABEL.open_12))).toHaveLength(1);
-      expect(screen.getByText(/5 of 12 seated/)).toBeInTheDocument();
-      expect(await axe(container)).toHaveNoViolations();
-    });
+  it("picks the nearest scheduled draft", () => {
+    expect(featuredLeagueId([scheduledLater, scheduledSoon])).toBe("soon");
   });
 
-  // NEW-3 (gauntlet fix wave, "reported, not fixed"): the shelf heading's own instance of
-  // `open-league-card.tsx`'s guided-`InfoTip` layout break — `BROWSE_HELP_LEVEL` is
-  // unconditionally `"guided"`, so the caption above is ALREADY present in every render of this
-  // heading (including the axe-clean assertion above); this locks in the structural fix itself
-  // rather than only its absence of axe violations, which a purely visual overflow would not
-  // trip.
-  it("wraps the shelf heading so its guided caption can drop to its own line instead of overflowing", () => {
-    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn helpLevel="guided" />);
-    const heading = screen.getByRole("heading", { level: 2, name: /Commish house leagues/ });
-    expect(heading.className).toContain("flex-wrap");
-    expect(heading.className).not.toContain("inline-flex");
+  it("never lets a when_full placeholder instant outrank a scheduled draft", () => {
+    expect(featuredLeagueId([whenFull, scheduledLater])).toBe("later");
   });
 
-  it("prints the shelf's promise once, beneath the whole shelf, never per card", () => {
-    const sitAndGo: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "house_sitandgo", houseRung: "sitandgo_12", startTrigger: "when_full" };
-    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE, sitAndGo]} signedIn helpLevel="standard" />);
-    expect(screen.getAllByText(HOUSE_SHELF_PROMISE)).toHaveLength(1);
+  it("falls back to the fewest seats remaining when nothing is scheduled with an instant", () => {
+    const roomier: PublicLeagueSummary = { ...whenFull, id: "roomy", filledTeams: 3 };
+    const noIso: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "no_iso" };
+    delete (noIso as { draftAtIso?: string }).draftAtIso;
+    expect(featuredLeagueId([roomier, whenFull, { ...noIso, filledTeams: 2 }])).toBe("wf");
   });
 
-  it("renders no progress bar", () => {
-    const { container } = render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn helpLevel="guided" />);
-    expect(container.querySelector("[role='progressbar']")).not.toBeInTheDocument();
+  it("breaks a tie by list order, deterministically", () => {
+    const twinA: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "twin_a", draftAtIso: "2026-09-10T19:00:00.000Z" };
+    const twinB: PublicLeagueSummary = { ...HOUSE_LEAGUE, id: "twin_b", draftAtIso: "2026-09-10T19:00:00.000Z" };
+    expect(featuredLeagueId([twinA, twinB])).toBe("twin_a");
+  });
+});
+
+describe("OpenLeagueShelf", () => {
+  it("renders ONE merged grid — house cards first, member cards after, one list element (E3)", async () => {
+    await renderSurface(
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />,
+      async ({ container }) => {
+        const lists = screen.getAllByRole("list");
+        expect(lists).toHaveLength(1);
+        const items = screen.getAllByRole("listitem");
+        expect(items).toHaveLength(1 + PUBLIC_LEAGUES.length);
+        expect(items[0]!.textContent).toContain(HOUSE_LEAGUE.name);
+        expect(screen.getByText("Rookie Snake Room")).toBeInTheDocument();
+        expect(screen.getByText("Sharks Only Auction")).toBeInTheDocument();
+        expect(screen.getByText(MATCHMAKING_CONFIG.stakeDisclosure)).toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
   });
 
-  it("opens an InfoTip on the shelf heading, guided by default, defining a house league", () => {
-    render(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn helpLevel="guided" />);
+  it("wears the wide grid tiers, sm:2 lg:3 xl:4 (E2)", () => {
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />);
+    const grid = screen.getByRole("list");
+    expect(grid.className).toContain("sm:grid-cols-2");
+    expect(grid.className).toContain("lg:grid-cols-3");
+    expect(grid.className).toContain("xl:grid-cols-4");
+  });
+
+  it("renders ONE shelf head: the title at the caller's heading level, the freshness sentence as its quiet sub", () => {
+    const { unmount } = render(
+      <OpenLeagueShelf house={[]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />,
+    );
+    expect(screen.getByRole("heading", { level: 2, name: "Open leagues" })).toBeInTheDocument();
+    expect(screen.getByText(seatCountsAsOfSentence(AS_OF))).toBeInTheDocument();
+    unmount();
+
+    render(<OpenLeagueShelf house={[]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} headingLevel={1} />);
+    expect(screen.getByRole("heading", { level: 1, name: "Open leagues" })).toBeInTheDocument();
+  });
+
+  it("says the house explainer as a plain full-row sentence under the head — never a second heading, never a caption fragment (E3/F2)", () => {
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />);
+    // The old "Commish house leagues" floating caption is DEAD: one shelf, one head.
+    expect(screen.queryByRole("heading", { name: /Commish house leagues/ })).not.toBeInTheDocument();
+    const explainer = screen.getByText(new RegExp(HOUSE_SHELF_EXPLAINER.slice(0, 40)));
+    expect(explainer.closest("p")).not.toBeNull();
+    expect(explainer.closest("h1, h2, h3")).toBeNull();
+  });
+
+  it("prints the shelf's promise once, inside the explainer row, never per card", () => {
+    const { container } = render(
+      <OpenLeagueShelf
+        house={[HOUSE_LEAGUE, { ...HOUSE_LEAGUE, id: "house_sitandgo", houseRung: "sitandgo_12", startTrigger: "when_full" }]}
+        leagues={PUBLIC_LEAGUES}
+        signedIn
+        helpLevel="standard"
+        asOfTime={AS_OF}
+      />,
+    );
+    expect(occurrences(container, HOUSE_SHELF_PROMISE)).toBe(1);
+  });
+
+  it("keeps the house explainer honest: no house leagues on the shelf, no house sentence", () => {
+    const { container } = render(
+      <OpenLeagueShelf house={[]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />,
+    );
+    expect(occurrences(container, HOUSE_SHELF_PROMISE)).toBe(0);
+    expect(screen.queryByText(new RegExp(HOUSE_SHELF_EXPLAINER.slice(0, 40)))).not.toBeInTheDocument();
+  });
+
+  it("offers the house-league definition through the one InfoTip affordance, guided captions included", () => {
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={[]} signedIn helpLevel="guided" asOfTime={AS_OF} />);
     expect(screen.getByRole("button", { name: "What is a house league?" })).toBeInTheDocument();
     expect(screen.getByText(GLOSSARY["house-league"].short)).toBeInTheDocument();
   });
 
-  it("gives a signed-in visitor a join button per house league", () => {
-    renderInLeague(<HouseLeagueShelf leagues={[HOUSE_LEAGUE]} signedIn helpLevel="guided" />, fixtureLeagueDeps().deps);
+  it("prints the legend line once, above the grid, whenever there is a grid to read (D1)", () => {
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />);
+    const legend = screen.getByText(OPEN_LEAGUE_LEGEND);
+    const grid = screen.getByRole("list");
+    expect(legend.compareDocumentPosition(grid) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("passes emphasis='ink' to exactly one card — never more, whatever the shelf holds (D2)", () => {
+    const shelves = [
+      { house: [HOUSE_LEAGUE], leagues: PUBLIC_LEAGUES },
+      { house: [], leagues: PUBLIC_LEAGUES },
+      { house: [HOUSE_LEAGUE], leagues: [] },
+      {
+        house: [{ ...HOUSE_LEAGUE, id: "wf_only", startTrigger: "when_full" as const }],
+        leagues: [{ ...PUBLIC_LEAGUES[0]!, id: "wf_member", startTrigger: "when_full" as const }],
+      },
+    ];
+    for (const { house, leagues } of shelves) {
+      const { container, unmount } = render(
+        <OpenLeagueShelf house={house} leagues={leagues} signedIn={false} helpLevel="standard" asOfTime={AS_OF} />,
+      );
+      expect(inkPillCount(container), `house=${house.length} leagues=${leagues.length}`).toBe(1);
+      unmount();
+    }
+  });
+
+  it("gives the ink to the nearest scheduled draft, quiet pills everywhere else", () => {
+    const soon: PublicLeagueSummary = { ...PUBLIC_LEAGUES[0]!, id: "soonest", name: "Soonest Draft Room", draftAtIso: "2026-09-10T19:00:00.000Z" };
+    const { container } = render(
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={[soon, PUBLIC_LEAGUES[1]!]} signedIn={false} helpLevel="standard" asOfTime={AS_OF} />,
+    );
+    const ink = container.querySelector('[class*="bg-text-primary"]');
+    expect(ink?.getAttribute("aria-label")).toContain("Soonest Draft Room");
+  });
+
+  it("marks every member card, and only member cards, for e2e scoping (data-testid='member-league')", () => {
+    const { container } = render(
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />,
+    );
+    const members = container.querySelectorAll('[data-testid="member-league"]');
+    expect(members).toHaveLength(PUBLIC_LEAGUES.length);
+    for (const member of members) expect(member.textContent).not.toContain(HOUSE_LEAGUE.name);
+  });
+
+  it("gives a signed-in visitor a join button per card, house and member alike", () => {
+    renderInLeague(
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="standard" asOfTime={AS_OF} />,
+      fixtureLeagueDeps().deps,
+    );
     expect(screen.getByRole("button", { name: `Join ${HOUSE_LEAGUE.name}` })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join Rookie Snake Room" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Join Sharks Only Auction" })).toBeInTheDocument();
+  });
+
+  it("sends a signed-out visitor to the hold interstitial, one link per card", () => {
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn={false} helpLevel="standard" asOfTime={AS_OF} />);
+    expect(screen.queryByRole("button", { name: /^Join / })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("link", { name: /^Take (a seat|the last seat) in / })).toHaveLength(1 + PUBLIC_LEAGUES.length);
+  });
+
+  it("offers a next action when no member league matches, rather than a dead end", async () => {
+    await renderSurface(
+      <OpenLeagueShelf house={[]} leagues={[]} signedIn helpLevel="standard" asOfTime={AS_OF} />,
+      async ({ container }) => {
+        expect(screen.getByText("No open leagues match")).toBeInTheDocument();
+        expect(screen.getByRole("link", { name: "Clear the filters" })).toHaveAttribute("href", "/browse");
+        expect(screen.getByRole("link", { name: "Start your own league" })).toHaveAttribute("href", "/app#create-league");
+        // No cards, nothing to press: the legend has no ⓘ to point at.
+        expect(screen.queryByText(OPEN_LEAGUE_LEGEND)).not.toBeInTheDocument();
+        expect(await axe(container)).toHaveNoViolations();
+      },
+    );
+  });
+
+  it("keeps the house cards standing beside the empty state when only the member list runs dry", () => {
+    render(<OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={[]} signedIn helpLevel="standard" asOfTime={AS_OF} />);
+    expect(screen.getByRole("heading", { name: HOUSE_LEAGUE.name })).toBeInTheDocument();
+    expect(screen.getByText("No open leagues match")).toBeInTheDocument();
+  });
+
+  it("renders no progress bar", () => {
+    const { container } = render(
+      <OpenLeagueShelf house={[HOUSE_LEAGUE]} leagues={PUBLIC_LEAGUES} signedIn helpLevel="guided" asOfTime={AS_OF} />,
+    );
+    expect(container.querySelector("[role='progressbar']")).not.toBeInTheDocument();
   });
 });
 

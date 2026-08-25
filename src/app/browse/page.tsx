@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { getDb } from "@/db/client";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { PageTitle } from "@/components/ui";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { shellData } from "@/components/app-shell/shell-data";
 import { PublicBar } from "@/components/app-shell/public-bar";
@@ -12,7 +11,7 @@ import { formatAbsoluteTime } from "@/league";
 import { listPublicLeagues } from "@/league-service/browse";
 import { normalizeBrowseFilter } from "@/matchmaking/filter";
 import { BrowseFilters, type BrowseFilterOption } from "@/league-room/components/browse-filters";
-import { HouseLeagueShelf, PublicLeagueList, seatCountsAsOfSentence } from "@/league-room/components/public-league-list";
+import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
 
 export const dynamic = "force-dynamic";
 
@@ -27,31 +26,28 @@ const first = (value: string | readonly string[] | undefined): string | null =>
   typeof value === "string" ? value : Array.isArray(value) ? value[0] ?? null : null;
 
 /**
- * The public front door to matchmaking, and the only page under a non-`/app` prefix that reads
- * league data. `middleware.ts` does not redirect outside `/app`, so this renders for a
- * signed-out visitor by design — `getCurrentUser()` returning null is the expected case, not an
- * error, and the only thing it changes is whether a card offers a join button or a sign-in
- * link. The signed-in chrome (`TopBar`) appears only when there is a person to name.
+ * The full, filterable lobby (D3's other half — the front door is the capped teaser, this page
+ * is the whole shelf), and the only page under a non-`/app` prefix that reads league data.
+ * `middleware.ts` does not redirect outside `/app`, so this renders for a signed-out visitor by
+ * design — `getCurrentUser()` returning null is the expected case, not an error, and the only
+ * thing it changes is whether a card offers a join button or a sign-in link. The signed-in
+ * chrome (`TopBar`) appears only when there is a person to name.
  *
- * The intro line always offers a "Start your own league" path alongside the browse, not only
- * inside `PublicLeagueList`'s empty state: a commissioner arriving to recruit for their own
- * group is a real visitor to this page, and results matching their filters should not be the
- * only way they find their way out of browsing someone else's leagues.
+ * The lede always offers a "Start your own league" path alongside the browse, not only inside
+ * the shelf's empty state: a commissioner arriving to recruit for their own group is a real
+ * visitor to this page, and results matching their filters should not be the only way they find
+ * their way out of browsing someone else's leagues.
  *
- * Phase 3.5, Task 8: `listPublicLeagues` now orders by seats-remaining first (Step 4) and every
- * `PublicLeagueSummary` carries `startTrigger` (Step 3, `PublicLeagueList`'s own card reads it) —
- * both land here for free, since this page already renders whatever `listPublicLeagues` answers
- * with, unfiltered by field.
- *
- * Phase 3.5 addendum, Task 14: `listPublicLeagues` now answers `BrowseBody` — `leagues` AND
- * `house` — and §4.1's hybrid lobby means the house shelf renders FIRST, above the filters and
- * the member list, the founder's "view and join like FFPC and Apex" made literal page order.
+ * Phase 3.7, Task 6 (E3/F2): the page renders ONE `OpenLeagueShelf` — the merged head (this
+ * band's title is the page's own `h1`, `headingLevel={1}`), the house explainer row, the filter
+ * pills, the legend line, and house + member cards in one grid — where a `PageTitle`, a floating
+ * "Commish house leagues" section, `BrowseFilters` and a member list used to stack as four
+ * siblings.
  *
  * Task 2: this page sits outside `/app`, so it is never wrapped by `(shell)/layout.tsx` — it
  * calls `shellData` and renders `AppShell` ITSELF, and only when there is a user (`/browse` is
  * reachable signed out by design, and a signed-in shell around a stranger would be chrome they
- * cannot use). Signed out, the header is `PublicBar` (Task 16, F6) — this page's own copy-pasted
- * inline header is gone.
+ * cannot use). Signed out, the header is `PublicBar` (Task 16, F6).
  */
 export default async function BrowsePage({ searchParams }: PageProps) {
   const params = await searchParams;
@@ -82,32 +78,27 @@ export default async function BrowsePage({ searchParams }: PageProps) {
   const helpLevel: HelpLevel = user === null ? "standard" : (await readPreferences(getDb(), user)).helpLevel;
 
   const content = (
-    <>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <PageTitle>Open leagues</PageTitle>
-        {/* F20, and the honest half of deferral D4: the shelf says when its numbers were true,
-            verbatim, rather than the mock's refused "Live seat counts · updated just now" — see
-            `seatCountsAsOfSentence`'s own docblock for why. */}
-        <p className="text-sm text-text-muted">{seatCountsAsOfSentence(formatAbsoluteTime(nowIso))}</p>
-      </div>
-      <p className="max-w-prose text-text-muted">
-        Leagues looking for managers, with a draft still to come. Pick one that matches how you
-        like to play. Recruiting your own group instead?{" "}
-        {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
-            first rather than an error, exactly like the empty state's identical link. */}
-        <Link href="/app#create-league" className="font-medium text-accent underline">
-          Start your own league
-        </Link>
-        .
-      </p>
-      {/* Phase 3.5 addendum, Task 14: §4.1's hybrid lobby — the house shelf leads, the member
-          list follows. `HouseLeagueShelf` renders nothing at all when the shelf is empty, so
-          an unreconciled database (or a rung mid-restock) never shows an apology above a
-          member list that is doing just fine on its own. */}
-      <HouseLeagueShelf leagues={house} signedIn={user !== null} helpLevel={helpLevel} />
-      <BrowseFilters active={active} />
-      <PublicLeagueList leagues={leagues} signedIn={user !== null} helpLevel={helpLevel} />
-    </>
+    <OpenLeagueShelf
+      house={house}
+      leagues={leagues}
+      signedIn={user !== null}
+      helpLevel={helpLevel}
+      asOfTime={formatAbsoluteTime(nowIso)}
+      headingLevel={1}
+      intro={
+        <p className="max-w-prose text-text-muted">
+          Leagues looking for managers, with a draft still to come. Pick one that matches how you
+          like to play. Recruiting your own group instead?{" "}
+          {/* /app is auth-gated by middleware.ts, so a signed-out visitor lands at sign-in
+              first rather than an error, exactly like the empty state's identical link. */}
+          <Link href="/app#create-league" className="font-medium text-accent underline">
+            Start your own league
+          </Link>
+          .
+        </p>
+      }
+      filters={<BrowseFilters active={active} />}
+    />
   );
 
   if (user === null) {

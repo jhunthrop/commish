@@ -51,11 +51,14 @@ export function BrowseFilters({ active }: BrowseFiltersProps) {
             key={option.key}
             href={option.href}
             aria-current={isActive ? "true" : undefined}
+            // Task 6 restyle (rules 4 and 5): quiet pills, structure from the hairline alone.
+            // Active is INK-BORDERED, never filled — a filter is a lens, not the view's one ink
+            // action — and the quiet pills answer hover with the same border darkening, no fill.
             className={
               "rounded-pill border px-3 py-1.5 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent " +
               (isActive
-                ? "border-text-muted bg-surface-elevated text-text-primary"
-                : "border-line text-text-muted hover:bg-surface-elevated hover:text-text-primary")
+                ? "border-text-primary text-text-primary"
+                : "border-line text-text-muted hover:border-text-muted hover:text-text-primary")
             }
           >
             {option.label}

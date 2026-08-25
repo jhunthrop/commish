@@ -80,13 +80,15 @@ test("a signed-in manager can browse open leagues and join one", async ({ manage
   await expect(managerB.getByText("Sunday Regulars")).toHaveCount(0);
   await expect(managerB.getByText("Rookie Snake Room")).toBeVisible();
 
-  // Scoped to the member list, not the whole page (Phase 3.5 addendum, Task 15): the house
-  // shelf (`HouseLeagueShelf`) renders its OWN "Join {name}" buttons above this list and is
-  // never narrowed by the format filter above (`data-testid="public-league-list"`,
-  // `PublicLeagueList`'s own docblock) — a bare `.first()` over the page can land on a house
-  // card instead, and a house league declared `beginner`-tier would refuse a veteran manager B
-  // has become across this suite's own other specs.
-  await managerB.getByTestId("public-league-list").getByRole("button", { name: /^Join / }).first().click();
+  // Scoped to MEMBER cards, not the whole page (Phase 3.5 addendum, Task 15; re-anchored by
+  // Phase 3.7, Task 6): house cards share the ONE merged shelf grid (`OpenLeagueShelf`), render
+  // the identical "Join {name}" accessible-name shape, and are never narrowed by the filter
+  // above — a bare `.first()` over the page can land on a house card instead, and a house league
+  // declared `beginner`-tier would refuse a veteran manager B has become across this suite's own
+  // other specs. Each member card's `<li>` carries `data-testid="member-league"` for exactly
+  // this scoping (the old wrapper-level `public-league-list` testid died with the two-section
+  // shelf).
+  await managerB.getByTestId("member-league").getByRole("button", { name: /^Join / }).first().click();
   await expect(managerB).toHaveURL(/\/app\/leagues\//);
   await expect(managerB.getByRole("heading", { level: 1 })).toBeVisible();
 });

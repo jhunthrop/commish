@@ -55,6 +55,17 @@ export const UI_CONFIG = {
     /** Oldest toasts beyond this are dropped so the stack can never cover the page. */
     maxVisible: 3,
   },
+  frontDoor: {
+    /**
+     * D3 (Phase 3.7, Task 6, self-ruled at 6): how many MEMBER leagues the front door's shelf
+     * shows before the one quiet "See every open league" pill hands off to `/browse` — the
+     * capped teaser that kills the audit's 5,800px front door (E2/D3). Member leagues only: the
+     * house shelf renders whole, since the factory's own `openAtOnce` already bounds it. Two
+     * full rows at the shelf's `lg` three-column tier; `/browse` remains the uncapped, filterable
+     * lobby.
+     */
+    shelfCap: 6,
+  },
   openLeagueCard: {
     /**
      * Rule 6, "only true things move" (Phase 3.7, Task 5, self-ruled at 6 hours): a browse

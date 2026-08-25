@@ -29,7 +29,7 @@ import { ModerationSummary } from "@/league-room/components/moderation-summary";
 import { OpenLeagueCard } from "@/league-room/components/open-league-card";
 import { OpenSeatsPanel } from "@/league-room/components/open-seats-panel";
 import { ProofStrip } from "@/league-room/components/proof-strip";
-import { PublicLeagueList } from "@/league-room/components/public-league-list";
+import { OpenLeagueShelf } from "@/league-room/components/public-league-list";
 import { SeatClaimSteps } from "@/league-room/components/seat-claim-steps";
 import { SeatHoldPanel } from "@/league-room/components/seat-hold-panel";
 import { SeatTakenPanel } from "@/league-room/components/seat-taken-panel";
@@ -763,15 +763,21 @@ describe("LeagueTermsPanel says nothing that breaks the house copy rules, includ
   });
 });
 
-describe("PublicLeagueList says nothing that breaks the house copy rules, including each card's composed draft time", () => {
-  it("is clean signed in, signed out, and empty", () => {
+describe("OpenLeagueShelf says nothing that breaks the house copy rules, including each card's composed draft time", () => {
+  // Task 6: the merged shelf's OWN voice grew — the shelf head, the house explainer row
+  // (`HOUSE_SHELF_EXPLAINER` + `HOUSE_SHELF_PROMISE`), the legend line (`OPEN_LEAGUE_LEGEND`)
+  // and the composed `seatCountsAsOfSentence` all render here and are all swept here, left IN
+  // the scanned text rather than subtracted.
+  const AS_OF = "Saturday 12 September, 7:42 PM UTC";
+  const HOUSE = { ...PUBLIC_LEAGUES[0]!, id: "house_sweep", name: "Open 12-team League 3", houseRung: "open_12" as const };
+  it("is clean signed in, signed out, house-shelved, and empty", () => {
     for (const element of [
-      <PublicLeagueList key="signed-in" leagues={PUBLIC_LEAGUES} signedIn={true} helpLevel="guided" />,
-      <PublicLeagueList key="signed-out" leagues={PUBLIC_LEAGUES} signedIn={false} helpLevel="standard" />,
-      <PublicLeagueList key="empty" leagues={[]} signedIn={true} helpLevel="standard" />,
+      <OpenLeagueShelf key="signed-in" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={true} helpLevel="guided" asOfTime={AS_OF} />,
+      <OpenLeagueShelf key="signed-out" house={[HOUSE]} leagues={PUBLIC_LEAGUES} signedIn={false} helpLevel="standard" asOfTime={AS_OF} />,
+      <OpenLeagueShelf key="empty" house={[]} leagues={[]} signedIn={true} helpLevel="standard" asOfTime={AS_OF} />,
     ]) {
       const { container, unmount } = render(element);
-      expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name));
+      expectClean(container, ...PUBLIC_LEAGUES.map((league) => league.name), HOUSE.name);
       unmount();
     }
   });

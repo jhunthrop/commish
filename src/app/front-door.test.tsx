@@ -14,14 +14,16 @@ vi.mock("next/navigation", () => ({
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { listPublicLeagues } from "@/league-service/browse";
 import { getProofCache } from "@/league-service/proof-cache-instance";
+import { UI_CONFIG } from "@/components/ui/config";
+import { PUBLIC_LEAGUES } from "@/league-room/test-fixtures";
 import Home from "./page";
 
 const EMPTY_BROWSE: BrowseBody = { leagues: [], house: [] };
 const EMPTY_STATS: ProofStats = { leaguesFilled: null, draftsNext48h: null, rating: null, any: false };
 const FULL_STATS: ProofStats = { leaguesFilled: 247, draftsNext48h: 12, rating: { average: 4.8, count: 63 }, any: true };
 
-async function renderHome(searchParams: Record<string, string> = {}) {
-  const page = await Home({ searchParams: Promise.resolve(searchParams) });
+async function renderHome() {
+  const page = await Home();
   return render(page);
 }
 
@@ -69,10 +71,33 @@ describe("the front door (Task 5)", () => {
     expect(screen.queryByText(/updated just now/)).not.toBeInTheDocument();
   });
 
-  it("renders the shelf and the four-control filter row", async () => {
+  it("renders the one shelf head, and NO filter row — the front door is the capped teaser, /browse is the lobby (D3)", async () => {
     await renderHome();
-    expect(screen.getByRole("heading", { name: "Open leagues" })).toBeInTheDocument();
-    expect(screen.getByRole("navigation", { name: "Filter open leagues" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 2, name: "Open leagues" })).toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Filter open leagues" })).not.toBeInTheDocument();
+  });
+
+  it("caps the member list at UI_CONFIG.frontDoor.shelfCap and offers the one quiet way to the rest (D3)", async () => {
+    const cap = UI_CONFIG.frontDoor.shelfCap;
+    const many = Array.from({ length: cap + 2 }, (_, index) => ({
+      ...PUBLIC_LEAGUES[0]!,
+      id: `capped_${index + 1}`,
+      name: `Capped League ${index + 1}`,
+    }));
+    vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: many, house: [] });
+    await renderHome();
+    expect(screen.getByRole("heading", { name: `Capped League ${cap}` })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: `Capped League ${cap + 1}` })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: `Capped League ${cap + 2}` })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "See every open league" })).toHaveAttribute("href", "/browse");
+  });
+
+  it("keeps 'See every open league' a quiet pill — the shelf's featured card holds the view's card ink (D2/rule 5)", async () => {
+    vi.mocked(listPublicLeagues).mockResolvedValue({ leagues: [...PUBLIC_LEAGUES], house: [] });
+    await renderHome();
+    const seeEvery = screen.getByRole("link", { name: "See every open league" });
+    expect(seeEvery.className).not.toContain("bg-text-primary");
+    expect(seeEvery.className).toContain("border-edge");
   });
 
   it("gives 'Start your own league' its own row, framed apart from the league cards", async () => {
@@ -89,13 +114,21 @@ describe("the front door (Task 5)", () => {
     expect(screen.getByRole("link", { name: "League rules" })).toHaveAttribute("href", "/league-rules");
   });
 
-  it("passes 'Drafting soonest' and 'Drafts when full' straight through to listPublicLeagues, never through BrowseFilter", async () => {
-    await renderHome({ sort: "soonest" });
+  it("always asks for the default, unfiltered shelf — the front door reads no params, /browse owns filtering (D3)", async () => {
+    await renderHome();
     expect(vi.mocked(listPublicLeagues)).toHaveBeenCalledWith(
       {},
       expect.objectContaining({ format: "any", experienceTier: "any", stakeTier: "any", participationTier: "any" }),
       expect.any(Object),
-      { sort: "soonest", whenFullOnly: false },
+      { sort: "seats_remaining", whenFullOnly: false },
     );
+  });
+
+  it("frames 'Start your own league' as a hairline-topped row, never a box (rule 4)", async () => {
+    await renderHome();
+    const heading = screen.getByRole("heading", { name: "Start your own league" });
+    const row = heading.closest("div");
+    expect(row?.className).toContain("border-t");
+    expect(row?.className).not.toContain("rounded");
   });
 });
