@@ -33,6 +33,10 @@ describe("MONEY_REFUSALS", () => {
   it("says what happened to the money first, on the overflow refusal — FINDING 1", () => {
     expect(MONEY_REFUSALS.amountOverflow).toMatch(/^No money moved\./);
   });
+
+  it("says what happened to the money first, on the insufficient-balance refusal (Task 3)", () => {
+    expect(MONEY_REFUSALS.insufficientBalance).toMatch(/^No money moved\./);
+  });
 });
 
 describe("formatUsd", () => {

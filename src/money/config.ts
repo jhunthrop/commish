@@ -58,6 +58,13 @@ export const MONEY_REFUSALS = {
    * happened to the money before the reason.
    */
   amountOverflow: "No money moved. This amount is too large for the ledger to represent safely.",
+  /**
+   * `postMoneyTransaction` (`src/money-service/post.ts`, Task 3): the posting would drive a
+   * player-facing balance below zero, and the writer refuses rather than clamps (plan ruling 5 —
+   * the database's own `money_accounts_balance_floor_ck` is the backstop, this sentence is the
+   * front door). Money-first copy, the same discipline as `amountOverflow` above.
+   */
+  insufficientBalance: "No money moved. The balance available does not cover this amount.",
 } as const;
 
 /** The union of every refusal sentence in `MONEY_REFUSALS`, for a writer's own refusal type. */
