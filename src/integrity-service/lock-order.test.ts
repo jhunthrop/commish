@@ -29,7 +29,10 @@ import { toggleReaction } from "@/chat-service/chat";
 import { reportMessage } from "@/chat-service/moderation";
 import { reportReview } from "@/review-service/reviews";
 import { accountIdFor } from "@/money/accounts";
+import { initiateDeposit, recordDepositCompleted, recordDepositReturned, type DepositDeps } from "@/money-service/deposits";
 import { postMoneyTransaction, type PostDeps } from "@/money-service/post";
+import { ingestProviderCallback, type PaymentsEvent } from "@/payments-provider/ingest";
+import { createMockPaymentsProvider } from "@/payments-provider/mock/mock-payments-provider";
 import { raiseFlag, resolveFlag } from "./flags";
 import { closeSupersededHoldFlag } from "./trade-fairness";
 import { grantAdmin } from "./grant-admin";
@@ -3453,5 +3456,124 @@ describe("postMoneyTransaction's lock order", () => {
     expect(available!.balanceCents).toBe(20_00);
     const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
     expect(platformAnchor!.headSequence).toBe(3);
+  });
+});
+
+/**
+ * PHASE 4, TASK 5 — the suite's 35th entry (34 counted off this file before it), for the deposit
+ * fate writers (`@/money-service/deposits`). Both `recordDepositCompleted` and
+ * `recordDepositReturned` share one shape, so one driven proof covers the class:
+ *
+ * STATEMENTS AND LOCKS, ENUMERATED (the suite's own law). Two plain reads first — the stored
+ * intent, and (return only) the completion transaction's existence — neither takes any lock.
+ * Then `ensureAndLockMoneyAccounts` (`@/money-service/post`, the ONE writer's own discipline,
+ * exported) locks the three fate accounts — `fbo_pool`, `platform_receivable:<id>`,
+ * `user_available:<id>` — in SORTED account-id order, each behind its own FK-free
+ * `INSERT … ON CONFLICT DO NOTHING`. The `postMoneyTransaction` call that follows re-locks a
+ * SUBSET of those same rows in the same sorted order (every acquisition a re-lock by this same
+ * transaction, no new edge), inserts rows whose FKs reference only rows this transaction created
+ * or already holds, and takes the platform audit anchor LAST. The initiation-side
+ * `payment_transfer_intents` INSERT carries NO foreign key at all (ruling 7's precedent), so
+ * `initiateDeposit` — which posts nothing — contributes no edge to the graph. Deposits are
+ * league-less: no `leagues` row is ever named, so the global lock law's first clause is
+ * vacuously honored.
+ *
+ * WHY THE PRE-LOCK EXISTS, which is what the race below drives: the return's clawback split
+ * (debit `user_available` up to its balance, shortfall to `platform_receivable` — ruling 5) is
+ * DECIDED from balances read under those locks. Decided from an unlocked read, a fee collected
+ * while the writer waited would be double-counted: the split would debit money the member no
+ * longer has, and the balance floor would refuse a legitimate return. So the proof parks the
+ * FIRST-sorted row (`fbo_pool`), commits a real fee against the member while the return is
+ * genuinely blocked there holding nothing, and requires the released return to split against
+ * the POST-fee balance.
+ */
+describe("recordDepositReturned's lock order", () => {
+  it("blocks at the pool row holding nothing, then decides the clawback split from balances a concurrent fee already moved", async () => {
+    await truncateMoneyTables(joinDb);
+    await joinDb
+      .insert(users)
+      .values({ id: "u_ret_lock", email: "u_ret_lock@test.local", displayName: "u_ret_lock", kycStatus: "verified" })
+      .onConflictDoNothing();
+    const provider = createMockPaymentsProvider(clock);
+    const depositDeps: DepositDeps = {
+      provider,
+      audit: getAuditLogger(),
+      clock,
+      newId: () => crypto.randomUUID(),
+      states: { enabled: [{ state: "TN", minAge: 18 }], neverEligible: [] },
+    };
+    const ingest = (queue: readonly { body: string; signature: string | undefined }[]): PaymentsEvent => {
+      const outcome = ingestProviderCallback(queue[0]!);
+      if (!outcome.ok) throw new Error(`mock callback failed ingestion: ${outcome.reason}`);
+      return outcome.event;
+    };
+
+    // The member's real history: a $50 deposit completes through the real pipeline.
+    const initiated = await initiateDeposit(
+      joinDb,
+      { userId: "u_ret_lock", amountCents: 50_00, stateOfEntry: "TN", method: "bank", idempotencyKey: "lock_form_1" },
+      depositDeps,
+    );
+    if (!initiated.ok) throw new Error(`unreachable: ${initiated.reason}`);
+    provider.advance();
+    const completed = await recordDepositCompleted(joinDb, ingest(provider.drainCallbacks()), depositDeps);
+    expect(completed).toMatchObject({ ok: true, replayed: false });
+    provider.triggerReturn(initiated.transfer.ref);
+    const returnedEvent = ingest(provider.drainCallbacks());
+
+    // The bystander: holds the FIRST-sorted fate row, `"fbo_pool"`, exactly as the
+    // postMoneyTransaction mirror proof above parks it.
+    let holdsPoolLock: () => void = () => {};
+    const poolLocked = new Promise<void>((resolve) => (holdsPoolLock = resolve));
+    let releasePoolLock: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releasePoolLock = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM money_accounts WHERE id = ${"fbo_pool"} FOR UPDATE`);
+      holdsPoolLock();
+      await released;
+    });
+    await poolLocked;
+
+    // T_return: the real writer, on its own connection. Its first LOCK is the parked pool row,
+    // so it must genuinely block here before it has read a single balance.
+    const returning = recordDepositReturned(flagDb, returnedEvent, depositDeps);
+    expect(await waitForBlockedBackend()).toBe(true);
+
+    // T_fee: while the return waits (holding nothing), the member spends $30 through the ONE
+    // writer on a third connection — no `fbo_pool` leg, so nothing blocks it — and COMMITS.
+    const fee = await pickDb.transaction((tx) =>
+      postMoneyTransaction(
+        tx,
+        {
+          kind: "entry_fee",
+          leagueId: "lg_ret_lock",
+          stateOfEntry: "TN",
+          entries: [
+            { accountId: accountIdFor("user_available", "u_ret_lock"), direction: "debit", amountCents: 30_00 },
+            { accountId: accountIdFor("league_escrow", "lg_ret_lock"), direction: "credit", amountCents: 30_00 },
+          ],
+          auditEvent: {
+            eventType: "entry_fee_collected",
+            actorId: "u_ret_lock",
+            actorType: "user",
+            leagueId: "lg_ret_lock",
+            payload: { amountCents: 30_00 },
+          },
+        },
+        depositDeps,
+      ),
+    );
+    expect(fee).toMatchObject({ ok: true, replayed: false });
+
+    releasePoolLock();
+    await holding;
+
+    // Released, the return reads the POST-fee balance under its own locks: $20 claws back from
+    // the available balance and the $30 already spent books to the receivable — never negative.
+    expect(await returning).toEqual({ ok: true, replayed: false, shortfallCents: 30_00 });
+    const [available] = await joinDb.select().from(moneyAccounts).where(eq(moneyAccounts.id, "user_available:u_ret_lock"));
+    expect(available!.balanceCents).toBe(0);
+    const [receivable] = await joinDb.select().from(moneyAccounts).where(eq(moneyAccounts.id, "platform_receivable:u_ret_lock"));
+    expect(receivable!.balanceCents).toBe(30_00);
   });
 });
