@@ -81,9 +81,12 @@ const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "p
   // dissolution becomes `entry_fee_refunded`'s second caller, same writer, no new event type.
   entry_fee_collected: "plan-a", // Task 8, `@/money-service/entry-fee`, inside joinLeagueInTx
   entry_fee_refunded: "plan-a", // Task 8 (seat release); Task 9's dissolution reuses the writer
-  prize_paid: "phase-4", // Task 10, `@/money-service/settlement`
-  payout_held: "phase-4", // Task 10, `@/money-service/settlement`
-  payout_released: "phase-4", // Task 10, `@/money-service/settlement`'s releaseHold
+  // Task 10 landed all three settlement publishers (`@/money-service/settlement`) — flipped
+  // exactly as the block comment above prescribes: the value marks PUBLISHED, and the writer's
+  // landing is what reddened each row until it moved.
+  prize_paid: "plan-a", // Task 10, `settleSeasonPayouts` (one per prize-table row paid)
+  payout_held: "plan-a", // Task 10, `settleSeasonPayouts` (a winner an open flag involves)
+  payout_released: "plan-a", // Task 10, `releaseHold`
   // Task 7's fix round: the same T2 pattern above (grow the enum, name the plan), except the
   // publisher lands in the SAME pass as the growth — migration 0039 and these three writers ship
   // together, so each moves straight to "plan-a" (PUBLISHED) rather than sitting at "phase-4"

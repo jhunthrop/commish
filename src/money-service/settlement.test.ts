@@ -147,13 +147,24 @@ function settle(leagueId: string, standings: readonly { readonly place: number; 
 async function snapshotSurface() {
   return {
     money: await snapshotMoneyBook(db),
-    auditEvents: await db.select().from(auditEvents).orderBy(asc(auditEvents.id)),
+    auditEvents: await db.select().from(auditEvents).orderBy(asc(auditEvents.chainScope), asc(auditEvents.sequence)),
     memberNotices: await db.select().from(memberNotices).orderBy(asc(memberNotices.id)),
   };
 }
 
+/** The record is `money_entries`/`money_transactions` plus the audit and notice tables; a
+ *  zero-balance `money_accounts` lock target committed around a refusal is not a posting —
+ *  `expectNoPostingTookPlace`'s own tolerance (`./test-support`), restated over this surface. */
 async function expectNoSettlementTookPlace(before: Awaited<ReturnType<typeof snapshotSurface>>): Promise<void> {
-  expect(await snapshotSurface()).toEqual(before);
+  const after = await snapshotSurface();
+  expect(after.money.transactions).toEqual(before.money.transactions);
+  expect(after.money.entries).toEqual(before.money.entries);
+  for (const account of after.money.accounts) {
+    const prior = before.money.accounts.find((row) => row.id === account.id);
+    expect({ id: account.id, balanceCents: account.balanceCents }).toEqual({ id: account.id, balanceCents: prior?.balanceCents ?? 0 });
+  }
+  expect(after.auditEvents).toEqual(before.auditEvents);
+  expect(after.memberNotices).toEqual(before.memberNotices);
 }
 
 async function settlementEntries(leagueId: string) {
@@ -173,7 +184,7 @@ async function settlementEntries(leagueId: string) {
 }
 
 async function eventsOfType(eventType: string) {
-  return db.select().from(auditEvents).where(eq(auditEvents.eventType, eventType as never)).orderBy(asc(auditEvents.id));
+  return db.select().from(auditEvents).where(eq(auditEvents.eventType, eventType as never)).orderBy(asc(auditEvents.chainScope), asc(auditEvents.sequence));
 }
 
 async function noticesOfType(noticeType: string) {
@@ -218,7 +229,9 @@ describe("settlement is never automatic", () => {
         }
         if (!/\.(ts|tsx)$/.test(entry.name) || /\.test\.(ts|tsx)$/.test(entry.name)) continue;
         const source = readFileSync(path, "utf8");
-        if (source.includes("money-service/settlement") || source.includes('from "./settlement"')) importers.push(path);
+        // IMPORT statements only — docblocks may NAME this module (`@/domain/audit` reserves the
+        // event types for it), and a mention is not a caller.
+        if (source.includes('from "@/money-service/settlement"') || source.includes('from "./settlement"')) importers.push(path);
       }
     };
     walk("src");
@@ -296,6 +309,34 @@ describe("settleSeasonPayouts refusals", () => {
     const before = await snapshotSurface();
     const result = await settle("lg_badtable", [{ place: 1, userId: "ua" }]);
     expect(result).toEqual({ ok: false, status: 409, reason: MONEY_REFUSALS.prizeTableMismatch });
+    await expectNoSettlementTookPlace(before);
+  });
+
+  it("refuses a paid league whose stored table is missing entirely — a state creation cannot produce, refused rather than trusted", async () => {
+    await seedLeague({ id: "lg_notable", payoutTable: null });
+    for (const u of ["ua", "ub", "uc", "ud"]) {
+      await fund(u, 50_00);
+      await paidJoin("lg_notable", u);
+    }
+    await completeSeason("lg_notable");
+    const before = await snapshotSurface();
+    const result = await settle("lg_notable", []);
+    expect(result).toEqual({ ok: false, status: 409, reason: MONEY_REFUSALS.prizeTableMismatch });
+    await expectNoSettlementTookPlace(before);
+  });
+
+  it("rolls the WHOLE settlement back when a PRIZE posting refuses mid-flight", async () => {
+    await seedSettledStage("lg_prize_refused");
+    const before = await snapshotSurface();
+    const refuseSecondPrize: NonNullable<SettlementDeps["postTransaction"]> = async (tx, input, postDeps) => {
+      if (input.idempotencyKey?.endsWith(":place:2")) return { ok: false, reason: MONEY_REFUSALS.insufficientBalance };
+      return postMoneyTransaction(tx, input, postDeps);
+    };
+    const result = await settle("lg_prize_refused", [
+      { place: 1, userId: "u1" },
+      { place: 2, userId: "u2" },
+    ], { ...deps, postTransaction: refuseSecondPrize });
+    expect(result).toEqual({ ok: false, status: 409, reason: SETTLEMENT_REFUSALS.escrowMismatch });
     await expectNoSettlementTookPlace(before);
   });
 
@@ -406,6 +447,7 @@ describe("settleSeasonPayouts refusals", () => {
 describe("settleSeasonPayouts", () => {
   it("pays the STORED table to the named winners with each winner's own attested state, sweeps the rake per seat, and drains the escrow to exactly zero", async () => {
     await seedSettledStage("lg_pay");
+    await seedUser(OPERATOR);
     // A RESOLVED flag involving u2 must not hold anything — only OPEN flags do.
     await raisePairFlag("u2", "u4", "flag_resolved_pair");
     const resolved = await resolveFlag(db, { flagId: "flag_resolved_pair", decision: "no_action", note: "clean", operatorUserId: OPERATOR });
@@ -482,7 +524,9 @@ describe("settleSeasonPayouts", () => {
       await paidJoin("lg_rakeonly", u, s);
     }
     await completeSeason("lg_rakeonly");
-    const result = await settle("lg_rakeonly", []);
+    // `{}` deps on a run that actually posts: the default clock/audit/newId are exercised end to
+    // end, so a caller injecting nothing gets the same working writer the tests drive.
+    const result = await settle("lg_rakeonly", [], {});
     expect(result).toEqual({ ok: true, alreadySettled: false, prizesPaidCents: 0, heldCents: 0, rakeCents: 40_00 });
     expect(await accountBalance(db, accountIdFor("league_escrow", "lg_rakeonly"))).toBe(0);
     expect(await accountBalance(db, accountIdFor("platform_rake"))).toBe(40_00);
@@ -624,6 +668,26 @@ describe("collusion holds", () => {
   it("holds ONLY the flagged winner: the clean winners are paid and told in the same settlement", async () => {
     await seedSettledStage("lg_mixed");
     await raisePairFlag("u2", "u_outsider", "flag_mixed");
+    // An open trade flag between two NON-winners must hold nobody on the podium.
+    const [u3Team] = await db.select({ id: teams.id }).from(teams).where(and(eq(teams.leagueId, "lg_mixed"), eq(teams.userId, "u3")));
+    const [u4Team] = await db.select({ id: teams.id }).from(teams).where(and(eq(teams.leagueId, "lg_mixed"), eq(teams.userId, "u4")));
+    await db.insert(tradeProposals).values({
+      id: "trade_mixed",
+      leagueId: "lg_mixed",
+      proposerTeamId: u3Team!.id,
+      counterpartyTeamId: u4Team!.id,
+      weekNumber: 4,
+      proposerAssets: [{ kind: "player", playerId: "p_a" }],
+      counterpartyAssets: [{ kind: "player", playerId: "p_b" }],
+      fingerprint: "fp_trade_mixed",
+      note: null,
+      status: "accepted",
+      proposedAt: new Date(NOW),
+      expiresAt: new Date(NOW),
+    });
+    await db.transaction((tx) =>
+      raiseFlag(tx, { flagType: "trade_fairness", subjectId: "trade_mixed", leagueId: "lg_mixed", evidence: {}, raisedByUserId: null, occurredAt: NOW, newId: () => "flag_trade_mixed", audit }),
+    );
     const result = await settle("lg_mixed", [
       { place: 1, userId: "u2" },
       { place: 2, userId: "u1" },
@@ -724,6 +788,32 @@ describe("releaseHold and confiscateHold", () => {
     const result = await releaseHold(db, { userId: "u_never", operatorUserId: OPERATOR });
     expect(result).toEqual({ ok: false, status: 409, reason: SETTLEMENT_REFUSALS.nothingHeld });
     await expectNoSettlementTookPlace(before);
+  });
+
+  it("releases with defaults for every dep — a caller injecting nothing gets the same working writer", async () => {
+    await seedHeldWinner();
+    const result = await releaseHold(db, { userId: "u_flag", operatorUserId: OPERATOR });
+    expect(result).toEqual({ ok: true, amountCents: 80_00 });
+    expect(await accountBalance(db, accountIdFor("held_for_review", "u_flag"))).toBe(0);
+  });
+
+  it("a hold can form AGAIN after an earlier release, and the next outcome reads only the live balance", async () => {
+    await seedHeldWinner();
+    await releaseHold(db, { userId: "u_flag", operatorUserId: OPERATOR }, deps);
+    // The flag is still open, and u_flag wins a third league: a fresh hold on an account whose
+    // book already carries the released (debited) history.
+    await seedLeague({ id: "lg_hc", teamCount: 2, entryFeeCents: 20_00, platformFeeCents: 0, payoutTable: [{ place: 1, amountCents: 40_00 }] });
+    await paidJoin("lg_hc", "u_flag", "TN");
+    await paidJoin("lg_hc", "u_other", "TN");
+    await completeSeason("lg_hc");
+    const settled = await settle("lg_hc", [{ place: 1, userId: "u_flag" }]);
+    expect(settled).toMatchObject({ ok: true, heldCents: 40_00 });
+    expect(await accountBalance(db, accountIdFor("held_for_review", "u_flag"))).toBe(40_00);
+
+    const confiscated = await confiscateHold(db, { userId: "u_flag", operatorUserId: OPERATOR }, deps);
+    expect(confiscated).toEqual({ ok: true, amountCents: 40_00 });
+    expect(await accountBalance(db, accountIdFor("held_for_review", "u_flag"))).toBe(0);
+    expect(await accountBalance(db, accountIdFor("platform_forfeiture"))).toBe(40_00);
   });
 
   it("rolls back and surfaces an unexpected posting failure", async () => {

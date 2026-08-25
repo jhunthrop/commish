@@ -353,6 +353,29 @@ export interface NoticeContexts {
     readonly leagueName: string;
     readonly refundedCents: number;
   };
+  /**
+   * `settleSeasonPayouts`'s own notice (`@/money-service/settlement`, Phase 4 Task 10) — the
+   * personal half of the `prize_paid` audit event the same transaction appends, sent to each
+   * winner whose prize actually landed in their wallet. Money-first (`MONEY_REFUSALS`' own copy
+   * rulebook, `@/money/config`): the sentence carrying the dollar figure states what happened to
+   * the money before anything else. NOT sent for a held payout — a hold names a suspicion, and
+   * the member is told nothing until an operator resolves it (the accusatory-surface rule).
+   */
+  readonly prize_paid: {
+    readonly leagueName: string;
+    readonly place: number;
+    readonly amountCents: number;
+  };
+  /**
+   * `releaseHold`'s own notice (`@/money-service/settlement`, Phase 4 Task 10), sent when an
+   * operator releases a held payout back to the member. Deliberately names NO league and NO
+   * hold: the held account pools across leagues, and "your winnings were held for review" is
+   * exactly the accusation `INTEGRITY_CONFIG.notices.accusatoryTerms` exists to keep out of this
+   * product — the member reads that money arrived, which is the only fact that is theirs to know.
+   */
+  readonly payout_released: {
+    readonly amountCents: number;
+  };
 }
 
 /**
@@ -593,7 +616,33 @@ export const NOTICE_TEMPLATES: { readonly [T in NoticeType]: NoticeTemplate<T> }
         ? `${leagueName} did not fill and an operator closed it. Your entry fee of ${formatUsd(refundedCents)} is back in your wallet.`
         : `${leagueName} did not fill and an operator closed it.`,
   }),
+  // No "no reply" line: winning money is not a sanction. Money-first — the dollar figure and
+  // where it now sits lead the sentence, before the finish that earned it.
+  prize_paid: ({ leagueName, place, amountCents }) => ({
+    title: `You won ${formatUsd(amountCents)} in ${leagueName}`,
+    body: `${formatUsd(amountCents)} in winnings is in your wallet for finishing ${ordinalPlace(place)} in ${leagueName}.`,
+  }),
+  // Names no league and no hold — see the context's own docblock for why this sentence carries
+  // only the money's arrival.
+  payout_released: ({ amountCents }) => ({
+    title: `${formatUsd(amountCents)} is in your wallet`,
+    body: `${formatUsd(amountCents)} in winnings is in your wallet.`,
+  }),
 };
+
+/**
+ * `1` -> `"1st"`, `2` -> `"2nd"`, `11` -> `"11th"` — the one place a finishing place becomes a
+ * word, shared by the `prize_paid` notice above and the league feed's own prize sentence
+ * (`renderPrizePaid`, `@/integrity/activity-view`), so the two surfaces can never disagree about
+ * how a place reads.
+ */
+export function ordinalPlace(place: number): string {
+  const mod100 = place % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${place}th`;
+  const mod10 = place % 10;
+  const suffix = mod10 === 1 ? "st" : mod10 === 2 ? "nd" : mod10 === 3 ? "rd" : "th";
+  return `${place}${suffix}`;
+}
 
 export function renderNotice<T extends NoticeType>(type: T, context: NoticeContexts[T]): RenderedNotice {
   return NOTICE_TEMPLATES[type](context);

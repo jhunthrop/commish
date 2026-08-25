@@ -1,6 +1,6 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, chatMessages, draftSlotPreferences, drafts, integrityFlags, leagues, lineupSlots, memberNotices, moneyAccounts, playerStatLines, reviews, rosterSlots, seatHolds, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
+import { auditChains, chatMessages, draftSlotPreferences, drafts, integrityFlags, leagues, lineupSlots, memberNotices, moneyAccounts, moneyTransactions, playerStatLines, reviews, rosterSlots, seatHolds, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
 import { createTestDb, truncateAll, truncateMoneyTables } from "@/db/test-db";
 import { currentDeadline, DRAFT_SKIP_POLICY } from "@/draft-engine";
 import { setSlotPreference } from "@/draft-service/slot-preference";
@@ -33,6 +33,7 @@ import { initiateDeposit, recordDepositCompleted, recordDepositReturned, type De
 import { dissolveLeague } from "@/money-service/dissolution";
 import { initiateWithdrawal, recordWithdrawalCompleted, type WithdrawalDeps } from "@/money-service/withdrawals";
 import { postMoneyTransaction, type PostDeps } from "@/money-service/post";
+import { settleSeasonPayouts } from "@/money-service/settlement";
 import { ingestProviderCallback, type PaymentsEvent } from "@/payments-provider/ingest";
 import { createMockPaymentsProvider } from "@/payments-provider/mock/mock-payments-provider";
 import { raiseFlag, resolveFlag } from "./flags";
@@ -3920,5 +3921,95 @@ describe("dissolveLeague vs. joinLeagueInTx — the dissolve-vs-join race on the
     expect(draft!.status).toBe("dissolved");
     const notices = await joinDb.select({ userId: memberNotices.userId }).from(memberNotices).where(eq(memberNotices.leagueId, leagueId));
     expect(notices.map((notice) => notice.userId).sort()).toEqual(["u_dvj_commish", "u_dvj_joiner"]);
+  });
+});
+
+describe("settleSeasonPayouts' lock order — leagues[X] FOR UPDATE first, before any money row (Task 10)", () => {
+  it("blocks behind a parked hold on the leagues row with ZERO money rows written, then pays and drains the escrow to zero once released", async () => {
+    const leagueId = "lg_settle_lock";
+    await joinDb.insert(users).values([
+      { id: "u_stl_a", email: "u_stl_a@test.local", displayName: "A" },
+      { id: "u_stl_b", email: "u_stl_b@test.local", displayName: "B" },
+    ]);
+    await joinDb.insert(leagues).values({
+      id: leagueId,
+      name: leagueId,
+      format: "snake",
+      teamCount: 2,
+      commissionerUserId: "u_stl_a",
+      entryFeeCents: 20_00,
+      platformFeeCents: 0,
+      payoutTable: [{ place: 1, amountCents: 40_00 }],
+      seasonCompletedAt: new Date("2026-09-01T00:00:00.000Z"),
+    });
+    await joinDb.insert(drafts).values({ id: "draft_settle_lock", leagueId, format: "snake", status: "complete", kickoffAt: new Date("2026-08-20T17:00:00.000Z") });
+    await joinDb.insert(teams).values([
+      { id: "team_stl_a", leagueId, userId: "u_stl_a", name: "A's Team" },
+      { id: "team_stl_b", leagueId, userId: "u_stl_b", name: "B's Team" },
+    ]);
+    // The book behind the escrow: each seat funded and its fee collected, through the one writer.
+    const audit = getAuditLogger();
+    let seq = 0;
+    const stlDeps: PostDeps = { audit, clock, newId: () => `stl_lock_${(seq += 1)}` };
+    for (const userId of ["u_stl_a", "u_stl_b"]) {
+      await joinDb.transaction(async (tx) => {
+        await postMoneyTransaction(
+          tx,
+          {
+            kind: "deposit",
+            stateOfEntry: "TN",
+            entries: [
+              { accountId: accountIdFor("fbo_pool"), direction: "debit", amountCents: 20_00 },
+              { accountId: accountIdFor("user_available", userId), direction: "credit", amountCents: 20_00 },
+            ],
+            auditEvent: { eventType: "deposit_completed", actorId: userId, actorType: "user", leagueId: null, payload: { amountCents: 20_00 } },
+          },
+          stlDeps,
+        );
+        await postMoneyTransaction(
+          tx,
+          {
+            kind: "entry_fee",
+            leagueId,
+            stateOfEntry: "TN",
+            entries: [
+              { accountId: accountIdFor("user_available", userId), direction: "debit", amountCents: 20_00 },
+              { accountId: accountIdFor("league_escrow", leagueId), direction: "credit", amountCents: 20_00 },
+            ],
+            auditEvent: { eventType: "entry_fee_collected", actorId: userId, actorType: "user", leagueId, payload: { amountCents: 20_00 } },
+          },
+          stlDeps,
+        );
+      });
+    }
+
+    // The bystander: a raw transaction holding `leagues[X] FOR UPDATE` — the honest fixture for a
+    // completed season, where a real join correctly refuses (the Task 9 fix's own lesson).
+    let holdsLeagueLock: () => void = () => {};
+    const leagueLocked = new Promise<void>((resolve) => (holdsLeagueLock = resolve));
+    let releasePark: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releasePark = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM leagues WHERE id = ${leagueId} FOR UPDATE`);
+      holdsLeagueLock();
+      await parked;
+    });
+    await leagueLocked;
+
+    // T_settle: the real function, on its own connection. Its FIRST statement is the identical
+    // `leagues[X] FOR UPDATE` the bystander holds — it must block HERE, before any money row.
+    const settling = settleSeasonPayouts(pickDb, { leagueId, operatorUserId: "u_stl_operator", standings: [{ place: 1, userId: "u_stl_b" }] }, { clock });
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    // Blocked before its first money statement: the book holds the two fees and nothing else.
+    const midFlight = await joinDb.select({ kind: moneyTransactions.kind }).from(moneyTransactions).where(eq(moneyTransactions.kind, "settlement"));
+    expect(midFlight).toEqual([]);
+    releasePark();
+
+    await expect(holding).resolves.toBeUndefined();
+    expect(await settling).toEqual({ ok: true, alreadySettled: false, prizesPaidCents: 40_00, heldCents: 0, rakeCents: 0 });
+
+    const [escrow] = await joinDb.select({ balanceCents: moneyAccounts.balanceCents }).from(moneyAccounts).where(eq(moneyAccounts.id, accountIdFor("league_escrow", leagueId)));
+    expect(escrow!.balanceCents).toBe(0);
   });
 });

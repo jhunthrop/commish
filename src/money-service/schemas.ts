@@ -93,3 +93,36 @@ export const clearExclusionRequestSchema = z.strictObject({
 });
 
 export type ClearExclusionRequest = z.infer<typeof clearExclusionRequestSchema>;
+
+/**
+ * The settlement door's request boundary (Task 10): WHO finished where, and nothing else. NO
+ * amount field exists on this shape at all, by design — every dollar figure comes from the
+ * league's own stored `payout_table`, read under lock inside `settleSeasonPayouts`, so a request
+ * cannot even ATTEMPT to name a prize. `strictObject` at both levels enforces that shape-wise: a
+ * body (or a standing) carrying an amount key is refused whole. Bounded because it is untrusted
+ * input; empty is legal — a rake-only table pays no places, and the service's own
+ * `standingsIncomplete` check is the authority on how many places need naming.
+ */
+export const settleSeasonRequestSchema = z.strictObject({
+  standings: z
+    .array(
+      z.strictObject({
+        place: z.number().int().positive(),
+        userId: z.string().min(1).max(128),
+      }),
+    )
+    .max(100),
+});
+
+export type SettleSeasonRequest = z.infer<typeof settleSeasonRequestSchema>;
+
+/**
+ * The holds door's request boundary (Task 10): which one-way outcome the operator chose for the
+ * member named by the path. The member's id lives in the path and the operator's in `withAdmin`'s
+ * session — the body carries only the decision, `resolveFlag`'s own separation.
+ */
+export const holdOutcomeRequestSchema = z.strictObject({
+  action: z.enum(["release", "confiscate"]),
+});
+
+export type HoldOutcomeRequest = z.infer<typeof holdOutcomeRequestSchema>;

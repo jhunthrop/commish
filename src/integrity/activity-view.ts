@@ -2,6 +2,7 @@ import type { IconName } from "@/components/ui/icon";
 import { type AuditEvent, type AuditEventType, type JsonObject } from "@/domain/audit";
 import { stripHiddenCharacters } from "@/identity/display-name";
 import { formatUsd } from "@/money/config";
+import { ordinalPlace } from "./notices";
 import { SYSTEM_ACTION_VISIBILITY, type SystemActionVisibility } from "./system-actions";
 
 /**
@@ -82,9 +83,17 @@ export const ACTIVITY_VISIBILITY: Readonly<Record<AuditEventType, ActivityVisibi
    */
   entry_fee_collected: "everyone", // Task 8 (the T2 pre-ruling): the fee is a published league term
   entry_fee_refunded: "everyone", // Task 8, same ruling — Task 9's dissolution rides the same event
-  prize_paid: "hidden", // Task 10 decides (pre-ruled visible; that task flips it with its writer)
-  payout_held: "hidden", // Task 10 decides
-  payout_released: "hidden", // Task 10 decides
+  /**
+   * Phase 4, Task 10 (the Task 2 review's controller pre-ruling, executed with the writer): a
+   * prize PAID is a published league fact — the table it paid was public in-league all season,
+   * and the standings that earned it are the league's own story — so the feed says it. A payout
+   * HELD (and its later release) stays hidden, permanently: a hold names a suspicion, and the
+   * accusatory-surface rule keeps suspicions off every member surface — those two live in the
+   * operator console only.
+   */
+  prize_paid: "everyone", // Task 10 (the T2 pre-ruling): a published prize is a league fact
+  payout_held: "hidden", // Task 10 ruling: a hold names a suspicion — operator console only
+  payout_released: "hidden", // Task 10 ruling: same suspicion, same surface
   /**
    * Task 7's fix round (controller ruling): verification and exclusion are a person's OWN private
    * facts, not a league one — whether and how a member verified their identity, and whether they
@@ -374,6 +383,20 @@ function renderEntryFeeRefunded(event: AuditEvent, names: ActivityNames): Render
   return { icon: "refresh-cw", headline: `The ${formatUsd(amountCents)} entry fee went back to ${names.member(event.actorId)}.`, detail: null };
 }
 
+/**
+ * The season's closing sentence (Task 10): who won what, from the payload's own `winnerUserId` —
+ * never `actorId`, which is `null` here by construction (the SYSTEM pays; the operator who
+ * triggered it is an operator-console fact carried on the payload, not a feed fact). The place
+ * reads through `ordinalPlace`, the same word the winner's own notice uses.
+ */
+function renderPrizePaid(event: AuditEvent, names: ActivityNames): Rendered | null {
+  const winnerUserId = str(event.payload, "winnerUserId");
+  const place = num(event.payload, "place");
+  const amountCents = num(event.payload, "amountCents");
+  if (winnerUserId === undefined || place === undefined || !Number.isInteger(place) || amountCents === undefined || !Number.isInteger(amountCents)) return null;
+  return { icon: "trophy", headline: `${names.member(winnerUserId)} won ${formatUsd(amountCents)} for finishing ${ordinalPlace(place)}.`, detail: null };
+}
+
 function renderSystemAction(event: AuditEvent, viewer: { readonly userId: string }): Rendered | null {
   const action = str(event.payload, "action");
   const visibility = action === undefined ? undefined : (SYSTEM_ACTION_VISIBILITY as Readonly<Record<string, SystemActionVisibility | undefined>>)[action];
@@ -416,6 +439,8 @@ function renderPayload(event: AuditEvent, names: ActivityNames, viewer: { readon
       return renderEntryFeeCollected(event, names);
     case "entry_fee_refunded":
       return renderEntryFeeRefunded(event, names);
+    case "prize_paid":
+      return renderPrizePaid(event, names);
     case "system_action":
       return renderSystemAction(event, viewer);
     default:

@@ -126,6 +126,55 @@ export interface RefundEntryFeeInput {
   readonly userId: string;
 }
 
+/** One member's net entry-fee position in one league, read from the BOOK — see
+ *  `entryFeeContributionInTx`. */
+export interface EntryFeeContribution {
+  /** Fees debited minus refunds credited, on this member's available account, for this league. */
+  readonly netCents: number;
+  /** `state_of_entry` from the LATEST fee posting, or `null` when the book holds no fee at all —
+   *  the state a reversal (refund) or a payout attribution (settlement's per-seat rake) carries. */
+  readonly lastFeeState: string | null;
+}
+
+/**
+ * WHAT WENT IN, read from the book rather than re-attested — the read `refundEntryFeeInTx` has
+ * always decided its amount from, extracted (Task 10) because settlement needs the identical
+ * fact per seat: each seat's net contribution is what the escrow actually holds for it, and each
+ * seat's latest fee state is the per-seat attribution the rake sweep stamps (plan ruling 10).
+ * One reader, two consumers, or the refund's arithmetic and the settlement's could drift.
+ */
+export async function entryFeeContributionInTx(tx: DbTx, input: RefundEntryFeeInput): Promise<EntryFeeContribution> {
+  const available = accountIdFor("user_available", input.userId);
+  const rows = await tx
+    .select({
+      kind: moneyTransactions.kind,
+      direction: moneyEntries.direction,
+      stateOfEntry: moneyEntries.stateOfEntry,
+      amountCents: moneyEntries.amountCents,
+    })
+    .from(moneyEntries)
+    .innerJoin(moneyTransactions, eq(moneyEntries.transactionId, moneyTransactions.id))
+    .where(
+      and(
+        eq(moneyEntries.accountId, available),
+        eq(moneyTransactions.leagueId, input.leagueId),
+        inArray(moneyTransactions.kind, ["entry_fee", "entry_fee_refund"]),
+      ),
+    )
+    .orderBy(asc(moneyEntries.createdAt));
+
+  // The net is a pure DIRECTION sum over the two fee kinds on this member's account — a fee's
+  // debit adds, a refund's credit subtracts — never a per-kind special case, so the arithmetic
+  // stays honest even against a leg shape no current writer produces.
+  let netCents = 0;
+  let lastFeeState: string | null = null;
+  for (const row of rows) {
+    netCents += row.direction === "debit" ? row.amountCents : -row.amountCents;
+    if (row.kind === "entry_fee") lastFeeState = row.stateOfEntry;
+  }
+  return { netCents, lastFeeState };
+}
+
 export interface RefundEntryFeeOutcome {
   /** `0` when this member has nothing in this league's escrow — a seat that was never paid for
    *  (seeded, comped) or one whose fee already went back. No posting is made for a zero. */
@@ -160,33 +209,7 @@ export interface RefundEntryFeeOutcome {
  */
 export async function refundEntryFeeInTx(tx: DbTx, input: RefundEntryFeeInput, deps: PostDeps): Promise<RefundEntryFeeOutcome> {
   const available = accountIdFor("user_available", input.userId);
-  const rows = await tx
-    .select({
-      kind: moneyTransactions.kind,
-      direction: moneyEntries.direction,
-      stateOfEntry: moneyEntries.stateOfEntry,
-      amountCents: moneyEntries.amountCents,
-    })
-    .from(moneyEntries)
-    .innerJoin(moneyTransactions, eq(moneyEntries.transactionId, moneyTransactions.id))
-    .where(
-      and(
-        eq(moneyEntries.accountId, available),
-        eq(moneyTransactions.leagueId, input.leagueId),
-        inArray(moneyTransactions.kind, ["entry_fee", "entry_fee_refund"]),
-      ),
-    )
-    .orderBy(asc(moneyEntries.createdAt));
-
-  // The net is a pure DIRECTION sum over the two fee kinds on this member's account — a fee's
-  // debit adds, a refund's credit subtracts — never a per-kind special case, so the arithmetic
-  // stays honest even against a leg shape no current writer produces.
-  let netCents = 0;
-  let lastFeeState: string | null = null;
-  for (const row of rows) {
-    netCents += row.direction === "debit" ? row.amountCents : -row.amountCents;
-    if (row.kind === "entry_fee") lastFeeState = row.stateOfEntry;
-  }
+  const { netCents, lastFeeState } = await entryFeeContributionInTx(tx, input);
   if (lastFeeState === null || netCents <= 0) return { refundedCents: 0, transactionId: null };
 
   const posted = await postMoneyTransaction(

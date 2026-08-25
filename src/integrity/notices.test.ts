@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { copyViolations } from "./copy-rules";
-import { NOTICE_TEMPLATES, renderNotice, type NoticeType, type StatWeekCorrectionOutcome } from "./notices";
+import { NOTICE_TEMPLATES, ordinalPlace, renderNotice, type NoticeType, type StatWeekCorrectionOutcome } from "./notices";
 import { NOTICE_SAMPLES } from "./test-support";
 
 const TYPES = Object.keys(NOTICE_TEMPLATES) as readonly NoticeType[];
@@ -185,6 +185,19 @@ describe("NOTICE_TEMPLATES", () => {
     expect(skipped.body).not.toContain("missed");
   });
 
+  it("tells a winner money-first, and tells a released payout only that the money arrived (Task 10)", () => {
+    const prize = renderNotice("prize_paid", NOTICE_SAMPLES.prize_paid);
+    expect(prize.title).toBe("You won $44.00 in Sunday Money");
+    expect(prize.body).toBe("$44.00 in winnings is in your wallet for finishing 1st in Sunday Money.");
+
+    // The release deliberately names no league and no hold — the accusatory-surface rule; see
+    // the context's own docblock in `notices.ts`.
+    const released = renderNotice("payout_released", NOTICE_SAMPLES.payout_released);
+    expect(released.title).toBe("$44.00 is in your wallet");
+    expect(released.body).toBe("$44.00 in winnings is in your wallet.");
+    expect(`${released.title} ${released.body}`).not.toMatch(/held|review|hold/i);
+  });
+
   it("fails the type checker rather than the reader when a type has no template", () => {
     // NOTICE_TEMPLATES is a Record over the full union, so adding a NoticeType without adding
     // its copy does not compile. Asserted here too so the property is visible in the suite.
@@ -201,6 +214,8 @@ describe("NOTICE_TEMPLATES", () => {
       "league_dissolved",
       "lineup_auto_set",
       "operator_warning",
+      "payout_released",
+      "prize_paid",
       "review_removed",
       "stat_week_corrected",
       "tier_blocked_join",
@@ -275,5 +290,21 @@ describe("NOTICE_TEMPLATES", () => {
       "Week 4 kicked off in Sunday Money before you set a lineup, so we started the same team you started in week 3. Christian McCaffrey is no longer on your roster, so we filled that spot from your bench. You can set your own lineup any week before kickoff, and we will leave it alone when you do.",
     );
     expect(copyViolations(`${withOneChange.title} ${withOneChange.body}`)).toEqual([]);
+  });
+});
+
+describe("ordinalPlace", () => {
+  it("reads every place the way a person says it, including the eleventh-through-thirteenth trap", () => {
+    expect(ordinalPlace(1)).toBe("1st");
+    expect(ordinalPlace(2)).toBe("2nd");
+    expect(ordinalPlace(3)).toBe("3rd");
+    expect(ordinalPlace(4)).toBe("4th");
+    expect(ordinalPlace(11)).toBe("11th");
+    expect(ordinalPlace(12)).toBe("12th");
+    expect(ordinalPlace(13)).toBe("13th");
+    expect(ordinalPlace(21)).toBe("21st");
+    expect(ordinalPlace(22)).toBe("22nd");
+    expect(ordinalPlace(23)).toBe("23rd");
+    expect(ordinalPlace(111)).toBe("111th");
   });
 });

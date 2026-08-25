@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { MONEY_CONFIG, MONEY_REFUSALS } from "@/money/config";
-import { depositRequestSchema, withdrawalRequestSchema } from "./schemas";
+import { depositRequestSchema, holdOutcomeRequestSchema, settleSeasonRequestSchema, withdrawalRequestSchema } from "./schemas";
 
 const valid = { amountCents: 50_00, stateOfEntry: "TN", method: "bank", idempotencyKey: "form_1" };
 
@@ -57,5 +57,35 @@ describe("withdrawalRequestSchema", () => {
     expect(withdrawalRequestSchema.safeParse({ ...validWithdrawal, destination: { externalAccountRef: "ext_1", method: "bank" } }).success).toBe(false);
     expect(withdrawalRequestSchema.safeParse({ ...validWithdrawal, extra: true }).success).toBe(false);
     expect(withdrawalRequestSchema.safeParse({ ...validWithdrawal, idempotencyKey: "" }).success).toBe(false);
+  });
+});
+
+describe("settleSeasonRequestSchema", () => {
+  it("accepts standings that name only places and members — including none at all, for a rake-only table", () => {
+    expect(settleSeasonRequestSchema.safeParse({ standings: [{ place: 1, userId: "u_1" }] }).success).toBe(true);
+    expect(settleSeasonRequestSchema.safeParse({ standings: [] }).success).toBe(true);
+  });
+
+  it("has no amount field to even attempt: a standing or a body carrying one is refused whole", () => {
+    expect(settleSeasonRequestSchema.safeParse({ standings: [{ place: 1, userId: "u_1", amountCents: 1_00 }] }).success).toBe(false);
+    expect(settleSeasonRequestSchema.safeParse({ standings: [{ place: 1, userId: "u_1" }], amountCents: 1_00 }).success).toBe(false);
+    expect(settleSeasonRequestSchema.safeParse({ standings: [{ place: 1, userId: "u_1" }], payoutTable: [] }).success).toBe(false);
+  });
+
+  it("refuses malformed places, empty ids, and an unbounded page", () => {
+    expect(settleSeasonRequestSchema.safeParse({ standings: [{ place: 0, userId: "u_1" }] }).success).toBe(false);
+    expect(settleSeasonRequestSchema.safeParse({ standings: [{ place: 1.5, userId: "u_1" }] }).success).toBe(false);
+    expect(settleSeasonRequestSchema.safeParse({ standings: [{ place: 1, userId: "" }] }).success).toBe(false);
+    expect(settleSeasonRequestSchema.safeParse({ standings: Array.from({ length: 101 }, (_, i) => ({ place: i + 1, userId: `u_${i}` })) }).success).toBe(false);
+  });
+});
+
+describe("holdOutcomeRequestSchema", () => {
+  it("accepts exactly the two one-way outcomes and nothing else", () => {
+    expect(holdOutcomeRequestSchema.safeParse({ action: "release" }).success).toBe(true);
+    expect(holdOutcomeRequestSchema.safeParse({ action: "confiscate" }).success).toBe(true);
+    expect(holdOutcomeRequestSchema.safeParse({ action: "keep" }).success).toBe(false);
+    expect(holdOutcomeRequestSchema.safeParse({ action: "release", userId: "u_1" }).success).toBe(false);
+    expect(holdOutcomeRequestSchema.safeParse({}).success).toBe(false);
   });
 });

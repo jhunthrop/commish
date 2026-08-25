@@ -145,7 +145,13 @@ const SAMPLE_PAYLOADS: Readonly<Record<AuditEventType, readonly { readonly paylo
   // sentences members actually read.
   entry_fee_collected: [{ payload: { amountCents: 20_00 }, actorId: "user_bob" }],
   entry_fee_refunded: [{ payload: { amountCents: 20_00 }, actorId: "user_bob" }],
-  prize_paid: [{ payload: {}, actorId: null }],
+  // Task 10: flipped to `"everyone"` (the Task 2 pre-ruling — a published prize is a league
+  // fact), with the REAL payload shape `settleSeasonPayouts` (`@/money-service/settlement`)
+  // writes, so the copy sweep runs over the sentence members actually read.
+  prize_paid: [{ payload: { winnerUserId: "user_alice", place: 1, amountCents: 44_00, operatorUserId: "user_op" }, actorId: null }],
+  // Task 10 ruled these two HIDDEN, permanently: a hold names a suspicion (operator console
+  // only), so these placeholder samples render nothing — the same "exhaustiveness forces a
+  // decision" reason the self-exclusion trio below keeps placeholders.
   payout_held: [{ payload: {}, actorId: null }],
   payout_released: [{ payload: {}, actorId: null }],
   // Task 7's fix round: these three land HIDDEN, PERMANENTLY — a person's own private compliance
@@ -184,19 +190,22 @@ describe("ACTIVITY_VISIBILITY", () => {
     }
   });
 
-  it("hides every money event whose publishing task has not yet ruled (Phase 4, Task 2; two flipped by Task 8)", () => {
+  it("hides every platform-private money event, and BOTH hold events — a hold names a suspicion (Task 10's ruling)", () => {
     for (const type of [
       "deposit_completed",
       "deposit_returned",
       "withdrawal_requested",
       "withdrawal_completed",
       "withdrawal_returned",
-      "prize_paid",
       "payout_held",
       "payout_released",
     ] as const) {
       expect(ACTIVITY_VISIBILITY[type]).toBe("hidden");
     }
+  });
+
+  it("publishes prize_paid — Task 10's flip, on the Task 2 pre-ruling that a published prize is a league fact", () => {
+    expect(ACTIVITY_VISIBILITY.prize_paid).toBe("everyone");
   });
 
   it("publishes entry_fee_collected and entry_fee_refunded — Task 8's flip, on the Task 2 pre-ruling that the fee is a published league term", () => {
@@ -279,6 +288,23 @@ describe("activityRowFor", () => {
     expect(activityRowFor(event("entry_fee_collected", { amountCents: 20.5 }, "user_bob"), viewer, names)).toBeNull();
     expect(activityRowFor(event("entry_fee_refunded", {}, "user_bob"), viewer, names)).toBeNull();
     expect(activityRowFor(event("entry_fee_refunded", { amountCents: 20.5 }, "user_bob"), viewer, names)).toBeNull();
+  });
+
+  it("renders a paid prize from the payload's own winner, never the (null) actor (Task 10)", () => {
+    expect(activityRowFor(event("prize_paid", { winnerUserId: "user_alice", place: 2, amountCents: 32_00, operatorUserId: "user_op" }, null), viewer, names)).toEqual({
+      eventId: "evt_1",
+      occurredAt: "2026-08-20T17:00:00.000Z",
+      icon: "trophy",
+      headline: "Alice won $32.00 for finishing 2nd.",
+      detail: null,
+    });
+  });
+
+  it("denies a prize event whose payload cannot make an honest sentence", () => {
+    expect(activityRowFor(event("prize_paid", {}, null), viewer, names)).toBeNull();
+    expect(activityRowFor(event("prize_paid", { winnerUserId: "user_alice", place: 1.5, amountCents: 32_00 }, null), viewer, names)).toBeNull();
+    expect(activityRowFor(event("prize_paid", { winnerUserId: "user_alice", place: 1, amountCents: 32.5 }, null), viewer, names)).toBeNull();
+    expect(activityRowFor(event("prize_paid", { place: 1, amountCents: 32_00 }, null), viewer, names)).toBeNull();
   });
 
   it("returns null for a payload missing a field it needs", () => {
