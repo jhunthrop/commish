@@ -31,6 +31,7 @@ const { defaultMockProvider, defaultMockBudget } = vi.hoisted(() => ({
     listGames: async () => [],
     getGameStatLines: async () => [],
     getWeeklyStatLines: async () => [],
+    listAdp: async () => [],
   },
   defaultMockBudget: {
     reserve: async () => ({ granted: true as const }),

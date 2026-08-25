@@ -71,6 +71,7 @@ describe("seedPlayers", () => {
         );
       },
       getWeeklyStatLines: (week) => provider.getWeeklyStatLines(week),
+      listAdp: () => provider.listAdp(),
     };
 
     await seedPlayers(db, revisedProvider);

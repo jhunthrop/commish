@@ -23,6 +23,20 @@ export interface GameSummary {
 }
 
 /**
+ * One player's Average Draft Position: the market's consensus of where that player gets taken,
+ * averaged over many real drafts — LOWER means drafted EARLIER, and fractional values ("1.6")
+ * are the norm because it is an average, never a rank.
+ */
+export interface AdpEntry {
+  /** The SAME id `listPlayers()` mints — the contract suite asserts the intersection, because an
+   *  ADP keyed to an id nobody lists can never reach a `players` row. */
+  readonly playerId: string;
+  /** Positive and finite. The contract suite pins both halves; a 0, negative or NaN ADP is a
+   *  parsing bug, never a real market position. */
+  readonly adp: number;
+}
+
+/**
  * The seam between the app and its stats source. Phase 1 used the deterministic mock; a licensed
  * feed (SportsDataIO / SportRadar / Genius — a business decision, Phase 8) plugs in as another
  * implementation of this interface, not a rewrite.
@@ -36,6 +50,7 @@ export interface GameSummary {
  * | `listGames(week)`     | 1                                                     |
  * | `getGameStatLines(g)` | 1                                                     |
  * | `getWeeklyStatLines(w)` | 1 + one per game in the week                        |
+ * | `listAdp()`           | 1, plus `listPlayers()`'s 2 when the roster is not already memoized |
  *
  * An implementation that cannot honor that table must say so in its own docblock rather than
  * quietly costing more, because `src/stats-pipeline/budget.ts` reserves against these numbers.
@@ -79,4 +94,12 @@ export interface StatsProvider {
    * week is how a seeded season and a live season end up disagreeing.
    */
   getWeeklyStatLines(week: number): Promise<readonly StatLine[]>;
+  /**
+   * The current Average Draft Position of every listed player the source ranks, best (lowest)
+   * first is NOT guaranteed — callers must not rely on order, only on the values. Read by
+   * `ingestAdp` (`src/stats-pipeline/adp.ts`), which writes `players.adp`, which is what
+   * `rankedPlayers` (`src/draft-service/pool.ts`) orders the draft pool by. A player the source
+   * does not rank simply does not appear — absence is the signal, never a sentinel value.
+   */
+  listAdp(): Promise<readonly AdpEntry[]>;
 }

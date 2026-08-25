@@ -17,6 +17,15 @@
       "trimmed": false
     },
     {
+      "file": "adp.json",
+      "path": "/getNFLADP",
+      "query": {
+        "adpType": "PPR"
+      },
+      "trimmed": true,
+      "trimmedNote": "The live response is 521 entries. Trimmed to 13 exercising every shape a live capture (2026-08-25) showed: ordinary players with string overallADP values; DST entries that carry teamAbv/teamID and NO playerID at all (the id is minted the same way mapTeamsToDefensePlayers mints it); one deep entry with an EMPTY playerID and no team (2 of 521 in the capture, dropped); and one entry for an unscored-position player (10024, LB) that listPlayers never mints, proving the listed-players intersection."
+    },
+    {
       "file": "games-week-1.json",
       "path": "/getNFLGamesForWeek",
       "query": {

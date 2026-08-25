@@ -21,7 +21,16 @@ export const TANK01_CONFIG = {
     teams: "/getNFLTeams",
     gamesForWeek: "/getNFLGamesForWeek",
     boxScore: "/getNFLBoxScore",
+    adp: "/getNFLADP",
   },
+  /**
+   * Which ADP market `/getNFLADP` answers with (`adpType` query parameter). `PPR` because it is
+   * the product's default scoring (`PPR_SCORING` is `rankedPlayers`' fallback): an ADP feed is
+   * one market-wide consensus, and the market this product's boards should mirror is the PPR
+   * one. Verified against the live API 2026-08-25: the response echoes the type back
+   * (`body.adpType: "PPR"`).
+   */
+  adpType: "PPR",
   /** Tank01 holds data from 2022 onward. `season=2026` means the 2026-27 season. */
   defaultSeason: 2026,
   /** `reg` | `post` | `pre` | `all`. Only the regular season is scored. */

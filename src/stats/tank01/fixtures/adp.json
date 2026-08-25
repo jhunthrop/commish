@@ -1,0 +1,19 @@
+{
+  "adpDate": "20260825",
+  "adpType": "PPR",
+  "adpList": [
+    { "posADP": "RB1", "overallADP": "1.6", "playerID": "10002", "longName": "Cody Marsh" },
+    { "posADP": "WR1", "overallADP": "2.5", "playerID": "10003", "longName": "Trevon Blake" },
+    { "posADP": "QB1", "overallADP": "11.4", "playerID": "10001", "longName": "Derek Sanders" },
+    { "posADP": "RB2", "overallADP": "14.0", "playerID": "10008", "longName": "Deion Marsh" },
+    { "posADP": "WR2", "overallADP": "18.9", "playerID": "10004", "longName": "Antoine Reyes" },
+    { "posADP": "TE1", "overallADP": "22.3", "playerID": "10005", "longName": "Colton Vance" },
+    { "posADP": "QB2", "overallADP": "29.6", "playerID": "10007", "longName": "Grant Wexler" },
+    { "posADP": "WR3", "overallADP": "33.1", "playerID": "10009", "longName": "Corey Lattimore" },
+    { "posADP": "DST1", "overallADP": "152.9", "teamAbv": "SF", "teamID": "28", "longName": "San Francisco 49ers DST" },
+    { "posADP": "K1", "overallADP": "155.2", "playerID": "10006", "longName": "Milo Hartt" },
+    { "posADP": "DST2", "overallADP": "163.9", "teamAbv": "SEA", "teamID": "29", "longName": "Seattle Seahawks DST" },
+    { "posADP": "LB1", "overallADP": "201.0", "playerID": "10024", "longName": "Marcus Dill" },
+    { "posADP": "TE41", "overallADP": "297.2", "playerID": "", "longName": "Tommy Myers" }
+  ]
+}

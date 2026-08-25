@@ -86,6 +86,18 @@ describe("Tank01StatsProvider", () => {
     expect(lines.map((line) => line.playerId).sort()).toEqual(["1", "2"]);
   });
 
+  it("maps the committed ADP fixture: players by id, defenses by minted DST id, dropping the empty-id and unlisted entries", async () => {
+    const entries = await provider().listAdp();
+    const byId = new Map(entries.map((entry) => [entry.playerId, entry.adp]));
+    expect(byId.get("10002")).toBe(1.6);
+    expect(byId.get(`${TANK01_CONFIG.defensePlayerIdPrefix}SF`)).toBe(152.9);
+    expect(byId.get(`${TANK01_CONFIG.defensePlayerIdPrefix}SEA`)).toBe(163.9);
+    // 10024 is an unscored position (LB) the roster never mints, and the fixture's empty-id
+    // entry keys to nobody — 13 fixture entries, 11 survive.
+    expect(byId.has("10024")).toBe(false);
+    expect(entries).toHaveLength(11);
+  });
+
   it("answers an out-of-season week without making a request at all", async () => {
     // The fixture fetch throws by name on anything unrecorded, and there IS a recorded week-99
     // schedule, so this passing proves the short circuit rather than proving the fixture exists.

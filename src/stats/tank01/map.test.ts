@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { TANK01_CONFIG } from "./config";
-import { mapBoxScoreToStatLines, mapGames, mapPlayerList, mapTeamsToDefensePlayers } from "./map";
+import { mapAdpList, mapBoxScoreToStatLines, mapGames, mapPlayerList, mapTeamsToDefensePlayers } from "./map";
 
 describe("mapPlayerList", () => {
   it("keeps only the positions the scoring engine handles", () => {
@@ -37,6 +37,80 @@ describe("mapTeamsToDefensePlayers", () => {
     expect(defenses).toEqual([
       { id: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`, name: "San Francisco 49ers", position: "DEF", nflTeam: "SF" },
       { id: `${TANK01_CONFIG.defensePlayerIdPrefix}WSH`, name: "Washington Commanders", position: "DEF", nflTeam: "WSH" },
+    ]);
+  });
+});
+
+describe("mapAdpList", () => {
+  const listed = new Set(["10001", "10002", `${TANK01_CONFIG.defensePlayerIdPrefix}SF`]);
+
+  it("reads playerID and the string overallADP off ordinary entries, keeping only listed players", () => {
+    const body = {
+      adpDate: "20260825",
+      adpType: "PPR",
+      adpList: [
+        { posADP: "RB1", overallADP: "1.6", playerID: "10002", longName: "Cody Marsh" },
+        { posADP: "QB1", overallADP: "11.4", playerID: "10001", longName: "Derek Sanders" },
+        { posADP: "WR1", overallADP: "2.5", playerID: "77777", longName: "Unlisted Receiver" },
+      ],
+    };
+    expect(mapAdpList(body, listed)).toEqual([
+      { playerId: "10002", adp: 1.6 },
+      { playerId: "10001", adp: 11.4 },
+    ]);
+  });
+
+  it("mints a DEF id from teamAbv for a DST entry that carries no playerID at all", () => {
+    // Verified live 2026-08-25: team defenses arrive keyed by teamAbv/teamID with NO playerID
+    // key. The minted id must be the SAME one mapTeamsToDefensePlayers minted, or a defense's
+    // market position could never land on its player row.
+    const body = {
+      adpList: [
+        { posADP: "DST1", overallADP: "152.9", teamAbv: "SF", teamID: "28", longName: "San Francisco 49ers DST" },
+        { posADP: "DST2", overallADP: "163.9", teamAbv: "ZZZ", teamID: "99", longName: "Unlisted DST" },
+      ],
+    };
+    expect(mapAdpList(body, listed)).toEqual([{ playerId: `${TANK01_CONFIG.defensePlayerIdPrefix}SF`, adp: 152.9 }]);
+  });
+
+  it("drops an entry with an empty playerID and no team, rather than minting an id from nothing", () => {
+    // 2 of 521 entries in the live capture look exactly like this.
+    const body = { adpList: [{ posADP: "TE41", overallADP: "297.2", playerID: "", longName: "Tommy Myers" }] };
+    expect(mapAdpList(body, listed)).toEqual([]);
+  });
+
+  it("drops an unparsable, missing, zero or negative overallADP instead of emitting 0", () => {
+    // The one mapper that must NOT use num()'s parse-to-0 fallback: rankedPlayers sorts
+    // ascending, so a silent 0 would put a parsing bug at the top of every draft board.
+    const body = {
+      adpList: [
+        { overallADP: "N/A", playerID: "10001" },
+        { overallADP: "", playerID: "10001" },
+        { playerID: "10001" },
+        { overallADP: "0", playerID: "10001" },
+        { overallADP: "-3", playerID: "10001" },
+      ],
+    };
+    expect(mapAdpList(body, listed)).toEqual([]);
+  });
+
+  it("keeps the first entry when a player id repeats — the feed lists best-first", () => {
+    const body = {
+      adpList: [
+        { overallADP: "1.6", playerID: "10002" },
+        { overallADP: "44.0", playerID: "10002" },
+      ],
+    };
+    expect(mapAdpList(body, listed)).toEqual([{ playerId: "10002", adp: 1.6 }]);
+  });
+
+  it("returns an empty list for a non-object body, a missing adpList, and drops a non-object entry", () => {
+    expect(mapAdpList(undefined, listed)).toEqual([]);
+    expect(mapAdpList("nope", listed)).toEqual([]);
+    expect(mapAdpList({}, listed)).toEqual([]);
+    expect(mapAdpList({ adpList: "nope" }, listed)).toEqual([]);
+    expect(mapAdpList({ adpList: [null, 42, { overallADP: "1.6", playerID: "10002" }] }, listed)).toEqual([
+      { playerId: "10002", adp: 1.6 },
     ]);
   });
 });

@@ -214,5 +214,39 @@ export function describeStatsProviderContract(label: string, factory: () => Stat
       await expect(provider.getWeeklyStatLines(0)).resolves.toEqual([]);
       await expect(provider.getWeeklyStatLines(99)).resolves.toEqual([]);
     });
+
+    it("ranks at least one player by ADP, every value positive and finite", async () => {
+      // The draft pool leads with ADP order (`rankedPlayers`), so a provider whose ADP feed maps
+      // to nothing would silently demote EVERY player to the projection-ordered tail — the exact
+      // "demo players outrank real NFL players" failure this arm of the seam exists to end. The
+      // positive-and-finite half is the same NaN discipline the stat-line case above enforces: a
+      // string that fails to parse must be dropped, never emitted as 0 or NaN, because
+      // `rankedPlayers` sorts by this number.
+      const entries = await (await factory()).listAdp();
+      expect(entries.length).toBeGreaterThan(0);
+      for (const entry of entries) {
+        expect(Number.isFinite(entry.adp)).toBe(true);
+        expect(entry.adp).toBeGreaterThan(0);
+      }
+    });
+
+    it("lists ADP only for players it also lists", async () => {
+      // Same law as the stat-line cases: `ingestAdp` writes `players.adp` by id, so an ADP keyed
+      // to an unlisted id can never land on a row — it would be quietly dropped at ingestion,
+      // which is a provider bug hiding behind a database no-op.
+      const provider = await factory();
+      const listed = new Set((await provider.listPlayers()).map((player) => player.id));
+      for (const entry of await provider.listAdp()) {
+        expect(listed.has(entry.playerId)).toBe(true);
+      }
+    });
+
+    it("never lists the same player twice in its ADP", async () => {
+      // One player, one market position. A duplicate makes the ingested value order-dependent —
+      // whichever entry the upsert applies last wins — which is nondeterminism dressed as data.
+      const entries = await (await factory()).listAdp();
+      const ids = entries.map((entry) => entry.playerId);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
   });
 }

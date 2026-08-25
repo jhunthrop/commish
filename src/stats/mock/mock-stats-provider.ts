@@ -1,5 +1,7 @@
 import type { StatLine } from "@/domain/player";
-import type { GameStatus, GameSummary, StatsProvider } from "../provider";
+import { PPR_SCORING } from "@/domain/scoring";
+import { computeFantasyPoints } from "@/scoring";
+import type { AdpEntry, GameStatus, GameSummary, StatsProvider } from "../provider";
 import type { Dataset } from "./generate-dataset";
 import { deriveMockGames } from "./games";
 import committed from "./dataset.json" with { type: "json" };
@@ -20,6 +22,34 @@ export function createMockStatsProvider(dataset: Dataset = committed as Dataset,
   const linesFor = (week: number): readonly StatLine[] => dataset.statLines.filter((line) => line.week === week);
   const statusFor = (week: number): GameStatus => (week === options.liveWeek ? "in_progress" : "final");
   const teamById = new Map(dataset.players.map((player) => [player.id, player.nflTeam]));
+
+  /**
+   * A deterministic ADP for the fixed dataset: every player, ranked by PPR season total (best =
+   * 1), ties broken by id so the order is total. Derived, not stored in `dataset.json`, so a
+   * dataset regeneration can never leave the two out of agreement — and PPR on purpose: an ADP
+   * feed is one market-wide consensus, not a per-league ranking, and PPR is the product's
+   * default scoring (`PPR_SCORING` is what `rankedPlayers` falls back to). Whole numbers 1..N
+   * where a real feed publishes fractional averages — both satisfy the contract, and integers
+   * keep the mock's ordering trivially auditable in a test.
+   */
+  function listAdpEntries(): readonly AdpEntry[] {
+    const totals = new Map<string, number>();
+    const positionById = new Map(dataset.players.map((player) => [player.id, player.position]));
+    for (const line of dataset.statLines) {
+      const position = positionById.get(line.playerId);
+      // A stat line for a player the dataset does not list ranks nobody. Unreachable with the
+      // committed dataset (generateDataset only ever writes lines for its own players); kept for
+      // a caller-supplied dataset, which this factory accepts.
+      if (position === undefined) continue;
+      totals.set(line.playerId, (totals.get(line.playerId) ?? 0) + computeFantasyPoints(line, position, PPR_SCORING));
+    }
+    return [...dataset.players]
+      .sort((a, b) => {
+        const diff = (totals.get(b.id) ?? 0) - (totals.get(a.id) ?? 0);
+        return diff !== 0 ? diff : a.id.localeCompare(b.id);
+      })
+      .map((player, index) => ({ playerId: player.id, adp: index + 1 }));
+  }
 
   async function listGames(week: number): Promise<readonly GameSummary[]> {
     return deriveMockGames(week, dataset.players, linesFor(week), statusFor(week));
@@ -55,6 +85,10 @@ export function createMockStatsProvider(dataset: Dataset = committed as Dataset,
         lines.push(...(await getGameStatLines(game)));
       }
       return lines;
+    },
+
+    async listAdp() {
+      return listAdpEntries();
     },
   };
 }

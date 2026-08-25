@@ -1,5 +1,5 @@
 import type { Player, StatLine } from "@/domain/player";
-import type { GameStatus, GameSummary, RequestCost, StatsProvider } from "@/stats/provider";
+import type { AdpEntry, GameStatus, GameSummary, RequestCost, StatsProvider } from "@/stats/provider";
 
 /** One game the fake provider knows about, plus the box score it hands back for it. */
 export interface ScriptedGame {
@@ -28,6 +28,9 @@ export interface FakeStatsProviderScript {
   /** Defaults to `metered`, which is what the worker's ledger tests need: a free provider is not
    *  debited at all, so a fake that claimed to be free could not demonstrate the arithmetic. */
   requestCost?: RequestCost;
+  /** Defaults to none: the worker never reads ADP, so most scripts have no reason to carry any.
+   *  A script driving the contract suite (or `ingestAdp`) sets its own. */
+  adp?: readonly AdpEntry[];
 }
 
 const DEFAULT_LAST_WEEK = 18;
@@ -64,6 +67,10 @@ export function fakeStatsProvider(script: FakeStatsProviderScript): StatsProvide
 
     async getWeeklyStatLines(week: number): Promise<readonly StatLine[]> {
       return gamesFor(week).flatMap((game) => game.lines);
+    },
+
+    async listAdp(): Promise<readonly AdpEntry[]> {
+      return script.adp ?? [];
     },
   };
 }

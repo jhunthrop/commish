@@ -2,7 +2,7 @@ import type { Player, StatLine } from "@/domain/player";
 import type { GameSummary, StatsProvider } from "../provider";
 import { createTank01Client, type Tank01ClientOptions } from "./client";
 import { TANK01_CONFIG } from "./config";
-import { mapBoxScoreToStatLines, mapGames, mapPlayerList, mapTeamsToDefensePlayers } from "./map";
+import { mapAdpList, mapBoxScoreToStatLines, mapGames, mapPlayerList, mapTeamsToDefensePlayers } from "./map";
 
 export interface Tank01ProviderOptions extends Tank01ClientOptions {
   /** Defaults to `TANK01_CONFIG.defaultSeason`. A season is adapter config, not an interface parameter. */
@@ -77,6 +77,18 @@ export function createTank01StatsProvider(options: Tank01ProviderOptions): Stats
         lines.push(...(await getGameStatLines(game)));
       }
       return lines;
+    },
+
+    async listAdp() {
+      // The memoized roster, for the same reason `getGameStatLines` reads it: the intersection
+      // against listed ids is decided ONCE, by `mapPlayerList`/`mapTeamsToDefensePlayers`, and
+      // every downstream read only ever filters against what was already decided. Costs the
+      // roster's 2 requests only when nothing has fetched it yet this instance — the contract
+      // table names that.
+      const list = await fetchPlayers();
+      const listedPlayerIds = new Set(list.map((player) => player.id));
+      const body = await client.get(TANK01_CONFIG.paths.adp, { adpType: TANK01_CONFIG.adpType });
+      return mapAdpList(body, listedPlayerIds);
     },
   };
 }
