@@ -926,6 +926,25 @@ export const auditEvents = pgTable(
     index("audit_events_league_occurred_idx").on(t.leagueId, t.occurredAt),
     /** The scaling review's second: Plan B's per-actor, per-type behavioral read. */
     index("audit_events_actor_type_occurred_idx").on(t.actorId, t.eventType, t.occurredAt),
+    /**
+     * Migration 0038 — a cross-lane carry from the design lane's Task 8 review (MEDIUM: unproven
+     * index coverage). The design lane's wire (`@/league-service/wire.ts`, `main`, not present in
+     * this worktree) reads `WHERE event_type = 'member_joined' AND occurred_at BETWEEN ...`,
+     * INNER JOINed to `leagues` with no `league_id` EQUALITY anywhere in its own `WHERE` — the
+     * join supplies `league_id` per outer row, never as one literal value the two indexes above
+     * could seek on. Measured (`src/db/index-plans.test.ts`) against migration 0037: neither
+     * composite above serves this shape, and the planner fell back to a Bitmap Index Scan across
+     * the WHOLE `audit_events_league_occurred_idx` (every league, not just the outer join's own),
+     * discarding 4 of every 5 candidate rows via a `Filter` on `event_type` applied after the
+     * heap fetch. Partial rather than a full `(event_type, occurred_at)` composite: `member_
+     * joined` is the one event type this shape ever filters on (every other `event_type` reader
+     * in the codebase already supplies a `league_id` or `actor_id` equality the two indexes above
+     * serve), so a full composite would index all sixteen `AUDIT_EVENT_TYPES` to serve a read that
+     * only ever wants one of them — the same "narrower than a full composite, same seek" choice
+     * `trade_proposals_open_fingerprint_idx`, `leagues_house_rung_idx` and `reviews_feed_idx`
+     * above already make for their own single-value predicates.
+     */
+    index("audit_events_member_joined_occurred_idx").on(t.occurredAt).where(sql`${t.eventType} = 'member_joined'`),
   ],
 );
 

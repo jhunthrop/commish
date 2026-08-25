@@ -1,11 +1,23 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { sql } from "drizzle-orm";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import type { Db } from "./client";
 import { createTestDb, truncateAll, truncateMoneyTables } from "./test-db";
-import { draftActions, lineupSlots, matchups, moneyEntries, moneyTransactions, rosterSlots, teams, MONEY_DIRECTIONS, MONEY_TXN_KINDS } from "./schema";
+import {
+  auditEvents,
+  draftActions,
+  leagues,
+  lineupSlots,
+  matchups,
+  moneyEntries,
+  moneyTransactions,
+  rosterSlots,
+  teams,
+  MONEY_DIRECTIONS,
+  MONEY_TXN_KINDS,
+} from "./schema";
 import { explainPlan, findNode, indexScanNode, nodeTypes, planCost, planUsesSeqScanOn, sequentiallyScannedRelations } from "./explain";
-import { seedRealisticCorpus, seedTradeCorpus } from "./test-corpus";
+import { LEAGUE_COUNT, TEAMS_PER_LEAGUE, USER_COUNT, seedRealisticCorpus, seedTradeCorpus } from "./test-corpus";
 import { chatPageQuery } from "@/chat-service/chat";
 import { dueDraftsQuery } from "@/draft-service/auto-start";
 import { liveDraftsQuery } from "@/draft-service/ticker";
@@ -14,6 +26,7 @@ import { signalsForUsersQuery } from "@/integrity-service/session-signals";
 import { completedSeasonsQuery } from "@/league-service/participation";
 import { browseQuery, houseShelfQuery } from "@/league-service/browse";
 import { leaguesNeedingAutoSetQuery } from "@/league-service/auto-lineup";
+import { ENFORCED_LEAGUE_SQL } from "@/league-service/enforcement";
 import { dueUnfilledScheduledDraftsQuery } from "@/league-service/roll";
 import { draftsNext48hQuery, leaguesFilledQuery } from "@/league-service/proof";
 import { tradesQuery } from "@/league-service/trades";
@@ -161,6 +174,81 @@ async function seedMoneyCorpus(db: Db): Promise<void> {
   await db.execute(sql`ANALYZE money_accounts, money_transactions, money_entries`);
 }
 
+/**
+ * Migration 0038 — a cross-lane carry from the design lane's Task 8 review (MEDIUM: unproven
+ * index coverage). The design lane's wire (`@/league-service/wire.ts`, merged to `main` on
+ * `worktree-phase3p7-design-v3`, not present in THIS worktree — read via `git show main:src/
+ * league-service/wire.ts`) reads `audit_events` by `event_type = 'member_joined'` and an
+ * `occurred_at` window, INNER JOINed to `leagues`, with NO `league_id` EQUALITY anywhere in its
+ * own `WHERE`: the join supplies `league_id` per outer row, never as one literal value the
+ * existing `audit_events_league_occurred_idx` (`league_id, occurred_at`) could seek on the way an
+ * equality predicate would. `audit_events_actor_type_occurred_idx` (`actor_id, event_type,
+ * occurred_at`) needs an equality on `actor_id` first, which this read never supplies either — an
+ * anonymous surface has no business filtering on who claimed a seat (wire.ts's own S9 note). Ten
+ * thousand leagues' worth of history and neither existing composite leads with the two columns
+ * this read actually filters on.
+ *
+ * `AUDIT_EVENT_TYPES`' own catalog spelling (`member_joined`) is reused rather than a string
+ * literal borrowed from a file this worktree cannot import.
+ *
+ * THE CORPUS. Reproduces the shape at realistic scale rather than trusting the reasoning above.
+ * `OTHER_AUDIT_EVENTS_PER_LEAGUE` (12) non-`member_joined` rows per league — draft picks and
+ * lineup changes, the bulk of a real audit history — spread across `AUDIT_HISTORY_DAYS` (180) so
+ * `audit_events` is a genuinely large table (75,000 rows over `LEAGUE_COUNT` leagues) with a long
+ * tail behind it, not a toy sized to fit the query under test. `member_joined` gets `TEAMS_PER_
+ * LEAGUE` (3) rows per league — the seats a 3-team corpus league actually fills — keyed on `g %
+ * AUDIT_HISTORY_DAYS`: every league whose day-offset lands on exactly 0 joined WITHIN the wire's
+ * 24-hour window (`now() - 0 days - a few minutes`), everyone else joined further back across the
+ * six-month tail. `AUDIT_HISTORY_DAYS` (180) is itself a multiple of 10, so every such league is
+ * automatically `is_public_matchmade` too (`seedRealisticCorpus`'s own `g % 10 = 0` rule) — the
+ * exact "recent, public claim" shape the wire exists to surface, arrived at by the corpus's own
+ * arithmetic rather than a second hand-picked list of league ids. One join in twenty is stamped a
+ * release (`payload.outcome: 'seat_released'`), so the corpus exercises `NOT_A_SEAT_RELEASE`'s
+ * own predicate (copied below, verbatim, from wire.ts's own comment) rather than leaving it
+ * permanently vacuous.
+ */
+const AUDIT_HISTORY_DAYS = 180;
+const OTHER_AUDIT_EVENTS_PER_LEAGUE = 12;
+
+async function seedWireClaimsAuditSample(db: Db): Promise<void> {
+  // The long tail: non-`member_joined` history, scattered across the full six-month window so
+  // the table's own size and age spread are realistic, not shaped around the query under test.
+  await db.execute(sql`
+    INSERT INTO audit_events (event_id, chain_scope, sequence, event_type, actor_id, actor_type, league_id, payload, occurred_at, previous_event_hash, event_hash, hash_version)
+    SELECT
+      'aeflr' || g || '_' || n,
+      'lg' || g,
+      n,
+      (ARRAY['draft_pick', 'lineup_change'])[1 + (n % 2)]::audit_event_type,
+      'u' || (1 + ((g * 7 + n) % ${USER_COUNT})),
+      'user'::audit_actor_type,
+      'lg' || g,
+      '{}'::jsonb,
+      now() - (((g * 13 + n * 7) % ${AUDIT_HISTORY_DAYS}) || ' days')::interval - (((g + n) % 1440) || ' minutes')::interval,
+      'h', 'haeflr' || g || '_' || n, 1
+    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${OTHER_AUDIT_EVENTS_PER_LEAGUE}) n
+  `);
+  // The claims: `TEAMS_PER_LEAGUE` seats per league, day-offset `g % AUDIT_HISTORY_DAYS` — see
+  // this function's own docblock for why day-offset 0 lands exactly the wire's public, in-window
+  // slice without a second hand-picked league list.
+  await db.execute(sql`
+    INSERT INTO audit_events (event_id, chain_scope, sequence, event_type, actor_id, actor_type, league_id, payload, occurred_at, previous_event_hash, event_hash, hash_version)
+    SELECT
+      'aemj' || g || '_' || t,
+      'lg' || g,
+      ${OTHER_AUDIT_EVENTS_PER_LEAGUE} + t,
+      'member_joined'::audit_event_type,
+      'u' || (1 + ((g * 11 + t) % ${USER_COUNT})),
+      'user'::audit_actor_type,
+      'lg' || g,
+      CASE WHEN (g + t) % 20 = 0 THEN jsonb_build_object('outcome', 'seat_released') ELSE '{}'::jsonb END,
+      now() - ((g % ${AUDIT_HISTORY_DAYS}) || ' days')::interval - ((t * 3) || ' minutes')::interval,
+      'h', 'haemj' || g || '_' || t, 1
+    FROM generate_series(1, ${LEAGUE_COUNT}) g, generate_series(1, ${TEAMS_PER_LEAGUE}) t
+  `);
+  await db.execute(sql`ANALYZE audit_events`);
+}
+
 describe("hot read paths use indexes", () => {
   beforeAll(async () => {
     await truncateAll(db);
@@ -169,6 +257,7 @@ describe("hot read paths use indexes", () => {
     await seedFullDueLeagueSample(db);
     await seedReviewCorpus(db);
     await seedMoneyCorpus(db);
+    await seedWireClaimsAuditSample(db);
   }, 120_000);
 
   // `teams` is deliberately not asserted here: at this corpus size, the planner's genuine
@@ -852,6 +941,75 @@ describe("hot read paths use indexes", () => {
     const plan = await explainPlan(db, leagueHistory);
     expect(sequentiallyScannedRelations(plan)).not.toContain("money_transactions");
     expect(indexScanNode(plan, "money_transactions_league_idx")).toBeDefined();
+  });
+
+  /**
+   * MIGRATION 0038 — the wire-claims index, `seedWireClaimsAuditSample`'s own consumer. Built
+   * inline, shaped exactly as `seatClaimsQuery` (`@/league-service/wire.ts`, design lane, `main`
+   * only) issues it — this worktree cannot import that file, so the WHERE/JOIN shape is copied
+   * here rather than trusted from memory (see `seedWireClaimsAuditSample`'s own docblock for the
+   * full cross-lane account). `WIRE_WINDOW_MS`/`WIRE_MAX_ITEMS` mirror `MATCHMAKING_CONFIG.wire`
+   * on `main` as of the merge this carry was found in (24 hours, 12 items) — literals, not an
+   * import, for the same reason the query shape itself is copied rather than imported.
+   *
+   * THE MEASUREMENT, taken against migration 0037 (before this task's own migration existed):
+   * over the 75,000-row corpus above, the planner could not seek on either existing composite —
+   * `audit_events_league_occurred_idx` never sees a literal `league_id` to match its leading
+   * column against, and `audit_events_actor_type_occurred_idx` never sees a literal `actor_id`
+   * either — and fell back to a `Seq Scan` on `audit_events` (`Filter: event_type = 'member_
+   * joined' AND occurred_at >= ... AND occurred_at <= ...`), discarding all but the ~80 rows in
+   * the 24-hour window out of 75,000. `drizzle/0038_wire_claims_index.sql` adds a PARTIAL index
+   * on `(occurred_at) WHERE event_type = 'member_joined'` — narrower than a full `(event_type,
+   * occurred_at)` composite, and just as capable of seeking the range: `member_joined` is the
+   * WHERE this read filters on, never a value it varies, so a partial predicate on it costs
+   * nothing this read does not already commit to and keeps the index's own footprint
+   * proportional to one event type out of `AUDIT_EVENT_TYPES`, not the whole table. The
+   * assertions below are what the SAME plan measures now: no sequential scan of `audit_events`,
+   * and the new index leading the seek.
+   */
+  it("the wire's seat-claims read seeks on audit_events_member_joined_occurred_idx, never a sequential scan of audit_events", async () => {
+    const WIRE_WINDOW_MS = 24 * 60 * 60 * 1000;
+    const WIRE_MAX_ITEMS = 12;
+    const now = new Date();
+    const windowStart = new Date(now.getTime() - WIRE_WINDOW_MS);
+    // `payload->>'outcome' is distinct from 'seat_released'` — copied verbatim from wire.ts's own
+    // `NOT_A_SEAT_RELEASE`, the predicate a release rides `member_joined` under instead of its
+    // own event type (the audit compromise `releaseSeat`, `@/league-service/release`, makes).
+    const NOT_A_SEAT_RELEASE = sql`${auditEvents.payload}->>'outcome' is distinct from 'seat_released'`;
+
+    const seatClaims = db
+      .select({
+        leagueName: leagues.name,
+        occurredAt: auditEvents.occurredAt,
+        teamCount: leagues.teamCount,
+        filledTeams: sql<number>`count(${teams.id})::int`,
+      })
+      .from(auditEvents)
+      .innerJoin(leagues, eq(leagues.id, auditEvents.leagueId))
+      .leftJoin(teams, eq(teams.leagueId, leagues.id))
+      .where(
+        and(
+          eq(auditEvents.eventType, "member_joined"),
+          NOT_A_SEAT_RELEASE,
+          gte(auditEvents.occurredAt, windowStart),
+          lte(auditEvents.occurredAt, now),
+          ENFORCED_LEAGUE_SQL,
+        ),
+      )
+      .groupBy(auditEvents.eventId, leagues.id)
+      .orderBy(desc(auditEvents.occurredAt))
+      .limit(WIRE_MAX_ITEMS);
+
+    const plan = await explainPlan(db, seatClaims);
+    expect(sequentiallyScannedRelations(plan)).not.toContain("audit_events");
+    expect(indexScanNode(plan, "audit_events_member_joined_occurred_idx")).toBeDefined();
+
+    // The mutation proof: the corpus's own arithmetic (`seedWireClaimsAuditSample`'s docblock)
+    // guarantees a non-empty, non-trivial result — an assertion that could pass vacuously against
+    // zero rows would prove nothing about which plan the planner actually chose.
+    const rows = await seatClaims;
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.length).toBeLessThanOrEqual(WIRE_MAX_ITEMS);
   });
 });
 

@@ -1,0 +1,43 @@
+-- The wire-claims index: a cross-lane carry from the design lane's Task 8 review (MEDIUM:
+-- unproven index coverage). `src/db/index-plans.test.ts` re-runs the design lane's own query
+-- shape (`seatClaimsQuery`, `@/league-service/wire.ts`, merged to `main` on
+-- `worktree-phase3p7-design-v3`, not present in this worktree) against this index on every build,
+-- so a regression reddens instead of waiting to be rediscovered.
+--
+-- THE SHAPE. The wire's seat-claims read is `WHERE event_type = 'member_joined' AND occurred_at
+-- BETWEEN <window>`, INNER JOINed to `leagues` with NO `league_id` EQUALITY anywhere in its own
+-- `WHERE` — the join supplies `league_id` per outer row, never as one literal value either
+-- existing composite could seek on: `audit_events_league_occurred_idx` (`league_id, occurred_at`)
+-- needs an equality on its leading column to be worth more than a per-row probe, and
+-- `audit_events_actor_type_occurred_idx` (`actor_id, event_type, occurred_at`) needs an equality
+-- on `actor_id`, which an anonymous surface has no business supplying (wire.ts's own S9 note —
+-- the read never selects `actor_id` either).
+--
+-- THE MEASUREMENT, taken against migration 0037 over a 75,000-row `audit_events` corpus
+-- (`seedWireClaimsAuditSample`, `src/db/index-plans.test.ts`): with neither existing composite
+-- able to seek on this shape, the planner fell back to a Bitmap Index Scan across the WHOLE
+-- `audit_events_league_occurred_idx` — every league's rows in the time window, not just the
+-- public ones the join ultimately keeps — applying `event_type = 'member_joined'` as a `Filter`
+-- AFTER the heap fetch. Measured: 415 rows fetched off the heap to keep 81, discarding 334 (80%)
+-- on every wire render, at a planner cost of ~2,824 dominated by a Bitmap Index Scan costed at
+-- ~1,890 for what is effectively a full pass over the index (no leading-column equality to seek
+-- on, so every entry is visited).
+--
+-- THE FIX. A single-column `(occurred_at)` index, PARTIAL on `event_type = 'member_joined'`,
+-- rather than a full `(event_type, occurred_at)` composite: `member_joined` is the one event type
+-- this shape ever filters on — every other `event_type` reader in the codebase already supplies a
+-- `league_id` or `actor_id` equality the two indexes above already serve
+-- (`draft-schedule.ts`, `integrity-service/flags.ts`) — so a full composite would index all
+-- sixteen `AUDIT_EVENT_TYPES` to serve a read that only ever wants one of them. The partial
+-- predicate matches the read's own `WHERE` exactly, the same "narrower than a full composite,
+-- same seek" choice `trade_proposals_open_fingerprint_idx`, `leagues_house_rung_idx` and
+-- `reviews_feed_idx` already make for their own single-value predicates. Re-measured with this
+-- index in place: a Bitmap Index Scan seeking directly on `occurred_at` within the partial slice
+-- (81 of 81 rows kept — no `event_type` Filter left to discard anything; the one Filter that
+-- remains is the non-indexable `payload->>'outcome'` release check, unrelated to this index's
+-- job), planner cost down from ~2,824 to ~364, and no sequential or full-index scan of
+-- `audit_events` anywhere in the plan (`src/db/index-plans.test.ts`'s own pinned assertion).
+--
+-- Forward-only, no CONCURRENTLY: pre-launch, `audit_events` is still small in production and this
+-- migration's own transaction is the same one every migration in this file runs in.
+CREATE INDEX "audit_events_member_joined_occurred_idx" ON "audit_events" USING btree ("occurred_at") WHERE "audit_events"."event_type" = 'member_joined';

@@ -267,6 +267,13 @@
       "when": 1787619874633,
       "tag": "0037_payment_transfer_intents",
       "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1787623685143,
+      "tag": "0038_wire_claims_index",
+      "breakpoints": true
     }
   ]
 }
