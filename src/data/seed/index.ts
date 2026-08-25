@@ -13,6 +13,7 @@ import { ensureHouseCatalog } from "@/league-service/house-factory";
 import { joinPublicLeague } from "@/league-service/join";
 import type { HouseRungName } from "@/matchmaking/house-catalog";
 import { DEV_SEED } from "./config";
+import { ensureMockBotRoster } from "./bot-roster";
 import { assertLocalSeedTarget } from "./guard";
 import { isSafeToKeepFillingHouseLeague, staleHouseShelfMessage } from "./house-fill-safety";
 import { seedDevLeagues } from "./seed-dev-leagues";
@@ -179,6 +180,13 @@ async function main(): Promise<void> {
   // and `player_stat_lines` row, so a guard placed after it would fire far too late.
   assertLocalSeedTarget();
   const db = getDb();
+  // Phase 4.5, Task 2: the platform's practice-opponent roster, ensured before anything else
+  // runs — NOT guarded by `assertLocalSeedTarget` (that guard already fired above for this
+  // script's OWN developer-fixture arcs; `ensureMockBotRoster` itself carries no such guard,
+  // because a production database needs this exact call the day its first mock room is
+  // created, through `createMockRoom`'s own identical call, Task 5). Idempotent, so running it
+  // here changes nothing about a database `createMockRoom` already seeded on its own.
+  await ensureMockBotRoster(db);
   // The real ledger, not the unmetered default: this is the one caller whose provider may be a
   // live feed with a real key behind it, so this is where the backfill's spending has to be
   // counted. Everything else that calls `seedPlayers` drives the mock and costs nothing upstream.

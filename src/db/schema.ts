@@ -18,6 +18,7 @@ import {
 import { sql } from "drizzle-orm";
 import { STANDARD_ROSTER_SLOTS, type RosterSlotConfig } from "@/domain/roster";
 import { AUDIT_EVENT_TYPES, type JsonObject } from "@/domain/audit";
+import { MOCK_CONFIG } from "@/mock-draft/config";
 import { MONEY_ACCOUNT_KINDS } from "@/money/accounts";
 import type { MoneyPostingDirection } from "@/money/posting";
 import type { PrizeTable } from "@/money/prize-table";
@@ -110,6 +111,14 @@ export const KYC_STATUSES = ["none", "pending", "verified", "failed"] as const;
 export type KycStatus = (typeof KYC_STATUSES)[number];
 export const kycStatusEnum = pgEnum("kyc_status", KYC_STATUSES);
 
+/**
+ * Phase 4.5, Task 2 (migration 0041). `MOCK_CONFIG.modes` (`@/mock-draft/config`) IS the runtime
+ * tuple — no second list respelled here, matching `moneyAccountKindEnum`'s own precedent of
+ * building the pg enum directly off the pure vocabulary's own array rather than a copy that could
+ * drift from it. `mock_rooms.mode` below is the only column that reads it.
+ */
+export const mockModeEnum = pgEnum("mock_mode", MOCK_CONFIG.modes);
+
 // Identity (credentials, sessions, MFA, OAuth) is owned by WorkOS AuthKit. This table is
 // the app's own profile row for a WorkOS user — `id` IS the WorkOS user id — holding the
 // fields WorkOS doesn't know about (experience tier, avatar) and giving teams/leagues an FK.
@@ -157,6 +166,18 @@ export const users = pgTable(
      * refuses every money door while this is non-null; free play is untouched.
      */
     selfExcludedAt: timestamp("self_excluded_at", { withTimezone: true }),
+    /**
+     * Phase 4.5, Task 2 (migration 0041). `true` for exactly the seeded practice-opponent roster
+     * (`MOCK_CONFIG.botRoster`, `@/mock-draft/config`) `ensureMockBotRoster` upserts
+     * (`@/data/seed/bot-roster.ts`) — never set by any other writer, and never flipped back. A
+     * bot row holds no session (WorkOS never issues one for a `bot_*` id), no `user_preferences`
+     * row, no review, no chat message and no audit `actor_id` — the mock lane's own carve-out
+     * (ruling 2) means a bot is never the actor of anything this column's readers care about, so
+     * this flag exists for exactly one reason: the nudge scheduler's "never talk to a bot" guard
+     * (Task 4) and the seat draw's "never seat a human's row as a bot" defense both need ONE
+     * indexed fact rather than a `LIKE 'bot_%'` string match on `id`.
+     */
+    isBot: boolean("is_bot").notNull().default(false),
   },
   (t) => [uniqueIndex("users_email_idx").on(t.email)],
 );
@@ -265,6 +286,25 @@ export const leagues = pgTable(
      * again at settlement, browser and server enforcing the one rule from the one module.
      */
     payoutTable: jsonb("payout_table").$type<PrizeTable>(),
+    /**
+     * Phase 4.5, Task 2 (migration 0041). THE architecture call: a mock is a league row, not a
+     * parallel table set, because `drafts`/`teams`/the store/the ticker/SSE/the whole room UI all
+     * key off `leagues` already (`docs/superpowers/plans/2026-08-25-phase4p5-mock-drafts.md`'s own
+     * architecture section walks every consumer). `false` for every league that exists before this
+     * column and every league a commissioner ever creates by hand; `true` only for a row
+     * `createMockRoom` (`@/mock-draft-service/creation`, a later task) writes, always alongside a
+     * `mock_rooms` sidecar carrying the mock-only facts this column does not.
+     *
+     * EXCLUSION IS MECHANISM, NOT A PROMISE: every mock ships `is_public_matchmade = false`, so
+     * `ENFORCED_LEAGUE_SQL` (`@/league-service/enforcement`) already keeps a mock off browse, the
+     * wire's three per-league queries and the proof strip's 48h/next-draft reads BY CONSTRUCTION —
+     * this column exists for the one aggregate that deliberately counts private leagues too
+     * (`leaguesFilledQuery`, `@/league-service/proof`, gains `NOT is_mock` here) and for
+     * `myLeaguesOverview` (`@/league-service/read`), which scopes by membership rather than by
+     * `is_public_matchmade` and so needs its own predicate to keep the locker room a room of real
+     * leagues.
+     */
+    isMock: boolean("is_mock").notNull().default(false),
   },
   (t) => [
     /**
@@ -328,6 +368,64 @@ export const leagues = pgTable(
      * scan is trivial and the deploy-era split is not needed here.
      */
     check("leagues_house_commissioner_ck", sql`(${t.houseRung} IS NULL) = (${t.commissionerUserId} IS NOT NULL)`),
+  ],
+);
+
+/**
+ * The mock-only sidecar (Phase 4.5, Task 2, migration 0041) — one row per mock `leagues.id`,
+ * carrying the facts a mock room needs that a real league never does: which of the three
+ * founder-required modes it is, its practice pick clock, the seed its bot brain replays from,
+ * the code strangers or friends claim a seat with, and when the fill window (or the solo/early
+ * grace) fires. Everything else a mock room needs already lives on `leagues`/`drafts`/`teams` —
+ * this table is the sidecar half of "one column, one sidecar, not a parallel machine."
+ *
+ * `leagueId` IS the primary key, not a separate id: a mock room has exactly one league, always
+ * (`createMockRoom` writes both in the same transaction), so a second identity for this row would
+ * only ever be able to disagree with the league it describes. `ON DELETE CASCADE` is what makes
+ * the retention sweep (Task 6) a clean `DELETE FROM leagues WHERE id = ...` — legal only because
+ * the mock lane's audit carve-out (ruling 2) means a mock never writes a row the audit spine's
+ * append-only triggers would refuse to lose.
+ */
+export const mockRooms = pgTable(
+  "mock_rooms",
+  {
+    leagueId: text("league_id")
+      .primaryKey()
+      .references(() => leagues.id, { onDelete: "cascade" }),
+    hostUserId: text("host_user_id")
+      .notNull()
+      .references(() => users.id),
+    mode: mockModeEnum("mode").notNull(),
+    pickSeconds: integer("pick_seconds").notNull(),
+    /** The seed `rngFor` (`@/mock-draft/rng`) derives every bot's own stream from — drawn once at
+     *  creation and stored, never re-drawn, so a draft's bot behavior replays exactly from this
+     *  one number for a bug report or a test. */
+    botSeed: integer("bot_seed").notNull(),
+    /** The short code a lobby listing or a `link` invite is claimed by (`/api/mock-drafts/
+     *  [code]`, a later task) — UNIQUE, not the primary key: unlike `league_invites.code`, this
+     *  table's own identity is the league it describes, and a code is one more fact about that
+     *  league rather than the row's own address. */
+    shareCode: text("share_code").notNull(),
+    /** The fill-window deadline: when the ticker's due scan (Task 6) may top up bots and start
+     *  this room regardless of how many humans have claimed a seat. A solo room stamps `now` at
+     *  creation (it starts itself in the same call, Task 5); `claimMockSeat` (Task 5) pulls this
+     *  forward to `now + earlyStartGraceSeconds` the instant every human seat is claimed. */
+    startsAt: timestamp("starts_at", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    uniqueIndex("mock_rooms_share_code_idx").on(t.shareCode),
+    /**
+     * THE ticker's due scan (Task 6's `dueMockRoomsQuery`: due-to-start rooms, `starts_at <=
+     * now()`) and the retention sweep (Task 6's `sweepExpiredMocks`: expired rooms by the same
+     * column against a per-status retention window) — both scan this table by `starts_at` alone,
+     * never by `leagueId` (already served by the primary key) or by any other column. No partial
+     * predicate: unlike `leagues_public_browse_idx`, every row in this table is mock-room-shaped
+     * by construction (the table holds nothing else), so there is no rare-versus-common split to
+     * carve a partial index around.
+     */
+    index("mock_rooms_starts_at_idx").on(t.startsAt),
+    check("mock_rooms_pick_seconds_positive_ck", sql`${t.pickSeconds} > 0`),
   ],
 );
 

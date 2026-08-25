@@ -9,6 +9,7 @@ import {
   leagues,
   lineupSlots,
   matchups,
+  mockRooms,
   moneyEntries,
   moneyTransactions,
   rosterSlots,
@@ -847,6 +848,15 @@ describe("hot read paths use indexes", () => {
    * ~3.4ms wall time. THE REAL FINDING (for the report, not a silent pass): this query has no
    * index-shaped fix, because it counts most of two tables by design. What bounds its cost as
    * `leagues`/`drafts` grow over many seasons is not an index but a cache — see the task report.
+   *
+   * PHASE 4.5, TASK 2: `NOT is_mock` joined the `leagues` side's own `WHERE` (`leagues.created_at
+   * >= season start AND leagues.is_mock = false`), and this corpus's own `seedRealisticCorpus`
+   * never seeds a mock row — every league already reads `is_mock = false` by the column's own
+   * default, the identical "matches every row" shape `season.startedAt` already has on this
+   * corpus. MEASURED, not assumed: the plan shape is UNCHANGED (still two sequential scans, same
+   * relations, same cost order), because a predicate that discards nothing changes nothing a
+   * planner would ever seek an index for — this is the same reasoning the docblock above already
+   * gives for the other two predicates, extended to the third.
    */
   it("measures the proof strip's leaguesFilled count — two genuinely unselective sequential scans, not a missing index", async () => {
     const plan = await explainPlan(db, leaguesFilledQuery(db));
@@ -858,6 +868,10 @@ describe("hot read paths use indexes", () => {
     // silently stopped holding, and that is worth learning about explicitly.
     const filterNode = findNode(plan, (node) => node["Relation Name"] === "drafts");
     expect(filterNode?.Filter).toContain("status");
+    // Phase 4.5, Task 2: the new predicate rides the SAME `leagues` scan, never a second one —
+    // `is_mock` sits in that scan's own `Filter` alongside the season-window comparison.
+    const leaguesFilterNode = findNode(plan, (node) => node["Relation Name"] === "leagues");
+    expect(leaguesFilterNode?.Filter).toContain("is_mock");
   });
 
   /**
@@ -1432,5 +1446,69 @@ describe("leagues_season_completed_idx carries its partial predicate", () => {
     await db.execute(sql`DROP INDEX leagues_season_completed_idx`);
     await db.execute(sql`CREATE INDEX leagues_season_completed_idx ON leagues (id)`);
     expect(await indexDef()).not.toBe(EXPECTED_INDEXDEF);
+  });
+});
+
+/**
+ * PHASE 4.5, TASK 2: `mock_rooms_starts_at_idx` (migration 0041), measured against the shape its
+ * two named consumers (Task 6's `dueMockRoomsQuery` and `sweepExpiredMocks`) will both issue —
+ * `starts_at <= now()`, oldest due first. Built INLINE for now, the same "shaped exactly as its
+ * named consumer will issue it" precedent the money book's own three indexes above already
+ * establish for a query whose exported builder does not exist yet: when Task 6 lands
+ * `dueMockRoomsQuery`, this assertion should EXPLAIN that real export instead, the same evolution
+ * every other query in this file already went through.
+ *
+ * A dedicated corpus, sized like `seedHouseShelfSample`'s own small-sample-beside-the-big-corpus
+ * shape rather than folded into `seedRealisticCorpus`: 2,000 mock rooms, half already due (`starts_
+ * at` in the past) and half not, split by parity so neither half is a `LIMIT`-defeating
+ * contiguous block. Every row is genuinely mock-room-shaped — its own league (`is_mock = true`),
+ * its own host — because a partial index question ("does `starts_at` alone select few enough rows
+ * to beat a sequential scan") is only answered honestly against realistic proportions.
+ */
+describe("mock_rooms_starts_at_idx serves the due-scan and sweep shape, never a sequential scan", () => {
+  const MOCK_ROOM_COUNT = 2000;
+
+  beforeAll(async () => {
+    await truncateAll(db);
+    await db.execute(sql`
+      INSERT INTO users (id, email, display_name)
+      SELECT 'mockidx_host_' || g, 'mockidx_host_' || g || '@test.local', 'Mock Host ' || g
+      FROM generate_series(1, ${sql.raw(String(MOCK_ROOM_COUNT))}) g
+    `);
+    await db.execute(sql`
+      INSERT INTO leagues (id, name, format, team_count, stake_tier, is_public_matchmade, experience_tier, commissioner_user_id, is_mock, created_at)
+      SELECT 'mockidx_lg_' || g, 'Mock Room ' || g, 'snake'::draft_format, 12, 0, false, 'beginner'::experience_tier,
+             'mockidx_host_' || g, true, now()
+      FROM generate_series(1, ${sql.raw(String(MOCK_ROOM_COUNT))}) g
+    `);
+    // Half due (starts_at in the past), half not — split by parity, never a contiguous block,
+    // so a `LIMIT`-bound scan cannot appear selective merely because the due rows happen to
+    // cluster at one end of physical storage.
+    await db.execute(sql`
+      INSERT INTO mock_rooms (league_id, host_user_id, mode, pick_seconds, bot_seed, share_code, starts_at)
+      SELECT 'mockidx_lg_' || g, 'mockidx_host_' || g, 'lobby'::mock_mode, 60, g, 'mockidx_code_' || g,
+             CASE WHEN g % 2 = 0 THEN now() - (g || ' seconds')::interval ELSE now() + (g || ' seconds')::interval END
+      FROM generate_series(1, ${sql.raw(String(MOCK_ROOM_COUNT))}) g
+    `);
+    await db.execute(sql`ANALYZE users, leagues, mock_rooms`);
+  }, 60_000);
+
+  afterAll(async () => {
+    await truncateAll(db);
+  });
+
+  it("seeks the due-scan/sweep shape on mock_rooms_starts_at_idx, never a sequential scan of mock_rooms", async () => {
+    const now = new Date();
+    const plan = await explainPlan(
+      db,
+      db
+        .select({ leagueId: mockRooms.leagueId, startsAt: mockRooms.startsAt })
+        .from(mockRooms)
+        .where(lte(mockRooms.startsAt, now))
+        .orderBy(asc(mockRooms.startsAt))
+        .limit(100),
+    );
+    expect(sequentiallyScannedRelations(plan)).not.toContain("mock_rooms");
+    expect(indexScanNode(plan, "mock_rooms_starts_at_idx")).toBeDefined();
   });
 });

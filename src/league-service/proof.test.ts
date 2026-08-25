@@ -1,10 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { drafts, leagues, reviews, users } from "@/db/schema";
+import { drafts, leagues, mockRooms, reviews, teams, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { LEAGUE_CONFIG } from "@/league/config";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
-import { proofStats, type ProofStatsDeps } from "./proof";
+import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
+import { browseQuery } from "./browse";
+import { completedSeasonsFor } from "./participation";
+import { myLeaguesOverview } from "./read";
+import { listWireItems } from "./wire";
+import { leaguesFilledQuery, proofStats, type ProofStatsDeps } from "./proof";
 
 const db = createTestDb();
 
@@ -97,10 +102,54 @@ async function seedReviews(count: number, opts?: { readonly ratings?: readonly n
   }
 }
 
+let mockSeq = 0;
+
+/**
+ * A mock league that drafted all the way to completion — a league row (`isMock: true,
+ * isPublicMatchmade: false`), its `mock_rooms` sidecar, a `'complete'` draft and a seated host —
+ * the whole shape a real one has, so a test that finds this invisible to a real aggregate is a
+ * genuine proof of the exclusion rather than an artifact of the shape being incomplete.
+ */
+async function seedCompletedMockRoom(): Promise<{ readonly leagueId: string; readonly hostUserId: string }> {
+  mockSeq += 1;
+  const leagueId = `mocklg${mockSeq}`;
+  const hostUserId = `mock_host_${mockSeq}`;
+  await db.insert(users).values({ id: hostUserId, email: `${hostUserId}@test.local`, displayName: hostUserId }).onConflictDoNothing();
+  await db.insert(leagues).values({
+    id: leagueId,
+    name: `Practice Room ${mockSeq}`,
+    format: "snake",
+    teamCount: 12,
+    isPublicMatchmade: false,
+    isMock: true,
+    commissionerUserId: hostUserId,
+    createdAt: DEFAULT_CREATED_AT,
+  });
+  await db.insert(mockRooms).values({
+    leagueId,
+    hostUserId,
+    mode: "solo",
+    pickSeconds: 60,
+    botSeed: mockSeq,
+    shareCode: `code_${leagueId}`,
+    startsAt: DEFAULT_CREATED_AT,
+  });
+  await db.insert(drafts).values({
+    id: `${leagueId}_draft`,
+    leagueId,
+    format: "snake",
+    status: "complete",
+    kickoffAt: DEFAULT_KICKOFF,
+  });
+  await db.insert(teams).values({ id: `${leagueId}_host_team`, leagueId, userId: hostUserId, name: "Host" });
+  return { leagueId, hostUserId };
+}
+
 beforeEach(async () => {
   await truncateAll(db);
   leagueSeq = 0;
   reviewSeq = 0;
+  mockSeq = 0;
 });
 
 afterAll(async () => {
@@ -244,5 +293,50 @@ describe("proofStats — the whole strip", () => {
     // Not asserting a value — only that the edge default exists and the call does not throw,
     // the same smoke-test shape `listPublicLeagues`'s own `clock = systemClock` default gets.
     await expect(proofStats(db, {})).resolves.toBeDefined();
+  });
+});
+
+/**
+ * THE EXCLUSION SUITE (Phase 4.5, Task 2). One describe block, named once, that every later task
+ * touching a real aggregate extends rather than duplicating: a mock league mirrors a real one in
+ * every shape a real one has (`seedCompletedMockRoom` above), and every public aggregate this
+ * phase's own architecture call names stays blind to it. Task 4 adds the audit/notice/money
+ * trace proof beside this; Task 9 adds the lobby's own "this mock is mine" read, which is the
+ * ONE place a mock is allowed to reappear.
+ *
+ * `leaguesFilledQuery` is asked directly here, not through `proofStats`'s floor-gated field —
+ * the floor would hide a count of 1 either way, which proves nothing about the predicate this
+ * suite exists to pin. `listWireItems` and `browseQuery` get their own dedicated pins in
+ * `wire.test.ts` and `browse.test.ts` (all four wire reads, and the browse shelf); the two
+ * assertions here are the brief's own literal shape, kept beside the query they exercise most
+ * directly.
+ */
+describe("the exclusion suite — a mock draft counts nowhere a real aggregate would (Phase 4.5, Task 2)", () => {
+  it("never counts a drafted mock in leagues filled this season", async () => {
+    await seedLeague({ draftStatus: "complete" });
+    await seedCompletedMockRoom();
+    const [row] = await leaguesFilledQuery(db);
+    expect(row!.count).toBe(1);
+  });
+
+  it("keeps every mock off the wire, the browse shelf and the locker room", async () => {
+    const { leagueId, hostUserId } = await seedCompletedMockRoom();
+
+    expect(await listWireItems(db, deps.clock)).toHaveLength(0);
+    expect(await browseQuery(db, EMPTY_BROWSE_FILTER)).toHaveLength(0);
+
+    const overview = await myLeaguesOverview(db, hostUserId);
+    expect(overview.leagueRows.map((row) => row.id)).not.toContain(leagueId);
+    expect(overview.leagueRows).toHaveLength(0);
+  });
+
+  it("never lets a completed mock season count toward an account's veteran history", async () => {
+    // Belt, not braces: a mock never grows a matchup and so can never earn `seasonCompletedAt`
+    // (Task 4 skips the season commit for the mock lane), which is what already keeps
+    // `completedSeasonsQuery` (gated on that column alone) blind to it with no predicate of its
+    // own. This test outlives that reasoning — if a future writer ever DID stamp a mock's season
+    // complete, this is the assertion that would catch it.
+    const { hostUserId } = await seedCompletedMockRoom();
+    expect(await completedSeasonsFor(db, hostUserId)).toBe(0);
   });
 });

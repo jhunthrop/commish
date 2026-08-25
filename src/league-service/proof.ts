@@ -42,6 +42,14 @@ export interface ProofStatsDeps {
  * public or private, and a bare total discloses nothing about any one private league the way an
  * aggregate broken out BY league (`draftsNext48hQuery`'s own reasoning) would.
  *
+ * `NOT is_mock` (Phase 4.5, Task 2): the ONE aggregate `ENFORCED_LEAGUE_SQL` does not already
+ * keep a mock out of. Every other query in this module (and `wire.ts`'s three) is scoped to
+ * `is_public_matchmade = true`, which a mock never is by construction — this is the deliberately
+ * unscoped exception, and the only one this whole feature needs to touch: a drafted mock counts
+ * as a league that "got to draft" by every predicate this query already applies, and would
+ * inflate a number the front door and the wire both read from this exact query (`wire.ts`'s own
+ * `seasonCount`) if it were not excluded here.
+ *
  * Exported as a builder, not just run inline, mirroring `browseQuery` (`@/league-service/browse`)
  * — `src/db/index-plans.test.ts` EXPLAINs this exact statement rather than a hand copy.
  */
@@ -50,7 +58,13 @@ export function leaguesFilledQuery(db: Db) {
     .select({ count: sql<number>`count(*)::int` })
     .from(leagues)
     .innerJoin(drafts, eq(drafts.leagueId, leagues.id))
-    .where(and(inArray(drafts.status, DRAFTED_STATUSES), gte(leagues.createdAt, new Date(LEAGUE_CONFIG.season.startedAt))));
+    .where(
+      and(
+        inArray(drafts.status, DRAFTED_STATUSES),
+        gte(leagues.createdAt, new Date(LEAGUE_CONFIG.season.startedAt)),
+        eq(leagues.isMock, false),
+      ),
+    );
 }
 
 /**

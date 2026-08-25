@@ -75,13 +75,30 @@ export interface LeagueMembershipRows {
  * membership, which is what makes the authorization guarantee simple to state: a league this
  * user has no team in never enters `ids`, so it can never appear in any of the three row sets
  * below, no matter what a caller does with them afterward.
+ *
+ * `AND NOT is_mock` (Phase 4.5, Task 2): the locker room this feeds (`listLeaguesForUser`) and
+ * the cross-league home it also feeds (`crossLeagueHome`, `@/league-service/home.ts`) are both
+ * membership-scoped reads, not `is_public_matchmade`-scoped ones — `ENFORCED_LEAGUE_SQL`
+ * (`@/league-service/enforcement`) never touches this query, so a mock the caller is seated in
+ * (the host, or a bot's own team never has a real caller) would otherwise show up as an ordinary
+ * league. Excluded at THIS read, before `teamRows`/`draftRows` ever run, rather than filtered out
+ * of the returned rows afterward: a mock league's id never enters `ids` at all, so nothing
+ * downstream has to remember to re-check it. Practice re-entry lives in the mock lobby instead
+ * (Task 9), never in the room of real leagues this function is the one source of.
  */
 export async function myLeaguesOverview(db: Db, userId: string): Promise<LeagueMembershipRows> {
   const mine = await db.select({ leagueId: teams.leagueId, teamId: teams.id }).from(teams).where(eq(teams.userId, userId));
   if (mine.length === 0) return { leagueRows: [], teamRows: [], draftRows: [], myTeamByLeague: new Map() };
-  const ids = mine.map((row) => row.leagueId);
+  const candidateIds = mine.map((row) => row.leagueId);
 
-  const leagueRows = await db.select().from(leagues).where(inArray(leagues.id, ids)).orderBy(asc(leagues.createdAt));
+  const leagueRows = await db
+    .select()
+    .from(leagues)
+    .where(and(inArray(leagues.id, candidateIds), eq(leagues.isMock, false)))
+    .orderBy(asc(leagues.createdAt));
+  if (leagueRows.length === 0) return { leagueRows: [], teamRows: [], draftRows: [], myTeamByLeague: new Map() };
+  const ids = leagueRows.map((row) => row.id);
+
   const teamRows = await db.select({ id: teams.id, leagueId: teams.leagueId, name: teams.name }).from(teams).where(inArray(teams.leagueId, ids));
   const draftRows = await db
     .select({
@@ -95,7 +112,13 @@ export async function myLeaguesOverview(db: Db, userId: string): Promise<LeagueM
     .from(drafts)
     .where(inArray(drafts.leagueId, ids));
 
-  return { leagueRows, teamRows, draftRows, myTeamByLeague: new Map(mine.map((row) => [row.leagueId, row.teamId])) };
+  const realIds = new Set(ids);
+  return {
+    leagueRows,
+    teamRows,
+    draftRows,
+    myTeamByLeague: new Map(mine.filter((row) => realIds.has(row.leagueId)).map((row) => [row.leagueId, row.teamId])),
+  };
 }
 
 /** The two numbers the league list needs beyond the raw rows: how full a league is, and what

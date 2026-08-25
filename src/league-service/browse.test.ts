@@ -100,6 +100,11 @@ interface SeedLeague {
   readonly createdAt?: Date;
   /** Defaults to `STANDARD_SCORING` — every real league has a scoring_settings row. */
   readonly scoring?: Omit<ScoringSettings, "leagueId">;
+  /** Phase 4.5, Task 2. Defaults to `false` (the schema default) — set explicitly to prove that
+   *  a mock league, which always ships `isPublicMatchmade: false` in production
+   *  (`createMockRoom`, a later task), is excluded from browse by that SAME predicate rather
+   *  than needing a second one here. */
+  readonly isMock?: boolean;
 }
 
 async function seed(league: SeedLeague): Promise<void> {
@@ -111,6 +116,7 @@ async function seed(league: SeedLeague): Promise<void> {
     stakeTier: league.stakeTier,
     experienceTier: league.experienceTier,
     isPublicMatchmade: league.isPublicMatchmade,
+    isMock: league.isMock ?? false,
     commissionerUserId: "owner",
     ...(league.createdAt === undefined ? {} : { createdAt: league.createdAt }),
     ...(league.medianGame === undefined ? {} : { medianGame: league.medianGame }),
@@ -368,6 +374,22 @@ describe("listPublicLeagues", () => {
     });
     expect(await browseLeagues(db, EMPTY_BROWSE_FILTER)).toEqual([]);
     expect(await browseLeagues(db, { ...EMPTY_BROWSE_FILTER, format: "snake" })).toEqual([]);
+  });
+
+  /**
+   * Phase 4.5, Task 2 — the architecture call's own claim, pinned rather than trusted: a mock
+   * league always ships `isPublicMatchmade: false`, so `browseQuery`'s existing
+   * `eq(leagues.isPublicMatchmade, true)` predicate already excludes it BY CONSTRUCTION, with no
+   * second `is_mock` check needed here. Seeded with `isMock: true` explicitly (not merely another
+   * `isPublicMatchmade: false` row) so this reads as a claim about mocks specifically, not a
+   * restatement of the private-league test above.
+   */
+  it("never lists a mock draft, on the shelf or in the member list", async () => {
+    await seed({
+      id: "mock_room", name: "Practice Room", format: "snake", experienceTier: "beginner",
+      stakeTier: 0, teamCount: 12, filled: 2, isPublicMatchmade: false, isMock: true,
+    });
+    expect(await browseLeagues(db, EMPTY_BROWSE_FILTER)).toEqual([]);
   });
 
   it("never lists a full league", async () => {
