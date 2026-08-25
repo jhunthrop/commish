@@ -20,3 +20,25 @@ export function depositRateLimited(userId: string): Response | null {
 export function resetDepositRateLimit(): void {
   limiter.reset();
 }
+
+/** The KYC submit door's own limiter — same shape as `limiter` above, `MONEY_CONFIG.kyc.rateLimit`. */
+const kycLimiter = createRateLimiter(MONEY_CONFIG.kyc.rateLimit);
+
+export function kycRateLimited(userId: string): Response | null {
+  return kycLimiter.allow(userId) ? null : fail("You have tried that a lot in a short time. Give it a minute and try again.", 429);
+}
+
+export function resetKycRateLimit(): void {
+  kycLimiter.reset();
+}
+
+/** The self-exclusion door's own limiter — same shape, `MONEY_CONFIG.exclusion.rateLimit`. */
+const exclusionLimiter = createRateLimiter(MONEY_CONFIG.exclusion.rateLimit);
+
+export function exclusionRateLimited(userId: string): Response | null {
+  return exclusionLimiter.allow(userId) ? null : fail("You have tried that a lot in a short time. Give it a minute and try again.", 429);
+}
+
+export function resetExclusionRateLimit(): void {
+  exclusionLimiter.reset();
+}

@@ -48,6 +48,7 @@ import { Panel } from "@/components/ui/panel";
 import { SeatMeter } from "@/components/ui/seat-meter";
 import { StatPill } from "@/components/ui/stat-pill";
 import { QueueTable } from "@/admin-room/components/queue-table";
+import { ExclusionControl } from "@/admin-room/components/exclusion-control";
 import { SignInLink } from "@/components/app-shell/sign-in-link";
 import { PublicBar } from "@/components/app-shell/public-bar";
 import { PublicFooter } from "@/components/app-shell/public-footer";
@@ -306,6 +307,42 @@ describe("QueueTable says nothing that breaks the house copy rules", () => {
       expectClean(container, QUEUE_ROW.question, QUEUE_ROW.about);
       unmount();
     }
+  });
+});
+
+/**
+ * `ExclusionControl` (Task 7, `src/admin-room/components/exclusion-control.tsx`) rendered
+ * directly, the same "own component, own `describe` block" precedent `QueueTable`'s block above
+ * sets — empty, erroring (both the empty-field guard and a server-stated refusal), and confirmed.
+ */
+describe("ExclusionControl says nothing that breaks the house copy rules", () => {
+  it("is clean empty, erroring, and confirmed", async () => {
+    const { fixtureAdminDeps, renderInAdmin } = await import("@/admin-room/test-fixtures");
+
+    const empty = fixtureAdminDeps();
+    const emptyRender = renderInAdmin(<ExclusionControl key="empty" />, empty.deps);
+    expectClean(emptyRender.container);
+
+    fireEvent.click(screen.getByRole("button", { name: "Clear self exclusion" }));
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expectClean(emptyRender.container);
+    emptyRender.unmount();
+
+    const refused = fixtureAdminDeps({ ok: false, error: '"u1" is not a user, or is not excluded.' });
+    const refusedRender = renderInAdmin(<ExclusionControl key="refused" />, refused.deps);
+    fireEvent.change(screen.getByLabelText("Member user id"), { target: { value: "u1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear self exclusion" }));
+    await screen.findByRole("alert");
+    expectClean(refusedRender.container, '"u1" is not a user, or is not excluded.');
+    refusedRender.unmount();
+
+    const cleared = fixtureAdminDeps({ ok: true, data: { userId: "u1" } });
+    const clearedRender = renderInAdmin(<ExclusionControl key="cleared" />, cleared.deps);
+    fireEvent.change(screen.getByLabelText("Member user id"), { target: { value: "u1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Clear self exclusion" }));
+    await screen.findByRole("status");
+    expectClean(clearedRender.container);
+    clearedRender.unmount();
   });
 });
 

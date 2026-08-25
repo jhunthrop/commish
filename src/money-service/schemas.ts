@@ -60,3 +60,36 @@ export const withdrawalRequestSchema = z.strictObject({
 });
 
 export type WithdrawalRequest = z.infer<typeof withdrawalRequestSchema>;
+
+/**
+ * The KYC submit door's request boundary (Task 7), the same discipline as `depositRequestSchema`.
+ * `stateOfEntry` is self-attested here too, for the same reason the deposit and withdrawal doors
+ * attest it: it is what `submitKycVerification` (`./kyc.ts`) reads `MONEY_STATES.enabled`'s
+ * `minAge` by — the number the provider is handed to attest age-of-majority against
+ * (`src/payments-provider/kyc-contract.ts`'s module docblock).
+ */
+export const kycSubmissionRequestSchema = z.strictObject({
+  /** The name on the identity document being verified. Bounded because it is untrusted input
+   *  that reaches the provider. */
+  legalName: z.string().trim().min(1).max(200),
+  /** ISO 8601 calendar date, `YYYY-MM-DD` — the one shape `submitVerification` accepts. */
+  dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date of birth must be in YYYY-MM-DD form."),
+  stateOfEntry: z.enum(US_STATE_CODES),
+  /** Minted by the KYC form once per submission attempt — the deposit door's own idempotency
+   *  idiom, namespaced per user at the writer (`kyc:<userId>:<idempotencyKey>`). */
+  idempotencyKey: z.string().min(1).max(128),
+});
+
+export type KycSubmissionBody = z.infer<typeof kycSubmissionRequestSchema>;
+
+/**
+ * The admin-room self-exclusion clear door's request boundary (Task 7 Step 2): the one field an
+ * operator supplies, the member being cleared. No other field — the operator's own id comes from
+ * `withAdmin`'s verified session, never from the body (the same discipline `resolveFlag`'s route
+ * follows for `operatorUserId`).
+ */
+export const clearExclusionRequestSchema = z.strictObject({
+  userId: z.string().min(1),
+});
+
+export type ClearExclusionRequest = z.infer<typeof clearExclusionRequestSchema>;

@@ -21,6 +21,13 @@ export const MONEY_CONFIG = {
     rateLimit: { maxRequests: 10, windowMs: 60_000 },
   },
   withdrawal: { minCents: 5_00 },
+  /** The KYC submit door's own request ceiling (`src/app/api/wallet/_shared.ts`), the same
+   *  blast-radius shape as `deposit.rateLimit` — tighter, because a legitimate member submits
+   *  identity documents rarely, not repeatedly. */
+  kyc: { rateLimit: { maxRequests: 5, windowMs: 60_000 } },
+  /** The self-exclusion door's own ceiling — same shape, same reasoning as `kyc.rateLimit`: a
+   *  one-way stamp a member sets at most once in the ordinary course of using this product. */
+  exclusion: { rateLimit: { maxRequests: 5, windowMs: 60_000 } },
   /**
    * Founder decision 6 / Phase 5's "Assumed Phase 4 interface": the threshold the ledger must
    * be able to answer, versioned by tax year because it is already legislation-sensitive
