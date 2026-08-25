@@ -67,7 +67,7 @@ export function TvBoard({ draftId }: { readonly draftId: string }) {
           {onClock === null ? null : <Avatar name={onClock.ownerDisplayName} avatar={onClock.ownerAvatarUrl} size="lg" />}
           <div>
             <p className="font-display text-sm tracking-wide text-text-muted">Now picking</p>
-            <p className="font-display text-display-lg font-bold leading-display text-text-primary">{onClock?.name ?? "Nobody"}</p>
+            <p className="font-display text-display-lg font-semibold leading-display text-text-primary">{onClock?.name ?? "Nobody"}</p>
             {onClock === null ? null : <Badge tone="neutral">{onClock.ownerDisplayName}</Badge>}
           </div>
         </section>

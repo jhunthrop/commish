@@ -256,7 +256,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
       data-mode={mode}
       className={`flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 border-b px-4 py-2 lg:min-h-20 lg:flex-nowrap ${MODE_SKIN[mode]}`}
     >
-      <h1 className={`font-display font-bold leading-display text-text-primary ${LEAGUE_TEXT[variant]}`}>{leagueName}</h1>
+      <h1 className={`font-display font-semibold leading-display text-text-primary ${LEAGUE_TEXT[variant]}`}>{leagueName}</h1>
       {/* NEW-3: `basis-full` so that below `lg:` (where the header is still `flex-wrap`, not yet
           `flex-nowrap`), a guided caption growing this span past one line claims a whole wrapped
           line of its own rather than squeezing onto a shared one beside the league name — the
@@ -305,7 +305,7 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
                       controls at all. */}
                   {view.format === "auction" || variant !== "room" ? null : <InfoTip term="on-the-clock" helpLevel={helpLevel} />}
                 </span>
-                <span className="truncate font-display text-display-sm font-bold leading-display text-text-primary">{turn.subject}</span>
+                <span className="truncate font-display text-display-sm font-semibold leading-display text-text-primary">{turn.subject}</span>
               </div>
             </div>
             <div className="flex flex-col items-end">
