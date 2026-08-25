@@ -116,11 +116,13 @@ export interface JoinLeagueInput {
  * order in this codebase; this function never takes a lock in the other direction, so nothing
  * here can deadlock against it.
  *
- * **LOCK ORDER, ENUMERATED (final whole-branch review, F1).** In statement order this transaction
- * takes: `leagues[X] FOR UPDATE`; the `teams` INSERT (implicit `FOR KEY SHARE` on `leagues` —
- * already held — and on `users`, a row nothing in this codebase ever takes `FOR UPDATE`);
- * `fireWhenFullInTx`'s `UPDATE drafts SET kickoff_at` (the draft row, plus `leagues FOR KEY SHARE`
- * again) and its `member_notices` inserts; then the audit anchor, LAST. That is leagues-then-
+ * **LOCK ORDER, ENUMERATED (final whole-branch review, F1; extended Phase 4, Task 9 fix round).**
+ * In statement order this transaction takes: `leagues[X] FOR UPDATE`; the already-member `teams`
+ * read (plain `SELECT`, no lock); the shared `drafts` status read (plain `SELECT`, no lock — see
+ * "THE SHARED DRAFT-STATUS REFUSAL" below); the `teams` INSERT (implicit `FOR KEY SHARE` on
+ * `leagues` — already held — and on `users`, a row nothing in this codebase ever takes
+ * `FOR UPDATE`); `fireWhenFullInTx`'s `UPDATE drafts SET kickoff_at` (the draft row, plus
+ * `leagues FOR KEY SHARE` again) and its `member_notices` inserts; then the audit anchor, LAST. That is leagues-then-
  * drafts-then-anchor, which is the branch-wide rule every transaction touching both rows now
  * obeys: `setDraftKickoff` (`./draft-schedule`) locks the league before the draft, and
  * `applyAction` (`@/draft-service/store`) takes `leagues FOR KEY SHARE` before `drafts FOR UPDATE`.
@@ -159,12 +161,34 @@ export interface JoinLeagueInput {
  * driven on two real connections in `src/integrity-service/lock-order.test.ts`'s "a paid join's
  * fee posting" block.
  *
- * **Why the precondition runs where it does.** Every path-specific gate (an invite's expiry and
- * use cap, a public league's listing and draft status) is checked AFTER the "are you already a
- * member" lookup and BEFORE the capacity check. That ordering is the rule that makes re-arriving
- * free: opening your own invite link again after it expired, or reloading a browse card after
- * the draft started, finds your existing team and succeeds rather than telling a member they
- * cannot join the league they are already in.
+ * **PHASE 4, TASK 9 FIX ROUND — THE SHARED DRAFT-STATUS REFUSAL.** Immediately after the
+ * already-member check, a plain `SELECT` reads `drafts.status` off the SAME row every other
+ * writer in this branch reads it from, behind the `leagues[X] FOR UPDATE` this transaction has
+ * held since statement one — no new lock, the identical "no new edge" argument `releaseSeat`'s
+ * own `drafts` read carries. A status other than `'scheduled'` refuses with the EXISTING
+ * `DRAFT_ALREADY_STARTED` sentence, for EVERY caller of this function, invite accept and public
+ * browse alike — closing the hole `invitePrecondition` (`./invites.ts`) left open on its own:
+ * that precondition checks only an invite's expiry and use cap, never the league's own season
+ * state, so a still-valid invite link into a league whose draft had started — or, Task 9, one an
+ * operator had DISSOLVED — could otherwise still seat a member and, for a paid league, collect a
+ * fee into an escrow that was supposed to be closed. One sentence covers both "started" and
+ * "dissolved" on purpose (`invites.ts:130-132`'s own no-existence-oracle discipline, carried one
+ * state further): a stranger holding a link learns only that the room is gone, never which of the
+ * two ways it went. `publicJoinPrecondition`'s own `draftStatus` check, further down this file, is
+ * now PROVABLY UNREACHABLE through `joinLeagueInTx` — this read answers first, under the same
+ * lock, so nothing can move `drafts.status` off `'scheduled'` between the two reads — but it is
+ * left in place rather than removed, since it is that precondition's own correctness statement,
+ * independent of this shared guard; `join.test.ts` calls it directly to prove the two answer
+ * byte-identically, and both spell the one shared `DRAFT_ALREADY_STARTED` constant, never a
+ * second copy of its words.
+ *
+ * **Why the precondition runs where it does.** Every remaining path-specific gate (an invite's
+ * expiry and use cap; a public league's listing, and its tier segregation) is checked AFTER the
+ * "are you already a member" lookup and the shared draft-status refusal above, and BEFORE the
+ * capacity check. That ordering is the rule that makes re-arriving free: opening your own invite
+ * link again after it expired, or reloading a browse card for a league whose draft has since
+ * started, finds your existing team and succeeds rather than telling a member they cannot join
+ * the league they are already in.
  *
  * Runs inside the CALLER's transaction on purpose: for the invite path, joining is one step of a
  * larger write that also bumps the invite's use count, and a half-applied join is not a state
@@ -188,6 +212,29 @@ export async function joinLeagueInTx(
     .where(and(eq(teams.leagueId, league.id), eq(teams.userId, input.userId)));
   // Arriving twice is not an error, and costs nothing.
   if (existing !== undefined) return { ok: true, leagueId: league.id, teamId: existing.id, alreadyMember: true };
+
+  // PHASE 4, TASK 9 FIX ROUND. THE SHARED DRAFT-STATUS REFUSAL — read off `drafts` behind the
+  // `leagues[X] FOR UPDATE` this transaction has held since statement one, so this plain SELECT
+  // is no new lock (the identical "no new edge" argument `releaseSeat`'s own `drafts` read
+  // carries). Positioned here, BEFORE seat-hold redemption and therefore before the fee
+  // savepoint, so no caller of `joinLeagueInTx` — an invite accept, a public browse join, or any
+  // future door — can omit it: `invitePrecondition` (`./invites.ts`) never asked this question at
+  // all (only an invite's own expiry and use cap), which is the hole this closes — a still-valid
+  // invite link into a DISSOLVED league could otherwise still seat someone and collect a fee into
+  // an escrow an operator had already closed. Answers with the EXISTING `DRAFT_ALREADY_STARTED`
+  // sentence rather than minting a dissolution-specific one: one collapsed sentence for
+  // "started" and "dissolved" alike is `invites.ts`'s own no-existence-oracle discipline
+  // (`invites.ts:130-132`) applied one state further — a stranger holding a link learns only that
+  // the room is gone, never which of the two ways it went. `publicJoinPrecondition`'s own
+  // identical check, below in this file, is now PROVABLY UNREACHABLE through this function (this
+  // read answers first, under the same lock, so nothing can leave the draft `'scheduled'` between
+  // the two reads) — left in place rather than removed, because it is that precondition's own
+  // correctness statement independent of this shared guard, and `join.test.ts` calls it directly
+  // to prove the two answer byte-identically.
+  const [draft] = await tx.select({ status: drafts.status }).from(drafts).where(eq(drafts.leagueId, league.id));
+  if (draft === undefined || draft.status !== "scheduled") {
+    return { ok: false, status: 409, reason: DRAFT_ALREADY_STARTED };
+  }
 
   // PHASE 3.6, TASK 6. Redeemed BEFORE the precondition below, deliberately: Step 3's own rule is
   // that "a held seat that a tier refusal rejects is released immediately rather than left to
@@ -362,6 +409,15 @@ export async function triggerMultiAccountSweep(db: Db, outcome: JoinLeagueOutcom
  * written by `joinPublicLeague`, below, AFTER the transaction has rolled back, in a SEPARATE
  * platform-scoped transaction (`recordTierBlockedJoin`) — because a refused join must not leave a
  * league-chain row behind, and because the refusal itself is what the caller is waiting for.
+ *
+ * PHASE 4, TASK 9 FIX ROUND: the draft-status clause below is now PROVABLY UNREACHABLE through
+ * `joinLeagueInTx` — that function's own shared draft-status refusal (see its docblock's "THE
+ * SHARED DRAFT-STATUS REFUSAL") answers first, under the same `leagues[X] FOR UPDATE`, for every
+ * caller including this one. Left in place, unchanged, as this precondition's own independent
+ * correctness statement (the same clause a caller reaching this function any OTHER way — none
+ * exists today, but the type signature does not forbid one — would still need); `join.test.ts`
+ * calls this function directly, bypassing the shared guard, to prove it still answers the
+ * identical `DRAFT_ALREADY_STARTED` sentence on its own.
  */
 export const publicJoinPrecondition: JoinPrecondition = async (tx, leagueId, userId) => {
   const [row] = await tx

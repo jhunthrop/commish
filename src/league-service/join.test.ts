@@ -15,6 +15,7 @@ import {
   joinPublicLeague,
   LEAGUE_FULL,
   NOT_PUBLIC,
+  publicJoinPrecondition,
   recordTierBlockedJoin,
   returnFromSignIn,
   triggerMultiAccountSweep,
@@ -58,7 +59,7 @@ async function seedLeague(over: {
   readonly teamCount?: number;
   readonly filled?: number;
   readonly isPublicMatchmade?: boolean;
-  readonly draftStatus?: "scheduled" | "in_progress" | "complete";
+  readonly draftStatus?: "scheduled" | "in_progress" | "complete" | "dissolved";
   readonly experienceTier?: "beginner" | "experienced";
   readonly startTrigger?: "scheduled" | "when_full";
 } = {}): Promise<string> {
@@ -161,6 +162,21 @@ describe("joinPublicLeague", () => {
     expect(await joinPublicLeague(deps(), { leagueId, userId: "joiner" })).toEqual({
       ok: false, status: 409, reason: DRAFT_ALREADY_STARTED,
     });
+  });
+
+  /**
+   * PHASE 4, TASK 9 FIX ROUND — the two-door proof, public half. Before the shared refusal in
+   * `joinLeagueInTx`, this case already answered the same way through `publicJoinPrecondition`'s
+   * own `draftStatus` check — this test now proves the SHARED guard answers it (the precondition
+   * itself is proven separately, directly, below), and that a dissolved league seats nobody.
+   */
+  it("refuses a league an operator has dissolved, the same sentence as a started draft, seating nobody", async () => {
+    const leagueId = await seedLeague({ draftStatus: "dissolved" });
+    const before = await db.select().from(teams).where(eq(teams.leagueId, leagueId));
+    expect(await joinPublicLeague(deps(), { leagueId, userId: "joiner" })).toEqual({
+      ok: false, status: 409, reason: DRAFT_ALREADY_STARTED,
+    });
+    expect(await db.select().from(teams).where(eq(teams.leagueId, leagueId))).toEqual(before);
   });
 
   it("refuses a full league", async () => {
@@ -564,5 +580,27 @@ describe("returnFromSignIn — the tier refusal stays honest (Task 6 Step 4)", (
       ok: false,
       reason: ENFORCEMENT_REFUSALS.join,
     });
+  });
+});
+
+/**
+ * PHASE 4, TASK 9 FIX ROUND. `joinLeagueInTx`'s new shared draft-status refusal (see its own
+ * docblock's "THE SHARED DRAFT-STATUS REFUSAL") answers BEFORE `publicJoinPrecondition` is ever
+ * called, which makes this precondition's own `draftStatus` clause provably unreachable through
+ * the real join flow — proven, not merely reasoned about, by calling the precondition directly,
+ * bypassing the shared guard entirely. The two answer byte-identically: the same
+ * `DRAFT_ALREADY_STARTED` constant, never a second copy of its words.
+ */
+describe("publicJoinPrecondition, called directly — its own draft-status clause, independent of the shared guard", () => {
+  it("still refuses a league whose draft is no longer scheduled, on its own", async () => {
+    const leagueId = await seedLeague({ draftStatus: "in_progress" });
+    const result = await db.transaction((tx) => publicJoinPrecondition(tx, leagueId, "joiner"));
+    expect(result).toEqual({ ok: false, status: 409, reason: DRAFT_ALREADY_STARTED });
+  });
+
+  it("still refuses a dissolved league's draft the same way", async () => {
+    const leagueId = await seedLeague({ draftStatus: "dissolved" });
+    const result = await db.transaction((tx) => publicJoinPrecondition(tx, leagueId, "joiner"));
+    expect(result).toEqual({ ok: false, status: 409, reason: DRAFT_ALREADY_STARTED });
   });
 });

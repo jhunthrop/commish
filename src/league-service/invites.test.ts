@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, afterAll, vi } from "vitest";
 import { eq, isNull } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
 import { createTestDb, truncateAll } from "@/db/test-db";
-import { auditEvents, draftActions, integrityFlags, leagueInvites, leagues, sessionSignals, teams, users } from "@/db/schema";
+import { auditEvents, draftActions, drafts, integrityFlags, leagueInvites, leagues, sessionSignals, teams, users } from "@/db/schema";
 import { STANDARD_ROSTER_SLOTS } from "@/domain/roster";
 import { createAuditLogger } from "@/integrity-service/audit-logger";
 import { INTEGRITY_CONFIG } from "@/integrity/config";
@@ -11,6 +11,7 @@ import { LEAGUE_CONFIG } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { createLeague } from "./creation";
 import { acceptInvite, createInvite, invitePreview } from "./invites";
+import { DRAFT_ALREADY_STARTED } from "./join";
 import { leagueHome } from "./read";
 
 /** `league()` below always mints this name — the one string every `invitePreview` leak
@@ -165,6 +166,32 @@ describe("acceptInvite", () => {
     expect(await db.select().from(teams).where(eq(teams.leagueId, created.leagueId))).toHaveLength(2);
     const [row] = await db.select().from(leagueInvites).where(eq(leagueInvites.code, invite.code));
     expect(row!.uses).toBe(1);
+  });
+
+  /**
+   * PHASE 4, TASK 9 FIX ROUND — the two-door proof, invite half. `invitePrecondition` (the
+   * closure inside `acceptInvite`, above) has never asked a question about the league's own
+   * season state — only its expiry and use cap — so a still-valid invite link into a league
+   * whose draft had started, or (Task 9) one an operator had DISSOLVED, could otherwise still
+   * seat someone. The refusal now lives in `joinLeagueInTx` itself (the shared draft-status
+   * check, `join.ts`'s own docblock), so this door closes with NO change to this file's own
+   * precondition: `acceptInvite` simply passes the shared refusal straight through.
+   */
+  it("refuses a still-valid invite into a league whose draft is no longer scheduled, spending no use and seating nobody", async () => {
+    const created = await league();
+    const invite = await createInvite(inviteDeps(), { leagueId: created.leagueId, createdByUserId: "u1" });
+    if (!invite.ok) throw new Error(invite.reason);
+    await db.update(drafts).set({ status: "dissolved" }).where(eq(drafts.leagueId, created.leagueId));
+
+    const before = await db.select().from(teams).where(eq(teams.leagueId, created.leagueId));
+    const result = await acceptInvite(writeDeps(), { code: invite.code, userId: "u2" });
+    expect(result).toEqual({ ok: false, status: 409, reason: DRAFT_ALREADY_STARTED });
+
+    // No team seated, no fee posting possible (there is nothing to unwind), and the invite's
+    // own use count never moved — `acceptInvite` returns before its own increment statement.
+    expect(await db.select().from(teams).where(eq(teams.leagueId, created.leagueId))).toEqual(before);
+    const [row] = await db.select().from(leagueInvites).where(eq(leagueInvites.code, invite.code));
+    expect(row!.uses).toBe(0);
   });
 
   it("is idempotent for somebody who already has a team, and spends no use", async () => {

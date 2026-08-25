@@ -1,18 +1,19 @@
 import { and, eq } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditEvents, drafts, leagues, memberNotices, moneyAccounts, moneyTransactions, teams, users } from "@/db/schema";
+import { auditEvents, drafts, leagueInvites, leagues, memberNotices, moneyAccounts, moneyTransactions, teams, users } from "@/db/schema";
 import { createTestDb, recordStatements, truncateAll, truncateMoneyTables } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
 import { browseQuery } from "@/league-service/browse";
-import { joinPublicLeague } from "@/league-service/join";
+import { acceptInvite, createInvite } from "@/league-service/invites";
+import { DRAFT_ALREADY_STARTED, joinPublicLeague } from "@/league-service/join";
 import { accountIdFor } from "@/money/accounts";
 import { MONEY_STATES, type MoneyStatesConfig, type StateCode } from "@/money/states";
 import { DISSOLUTION_REFUSALS, dissolveLeague, LEAGUE_DISSOLVED_SUMMARY } from "./dissolution";
 import { postMoneyTransaction } from "./post";
 import { walletSummary } from "./read";
-import { snapshotMoneyBook } from "./test-support";
+import { expectNoPostingTookPlace, snapshotMoneyBook } from "./test-support";
 
 /**
  * Task 9's own suite: the operator-triggered dissolution door. Mirrors `entry-fee.test.ts`'s own
@@ -321,5 +322,51 @@ describe("dissolveLeague — the league-wide anchor", () => {
     const notices = await db.select().from(memberNotices).where(eq(memberNotices.leagueId, "lg_attach"));
     expect(notices).toHaveLength(2);
     for (const notice of notices) expect(notice.auditEventId).toBe(event!.eventId);
+  });
+});
+
+/**
+ * PHASE 4, TASK 9 FIX ROUND (review spec, executed verbatim). The hole: `invitePrecondition`
+ * (the closure inside `acceptInvite`, `@/league-service/invites`) never asked a question about
+ * the league's own season state — only an invite's expiry and use cap — so a still-valid invite
+ * link into a DISSOLVED paid league could otherwise still seat someone and collect a fee into an
+ * escrow the operator had already closed. The fix lives in `joinLeagueInTx` itself (the shared
+ * draft-status refusal, `join.ts`'s own docblock), so BOTH doors close with the SAME
+ * `DRAFT_ALREADY_STARTED` sentence `join.ts` already owns — never a dissolution-specific one,
+ * `invites.ts`'s own no-existence-oracle discipline carried one state further.
+ */
+describe("the two-door proof — a dissolved PAID league refuses both doors", () => {
+  it("refuses an invite-accept and a public-browse attempt alike, no team row, no fee posting, no invite-use increment", async () => {
+    await seedLeague({ id: "lg_two_door", entryFeeCents: FEE, teamCount: 6, commissionerUserId: "u_two_door_commish" });
+    const dissolved = await dissolveLeague(db, { leagueId: "lg_two_door", operatorUserId: OPERATOR }, { clock, audit, newId });
+    expect(dissolved).toMatchObject({ ok: true });
+
+    // THE INVITE DOOR. Minted AFTER dissolution — creating an invite asks nothing about draft
+    // status either, so this is the exact still-valid link a support conversation could
+    // reproduce for real.
+    const invite = await createInvite({ db, clock, random: () => 0.5 }, { leagueId: "lg_two_door", createdByUserId: "u_two_door_commish" });
+    if (!invite.ok) throw new Error(invite.reason);
+    await seedUser("u_invited");
+    await fund("u_invited", FEE);
+    const beforeInvite = await snapshotMoneyBook(db);
+    const inviteOutcome = await acceptInvite({ db, clock, newId }, { code: invite.code, userId: "u_invited" });
+    expect(inviteOutcome).toEqual({ ok: false, status: 409, reason: DRAFT_ALREADY_STARTED });
+    await expectNoPostingTookPlace(db, beforeInvite);
+    expect(await seatedUsersOf("lg_two_door")).not.toContain("u_invited");
+    const [inviteRow] = await db.select().from(leagueInvites).where(eq(leagueInvites.code, invite.code));
+    expect(inviteRow!.uses).toBe(0);
+
+    // THE PUBLIC-BROWSE DOOR. The league is already off the shelf (proven elsewhere in this
+    // file); this is the direct-id attempt a stale tab or a shared link could still make.
+    await seedUser("u_browser");
+    await fund("u_browser", FEE);
+    const beforeBrowse = await snapshotMoneyBook(db);
+    const browseOutcome = await joinPublicLeague(
+      { db, newId: () => newId(), clock },
+      { leagueId: "lg_two_door", userId: "u_browser", money: { stateOfEntry: "TN", states: enabledTN } },
+    );
+    expect(browseOutcome).toEqual({ ok: false, status: 409, reason: DRAFT_ALREADY_STARTED });
+    await expectNoPostingTookPlace(db, beforeBrowse);
+    expect(await seatedUsersOf("lg_two_door")).not.toContain("u_browser");
   });
 });

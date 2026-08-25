@@ -374,6 +374,12 @@ describe("raiseFlag's insert order", () => {
       teamCount: 2,
       commissionerUserId: "u_commish_flag",
     });
+    // Phase 4, Task 9 fix round: `joinLeagueInTx`'s new shared draft-status refusal reads this
+    // row before the injected precondition ever runs — see `seedLeagueWith`'s own docblock above
+    // for why a `'scheduled'` draft is load-bearing for every parked join in this file now.
+    await joinDb
+      .insert(drafts)
+      .values({ id: "league_flag_lock_draft", leagueId: "league_flag_lock", format: "snake", status: "scheduled", kickoffAt: new Date("2026-09-10T17:00:00.000Z") });
 
     let holdsLeagueLock: () => void = () => {};
     const leagueLocked = new Promise<void>((resolve) => (holdsLeagueLock = resolve));
@@ -450,6 +456,11 @@ describe("resolveFlag's notice order", () => {
       format: "snake",
       teamCount: 2,
       commissionerUserId: "u_commish_resolve",
+    });
+    // Phase 4, Task 9 fix round: see `seedLeagueWith`'s own docblock above.
+    await joinDb.insert(drafts).values({
+      id: "league_resolve_lock_draft", leagueId: "league_resolve_lock", format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
     });
     const [message] = await joinDb
       .insert(chatMessages)
@@ -627,10 +638,22 @@ function parkedJoin(leagueId: string, userId: string, teamId: string) {
   return { joining, leagueLocked, release: () => release() };
 }
 
-/** Users, a league and (optionally) a team — the shell every case below needs. */
+/**
+ * Users, a league and (optionally) a team — the shell every case below needs. Carries a
+ * `'scheduled'` `drafts` row (Phase 4, Task 9 fix round): `joinLeagueInTx`'s new shared
+ * draft-status refusal reads this row on EVERY call now, including every `parkedJoin` this file
+ * parks mid-precondition — a fixture with no draft row at all would refuse before the
+ * precondition callback ever ran, so `holdsLeagueLock()` would never fire and every caller
+ * `await`ing `leagueLocked` would hang rather than fail. Every real league gets exactly one draft
+ * row at creation (`drafts_league_id_idx` is UNIQUE), so this is the fixture matching production,
+ * not a workaround for it.
+ */
 async function seedLeagueWith(leagueId: string, userIds: readonly string[]): Promise<void> {
   await joinDb.insert(users).values(userIds.map((id) => ({ id, email: `${id}@test.local`, displayName: id })));
   await joinDb.insert(leagues).values({ id: leagueId, name: leagueId, format: "snake", teamCount: 3, commissionerUserId: userIds[0]! });
+  await joinDb
+    .insert(drafts)
+    .values({ id: `${leagueId}_draft`, leagueId, format: "snake", status: "scheduled", kickoffAt: new Date("2026-09-10T17:00:00.000Z") });
 }
 
 describe("resolveFlag's content_removed branches", () => {
@@ -1496,6 +1519,13 @@ describe("reverseTradeInTx's team-lock order — racing a fresh accept between t
  *
  * Driven through the real `correctSettledWeek`, over a real settled week with real revised stat
  * lines, because the notice-producing branch only runs when a team's points ACTUALLY move.
+ *
+ * PHASE 4, TASK 9 FIX ROUND: the concurrent side is a raw `leagues[X] FOR UPDATE` bystander, not
+ * a real `joinLeagueInTx` call — `checkFinalizeGuards` (`@/stats-pipeline/finalize`) requires this
+ * league's draft to be `'complete'` before `correctSettledWeek` will touch it at all, and a real
+ * join now refuses a `'complete'` draft before it ever reaches for the row (the correct
+ * PRODUCTION answer). The row itself, and the mode it is held in, are unchanged — what this
+ * block proves is unaffected.
  */
 describe("correctLeagueInTx's notice order", () => {
   const CORRECT_WEEK = 3;
@@ -1517,7 +1547,7 @@ describe("correctLeagueInTx's notice order", () => {
     };
   }
 
-  it("corrects a league beside a concurrent join in the SAME league, on the same chain, without deadlocking", async () => {
+  it("corrects a league beside a concurrent leagues[X] FOR UPDATE holder, on the same chain, without deadlocking", async () => {
     await joinDb.insert(users).values([
       { id: "u_corr_a", email: "corr_a@test.local", displayName: "Manager A" },
       { id: "u_corr_b", email: "corr_b@test.local", displayName: "Manager B" },
@@ -1532,6 +1562,16 @@ describe("correctLeagueInTx's notice order", () => {
       { id: "team_corr_a", leagueId: CORRECT_LEAGUE, userId: "u_corr_a", name: "A" },
       { id: "team_corr_b", leagueId: CORRECT_LEAGUE, userId: "u_corr_b", name: "B" },
     ]);
+    // `'complete'`, held from the ORIGINAL shape — `checkFinalizeGuards`
+    // (`@/stats-pipeline/finalize`) itself REQUIRES a complete draft before `finalizeWeek`/
+    // `correctSettledWeek` will touch a week at all, so `'scheduled'` is not an option here.
+    // Phase 4, Task 9 fix round: this is exactly why the row-lock bystander below (not
+    // `parkedJoin`) stands in for the concurrent join — `joinLeagueInTx`'s own shared
+    // draft-status refusal now answers before a real join could ever reach a `'complete'`
+    // league's own precondition, which is the correct PRODUCTION answer (nobody joins a league
+    // whose draft already finished) but leaves nothing for `parkedJoin`'s injected precondition
+    // to park inside. The property under test — `finalizeWeekInTx`/`correctLeagueInTx` never
+    // inverting against `leagues[X] FOR UPDATE` — only needs the ROW held, never a real seat.
     await joinDb.insert(drafts).values({
       id: `${CORRECT_LEAGUE}_draft`, leagueId: CORRECT_LEAGUE, format: "snake", status: "complete",
       kickoffAt: new Date("2026-09-01T00:00:00.000Z"), auctionBudget: null,
@@ -1552,8 +1592,19 @@ describe("correctLeagueInTx's notice order", () => {
     await finalizeWeek(joinDb, CORRECT_LEAGUE, CORRECT_WEEK);
     await joinDb.insert(statWeeks).values({ week: CORRECT_WEEK, status: "final", version: 1, gamesTotal: 1, gamesFinal: 1, updatedAt: new Date(clock.now()) });
 
-    const join = parkedJoin(CORRECT_LEAGUE, "u_corr_joiner", "team_corr_joiner");
-    await join.leagueLocked;
+    // THE BYSTANDER (Phase 4, Task 9 fix round — see the fixture's own comment above for why
+    // this replaced `parkedJoin`): a raw `leagues[X] FOR UPDATE`, the identical row and mode a
+    // real join's first statement takes, held open exactly as long as `parkedJoin` would hold it.
+    let holdsLeagueLock: () => void = () => {};
+    const leagueLocked = new Promise<void>((resolve) => (holdsLeagueLock = resolve));
+    let releaseBystander: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseBystander = resolve));
+    const bystander = joinDb.transaction(async (tx) => {
+      await tx.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, CORRECT_LEAGUE)).for("update");
+      holdsLeagueLock();
+      await released;
+    });
+    await leagueLocked;
 
     // The provider revises `qb_corr_a` upward, so team A's points move and the notice branch runs.
     const correcting = correctSettledWeek(pickDb, {
@@ -1574,19 +1625,19 @@ describe("correctLeagueInTx's notice order", () => {
     });
 
     expect(await waitForBlockedBackend(10_000)).toBe(true);
-    join.release();
+    releaseBystander();
+    await bystander;
 
-    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
     const result = await correcting;
     // A deadlock would surface HERE, as a reported per-league failure rather than a throw —
     // `attemptLeague` catches everything — so the empty list is the real assertion.
     expect(result).toMatchObject({ ok: true, changed: true });
     if (result.ok) expect(result.leaguesFailed).toEqual([]);
 
-    // Both transactions really did append to the SAME league chain, which is what makes the
-    // absence of a deadlock meaningful rather than incidental.
+    // The correction's own append is the whole chain now — no real join rides beside it (the
+    // bystander takes no lock this league's chain anchor cares about and appends nothing).
     const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, CORRECT_LEAGUE));
-    expect(leagueAnchor!.headSequence).toBe(2); // the join's member_joined and the correction's system_action
+    expect(leagueAnchor!.headSequence).toBe(1); // the correction's own system_action
 
     // And the notices written before that anchor still name the event minted after it.
     const notices = await joinDb.select().from(memberNotices).where(eq(memberNotices.leagueId, CORRECT_LEAGUE));
@@ -1600,33 +1651,39 @@ describe("correctLeagueInTx's notice order", () => {
  * (`@/league-service/participation`), the LAST statement `finalizeWeekInTx` runs. Its own docblock
  * argues that a settlement transaction never inverts against `joinLeagueInTx`'s `leagues FOR
  * UPDATE` because a league whose last week is being scored has a complete draft, and a league
- * with a complete draft refuses joins before it locks anything — a claim about PRODUCTION
- * behavior, not about what this lower-level `joinLeagueInTx` proof (which drives the real function
- * with its OWN precondition override, bypassing `publicJoinPrecondition` on purpose, exactly like
- * every sibling above) can be made to do.
+ * with a complete draft refuses joins before it locks anything — once a claim about PRODUCTION
+ * behavior alone, now (Phase 4, Task 9 fix round) literally true of `joinLeagueInTx` itself, via
+ * its shared draft-status refusal.
  *
- * So this proves the narrower, structural claim directly: EVEN WHEN a join is parked holding
- * `leagues[id] FOR UPDATE`, a concurrent `finalizeWeek` call whose stamp genuinely fires (the
- * league's only week, about to become its last) blocks BEHIND the join rather than cycling with
+ * PHASE 4, TASK 9 FIX ROUND: which is exactly why the concurrent side below is a raw
+ * `leagues[X] FOR UPDATE` bystander rather than a real `joinLeagueInTx` call — `checkFinalizeGuards`
+ * requires THIS league's draft to be `'complete'` before `finalizeWeek` will touch it at all
+ * (the fixture keeps `'complete'`, unchanged), and a real join now refuses a `'complete'` draft
+ * before it ever reaches for the row. The row itself, and the mode it is held in, are identical
+ * to what a real join's first statement takes — the property below is about the ROW, not about
+ * whether a join happens to be the one holding it.
+ *
+ * So this proves the narrower, structural claim directly: EVEN WHEN `leagues[id] FOR UPDATE` is
+ * held by a concurrent transaction, a `finalizeWeek` call whose stamp genuinely fires (the
+ * league's only week, about to become its last) blocks BEHIND the holder rather than cycling with
  * it — a one-directional wait, the same shape `recordSessionSignals`' proof above uses, because
- * the join transaction never reaches for anything the settlement transaction holds.
+ * the settlement transaction never reaches for anything the holder needs in return.
  */
 describe("stampSeasonCompleteInTx's lock, inside finalizeWeekInTx", () => {
-  it("blocks behind a concurrent join holding the same league row, and still stamps the season complete once it releases", async () => {
+  it("blocks behind a concurrent leagues[X] FOR UPDATE holder, and still stamps the season complete once it releases", async () => {
     await joinDb.insert(users).values([
       { id: "u_stamp_commish", email: "stamp_commish@test.local", displayName: "Commish" },
       { id: "u_stamp_away", email: "stamp_away@test.local", displayName: "Away" },
-      { id: "u_stamp_joiner", email: "stamp_joiner@test.local", displayName: "Joiner" },
     ]);
-    // teamCount 3, not 2: the join under test needs an open seat, and `writeSchedule` below only
-    // schedules the two REAL teams — the third seat is what the joiner fills.
     await joinDb.insert(leagues).values({
-      id: "lg_stamp_lock", name: "lg_stamp_lock", format: "snake", teamCount: 3, commissionerUserId: "u_stamp_commish",
+      id: "lg_stamp_lock", name: "lg_stamp_lock", format: "snake", teamCount: 2, commissionerUserId: "u_stamp_commish",
     });
     await joinDb.insert(teams).values([
       { id: "team_stamp_home", leagueId: "lg_stamp_lock", userId: "u_stamp_commish", name: "Home" },
       { id: "team_stamp_away", leagueId: "lg_stamp_lock", userId: "u_stamp_away", name: "Away" },
     ]);
+    // `'complete'`, held from the ORIGINAL shape — see this block's own docblock (Phase 4, Task 9
+    // fix round): `checkFinalizeGuards` requires it before `finalizeWeek` will touch this league.
     await joinDb.insert(drafts).values({
       id: "draft_stamp_lock", leagueId: "lg_stamp_lock", format: "snake", status: "complete",
       kickoffAt: new Date("2026-09-01T00:00:00.000Z"), auctionBudget: null,
@@ -1635,17 +1692,27 @@ describe("stampSeasonCompleteInTx's lock, inside finalizeWeekInTx", () => {
     // the call whose stamp UPDATE reaches for `leagues[id]`.
     await joinDb.transaction((tx) => writeSchedule(tx, { leagueId: "lg_stamp_lock", teamIds: ["team_stamp_home", "team_stamp_away"], weeks: 1 }));
 
-    const join = parkedJoin("lg_stamp_lock", "u_stamp_joiner", "team_stamp_joiner");
-    await join.leagueLocked;
+    // THE BYSTANDER (Phase 4, Task 9 fix round) — see the describe block's own docblock for why
+    // this replaced a real parked join: the identical row, the identical mode.
+    let holdsLeagueLock: () => void = () => {};
+    const leagueLocked = new Promise<void>((resolve) => (holdsLeagueLock = resolve));
+    let releaseBystander: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseBystander = resolve));
+    const bystander = joinDb.transaction(async (tx) => {
+      await tx.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, "lg_stamp_lock")).for("update");
+      holdsLeagueLock();
+      await released;
+    });
+    await leagueLocked;
 
     // T_finalize: the real finalizeWeek, on its own connection, reaching for the SAME league row
     // through the stamp's UPDATE — a lock `finalizeWeekInTx` never took before this task.
     const finalizing = finalizeWeek(pickDb, "lg_stamp_lock", 1);
 
     expect(await waitForBlockedBackend()).toBe(true);
-    join.release();
+    releaseBystander();
+    await bystander;
 
-    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
     expect(await finalizing).toMatchObject({ ok: true, weekNumber: 1, matchupsScored: 1 });
 
     const [league] = await joinDb.select().from(leagues).where(eq(leagues.id, "lg_stamp_lock"));

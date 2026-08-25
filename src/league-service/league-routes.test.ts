@@ -346,6 +346,14 @@ describe("POST /api/public/leagues/[leagueId]/join", () => {
       id: "private", name: "Group Chat Only", format: "snake", teamCount: 12,
       stakeTier: 0, experienceTier: "beginner", isPublicMatchmade: false, commissionerUserId: "u1",
     });
+    // Every real league gets a `drafts` row at creation (`drafts_league_id_idx` is UNIQUE) —
+    // seeded here so this fixture matches production and the assertion below is about
+    // PRIVACY, not an artifact of `joinLeagueInTx`'s shared draft-status refusal (Phase 4,
+    // Task 9 fix round) collapsing a genuinely-unreachable missing-draft case into a refusal.
+    await db.insert(drafts).values({
+      id: "private_draft", leagueId: "private", format: "snake", status: "scheduled",
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"), auctionBudget: null,
+    });
     signedInAs("u2");
     const response = await postPublicJoin(post("http://test/api/public/leagues/private/join", {}), {
       params: Promise.resolve({ leagueId: "private" }),
