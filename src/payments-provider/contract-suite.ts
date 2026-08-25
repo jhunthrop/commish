@@ -133,6 +133,63 @@ export function runPaymentsProviderContractSuite(name: string, make: () => Payme
       await expect(h.provider.getTransferStatus(ref)).resolves.toBe("returned");
     });
 
+    it("refuses to return a transfer that has not completed: returned is reachable only from completed", async () => {
+      // The transition, not just the state: a return is settled money coming back, so an
+      // implementation that lets a PENDING or FAILED transfer become returned is inventing a
+      // clawback of money that never moved — and the ledger downstream would post the reversal
+      // of a deposit it never credited. Review HIGH: this was asserted only against the mock's
+      // internals; it is a property of the SEAM, so every implementation proves it here.
+      const h = await make();
+      const pending = await h.provider.initiateDeposit({
+        userId: h.userId,
+        amountCents: 21_00,
+        method: "bank",
+        idempotencyKey: "contract-return-of-pending",
+      });
+      await expect(h.triggerReturn(pending.ref)).rejects.toThrow();
+      const declined = await h.depositDeclining(17_00);
+      await expect(h.triggerReturn(declined.ref)).rejects.toThrow();
+      // Neither refusal moved anything: both transfers still answer their own status.
+      await expect(h.provider.getTransferStatus(pending.ref)).resolves.toBe("pending");
+      await expect(h.provider.getTransferStatus(declined.ref)).resolves.toBe("failed");
+    });
+
+    it("rejects a status query for a reference it never issued, rather than inventing an answer", async () => {
+      // A ref reaches getTransferStatus from stored ledger rows and from callbacks. If a
+      // corrupted or foreign ref quietly answered some status, the mistake would post money;
+      // the only safe answer for an unknown reference is a loud rejection. (Review HIGH: was
+      // mock-only, and a real adapter mapping its upstream's 404 to a default status would
+      // have passed the suite.)
+      const h = await make();
+      await expect(h.provider.getTransferStatus("contract-ref-never-issued")).rejects.toThrow();
+    });
+
+    it("rejects a replayed idempotency key that disagrees with the transfer it created", async () => {
+      // The replay case above proves the same input is the same transfer. This proves the
+      // complement: the SAME key with a DIFFERENT amount or direction is a caller bug the
+      // provider must refuse loudly — honoring it double-moves money, and answering the
+      // original would silently ship a number the caller did not ask for.
+      const h = await make();
+      const input = {
+        userId: h.userId,
+        amountCents: 10_00,
+        method: "bank",
+        idempotencyKey: "contract-replay-disagreement",
+      } as const;
+      await h.provider.initiateDeposit(input);
+      await expect(h.provider.initiateDeposit({ ...input, amountCents: 20_00 })).rejects.toThrow();
+      await expect(
+        h.provider.initiateWithdrawal({
+          userId: h.userId,
+          amountCents: input.amountCents,
+          destination: { externalAccountRef: "contract-ext-account" },
+          idempotencyKey: input.idempotencyKey,
+        }),
+      ).rejects.toThrow();
+      // And the original is untouched by the refused attempts.
+      await expect(h.provider.getTransferStatus((await h.provider.initiateDeposit(input)).ref)).resolves.toBe("pending");
+    });
+
     it("models a withdrawal that completes and then returns, the same class on the outbound leg", async () => {
       // A withdrawal's credit can bounce after settling (closed account, R02 family). The seam
       // must represent it for the same reason it must represent deposit returns: the ledger has
