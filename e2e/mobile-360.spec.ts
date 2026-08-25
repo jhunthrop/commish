@@ -235,7 +235,10 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // so this reuses that league rather than minting a third — the trades page fits at 360px
     // whichever league it renders for, and this is the one already on hand.
     await page.goto(`/app/leagues/${SEEDED_SEASON_LEAGUE_ID}/trades`);
-    await expect(page.getByRole("heading", { name: "Trades" })).toBeVisible();
+    // `exact`: the empty state's own `h2` "No trades yet." substring-matches a bare "Trades",
+    // and the page `h1` is the heading this walk has always meant — the same `exact` precedent
+    // the "Save" button above and the 3.6 waiting-room heading below already set.
+    await expect(page.getByRole("heading", { name: "Trades", exact: true })).toBeVisible();
     await expectNoHorizontalScroll(page, "the trades page");
 
     // --- Phase 3.6, Task 13: league home (post-draft, standings included) and standings -----
@@ -291,7 +294,8 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     // accumulation the reuse-if-exists discipline exists to avoid, and this section only READS
     // what that spec already made real. -------------------------------------------------------
     await page.goto(`/app/leagues/${E2E_HELD_TRADE_LEAGUE_ID}/trades`);
-    await expect(page.getByRole("heading", { name: "Trades" })).toBeVisible();
+    // `exact`: same reason as the seeded season league's trades visit above.
+    await expect(page.getByRole("heading", { name: "Trades", exact: true })).toBeVisible();
     await expect(page.getByText("Your trade is waiting on a fairness review").first()).toBeVisible();
     await expectNoHorizontalScroll(page, "the trades page with a held trade's own banner");
 
