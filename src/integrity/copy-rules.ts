@@ -29,10 +29,13 @@ import { INTEGRITY_CONFIG } from "./config";
  *    (`waiting-room.tsx`, D1) — recorded as a decision somebody made once, not a precedent the
  *    next writer generalizes from, so it is allowlisted by exact phrase rather than by loosening
  *    the rule.
- *  - NOTHING FROM THE FORBIDDEN VOCABULARY (C3, ruled). No surface invents "autopick,"
- *    "auto-draft," or "we will draft for you" — the one sanctioned phrase for the safety net is
- *    "the room picks for you from your queue," and every surface that reassures a member about
- *    missing a draft quotes it exactly.
+ *  - NOTHING FROM THE FORBIDDEN VOCABULARY (C3, ruled; extended Phase 4.5). No surface invents
+ *    "autopick," "auto-draft," or "we will draft for you" — the one sanctioned phrase for the
+ *    safety net is "the room picks for you from your queue," and every surface that reassures a
+ *    member about missing a draft quotes it exactly. Phase 4.5 adds the mock draft's own honesty
+ *    floor beside it: no surface calls a bot an "AI opponent," "smart AI," or claims it "learns
+ *    from" anything or uses "machine learning" — a mock bot is a named, seeded sampler, and no
+ *    claim of intelligence is true until Phase 6 actually ships one.
  *
  * A rule about copy is only real if something checks the copy, which is why this returns every
  * violation rather than a boolean: a failing sweep should name the rule and the words that broke
@@ -68,6 +71,14 @@ const CONTRACTION_ALLOWLIST: readonly string[] = ["You're in"];
  * safety-net idea, because "the room picks for you from your queue" is the one sanctioned phrase
  * and a second name for the same idea is exactly the "two names for one idea" confusion the
  * first-timer persona flagged.
+ *
+ * Phase 4.5's own addition, beside it rather than a second family: the mock draft's bot vocabulary
+ * ban. A mock room's bots are named, seeded samplers (`MOCK_CONFIG.botRoster`, `@/mock-draft`) —
+ * "practice opponent," never "AI." This phase's honesty floor is that no surface may claim a bot
+ * is intelligent or that it learns, because neither is true yet: Phase 6 is the phase that ships
+ * actual learning, and a claim made two phases early is a claim this product cannot back up the
+ * moment a member asks how. Enforced by the SAME four sweeps that enforce C3 — one rulebook, one
+ * `copyViolations`, no second implementation to drift out of sync with this one.
  */
 const FORBIDDEN_VOCABULARY: readonly string[] = [
   "autopick",
@@ -77,6 +88,10 @@ const FORBIDDEN_VOCABULARY: readonly string[] = [
   "auto draft",
   "we'll draft for you",
   "we will draft for you",
+  "ai opponent",
+  "smart ai",
+  "learns from",
+  "machine learning",
 ];
 
 export function copyViolations(text: string): readonly CopyViolation[] {

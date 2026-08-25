@@ -87,6 +87,13 @@ const COVERAGE_GATED_DIRS = [
   // strict payload parse and the mock's return-after-completion machinery are exactly the code
   // whose unmeasured branch is a forged or misread callback.
   "src/payments-provider",
+  // Gate 25 (Phase 4.5, Task 1). `src/mock-draft` is pure, no I/O, no clock, and gates for the
+  // same reason every pure directory does. It is NOT on the browser-safe exempt list beside
+  // `@/money` despite being pure — `src/mock-draft/config.ts`'s own docblock is where that split
+  // is argued in full: the bot strategy numbers must not ship into the client bundle, and the
+  // room-facing copy reaches a mock room pre-rendered, the same `NoticeView`/`ActivityRow` shape
+  // `@/integrity` already uses.
+  "src/mock-draft",
 ] as const;
 /**
  * The three service directories' `schemas.ts` files are named explicitly alongside the `**` glob
@@ -299,6 +306,15 @@ export default defineConfig({
         // with no `thresholds` block measures nothing, so both halves ship in the same commit
         // as every gate before it.
         "src/payments-provider/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        // Gate 25 (Phase 4.5, Task 1). Pure and gates for the same reason every pure directory
+        // does; an `include` entry with no `thresholds` block measures nothing, so both halves
+        // ship in the same commit as every gate before it.
+        "src/mock-draft/**": {
           branches: 100,
           functions: 100,
           lines: 100,

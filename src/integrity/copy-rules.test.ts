@@ -36,4 +36,17 @@ describe("copyViolations", () => {
     const dashed = "A — B";
     expect(copyViolations(dashed)).toEqual(copyViolations(dashed));
   });
+
+  it("catches the mock draft's bot-vocabulary ban (Phase 4.5), whatever its casing", () => {
+    for (const term of ["ai opponent", "smart ai", "learns from", "machine learning"]) {
+      expect(copyViolations(`Your ${term.toUpperCase()} adapts every round.`)).toContainEqual({
+        rule: "forbiddenVocabulary",
+        found: term,
+      });
+    }
+  });
+
+  it("passes the mock draft's own honest bot copy", () => {
+    expect(copyViolations("Park Bench Bot is a practice opponent, seeded for this room only.")).toEqual([]);
+  });
 });

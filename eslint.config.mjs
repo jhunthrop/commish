@@ -90,6 +90,14 @@ const SERVER_ONLY_MODULE_GROUPS = [
   // `ActivityRow` reach `src/account-room/**` and `src/league-room/**`.
   "@/integrity",
   "@/integrity-service",
+  // Phase 4.5, Task 1: the mock draft vocabulary. Pure — no database, no clock, no I/O — but
+  // blocked rather than exempt, beside `@/integrity` and for the same "neither half is actually
+  // browser-safe" reasoning: `MOCK_CONFIG.strategy` is a bot's own playbook (temperature, reach
+  // depth, run-reaction thresholds) and must not ship into the client bundle as inspectable
+  // data, and `MOCK_COPY`'s room-facing sentences reach a mock room pre-rendered, the same
+  // `NoticeView`/`ActivityRow` shape `@/integrity` already uses — never a live client-side
+  // `import { MOCK_COPY }`. `src/mock-draft/config.ts`'s own docblock argues this in full.
+  "@/mock-draft",
   // Phase 4, Task 3: the money vocabulary's Postgres half — `postMoneyTransaction` (the ONE
   // writer of the money book of record), the wallet reads and, in later tasks, every other
   // money writer. Exactly the split promised when `@/money` joined the browser-safe exempt set

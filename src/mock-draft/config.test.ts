@@ -1,0 +1,77 @@
+import { describe, expect, it } from "vitest";
+import { copyViolations } from "@/integrity/copy-rules";
+import { MOCK_CONFIG, MOCK_COPY } from "./config";
+
+describe("MOCK_CONFIG", () => {
+  it("keeps every bot think-delay inside the fastest pick clock, with room for the human safety net", () => {
+    const fastest = Math.min(...MOCK_CONFIG.pickClockSecondsOptions);
+    expect(MOCK_CONFIG.botDelay.maxSeconds).toBeLessThan(fastest * MOCK_CONFIG.botDelay.maxFractionOfClock);
+  });
+
+  it("keeps the minimum bot think-delay below the maximum", () => {
+    expect(MOCK_CONFIG.botDelay.minSeconds).toBeLessThan(MOCK_CONFIG.botDelay.maxSeconds);
+  });
+
+  it("holds a bot roster larger than the largest room, so the seat draw never runs dry", () => {
+    expect(MOCK_CONFIG.botRoster.length).toBeGreaterThanOrEqual(Math.max(...MOCK_CONFIG.teamCountOptions) + 4);
+    expect(new Set(MOCK_CONFIG.botRoster.map((b) => b.id)).size).toBe(MOCK_CONFIG.botRoster.length);
+  });
+
+  it("gives every bot a distinct, non-empty name", () => {
+    const names = MOCK_CONFIG.botRoster.map((b) => b.name);
+    expect(new Set(names).size).toBe(names.length);
+    for (const name of names) {
+      expect(name.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("defaults the pick clock to one of the offered options", () => {
+    expect(MOCK_CONFIG.pickClockSecondsOptions).toContain(MOCK_CONFIG.defaultPickClockSeconds);
+  });
+
+  it("names exactly the three founder-required modes", () => {
+    expect(MOCK_CONFIG.modes).toEqual(["solo", "lobby", "link"]);
+  });
+
+  it("orders retention windows from shortest to the completed room's day-long life", () => {
+    const { unstartedMs, inProgressMs, completedMs } = MOCK_CONFIG.retention;
+    expect(unstartedMs).toBeLessThan(inProgressMs);
+    expect(inProgressMs).toBeLessThan(completedMs);
+    expect(completedMs).toBe(24 * 60 * 60 * 1000);
+  });
+
+  it("gives lobby and link rooms time to fill before an early-start grace could ever race it", () => {
+    expect(MOCK_CONFIG.earlyStartGraceSeconds).toBeLessThan(MOCK_CONFIG.fillWindowSeconds);
+  });
+
+  it("keeps the ticker-lane ceilings positive", () => {
+    expect(MOCK_CONFIG.maxMockStartsPerTick).toBeGreaterThan(0);
+    expect(MOCK_CONFIG.maxBotPicksPerTick).toBeGreaterThan(0);
+    expect(MOCK_CONFIG.sweepIntervalMs).toBeGreaterThan(0);
+  });
+
+  it("keeps the strategy's reach depth and run-reaction window positive", () => {
+    expect(MOCK_CONFIG.strategy.reachDepth).toBeGreaterThan(0);
+    expect(MOCK_CONFIG.strategy.temperature).toBeGreaterThan(0);
+    expect(MOCK_CONFIG.strategy.runReaction.window).toBeGreaterThan(0);
+    expect(MOCK_CONFIG.strategy.runReaction.threshold).toBeLessThanOrEqual(MOCK_CONFIG.strategy.runReaction.window);
+  });
+});
+
+describe("MOCK_COPY", () => {
+  it("breaks none of the house copy rules — no dash, nothing accusatory or passive, no contraction, no forbidden vocabulary", () => {
+    for (const [key, value] of Object.entries(MOCK_COPY)) {
+      expect(copyViolations(value), `MOCK_COPY.${key} = ${JSON.stringify(value)}`).toEqual([]);
+    }
+  });
+
+  it("never claims the bot is anything but a named, seeded opponent", () => {
+    expect(MOCK_COPY.botMarkerLabel.toLowerCase()).not.toContain("ai");
+    expect(MOCK_COPY.botBadge).toBe("Bot");
+  });
+
+  it("never leaves a swept room or an empty lobby without an action", () => {
+    expect(MOCK_COPY.sweptRoomActionLabel.length).toBeGreaterThan(0);
+    expect(MOCK_COPY.lobbyEmptyActionLabel.length).toBeGreaterThan(0);
+  });
+});
