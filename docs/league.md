@@ -543,15 +543,18 @@ default, structurally unable to be narrowed. The shelf orders **soonest-draft-fi
 rung** (`ORDER BY drafts.kickoff_at ASC`), not by `leagues_house_rung_idx`'s own `created_at`
 column — the two coincide within one rung, since a `scheduled` rung's kickoff is itself
 creation-ordered by its stagger, but not across rungs, since `open_12` and `beginner_12` stagger on
-independent clocks. `HouseLeagueShelf` (`public-league-list.tsx`) renders it above the filters and
-the member list, one card per open house league, and prints "A new league opens as soon as one
-fills, so there is always a seat." beneath the shelf once — a promise `HOUSE_CATALOG`'s own
-reconciler (`ensureHouseCatalog`, `src/league-service/house-factory.ts`) is what makes true by
-construction. See `docs/decisions/house-leagues.md` for the schema and reconciler this shelf reads.
+independent clocks. `OpenLeagueShelf` (`public-league-list.tsx`) renders the house leagues first
+in its one merged house-then-member list (Phase 3.7, Task 6 — the shelf's own second section
+head was cut, so house leagues differentiate by title, not by a boundary) and collapses the
+"A new league opens as soon as one fills, so there is always a seat." promise into one muted
+sentence beneath the shelf head — a promise `HOUSE_CATALOG`'s own reconciler
+(`ensureHouseCatalog`, `src/league-service/house-factory.ts`) is what makes true by
+construction. See `docs/decisions/house-leagues.md` for the schema and reconciler this shelf reads,
+and `docs/design-system.md`'s "The row shelf" for the v3 row/card forms this now renders through.
 
 **A `when_full` league shows a sentence, not a date.** Its stored `kickoff_at` is a placeholder
 until the sit-and-go fill trigger rewrites it (below), and rendering that placeholder as a real
-time would put a specific, wrong evening on a public card. `PublicLeagueList` reads
+time would put a specific, wrong evening on a public card. `OpenLeagueShelf` reads
 `startTrigger` and renders "Starts as soon as it fills" instead of `draftAt` whenever it is
 `"when_full"` — how a league starts is a fact about the league, the same disclosure reasoning
 `draftAt`, `scoringLabel` and `compositionCategory` each already established.
@@ -593,8 +596,8 @@ tax reporting.
 
 **Signed in changes the button, not the list.** `GET /browse` itself needs no session (the
 whole point is that a stranger can see what is on offer before creating an account), but joining
-does. `PublicLeagueList` (`src/league-room/components/public-league-list.tsx`) renders every
-card from the same `PublicLeagueSummary` rows either way; only the call to action differs. A
+does. `OpenLeagueShelf` (`src/league-room/components/public-league-list.tsx`) renders every
+row/card from the same `PublicLeagueSummary` rows either way; only the call to action differs. A
 signed-in visitor gets the real `JoinPublicLeagueButton`. A signed-out one gets a plain "Sign in
 to join" link to `/sign-in`, so the page never shows a button whose press would just bounce off
 a 401. The two states are two different pieces of markup, not one button with a client-side

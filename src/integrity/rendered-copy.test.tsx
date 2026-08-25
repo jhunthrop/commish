@@ -747,7 +747,7 @@ describe("TradeComposer says nothing that breaks the house copy rules, with and 
 });
 
 /**
- * Task 6, fix round 1 (review LOW). `LeagueTermsPanel`, `PublicLeagueList`, `DraftSchedulePanel`
+ * Task 6, fix round 1 (review LOW). `LeagueTermsPanel`, `OpenLeagueShelf`, `DraftSchedulePanel`
  * and `LeagueHome` all render `formatDraftTime`'s (`@/league/terms`) COMPOSED output — a string
  * assembled at runtime from a weekday, a day, a month, a time and a relative clause, never a
  * literal in the source. `room-copy.source.test.ts`'s own docblock states its blind spot exactly:

@@ -282,7 +282,8 @@ export const TOKENS = {
      * Display scale, px — the display face only. Deliberately a SEPARATE scale from `size`:
      * these sizes interleave with the body scale numerically, and a display size is never a
      * substitute for a body size at the same px (see docs/design-system.md). `xs` in the body
-     * scale is for letter-spaced uppercase eyebrows only, never a sentence — the rule this
+     * scale is for letter-spaced eyebrows only (mono, sentence case — the caps charter removed
+     * the uppercase treatment `xs` carried before v3), never a sentence — the rule this
      * scale's own docblock neighbor. `xl` is 58 (was 64 in v2) — the Sunday Standard mock's
      * display size (self-ruling S3); the display tracking rule that pairs with it lives in
      * globals.css, not here.

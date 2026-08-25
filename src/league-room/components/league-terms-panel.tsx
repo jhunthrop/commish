@@ -10,10 +10,11 @@ const FORMAT_TERM: Readonly<Record<DraftFormat, TermKey>> = { snake: "snake-draf
 /**
  * `scoringLabel` is a derived string (`describeScoring`, `@/scoring`), not a `TermKey`. Every
  * label it can produce gets an `InfoTip` except "Standard" — that one is already plain English —
- * mirroring `PublicLeagueList`'s own `SCORING_LABEL_TERM` (`@/league-room/components/public-
- * league-list`), which this deliberately duplicates rather than shares: the two components
- * render two different contracts (`PublicLeagueSummary` and `LeagueTerms`) that happen to carry
- * the same string values, and a shared map would couple them for no reason beyond four lines.
+ * mirroring `open-league-shared.tsx`'s own `SCORING_LABEL_TERM`
+ * (`@/league-room/components/open-league-shared`), which this deliberately duplicates rather
+ * than shares: the two modules render two different contracts (`PublicLeagueSummary` and
+ * `LeagueTerms`) that happen to carry the same string values, and a shared map would couple them
+ * for no reason beyond four lines.
  */
 const SCORING_LABEL_TERM: Readonly<Record<string, TermKey>> = {
   PPR: "ppr",

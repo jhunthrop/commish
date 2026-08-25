@@ -52,7 +52,7 @@ const SECTIONS: Readonly<Record<FirstRunPathKey, () => ReactElement>> = {
  * second opinion about the same manager.
  *
  * Closed by default, EXCEPT when the page was reached via the `#create-league` fragment: three
- * surfaces link straight at that id (`/browse`'s intro line, `PublicLeagueList`'s empty state,
+ * surfaces link straight at that id (`/browse`'s intro line, `OpenLeagueShelf`'s empty state,
  * and `HomeBoard`'s own defensive empty state) expecting the create form to be visible, not one
  * more click away behind a closed disclosure a fragment link cannot open on its own. Read on
  * mount rather than server-side, because `window.location.hash` does not exist on the server —

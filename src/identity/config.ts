@@ -29,7 +29,7 @@ export const IDENTITY_CONFIG = {
 
 /**
  * The one copy vocabulary for `experienceTier`, shared by every surface that shows it:
- * `PublicLeagueList` (a stranger sizing up an open league) and `ProfileForm` (the same manager
+ * `OpenLeagueShelf`'s row and card forms (a stranger sizing up an open league) and `ProfileForm` (the same manager
  * choosing their own). Copy, not enum values — `"New to fantasy"` / `"Played before"` say more
  * than `"beginner"` / `"experienced"` would, and a single map is what stops the two surfaces
  * from ever describing the same tier differently.
