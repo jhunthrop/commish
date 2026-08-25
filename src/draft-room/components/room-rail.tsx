@@ -243,9 +243,12 @@ export function RoomRail({ leagueName, view, teams, myTeamId, playersById, conne
   // reading `remainingMs` came from), so a turn that started BEFORE the freeze but runs into it
   // — the common case — still shows this once the clock actually crosses in, and "the countdown
   // resumes on the next frame" (Task 4) falls out of this same comparison flipping back once
-  // `now` passes `pausedUntil`, with no new event required.
-  const paused = pausedUntil !== null && now < Date.parse(pausedUntil);
-  const tightening = formatTightening(view.nextTightening, now, pausedUntil);
+  // `now` passes `pausedUntil`, with no new event required. `now` is null on the server render
+  // and the hydrating render (`useNow`'s hydration contract): both clock-derived lines hold
+  // their non-ticking fallback (nothing) for that one frame rather than reading a clock the
+  // server and client would disagree on.
+  const paused = pausedUntil !== null && now !== null && now < Date.parse(pausedUntil);
+  const tightening = now === null ? null : formatTightening(view.nextTightening, now, pausedUntil);
   const myTeamName = personalId === null ? null : teamName(teamsById(teams), personalId, "Your team");
   const turnWhere = turnLabel(view);
   const pending = pendingPickCount(view);

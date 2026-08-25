@@ -86,7 +86,9 @@ function PreDraftHero({
         {league.startTrigger === "when_full" ? (
           <Meter label="Seats filled" value={league.filledTeams} max={league.teamCount} className="w-full max-w-xs" />
         ) : (
-          <Countdown remainingMs={remainingMs ?? 0} size="xl" />
+          // Null pre-hydration (`useNow`'s contract): the digits hold their placeholder for
+          // that one frame rather than a false "0:00".
+          <Countdown remainingMs={remainingMs} size="xl" />
         )}
         <SeatMeter filled={league.filledTeams} total={league.teamCount} />
       </div>

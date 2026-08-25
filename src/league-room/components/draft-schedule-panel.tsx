@@ -320,8 +320,11 @@ export function DraftSchedulePanel({
   const terminal = draftTerminalStatePanel(schedule, currentWeek, totalWeeks);
   if (terminal !== null) return terminal;
 
-  const msUntil = remainingMs ?? 0;
-  const startingSoon = msUntil <= MS_PER_HOUR;
+  // `remainingMs` is null pre-hydration (`useNow`'s contract): the clock-derived lines hold
+  // their non-ticking fallback for that one frame — the digits their placeholder, the local
+  // line its absolute half alone, and `startingSoon` its "not yet known to be soon" default
+  // (so the static overnight-pause note, which needs no clock, still renders).
+  const startingSoon = remainingMs !== null && remainingMs <= MS_PER_HOUR;
   // Phase 3.6, Task 9, Step 2: the `xl` `Countdown` beside the fill `SeatMeter` (F17), with the
   // local-time line under it — the hero every `describeStartTiming`-adjacent surface now shares.
   // `data-testid="waiting-room-countdown"` is hardcoded rather than threaded as a prop: this
@@ -329,9 +332,11 @@ export function DraftSchedulePanel({
   // could ever need to change.
   const hero = (
     <div data-testid="waiting-room-hero" className="flex flex-col items-center gap-1">
-      <Countdown remainingMs={msUntil} size="xl" data-testid="waiting-room-countdown" />
+      <Countdown remainingMs={remainingMs} size="xl" data-testid="waiting-room-countdown" />
       <SeatMeter filled={schedule.filledTeams} total={teamCount} />
-      <p className="text-sm text-text-muted">{`${formatLocal(schedule.kickoffAt)} (${formatRelativeCountdown(msUntil)})`}</p>
+      <p className="text-sm text-text-muted">
+        {remainingMs === null ? formatLocal(schedule.kickoffAt) : `${formatLocal(schedule.kickoffAt)} (${formatRelativeCountdown(remainingMs)})`}
+      </p>
       {/* Gauntlet fix wave, item 11 (JF-H4): C3's safety-net sentence, quoted verbatim, reaching
           a SCHEDULED league's waiting room — this product's most common waiting state, and the
           one the gauntlet's first-timer persona actually asked "what if I miss it" from. Only

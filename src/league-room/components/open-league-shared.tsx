@@ -103,6 +103,12 @@ export interface OpenLeagueLive {
  * the same placeholder its `draftAt` is, so it never reaches `useCountdown` at all (the
  * identical gate every reader of `draftAt` holds). "Filling" reads the seat meter's own
  * low-seats threshold; "On deck" reads the clock's own window.
+ *
+ * Hydration-safe for free: `remainingMs` is null on the server render and the hydrating render
+ * (`useNow`'s contract — this hook reaches SSR'd pages via / and /browse, where the founder's
+ * 2026-08-24 mismatch report originated), so `onDeck` is false there and
+ * `ScheduledDraftValue` serves the absolute `draftAt` string both renders agree on;
+ * the ticking clock and the "On deck" chip are post-hydration upgrades.
  */
 export function useOpenLeagueLive(league: PublicLeagueSummary): OpenLeagueLive {
   const { remainingMs } = useCountdown(league.startTrigger === "scheduled" ? (league.draftAtIso ?? null) : null);

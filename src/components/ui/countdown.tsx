@@ -10,12 +10,17 @@ const MS_PER_HOUR = MS_PER_MINUTE * MINUTES_PER_HOUR;
 const MS_PER_DAY = MS_PER_HOUR * HOURS_PER_DAY;
 
 export interface CountdownState {
-  /** Ms remaining until `deadlineAt`, clamped to zero; null when there is no deadline. */
+  /** Ms remaining until `deadlineAt`, clamped to zero; null when there is no deadline — and
+   *  null on the server render and the client's first (hydrating) render, before `useNow` has
+   *  snapped (its own docblock owns the hydration argument). One null, two meanings, one
+   *  consumer branch: "nothing to tick against yet" renders the non-ticking fallback either
+   *  way. */
   readonly remainingMs: number | null;
   /** The wall-clock reading `remainingMs` was computed from — so a caller that also needs
    *  "now" (`RoomRail`'s tightening line) derives it from this one ticking interval
-   *  instead of running a second `useNow` alongside it. */
-  readonly now: number;
+   *  instead of running a second `useNow` alongside it. Null until the client clock snaps,
+   *  exactly as `useNow` is. */
+  readonly now: number | null;
 }
 
 /**
@@ -42,7 +47,7 @@ export function useCountdown(deadlineAt: string | null): CountdownState {
   const reducedMotion = usePrefersReducedMotion();
   const tickMs = reducedMotion ? UI_CONFIG.countdown.reducedMotionTickMs : UI_CONFIG.countdown.tickMs;
   const now = useNow(tickMs);
-  return { remainingMs: deadlineAt === null ? null : Math.max(0, Date.parse(deadlineAt) - now), now };
+  return { remainingMs: deadlineAt === null || now === null ? null : Math.max(0, Date.parse(deadlineAt) - now), now };
 }
 
 function pad(value: number): string {
@@ -86,7 +91,10 @@ export type CountdownSize = "sm" | "md" | "lg" | "xl";
 export type CountdownTone = "default" | "hot";
 
 export interface CountdownProps {
-  readonly remainingMs: number;
+  /** Null renders the pre-snap placeholder — a caller holding `useCountdown`'s pre-hydration
+   *  null passes it straight through rather than inventing a false `0` ("0:00" is a claim
+   *  about time; a placeholder is not). */
+  readonly remainingMs: number | null;
   /** `lg` is the rail's headline clock; `md` is an inline one; `sm` is a ledger-row clock at
    *  body size; `xl` is the waiting room's hero clock. */
   readonly size?: CountdownSize;
@@ -122,10 +130,16 @@ export function Countdown({ remainingMs, size = "md", tone = "default", "data-te
   return (
     <>
       <span data-testid={testId} aria-hidden="true" className={`font-mono font-semibold tabular-nums ${TONE[tone]} ${SIZE[size]}`}>
-        {formatCountdown(remainingMs)}
+        {/* Pre-snap (`remainingMs` null, one hydration frame): a non-breaking space holds the
+            line box at the digits' own em height — no layout jump, and never "0:00", which
+            would be a false time rather than a placeholder. */}
+        {remainingMs === null ? "\u00A0" : formatCountdown(remainingMs)}
       </span>
       <span className="sr-only" aria-live="polite">
-        {formatCoarseRemaining(remainingMs)}
+        {/* The live region exists from the first render (assistive tech tracks regions that
+            were present at load far more reliably than ones inserted later); it simply has
+            nothing to say until the clock snaps. */}
+        {remainingMs === null ? null : formatCoarseRemaining(remainingMs)}
       </span>
     </>
   );

@@ -82,7 +82,11 @@ export function SeatHoldPanel({ leagueId, leagueName }: SeatHoldPanelProps) {
     );
   }
 
-  if (remainingMs === null) return null; // Unreachable in practice — `claim.status === "held"` always carries an `expiresAt`.
+  // Unreachable in practice: `claim.status === "held"` always carries an `expiresAt`, and the
+  // clock has always snapped (`useNow`'s hydration contract) by the time the claim fetch — an
+  // effect declared BEFORE the hook's own — has resolved. The server render never gets here at
+  // all (`claim` starts as "claiming", the Skeleton branch above).
+  if (remainingMs === null) return null;
 
   return (
     <Panel title={leagueName} meta="Seat held">
