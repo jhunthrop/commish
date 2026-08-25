@@ -247,7 +247,58 @@ describe("the idempotency backstop", () => {
     expect(await balanceOf("user_available:u1")).toBe(50_00);
   });
 
-  it("returns the prior outcome when the replay races the original posting — the unique index catches it", async () => {
+  it("answers a mid-lock replay of a DEBIT the account tolerates exactly once — never a spurious insufficientBalance", async () => {
+    // The fix-round scenario (review, CRITICAL): a webhook double-delivers a withdrawal whose
+    // amount the balance can absorb ONCE. The replay blocks on the account row lock, unblocks
+    // after the original commits, and re-evaluates the same debit against the POST-commit
+    // balance — the post-lock replay re-check must answer it as the non-event before the
+    // balance floor ever sees the now-unaffordable delta.
+    await withTx((tx) => postMoneyTransaction(tx, depositInput("u1", 50_00), deps));
+
+    const withdrawal = (): MoneyTransactionInput => ({
+      kind: "withdrawal_request",
+      stateOfEntry: "NJ",
+      idempotencyKey: "idem_withdrawal",
+      entries: [
+        { accountId: accountIdFor("user_available", "u1"), direction: "debit", amountCents: 50_00 },
+        { accountId: accountIdFor("provider_clearing"), direction: "credit", amountCents: 50_00 },
+      ],
+      auditEvent: { eventType: "withdrawal_requested", actorId: "u1", actorType: "user", leagueId: null, payload: { amountCents: 50_00 } },
+    });
+
+    let firstPosted: () => void = () => {};
+    const posted = new Promise<void>((resolve) => (firstPosted = resolve));
+    let releaseFirst: () => void = () => {};
+    const parked = new Promise<void>((resolve) => (releaseFirst = resolve));
+
+    let first: PostMoneyOutcome | undefined;
+    const holding = db.transaction(async (tx) => {
+      first = await postMoneyTransaction(tx, withdrawal(), deps);
+      firstPosted();
+      await parked;
+    });
+    await posted;
+
+    // The replay's own pre-check sees nothing (the original is uncommitted), so it walks into
+    // the rollup locks the original holds and genuinely blocks — asked of Postgres, never slept.
+    const racing = raceDb.transaction((tx) => postMoneyTransaction(tx, withdrawal(), deps));
+    expect(await waitForBlockedBackend()).toBe(true);
+    releaseFirst();
+    await holding;
+
+    const second = await racing;
+    expect(first).toMatchObject({ ok: true, replayed: false });
+    expect(second).toEqual({ ok: true, transactionId: (first as { transactionId: string }).transactionId, replayed: true });
+    expect(await db.select().from(moneyTransactions).where(eq(moneyTransactions.kind, "withdrawal_request"))).toHaveLength(1);
+    expect(await balanceOf("user_available:u1")).toBe(0); // debited exactly once
+    expect(await balanceOf("provider_clearing")).toBe(50_00);
+  });
+
+  it("returns the prior outcome when a replay touching DISJOINT accounts races the original — the unique index catches it", async () => {
+    // No shared rollup row here, on purpose: with disjoint accounts neither the row locks nor
+    // the post-lock re-check can serialize the pair, so the replay proceeds all the way to its
+    // own `money_transactions` insert and waits on the unique index — the backstop's one
+    // genuinely reachable moment, driven deterministically.
     let firstPosted: () => void = () => {};
     const posted = new Promise<void>((resolve) => (firstPosted = resolve));
     let releaseFirst: () => void = () => {};
@@ -261,9 +312,17 @@ describe("the idempotency backstop", () => {
     });
     await posted;
 
-    // The replay arrives while the original is still uncommitted: its own pre-check sees
-    // nothing, so it walks into the rollup locks the original holds and genuinely blocks.
-    const racing = raceDb.transaction((tx) => postMoneyTransaction(tx, depositInput("u1", 50_00, { idempotencyKey: "idem_race" }), deps));
+    const disjoint: MoneyTransactionInput = {
+      kind: "deposit_return",
+      stateOfEntry: "NJ",
+      idempotencyKey: "idem_race",
+      entries: [
+        { accountId: accountIdFor("provider_clearing"), direction: "credit", amountCents: 10_00 },
+        { accountId: accountIdFor("platform_receivable", "u2"), direction: "debit", amountCents: 10_00 },
+      ],
+      auditEvent: { eventType: "deposit_returned", actorId: "u2", actorType: "user", leagueId: null, payload: { amountCents: 10_00 } },
+    };
+    const racing = raceDb.transaction((tx) => postMoneyTransaction(tx, disjoint, deps));
     expect(await waitForBlockedBackend()).toBe(true);
     releaseFirst();
     await holding;
@@ -273,6 +332,7 @@ describe("the idempotency backstop", () => {
     expect(second).toEqual({ ok: true, transactionId: "m_1", replayed: true });
     expect(await db.select().from(moneyTransactions)).toHaveLength(1);
     expect(await balanceOf("user_available:u1")).toBe(50_00);
+    expect(await balanceOf("provider_clearing")).toBe(0); // the replay wrote nothing of its own
   });
 
   it("rethrows a duplicate transaction id with no idempotency key in play — a bug, never a replay", async () => {

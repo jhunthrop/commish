@@ -140,9 +140,13 @@ function deltaFor(kind: MoneyAccountKind, accountId: MoneyAccountId, entries: re
  *     the rollup lock is held, refused (never clamped) with zero writes; only
  *     `NEGATIVE_ALLOWED_KINDS` may swing negative (ruling 5's ACH-return model).
  *  4. A replayed `idempotencyKey` — the double-click and the webhook redelivery — returns the
- *     already-committed transaction's outcome as the same non-event: a cheap pre-check catches
- *     the committed case, and the unique index catches the mid-flight race (the violation is
- *     caught via `isUniqueViolation` under a savepoint so the caller's transaction survives it).
+ *     already-committed transaction's outcome as the same non-event, at three layers: a cheap
+ *     pre-lock read answers the long-committed case; a post-lock RE-CHECK answers the duplicate
+ *     that committed while this transaction was blocked on a shared rollup row, BEFORE the
+ *     balance floor can re-evaluate the duplicate's own debit against the post-commit balance
+ *     (fix round 1); and the unique index catches the disjoint-row race that neither read can
+ *     see (the violation is caught via `isUniqueViolation` under a savepoint so the caller's
+ *     transaction survives it).
  *  5. Decision 6: EVERY entry row is stamped `state_of_entry` (from the input, per-leg
  *     overridable) and `tax_year` (from the injected clock, stored — never recomputed later).
  *  6. Ruling 4: `deps.audit.record` appends in the SAME transaction; an append failure throws
@@ -185,17 +189,38 @@ export async function postMoneyTransaction(tx: DbTx, input: MoneyTransactionInpu
     await tx.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, input.leagueId)).for("update");
   }
 
-  // The committed-replay fast path: a webhook redelivering an already-settled transfer answers
-  // here, before this transaction takes a single lock the original no longer holds.
+  // The committed-replay FAST PATH, deliberately ahead of the leagues lock and every money row
+  // lock: the ordinary replay (a webhook redelivering a transfer settled minutes ago, a
+  // double-click answered after the first commit) is answered from one indexed read without
+  // this transaction taking a single lock the original no longer holds. Correctness does not
+  // rest here — the post-lock re-check below is the load-bearing half.
   if (input.idempotencyKey != null) {
     const replay = await replayOutcome(tx, input.idempotencyKey);
     if (replay !== undefined) return replay;
   }
 
   const accountIds = [...new Set(input.entries.map((entry) => entry.accountId))].sort();
+  const lockedAccounts = new Map<MoneyAccountId, { kind: MoneyAccountKind; balanceCents: number }>();
+  for (const accountId of accountIds) {
+    lockedAccounts.set(accountId, await ensureAndLockAccount(tx, accountId));
+  }
+
+  // The post-lock replay RE-CHECK (fix round 1, CRITICAL), between the locks and the balance
+  // floor: a duplicate that shared a rollup row committed while this transaction was BLOCKED on
+  // that row's lock above, and its delta is already in the balances just read. Evaluating the
+  // floor first would re-apply the same debit against the post-commit balance and hand a
+  // webhook redelivery a spurious insufficientBalance refusal — the exact non-event the
+  // idempotency mechanism exists to prevent. Answered here, the just-committed duplicate is a
+  // replay BEFORE its delta is ever evaluated a second time. (A duplicate sharing NO rollup row
+  // never serializes here and is caught by the unique index below instead.)
+  if (input.idempotencyKey != null) {
+    const replay = await replayOutcome(tx, input.idempotencyKey);
+    if (replay !== undefined) return replay;
+  }
+
   const nextBalances = new Map<MoneyAccountId, number>();
   for (const accountId of accountIds) {
-    const account = await ensureAndLockAccount(tx, accountId);
+    const account = lockedAccounts.get(accountId)!;
     const next = account.balanceCents + deltaFor(account.kind, accountId, input.entries);
     if (next < 0 && !NEGATIVE_ALLOWED_KINDS.includes(account.kind)) {
       return { ok: false, reason: MONEY_REFUSALS.insufficientBalance };
