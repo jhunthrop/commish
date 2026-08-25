@@ -2,6 +2,16 @@ import { z } from "zod";
 import { isPrintableDisplayName } from "@/identity/display-name";
 import { LEAGUE_CONFIG } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
+import { formatUsd, MONEY_CONFIG } from "@/money/config";
+import { moneyIsLive } from "@/money/states";
+import { leagueMoneyOrRefuse } from "./creation";
+
+/**
+ * The boundary's own sentence for a paid league asked for before the founder has named a launch
+ * state (`moneyIsLive`, `@/money/states` — the phase's one dark/live switch). Exported so the
+ * schema test and the copy sweep read the same words the refusal actually carries.
+ */
+export const FREE_SEASON_ENTRY_FEE_MESSAGE = "Every league is free this season. An entry fee cannot be charged until paid play opens.";
 
 /**
  * Both names a member chooses: the league's and their team's.
@@ -86,13 +96,52 @@ export const createLeagueSchema = z.object({
   experienceTier: z.enum(["beginner", "experienced"]).optional(),
   /** Defaults at the route to the creator's display name, which the route knows and the service does not. */
   teamName: name.optional(),
-}).refine((data) => data.startTrigger !== "when_full" || data.visibility === "public", {
-  // `dueDraftsQuery` (`@/draft-service/auto-start`) starts drafts only in public matchmade
-  // leagues (`ENFORCED_LEAGUE_SQL`) — a private league whose fill wrote a time nobody pressed
-  // would be the control wired to nothing this codebase has already refused five times.
-  message: "Leagues that start when they fill are public leagues. Make this one public, or pick a draft time.",
-  path: ["startTrigger"],
-});
+  /**
+   * Phase 4, Task 8: what one seat costs. `0` (the default) is the free league — the only kind
+   * this boundary permits until money is live, refused below with `FREE_SEASON_ENTRY_FEE_MESSAGE`.
+   * The ceiling is founder decision 8's config value, rendered into the refusal through
+   * `formatUsd` so the sentence can never state a bound the server does not enforce (the
+   * `depositBelowMinimum` construction).
+   */
+  entryFeeCents: z
+    .number()
+    .int()
+    .min(0, { message: "An entry fee cannot be negative." })
+    .max(MONEY_CONFIG.entryFeeCeilingCents, { message: `An entry fee can be at most ${formatUsd(MONEY_CONFIG.entryFeeCeilingCents)} per seat.` })
+    .default(0),
+  /** The platform's fixed per-entry fee (decision 10) — its real bound is the arithmetic law
+   *  below, which refuses any rake the published prizes do not balance against. */
+  platformFeeCents: z.number().int().min(0, { message: "A platform fee cannot be negative." }).default(0),
+  /** The published prize table. Shape only here — `leagueMoneyOrRefuse` (below) owns every rule
+   *  about places and amounts, so the boundary and the service can never disagree on one. */
+  payoutTable: z.array(z.object({ place: z.number().int(), amountCents: z.number().int() })).optional(),
+})
+  .refine((data) => data.startTrigger !== "when_full" || data.visibility === "public", {
+    // `dueDraftsQuery` (`@/draft-service/auto-start`) starts drafts only in public matchmade
+    // leagues (`ENFORCED_LEAGUE_SQL`) — a private league whose fill wrote a time nobody pressed
+    // would be the control wired to nothing this codebase has already refused five times.
+    message: "Leagues that start when they fill are public leagues. Make this one public, or pick a draft time.",
+    path: ["startTrigger"],
+  })
+  .superRefine((data, ctx) => {
+    // Phase 4, Task 8: the SAME `leagueMoneyOrRefuse` the service layer enforces
+    // (`@/league-service/creation`), asked at the boundary so a commissioner's form hears the
+    // refusal before a request ever reaches `createLeague` — derived, never retyped. A wholly
+    // free league (every default) passes without touching the money vocabulary.
+    const money = leagueMoneyOrRefuse(data);
+    if (!money.ok) {
+      ctx.addIssue({ code: "custom", message: money.reason, path: ["payoutTable"] });
+      return;
+    }
+    // The free-season law at the boundary (founder decision 7: `MONEY_STATES.enabled` ships
+    // empty): a structurally valid PAID league still refuses until money is live — nobody may
+    // open a room whose published fee no join could lawfully pay, and the commissioner's own
+    // creation-seated team pays no fee today, a hole the money-live task must close before this
+    // gate ever opens (see `writeLeagueInTx`'s member-owner team insert).
+    if (money.config.entryFeeCents > 0 && !moneyIsLive()) {
+      ctx.addIssue({ code: "custom", message: FREE_SEASON_ENTRY_FEE_MESSAGE, path: ["entryFeeCents"] });
+    }
+  });
 
 export const createInviteSchema = z.object({
   maxUses: z

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { copyViolations } from "@/integrity/copy-rules";
+import { prizeTableInvariant } from "@/money/prize-table";
 import { LEAGUE_CONFIG } from "@/league/config";
 import {
   HOUSE_CATALOG,
@@ -89,5 +90,26 @@ describe("plusMinutesIso", () => {
 
   it("is a no-op at zero minutes", () => {
     expect(plusMinutesIso(NOW, 0)).toBe(NOW);
+  });
+});
+
+// Phase 4, Task 8: the catalog is config — a rung's fee terms are declared here, so this is
+// where founder decision 10's arithmetic law holds them before any spawn ever runs.
+describe("rung entry fees", () => {
+  it("keeps every rung free until the founder flips one, and holds any flipped rung to the prize-table invariant", () => {
+    for (const rung of Object.values(HOUSE_CATALOG.rungs)) {
+      if (rung.entryFeeCents === 0) {
+        expect(rung.platformFeeCents).toBe(0);
+        expect(rung.payoutTable).toBeNull();
+      } else {
+        expect(prizeTableInvariant(rung.entryFeeCents, rung.platformFeeCents, rung.teamCount, rung.payoutTable ?? [])).toEqual({ ok: true });
+      }
+    }
+  });
+
+  it("is free on every rung today — the founder's free season, as catalog fact", () => {
+    for (const rung of Object.values(HOUSE_CATALOG.rungs)) {
+      expect(rung.entryFeeCents).toBe(0);
+    }
   });
 });

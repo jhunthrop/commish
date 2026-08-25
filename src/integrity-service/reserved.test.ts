@@ -75,8 +75,12 @@ const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "p
   withdrawal_requested: "plan-a", // Task 6, `@/money-service/withdrawals`
   withdrawal_completed: "plan-a", // Task 6, `@/money-service/withdrawals`
   withdrawal_returned: "plan-a", // Task 6, `@/money-service/withdrawals`
-  entry_fee_collected: "phase-4", // Task 8, `@/money-service/entry-fee`, inside joinLeagueInTx
-  entry_fee_refunded: "phase-4", // Task 8 (seat release) and Task 9 (`@/money-service/dissolution`)
+  // Task 8 landed both entry-fee publishers (`collectEntryFeeInTx`/`refundEntryFeeInTx`,
+  // `@/money-service/entry-fee`, composed into `joinLeagueInTx` and `releaseSeat`) — flipped
+  // exactly as the block comment above prescribes: the value marks PUBLISHED. Task 9's
+  // dissolution becomes `entry_fee_refunded`'s second caller, same writer, no new event type.
+  entry_fee_collected: "plan-a", // Task 8, `@/money-service/entry-fee`, inside joinLeagueInTx
+  entry_fee_refunded: "plan-a", // Task 8 (seat release); Task 9's dissolution reuses the writer
   prize_paid: "phase-4", // Task 10, `@/money-service/settlement`
   payout_held: "phase-4", // Task 10, `@/money-service/settlement`
   payout_released: "phase-4", // Task 10, `@/money-service/settlement`'s releaseHold

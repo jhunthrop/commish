@@ -281,6 +281,13 @@ describe("releaseSeat", () => {
     });
   });
 
+  it("works with every dependency defaulted — the system clock and process-wide logger are the production path", async () => {
+    expect(await releaseSeat(db, { leagueId: "nope", userId: "u_anyone" })).toEqual({
+      ok: false,
+      reason: RELEASE_REFUSALS.leagueMissing,
+    });
+  });
+
   // P9 fix round, P8-M2: every refusal path means all FOUR (`RELEASE_REFUSALS` has four members) —
   // `draftStarted` was the one this sweep left out. `db.update(drafts)` here is a test-only
   // shortcut for "a draft that has started," deliberately lighter than the dedicated test above

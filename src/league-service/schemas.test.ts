@@ -1,5 +1,18 @@
-import { describe, expect, it } from "vitest";
-import { acceptInviteSchema, createLeagueSchema } from "./schemas";
+import { describe, expect, it, vi } from "vitest";
+import { MONEY_CONFIG, MONEY_REFUSALS } from "@/money/config";
+import { acceptInviteSchema, createLeagueSchema, FREE_SEASON_ENTRY_FEE_MESSAGE } from "./schemas";
+
+/**
+ * Phase 4, Task 8: the boundary's money rules need BOTH sides of the dark/live switch — the
+ * shipped `MONEY_STATES.enabled` is empty, so without this seam the "a valid paid league parses
+ * once money is live" branch could never run. Only `moneyIsLive` is replaced; everything else in
+ * the module stays real.
+ */
+const liveness = { live: false };
+vi.mock("@/money/states", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/money/states")>();
+  return { ...actual, moneyIsLive: () => liveness.live };
+});
 
 /** Built from code points so this file, too, contains no invisible characters. */
 const ch = (code: number): string => String.fromCharCode(code);
@@ -65,5 +78,63 @@ describe("startTrigger", () => {
   it("never refuses 'scheduled' regardless of visibility", () => {
     expect(createLeagueSchema.safeParse({ name: "Sunday Money", startTrigger: "scheduled", visibility: "invite_only" }).success).toBe(true);
     expect(createLeagueSchema.safeParse({ name: "Sunday Money", startTrigger: "scheduled", visibility: "public" }).success).toBe(true);
+  });
+});
+
+// Phase 4, Task 8: entry fees at the creation boundary.
+describe("entry fee, platform fee and payout table", () => {
+  const teamCount = 4;
+  const paid = (over: Record<string, unknown> = {}) => ({
+    name: "Sunday Money",
+    teamCount,
+    entryFeeCents: 20_00,
+    payoutTable: [{ place: 1, amountCents: 80_00 }],
+    ...over,
+  });
+
+  it("defaults every money field to the free league, so an ordinary create request is unaffected", () => {
+    const result = createLeagueSchema.safeParse({ name: "Sunday Money" });
+    expect(result.success).toBe(true);
+    expect(result.data).toMatchObject({ entryFeeCents: 0, platformFeeCents: 0 });
+    expect(result.data?.payoutTable).toBeUndefined();
+  });
+
+  it("refuses a negative fee and a fee above the founder's ceiling, ceiling rendered from config", () => {
+    expect(createLeagueSchema.safeParse(paid({ entryFeeCents: -1 })).success).toBe(false);
+    const over = createLeagueSchema.safeParse(paid({ entryFeeCents: MONEY_CONFIG.entryFeeCeilingCents + 1 }));
+    expect(over.success).toBe(false);
+    expect(over.error?.issues[0]?.message).toBe("An entry fee can be at most $500.00 per seat.");
+    expect(createLeagueSchema.safeParse(paid({ platformFeeCents: -1 })).success).toBe(false);
+  });
+
+  it("refuses a paid league while money is dark, with the free-season sentence on the fee field", () => {
+    liveness.live = false;
+    const result = createLeagueSchema.safeParse(paid());
+    expect(result.success).toBe(false);
+    expect(result.error?.issues[0]).toMatchObject({ path: ["entryFeeCents"], message: FREE_SEASON_ENTRY_FEE_MESSAGE });
+  });
+
+  it("holds any money field to the one arithmetic law, dark or live — the same leagueMoneyOrRefuse the service enforces", () => {
+    liveness.live = false;
+    const mismatch = createLeagueSchema.safeParse(paid({ payoutTable: [{ place: 1, amountCents: 79_00 }] }));
+    expect(mismatch.success).toBe(false);
+    expect(mismatch.error?.issues[0]).toMatchObject({ path: ["payoutTable"], message: MONEY_REFUSALS.prizeTableMismatch });
+
+    expect(createLeagueSchema.safeParse(paid({ payoutTable: undefined })).success).toBe(false);
+    expect(createLeagueSchema.safeParse({ name: "Sunday Money", teamCount, platformFeeCents: 1_00 }).success).toBe(false);
+    const badPlace = createLeagueSchema.safeParse(paid({ payoutTable: [{ place: 2, amountCents: 80_00 }] }));
+    expect(badPlace.success).toBe(false);
+    expect(badPlace.error?.issues[0]?.message).toBe(MONEY_REFUSALS.invalidPrizeTableEntry);
+  });
+
+  it("accepts a balanced paid league once money is live", () => {
+    liveness.live = true;
+    try {
+      const result = createLeagueSchema.safeParse(paid({ platformFeeCents: 1_00, payoutTable: [{ place: 1, amountCents: 76_00 }] }));
+      expect(result.success).toBe(true);
+      expect(result.data).toMatchObject({ entryFeeCents: 20_00, platformFeeCents: 1_00 });
+    } finally {
+      liveness.live = false;
+    }
   });
 });

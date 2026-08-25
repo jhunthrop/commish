@@ -1,6 +1,7 @@
 import type { IconName } from "@/components/ui/icon";
 import { type AuditEvent, type AuditEventType, type JsonObject } from "@/domain/audit";
 import { stripHiddenCharacters } from "@/identity/display-name";
+import { formatUsd } from "@/money/config";
 import { SYSTEM_ACTION_VISIBILITY, type SystemActionVisibility } from "./system-actions";
 
 /**
@@ -72,9 +73,16 @@ export const ACTIVITY_VISIBILITY: Readonly<Record<AuditEventType, ActivityVisibi
   withdrawal_requested: "hidden", // platform chain
   withdrawal_completed: "hidden", // platform chain
   withdrawal_returned: "hidden", // platform chain
-  entry_fee_collected: "hidden", // Task 8 decides
-  entry_fee_refunded: "hidden", // Tasks 8-9 decide
-  prize_paid: "hidden", // Task 10 decides
+  /**
+   * Phase 4, Task 8 (the Task 2 review's controller pre-ruling): the entry fee is a PUBLISHED
+   * league term — every member joined a room whose fee and prize table are league facts, so a
+   * member paying it (or getting it back at a seat release) leaks no private fact and is exactly
+   * what a league feed exists to show. The deposit that funded the fee, and everything else
+   * about anyone's wallet, stays platform-private above.
+   */
+  entry_fee_collected: "everyone", // Task 8 (the T2 pre-ruling): the fee is a published league term
+  entry_fee_refunded: "everyone", // Task 8, same ruling — Task 9's dissolution rides the same event
+  prize_paid: "hidden", // Task 10 decides (pre-ruled visible; that task flips it with its writer)
   payout_held: "hidden", // Task 10 decides
   payout_released: "hidden", // Task 10 decides
   /**
@@ -340,6 +348,32 @@ function renderRosterMove(event: AuditEvent, names: ActivityNames): Rendered | n
     : { icon: "refresh-cw", headline: `${proposerTeamName} and ${counterpartyTeamName}'s roster swap was reversed.`, detail: null };
 }
 
+/**
+ * Phase 4, Task 8. The amount renders because the fee is a PUBLISHED league term (the Task 2
+ * pre-ruling this flip carries out) — through `formatUsd`, the one place cents become dollars,
+ * never a hand-built string. `formatUsd` throws on a non-integer by design, and a feed renderer
+ * must deny a malformed payload rather than crash a page on it, so the integer check joins the
+ * `undefined` check — the same deny-by-default every renderer here holds its payload to.
+ * Money-first copy: the sentence states what happened to the money, no contractions.
+ */
+function renderEntryFeeCollected(event: AuditEvent, names: ActivityNames): Rendered | null {
+  const amountCents = num(event.payload, "amountCents");
+  if (amountCents === undefined || !Number.isInteger(amountCents)) return null;
+  return { icon: "check", headline: `${names.member(event.actorId)} paid the ${formatUsd(amountCents)} entry fee.`, detail: null };
+}
+
+/**
+ * The mirror sentence, shared by BOTH refund writers — a seat release (Task 8) and a
+ * dissolution's per-member refund (Task 9) — which is why it states the money's motion without
+ * presuming WHY the fee came back: the `member_joined`/`system_action` row beside it in the feed
+ * carries that story.
+ */
+function renderEntryFeeRefunded(event: AuditEvent, names: ActivityNames): Rendered | null {
+  const amountCents = num(event.payload, "amountCents");
+  if (amountCents === undefined || !Number.isInteger(amountCents)) return null;
+  return { icon: "refresh-cw", headline: `The ${formatUsd(amountCents)} entry fee went back to ${names.member(event.actorId)}.`, detail: null };
+}
+
 function renderSystemAction(event: AuditEvent, viewer: { readonly userId: string }): Rendered | null {
   const action = str(event.payload, "action");
   const visibility = action === undefined ? undefined : (SYSTEM_ACTION_VISIBILITY as Readonly<Record<string, SystemActionVisibility | undefined>>)[action];
@@ -378,6 +412,10 @@ function renderPayload(event: AuditEvent, names: ActivityNames, viewer: { readon
       return renderRosterMove(event, names);
     case "trade_accepted":
       return renderTradeAccepted(event, names);
+    case "entry_fee_collected":
+      return renderEntryFeeCollected(event, names);
+    case "entry_fee_refunded":
+      return renderEntryFeeRefunded(event, names);
     case "system_action":
       return renderSystemAction(event, viewer);
     default:

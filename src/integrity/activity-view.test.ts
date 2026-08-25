@@ -139,8 +139,12 @@ const SAMPLE_PAYLOADS: Readonly<Record<AuditEventType, readonly { readonly paylo
   withdrawal_requested: [{ payload: {}, actorId: "user_bob" }],
   withdrawal_completed: [{ payload: {}, actorId: null }],
   withdrawal_returned: [{ payload: {}, actorId: null }],
-  entry_fee_collected: [{ payload: {}, actorId: "user_bob" }],
-  entry_fee_refunded: [{ payload: {}, actorId: null }],
+  // Task 8: both flipped to `"everyone"` (the Task 2 review's pre-ruling — the fee is a
+  // published league term), with the REAL payload shape `collectEntryFeeInTx`/
+  // `refundEntryFeeInTx` (`@/money-service/entry-fee`) write, so the copy sweep runs over the
+  // sentences members actually read.
+  entry_fee_collected: [{ payload: { amountCents: 20_00 }, actorId: "user_bob" }],
+  entry_fee_refunded: [{ payload: { amountCents: 20_00 }, actorId: "user_bob" }],
   prize_paid: [{ payload: {}, actorId: null }],
   payout_held: [{ payload: {}, actorId: null }],
   payout_released: [{ payload: {}, actorId: null }],
@@ -180,21 +184,24 @@ describe("ACTIVITY_VISIBILITY", () => {
     }
   });
 
-  it("hides all ten money events until the task that publishes each decides otherwise (Phase 4, Task 2)", () => {
+  it("hides every money event whose publishing task has not yet ruled (Phase 4, Task 2; two flipped by Task 8)", () => {
     for (const type of [
       "deposit_completed",
       "deposit_returned",
       "withdrawal_requested",
       "withdrawal_completed",
       "withdrawal_returned",
-      "entry_fee_collected",
-      "entry_fee_refunded",
       "prize_paid",
       "payout_held",
       "payout_released",
     ] as const) {
       expect(ACTIVITY_VISIBILITY[type]).toBe("hidden");
     }
+  });
+
+  it("publishes entry_fee_collected and entry_fee_refunded — Task 8's flip, on the Task 2 pre-ruling that the fee is a published league term", () => {
+    expect(ACTIVITY_VISIBILITY.entry_fee_collected).toBe("everyone");
+    expect(ACTIVITY_VISIBILITY.entry_fee_refunded).toBe("everyone");
   });
 
   it("hides self-exclusion and KYC status events, permanently — a person's own private facts (Task 7's fix round)", () => {
@@ -236,6 +243,42 @@ describe("activityRowFor", () => {
 
   it("returns null for a hidden type rather than a row with a blank headline", () => {
     expect(activityRowFor(event("flag_raised", { flagId: "f1" }, null), viewer, names)).toBeNull();
+  });
+
+  it("renders a seat release as leaving, not joining — the frozen-enum compromise's other sentence", () => {
+    // Task 7's coverage-backlog item, cleared here where Task 8 makes the branch matter: a paid
+    // seat's release now writes this row BESIDE the refund row, and both must read honestly.
+    expect(activityRowFor(event("member_joined", { teamId: "team_1", outcome: "seat_released" }, "user_alice"), viewer, names)).toMatchObject({
+      icon: "users",
+      headline: "Alice left the league before the draft.",
+    });
+  });
+
+  it("renders an entry fee collection with the amount, through formatUsd (Task 8)", () => {
+    expect(activityRowFor(event("entry_fee_collected", { amountCents: 20_00 }, "user_bob"), viewer, names)).toEqual({
+      eventId: "evt_1",
+      occurredAt: "2026-08-20T17:00:00.000Z",
+      icon: "check",
+      headline: "Bob paid the $20.00 entry fee.",
+      detail: null,
+    });
+  });
+
+  it("renders an entry fee refund as the money's own motion, whatever door sent it back", () => {
+    expect(activityRowFor(event("entry_fee_refunded", { amountCents: 20_00 }, "user_alice"), viewer, names)).toEqual({
+      eventId: "evt_1",
+      occurredAt: "2026-08-20T17:00:00.000Z",
+      icon: "refresh-cw",
+      headline: "The $20.00 entry fee went back to Alice.",
+      detail: null,
+    });
+  });
+
+  it("denies a fee event whose amount is missing or not a whole number of cents, rather than crash formatUsd on it", () => {
+    expect(activityRowFor(event("entry_fee_collected", {}, "user_bob"), viewer, names)).toBeNull();
+    expect(activityRowFor(event("entry_fee_collected", { amountCents: 20.5 }, "user_bob"), viewer, names)).toBeNull();
+    expect(activityRowFor(event("entry_fee_refunded", {}, "user_bob"), viewer, names)).toBeNull();
+    expect(activityRowFor(event("entry_fee_refunded", { amountCents: 20.5 }, "user_bob"), viewer, names)).toBeNull();
   });
 
   it("returns null for a payload missing a field it needs", () => {

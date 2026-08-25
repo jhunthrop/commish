@@ -3,6 +3,7 @@ import type { RosterShapeName } from "@/domain/roster";
 import type { ScoringPresetName } from "@/domain/scoring";
 import type { ExperienceTier } from "@/domain/user";
 import { LEAGUE_CONFIG } from "@/league/config";
+import type { PrizeTable } from "@/money/prize-table";
 
 /**
  * "View and join like FFPC and Apex": a shelf of canonical leagues with real draft times,
@@ -59,6 +60,15 @@ export interface HouseRung {
   readonly rosterShape: RosterShapeName;
   readonly medianGame: boolean;
   readonly stakeTier: number;
+  /**
+   * Phase 4, Task 8: what a seat on this rung costs, with the published table the pot pays out
+   * through. ALL RUNGS ARE FREE (`0`/`0`/`null`) until money is live — the catalog is config, so
+   * flipping a rung to paid is a one-line, founder-visible diff here, held to founder decision
+   * 10's arithmetic by `house-catalog.test.ts` running `prizeTableInvariant` over every rung.
+   */
+  readonly entryFeeCents: number;
+  readonly platformFeeCents: number;
+  readonly payoutTable: PrizeTable | null;
 }
 
 /**
@@ -88,6 +98,10 @@ const CANON = {
   medianGame: false,
   /** Cosmetic only (`MATCHMAKING_CONFIG.stakeDisclosure`) — every rung reads "Free". */
   stakeTier: 0,
+  /** Phase 4, Task 8: free, whole-shelf, until the founder flips a rung — see `HouseRung`. */
+  entryFeeCents: 0,
+  platformFeeCents: 0,
+  payoutTable: null,
 } as const;
 
 /**

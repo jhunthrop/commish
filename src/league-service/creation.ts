@@ -9,6 +9,7 @@ import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logg
 import { LEAGUE_CONFIG } from "@/league";
 import { ROSTER_SHAPES } from "@/league/roster-shape";
 import type { HouseRungName, StartTrigger } from "@/matchmaking/house-catalog";
+import { prizeTableInvariant, type PrizeTable } from "@/money/prize-table";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { MS_PER_DAY } from "./config";
 import { ENFORCEMENT_REFUSALS, tierJoinPrecondition } from "./enforcement";
@@ -90,6 +91,25 @@ export interface CreateLeagueInput {
   readonly experienceTier: ExperienceTier;
   /** Cosmetic tier index only — no entry fee is charged and no balance exists in this phase. */
   readonly stakeTier: number;
+  /**
+   * Phase 4, Task 8: what one seat costs, in cents, fixed at creation forever — `0` (the
+   * default) IS the free league, and the only kind the boundary permits until money is live
+   * (`createLeagueSchema`'s free-season refusal). Bounded by `MONEY_CONFIG.entryFeeCeilingCents`
+   * at that same boundary; here the invariant below is what holds it honest against the table.
+   */
+  readonly entryFeeCents?: number;
+  /** The platform's fixed per-entry fee (founder decision 10: fixed, NEVER percent-of-pool),
+   *  collected at settlement's sweep — named at creation because the published prize table must
+   *  balance against it to the cent. */
+  readonly platformFeeCents?: number;
+  /**
+   * The published prize table, fixed in advance (founder decision 9: no proration, ever).
+   * REQUIRED to balance whenever any money field is set: `leagueMoneyOrRefuse` holds
+   * `sum(prizes) + rake × seats = fee × seats` exactly (`prizeTableInvariant`,
+   * `@/money/prize-table`) or `createLeague` refuses before its transaction ever opens. `null`
+   * (or an empty table) for a free league — stored as `NULL`.
+   */
+  readonly payoutTable?: PrizeTable | null;
   /** Opt-in. A league is invite-only and unlisted unless its creator chose otherwise. */
   readonly isPublicMatchmade: boolean;
   /**
@@ -132,6 +152,40 @@ export interface LeagueWriteOutcome {
   readonly claimed: boolean;
 }
 
+/** The money shape a league is created with, once validated — what `writeLeagueInTx` stores. */
+export interface LeagueMoneyConfig {
+  readonly entryFeeCents: number;
+  readonly platformFeeCents: number;
+  readonly payoutTable: PrizeTable | null;
+}
+
+export type LeagueMoneyOutcome = { readonly ok: true; readonly config: LeagueMoneyConfig } | { readonly ok: false; readonly reason: string };
+
+/**
+ * Phase 4, Task 8: the creation-time half of founder decision 10's arithmetic law, applied to
+ * the fields THIS request asks to create — the same "ask the one predicate before the row
+ * exists" shape the tier gate above takes with `tierJoinPrecondition`. A wholly free league
+ * (fee `0`, platform fee `0`, no table — every field's default) passes untouched with its table
+ * normalized to `null`; ANY money field set makes the full invariant binding:
+ * `prizeTableInvariant` (`@/money/prize-table`) holds `sum(prizes) + rake × seats` to the pot
+ * exactly, which also refuses the incoherent halves for free (a fee with no table, a table with
+ * no fee, a platform fee on a free league — each leaves the identity unbalanced). Pure, so the
+ * boundary schema, `createLeague` and any test can ask it without a connection.
+ */
+export function leagueMoneyOrRefuse(
+  input: Pick<CreateLeagueInput, "teamCount" | "entryFeeCents" | "platformFeeCents" | "payoutTable">,
+): LeagueMoneyOutcome {
+  const entryFeeCents = input.entryFeeCents ?? 0;
+  const platformFeeCents = input.platformFeeCents ?? 0;
+  const payoutTable = input.payoutTable == null || input.payoutTable.length === 0 ? null : input.payoutTable;
+  if (entryFeeCents === 0 && platformFeeCents === 0 && payoutTable === null) {
+    return { ok: true, config: { entryFeeCents: 0, platformFeeCents: 0, payoutTable: null } };
+  }
+  const invariant = prizeTableInvariant(entryFeeCents, platformFeeCents, input.teamCount, payoutTable ?? []);
+  if (!invariant.ok) return { ok: false, reason: invariant.reason };
+  return { ok: true, config: { entryFeeCents, platformFeeCents, payoutTable } };
+}
+
 /**
  * The one write shape a league ever gets, run INSIDE a transaction the caller already holds
  * open. `createLeague` (below) wraps this in its own `db.transaction`, one call per member
@@ -167,6 +221,14 @@ export async function writeLeagueInTx(
   // default shape when neither is given — the identical fallback chain `kickoffAt` uses below.
   const rosterSlots = input.rosterSlots ?? ROSTER_SHAPES[input.rosterShape ?? LEAGUE_CONFIG.defaults.rosterShape];
 
+  // Phase 4, Task 8. Re-validated HERE — not only in `createLeague` — because this function is
+  // also the house factory's write path (`spawnHouseLeagueInTx` never passes through
+  // `createLeague`): a config that fails the arithmetic law is a caller bug this deep, so it
+  // throws and rolls the transaction back rather than storing a prize table settlement could
+  // never balance. `createLeague` refuses the same input politely before any transaction opens.
+  const money = leagueMoneyOrRefuse(input);
+  if (!money.ok) throw new Error(`writeLeagueInTx: ${money.reason}`);
+
   const [insertedLeague] = await tx
     .insert(leagues)
     .values({
@@ -181,6 +243,9 @@ export async function writeLeagueInTx(
       stakeTier: input.stakeTier,
       isPublicMatchmade: input.isPublicMatchmade,
       medianGame: input.medianGame ?? false,
+      entryFeeCents: money.config.entryFeeCents,
+      platformFeeCents: money.config.platformFeeCents,
+      payoutTable: money.config.payoutTable,
     })
     .onConflictDoNothing()
     .returning({ id: leagues.id });
@@ -251,6 +316,11 @@ export async function createLeague(
   { db, clock, newId, cache = NOOP_REFERENCE_CACHE, audit = getAuditLogger() }: LeagueWriteDeps,
   input: CreateLeagueInput,
 ): Promise<CreateLeagueResult> {
+  // Phase 4, Task 8: the money shape refuses FIRST — pure arithmetic, cheaper than the tier
+  // gate's queries, and a table that cannot balance should never cost a database round trip.
+  const money = leagueMoneyOrRefuse(input);
+  if (!money.ok) return { ok: false, status: 400, reason: money.reason };
+
   if (
     input.owner.kind === "member" &&
     (await tierJoinPrecondition(db, { isPublicMatchmade: input.isPublicMatchmade, experienceTier: input.experienceTier }, input.owner.userId))

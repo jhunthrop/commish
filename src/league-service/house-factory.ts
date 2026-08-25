@@ -201,6 +201,13 @@ export async function spawnHouseLeagueInTx(
     isPublicMatchmade: true,
     startTrigger: rung.startTrigger,
     owner: { kind: "house", rung: params.rung },
+    // Phase 4, Task 8: the rung's fee terms flow through the one write shape, `0`/`0`/`null`
+    // for every rung until the founder flips one in `house-catalog.ts` — `writeLeagueInTx`'s own
+    // `leagueMoneyOrRefuse` re-validation is what makes a mis-flipped rung throw here rather
+    // than store a table settlement could never balance.
+    entryFeeCents: rung.entryFeeCents,
+    platformFeeCents: rung.platformFeeCents,
+    payoutTable: rung.payoutTable,
   };
 
   const outcome = await writeLeagueInTx(

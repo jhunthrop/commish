@@ -4,6 +4,7 @@ import { drafts, leagues, teams } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger, type AuditLogger } from "@/integrity-service/audit-logger";
 import { attachAuditEvent, notifyAffectedMember, type MemberNotice } from "@/integrity-service/notify";
+import { refundEntryFeeInTx } from "@/money-service/entry-fee";
 import { isCommissionerOf, type LeagueAuthorityRow } from "./authority";
 
 /**
@@ -41,6 +42,10 @@ export interface ReleaseSeatDeps {
   readonly clock?: Clock;
   /** Defaults to the process-wide logger (`getAuditLogger()`). */
   readonly audit?: AuditLogger;
+  /** Phase 4, Task 8: mints the refund posting's row ids. Defaults to `crypto.randomUUID` —
+   *  injected only so tests can make money ids deterministic, the same reason `createLeague`
+   *  takes one. A free league's release never calls it. */
+  readonly newId?: () => string;
 }
 
 const systemClock: Clock = { now: () => new Date().toISOString() };
@@ -127,7 +132,13 @@ export async function releaseSeat(db: Db, input: ReleaseSeatInput, deps: Release
     // same strength `joinLeagueInTx` takes: this function frees a seat the same way that one
     // claims one, and the two must serialize on the same row.
     const [league] = await tx
-      .select({ id: leagues.id, name: leagues.name, commissionerUserId: leagues.commissionerUserId, houseRung: leagues.houseRung })
+      .select({
+        id: leagues.id,
+        name: leagues.name,
+        commissionerUserId: leagues.commissionerUserId,
+        houseRung: leagues.houseRung,
+        entryFeeCents: leagues.entryFeeCents,
+      })
       .from(leagues)
       .where(eq(leagues.id, input.leagueId))
       .for("update");
@@ -177,6 +188,26 @@ export async function releaseSeat(db: Db, input: ReleaseSeatInput, deps: Release
           }),
         );
       }
+    }
+
+    // PHASE 4, TASK 8 — THE FEE COMES BACK WITH THE SEAT, in this same transaction (the whole
+    // fee: pre-draft escrow was never anyone else's to keep, and the roll's humanity argument
+    // rides on this door working for paid seats too). `refundEntryFeeInTx` reads the amount off
+    // the book (a comped or seeded seat refunds nothing) and posts the mirror `entry_fee_refund`
+    // with its own `entry_fee_refunded` append — which takes this league's chain anchor a step
+    // before the `member_joined` append below, safe for exactly the reason the paid join's
+    // docblock argues: this transaction has held `leagues[X] FOR UPDATE` since statement one,
+    // and so must anything that could otherwise be holding the anchor or a money rollup row
+    // while waiting on us. Its `money_accounts` locks are taken in the every-money-writer sorted
+    // order, AFTER the notice inserts above took their `users FOR KEY SHARE` — a share-mode lock
+    // no money writer conflicts with. A FREE league (`entry_fee_cents = 0`) never enters this
+    // branch: zero money statements, the same spy-proven law as the free join.
+    if (league.entryFeeCents > 0) {
+      await refundEntryFeeInTx(
+        tx,
+        { leagueId: league.id, userId: input.userId },
+        { audit, clock: { now: () => nowIso }, newId: deps.newId ?? (() => crypto.randomUUID()) },
+      );
     }
 
     // THE ANCHOR, LAST. The departing member's own event first (the audit compromise, Step 3),

@@ -96,6 +96,33 @@ export async function expectRejectionMatching(promise: Promise<unknown>, pattern
   await expect(promise).rejects.toSatisfy((error: unknown) => pattern.test(causeChainMessage(error)));
 }
 
+/**
+ * Runs `fn` against a `Db` that records the SQL text of EVERY statement it sends — statements
+ * inside `db.transaction(...)` included — and returns them in execution order.
+ *
+ * The free-season proof (Phase 4, Task 8; reused by Task 9's dissolution): a free league's join
+ * and release must run without a single `money_*` table read or write, asserted as
+ * `statements.filter((s) => /money_/.test(s))` being empty rather than trusted from a code read.
+ *
+ * Uses drizzle's own `logger` seam, NOT `countingDb`'s `$client.unsafe` proxy, deliberately:
+ * postgres-js scopes a transaction's statements to the connection `sql.begin(...)` reserved, so
+ * a proxy over the BASE client never sees them — while the logger is part of the drizzle session
+ * config and rides into every nested transaction session untouched.
+ */
+export async function recordStatements(base: Db, fn: (db: Db) => Promise<unknown>): Promise<readonly string[]> {
+  const statements: string[] = [];
+  const logged = drizzle(base.$client, {
+    schema,
+    logger: {
+      logQuery: (query: string) => {
+        statements.push(query);
+      },
+    },
+  });
+  await fn(logged);
+  return statements;
+}
+
 export interface CountingDb {
   /** A full `Db` — also assignable to `ReadonlyDb` for a caller (like `affectedTeams`) that
    *  only needs the read half. */

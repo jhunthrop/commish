@@ -188,6 +188,22 @@ describe("ensureHouseCatalog", () => {
     });
   });
 
+  it("carries every rung's fee terms through the one write shape — free, whole-shelf, until the founder flips a rung (Task 8)", async () => {
+    await ensureHouseCatalog(db, deps());
+    for (const rung of Object.keys(HOUSE_CATALOG.rungs) as (keyof typeof HOUSE_CATALOG.rungs)[]) {
+      const spawned = await db.select().from(leagues).where(eq(leagues.houseRung, rung));
+      expect(spawned.length).toBeGreaterThan(0);
+      for (const league of spawned) {
+        expect({ id: league.id, entryFeeCents: league.entryFeeCents, platformFeeCents: league.platformFeeCents, payoutTable: league.payoutTable }).toEqual({
+          id: league.id,
+          entryFeeCents: HOUSE_CATALOG.rungs[rung].entryFeeCents,
+          platformFeeCents: HOUSE_CATALOG.rungs[rung].platformFeeCents,
+          payoutTable: HOUSE_CATALOG.rungs[rung].payoutTable,
+        });
+      }
+    }
+  });
+
   it("records a house_league_opened system_action on the new league's own chain", async () => {
     await ensureHouseCatalog(db, deps());
     const rows = await db.select().from(auditEvents).where(eq(auditEvents.chainScope, "house_open_12_1"));

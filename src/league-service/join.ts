@@ -8,6 +8,9 @@ import { defaultSweepDeps, sweepQuietly, type SweepDeps } from "@/integrity-serv
 import { attachAuditEvent, notifyAffectedMember } from "@/integrity-service/notify";
 import { hasOpenSeat } from "@/matchmaking/filter";
 import { SEAT_HOLD_REFUSALS } from "@/matchmaking/seat-hold";
+import { collectEntryFeeInTx } from "@/money-service/entry-fee";
+import { MONEY_REFUSALS } from "@/money/config";
+import type { MoneyStatesConfig, StateCode } from "@/money/states";
 import { ENFORCEMENT_REFUSALS, tierJoinPrecondition } from "./enforcement";
 import { fireWhenFullInTx } from "./fill-trigger";
 import { consumeSeatHoldInTx, liveHoldsFor } from "./seat-hold";
@@ -52,6 +55,29 @@ export type JoinLeagueOutcome =
  */
 export type JoinPrecondition = (tx: DbTx, leagueId: string, userId: string) => Promise<JoinLeagueOutcome | null>;
 
+/**
+ * Phase 4, Task 8: what a PAID join must arrive holding — the joiner's attested state of entry
+ * and the enabled-state list the money gates read (`MONEY_STATES` in production; tests prove the
+ * enabled path with a test-only entry). Optional on `JoinLeagueInput` because every free join —
+ * which is every join this season — neither has nor needs one; a paid league reached WITHOUT it
+ * refuses with the state gate's own sentence, because an unattested state is a state the gates
+ * cannot pass, never a fee waived. Wiring a real attestation control into the join doors is the
+ * money-live UI's job (Task 13's gated surface), not this seam's.
+ */
+export interface JoinMoneyContext {
+  readonly stateOfEntry: StateCode;
+  readonly states: MoneyStatesConfig;
+}
+
+/** The savepoint sentinel `joinLeagueInTx` throws to unwind the seat insert when the fee
+ *  refuses — caught by the same function, never visible to a caller. */
+class EntryFeeRefused extends Error {
+  constructor(readonly refusal: { readonly status: number; readonly reason: string }) {
+    super(refusal.reason);
+    this.name = "EntryFeeRefused";
+  }
+}
+
 export interface JoinLeagueInput {
   readonly leagueId: string;
   readonly userId: string;
@@ -70,6 +96,9 @@ export interface JoinLeagueInput {
    * against it (see the capacity check's own comment).
    */
   readonly holdToken?: string | null;
+  /** Phase 4, Task 8 — see `JoinMoneyContext`. Absent for every free join, which is every join
+   *  this season. */
+  readonly money?: JoinMoneyContext;
 }
 
 /**
@@ -107,6 +136,29 @@ export interface JoinLeagueInput {
  * serializes either of them against a concurrent `claimSeatHold` on the same league — see that
  * function's own FK enumeration in `./seat-hold`.
  *
+ * **PHASE 4, TASK 8 — THE ENTRY FEE'S PLACE IN THIS ORDER.** For a PAID league
+ * (`leagues.entry_fee_cents > 0`, a fact read off the SAME locked row as the capacity), the
+ * `teams` INSERT and `collectEntryFeeInTx` (`@/money-service/entry-fee`) run together inside ONE
+ * SAVEPOINT (`tx.transaction`), after every precondition and before `fireWhenFullInTx` — so a
+ * fee refusal (a closed gate, an insufficient balance) unwinds the seat insert with it and the
+ * join answers a plain refusal with NO seat taken and NO money moved, while everything the outer
+ * transaction wrote before it (a consumed seat hold's stamp — the "released immediately" rule)
+ * still commits. The fee's own statements, in order: plain `users`/receivable reads (no lock);
+ * `money_accounts FOR UPDATE` in sorted id order (the every-money-writer order, so a concurrent
+ * standalone posting on the same member's account queues, never cycles); the money inserts and
+ * rollup UPDATEs (no lock this transaction does not already hold); then the
+ * `entry_fee_collected` append, which takes this league's chain ANCHOR. That anchor lands
+ * BEFORE `fireWhenFullInTx`'s FK-carrying writes below — the one deliberate exception to
+ * anchor-last, and it is safe by the same rule that orders everything else here: every
+ * transaction in this codebase that touches this league's drafts row, notices or chain anchor
+ * takes a `leagues[X]` row lock as its own first statement (or an FK lock that conflicts with
+ * ours), and this transaction has held `leagues[X] FOR UPDATE` since statement one — nothing can
+ * be holding any of those later rows while waiting on us, so no cycle can close. A FREE league
+ * takes the plain insert with not one money statement — the free-season law, proven by the
+ * statement-log spy in `entry-fee.test.ts` rather than promised here. The composed order is
+ * driven on two real connections in `src/integrity-service/lock-order.test.ts`'s "a paid join's
+ * fee posting" block.
+ *
  * **Why the precondition runs where it does.** Every path-specific gate (an invite's expiry and
  * use cap, a public league's listing and draft status) is checked AFTER the "are you already a
  * member" lookup and BEFORE the capacity check. That ordering is the rule that makes re-arriving
@@ -124,7 +176,7 @@ export async function joinLeagueInTx(
   precondition?: JoinPrecondition,
 ): Promise<JoinLeagueOutcome> {
   const [league] = await tx
-    .select({ id: leagues.id, teamCount: leagues.teamCount })
+    .select({ id: leagues.id, teamCount: leagues.teamCount, entryFeeCents: leagues.entryFeeCents })
     .from(leagues)
     .where(eq(leagues.id, input.leagueId))
     .for("update");
@@ -183,13 +235,42 @@ export async function joinLeagueInTx(
 
   const [profile] = await tx.select({ displayName: users.displayName }).from(users).where(eq(users.id, input.userId));
   const teamId = input.newId();
-  await tx.insert(teams).values({
+  const audit = input.audit ?? getAuditLogger();
+  const teamRow = {
     id: teamId,
     leagueId: league.id,
     userId: input.userId,
     name: input.teamName ?? profile?.displayName ?? "New team",
-  });
-  const audit = input.audit ?? getAuditLogger();
+  };
+  if (league.entryFeeCents > 0) {
+    // PHASE 4, TASK 8 — the paid seat. See the docblock's own "THE ENTRY FEE'S PLACE IN THIS
+    // ORDER" for why the insert and the fee share one savepoint, and why an unattested state
+    // refuses with the state gate's sentence rather than waiving a published fee.
+    const money = input.money;
+    if (money === undefined) return { ok: false, status: 403, reason: MONEY_REFUSALS.stateNotEnabled };
+    try {
+      await tx.transaction(async (seatTx) => {
+        await seatTx.insert(teams).values(teamRow);
+        const fee = await collectEntryFeeInTx(
+          seatTx,
+          { leagueId: league.id, userId: input.userId, entryFeeCents: league.entryFeeCents, stateOfEntry: money.stateOfEntry },
+          { audit, clock: { now: () => input.occurredAt }, newId: input.newId, states: money.states },
+        );
+        // Thrown, not returned: a normal return would RELEASE the savepoint and commit the seat
+        // of a join the fee just refused. The catch below is the only reader.
+        if (!fee.ok) throw new EntryFeeRefused(fee);
+      });
+    } catch (error: unknown) {
+      if (error instanceof EntryFeeRefused) return { ok: false, ...error.refusal };
+      // Anything else (the unique-index backstop included) is the caller's to handle, exactly as
+      // it was when the insert ran bare.
+      throw error;
+    }
+  } else {
+    // The free league — every league this season. NOT ONE money statement runs on this path
+    // (the free-season law, held by the statement-log spy in `entry-fee.test.ts`).
+    await tx.insert(teams).values(teamRow);
+  }
   // Phase 3.5, Task 7: "a time, not a button". Called unconditionally, after every seat this
   // codebase ever takes, through BOTH doors that reach `joinLeagueInTx` (an invite accept and a
   // public browse join) — `fireWhenFullInTx` (`./fill-trigger`) answers "is this now full, and
@@ -368,6 +449,10 @@ export interface JoinPublicLeagueInput {
   /** Phase 3.6, Task 6 — see `JoinLeagueInput.holdToken`'s own docblock. Spread straight through
    *  to `joinLeagueInTx` below; an ordinary "Join" click never sets it. */
   readonly holdToken?: string | null;
+  /** Phase 4, Task 8 — see `JoinMoneyContext`. Spread straight through to `joinLeagueInTx`;
+   *  no production route sets it yet (every league is free this season), so a paid league
+   *  reached through this door refuses at the state gate rather than seating anyone unpaid. */
+  readonly money?: JoinMoneyContext;
 }
 
 /**

@@ -3686,3 +3686,119 @@ describe("recordWithdrawalCompleted's lock order", () => {
     expect(available2!.balanceCents).toBe(15_00); // 30 funded minus the 15 reserved
   });
 });
+
+/**
+ * PHASE 4, TASK 8: the composed transaction — a PAID join carrying `collectEntryFeeInTx`
+ * (`@/money-service/entry-fee`) inside `joinLeagueInTx`'s own transaction — against a concurrent
+ * STANDALONE posting on the same member's account. The join's order is leagues FOR UPDATE, the
+ * seat insert, then `money_accounts` in sorted id order; the standalone writer's is the same
+ * sorted account order with no leagues row at all. The shared rollup row
+ * (`user_available:<id>`) is the LAST each must reach for here, so with a bystander parked on
+ * it both writers demonstrably queue — and when it releases, both commit, to the cent. An
+ * input-order lock would have let the pair cycle instead.
+ */
+describe("a paid join's fee posting beside a standalone posting on the same member account (Task 8)", () => {
+  const feeStates = { enabled: [{ state: "TN", minAge: 18 }], neverEligible: [] } as const;
+  const feeDeps: PostDeps = { audit: getAuditLogger(), clock, newId: () => crypto.randomUUID() };
+
+  async function waitForBlockedBackends(count: number, timeoutMs = 5_000): Promise<boolean> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+      const rows = await joinDb.execute<{ count: string }>(
+        sql`SELECT count(*) AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()`,
+      );
+      if (Number(rows[0]?.count ?? 0) >= count) return true;
+      if (Date.now() > deadline) return false;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+  }
+
+  it("queues both writers on the shared rollup row in sorted order — no deadlock, both commit, exact balances", async () => {
+    await truncateMoneyTables(joinDb);
+    await seedLeagueWith("lg_fee_lock", ["u_fee_commish", "u_fee_joiner"]);
+    // The seeded league becomes PAID (teamCount 3, so the pot is 3 × 20_00), and the joiner
+    // passes the money gates for real: verified, unexcluded, attested in the test-enabled state.
+    await joinDb
+      .update(leagues)
+      .set({ entryFeeCents: 20_00, payoutTable: [{ place: 1, amountCents: 60_00 }] })
+      .where(eq(leagues.id, "lg_fee_lock"));
+    await joinDb.update(users).set({ kycStatus: "verified" }).where(eq(users.id, "u_fee_joiner"));
+    await joinDb.transaction((tx) =>
+      postMoneyTransaction(
+        tx,
+        {
+          kind: "deposit",
+          stateOfEntry: "TN",
+          entries: [
+            { accountId: accountIdFor("fbo_pool"), direction: "debit", amountCents: 50_00 },
+            { accountId: accountIdFor("user_available", "u_fee_joiner"), direction: "credit", amountCents: 50_00 },
+          ],
+          auditEvent: { eventType: "deposit_completed", actorId: "u_fee_joiner", actorType: "user", leagueId: null, payload: { amountCents: 50_00 } },
+        },
+        feeDeps,
+      ),
+    );
+
+    // The bystander parks on the ONE row both writers must reach for LAST in sorted order:
+    // `"league_escrow:…"` and `"platform_receivable:…"` sort before `"user_available:…"` for the
+    // join, `"fbo_pool"` sorts before it for the standalone deposit.
+    let holdsAvailableLock: () => void = () => {};
+    const availableLocked = new Promise<void>((resolve) => (holdsAvailableLock = resolve));
+    let releaseBystander: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releaseBystander = resolve));
+    const bystander = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM money_accounts WHERE id = ${"user_available:u_fee_joiner"} FOR UPDATE`);
+      holdsAvailableLock();
+      await released;
+    });
+    await availableLocked;
+
+    // T_join: the composed writer — leagues FOR UPDATE, the seat insert, then the fee's sorted
+    // account locks, blocking at the bystander's row.
+    const joining = pickDb.transaction((tx) =>
+      joinLeagueInTx(tx, {
+        leagueId: "lg_fee_lock",
+        userId: "u_fee_joiner",
+        newId: () => crypto.randomUUID(),
+        via: "public_browse",
+        occurredAt: clock.now(),
+        money: { stateOfEntry: "TN", states: feeStates },
+      }),
+    );
+    expect(await waitForBlockedBackends(1)).toBe(true);
+
+    // T_post: the standalone writer on the SAME member account, third connection.
+    const posting = flagDb.transaction((tx) =>
+      postMoneyTransaction(
+        tx,
+        {
+          kind: "deposit",
+          stateOfEntry: "TN",
+          entries: [
+            { accountId: accountIdFor("fbo_pool"), direction: "debit", amountCents: 10_00 },
+            { accountId: accountIdFor("user_available", "u_fee_joiner"), direction: "credit", amountCents: 10_00 },
+          ],
+          auditEvent: { eventType: "deposit_completed", actorId: "u_fee_joiner", actorType: "user", leagueId: null, payload: { amountCents: 10_00 } },
+        },
+        feeDeps,
+      ),
+    );
+    expect(await waitForBlockedBackends(2)).toBe(true);
+
+    releaseBystander();
+    await bystander;
+
+    expect(await joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await posting).toMatchObject({ ok: true, replayed: false });
+
+    // To the cent, whichever order the queue drained in: 50 funded − 20 fee + 10 deposited.
+    const [available] = await joinDb.select().from(moneyAccounts).where(eq(moneyAccounts.id, "user_available:u_fee_joiner"));
+    expect(available!.balanceCents).toBe(40_00);
+    const [escrow] = await joinDb.select().from(moneyAccounts).where(eq(moneyAccounts.id, "league_escrow:lg_fee_lock"));
+    expect(escrow!.balanceCents).toBe(20_00);
+    // Both of the join's appends landed on the league's own chain: entry_fee_collected, then
+    // member_joined — the composed transaction's two events, exactly.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_fee_lock"));
+    expect(leagueAnchor!.headSequence).toBe(2);
+  });
+});

@@ -10,7 +10,8 @@ import { LEAGUE_CONFIG } from "@/league";
 import { SUPERFLEX_ROSTER_SLOTS } from "@/league/roster-shape";
 import { ENFORCEMENT_REFUSALS } from "./enforcement";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
-import { createLeague, type CreateLeagueInput, type LeagueOwner } from "./creation";
+import { MONEY_REFUSALS } from "@/money/config";
+import { createLeague, leagueMoneyOrRefuse, writeLeagueInTx, type CreateLeagueInput, type LeagueOwner } from "./creation";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-17T12:00:00.000Z" };
@@ -460,6 +461,96 @@ describe("createLeague", () => {
       const rows = await db.select().from(auditEvents).where(eq(auditEvents.chainScope, result.leagueId));
       expect(rows).toHaveLength(1);
       expect(rows[0]).toMatchObject({ eventType: "league_created", actorId: null, actorType: "system" });
+    });
+  });
+});
+
+// Phase 4, Task 8: the money shape at creation.
+describe("entry fees at creation (Task 8)", () => {
+  const teamCount = LEAGUE_CONFIG.defaults.teamCount;
+  const FEE = 20_00;
+  const RAKE = 1_00;
+  const paidInput = (): CreateLeagueInput => ({
+    ...validInput(),
+    entryFeeCents: FEE,
+    platformFeeCents: RAKE,
+    payoutTable: [{ place: 1, amountCents: (FEE - RAKE) * teamCount }],
+  });
+
+  it("stores the fee, the platform fee and the published table when the arithmetic balances", async () => {
+    await giveCompletedSeasons("u1", 0);
+    const result = await createLeague(deps(), paidInput());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
+    expect(league).toMatchObject({
+      entryFeeCents: FEE,
+      platformFeeCents: RAKE,
+      payoutTable: [{ place: 1, amountCents: (FEE - RAKE) * teamCount }],
+    });
+  });
+
+  it("stores the free league's money shape as zeros and NULL, an empty table included", async () => {
+    await giveCompletedSeasons("u1", 0);
+    const result = await createLeague(deps(), { ...validInput(), payoutTable: [] });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
+    expect(league).toMatchObject({ entryFeeCents: 0, platformFeeCents: 0, payoutTable: null });
+  });
+
+  it("refuses a table that does not balance the pot exactly, before any transaction opens", async () => {
+    await giveCompletedSeasons("u1", 0);
+    const result = await createLeague(deps(), { ...paidInput(), payoutTable: [{ place: 1, amountCents: 1 }] });
+    expect(result).toEqual({ ok: false, status: 400, reason: MONEY_REFUSALS.prizeTableMismatch });
+    expect(await db.select().from(leagues)).toEqual([]);
+    expect(await db.select().from(auditEvents)).toEqual([]);
+  });
+
+  it("refuses a fee with no table, and a platform fee on a free league — the identity is one rule", async () => {
+    await giveCompletedSeasons("u1", 0);
+    expect(await createLeague(deps(), { ...validInput(), entryFeeCents: FEE })).toEqual({
+      ok: false,
+      status: 400,
+      reason: MONEY_REFUSALS.prizeTableMismatch,
+    });
+    expect(await createLeague(deps(), { ...validInput(), platformFeeCents: RAKE })).toEqual({
+      ok: false,
+      status: 400,
+      reason: MONEY_REFUSALS.prizeTableMismatch,
+    });
+  });
+
+  it("throws from writeLeagueInTx for a config createLeague never validated — the house factory's own backstop", async () => {
+    await giveCompletedSeasons("u1", 0);
+    await expect(
+      db.transaction((tx) =>
+        writeLeagueInTx(
+          tx,
+          { leagueId: "lg_bad_money", teamId: "t_bad_money", draftId: "d_bad_money" },
+          { ...validInput(), entryFeeCents: FEE },
+          new Date("2026-09-10T00:00:00.000Z"),
+          clock,
+          logger,
+        ),
+      ),
+    ).rejects.toThrow(MONEY_REFUSALS.prizeTableMismatch);
+    expect(await db.select().from(leagues)).toEqual([]);
+  });
+
+  it("answers leagueMoneyOrRefuse as pure data, the same rule the boundary schema reads", () => {
+    expect(leagueMoneyOrRefuse({ teamCount: 4, entryFeeCents: 0, platformFeeCents: 0, payoutTable: null })).toEqual({
+      ok: true,
+      config: { entryFeeCents: 0, platformFeeCents: 0, payoutTable: null },
+    });
+    expect(leagueMoneyOrRefuse({ teamCount: 4 })).toMatchObject({ ok: true });
+    expect(leagueMoneyOrRefuse({ teamCount: 4, entryFeeCents: 10_00, payoutTable: [{ place: 1, amountCents: 40_00 }] })).toEqual({
+      ok: true,
+      config: { entryFeeCents: 10_00, platformFeeCents: 0, payoutTable: [{ place: 1, amountCents: 40_00 }] },
+    });
+    expect(leagueMoneyOrRefuse({ teamCount: 4, entryFeeCents: -1, payoutTable: [{ place: 1, amountCents: 1 }] })).toEqual({
+      ok: false,
+      reason: MONEY_REFUSALS.invalidPrizeTableInputs,
     });
   });
 });
