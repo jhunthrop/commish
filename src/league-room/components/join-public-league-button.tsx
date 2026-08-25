@@ -59,7 +59,11 @@ export function JoinPublicLeagueButton({
         Join
       </Button>
       {error === null ? null : (
-        <p role="alert" className="text-sm text-negative">
+        /* `max-w-56` (Task 12, persona checkpoint): inside `LeagueRow`'s `max-content` action
+           column an unmeasured paragraph sizes the track to the whole sentence unwrapped and
+           crushes the row's other five columns — the cap wraps the refusal inside its own
+           column. In a card the surrounding width already governs, so nothing changes there. */
+        <p role="alert" className="max-w-56 text-sm text-negative">
           {error}
         </p>
       )}

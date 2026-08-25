@@ -1,5 +1,6 @@
 import type { HelpLevel } from "@/identity/preferences";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
+import { LeagueRow, LeagueRowsHeader } from "./league-row";
 import { OpenLeagueCard } from "./open-league-card";
 
 export interface OpenSeatsPanelProps {
@@ -9,7 +10,8 @@ export interface OpenSeatsPanelProps {
    *  pre-draft hero above it. */
   readonly quiet?: boolean;
   /** D1/E7: the signed-in member's own stored preference, threaded from the home page's
-   *  `readPreferences` read — a guided-preference member keeps inline captions here too. */
+   *  `readPreferences` read — a guided-preference member keeps inline captions on the CARD
+   *  form; the row form never prints a caption inline (Task 13's rule, unchanged here). */
   readonly helpLevel: HelpLevel;
 }
 
@@ -22,9 +24,15 @@ export interface OpenSeatsPanelProps {
  * `FirstRunPanel`'s own three paths already open with "find an open league", which IS this
  * shelf, and showing it twice on one screen is the same offer competing with itself.
  *
- * Every card is `OpenLeagueCard` (Task 5) — the same card `/browse` and the front door render —
- * so its seat count is `SeatMeter`, never a fourth phrasing (F17); this panel writes no seat
- * sentence of its own.
+ * ROWS ON lg+, CARDS BELOW (Phase 3.7, Task 12 — persona-checkpoint adjudication, delegated):
+ * the founder's rows order ("horizontal row elements instead of these cards - my eyes don't
+ * know where to focus", 2026-08-24) named the card-grid FORM at desktop widths, not the page it
+ * happened to be on — and this panel sits under a league TABLE, where a card grid is the same
+ * focus failure twice over. Both forms come from `open-league-shared.tsx` via `LeagueRow` /
+ * `OpenLeagueCard` (Task 13's one-source split), so this panel writes no seat sentence and no
+ * derived fact of its own (F17). One deliberate difference from `OpenLeagueShelf`: NO featured
+ * league — rule 5 gives this view's one ink action to the attention queue's top item (S10), so
+ * every CTA here is the quiet pill in both renderings.
  */
 export function OpenSeatsPanel({ leagues, quiet = false, helpLevel }: OpenSeatsPanelProps) {
   if (leagues.length === 0) return null;
@@ -40,7 +48,19 @@ export function OpenSeatsPanel({ leagues, quiet = false, helpLevel }: OpenSeatsP
       >
         Open leagues
       </Heading>
-      <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div data-testid="league-rows" className="hidden lg:block">
+        <LeagueRowsHeader />
+        <ul className="flex flex-col">
+          {leagues.map((league) => (
+            <li key={league.id} className="border-t border-line">
+              <LeagueRow league={league} signedIn emphasis="quiet" />
+            </li>
+          ))}
+        </ul>
+      </div>
+      {/* Below lg the ledger card IS the form (Task 13) — a six-column row cannot fit 360px.
+          The old lg:grid-cols-3 tier left with the rows ruling: this grid never renders at lg+. */}
+      <ul data-testid="league-cards" className="grid gap-3 sm:grid-cols-2 lg:hidden">
         {leagues.map((league) => (
           <li key={league.id} className="min-w-0">
             <OpenLeagueCard league={league} signedIn helpLevel={helpLevel} />
