@@ -53,6 +53,12 @@ npm run trades:sweep      # the trade-fairness detector's manual re-run: raises 
                           # idempotent by construction, the same shape npm run integrity:sweep
                           # already uses. See docs/trades.md and
                           # docs/decisions/trades-and-fairness.md §6.
+npm run money:reconcile   # the ledger's pooled balance against the bank's, plus the double-entry
+                          # law, the user_available floor and escrow-by-league consistency —
+                          # every check its own figure, never a boolean. Exits non-zero and names
+                          # each drift to the cent; a clean run says so plainly. Level-triggered,
+                          # no scheduler (this and the admin-room drift panel's own "Refresh"
+                          # button, /app/admin/money/reconcile, are the only two callers).
 npm run e2e:install       # one-time: download the Playwright browser
 npm run e2e               # browser end-to-end suite (needs a build + a WorkOS test key)
 npm run e2e:ui            # same suite, in Playwright's interactive UI mode

@@ -27,6 +27,7 @@
     "admin:grant": "dotenv -e .env.local -- tsx scripts/grant-admin.ts",
     "integrity:sweep": "dotenv -e .env.local -- tsx scripts/sweep-multi-account.ts",
     "trades:sweep": "dotenv -e .env.local -- tsx scripts/sweep-trade-fairness.ts",
+    "money:reconcile": "dotenv -e .env.local -- tsx scripts/money-reconcile.ts",
     "infra:up": "docker compose up -d --wait",
     "infra:down": "docker compose down",
     "e2e": "dotenv -e .env.local -v STATS_PROVIDER=mock -- playwright test",
