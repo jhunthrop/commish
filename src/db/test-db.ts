@@ -63,9 +63,14 @@ export async function truncateAll(db: Db): Promise<void> {
  * The append-only triggers do not block TRUNCATE, by 0035's own note (ruling 26's reasoning,
  * inherited from 0019/0021): table ownership can already DROP or DISABLE TRIGGER, and this
  * function is how every money integration test starts.
+ *
+ * `payment_transfer_intents` (Task 5, migration 0037) rides along for the same merge-cleanup
+ * reason: it does not exist on main's `commish_test` until this lane lands.
  */
 export async function truncateMoneyTables(db: Db): Promise<void> {
-  await db.execute(sql`TRUNCATE TABLE money_entries, money_transactions, money_accounts RESTART IDENTITY CASCADE`);
+  await db.execute(
+    sql`TRUNCATE TABLE money_entries, money_transactions, money_accounts, payment_transfer_intents RESTART IDENTITY CASCADE`,
+  );
 }
 
 /**

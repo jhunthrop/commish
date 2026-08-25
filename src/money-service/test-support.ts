@@ -1,7 +1,7 @@
 import { asc } from "drizzle-orm";
 import { expect } from "vitest";
 import type { Db } from "@/db/client";
-import { moneyAccounts, moneyEntries, moneyTransactions } from "@/db/schema";
+import { moneyAccounts, moneyEntries, moneyTransactions, paymentTransferIntents } from "@/db/schema";
 import { accountIdFor } from "@/money/accounts";
 import { postMoneyTransaction, type MoneyTransactionInput, type PostDeps, type PostMoneyOutcome } from "./post";
 
@@ -51,6 +51,32 @@ export async function expectNoPostingTookPlace(db: Db, before: MoneyBookSnapshot
     const prior = before.accounts.find((row) => row.id === account.id);
     expect({ id: account.id, balanceCents: account.balanceCents }).toEqual({ id: account.id, balanceCents: prior?.balanceCents ?? 0 });
   }
+}
+
+/** `MoneyBookSnapshot` plus the deposit door's own side table — see `expectNoDepositTookPlace`. */
+export interface DepositBookSnapshot extends MoneyBookSnapshot {
+  readonly intents: readonly (typeof paymentTransferIntents.$inferSelect)[];
+}
+
+/** `snapshotMoneyBook` plus `payment_transfer_intents`, for before/after comparison at the
+ *  deposit door. */
+export async function snapshotDepositBook(db: Db): Promise<DepositBookSnapshot> {
+  return {
+    ...(await snapshotMoneyBook(db)),
+    intents: await db.select().from(paymentTransferIntents).orderBy(asc(paymentTransferIntents.providerTransferRef)),
+  };
+}
+
+/**
+ * The deposit door's own refusal proof (Task 5's TDD requirement): a refused initiation left the
+ * book untouched AND stored no intent — because an intent row with no gate behind it would be a
+ * deposit the platform later completes for a member the gates refused. Composes
+ * `expectNoPostingTookPlace` for the book half.
+ */
+export async function expectNoDepositTookPlace(db: Db, before?: DepositBookSnapshot): Promise<void> {
+  await expectNoPostingTookPlace(db, before);
+  const intents = await db.select().from(paymentTransferIntents).orderBy(asc(paymentTransferIntents.providerTransferRef));
+  expect(intents).toEqual(before?.intents ?? []);
 }
 
 /**

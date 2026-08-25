@@ -42,7 +42,19 @@ export const MONEY_STATES = {
   /** Empty by default. The founder names this list with counsel — nothing else ever should. */
   enabled: [] as readonly MoneyStateEntry[],
   neverEligible: ["HI", "ID", "MT", "NV", "WA"] as readonly StateCode[],
-} as const;
+} as const satisfies MoneyStatesConfig;
+
+/**
+ * The SHAPE of `MONEY_STATES`, as the one seam a money gate reads it through: `moneyGates`
+ * (`src/money-service/gates.ts`, Task 5) takes this in its deps rather than importing the
+ * constant, so its tests can prove the enabled-state path with a test-only entry while the
+ * shipped list stays empty — the production caller passes `MONEY_STATES` itself, and the
+ * `satisfies` above holds the constant to this shape.
+ */
+export interface MoneyStatesConfig {
+  readonly enabled: readonly MoneyStateEntry[];
+  readonly neverEligible: readonly StateCode[];
+}
 
 /** Money is live only once at least one state has been named. Every money-real surface — entry
  *  fee collection, the wallet, the free-season sentence — reads this rather than checking

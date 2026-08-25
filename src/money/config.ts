@@ -12,7 +12,14 @@
 export const MONEY_CONFIG = {
   /** Founder decision 8: $500 per seat, config not constant. */
   entryFeeCeilingCents: 50_000,
-  deposit: { minCents: 5_00, maxPerTransferCents: 1_000_00 },
+  deposit: {
+    minCents: 5_00,
+    maxPerTransferCents: 1_000_00,
+    /** The deposit door's per-user request ceiling (`src/app/api/wallet/_shared.ts`), the
+     *  `preferencesRateLimit` shape: a blast-radius bound on one authenticated caller, not a
+     *  distributed budget. */
+    rateLimit: { maxRequests: 10, windowMs: 60_000 },
+  },
   withdrawal: { minCents: 5_00 },
   /**
    * Founder decision 6 / Phase 5's "Assumed Phase 4 interface": the threshold the ledger must
@@ -65,6 +72,29 @@ export const MONEY_REFUSALS = {
    * front door). Money-first copy, the same discipline as `amountOverflow` above.
    */
   insufficientBalance: "No money moved. The balance available does not cover this amount.",
+  /**
+   * `moneyGates` (`src/money-service/gates.ts`, Task 5), the FIRST gate on every money door:
+   * the caller's attested state is not on `MONEY_STATES.enabled` — which today is every state,
+   * because the list ships empty until the founder names one with counsel (decision 7).
+   */
+  stateNotEnabled: "No money moved. Paid play is not open in your state yet.",
+  /** `moneyGates`, second: the dossier's §4.2 federal-rules gate, in the door's own words. */
+  kycRequired: "Verify your identity first. Federal rules require it before you can hold a balance.",
+  /** `moneyGates`, third: self-exclusion closes every door money enters (§4.4). One way, by
+   *  design — reopening it is a support conversation, not an endpoint. */
+  selfExcluded: "No money moved. You closed paid play on this account, and only support can reopen it.",
+  /**
+   * `moneyGates`, the spend-door fourth (plan invariant 5): a returned deposit left this account
+   * owing the platform, and every paid door stays closed until a new deposit settles it. The
+   * deposit door itself stays OPEN while owed — the deposit is how the debt clears.
+   */
+  balanceOwed: "No money moved. A returned deposit left this account owing money, and a new deposit settles that first.",
+  /** `depositRequestSchema` (`src/money-service/schemas.ts`): below `MONEY_CONFIG.deposit.minCents`.
+   *  Rendered THROUGH `formatUsd` from the config value itself, so the sentence can never state a
+   *  bound the server does not enforce. (`formatUsd` is a hoisted declaration below.) */
+  depositBelowMinimum: `No money moved. The minimum deposit is ${formatUsd(MONEY_CONFIG.deposit.minCents)}.`,
+  /** `depositRequestSchema`: above `MONEY_CONFIG.deposit.maxPerTransferCents`. Same construction. */
+  depositAboveMaximum: `No money moved. The maximum deposit is ${formatUsd(MONEY_CONFIG.deposit.maxPerTransferCents)} per transfer.`,
 } as const;
 
 /** The union of every refusal sentence in `MONEY_REFUSALS`, for a writer's own refusal type. */

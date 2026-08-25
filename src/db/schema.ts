@@ -21,6 +21,7 @@ import { AUDIT_EVENT_TYPES, type JsonObject } from "@/domain/audit";
 import { MONEY_ACCOUNT_KINDS } from "@/money/accounts";
 import type { MoneyPostingDirection } from "@/money/posting";
 import type { PrizeTable } from "@/money/prize-table";
+import type { TransferIntent } from "@/payments-provider/contract";
 import type { TradeAsset } from "@/trades/assets";
 
 export const experienceTierEnum = pgEnum("experience_tier", ["beginner", "experienced"]);
@@ -90,6 +91,13 @@ export const moneyTxnKindEnum = pgEnum("money_txn_kind", MONEY_TXN_KINDS);
  *  to the same pair of words, so the pure vocabulary and the pg enum cannot drift. */
 export const MONEY_DIRECTIONS = ["debit", "credit"] as const satisfies readonly MoneyPostingDirection[];
 export const moneyDirectionEnum = pgEnum("money_direction", MONEY_DIRECTIONS);
+/** Which way an EXTERNAL transfer moves money (Seam A's `TransferIntent.direction`), for the
+ *  intent store below — `satisfies` pins the tuple to the seam's own union, so the pg enum and
+ *  the contract cannot drift. Distinct from `money_direction`: that pair is double-entry
+ *  vocabulary, this pair is which side of the bank the money starts on. */
+export const TRANSFER_DIRECTIONS = ["deposit", "withdrawal"] as const satisfies readonly TransferIntent["direction"][];
+export type TransferDirection = (typeof TRANSFER_DIRECTIONS)[number];
+export const transferDirectionEnum = pgEnum("transfer_direction", TRANSFER_DIRECTIONS);
 /** `none → pending → verified | failed`, written only by the KYC callback path (Task 7) — one-way
  *  except an operator reset. `none` is the default every existing and future row starts at. */
 export const KYC_STATUSES = ["none", "pending", "verified", "failed"] as const;
@@ -1331,5 +1339,51 @@ export const moneyEntries = pgTable(
     /** THE Phase 5 guarantee (founder decision 6): the 1099 threshold query — every entry for a
      *  tax year, grouped by state — seeks here instead of scanning the whole book each January. */
     index("money_entries_tax_year_state_idx").on(t.taxYear, t.stateOfEntry),
+  ],
+);
+
+/**
+ * Phase 4, Task 5 (migration 0037): what a provider callback cannot say for itself. A
+ * `PaymentsEvent` (Seam A's `ingest.ts`) carries only `{type, ref, amountCents}` — the provider
+ * speaks its own vocabulary and knows nothing of our users — so the initiation writer
+ * (`initiateDeposit`, `@/money-service/deposits`) records here WHOSE transfer a ref names, the
+ * state they attested at the door (decision 6: every eventual entry row needs it, and the
+ * completion callback arrives days after the attestation), and the amount the provider accepted,
+ * for the disagreement alarm. This is the "stores the intent" half of the deposits brief:
+ * pending money is the bank's, not the book's, so an intent is deliberately NOT a
+ * `money_transactions` row — no ledger rows exist until the completion event posts them.
+ *
+ * NOT append-only-triggered and NOT FK'd to `users`, both on the money tables' own reasoning:
+ * it is provenance beside the book rather than the book itself (the rollup/`session_signals`
+ * class), and money history must survive anything (ruling 7 — `money_transactions.league_id`
+ * carries no FK for the same reason). Insert-only by usage: status is never stored here because
+ * the book itself answers it (a `deposit`-kind transaction with this ref means completed; a
+ * `deposit_return` means returned), and a second place to say so would be a place to drift.
+ */
+export const paymentTransferIntents = pgTable(
+  "payment_transfer_intents",
+  {
+    /** The provider's own reference — opaque, and the one join key a callback carries. */
+    providerTransferRef: text("provider_transfer_ref").primaryKey(),
+    direction: transferDirectionEnum("direction").notNull(),
+    userId: text("user_id").notNull(),
+    /** Integer cents the provider accepted — the disagreement alarm compares callbacks to this. */
+    amountCents: bigint("amount_cents", { mode: "number" }).notNull(),
+    /** The deposit rail chosen (`bank`/`card`); NULL for a withdrawal (bank only, permanently). */
+    method: text("method"),
+    /** Self-attested at the door this phase (Task 5 Step 2); Phase 5 replaces the producer. */
+    stateOfEntry: char("state_of_entry", { length: 2 }).notNull(),
+    /** The namespaced key this product handed the provider — provenance, never a join key. */
+    idempotencyKey: text("idempotency_key").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check("payment_transfer_intents_amount_positive_ck", sql`${t.amountCents} > 0`),
+    /** One intent per initiation: a double-submit resolves at the provider into the SAME ref,
+     *  and this index is the database's backstop for the same fact on our side. */
+    uniqueIndex("payment_transfer_intents_idempotency_key_idx").on(t.idempotencyKey),
+    /** The wallet's "your pending deposits" read, and Task 11's reconcile sweep: one user's
+     *  intents in time order. */
+    index("payment_transfer_intents_user_created_idx").on(t.userId, t.createdAt),
   ],
 );

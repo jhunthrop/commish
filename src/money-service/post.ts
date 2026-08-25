@@ -113,6 +113,29 @@ async function ensureAndLockAccount(tx: DbTx, accountId: MoneyAccountId): Promis
   return row;
 }
 
+/**
+ * Sorted-order lock acquisition over any set of money accounts, exported for the writers that
+ * must DECIDE a posting's shape from balances no concurrent transaction can move — the ACH-return
+ * clawback split and the receivable-settlement split (`./deposits.ts`), each of which reads a
+ * balance and then posts against it. Deciding from an unlocked read would race every concurrent
+ * posting; taking the locks in any order but this one could deadlock against
+ * `postMoneyTransaction` itself. So the ONE writer owns the discipline and lends it out:
+ * deduplicate, sort lexicographically, `ensureAndLockAccount` each — exactly the acquisition
+ * order `postMoneyTransaction` uses below, which makes a caller's pre-lock a pure prefix of the
+ * posting's own (every re-lock inside the posting finds the row already held by this same
+ * transaction). The returned map's iteration order is the sorted lock order.
+ */
+export async function ensureAndLockMoneyAccounts(
+  tx: DbTx,
+  accountIds: readonly MoneyAccountId[],
+): Promise<Map<MoneyAccountId, { kind: MoneyAccountKind; balanceCents: number }>> {
+  const locked = new Map<MoneyAccountId, { kind: MoneyAccountKind; balanceCents: number }>();
+  for (const accountId of [...new Set(accountIds)].sort()) {
+    locked.set(accountId, await ensureAndLockAccount(tx, accountId));
+  }
+  return locked;
+}
+
 /** How this posting moves ONE account's rollup, under the vocabulary's own sign convention. */
 function deltaFor(kind: MoneyAccountKind, accountId: MoneyAccountId, entries: readonly MoneyEntryInput[]): number {
   let debits = 0;
@@ -199,11 +222,11 @@ export async function postMoneyTransaction(tx: DbTx, input: MoneyTransactionInpu
     if (replay !== undefined) return replay;
   }
 
-  const accountIds = [...new Set(input.entries.map((entry) => entry.accountId))].sort();
-  const lockedAccounts = new Map<MoneyAccountId, { kind: MoneyAccountKind; balanceCents: number }>();
-  for (const accountId of accountIds) {
-    lockedAccounts.set(accountId, await ensureAndLockAccount(tx, accountId));
-  }
+  const lockedAccounts = await ensureAndLockMoneyAccounts(
+    tx,
+    input.entries.map((entry) => entry.accountId),
+  );
+  const accountIds = [...lockedAccounts.keys()];
 
   // The post-lock replay RE-CHECK (fix round 1, CRITICAL), between the locks and the balance
   // floor: a duplicate that shared a rollup row committed while this transaction was BLOCKED on
