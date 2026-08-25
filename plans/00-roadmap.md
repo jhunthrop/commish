@@ -52,6 +52,10 @@ is this pass's own decision doc, and `docs/research/2026-08-23-backend-gaps-back
 closeout deliverable: every backend gap the phase's persona panels flagged, with severities and
 suggested owner phases, none of it implemented in 3.6.
 
+## Phase 3.7 — a founder-ordered design remediation pass
+
+`docs/superpowers/plans/2026-08-24-phase3p7-design-v3.md` is Phase 3.7: the founder-ordered remediation of Phase 3.6's rejected mint-on-ink identity into the approved "Sunday Standard" (near-monochrome six-rule palette, the caps and accent-budget sweeps, the ledger card, the wire, and the mid-phase founder-ordered row shelf) — same non-renumbering rule, Phase 4's position **unchanged**; `docs/decisions/design-v3.md` is its decision record, closed by Task 12's persona checkpoint.
+
 ## Cross-phase dependency graph
 
 ```

@@ -186,3 +186,82 @@ re-derivation, `docs/design-system.md`'s "One pigment, two jobs"). Task 12's per
 verdicts, once run, are the next entry this document expects — appended below this line, not
 folded into the sections above, so the record of what the panel found stays distinguishable from
 what execution had already decided before they walked the product.
+
+---
+
+## 8. The persona checkpoint (Task 12, 2026-08-25)
+
+Run against the rendered production build (`next start`, the e2e bundle), both themes, at 1440px
+and 360px — screenshots of every station, never a claim from source alone. The phase-end battery
+ran first (26/26 e2e specs green across both viewport projects, after one spec-layer fix — see
+the task report), and the browser contrast pass rode the battery's own axe spec
+(`e2e/design-v2.spec.ts`, "every v2 surface clears axe's color-contrast rule"): zero
+`color-contrast` violations on `/`, `/browse`, the locker room and the draft room (plus the hold
+interstitial, waiting room, league home, standings and a matchup week), light and dark.
+
+**The panel** — veteran, casual, commissioner, first-timer, plus the phone user and the skeptic —
+walked `/`, `/browse`, a league row, an open card at 360px, the wire, and the locker room against
+the founder's bar ("most premium… beautifully simplistic but high information density… best app
+I've ever seen") and the six rules.
+
+**Verdicts by station:**
+
+- **The front door (`/`).** Holds the bar in both themes. The floodlit hero, the three-step
+  strip, the proof stats and the row shelf read as one object; color lands only where rules 1
+  and 6 permit it (money green on "Drafting this week." and entry values, live red on ticking
+  clocks and "On deck" dots). The veteran finds the shelf scannable top to bottom in one pass —
+  the founder's rows correction, verified working at the checkpoint. The first-timer finds the
+  three-step strip answers "what happens when I press this" before pressing anything.
+- **`/browse`.** The full lobby carries the same row grammar with the four filter pills and one
+  legend line; the commissioner's "Start your own league" escape is present without competing
+  for ink (rule 5: one ink pill per rendering, on the featured row only, verified in the
+  screenshots and by `public-league-list.test.tsx`'s own count assertion).
+- **A league row.** Six columns, hairline-separated, exactly one spoken key per cell that needs
+  one. The casual reads a row left-to-right as a sentence; the veteran compares columns
+  vertically. One LOW noted, not actioned: a member league's stake badge beside its name repeats
+  the Entry column's value in the row form — the standing badge-authority ruling (§5, Task 5 fix
+  round) holds as written, and the panel judged the repetition tolerable against the cost of
+  reopening a reviewed ruling mid-checkpoint. Recorded for the next design pass, not silently
+  absorbed.
+- **The open card at 360px.** The phone user's verdict: the ledger card is the strongest single
+  surface in the product — name, live chip, five ledger rows, seat segments and one action in
+  under a screen, nothing truncated, no horizontal scroll (also proven by `mobile-360.spec.ts`
+  in the battery).
+- **The wire.** Actor-free sentences (S9) read naturally; the skeptic specifically checked that
+  every item names a league, a count or a coarse duration and none of it is fabricated filler —
+  the honesty contract (`docs/design-system.md`) is visible in the rendered output, not just the
+  docblock. Reduced-motion and static-row branches are test-asserted (`wire.test.tsx`).
+- **The locker room.** The attention queue's top action is the view's one ink (S10); the board
+  is quiet; and the open-leagues panel below it now follows the founder's rows order (see
+  adjudication A below). With a heavy fixture dataset (60+ leagues) the table stays legible —
+  density is the product working as briefed, not a defect.
+
+**No DIRECTION-class findings.** Nothing the panel found requires founder input; the one noted
+LOW above is recorded under a standing ruling.
+
+**Adjudication A — the signed-in home's `OpenSeatsPanel` renders rows too (decided yes,
+shipped).** The founder's order ("horizontal row elements instead of these cards - my eyes don't
+know where to focus") named the card-grid *form* at desktop widths, not the page it happened to
+be on. The signed-in home showed the same league twice-shaped — a row on `/browse`, a card on
+`/app` — and stacked a card grid under a league *table*, the exact focus failure the order
+diagnosed. `OpenSeatsPanel` now renders `LeagueRow`s on `lg`+ and keeps the card grid below
+`lg`, through the same `open-league-shared.tsx` source (Task 13's split), so the two surfaces
+can never disagree. One deliberate difference from the public shelf: no featured league — rule 5
+gives this view's one ink action to the attention queue's top item (S10), so every panel CTA is
+quiet in both renderings, asserted by `open-seats-panel.test.tsx`.
+
+**Adjudication B — the tier-refusal sentence in the row's action column (decided: cosmetic
+defect, fixed).** Reproduced in the rendered build: `LeagueRow`'s action column is a
+`max-content` grid track, and `ENFORCEMENT_REFUSALS.join`'s 140-character sentence sized the
+track to the sentence *unwrapped*, ballooning the CTA pill and crushing the other five columns
+into stacks. Not acceptable at the founder's bar. Fix: the refusal paragraph in
+`JoinPublicLeagueButton` carries `max-w-56`, so the sentence wraps inside its own column beside
+the button that caused it — the row's columns hold, and a card reader sees no change (the card's
+own width already governed there). Verified by re-render screenshot and the updated
+`join-public-league-button.test.tsx`.
+
+**EXECUTION fixes shipped at this checkpoint:** the two adjudications above (both TDD,
+red-first), plus one spec-layer e2e fix from the battery (the App Router streaming-buffer
+strict-mode race on the `/app` first-run fork — `onboarding.spec.ts` / `whole-site.spec.ts`
+scope their text/label reads to `main`; diagnosis in the spec comment). Zero product regressions
+found; the full suite re-ran 26/26 green after the fixes.
