@@ -134,7 +134,15 @@ const light: Palette = {
   // WCAG 1.4.11's 3:1 against all three surfaces a control can sit on.
   edge: "#8B8B91",
   textPrimary: "#1A1A1E", // ink — also the ink pill's fill (see Button, Task 4)
-  textMuted: "#6B6B70", // quiet
+  // Derived, retuned (Task 1 fix round 1): darkened one further notch past the mock's raw
+  // "quiet" gray. `tokens.test.ts`'s original pair matrix only checked this role against the
+  // four PLAIN surfaces (`surface`/`surfaceElevated`/`surfaceRaised`/`surfaceInset`), which it
+  // clears comfortably at either value — but the draft room's "hot" rail paints a translucent
+  // `bg-negative/10` tint UNDER this text (`room-rail.tsx`'s `MODE_SKIN.hot`), and axe's
+  // real-browser color-contrast scan (`e2e/design-v2.spec.ts`) caught that the untinted value
+  // measured only 4.45:1 against that composited ground in daylight — a hair under the 4.5:1
+  // floor the plain-surface checks never exercised. See `TOKENS.color bands` below.
+  textMuted: "#68686D",
   // Derived: the mock's --faint (#AEAEB4) is a daylight-appropriate gray but too light to clear
   // 4.5:1 against surfaceInset (the dimmest of the four surfaces textFaint is used on) —
   // darkened, same hue family, until it clears the floor on all four. The token moves, the
@@ -146,15 +154,24 @@ const light: Palette = {
   accentGlow: "rgba(11, 107, 67, 0.12)", // the floodlight's radial tint (Task 7)
   // Same doubling as dark, same reason — see `dark.positive`'s docblock.
   positive: "#0B6B43",
-  negative: "#D43A2F", // live — a hair darker than the mock's raw #D6453A, the minimum needed
-  // to clear 4.5:1 as text on `surface` (#FBFBFA); the mock's value misses the floor by a
-  // fraction, same story as `textFaint`.
+  // Derived, retuned (Task 1 fix round 1): live — darkened further than the fraction the mock's
+  // raw #D6453A was already missing by. `negative` is both the "hot" rail's text-on-its-own-tint
+  // color (the on-the-clock label, `text-negative` in `room-rail.tsx`) AND the source color OF
+  // that tint (`bg-negative/10`), so this is a fixed point: the value darkens until it clears
+  // 4.5:1 against the very 10%-of-itself-over-`surface` composite it paints. See
+  // `TOKENS.color bands` below — the plain-surface checks alone (still ≥5.3:1 here) never would
+  // have caught this.
+  negative: "#C23228",
   negativeText: "#FFFFFF", // label ≥4.5:1 on the live fill
-  // Derived: a quiet amber, same hue family as v2's, resaturated down and retuned to clear
-  // 4.5:1 as text on the new (near-white) grounds. See `dark.warning`'s docblock for the
-  // usage-demotion context (E5).
-  warning: "#8E6A17",
-  warningGlow: "rgba(142, 106, 23, 0.12)",
+  // Derived, retuned (Task 1 fix round 1): a quiet amber, same hue family as v2's, resaturated
+  // down. Darkened one further notch past the original retune: the "Connecting…" chip
+  // (`ConnectionBanner`, `Badge tone="warning"`) has no fill of its own, so it sits directly on
+  // whatever is behind it — inside the draft room's "hot" rail, that is the same `bg-negative/10`
+  // composite `textMuted`'s comment above describes, and axe caught the same class of gap here.
+  // See `dark.warning`'s docblock for the usage-demotion context (E5), and
+  // `TOKENS.color bands` below for the composite-ground gate.
+  warning: "#846315",
+  warningGlow: "rgba(132, 99, 21, 0.12)",
   // Derived: a quiet blue, same hue family as v2's, retuned for notices and the WR pigment.
   info: "#4C69CD",
   scrim: "#000000",
@@ -193,6 +210,15 @@ const light: Palette = {
  * proven against, in both themes: every pairwise sticker still clears 1.5:1 contrast or 30° of
  * hue separation, and `marker`/`slate` (the one pair that was ALREADY hue-adjacent, ~0-9° apart,
  * riding on contrast alone) still clear it with margin to spare.
+ *
+ * Task 1 fix round 1 retuned `light.negative` and `light.warning` further (a translucent-band
+ * gap the sticker matrix can't see — see those two fields' own docblocks and `TOKENS.color
+ * bands` in `tokens.test.ts`). The pigments below are UNCHANGED: a sticker fill is always
+ * painted opaque, never composited into a translucent band, so the sticker matrix that already
+ * proved these values stands. `whistle`/`clay`'s "was #…" comments below name the ANCHOR hex at
+ * the time each pigment was derived, not `negative`/`warning`'s current value — the two roles
+ * moved out from under an already-proven pigment, which is exactly what "no longer pinned to the
+ * semantic role's own hex" (above) means in practice.
  */
 const darkPigments: Pigments = {
   whistle: "#DF867E", // v3 dark.negative #FF6B5E, 60% saturation, same hue/lightness
@@ -204,10 +230,10 @@ const darkPigments: Pigments = {
 };
 
 const lightPigments: Pigments = {
-  whistle: "#B35750", // v3 light.negative #D43A2F, 60% saturation, same hue/lightness
+  whistle: "#B35750", // light.negative's Task 1 anchor #D43A2F (since retuned to #C23228), 60% saturation, same hue/lightness
   leaf: "#1E5840", // v3 light.accent/positive #0B6B43, 60% saturation, same hue/lightness
   marker: "#5D70AF", // v3 light.info #4C69CD, 60%-family saturation, lightness retuned to clear 4.5:1
-  clay: "#76612F", // v3 light.warning #8E6A17, 60% saturation, same hue/lightness
+  clay: "#76612F", // light.warning's Task 1 anchor #8E6A17 (since retuned to #846315), 60% saturation, same hue/lightness
   grape: "#6D528D", // independent purple, unchanged — already clears v3's grounds
   slate: "#B9C0CB", // unchanged — already the quiet one, already clears v3's grounds
 };

@@ -36,6 +36,25 @@ export function contrastRatio(a: string, b: string): number {
   return (hi + 0.05) / (lo + 0.05);
 }
 
+/**
+ * The flat sRGB alpha composite of a translucent foreground over an opaque background —
+ * `fgHex` at `alpha` (0..1) painted on top of `bgHex`, standard `fg*alpha + bg*(1-alpha)` per
+ * channel. This is what a Tailwind `bg-<role>/NN` utility actually paints (`bg-negative/10`,
+ * `bg-accent/10`) and what axe-core's own `color-contrast` check composites against when a text
+ * node sits on one of these tinted "bands" rather than directly on a plain `ColorRole` surface —
+ * `tokens.test.ts`'s own pair matrix only ever tested a role against the plain surfaces `TOKENS`
+ * names, so a role that clears every plain surface can still fail once a caller tints the ground
+ * underneath it (Task 1 fix round 1, `e2e/design-v2.spec.ts`'s axe scan caught this on the draft
+ * room's "hot" rail — `room-rail.tsx`'s `MODE_SKIN.hot` is `border-negative bg-negative/10`).
+ */
+export function blendOver(fgHex: string, alpha: number, bgHex: string): string {
+  const [fr, fg, fb] = parseHex(fgHex);
+  const [br, bg, bb] = parseHex(bgHex);
+  const mix = (f: number, b: number) => Math.round(f * alpha + b * (1 - alpha));
+  const toChannel = (n: number) => n.toString(16).padStart(2, "0");
+  return `#${toChannel(mix(fr, br))}${toChannel(mix(fg, bg))}${toChannel(mix(fb, bb))}`.toUpperCase();
+}
+
 /** Standard RGB→HSL hue, degrees, 0 (inclusive) .. 360 (exclusive). Gray (zero saturation) is 0. */
 export function hueDegrees(hex: string): number {
   const [r, g, b] = parseHex(hex).map((c) => c / 255);
