@@ -1,6 +1,8 @@
-import { eq } from "drizzle-orm";
+import { and, eq, ne } from "drizzle-orm";
 import type { Db } from "@/db/client";
 import { users } from "@/db/schema";
+import type { Clock } from "@/domain/timing";
+import type { AuditLogger } from "@/integrity-service/audit-logger";
 import { MONEY_REFUSALS, type MoneyRefusalReason } from "@/money/config";
 import type { MoneyStatesConfig, StateCode } from "@/money/states";
 import type { KycProvider, KycProviderStatus } from "@/payments-provider/kyc-contract";
@@ -24,6 +26,8 @@ export interface KycSubmissionRequest {
 export interface SubmitKycDeps {
   readonly provider: KycProvider;
   readonly states: MoneyStatesConfig;
+  readonly clock: Clock;
+  readonly audit: AuditLogger;
 }
 
 export type SubmitKycOutcome =
@@ -33,28 +37,42 @@ export type SubmitKycOutcome =
 /**
  * Looks up the submitted state's `minAge` from `deps.states.enabled` (empty in production until
  * the founder names a state — decision 7), submits to the provider, writes back whatever it
- * currently says.
+ * currently says, inside a `db.transaction`.
  *
  * `"verified"` IS the age attestation this platform holds (the seam's own module docblock): the
  * provider is handed `minAge` and is the one place a date of birth is ever checked against it.
  *
- * ONE-WAY TOWARD VERIFIED, never a regression once there (`users.kyc_status`'s own docblock,
- * `src/db/schema.ts`): a member already verified is answered `"verified"` straight from the
- * current row, WITHOUT re-submitting to the provider — both an honest early exit (nothing this
- * call could learn changes an already-settled verification) and good stewardship of a vendor call
- * budget. This is a plain read-then-write, not a locked transaction: two submissions racing from
- * the SAME user is not a scenario this product's own UI can produce (one form, one submit button),
- * and the worst a genuine race could do is have a stale `"pending"`/`"failed"` write land after a
- * concurrent `"verified"` one — recoverable by resubmitting, never a money-safety issue, so it
- * does not carry the row-lock discipline `postMoneyTransaction` holds its callers to.
+ * FIX ROUND (Task 7 review HIGH). The `users` UPDATE carries TWO guards in its `WHERE`, both load-
+ * bearing:
+ *
+ *  1. `ne(kycStatus, "verified")` — ONE-WAY TOWARD VERIFIED, never a regression once there
+ *     (`users.kyc_status`'s own docblock, `src/db/schema.ts`). The bug this fixes: a member can
+ *     become `verified` by ANY submission that resolves that way while ANOTHER, earlier submission
+ *     from the same member is still awaiting its own (slower) provider round trip. Without this
+ *     guard, that earlier submission's write lands LAST and downgrades a already-verified member
+ *     back to `pending` or `failed` — a stale async writer overwriting a true fact with a stale
+ *     one. The guard makes `verified` an absorbing state at the database level, not just by
+ *     application-code ordering, which is the only version of this promise that survives two
+ *     requests actually racing.
+ *  2. `ne(kycStatus, status)` — audits only a GENUINE change. A resubmission that lands on the
+ *     SAME status the row already carries (an identical retry, a provider echoing its own prior
+ *     answer) writes nothing and appends no `kyc_status_changed` event; the guard is one atomic
+ *     statement, so "did anything change" and "is it safe to write" are answered together, with no
+ *     read-then-write gap between them for a concurrent writer to land in.
+ *
+ * Deliberately NO early short-circuit for an already-verified caller (an earlier version of this
+ * function had one): with an early check, a second call from an already-verified member never
+ * reaches this guard at all, and the regression-prevention promise above rests entirely on the
+ * early check instead — exactly the version of "prevented" that a genuine race defeats, because
+ * the early check and this write are two separate round trips with a gap between them a concurrent
+ * writer can land in. Every call reaches the SAME guarded write, so the guard is what protects the
+ * fact, not an optimization that happens to make the common case look protected. The cost is one
+ * avoidable provider call for an already-verified member re-submitting — not a money-safety
+ * concern, and a small price for a promise that is actually true under concurrency.
  */
 export async function submitKycVerification(db: Db, input: KycSubmissionRequest, deps: SubmitKycDeps): Promise<SubmitKycOutcome> {
   const entry = deps.states.enabled.find((candidate) => candidate.state === input.stateOfEntry);
   if (entry === undefined) return { ok: false, status: 403, reason: MONEY_REFUSALS.stateNotEnabled };
-
-  const [before] = await db.select({ kycStatus: users.kycStatus }).from(users).where(eq(users.id, input.userId));
-  if (before === undefined) throw new Error(`submitKycVerification: no user row for "${input.userId}".`);
-  if (before.kycStatus === "verified") return { ok: true, status: "verified" };
 
   const ref = await deps.provider.submitVerification({
     userId: input.userId,
@@ -65,6 +83,35 @@ export async function submitKycVerification(db: Db, input: KycSubmissionRequest,
   });
   const status = await deps.provider.getStatus(ref);
 
-  await db.update(users).set({ kycStatus: status }).where(eq(users.id, input.userId));
-  return { ok: true, status };
+  return db.transaction(async (tx) => {
+    const [updated] = await tx
+      .update(users)
+      .set({ kycStatus: status })
+      .where(and(eq(users.id, input.userId), ne(users.kycStatus, "verified"), ne(users.kycStatus, status)))
+      .returning({ kycStatus: users.kycStatus });
+
+    if (updated !== undefined) {
+      await deps.audit.record(tx, {
+        eventType: "kyc_status_changed",
+        actorId: input.userId,
+        actorType: "user",
+        leagueId: null,
+        payload: { status },
+        occurredAt: deps.clock.now(),
+      });
+      return { ok: true, status };
+    }
+
+    // The guard above matched zero rows: either this user does not exist, they are already
+    // `verified` (guard 1), or the write would have been a no-op (guard 2). Reading the row back
+    // rather than assuming which, so the answer always matches what is actually stored.
+    const [current] = await tx.select({ kycStatus: users.kycStatus }).from(users).where(eq(users.id, input.userId));
+    if (current === undefined) throw new Error(`submitKycVerification: no user row for "${input.userId}".`);
+    // Provably never "none" here: this branch is reached only because the guarded write above
+    // found the row already `"verified"` (guard 1) or already equal to `status` (guard 2), and
+    // `status` — the provider's own vocabulary, `KycProviderStatus` — never carries `"none"`.
+    // Nothing in this codebase ever writes `kyc_status` back to `"none"` once it has left that
+    // default, so both paths into this branch read a real `KycProviderStatus` value.
+    return { ok: true, status: current.kycStatus as KycProviderStatus };
+  });
 }

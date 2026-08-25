@@ -91,6 +91,30 @@ export const AUDIT_EVENT_TYPES = [
    *  in the member's favor. Confiscation is the same writer's other arm, recorded on the flag's
    *  own resolution — the hold's release is the event the LEAGUE is owed sight of. */
   "payout_released",
+  /**
+   * Task 7's fix round: three more events, the phase's SECOND vocabulary growth (ruling 2 again —
+   * a person's own compliance history is exactly the class of fact ruling 2 already carved out an
+   * exception for, and it is auditable the same way a dollar is). Own migration
+   * (`drizzle/0039_kyc_and_exclusion_audit_events.sql`, `ALTER TYPE … ADD VALUE`), for the same
+   * reason 0036 is its own migration: an added enum value must not be used by a statement inside
+   * the migration that adds it. All three are PLATFORM-SCOPED and HIDDEN from every member-facing
+   * activity feed (`src/integrity/activity-view.ts`'s `ACTIVITY_VISIBILITY`, controller ruling):
+   * whether and how a person verified their identity, and whether they closed their own account to
+   * paid play, are that person's own private facts — nobody's league feed, operator console only.
+   */
+  /** Published by `setSelfExclusion` (`@/money-service/exclusion`), ONLY on the branch that
+   *  actually stamps `self_excluded_at` — the idempotent already-set repeat call stays audit-free
+   *  (`grantAdmin`'s own "no event for a no-op" precedent). */
+  "self_exclusion_set",
+  /** Published by `clearSelfExclusion` (`@/money-service/exclusion`), operator-only from the admin
+   *  room. REPLACES the `admin_action` event this writer used to append before this fix round — no
+   *  prior `admin_action` row from this writer exists in any real data, so the replacement is
+   *  clean, and a clear now reads as its own named fact on the chain rather than a generic one. */
+  "self_exclusion_cleared",
+  /** Published by `submitKycVerification` (`@/money-service/kyc`), ONLY when the write actually
+   *  changes `users.kyc_status` — a re-submission that lands on the SAME status (or one the
+   *  guarded write refuses because the member is already `verified`) appends nothing. */
+  "kyc_status_changed",
 ] as const;
 
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];

@@ -67,14 +67,27 @@ const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "p
   // value marks PUBLISHED, and the writer's landing is what reddened this row until it moved.
   deposit_completed: "plan-a", // Task 5, `@/money-service/deposits`
   deposit_returned: "plan-a", // Task 5, `@/money-service/deposits` (the ACH-return posting)
-  withdrawal_requested: "phase-4", // Task 6, `@/money-service/withdrawals`
-  withdrawal_completed: "phase-4", // Task 6, `@/money-service/withdrawals`
-  withdrawal_returned: "phase-4", // Task 6, `@/money-service/withdrawals`
+  // Task 6 landed all three withdrawal publishers (`@/money-service/withdrawals`) but this row was
+  // never flipped from "phase-4" — found and fixed here, in Task 7's fix round, while this file's
+  // own "no publisher anywhere" check was made to actually run again (it had gone unexercised for
+  // these three the same way an unflipped row always does: silently, since the check only fires
+  // for rows NOT marked "plan-a").
+  withdrawal_requested: "plan-a", // Task 6, `@/money-service/withdrawals`
+  withdrawal_completed: "plan-a", // Task 6, `@/money-service/withdrawals`
+  withdrawal_returned: "plan-a", // Task 6, `@/money-service/withdrawals`
   entry_fee_collected: "phase-4", // Task 8, `@/money-service/entry-fee`, inside joinLeagueInTx
   entry_fee_refunded: "phase-4", // Task 8 (seat release) and Task 9 (`@/money-service/dissolution`)
   prize_paid: "phase-4", // Task 10, `@/money-service/settlement`
   payout_held: "phase-4", // Task 10, `@/money-service/settlement`
   payout_released: "phase-4", // Task 10, `@/money-service/settlement`'s releaseHold
+  // Task 7's fix round: the same T2 pattern above (grow the enum, name the plan), except the
+  // publisher lands in the SAME pass as the growth — migration 0039 and these three writers ship
+  // together, so each moves straight to "plan-a" (PUBLISHED) rather than sitting at "phase-4"
+  // first. `has NO publisher anywhere` below would fail these entries "phase-4" the moment the
+  // writer landed, exactly the mechanism the block comment above describes.
+  self_exclusion_set: "plan-a", // Task 7, `@/money-service/exclusion` (`setSelfExclusion`)
+  self_exclusion_cleared: "plan-a", // Task 7, `@/money-service/exclusion` (`clearSelfExclusion`)
+  kyc_status_changed: "plan-a", // Task 7, `@/money-service/kyc` (`submitKycVerification`)
 };
 
 interface SourceFile {

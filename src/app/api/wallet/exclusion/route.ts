@@ -27,7 +27,7 @@ export async function POST(request: Request) {
     const limited = exclusionRateLimited(userId);
     if (limited !== null) return limited;
 
-    const selfExcludedAt = await setSelfExclusion(getDb(), userId, systemClock);
+    const selfExcludedAt = await setSelfExclusion(getDb(), userId, systemClock, getAuditLogger());
     return ok<SetExclusionBody>({ selfExcludedAt });
   });
 }
@@ -38,7 +38,8 @@ export interface ClearExclusionBody {
 
 /**
  * The self-exclusion CLEAR door (Task 7 Step 2): operator-only, `withAdmin`-gated, audited as
- * `admin_action` — the exact requirement the brief states. Lives on the SAME route as the member's
+ * `self_exclusion_cleared` (fix round: replaces the generic `admin_action` this writer used to
+ * append — see `clearSelfExclusion`'s own docblock). Lives on the SAME route as the member's
  * own `POST` (a different HTTP method, not a second file) because the master route inventory
  * names exactly one file here; a support conversation clearing a member's own decision reuses the
  * door the member set it through, rather than growing a second wallet route the plan never named.

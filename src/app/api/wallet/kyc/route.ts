@@ -1,4 +1,5 @@
 import { getDb } from "@/db/client";
+import { getAuditLogger } from "@/integrity-service/audit-logger";
 import { fail, ok, parseJson } from "@/lib/api/respond";
 import { submitKycVerification } from "@/money-service/kyc";
 import { kycSubmissionRequestSchema } from "@/money-service/schemas";
@@ -10,6 +11,9 @@ import { kycRateLimited } from "../_shared";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+
+/** The outermost edge is the only place a wall clock is allowed. */
+const systemClock = { now: () => new Date().toISOString() };
 
 /**
  * One provider handle per PROCESS, not per request — `src/app/api/wallet/deposits/route.ts`'s
@@ -43,7 +47,7 @@ export async function POST(request: Request) {
     const outcome = await submitKycVerification(
       getDb(),
       { userId, ...parsed.value },
-      { provider: getProvider(), states: MONEY_STATES },
+      { provider: getProvider(), states: MONEY_STATES, clock: systemClock, audit: getAuditLogger() },
     );
     if (!outcome.ok) return fail(outcome.reason, outcome.status);
     return ok<SubmitKycBody>({ status: outcome.status });

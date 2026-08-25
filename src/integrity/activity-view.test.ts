@@ -144,6 +144,13 @@ const SAMPLE_PAYLOADS: Readonly<Record<AuditEventType, readonly { readonly paylo
   prize_paid: [{ payload: {}, actorId: null }],
   payout_held: [{ payload: {}, actorId: null }],
   payout_released: [{ payload: {}, actorId: null }],
+  // Task 7's fix round: these three land HIDDEN, PERMANENTLY — a person's own private compliance
+  // facts, never a league feed's business (controller ruling; see `ACTIVITY_VISIBILITY`'s own
+  // comment). Placeholder samples for the same "exhaustiveness forces a decision" reason the money
+  // ones above use, even though nothing will ever flip these to renderable.
+  self_exclusion_set: [{ payload: {}, actorId: "user_bob" }],
+  self_exclusion_cleared: [{ payload: {}, actorId: null }],
+  kyc_status_changed: [{ payload: {}, actorId: "user_bob" }],
 };
 
 /** Every sentence this module can actually produce, derived from the visibility table itself. */
@@ -186,6 +193,12 @@ describe("ACTIVITY_VISIBILITY", () => {
       "payout_held",
       "payout_released",
     ] as const) {
+      expect(ACTIVITY_VISIBILITY[type]).toBe("hidden");
+    }
+  });
+
+  it("hides self-exclusion and KYC status events, permanently — a person's own private facts (Task 7's fix round)", () => {
+    for (const type of ["self_exclusion_set", "self_exclusion_cleared", "kyc_status_changed"] as const) {
       expect(ACTIVITY_VISIBILITY[type]).toBe("hidden");
     }
   });

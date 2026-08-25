@@ -78,7 +78,7 @@ describe("POST /api/wallet/exclusion", () => {
     expect(res.status).toBe(401);
   });
 
-  it("stamps self_excluded_at for the caller and answers it back", async () => {
+  it("stamps self_excluded_at for the caller, answers it back, and audits self_exclusion_set", async () => {
     signedInAs("u1");
     await seedUser("u1");
     const res = await post();
@@ -87,6 +87,9 @@ describe("POST /api/wallet/exclusion", () => {
     expect(payload.data.selfExcludedAt).toMatch(/\S/);
     const [row] = await db.select({ selfExcludedAt: users.selfExcludedAt }).from(users).where(eq(users.id, "u1"));
     expect(row?.selfExcludedAt).not.toBeNull();
+
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "self_exclusion_set"));
+    expect(event).toMatchObject({ chainScope: "platform", actorId: "u1", actorType: "user", leagueId: null, payload: {} });
   });
 
   it("is idempotent: a second call answers the SAME stamp, never a fresh one", async () => {
@@ -126,7 +129,7 @@ describe("DELETE /api/wallet/exclusion", () => {
     expect(res.status).toBe(400);
   });
 
-  it("clears the stamp for an operator, audits admin_action, and answers 200", async () => {
+  it("clears the stamp for an operator, audits self_exclusion_cleared, and answers 200", async () => {
     operatorSignedInAs("u_op");
     await seedUser("u_op");
     await seedUser("u1");
@@ -141,9 +144,9 @@ describe("DELETE /api/wallet/exclusion", () => {
     const [row] = await db.select({ selfExcludedAt: users.selfExcludedAt }).from(users).where(eq(users.id, "u1"));
     expect(row?.selfExcludedAt).toBeNull();
 
-    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "admin_action"));
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "self_exclusion_cleared"));
     expect(event).toMatchObject({ actorId: "u_op", actorType: "user", leagueId: null });
-    expect(event!.payload).toEqual({ action: "self_exclusion_cleared", subjectUserId: "u1" });
+    expect(event!.payload).toEqual({ subjectUserId: "u1" });
   });
 
   it("answers 404 for a member who is not excluded — nothing to clear", async () => {

@@ -77,6 +77,16 @@ export const ACTIVITY_VISIBILITY: Readonly<Record<AuditEventType, ActivityVisibi
   prize_paid: "hidden", // Task 10 decides
   payout_held: "hidden", // Task 10 decides
   payout_released: "hidden", // Task 10 decides
+  /**
+   * Task 7's fix round (controller ruling): verification and exclusion are a person's OWN private
+   * facts, not a league one — whether and how a member verified their identity, and whether they
+   * closed their own account to paid play, are nobody's business but theirs and the operator
+   * console's. HIDDEN, permanently, not "until a later task decides" the way the still-reserved
+   * money five above are: there is no future publisher that will ever want these on a member feed.
+   */
+  self_exclusion_set: "hidden", // platform chain, permanently hidden — a person's own private fact
+  self_exclusion_cleared: "hidden", // platform chain, permanently hidden — operator console only
+  kyc_status_changed: "hidden", // platform chain, permanently hidden — a person's own private fact
 };
 
 /**

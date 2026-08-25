@@ -141,10 +141,14 @@ export const users = pgTable(
     kycStatus: kycStatusEnum("kyc_status").notNull().default("none"),
     /**
      * Phase 4, Task 2 (migration 0035). Self-exclusion is a ONE-WAY STAMP in the
-     * `reviews.removed_at` family: set once by the member's own exclusion action (Task 7's door),
-     * never cleared by anything in the product — a member who excluded themselves and changed
-     * their mind is a support conversation, not an endpoint. `moneyGates` refuses every money
-     * door while this is non-null; free play is untouched.
+     * `reviews.removed_at` family, set once by the member's own exclusion action
+     * (`setSelfExclusion`, `@/money-service/exclusion`) — from the MEMBER's side it is an
+     * endpoint, never an in-product toggle a member flips back themselves. Task 7 corrects this
+     * comment's earlier claim that nothing in the product ever clears it: an OPERATOR can, from
+     * the admin room (`clearSelfExclusion`, same module), audited as `self_exclusion_cleared` —
+     * the member's own "I closed this" stays one-way, but a support conversation that convinces an
+     * operator to reopen it is a real, built, audited path, not a hypothetical one. `moneyGates`
+     * refuses every money door while this is non-null; free play is untouched.
      */
     selfExcludedAt: timestamp("self_excluded_at", { withTimezone: true }),
   },

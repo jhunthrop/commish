@@ -26,7 +26,7 @@ vi.mock("@/money/states", async (importOriginal) => {
 });
 
 import { eq } from "drizzle-orm";
-import { users } from "@/db/schema";
+import { auditEvents, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { MONEY_CONFIG, MONEY_REFUSALS } from "@/money/config";
@@ -112,7 +112,7 @@ describe("POST /api/wallet/kyc", () => {
     expect(row?.kycStatus).toBe("none");
   });
 
-  it("submits once a state is enabled: 200 with pending, and the row written", async () => {
+  it("submits once a state is enabled: 200 with pending, the row written, and kyc_status_changed audited", async () => {
     stateHolder.enabled = [{ state: "TN", minAge: 18 }];
     signedInAs("u1");
     await seedUser("u1");
@@ -123,6 +123,9 @@ describe("POST /api/wallet/kyc", () => {
     expect(payload.data.status).toBe("pending");
     const [row] = await db.select({ kycStatus: users.kycStatus }).from(users).where(eq(users.id, "u1"));
     expect(row?.kycStatus).toBe("pending");
+
+    const [event] = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "kyc_status_changed"));
+    expect(event).toMatchObject({ chainScope: "platform", actorId: "u1", actorType: "user", leagueId: null, payload: { status: "pending" } });
   });
 
   it("writes failed for the mock's fixed failing identity, 200 not an error", async () => {

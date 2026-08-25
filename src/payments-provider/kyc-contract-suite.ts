@@ -108,5 +108,35 @@ export function runKycProviderContractSuite(name: string, make: () => KycProvide
       const h = await make();
       await expect(h.provider.getStatus("kyc-ref-never-issued")).rejects.toThrow();
     });
+
+    /**
+     * MEDIUM (Task 7 review): a terminal failure must not poison the member's NEXT attempt. A
+     * failed submission and a resubmission with a FRESH idempotency key are two DIFFERENT
+     * submissions under this contract — the failed one's own ref stays `"failed"` forever (proven
+     * above), and the fresh one is a genuinely new, independently-resolvable submission, never a
+     * collision with it. An implementation that let a prior failure taint a fresh key — refusing
+     * the retry, or answering the OLD ref's status for the NEW key — would trap a member who typed
+     * their name wrong once behind a dead end, exactly what the copy rulebook's "never a dead end"
+     * rule forbids at the product layer; this is the seam-level guarantee that rule depends on.
+     */
+    it("lets a member resubmit with a fresh key after a terminal failure, as a genuinely new submission", async () => {
+      const h = await make();
+      const failed = await h.failingIdentity(18);
+      await expect(h.provider.getStatus(failed)).resolves.toBe("failed");
+
+      const retry = await h.provider.submitVerification({
+        userId: h.userId,
+        legalName: "Retry Person",
+        dateOfBirth: "1990-01-01",
+        minAge: 18,
+        idempotencyKey: "contract-kyc-retry-fresh-key",
+      });
+      expect(retry).not.toBe(failed);
+      await expect(h.provider.getStatus(retry)).resolves.toBe("pending");
+      await h.advance();
+      await expect(h.provider.getStatus(retry)).resolves.toBe("verified");
+      // The original failure is untouched by the retry settling — two independent submissions.
+      await expect(h.provider.getStatus(failed)).resolves.toBe("failed");
+    });
   });
 }
