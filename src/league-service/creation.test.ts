@@ -11,7 +11,7 @@ import { SUPERFLEX_ROSTER_SLOTS } from "@/league/roster-shape";
 import { ENFORCEMENT_REFUSALS } from "./enforcement";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { MONEY_REFUSALS } from "@/money/config";
-import { createLeague, leagueMoneyOrRefuse, writeLeagueInTx, type CreateLeagueInput, type LeagueOwner } from "./creation";
+import { createLeague, FREE_SEASON_ENTRY_FEE_MESSAGE, leagueMoneyOrRefuse, writeLeagueInTx, type CreateLeagueInput, type LeagueOwner } from "./creation";
 
 const db = createTestDb();
 const clock = { now: () => "2026-08-17T12:00:00.000Z" };
@@ -479,7 +479,7 @@ describe("entry fees at creation (Task 8)", () => {
 
   it("stores the fee, the platform fee and the published table when the arithmetic balances", async () => {
     await giveCompletedSeasons("u1", 0);
-    const result = await createLeague(deps(), paidInput());
+    const result = await createLeague({ ...deps(), live: true }, paidInput());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const [league] = await db.select().from(leagues).where(eq(leagues.id, result.leagueId));
@@ -501,7 +501,7 @@ describe("entry fees at creation (Task 8)", () => {
 
   it("refuses a table that does not balance the pot exactly, before any transaction opens", async () => {
     await giveCompletedSeasons("u1", 0);
-    const result = await createLeague(deps(), { ...paidInput(), payoutTable: [{ place: 1, amountCents: 1 }] });
+    const result = await createLeague({ ...deps(), live: true }, { ...paidInput(), payoutTable: [{ place: 1, amountCents: 1 }] });
     expect(result).toEqual({ ok: false, status: 400, reason: MONEY_REFUSALS.prizeTableMismatch });
     expect(await db.select().from(leagues)).toEqual([]);
     expect(await db.select().from(auditEvents)).toEqual([]);
@@ -509,15 +509,23 @@ describe("entry fees at creation (Task 8)", () => {
 
   it("refuses a fee with no table, and a platform fee on a free league — the identity is one rule", async () => {
     await giveCompletedSeasons("u1", 0);
-    expect(await createLeague(deps(), { ...validInput(), entryFeeCents: FEE })).toEqual({
+    expect(await createLeague({ ...deps(), live: true }, { ...validInput(), entryFeeCents: FEE })).toEqual({
       ok: false,
       status: 400,
       reason: MONEY_REFUSALS.prizeTableMismatch,
     });
-    expect(await createLeague(deps(), { ...validInput(), platformFeeCents: RAKE })).toEqual({
+    expect(await createLeague({ ...deps(), live: true }, { ...validInput(), platformFeeCents: RAKE })).toEqual({
       ok: false,
       status: 400,
       reason: MONEY_REFUSALS.prizeTableMismatch,
+    });
+    // The dark default answers FIRST, at every layer — the Task 8 review's defense-in-depth
+    // fix: without live injection, the same paid config refuses as the free season, so a future
+    // direct caller of createLeague can never seat a paid league while money is dark.
+    expect(await createLeague(deps(), { ...validInput(), entryFeeCents: FEE })).toEqual({
+      ok: false,
+      status: 400,
+      reason: FREE_SEASON_ENTRY_FEE_MESSAGE,
     });
   });
 
@@ -532,9 +540,24 @@ describe("entry fees at creation (Task 8)", () => {
           new Date("2026-09-10T00:00:00.000Z"),
           clock,
           logger,
+          true,
         ),
       ),
     ).rejects.toThrow(MONEY_REFUSALS.prizeTableMismatch);
+    // And the same config with the REAL dark default: the backstop refuses as the free season,
+    // so even a caller that skips createLeague entirely cannot write a paid league today.
+    await expect(
+      db.transaction((tx) =>
+        writeLeagueInTx(
+          tx,
+          { leagueId: "lg_bad_money2", teamId: "t_bad_money2", draftId: "d_bad_money2" },
+          { ...validInput(), entryFeeCents: FEE },
+          new Date("2026-09-10T00:00:00.000Z"),
+          clock,
+          logger,
+        ),
+      ),
+    ).rejects.toThrow(FREE_SEASON_ENTRY_FEE_MESSAGE);
     expect(await db.select().from(leagues)).toEqual([]);
   });
 
@@ -544,13 +567,19 @@ describe("entry fees at creation (Task 8)", () => {
       config: { entryFeeCents: 0, platformFeeCents: 0, payoutTable: null },
     });
     expect(leagueMoneyOrRefuse({ teamCount: 4 })).toMatchObject({ ok: true });
-    expect(leagueMoneyOrRefuse({ teamCount: 4, entryFeeCents: 10_00, payoutTable: [{ place: 1, amountCents: 40_00 }] })).toEqual({
+    expect(leagueMoneyOrRefuse({ teamCount: 4, entryFeeCents: 10_00, payoutTable: [{ place: 1, amountCents: 40_00 }] }, true)).toEqual({
       ok: true,
       config: { entryFeeCents: 10_00, platformFeeCents: 0, payoutTable: [{ place: 1, amountCents: 40_00 }] },
     });
-    expect(leagueMoneyOrRefuse({ teamCount: 4, entryFeeCents: -1, payoutTable: [{ place: 1, amountCents: 1 }] })).toEqual({
+    expect(leagueMoneyOrRefuse({ teamCount: 4, entryFeeCents: -1, payoutTable: [{ place: 1, amountCents: 1 }] }, true)).toEqual({
       ok: false,
       reason: MONEY_REFUSALS.invalidPrizeTableInputs,
+    });
+    // The rule carries the dark-season gate itself (review fix): any money field set, with the
+    // real default, refuses as the free season before the arithmetic is ever consulted.
+    expect(leagueMoneyOrRefuse({ teamCount: 4, entryFeeCents: 10_00, payoutTable: [{ place: 1, amountCents: 40_00 }] })).toEqual({
+      ok: false,
+      reason: FREE_SEASON_ENTRY_FEE_MESSAGE,
     });
   });
 });

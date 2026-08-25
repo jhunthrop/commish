@@ -114,17 +114,23 @@ describe("entry fee, platform fee and payout table", () => {
     expect(result.error?.issues[0]).toMatchObject({ path: ["entryFeeCents"], message: FREE_SEASON_ENTRY_FEE_MESSAGE });
   });
 
-  it("holds any money field to the one arithmetic law, dark or live — the same leagueMoneyOrRefuse the service enforces", () => {
-    liveness.live = false;
-    const mismatch = createLeagueSchema.safeParse(paid({ payoutTable: [{ place: 1, amountCents: 79_00 }] }));
-    expect(mismatch.success).toBe(false);
-    expect(mismatch.error?.issues[0]).toMatchObject({ path: ["payoutTable"], message: MONEY_REFUSALS.prizeTableMismatch });
+  it("holds any money field to the one arithmetic law once live — the same leagueMoneyOrRefuse the service enforces", () => {
+    // The rule answers DARK first (the Task 8 review's defense-in-depth fix), so the arithmetic
+    // is only reachable live — which is also the only season it will ever matter in.
+    liveness.live = true;
+    try {
+      const mismatch = createLeagueSchema.safeParse(paid({ payoutTable: [{ place: 1, amountCents: 79_00 }] }));
+      expect(mismatch.success).toBe(false);
+      expect(mismatch.error?.issues[0]).toMatchObject({ path: ["payoutTable"], message: MONEY_REFUSALS.prizeTableMismatch });
 
-    expect(createLeagueSchema.safeParse(paid({ payoutTable: undefined })).success).toBe(false);
-    expect(createLeagueSchema.safeParse({ name: "Sunday Money", teamCount, platformFeeCents: 1_00 }).success).toBe(false);
-    const badPlace = createLeagueSchema.safeParse(paid({ payoutTable: [{ place: 2, amountCents: 80_00 }] }));
-    expect(badPlace.success).toBe(false);
-    expect(badPlace.error?.issues[0]?.message).toBe(MONEY_REFUSALS.invalidPrizeTableEntry);
+      expect(createLeagueSchema.safeParse(paid({ payoutTable: undefined })).success).toBe(false);
+      expect(createLeagueSchema.safeParse({ name: "Sunday Money", teamCount, platformFeeCents: 1_00 }).success).toBe(false);
+      const badPlace = createLeagueSchema.safeParse(paid({ payoutTable: [{ place: 2, amountCents: 80_00 }] }));
+      expect(badPlace.success).toBe(false);
+      expect(badPlace.error?.issues[0]?.message).toBe(MONEY_REFUSALS.invalidPrizeTableEntry);
+    } finally {
+      liveness.live = false;
+    }
   });
 
   it("accepts a balanced paid league once money is live", () => {

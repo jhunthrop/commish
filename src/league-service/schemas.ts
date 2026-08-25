@@ -3,15 +3,15 @@ import { isPrintableDisplayName } from "@/identity/display-name";
 import { LEAGUE_CONFIG } from "@/league";
 import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { formatUsd, MONEY_CONFIG } from "@/money/config";
-import { moneyIsLive } from "@/money/states";
-import { leagueMoneyOrRefuse } from "./creation";
+
+import { FREE_SEASON_ENTRY_FEE_MESSAGE, leagueMoneyOrRefuse } from "./creation";
 
 /**
- * The boundary's own sentence for a paid league asked for before the founder has named a launch
- * state (`moneyIsLive`, `@/money/states` — the phase's one dark/live switch). Exported so the
- * schema test and the copy sweep read the same words the refusal actually carries.
+ * Re-exported from `./creation`, where the sentence now lives beside `leagueMoneyOrRefuse` — the
+ * rule that carries it at every layer (Task 8 review's defense-in-depth fix). Existing consumers
+ * (the schema test, the copy sweep) keep importing it from here unchanged.
  */
-export const FREE_SEASON_ENTRY_FEE_MESSAGE = "Every league is free this season. An entry fee cannot be charged until paid play opens.";
+export { FREE_SEASON_ENTRY_FEE_MESSAGE } from "./creation";
 
 /**
  * Both names a member chooses: the league's and their team's.
@@ -124,22 +124,20 @@ export const createLeagueSchema = z.object({
     path: ["startTrigger"],
   })
   .superRefine((data, ctx) => {
-    // Phase 4, Task 8: the SAME `leagueMoneyOrRefuse` the service layer enforces
-    // (`@/league-service/creation`), asked at the boundary so a commissioner's form hears the
-    // refusal before a request ever reaches `createLeague` — derived, never retyped. A wholly
-    // free league (every default) passes without touching the money vocabulary.
+    // Phase 4, Task 8 (rewired by the Task 8 review's defense-in-depth fix): the SAME
+    // `leagueMoneyOrRefuse` the service layer enforces (`@/league-service/creation`), asked at
+    // the boundary so a commissioner's form hears the refusal before a request ever reaches
+    // `createLeague` — derived, never retyped. The rule now carries the free-season law ITSELF
+    // (founder decision 7: a structurally valid paid league refuses while `moneyIsLive()` is
+    // false), so this boundary, `createLeague`, and `writeLeagueInTx`'s backstop all gate the
+    // dark season without any layer re-spelling it. The commissioner's own creation-seated team
+    // pays no fee today, a hole the money-live task must close before this gate ever opens
+    // (see `writeLeagueInTx`'s member-owner team insert). A wholly free league (every default)
+    // passes without touching the money vocabulary.
     const money = leagueMoneyOrRefuse(data);
     if (!money.ok) {
-      ctx.addIssue({ code: "custom", message: money.reason, path: ["payoutTable"] });
-      return;
-    }
-    // The free-season law at the boundary (founder decision 7: `MONEY_STATES.enabled` ships
-    // empty): a structurally valid PAID league still refuses until money is live — nobody may
-    // open a room whose published fee no join could lawfully pay, and the commissioner's own
-    // creation-seated team pays no fee today, a hole the money-live task must close before this
-    // gate ever opens (see `writeLeagueInTx`'s member-owner team insert).
-    if (money.config.entryFeeCents > 0 && !moneyIsLive()) {
-      ctx.addIssue({ code: "custom", message: FREE_SEASON_ENTRY_FEE_MESSAGE, path: ["entryFeeCents"] });
+      const darkSeason = money.reason === FREE_SEASON_ENTRY_FEE_MESSAGE;
+      ctx.addIssue({ code: "custom", message: money.reason, path: [darkSeason ? "entryFeeCents" : "payoutTable"] });
     }
   });
 

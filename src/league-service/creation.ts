@@ -10,6 +10,7 @@ import { LEAGUE_CONFIG } from "@/league";
 import { ROSTER_SHAPES } from "@/league/roster-shape";
 import type { HouseRungName, StartTrigger } from "@/matchmaking/house-catalog";
 import { prizeTableInvariant, type PrizeTable } from "@/money/prize-table";
+import { moneyIsLive } from "@/money/states";
 import type { ReferenceCache } from "@/stats-pipeline/reference-cache";
 import { MS_PER_DAY } from "./config";
 import { ENFORCEMENT_REFUSALS, tierJoinPrecondition } from "./enforcement";
@@ -39,6 +40,9 @@ export interface LeagueWriteDeps {
   readonly clock: Clock;
   /** Injected so ids are deterministic in a test and in the seed. `crypto.randomUUID` at the edge. */
   readonly newId: () => string;
+  /** The dark/live switch, defaulting to the real `moneyIsLive()` — injectable so a test can
+   *  exercise the paid arithmetic without editing shipped state (see `leagueMoneyOrRefuse`). */
+  readonly live?: boolean;
   /**
    * Invalidates this new league's cached scoring settings after they're written, no-op by
    * default. `createLeague` is one of two writers of `scoring_settings` today (the other is the
@@ -162,6 +166,14 @@ export interface LeagueMoneyConfig {
 export type LeagueMoneyOutcome = { readonly ok: true; readonly config: LeagueMoneyConfig } | { readonly ok: false; readonly reason: string };
 
 /**
+ * The refusal for a paid league asked for before the founder has named a launch state
+ * (`moneyIsLive`, `@/money/states` — the phase's one dark/live switch). Lives beside
+ * `leagueMoneyOrRefuse`, the rule that carries it at every layer; `./schemas` re-exports it so
+ * the boundary test and the copy sweep keep reading the same words the refusal carries.
+ */
+export const FREE_SEASON_ENTRY_FEE_MESSAGE = "Every league is free this season. An entry fee cannot be charged until paid play opens.";
+
+/**
  * Phase 4, Task 8: the creation-time half of founder decision 10's arithmetic law, applied to
  * the fields THIS request asks to create — the same "ask the one predicate before the row
  * exists" shape the tier gate above takes with `tierJoinPrecondition`. A wholly free league
@@ -174,6 +186,13 @@ export type LeagueMoneyOutcome = { readonly ok: true; readonly config: LeagueMon
  */
 export function leagueMoneyOrRefuse(
   input: Pick<CreateLeagueInput, "teamCount" | "entryFeeCents" | "platformFeeCents" | "payoutTable">,
+  // Defaulted so every production layer (the boundary schema, `createLeague`, `writeLeagueInTx`'s
+  // backstop) carries the dark-season gate FOR FREE — defense in depth the Task 8 review asked
+  // for, after finding the gate lived only in the schema and one future direct caller of
+  // `createLeague` away from a paid league with a free commissioner seat. Tests exercising paid
+  // arithmetic pass `live: true` explicitly; nothing in production does until decision 7's list
+  // gains a state.
+  live: boolean = moneyIsLive(),
 ): LeagueMoneyOutcome {
   const entryFeeCents = input.entryFeeCents ?? 0;
   const platformFeeCents = input.platformFeeCents ?? 0;
@@ -181,6 +200,7 @@ export function leagueMoneyOrRefuse(
   if (entryFeeCents === 0 && platformFeeCents === 0 && payoutTable === null) {
     return { ok: true, config: { entryFeeCents: 0, platformFeeCents: 0, payoutTable: null } };
   }
+  if (!live) return { ok: false, reason: FREE_SEASON_ENTRY_FEE_MESSAGE };
   const invariant = prizeTableInvariant(entryFeeCents, platformFeeCents, input.teamCount, payoutTable ?? []);
   if (!invariant.ok) return { ok: false, reason: invariant.reason };
   return { ok: true, config: { entryFeeCents, platformFeeCents, payoutTable } };
@@ -215,6 +235,9 @@ export async function writeLeagueInTx(
   kickoffAt: Date,
   clock: Clock,
   audit: AuditLogger,
+  /** Injected dark/live switch, defaulting to the real one — tests exercising paid arithmetic
+   *  pass `true`; production callers pass nothing (see `leagueMoneyOrRefuse`'s own docblock). */
+  live: boolean = moneyIsLive(),
 ): Promise<LeagueWriteOutcome> {
   // Explicit rows win when given (the seeds' and the test pipeline's own escape hatch);
   // otherwise the named shape resolves through `ROSTER_SHAPES`, falling back to the configured
@@ -226,7 +249,7 @@ export async function writeLeagueInTx(
   // `createLeague`): a config that fails the arithmetic law is a caller bug this deep, so it
   // throws and rolls the transaction back rather than storing a prize table settlement could
   // never balance. `createLeague` refuses the same input politely before any transaction opens.
-  const money = leagueMoneyOrRefuse(input);
+  const money = leagueMoneyOrRefuse(input, live);
   if (!money.ok) throw new Error(`writeLeagueInTx: ${money.reason}`);
 
   const [insertedLeague] = await tx
@@ -313,12 +336,12 @@ export async function writeLeagueInTx(
  * transaction nobody sees commit.
  */
 export async function createLeague(
-  { db, clock, newId, cache = NOOP_REFERENCE_CACHE, audit = getAuditLogger() }: LeagueWriteDeps,
+  { db, clock, newId, cache = NOOP_REFERENCE_CACHE, audit = getAuditLogger(), live = moneyIsLive() }: LeagueWriteDeps,
   input: CreateLeagueInput,
 ): Promise<CreateLeagueResult> {
   // Phase 4, Task 8: the money shape refuses FIRST — pure arithmetic, cheaper than the tier
   // gate's queries, and a table that cannot balance should never cost a database round trip.
-  const money = leagueMoneyOrRefuse(input);
+  const money = leagueMoneyOrRefuse(input, live);
   if (!money.ok) return { ok: false, status: 400, reason: money.reason };
 
   if (
@@ -339,7 +362,7 @@ export async function createLeague(
   let outcome: LeagueWriteOutcome | undefined;
   try {
     await db.transaction(async (tx) => {
-      outcome = await writeLeagueInTx(tx, { leagueId, teamId, draftId }, input, kickoffAt, clock, audit);
+      outcome = await writeLeagueInTx(tx, { leagueId, teamId, draftId }, input, kickoffAt, clock, audit, live);
     });
   } catch (error: unknown) {
     // Plain language out, real detail into the logs — never raw driver text to a user.
