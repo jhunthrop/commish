@@ -38,9 +38,17 @@ export function resetRankedPlayersCacheForTests(): void {
 }
 
 /**
- * The league's players, best projected season first, ties broken by player id so the order is
- * total. Projection uses the league's own scoring settings via the same scoring engine that
- * scores real weeks, so a PPR league's board looks like a PPR board.
+ * The league's players in draft order: ADP ascending first (`players.adp`, written by the stats
+ * provider's feed via `ingestAdp` — lower means the market takes that player earlier), and every
+ * player the feed does not rank AFTER every player it does. That null-last rule is the point,
+ * not a tie-break detail: with a real feed configured, real NFL players carry ADP and fabricated
+ * demo players never do, so the demo pool sinks below the real one instead of leading it on the
+ * strength of stat lines only the demo data has.
+ *
+ * Projection (the league's own scoring settings through the same engine that scores real weeks,
+ * so a PPR league's board still looks like a PPR board) is the tie-break within an equal ADP and
+ * the whole ordering of the no-ADP tail — which also keeps mock-mode boards and every pre-ADP
+ * test fixture ranking exactly as before. Final tie-break is player id, so the order is total.
  */
 export async function rankedPlayers(db: Db | DbTx, leagueId: string): Promise<readonly Player[]> {
   const cached = cache.get(leagueId);
@@ -64,6 +72,8 @@ export async function rankedPlayers(db: Db | DbTx, leagueId: string): Promise<re
   }
 
   const ranked = [...roster].sort((a, b) => {
+    if (a.adp !== null && b.adp !== null && a.adp !== b.adp) return a.adp - b.adp;
+    if ((a.adp === null) !== (b.adp === null)) return a.adp === null ? 1 : -1;
     const diff = (projected.get(b.id) ?? 0) - (projected.get(a.id) ?? 0);
     return diff !== 0 ? diff : a.id.localeCompare(b.id);
   });
