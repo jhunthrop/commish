@@ -164,6 +164,15 @@ describe("MATCHMAKING_CONFIG", () => {
     expect(MATCHMAKING_CONFIG.stakeDisclosure).not.toContain("—");
   });
 
+  // 2026-08-25, the absolutism sweep's carried finding: the shelf's live disclosure defers to
+  // the per-league Entry column rather than re-asserting a blanket "no money" claim for a merged
+  // list that can now hold a real fee.
+  it("defers the shelf's live disclosure to the per-league Entry column, with no em-dash in the copy", () => {
+    expect(MATCHMAKING_CONFIG.liveShelfStakeDisclosure).toContain("Entry fees are listed per league");
+    expect(MATCHMAKING_CONFIG.liveShelfStakeDisclosure).not.toContain("—");
+    expect(MATCHMAKING_CONFIG.liveShelfStakeDisclosure).not.toContain("No money changes hands");
+  });
+
   it("offers the same two participation tiers the platform computes, and no third one", () => {
     expect([...MATCHMAKING_CONFIG.participationTiers]).toEqual(["newcomer", "veteran"]);
   });

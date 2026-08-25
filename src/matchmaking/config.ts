@@ -53,6 +53,19 @@ export const MATCHMAKING_CONFIG = {
    */
   liveStakeDisclosure:
     "This league charges a real entry fee. The prize table is fixed in advance and paid out when the season settles.",
+  /**
+   * 2026-08-25, the absolutism sweep's carried finding (Phase 4, Task 13's steps-live report):
+   * `OpenLeagueShelf` prints ONE sentence below a MERGED list of every house and member league on
+   * the shelf, never a single league's own terms — `stakeDisclosure`'s "No money changes hands"
+   * is a true claim about that whole list only while every league on it is free, and stops being
+   * one the moment `moneyIsLive()` lets a single listed league carry a real fee. Rather than
+   * retry the blanket claim for a mixed list, this sentence defers: the per-league truth already
+   * lives in the Entry column (`entryFeeLabel`, `@/league-room/components/open-league-shared`),
+   * so the shelf states that fact about itself instead of re-asserting a number it does not
+   * itself compute. Read ONLY once `moneyIsLive()` is true, the same derived-switch idiom
+   * `liveStakeDisclosure` above and `FrontDoorHero`'s money line already hold to.
+   */
+  liveShelfStakeDisclosure: "Entry fees are listed per league. Free leagues stay free.",
   /** Most open leagues one browse answers with. A list nobody can scan is not a shortlist. */
   maxResults: 48,
   /**
