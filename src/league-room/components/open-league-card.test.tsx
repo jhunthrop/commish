@@ -192,23 +192,27 @@ describe("OpenLeagueCard", () => {
     });
   });
 
-  describe("the badge carries only what the title does not (E3)", () => {
-    it("drops the rung badge on a factory-named house card — the title already says Open 12-team", () => {
+  describe("the badge carries only what the title does not (E3) — decided by authority, never by user text", () => {
+    it("renders no rung badge on a house card — the factory title carries the rung by construction", () => {
       render(card({ ...BASE, id: "house3", name: "Open 12-team League 3", houseRung: "open_12" }));
-      // The rung survives in the title; the duplicated badge beside it dies.
+      // The rung reaches the reader exactly once, via the title.
       expect(screen.getByRole("heading", { name: "Open 12-team League 3" })).toBeInTheDocument();
       expect(screen.getAllByText(/Open 12-team/)).toHaveLength(1);
-    });
-
-    it("badges the rung on a house card whose title does not carry it", () => {
-      render(card({ ...BASE, id: "house9", name: "Sunday Special", houseRung: "open_12" }));
-      expect(screen.getByText("Open 12-team")).toBeInTheDocument();
     });
 
     it("badges a member league with its stake tier", () => {
       render(card({ ...BASE, id: "member1", houseRung: null }));
       // "Free" appears as the stake badge AND as the Entry row's value.
       expect(screen.getAllByText("Free").length).toBeGreaterThanOrEqual(2);
+    });
+
+    it("keeps the stake badge on a member league whose NAME happens to contain the label", () => {
+      // Review HIGH (fix round 1): the earlier substring test on the league name silently
+      // stripped this card's badge — a member's arbitrary name must never decide it.
+      render(card({ ...BASE, id: "member2", name: "Free For All League", houseRung: null }));
+      // Exactly two exact "Free" texts survive: the stake badge and the Entry row's value —
+      // the title node is "Free For All League", never an exact match.
+      expect(screen.getAllByText("Free")).toHaveLength(2);
     });
   });
 

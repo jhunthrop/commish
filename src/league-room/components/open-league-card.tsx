@@ -13,7 +13,6 @@ import type { HelpLevel } from "@/identity/preferences";
 import { describeStartTiming, rollNoticeSentence } from "@/matchmaking/roll";
 import type { PublicLeagueSummary } from "@/matchmaking/contract";
 import { stakeTierLabel } from "@/matchmaking/filter";
-import { HOUSE_RUNG_LABEL } from "@/matchmaking/house-catalog";
 import { JoinPublicLeagueButton } from "./join-public-league-button";
 
 const FORMAT_LABEL: Readonly<Record<string, string>> = { snake: "Snake", auction: "Auction" };
@@ -150,12 +149,15 @@ export function OpenLeagueCard({ league, signedIn, helpLevel, emphasis = "quiet"
   const filling = remainingSeats > 0 && remainingSeats < UI_CONFIG.seatMeter.lowSeatsThreshold;
   const liveChipLabel = onDeck ? "On deck" : filling ? "Filling" : null;
 
-  // E3: the badge carries only what the title does not, made literal — a factory-named house
-  // league is "Open 12-team League 3", so a rung badge beside it repeats the title's own first
-  // words and dies; a member league's name never states its stake, so the stake badge stands.
-  const badgeLabel = league.houseRung === null ? stakeTierLabel(league.stakeTier) : HOUSE_RUNG_LABEL[league.houseRung];
-  const badgeTone = league.houseRung === null ? ("neutral" as const) : ("accent" as const);
-  const badge = league.name.includes(badgeLabel) ? null : <Badge tone={badgeTone}>{badgeLabel}</Badge>;
+  // E3, review-ruled (fix round 1): the badge carries only what the title does not — decided by
+  // AUTHORITY, never by inspecting user text. A house league's title carries its rung BY
+  // CONSTRUCTION (`houseLeagueName`, `@/matchmaking/house-catalog`, is the one namer of house
+  // leagues and prefixes `HOUSE_RUNG_LABEL` verbatim), so a rung badge is always redundant and
+  // never renders. A member league's name is the member's own arbitrary text, so its stake badge
+  // ALWAYS renders — the earlier `name.includes(label)` spelling was rejected because a member
+  // league named "Free For All League" (or any future paid-tier label coinciding with a name
+  // fragment) would silently lose its stake badge to a substring coincidence.
+  const badge = league.houseRung === null ? <Badge tone="neutral">{stakeTierLabel(league.stakeTier)}</Badge> : null;
 
   const ctaVariant = emphasis === "ink" ? ("primary" as const) : ("secondary" as const);
 
