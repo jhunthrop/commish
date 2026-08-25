@@ -90,6 +90,14 @@ const SERVER_ONLY_MODULE_GROUPS = [
   // `ActivityRow` reach `src/account-room/**` and `src/league-room/**`.
   "@/integrity",
   "@/integrity-service",
+  // Phase 4, Task 3: the money vocabulary's Postgres half — `postMoneyTransaction` (the ONE
+  // writer of the money book of record), the wallet reads and, in later tasks, every other
+  // money writer. Exactly the split promised when `@/money` joined the browser-safe exempt set
+  // below: the wallet component value-imports `MONEY_CONFIG`/`formatUsd` from `@/money` and
+  // reaches every FIGURE over the wire; nothing in the browser bundle may hold a handle to the
+  // ledger itself. `import type` stays allowed, which is how `WalletSummary` reaches a client
+  // component.
+  "@/money-service",
 ];
 
 /**
@@ -126,9 +134,9 @@ const SERVER_ONLY_MODULE_GROUPS = [
  * (`MONEY_CONFIG`, `MONEY_STATES`/`moneyIsLive`, the account/posting/prize-table shapes and
  * refusal reasons) a later task's wallet and entry-fee form value-import directly, so the fee
  * ceiling a member sees and the one the server enforces read the identical number. The Postgres
- * half (`src/money-service/**`, a later task) and the external-money seam
- * (`src/payments-provider/**`) are NOT exempt and join `SERVER_ONLY_MODULE_GROUPS` when they
- * land, the same split every other exempt pure directory keeps from its own service layer.
+ * half (`src/money-service/**`, on the list above since Task 3 created it) and the
+ * external-money seam (`src/payments-provider/**`, joining when Task 4 lands) are NOT exempt —
+ * the same split every other exempt pure directory keeps from its own service layer.
  *
  * `src/chat-room/**` reaches `parseAvatarRef` indirectly through
  * `Avatar` (`src/components/ui/avatar.tsx`) rather than importing `@/identity` itself, but the

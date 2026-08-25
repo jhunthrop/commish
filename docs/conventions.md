@@ -197,6 +197,23 @@ src/
                           src/help, src/reviews, src/moderation, src/trades and
                           src/participation. See docs/superpowers/plans/
                           2026-08-24-phase4-money-foundations.md.
+  money-service/          Phase 4, Task 3: the money vocabulary's Postgres half — server-only,
+                          on the banned value-import list, 100% coverage (gate 23).
+                          postMoneyTransaction (post.ts): the ONE writer of money_entries and
+                          money_transactions. Balanced set gated by balancedOrRefuse before any
+                          statement; leagues row lock FIRST when the posting names a league (the
+                          global lock law); money_accounts rollup rows ensured and locked FOR
+                          UPDATE in sorted account-id order; the balance floor refuses (never
+                          clamps) for player-facing kinds under that lock; idempotency_key
+                          replays answer the committed outcome (unique-index backstop caught
+                          under a savepoint); state_of_entry and tax_year stamped on every leg
+                          per founder decision 6; audit append in the same transaction, anchor
+                          last (rulings 3 and 4). The reads (read.ts): walletSummary,
+                          accountBalance, getUserAnnualNetProfit — every figure a SUM over
+                          money_entries, never the rollup. test-support.ts:
+                          expectNoPostingTookPlace, asserted on every refusal path of every
+                          money writer, plus the property harness. Later tasks add the deposit/
+                          withdrawal/entry-fee/dissolution/settlement writers here.
   scoring/                Pure fantasy-scoring engine: computeFantasyPoints/scoreLineup, every
                           preset (PPR/standard/K-DEF/TE-premium). NO I/O. 100% coverage.
   stats/                  The stats seam. provider.ts (the interface: listPlayers, listGames,
@@ -475,9 +492,11 @@ directory on the list, holding `MONEY_CONFIG`, `MONEY_STATES`/`moneyIsLive`, the
 database, no clock, no I/O. A later task's wallet component and entry-fee creation form
 value-import `MONEY_CONFIG.entryFeeCeilingCents` and `moneyIsLive()` directly, the same
 "a client-side number and a server-enforced one must read the identical value" reason every other
-exempt directory is on this list. Its Postgres half, `src/money-service/**`, and the external-money
-seam, `src/payments-provider/**`, are NOT exempt and join the BLOCKED list when a later task creates
-them.
+exempt directory is on this list. Its Postgres half, `src/money-service/**` (Phase 4, Task 3:
+`postMoneyTransaction`, the one writer of the money book of record, plus the wallet reads), is on
+the BLOCKED list; the external-money seam, `src/payments-provider/**`, joins it when Task 4
+creates it. A wallet component value-imports `@/money` and reaches every figure over the wire;
+`import type` is how `WalletSummary` crosses.
 
 `src/integrity/**` and `src/integrity-service/**` join the BLOCKED list instead — unlike
 `@/chat`, `@/matchmaking`, `@/identity`, `@/help`, `@/reviews`, `@/moderation`, `@/trades`,
@@ -516,7 +535,7 @@ Thresholds, limits, durations, key formats live in a `config.ts` next to the mod
 - **Test-first.** Every step's tests are written before its implementation.
 - Tests live beside the code: `src/<feature>/**/*.test.ts`. Verification commands filter by directory: `npm test -- src/scoring`, never by a guessed filename.
 - Integration tests hit the **real** test Postgres / Redis from docker-compose — not mocks. Use `createTestDb()` + `truncateAll(db)` in `beforeEach`. Test files run serially (`fileParallelism: false`) because they share that DB.
-- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**`, `src/integrity-service/**`, `src/league-service/**`, `src/draft-service/**`, `src/moderation/**`, `src/trades/**` and `src/participation/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — twenty-one gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. `src/league-service` and `src/draft-service` (gates 17 and 18) are gated for the identical service-layer reason; `src/moderation` (gate 19) is pure and gates for the reason every pure directory does; `src/trades` (gate 20) is pure and holds the one fairness function the write path calls inside a transaction, moved out of the coverage-ungated `src/ai-advisor/**` for exactly that reason (`docs/decisions/trades-and-fairness.md` §2); `src/participation` (gate 21, Phase 3 Plan D) is pure and holds the third tier vocabulary that decides who is a veteran, joining two plans early gated `src/league-service`/`src/draft-service`/`src/integrity`/`src/integrity-service` in covering by construction every directory this plan writes into. See `docs/decisions/operators-and-moderation.md` and `docs/decisions/enforcement-and-tiers.md`. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
+- Coverage threshold: 100% for `src/scoring/**`, `src/draft-engine/**`, `src/draft-room/state/**`, `src/league/**`, `src/chat/**`, `src/matchmaking/**`, `src/stats/**`, `src/stats-pipeline/**`, `src/identity/**`, `src/help/**`, `src/reviews/**`, `src/gifs/**`, `src/identity-service/**`, `src/review-service/**`, `src/integrity/**`, `src/integrity-service/**`, `src/league-service/**`, `src/draft-service/**`, `src/moderation/**`, `src/trades/**`, `src/participation/**`, `src/money/**` and `src/money-service/**` (configured in `vitest.config.mts` with `coverage.include`, so unimported files count as 0%) — twenty-three gated directories, each with both an `include` entry and its own `thresholds` block; an `include` entry with no `thresholds` block measures nothing. The first twelve are pure; `src/identity-service`, `src/review-service`, `src/integrity` and `src/integrity-service` are gated because a whole-branch review found every HIGH finding living in the service layer, which no gate measured — `src/integrity`/`src/integrity-service` are the write path for the audit record this codebase's trust model depends on. `src/league-service` and `src/draft-service` (gates 17 and 18) are gated for the identical service-layer reason; `src/moderation` (gate 19) is pure and gates for the reason every pure directory does; `src/trades` (gate 20) is pure and holds the one fairness function the write path calls inside a transaction, moved out of the coverage-ungated `src/ai-advisor/**` for exactly that reason (`docs/decisions/trades-and-fairness.md` §2); `src/participation` (gate 21, Phase 3 Plan D) is pure and holds the third tier vocabulary that decides who is a veteran, joining two plans early gated `src/league-service`/`src/draft-service`/`src/integrity`/`src/integrity-service` in covering by construction every directory this plan writes into; `src/money` (gate 22, Phase 4 Task 1) is pure and holds the money vocabulary; `src/money-service` (gate 23, Phase 4 Task 3) is Postgres-backed and holds `postMoneyTransaction`, the one writer of the money book of record — the service-layer reason gates 13-18 exist, and more so. See `docs/decisions/operators-and-moderation.md` and `docs/decisions/enforcement-and-tiers.md`. Verify with an **unfiltered** `npm run test:coverage` — a path-filtered coverage run reports the other gated directories at 0%.
 
 **The gate count stays twenty-one through the Phase 3.5 addendum (house leagues) too.** Every module the addendum adds — `src/league-service/authority.ts`, `src/league-service/house-factory.ts`, `src/matchmaking/house-catalog.ts` — lands inside a directory already on the list above; `src/matchmaking` and `src/league-service` were both gated before this addendum existed, for reasons unrelated to it. No ninth pure-exempt directory and no twenty-second gate were needed because nothing new here is a directory-level concern — see `docs/decisions/house-leagues.md`.
 

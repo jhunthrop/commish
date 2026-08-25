@@ -1,7 +1,7 @@
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeEach, describe, expect, it } from "vitest";
-import { auditChains, chatMessages, draftSlotPreferences, drafts, integrityFlags, leagues, lineupSlots, memberNotices, playerStatLines, reviews, rosterSlots, seatHolds, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
-import { createTestDb, truncateAll } from "@/db/test-db";
+import { auditChains, chatMessages, draftSlotPreferences, drafts, integrityFlags, leagues, lineupSlots, memberNotices, moneyAccounts, playerStatLines, reviews, rosterSlots, seatHolds, sessionSignals, statWeeks, teams, tradeProposals, users } from "@/db/schema";
+import { createTestDb, truncateAll, truncateMoneyTables } from "@/db/test-db";
 import { currentDeadline, DRAFT_SKIP_POLICY } from "@/draft-engine";
 import { setSlotPreference } from "@/draft-service/slot-preference";
 import { createDraftStore } from "@/draft-service/store";
@@ -28,6 +28,8 @@ import { syncUserFromWorkOS } from "@/lib/auth/user-sync";
 import { toggleReaction } from "@/chat-service/chat";
 import { reportMessage } from "@/chat-service/moderation";
 import { reportReview } from "@/review-service/reviews";
+import { accountIdFor } from "@/money/accounts";
+import { postMoneyTransaction, type PostDeps } from "@/money-service/post";
 import { raiseFlag, resolveFlag } from "./flags";
 import { closeSupersededHoldFlag } from "./trade-fairness";
 import { grantAdmin } from "./grant-admin";
@@ -3287,5 +3289,169 @@ describe("claimSeatHold and a last-seat join — the hold-vs-join race (Task 6)"
       expect(await joinDb.select().from(teams).where(eq(teams.leagueId, leagueId))).toHaveLength(joinWon ? 2 : 1);
       expect(await joinDb.select().from(seatHolds).where(eq(seatHolds.leagueId, leagueId))).toHaveLength(holdWon ? 1 : 0);
     }
+  });
+});
+
+/**
+ * PHASE 4, TASK 3 — the suite's 34th entry (33 counted off this file before it), for the money
+ * book's ONE writer. `postMoneyTransaction` (`@/money-service/post`) is bound by both standing
+ * laws at once: a posting that names a league takes `leagues[X] FOR UPDATE` FIRST, as its own
+ * statement (the global lock law — Task 8 will run this writer INSIDE `joinLeagueInTx`, so the
+ * two must want that row in the same order), and its `money_accounts` rollup locks are taken in
+ * SORTED account-id order with the audit anchor last (its docblock enumerates every acquisition,
+ * implicit FK locks included: the `money_entries` insert re-locks only rows this same
+ * transaction already holds). Two proofs, each on real connections:
+ *
+ *  1. A posting beside a concurrent JOIN in the same league — the pair Task 8 makes permanent.
+ *     The join parks holding `leagues[X]`; the posting must genuinely block on that row BEFORE
+ *     touching any money row, then complete onto the SAME league chain.
+ *  2. A posting beside a concurrent posting sharing BOTH rollup rows, inputs in OPPOSITE
+ *     orders — the mirror-propose shape. A bystander parks the row that sorts FIRST
+ *     (`"fbo_pool"` < `"user_available:…"`); both postings must converge on it, which is what an
+ *     input-order lock would not do (the second would hold its own first-named row while
+ *     waiting, and releasing the bystander would complete a cycle).
+ */
+describe("postMoneyTransaction's lock order", () => {
+  const moneyDeps: PostDeps = { audit: getAuditLogger(), clock, newId: () => crypto.randomUUID() };
+
+  it("posts beside a concurrent join in the same league without deadlocking — leagues first, money rows after", async () => {
+    await truncateMoneyTables(joinDb);
+    await seedLeagueWith("lg_money_lock", ["u_mny_commish", "u_mny_joiner"]);
+    // Fund the payer before anything is parked: a league-less deposit, platform-scoped.
+    await joinDb.transaction((tx) =>
+      postMoneyTransaction(
+        tx,
+        {
+          kind: "deposit",
+          stateOfEntry: "NJ",
+          entries: [
+            { accountId: accountIdFor("fbo_pool"), direction: "debit", amountCents: 20_00 },
+            { accountId: accountIdFor("user_available", "u_mny_payer"), direction: "credit", amountCents: 20_00 },
+          ],
+          auditEvent: { eventType: "deposit_completed", actorId: "u_mny_payer", actorType: "user", leagueId: null, payload: { amountCents: 20_00 } },
+        },
+        moneyDeps,
+      ),
+    );
+
+    const join = parkedJoin("lg_money_lock", "u_mny_joiner", "team_mny_joiner");
+    await join.leagueLocked;
+
+    // T_post: the real writer, on its own connection. Its FIRST statement after the pure
+    // balance gate is `leagues[lg_money_lock] FOR UPDATE` — the row the join is holding — so it
+    // must genuinely block here before it touches a single money row.
+    const posting = flagDb.transaction((tx) =>
+      postMoneyTransaction(
+        tx,
+        {
+          kind: "entry_fee",
+          leagueId: "lg_money_lock",
+          stateOfEntry: "NJ",
+          entries: [
+            { accountId: accountIdFor("user_available", "u_mny_payer"), direction: "debit", amountCents: 20_00 },
+            { accountId: accountIdFor("league_escrow", "lg_money_lock"), direction: "credit", amountCents: 20_00 },
+          ],
+          auditEvent: { eventType: "entry_fee_collected", actorId: "u_mny_payer", actorType: "user", leagueId: "lg_money_lock", payload: { amountCents: 20_00 } },
+        },
+        moneyDeps,
+      ),
+    );
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    join.release();
+
+    expect(await join.joining).toMatchObject({ ok: true, alreadyMember: false });
+    expect(await posting).toMatchObject({ ok: true, replayed: false });
+
+    // Both transactions landed on the SAME league chain — the join's member_joined and the
+    // posting's entry_fee_collected — which is what makes the absence of a deadlock meaningful.
+    const [leagueAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "lg_money_lock"));
+    expect(leagueAnchor!.headSequence).toBe(2);
+    const [escrow] = await joinDb.select().from(moneyAccounts).where(eq(moneyAccounts.id, "league_escrow:lg_money_lock"));
+    expect(escrow!.balanceCents).toBe(20_00);
+  });
+
+  it("lets two mirror postings sharing both rollup rows run concurrently without deadlocking — sorted order, proven at the first-sorted row", async () => {
+    await truncateMoneyTables(joinDb);
+    // The shared pair, created and funded before anything is parked.
+    await joinDb.transaction((tx) =>
+      postMoneyTransaction(
+        tx,
+        {
+          kind: "deposit",
+          stateOfEntry: "NJ",
+          entries: [
+            { accountId: accountIdFor("fbo_pool"), direction: "debit", amountCents: 20_00 },
+            { accountId: accountIdFor("user_available", "u_mny_mirror"), direction: "credit", amountCents: 20_00 },
+          ],
+          auditEvent: { eventType: "deposit_completed", actorId: "u_mny_mirror", actorType: "user", leagueId: null, payload: { amountCents: 20_00 } },
+        },
+        moneyDeps,
+      ),
+    );
+
+    // The bystander: holds the ONE row both postings must reach for first —
+    // `"fbo_pool"` sorts before `"user_available:u_mny_mirror"`.
+    let holdsPoolLock: () => void = () => {};
+    const poolLocked = new Promise<void>((resolve) => (holdsPoolLock = resolve));
+    let releasePoolLock: () => void = () => {};
+    const released = new Promise<void>((resolve) => (releasePoolLock = resolve));
+    const holding = joinDb.transaction(async (tx) => {
+      await tx.execute(sql`SELECT id FROM money_accounts WHERE id = ${"fbo_pool"} FOR UPDATE`);
+      holdsPoolLock();
+      await released;
+    });
+    await poolLocked;
+
+    // T_post1 and T_post2: the real writer, twice, on TWO separate connections, the shared
+    // accounts named in OPPOSITE input orders — the exact shape an input-order lock deadlocks on.
+    const posting1 = pickDb.transaction((tx) =>
+      postMoneyTransaction(
+        tx,
+        {
+          kind: "deposit",
+          stateOfEntry: "NJ",
+          entries: [
+            { accountId: accountIdFor("user_available", "u_mny_mirror"), direction: "credit", amountCents: 10_00 },
+            { accountId: accountIdFor("fbo_pool"), direction: "debit", amountCents: 10_00 },
+          ],
+          auditEvent: { eventType: "deposit_completed", actorId: "u_mny_mirror", actorType: "user", leagueId: null, payload: { amountCents: 10_00 } },
+        },
+        moneyDeps,
+      ),
+    );
+    const posting2 = resolveDb.transaction((tx) =>
+      postMoneyTransaction(
+        tx,
+        {
+          kind: "deposit_return",
+          stateOfEntry: "NJ",
+          providerTransferRef: "transfer_mirror_return",
+          entries: [
+            { accountId: accountIdFor("fbo_pool"), direction: "credit", amountCents: 10_00 },
+            { accountId: accountIdFor("user_available", "u_mny_mirror"), direction: "debit", amountCents: 10_00 },
+          ],
+          auditEvent: { eventType: "deposit_returned", actorId: "u_mny_mirror", actorType: "user", leagueId: null, payload: { amountCents: 10_00 } },
+        },
+        moneyDeps,
+      ),
+    );
+
+    expect(await waitForBlockedBackend()).toBe(true);
+    releasePoolLock();
+
+    await expect(holding).resolves.toBeUndefined();
+    const [result1, result2] = await Promise.all([posting1, posting2]);
+    expect(result1).toMatchObject({ ok: true });
+    expect(result2).toMatchObject({ ok: true });
+
+    // The pair nets to where it started, and all three audit events (the setup deposit plus one
+    // per posting) landed on the platform chain.
+    const [pool] = await joinDb.select().from(moneyAccounts).where(eq(moneyAccounts.id, "fbo_pool"));
+    expect(pool!.balanceCents).toBe(20_00);
+    const [available] = await joinDb.select().from(moneyAccounts).where(eq(moneyAccounts.id, "user_available:u_mny_mirror"));
+    expect(available!.balanceCents).toBe(20_00);
+    const [platformAnchor] = await joinDb.select().from(auditChains).where(eq(auditChains.scope, "platform"));
+    expect(platformAnchor!.headSequence).toBe(3);
   });
 });

@@ -73,6 +73,13 @@ const COVERAGE_GATED_DIRS = [
   // reasons, the identical argument that put the roll's vocabulary in `src/matchmaking`. NO I/O,
   // no clock, no database.
   "src/money",
+  // Gate 23 (Phase 4, Task 3). `src/money-service` is Postgres-backed and gates for the reason
+  // gates 13-18 exist — every whole-branch review found its HIGH findings in the service
+  // layer — and more so: `postMoneyTransaction` (`post.ts`) is the ONE writer of the money book
+  // of record (founder decision 1), and a gate that measures everywhere except the place every
+  // dollar moves measures the wrong place. Guards unreachable through real Postgres get narrow
+  // stub-`DbTx` tests, the `lockAnchor` discipline.
+  "src/money-service",
 ] as const;
 /**
  * The three service directories' `schemas.ts` files are named explicitly alongside the `**` glob
@@ -266,6 +273,16 @@ export default defineConfig({
         // does; an `include` entry with no `thresholds` block measures nothing, so both halves
         // ship in the same commit as every gate before it.
         "src/money/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        // Gate 23 (Phase 4, Task 3). Postgres-backed, gated for the service-layer reason gates
+        // 13-18 are and because it holds the one writer of the money book of record; an
+        // `include` entry with no `thresholds` block measures nothing, so both halves ship in
+        // the same commit as every gate before it.
+        "src/money-service/**": {
           branches: 100,
           functions: 100,
           lines: 100,
