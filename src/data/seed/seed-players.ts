@@ -96,7 +96,11 @@ export async function seedPlayers(
     await db
       .insert(players)
       .values(batch.map((p) => ({ id: p.id, name: p.name, position: p.position, nflTeam: p.nflTeam })))
-      .onConflictDoUpdate({ target: players.id, set: excludedSetFor(players, ["id"]) });
+      // `adp` is excluded from the update set alongside the conflict key: the seed inserts rows
+      // WITHOUT an adp value, so `excluded.adp` is always NULL, and including it would make every
+      // seed re-run silently wipe the ADP enrichment `ingestAdp` (`src/stats-pipeline/adp.ts`)
+      // wrote — the column has exactly one writer, and this function is not it.
+      .onConflictDoUpdate({ target: players.id, set: excludedSetFor(players, ["id", "adp"]) });
   }
   void cache.invalidatePlayers();
 
