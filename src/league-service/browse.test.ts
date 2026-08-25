@@ -265,7 +265,8 @@ describe("listPublicLeagues", () => {
       {
         id: "open", name: "Rookie Snake Room", format: "snake", experienceTier: "beginner", stakeTier: 0,
         teamCount: 12, filledTeams: 8, scoringLabel: "Standard", compositionCategory: "all_newcomers",
-        draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)", medianGame: false, startTrigger: "scheduled",
+        draftAt: "Thursday 10 September, 5:00 PM UTC (in 24 days)", draftAtIso: "2026-09-10T17:00:00.000Z",
+        medianGame: false, startTrigger: "scheduled",
         houseRung: null, heldSeats: 0, rosterSummary: "15 slots, 1 flex", playoffWeeks: [15, 16, 17],
         kickoffRolls: 0,
       },

@@ -35,6 +35,7 @@ export const PUBLIC_LEAGUE_FIELDS: readonly (keyof PublicLeagueSummary)[] = [
   "scoringLabel",
   "compositionCategory",
   "draftAt",
+  "draftAtIso",
   "medianGame",
   "startTrigger",
   "houseRung",

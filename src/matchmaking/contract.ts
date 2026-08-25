@@ -95,13 +95,12 @@ export interface PublicLeagueSummary {
    * computed from a pre-formatted sentence, and re-parsing `formatDraftTime`'s prose would couple
    * the clock to display copy.
    *
-   * OPTIONAL, deliberately, and absent from `PUBLIC_LEAGUE_FIELDS` for now: populating it is a
-   * one-line `summarizeRow` diff in `@/league-service/browse`, a path this phase's global
-   * constraint locks (its two sanctioned service additions are Task 7's proof query and Task 8's
-   * wire read). Until the controller sanctions that line, no producer sets this field and the
-   * card's clock/on-deck states simply never activate — the mechanics are built and tested
-   * against fixtures that pass it. Carries `when_full` leagues' PLACEHOLDER kickoff exactly as
-   * `draftAt` does; every reader gates on `startTrigger === "scheduled"` first, same as `draftAt`.
+   * OPTIONAL in type (a fixture may omit it), but produced by `summarizeRow` and named in
+   * `PUBLIC_LEAGUE_FIELDS` since the controller sanctioned the one-line producer as the phase's
+   * third read-only league-service diff (beside Task 7's proof query and Task 8's wire read).
+   * The instant was already public as `draftAt`'s prose; this is the same fact in machine form.
+   * Carries `when_full` leagues' PLACEHOLDER kickoff exactly as `draftAt` does; every reader
+   * gates on `startTrigger === "scheduled"` first, same as `draftAt`.
    */
   readonly draftAtIso?: string;
   /** Whether this league plays a median game (Task 2) — see this interface's own docblock. */
