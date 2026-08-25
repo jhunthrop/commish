@@ -60,19 +60,22 @@ export type SubmitKycOutcome =
  *     statement, so "did anything change" and "is it safe to write" are answered together, with no
  *     read-then-write gap between them for a concurrent writer to land in.
  *
- * Deliberately NO early short-circuit for an already-verified caller (an earlier version of this
- * function had one): with an early check, a second call from an already-verified member never
- * reaches this guard at all, and the regression-prevention promise above rests entirely on the
- * early check instead — exactly the version of "prevented" that a genuine race defeats, because
- * the early check and this write are two separate round trips with a gap between them a concurrent
- * writer can land in. Every call reaches the SAME guarded write, so the guard is what protects the
- * fact, not an optimization that happens to make the common case look protected. The cost is one
- * avoidable provider call for an already-verified member re-submitting — not a money-safety
- * concern, and a small price for a promise that is actually true under concurrency.
+ * TWO layers, each with its own job (fix round 2, review MEDIUM): a cheap pre-provider READ
+ * refuses an already-verified caller before any vendor round trip is spent — that read is a COST
+ * control, never the correctness story — while the guarded WHERE below remains the load-bearing
+ * regression prevention: a concurrent writer landing between the read and the write still cannot
+ * knock `verified` back, because every call that reaches the write reaches the SAME guard. An
+ * earlier revision deleted the pre-read entirely so the guard could be proven load-bearing; the
+ * race test (`kyc.test.ts`) exercises the guard by landing the concurrent verify INSIDE the
+ * read-write gap (a provider whose awaited answer verifies the row as a side effect), so
+ * restoring the read re-buys the vendor economics without re-masking the guard.
  */
 export async function submitKycVerification(db: Db, input: KycSubmissionRequest, deps: SubmitKycDeps): Promise<SubmitKycOutcome> {
   const entry = deps.states.enabled.find((candidate) => candidate.state === input.stateOfEntry);
   if (entry === undefined) return { ok: false, status: 403, reason: MONEY_REFUSALS.stateNotEnabled };
+
+  const [existing] = await db.select({ kycStatus: users.kycStatus }).from(users).where(eq(users.id, input.userId));
+  if (existing?.kycStatus === "verified") return { ok: true, status: "verified" };
 
   const ref = await deps.provider.submitVerification({
     userId: input.userId,

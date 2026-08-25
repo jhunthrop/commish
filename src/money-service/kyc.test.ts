@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { auditEvents, users } from "@/db/schema";
 import { createTestDb, truncateAll } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
@@ -129,20 +129,44 @@ describe("submitKycVerification", () => {
    * count, exercised here through the outcome it produces), the row is never downgraded, and
    * nothing is audited for a write that did not happen.
    */
-  it("never downgrades an already-verified member — a later submission landing after a verify is refused by the guarded write, not audited", async () => {
+  it("never downgrades an already-verified member — a verify landing INSIDE the read-write gap is refused by the guarded write, not audited", async () => {
     await seedUser("u1");
-    // Some other path already verified this member (a faster concurrent submission, or a future
-    // operator path) — simulated directly, since this test is about the WRITE guard, not about
-    // how "verified" was reached.
-    await db.update(users).set({ kycStatus: "verified" }).where(eq(users.id, "u1"));
+    // The concurrent verify must land AFTER the pre-provider cost read (which would otherwise
+    // answer it) and BEFORE the guarded write — the provider's own awaited round trip IS that
+    // gap, so this provider verifies the row as a side effect of answering: the exact interleaving
+    // a faster concurrent submission produces, and the one the pre-read can never intercept.
+    const base = deps();
+    const racing: SubmitKycDeps = {
+      ...base,
+      provider: {
+        ...base.provider,
+        getStatus: async (ref) => {
+          await db.update(users).set({ kycStatus: "verified" }).where(eq(users.id, "u1"));
+          return base.provider.getStatus(ref);
+        },
+      },
+    };
 
-    // A late-arriving submission that resolves to "failed" this time (the fixed failing fixture)
-    // — must not touch the row.
-    const out = await submitKycVerification(db, { userId: "u1", ...REQUEST, legalName: MOCK_KYC_CONFIG.failingLegalName }, deps());
+    const out = await submitKycVerification(db, { userId: "u1", ...REQUEST, legalName: MOCK_KYC_CONFIG.failingLegalName }, racing);
     expect(out).toEqual({ ok: true, status: "verified" });
 
     const [row] = await db.select({ kycStatus: users.kycStatus }).from(users).where(eq(users.id, "u1"));
     expect(row?.kycStatus).toBe("verified");
+    expect(await kycAuditEvents()).toEqual([]);
+  });
+
+  it("refuses an already-verified member before any provider round trip is spent", async () => {
+    await seedUser("u1");
+    await db.update(users).set({ kycStatus: "verified" }).where(eq(users.id, "u1"));
+    const base = deps();
+    const submitSpy = vi.fn(base.provider.submitVerification);
+    const statusSpy = vi.fn(base.provider.getStatus);
+    const watched: SubmitKycDeps = { ...base, provider: { ...base.provider, submitVerification: submitSpy, getStatus: statusSpy } };
+
+    const out = await submitKycVerification(db, { userId: "u1", ...REQUEST }, watched);
+    expect(out).toEqual({ ok: true, status: "verified" });
+    expect(submitSpy).not.toHaveBeenCalled();
+    expect(statusSpy).not.toHaveBeenCalled();
     expect(await kycAuditEvents()).toEqual([]);
   });
 
