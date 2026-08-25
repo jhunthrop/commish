@@ -62,8 +62,11 @@ const OWNER: Readonly<Record<AuditEventType, "plan-a" | "plan-b" | "plan-c" | "p
   // `flag_raised`/`roster_move` did above — the value marks PUBLISHED, not which phase wrote it.
   // The "no publisher anywhere" check below is what keeps these honest in the meantime: a money
   // writer landing without flipping its row here reddens this file, not just a review comment.
-  deposit_completed: "phase-4", // Task 6, `@/money-service/deposits`
-  deposit_returned: "phase-4", // Task 6, `@/money-service/deposits` (the ACH-return posting)
+  // Task 5 landed both deposit publishers (`recordDepositCompleted`/`recordDepositReturned`,
+  // `@/money-service/deposits`) — flipped exactly as the block comment above prescribes: the
+  // value marks PUBLISHED, and the writer's landing is what reddened this row until it moved.
+  deposit_completed: "plan-a", // Task 5, `@/money-service/deposits`
+  deposit_returned: "plan-a", // Task 5, `@/money-service/deposits` (the ACH-return posting)
   withdrawal_requested: "phase-4", // Task 6, `@/money-service/withdrawals`
   withdrawal_completed: "phase-4", // Task 6, `@/money-service/withdrawals`
   withdrawal_returned: "phase-4", // Task 6, `@/money-service/withdrawals`
