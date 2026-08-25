@@ -80,6 +80,13 @@ const COVERAGE_GATED_DIRS = [
   // dollar moves measures the wrong place. Guards unreachable through real Postgres get narrow
   // stub-`DbTx` tests, the `lockAnchor` discipline.
   "src/money-service",
+  // Gate 24 (Phase 4, Task 4). `src/payments-provider` is Seam A — the external-money seam:
+  // the contract, its registry, the mock rail and the ONE ingestion point every provider
+  // callback crosses. Server-only (node:crypto in ingest.ts), no Postgres. It gates because it
+  // is the boundary real money crosses into the ledger's custody: the signature check, the
+  // strict payload parse and the mock's return-after-completion machinery are exactly the code
+  // whose unmeasured branch is a forged or misread callback.
+  "src/payments-provider",
 ] as const;
 /**
  * The three service directories' `schemas.ts` files are named explicitly alongside the `**` glob
@@ -283,6 +290,15 @@ export default defineConfig({
         // `include` entry with no `thresholds` block measures nothing, so both halves ship in
         // the same commit as every gate before it.
         "src/money-service/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        // Gate 24 (Phase 4, Task 4). Seam A, the external-money boundary; an `include` entry
+        // with no `thresholds` block measures nothing, so both halves ship in the same commit
+        // as every gate before it.
+        "src/payments-provider/**": {
           branches: 100,
           functions: 100,
           lines: 100,

@@ -1,6 +1,15 @@
 import type { Clock } from "@/domain/timing";
-import type { PaymentsProvider, TransferRef } from "../contract";
-import type { RawProviderCallback } from "../ingest";
+import type {
+  DepositInput,
+  MethodDescriptor,
+  PaymentsProvider,
+  TransferIntent,
+  TransferRef,
+  TransferStatus,
+  WithdrawalInput,
+} from "../contract";
+import type { PaymentsEvent, RawProviderCallback } from "../ingest";
+import { signProviderCallback } from "../ingest";
 
 /**
  * The mock rail: an in-memory transfer book on an injected `Clock`, moving no money and hitting
@@ -83,6 +92,183 @@ export interface MockPaymentsProvider extends PaymentsProvider {
   drainCallbacks(): readonly RawProviderCallback[];
 }
 
+/** One transfer as the mock's book records it. Replaced whole on every transition, never mutated. */
+interface TransferRecord {
+  readonly ref: TransferRef;
+  readonly direction: "deposit" | "withdrawal";
+  readonly userId: string;
+  readonly amountCents: number;
+  readonly idempotencyKey: string;
+  readonly status: TransferStatus;
+  readonly failureReason?: string;
+  readonly initiatedAt: string;
+}
+
+/**
+ * What one transfer contributes to the pooled FBO balance: money that SETTLED and stayed.
+ * A returned transfer contributes zero — the money moved and then moved back — which is
+ * exactly the arithmetic the contract suite's reconcile case asserts.
+ */
+function pooledContributionCents(record: TransferRecord): number {
+  if (record.status !== "completed") return 0;
+  return record.direction === "deposit" ? record.amountCents : -record.amountCents;
+}
+
 export function createMockPaymentsProvider(clock: Clock, options: MockPaymentsOptions = {}): MockPaymentsProvider {
-  throw new Error(`Task 4 Step 3 implements createMockPaymentsProvider. (${clock.now()}, ${String(options.surfaceCardFee)})`);
+  const surfaceCardFee = options.surfaceCardFee ?? MOCK_PAYMENTS_CONFIG.surfaceCardFee;
+  const accounts = new Map<string, string>();
+  const transfers = new Map<TransferRef, TransferRecord>();
+  const refByIdempotencyKey = new Map<string, TransferRef>();
+  const callbackQueue: RawProviderCallback[] = [];
+  let injectedDeclineReason: string | undefined;
+  let nextRefSequence = 1;
+
+  /** Sign-and-queue exactly what a real rail's webhook would deliver: raw body, header value. */
+  function queueCallback(event: PaymentsEvent): void {
+    const body = JSON.stringify(event);
+    callbackQueue.push({ body, signature: signProviderCallback(body) });
+  }
+
+  function requireTransfer(ref: TransferRef): TransferRecord {
+    const record = transfers.get(ref);
+    if (record === undefined) {
+      throw new Error(`Unknown transfer ref "${ref}". The mock never issued it.`);
+    }
+    return record;
+  }
+
+  function intentFor(record: TransferRecord): TransferIntent {
+    return {
+      ref: record.ref,
+      direction: record.direction,
+      amountCents: record.amountCents,
+      status: record.status,
+      ...(record.failureReason === undefined ? {} : { failureReason: record.failureReason }),
+      initiatedAt: record.initiatedAt,
+    };
+  }
+
+  /**
+   * The one initiation path for both directions: guards (caller bugs, thrown), idempotent
+   * replay (the same transfer answered at its current status), then decline-or-pend. The
+   * sentinel amount and the injected reason both decline TYPED — a decline is a business
+   * outcome the form renders, never an exception.
+   */
+  function initiate(direction: "deposit" | "withdrawal", input: DepositInput | WithdrawalInput): TransferIntent {
+    if (!accounts.has(input.userId)) {
+      throw new Error(`No provider account for user "${input.userId}". Call ensureAccount first.`);
+    }
+    if (!Number.isInteger(input.amountCents) || input.amountCents <= 0) {
+      throw new Error(`Transfer amounts must be a positive integer number of cents (got ${input.amountCents}).`);
+    }
+    const existingRef = refByIdempotencyKey.get(input.idempotencyKey);
+    if (existingRef !== undefined) {
+      const existing = requireTransfer(existingRef);
+      if (existing.direction !== direction || existing.userId !== input.userId || existing.amountCents !== input.amountCents) {
+        throw new Error(
+          `Replayed idempotency key "${input.idempotencyKey}" disagrees with the transfer it created (${existing.direction} of ${existing.amountCents} cents).`,
+        );
+      }
+      return intentFor(existing);
+    }
+
+    const declineReason = injectedDeclineReason ?? (input.amountCents === MOCK_PAYMENTS_CONFIG.declineAmountCents ? MOCK_PAYMENTS_CONFIG.declineReason : undefined);
+    injectedDeclineReason = undefined;
+    const record: TransferRecord = {
+      ref: `mock-transfer-${nextRefSequence++}`,
+      direction,
+      userId: input.userId,
+      amountCents: input.amountCents,
+      idempotencyKey: input.idempotencyKey,
+      status: declineReason === undefined ? "pending" : "failed",
+      ...(declineReason === undefined ? {} : { failureReason: declineReason }),
+      initiatedAt: clock.now(),
+    };
+    transfers.set(record.ref, record);
+    refByIdempotencyKey.set(input.idempotencyKey, record.ref);
+    return intentFor(record);
+  }
+
+  return {
+    async ensureAccount(userId) {
+      const existing = accounts.get(userId);
+      if (existing !== undefined) return existing;
+      const ref = `mock-account-${userId}`;
+      accounts.set(userId, ref);
+      return ref;
+    },
+
+    async initiateDeposit(input) {
+      return initiate("deposit", input);
+    },
+
+    async initiateWithdrawal(input) {
+      return initiate("withdrawal", input);
+    },
+
+    async getTransferStatus(ref) {
+      return requireTransfer(ref).status;
+    },
+
+    listSupportedMethods(): readonly MethodDescriptor[] {
+      const card = surfaceCardFee
+        ? MOCK_PAYMENTS_CONFIG.methods.card
+        : { ...MOCK_PAYMENTS_CONFIG.methods.card, feeCents: 0, feePercentBasisPoints: 0 };
+      return [
+        { method: "bank", ...MOCK_PAYMENTS_CONFIG.methods.bank },
+        { method: "card", ...card },
+      ];
+    },
+
+    async getPooledBalanceCents() {
+      let total = 0;
+      for (const record of transfers.values()) total += pooledContributionCents(record);
+      return total;
+    },
+
+    advance() {
+      for (const record of transfers.values()) {
+        if (record.status !== "pending") continue;
+        transfers.set(record.ref, { ...record, status: "completed" });
+        queueCallback({
+          type: record.direction === "deposit" ? "deposit_completed" : "withdrawal_completed",
+          ref: record.ref,
+          amountCents: record.amountCents,
+        });
+      }
+    },
+
+    triggerReturn(ref) {
+      const record = requireTransfer(ref);
+      if (record.status !== "completed") {
+        throw new Error(`Only a completed transfer can be returned; "${ref}" is ${record.status}.`);
+      }
+      transfers.set(ref, { ...record, status: "returned" });
+      queueCallback({
+        type: record.direction === "deposit" ? "deposit_returned" : "withdrawal_returned",
+        ref,
+        amountCents: record.amountCents,
+      });
+    },
+
+    failNextInitiation(reason) {
+      injectedDeclineReason = reason;
+    },
+
+    failPendingWithdrawal(ref, reason) {
+      const record = requireTransfer(ref);
+      if (record.direction !== "withdrawal") {
+        throw new Error(`Only a withdrawal can fail asynchronously; "${ref}" is a ${record.direction}. A deposit's late failure is a return.`);
+      }
+      if (record.status !== "pending") {
+        throw new Error(`Only a pending withdrawal can fail asynchronously; "${ref}" is ${record.status}.`);
+      }
+      transfers.set(ref, { ...record, status: "failed", failureReason: reason });
+      queueCallback({ type: "withdrawal_failed", ref, amountCents: record.amountCents });
+    },
+
+    drainCallbacks() {
+      return callbackQueue.splice(0, callbackQueue.length);
+    },
+  };
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DEPOSIT_METHODS, TRANSFER_STATUSES } from "./contract";
 import type { PaymentsProvider, TransferIntent, TransferRef } from "./contract";
 
 /**
@@ -56,6 +57,9 @@ export function runPaymentsProviderContractSuite(name: string, make: () => Payme
       const names = methods.map((m) => m.method);
       expect(new Set(names).size).toBe(names.length);
       for (const m of methods) {
+        // The method vocabulary is closed: an implementation may support fewer rails than the
+        // contract names, never invent one the product has no words for.
+        expect(DEPOSIT_METHODS).toContain(m.method);
         expect(Number.isInteger(m.feeCents)).toBe(true);
         expect(m.feeCents).toBeGreaterThanOrEqual(0);
         expect(Number.isInteger(m.feePercentBasisPoints)).toBe(true);
@@ -74,6 +78,9 @@ export function runPaymentsProviderContractSuite(name: string, make: () => Payme
       });
       expect(intent.direction).toBe("deposit");
       expect(intent.amountCents).toBe(25_00);
+      // The status vocabulary is closed too — asserted once before the specific expectations,
+      // so an implementation leaking its upstream's spelling fails HERE, not downstream.
+      expect(TRANSFER_STATUSES).toContain(intent.status);
       expect(intent.status).toBe("pending");
       expect(intent.initiatedAt).toMatch(/\S/);
       await expect(h.provider.getTransferStatus(intent.ref)).resolves.toBe("pending");

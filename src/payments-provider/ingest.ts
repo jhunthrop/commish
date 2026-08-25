@@ -1,3 +1,6 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { z } from "zod";
+import { envOr } from "@/lib/env";
 import { PAYMENTS_PROVIDER_CONFIG } from "./config";
 import type { TransferRef } from "./contract";
 
@@ -69,6 +72,28 @@ export type IngestOutcome =
   | { readonly ok: false; readonly reason: IngestRefusalReason };
 
 /**
+ * `z.strictObject`, not `z.object`: a payload carrying keys this boundary does not fully
+ * understand is refused whole, the validate-hard rule for untrusted input. `.lte` on the
+ * amount is the same safe-integer ceiling `MONEY_REFUSALS.amountOverflow` enforces on the
+ * ledger side — a callback may not smuggle in an amount the ledger could not represent.
+ */
+const callbackPayloadSchema = z.strictObject({
+  type: z.enum(PAYMENTS_EVENT_TYPES),
+  ref: z.string().min(1),
+  amountCents: z.number().int().positive().lte(Number.MAX_SAFE_INTEGER),
+});
+
+/**
+ * Read per call, never cached at module load: `.env.local` is loaded by the runtime before
+ * routes execute, but tests legitimately vary it, and a cached secret is a stale secret after
+ * rotation. `envOr`, not `??`, because `.env.example` documents the var and an empty line must
+ * mean unset (`src/lib/env.ts`).
+ */
+function webhookSecret(): string {
+  return envOr(PAYMENTS_PROVIDER_CONFIG.envVars.webhookSecret, PAYMENTS_PROVIDER_CONFIG.mockWebhookSecret);
+}
+
+/**
  * Lowercase hex HMAC-SHA256 of the raw body under the shared webhook secret
  * (`PAYMENTS_WEBHOOK_SECRET`, falling back to the mock's dev constant — see
  * `PAYMENTS_PROVIDER_CONFIG.mockWebhookSecret` for why that fallback is mock-only). Exported
@@ -76,13 +101,34 @@ export type IngestOutcome =
  * this verifier can never disagree about the algorithm.
  */
 export function signProviderCallback(body: string): string {
-  throw new Error(`Task 4 Step 5 implements signProviderCallback. (${body.length})`);
+  return createHmac("sha256", webhookSecret()).update(body).digest("hex");
+}
+
+/**
+ * Constant-time comparison against the expected digest. `Buffer.from(x, "hex")` never throws —
+ * it silently truncates at the first non-hex character — so the length check is not an
+ * optimization: it is what makes a malformed signature a mismatch instead of a
+ * `timingSafeEqual` crash on unequal lengths.
+ */
+function signatureVerifies(body: string, signature: string): boolean {
+  const expected = createHmac("sha256", webhookSecret()).update(body).digest();
+  const presented = Buffer.from(signature, "hex");
+  if (presented.length !== expected.length) return false;
+  return timingSafeEqual(presented, expected);
 }
 
 /** See the module docblock: verify, then parse, then translate — refusing typed, never throwing. */
 export function ingestProviderCallback(raw: RawProviderCallback): IngestOutcome {
-  throw new Error(`Task 4 Step 5 implements ingestProviderCallback. (${raw.body.length})`);
-}
+  if (raw.signature === undefined) return { ok: false, reason: INGEST_REFUSALS.missingSignature };
+  if (!signatureVerifies(raw.body, raw.signature)) return { ok: false, reason: INGEST_REFUSALS.invalidSignature };
 
-/** Referenced so the red stub compiles with `PAYMENTS_PROVIDER_CONFIG` imported for Step 5. */
-export const WEBHOOK_SIGNATURE_HEADER = PAYMENTS_PROVIDER_CONFIG.webhookSignatureHeader;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw.body);
+  } catch {
+    return { ok: false, reason: INGEST_REFUSALS.malformedPayload };
+  }
+  const payload = callbackPayloadSchema.safeParse(parsed);
+  if (!payload.success) return { ok: false, reason: INGEST_REFUSALS.malformedPayload };
+  return { ok: true, event: payload.data };
+}

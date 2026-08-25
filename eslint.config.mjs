@@ -98,6 +98,12 @@ const SERVER_ONLY_MODULE_GROUPS = [
   // ledger itself. `import type` stays allowed, which is how `WalletSummary` reaches a client
   // component.
   "@/money-service",
+  // Phase 4, Task 4: Seam A, the external-money seam. `registry.ts` reads PAYMENTS_PROVIDER,
+  // `ingest.ts` holds the webhook-secret verification (`node:crypto`) — exactly as server-only
+  // as `@/stats` and `@/gifs`, and the promised join from the `@/money` exemption note below.
+  // `import type` stays allowed, which is how `MethodDescriptor` and `TransferStatus` reach the
+  // wallet's client components; every FIGURE arrives over the wire.
+  "@/payments-provider",
 ];
 
 /**
@@ -135,8 +141,9 @@ const SERVER_ONLY_MODULE_GROUPS = [
  * refusal reasons) a later task's wallet and entry-fee form value-import directly, so the fee
  * ceiling a member sees and the one the server enforces read the identical number. The Postgres
  * half (`src/money-service/**`, on the list above since Task 3 created it) and the
- * external-money seam (`src/payments-provider/**`, joining when Task 4 lands) are NOT exempt —
- * the same split every other exempt pure directory keeps from its own service layer.
+ * external-money seam (`src/payments-provider/**`, on the list above since Task 4 created it)
+ * are NOT exempt — the same split every other exempt pure directory keeps from its own service
+ * layer.
  *
  * `src/chat-room/**` reaches `parseAvatarRef` indirectly through
  * `Avatar` (`src/components/ui/avatar.tsx`) rather than importing `@/identity` itself, but the
