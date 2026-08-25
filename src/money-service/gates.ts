@@ -34,9 +34,19 @@ import type { MoneyStatesConfig, StateCode } from "@/money/states";
  *     shortfall sits on `platform_receivable:<id>`, every paid door is closed. The DEPOSIT door
  *     deliberately skips this gate — the next completed deposit is HOW the receivable settles
  *     (`recordDepositCompleted`, `./deposits.ts`), so refusing deposits while owed would
- *     deadlock the member out of ever clearing it. The WITHDRAWAL door skips it too, for the
- *     same "spend doors only" reason stated in its own name — a withdrawal moves the member's
- *     OWN available balance to their own bank, it never spends INTO the platform.
+ *     deadlock the member out of ever clearing it. The WITHDRAWAL door skips this REFUSAL gate
+ *     too, but for a DIFFERENT reason than the deposit door's, and — REVIEW HIGH, Task 6 — NOT
+ *     by simply ignoring the debt: blocking a withdrawal over an unrelated receivable would
+ *     strand that debt with NO collection path at all (a withdrawal moves money OUT of the
+ *     platform; refusing the request collects nothing back, unlike refusing a deposit, which at
+ *     least leaves the deposit door open to collect through later). So this door does not skip
+ *     collection, it moves it INLINE: `initiateWithdrawal` (`./withdrawals.ts`) nets any
+ *     `platform_receivable` balance against the available balance BEFORE reserving anything —
+ *     settling what it can from the balance, reserving only what remains, and refusing the
+ *     withdrawal itself (not the settlement) only when nothing remains at all. Collection by
+ *     NETTING, never by blocking — the same "do not deadlock the member out of clearing it"
+ *     principle the deposit door's own exemption argues, applied on the door money leaves
+ *     through instead of the one it enters through.
  */
 
 /** Which class of door is asking. Spend doors add the receivable gate; the deposit and

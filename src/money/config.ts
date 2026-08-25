@@ -99,6 +99,15 @@ export const MONEY_REFUSALS = {
    *  Same construction as `depositBelowMinimum`; there is no per-transfer maximum to state — the
    *  member's own LOCKED available balance is the ceiling, enforced by the writer's balance floor. */
   withdrawalBelowMinimum: `No money moved. The minimum withdrawal is ${formatUsd(MONEY_CONFIG.withdrawal.minCents)}.`,
+  /**
+   * `initiateWithdrawal` (`src/money-service/withdrawals.ts`, Task 6 review HIGH fix): a
+   * `platform_receivable` balance nets against the available balance BEFORE any withdrawal
+   * reserves anything, and this is the refusal for the one case netting cannot avoid — the debt
+   * consumed the whole available balance, and nothing remains to send. Money-first, but not "no
+   * money moved": money DID move, into the settlement, which stands even though this refusal
+   * does. Supportive and factual, no accusation, no contraction.
+   */
+  withdrawalSettledInFull: "The balance owed was settled from this account, and nothing remains to withdraw.",
 } as const;
 
 /** The union of every refusal sentence in `MONEY_REFUSALS`, for a writer's own refusal type. */

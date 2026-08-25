@@ -1,15 +1,17 @@
 import { eq } from "drizzle-orm";
 import { beforeEach, describe, expect, it } from "vitest";
-import { auditEvents, moneyTransactions, paymentTransferIntents, users } from "@/db/schema";
+import { auditEvents, moneyAccounts, moneyTransactions, paymentTransferIntents, users } from "@/db/schema";
 import { createTestDb, truncateAll, truncateMoneyTables } from "@/db/test-db";
 import type { Clock } from "@/domain/timing";
 import { getAuditLogger } from "@/integrity-service/audit-logger";
+import { accountIdFor } from "@/money/accounts";
 import { MONEY_REFUSALS } from "@/money/config";
 import { MONEY_STATES, type MoneyStatesConfig, type StateCode } from "@/money/states";
 import type { TransferRef } from "@/payments-provider/contract";
 import { ingestProviderCallback, type PaymentsEvent } from "@/payments-provider/ingest";
 import { createMockPaymentsProvider, type MockPaymentsProvider } from "@/payments-provider/mock/mock-payments-provider";
 import { initiateDeposit, recordDepositCompleted, type DepositDeps } from "./deposits";
+import { postMoneyTransaction } from "./post";
 import type { PostDeps } from "./post";
 import { walletSummary } from "./read";
 import {
@@ -66,6 +68,34 @@ async function fundAvailable(userId: string, amountCents: number): Promise<void>
   if (!outcome.ok) throw new Error(`test funding: callback failed ingestion: ${outcome.reason}`);
   const completed = await recordDepositCompleted(db, outcome.event, postDeps());
   expect(completed).toMatchObject({ ok: true, replayed: false });
+}
+
+/** Books `amountCents` of owed money onto `platform_receivable:<userId>` through the real
+ *  writer — `gates.test.ts`'s own `bookReceivable`, the post-return shape (ruling 5) without the
+ *  full deposit lifecycle, applied here for the netting fix's tests. */
+async function bookReceivable(userId: string, amountCents: number): Promise<void> {
+  const outcome = await db.transaction((tx) =>
+    postMoneyTransaction(
+      tx,
+      {
+        kind: "deposit_return",
+        stateOfEntry: "TN",
+        entries: [
+          { accountId: accountIdFor("fbo_pool"), direction: "credit", amountCents },
+          { accountId: accountIdFor("platform_receivable", userId), direction: "debit", amountCents },
+        ],
+        auditEvent: {
+          eventType: "deposit_returned",
+          actorId: userId,
+          actorType: "user",
+          leagueId: null,
+          payload: { amountCents, shortfallCents: amountCents },
+        },
+      },
+      postDeps(),
+    ),
+  );
+  expect(outcome).toMatchObject({ ok: true });
 }
 
 /** Drains the mock's queued callbacks through the REAL ingestion point. */
@@ -177,6 +207,107 @@ describe("initiateWithdrawal's request-time reservation — the debit-at-request
     expect(second).toEqual(first);
     expect(await walletSummary(db, "u1")).toMatchObject({ availableCents: 30_00 });
     expect(await db.select().from(paymentTransferIntents).where(eq(paymentTransferIntents.direction, "withdrawal"))).toHaveLength(1);
+  });
+});
+
+describe("initiateWithdrawal's receivable netting — review HIGH fix", () => {
+  it("$50 available, $30 owed: settles the debt, reserves what remains, and the provider is called for the netted amount", async () => {
+    await fundAvailable("u1", 50_00);
+    await bookReceivable("u1", 30_00);
+
+    const out = await initiateWithdrawal(db, withdrawalInput("u1", 50_00), deps);
+    expect(out).toMatchObject({ ok: true, transfer: { status: "pending", direction: "withdrawal", amountCents: 20_00 }, settledCents: 30_00 });
+
+    // The debt is gone, the remainder — not the original request — is what actually reserved.
+    expect(await walletSummary(db, "u1")).toMatchObject({ availableCents: 0, owedCents: 0 });
+    const [clearing] = await db.select().from(moneyAccounts).where(eq(moneyAccounts.id, "provider_clearing"));
+    expect(clearing!.balanceCents).toBe(20_00);
+
+    const settlement = await db.select().from(moneyTransactions).where(eq(moneyTransactions.kind, "receivable_settlement"));
+    expect(settlement).toHaveLength(1);
+    expect(settlement[0]!.idempotencyKey).toMatch(/^withdrawal-settlement:u1:/);
+    const settlementAudit = await db.select().from(auditEvents).where(eq(auditEvents.eventType, "system_action"));
+    expect(settlementAudit).toHaveLength(1);
+    expect(settlementAudit[0]!.payload).toMatchObject({ outcome: "receivable_settlement", userId: "u1", amountCents: 30_00 });
+  });
+
+  it("$30 available, $30 owed: the settlement stands, the reservation does not, and the refusal names the new reason", async () => {
+    await fundAvailable("u1", 30_00);
+    await bookReceivable("u1", 30_00);
+
+    const out = await initiateWithdrawal(db, withdrawalInput("u1", 30_00), deps);
+    expect(out).toEqual({ ok: false, status: 403, reason: MONEY_REFUSALS.withdrawalSettledInFull });
+
+    // The settlement DID post — `expectNoPostingTookPlace` does not apply here. Assert explicitly:
+    // the debt is cleared, the balance is zero (settled, not reserved), no reservation exists.
+    expect(await walletSummary(db, "u1")).toMatchObject({ availableCents: 0, owedCents: 0 });
+    const settlement = await db.select().from(moneyTransactions).where(eq(moneyTransactions.kind, "receivable_settlement"));
+    expect(settlement).toHaveLength(1);
+    const reservation = await db.select().from(moneyTransactions).where(eq(moneyTransactions.kind, "withdrawal_request"));
+    expect(reservation).toHaveLength(0);
+    const [clearing] = await db.select().from(moneyAccounts).where(eq(moneyAccounts.id, "provider_clearing"));
+    expect(clearing?.balanceCents ?? 0).toBe(0);
+  });
+
+  it("$50 available, $0 owed: byte-identical to the pre-fix door — the full requested amount reserves, settledCents is 0", async () => {
+    await fundAvailable("u1", 50_00);
+    const out = await initiateWithdrawal(db, withdrawalInput("u1", 20_00), deps);
+    expect(out).toMatchObject({ ok: true, transfer: { status: "pending", amountCents: 20_00 }, settledCents: 0 });
+    expect(await walletSummary(db, "u1")).toMatchObject({ availableCents: 30_00 });
+    const settlement = await db.select().from(moneyTransactions).where(eq(moneyTransactions.kind, "receivable_settlement"));
+    expect(settlement).toHaveLength(0);
+  });
+
+  it("replays cleanly across the two-posting shape: a redelivered request reserves the SAME netted amount, never re-settling", async () => {
+    await fundAvailable("u1", 50_00);
+    await bookReceivable("u1", 30_00);
+    const input = withdrawalInput("u1", 50_00);
+
+    const first = await initiateWithdrawal(db, input, deps);
+    expect(first).toMatchObject({ ok: true, transfer: { amountCents: 20_00 }, settledCents: 30_00 });
+
+    // The idempotency layer that answers THIS (sequential) replay is `replayedReservationFor`'s
+    // cheap PRE-LOCK read — proven by the fact that a naive recompute would see owed=0 and
+    // available=0 on this second call and either wrongly refuse or wrongly reserve 0, not
+    // reproduce the original $20 transfer.
+    const before = await snapshotMoneyBook(db);
+    const second = await initiateWithdrawal(db, input, deps);
+    expect(second).toEqual(first);
+    expect(await snapshotMoneyBook(db)).toEqual(before);
+
+    const settlement = await db.select().from(moneyTransactions).where(eq(moneyTransactions.kind, "receivable_settlement"));
+    expect(settlement).toHaveLength(1); // never re-settled
+    const reservation = await db.select().from(moneyTransactions).where(eq(moneyTransactions.kind, "withdrawal_request"));
+    expect(reservation).toHaveLength(1); // never re-reserved
+  });
+
+  it("a TRUE concurrent race between two identical requests answers through the POST-lock re-check, not the pre-lock one", async () => {
+    await fundAvailable("u1", 50_00);
+    await bookReceivable("u1", 30_00);
+    const input = withdrawalInput("u1", 50_00);
+
+    // Both calls' pre-lock reads race BEFORE either has committed (nothing exists yet for
+    // either), so neither can be answered by the pre-lock fast path; whichever loses the
+    // `user_available` row lock only sees the winner's reservation once it acquires that same
+    // lock — the post-lock re-check is what makes THAT case correct (`replayedReservationFor`'s
+    // own docblock).
+    const [first, second] = await Promise.all([initiateWithdrawal(db, input, deps), initiateWithdrawal(db, input, deps)]);
+    expect(first).toEqual(second);
+    expect(first).toMatchObject({ ok: true, transfer: { amountCents: 20_00 }, settledCents: 30_00 });
+
+    const settlement = await db.select().from(moneyTransactions).where(eq(moneyTransactions.kind, "receivable_settlement"));
+    expect(settlement).toHaveLength(1); // settled exactly once, not twice
+    const reservation = await db.select().from(moneyTransactions).where(eq(moneyTransactions.kind, "withdrawal_request"));
+    expect(reservation).toHaveLength(1); // reserved exactly once, not twice
+    expect(await walletSummary(db, "u1")).toMatchObject({ availableCents: 0, owedCents: 0 });
+  });
+
+  it("a request less than what remains after settling is unaffected by netting", async () => {
+    await fundAvailable("u1", 100_00);
+    await bookReceivable("u1", 30_00);
+    const out = await initiateWithdrawal(db, withdrawalInput("u1", 20_00), deps);
+    expect(out).toMatchObject({ ok: true, transfer: { amountCents: 20_00 }, settledCents: 30_00 });
+    expect(await walletSummary(db, "u1")).toMatchObject({ availableCents: 50_00 }); // 100 - 30 settled - 20 reserved
   });
 });
 

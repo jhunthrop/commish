@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { Db, DbTx } from "@/db/client";
-import { moneyTransactions, paymentTransferIntents, users } from "@/db/schema";
-import { accountIdFor } from "@/money/accounts";
+import { moneyEntries, moneyTransactions, paymentTransferIntents, users } from "@/db/schema";
+import { accountIdFor, type MoneyAccountId } from "@/money/accounts";
 import { MONEY_REFUSALS } from "@/money/config";
 import type { MoneyStatesConfig, StateCode } from "@/money/states";
 import type { PaymentsProvider, TransferIntent, TransferRef, WithdrawalDestination } from "@/payments-provider/contract";
@@ -24,6 +24,17 @@ import { ensureAndLockMoneyAccounts, postMoneyTransaction, type PostDeps, type P
  * arriving synchronously (right here, in the same request) reverses that reservation immediately
  * — no callback will ever name a transfer that never left initiation, the same reasoning
  * `initiateDeposit` uses for why a declined deposit stores no intent.
+ *
+ * (1b) NETTING (Task 6 review HIGH fix). `moneyGates` exempts this door from the receivable
+ * REFUSAL gate (`./gates.ts`'s own docblock), but exemption is not the same as ignoring the
+ * debt — the original shape let a member owing `platform_receivable` drain `user_available`
+ * whole, stranding the debt with no collection path. `reserveForWithdrawal` below settles it
+ * INLINE instead: before anything reserves, any owed balance nets against the available balance
+ * (`min(available, owed)`, posted UNCONDITIONALLY whenever owed > 0), and only what remains funds
+ * the withdrawal — reserving less than requested, never more, and refusing the withdrawal itself
+ * (not the settlement) only when nothing remains at all. The settlement STANDS even when the
+ * withdrawal refuses: this is the one place in the module a refusal-shaped outcome coincides with
+ * a real, committed money movement.
  *
  * (2) THE FATE SET. Completion settles `provider_clearing` against `fbo_pool` (the money
  * genuinely left). A provider FAILURE (the credit leg bouncing before it settles) and a bank
@@ -58,11 +69,14 @@ export interface InitiateWithdrawalInput {
 }
 
 /**
- * A refusal is a closed gate or the reservation's own insufficient-balance floor — both answered
- * in the SAME `{ ok: false, status: 403, reason }` shape, so the route needs exactly one branch.
- * Fee and ETA ride every success answer, read from the provider's own `listSupportedMethods()`
+ * A refusal is a closed gate, the reservation's own insufficient-balance floor, or — since the
+ * review HIGH fix — a receivable settlement that consumed the whole balance; all three answer in
+ * the SAME `{ ok: false, status: 403, reason }` shape, so the route needs exactly one branch. Fee
+ * and ETA ride every success answer, read from the provider's own `listSupportedMethods()`
  * descriptor for `"bank"` — withdrawals are bank-only, permanently — so the UI renders figures the
- * provider stated and never invents one.
+ * provider stated and never invents one. `settledCents` rides every success answer too — 0 when
+ * nothing was owed, the netted amount otherwise — so the confirmation the member sees can say
+ * plainly that a debt was cleared first.
  */
 export type InitiateWithdrawalOutcome =
   | {
@@ -71,9 +85,14 @@ export type InitiateWithdrawalOutcome =
       readonly feeCents: number;
       readonly feePercentBasisPoints: number;
       readonly etaDescription: string;
+      readonly settledCents: number;
     }
   | Exclude<MoneyGateOutcome, { ok: true }>
-  | { readonly ok: false; readonly status: 403; readonly reason: typeof MONEY_REFUSALS.insufficientBalance };
+  | {
+      readonly ok: false;
+      readonly status: 403;
+      readonly reason: typeof MONEY_REFUSALS.insufficientBalance | typeof MONEY_REFUSALS.withdrawalSettledInFull;
+    };
 
 /**
  * The closed set of operator-facing alarm sentences the callback writers answer instead of
@@ -118,6 +137,9 @@ export type WithdrawalReturnedOutcome =
  *  provider call safe to attempt, not the other way around. The other three are ref-scoped, the
  *  deposit idiom, so a webhook redelivery becomes the same non-event at the book. */
 const requestKey = (userId: string, idempotencyKey: string): string => `withdrawal_requested:${userId}:${idempotencyKey}`;
+/** The receivable-netting posting's own key (review HIGH fix) — namespaced like `requestKey` but
+ *  distinctly suffixed, so the SAME client submission never collides the two postings' keys. */
+const settlementKey = (userId: string, idempotencyKey: string): string => `withdrawal-settlement:${userId}:${idempotencyKey}`;
 const completionKey = (ref: TransferRef): string => `withdrawal_completed:${ref}`;
 const failKey = (ref: TransferRef): string => `withdrawal_failed:${ref}`;
 const returnKey = (ref: TransferRef): string => `withdrawal_returned:${ref}`;
@@ -132,6 +154,169 @@ async function lockWithdrawalAccounts(tx: DbTx, userId: string) {
   const available = accountIdFor("user_available", userId);
   await ensureAndLockMoneyAccounts(tx, [fboPool, providerClearing, available]);
   return { fboPool, providerClearing, available };
+}
+
+/** One posting's own amount, read back by its idempotency key — `undefined` when no such
+ *  transaction has committed. The primitive both replay reads below share. */
+async function postedAmountFor(tx: DbTx, idempotencyKey: string): Promise<number | undefined> {
+  const [txn] = await tx.select({ id: moneyTransactions.id }).from(moneyTransactions).where(eq(moneyTransactions.idempotencyKey, idempotencyKey));
+  if (txn === undefined) return undefined;
+  const [entry] = await tx.select({ amountCents: moneyEntries.amountCents }).from(moneyEntries).where(eq(moneyEntries.transactionId, txn.id)).limit(1);
+  return entry?.amountCents;
+}
+
+/**
+ * The reservation and (if it happened) the settlement ACTUALLY posted for `input`, read back —
+ * never recomputed — when a reservation under this key already exists. A replayed request's
+ * SECOND call sees balances the first call's own settlement and reservation already moved;
+ * recomputing from those would hand `PaymentsProvider.initiateWithdrawal`'s own replay check
+ * (which compares amounts, Seam A's contract) a DIFFERENT figure than the one it actually
+ * initiated the first time, turning a benign double-submit into the seam's disagreement throw.
+ * `undefined` when no reservation exists yet under this key. The settlement key is checked
+ * independently — a replay's own re-read of `owedCents` would answer 0 (already settled), so the
+ * settlement's OWN existence, not a fresh balance read, is what tells a replay it happened.
+ */
+async function replayedReservationFor(tx: DbTx, input: InitiateWithdrawalInput): Promise<{ readonly reservedCents: number; readonly settledCents: number } | undefined> {
+  const reservedCents = await postedAmountFor(tx, requestKey(input.userId, input.idempotencyKey));
+  if (reservedCents === undefined) return undefined;
+  const settledCents = (await postedAmountFor(tx, settlementKey(input.userId, input.idempotencyKey))) ?? 0;
+  return { reservedCents, settledCents };
+}
+
+export type ReserveForWithdrawalOutcome =
+  | { readonly ok: true; readonly reservedCents: number; readonly settledCents: number }
+  | {
+      readonly ok: false;
+      readonly status: 403;
+      readonly reason: typeof MONEY_REFUSALS.insufficientBalance | typeof MONEY_REFUSALS.withdrawalSettledInFull;
+    };
+
+/**
+ * Reserves `input.amountCents` for withdrawal — but FIRST, inline, nets any `platform_receivable`
+ * debt against the available balance (Task 6 review HIGH fix). See the module docblock's (1b):
+ * this is where the withdrawal door's exemption from `moneyGates`' receivable REFUSAL gate is
+ * made safe — the exemption without this would let a member drain their available balance while
+ * a debt sat uncollected.
+ *
+ * NETS, DOES NOT BLOCK. Two branches:
+ *  - NO DEBT (`owedCents <= 0`): byte-identical to the door's pre-fix behavior — the full
+ *    requested amount is reserved, or the ordinary balance floor refuses with
+ *    `insufficientBalance`, exactly as before this fix.
+ *  - A DEBT: the settlement (`min(available, owed)`) posts UNCONDITIONALLY, in the SAME
+ *    transaction as the reservation that follows it (the Task 5 atomic-ordering precedent) —
+ *    even when it consumes the whole balance. Only what remains after settling funds the
+ *    withdrawal (`min(requested, remaining)`); when nothing remains, the WITHDRAWAL refuses
+ *    (`withdrawalSettledInFull`) but the settlement itself is not undone by that refusal — the
+ *    one place in this module a refusal-shaped outcome sits beside a real, committed posting.
+ *
+ * REPLAY. Checked via `replayedReservationFor` twice: a cheap PRE-LOCK read (the ordinary double-
+ * submit, answered before this call takes a single lock) and a POST-LOCK RE-CHECK immediately
+ * after `user_available`/`platform_receivable` are locked (`postMoneyTransaction`'s own two-layer
+ * shape, `./post.ts`'s docblock) — a concurrent call for the SAME key may commit while this one
+ * waits on the row lock just taken, and only the post-lock read sees that.
+ */
+async function reserveForWithdrawal(tx: DbTx, input: InitiateWithdrawalInput, deps: PostDeps): Promise<ReserveForWithdrawalOutcome> {
+  const reqKey = requestKey(input.userId, input.idempotencyKey);
+
+  const preLock = await replayedReservationFor(tx, input);
+  if (preLock !== undefined) return { ok: true, ...preLock };
+
+  const receivable = accountIdFor("platform_receivable", input.userId);
+  const available = accountIdFor("user_available", input.userId);
+  const locked = await ensureAndLockMoneyAccounts(tx, [receivable, available]);
+  const balanceOf = (id: MoneyAccountId): number => locked.get(id)!.balanceCents;
+
+  const postLock = await replayedReservationFor(tx, input);
+  if (postLock !== undefined) return { ok: true, ...postLock };
+
+  const owedCents = balanceOf(receivable);
+  if (owedCents <= 0) {
+    const reserved = await postMoneyTransaction(
+      tx,
+      {
+        kind: "withdrawal_request",
+        stateOfEntry: input.stateOfEntry,
+        idempotencyKey: reqKey,
+        entries: [
+          { accountId: available, direction: "debit", amountCents: input.amountCents },
+          { accountId: accountIdFor("provider_clearing"), direction: "credit", amountCents: input.amountCents },
+        ],
+        auditEvent: {
+          eventType: "withdrawal_requested",
+          actorId: input.userId,
+          actorType: "user",
+          leagueId: null,
+          payload: { amountCents: input.amountCents },
+        },
+      },
+      deps,
+    );
+    if (!reserved.ok) return { ok: false, status: 403, reason: MONEY_REFUSALS.insufficientBalance };
+    return { ok: true, reservedCents: input.amountCents, settledCents: 0 };
+  }
+
+  const availableCents = balanceOf(available);
+  const settledCents = Math.min(availableCents, owedCents);
+  const settlement = await postMoneyTransaction(
+    tx,
+    {
+      kind: "receivable_settlement",
+      stateOfEntry: input.stateOfEntry,
+      idempotencyKey: settlementKey(input.userId, input.idempotencyKey),
+      entries: [
+        { accountId: available, direction: "debit", amountCents: settledCents },
+        { accountId: receivable, direction: "credit", amountCents: settledCents },
+      ],
+      // `system_action` with a payload outcome — the same reuse `recordDepositCompleted`'s own
+      // receivable settlement uses (`./deposits.ts`): the platform collecting its own receivable
+      // is not one of the ten money events.
+      auditEvent: {
+        eventType: "system_action",
+        actorId: null,
+        actorType: "system",
+        leagueId: null,
+        payload: { outcome: "receivable_settlement", userId: input.userId, amountCents: settledCents },
+      },
+    },
+    deps,
+  );
+  if (!settlement.ok) throw new Error(`reserveForWithdrawal: the receivable settlement refused: ${settlement.reason}`);
+
+  // Decided under the SAME locks the settlement just posted under — no concurrent posting can
+  // have moved `availableCents` between the read above and here.
+  const remainingCents = availableCents - settledCents;
+  const reserveCents = Math.min(input.amountCents, remainingCents);
+  if (reserveCents <= 0) {
+    // The settlement above STANDS — this refusal is the withdrawal's alone (module docblock 1b).
+    return { ok: false, status: 403, reason: MONEY_REFUSALS.withdrawalSettledInFull };
+  }
+
+  const reserved = await postMoneyTransaction(
+    tx,
+    {
+      kind: "withdrawal_request",
+      stateOfEntry: input.stateOfEntry,
+      idempotencyKey: reqKey,
+      entries: [
+        { accountId: available, direction: "debit", amountCents: reserveCents },
+        { accountId: accountIdFor("provider_clearing"), direction: "credit", amountCents: reserveCents },
+      ],
+      auditEvent: {
+        eventType: "withdrawal_requested",
+        actorId: input.userId,
+        actorType: "user",
+        leagueId: null,
+        payload: { amountCents: reserveCents, settledCents },
+      },
+    },
+    deps,
+  );
+  // Unreachable given `reserveCents <= remainingCents <= availableCents`, both read under the
+  // same locks this posting re-acquires — kept as a defensive throw, the codebase's own
+  // discipline for a floor refusal the math has already ruled out (`recordDepositCompleted`'s own
+  // `if (!deposit.ok) throw ...` guards, `./deposits.ts`).
+  if (!reserved.ok) throw new Error(`reserveForWithdrawal: the reservation refused after settlement: ${reserved.reason}`);
+  return { ok: true, reservedCents: reserveCents, settledCents };
 }
 
 /**
@@ -173,17 +358,21 @@ async function postWithdrawalReversal(
 
 /**
  * The withdrawal door. Gates first (`moneyGates`, door `"withdraw"` — self-exclusion does not
- * apply, see the gates' own docblock), then the reservation posting (the balance floor's answer
- * IS the amount enforcement — never a pre-trusted read), then the provider, mirroring
- * `initiateDeposit`'s shape everywhere else: `ensureAccount`, `initiateWithdrawal` under the
- * namespaced key `withdrawal:<userId>:<formKey>`, an intent row stored for every outcome EXCEPT a
- * decline (which never had and never will have a callback).
+ * apply, see the gates' own docblock), then `reserveForWithdrawal` (which nets any receivable
+ * debt inline before reserving anything — the balance floor's answer IS the amount enforcement,
+ * never a pre-trusted read), then the provider, mirroring `initiateDeposit`'s shape everywhere
+ * else: `ensureAccount`, `initiateWithdrawal` under the namespaced key
+ * `withdrawal:<userId>:<formKey>`, an intent row stored for every outcome EXCEPT a decline (which
+ * never had and never will have a callback).
  *
  * ORDER, AND WHY: the reservation posts BEFORE the provider is ever called. An internal debit is
- * cheap and instantly reversible; a bank pull is neither. So an insufficient-balance refusal here
- * never reaches the provider at all — the member's balance is checked by attempting to move it,
- * under the SAME row locks a concurrent posting would need, so two requests racing the same
- * balance genuinely serialize rather than both reading a balance that is about to change.
+ * cheap and instantly reversible; a bank pull is neither. So neither an insufficient-balance
+ * refusal NOR a full-settlement refusal here ever reaches the provider at all — the member's
+ * balance is checked by attempting to move it, under the SAME row locks a concurrent posting
+ * would need, so two requests racing the same balance genuinely serialize rather than both
+ * reading a balance that is about to change. The amount actually sent to the provider is
+ * `reservation.reservedCents` — the NETTED figure, which may be less than `input.amountCents`
+ * whenever a debt was settled first.
  *
  * A provider decline (typed data, `status: "failed"`, never a thrown string — Seam A's own
  * discipline) arriving in this same call reverses the reservation immediately via
@@ -210,34 +399,15 @@ export async function initiateWithdrawal(db: Db, input: InitiateWithdrawalInput,
   }
   const fee = { feeCents: bankMethod.feeCents, feePercentBasisPoints: bankMethod.feePercentBasisPoints, etaDescription: bankMethod.etaDescription };
 
-  const reserved = await db.transaction((tx) =>
-    postMoneyTransaction(
-      tx,
-      {
-        kind: "withdrawal_request",
-        stateOfEntry: input.stateOfEntry,
-        idempotencyKey: requestKey(input.userId, input.idempotencyKey),
-        entries: [
-          { accountId: accountIdFor("user_available", input.userId), direction: "debit", amountCents: input.amountCents },
-          { accountId: accountIdFor("provider_clearing"), direction: "credit", amountCents: input.amountCents },
-        ],
-        auditEvent: {
-          eventType: "withdrawal_requested",
-          actorId: input.userId,
-          actorType: "user",
-          leagueId: null,
-          payload: { amountCents: input.amountCents },
-        },
-      },
-      deps,
-    ),
-  );
-  if (!reserved.ok) return { ok: false, status: 403, reason: MONEY_REFUSALS.insufficientBalance };
+  const reservation = await db.transaction((tx) => reserveForWithdrawal(tx, input, deps));
+  if (!reservation.ok) return reservation;
 
   await deps.provider.ensureAccount(input.userId);
   const transfer = await deps.provider.initiateWithdrawal({
     userId: input.userId,
-    amountCents: input.amountCents,
+    // The NETTED amount, never `input.amountCents` — the two agree whenever nothing was owed,
+    // and disagree exactly when netting reduced what actually got reserved (module docblock 1b).
+    amountCents: reservation.reservedCents,
     destination: input.destination,
     idempotencyKey: `withdrawal:${input.userId}:${input.idempotencyKey}`,
   });
@@ -246,12 +416,12 @@ export async function initiateWithdrawal(db: Db, input: InitiateWithdrawalInput,
     const reversed = await db.transaction((tx) =>
       postWithdrawalReversal(
         tx,
-        { userId: input.userId, stateOfEntry: input.stateOfEntry, amountCents: input.amountCents, providerTransferRef: transfer.ref, idempotencyKey: failKey(transfer.ref) },
+        { userId: input.userId, stateOfEntry: input.stateOfEntry, amountCents: transfer.amountCents, providerTransferRef: transfer.ref, idempotencyKey: failKey(transfer.ref) },
         deps,
       ),
     );
     if (!reversed.ok) throw new Error(`initiateWithdrawal: the decline reversal refused: ${reversed.reason}`);
-    return { ok: true, transfer, ...fee };
+    return { ok: true, transfer, ...fee, settledCents: reservation.settledCents };
   }
 
   await db
@@ -268,7 +438,7 @@ export async function initiateWithdrawal(db: Db, input: InitiateWithdrawalInput,
     })
     .onConflictDoNothing();
 
-  return { ok: true, transfer, ...fee };
+  return { ok: true, transfer, ...fee, settledCents: reservation.settledCents };
 }
 
 /** The stored intent for `ref`, verified against the callback that names it — or the alarm.
