@@ -1,5 +1,7 @@
 # Blueprint: Commish — Phase 4: Payments & Money Movement
 
+> **SUPERSEDED (2026-08-24):** this 8-step sketch was rebased into the executed plan, `docs/superpowers/plans/2026-08-24-phase4-money-foundations.md`, whose supersession table maps every step below to its fate. The built system is documented in `docs/money.md`; the decision record is `docs/decisions/money-foundations.md`. Read those first — this file is kept as the historical sketch only.
+
 **Objective:** Turn the prototype's mock stake tiers (`plans/fantasy-mvp-prototype.md`, Step 9) into real entry fees, real prize pools, and real payouts, following the FBO/agent-of-payee architecture in `docs/research/2026-08-16-beating-apex-strategy.md` §3. This phase adds: a payment-provider adapter interface with a mock/sandbox implementation, a double-entry per-user/per-state ledger, entry-fee collection wired to the join flow, prize-pool escrow and payout, deposit/withdrawal UI with risk-based staged KYC/CIP, and an AML/OFAC sanctions-screening adapter.
 
 **Source strategy doc:** `docs/research/2026-08-16-beating-apex-strategy.md`, primarily §3 ("Tax & Payments, Built In From Day One") — §3.3 (FBO/agent-of-payee model, banking partners) and §3.4 (engineering checklist) are load-bearing for this entire phase. §2.4 (public-league experience-tier rules) and §4.1 (public-league integrity tooling) are referenced where payout settlement needs to respect Phase 3's collusion flags.

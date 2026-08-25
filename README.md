@@ -17,8 +17,9 @@ npm run dev               # start the dev server
 npm test                  # run the test suite once
 npm run test:watch        # run tests in watch mode
 npm run test:coverage     # run tests with coverage — verify UNFILTERED before merging any change
-                          # touching src/scoring, src/draft-engine, src/draft-room/state,
-                          # src/league, src/chat, src/matchmaking, src/stats or src/stats-pipeline
+                          # touching a gated directory (twenty-four of them, each held at 100% —
+                          # the list lives in vitest.config.mts and docs/conventions.md's Tests
+                          # section; a path-filtered run reports the others at 0%)
 npm run lint              # lint
 npm run typecheck         # type-check with no emit
 npm run build             # production build — part of the verification gate for every step

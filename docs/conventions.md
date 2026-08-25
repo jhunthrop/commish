@@ -135,10 +135,15 @@ src/
                           no-re-stamp removal write). Consumed by /api/reviews/** and by
                           scripts/remove-review.ts.
   account-room/           The browser half of the profile/account surface: the profile form,
-                          the avatar picker, the notification summary and the review composer
-                          + feed. Reaches @/identity-service and @/review-service only over
+                          the avatar picker, the notification summary, the review composer
+                          + feed, the theme switcher (Phase 3.6), and the wallet surface
+                          (Phase 4, Task 12: wallet-panel, deposit-form, withdrawal-form,
+                          kyc-panel, exclusion-panel, money-copy.ts — dark behind
+                          moneyIsLive(), every figure a ledger query or absent). Reaches
+                          @/identity-service, @/review-service and @/money-service only over
                           the wire; value-imports @/reviews directly (pure, browser-safe) for
-                          the composer's live character count. See "Client boundary" below.
+                          the composer's live character count and @/money for the shared
+                          refusal sentences, bounds and formatUsd. See "Client boundary" below.
   integration/            Cross-module proofs: a real draft, run through the real store, into
                           real standings, chat, advisor and browse reads. Test-only.
   chat/                   Pure chat fold + wire contract + CHAT_CONFIG. NO I/O. 100% coverage.
@@ -212,8 +217,26 @@ src/
                           accountBalance, getUserAnnualNetProfit — every figure a SUM over
                           money_entries, never the rollup. test-support.ts:
                           expectNoPostingTookPlace, asserted on every refusal path of every
-                          money writer, plus the property harness. Later tasks add the deposit/
-                          withdrawal/entry-fee/dissolution/settlement writers here.
+                          money writer, plus the property harness. The writers around it
+                          (Tasks 5-11): gates.ts (moneyGates — state enablement, KYC,
+                          self-exclusion, receivable — the ONE choke point every money door
+                          calls), deposits.ts (nothing posts until completion; the ACH-return
+                          clawback with its platform_receivable shortfall; receivable
+                          settlement), withdrawals.ts (debit at request; netting an owed
+                          receivable before anything reserves — the Task 6 ruling),
+                          entry-fee.ts (collectEntryFeeInTx/refundEntryFeeInTx, run inside
+                          joinLeagueInTx/releaseSeat's own transactions), kyc.ts +
+                          exclusion.ts (the two compliance flag writers, each chain-audited
+                          per the Task 7 ruling), dissolution.ts (operator-only, pre-draft
+                          only, every seat refunded in one transaction), settlement.ts
+                          (operator-triggered payout against the STORED prize table, escrow
+                          to exactly zero, holds for flagged winners; its hold outcomes are
+                          the THIRD publisher of admin_action, beside grantAdmin and chat
+                          moderation — superseding Phase 3 Plan B ruling 15's two-publisher
+                          enumeration, per the Task 10 ruling), reconcile.ts (the four
+                          drift checks, level-triggered, no scheduler) and schemas.ts (Zod
+                          bounds derived from MONEY_CONFIG, never retyped). See
+                          docs/money.md and docs/decisions/money-foundations.md.
   payments-provider/      Phase 4, Task 4: Seam A — the EXTERNAL money seam, server-only, on the
                           banned value-import list, 100% coverage (gate 24). contract.ts (the
                           PaymentsProvider interface: ensureAccount, initiateDeposit/
@@ -228,7 +251,14 @@ src/
                           injected Clock: pending settles on advance(), typed declines,
                           triggerReturn flips completed to returned and queues a signed
                           callback), ingest.ts (the ONE ingestion point: HMAC verify, Zod-strict
-                          parse, typed PaymentsEvent out — Task 5's webhook route consumes it).
+                          parse, typed PaymentsEvent out — Task 5's webhook route consumes it),
+                          and the KYC seam beside it (Task 7, ruling 4's argument: different
+                          vendor and timeline than the money rail, same registry machinery) —
+                          kyc-contract.ts, kyc-registry.ts (KYC_PROVIDER selection, fail-fast),
+                          kyc-contract-suite.ts and mock/mock-kyc-provider.ts. registry.ts also
+                          holds getSharedPaymentsProvider(), the ONE process-wide instance every
+                          wallet/admin money route reads (Task 12 — per-route instances made a
+                          mock deposit invisible to reconciliation).
   scoring/                Pure fantasy-scoring engine: computeFantasyPoints/scoreLineup, every
                           preset (PPR/standard/K-DEF/TE-premium). NO I/O. 100% coverage.
   stats/                  The stats seam. provider.ts (the interface: listPlayers, listGames,
@@ -295,14 +325,19 @@ src/
                           chat report pick from; src/reviews/config.ts re-exports it so the diff
                           at every existing consumer is zero. NO I/O. 100% coverage. See
                           docs/decisions/operators-and-moderation.md §8.
-  db/                     schema.ts (Drizzle, pg-core: users, leagues (season_completed_at, the
-                          one-way season-completion stamp, Phase 3 Plan D), teams, league_invites,
-                          scoring_settings, roster_slots, lineup_slots, drafts, draft_actions,
-                          draft_nudges, draft_picks, weeks, matchups, players,
-                          player_stat_lines, chat_messages, chat_reactions, reviews,
+  db/                     schema.ts (Drizzle, pg-core: users, user_preferences, leagues
+                          (season_completed_at, the one-way season-completion stamp, Phase 3
+                          Plan D; entry_fee_cents/platform_fee_cents/payout_table, Phase 4),
+                          teams, league_invites, scoring_settings, roster_slots, lineup_slots,
+                          drafts, draft_slot_preferences, draft_actions, draft_nudges,
+                          draft_picks, weeks, matchups, players, player_stat_lines, stat_weeks,
+                          chat_messages, chat_message_reports, chat_reactions, reviews,
                           review_reports, audit_events, audit_chains, audit_chain_checkpoints,
-                          member_notices, integrity_flags, trade_proposals), client.ts
-                          (createDb/getDb), test-db.ts
+                          member_notices, integrity_flags, session_signals, trade_proposals,
+                          seat_holds, and Phase 4's money four — money_accounts,
+                          money_transactions, money_entries (append-only by trigger, migration
+                          0035) and payment_transfer_intents), client.ts (createDb/getDb),
+                          test-db.ts
   lib/
     env.ts                envOr/envOrUndefined — the ONE place an optional env var is read with a
                           fallback. `.env.example` ships some vars as empty lines and dotenv reads
@@ -338,17 +373,26 @@ docs/                     conventions.md (this), design-system.md, draft-engine.
                           the nullable-commissioner schema, the authority union, the catalog
                           reconciler, design-v2.md — Phase 3.6's own closing record: the theme
                           reversal, the retone's contrast corrections, the roll's start predicate,
-                          the seat hold's Postgres argument, …)
+                          the seat hold's Postgres argument, design-v3.md — Phase 3.7's Sunday
+                          Standard record, money-foundations.md — Phase 4's own closing record,
+                          and the two FOUNDER-GATED application packs,
+                          column-fbo-application.md + payments-gateway-application.md, prepared
+                          but never submitted, each ending in a blank founder sign-off line),
+                          money.md — the money system's own doc: the two seams, the four laws,
+                          the posting flows, the closed-loop product law and THE MONEY-LIVE
+                          CHECKLIST (the single place the money-live task starts from)
 scripts/                  Operator-run CLIs, never imported by src/**: seed (npm run seed),
                           audit:verify (verify-audit-chain.ts), reviews:remove
                           (remove-review.ts), admin:grant (grant-admin.ts, the only door
                           users.is_admin opens through), integrity:sweep
                           (sweep-multi-account.ts, the multi-account detector's manual re-run),
                           stats:correct (correct-stat-week.ts, the post-final settlement
-                          correction) and trades:sweep (sweep-trade-fairness.ts, the
+                          correction), trades:sweep (sweep-trade-fairness.ts, the
                           trade-fairness detector's manual re-run — see
-                          docs/decisions/trades-and-fairness.md §6). See
-                          docs/decisions/operators-and-moderation.md.
+                          docs/decisions/trades-and-fairness.md §6) and money:reconcile
+                          (money-reconcile.ts, the ledger's four drift checks against the
+                          bank and itself — level-triggered, no scheduler, see docs/money.md).
+                          See docs/decisions/operators-and-moderation.md.
 e2e/                      Playwright specs plus the sealed-session global setup (see README).
 plans/                    the phase blueprints
 ```
@@ -592,7 +636,7 @@ One rulebook, `src/integrity/copy-rules.ts` (`copyViolations`): no em or en dash
 Conventional commits (`feat:`, `fix:`, `chore:`, `docs:`, `test:`). Commit after every completed step; commit bodies explain *why* and record any deviation from the plan.
 
 ### Environment
-`.env.example` is committed; `.env.local` is gitignored. Required: `DATABASE_URL`, `REDIS_URL`, `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD`, `NEXT_PUBLIC_WORKOS_REDIRECT_URI`; test-only: `TEST_DATABASE_URL`, `TEST_PGBOUNCER_URL`; optional: `ANTHROPIC_API_KEY`, `STATS_PROVIDER` (default `mock`), `TANK01_API_KEY` + `TANK01_SEASON` (only when `STATS_PROVIDER=tank01`), `MOCK_STATS_LIVE_WEEK` (only when `STATS_PROVIDER=mock`), `STATS_INGESTION_MODE` + `STATS_POLL_INTERVAL_MS` + `STATS_MONTHLY_REQUEST_BUDGET` (override `STATS_INGESTION_CONFIG`'s defaults). Fail fast with a clear message when a required var is missing (see `db/client.ts`, `realtime/redis.ts`).
+`.env.example` is committed; `.env.local` is gitignored. Required: `DATABASE_URL`, `REDIS_URL`, `WORKOS_CLIENT_ID`, `WORKOS_API_KEY`, `WORKOS_COOKIE_PASSWORD`, `NEXT_PUBLIC_WORKOS_REDIRECT_URI`; test-only: `TEST_DATABASE_URL`, `TEST_PGBOUNCER_URL`; optional: `ANTHROPIC_API_KEY`, `STATS_PROVIDER` (default `mock`), `TANK01_API_KEY` + `TANK01_SEASON` (only when `STATS_PROVIDER=tank01`), `MOCK_STATS_LIVE_WEEK` (only when `STATS_PROVIDER=mock`), `STATS_INGESTION_MODE` + `STATS_POLL_INTERVAL_MS` + `STATS_MONTHLY_REQUEST_BUDGET` (override `STATS_INGESTION_CONFIG`'s defaults), `PAYMENTS_PROVIDER` + `KYC_PROVIDER` (both default `mock` via `envOr`; only `mock` exists this phase — a real rail's name is founder-gated on passing the contract suite unchanged, and an unknown name fails fast, never falls back). Fail fast with a clear message when a required var is missing (see `db/client.ts`, `realtime/redis.ts`).
 
 ## Verification commands (every step)
 
