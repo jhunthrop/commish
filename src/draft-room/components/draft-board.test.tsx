@@ -4,7 +4,10 @@ import { axe } from "vitest-axe";
 import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { REDUCED_MOTION_QUERY } from "@/design/use-reduced-motion";
 import { renderSurface } from "@/components/ui/test-utils";
+import { blendOver, contrastRatio } from "@/design/test-support";
+import { TOKENS } from "@/design/tokens";
 import { AUCTION_VIEW, PLAYERS, SNAKE_VIEW, TEAMS, playersById } from "../test-fixtures";
+import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { DraftBoard } from "./draft-board";
 
 function stubMatchMedia(reduced: boolean) {
@@ -243,6 +246,64 @@ describe("DraftBoard", () => {
       render(<DraftBoard {...props} view={view} variant="tv" />);
       const rows = within(grid()).getAllByRole("row");
       expect(within(rows[1]!).getAllByRole("cell")[1]).toHaveTextContent("Pending");
+    });
+  });
+
+  // Founder-reported live defect, 2026-08-25: a v2-era `border-line/35` opacity dilution on
+  // far-future rounds' empty cells, once sunk into v3's `#0D0D0F` graphite ground, made rounds
+  // 3-15 of a real board read as a void. The fix floors the recede at `border-line`'s own
+  // decorative-hairline contrast against `surface` — a future cell may shrink, never dim past
+  // that floor.
+  describe("far-future rounds never dim their border past the line token's own floor", () => {
+    const FIFTEEN_ROUND_VIEW: DraftStateView = {
+      ...SNAKE_VIEW,
+      slotConfig: [{ slot: "QB", count: 15, eligiblePositions: ["QB"] }],
+      picks: [],
+      onClockTeamId: "t1",
+      pickNumber: 1,
+    };
+
+    it("never emits an opacity-diluted border-line class on any empty cell", () => {
+      stubMatchMedia(false);
+      render(<DraftBoard {...props} view={FIFTEEN_ROUND_VIEW} />);
+      const emptyCells = within(grid()).getByRole("table").querySelectorAll('[aria-hidden="true"].border-dashed');
+      expect(emptyCells.length).toBeGreaterThan(0);
+      for (const cell of emptyCells) {
+        // `border-line` is fine; `border-line/NN` (any opacity suffix) is exactly the v2-era
+        // dilution this fix removes.
+        expect(cell.className).not.toMatch(/border-line\//);
+      }
+    });
+
+    it("renders the same border-line class, at full strength, for a near round and a far-future one", () => {
+      stubMatchMedia(false);
+      render(<DraftBoard {...props} view={FIFTEEN_ROUND_VIEW} />);
+      const rows = within(grid()).getAllByRole("row");
+      // Round 1 (rows[1]) is the active round — "near". Round 15 (rows[15]) is far past it.
+      const nearCell = within(rows[1]!).getAllByRole("cell")[1]!.querySelector('[aria-hidden="true"]')!;
+      const farCell = within(rows[15]!).getAllByRole("cell")[1]!.querySelector('[aria-hidden="true"]')!;
+      expect(nearCell.className).toContain("border-line");
+      expect(farCell.className).toContain("border-line");
+      expect(nearCell.className).not.toMatch(/border-line\//);
+      expect(farCell.className).not.toMatch(/border-line\//);
+      // The two differ only by the height token that shapes the recede, never by color.
+      expect(nearCell.className).toContain(DRAFT_ROOM_CONFIG.emptyCellBorderClass.near);
+      expect(farCell.className).toContain(DRAFT_ROOM_CONFIG.emptyCellBorderClass.future);
+    });
+
+    it("would fail contrast if the old opacity dilution ever came back, in both themes", () => {
+      // Quantifies why the fix floors at `border-line`'s own, undiluted contrast: any opacity
+      // modifier composited toward `surface` (what a `border-line/NN` utility paints) can only
+      // pull that number down, never up. The floored config never dilutes, so its contrast is
+      // always the token pair's own — never the lower, diluted number a regression would produce.
+      expect(DRAFT_ROOM_CONFIG.emptyCellBorderClass.future).not.toMatch(/border-line\//);
+      for (const theme of ["light", "dark"] as const) {
+        const { line, surface } = TOKENS.color[theme];
+        const flooredContrast = contrastRatio(line, surface);
+        const wouldBeDilutedColor = blendOver(line, 0.35, surface); // the old `border-line/35`
+        const dilutedContrast = contrastRatio(wouldBeDilutedColor, surface);
+        expect(flooredContrast).toBeGreaterThan(dilutedContrast);
+      }
     });
   });
 });

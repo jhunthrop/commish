@@ -6,6 +6,7 @@ import type { CompletedPick, DraftStateView } from "@/draft-engine";
 import { Avatar, EYEBROW, Sticker } from "@/components/ui";
 import { useEffect, useRef } from "react";
 import { usePrefersReducedMotion } from "@/design/use-reduced-motion";
+import { DRAFT_ROOM_CONFIG } from "../state/config";
 import { rosterSpots } from "../state/format";
 import { teamName, teamsById } from "../lib/lookups";
 
@@ -223,8 +224,11 @@ function StickerCell({
   }
 
   // Far-future rounds compress to slivers: the present deserves the space, and the shape of
-  // the season is still visible without shouting.
-  return <div aria-hidden="true" className={`h-full rounded-sm border border-dashed ${cell.future ? "min-h-4 border-line/35" : "min-h-12 border-line"}`} />;
+  // the season is still visible without shouting. The recede is height only — see
+  // `DRAFT_ROOM_CONFIG.emptyCellBorderClass`'s own docblock for why the border color never
+  // dilutes further than `border-line`'s own decorative-hairline floor.
+  const borderClass = cell.future ? DRAFT_ROOM_CONFIG.emptyCellBorderClass.future : DRAFT_ROOM_CONFIG.emptyCellBorderClass.near;
+  return <div aria-hidden="true" className={`h-full rounded-sm border border-dashed ${borderClass}`} />;
 }
 
 /**
