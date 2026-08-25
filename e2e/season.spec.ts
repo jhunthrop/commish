@@ -20,7 +20,11 @@ test("a manager sets a lineup, and sees the week's real state and the standings 
   // regression that made BOTH "Save lineup" and the locked message disappear would silently
   // skip the `if` below and still pass.
   const save = managerA.getByRole("button", { name: /Save lineup/i });
-  const locked = managerA.getByText(/lineup can.t change/i);
+  // COPY MOVE, followed deliberately: the design-v2 gauntlet wave (8f7b8f9) retoned the lock
+  // sentence from "can't change" to "cannot change" (matching the server's own copy in
+  // `lineups.ts`), and the old `/can.t/` pattern cannot match "cannot". Same lock, same
+  // disjunction below — tighter pattern.
+  const locked = managerA.getByText(/lineup cannot change/i);
   await expect(save.or(locked).first()).toBeVisible();
   if ((await save.count()) > 0) {
     await save.first().click();
