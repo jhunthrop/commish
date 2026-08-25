@@ -511,6 +511,12 @@ function summarizeRow(
     scoringLabel: weights === undefined ? "Custom" : describeScoring(weights),
     compositionCategory: compositionCategoryFor(tierCompositionFor({ newcomers: row.newcomers, veterans: row.veterans })),
     draftAt: formatDraftTime(row.kickoffAt.toISOString(), now),
+    // The raw instant beside its prose sibling, for the ledger card's ticking clock
+    // (`draftAtIso`, `@/matchmaking/contract`) — the third sanctioned read-only
+    // league-service diff of Phase 3.7 (controller ruling; the other two are
+    // `proof.ts`'s min-kickoff query and `wire.ts`). Projection only: no new query,
+    // no write, no lock.
+    draftAtIso: row.kickoffAt.toISOString(),
     medianGame: row.medianGame,
     startTrigger: row.startTrigger,
     houseRung,
