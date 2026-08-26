@@ -31,9 +31,9 @@ export default async function MockDraftLandingPage({ params }: PageProps) {
   if (!result.ok) {
     return (
       <>
-        <PageTitle>Practice drafts</PageTitle>
+        <PageTitle>Mock drafts</PageTitle>
         <ErrorState
-          title="We could not find that practice draft"
+          title="We could not find that mock draft"
           description={result.reason}
           action={<ButtonLink href="/app/mock-drafts">Open the practice lobby</ButtonLink>}
         />
@@ -43,7 +43,7 @@ export default async function MockDraftLandingPage({ params }: PageProps) {
 
   return (
     <>
-      <PageTitle>Practice drafts</PageTitle>
+      <PageTitle>Mock drafts</PageTitle>
       <MockShareLanding code={code} summary={result.summary} />
     </>
   );

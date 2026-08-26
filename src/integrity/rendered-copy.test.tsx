@@ -1690,7 +1690,7 @@ describe("ExclusionPanel says nothing that breaks the house copy rules, excluded
  */
 describe("PracticeBanner says nothing that breaks the house copy rules", () => {
   it("is clean with the room's own practice banner text", () => {
-    const message = "This is a practice draft. Nothing here counts, and this room clears itself after a day.";
+    const message = "This is a mock draft. Nothing here counts, and this room clears itself after a day.";
     const { container } = render(<PracticeBanner message={message} />);
     expectClean(container);
   });
@@ -1727,9 +1727,9 @@ describe("ShareLinkPanel says nothing that breaks the house copy rules", () => {
 });
 
 const MOCK_RESULTS_COPY: MockResultsCopy = {
-  heading: "Your practice draft is complete.",
+  heading: "Your mock draft is complete.",
   retentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
-  runAgainLabel: "Run another practice draft",
+  runAgainLabel: "Run another mock draft",
   openLobbyLabel: "Open the practice lobby",
   browseLeaguesLabel: "Browse real leagues",
 };

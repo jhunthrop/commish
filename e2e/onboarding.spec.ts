@@ -22,7 +22,7 @@ test("a manager with zero leagues sees the fork, ordered and explained, and brow
   // (`ProfileForm`, `variant="first-run"`) first — "Set up your manager profile" now leads the
   // level-3 heading list, ahead of the paths it used to open with; this is a deliberate
   // structure move, not a loosened assertion, so the array still asserts the exact order.
-  // Phase 4.5, Task 9: "Try a practice draft" leads ALL of create/join/browse, unconditionally —
+  // Phase 4.5, Task 9: "Try a mock draft" leads ALL of create/join/browse, unconditionally —
   // it is not one of the tier-ordered three (`firstRunPlan`'s own docblock).
   //
   // Text/label assertions here are scoped to `main` because this content streams: the App
@@ -38,7 +38,7 @@ test("a manager with zero leagues sees the fork, ordered and explained, and brow
   const headings = managerZero.getByRole("heading", { level: 3 });
   await expect(headings).toHaveText([
     "Set up your manager profile",
-    "Try a practice draft",
+    "Try a mock draft",
     "Find an open league",
     "Join with an invite",
     "Start a league",

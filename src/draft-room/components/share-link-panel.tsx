@@ -28,7 +28,7 @@ export function ShareLinkPanel({ path, shareCode, seatsFilled, seatsTotal, start
   const { remainingMs } = useCountdown(startsAt);
   return (
     <div className="mx-4 mt-3" data-testid="share-link-panel">
-      <Panel title="Invite others to this practice draft">
+      <Panel title="Invite others to this mock draft">
         <div className="flex flex-col gap-3">
           <Input label="Share link" value={path} readOnly />
           <p className="text-sm text-text-muted">

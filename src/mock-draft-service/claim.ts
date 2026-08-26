@@ -15,13 +15,13 @@ import { MOCK_CONFIG } from "@/mock-draft/config";
  * `joinLeagueInTx`'s shared draft-status refusal keeps for real leagues.
  */
 export const MOCK_REFUSALS = {
-  missing: "That practice draft does not exist. Check the link or start a new one.",
-  started: "This practice draft has already started. Start a new one whenever you like.",
-  full: "This practice draft is already full. Start a new one whenever you like.",
+  missing: "That mock draft does not exist. Check the link or start a new one.",
+  started: "This mock draft has already started. Start a new one whenever you like.",
+  full: "This mock draft is already full. Start a new one whenever you like.",
   /** `topUpBots`' structural guard (`./start`): a bot may only ever be seated into a league a
    *  `mock_rooms` row vouches for — a real league reached by mistake refuses before one bot row
    *  is drawn. */
-  notMock: "That league is not a practice draft.",
+  notMock: "That league is not a mock draft.",
 } as const;
 
 /**

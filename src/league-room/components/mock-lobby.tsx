@@ -126,8 +126,8 @@ export function MockLobby({
 
   return (
     <div className="flex flex-col gap-8">
-      <Card as="section" aria-label="Start a practice draft" className="flex flex-col gap-3">
-        <h2 className="text-lg font-semibold text-text-primary">Start a practice draft</h2>
+      <Card as="section" aria-label="Start a mock draft" className="flex flex-col gap-3">
+        <h2 className="text-lg font-semibold text-text-primary">Start a mock draft</h2>
         <MockSetupForm
           modes={modes}
           teamCountOptions={teamCountOptions}
@@ -140,9 +140,9 @@ export function MockLobby({
         />
       </Card>
 
-      <section aria-label="Open practice drafts" className="flex flex-col gap-3">
+      <section aria-label="Open mock drafts" className="flex flex-col gap-3">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold text-text-primary">Open practice drafts</h2>
+          <h2 className="text-lg font-semibold text-text-primary">Open mock drafts</h2>
           <Button variant="ghost" size="sm" onClick={() => void refresh()} disabled={refreshing} loading={refreshing}>
             Refresh
           </Button>

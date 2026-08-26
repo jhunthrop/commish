@@ -47,8 +47,8 @@ export default async function MockDraftsPage({ searchParams }: PageProps) {
       const body = (await limited.json()) as { readonly error: string };
       return (
         <>
-          <PageTitle>Practice drafts</PageTitle>
-          <ErrorState title="Too many practice drafts" description={body.error} action={RETRY_ACTION} />
+          <PageTitle>Mock drafts</PageTitle>
+          <ErrorState title="Too many mock drafts" description={body.error} action={RETRY_ACTION} />
         </>
       );
     }
@@ -58,8 +58,8 @@ export default async function MockDraftsPage({ searchParams }: PageProps) {
     if (result.ok) redirect(`/app/drafts/${result.draftId}`);
     return (
       <>
-        <PageTitle>Practice drafts</PageTitle>
-        <ErrorState title="We could not start that practice draft" description={result.reason} action={RETRY_ACTION} />
+        <PageTitle>Mock drafts</PageTitle>
+        <ErrorState title="We could not start that mock draft" description={result.reason} action={RETRY_ACTION} />
       </>
     );
   }
@@ -69,7 +69,7 @@ export default async function MockDraftsPage({ searchParams }: PageProps) {
 
   return (
     <>
-      <PageTitle>Practice drafts</PageTitle>
+      <PageTitle>Mock drafts</PageTitle>
       <MockLobby
         initialOpen={open}
         initialMine={mine}

@@ -60,7 +60,7 @@ export function MockShareLanding({ code, summary }: MockShareLandingProps) {
 
   return (
     <div className="mx-4 mt-3">
-      <Panel title="Join this practice draft">
+      <Panel title="Join this mock draft">
         <div className="flex flex-col gap-3">
           <p className="text-sm text-text-muted">
             {summary.teamCount} teams · {summary.pickSeconds}s clock
@@ -76,7 +76,7 @@ export function MockShareLanding({ code, summary }: MockShareLandingProps) {
           )}
           {strangerAfterStart ? (
             <p className="text-sm text-text-muted">
-              This practice draft has already started.{" "}
+              This mock draft has already started.{" "}
               <Link href="/app/mock-drafts" className="font-medium text-accent underline">
                 Start a new one
               </Link>
@@ -84,7 +84,7 @@ export function MockShareLanding({ code, summary }: MockShareLandingProps) {
             </p>
           ) : (
             <Button onClick={() => void join()} loading={claiming} disabled={claiming}>
-              {summary.alreadySeated ? "Enter this practice draft" : "Join this practice draft"}
+              {summary.alreadySeated ? "Enter this mock draft" : "Join this mock draft"}
             </Button>
           )}
         </div>

@@ -46,7 +46,7 @@ export interface MockSetupFormProps {
  * `CreateLeagueForm`'s existing option vocabulary — the SAME `PRESETS` table and the SAME
  * `ROSTER_SHAPE_LABEL` map a real league's own create form reads, since a mock shares this whole
  * vocabulary with a real league (`createMockRoomSchema`'s `scoringPreset`/`rosterShape` are the
- * identical enums). One ink action: "Start practice draft" is this page's only primary button,
+ * identical enums). One ink action: "Start mock draft" is this page's only primary button,
  * the same one-ink-per-view budget (rule 5) the front door and browse both hold to.
  */
 export function MockSetupForm({
@@ -140,7 +140,7 @@ export function MockSetupForm({
         </p>
       )}
       <Button type="submit" loading={submitting} disabled={submitting}>
-        Start practice draft
+        Start mock draft
       </Button>
     </form>
   );

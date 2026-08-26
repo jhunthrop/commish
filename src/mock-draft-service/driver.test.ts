@@ -242,7 +242,7 @@ describe("the due scan (Task 6, Step 2)", () => {
         leagueId: roomA.leagueId,
         started: false,
         benignRace: false,
-        reason: "Something went wrong starting this practice draft.",
+        reason: "Something went wrong starting this mock draft.",
       });
       expect(outcomes).toContainEqual({ leagueId: roomB.leagueId, started: true, draftId: roomB.draftId });
       expect(errorSpy).toHaveBeenCalledWith("[mock-draft] due start failed", { leagueId: roomA.leagueId }, expect.any(Error));

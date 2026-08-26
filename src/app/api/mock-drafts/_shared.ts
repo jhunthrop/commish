@@ -67,14 +67,14 @@ const readRequests = createRateLimiter(MOCK_CONFIG.rateLimit.read);
  *  ceiling. */
 export function createMockRateLimited(userId: string): Response | null {
   if (createRequests.allow(userId)) return null;
-  return fail("You have started a lot of practice drafts at once. Please wait a minute and try again.", 429);
+  return fail("You have started a lot of mock drafts at once. Please wait a minute and try again.", 429);
 }
 
 /** The 429 `POST /api/mock-drafts/[code]` answers with, or `null` when the caller is inside the
  *  ceiling. */
 export function claimMockRateLimited(userId: string): Response | null {
   if (claimRequests.allow(userId)) return null;
-  return fail("You have joined a lot of practice drafts at once. Please wait a minute and try again.", 429);
+  return fail("You have joined a lot of mock drafts at once. Please wait a minute and try again.", 429);
 }
 
 /** The 429 `GET /api/mock-drafts` and `GET /api/mock-drafts/[code]` share — one budget for both,

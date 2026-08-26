@@ -3,7 +3,7 @@ import { axe } from "vitest-axe";
 import { renderSurface } from "@/components/ui/test-utils";
 import { PracticeBanner } from "./practice-banner";
 
-const MESSAGE = "This is a practice draft. Nothing here counts, and this room clears itself after a day.";
+const MESSAGE = "This is a mock draft. Nothing here counts, and this room clears itself after a day.";
 
 describe("PracticeBanner", () => {
   it("renders exactly the message it is given, in both themes, axe-clean", async () => {

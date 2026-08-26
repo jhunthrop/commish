@@ -214,11 +214,11 @@ export type MockMode = (typeof MOCK_CONFIG.modes)[number];
  */
 export const MOCK_COPY = {
   /** The banner every mock room shows, verbatim, for the whole life of the room. */
-  practiceBanner: "This is a practice draft. Nothing here counts, and this room clears itself after a day.",
+  practiceBanner: "This is a mock draft. Nothing here counts, and this room clears itself after a day.",
   /** The `leagues.name` every mock room is created under (`createMockRoom`,
    *  `@/mock-draft-service/creation`, Task 5) — rendered wherever a real league's own name would
    *  be, so it says plainly what the room is rather than pretending to be a league. */
-  roomName: "Practice draft",
+  roomName: "Mock draft",
   /** The accessible label a bot's seat carries alongside its visible "Bot" badge below — never
    *  "AI opponent," because this product makes no claim of intelligence about a seeded sampler. */
   botMarkerLabel: "practice opponent",
@@ -231,14 +231,14 @@ export const MOCK_COPY = {
    * real league's rail quotes `describeStartTiming` (`@/matchmaking/roll`) instead; a mock's
    * start has its own trigger (the fill window), so it gets its own honest sentence.
    */
-  waitingDetail: "This practice draft starts when the countdown ends. Practice opponents fill any open seats.",
+  waitingDetail: "This mock draft starts when the countdown ends. Practice opponents fill any open seats.",
   /** The results page heading. Deliberately not a grade or a score against the room: this
    *  product invents no draft-grade authority (founder self-ruling), only confirms the practice
    *  round is over. */
-  resultsHeading: "Your practice draft is complete.",
+  resultsHeading: "Your mock draft is complete.",
   /** Shown in the mock lobby when no open room is waiting to be joined. Pairs with
    *  `lobbyEmptyActionLabel` so an empty lobby is an invitation, never a dead end. */
-  lobbyEmptyMessage: "No practice drafts are open right now.",
+  lobbyEmptyMessage: "No mock drafts are open right now.",
   lobbyEmptyActionLabel: "Start a mock draft",
   /**
    * Task 8's own results-page line, beside `resultsHeading`. The number is a literal, not a
@@ -249,9 +249,9 @@ export const MOCK_COPY = {
   resultsRetentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
   /** The results page's three next actions (Task 8, Step 2 — "never a dead end"): a quick
    *  rematch, the lobby, and the real thing. `MockResults` (`@/draft-room/components/
-   *  mock-results`) renders all three, every time — a finished practice draft never leaves a
+   *  mock-results`) renders all three, every time — a finished mock draft never leaves a
    *  member with nowhere to go. */
-  resultsRunAgainLabel: "Run another practice draft",
+  resultsRunAgainLabel: "Run another mock draft",
   resultsOpenLobbyLabel: "Open the practice lobby",
   resultsBrowseLeaguesLabel: "Browse real leagues",
 } as const;

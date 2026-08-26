@@ -226,15 +226,15 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
     fixture.mock = {
       ...MOCK_ROOM,
       results: {
-        heading: "Your practice draft is complete.",
+        heading: "Your mock draft is complete.",
         retentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
-        runAgainLabel: "Run another practice draft",
+        runAgainLabel: "Run another mock draft",
         openLobbyLabel: "Open the practice lobby",
         browseLeaguesLabel: "Browse real leagues",
       },
     };
     mount(fixture);
-    await waitFor(() => expect(screen.getByRole("heading", { name: "Your practice draft is complete." })).toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("heading", { name: "Your mock draft is complete." })).toBeInTheDocument());
     // The board and dock are gone — the results panel is what the room shows now.
     expect(screen.queryByRole("list", { name: /available players/i })).not.toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Browse real leagues" })).toBeInTheDocument();

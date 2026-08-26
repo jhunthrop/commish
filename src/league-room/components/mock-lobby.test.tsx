@@ -22,7 +22,7 @@ function baseProps() {
     pickSecondsOptions: [30, 60, 90],
     defaultTeamCount: 12,
     defaultPickSeconds: 60,
-    emptyMessage: "No practice drafts are open right now.",
+    emptyMessage: "No mock drafts are open right now.",
     emptyActionLabel: "Start a mock draft",
   };
 }
@@ -35,7 +35,7 @@ describe("MockLobby", () => {
   it("shows the empty-lobby invitation when nothing is open, pointing at an immediate solo start", () => {
     const fixture = fixtureLeagueDeps();
     renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
-    expect(screen.getByText("No practice drafts are open right now.")).toBeInTheDocument();
+    expect(screen.getByText("No mock drafts are open right now.")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Start a mock draft" })).toHaveAttribute("href", "/app/mock-drafts?create=solo");
   });
 
@@ -70,7 +70,7 @@ describe("MockLobby", () => {
   });
 
   it("shows the server's own refusal when a join fails, and never navigates", async () => {
-    const fixture = fixtureLeagueDeps({ ok: false, error: "This practice draft is already full. Start a new one whenever you like." });
+    const fixture = fixtureLeagueDeps({ ok: false, error: "This mock draft is already full. Start a new one whenever you like." });
     renderInLeague(<MockLobby {...baseProps()} initialOpen={[OPEN_ROOM]} />, fixture.deps);
     fireEvent.click(screen.getByRole("button", { name: "Join" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("already full");
@@ -80,7 +80,7 @@ describe("MockLobby", () => {
   it("navigates straight into a newly created room from its own setup form", async () => {
     const fixture = fixtureLeagueDeps({ ok: true, data: { leagueId: "l9", teamId: "t1", draftId: "d9", shareCode: "NEW001", startsAt: "2026-08-25T12:00:00.000Z" } });
     renderInLeague(<MockLobby {...baseProps()} />, fixture.deps);
-    fireEvent.click(screen.getByRole("button", { name: "Start practice draft" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start mock draft" }));
     await waitFor(() => expect(calls).toEqual(["push:/app/drafts/d9"]));
   });
 

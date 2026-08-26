@@ -30,10 +30,10 @@ describe("MockDraftLandingPage", () => {
   });
 
   it("renders the server's own honest refusal for a stale or unknown code, never a bare 404", async () => {
-    vi.mocked(mockRoomSummary).mockResolvedValue({ ok: false, status: 404, reason: "That practice draft does not exist. Check the link or start a new one." });
+    vi.mocked(mockRoomSummary).mockResolvedValue({ ok: false, status: 404, reason: "That mock draft does not exist. Check the link or start a new one." });
     const page = await MockDraftLandingPage({ params: Promise.resolve({ code: "GONE00" }) });
     render(page);
-    expect(screen.getByText("We could not find that practice draft")).toBeInTheDocument();
+    expect(screen.getByText("We could not find that mock draft")).toBeInTheDocument();
     expect(screen.getByText(/does not exist/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open the practice lobby" })).toHaveAttribute("href", "/app/mock-drafts");
   });

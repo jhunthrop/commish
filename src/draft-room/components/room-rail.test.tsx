@@ -242,7 +242,7 @@ describe("RoomRail", () => {
       // itself is pinned to `MOCK_COPY.waitingDetail` by the snapshot route's own test.
       const waiting = {
         kickoffAt: new Date(Date.now() + 125_000).toISOString(),
-        detail: "This practice draft starts when the countdown ends. Practice opponents fill any open seats.",
+        detail: "This mock draft starts when the countdown ends. Practice opponents fill any open seats.",
       };
       render(<RoomRail {...props} view={scheduledView} myTeamId="t1" waiting={waiting} />);
       expect(screen.getByText(waiting.detail)).toBeInTheDocument();

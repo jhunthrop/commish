@@ -124,7 +124,7 @@ bar the veteran persona holds.
 
 ## 13. The sweep deletes; it does not archive
 
-A practice draft's afterlife is the results page for a day. Archival tables for rehearsals
+A mock draft's afterlife is the results page for a day. Archival tables for rehearsals
 would be the product keeping data nobody asked it to keep — the retention windows are config,
 the results page's retention sentence tells the user the rule up front, and the delete is a
 cascade whose completeness is asserted table by table. A member reaching a swept code afterward

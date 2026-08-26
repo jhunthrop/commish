@@ -8,9 +8,9 @@ import { PLAYERS, SNAKE_VIEW } from "../test-fixtures";
 import { MockResults, type MockResultsCopy } from "./mock-results";
 
 const COPY: MockResultsCopy = {
-  heading: "Your practice draft is complete.",
+  heading: "Your mock draft is complete.",
   retentionSentence: "Your results stay here for 24 hours, then this room clears itself.",
-  runAgainLabel: "Run another practice draft",
+  runAgainLabel: "Run another mock draft",
   openLobbyLabel: "Open the practice lobby",
   browseLeaguesLabel: "Browse real leagues",
 };

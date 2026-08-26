@@ -7,7 +7,7 @@ calls below was made) before touching `src/mock-draft/**`, `src/mock-draft-servi
 
 ## What a mock IS
 
-A practice draft: the real draft room, the real engine, the real clock, against named bot
+A mock draft: the real draft room, the real engine, the real clock, against named bot
 opponents — free, sign-in-first, and gone after a day. It exists so a first-timer rehearses the
 room before their real draft, and so the front door has something a visitor can DO. Two founder
 requirements shaped it (2026-08-25): live-against-others practice (a lobby, plus a shareable

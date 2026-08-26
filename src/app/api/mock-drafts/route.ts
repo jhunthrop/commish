@@ -44,7 +44,7 @@ export async function GET(request: Request) {
 }
 
 /**
- * Create a practice draft. Every field but `mode` has a default (`createMockRoomSchema`'s own
+ * Create a mock draft. Every field but `mode` has a default (`createMockRoomSchema`'s own
  * doc), so `{ "mode": "solo" }` is a complete request body — the same handful-of-interactions
  * doctrine `POST /api/leagues` holds for a real league.
  *

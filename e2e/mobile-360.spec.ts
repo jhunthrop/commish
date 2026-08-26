@@ -54,7 +54,7 @@ const E2E_MOBILE360_ROOM_TEAM_A_ID = "e2e_mobile360_room_team_a";
 const E2E_MOBILE360_ROOM_TEAM_B_ID = "e2e_mobile360_room_team_b";
 
 /**
- * Phase 4.5, Task 11's own two surfaces: the practice draft's share landing (a `link`-mode room,
+ * Phase 4.5, Task 11's own two surfaces: the mock draft's share landing (a `link`-mode room,
  * never started) and the room's own mock dressing (a `solo`-mode room, in progress the instant
  * `createMockRoom` returns). Set by `beforeAll`, read by the main test below.
  *
@@ -435,18 +435,18 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
 
     // --- Phase 4.5, Task 11: the practice lobby --------------------------------------------
     await page.goto("/app/mock-drafts");
-    await expect(page.getByRole("heading", { name: "Practice drafts", level: 1 })).toBeVisible();
-    await expect(page.getByRole("heading", { name: "Start a practice draft" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Start a mock draft" })).toBeVisible();
     await expectNoHorizontalScroll(page, "the practice lobby");
 
-    // --- Task 11: the practice draft's share-link landing -----------------------------------
+    // --- Task 11: the mock draft's share-link landing -----------------------------------
     await page.goto(mobile360LinkRoomPath);
-    await expect(page.getByRole("heading", { name: "Join this practice draft" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Join this mock draft" })).toBeVisible();
     // Manager A is this fixture room's own host (`beforeAll` above), so the real claim door
     // answers a re-entry — "Enter", never "Join" — the same honest server answer every caller
     // gets (`MockShareLanding`'s own docblock).
-    await expect(page.getByRole("button", { name: "Enter this practice draft" })).toBeVisible();
-    await expectNoHorizontalScroll(page, "the practice draft share landing");
+    await expect(page.getByRole("button", { name: "Enter this mock draft" })).toBeVisible();
+    await expectNoHorizontalScroll(page, "the mock draft share landing");
 
     // --- Task 11: the room's own mock dressing — the practice banner and the board itself ---
     await page.goto(`/app/drafts/${mobile360SoloDraftId}`);
@@ -454,7 +454,7 @@ test("every Plan C surface fits a 360px phone, with its controls reachable", asy
     if ((await mockRoomGotIt.count()) > 0) await mockRoomGotIt.click();
     await expect(page.getByTestId("practice-banner")).toBeVisible();
     await expect(page.getByLabel("Player pool")).toBeVisible();
-    await expectNoHorizontalScroll(page, "the practice draft room");
+    await expectNoHorizontalScroll(page, "the mock draft room");
   } finally {
     await context.close();
   }

@@ -59,9 +59,9 @@ const PATH_COPY: Readonly<Record<FirstRunPathKey, FirstRunPath>> = {
    */
   practice: {
     key: "practice",
-    title: "Try a practice draft",
+    title: "Try a mock draft",
     detail: "Draft against practice bots anytime, before your real league starts.",
-    cta: "Try a practice draft",
+    cta: "Try a mock draft",
   },
 };
 

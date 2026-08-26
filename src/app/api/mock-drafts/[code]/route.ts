@@ -41,7 +41,7 @@ export async function GET(request: Request, { params }: RouteContext) {
 }
 
 /**
- * Join a practice draft by its share code. The code is the URL segment itself — validated
+ * Join a mock draft by its share code. The code is the URL segment itself — validated
  * through the SAME `claimMockSeatSchema` `schemas.ts` states is the claim door's only input, run
  * against the path param rather than a JSON body (this route takes none). Re-claiming a seat you
  * already hold answers success, never an error — the identical re-entry rule `acceptInvite`

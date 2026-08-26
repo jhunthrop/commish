@@ -46,8 +46,8 @@ describe("MockDraftsPage", () => {
   it("renders the lobby with the real config's own options when there is no ?create=solo", async () => {
     const page = await MockDraftsPage({ searchParams: searchParams() });
     render(page);
-    expect(screen.getByText("Practice drafts")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start practice draft" })).toBeInTheDocument();
+    expect(screen.getByText("Mock drafts")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start mock draft" })).toBeInTheDocument();
     expect(screen.getByRole("option", { name: "Solo, play against bots" })).toBeInTheDocument();
   });
 
@@ -60,20 +60,20 @@ describe("MockDraftsPage", () => {
   });
 
   it("renders the server's own refusal, never a redirect, when solo creation fails", async () => {
-    vi.mocked(createMockRoom).mockResolvedValue({ ok: false, status: 429, reason: "You have started a lot of practice drafts at once. Please wait a minute and try again." });
+    vi.mocked(createMockRoom).mockResolvedValue({ ok: false, status: 429, reason: "You have started a lot of mock drafts at once. Please wait a minute and try again." });
     const page = await MockDraftsPage({ searchParams: searchParams({ create: "solo" }) });
     render(page);
-    expect(screen.getByText("We could not start that practice draft")).toBeInTheDocument();
-    expect(screen.getByText(/You have started a lot of practice drafts/)).toBeInTheDocument();
+    expect(screen.getByText("We could not start that mock draft")).toBeInTheDocument();
+    expect(screen.getByText(/You have started a lot of mock drafts/)).toBeInTheDocument();
   });
 
   it("renders a rate-limit refusal without ever calling createMockRoom", async () => {
     vi.mocked(createMockRateLimited).mockReturnValueOnce({
-      json: async () => ({ error: "You have started a lot of practice drafts at once. Please wait a minute and try again." }),
+      json: async () => ({ error: "You have started a lot of mock drafts at once. Please wait a minute and try again." }),
     } as unknown as Response);
     const page = await MockDraftsPage({ searchParams: searchParams({ create: "solo" }) });
     render(page);
-    expect(screen.getByText("Too many practice drafts")).toBeInTheDocument();
+    expect(screen.getByText("Too many mock drafts")).toBeInTheDocument();
     expect(createMockRoom).not.toHaveBeenCalled();
   });
 });

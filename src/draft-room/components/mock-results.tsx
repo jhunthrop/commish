@@ -123,7 +123,7 @@ function PickList({
 export function MockResults({ view, players, myTeamId, copy, actions }: MockResultsProps) {
   const playersById = buildPlayersById(players);
   return (
-    <section aria-label="Practice draft results" className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
+    <section aria-label="Mock draft results" className="mx-auto flex w-full max-w-3xl flex-col gap-6 p-6">
       <div className="flex flex-col gap-1">
         <h1 className="font-display text-display-md font-semibold leading-display text-text-primary">{copy.heading}</h1>
         <p className="text-sm text-text-muted">{copy.retentionSentence}</p>

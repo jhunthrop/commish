@@ -64,7 +64,7 @@ describe("FirstRunPanel", () => {
       const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
       expect(headings).toEqual([
         "Set up your manager profile",
-        "Try a practice draft",
+        "Try a mock draft",
         "Find an open league",
         "Join with an invite",
         "Start a league",
@@ -92,7 +92,7 @@ describe("FirstRunPanel", () => {
     const headings = screen.getAllByRole("heading", { level: 3 }).map((h) => h.textContent);
     expect(headings).toEqual([
       "Set up your manager profile",
-      "Try a practice draft",
+      "Try a mock draft",
       "Start a league",
       "Join with an invite",
       "Find an open league",
@@ -102,7 +102,7 @@ describe("FirstRunPanel", () => {
   it("gives every path a real, working control, not a description-only card", () => {
     renderPanel(GUIDED_BEGINNER);
     // practice: the real, signed-in practice lobby link.
-    expect(screen.getByRole("link", { name: "Try a practice draft" })).toHaveAttribute("href", "/app/mock-drafts");
+    expect(screen.getByRole("link", { name: "Try a mock draft" })).toHaveAttribute("href", "/app/mock-drafts");
     // browse: a real link, labeled with the plan's own cta text, to the real page.
     expect(screen.getByRole("link", { name: "Browse open leagues" })).toHaveAttribute("href", "/browse");
     // join: the actual invite-entry form, not a placeholder.

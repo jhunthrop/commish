@@ -89,13 +89,13 @@ describe("FrontDoorHero", () => {
   describe("the practice invitation", () => {
     it("points a signed-in visitor straight at the practice lobby", async () => {
       await renderSurface(<FrontDoorHero signedIn={true} />, ({ getByRole }) => {
-        expect(getByRole("link", { name: "Try a practice draft" })).toHaveAttribute("href", "/app/mock-drafts");
+        expect(getByRole("link", { name: "Try a mock draft" })).toHaveAttribute("href", "/app/mock-drafts");
       });
     });
 
     it("sends a signed-out visitor through sign-up, carrying the lobby as its own intent", async () => {
       await renderSurface(<FrontDoorHero signedIn={false} />, ({ getByRole }) => {
-        expect(getByRole("link", { name: "Try a practice draft" })).toHaveAttribute(
+        expect(getByRole("link", { name: "Try a mock draft" })).toHaveAttribute(
           "href",
           "/sign-up?returnTo=%2Fapp%2Fmock-drafts",
         );

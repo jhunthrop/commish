@@ -194,9 +194,9 @@ test("front door -> practice lobby -> a solo mock -> a real pick -> bots pick ar
   // --- Front door -> the practice CTA -------------------------------------------------------
   await managerA.goto("/");
   await expect(managerA.getByRole("heading", { name: "Real leagues. Real seats. Drafting this week." })).toBeVisible();
-  await managerA.getByRole("link", { name: "Try a practice draft" }).click();
+  await managerA.getByRole("link", { name: "Try a mock draft" }).click();
   await expect(managerA).toHaveURL(/\/app\/mock-drafts$/);
-  await expect(managerA.getByRole("heading", { name: "Practice drafts", level: 1 })).toBeVisible();
+  await expect(managerA.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
 
   // --- Setup: solo (the default mode), the widest room, a fast clock (see `PICK_SECONDS`'s own
   // docblock for why this is the 90s tier, not the 30s one) --------------------------------
@@ -206,7 +206,7 @@ test("front door -> practice lobby -> a solo mock -> a real pick -> bots pick ar
   // to a moment ago, the identical pre-hydration hazard `design-v2.spec.ts`'s own keyboard walk
   // documents for a button in the same position in its own journey.
   await expect(async () => {
-    await managerA.getByRole("button", { name: "Start practice draft" }).click();
+    await managerA.getByRole("button", { name: "Start mock draft" }).click();
     await expect(managerA).toHaveURL(/\/app\/drafts\//, { timeout: 5_000 });
   }).toPass({ timeout: 20_000 });
   const draftId = new URL(managerA.url()).pathname.split("/").pop()!;
@@ -306,11 +306,11 @@ test("a link room's share code, claimed by a second seeded identity, moves the s
 
   // --- managerB hosts a private link room -----------------------------------------------------
   await managerB.goto("/app/mock-drafts");
-  await expect(managerB.getByRole("heading", { name: "Practice drafts", level: 1 })).toBeVisible();
+  await expect(managerB.getByRole("heading", { name: "Mock drafts", level: 1 })).toBeVisible();
   await managerB.getByLabel("Mode").selectOption("link");
   await managerB.getByLabel("Teams").selectOption(String(teamCount));
   await expect(async () => {
-    await managerB.getByRole("button", { name: "Start practice draft" }).click();
+    await managerB.getByRole("button", { name: "Start mock draft" }).click();
     await expect(managerB).toHaveURL(/\/app\/drafts\//, { timeout: 5_000 });
   }).toPass({ timeout: 20_000 });
 
@@ -330,9 +330,9 @@ test("a link room's share code, claimed by a second seeded identity, moves the s
   // --- managerA, a second seeded identity in a wholly separate browser context, arrives signed
   // in at the exact share path and claims a seat ---------------------------------------------
   await managerA.goto(sharePath);
-  await expect(managerA.getByRole("heading", { name: "Join this practice draft" })).toBeVisible();
+  await expect(managerA.getByRole("heading", { name: "Join this mock draft" })).toBeVisible();
   await expect(managerA.getByText(`${teamCount} teams`)).toBeVisible();
-  await managerA.getByRole("button", { name: "Join this practice draft" }).click();
+  await managerA.getByRole("button", { name: "Join this mock draft" }).click();
   await expect(managerA).toHaveURL(/\/app\/drafts\//, { timeout: 20_000 });
   const claimedDraftId = new URL(managerA.url()).pathname.split("/").pop()!;
   const hostDraftId = new URL(managerB.url()).pathname.split("/").pop()!;

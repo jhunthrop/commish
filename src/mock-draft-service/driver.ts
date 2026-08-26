@@ -21,7 +21,7 @@ import { startMockDraft } from "./start";
 
 /** The outcome reason the due scan reports when `startMockDraft` itself throws — product copy
  *  in the ticker-outcome voice (`"Something went wrong checking this draft's clock."`). */
-export const MOCK_START_FAILED_REASON = "Something went wrong starting this practice draft.";
+export const MOCK_START_FAILED_REASON = "Something went wrong starting this mock draft.";
 
 /**
  * THE due scan (brief, Step 2): every mock room whose `starts_at` has passed and whose draft is

@@ -327,10 +327,10 @@ describe("WaitingRoom", () => {
     expect(screen.getByRole("dialog", { name: "How this room works" })).toBeInTheDocument();
   });
 
-  // Task 9, Step 1 (row 18): the tour item offers BOTH the preview and a real practice draft,
+  // Task 9, Step 1 (row 18): the tour item offers BOTH the preview and a real mock draft,
   // side by side — `?create=solo` is `DraftRoom`'s own immediate-solo contract.
-  it("also offers a real practice draft beside the room tour", () => {
+  it("also offers a real mock draft beside the room tour", () => {
     render(<WaitingRoom league={whenFullAndFilling} />);
-    expect(screen.getByRole("link", { name: "Run a practice draft" })).toHaveAttribute("href", "/app/mock-drafts?create=solo");
+    expect(screen.getByRole("link", { name: "Run a mock draft" })).toHaveAttribute("href", "/app/mock-drafts?create=solo");
   });
 });

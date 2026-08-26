@@ -25,7 +25,7 @@ export interface PracticeEntryLinkProps {
  * own intent (`docs/conventions.md:414`'s intent rule: every sign-in/sign-up entry point carries
  * the visitor's own intent, validated where it redirects — `safeReturnTo`), never `SignInLink`
  * (`@/components/app-shell/sign-in-link`), which is hard-wired to `/sign-in`: a stranger clicking
- * "Try a practice draft" has usually never made an account, and sign-up is that door, sign-in is
+ * "Try a mock draft" has usually never made an account, and sign-up is that door, sign-in is
  * not. This is the same "dress a different element as a button" exception `SignInLink` itself is
  * (`button.tsx`'s own docblock) — a second one, for the identical reason.
  */
@@ -33,7 +33,7 @@ export function PracticeEntryLink({ signedIn, className }: PracticeEntryLinkProp
   const href = signedIn ? MOCK_LOBBY_PATH : `/sign-up?returnTo=${encodeURIComponent(MOCK_LOBBY_PATH)}`;
   return (
     <Link href={href} className={buttonClassName("secondary", "md", className)}>
-      Try a practice draft
+      Try a mock draft
     </Link>
   );
 }

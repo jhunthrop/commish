@@ -69,7 +69,7 @@ export type CreateMockRoomResult =
     }
   | { readonly ok: false; readonly status: number; readonly reason: string };
 
-const CREATE_FAILED = "We could not create that practice draft. Please try again.";
+const CREATE_FAILED = "We could not create that mock draft. Please try again.";
 
 /**
  * The front door of the mock lane: one transaction that makes a practice room WHOLE — the bot

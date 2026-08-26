@@ -30,7 +30,7 @@ export const TEAMS_WITH_BOT: readonly TeamCard[] = [
 /** Task 8: `DraftSnapshotBody.mock` for an unstarted, non-link mock room — the shape most tests
  *  reach for; `share`/`results` are overridden per-case for the other two states. */
 export const MOCK_ROOM: MockRoomInfo = {
-  practiceBanner: "This is a practice draft. Nothing here counts, and this room clears itself after a day.",
+  practiceBanner: "This is a mock draft. Nothing here counts, and this room clears itself after a day.",
   botMarkerLabel: "practice opponent",
   botBadge: "Bot",
   expectedBotPickSeconds: 6,

@@ -5,12 +5,12 @@ import { PracticeEntryLink } from "./practice-entry-link";
 describe("PracticeEntryLink", () => {
   it("goes straight to the practice lobby when signed in", () => {
     const { getByRole } = render(<PracticeEntryLink signedIn={true} />);
-    expect(getByRole("link", { name: "Try a practice draft" })).toHaveAttribute("href", "/app/mock-drafts");
+    expect(getByRole("link", { name: "Try a mock draft" })).toHaveAttribute("href", "/app/mock-drafts");
   });
 
   it("goes through sign-up, carrying the lobby as its own intent, when signed out", () => {
     const { getByRole } = render(<PracticeEntryLink signedIn={false} />);
-    expect(getByRole("link", { name: "Try a practice draft" })).toHaveAttribute(
+    expect(getByRole("link", { name: "Try a mock draft" })).toHaveAttribute(
       "href",
       "/sign-up?returnTo=%2Fapp%2Fmock-drafts",
     );
@@ -18,7 +18,7 @@ describe("PracticeEntryLink", () => {
 
   it("renders as the quiet outlined pill, never ink", () => {
     const { getByRole } = render(<PracticeEntryLink signedIn={true} />);
-    const link = getByRole("link", { name: "Try a practice draft" });
+    const link = getByRole("link", { name: "Try a mock draft" });
     expect(link.className).toContain("border-edge");
     expect(link.className).not.toContain("bg-text-primary");
   });

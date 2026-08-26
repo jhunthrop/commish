@@ -45,16 +45,16 @@ describe("MockSetupForm", () => {
     fireEvent.change(screen.getByLabelText("Mode"), { target: { value: "lobby" } });
     fireEvent.change(screen.getByLabelText("Teams"), { target: { value: "8" } });
     fireEvent.change(screen.getByLabelText("Team name (optional)"), { target: { value: "Bay Bandits" } });
-    fireEvent.click(screen.getByRole("button", { name: "Start practice draft" }));
+    fireEvent.click(screen.getByRole("button", { name: "Start mock draft" }));
     await vi.waitFor(() => expect(onCreated).toHaveBeenCalledWith(CREATED));
 
     expect(fixture.calls).toEqual(["POST /api/mock-drafts"]);
   });
 
   it("shows the server's own refusal on failure, and never calls onCreated", async () => {
-    const { onCreated } = renderForm(vi.fn(), { ok: false, error: "You have started a lot of practice drafts at once. Please wait a minute and try again." });
-    fireEvent.click(screen.getByRole("button", { name: "Start practice draft" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("You have started a lot of practice drafts at once.");
+    const { onCreated } = renderForm(vi.fn(), { ok: false, error: "You have started a lot of mock drafts at once. Please wait a minute and try again." });
+    fireEvent.click(screen.getByRole("button", { name: "Start mock draft" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("You have started a lot of mock drafts at once.");
     expect(onCreated).not.toHaveBeenCalled();
   });
 
@@ -69,7 +69,7 @@ describe("MockSetupForm", () => {
         onCreated={() => {}}
       />,
       async ({ container, getByRole }) => {
-        const button = getByRole("button", { name: "Start practice draft" });
+        const button = getByRole("button", { name: "Start mock draft" });
         expect(button.className).toContain("bg-text-primary");
         expect(await axe(container)).toHaveNoViolations();
       },
