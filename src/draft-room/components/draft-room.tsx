@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { ClientDraftAction } from "@/draft-engine";
 import { Button, ButtonLink, ErrorState, Skeleton, useToast } from "@/components/ui";
 import { LeagueChat } from "@/chat-room/components/league-chat";
@@ -53,18 +53,22 @@ export function DraftRoom({ draftId, dismissedAt, helpLevel }: DraftRoomProps) {
    * squeeze — "auto-collapse chat under a width threshold" — so the board gets its columns
    * back below `xl` without anybody having to find the "Hide chat" button first. Below `xl`
    * the chat starts collapsed; at `xl+` there is room for both, so it starts open. Read ONCE,
-   * inside `useState`'s lazy initializer — the user's own toggle (`setChatOpen` below) wins
-   * from then on, exactly like every other "default from a media query, user wins after"
-   * control in this app (`ThemeProvider`, `usePrefersReducedMotion`).
+   * in a mount effect — NEVER during render: reading `matchMedia` in the render pass is the
+   * exact hydration trap `usePrefersReducedMotion`'s own docblock documents (and the
+   * `LeagueRow`/`useNow` incident already cost a founder-reported bug to learn). The state
+   * starts `true` (the widest, SSR-safe answer) on server and hydrating client alike, and the
+   * effect corrects a narrower viewport immediately after mount. Today `DraftRoom` paints only
+   * its loading skeleton on first render, which would mask a render-time read — but that is a
+   * coincidence of the loading gate, not an invariant, and the hydration regression test
+   * (`draft-room.test.tsx`, hydrateSurface) exists so nobody gets to rediscover why.
    *
-   * `typeof window === "undefined"` guards the server render, which this component's own
-   * `"use client"` still runs during SSR before hydration — there is no viewport to ask yet.
-   * Defaulting OPEN there (rather than collapsed) is the deliberate choice: it is the WIDEST
-   * state, so a client that turns out to be `xl+` never has to visibly snap open after
-   * hydration — only a narrower client ever corrects the initial paint, and it does so by
-   * collapsing a band shut, never by having content pop into view.
+   * The user's own toggle (`setChatOpen` below) wins from the first paint on: the effect runs
+   * once at mount, before any human can reach the toggle, so it never overwrites a choice.
    */
-  const [chatOpen, setChatOpen] = useState<boolean>(() => (typeof window === "undefined" ? true : window.matchMedia(CHAT_OPEN_QUERY).matches));
+  const [chatOpen, setChatOpen] = useState<boolean>(true);
+  useEffect(() => {
+    setChatOpen(window.matchMedia(CHAT_OPEN_QUERY).matches);
+  }, []);
 
   const act = (action: ClientDraftAction): void => {
     void room.submit(action).then((outcome) => {

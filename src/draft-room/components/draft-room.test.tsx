@@ -2,7 +2,9 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, waitFor, fireEvent, act } from "@testing-library/react";
 import { axe } from "vitest-axe";
 import { ToastProvider } from "@/components/ui";
-import { renderSurface } from "@/components/ui/test-utils";
+import { hydrateSurface, renderSurface } from "@/components/ui/test-utils";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { ChatRoomDepsProvider } from "@/chat-room/hooks/deps";
 import { fixtureChatDeps } from "@/chat-room/test-fixtures";
 import { fixtureDeps, MOCK_ROOM, renderInRoom, SNAKE_VIEW } from "../test-fixtures";
@@ -244,5 +246,37 @@ describe("DraftRoom — Task 8's mock room dressing", () => {
         expect(await axe(container)).toHaveNoViolations();
       },
     );
+  });
+
+  // T3 review HIGH: the chat's breakpoint default must be read AFTER mount, never in the
+  // render pass — the LeagueRow/useNow incident's exact defect class. Two guards, because the
+  // loading gate (DraftRoom's first paint is always the skeleton) would mask a render-time
+  // read from the hydration harness itself:
+  it("hydrates onto the server HTML with zero errors on a narrow viewport", async () => {
+    stubChatBreakpoint(false);
+    const fixture = fixtureDeps();
+    await hydrateSurface(
+      () => (
+        <DraftRoomDepsProvider deps={fixture.deps}>
+          <ChatRoomDepsProvider deps={fixtureChatDeps().deps}>
+            <ToastProvider>
+              <DraftRoom draftId="d1" dismissedAt={TOUR_DISMISSED} />
+            </ToastProvider>
+          </ChatRoomDepsProvider>
+        </DraftRoomDepsProvider>
+      ),
+      ({ recoverableErrors, consoleErrors }) => {
+        expect(recoverableErrors).toEqual([]);
+        expect(consoleErrors).toEqual([]);
+      },
+    );
+  });
+
+  it("never reads matchMedia during render — the mount effect is the one sanctioned reader", () => {
+    const source = readFileSync(join(process.cwd(), "src/draft-room/components/draft-room.tsx"), "utf8");
+    // A lazy useState initializer that touches matchMedia is the hydration trap itself; the
+    // loading gate that hides it today is a coincidence, not an invariant.
+    expect(source).not.toMatch(/useState[^\n]*matchMedia/);
+    expect(source).not.toMatch(/useState<boolean>\(\(\) =>/);
   });
 });
