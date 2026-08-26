@@ -76,7 +76,7 @@ export function PickWire({ view, teams, playersById, variant = "room" }: PickWir
   return (
     <div
       data-testid="pick-wire"
-      className={`h-8 shrink-0 truncate whitespace-nowrap border-t border-line font-mono leading-8 text-text-muted ${TEXT_SIZE[variant]}`}
+      className={`h-8 shrink-0 truncate border-t border-line font-mono leading-8 text-text-muted ${TEXT_SIZE[variant]}`}
     >
       {entries.length === 0 ? null : (
         <ul aria-label="Recent picks" className="inline">

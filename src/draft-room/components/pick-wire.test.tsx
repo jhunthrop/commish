@@ -19,6 +19,13 @@ describe("PickWire", () => {
     const band = screen.getByTestId("pick-wire");
     expect(band).toBeInTheDocument();
     expect(band).toHaveTextContent("");
+    // The anti-reflow contract itself (review of this task): the band is a FIXED height with
+    // single-line clipping, and the default (room) variant reads at text-xs. Class assertions,
+    // because this is exactly the property a refactor to min-h-8 (or a dropped truncate) would
+    // silently lose while every behavioral test stayed green.
+    expect(band.className).toMatch(/\bh-8\b/);
+    expect(band.className).toMatch(/\btruncate\b/);
+    expect(band.className).toMatch(/\btext-xs\b/);
   });
 
   it("renders newest pick first, with team, player, and position", () => {
@@ -36,6 +43,8 @@ describe("PickWire", () => {
     expect(text).toContain("#1 Bay Bandits");
     expect(text).toContain("Jalen Croft");
     expect(text).toContain("QB");
+    // The separator is spec ("separated by ·"): two items means exactly one interpunct.
+    expect(text.split("\u00b7")).toHaveLength(2);
   });
 
   it("gives only the newest item's player name ink — every other item stays quiet", () => {
