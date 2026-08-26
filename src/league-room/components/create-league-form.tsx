@@ -19,8 +19,15 @@ const TEAM_COUNTS = [8, 10, 12, 14, 16].map((n) => ({ value: String(n), label: `
  * Half-PPR leads (founder decision, §4.2's launch canon: "half-PPR default with PPR /
  * TE-premium / superflex toggles") — full PPR stays one tap away, not removed or demoted past
  * reach, only no longer preselected.
+ *
+ * Exported (Task 9): `MockSetupForm` (`./mock-setup-form.tsx`) reuses this SAME table for the
+ * practice lobby's own scoring control — "reuse the create-league form's existing option
+ * vocabulary, never a parallel picker" (the brief's own words). A mock room shares this whole
+ * vocabulary with a real league (`createMockRoomSchema`'s `scoringPreset` is the identical
+ * `ScoringPresetName` enum), so the labels a commissioner already knows are the labels a
+ * practice host sees too.
  */
-const PRESETS = [
+export const PRESETS = [
   { value: "half_ppr", label: "Half PPR" },
   { value: "ppr", label: "PPR (a point per catch)" },
   { value: "standard", label: "Standard" },
