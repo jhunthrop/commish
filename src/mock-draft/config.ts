@@ -80,6 +80,38 @@ export const MOCK_CONFIG = {
   maxBotPicksPerTick: 100,
   sweepIntervalMs: 60_000,
   /**
+   * Task 7: `GET /api/mock-drafts`'s own cap on both halves of the lobby read (the open-room
+   * listing and the caller's own rooms) — the identical "no scan in this codebase is unbounded"
+   * rule the ticker bounds above already keep, on a table the retention sweep already keeps
+   * small (`retention`, above) rather than a table that grows with the whole platform's history.
+   * Smaller than `MATCHMAKING_CONFIG.maxResults` (48) on purpose: a practice lobby a stranger can
+   * actually scan is a shorter list than the real browse page's whole member shelf.
+   */
+  maxLobbyListing: 20,
+  /**
+   * Task 7's per-user ceilings on the mock-drafts surface — every route behind it requires a
+   * signed-in caller (no anonymous rooms), so each is keyed on the caller's own id, the identical
+   * shape `ADVISOR_CONFIG.maxRequestsPerWindow`/`rateLimitWindowMs` and
+   * `MATCHMAKING_CONFIG.browseRateLimit`/`holdRateLimit` already use for their own routes — see
+   * `createRateLimiter`'s own docblock for what a single-process fixed window is and is not.
+   */
+  rateLimit: {
+    /** `POST /api/mock-drafts` — the costliest single call this domain exposes: a whole
+     *  room-creation transaction (the bot roster ensured, a league/draft/team write, a
+     *  share-code mint loop) followed, for solo mode, by an immediate start. Tighter than a
+     *  real league's own creation route, which has none at all, because a mock costs nothing to
+     *  request and a script could otherwise mint rooms the retention sweep would only ever
+     *  have to clean up. */
+    create: { maxRequests: 10, windowMs: 60_000 },
+    /** `POST /api/mock-drafts/[code]` — one seat claim, the same write-is-tighter-than-read
+     *  shape as `MATCHMAKING_CONFIG.holdRateLimit`. */
+    claim: { maxRequests: 20, windowMs: 60_000 },
+    /** `GET /api/mock-drafts` and `GET /api/mock-drafts/[code]` share ONE budget — both spend
+     *  the same scarce thing, a read-time database query, the identical shared-budget reasoning
+     *  `advisorRateLimited`'s own docblock states for its two routes. */
+    read: { maxRequests: 60, windowMs: 60_000 },
+  },
+  /**
    * The named bot roster a room draws its seats from — 24 total, more than the widest room
    * (`Math.max(...teamCountOptions) + 4`, `config.test.ts`'s own gate on this) needs even if a
    * mock somehow reused the same seat twice in one draw. A bot's `id` is what a stream key in

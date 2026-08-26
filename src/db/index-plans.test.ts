@@ -21,6 +21,7 @@ import { LEAGUE_COUNT, TEAMS_PER_LEAGUE, USER_COUNT, seedRealisticCorpus, seedTr
 import { chatPageQuery } from "@/chat-service/chat";
 import { dueDraftsQuery } from "@/draft-service/auto-start";
 import { dueMockRoomsQuery } from "@/mock-draft-service/driver";
+import { listOpenMockRoomsQuery } from "@/mock-draft-service/lobby";
 import { liveDraftsQuery } from "@/draft-service/ticker";
 import { openQuestionsQuery, pendingFlagQuery } from "@/integrity-service/flags";
 import { signalsForUsersQuery } from "@/integrity-service/session-signals";
@@ -32,6 +33,7 @@ import { dueUnfilledScheduledDraftsQuery } from "@/league-service/roll";
 import { draftsNext48hQuery, leaguesFilledQuery } from "@/league-service/proof";
 import { tradesQuery } from "@/league-service/trades";
 import { EMPTY_BROWSE_FILTER } from "@/matchmaking/filter";
+import { MOCK_CONFIG } from "@/mock-draft/config";
 import { reviewAggregateQuery } from "@/review-service/reviews";
 import { AUDIT_EVENT_TYPES } from "@/domain/audit";
 import { MONEY_ACCOUNT_KINDS } from "@/money/accounts";
@@ -1463,6 +1465,11 @@ describe("leagues_season_completed_idx carries its partial predicate", () => {
  * contiguous block. Every row is genuinely mock-room-shaped — its own league (`is_mock = true`),
  * its own host — because a partial index question ("does `starts_at` alone select few enough rows
  * to beat a sequential scan") is only answered honestly against realistic proportions.
+ *
+ * TASK 7 reuses this SAME corpus for `listOpenMockRoomsQuery` (`@/mock-draft-service/lobby`) —
+ * every row here is already `lobby`-mode with a `scheduled` draft and zero seated teams, which is
+ * exactly the lobby read's own candidate shape, so a second dedicated corpus would only pay the
+ * same 2,000-row seed twice for no new signal.
  */
 describe("mock_rooms_starts_at_idx serves the due-scan and sweep shape, never a sequential scan", () => {
   const MOCK_ROOM_COUNT = 2000;
@@ -1508,5 +1515,30 @@ describe("mock_rooms_starts_at_idx serves the due-scan and sweep shape, never a 
     const plan = await explainPlan(db, dueMockRoomsQuery(db, new Date()));
     expect(sequentiallyScannedRelations(plan)).not.toContain("mock_rooms");
     expect(indexScanNode(plan, "mock_rooms_starts_at_idx")).toBeDefined();
+  });
+
+  /**
+   * TASK 7: `listOpenMockRoomsQuery` has no index of its own to seek on `mock_rooms.mode` — this
+   * table's small, retention-swept size (`MOCK_CONFIG.retention`) is what makes a sequential
+   * scan of IT (or of this corpus's equally-sized `leagues` side, joined 1:1) an accepted,
+   * planner-chosen shape rather than a missing index, the identical "genuinely unselective scan,
+   * not a missing index" reasoning `leaguesFilledQuery`'s own EXPLAIN assertion documents for a
+   * different pair of tables. This corpus deliberately sizes `mock_rooms` and its matching
+   * `leagues` rows 1:1 (2,000 each) — the same skew the driving `mock_rooms` side would have in
+   * production, where it never grows past the retention windows regardless of how large the
+   * REAL `leagues` table gets, so a hash join over two equally-small sides here is not a
+   * production risk. What is asserted is the shape every plan for this query must have
+   * regardless of which join strategy the planner picks: a `Limit` over the `GROUP BY`/`HAVING`
+   * aggregate, never an unbounded scan.
+   */
+  it("plans listOpenMockRoomsQuery as a bounded aggregate — a Limit over the seats-open HAVING, never unbounded", async () => {
+    const plan = await explainPlan(db, listOpenMockRoomsQuery(db));
+    expect(nodeTypes(plan)).toContain("Limit");
+    expect(nodeTypes(plan).some((type) => type.includes("Aggregate"))).toBe(true);
+  });
+
+  it("returns exactly MOCK_CONFIG.maxLobbyListing rows against the 2,000-room corpus — every room here is an open lobby seat", async () => {
+    const rows = await listOpenMockRoomsQuery(db);
+    expect(rows).toHaveLength(MOCK_CONFIG.maxLobbyListing);
   });
 });

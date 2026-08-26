@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";
 import { copyViolations } from "@/integrity/copy-rules";
+import { MATCHMAKING_CONFIG } from "@/matchmaking/config";
 import { MOCK_CONFIG, MOCK_COPY } from "./config";
 
 describe("MOCK_CONFIG", () => {
@@ -49,6 +50,21 @@ describe("MOCK_CONFIG", () => {
     expect(MOCK_CONFIG.maxMockStartsPerTick).toBeGreaterThan(0);
     expect(MOCK_CONFIG.maxBotPicksPerTick).toBeGreaterThan(0);
     expect(MOCK_CONFIG.sweepIntervalMs).toBeGreaterThan(0);
+  });
+
+  it("bounds the lobby read to a shorter list than the real browse page's own cap", () => {
+    expect(MOCK_CONFIG.maxLobbyListing).toBeGreaterThan(0);
+    expect(MOCK_CONFIG.maxLobbyListing).toBeLessThan(MATCHMAKING_CONFIG.maxResults);
+  });
+
+  it("keeps every mock route's rate limit positive, and the write ceilings tighter than the shared read ceiling", () => {
+    const { create, claim, read } = MOCK_CONFIG.rateLimit;
+    for (const limit of [create, claim, read]) {
+      expect(limit.maxRequests).toBeGreaterThan(0);
+      expect(limit.windowMs).toBeGreaterThan(0);
+    }
+    expect(create.maxRequests).toBeLessThanOrEqual(read.maxRequests);
+    expect(claim.maxRequests).toBeLessThanOrEqual(read.maxRequests);
   });
 
   it("budgets at least one bot pick for every expiry-scan slot, so the ceiling stays slack by arithmetic (Task 6 fix round)", () => {
