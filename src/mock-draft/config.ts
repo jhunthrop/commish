@@ -130,6 +130,10 @@ export type MockMode = (typeof MOCK_CONFIG.modes)[number];
 export const MOCK_COPY = {
   /** The banner every mock room shows, verbatim, for the whole life of the room. */
   practiceBanner: "This is a practice draft. Nothing here counts, and this room clears itself after a day.",
+  /** The `leagues.name` every mock room is created under (`createMockRoom`,
+   *  `@/mock-draft-service/creation`, Task 5) — rendered wherever a real league's own name would
+   *  be, so it says plainly what the room is rather than pretending to be a league. */
+  roomName: "Practice draft",
   /** The accessible label a bot's seat carries alongside its visible "Bot" badge below — never
    *  "AI opponent," because this product makes no claim of intelligence about a seeded sampler. */
   botMarkerLabel: "practice opponent",

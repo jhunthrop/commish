@@ -10,7 +10,7 @@
  * intelligence and this product does not pretend otherwise.
  */
 import type { Position } from "@/domain/player";
-import { rngFor, type Rng } from "./rng";
+import { rngFor, seededShuffle } from "./rng";
 
 export interface BotArchetype {
   readonly name: string;
@@ -39,18 +39,6 @@ export const BOT_ARCHETYPES: readonly BotArchetype[] = [
  */
 const ARCHETYPE_STREAM_KEY = "archetypes";
 
-/** A seeded Fisher-Yates over a fresh copy — the input array is never touched. */
-function shuffled<T>(items: readonly T[], rng: Rng): readonly T[] {
-  const deck = [...items];
-  for (let i = deck.length - 1; i > 0; i--) {
-    const j = Math.floor(rng.next() * (i + 1));
-    const swap = deck[i]!;
-    deck[i] = deck[j]!;
-    deck[j] = swap;
-  }
-  return deck;
-}
-
 /**
  * Deals one archetype to every bot seat from `rngFor(draftSeed, "archetypes")`: a seeded shuffle
  * of the whole deck, then round-robin. Dealt rather than drawn independently ON PURPOSE — a deal
@@ -59,6 +47,6 @@ function shuffled<T>(items: readonly T[], rng: Rng): readonly T[] {
  * brain no matter what the seed happens to be.
  */
 export function assignArchetypes(draftSeed: number, botTeamIds: readonly string[]): Readonly<Record<string, BotArchetype>> {
-  const deck = shuffled(BOT_ARCHETYPES, rngFor(draftSeed, ARCHETYPE_STREAM_KEY));
+  const deck = seededShuffle(BOT_ARCHETYPES, rngFor(draftSeed, ARCHETYPE_STREAM_KEY));
   return Object.fromEntries(botTeamIds.map((teamId, i) => [teamId, deck[i % deck.length]!]));
 }

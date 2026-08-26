@@ -10,7 +10,10 @@ import { canonicalPairId, defaultSweepDeps, type SweepDeps } from "@/integrity-s
 import { SEAT_HOLD_REFUSALS } from "@/matchmaking/seat-hold";
 import { ENFORCEMENT_REFUSALS } from "./enforcement";
 import { acceptInvite, createInvite } from "./invites";
+import { ensureMockBotRoster } from "@/data/seed/bot-roster";
+import { copyViolations } from "@/integrity/copy-rules";
 import {
+  BOT_ACCOUNT_REFUSAL,
   DRAFT_ALREADY_STARTED,
   joinPublicLeague,
   LEAGUE_FULL,
@@ -602,5 +605,35 @@ describe("publicJoinPrecondition, called directly — its own draft-status claus
     const leagueId = await seedLeague({ draftStatus: "dissolved" });
     const result = await db.transaction((tx) => publicJoinPrecondition(tx, leagueId, "joiner"));
     expect(result).toEqual({ ok: false, status: 409, reason: DRAFT_ALREADY_STARTED });
+  });
+});
+
+describe("the bot-account guard (Phase 4.5, Task 5's delegated ruling)", () => {
+  it("structurally refuses a roster bot at the public door, with nothing written", async () => {
+    await ensureMockBotRoster(db);
+    const leagueId = await seedLeague();
+
+    const outcome = await joinPublicLeague({ db, newId, clock }, { leagueId, userId: "bot_park" });
+
+    expect(outcome).toEqual({ ok: false, status: 403, reason: BOT_ACCOUNT_REFUSAL });
+    expect(await db.select().from(teams).where(and(eq(teams.leagueId, leagueId), eq(teams.userId, "bot_park")))).toEqual([]);
+    expect(await auditEventsOn(leagueId, "member_joined")).toEqual([]);
+    expect(await noticesFor("bot_park")).toEqual([]);
+  });
+
+  it("refuses the same bot through the invite door — one guard, both doors", async () => {
+    await ensureMockBotRoster(db);
+    const leagueId = await seedLeague({ isPublicMatchmade: false });
+    const invite = await createInvite({ db, clock, random: () => 0.42 }, { leagueId, createdByUserId: "owner" });
+    expect(invite.ok).toBe(true);
+
+    const outcome = await acceptInvite({ db, clock, newId, audit: logger }, { code: (invite as { code: string }).code, userId: "bot_earlybird" });
+
+    expect(outcome).toEqual({ ok: false, status: 403, reason: BOT_ACCOUNT_REFUSAL });
+    expect(await db.select().from(teams).where(and(eq(teams.leagueId, leagueId), eq(teams.userId, "bot_earlybird")))).toEqual([]);
+  });
+
+  it("speaks the refusal in the house copy voice", () => {
+    expect(copyViolations(BOT_ACCOUNT_REFUSAL)).toEqual([]);
   });
 });

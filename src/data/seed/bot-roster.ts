@@ -1,4 +1,4 @@
-import type { Db } from "@/db/client";
+import type { Db, DbTx } from "@/db/client";
 import { users } from "@/db/schema";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 
@@ -36,7 +36,7 @@ const BOT_EMAIL_DOMAIN = "bots.commish.internal";
  * inserts nothing and errors on nothing, which is what lets both call sites run this
  * unconditionally rather than checking first.
  */
-export async function ensureMockBotRoster(db: Db): Promise<void> {
+export async function ensureMockBotRoster(db: Db | DbTx): Promise<void> {
   await db
     .insert(users)
     .values(

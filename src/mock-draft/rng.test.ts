@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSeededRng, rngFor } from "./rng";
+import { createSeededRng, rngFor, seededShuffle } from "./rng";
 
 describe("createSeededRng", () => {
   it("produces the identical sequence for the identical seed, and a different one for the next seed", () => {
@@ -42,5 +42,18 @@ describe("rngFor", () => {
   it("is stable across every character of the key, not just its length", () => {
     // "team_a" and "team_b" are the same length; only their content may distinguish the streams.
     expect(rngFor(1, "team_a").next()).not.toBe(rngFor(1, "team_b").next());
+  });
+});
+
+describe("seededShuffle", () => {
+  it("is a pure permutation: same stream, same order; the input array is never touched", () => {
+    const input = ["a", "b", "c", "d", "e"];
+    const frozen = [...input];
+    const first = seededShuffle(input, createSeededRng(9));
+    const second = seededShuffle(input, createSeededRng(9));
+    expect(input).toEqual(frozen); // never mutated
+    expect(second).toEqual(first); // same stream, same deal
+    expect([...first].sort()).toEqual(frozen); // a permutation, nothing lost or invented
+    expect(seededShuffle(input, createSeededRng(10))).not.toEqual(first);
   });
 });

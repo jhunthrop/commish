@@ -37,6 +37,25 @@ export function createSeededRng(seed: number): Rng {
 }
 
 /**
+ * A seeded Fisher-Yates over a fresh copy — the input array is never touched. Hoisted here from
+ * `@/mock-draft/archetypes` (Phase 4.5, Task 5) the day a second seeded draw needed it
+ * (`drawBotSeats`, `@/mock-draft-service/start`): one shuffle implementation means the archetype
+ * deal and the bot seat draw consume a stream the same way forever, and a replayed seed can
+ * never diverge because two hand-rolled shuffles drifted. The algorithm is byte-identical to the
+ * one that shipped in Task 3 — a relocation, never a re-deal.
+ */
+export function seededShuffle<T>(items: readonly T[], rng: Rng): readonly T[] {
+  const deck = [...items];
+  for (let i = deck.length - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1));
+    const swap = deck[i]!;
+    deck[i] = deck[j]!;
+    deck[j] = swap;
+  }
+  return deck;
+}
+
+/**
  * FNV-1a over the key's UTF-16 code units, folding the numeric seed in as the hash's own starting
  * value rather than appending it to the string — one pass, no allocation, and the seed still
  * changes every output bit the way a genuine FNV offset-basis would.

@@ -117,6 +117,16 @@ export interface CreateLeagueInput {
   /** Opt-in. A league is invite-only and unlisted unless its creator chose otherwise. */
   readonly isPublicMatchmade: boolean;
   /**
+   * Phase 4.5, Task 5: `true` for exactly one caller — `createMockRoom`
+   * (`@/mock-draft-service/creation`), which reaches `writeLeagueInTx` directly, inside its own
+   * transaction, the same way the house factory does. Every other door leaves this unset and
+   * every league they create stays a real league (`?? false` in the insert below). A caller that
+   * ever set this `true` alongside `isPublicMatchmade: true` would not create a leaky mock — the
+   * row refuses to commit at the database (`leagues_mock_private_ck`, `@/db/schema`), which is
+   * the CHECK's whole reason to exist.
+   */
+  readonly isMock?: boolean;
+  /**
    * ISO instant. Optional: the creation form itself never collects this (Task 6 only wires the
    * schedule PANEL, reachable after a league exists, not a creation-time field), but a caller
    * who already has a real chosen time — a seed, a fixture, a future creation flow — should not
@@ -265,6 +275,7 @@ export async function writeLeagueInTx(
       experienceTier: input.experienceTier,
       stakeTier: input.stakeTier,
       isPublicMatchmade: input.isPublicMatchmade,
+      isMock: input.isMock ?? false,
       medianGame: input.medianGame ?? false,
       entryFeeCents: money.config.entryFeeCents,
       platformFeeCents: money.config.platformFeeCents,

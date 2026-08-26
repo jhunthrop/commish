@@ -98,6 +98,13 @@ const SERVER_ONLY_MODULE_GROUPS = [
   // `NoticeView`/`ActivityRow` shape `@/integrity` already uses — never a live client-side
   // `import { MOCK_COPY }`. `src/mock-draft/config.ts`'s own docblock argues this in full.
   "@/mock-draft",
+  // Phase 4.5, Task 5: the mock draft's Postgres half — the lifecycle writers (`createMockRoom`,
+  // `claimMockSeat`, `topUpBots`, `startMockDraft`) and, in Task 6, the bot driver and the
+  // retention sweep. This closes the "ONE boundary, not two" promise `src/mock-draft/config.ts`'s
+  // own docblock made when the pure half joined this list: exactly as blocked as
+  // `@/integrity-service` has always been. `aliasOrRelative` anchors on the full segment, so the
+  // `@/mock-draft` entry above cannot catch this sibling on its own — both are named.
+  "@/mock-draft-service",
   // Phase 4, Task 3: the money vocabulary's Postgres half — `postMoneyTransaction` (the ONE
   // writer of the money book of record), the wallet reads and, in later tasks, every other
   // money writer. Exactly the split promised when `@/money` joined the browser-safe exempt set

@@ -94,6 +94,13 @@ const COVERAGE_GATED_DIRS = [
   // room-facing copy reaches a mock room pre-rendered, the same `NoticeView`/`ActivityRow` shape
   // `@/integrity` already uses.
   "src/mock-draft",
+  // Gate 26 (Phase 4.5, Task 5). `src/mock-draft-service` is Postgres-backed and gates for the
+  // service-layer reason gates 13-18 and 23 do — and more so: it is the ONE lane allowed to
+  // create leagues that write no audit trail (ruling 2's carve-out), and a gate that measured
+  // everywhere except the one place the audit law is deliberately vacuous would measure the
+  // wrong place. Guards unreachable through real Postgres (the claim door's vanished-row reads)
+  // get narrow stub-`DbTx` tests, the `lockAnchor` discipline.
+  "src/mock-draft-service",
 ] as const;
 /**
  * The three service directories' `schemas.ts` files are named explicitly alongside the `**` glob
@@ -315,6 +322,16 @@ export default defineConfig({
         // does; an `include` entry with no `thresholds` block measures nothing, so both halves
         // ship in the same commit as every gate before it.
         "src/mock-draft/**": {
+          branches: 100,
+          functions: 100,
+          lines: 100,
+          statements: 100,
+        },
+        // Gate 26 (Phase 4.5, Task 5). The mock lane's Postgres half — see the
+        // `COVERAGE_GATED_DIRS` entry above for the full argument; an `include` entry with no
+        // `thresholds` block measures nothing, so both halves ship in the same commit as every
+        // gate before it.
+        "src/mock-draft-service/**": {
           branches: 100,
           functions: 100,
           lines: 100,

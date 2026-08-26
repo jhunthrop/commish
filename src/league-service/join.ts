@@ -18,6 +18,21 @@ import { consumeSeatHoldInTx, liveHoldsFor } from "./seat-hold";
 /** The unique index that backstops "the same person joined twice" — see `schema.ts`. */
 const TEAM_MEMBERSHIP_UNIQUE_INDEX = "teams_league_user_idx";
 
+/**
+ * PHASE 4.5, TASK 5 — THE BOT-IN-REAL-LEAGUE RULING (delegated to this task, ruled with its
+ * review). A `users.is_bot` account is a mock-lane fixture: a named, seeded practice opponent
+ * with no session, no balance and no judgment. A REAL league seat is a commitment this product
+ * makes promises about — money moves against it, standings count it, the integrity spine records
+ * it. So the refusal is STRUCTURAL, here in the one function both real doors (invite accept,
+ * public browse) share, rather than left to "no bot holds a session": a session is an
+ * authentication fact, and authentication facts change shape (a service integration, an operator
+ * tool, a replayed cookie, a bug), while this guard is one read off the `users` row this
+ * function already fetches for the team's default name — closing the whole class for the price
+ * of one column in an existing SELECT. Mock rooms are untouched: `claimMockSeat` and
+ * `seatBotsInTx` (`@/mock-draft-service`) seat their rows without ever entering this function.
+ */
+export const BOT_ACCOUNT_REFUSAL = "That account is a practice opponent. A practice opponent cannot hold a seat in a real league.";
+
 export const LEAGUE_MISSING = "That league does not exist.";
 export const LEAGUE_FULL = "That league is already full.";
 export const NOT_PUBLIC = "That league is not open to join. Ask its commissioner for an invite link.";
@@ -280,7 +295,13 @@ export async function joinLeagueInTx(
     }
   }
 
-  const [profile] = await tx.select({ displayName: users.displayName }).from(users).where(eq(users.id, input.userId));
+  const [profile] = await tx.select({ displayName: users.displayName, isBot: users.isBot }).from(users).where(eq(users.id, input.userId));
+  // The bot-account guard (see `BOT_ACCOUNT_REFUSAL`'s docblock): decided off the row already in
+  // scope, before the first write, so a refused bot leaves nothing behind — the same
+  // no-write-before-refusal shape every gate above holds. A caller id that names NO row at all
+  // falls through unchanged (`undefined?.isBot`): the FK on the insert below answers that case
+  // exactly as it did before this guard existed.
+  if (profile?.isBot === true) return { ok: false, status: 403, reason: BOT_ACCOUNT_REFUSAL };
   const teamId = input.newId();
   const audit = input.audit ?? getAuditLogger();
   const teamRow = {

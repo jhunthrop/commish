@@ -34,6 +34,10 @@ import { dissolveLeague } from "@/money-service/dissolution";
 import { initiateWithdrawal, recordWithdrawalCompleted, type WithdrawalDeps } from "@/money-service/withdrawals";
 import { postMoneyTransaction, type PostDeps } from "@/money-service/post";
 import { settleSeasonPayouts } from "@/money-service/settlement";
+import { claimMockSeat, MOCK_REFUSALS } from "@/mock-draft-service/claim";
+import { createMockRoom } from "@/mock-draft-service/creation";
+import { topUpBots } from "@/mock-draft-service/start";
+import { mockLifecycleDeps } from "@/mock-draft-service/test-support";
 import { ingestProviderCallback, type PaymentsEvent } from "@/payments-provider/ingest";
 import { createMockPaymentsProvider } from "@/payments-provider/mock/mock-payments-provider";
 import { raiseFlag, resolveFlag } from "./flags";
@@ -109,12 +113,19 @@ const releaseDb = createTestDb();
  * here is one of them by construction.
  */
 async function waitForBlockedBackend(timeoutMs = 5_000): Promise<boolean> {
+  return waitForBlockedBackends(1, timeoutMs);
+}
+
+/** The N-party rendezvous (Phase 4.5, Task 5): two mock writers parked behind one bystander's
+ *  league lock are TWO blocked backends, and releasing before both are genuinely queued would
+ *  turn the pair proof back into a hopeful interleaving. */
+async function waitForBlockedBackends(minBlocked: number, timeoutMs = 5_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   for (;;) {
     const rows = await joinDb.execute<{ count: string }>(
       sql`SELECT count(*) AS count FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND datname = current_database()`,
     );
-    if (Number(rows[0]?.count ?? 0) > 0) return true;
+    if (Number(rows[0]?.count ?? 0) >= minBlocked) return true;
     if (Date.now() > deadline) return false;
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
@@ -4023,14 +4034,18 @@ describe("settleSeasonPayouts' lock order — leagues[X] FOR UPDATE first, befor
  * that can only ever be safer against the "join and an autopick" cycle the first `describe`
  * block in this file exists to close, never a new way to reopen it. Proven the identical way —
  * two real connections, a genuine rendezvous — rather than argued from the smaller diff.
- *
- * Task 5 (not yet built) will give a mock room its own seat-claim primitive (`claimMockSeat`);
- * until then `joinLeagueInTx` is reused here as the concurrent `leagues[X] FOR UPDATE` holder —
- * mechanically the same contended lock a seat claim would take, and the only one this proof
- * actually needs.
+ * * TASK 5's SWAP (the T4 carry, closed): the provisional `joinLeagueInTx` stand-in this entry
+ * shipped with is now the REAL `claimMockSeat` — the exact seat-claim primitive a lobby mock's
+ * pick actually contends with. `claimMockSeat` deliberately has no injection seam to park it
+ * mid-transaction the way `parkedJoin` parks a precondition, so the rendezvous is a BYSTANDER
+ * transaction holding the identical `leagues[X] FOR UPDATE` while BOTH real writers queue behind
+ * it, released only once both are genuinely blocked (`waitForBlockedBackends(2)`) — the same
+ * shape the settlement proof above already uses. And the chain assertion is now STRONGER than
+ * the stand-in's: a mock claim writes no `member_joined` at all (ruling 2), so the league's
+ * chain must end this test EMPTY, not one event long.
  */
-describe("the mock lane's applyAction — no anchor lock to contend for (Task 4)", () => {
-  it("lets a mock draft's pick run beside a concurrent join in the same league without deadlocking, and never reaches the audit anchor", async () => {
+describe("the mock lane's applyAction — no anchor lock to contend for (Task 4; the claimant is Task 5's real claimMockSeat)", () => {
+  it("lets a mock draft's pick run beside a concurrent claimMockSeat in the same league without deadlocking, and neither ever reaches the audit anchor", async () => {
     const { draftId, leagueId, teamIds } = await seedDraftFixture(joinDb, {
       draftId: "draft_mock_lock",
       leagueId: "league_mock_lock",
@@ -4042,40 +4057,139 @@ describe("the mock lane's applyAction — no anchor lock to contend for (Task 4)
       isMock: true,
       botTeams: 2,
     });
-    // An open seat for the joiner — mirrors the real-league proof at the top of this file; a join
-    // refused for capacity never reaches the append, which is the half of this proof under test.
+    // An open seat for the claimant — mirrors the real-league proof at the top of this file; a
+    // claim refused for capacity would take no seat, which is not the half under test here.
     await joinDb.update(leagues).set({ teamCount: 3 }).where(eq(leagues.id, leagueId));
     await joinDb.insert(users).values({ id: "user_mock_joiner", email: "mock_joiner@test.local", displayName: "Joiner" });
 
     const store = pickStore();
     // The DIRECT `applyAction`, not `store.startDraft` — bypassing `claimAutoStart` on purpose,
     // the same technique the "join and an autopick" proof above uses, so `drafts.status` stays
-    // `'scheduled'` and the concurrent join's own shared draft-status refusal still passes.
+    // `'scheduled'` and `claimMockSeat`'s own started-draft refusal still passes.
     await store.applyAction(draftId, { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: clock.now(), draftOrder: teamIds, pool: POOL });
     const state = await store.getDraftState(draftId);
 
-    const join = parkedJoin(leagueId, "user_mock_joiner", "team_mock_joiner");
-    await join.leagueLocked;
+    const park = parkedLeagueLock(leagueId);
+    await park.leagueLocked;
 
+    // T_claim: the real door, on its own connection. Its plain `mock_rooms` read answers first
+    // (no lock), then its `leagues[X] FOR UPDATE` blocks HERE, behind the bystander.
+    const claiming = claimMockSeat(flagDb, { code: `${leagueId}_code`, userId: "user_mock_joiner" }, { clock, newId: () => "team_mock_claim" });
     // T_pick: the mock lane's own `applyAction`. It still takes `leagues[X] FOR KEY SHARE` as its
-    // own first statement (Task 4 changes nothing about that) — this is where it blocks, behind
-    // T_join, identically to a real draft's pick.
+    // own first statement (Task 4 changed nothing about that) — blocked behind the same lock.
     const picking = store.applyAction(draftId, { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state!) ?? clock.now() });
 
-    expect(await waitForBlockedBackend()).toBe(true);
-    join.release();
+    expect(await waitForBlockedBackends(2)).toBe(true);
+    park.release();
+    await expect(park.holding).resolves.toBeUndefined();
 
-    const joined = await join.joining;
+    const claimed = await claiming;
     const picked = await picking;
-    expect(joined).toMatchObject({ ok: true, alreadyMember: false });
+    expect(claimed).toMatchObject({ ok: true, alreadySeated: false });
     expect(picked.ok).toBe(true);
 
-    // The join's own `member_joined` event is the ONLY thing on this league's chain — the mock
-    // pick never reached the anchor at all, the literal proof that the shorter mock-lane lock
-    // footprint (no notice insert, no `commitDraftState`, no `audit.recordAll`) introduces no new
-    // contention and closes no new cycle.
+    // NOTHING on this league's chain, from either writer: the claim appends no `member_joined`
+    // (ruling 2's carve-out) and the mock pick never reaches the anchor — the literal proof that
+    // the shorter mock-lane lock footprint (no notice insert, no `commitDraftState`, no
+    // `audit.recordAll`) introduces no new contention and closes no new cycle.
     const chainEvents = await joinDb.select({ eventType: auditEvents.eventType }).from(auditEvents).where(eq(auditEvents.chainScope, leagueId));
-    expect(chainEvents).toEqual([{ eventType: "member_joined" }]);
+    expect(chainEvents).toEqual([]);
     expect(await joinDb.select().from(memberNotices).where(eq(memberNotices.leagueId, leagueId))).toHaveLength(0);
+  });
+});
+
+/** The bystander rendezvous: a transaction on `joinDb` holding `leagues[X] FOR UPDATE` — the
+ *  identical contended row every mock writer takes first — parked until `release()`. */
+function parkedLeagueLock(leagueId: string) {
+  let holdsLeagueLock: () => void = () => {};
+  const leagueLocked = new Promise<void>((resolve) => (holdsLeagueLock = resolve));
+  let release: () => void = () => {};
+  const parked = new Promise<void>((resolve) => (release = resolve));
+  const holding = joinDb.transaction(async (tx) => {
+    await tx.execute(sql`SELECT id FROM leagues WHERE id = ${leagueId} FOR UPDATE`);
+    holdsLeagueLock();
+    await parked;
+  });
+  return { holding, leagueLocked, release: () => release() };
+}
+
+/**
+ * PHASE 4.5, TASK 5's OWN PAIRS. Every mock lifecycle writer's first LOCKING statement is
+ * `leagues[X] FOR UPDATE` — the branch-wide law — and none of them ever reaches a notice row, a
+ * money row or the audit anchor (ruling 2), so their whole contention surface IS that one lock.
+ * These two proofs drive the writers that genuinely race in production: two people clicking the
+ * same lobby card's last seat, and a person claiming while the ticker's due scan (Task 6) tops
+ * the same room up. Both are outcome-agnostic about WHO wins (Postgres's grant order decides)
+ * and absolute about what may not happen: a deadlock, an overfilled room, or one audit statement.
+ */
+describe("the mock lifecycle writers' own pairs (Task 5)", () => {
+  it("serializes two claims racing for the last seat: one seated, one told the room is full, no deadlock", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_m5_host", email: "m5host@test.local", displayName: "Host" },
+      { id: "u_m5_a", email: "m5a@test.local", displayName: "Racer A" },
+      { id: "u_m5_b", email: "m5b@test.local", displayName: "Racer B" },
+    ]);
+    const created = await createMockRoom(
+      joinDb,
+      { hostUserId: "u_m5_host", mode: "lobby", teamCount: 2, pickSeconds: 60, scoringPreset: "ppr", rosterShape: "standard" },
+      mockLifecycleDeps(joinDb),
+    );
+    expect(created).toMatchObject({ ok: true });
+    const { leagueId, shareCode } = created as { leagueId: string; shareCode: string };
+
+    const park = parkedLeagueLock(leagueId);
+    await park.leagueLocked;
+
+    const racing = [
+      claimMockSeat(pickDb, { code: shareCode, userId: "u_m5_a" }, mockLifecycleDeps(pickDb)),
+      claimMockSeat(flagDb, { code: shareCode, userId: "u_m5_b" }, mockLifecycleDeps(flagDb)),
+    ];
+    expect(await waitForBlockedBackends(2)).toBe(true);
+    park.release();
+    await expect(park.holding).resolves.toBeUndefined();
+
+    const results = await Promise.all(racing);
+    expect(results.filter((result) => result.ok)).toHaveLength(1);
+    expect(results.filter((result) => !result.ok)).toEqual([{ ok: false, status: 409, reason: MOCK_REFUSALS.full }]);
+    expect(await joinDb.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, leagueId))).toHaveLength(2);
+    expect(await joinDb.select().from(auditEvents).where(eq(auditEvents.chainScope, leagueId))).toEqual([]);
+  });
+
+  it("serializes a claim against the ticker's own top-up: both resolve, the room never overfills", async () => {
+    await joinDb.insert(users).values([
+      { id: "u_m5_host2", email: "m5host2@test.local", displayName: "Host" },
+      { id: "u_m5_c", email: "m5c@test.local", displayName: "Claimant C" },
+    ]);
+    const created = await createMockRoom(
+      joinDb,
+      { hostUserId: "u_m5_host2", mode: "lobby", teamCount: 4, pickSeconds: 60, scoringPreset: "ppr", rosterShape: "standard" },
+      mockLifecycleDeps(joinDb),
+    );
+    expect(created).toMatchObject({ ok: true });
+    const { leagueId, shareCode } = created as { leagueId: string; shareCode: string };
+
+    const park = parkedLeagueLock(leagueId);
+    await park.leagueLocked;
+
+    const claiming = claimMockSeat(pickDb, { code: shareCode, userId: "u_m5_c" }, mockLifecycleDeps(pickDb));
+    const topping = topUpBots(flagDb, leagueId, mockLifecycleDeps(flagDb));
+    expect(await waitForBlockedBackends(2)).toBe(true);
+    park.release();
+    await expect(park.holding).resolves.toBeUndefined();
+
+    const claimed = await claiming;
+    const topped = await topping;
+    expect(topped.ok).toBe(true);
+    // Postgres's grant order decides who ran first; the arithmetic decides everything else. The
+    // claim first: it took seat 2 of 4, and the top-up filled the remaining 2. The top-up first:
+    // it filled ALL 3 empty seats, and the claim found a full practice room — never a 5th seat.
+    if (claimed.ok) {
+      expect((topped as { added: number }).added).toBe(2);
+    } else {
+      expect(claimed).toEqual({ ok: false, status: 409, reason: MOCK_REFUSALS.full });
+      expect((topped as { added: number }).added).toBe(3);
+    }
+    expect(await joinDb.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, leagueId))).toHaveLength(4);
+    expect(await joinDb.select().from(auditEvents).where(eq(auditEvents.chainScope, leagueId))).toEqual([]);
   });
 });
