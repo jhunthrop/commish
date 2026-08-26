@@ -9,6 +9,7 @@ import type { DraftRoom as DraftRoomState } from "../hooks/use-draft-room";
 import { DraftBoard } from "./draft-board";
 import { NudgeBanner } from "./nudge-banner";
 import { PickCelebration } from "./pick-celebration";
+import { PickWire } from "./pick-wire";
 import { PlayerPool } from "./player-pool";
 import { RoomDock } from "./room-dock";
 import { RoomLayout } from "./room-layout";
@@ -117,6 +118,10 @@ export function RoomShell({
               <PickCelebration lastPick={room.lastPick} playersById={playersById} teams={room.teams} />
             </div>
           </div>
+          {/* R1 (2026-08-26 design review): the room's own history, one quiet mono line above
+              the board it never moves — same fixed-height reasoning as the notices slot above,
+              just reserved unconditionally rather than only while something is speaking. */}
+          <PickWire view={view} teams={room.teams} playersById={playersById} />
           <DraftBoard
             view={view}
             teams={room.teams}

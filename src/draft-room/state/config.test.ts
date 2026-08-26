@@ -15,12 +15,19 @@ import { DRAFT_ROOM_CONFIG } from "./config";
 describe("DRAFT_ROOM_CONFIG", () => {
   it("defines every numeric tunable as a positive number", () => {
     const numericKeys: readonly (keyof typeof DRAFT_ROOM_CONFIG)[] = ["poolPageSize", "celebrationMs"];
-    const allKeys = [...numericKeys, "emptyCellBorderClass"] as const;
+    const allKeys = [...numericKeys, "emptyCellBorderClass", "wire"] as const;
     expect(Object.keys(DRAFT_ROOM_CONFIG).sort()).toEqual([...allKeys].sort());
     for (const key of numericKeys) {
       expect(Number.isFinite(DRAFT_ROOM_CONFIG[key])).toBe(true);
       expect(DRAFT_ROOM_CONFIG[key]).toBeGreaterThan(0);
     }
+  });
+
+  // `PickWire`'s own tunable: a positive item count, or the band silently shows nothing (0)
+  // or an unbounded history (a negative/non-finite cap would never trim).
+  it("caps the pick wire at a positive number of items", () => {
+    expect(Number.isFinite(DRAFT_ROOM_CONFIG.wire.maxItems)).toBe(true);
+    expect(DRAFT_ROOM_CONFIG.wire.maxItems).toBeGreaterThan(0);
   });
 
   // `DraftBoard`'s empty-cell recede: a future round's border may shrink, never dim past

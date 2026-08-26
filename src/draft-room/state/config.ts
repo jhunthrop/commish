@@ -29,4 +29,12 @@ export const DRAFT_ROOM_CONFIG = {
     future: "min-h-4 border-line",
     near: "min-h-12 border-line",
   },
+  /**
+   * `PickWire`'s own tunable (2026-08-26 design review, R1): how many of the draft's most
+   * recent picks the band shows, newest first. One number, read by both the room's `text-xs`
+   * band and the TV's `text-base` one, so a future retune never drifts between the two.
+   */
+  wire: {
+    maxItems: 6,
+  },
 } as const;
