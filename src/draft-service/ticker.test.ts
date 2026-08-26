@@ -7,6 +7,8 @@ import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import { currentDeadline } from "@/draft-engine";
 import type { HouseFactoryOutcome } from "@/league-service/house-factory";
 import { HOUSE_CATALOG } from "@/matchmaking/house-catalog";
+import { MOCK_CONFIG } from "@/mock-draft/config";
+import type { MockStartOutcome } from "@/mock-draft-service/driver";
 import type { AutoStartOutcome } from "./auto-start";
 import { DRAFT_SERVICE_CONFIG } from "./config";
 import { createDraftStore, type DraftStore } from "./store";
@@ -695,5 +697,346 @@ describe("draft ticker — house reconcile (Phase 3.5 addendum, Task 13)", () =>
       .from(leagues)
       .where(eq(leagues.houseRung, "open_12"));
     expect(rows).toHaveLength(HOUSE_CATALOG.rungs.open_12.openAtOnce);
+  });
+});
+
+/**
+ * Phase 4.5, Task 6: the ticker's three MOCK lanes — the due-start scan, the bot driver hook in
+ * `tickOne`, and the interval-gated retention sweep. These tests pin the WIRING (ordering,
+ * outcome mapping, failure isolation, the per-tick bot budget); the lanes' own behavior against
+ * real rooms lives with them, in `@/mock-draft-service/driver.test.ts` and `sweep.test.ts`.
+ */
+describe("draft ticker — mock lanes (Phase 4.5, Task 6)", () => {
+  const NO_MOCK_STARTS = async (): Promise<readonly MockStartOutcome[]> => [];
+  const NO_SWEEP = async (): Promise<readonly never[]> => [];
+
+  /** A started 2-team all-bot mock draft on the 30s practice clock. Callers seed players first. */
+  async function liveMockDraft(id: string) {
+    const fixture = await seedDraftFixture(db, {
+      draftId: `draft_${id}`,
+      leagueId: `league_${id}`,
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+      isMock: true,
+      botTeams: 2,
+      mockPickSeconds: 30,
+    });
+    const store = createDraftStore({ db, publish: async () => "1-0", clock });
+    await store.startDraft(fixture.draftId);
+    return { fixture, store };
+  }
+
+  async function seedSharedPlayers() {
+    await db.insert(players).values([
+      { id: "mqb1", name: "MQB One", position: "QB", nflTeam: "KC" },
+      { id: "mqb2", name: "MQB Two", position: "QB", nflTeam: "KC" },
+      { id: "mrb1", name: "MRB One", position: "RB", nflTeam: "SF" },
+      { id: "mrb2", name: "MRB Two", position: "RB", nflTeam: "SF" },
+      { id: "mwr1", name: "MWR One", position: "WR", nflTeam: "NYJ" },
+      { id: "mwr2", name: "MWR Two", position: "WR", nflTeam: "NYJ" },
+    ]);
+  }
+
+  it("runs the mock due-start THIRD and the sweep FOURTH: after auto-start and house reconcile, before the expiry scan", async () => {
+    const { store, fixture } = await liveDraft();
+    now = "2026-09-01T12:00:00.000Z"; // past the live draft's own (pause-extended) deadline
+    const calls: string[] = [];
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      autoStart: async () => {
+        calls.push("auto-start");
+        return [];
+      },
+      reconcileHouse: async () => {
+        calls.push("house-reconcile");
+        return { opened: [], refused: [] };
+      },
+      startDueMocks: async () => {
+        calls.push("mock-due-start");
+        return [];
+      },
+      sweepMocks: async () => {
+        calls.push("mock-sweep");
+        return [];
+      },
+    });
+
+    const outcomes = await ticking.tick();
+    expect(calls).toEqual(["auto-start", "house-reconcile", "mock-due-start", "mock-sweep"]);
+    // The expiry scan still ran last: the live draft expired on this same tick.
+    expect(outcomes).toEqual([{ draftId: fixture.draftId, applied: true }]);
+  });
+
+  it("maps due-start outcomes: a start joins the outcomes, a failure is reported, the mapped-409 race is absorbed silently", async () => {
+    const { store } = await liveDraft();
+    const startDueMocks = async (): Promise<readonly MockStartOutcome[]> => [
+      { leagueId: "league_started", started: true, draftId: "draft_started_mock" },
+      { leagueId: "league_failed", started: false, benignRace: false, reason: "boom" },
+      { leagueId: "league_race", started: false, benignRace: true, reason: "This draft has already started." },
+    ];
+    const onOutcome = vi.fn();
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      autoStart: async () => [],
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+      startDueMocks,
+      sweepMocks: NO_SWEEP,
+      onOutcome,
+    });
+
+    const outcomes = await ticking.tick();
+    expect(outcomes).toContainEqual({ draftId: "draft_started_mock", applied: true });
+    expect(outcomes).toContainEqual({ draftId: "mock:league_failed", applied: false, reason: "boom" });
+    // The benign race maps to NOTHING: not an outcome, not a warning — the room the scan wanted
+    // started exists, another instance simply got there first.
+    expect(outcomes.map((outcome) => outcome.draftId)).not.toContain("mock:league_race");
+    expect(onOutcome).toHaveBeenCalledTimes(1);
+    expect(onOutcome).toHaveBeenCalledWith({ draftId: "mock:league_failed", applied: false, reason: "boom" });
+  });
+
+  it("logs and continues to the expiry scan when the due-start scan itself throws", async () => {
+    const { store, fixture } = await liveDraft();
+    now = "2026-09-01T12:00:00.000Z";
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const ticking = createDraftTicker({
+        db,
+        store,
+        clock,
+        autoStart: async () => [],
+        reconcileHouse: NO_OP_HOUSE_RECONCILE,
+        startDueMocks: async () => {
+          throw new Error("mock scan connection reset");
+        },
+        sweepMocks: NO_SWEEP,
+      });
+      const outcomes = await ticking.tick();
+      expect(outcomes).toEqual([{ draftId: fixture.draftId, applied: true }]);
+      expect(errorSpy).toHaveBeenCalledWith("[draft] mock due-start scan failed", expect.any(Error));
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("runs the sweep on the first tick, then withholds it until sweepIntervalMs has passed", async () => {
+    const { store } = await liveDraft();
+    now = "2026-09-01T12:00:00.000Z";
+    let sweeps = 0;
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      autoStart: async () => [],
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+      startDueMocks: NO_MOCK_STARTS,
+      sweepMocks: async () => {
+        sweeps += 1;
+        return [];
+      },
+    });
+
+    await ticking.tick();
+    expect(sweeps).toBe(1);
+
+    // Same instant — still gated.
+    await ticking.tick();
+    expect(sweeps).toBe(1);
+
+    // Just under the interval.
+    now = new Date(Date.parse("2026-09-01T12:00:00.000Z") + MOCK_CONFIG.sweepIntervalMs - 1).toISOString();
+    await ticking.tick();
+    expect(sweeps).toBe(1);
+
+    // At/after the interval.
+    now = new Date(Date.parse("2026-09-01T12:00:00.000Z") + MOCK_CONFIG.sweepIntervalMs).toISOString();
+    await ticking.tick();
+    expect(sweeps).toBe(2);
+  });
+
+  it("logs and continues to the expiry scan when the sweep throws", async () => {
+    const { store, fixture } = await liveDraft();
+    now = "2026-09-01T12:00:00.000Z";
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const ticking = createDraftTicker({
+        db,
+        store,
+        clock,
+        autoStart: async () => [],
+        reconcileHouse: NO_OP_HOUSE_RECONCILE,
+        startDueMocks: NO_MOCK_STARTS,
+        sweepMocks: async () => {
+          throw new Error("sweep connection reset");
+        },
+      });
+      const outcomes = await ticking.tick();
+      expect(outcomes).toEqual([{ draftId: fixture.draftId, applied: true }]);
+      expect(errorSpy).toHaveBeenCalledWith("[draft] mock sweep failed", expect.any(Error));
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("hands a live mock draft to the bot driver and maps its pick to an applied outcome", async () => {
+    await seedSharedPlayers();
+    const { fixture, store } = await liveMockDraft("wire_pick");
+    const seenStates: unknown[] = [];
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      autoStart: async () => [],
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+      startDueMocks: NO_MOCK_STARTS,
+      sweepMocks: NO_SWEEP,
+      driveMockPick: async (state) => {
+        seenStates.push(state);
+        return { picked: true as const };
+      },
+    });
+
+    const outcomes = await ticking.tick();
+    expect(seenStates).toHaveLength(1);
+    expect(seenStates[0]).toMatchObject({ config: { draftId: fixture.draftId, isMock: true } });
+    expect(outcomes).toEqual([{ draftId: fixture.draftId, applied: true }]);
+  });
+
+  it("surfaces the driver's refusal through the same rate-limited reporter every lane uses", async () => {
+    await seedSharedPlayers();
+    const { fixture, store } = await liveMockDraft("wire_refuse");
+    const onOutcome = vi.fn();
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      autoStart: async () => [],
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+      startDueMocks: NO_MOCK_STARTS,
+      sweepMocks: NO_SWEEP,
+      driveMockPick: async () => ({ picked: false as const, reason: "bot boom" }),
+      onOutcome,
+    });
+
+    const outcomes = await ticking.tick();
+    const expected = { draftId: fixture.draftId, applied: false, reason: "bot boom" };
+    expect(outcomes).toEqual([expected]);
+    expect(onOutcome).toHaveBeenCalledWith(expected);
+  });
+
+  it("falls through to the ordinary clock check when the driver has nothing to do", async () => {
+    await seedSharedPlayers();
+    const { fixture, store } = await liveMockDraft("wire_null");
+    now = "2026-09-01T00:00:31.000Z"; // past the mock's own 30s practice clock
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      autoStart: async () => [],
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+      startDueMocks: NO_MOCK_STARTS,
+      sweepMocks: NO_SWEEP,
+      driveMockPick: async () => null,
+    });
+
+    const outcomes = await ticking.tick();
+    expect(outcomes).toEqual([{ draftId: fixture.draftId, applied: true }]);
+    // The clock acted, not the driver: the pick the fall-through produced is an autopick.
+    const state = await store.getDraftState(fixture.draftId);
+    expect(state?.picks).toHaveLength(1);
+    expect(state?.picks[0]?.auto).toBe(true);
+  });
+
+  it("logs a driver failure and still checks that draft's clock the same tick", async () => {
+    await seedSharedPlayers();
+    const { fixture, store } = await liveMockDraft("wire_throw");
+    now = "2026-09-01T00:00:31.000Z"; // past the mock's own 30s practice clock
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      const ticking = createDraftTicker({
+        db,
+        store,
+        clock,
+        autoStart: async () => [],
+        reconcileHouse: NO_OP_HOUSE_RECONCILE,
+        startDueMocks: NO_MOCK_STARTS,
+        sweepMocks: NO_SWEEP,
+        driveMockPick: async () => {
+          throw new Error("driver connection reset");
+        },
+      });
+      const outcomes = await ticking.tick();
+      expect(outcomes).toEqual([{ draftId: fixture.draftId, applied: true }]);
+      expect(errorSpy).toHaveBeenCalledWith("[draft] mock bot driver failed for draft", fixture.draftId, expect.any(Error));
+    } finally {
+      errorSpy.mockRestore();
+    }
+  });
+
+  it("never hands a REAL draft to the bot driver", async () => {
+    const { store, fixture } = await liveDraft();
+    now = "2026-09-01T12:00:00.000Z";
+    const driveMockPick = vi.fn(async () => null);
+    const ticking = createDraftTicker({
+      db,
+      store,
+      clock,
+      autoStart: async () => [],
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+      startDueMocks: NO_MOCK_STARTS,
+      sweepMocks: NO_SWEEP,
+      driveMockPick,
+    });
+
+    const outcomes = await ticking.tick();
+    expect(driveMockPick).not.toHaveBeenCalled();
+    expect(outcomes).toEqual([{ draftId: fixture.draftId, applied: true }]);
+  });
+
+  it("bounds bot picks per tick: at the budget, later mock drafts fall through to the ordinary clock check", async () => {
+    await seedSharedPlayers();
+    const first = await liveMockDraft("wire_budget_a");
+    const second = await liveMockDraft("wire_budget_b");
+    const driveMockPick = vi.fn(async () => ({ picked: true as const }));
+    const ticking = createDraftTicker({
+      db,
+      store: first.store,
+      clock,
+      autoStart: async () => [],
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+      startDueMocks: NO_MOCK_STARTS,
+      sweepMocks: NO_SWEEP,
+      driveMockPick,
+      maxBotPicksPerTick: 1,
+    });
+
+    const outcomes = await ticking.tick();
+    // One budgeted pick; the second mock draft was not driven this tick (and, inside its own
+    // clock, produced no outcome at all).
+    expect(driveMockPick).toHaveBeenCalledTimes(1);
+    expect(outcomes).toHaveLength(1);
+    expect([first.fixture.draftId, second.fixture.draftId]).toContain(outcomes[0]!.draftId);
+
+    // A zero budget never invokes the driver at all.
+    driveMockPick.mockClear();
+    const stopped = createDraftTicker({
+      db,
+      store: first.store,
+      clock,
+      autoStart: async () => [],
+      reconcileHouse: NO_OP_HOUSE_RECONCILE,
+      startDueMocks: NO_MOCK_STARTS,
+      sweepMocks: NO_SWEEP,
+      driveMockPick,
+      maxBotPicksPerTick: 0,
+    });
+    await stopped.tick();
+    expect(driveMockPick).not.toHaveBeenCalled();
   });
 });

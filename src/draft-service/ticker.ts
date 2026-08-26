@@ -5,6 +5,10 @@ import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import type { Clock } from "@/domain/timing";
 import { currentDeadline } from "@/draft-engine";
 import { ensureHouseCatalog, type HouseFactoryDeps, type HouseFactoryOutcome } from "@/league-service/house-factory";
+import { MOCK_CONFIG } from "@/mock-draft/config";
+import { createMockBotDriver, startDueMockRooms, type MockBotDriveFn, type MockStartOutcome } from "@/mock-draft-service/driver";
+import type { MockLifecycleDeps } from "@/mock-draft-service/claim";
+import { sweepExpiredMocks, type MockSweepDeps, type SweptMockRoom } from "@/mock-draft-service/sweep";
 import { autoStartDueDrafts, type AutoStartDeps, type AutoStartOutcome } from "./auto-start";
 import { DRAFT_SERVICE_CONFIG } from "./config";
 import { NO_OP_NUDGE_SCHEDULER, type NudgeScheduler } from "./nudge";
@@ -74,6 +78,34 @@ interface TickerDeps {
    * spamming them. Defaults to `console.warn`.
    */
   readonly onOutcome?: (outcome: TickOutcome) => void;
+  /**
+   * Phase 4.5, Task 6's due scan: starts every mock room whose fill window (or early-start
+   * grace, or failed solo self-start) has fired. Defaults to the real `startDueMockRooms`
+   * (`@/mock-draft-service/driver`); injectable for the same fixture-free-stubbing reason
+   * `autoStart`/`reconcileHouse` are.
+   */
+  readonly startDueMocks?: (db: Db, deps: Pick<MockLifecycleDeps, "store" | "clock" | "newId">) => Promise<readonly MockStartOutcome[]>;
+  /**
+   * Task 6's bot driver: at most one bot pick per live MOCK draft per tick, invoked from
+   * `tickOne` against the very rows the expiry scan already fetched — no second scan. Defaults
+   * to the real `createMockBotDriver({ db, store }).driveBotPick`.
+   */
+  readonly driveMockPick?: MockBotDriveFn;
+  /**
+   * Task 6's retention sweep, gated by `MOCK_CONFIG.sweepIntervalMs` exactly the way
+   * `reconcileHouse` is gated by `houseReconcileIntervalMs`. Defaults to the real
+   * `sweepExpiredMocks` (`@/mock-draft-service/sweep`).
+   */
+  readonly sweepMocks?: (db: Db, deps: MockSweepDeps) => Promise<readonly SweptMockRoom[]>;
+  /**
+   * Tick-wide ceiling on bot picks across ALL mock drafts, defaulting to
+   * `MOCK_CONFIG.maxBotPicksPerTick`. In ordinary operation the ceiling is slack by
+   * arithmetic — the expiry scan itself is bounded by `maxDraftsPerTick` (50) and the driver
+   * lands at most one pick per draft per tick, so at the shipped numbers at most 50 of the 100
+   * budgeted picks can ever be attempted. Injectable so the exhausted-budget branch is a test's
+   * to reach rather than dead configuration.
+   */
+  readonly maxBotPicksPerTick?: number;
 }
 
 const defaultOnOutcome = (outcome: TickOutcome): void => {
@@ -94,9 +126,21 @@ export function createDraftTicker({
   autoStart = autoStartDueDrafts,
   reconcileHouse = ensureHouseCatalog,
   onOutcome = defaultOnOutcome,
+  startDueMocks = startDueMockRooms,
+  driveMockPick,
+  sweepMocks = sweepExpiredMocks,
+  maxBotPicksPerTick = MOCK_CONFIG.maxBotPicksPerTick,
 }: TickerDeps): DraftTicker {
+  // The default driver closes over THIS ticker's db/store so its per-draft meta cache lives
+  // exactly as long as the ticker does — built here rather than as a parameter default because
+  // it needs both sibling parameters.
+  const driveMock = driveMockPick ?? createMockBotDriver({ db, store }).driveBotPick;
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
+  // Per-tick bot-pick budget (see `maxBotPicksPerTick` above). Reset at the top of every tick;
+  // decremented inside `tickOne`, which is safe because ticks never overlap (the `running`
+  // guard below, and tests drive `tick()` sequentially).
+  let botPickBudget = 0;
   // Last time (ms since epoch, per the injected clock) a given draft's failure was logged —
   // the first failure always logs; a rejection or thrown error may recur every tick, and
   // without this a stuck draft would log once per tick forever.
@@ -105,6 +149,9 @@ export function createDraftTicker({
   // its very first tick rather than waiting a full `houseReconcileIntervalMs` for a shelf that
   // may have sat empty since the last deploy.
   let lastHouseReconcileAtMs: number | undefined;
+  // The sweep's own gate, the identical undefined-means-run-first-tick shape: a room whose
+  // retention expired while the server was down is cleared on the first tick after a deploy.
+  let lastMockSweepAtMs: number | undefined;
 
   function reportIfDue(outcome: TickOutcome, nowMs: number): void {
     if (outcome.applied) return;
@@ -117,6 +164,26 @@ export function createDraftTicker({
   async function tickOne(draftId: string, now: string): Promise<TickOutcome | null> {
     const state = await store.getDraftState(draftId);
     if (state === null) return null;
+    // THE BOT DRIVER LANE (Phase 4.5, Task 6), on the very row the expiry scan fetched — no
+    // second scan. It runs BEFORE the deadline check because a bot's think-delay always elapses
+    // inside the room's clock (`MOCK_CONFIG.botDelay`'s cap — the T1 guarantee), so on any tick
+    // where both could apply the bot's own MAKE_PICK is the correct event, not a TIMER_EXPIRE.
+    // A driver failure falls through rather than returning: this draft's clock still needs
+    // checking this tick, exactly like every other live draft's.
+    if (state.config.isMock === true && botPickBudget > 0) {
+      try {
+        const driven = await driveMock(state, now);
+        if (driven !== null) {
+          if (driven.picked) {
+            botPickBudget -= 1;
+            return { draftId, applied: true };
+          }
+          return { draftId, applied: false, reason: driven.reason };
+        }
+      } catch (error: unknown) {
+        console.error("[draft] mock bot driver failed for draft", draftId, error);
+      }
+    }
     const deadline = currentDeadline(state);
     if (deadline === null || Date.parse(now) < Date.parse(deadline)) {
       // The clock is still running — this is the window the moderator speaks in. It never
@@ -169,6 +236,42 @@ export function createDraftTicker({
       }
     }
 
+    // Mock due-start THIRD (Phase 4.5, Task 6), still before the expiry scan below, for the
+    // identical ordering argument auto-start records above: a mock started this tick gets its
+    // first clock checked on the NEXT tick rather than being judged a millisecond after it
+    // began. Outcomes ride the same rate-limited reporter; the mapped-409 race (`benignRace`)
+    // maps to NOTHING at all — another instance already produced the state this scan wanted,
+    // which is an answer, not an error (the T5 carry).
+    try {
+      const dueMocks = await startDueMocks(db, { store, clock, newId: () => crypto.randomUUID() });
+      for (const outcome of dueMocks) {
+        if (outcome.started) {
+          outcomes.push({ draftId: outcome.draftId, applied: true });
+          continue;
+        }
+        if (outcome.benignRace) continue;
+        const mapped: TickOutcome = { draftId: `mock:${outcome.leagueId}`, applied: false, reason: outcome.reason };
+        outcomes.push(mapped);
+        reportIfDue(mapped, nowMs);
+      }
+    } catch (error: unknown) {
+      console.error("[draft] mock due-start scan failed", error);
+    }
+
+    // Retention sweep FOURTH, gated by `sweepIntervalMs` (the `houseReconcileIntervalMs`
+    // shape) — retention windows are hours long, so most ticks skip this entirely, and the
+    // undefined-first-run arm clears any room whose window expired while the server was down.
+    if (lastMockSweepAtMs === undefined || nowMs - lastMockSweepAtMs >= MOCK_CONFIG.sweepIntervalMs) {
+      lastMockSweepAtMs = nowMs;
+      try {
+        await sweepMocks(db, { store, clock });
+      } catch (error: unknown) {
+        console.error("[draft] mock sweep failed", error);
+      }
+    }
+
+    // Reset the tick-wide bot budget before the scan whose `tickOne` calls spend it.
+    botPickBudget = maxBotPicksPerTick;
     const rows = await liveDraftsQuery(db);
 
     for (const row of rows) {

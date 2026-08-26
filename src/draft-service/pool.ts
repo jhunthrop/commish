@@ -67,7 +67,14 @@ export async function rankedPlayers(db: Db | DbTx, leagueId: string): Promise<re
     const diff = (projected.get(b.id) ?? 0) - (projected.get(a.id) ?? 0);
     return diff !== 0 ? diff : a.id.localeCompare(b.id);
   });
-  cache.set(leagueId, ranked);
+  // NEVER cache a ranking built before any player exists (Phase 4.5, Task 6). A start attempted
+  // against an unseeded `players` table is REFUSED ("There are no players to draft yet.") and
+  // then legitimately retried — a commissioner presses again, `autoStartDueDrafts` finds the
+  // still-scheduled draft next tick, and a mock room's due scan retries by design (a failed solo
+  // self-start leaves `startsAt = now` precisely so the ticker finishes it). Caching the empty
+  // answer would turn every one of those retries into the same refusal for the rest of the
+  // process's life, long after the players landed — the retry loop this line exists to unbreak.
+  if (ranked.length > 0) cache.set(leagueId, ranked);
   return ranked;
 }
 

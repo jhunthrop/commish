@@ -122,6 +122,16 @@ describe("rankedPlayers", () => {
     expect(pool.map((entry) => entry.playerId)).toEqual(ranked.map((player) => player.id));
   });
 
+  it("never caches an empty ranking: a read before any player exists does not poison later retries (Phase 4.5, Task 6)", async () => {
+    // The retry story this protects: a start refused against an unseeded players table is
+    // retried later (a commissioner's second press, auto-start's next tick, the mock due
+    // scan's own recovery of a failed solo self-start) — and must see the players that have
+    // arrived since, not a cached empty answer from before they existed.
+    expect(await rankedPlayers(db, "league_empty_then_seeded")).toEqual([]);
+    await db.insert(players).values({ id: "late_arrival", name: "Late Arrival", position: "RB", nflTeam: "SF" });
+    expect((await rankedPlayers(db, "league_empty_then_seeded")).map((player) => player.id)).toEqual(["late_arrival"]);
+  });
+
   it("caches the ranking per league id: a row written straight to the DB (bypassing the cache) is not reflected until invalidated", async () => {
     await db.insert(players).values([
       { id: "cache_low", name: "Cache Low", position: "RB", nflTeam: "SF" },

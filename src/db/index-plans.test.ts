@@ -9,7 +9,6 @@ import {
   leagues,
   lineupSlots,
   matchups,
-  mockRooms,
   moneyEntries,
   moneyTransactions,
   rosterSlots,
@@ -21,6 +20,7 @@ import { explainPlan, findNode, indexScanNode, nodeTypes, planCost, planUsesSeqS
 import { LEAGUE_COUNT, TEAMS_PER_LEAGUE, USER_COUNT, seedRealisticCorpus, seedTradeCorpus } from "./test-corpus";
 import { chatPageQuery } from "@/chat-service/chat";
 import { dueDraftsQuery } from "@/draft-service/auto-start";
+import { dueMockRoomsQuery } from "@/mock-draft-service/driver";
 import { liveDraftsQuery } from "@/draft-service/ticker";
 import { openQuestionsQuery, pendingFlagQuery } from "@/integrity-service/flags";
 import { signalsForUsersQuery } from "@/integrity-service/session-signals";
@@ -1450,13 +1450,12 @@ describe("leagues_season_completed_idx carries its partial predicate", () => {
 });
 
 /**
- * PHASE 4.5, TASK 2: `mock_rooms_starts_at_idx` (migration 0041), measured against the shape its
- * two named consumers (Task 6's `dueMockRoomsQuery` and `sweepExpiredMocks`) will both issue —
- * `starts_at <= now()`, oldest due first. Built INLINE for now, the same "shaped exactly as its
- * named consumer will issue it" precedent the money book's own three indexes above already
- * establish for a query whose exported builder does not exist yet: when Task 6 lands
- * `dueMockRoomsQuery`, this assertion should EXPLAIN that real export instead, the same evolution
- * every other query in this file already went through.
+ * PHASE 4.5, TASK 2 (evolved by TASK 6): `mock_rooms_starts_at_idx` (migration 0041), measured
+ * against the REAL exported builder — Task 6's `dueMockRoomsQuery` (`@/mock-draft-service/
+ * driver`) — exactly the evolution the Task 2 version of this block promised once the export
+ * existed. The builder joins `drafts` on `status = 'scheduled'` (every corpus room below gets a
+ * scheduled draft so the join is real), ranges on `starts_at <= now`, orders by the index's own
+ * column first, and is LIMIT-bounded by `MOCK_CONFIG.maxMockStartsPerTick`.
  *
  * A dedicated corpus, sized like `seedHouseShelfSample`'s own small-sample-beside-the-big-corpus
  * shape rather than folded into `seedRealisticCorpus`: 2,000 mock rooms, half already due (`starts_
@@ -1490,24 +1489,23 @@ describe("mock_rooms_starts_at_idx serves the due-scan and sweep shape, never a 
              CASE WHEN g % 2 = 0 THEN now() - (g || ' seconds')::interval ELSE now() + (g || ' seconds')::interval END
       FROM generate_series(1, ${sql.raw(String(MOCK_ROOM_COUNT))}) g
     `);
-    await db.execute(sql`ANALYZE users, leagues, mock_rooms`);
+    // The scheduled draft every real mock room has (`createMockRoom` writes both in one
+    // transaction) — without it the builder's join would run against an empty `drafts` and the
+    // planner would be judged on a shape production never issues.
+    await db.execute(sql`
+      INSERT INTO drafts (id, league_id, format, status, kickoff_at)
+      SELECT 'mockidx_dr_' || g, 'mockidx_lg_' || g, 'snake'::draft_format, 'scheduled'::draft_status, now()
+      FROM generate_series(1, ${sql.raw(String(MOCK_ROOM_COUNT))}) g
+    `);
+    await db.execute(sql`ANALYZE users, leagues, mock_rooms, drafts`);
   }, 60_000);
 
   afterAll(async () => {
     await truncateAll(db);
   });
 
-  it("seeks the due-scan/sweep shape on mock_rooms_starts_at_idx, never a sequential scan of mock_rooms", async () => {
-    const now = new Date();
-    const plan = await explainPlan(
-      db,
-      db
-        .select({ leagueId: mockRooms.leagueId, startsAt: mockRooms.startsAt })
-        .from(mockRooms)
-        .where(lte(mockRooms.startsAt, now))
-        .orderBy(asc(mockRooms.startsAt))
-        .limit(100),
-    );
+  it("seeks the REAL dueMockRoomsQuery on mock_rooms_starts_at_idx, never a sequential scan of mock_rooms", async () => {
+    const plan = await explainPlan(db, dueMockRoomsQuery(db, new Date()));
     expect(sequentiallyScannedRelations(plan)).not.toContain("mock_rooms");
     expect(indexScanNode(plan, "mock_rooms_starts_at_idx")).toBeDefined();
   });

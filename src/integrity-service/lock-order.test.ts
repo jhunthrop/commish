@@ -37,6 +37,7 @@ import { settleSeasonPayouts } from "@/money-service/settlement";
 import { claimMockSeat, MOCK_REFUSALS } from "@/mock-draft-service/claim";
 import { createMockRoom } from "@/mock-draft-service/creation";
 import { topUpBots } from "@/mock-draft-service/start";
+import { sweepExpiredMocks } from "@/mock-draft-service/sweep";
 import { mockLifecycleDeps } from "@/mock-draft-service/test-support";
 import { ingestProviderCallback, type PaymentsEvent } from "@/payments-provider/ingest";
 import { createMockPaymentsProvider } from "@/payments-provider/mock/mock-payments-provider";
@@ -4190,6 +4191,75 @@ describe("the mock lifecycle writers' own pairs (Task 5)", () => {
       expect((topped as { added: number }).added).toBe(3);
     }
     expect(await joinDb.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, leagueId))).toHaveLength(4);
+    expect(await joinDb.select().from(auditEvents).where(eq(auditEvents.chainScope, leagueId))).toEqual([]);
+  });
+});
+
+/**
+ * PHASE 4.5, TASK 6's OWN ENTRY: the retention sweep's `DELETE FROM leagues` beside a concurrent
+ * mock pick. The sweep is a NEW writer of contended rows, so it proves its order here like every
+ * writer before it — but its shape is the simplest in this file: its scans and its per-candidate
+ * state load are plain reads (no lock), and its one write is a single-statement DELETE whose
+ * FIRST lock is `leagues[X]` — the same first lock `claimMockSeat`/`joinLeagueInTx`/`topUpBots`
+ * take — with every child-row lock (the FK cascade through `mock_rooms`/`teams`/`drafts`/
+ * `draft_actions`) acquired AFTER it, the branch-wide leagues-then-drafts direction. The
+ * concurrent pick holds `leagues [KEY SHARE]` then `drafts [X]`; same direction, no cycle. The
+ * anchor law is vacuous twice over: a mock pick never reaches the anchor (Task 4) and the sweep
+ * appends nothing anywhere (it only deletes rows ruling 2 guaranteed are not audit-protected).
+ *
+ * Outcome-agnostic about the grant order — pick first means the pick lands and THEN the room is
+ * swept; delete first means the pick finds no draft — and absolute about what may not happen: a
+ * deadlock, a surviving row, or one audit statement.
+ */
+describe("the retention sweep's DELETE beside a concurrent mock pick (Task 6)", () => {
+  it("queues on the same leagues lock as every mock writer, deletes the whole room, and never deadlocks", async () => {
+    const { draftId, leagueId, teamIds } = await seedDraftFixture(joinDb, {
+      draftId: "draft_mock_sweep",
+      leagueId: "league_mock_sweep",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date("2026-09-10T17:00:00.000Z"),
+      auctionBudget: null,
+      isMock: true,
+      botTeams: 2,
+    });
+    const store = pickStore();
+    // The direct `applyAction`, exactly like Task 4's entry — `drafts.status` stays `'scheduled'`
+    // there; the sweep's started-candidates scan keys on `'in_progress'`, so flip it by hand.
+    await store.applyAction(draftId, { v: 1, type: "START_DRAFT", minBid: 1, skipPolicy: DRAFT_SKIP_POLICY, timestamp: clock.now(), draftOrder: teamIds, pool: POOL });
+    await joinDb.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, draftId));
+    const state = await store.getDraftState(draftId);
+    // A sweep clock a day past the log's last action: well beyond `inProgressMs`, so the room is
+    // genuinely expired by the sweep's own per-state judgment.
+    const sweepClock = { now: () => "2026-09-02T00:00:00.000Z" };
+    const sweepStore = createDraftStore({ db: flagDb, publish: async () => "1-0", clock: sweepClock });
+
+    const park = parkedLeagueLock(leagueId);
+    await park.leagueLocked;
+
+    // T_sweep: scans and state load are plain reads and complete; its DELETE blocks HERE.
+    const sweeping = sweepExpiredMocks(flagDb, { store: sweepStore, clock: sweepClock });
+    // T_pick: `leagues[X] FOR KEY SHARE` as its own first statement — blocked behind the same lock.
+    const picking = store.applyAction(draftId, { v: 1, type: "TIMER_EXPIRE", timestamp: currentDeadline(state!) ?? clock.now() });
+
+    expect(await waitForBlockedBackends(2)).toBe(true);
+    park.release();
+    await expect(park.holding).resolves.toBeUndefined();
+
+    const swept = await sweeping;
+    const picked = await picking;
+    // Whichever side won the grant, the room ends deleted whole and the sweep reported it.
+    expect(swept).toEqual([{ leagueId, draftId }]);
+    if (!picked.ok) {
+      // The delete won: the pick's own first read found no league left to lock.
+      expect(picked.reason).toBe("That draft does not exist.");
+    }
+    expect(await joinDb.select({ id: leagues.id }).from(leagues).where(eq(leagues.id, leagueId))).toEqual([]);
+    expect(await joinDb.select({ id: teams.id }).from(teams).where(eq(teams.leagueId, leagueId))).toEqual([]);
+    expect(await joinDb.select({ id: drafts.id }).from(drafts).where(eq(drafts.leagueId, leagueId))).toEqual([]);
+    // NOTHING on this league's chain, from either writer — the clause that makes the DELETE
+    // legal at all, held under contention too.
     expect(await joinDb.select().from(auditEvents).where(eq(auditEvents.chainScope, leagueId))).toEqual([]);
   });
 });
