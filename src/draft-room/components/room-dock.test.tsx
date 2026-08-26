@@ -122,6 +122,19 @@ describe("RoomDock", () => {
     expect(screen.getByTestId("dock-your-turn")).toHaveTextContent("You're up in 2 picks (any moment).");
   });
 
+  it("chip controls wait for the chip's own intent on hover devices, stay always-on for touch (review E8)", () => {
+    render(<RoomDock {...props} />);
+    // Fifteen idle ghost buttons was the finding; the fix is opacity-only reveal gated on
+    // @media(hover:hover) — touch keeps every control visible, keyboard focus reveals what it
+    // lands on, and the buttons never leave the DOM or lose their names.
+    const up = screen.getByRole("button", { name: "Move Jalen Croft up" });
+    expect(up.className).toContain("[@media(hover:hover)]:opacity-0");
+    expect(up.className).toContain("group-hover/chip:opacity-100");
+    expect(up.className).toContain("group-focus-within/chip:opacity-100");
+    expect(up.className).toContain("focus-visible:opacity-100");
+    expect(up.closest("li")?.className).toContain("group/chip");
+  });
+
   it("reorders and removes from the queue with named, keyboard-reachable buttons", () => {
     const onQueueChange = vi.fn();
     render(<RoomDock {...props} onQueueChange={onQueueChange} />);

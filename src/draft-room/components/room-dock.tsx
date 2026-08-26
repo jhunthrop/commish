@@ -86,6 +86,11 @@ function RosterFill({ view, myTeamId }: { readonly view: DraftStateView; readonl
   );
 }
 
+/** The chip controls' reveal-on-intent classes (review E8) — the same idiom `ReactionBar`
+ *  documents in full (`src/chat-room/components/reaction-bar.tsx`): hover-capable devices get
+ *  quiet-until-wanted, touch stays always-on, focus always reveals. */
+const CHIP_REVEAL = "[@media(hover:hover)]:opacity-0 group-hover/chip:opacity-100 group-focus-within/chip:opacity-100 focus-visible:opacity-100 transition-opacity motion-reduce:transition-none";
+
 interface QueueChipsProps {
   readonly queue: readonly string[];
   readonly playersById: ReadonlyMap<string, Player>;
@@ -133,9 +138,12 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
           const player = playersById.get(playerId);
           const drafted = draftedIds.has(playerId);
           return (
+            // `group/chip` is the reveal surface for this chip's own controls (review E8):
+            // opacity-only, gated on @media(hover:hover), so touch keeps every control visible
+            // and the chip's width never changes — the D1 containment above stays honest.
             <li
               key={playerId}
-              className="flex shrink-0 items-center gap-1 rounded-pill border border-line bg-surface-elevated py-1 pl-2 pr-1"
+              className="group/chip flex shrink-0 items-center gap-1 rounded-pill border border-line bg-surface-elevated py-1 pl-2 pr-1"
             >
               <span className="font-mono text-xs tabular-nums text-text-muted">{index + 1}</span>
               {player === undefined ? null : <PositionBadge position={player.position} size="sm" />}
@@ -143,13 +151,13 @@ function QueueChips({ queue, playersById, draftedIds, busy, onChange }: QueueChi
                 {name}
               </span>
               {drafted ? <span className="sr-only">Already drafted</span> : null}
-              <Button size="sm" variant="ghost" disabled={busy} aria-label={`Move ${name} up`} onClick={() => onChange(moveInQueue(queue, playerId, -1))}>
+              <Button size="sm" variant="ghost" className={CHIP_REVEAL} disabled={busy} aria-label={`Move ${name} up`} onClick={() => onChange(moveInQueue(queue, playerId, -1))}>
                 <span aria-hidden="true">←</span>
               </Button>
-              <Button size="sm" variant="ghost" disabled={busy} aria-label={`Move ${name} down`} onClick={() => onChange(moveInQueue(queue, playerId, 1))}>
+              <Button size="sm" variant="ghost" className={CHIP_REVEAL} disabled={busy} aria-label={`Move ${name} down`} onClick={() => onChange(moveInQueue(queue, playerId, 1))}>
                 <span aria-hidden="true">→</span>
               </Button>
-              <Button size="sm" variant="ghost" disabled={busy} aria-label={queueButtonLabel(name, true)} onClick={() => onChange(removeFromQueue(queue, playerId))}>
+              <Button size="sm" variant="ghost" className={CHIP_REVEAL} disabled={busy} aria-label={queueButtonLabel(name, true)} onClick={() => onChange(removeFromQueue(queue, playerId))}>
                 <span aria-hidden="true">×</span>
               </Button>
             </li>
