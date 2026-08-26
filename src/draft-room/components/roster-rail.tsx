@@ -18,12 +18,10 @@ export interface RosterRailProps {
 /** One roster spot: a filled face-and-name row, or a quiet open placeholder. */
 function RosterRow({
   slot,
-  slotIndex,
   player,
   className,
 }: {
   readonly slot: RosterSlotType;
-  readonly slotIndex: number;
   readonly player: Player | null;
   readonly className?: string;
 }) {
@@ -81,7 +79,6 @@ export function RosterRail({ view, myTeamId, playersById, slotConfig }: RosterRa
             <RosterRow
               key={`${row.slot}:${row.slotIndex}`}
               slot={row.slot}
-              slotIndex={row.slotIndex}
               player={row.playerId === null ? null : (playersById.get(row.playerId) ?? null)}
               className={startsBench ? "mt-1 border-t border-line pt-2" : undefined}
             />
