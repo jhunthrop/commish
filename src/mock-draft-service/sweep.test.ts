@@ -77,6 +77,11 @@ async function seedMock(id: string, opts: { readonly completed: boolean }): Prom
       await ticker.tick();
     }
     expect((await store.getDraftState(fixture.draftId))!.phase).toBe("complete");
+    // One more tick: the driver settles the finished room's status (Task 6 fix round, ruled),
+    // which is exactly what makes it a candidate of the sweep's pure-SQL 'complete' scan.
+    await ticker.tick();
+    const [settled] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, fixture.draftId));
+    expect(settled?.status).toBe("complete");
   }
   return { leagueId: fixture.leagueId, draftId: fixture.draftId, store };
 }
@@ -116,6 +121,10 @@ describe("the retention sweep (Task 6, Step 4)", () => {
     // `pool.ts`'s Map would otherwise hold one dead ranking per swept mock forever — a fresh
     // read must rebuild, never hand back the swept room's cached array.
     expect(await rankedPlayers(db, leagueId)).not.toBe(cachedRanking);
+    // No resurrection, BEHAVIORALLY (fix round, review MEDIUM): the same store that drove and
+    // cached this draft now answers null — the sweep's `store.invalidate` plus the cascade left
+    // nothing for a replay to rebuild from, not merely a spy that was called.
+    expect(await store.getDraftState(draftId)).toBeNull();
   });
 
   it("keeps a finished room for its full completedMs — the longer window, judged per state", async () => {
@@ -243,29 +252,18 @@ describe("the retention sweep (Task 6, Step 4)", () => {
     expect((await rowCounts(mock.leagueId, mock.draftId)).leagues).toBe(0);
   });
 
-  it("skips a candidate whose state can no longer be loaded — a concurrent instance already won", async () => {
-    const { leagueId, draftId, store } = await seedMock("gone_state", { completed: false });
-    advance(MOCK_CONFIG.retention.inProgressMs + 60_000);
-    const nullStore: DraftStore = { ...store, getDraftState: async () => null };
-    expect(await sweepExpiredMocks(db, { store: nullStore, clock })).toEqual([]);
-    expect((await rowCounts(leagueId, draftId)).leagues).toBe(1);
-  });
-
   it("absorbs losing the delete race itself: a league that vanishes between the scan and the DELETE is skipped, not an error", async () => {
     const { leagueId, draftId, store } = await seedMock("delete_race", { completed: false });
     advance(MOCK_CONFIG.retention.inProgressMs + 60_000);
-    // The "concurrent sweep" wins in the window between this run's state read and its DELETE.
-    const racedStore: DraftStore = {
-      ...store,
-      getDraftState: async (id) => {
-        const state = await store.getDraftState(id);
-        await db.delete(leagues).where(eq(leagues.id, leagueId));
-        return state;
-      },
+    // The "concurrent sweep" wins in the window between this run's scan and its own DELETE —
+    // simulated at the injectable writer seam, with the REAL writer still making the final call.
+    const racedDelete = async (dbArg: typeof db, id: string): Promise<boolean> => {
+      await db.delete(leagues).where(eq(leagues.id, id));
+      return deleteMockLeagueRow(dbArg, id);
     };
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     try {
-      expect(await sweepExpiredMocks(db, { store: racedStore, clock })).toEqual([]);
+      expect(await sweepExpiredMocks(db, { store, clock, deleteLeague: racedDelete })).toEqual([]);
       expect(errorSpy).toHaveBeenCalledWith("[mock-draft] sweep could not delete a league it judged expired", { leagueId });
     } finally {
       errorSpy.mockRestore();
@@ -273,17 +271,24 @@ describe("the retention sweep (Task 6, Step 4)", () => {
     expect((await rowCounts(leagueId, draftId)).leagues).toBe(0);
   });
 
-  it("invalidates the ranking cache and the store's own state cache per swept room (the injected seams)", async () => {
+  it("invalidates the ranking cache, the store's own state cache and the bot driver's meta per swept room (the injected seams)", async () => {
     const { leagueId, draftId, store } = await seedMock("caches", { completed: true });
     advance(MOCK_CONFIG.retention.completedMs + 60_000);
     const invalidateRanking = vi.fn();
     const invalidate = vi.fn();
-    const swept = await sweepExpiredMocks(db, { store: { ...store, invalidate }, clock, invalidateRanking });
+    const invalidateDriverMeta = vi.fn();
+    const swept = await sweepExpiredMocks(db, { store: { ...store, invalidate }, clock, invalidateRanking, invalidateDriverMeta });
     expect(swept).toEqual([{ leagueId, draftId }]);
     expect(invalidateRanking).toHaveBeenCalledTimes(1);
     expect(invalidateRanking).toHaveBeenCalledWith(leagueId);
     expect(invalidate).toHaveBeenCalledTimes(1);
     expect(invalidate).toHaveBeenCalledWith(draftId);
+    // Fix round (review MEDIUM): the driver's per-draft meta is the third in-memory hold a
+    // swept room could keep — dropped through the same per-room seam the ticker wires to
+    // `createMockBotDriver().invalidateDraft` (that function's own behavior is proven in
+    // `driver.test.ts`; this pins that the sweep calls it once per swept room).
+    expect(invalidateDriverMeta).toHaveBeenCalledTimes(1);
+    expect(invalidateDriverMeta).toHaveBeenCalledWith(draftId);
   });
 
   it("rides the real ticker by default: an expired room is gone after a tick, with no other help", async () => {

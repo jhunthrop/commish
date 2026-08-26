@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { DRAFT_SERVICE_CONFIG } from "@/draft-service/config";
 import { copyViolations } from "@/integrity/copy-rules";
 import { MOCK_CONFIG, MOCK_COPY } from "./config";
 
@@ -48,6 +49,15 @@ describe("MOCK_CONFIG", () => {
     expect(MOCK_CONFIG.maxMockStartsPerTick).toBeGreaterThan(0);
     expect(MOCK_CONFIG.maxBotPicksPerTick).toBeGreaterThan(0);
     expect(MOCK_CONFIG.sweepIntervalMs).toBeGreaterThan(0);
+  });
+
+  it("budgets at least one bot pick for every expiry-scan slot, so the ceiling stays slack by arithmetic (Task 6 fix round)", () => {
+    // The driver lands at most ONE pick per draft per tick, and the expiry scan hands it at
+    // most `maxDraftsPerTick` drafts — so as long as this pin holds, the tick-wide bot budget
+    // can never starve a mock mid-tick in ordinary operation. The same arithmetic-pin idiom as
+    // the botDelay-inside-the-fastest-clock bound above: the config carries the guarantee, the
+    // test keeps a future retune honest.
+    expect(MOCK_CONFIG.maxBotPicksPerTick).toBeGreaterThanOrEqual(DRAFT_SERVICE_CONFIG.maxDraftsPerTick);
   });
 
   it("keeps the strategy's reach depth and run-reaction window positive", () => {

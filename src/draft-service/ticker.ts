@@ -133,8 +133,11 @@ export function createDraftTicker({
 }: TickerDeps): DraftTicker {
   // The default driver closes over THIS ticker's db/store so its per-draft meta cache lives
   // exactly as long as the ticker does — built here rather than as a parameter default because
-  // it needs both sibling parameters.
-  const driveMock = driveMockPick ?? createMockBotDriver({ db, store }).driveBotPick;
+  // it needs both sibling parameters. Built even when `driveMockPick` is injected: the sweep
+  // lane below always hands the sweep THIS driver's `invalidateDraft` (fix round, review
+  // MEDIUM), and against an instance whose cache never filled that call is a free no-op.
+  const mockDriver = createMockBotDriver({ db, store });
+  const driveMock = driveMockPick ?? mockDriver.driveBotPick;
   let timer: ReturnType<typeof setInterval> | undefined;
   let running = false;
   // Per-tick bot-pick budget (see `maxBotPicksPerTick` above). Reset at the top of every tick;
@@ -264,7 +267,10 @@ export function createDraftTicker({
     if (lastMockSweepAtMs === undefined || nowMs - lastMockSweepAtMs >= MOCK_CONFIG.sweepIntervalMs) {
       lastMockSweepAtMs = nowMs;
       try {
-        await sweepMocks(db, { store, clock });
+        // `invalidateDriverMeta` completes the swept room's cache story: the sweep already
+        // drops the ranking cache and the store's materialization itself; the driver's own
+        // per-draft meta is the third in-memory hold, and this ticker's driver is where it lives.
+        await sweepMocks(db, { store, clock, invalidateDriverMeta: mockDriver.invalidateDraft });
       } catch (error: unknown) {
         console.error("[draft] mock sweep failed", error);
       }

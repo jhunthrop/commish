@@ -33,13 +33,20 @@ import { MOCK_CONFIG } from "@/mock-draft/config";
 const MAX_ROOMS_PER_SWEEP = MOCK_CONFIG.maxMockStartsPerTick;
 
 export interface MockSweepDeps {
-  /** Judges a started candidate's phase (completed rooms keep the longer window) and has its
-   *  own per-draft state cache dropped for every swept room. */
+  /** Has its own per-draft state cache dropped for every swept room (`store.invalidate`). */
   readonly store: DraftStore;
   readonly clock: Clock;
   /** Seam for the sweep tests' spy; defaults to the real `invalidateRankedPlayersCache` —
    *  `pool.ts`'s Map would otherwise hold one dead ranking per swept mock forever. */
   readonly invalidateRanking?: (leagueId: string) => void;
+  /** The bot driver's own per-draft meta cache, dropped per swept room (fix round, review
+   *  MEDIUM) — the ticker wires `createMockBotDriver`'s `invalidateDraft` here. Optional so a
+   *  direct caller without a driver (tests, the lock-order proof) owes nothing. */
+  readonly invalidateDriverMeta?: (draftId: string) => void;
+  /** The one writer, injectable so the lost-delete-race arm is a test's to reach (a concurrent
+   *  instance deleting the row between this run's scan and its DELETE). Defaults to the real
+   *  `deleteMockLeagueRow`. */
+  readonly deleteLeague?: (db: Db, leagueId: string) => Promise<boolean>;
 }
 
 export interface SweptMockRoom {
@@ -61,14 +68,6 @@ export async function deleteMockLeagueRow(db: Db, leagueId: string): Promise<boo
   return deleted.length > 0;
 }
 
-/** A room the scans consider sweepable pending (for started rooms) the per-state judgment. */
-interface SweepCandidate extends SweptMockRoom {
-  /** `MAX(draft_actions.timestamp)` — the completion/abandonment instant, read off the log
-   *  itself, never a wall-clock guess. Null for the never-started scan (judged on `created_at`,
-   *  already applied in SQL). */
-  readonly lastActionAt: Date | null;
-}
-
 /**
  * Never-started rooms: `drafts.status = 'scheduled'` past `unstartedMs` from the room's own
  * `created_at`. Fully decided in SQL — an unstarted room has no log to consult.
@@ -85,24 +84,24 @@ function unstartedCandidatesQuery(db: Db, cutoff: Date) {
 }
 
 /**
- * Started rooms whose last action is at least `inProgressMs` old — the SMALLER of the two
- * started windows, so this scan surfaces every possible candidate and the per-state judgment in
- * `sweepExpiredMocks` applies the longer `completedMs` to rooms whose replayed phase is
- * `complete`. `drafts.status` alone cannot make that split: a finished mock's status stays
- * `'in_progress'` forever (Task 4's law — `commitDraftState` never runs for a mock), which is
- * exactly why the phase is judged off the replayed log rather than off a column.
+ * Started rooms whose last action (`MAX(draft_actions.timestamp)` — the log's own instant,
+ * never a wall-clock guess) is at least `cutoff` old, split by `drafts.status`. Pure SQL both
+ * ways (Task 6 fix round, ruled): the driver's `settleMockDraftCompletion` (`./driver`) makes
+ * status trustworthy for mocks — `'complete'` is a finished room (judged at `completedMs`),
+ * `'in_progress'` an abandoned one (judged at `inProgressMs`) — so no per-candidate replay is
+ * needed. The one edge this accepts, documented rather than defended: a room that finished
+ * inside the one-tick window before its settle AND whose server then stayed down past
+ * `inProgressMs` is judged as abandoned on restart, trading (at most) the tail of its results
+ * page for a sweep that needs no replay machinery.
  */
-function startedCandidatesQuery(db: Db, cutoff: Date) {
-  // `mapWith` the column itself, so the aggregate decodes through the identical Date mapping
-  // every plain read of `draft_actions.timestamp` already gets.
-  const lastActionAt = sql<Date>`max(${draftActions.timestamp})`.mapWith(draftActions.timestamp);
+function startedExpiredQuery(db: Db, status: "complete" | "in_progress", cutoff: Date) {
   return db
-    .select({ leagueId: mockRooms.leagueId, draftId: drafts.id, lastActionAt })
+    .select({ leagueId: mockRooms.leagueId, draftId: drafts.id })
     .from(mockRooms)
     .innerJoin(leagues, and(eq(leagues.id, mockRooms.leagueId), eq(leagues.isMock, true)))
     .innerJoin(drafts, eq(drafts.leagueId, mockRooms.leagueId))
     .innerJoin(draftActions, eq(draftActions.draftId, drafts.id))
-    .where(eq(drafts.status, "in_progress"))
+    .where(eq(drafts.status, status))
     .groupBy(mockRooms.leagueId, drafts.id)
     // The cutoff rides as an ISO string: a bare `Date` inside a raw `sql` fragment has no
     // column to borrow an encoder from, and the driver refuses to serialize it.
@@ -112,34 +111,29 @@ function startedCandidatesQuery(db: Db, cutoff: Date) {
 }
 
 /**
- * One sweep run: scan both candidate shapes, judge started rooms per replayed state, delete
- * whatever is genuinely past its window, and drop both in-memory caches for every deletion —
- * the ranking cache (`pool.ts`) and the store's own draft-state cache, either of which would
- * otherwise hold a swept room's data for the rest of the process's life.
+ * One sweep run: three pure-SQL scans (never started / finished / abandoned, each at its own
+ * window), one deletion loop. Every deletion drops all three in-memory holds a swept room could
+ * otherwise keep for the rest of the process's life: the ranking cache (`pool.ts`), the store's
+ * own draft-state materialization, and the bot driver's per-draft meta.
  */
 export async function sweepExpiredMocks(db: Db, deps: MockSweepDeps): Promise<readonly SweptMockRoom[]> {
   const invalidateRanking = deps.invalidateRanking ?? invalidateRankedPlayersCache;
+  const deleteLeague = deps.deleteLeague ?? deleteMockLeagueRow;
   const nowMs = Date.parse(deps.clock.now());
   const { completedMs, unstartedMs, inProgressMs } = MOCK_CONFIG.retention;
 
-  const unstarted = await unstartedCandidatesQuery(db, new Date(nowMs - unstartedMs));
-  const started = await startedCandidatesQuery(db, new Date(nowMs - inProgressMs));
-
-  const expired: SweepCandidate[] = unstarted.map((row) => ({ ...row, lastActionAt: null }));
-  for (const row of started) {
-    const state = await deps.store.getDraftState(row.draftId);
-    // Vanished between the scan and this read — a concurrent instance's sweep already won.
-    if (state === null) continue;
+  const expired: SweptMockRoom[] = [
+    ...(await unstartedCandidatesQuery(db, new Date(nowMs - unstartedMs))),
     // A COMPLETED room keeps the longer window (its results page lives a day); an abandoned
-    // in-progress room only its own. Judged per state, because status cannot tell them apart.
-    const windowMs = state.phase === "complete" ? completedMs : inProgressMs;
-    if (nowMs < row.lastActionAt!.getTime() + windowMs) continue;
-    expired.push(row);
-  }
+    // in-progress room only its own. Status tells them apart since the driver settles a
+    // finished mock (`settleMockDraftCompletion` — see `startedExpiredQuery`'s docblock).
+    ...(await startedExpiredQuery(db, "complete", new Date(nowMs - completedMs))),
+    ...(await startedExpiredQuery(db, "in_progress", new Date(nowMs - inProgressMs))),
+  ];
 
   const swept: SweptMockRoom[] = [];
   for (const room of expired) {
-    if (!(await deleteMockLeagueRow(db, room.leagueId))) {
+    if (!(await deleteLeague(db, room.leagueId))) {
       // Either the delete race lost to another instance (the row is simply gone) or — the state
       // this writer exists to refuse — the league is not a mock. Both are worth a log line and
       // neither may stop the rooms after it.
@@ -148,6 +142,7 @@ export async function sweepExpiredMocks(db: Db, deps: MockSweepDeps): Promise<re
     }
     invalidateRanking(room.leagueId);
     deps.store.invalidate(room.draftId);
+    deps.invalidateDriverMeta?.(room.draftId);
     swept.push({ leagueId: room.leagueId, draftId: room.draftId });
   }
   return swept;

@@ -825,10 +825,11 @@ describe("draft ticker — mock lanes (Phase 4.5, Task 6)", () => {
     }
   });
 
-  it("runs the sweep on the first tick, then withholds it until sweepIntervalMs has passed", async () => {
+  it("runs the sweep on the first tick, then withholds it until sweepIntervalMs has passed — wired to the driver's own meta invalidation", async () => {
     const { store } = await liveDraft();
     now = "2026-09-01T12:00:00.000Z";
     let sweeps = 0;
+    let sweepDeps: { invalidateDriverMeta?: (draftId: string) => void } | undefined;
     const ticking = createDraftTicker({
       db,
       store,
@@ -836,14 +837,19 @@ describe("draft ticker — mock lanes (Phase 4.5, Task 6)", () => {
       autoStart: async () => [],
       reconcileHouse: NO_OP_HOUSE_RECONCILE,
       startDueMocks: NO_MOCK_STARTS,
-      sweepMocks: async () => {
+      sweepMocks: async (_sweepDb, deps) => {
         sweeps += 1;
+        sweepDeps = deps;
         return [];
       },
     });
 
     await ticking.tick();
     expect(sweeps).toBe(1);
+    // Fix round (review MEDIUM): the ticker hands the sweep its OWN driver's `invalidateDraft`,
+    // so a swept room's cached bot meta dies with the room — the seam's behavior is proven in
+    // `driver.test.ts`/`sweep.test.ts`; this pins that the default wiring actually connects it.
+    expect(typeof sweepDeps?.invalidateDriverMeta).toBe("function");
 
     // Same instant — still gated.
     await ticking.tick();

@@ -6,6 +6,7 @@ import { auditEvents, draftActions, drafts, memberNotices, players, teams } from
 import type { DraftAction, DraftPoolEntry } from "@/domain/draft";
 import { currentDeadline, DRAFT_SKIP_POLICY, initialDraftState, type DraftConfig } from "@/draft-engine";
 import type { MemberNotice } from "@/integrity-service/notify";
+import { settleMockDraftCompletion } from "@/mock-draft-service/driver";
 import { draftOrderFor } from "./order";
 import { setSlotPreference, slotPreferencesFor } from "./slot-preference";
 import { PUBLIC_ROOM_SHORT_REFUSAL } from "@/matchmaking/roll";
@@ -1001,7 +1002,10 @@ describe("draft store — the mock lane (Task 4)", () => {
 
     // The silence above must not be "it never really ran": the engine genuinely finished the
     // draft (the same reducer, the same clock), while `drafts.status` never left `scheduled` —
-    // `commitDraftState` is the ONLY writer of `'complete'`, and it never ran for this draft.
+    // NOTHING in the apply path writes `'complete'` for a mock. (`commitDraftState` never runs
+    // for one, and Task 6's `settleMockDraftCompletion` — the fix round's OTHER writer of
+    // `'complete'`, proven consequence-free in its own test below — is the ticker driver's,
+    // guarded on `'in_progress'`, which this direct-applyAction drive never reaches.)
     const finalState = await createDraftStore({ db, publish, clock }).getDraftState(draftId);
     expect(finalState?.phase).toBe("complete");
     const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
@@ -1045,6 +1049,33 @@ describe("draft store — the mock lane (Task 4)", () => {
     // "also non-empty by coincidence".
     expect(published.length).toBeGreaterThan(0);
     expect(published.filter((event) => event.type === "draft.pick").length).toBe(mockPublishedPickCount);
+  });
+
+  it("settles a finished mock's status with one bare column write — still zero audit, notice, money or season statements (Task 6 fix round)", async () => {
+    // The differential proof, extended over the fix round's new write path: the settle flips
+    // `drafts.status` (so the expiry scan lets go of the finished room) and touches NOTHING
+    // consequence-shaped — never `applyAction`, never `commitDraftState`, no anchor, no notice,
+    // no season row. Driven through the REAL start (`claimAutoStart` puts the row at
+    // `'in_progress'`, the settle's own precondition), unlike the central-law test above whose
+    // direct-applyAction drive deliberately leaves status at `'scheduled'`.
+    const { draftId } = await mockFixture();
+    const store = newStore();
+    const started = await store.startDraft(draftId);
+    expect(started.ok).toBe(true);
+    await runFullDraft(store, draftId);
+
+    const statements = await recordStatements(db, async (logged) => {
+      expect(await settleMockDraftCompletion(logged, draftId)).toBe(true);
+    });
+    expect(statements.filter((s) => REAL_WORLD_CONSEQUENCE_TABLES.test(s))).toHaveLength(0);
+
+    const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, draftId));
+    expect(row?.status).toBe("complete");
+    // Idempotent: the guarded UPDATE finds zero rows the second time.
+    expect(await settleMockDraftCompletion(db, draftId)).toBe(false);
+    // And the whole start-to-settle life still left the consequence tables empty.
+    expect(await db.select().from(memberNotices)).toHaveLength(0);
+    expect(await db.select().from(auditEvents)).toHaveLength(0);
   });
 
   it("never announces or audits an auto-start for a mock draft, even called with { auto: true } (fix round: review MEDIUM 1)", async () => {

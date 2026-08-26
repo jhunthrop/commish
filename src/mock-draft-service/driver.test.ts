@@ -5,13 +5,13 @@ import { drafts, mockRooms, players, teams, users } from "@/db/schema";
 import type { Clock } from "@/domain/timing";
 import type { DraftState } from "@/draft-engine";
 import { createDraftStore, type DraftStore } from "@/draft-service/store";
-import { createDraftTicker, type DraftTicker } from "@/draft-service/ticker";
+import { createDraftTicker, liveDraftsQuery, type DraftTicker } from "@/draft-service/ticker";
 import { seedDraftFixture, SPRINT_ROSTER_SLOTS } from "@/draft-service/test-support";
 import { botThinkDelaySeconds } from "@/mock-draft/bots";
 import { MOCK_CONFIG } from "@/mock-draft/config";
 import { rngFor } from "@/mock-draft/rng";
 import { createMockRoom } from "./creation";
-import { createMockBotDriver, dueMockRoomsQuery, startDueMockRooms } from "./driver";
+import { createMockBotDriver, dueMockRoomsQuery, settleMockDraftCompletion, startDueMockRooms } from "./driver";
 import { mockLifecycleDeps, seedLobbyMock, seedPracticePlayers, MOCK_TEST_CLOCK } from "./test-support";
 
 const db = createTestDb();
@@ -359,13 +359,88 @@ describe("the bot driver (Task 6, Step 3)", () => {
     expect((await store.getDraftState(fixture.draftId))!.picks).toHaveLength(0);
   });
 
-  it("answers null for a draft with no team on the clock (a finished room the scan still holds)", async () => {
+  it("answers null with no team on the clock — settling a finished room, leaving any other phase alone (fix round)", async () => {
     const fixture = await seedAllBotMock("done");
     const store = testStore();
     await store.startDraft(fixture.draftId);
     const state = await store.getDraftState(fixture.draftId);
     const { driveBotPick } = createMockBotDriver({ db, store });
+
+    // A no-team-on-clock state that is NOT complete settles nothing.
+    expect(await driveBotPick({ ...state!, phase: "scheduled" }, now)).toBeNull();
+    const [unsettled] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, fixture.draftId));
+    expect(unsettled?.status).toBe("in_progress");
+
+    // A finished room is settled in the same breath as the null answer (Task 6 fix round).
     expect(await driveBotPick({ ...state!, phase: "complete" }, now)).toBeNull();
+    const [settled] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, fixture.draftId));
+    expect(settled?.status).toBe("complete");
+  });
+
+  it("settleMockDraftCompletion is idempotent and refuses everything but an in_progress mock (fix round, ruled)", async () => {
+    // The real thing, once: started mock, settled exactly one time.
+    const mock = await seedAllBotMock("settle");
+    const store = testStore();
+    await store.startDraft(mock.draftId);
+    expect(await settleMockDraftCompletion(db, mock.draftId)).toBe(true);
+    expect(await settleMockDraftCompletion(db, mock.draftId)).toBe(false); // idempotent — zero rows the second time
+    const [row] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, mock.draftId));
+    expect(row?.status).toBe("complete");
+
+    // A mock that never started: the in_progress precondition refuses.
+    const scheduled = await seedDraftFixture(db, {
+      draftId: "draft_settle_sched",
+      leagueId: "league_settle_sched",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date(Date.parse(BASE_NOW) + 24 * 60 * 60 * 1000),
+      auctionBudget: null,
+      isMock: true,
+      botTeams: 2,
+    });
+    expect(await settleMockDraftCompletion(db, scheduled.draftId)).toBe(false);
+    const [sched] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, scheduled.draftId));
+    expect(sched?.status).toBe("scheduled");
+
+    // A REAL league's in-progress draft: the is_mock belt refuses at the writer, whatever the
+    // caller believed — a real draft's status is only ever written by claimAutoStart and
+    // commitDraftState.
+    const real = await seedDraftFixture(db, {
+      draftId: "draft_settle_real",
+      leagueId: "league_settle_real",
+      format: "snake",
+      teamCount: 2,
+      slotConfig: SPRINT_ROSTER_SLOTS,
+      kickoffAt: new Date(Date.parse(BASE_NOW) + 24 * 60 * 60 * 1000),
+      auctionBudget: null,
+    });
+    await db.update(drafts).set({ status: "in_progress" }).where(eq(drafts.id, real.draftId));
+    expect(await settleMockDraftCompletion(db, real.draftId)).toBe(false);
+    const [realRow] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, real.draftId));
+    expect(realRow?.status).toBe("in_progress");
+  });
+
+  it("invalidateDraft drops a swept draft's cached meta; a live cache never re-reads the sidecar (fix round MEDIUM)", async () => {
+    const fixture = await seedAllBotMock("meta_sweep");
+    const store = testStore();
+    await store.startDraft(fixture.draftId);
+    const stale = await store.getDraftState(fixture.draftId);
+    const driver = createMockBotDriver({ db, store });
+    advance(MOCK_CONFIG.botDelay.maxSeconds * 1000);
+
+    expect(await driver.driveBotPick(stale!, now)).toEqual({ picked: true }); // meta cached here
+    await db.delete(mockRooms).where(eq(mockRooms.leagueId, fixture.leagueId));
+
+    // CONTROL — the cache is real: with the sidecar row already gone, the cached meta still
+    // carries the same stale state all the way to the store (which refuses the replayed pick
+    // against the fresh log) — `mock_rooms` was never consulted again.
+    expect(await driver.driveBotPick(stale!, now)).toMatchObject({ picked: false });
+
+    // THE SEAM: invalidated (what the sweep calls per swept room), the next call re-reads the
+    // sidecar, finds the room gone, and answers null.
+    driver.invalidateDraft(fixture.draftId);
+    expect(await driver.driveBotPick(stale!, now)).toBeNull();
   });
 
   it("answers null when the mock_rooms row is gone out from under a held state (a concurrent sweep)", async () => {
@@ -460,8 +535,21 @@ describe("the whole practice round, through the real writers", () => {
     const botPicks = state!.picks.filter((pick) => pick.teamId !== room.teamId);
     expect(hostPicks.every((pick) => pick.auto)).toBe(true); // the absent host was autopicked by the clock
     expect(botPicks.every((pick) => !pick.auto)).toBe(true); // no bot ever timed out (the T1 guarantee)
-    // Task 4's law holds through a full driven round: a finished mock never flips `drafts.status`.
-    const [draft] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, room.draftId));
-    expect(draft?.status).toBe("in_progress");
+
+    // Task 4's law still holds at the completing pick itself: the pick that finishes a mock
+    // writes NO status (`commitDraftState` never runs) — so right here, one tick after the last
+    // pick landed, the row still says in_progress and still occupies an expiry-scan slot.
+    const [before] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, room.draftId));
+    expect(before?.status).toBe("in_progress");
+    expect((await liveDraftsQuery(db)).map((row) => row.id)).toContain(room.draftId);
+
+    // THE SETTLE (Task 6 fix round, ruled): the very next tick observes the finished room and
+    // settles its status with the bare guarded write — promptly, ~1 tick, never the retention
+    // window — which frees its `liveDraftsQuery` slot for real drafts (the slot-freed
+    // regression the ruling exists for).
+    await ticker.tick();
+    const [after] = await db.select({ status: drafts.status }).from(drafts).where(eq(drafts.id, room.draftId));
+    expect(after?.status).toBe("complete");
+    expect((await liveDraftsQuery(db)).map((row) => row.id)).not.toContain(room.draftId);
   });
 });

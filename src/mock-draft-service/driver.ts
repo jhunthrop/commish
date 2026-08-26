@@ -1,6 +1,6 @@
-import { and, asc, eq, lte } from "drizzle-orm";
+import { and, asc, eq, inArray, lte } from "drizzle-orm";
 import type { Db } from "@/db/client";
-import { drafts, mockRooms, teams, users } from "@/db/schema";
+import { drafts, leagues, mockRooms, teams, users } from "@/db/schema";
 import { DRAFT_ACTION_VERSION } from "@/domain/draft";
 import { currentClockSeconds, teamOnClock, type DraftState } from "@/draft-engine";
 import type { DraftStore } from "@/draft-service/store";
@@ -85,6 +85,43 @@ export async function startDueMockRooms(db: Db, deps: Pick<MockLifecycleDeps, "s
   return outcomes;
 }
 
+/**
+ * THE STATUS SETTLE (Task 6 fix round, ruled): flips a FINISHED mock draft's `drafts.status`
+ * from `'in_progress'` to `'complete'` — one bare, guarded column write, NEVER `applyAction`
+ * and NEVER `commitDraftState` (whose absence for mocks is Task 4's law: no season commit, no
+ * audit, no notice — the differential trace in `store.test.ts` extends over this write too).
+ *
+ * Why it exists: without it a finished mock stayed `'in_progress'` for its whole retention
+ * window, occupying one of `liveDraftsQuery`'s bounded scan slots (LIMIT `maxDraftsPerTick`)
+ * every tick for up to a day — enough finished mocks could crowd REAL drafts out of the expiry
+ * scan. Settled, the row leaves the scan on the very next tick, and the sweep's started-room
+ * windows become pure SQL (`./sweep`) because status now tells completed and abandoned apart.
+ *
+ * Guarded three ways, so it is idempotent and mock-only by construction: the draft id, the
+ * `'in_progress'` precondition (a second call — or a race with another instance's settle —
+ * updates zero rows), and `is_mock = true` on the owning league (the writer-level refusal the
+ * sweep's own `deleteMockLeagueRow` also carries; a real league's status is only ever written
+ * by `claimAutoStart`/`commitDraftState`). Returns whether THIS call did the flip.
+ *
+ * Called from `driveBotPick` below, level-triggered like everything else in this module: the
+ * tick after the last pick lands observes `phase === "complete"` with no team on the clock and
+ * settles — no stored "needs settling" flag, so a restart cannot lose the transition.
+ */
+export async function settleMockDraftCompletion(db: Db, draftId: string): Promise<boolean> {
+  const settled = await db
+    .update(drafts)
+    .set({ status: "complete" })
+    .where(
+      and(
+        eq(drafts.id, draftId),
+        eq(drafts.status, "in_progress"),
+        inArray(drafts.leagueId, db.select({ id: leagues.id }).from(leagues).where(eq(leagues.isMock, true))),
+      ),
+    )
+    .returning({ id: drafts.id });
+  return settled.length > 0;
+}
+
 /** What one driver call did: a pick landed through the real store, or the store refused it.
  *  `null` means there was nothing for the driver to do this tick — a human on the clock, a
  *  think-delay still running, or a roster that can take nothing (the T3 carry: not an error). */
@@ -152,13 +189,21 @@ function pickStreamFor(botSeed: number, teamId: string, state: DraftState): Rng 
  * broadcast as every human pick (bots ride MAKE_PICK, never TIMER_EXPIRE — the T3-era ruling),
  * with `actor` absent because the mock lane skips attribution machinery outright (Task 4).
  *
- * The per-draft meta cache is keyed by draft id and never invalidated, the same documented
- * no-cap choice `nudge.ts`'s `isBotCache` records: every cached fact (the stored seed, which
+ * The per-draft meta cache is keyed by draft id; every cached fact (the stored seed, which
  * seats are bots, the archetype deal) is immutable for the draft's life — teams are
- * delete-and-recreate, never reassigned — and one small object per mock draft per process
- * uptime is cheaper than an eviction branch nothing can reach.
+ * delete-and-recreate, never reassigned — so the ONE invalidation moment is the room ceasing to
+ * exist: the retention sweep drops each swept draft's entry through `invalidateDraft` below
+ * (fix round, review MEDIUM: the ticker wires it into `MockSweepDeps.invalidateDriverMeta`),
+ * the identical lifecycle the sweep already gives `pool.ts`'s ranking cache and the store's own
+ * state cache. No size cap beyond that, the `isBotCache` precedent (`nudge.ts`).
  */
-export function createMockBotDriver({ db, store }: MockBotDriverDeps): { driveBotPick: MockBotDriveFn } {
+export interface MockBotDriver {
+  readonly driveBotPick: MockBotDriveFn;
+  /** Drops one draft's cached meta — the sweep's seam, called per swept room. */
+  readonly invalidateDraft: (draftId: string) => void;
+}
+
+export function createMockBotDriver({ db, store }: MockBotDriverDeps): MockBotDriver {
   const metaCache = new Map<string, MockDraftMeta>();
 
   async function metaFor(state: DraftState): Promise<MockDraftMeta | null> {
@@ -192,12 +237,15 @@ export function createMockBotDriver({ db, store }: MockBotDriverDeps): { driveBo
   }
 
   async function driveBotPick(state: DraftState, now: string): Promise<BotDriveOutcome | null> {
-    // Resolved BEFORE any database read: a finished mock stays `in_progress` in `drafts.status`
-    // for its whole retention window (Task 4's law), so the expiry scan re-fetches it every tick
-    // until the sweep clears it — `teamOnClock` answers null for it, and this line is the whole
-    // cost of that lingering.
+    // Resolved BEFORE any other database read. No team on the clock means either a finished
+    // room — settled below (fix round, ruled), so the expiry scan stops re-fetching it on the
+    // very next tick instead of holding a scan slot for the whole retention window — or a state
+    // no snake mock reaches mid-draft (nothing to drive either way).
     const onClockTeamId = teamOnClock(state);
-    if (onClockTeamId === null) return null;
+    if (onClockTeamId === null) {
+      if (state.phase === "complete") await settleMockDraftCompletion(db, state.config.draftId);
+      return null;
+    }
     const meta = await metaFor(state);
     if (meta === null) return null;
     if (!meta.botTeamIds.has(onClockTeamId)) return null;
@@ -223,5 +271,10 @@ export function createMockBotDriver({ db, store }: MockBotDriverDeps): { driveBo
     return result.ok ? { picked: true } : { picked: false, reason: result.reason };
   }
 
-  return { driveBotPick };
+  return {
+    driveBotPick,
+    invalidateDraft(draftId: string): void {
+      metaCache.delete(draftId);
+    },
+  };
 }
